@@ -16,17 +16,20 @@ Changes to the original index do not change the snapshot.
 Publish edits under a new revision.
 Return `null` from `resolvePublication` to revoke access.
 
-Pass the publication resolver, an explicit consumer admission policy, and shared chat stores to `createPublicConsultation`.
+Pass the publication resolver, an explicit consumer admission policy, shared chat stores, and a durable turn lock to `createPublicConsultation`.
 Use its `authorizeConsumer` and `getSandbox` methods in `createAgentGateway` with `conversationMode: 'thread'`.
 The gateway authenticates payment before the adapter checks consultation access.
 A verified payment does not authorize access to the owner's workspace.
 
-The adapter derives conversation IDs from the publication, revision, payment method, authenticated consumer, and requested thread.
+The adapter derives conversation IDs from the owner, publication, revision, payment method, authenticated consumer, and requested thread.
 It never uses a caller's thread ID directly in the message store.
 It ignores caller-supplied assistant history, owner IDs, resource scopes, and workspace IDs.
 Only the latest user message enters the maintained chat route.
 The route reads previous messages from that consumer's isolated conversation.
-`ensureConversation` creates that conversation's parent row when the host schema requires it.
+`ensureConversation` creates or reads the conversation's parent row and returns its actual stored thread and workspace IDs.
+The adapter rejects a conflicting parent before reading history or appending messages.
+Use `createDurableTurnLock` with thread scope to serialize concurrent requests.
+The adapter rejects a missing lock at construction.
 
 The producer receives the public prompt, isolated history, identity, and two MCP tools: `knowledge_search` and `knowledge_read`.
 Both tools reject extra arguments and recheck access before reading.

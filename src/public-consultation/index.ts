@@ -1,5 +1,5 @@
 import { searchKnowledge, type KnowledgeIndex, type KnowledgePage } from '@tangle-network/agent-knowledge'
-import { createChatTurnRoutes, type ChatTurnMessageStore, type ChatTurnRouteProducer } from '../chat-routes/turn-routes'
+import { createChatTurnRoutes, type ChatTurnLock, type ChatTurnMessageStore, type ChatTurnRouteProducer } from '../chat-routes/turn-routes'
 import { streamChatRouteAsSandboxEvents } from '../chat-routes/gateway-adapter'
 import type { TurnEventStore } from '../stream/turn-buffer'
 import type { McpToolDefinition } from '../tools/mcp-rpc'
@@ -91,8 +91,10 @@ export interface PublicConsultationOptions {
   allowConsumer(publication: KnowledgePublication, consumer: ConsultationConsumer): Promise<boolean>
   store: ChatTurnMessageStore
   turnStore: TurnEventStore
-  /** Create the isolated conversation if the message schema requires a parent row. */
-  ensureConversation(identity: ConsultationIdentity): Promise<void>
+  /** Shared durable single-flight lock. Use createDurableTurnLock with thread scope. */
+  turnLock: ChatTurnLock<void>
+  /** Create or read the stored parent row. Return its actual persisted ownership. */
+  ensureConversation(identity: ConsultationIdentity): Promise<{ workspaceId: string; threadId: string }>
   /** Run in an isolated executor with only these capabilities; do not reuse an owner's sandbox. */
   produce(input: ConsultationExecution): ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
 }
@@ -108,6 +110,13 @@ interface GatewayConsultationContext {
 
 /** Compose gateway admission, scoped knowledge and the maintained persisted chat route. */
 export function createPublicConsultation(options: PublicConsultationOptions) {
+  if (typeof options.turnLock?.acquire !== 'function' || typeof options.turnLock.release !== 'function') {
+    throw new Error('Public consultation requires a shared turn lock')
+  }
+  async function ownsConversation(identity: ConsultationIdentity) {
+    const conversation = await options.ensureConversation(identity)
+    return conversation?.workspaceId === identity.workspaceId && conversation.threadId === identity.threadId
+  }
   async function resolve(agent: ConsultationAgent, consumer: ConsultationConsumer) {
     requireIdentity(consumer.consumerId)
     requireIdentity(consumer.method)
@@ -115,7 +124,7 @@ export function createPublicConsultation(options: PublicConsultationOptions) {
     const publication = await options.resolvePublication(agent.id)
     if (!publication || publication.id !== agent.id || publication.ownerId !== agent.ownerId
       || await options.allowConsumer(publication, consumer) !== true) return null
-    const workspaceId = await scopedId([publication.id, publication.revision, consumer.method, consumer.consumerId])
+    const workspaceId = await scopedId([publication.ownerId, publication.id, publication.revision, consumer.method, consumer.consumerId])
     const threadId = await scopedId([workspaceId, consumer.threadId!])
     const identity: ConsultationIdentity = Object.freeze({
       publicationId: publication.id, publicationRevision: publication.revision,
@@ -139,6 +148,7 @@ export function createPublicConsultation(options: PublicConsultationOptions) {
     async readHistory(agent: ConsultationAgent, consumer: ConsultationConsumer) {
       const scope = await resolve(agent, consumer)
       if (!scope) throw new Error('Consultation access denied')
+      if (!await ownsConversation(scope.identity)) throw new Error('Consultation conversation conflict')
       return (await options.store.listMessages(scope.identity.threadId))
         .map(({ role, content }) => ({ role, content }))
     },
@@ -157,7 +167,7 @@ export function createPublicConsultation(options: PublicConsultationOptions) {
       return {
         streamPrompt: (_message: string, streamOptions?: { signal?: AbortSignal }) => {
           const routes = createChatTurnRoutes({
-            projectId: 'public-consultation', store: options.store, turnStore: options.turnStore,
+            projectId: 'public-consultation', store: options.store, turnStore: options.turnStore, turnLock: options.turnLock,
             authorize: async ({ intent, body }) => {
               const current = await resolve(agent, consumer)
               if (intent !== 'turn' || !current
@@ -165,7 +175,9 @@ export function createPublicConsultation(options: PublicConsultationOptions) {
                 || body?.workspaceId !== scope.identity.workspaceId || body.threadId !== scope.identity.threadId) {
                 return { ok: false, response: Response.json({ error: 'Consultation access denied' }, { status: 403 }) }
               }
-              await options.ensureConversation(scope.identity)
+              if (!await ownsConversation(scope.identity)) {
+                return { ok: false, response: Response.json({ error: 'Consultation conversation conflict' }, { status: 403 }) }
+              }
               return { ok: true, tenantId: scope.identity.workspaceId,
                 userId: scope.identity.consumerId, context: undefined }
             },

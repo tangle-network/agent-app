@@ -4,6 +4,7 @@ import { searchKnowledge, type KnowledgeIndex, type KnowledgePage } from '@tangl
 import { createKnowledgePublication, createPublicConsultation, type ConsultationConsumer, type ConsultationExecution } from '../src/public-consultation/index'
 import { createMcpToolHandler } from '../src/tools/mcp-rpc'
 import { createMemoryTurnEventStore } from '../src/stream/index'
+import { createDurableTurnLock, createMemoryTurnStreamHarness } from '../src/turn-stream/index'
 import type { ChatTurnMessageStore } from '../src/chat-routes/turn-routes'
 
 const PRIVATE = 'SYNTHETIC_PRIVATE_CLIENT_SETTLEMENT_9182'
@@ -17,7 +18,7 @@ const agent = { id: 'legal-consultation', ownerId: 'legal-owner', slug: 'legal',
   pricePerTokenUsd: 0, platformFeePercent: 0, sandboxEndpoint: null, remoteSandboxId: null,
   remoteBearerToken: OWNER_KEY, systemPrompt: `Private owner instructions ${PRIVATE}` }
 
-function fixture() {
+function fixture(beforeProduce?: () => Promise<void>, conflictingParent = false) {
   const index: KnowledgeIndex = { root: '/owner/private', generatedAt: '', sources: [],
     pages: [page('public', PUBLIC), page('private', `Delaware contract ${PRIVATE}`)], graph: { nodes: [], edges: [] } }
   const publication = createKnowledgePublication({ id: agent.id, ownerId: agent.ownerId,
@@ -39,9 +40,13 @@ function fixture() {
   const adapter = createPublicConsultation({
     resolvePublication: async () => published ? publication : null,
     allowConsumer: async (_publication, consumer) => !denied.has(consumer.consumerId),
-    store, turnStore: createMemoryTurnEventStore(), ensureConversation: async () => {},
+    store, turnStore: createMemoryTurnEventStore(), ensureConversation: async identity => ({
+      workspaceId: conflictingParent ? 'owner-workspace' : identity.workspaceId, threadId: identity.threadId,
+    }),
+    turnLock: createDurableTurnLock({ namespace: createMemoryTurnStreamHarness().namespace, scopeOf: () => 'thread' }),
     produce: async input => {
       executions.push(input)
+      await beforeProduce?.()
       const command = JSON.parse(input.prompt) as { action: string; value?: string }
       let result: unknown
       if (command.action === 'history') result = input.priorMessages
@@ -189,5 +194,48 @@ describe('synthetic Legal consultation through gateway and persisted chat', () =
     expect(f.executions[1]!.identity.consumerId).toBe('apikey:bob')
     expect(f.executions[1]!.priorMessages).toEqual([])
     expect(f.executions[1]!.identity.workspaceId).not.toBe(aliceScope.workspaceId)
+  })
+
+  it('uses the shared durable lock to reject concurrent turns before history or message writes', async () => {
+    let started!: () => void
+    let release!: () => void
+    let admittedSecond!: () => void
+    let entryCount = 0
+    const ready = new Promise<void>(resolve => { started = resolve })
+    const blocked = new Promise<void>(resolve => { release = resolve })
+    const doubleExecution = new Promise<'executed'>(resolve => { admittedSecond = () => resolve('executed') })
+    const f = fixture(async () => {
+      if (++entryCount === 1) started()
+      else admittedSecond()
+      await blocked
+    })
+    const first = f.request('read', 'public')
+    await ready
+    const secondRequest = f.request('read', 'private')
+    try {
+      const second = await Promise.race([secondRequest, doubleExecution])
+      expect(second).not.toBe('executed')
+      if (second !== 'executed') expect(second.status).toBeGreaterThanOrEqual(400)
+      expect(f.executions).toHaveLength(1)
+      expect(f.rows.filter(row => row.role === 'user')).toHaveLength(1)
+    } finally {
+      release()
+      expect((await first).status).toBe(200)
+      await secondRequest
+    }
+    expect((await f.request('read', 'public')).status).toBe(200)
+    expect(f.executions).toHaveLength(2)
+  })
+
+  it('rejects a conflicting stored conversation before history and execution', async () => {
+    const f = fixture(undefined, true)
+    expect((await f.request('history')).status).toBeGreaterThanOrEqual(400)
+    expect(f.executions).toEqual([])
+    expect(f.rows).toHaveLength(1)
+    await expect(f.adapter.readHistory(agent, f.consumer())).rejects.toThrow('conversation conflict')
+  })
+
+  it('requires an explicit shared lock even for JavaScript callers', () => {
+    expect(() => Reflect.apply(createPublicConsultation, undefined, [{}])).toThrow('shared turn lock')
   })
 })
