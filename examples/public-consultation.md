@@ -31,7 +31,7 @@ The adapter rejects a conflicting parent before reading history or appending mes
 Use `createDurableTurnLock` with thread scope to serialize concurrent requests.
 The adapter rejects a missing lock at construction.
 
-The producer receives the public prompt, isolated history, identity, and two MCP tools: `knowledge_search` and `knowledge_read`.
+The prepared producer receives the public prompt, isolated history, identity, limits, cancellation signal, and two MCP tools: `knowledge_search` and `knowledge_read`.
 Both tools reject extra arguments and recheck access before reading.
 They cannot write knowledge, access owner files, invoke integrations, or retrieve owner session history.
 Use the maintained MCP dispatcher to expose these definitions.
@@ -47,8 +47,19 @@ Their consumer argument must come from authenticated server context.
 Never pass request JSON or model arguments as that identity.
 They do not provide payment authentication or settlement.
 
-The adapter does not implement `prepareBudgetedPrompt`.
-Gateway keys with finite spending caps therefore retain the shared fail-closed behavior until the execution backend enforces those limits.
+Supply `prepareExecution` to prepare an isolated executor without starting model or tool work.
+Return `unsupported` when it cannot enforce every supplied limit across retries, reasoning, tool calls, and child calls.
+Return `prepared` with a producer only when it can enforce those limits and stop inference on the supplied `AbortSignal`.
+The adapter freezes a copy of execution limits and passes the same signal to preparation, production, and tool authorization.
+Preparation must not use a successful status as a substitute for actual provider enforcement.
+The producer must check the complete prompt and persisted history against input limits before inference.
+Forward provider usage and terminal errors through the maintained chat producer stream.
+Configure the gateway's input bound to cover the executor's enforced complete-input maximum.
+
+Both `prepareBudgetedPrompt` and ordinary `streamPrompt` use this preparation contract.
+Unsupported preparation fails before conversation creation or model execution.
+The gateway can supply execution limits even for keys without a finite spending cap.
+A successful synthetic producer test does not establish real provider budget enforcement.
 
 ## Reference proof
 

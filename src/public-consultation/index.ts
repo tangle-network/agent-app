@@ -1,5 +1,5 @@
 import { searchKnowledge, type KnowledgeIndex, type KnowledgePage } from '@tangle-network/agent-knowledge'
-import { createChatTurnRoutes, type ChatTurnLock, type ChatTurnMessageStore, type ChatTurnRouteProducer } from '../chat-routes/turn-routes'
+import { createChatTurnRoutes, type ChatTurnExecutionLimits, type ChatTurnLock, type ChatTurnMessageStore, type ChatTurnRouteProducer } from '../chat-routes/turn-routes'
 import { streamChatRouteAsSandboxEvents } from '../chat-routes/gateway-adapter'
 import type { TurnEventStore } from '../stream/turn-buffer'
 import type { McpToolDefinition } from '../tools/mcp-rpc'
@@ -76,7 +76,17 @@ export interface ConsultationIdentity {
   readonly threadId: string
 }
 
-export interface ConsultationExecution {
+export interface ConsultationExecutionControl {
+  readonly identity: ConsultationIdentity
+  readonly signal: AbortSignal
+  readonly executionLimits?: Readonly<ChatTurnExecutionLimits>
+}
+
+export type PreparedConsultationExecution =
+  | { status: 'unsupported'; reason: string }
+  | { status: 'prepared'; produce(input: ConsultationExecution): ChatTurnRouteProducer | Promise<ChatTurnRouteProducer> }
+
+export interface ConsultationExecution extends ConsultationExecutionControl {
   readonly identity: ConsultationIdentity
   readonly systemPrompt: string
   readonly prompt: string
@@ -95,8 +105,8 @@ export interface PublicConsultationOptions {
   turnLock: ChatTurnLock<void>
   /** Create or read the stored parent row. Return its actual persisted ownership. */
   ensureConversation(identity: ConsultationIdentity): Promise<{ workspaceId: string; threadId: string }>
-  /** Run in an isolated executor with only these capabilities; do not reuse an owner's sandbox. */
-  produce(input: ConsultationExecution): ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
+  /** Prepare without compute. Refuse limits the isolated executor cannot enforce across all model and tool calls. */
+  prepareExecution(input: ConsultationExecutionControl): Promise<PreparedConsultationExecution>
 }
 
 interface GatewayConsultationContext {
@@ -164,8 +174,30 @@ export function createPublicConsultation(options: PublicConsultationOptions) {
       // Client-supplied history and owner system prompts never enter this producer.
       const prompt = context.messages.filter(message => message.role === 'user').at(-1)?.content
       if (!prompt) throw new Error('Consultation requires a user message')
-      return {
-        streamPrompt: (_message: string, streamOptions?: { signal?: AbortSignal }) => {
+      type PromptOptions = { signal?: AbortSignal; executionBudget?: ChatTurnExecutionLimits; maxOutputTokens?: number }
+      const prepare = async (streamOptions?: PromptOptions) => {
+        const signal = streamOptions?.signal ?? new AbortController().signal
+        signal.throwIfAborted()
+        const supplied = streamOptions?.executionBudget
+        const executionLimits = supplied || streamOptions?.maxOutputTokens !== undefined
+          ? Object.freeze({ ...supplied, ...(streamOptions?.maxOutputTokens !== undefined
+            ? { maxOutputTokens: Math.min(streamOptions.maxOutputTokens, supplied?.maxOutputTokens ?? Infinity) } : {}) })
+          : undefined
+        if (executionLimits && Object.values(executionLimits).some(value => typeof value !== 'number' || !Number.isFinite(value) || value < 0)) {
+          return { status: 'unsupported' as const, reason: 'Invalid consultation execution limits' }
+        }
+        const control = Object.freeze({ identity: scope.identity, signal, executionLimits })
+        const prepared = await options.prepareExecution(control)
+        signal.throwIfAborted()
+        if (prepared?.status !== 'prepared' || typeof prepared.produce !== 'function') {
+          return { status: 'unsupported' as const, reason: prepared?.status === 'unsupported'
+            ? prepared.reason : 'Invalid consultation execution preparation' }
+        }
+        let started = false
+        const start = () => {
+          signal.throwIfAborted()
+          if (started) throw new Error('Consultation execution already started')
+          started = true
           const routes = createChatTurnRoutes({
             projectId: 'public-consultation', store: options.store, turnStore: options.turnStore, turnLock: options.turnLock,
             authorize: async ({ intent, body }) => {
@@ -181,22 +213,37 @@ export function createPublicConsultation(options: PublicConsultationOptions) {
               return { ok: true, tenantId: scope.identity.workspaceId,
                 userId: scope.identity.consumerId, context: undefined }
             },
-            produce: args => options.produce({
-              identity: scope.identity, systemPrompt: scope.publication.systemPrompt, prompt,
-              priorMessages: args.priorMessages.map(({ role, content }) => ({ role, content })),
-              tools: publicationTools(scope.publication, async () => {
-                const current = await resolve(agent, consumer)
-                if (!current || current.identity.workspaceId !== scope.identity.workspaceId) {
-                  throw new Error('Consultation access denied')
-                }
-              }),
-            }),
+            produce: args => {
+              signal.throwIfAborted()
+              return prepared.produce({
+                ...control,
+                identity: scope.identity, systemPrompt: scope.publication.systemPrompt, prompt,
+                priorMessages: args.priorMessages.map(({ role, content }) => ({ role, content })),
+                tools: publicationTools(scope.publication, async () => {
+                  signal.throwIfAborted()
+                  const current = await resolve(agent, consumer)
+                  signal.throwIfAborted()
+                  if (!current || current.identity.workspaceId !== scope.identity.workspaceId) {
+                    throw new Error('Consultation access denied')
+                  }
+                }),
+              })
+            },
           })
           return streamChatRouteAsSandboxEvents({
             routes, request: new Request('https://consultation.invalid/internal'),
             payload: { workspaceId: scope.identity.workspaceId, threadId: scope.identity.threadId,
-              content: prompt, turnId: consumer.requestId }, signal: streamOptions?.signal,
+              content: prompt, turnId: consumer.requestId }, signal, executionLimits,
           })
+        }
+        return { status: 'prepared' as const, start }
+      }
+      return {
+        prepareBudgetedPrompt: (_message: string, streamOptions: PromptOptions) => prepare(streamOptions),
+        streamPrompt: async function* (_message: string, streamOptions?: PromptOptions) {
+          const prepared = await prepare(streamOptions)
+          if (prepared.status !== 'prepared') throw new Error(prepared.reason)
+          yield* prepared.start()
         },
       }
     },

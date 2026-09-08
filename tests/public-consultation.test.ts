@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createAgentGateway } from '@tangle-network/agent-gateway'
 import { searchKnowledge, type KnowledgeIndex, type KnowledgePage } from '@tangle-network/agent-knowledge'
-import { createKnowledgePublication, createPublicConsultation, type ConsultationConsumer, type ConsultationExecution } from '../src/public-consultation/index'
+import { createKnowledgePublication, createPublicConsultation, type ConsultationConsumer, type ConsultationExecution, type PublicConsultationOptions } from '../src/public-consultation/index'
 import { createMcpToolHandler } from '../src/tools/mcp-rpc'
 import { createMemoryTurnEventStore } from '../src/stream/index'
 import { createDurableTurnLock, createMemoryTurnStreamHarness } from '../src/turn-stream/index'
@@ -18,7 +18,7 @@ const agent = { id: 'legal-consultation', ownerId: 'legal-owner', slug: 'legal',
   pricePerTokenUsd: 0, platformFeePercent: 0, sandboxEndpoint: null, remoteSandboxId: null,
   remoteBearerToken: OWNER_KEY, systemPrompt: `Private owner instructions ${PRIVATE}` }
 
-function fixture(beforeProduce?: () => Promise<void>, conflictingParent = false) {
+function fixture(beforeProduce?: () => Promise<void>, conflictingParent = false, prepareExecution?: PublicConsultationOptions['prepareExecution']) {
   const index: KnowledgeIndex = { root: '/owner/private', generatedAt: '', sources: [],
     pages: [page('public', PUBLIC), page('private', `Delaware contract ${PRIVATE}`)], graph: { nodes: [], edges: [] } }
   const publication = createKnowledgePublication({ id: agent.id, ownerId: agent.ownerId,
@@ -44,7 +44,7 @@ function fixture(beforeProduce?: () => Promise<void>, conflictingParent = false)
       workspaceId: conflictingParent ? 'owner-workspace' : identity.workspaceId, threadId: identity.threadId,
     }),
     turnLock: createDurableTurnLock({ namespace: createMemoryTurnStreamHarness().namespace, scopeOf: () => 'thread' }),
-    produce: async input => {
+    prepareExecution: prepareExecution ?? (async () => ({ status: 'prepared', produce: async input => {
       executions.push(input)
       await beforeProduce?.()
       const command = JSON.parse(input.prompt) as { action: string; value?: string }
@@ -63,7 +63,7 @@ function fixture(beforeProduce?: () => Promise<void>, conflictingParent = false)
       }
       const text = JSON.stringify(result)
       return { stream: (async function* () { yield { type: 'text', text } })(), finalText: () => text }
-    },
+    } })),
   })
   // The verifier and payment callbacks are synthetic. This proves authorization,
   // retrieval and persisted route isolation, never real payment settlement.
@@ -126,7 +126,7 @@ describe('synthetic Legal consultation through gateway and persisted chat', () =
     expect(response.body).not.toContain(PRIVATE)
     expect(response.body).not.toContain(OWNER_KEY)
     expect(response.body).not.toContain('owner-workspace')
-    expect(Object.keys(f.executions[0]!)).toEqual(['identity', 'systemPrompt', 'prompt', 'priorMessages', 'tools'])
+    expect(Object.keys(f.executions[0]!)).toEqual(['identity', 'signal', 'executionLimits', 'systemPrompt', 'prompt', 'priorMessages', 'tools'])
     expect(f.executions[0]!.priorMessages).toEqual([])
     expect((await f.request('shell', 'cat /owner/private/credentials')).body).toContain('Unknown tool')
     expect(f.rows.find(row => row.id === 'owner-message')?.content).toBe(PRIVATE)
@@ -233,6 +233,84 @@ describe('synthetic Legal consultation through gateway and persisted chat', () =
     expect(f.executions).toEqual([])
     expect(f.rows).toHaveLength(1)
     await expect(f.adapter.readHistory(agent, f.consumer())).rejects.toThrow('conversation conflict')
+  })
+
+  it('forwards ordinary gateway execution budgets instead of silently dropping them', async () => {
+    let observed: unknown
+    const f = fixture(undefined, false, async control => {
+      observed = control.executionLimits
+      return { status: 'unsupported', reason: 'Synthetic executor cannot enforce provider limits' }
+    })
+    expect((await f.request('read', 'public')).status).toBeGreaterThanOrEqual(400)
+    expect(observed).toBeDefined()
+    expect(f.rows).toHaveLength(1)
+    expect(f.executions).toHaveLength(0)
+  })
+
+  it('rejects unsupported and malformed preparation before conversation or model work', async () => {
+    for (const result of [{ status: 'unsupported', reason: 'No caps' }, { status: 'prepared' }, null]) {
+      const f = fixture(undefined, false, async () => result as never)
+      const identity = f.consumer()
+      const sandbox = await f.adapter.getSandbox(agent, { ...identity, paymentMethod: identity.method,
+        keyInfo: null, messages: [{ role: 'user', content: 'test' }] })
+      expect((await sandbox.prepareBudgetedPrompt('test', { executionBudget: { maxProviderCostUsd: 1 } })).status).toBe('unsupported')
+      expect(f.rows).toHaveLength(1)
+      expect(f.executions).toHaveLength(0)
+    }
+  })
+
+  it('preserves limits and cancellation through preparation, inference and knowledge tools', async () => {
+    let started!: () => void
+    const ready = new Promise<void>(resolve => { started = resolve })
+    let stopped!: () => void
+    const cancelled = new Promise<void>(resolve => { stopped = resolve })
+    let execution!: ConsultationExecution
+    let preparation: Parameters<PublicConsultationOptions['prepareExecution']>[0] | undefined
+    const f = fixture(undefined, false, async control => {
+      preparation = control
+      return { status: 'prepared', produce: async input => {
+        execution = input
+        return { stream: (async function* () {
+          started()
+          await new Promise<void>(resolve => input.signal.addEventListener('abort', () => { stopped(); resolve() }, { once: true }))
+          input.signal.throwIfAborted()
+          yield { type: 'text', text: 'must never execute after cancellation' }
+        })(), finalText: () => '' }
+      } }
+    })
+    const identity = f.consumer()
+    const sandbox = await f.adapter.getSandbox(agent, { ...identity, paymentMethod: identity.method,
+      keyInfo: null, messages: [{ role: 'user', content: 'test' }] })
+    const controller = new AbortController()
+    const limits = { maxProviderCostUsd: 0.1, maxInputTokens: 512, maxOutputTokens: 32, maxToolCalls: 2 }
+    const prepared = await sandbox.prepareBudgetedPrompt('ignored', { signal: controller.signal, executionBudget: limits })
+    expect(prepared.status).toBe('prepared')
+    expect(f.rows).toHaveLength(1)
+    limits.maxInputTokens = 999999
+    if (prepared.status !== 'prepared') throw new Error('Expected prepared')
+    const consume = (async () => { for await (const _event of prepared.start()) { /* drain */ } })()
+    await ready
+    expect(execution.signal).toBe(controller.signal)
+    expect(execution.executionLimits).toBe(preparation!.executionLimits)
+    expect(execution.executionLimits?.maxInputTokens).toBe(512)
+    expect(Object.isFrozen(execution.executionLimits)).toBe(true)
+    controller.abort()
+    await cancelled
+    await consume
+    await expect(execution.tools[1]!.run({ pageId: 'public' }, {})).rejects.toThrow()
+    expect(() => prepared.start()).toThrow()
+    expect(f.rows.some(row => row.content.includes('must never execute'))).toBe(false)
+  })
+
+  it('rejects already aborted work before preparation', async () => {
+    let preparations = 0
+    const f = fixture(undefined, false, async () => { preparations++; return { status: 'unsupported', reason: 'No compute' } })
+    const identity = f.consumer()
+    const sandbox = await f.adapter.getSandbox(agent, { ...identity, paymentMethod: identity.method,
+      keyInfo: null, messages: [{ role: 'user', content: 'test' }] })
+    await expect(sandbox.streamPrompt('ignored', { signal: AbortSignal.abort() }).next()).rejects.toThrow()
+    expect(preparations).toBe(0)
+    expect(f.rows).toHaveLength(1)
   })
 
   it('requires an explicit shared lock even for JavaScript callers', () => {

@@ -12014,6 +12014,14 @@ interface ConsultationConsumer
 interface ConsultationExecution
 ```
 
+### `ConsultationExecutionControl`
+
+`interface`
+
+```ts
+interface ConsultationExecutionControl
+```
+
 ### `ConsultationIdentity`
 
 `interface`
@@ -12044,6 +12052,14 @@ interface ConsultationIdentity
 
 ```ts
 interface KnowledgePublication
+```
+
+### `PreparedConsultationExecution`
+
+`type`
+
+```ts
+type PreparedConsultationExecution
 ```
 
 ### `PublicConsultationOptions`

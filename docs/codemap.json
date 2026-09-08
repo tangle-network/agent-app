@@ -9316,6 +9316,12 @@
           "doc": null
         },
         {
+          "name": "ConsultationExecutionControl",
+          "kind": "interface",
+          "signature": "interface ConsultationExecutionControl",
+          "doc": null
+        },
+        {
           "name": "ConsultationIdentity",
           "kind": "interface",
           "signature": "interface ConsultationIdentity",
@@ -9338,6 +9344,12 @@
           "kind": "interface",
           "signature": "interface KnowledgePublication",
           "doc": "A server-created publication."
+        },
+        {
+          "name": "PreparedConsultationExecution",
+          "kind": "type",
+          "signature": "type PreparedConsultationExecution",
+          "doc": null
         },
         {
           "name": "PublicConsultationOptions",

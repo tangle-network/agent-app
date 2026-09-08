@@ -4,7 +4,7 @@
 
 Source: `src/public-consultation/index.ts`
 
-9 exports.
+11 exports.
 
 ### `ConsultationAgent`
 
@@ -28,6 +28,14 @@ interface ConsultationConsumer
 
 ```ts
 interface ConsultationExecution
+```
+
+### `ConsultationExecutionControl`
+
+`interface`
+
+```ts
+interface ConsultationExecutionControl
 ```
 
 ### `ConsultationIdentity`
@@ -60,6 +68,14 @@ interface ConsultationIdentity
 
 ```ts
 interface KnowledgePublication
+```
+
+### `PreparedConsultationExecution`
+
+`type`
+
+```ts
+type PreparedConsultationExecution
 ```
 
 ### `PublicConsultationOptions`
