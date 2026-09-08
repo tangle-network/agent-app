@@ -84,7 +84,6 @@ import {
   PROVISION_PAYLOAD_MAX_BYTES,
   ENV_VALUE_MAX_BYTES,
   ENV_TOTAL_MAX_BYTES,
-  DEFAULT_SIDECAR_PROCESS_PATTERN,
   DEFAULT_SANDBOX_RESOURCES,
   SandboxRuntimeAuthRefreshError,
   SandboxEgressPolicyMismatchError,
@@ -770,9 +769,9 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       name: 'box-w1',
       metadata: { harness: 'opencode' },
       delete: del,
-      exec: vi.fn().mockImplementation(async (cmd: string) => {
+      exec: vi.fn().mockImplementation(async () => {
         if (!restarted) throw new Error('exec timed out')
-        return { stdout: cmd.startsWith('pgrep') ? '123' : 'alive' }
+        return { stdout: 'alive', stderr: '', exitCode: 0 }
       }),
       stop: vi.fn().mockImplementation(async () => {
         restarted = true
@@ -782,7 +781,7 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       status === 'running' ? Promise.resolve([wedged]) : Promise.resolve([]),
     )
     const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
+      livenessProbe: {},
     })
 
     const box = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
@@ -815,7 +814,7 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     )
     const recoverMissingSandbox = vi.fn()
     const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
+      livenessProbe: {},
       recoverMissingSandbox,
     })
 
@@ -835,23 +834,20 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
   })
 
   it.each([
-    ['missing alive marker', async () => ({ stdout: 'unexpected private output', stderr: '', exitCode: 0 }), 'alive check returned no alive marker'],
-    ['missing process', async (command: string) => ({ stdout: command === 'echo alive' ? 'alive' : 'no-sidecar', stderr: '', exitCode: 0 }), 'process check found no sidecar'],
-    ['exec deadline', () => new Promise<never>(() => {}), 'alive check failed'],
-  ])('retains the failed liveness step after recovery: %s', async (scenario, exec, message) => {
+    ['missing alive marker', async () => ({ stdout: 'unexpected private output', stderr: '', exitCode: 0 }), 'alive check did not return a successful alive marker'],
+    ['failed exit', async () => ({ stdout: 'alive', stderr: '', exitCode: 1 }), 'alive check did not return a successful alive marker'],
+    ['misleading marker', async () => ({ stdout: 'not alive', stderr: '', exitCode: 0 }), 'alive check did not return a successful alive marker'],
+  ])('retains the failed liveness step after recovery: %s', async (_scenario, exec, message) => {
     const dead = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, exec: vi.fn(exec) } as Partial<SandboxInstance>)
     listMock.mockImplementation(({ status }: { status: string }) =>
       status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
     )
     const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'sidecar', execTimeoutMs: 1 },
+      livenessProbe: { execTimeoutMs: 100 },
     })
     const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
       .then(() => null, (err: unknown) => err)
     expect(rejection).toMatchObject({ phase: 'probe', cause: { message } })
-    if (scenario === 'exec deadline') {
-      expect(rejection).toMatchObject({ cause: { cause: { message: 'alive check timed out after 1ms' } } })
-    }
     expect(JSON.stringify(serializeSandboxProvisioningError(rejection))).not.toContain('unexpected private output')
     expect(dead.delete).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
@@ -871,7 +867,7 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
     )
     const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
+      livenessProbe: {},
     })
 
     const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
@@ -896,7 +892,7 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       status === 'stopped' ? Promise.resolve([stopped]) : Promise.resolve([]),
     )
     const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
+      livenessProbe: {},
     })
 
     const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
@@ -1992,45 +1988,75 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(createMock).toHaveBeenCalledOnce()
   })
 
-  it('uses the default ERE to match a live harness process when no pattern is supplied (#342)', async () => {
-    const processTable = [
-      '/nix/profile/bin/opencode serve --hostname=127.0.0.1 --port=0',
-      '/usr/local/bin/claude --dangerously-skip-permissions',
-      '/opt/tangle/bin/codex app-server',
-      'node server.js',
-    ]
-    const exec = vi.fn().mockImplementation(async (cmd: string) => {
-      if (cmd === 'echo alive') return { stdout: 'alive', exitCode: 0 }
-      const match = cmd.match(/^pgrep -f '([^']+)' \|\| echo no-sidecar$/)
-      expect(match).not.toBeNull()
-      const pattern = match?.[1] ?? ''
-      const matched = processTable.some((line) => new RegExp(pattern).test(line))
-      return { stdout: matched ? '143\n' : 'no-sidecar\n', exitCode: 0 }
-    })
+  it.each([undefined, 100, 600_000])('reuses a healthy idle runtime without requiring a CLI process (%s)', async (execTimeoutMs) => {
+    const exec = vi.fn(async (command: string) => ({
+      stdout: command === 'echo alive' ? 'alive\n' : 'no-sidecar\n',
+      stderr: '', exitCode: 0,
+    }))
     const running = fakeBox({ name: 'box-w1', exec })
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      status === 'running' ? Promise.resolve([running]) : Promise.resolve([]),
-    )
-
+    listMock.mockResolvedValue([running])
     const box = await ensureWorkspaceSandbox(
-      shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: {} }),
+      shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: { execTimeoutMs } }),
       { workspaceId: 'w1', harness: 'opencode' },
     )
-
-    expect(DEFAULT_SIDECAR_PROCESS_PATTERN).toBe('opencode|claude|codex')
-    expect(exec).toHaveBeenCalledWith(
-      `pgrep -f '${DEFAULT_SIDECAR_PROCESS_PATTERN}' || echo no-sidecar`,
-    )
     expect(box).toBe(running)
+    expect(exec).toHaveBeenCalledExactlyOnceWith('echo alive', { timeoutMs: execTimeoutMs ?? 5000 })
     expect(running.stop).not.toHaveBeenCalled()
     expect(running.resume).not.toHaveBeenCalled()
+  })
+
+  it.each([NaN, Infinity, -1, 0, 99, 100.5, 600_001])('rejects invalid probe timeout %s before lifecycle mutation', async (execTimeoutMs) => {
+    const running = fakeBox({ name: 'box-w1', exec: vi.fn(), stop: vi.fn() })
+    listMock.mockResolvedValue([running])
+    await expect(ensureWorkspaceSandbox(
+      shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: { execTimeoutMs } }),
+      { workspaceId: 'w1', harness: 'opencode', forceNew: true },
+    )).rejects.toThrow('livenessProbe.execTimeoutMs must be an integer between 100 and 600000')
+    expect(listMock).not.toHaveBeenCalled()
+    expect(running.exec).not.toHaveBeenCalled()
+    expect(running.stop).not.toHaveBeenCalled()
+    expect(running.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('waits for SDK exec settlement before restarting after a command timeout', async () => {
+    vi.useFakeTimers()
+    try {
+      let execSettled = false
+      const sdkTimeout = new Error('runtime process timed out')
+      const exec = vi.fn()
+        .mockImplementationOnce(() => new Promise((_, reject) => setTimeout(() => {
+          execSettled = true
+          reject(sdkTimeout)
+        }, 5_200)))
+        .mockResolvedValue({ stdout: 'alive\n', stderr: '', exitCode: 0 })
+      const running = fakeBox({ name: 'box-w1', exec, stop: vi.fn(async () => {
+        expect(execSettled).toBe(true)
+      }) })
+      listMock.mockResolvedValue([running])
+      const provisioning = ensureWorkspaceSandbox(
+        shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: { execTimeoutMs: 5000 } }),
+        { workspaceId: 'w1', harness: 'opencode' },
+      ).then((box) => ({ box }), (error: unknown) => ({ error }))
+      await vi.advanceTimersByTimeAsync(5_001)
+      expect(exec).toHaveBeenCalledExactlyOnceWith('echo alive', { timeoutMs: 5000 })
+      expect(running.stop).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(200)
+      await expect(provisioning).resolves.toEqual({ box: running })
+      expect(running.stop).toHaveBeenCalledOnce()
+      expect(running.resume).toHaveBeenCalledOnce()
+      expect(running.delete).not.toHaveBeenCalled()
+      expect(createMock).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('reuses a recent liveness verification and probes again after the default TTL', async () => {
     vi.useFakeTimers({ now: 10_000 })
     try {
-      const exec = vi.fn().mockImplementation(async (command: string) => ({
-        stdout: command.startsWith('pgrep') ? '123\n' : 'alive\n',
+      const exec = vi.fn().mockImplementation(async () => ({
+        stdout: 'alive\n',
         exitCode: 0,
       }))
       const getEgress = vi.fn().mockResolvedValue({
@@ -2054,12 +2080,12 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       await vi.advanceTimersByTimeAsync(4_999)
       await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
 
-      expect(exec).toHaveBeenCalledTimes(2)
+      expect(exec).toHaveBeenCalledTimes(1)
 
       await vi.advanceTimersByTimeAsync(2)
       await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
 
-      expect(exec).toHaveBeenCalledTimes(4)
+      expect(exec).toHaveBeenCalledTimes(2)
       expect(getEgress).toHaveBeenCalledTimes(3)
       expect(bootstrap).toHaveBeenCalledTimes(3)
     } finally {
@@ -2070,10 +2096,10 @@ describe('ensureWorkspaceSandbox — new seams', () => {
   it('lets dispatch fail loud when a cached box dies without deleting the workspace', async () => {
     let alive = true
     const del = vi.fn().mockResolvedValue(undefined)
-    const exec = vi.fn().mockImplementation(async (command: string) => {
+    const exec = vi.fn().mockImplementation(async () => {
       if (!alive) throw new Error('sandbox is gone')
       return {
-        stdout: command.startsWith('pgrep') ? '123\n' : 'alive\n',
+        stdout: 'alive\n',
         exitCode: 0,
       }
     })
@@ -2095,29 +2121,10 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     alive = false
     const cached = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
 
-    expect(exec).toHaveBeenCalledTimes(2)
+    expect(exec).toHaveBeenCalledTimes(1)
     await expect(cached.streamPrompt('hello').next()).rejects.toThrow('dispatch connection refused')
     expect(del).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('rejects a BRE-escaped alternation before probing or restarting the box (#342)', async () => {
-    const running = fakeBox({ name: 'box-w1', exec: vi.fn() })
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      status === 'running' ? Promise.resolve([running]) : Promise.resolve([]),
-    )
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'opencode\\|claude' },
-    })
-
-    await expect(
-      ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' }),
-    ).rejects.toThrow(
-      'Invalid livenessProbe.sidecarProcessPattern: pgrep -f uses extended regular expressions',
-    )
-    expect(running.exec).not.toHaveBeenCalled()
-    expect(running.stop).not.toHaveBeenCalled()
-    expect(running.resume).not.toHaveBeenCalled()
   })
 
   it('liveness probe restarts an unresponsive running box in place — never deletes (#299)', async () => {
@@ -2126,9 +2133,9 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     const dead = fakeBox({
       name: 'box-w1',
       delete: del,
-      exec: vi.fn().mockImplementation(async (cmd: string) =>
+      exec: vi.fn().mockImplementation(async () =>
         restarted
-          ? { stdout: cmd.startsWith('pgrep') ? '123' : 'alive', exitCode: 0 }
+          ? { stdout: 'alive', exitCode: 0 }
           : { stdout: '', exitCode: 1 },
       ),
       stop: vi.fn().mockImplementation(async () => {
@@ -2142,7 +2149,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       livenessProbe: {},
     })
     const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-    expect(dead.exec).toHaveBeenCalledWith('echo alive')
+    expect(dead.exec).toHaveBeenCalledWith('echo alive', { timeoutMs: 5000 })
     expect(dead.stop).toHaveBeenCalledOnce()
     expect(dead.resume).toHaveBeenCalledOnce()
     expect(box).toBe(dead)
@@ -2167,7 +2174,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
           : Promise.resolve([]),
     )
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'opencode' },
+      livenessProbe: {},
       provisionTimeoutMs: 91_234,
     })
     const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
@@ -2263,7 +2270,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
 
     await expect(
       ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-        livenessProbe: { sidecarProcessPattern: () => 'nothing-matches' },
+        livenessProbe: {},
       }), { workspaceId: 'w1', harness: 'opencode' }),
     ).rejects.toMatchObject({ name: 'SandboxRecoveryFailedError' })
 
@@ -2289,7 +2296,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
 
     const box = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
       replaceUnbringableBox: true,
-      livenessProbe: { sidecarProcessPattern: () => 'nothing-matches' },
+      livenessProbe: {},
     }), { workspaceId: 'w1', harness: 'opencode' })
 
     expect(stopped.delete).toHaveBeenCalledOnce()
@@ -2314,7 +2321,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     await expect(
       ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
         replaceUnbringableBox: true,
-        livenessProbe: { sidecarProcessPattern: () => 'nothing-matches' },
+        livenessProbe: {},
       }), { workspaceId: 'w1', harness: 'opencode' }),
     ).rejects.toBe(createFailure)
 

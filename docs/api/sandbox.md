@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-186 exports.
+185 exports.
 
 ### `adaptSandboxStream`
 
@@ -228,14 +228,6 @@ interface D1PrewarmClaimStoreOptions
 
 ```ts
 SandboxResourceConfig
-```
-
-### `DEFAULT_SIDECAR_PROCESS_PATTERN`
-
-`const` — Default ERE passed to `pgrep -f` when a liveness probe does not override the harness-process matcher.
-
-```ts
-"opencode|claude|codex"
 ```
 
 ### `deferredCorpusHash`
@@ -480,7 +472,7 @@ interface InspectablePrewarmClaimStore
 
 ### `LivenessProbeConfig`
 
-`interface` — Define configuration for liveness probes including sidecar process pattern and optional timeouts
+`interface` — Configure runtime exec verification before reusing a sandbox.
 
 ```ts
 interface LivenessProbeConfig
