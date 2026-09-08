@@ -45,11 +45,12 @@ Discovery: **Where does this app live and what may it spend?**
 - [ ] `wrangler d1 create <name>` → paste `database_id` into `wrangler.toml`.
 - [ ] Copy `.dev.vars.example` → `.dev.vars`; fill `BETTER_AUTH_SECRET`,
       `TANGLE_API_KEY`, `SANDBOX_API_KEY`, `SANDBOX_GATEWAY_URL`.
-- [ ] `pnpm db:migrate:local` — applies both migrations (auth, chat, turn
-      buffer, API keys, usage, and request limits).
+- [ ] `pnpm db:migrate:local` — applies migrations for auth, chat, turn
+      buffer, API keys, usage, request limits, and spending reservations.
       The e2e test executes these same files, so they cannot drift from the schema.
 - [ ] Existing generated app: copy and apply `0002_agent_gateway.sql`.
       Never edit its already-applied `0001_init.sql`.
+- [ ] Apply `0003_gateway_reservations.sql` when adopting the gateway reservation lifecycle.
 - [ ] Existing app only: add `sandbox_prewarm_claims` in a new migration.
       Do not edit an applied `0001_init.sql`; Wrangler will not run it again.
 - [ ] R2 stays commented out unless the product stores artifacts.
@@ -64,6 +65,9 @@ Discovery: **Does a real message round-trip through a real box?**
 - [ ] Kill the tab mid-turn, reopen the thread — the persisted row is intact
       (the turn keeps running server-side and buffers for replay).
 - [ ] Create a key through the signed-in `/api/keys` route.
+      Finite-cap keys require backend enforcement of per-turn spending limits.
+      The current remote chat adapter rejects capped execution before compute.
+      Explicitly uncapped keys use the existing chat path.
 - [ ] Call `/v1/agents/<slug>/chat/completions` with that key.
       Open the returned `X-Tangle-Thread-Url` and confirm it shows the same durable conversation.
 
