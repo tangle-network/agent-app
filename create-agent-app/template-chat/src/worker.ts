@@ -11,6 +11,7 @@
  *   POST /api/chat                      run one turn (NDJSON stream)
  *   GET  /api/chat/replay/:turnId       replay a buffered turn (?fromSeq=)
  *   GET  /api/chat/running              live turn ids on a thread (?threadId=)
+ *   GET  /api/files                     owned artifact index (no provisioning)
  *   POST /api/chat/upload               multipart upload → prompt parts
  *   GET  /api/chat/interactions         outstanding agent asks (?threadId=)
  *   POST /api/chat/interactions         answer an ask
@@ -18,6 +19,8 @@
  *   POST /v1/agents/:slug/chat/completions  OpenAI-compatible API
  */
 
+import { createArtifactIndex } from './files'
+import type { peekWorkspaceSandbox } from '@tangle-network/agent-app/sandbox'
 import { config } from '../agent.config'
 import { buildChatApp, type ChatApp } from './chat'
 import type { AppEnv } from './env'
@@ -35,6 +38,8 @@ export interface WorkerAssembly {
   ): ReturnType<typeof buildGatewayApp>
   /** Test override. Production follows agent.config.ts. */
   gatewayEnabled?: boolean
+  /** Test seam; production reads existing sandbox state without provisioning. */
+  peekWorkspace?: typeof peekWorkspaceSandbox
 }
 
 function attachThreadUrl(response: Response, request: Request): Response {
@@ -98,6 +103,10 @@ export function createWorker(assembly: WorkerAssembly = defaultAssembly): Export
           waitUntil: (promise) => ctx.waitUntil(promise),
         })
         return attachThreadUrl(await gateway.fetch(request), request)
+      }
+
+      if (pathname === '/api/files' && method === 'GET') {
+        return createArtifactIndex(env, app, assembly.peekWorkspace)(request)
       }
 
       if (pathname.startsWith('/api/auth/')) return app.auth.auth.handler(request)

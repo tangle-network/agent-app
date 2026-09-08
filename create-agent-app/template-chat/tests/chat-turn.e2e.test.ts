@@ -21,7 +21,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   createSandboxChatProducer,
@@ -46,7 +46,7 @@ import { buildChatApp, type ChatApp } from '../src/chat'
 import type { AppEnv } from '../src/env'
 import { buildGatewayApp } from '../src/gateway'
 import { appSlug } from '../src/sandbox'
-import { createWorker } from '../src/worker'
+import { createWorker, type WorkerAssembly } from '../src/worker'
 
 const BASE = 'http://localhost:8787'
 const MODEL = 'test/model-1'
@@ -126,6 +126,7 @@ interface Harness {
 async function createHarness(
   produce: (args: ChatTurnProduceArgs<void>) => ChatTurnRouteProducer = () =>
     createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MODEL }),
+  peekWorkspace?: WorkerAssembly['peekWorkspace'],
 ): Promise<Harness> {
   const database = openMigratedDb()
   const pending: Promise<unknown>[] = []
@@ -159,6 +160,7 @@ async function createHarness(
   app.routes.turn = (request) =>
     originalTurn(request, { waitUntil: (p) => void pending.push(p) })
   const worker = createWorker({
+    peekWorkspace,
     buildChatApp: () => app,
     buildGatewayApp: (_env, chatApp, options) => {
       gatewayBuildCount += 1
@@ -234,6 +236,41 @@ async function readGatewayText(response: Response): Promise<string> {
 // ── the gate ────────────────────────────────────────────────────────────────
 
 describe('e2e: fake sandbox producer → streamed turn → persisted transcript', () => {
+  it('indexes only owned artifacts through the real authenticated Worker route', async () => {
+    const tree = vi.fn(async () => ({
+      root: '/home/agent/artifacts',
+      files: [
+        { path: '/home/agent/artifacts/report.txt', size: 7 },
+        { path: '/home/agent/artifacts/.env', size: 99 },
+        { path: '/home/agent/private.txt', size: 99 },
+        { path: '../private.txt', size: 99 },
+      ],
+      stats: { truncated: false },
+    }))
+    const peek = vi.fn().mockResolvedValue({ status: 'running', box: { fs: { tree } } })
+    const h = await createHarness(undefined, peek)
+    expect((await h.workerFetch(new Request(`${BASE}/api/files`))).status).toBe(401)
+    expect(peek).not.toHaveBeenCalled()
+    const denied = await h.workerFetch(new Request(`${BASE}/api/files?workspaceId=another-user`, {
+      headers: { cookie: h.cookie },
+    }))
+    expect(denied.status).toBe(404)
+    expect(peek).not.toHaveBeenCalled()
+    const response = await h.workerFetch(new Request(`${BASE}/api/files?root=/home/agent`, {
+      headers: { cookie: h.cookie },
+    }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ status: 'ready', files: [{ path: 'report.txt', name: 'report.txt', size: 7 }] })
+    expect(tree).toHaveBeenCalledWith('/home/agent/artifacts', { maxDepth: 12 })
+    const session = await h.app.auth.getSession(new Request(BASE, { headers: { cookie: h.cookie } }))
+    expect(peek).toHaveBeenCalledWith(expect.anything(), { userId: session!.user.id, workspaceId: session!.user.id })
+    peek.mockResolvedValue({ status: 'absent' })
+    tree.mockClear()
+    const cold = await h.workerFetch(new Request(`${BASE}/api/files`, { headers: { cookie: h.cookie } }))
+    expect(await cold.json()).toEqual({ status: 'warming' })
+    expect(tree).not.toHaveBeenCalled()
+  })
+
   it('normalizes path-backed generic files for the sandbox prompt API', () => {
     expect(
       normalizeChatPromptForSandbox([

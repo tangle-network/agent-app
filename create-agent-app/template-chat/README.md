@@ -51,3 +51,11 @@ Then walk the trail:
 Identity comes from the session, never a request body. Inaccessible threads
 read as 404. No mock agent — missing sandbox credentials fail loud. See
 `AGENTS.md` for the full contract.
+
+## Artifact index
+
+`GET /api/files` lists files under `/home/agent/artifacts` for the signed-in user's workspace.
+Write user-facing outputs there explicitly; other workspace files are not indexed.
+The route returns `ready` with filtered metadata or `warming` when no ready sandbox exists.
+It never provisions or resumes a sandbox, and it does not provide file downloads.
+Hidden files and paths outside the artifact root are excluded.
