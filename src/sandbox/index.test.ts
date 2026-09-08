@@ -795,11 +795,14 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
-  it('surfaces a typed error (no delete) when the box is still dead after recovery', async () => {
+  it.each([
+    [502, 'RUNTIME_PROXY_FAILED', '/v1/sandboxes/test/runtime/process/spawn'],
+    [404, 'NOT_FOUND', '/v1/sandboxes/test'],
+    [404, 'NOT_FOUND', '/v1/sandboxes/test/runtime/process/spawn'],
+  ])('preserves probe recovery and SDK cause without replacement (%s)', async (status, code, endpoint) => {
     const del = vi.fn().mockResolvedValue(undefined)
     const sdkCause = Object.assign(new Error('exec timed out'), {
-      status: 502, code: 'RUNTIME_PROXY_FAILED', origin: 'sandbox-api',
-      endpoint: '/v1/sandboxes/test/runtime/process/spawn',
+      status, code, endpoint, origin: 'sandbox-api',
     })
     const dead = fakeBox({
       name: 'box-w1',
@@ -810,8 +813,10 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     listMock.mockImplementation(({ status }: { status: string }) =>
       status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
     )
+    const recoverMissingSandbox = vi.fn()
     const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
       livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
+      recoverMissingSandbox,
     })
 
     const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
@@ -822,9 +827,9 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       cause: { message: 'alive check failed', cause: { message: 'exec timed out' } },
     })
     expect(serializeSandboxProvisioningError(rejection).causes).toEqual(expect.arrayContaining([
-      expect.objectContaining({ status: 502, code: 'RUNTIME_PROXY_FAILED', origin: 'sandbox-api',
-        endpoint: '/v1/sandboxes/test/runtime/process/spawn' }),
+      expect.objectContaining({ status, code, endpoint, origin: 'sandbox-api' }),
     ]))
+    expect(recoverMissingSandbox).not.toHaveBeenCalled()
     expect(del).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
   })
@@ -847,7 +852,7 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     if (scenario === 'exec deadline') {
       expect(rejection).toMatchObject({ cause: { cause: { message: 'alive check timed out after 1ms' } } })
     }
-    expect(String(rejection)).not.toContain('unexpected private output')
+    expect(JSON.stringify(serializeSandboxProvisioningError(rejection))).not.toContain('unexpected private output')
     expect(dead.delete).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
   })

@@ -2348,6 +2348,10 @@ async function requestMissingSandboxReplacement(
   shell: SandboxRuntimeConfig,
   failure: MissingSandboxFailure,
 ): Promise<StoppedSandboxResumeRecovery> {
+  // Probe causes diagnose failed liveness; they do not authorize replacement.
+  if (failure.error instanceof SandboxRecoveryFailedError && failure.error.phase === 'probe') {
+    throw failure.error
+  }
   const diagnostics = serializeSandboxProvisioningError(failure.error)
   if (!isSandboxApiSandboxMissingFailure(diagnostics)) throw failure.error
   return requestSandboxReplacement(
