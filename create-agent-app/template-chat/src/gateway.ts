@@ -97,6 +97,7 @@ export function buildGatewayApp(
       : null,
     verifyApiKey: verifyKey,
     claimApiKeyRequest: createApiKeyRequestClaim(apiKeys),
+    apiKeyReservationLifecycle: apiKeys.reservations,
     apiKeyPrefix: 'ak_',
     conversationMode: 'thread',
     // A2A task control remains off until the shared gateway owns durable

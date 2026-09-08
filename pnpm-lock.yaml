@@ -41,8 +41,8 @@ importers:
         specifier: 0.173.1
         version: 0.173.1
       '@tangle-network/agent-gateway':
-        specifier: 0.9.0
-        version: 0.9.0
+        specifier: 0.10.0
+        version: 0.10.0
       '@tangle-network/agent-integrations':
         specifier: 0.53.55
         version: 0.53.55(@types/node@24.13.3)
@@ -2209,8 +2209,8 @@ packages:
     engines: {node: '>=20.19.0'}
     hasBin: true
 
-  '@tangle-network/agent-gateway@0.9.0':
-    resolution: {integrity: sha512-ib9hUfQpRcPg2CYLiu87Y3vHYj7i2y/oLUvdfIE4fYqfWHeT5L9VI8/+ewClPiCScDXrZoiGr08G/L6246QgDA==}
+  '@tangle-network/agent-gateway@0.10.0':
+    resolution: {integrity: sha512-hHTpIrSkRsuew3NxiOI6S5uOEKDyW9uXt6CSqqcllmSv6KGq/Y7Sz3QOPSGiWkvrmVNtJknvkl5eZyTyZQ4wvg==}
     engines: {node: '>=22.13.0'}
 
   '@tangle-network/agent-integrations@0.53.55':
@@ -7033,7 +7033,7 @@ snapshots:
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
 
-  '@tangle-network/agent-gateway@0.9.0':
+  '@tangle-network/agent-gateway@0.10.0':
     dependencies:
       hono: 4.13.5
 

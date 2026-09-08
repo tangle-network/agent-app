@@ -61,6 +61,7 @@ const MIGRATIONS = readdirSync(MIGRATIONS_DIR)
   .map((name) => join(MIGRATIONS_DIR, name))
 const BASE_MIGRATION = join(MIGRATIONS_DIR, '0001_init.sql')
 const GATEWAY_MIGRATION = join(MIGRATIONS_DIR, '0002_agent_gateway.sql')
+const RESERVATION_MIGRATION = join(MIGRATIONS_DIR, '0003_gateway_reservations.sql')
 
 /** The real migration, executed against a real SQLite database. Every query
  *  the test makes afterwards runs over THESE tables — schema drift between
@@ -412,7 +413,8 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
   })
 
   it('the migration carries every agent-gateway SQL store statement', () => {
-    const migration = readFileSync(GATEWAY_MIGRATION, 'utf8')
+    const migration = [GATEWAY_MIGRATION, RESERVATION_MIGRATION]
+      .map((path) => readFileSync(path, 'utf8')).join('\n')
     const normalize = (sql: string) => sql.replace(/\s+/g, ' ').replace(/;$/, '').trim()
     const statements = [
       ...sqlApiKeyStoreSchemaStatements(),
@@ -438,6 +440,30 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
       'agent_api_key_usage',
       'agent_gateway_usage',
     ])
+  })
+
+  it('rejects capped remote execution before starting a chat turn', async () => {
+    let starts = 0
+    const { workerFetch, sql, cookie } = await createHarness(() => {
+      starts += 1
+      return createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MODEL })
+    })
+    const keyResponse = await workerFetch(post('/api/keys', cookie, {
+      name: 'bounded caller', spendingLimitCents: 100_000,
+    }))
+    expect(keyResponse.status).toBe(201)
+    const { key } = (await keyResponse.json()) as { key: string }
+    const response = await workerFetch(new Request(`${BASE}/v1/agents/${appSlug}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'Read my lease' }], stream: true }),
+    }))
+    expect(response.status, await response.clone().text()).toBe(200)
+    expect(await response.text()).toContain('api_key.execution_budget_unsupported')
+    expect(starts).toBe(0)
+    expect(await sql.query('SELECT state FROM agent_api_key_reservation'))
+      .toEqual([{ state: 'released' }])
+    expect(await sql.query('SELECT cost_cents FROM agent_api_key_usage')).toEqual([])
   })
 
   it('shares one owned thread across OpenAI-compatible API calls', async () => {
