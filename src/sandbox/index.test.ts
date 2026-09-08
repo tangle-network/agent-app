@@ -830,8 +830,8 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
   })
 
   it.each([
-    ['missing alive marker', async () => ({ stdout: 'unexpected private output' }), 'alive check returned no alive marker'],
-    ['missing process', async (command: string) => ({ stdout: command === 'echo alive' ? 'alive' : 'no-sidecar' }), 'process check found no sidecar'],
+    ['missing alive marker', async () => ({ stdout: 'unexpected private output', stderr: '', exitCode: 0 }), 'alive check returned no alive marker'],
+    ['missing process', async (command: string) => ({ stdout: command === 'echo alive' ? 'alive' : 'no-sidecar', stderr: '', exitCode: 0 }), 'process check found no sidecar'],
     ['exec deadline', () => new Promise<never>(() => {}), 'alive check failed'],
   ])('retains the failed liveness step after recovery: %s', async (scenario, exec, message) => {
     const dead = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, exec: vi.fn(exec) } as Partial<SandboxInstance>)
