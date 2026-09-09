@@ -98,7 +98,7 @@ describe('protected Runtime chat producer', () => {
     // Runtime's protected executor currently emits only a final snapshot. Inject
     // preceding deltas to exercise the producer's supported stream contract too.
     streamContract.precedingText = scenario.streamed
-    const rows: Array<Awaited<ReturnType<ChatTurnMessageStore['appendMessage']>>> = []
+    const rows: Array<Parameters<ChatTurnMessageStore['appendMessage']>[0] & { id: string }> = []
     const store: ChatTurnMessageStore = {
       listMessages: async threadId => rows.filter(row => row.threadId === threadId),
       appendMessage: async input => { const row = { id: `message-${rows.length}`, ...input }; rows.push(row); return row },
@@ -115,7 +115,7 @@ describe('protected Runtime chat producer', () => {
       resolveAgent: async () => ({ id: 'public', ownerId: 'owner', slug: 'public', enabled: true,
         pricePerTokenUsd: 0.001, platformFeePercent: 0, sandboxEndpoint: null, remoteSandboxId: null, remoteBearerToken: null }),
       authorizeConsumer: async () => ({ allow: true }),
-      verifyApiKey: async () => ({ keyId: 'payer', ownerId: 'payer', scopes: ['chat'] }),
+      verifyApiKey: async () => ({ keyId: 'payer', consumerId: 'apikey:payer', ownerId: 'payer', scopes: ['chat'] }),
       claimApiKeyRequest: async () => ({ allowed: true, minuteRemaining: 100, dailyRemaining: 100,
         minuteResetAt: Date.now() + 60_000, dailyResetAt: Date.now() + 86_400_000 }),
       recordUsage: async () => {}, settlePayment: async () => {}, a2a: false,
