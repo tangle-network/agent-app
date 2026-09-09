@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-67 exports.
+71 exports.
 
 ### `AnySurfaceKind`
 
@@ -76,6 +76,14 @@ interface CertifiedDeliveryConfig
 
 ```ts
 (opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>
+```
+
+### `createRouterProtectedModelPort`
+
+`function` — Bind one turn to Router's atomic grant ledger without exposing its parent key.
+
+```ts
+(options: RouterProtectedModelPortOptions) => AgentCandidateModelPort
 ```
 
 ### `createSurfaceRegistry`
@@ -246,6 +254,14 @@ interface OpenAICompatStreamTurnOptions
 interface OpenAIStreamChunk
 ```
 
+### `ProtectedModelSettlementError`
+
+`class` — A validated charge remains authoritative when the product cannot save its audit record.
+
+```ts
+class ProtectedModelSettlementError
+```
+
 ### `resolveCatalogModelId`
 
 `function` — Reconcile a persisted selection against the live catalogue.
@@ -348,6 +364,22 @@ interface ResolveUserTangleExecutionKeyOptions
 
 ```ts
 interface RouterModel
+```
+
+### `RouterProtectedModelPortOptions`
+
+`interface`
+
+```ts
+interface RouterProtectedModelPortOptions
+```
+
+### `RouterProtectedModelSettlement`
+
+`interface`
+
+```ts
+interface RouterProtectedModelSettlement
 ```
 
 ### `runAppToolLoop`
