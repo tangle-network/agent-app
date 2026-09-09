@@ -7,7 +7,7 @@ import type { AgentCandidateModelPort } from '@tangle-network/agent-runtime/cand
 import { createRouterProtectedModelPort } from '../src/runtime/protected-model'
 import { createProtectedRuntimeChatProducer, type ProtectedRuntimeChatOptions } from '../src/chat-routes/protected-runtime-producer'
 
-const streamContract = vi.hoisted(() => ({ precedingText: undefined as string | undefined }))
+const streamContract = vi.hoisted(() => ({ precedingText: undefined as string | undefined, repeatFinal: false }))
 vi.mock('@tangle-network/agent-runtime/kernel', async importOriginal => {
   const original = await importOriginal<typeof import('@tangle-network/agent-runtime/kernel')>()
   return { ...original, streamAgentTurn: async function* (...args: Parameters<typeof original.streamAgentTurn>) {
@@ -16,6 +16,7 @@ vi.mock('@tangle-network/agent-runtime/kernel', async importOriginal => {
         yield { type: 'text_delta', text: streamContract.precedingText }
       }
       yield event
+      if (event.type === 'final' && streamContract.repeatFinal) yield event
     }
   } }
 })
@@ -66,7 +67,7 @@ async function drain(producer: ReturnType<typeof createProtectedRuntimeChatProdu
   return events
 }
 
-afterEach(() => { streamContract.precedingText = undefined; vi.unstubAllGlobals(); vi.restoreAllMocks() })
+afterEach(() => { streamContract.precedingText = undefined; streamContract.repeatFinal = false; vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('protected Runtime chat producer', () => {
   it('uses the real Runtime executor and publishes only settled usage', async () => {
@@ -91,6 +92,7 @@ describe('protected Runtime chat producer', () => {
     { streamed: undefined, final: 'A useful finding.', status: 200 },
     { streamed: 'A useful ', final: 'A useful finding.', status: 200 },
     { streamed: 'A useful finding.', final: 'A useful finding.', status: 200 },
+    { streamed: undefined, final: 'A useful finding.', status: 200, repeatFinal: true },
     { streamed: 'An obsolete draft.', final: 'A corrected finding.', status: 500 },
   ])('delivers the authoritative answer once through chat and gateway ($streamed → $final)', async scenario => {
     const { options, settle } = fixture()
@@ -98,6 +100,7 @@ describe('protected Runtime chat producer', () => {
     // Runtime's protected executor currently emits only a final snapshot. Inject
     // preceding deltas to exercise the producer's supported stream contract too.
     streamContract.precedingText = scenario.streamed
+    streamContract.repeatFinal = 'repeatFinal' in scenario && scenario.repeatFinal === true
     const rows: Array<Parameters<ChatTurnMessageStore['appendMessage']>[0] & { id: string }> = []
     const store: ChatTurnMessageStore = {
       listMessages: async threadId => rows.filter(row => row.threadId === threadId),

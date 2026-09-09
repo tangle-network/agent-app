@@ -144,6 +144,7 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
               if (suffix) await emit({ type: 'message.part.updated', data: {
                 part: { id: 'text_delta', type: 'text' }, delta: suffix,
               } })
+              streamedText = event.text
             }
             completed = true
             await emit({ type: 'result', data: { finalText: event.text } })
