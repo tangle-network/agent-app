@@ -1,7 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createAgentGateway } from '@tangle-network/agent-gateway'
+import { createChatTurnRoutes, type ChatTurnMessageStore } from '../src/chat-routes/turn-routes'
+import { streamChatRouteAsSandboxEvents } from '../src/chat-routes/gateway-adapter'
+import { createMemoryTurnEventStore } from '../src/stream/turn-buffer'
 import type { AgentCandidateModelPort } from '@tangle-network/agent-runtime/candidate-execution'
 import { createRouterProtectedModelPort } from '../src/runtime/protected-model'
 import { createProtectedRuntimeChatProducer, type ProtectedRuntimeChatOptions } from '../src/chat-routes/protected-runtime-producer'
+
+const streamContract = vi.hoisted(() => ({ precedingText: undefined as string | undefined }))
+vi.mock('@tangle-network/agent-runtime/kernel', async importOriginal => {
+  const original = await importOriginal<typeof import('@tangle-network/agent-runtime/kernel')>()
+  return { ...original, streamAgentTurn: async function* (...args: Parameters<typeof original.streamAgentTurn>) {
+    for await (const event of original.streamAgentTurn(...args)) {
+      if (event.type === 'final' && streamContract.precedingText !== undefined) {
+        yield { type: 'text_delta', text: streamContract.precedingText }
+      }
+      yield event
+    }
+  } }
+})
 
 const digest = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as const
 const model = 'anthropic/claude-haiku-4-5-20251001'
@@ -49,7 +66,7 @@ async function drain(producer: ReturnType<typeof createProtectedRuntimeChatProdu
   return events
 }
 
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+afterEach(() => { streamContract.precedingText = undefined; vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('protected Runtime chat producer', () => {
   it('uses the real Runtime executor and publishes only settled usage', async () => {
@@ -68,6 +85,62 @@ describe('protected Runtime chat producer', () => {
     expect(events.some(event => event.type === 'error')).toBe(false)
     expect(producer.finalText()).toBe('A useful finding.')
     expect(producer.usage?.()).toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: 0, costUsd: 0.0001 })
+  })
+
+  it.each([
+    { streamed: undefined, final: 'A useful finding.', status: 200 },
+    { streamed: 'A useful ', final: 'A useful finding.', status: 200 },
+    { streamed: 'A useful finding.', final: 'A useful finding.', status: 200 },
+    { streamed: 'An obsolete draft.', final: 'A corrected finding.', status: 500 },
+  ])('delivers the authoritative answer once through chat and gateway ($streamed → $final)', async scenario => {
+    const { options, settle } = fixture()
+    vi.stubGlobal('fetch', vi.fn(async () => response({ content: scenario.final })))
+    // Runtime's protected executor currently emits only a final snapshot. Inject
+    // preceding deltas to exercise the producer's supported stream contract too.
+    streamContract.precedingText = scenario.streamed
+    const rows: Array<Awaited<ReturnType<ChatTurnMessageStore['appendMessage']>>> = []
+    const store: ChatTurnMessageStore = {
+      listMessages: async threadId => rows.filter(row => row.threadId === threadId),
+      appendMessage: async input => { const row = { id: `message-${rows.length}`, ...input }; rows.push(row); return row },
+      updateMessage: async (id, patch) => { const row = rows.find(row => row.id === id); if (row) Object.assign(row, patch); return row ?? null },
+      deleteMessage: async () => null,
+    }
+    const routes = createChatTurnRoutes({ projectId: 'protected-final-text',
+      authorize: async () => ({ ok: true, tenantId: 'publication', userId: 'payer', context: undefined }),
+      store, turnStore: createMemoryTurnEventStore(), log: () => {},
+      produce: () => createProtectedRuntimeChatProducer(options),
+    })
+    const pending: Promise<unknown>[] = []
+    const gateway = createAgentGateway({
+      resolveAgent: async () => ({ id: 'public', ownerId: 'owner', slug: 'public', enabled: true,
+        pricePerTokenUsd: 0.001, platformFeePercent: 0, sandboxEndpoint: null, remoteSandboxId: null, remoteBearerToken: null }),
+      authorizeConsumer: async () => ({ allow: true }),
+      verifyApiKey: async () => ({ keyId: 'payer', ownerId: 'payer', scopes: ['chat'] }),
+      claimApiKeyRequest: async () => ({ allowed: true, minuteRemaining: 100, dailyRemaining: 100,
+        minuteResetAt: Date.now() + 60_000, dailyResetAt: Date.now() + 86_400_000 }),
+      recordUsage: async () => {}, settlePayment: async () => {}, a2a: false,
+      getSandbox: async () => ({ streamPrompt: () => streamChatRouteAsSandboxEvents({
+        routes, request: new Request('https://synthetic.test/api/chat'),
+        payload: { workspaceId: 'publication', threadId: 'payer-thread', content: options.prompt },
+        waitUntil: promise => { pending.push(promise) },
+      }) }),
+    })
+    const result = await gateway.request('/public/chat/completions', { method: 'POST',
+      headers: { Authorization: 'Bearer sk_agent_synthetic', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stream: false, messages: [{ role: 'user', content: options.prompt }] }),
+    })
+    const body = await result.json()
+    await Promise.all(pending)
+    expect(result.status, JSON.stringify(body)).toBe(scenario.status)
+    expect(settle).toHaveBeenCalledOnce()
+    if (scenario.status === 200) {
+      expect(body.choices[0].message.content).toBe(scenario.final)
+      expect(rows.find(row => row.role === 'assistant')?.content).toBe(scenario.final)
+      expect(body.usage).toMatchObject({ prompt_tokens: 3, completion_tokens: 2 })
+    } else {
+      expect(JSON.stringify(body)).toContain('revised already streamed text')
+      expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'failed' }))
+    }
   })
 
   it('retains the validated charge when the real transport audit callback fails after settlement', async () => {

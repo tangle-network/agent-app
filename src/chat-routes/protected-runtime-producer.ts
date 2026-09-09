@@ -122,9 +122,11 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
           },
         })
         let completed = false
+        let streamedText = ''
         for await (const event of streamAgentTurn({ kind: 'executor', factory, profile },
           { prompt: options.prompt }, { signal, callId: options.grant.reserve.executionId,
             timeoutMs: Math.max(1, options.grant.deadlineAtMs - Date.now()) })) {
+          if (event.type === 'text_delta') streamedText += event.text
           if (event.type === 'text_delta' || event.type === 'reasoning_delta') {
             await emit({ type: 'message.part.updated', data: {
               part: { id: event.type, type: event.type === 'text_delta' ? 'text' : 'reasoning' }, delta: event.text,
@@ -132,6 +134,17 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
           }
           if (event.type === 'final') {
             if (event.status !== 'completed') throw new Error(`Protected execution ${event.status}`)
+            // Executor backends may emit only a final snapshot. The chat and
+            // gateway wire append text, so emit its missing suffix exactly once.
+            if (event.text !== undefined) {
+              if (!event.text.startsWith(streamedText)) {
+                throw new Error('Protected execution revised already streamed text')
+              }
+              const suffix = event.text.slice(streamedText.length)
+              if (suffix) await emit({ type: 'message.part.updated', data: {
+                part: { id: 'text_delta', type: 'text' }, delta: suffix,
+              } })
+            }
             completed = true
             await emit({ type: 'result', data: { finalText: event.text } })
           }
