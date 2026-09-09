@@ -542,7 +542,17 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
   const sortedModels = useMemo(() => sortModelsByFreshness(models), [models])
 
   useEffect(() => {
-    if (open) inputRef.current?.focus()
+    if (!open) return
+
+    // PopoverSurface is portaled and its placement effect can commit a second
+    // render after the panel mounts. Focus once after that commit so the
+    // browser keeps the search field active instead of restoring focus to the
+    // trigger button. Guard the browser-only scheduler for SSR and test hosts.
+    const focus = () => inputRef.current?.focus()
+    focus()
+    if (typeof requestAnimationFrame !== 'function') return
+    const frame = requestAnimationFrame(focus)
+    return () => cancelAnimationFrame(frame)
   }, [open])
 
   const selected = sortedModels.find((m) => m.id === value)

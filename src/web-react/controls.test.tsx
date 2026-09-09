@@ -37,6 +37,25 @@ describe('ModelPicker', () => {
     expect(screen.getByText('No models available')).toBeTruthy()
   })
 
+  it('keeps the search field focused after the portaled surface settles', () => {
+    let scheduled: FrameRequestCallback | undefined
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      scheduled = callback
+      return 1
+    })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+
+    render(<ModelPicker value="gpt-5" onChange={() => {}} models={[model('gpt-5')]} />)
+    const trigger = screen.getByRole('button', { expanded: false })
+    fireEvent.click(trigger)
+    const input = screen.getByPlaceholderText('Search models...')
+    trigger.focus()
+    scheduled?.(performance.now())
+
+    expect(document.activeElement).toBe(input)
+    vi.unstubAllGlobals()
+  })
+
   it('renders provider-grouped rows for a real catalogue', () => {
     render(<ModelPicker value="gpt-4" onChange={() => {}} models={[model('gpt-4', { name: 'GPT-4' })]} />)
     openPicker()
