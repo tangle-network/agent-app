@@ -219,7 +219,7 @@ interface Scenario
 `function` — One-shot self-improvement loop.
 
 ```ts
-<TScenario extends Scenario, TArtifact>(opts: SelfImproveOptions<TScenario, TArtifact>) => Promise<SelfImproveResult<TS…
+{ <TScenario extends Scenario, TArtifact>(opts: SelfImproveMethodOptions<TScenario, TArtifact>): Promise<SelfImproveMet…
 ```
 
 ### `SelfImproveBudget`
@@ -240,10 +240,10 @@ interface SelfImproveOptions
 
 ### `SelfImproveResult`
 
-`interface`
+`type`
 
 ```ts
-interface SelfImproveResult
+type SelfImproveResult
 ```
 
 ### `skillOptOptimizationMethod`
