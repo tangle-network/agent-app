@@ -449,6 +449,7 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
       provisioner: { ...h.provisioner, findCreatedKeys: async () => [] },
     })
     const result = await manager.ensureKey(h.identity())
+    if (!original.id) throw new Error('Fixture create did not return its original id')
     expect(h.remote.get(original.id)?.revoked).toBe(true)
     expect(h.remote.size).toBe(2)
     expect(result.usage.keyId).not.toBe(original.id)
@@ -765,9 +766,7 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
   it('fails before remote spend when encryption is unavailable', async () => {
     const h = makeHarness()
     let creates = 0
-    const createdByIdentity = new Map<string, RemoteKey>()
-  const provisioner: DurableWorkspaceKeyProvisioner = {
-    supportsIdempotentCreate: true,
+    const provisioner: DurableWorkspaceKeyProvisioner = {
       ...h.provisioner,
       async createKey(input) {
         creates += 1
