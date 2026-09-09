@@ -1571,7 +1571,7 @@ interface EntryComposerProps
 
 ## `./chat-routes`
 
-Source: `src/chat-routes/index.ts` · depends on `chat-store`, `interactions`, `model-resolution`, `plans`, `redact`, `sandbox`, `stream`, `web`
+Source: `src/chat-routes/index.ts` · depends on `chat-store`, `interactions`, `model-resolution`, `plans`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `web`
 
 ### `AbortAttachmentWriteFn`
 
@@ -2229,6 +2229,14 @@ interface CreateChatTurnRoutesOptions
 interface CreateLegacyAttachmentUploadRouteOptions
 ```
 
+### `createProtectedRuntimeChatProducer`
+
+`function` — Run a profile through the protected Router tool executor and the shared chat projection.
+
+```ts
+(options: ProtectedRuntimeChatOptions) => ChatTurnRouteProducer
+```
+
 ### `createSandboxChatProducer`
 
 `function` — Create a sandbox chat producer that manages chat turn routing with logging and interaction rendering options
@@ -2835,6 +2843,14 @@ type PromptInputPart
 
 ```ts
 (parts: ChatTurnPartInput[]) => number
+```
+
+### `ProtectedRuntimeChatOptions`
+
+`interface`
+
+```ts
+interface ProtectedRuntimeChatOptions
 ```
 
 ### `RawAgentFilePart`
@@ -12722,6 +12738,14 @@ interface CertifiedDeliveryConfig
 (opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>
 ```
 
+### `createRouterProtectedModelPort`
+
+`function` — Bind one turn to Router's atomic grant ledger without exposing its parent key.
+
+```ts
+(options: RouterProtectedModelPortOptions) => AgentCandidateModelPort
+```
+
 ### `createSurfaceRegistry`
 
 `function` — Assemble the product's surface registry from its registered kinds.
@@ -12890,6 +12914,14 @@ interface OpenAICompatStreamTurnOptions
 interface OpenAIStreamChunk
 ```
 
+### `ProtectedModelSettlementError`
+
+`class` — A validated charge remains authoritative when the product cannot save its audit record.
+
+```ts
+class ProtectedModelSettlementError
+```
+
 ### `resolveCatalogModelId`
 
 `function` — Reconcile a persisted selection against the live catalogue.
@@ -12992,6 +13024,22 @@ interface ResolveUserTangleExecutionKeyOptions
 
 ```ts
 interface RouterModel
+```
+
+### `RouterProtectedModelPortOptions`
+
+`interface`
+
+```ts
+interface RouterProtectedModelPortOptions
+```
+
+### `RouterProtectedModelSettlement`
+
+`interface`
+
+```ts
+interface RouterProtectedModelSettlement
 ```
 
 ### `runAppToolLoop`

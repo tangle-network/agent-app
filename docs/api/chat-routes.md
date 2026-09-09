@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-197 exports.
+199 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -662,6 +662,14 @@ interface CreateChatTurnRoutesOptions
 interface CreateLegacyAttachmentUploadRouteOptions
 ```
 
+### `createProtectedRuntimeChatProducer`
+
+`function` — Run a profile through the protected Router tool executor and the shared chat projection.
+
+```ts
+(options: ProtectedRuntimeChatOptions) => ChatTurnRouteProducer
+```
+
 ### `createSandboxChatProducer`
 
 `function` — Create a sandbox chat producer that manages chat turn routing with logging and interaction rendering options
@@ -1268,6 +1276,14 @@ type PromptInputPart
 
 ```ts
 (parts: ChatTurnPartInput[]) => number
+```
+
+### `ProtectedRuntimeChatOptions`
+
+`interface`
+
+```ts
+interface ProtectedRuntimeChatOptions
 ```
 
 ### `RawAgentFilePart`

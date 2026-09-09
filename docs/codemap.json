@@ -1234,8 +1234,10 @@
         "model-resolution",
         "plans",
         "redact",
+        "runtime",
         "sandbox",
         "stream",
+        "tools",
         "web"
       ],
       "error": null,
@@ -1733,6 +1735,12 @@
           "doc": "Stable route options for products using the original writer contract."
         },
         {
+          "name": "createProtectedRuntimeChatProducer",
+          "kind": "function",
+          "signature": "(options: ProtectedRuntimeChatOptions) => ChatTurnRouteProducer",
+          "doc": "Run a profile through the protected Router tool executor and the shared chat projection."
+        },
+        {
           "name": "createSandboxChatProducer",
           "kind": "function",
           "signature": "(options: SandboxChatProducerOptions) => ChatTurnRouteProducer",
@@ -2187,6 +2195,12 @@
           "kind": "function",
           "signature": "(parts: ChatTurnPartInput[]) => number",
           "doc": "Calculate the total byte size of an array of chat turn parts"
+        },
+        {
+          "name": "ProtectedRuntimeChatOptions",
+          "kind": "interface",
+          "signature": "interface ProtectedRuntimeChatOptions",
+          "doc": null
         },
         {
           "name": "RawAgentFilePart",
@@ -9864,6 +9878,12 @@
           "doc": "Build a `streamTurn` that calls an OpenAI-compatible `/chat/completions` endpoint (Tangle Router / tcloud / any compat provider) with `stream: true` and yields `LoopEvent`s via {@link toLoopEvents}."
         },
         {
+          "name": "createRouterProtectedModelPort",
+          "kind": "function",
+          "signature": "(options: RouterProtectedModelPortOptions) => AgentCandidateModelPort",
+          "doc": "Bind one turn to Router's atomic grant ledger without exposing its parent key."
+        },
+        {
           "name": "createSurfaceRegistry",
           "kind": "function",
           "signature": "(kinds: readonly AnySurfaceKind[]) => SurfaceRegistry",
@@ -9990,6 +10010,12 @@
           "doc": "Minimal OpenAI Chat Completions streaming chunk (structural — no `openai` dep)."
         },
         {
+          "name": "ProtectedModelSettlementError",
+          "kind": "class",
+          "signature": "class ProtectedModelSettlementError",
+          "doc": "A validated charge remains authoritative when the product cannot save its audit record."
+        },
+        {
           "name": "resolveCatalogModelId",
           "kind": "function",
           "signature": "(models: readonly CatalogModel[], selectedId?: string | undefined, fallbackId?: string | undefined) => string | undefin…",
@@ -10066,6 +10092,18 @@
           "kind": "interface",
           "signature": "interface RouterModel",
           "doc": "Model catalogue — computed live from the Tangle Router, never hand-curated."
+        },
+        {
+          "name": "RouterProtectedModelPortOptions",
+          "kind": "interface",
+          "signature": "interface RouterProtectedModelPortOptions",
+          "doc": null
+        },
+        {
+          "name": "RouterProtectedModelSettlement",
+          "kind": "interface",
+          "signature": "interface RouterProtectedModelSettlement",
+          "doc": null
         },
         {
           "name": "runAppToolLoop",

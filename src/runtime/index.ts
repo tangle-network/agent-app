@@ -15,3 +15,5 @@ export * from './surface-profile'
  * `reasoning` / `usage` widening.
  */
 export * from './loop'
+
+export * from './protected-model'

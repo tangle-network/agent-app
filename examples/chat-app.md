@@ -218,6 +218,26 @@ structured `{ type: 'error', data: { message, code?, details? } }` lines.
 `onErrorEventDetail` receives the structured fields while the existing
 `onErrorEvent(message)` callback continues to fire unchanged.
 
+### Bounded server tools
+
+Use `createProtectedRuntimeChatProducer` when a server turn needs provider-enforced spending and tool-call limits.
+It composes Runtime's protected grant with its Router executor and the shared chat event projection.
+Use `createRouterProtectedModelPort` from `/runtime` for the maintained Router transport.
+Supply an authenticated product key, an exact profile and turn digest, a deadline, and authorized tools.
+The supported route uses Anthropic without reasoning or provider-hosted tools.
+Tool callbacks receive an abort signal and must validate arguments and recheck access before effects.
+
+Retain the full Router settlement through `onSettlement` in the product's durable audit store.
+Router settles that authorization; do not deduct its cost again in product post-processing.
+A failed or cancelled turn can still incur a provider charge.
+The producer retains validated usage when execution or audit persistence fails.
+A `ProtectedModelSettlementError` carries the validated settlement when the audit callback fails.
+An invalid or unverified receipt cannot establish a charge or successful budget enforcement.
+
+The producer executes once and does not retry an uncertain execution.
+The normal chat route still owns admission, durable history, event replay, and completion records.
+Its success does not prove a particular product's tools, live provider billing, or scheduling.
+
 ## Attachments (store-backed files, #224)
 
 An attachment is a file the product already saved to its own store (vault /
