@@ -333,8 +333,12 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
 
     const [updated] = await db.update(workspaceInvitations)
       .set({ status: 'revoked', revokedAt: input.now ?? new Date() })
-      .where(eq(workspaceInvitations.id, row.invitation.id))
+      .where(and(eq(workspaceInvitations.id, row.invitation.id), eq(workspaceInvitations.status, 'pending')))
       .returning()
+
+    // The status read above is advisory. A concurrent accept may win between
+    // that read and this update, so the write must be compare-and-set.
+    if (!updated) return { succeeded: false, status: 409, error: 'The invitation changed. Reload it before continuing.' }
 
     return { succeeded: true, value: { invitation: toInvitationView(updated!, row.inviterEmail) } }
   }
@@ -443,9 +447,18 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
       }
     }
 
-    await db.update(workspaceInvitations)
+    const [accepted] = await db.update(workspaceInvitations)
       .set({ status: 'accepted', acceptedAt: now })
-      .where(eq(workspaceInvitations.id, invitation.id))
+      .where(and(eq(workspaceInvitations.id, invitation.id), eq(workspaceInvitations.status, 'pending')))
+      .returning()
+
+    if (!accepted) {
+      // Membership was materialized before the final compare-and-set. Remove
+      // only the row created by this attempt before reporting the conflict.
+      await db.delete(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, invitation.workspaceId), eq(workspaceMembers.userId, currentUser.id)))
+      return { succeeded: false, status: 409, error: 'The invitation changed. Reload it before continuing.' }
+    }
 
     return { succeeded: true, value: { workspaceId: invitation.workspaceId } }
   }
