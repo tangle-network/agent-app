@@ -64,7 +64,7 @@ type ArtifactAgreement
 
 ### `CLAIM_SUPPORT_CHECK`
 
-`const` — Platform check: how many quoted evidence entries anchor to text that actually CARRIES the figure the entry claims.
+`const` — Numeric-only platform check, omitted when no entries are checkable.
 
 ```ts
 "claim_support"

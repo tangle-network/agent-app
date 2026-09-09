@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-186 exports.
+185 exports.
 
 ### `adaptSandboxStream`
 
@@ -56,10 +56,10 @@ interface AppToolDescriptor
 
 ### `attachReasoningEffort`
 
-`function` — Attach a specified reasoning effort level to an agent profile for a given harness
+`function` — Attach explicit effort through the portable model contract consumed by providers.
 
 ```ts
-(profile: AgentProfile, harness: Harness, effort: "auto" | "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "…
+(profile: AgentProfile, _harness: Harness, effort: "auto" | "none" | "minimal" | "low" | "medium" | "high" | "xhigh" |…
 ```
 
 ### `buildAppToolMcpServers`
@@ -228,14 +228,6 @@ interface D1PrewarmClaimStoreOptions
 
 ```ts
 SandboxResourceConfig
-```
-
-### `DEFAULT_SIDECAR_PROCESS_PATTERN`
-
-`const` — Default ERE passed to `pgrep -f` when a liveness probe does not override the harness-process matcher.
-
-```ts
-"opencode|claude|codex"
 ```
 
 ### `deferredCorpusHash`
@@ -480,7 +472,7 @@ interface InspectablePrewarmClaimStore
 
 ### `LivenessProbeConfig`
 
-`interface` — Define configuration for liveness probes including sidecar process pattern and optional timeouts
+`interface` — Configure runtime exec verification before reusing a sandbox.
 
 ```ts
 interface LivenessProbeConfig

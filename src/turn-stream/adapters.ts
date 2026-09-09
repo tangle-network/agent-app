@@ -98,14 +98,14 @@ async function postJsonOk<T>(
  * instance; `listRunning` reconnect discovery rides a per-scope index
  * instance. Drops in wherever `createD1TurnEventStore(env.DB)` would.
  *
- * KEPT and load-bearing for AUTONOMOUS work. A detached run
- * (`dispatchPrompt({ detach: true })`, `driveTurn`) executes on the sandbox
- * run/stream lane, which publishes nothing to the session event bus — a
- * `SessionGatewayClient` attached to that session sees zero turn events
- * (measured: 0 of 71 / 0 of 527 / 0 of 408 across three session-id
- * strategies). So a browser that must tail a mission step, a queue job, or
- * an inbound-email review has no SDK path; it needs these durable rows plus
- * `runDetachedTurn` (`/chat-routes`). Nothing here is deprecated.
+ * KEPT and load-bearing for AUTONOMOUS work. A detached run driven through
+ * `dispatchPrompt({ detach: true })` or `streamPrompt` executes on the sandbox
+ * run/stream lane, which publishes nothing to the session event bus on the
+ * measured path (0 of 71 / 0 of 527 / 0 of 408 across three session-id
+ * strategies). Sandbox 0.37 `driveTurn` uses the session message lane and is
+ * gateway-visible by SDK contract. A browser tailing a stream/dispatch run
+ * needs these durable rows plus `runDetachedTurn` (`/chat-routes`). Nothing
+ * here is deprecated.
  */
 export function createDurableObjectTurnEventStore(namespace: TurnStreamNamespaceLike): TurnEventStore {
   return {
@@ -412,8 +412,8 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
  * the message lane delivered 297 of 297.
  *
  * Two things this deprecation does NOT cover, both still supported:
- * DETACHED runs (no gateway fanout at all — keep `runDetachedTurn` over the
- * durable turn-event rows) and the per-workspace signals
+ * stream/dispatch DETACHED runs (keep `runDetachedTurn` over the durable
+ * turn-event rows) and the per-workspace signals
  * ({@link broadcastWorkspaceActivity} / {@link broadcastThreadCreated}).
  * A SANDBOX-FREE copilot that wants a second viewer should use `/stream`'s
  * `replayTurnEvents` (`GET /chat/stream/:turnId`), which follows a running

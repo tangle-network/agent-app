@@ -16,8 +16,8 @@
  * - **turn storage** (`turn:${turnId}`) — the durable `TurnEventStore` rows +
  *   status for one buffered turn (replay survives DO eviction — this is what
  *   graduates the vertical's `turnStore` from no-op). KEPT and load-bearing:
- *   a DETACHED run never reaches the gateway, so this is the only way a
- *   browser tails autonomous work.
+ *   a stream/dispatch DETACHED run does not reach the gateway on the
+ *   measured path, so this is how a browser tails that autonomous work.
  * - **scope index** (`scope:${scopeId}`) — the running-turn index backing
  *   `TurnEventStore.listRunning` reconnect discovery. KEPT.
  *

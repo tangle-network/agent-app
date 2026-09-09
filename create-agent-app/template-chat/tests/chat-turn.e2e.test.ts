@@ -21,7 +21,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   createSandboxChatProducer,
@@ -46,7 +46,8 @@ import { buildChatApp, type ChatApp } from '../src/chat'
 import type { AppEnv } from '../src/env'
 import { buildGatewayApp } from '../src/gateway'
 import { appSlug } from '../src/sandbox'
-import { createWorker } from '../src/worker'
+import { ARTIFACT_ROOT } from '../src/files'
+import { createWorker, type WorkerAssembly } from '../src/worker'
 
 const BASE = 'http://localhost:8787'
 const MODEL = 'test/model-1'
@@ -60,6 +61,7 @@ const MIGRATIONS = readdirSync(MIGRATIONS_DIR)
   .map((name) => join(MIGRATIONS_DIR, name))
 const BASE_MIGRATION = join(MIGRATIONS_DIR, '0001_init.sql')
 const GATEWAY_MIGRATION = join(MIGRATIONS_DIR, '0002_agent_gateway.sql')
+const RESERVATION_MIGRATION = join(MIGRATIONS_DIR, '0003_gateway_reservations.sql')
 
 /** The real migration, executed against a real SQLite database. Every query
  *  the test makes afterwards runs over THESE tables — schema drift between
@@ -126,6 +128,7 @@ interface Harness {
 async function createHarness(
   produce: (args: ChatTurnProduceArgs<void>) => ChatTurnRouteProducer = () =>
     createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MODEL }),
+  peekWorkspace?: WorkerAssembly['peekWorkspace'],
 ): Promise<Harness> {
   const database = openMigratedDb()
   const pending: Promise<unknown>[] = []
@@ -159,6 +162,7 @@ async function createHarness(
   app.routes.turn = (request) =>
     originalTurn(request, { waitUntil: (p) => void pending.push(p) })
   const worker = createWorker({
+    peekWorkspace,
     buildChatApp: () => app,
     buildGatewayApp: (_env, chatApp, options) => {
       gatewayBuildCount += 1
@@ -234,6 +238,42 @@ async function readGatewayText(response: Response): Promise<string> {
 // ── the gate ────────────────────────────────────────────────────────────────
 
 describe('e2e: fake sandbox producer → streamed turn → persisted transcript', () => {
+  it('indexes only owned artifacts through the real authenticated Worker route', async () => {
+    expect(config.systemPrompt).toContain(ARTIFACT_ROOT)
+    const tree = vi.fn(async () => ({
+      root: '/home/agent/artifacts',
+      files: [
+        { path: '/home/agent/artifacts/report.txt', size: 7 },
+        { path: '/home/agent/artifacts/.env', size: 99 },
+        { path: '/home/agent/private.txt', size: 99 },
+        { path: '../private.txt', size: 99 },
+      ],
+      stats: { truncated: false },
+    }))
+    const peek = vi.fn().mockResolvedValue({ status: 'running', box: { fs: { tree } } })
+    const h = await createHarness(undefined, peek)
+    expect((await h.workerFetch(new Request(`${BASE}/api/files`))).status).toBe(401)
+    expect(peek).not.toHaveBeenCalled()
+    const denied = await h.workerFetch(new Request(`${BASE}/api/files?workspaceId=another-user`, {
+      headers: { cookie: h.cookie },
+    }))
+    expect(denied.status).toBe(404)
+    expect(peek).not.toHaveBeenCalled()
+    const response = await h.workerFetch(new Request(`${BASE}/api/files?root=/home/agent`, {
+      headers: { cookie: h.cookie },
+    }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ status: 'ready', files: [{ path: 'report.txt', name: 'report.txt', size: 7 }] })
+    expect(tree).toHaveBeenCalledWith('/home/agent/artifacts', { maxDepth: 12 })
+    const session = await h.app.auth.getSession(new Request(BASE, { headers: { cookie: h.cookie } }))
+    expect(peek).toHaveBeenCalledWith(expect.anything(), { userId: session!.user.id, workspaceId: session!.user.id })
+    peek.mockResolvedValue({ status: 'absent' })
+    tree.mockClear()
+    const cold = await h.workerFetch(new Request(`${BASE}/api/files`, { headers: { cookie: h.cookie } }))
+    expect(await cold.json()).toEqual({ status: 'warming' })
+    expect(tree).not.toHaveBeenCalled()
+  })
+
   it('normalizes path-backed generic files for the sandbox prompt API', () => {
     expect(
       normalizeChatPromptForSandbox([
@@ -373,7 +413,8 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
   })
 
   it('the migration carries every agent-gateway SQL store statement', () => {
-    const migration = readFileSync(GATEWAY_MIGRATION, 'utf8')
+    const migration = [GATEWAY_MIGRATION, RESERVATION_MIGRATION]
+      .map((path) => readFileSync(path, 'utf8')).join('\n')
     const normalize = (sql: string) => sql.replace(/\s+/g, ' ').replace(/;$/, '').trim()
     const statements = [
       ...sqlApiKeyStoreSchemaStatements(),
@@ -399,6 +440,30 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
       'agent_api_key_usage',
       'agent_gateway_usage',
     ])
+  })
+
+  it('rejects capped remote execution before starting a chat turn', async () => {
+    let starts = 0
+    const { workerFetch, sql, cookie } = await createHarness(() => {
+      starts += 1
+      return createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MODEL })
+    })
+    const keyResponse = await workerFetch(post('/api/keys', cookie, {
+      name: 'bounded caller', spendingLimitCents: 100_000,
+    }))
+    expect(keyResponse.status).toBe(201)
+    const { key } = (await keyResponse.json()) as { key: string }
+    const response = await workerFetch(new Request(`${BASE}/v1/agents/${appSlug}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'Read my lease' }], stream: true }),
+    }))
+    expect(response.status, await response.clone().text()).toBe(200)
+    expect(await response.text()).toContain('api_key.execution_budget_unsupported')
+    expect(starts).toBe(0)
+    expect(await sql.query('SELECT state FROM agent_api_key_reservation'))
+      .toEqual([{ state: 'released' }])
+    expect(await sql.query('SELECT cost_cents FROM agent_api_key_usage')).toEqual([])
   })
 
   it('shares one owned thread across OpenAI-compatible API calls', async () => {

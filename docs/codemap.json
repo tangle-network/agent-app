@@ -1246,8 +1246,10 @@
         "model-resolution",
         "plans",
         "redact",
+        "runtime",
         "sandbox",
         "stream",
+        "tools",
         "web"
       ],
       "error": null,
@@ -1745,6 +1747,12 @@
           "doc": "Stable route options for products using the original writer contract."
         },
         {
+          "name": "createProtectedRuntimeChatProducer",
+          "kind": "function",
+          "signature": "(options: ProtectedRuntimeChatOptions) => ChatTurnRouteProducer",
+          "doc": "Run a profile through the protected Router tool executor and the shared chat projection."
+        },
+        {
           "name": "createSandboxChatProducer",
           "kind": "function",
           "signature": "(options: SandboxChatProducerOptions) => ChatTurnRouteProducer",
@@ -2199,6 +2207,12 @@
           "kind": "function",
           "signature": "(parts: ChatTurnPartInput[]) => number",
           "doc": "Calculate the total byte size of an array of chat turn parts"
+        },
+        {
+          "name": "ProtectedRuntimeChatOptions",
+          "kind": "interface",
+          "signature": "interface ProtectedRuntimeChatOptions",
+          "doc": null
         },
         {
           "name": "RawAgentFilePart",
@@ -9300,6 +9314,84 @@
       ]
     },
     {
+      "id": "./public-consultation",
+      "source": "src/public-consultation/index.ts",
+      "dependsOn": [
+        "chat-routes",
+        "stream",
+        "tools"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "ConsultationAgent",
+          "kind": "interface",
+          "signature": "interface ConsultationAgent",
+          "doc": null
+        },
+        {
+          "name": "ConsultationConsumer",
+          "kind": "interface",
+          "signature": "interface ConsultationConsumer",
+          "doc": "Authenticated server identity."
+        },
+        {
+          "name": "ConsultationExecution",
+          "kind": "interface",
+          "signature": "interface ConsultationExecution",
+          "doc": null
+        },
+        {
+          "name": "ConsultationExecutionControl",
+          "kind": "interface",
+          "signature": "interface ConsultationExecutionControl",
+          "doc": null
+        },
+        {
+          "name": "ConsultationIdentity",
+          "kind": "interface",
+          "signature": "interface ConsultationIdentity",
+          "doc": null
+        },
+        {
+          "name": "createKnowledgePublication",
+          "kind": "function",
+          "signature": "(input: { id: string; revision: string; ownerId: string; systemPrompt: string; index: KnowledgeIndex; pageIds: readonly…",
+          "doc": "Select content at publication time, before any payer or model input exists."
+        },
+        {
+          "name": "createPublicConsultation",
+          "kind": "function",
+          "signature": "(options: PublicConsultationOptions) => { authorizeConsumer(agent: ConsultationAgent, consumer: ConsultationConsumer):…",
+          "doc": "Compose gateway admission, scoped knowledge and the maintained persisted chat route."
+        },
+        {
+          "name": "KnowledgePublication",
+          "kind": "interface",
+          "signature": "interface KnowledgePublication",
+          "doc": "A server-created publication."
+        },
+        {
+          "name": "PreparedConsultationExecution",
+          "kind": "type",
+          "signature": "type PreparedConsultationExecution",
+          "doc": null
+        },
+        {
+          "name": "PublicConsultationOptions",
+          "kind": "interface",
+          "signature": "interface PublicConsultationOptions",
+          "doc": null
+        },
+        {
+          "name": "PublishedKnowledgePage",
+          "kind": "interface",
+          "signature": "interface PublishedKnowledgePage",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./record",
       "source": "src/record/index.ts",
       "dependsOn": [],
@@ -9876,6 +9968,12 @@
           "doc": "Build a `streamTurn` that calls an OpenAI-compatible `/chat/completions` endpoint (Tangle Router / tcloud / any compat provider) with `stream: true` and yields `LoopEvent`s via {@link toLoopEvents}."
         },
         {
+          "name": "createRouterProtectedModelPort",
+          "kind": "function",
+          "signature": "(options: RouterProtectedModelPortOptions) => AgentCandidateModelPort",
+          "doc": "Bind one turn to Router's atomic grant ledger without exposing its parent key."
+        },
+        {
           "name": "createSurfaceRegistry",
           "kind": "function",
           "signature": "(kinds: readonly AnySurfaceKind[]) => SurfaceRegistry",
@@ -10002,6 +10100,12 @@
           "doc": "Minimal OpenAI Chat Completions streaming chunk (structural — no `openai` dep)."
         },
         {
+          "name": "ProtectedModelSettlementError",
+          "kind": "class",
+          "signature": "class ProtectedModelSettlementError",
+          "doc": "A validated charge remains authoritative when the product cannot save its audit record."
+        },
+        {
           "name": "resolveCatalogModelId",
           "kind": "function",
           "signature": "(models: readonly CatalogModel[], selectedId?: string | undefined, fallbackId?: string | undefined) => string | undefin…",
@@ -10078,6 +10182,18 @@
           "kind": "interface",
           "signature": "interface RouterModel",
           "doc": "Model catalogue — computed live from the Tangle Router, never hand-curated."
+        },
+        {
+          "name": "RouterProtectedModelPortOptions",
+          "kind": "interface",
+          "signature": "interface RouterProtectedModelPortOptions",
+          "doc": null
+        },
+        {
+          "name": "RouterProtectedModelSettlement",
+          "kind": "interface",
+          "signature": "interface RouterProtectedModelSettlement",
+          "doc": null
         },
         {
           "name": "runAppToolLoop",
@@ -10275,8 +10391,8 @@
         {
           "name": "attachReasoningEffort",
           "kind": "function",
-          "signature": "(profile: AgentProfile, harness: Harness, effort: \"auto\" | \"none\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" | \"…",
-          "doc": "Attach a specified reasoning effort level to an agent profile for a given harness"
+          "signature": "(profile: AgentProfile, _harness: Harness, effort: \"auto\" | \"none\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" |…",
+          "doc": "Attach explicit effort through the portable model contract consumed by providers."
         },
         {
           "name": "buildAppToolMcpServers",
@@ -10403,12 +10519,6 @@
           "kind": "const",
           "signature": "SandboxResourceConfig",
           "doc": "Define default resource limits and settings for sandbox environments"
-        },
-        {
-          "name": "DEFAULT_SIDECAR_PROCESS_PATTERN",
-          "kind": "const",
-          "signature": "\"opencode|claude|codex\"",
-          "doc": "Default ERE passed to `pgrep -f` when a liveness probe does not override the harness-process matcher."
         },
         {
           "name": "deferredCorpusHash",
@@ -10594,7 +10704,7 @@
           "name": "LivenessProbeConfig",
           "kind": "interface",
           "signature": "interface LivenessProbeConfig",
-          "doc": "Define configuration for liveness probes including sidecar process pattern and optional timeouts"
+          "doc": "Configure runtime exec verification before reusing a sandbox."
         },
         {
           "name": "MemberSyncSeam",
@@ -20358,6 +20468,159 @@
       ]
     },
     {
+      "id": "./web-react/session-gateway",
+      "source": "src/web-react/session-gateway.ts",
+      "dependsOn": [
+        "brand",
+        "chat-routes",
+        "chat-store",
+        "harness",
+        "interactions",
+        "missions",
+        "plans",
+        "platform",
+        "runtime",
+        "session-shell",
+        "trace",
+        "work-product"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "APPLIED_SEQ_CAP",
+          "kind": "const",
+          "signature": "100000",
+          "doc": "Default bound on applied sequence ids retained by one attachment."
+        },
+        {
+          "name": "createSessionGatewayLane",
+          "kind": "function",
+          "signature": "(options: SessionGatewayLaneOptions) => SessionGatewayLiveViewConnector",
+          "doc": "Build a browser-direct Sandbox live-view connector."
+        },
+        {
+          "name": "createSessionStreamGrantFetcher",
+          "kind": "function",
+          "signature": "(options: SessionStreamGrantFetcherOptions) => (signal: AbortSignal) => Promise<SessionStreamGrant | null>",
+          "doc": "Build a grant fetcher that never throws."
+        },
+        {
+          "name": "GATEWAY_TERMINAL_EVENT_TYPES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "Event types that terminate a Sandbox execution."
+        },
+        {
+          "name": "GATEWAY_TRANSPORT_NOTICE_TYPES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "Gateway bookkeeping events that are not turn feedback."
+        },
+        {
+          "name": "gatewayFrameToTurnEvent",
+          "kind": "function",
+          "signature": "(raw: unknown) => GatewayTurnEvent | null",
+          "doc": "Decode one raw `onAgentEvent` payload into the event shape a turn reducer consumes."
+        },
+        {
+          "name": "GatewayTurnEvent",
+          "kind": "interface",
+          "signature": "interface GatewayTurnEvent",
+          "doc": "A decoded event from the raw Sandbox gateway payload."
+        },
+        {
+          "name": "isGatewayTransportNotice",
+          "kind": "function",
+          "signature": "(type: string) => boolean",
+          "doc": "Report whether a decoded event is gateway bookkeeping."
+        },
+        {
+          "name": "isTerminalGatewayEvent",
+          "kind": "function",
+          "signature": "(type: string) => boolean",
+          "doc": "Report whether a decoded event ends the execution."
+        },
+        {
+          "name": "parseSessionStreamGrant",
+          "kind": "function",
+          "signature": "(body: unknown) => SessionStreamGrant | null",
+          "doc": "Parse a grant response."
+        },
+        {
+          "name": "ReplayCursorStorage",
+          "kind": "interface",
+          "signature": "interface ReplayCursorStorage",
+          "doc": "Structural replay storage accepted by the SDK client."
+        },
+        {
+          "name": "SessionGatewayClientConfigLike",
+          "kind": "interface",
+          "signature": "interface SessionGatewayClientConfigLike",
+          "doc": "Subset of the SDK client configuration used by this adapter."
+        },
+        {
+          "name": "SessionGatewayClientFactory",
+          "kind": "type",
+          "signature": "type SessionGatewayClientFactory",
+          "doc": "Injectable SDK-client constructor, used for tests and alternate transports."
+        },
+        {
+          "name": "SessionGatewayClientLike",
+          "kind": "interface",
+          "signature": "interface SessionGatewayClientLike",
+          "doc": "Minimal structural surface of the SDK session gateway client."
+        },
+        {
+          "name": "SessionGatewayLaneOptions",
+          "kind": "interface",
+          "signature": "interface SessionGatewayLaneOptions",
+          "doc": "Options for {@link createSessionGatewayLane}."
+        },
+        {
+          "name": "SessionGatewayLiveViewAttachment",
+          "kind": "interface",
+          "signature": "interface SessionGatewayLiveViewAttachment",
+          "doc": "A handle that stops one gateway attachment."
+        },
+        {
+          "name": "SessionGatewayLiveViewConnector",
+          "kind": "type",
+          "signature": "type SessionGatewayLiveViewConnector",
+          "doc": "Structural connector returned by {@link createSessionGatewayLane}."
+        },
+        {
+          "name": "SessionGatewayLiveViewHandlers",
+          "kind": "interface",
+          "signature": "interface SessionGatewayLiveViewHandlers",
+          "doc": "Callbacks driven by one live gateway attachment."
+        },
+        {
+          "name": "SessionGrantUnavailableReason",
+          "kind": "type",
+          "signature": "type SessionGrantUnavailableReason",
+          "doc": "Common soft-miss reasons a product grant route may report."
+        },
+        {
+          "name": "SessionStreamGrant",
+          "kind": "interface",
+          "signature": "interface SessionStreamGrant",
+          "doc": "A short-lived, read-only grant for one session's gateway stream."
+        },
+        {
+          "name": "SessionStreamGrantFetcherOptions",
+          "kind": "interface",
+          "signature": "interface SessionStreamGrantFetcherOptions",
+          "doc": "Options for a product-owned grant fetcher."
+        },
+        {
+          "name": "SessionStreamGrantResponse",
+          "kind": "type",
+          "signature": "type SessionStreamGrantResponse",
+          "doc": "The grant endpoint response accepted by {@link parseSessionStreamGrant}."
+        }
+      ]
+    },
+    {
       "id": "./web-react/terminal",
       "source": "src/web-react/terminal.ts",
       "dependsOn": [
@@ -20469,7 +20732,7 @@
           "name": "CLAIM_SUPPORT_CHECK",
           "kind": "const",
           "signature": "\"claim_support\"",
-          "doc": "Platform check: how many quoted evidence entries anchor to text that actually CARRIES the figure the entry claims."
+          "doc": "Numeric-only platform check, omitted when no entries are checkable."
         },
         {
           "name": "ClaimSupport",

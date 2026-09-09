@@ -41,10 +41,11 @@
  *     `productSyncEvents`) — the gateway is per-session;
  *   • the durable TURN-EVENT rows + running-turn index
  *     (`createDurableObjectTurnEventStore`) that `runDetachedTurn` streams
- *     into — a detached run (`dispatchPrompt({ detach: true })`,
- *     `driveTurn`) goes through `streamPrompt` internally, so it never
- *     reaches the gateway at all. Autonomous work a browser must tail has
- *     no other path today.
+ *     into — stream/dispatch detached runs (`dispatchPrompt({ detach: true })`,
+ *     `streamPrompt`) do not reach the gateway on the measured path. Sandbox
+ *     0.37 `driveTurn` uses the session message lane and is gateway-visible
+ *     by SDK contract. Autonomous stream/dispatch work a browser must tail
+ *     still needs the durable rows.
  *
  * DEPRECATED — duplicates the SDK:
  *   • the interactive per-turn REBROADCAST/replay on the thread channel

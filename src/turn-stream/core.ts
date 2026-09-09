@@ -21,12 +21,15 @@
  *   | ------------------------------------ | --------------- | --------------- |
  *   | `box.streamPrompt()` (run/stream)    | 71 / 527 / 408  | 0 / 0 / 0       |
  *   | `box.session(id).sendMessage()`      | 297             | 297             |
+ *   | `box.driveTurn()` (Sandbox 0.37+)    | —               | SDK contract    |
  *
  * `POST /agents/run/stream` publishes nothing to the sidecar session event
  * bus, so a `SessionGatewayClient` attached to that session receives zero
  * turn events — three different session-id strategies all got 0, the id was
  * not the variable. `POST /agents/sessions/{id}/messages` publishes to the
  * bus and the gateway delivered every frame, byte-matching the sidecar tail.
+ * Sandbox 0.37 admits `driveTurn` through the session message lane, so the
+ * gateway can observe it. That is an SDK contract, not a new production count.
  *
  * Consequences for this module, and they cut both ways:
  *
@@ -37,12 +40,11 @@
  *    That half is `@deprecated` (see the tags on {@link createSegmentStore},
  *    {@link appendSegmentEvent}, {@link replayActiveSegment} and
  *    `broadcastTurnStreamEvent` in `./adapters`).
- * 2. DETACHED/autonomous turns are INVISIBLE to the gateway:
- *    `dispatchPrompt({ detach: true })` and `driveTurn` both go through
- *    `streamPrompt` internally, i.e. the run/stream lane, which does not fan
- *    out. A browser that must tail an unattended run still needs a buffer —
- *    `runDetachedTurn` (`/chat-routes`) over the durable turn-event rows
- *    below. That half is NOT deprecated and has no SDK replacement today.
+ * 2. Detached turns driven through `dispatchPrompt({ detach: true })` or
+ *    `streamPrompt` remain on the run/stream lane and need a buffer when a
+ *    browser must tail them. Sandbox 0.37 `driveTurn` is different: it uses
+ *    the session message lane and the gateway can observe it. The buffer
+ *    remains the path for stream/dispatch runs and has no SDK replacement.
  * 3. The LOCK and the per-workspace SIGNALS have no gateway equivalent at
  *    all (the gateway is per-session and read-only). They stay canonical.
  *
@@ -119,9 +121,9 @@ export function turnLockChannelKey(workspaceId: string, threadId: string, scope:
 
 /** Generate a storage channel key string for a given turn identifier.
  *
- *  KEPT and canonical: the DETACHED lane's durable turn-event rows live on
- *  this instance. A detached run never reaches the session gateway, so this
- *  is the only way a browser tails one. */
+ *  KEPT and canonical: durable turn-event rows for stream/dispatch detached
+ *  runs live on this instance. Those run/stream paths do not reach the
+ *  session gateway, so this is how a browser tails one. */
 export function turnStorageChannelKey(turnId: string): string {
   return `turn:${turnId}`
 }
@@ -160,8 +162,8 @@ export interface SegmentStore {
  *  self-heals via the final `result` event + loader revalidation).
  *
  *  @deprecated Sizes the interactive turn-rebroadcast buffer only. The
- *  DETACHED lane's durable rows (`turnEvent:` storage) are uncapped and are
- *  not affected. */
+ *  stream/dispatch detached lanes' durable rows (`turnEvent:` storage) are
+ *  uncapped and are not affected. */
 export const MAX_SEGMENT_EVENTS = 2000
 
 /** Recent `thread.created` markers kept for late-connecting sidebars.
@@ -182,7 +184,8 @@ export const ACTIVITY_TTL_MS = 15 * 60 * 1000
  *  the browser attach with `box.mintScopedToken({ scope: 'session' })` +
  *  `SessionGatewayClient`. Sandbox-FREE turns: `/stream`'s
  *  `replayTurnEvents` (`GET /chat/stream/:turnId`) already follows a running
- *  turn from a cursor. Detached turns keep the durable turn-event rows —
+ *  turn from a cursor. Stream/dispatch detached turns keep the durable
+ *  turn-event rows —
  *  they are a different, non-deprecated lane. Removal is a major-version
  *  change; nothing is deleted here. */
 export function createSegmentStore(): SegmentStore {
