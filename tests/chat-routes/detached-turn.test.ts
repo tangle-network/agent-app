@@ -36,6 +36,21 @@ describe('runDetachedTurn', () => {
     expect(buffered.length).toBeGreaterThan(0)
   })
 
+  it('returns native provider usage when detached execution has no step-finish receipt', async () => {
+    const snapshot = { type: 'usage', usage: { promptTokens: 71225, completionTokens: 9504, providerCostUsd: 0 } }
+    async function* events() {
+      yield { type: 'text', text: 'Saved the report.' }
+      yield snapshot
+      yield snapshot
+      yield { type: 'done' }
+    }
+    const result = await runDetachedTurn({
+      store: createMemoryTurnEventStore(), turnId: 'native-usage', scopeId: 'background-report', events: events(),
+    })
+    expect(result.state).toBe('completed')
+    expect(result.usage).toEqual({ inputTokens: 71225, outputTokens: 9504, costUsd: 0 })
+  })
+
   it('returns and persists requested-versus-served model attribution', async () => {
     const store = createMemoryTurnEventStore()
     const rows: Array<Record<string, unknown> & {

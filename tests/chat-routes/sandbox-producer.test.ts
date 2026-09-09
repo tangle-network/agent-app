@@ -446,6 +446,30 @@ describe('createSandboxChatProducer', () => {
     ])
   })
 
+  it('captures cumulative native usage snapshots without double counting retries or step totals', async () => {
+    const snapshot = { type: 'usage', usage: { promptTokens: 71225, completionTokens: 9504, reasoningTokens: 11, providerCostUsd: 0 } }
+    const producer = createSandboxChatProducer({ events: feed([
+      partUpdated({ type: 'step-finish', tokens: { input: 40, output: 20 }, cost: 0.01 }),
+      snapshot,
+      snapshot,
+      { type: 'done' },
+    ]) })
+    const events = await drain(producer.stream)
+    expect(events.filter((event) => event.type === 'usage').slice(-2)).toEqual([snapshot, snapshot])
+    expect(producer.usage?.()).toEqual({ inputTokens: 71225, outputTokens: 9504, reasoningTokens: 11, costUsd: 0 })
+  })
+
+  it('retains authoritative zero usage and rejects malformed native snapshots', async () => {
+    const producer = createSandboxChatProducer({ events: feed([
+      { type: 'usage', usage: { promptTokens: 9, completionTokens: 4, providerCostUsd: 0.02 } },
+      { type: 'usage', usage: { promptTokens: 0, completionTokens: 0, reasoningTokens: 0, providerCostUsd: 0 } },
+      { type: 'usage', usage: { promptTokens: 'unavailable', completionTokens: 8 } },
+      { type: 'usage', usage: { promptTokens: -1, completionTokens: 8 } },
+    ]) })
+    await drain(producer.stream)
+    expect(producer.usage?.()).toEqual({ inputTokens: 0, outputTokens: 0, reasoningTokens: 0, costUsd: 0 })
+  })
+
   it('uses rich terminal done usage and emits the authoritative token totals', async () => {
     const producer = createSandboxChatProducer({
       events: feed([{

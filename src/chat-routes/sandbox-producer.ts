@@ -261,6 +261,19 @@ function extractReportedTurnUsage(data: JsonRecord | null | undefined): ChatTurn
   return reported
 }
 
+/** Native runtime usage events contain cumulative totals, including repeated terminal snapshots. */
+function extractUsageSnapshot(value: JsonRecord | null | undefined): ChatTurnUsage | null {
+  const inputTokens = toFiniteNumber(value?.promptTokens)
+  const outputTokens = toFiniteNumber(value?.completionTokens)
+  if (inputTokens === null || outputTokens === null || inputTokens < 0 || outputTokens < 0) return null
+  const reported: ChatTurnUsage = { inputTokens, outputTokens }
+  const reasoningTokens = toFiniteNumber(value?.reasoningTokens)
+  if (reasoningTokens !== null && reasoningTokens >= 0) reported.reasoningTokens = reasoningTokens
+  const costUsd = toFiniteNumber(value?.providerCostUsd)
+  if (costUsd !== null && costUsd >= 0) reported.costUsd = costUsd
+  return reported
+}
+
 function applyTerminalUsage(reported: ChatTurnUsage, usage: ChatTurnUsage): void {
   usage.inputTokens = reported.inputTokens
   usage.outputTokens = reported.outputTokens
@@ -737,6 +750,13 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           }
           // The flattened notice is additive; existing raw-warning consumers keep
           // receiving the original event too.
+          yield toProducerWireEvent(record)
+          continue
+        }
+
+        if (event.type === 'usage') {
+          const reported = extractUsageSnapshot(asRecord(record.usage))
+          if (reported) applyTerminalUsage(reported, usage)
           yield toProducerWireEvent(record)
           continue
         }
