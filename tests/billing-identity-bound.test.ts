@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createIdentityBoundWorkspaceKeyManager,
+  type DurableWorkspaceKeyConditionalWrites,
   type DurableWorkspaceKeyManager,
   type DurableWorkspaceKeyProvisioner,
   type DurableWorkspaceKeyRecord,
@@ -46,7 +47,37 @@ function makeHarness() {
   let renewalDelayMs = 0
   let failRenewal = false
   let failMarkPending = false
-  let lastCreateInput: { name: string; product: string; budgetUsd: number; expiresAt: string } | null = null
+  let createStartedResolve: (() => void) | null = null
+  const createInputs: Array<{ name: string; product: string; budgetUsd: number; expiresAt: string; idempotencyKey: string }> = []
+
+  const markProvisioningRemote = async (input: { id: string; keyId: string }): Promise<boolean> => {
+    const row = rows.get(input.id)
+    if (!row) throw new Error(`unknown row ${input.id}`)
+    if (row.status !== 'provisioning') return false
+    row.keyId = input.keyId
+    return true
+  }
+  const markActive = async (input: {
+    id: string
+    keyId: string
+    keyEncrypted: string
+    expiresAt: Date
+    budgetUsd: number
+  }): Promise<boolean> => {
+    const row = rows.get(input.id)
+    if (!row) throw new Error(`unknown row ${input.id}`)
+    if (row.status !== 'provisioning') return false
+    row.keyId = input.keyId
+    row.keyEncrypted = input.keyEncrypted
+    row.expiresAt = input.expiresAt
+    row.budgetUsd = input.budgetUsd
+    row.status = 'active'
+    return true
+  }
+  const conditionalWrites: DurableWorkspaceKeyConditionalWrites = {
+    markProvisioningRemote,
+    markActive,
+  }
 
   const store: DurableWorkspaceKeyStore = {
     async getActive(scope) {
@@ -68,23 +99,17 @@ function makeHarness() {
       rows.set(record.id, { ...record })
     },
     async markProvisioningRemote(input) {
-      const row = rows.get(input.id)
-      if (!row) throw new Error(`unknown row ${input.id}`)
-      row.keyId = input.keyId
+      await markProvisioningRemote(input)
     },
     async markActive(input) {
-      const row = rows.get(input.id)
-      if (!row) throw new Error(`unknown row ${input.id}`)
-      row.keyId = input.keyId
-      row.keyEncrypted = input.keyEncrypted
-      row.expiresAt = input.expiresAt
-      row.budgetUsd = input.budgetUsd
-      row.status = 'active'
+      await markActive(input)
     },
+    conditionalWrites,
     async markRevocationPending(input) {
       if (failMarkPending) throw new Error('state store unavailable')
       const row = rows.get(input.id)
       if (!row) throw new Error(`unknown row ${input.id}`)
+      if (row.status === 'revoked' || row.status === 'orphaned') return
       row.status = 'revocation_pending'
       row.nextRevocationAt = input.nextAttemptAt
       row.lastRevocationError = input.error ?? null
@@ -132,9 +157,15 @@ function makeHarness() {
     },
   }
 
+  const createdByIdentity = new Map<string, RemoteKey>()
   const provisioner: DurableWorkspaceKeyProvisioner = {
+    supportsIdempotentCreate: true,
     async createKey(input) {
-      lastCreateInput = input
+      createInputs.push(input)
+      const previous = createdByIdentity.get(input.idempotencyKey)
+      if (previous) return { id: previous.id, key: previous.key, budgetUsd: previous.budgetUsd, expiresAt: previous.expiresAt }
+      createStartedResolve?.()
+      createStartedResolve = null
       if (createDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, createDelayMs))
       keyNumber += 1
       const id = returnMissingId ? '' : `remote-${keyNumber}`
@@ -151,6 +182,7 @@ function makeHarness() {
         expiresAt: input.expiresAt,
         revoked: false,
       })
+      createdByIdentity.set(input.idempotencyKey, remote.get(remoteId)!)
       const failure = createFailure
       createFailure = null
       returnMissingId = false
@@ -219,6 +251,7 @@ function makeHarness() {
       sourceKeyId,
       sourceKeyFingerprint: sourceKeyId ? `fingerprint-${sourceKeyId}` : 'fingerprint-none',
       name: `router:workspace-1:crashed-attempt`,
+      idempotencyKey: `workspace-key:row-${rowNumber}`,
       keyId: 'provisioning:crashed-attempt',
       keyEncrypted: '',
       budgetUsd: 25,
@@ -253,7 +286,9 @@ function makeHarness() {
     setReturnMissingId(value: boolean) { returnMissingId = value },
     failRevocationFor(value: string | null) { failNextRevocationFor = value },
     setRevocationFailure(value: Error) { revocationFailure = value },
-    getLastCreateInput() { return lastCreateInput },
+    getLastCreateInput() { return createInputs.at(-1) ?? null },
+    getCreateInputs() { return createInputs },
+    waitForCreateStart() { return new Promise<void>((resolve) => { createStartedResolve = resolve }) },
     getRenewalCount() { return renewalCount },
   }
 }
@@ -271,6 +306,37 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(h.remote.get(first[0]!.usage.keyId)?.product).toBe('router')
     expect(h.remote.get(sandboxKey.usage.keyId)?.product).toBe('sandbox')
     expect([...h.rows.values()].filter((row) => row.status === 'active')).toHaveLength(2)
+  })
+
+  it('keeps legacy void lifecycle stores compatible', async () => {
+    const h = makeHarness()
+    const { conditionalWrites: _conditionalWrites, ...legacyMethods } = h.store
+    const legacyStore: DurableWorkspaceKeyStore = {
+      ...legacyMethods,
+      async markProvisioningRemote(input) {
+        await h.store.markProvisioningRemote(input)
+      },
+      async markActive(input) {
+        await h.store.markActive(input)
+      },
+    }
+    const manager = createIdentityBoundWorkspaceKeyManager({
+      store: legacyStore,
+      provisioner: h.provisioner,
+      crypto: {
+        async encrypt(value) { return `encrypted:${value}` },
+        async decrypt(value) { return value.slice('encrypted:'.length) },
+      },
+      product: 'router',
+      defaultBudgetUsd: 25,
+      now: () => new Date(START),
+    })
+
+    const result = await manager.ensureKey(h.identity())
+
+    expect(result.usage.keyId).toBe('remote-1')
+    expect([...h.rows.values()].find((row) => row.keyId === 'remote-1')?.status).toBe('active')
+    expect(h.remote.get('remote-1')?.revoked).toBe(false)
   })
 
   it('uses the durable lease across manager instances', async () => {
@@ -333,6 +399,131 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(h.remote.get('crashed-remote')?.revoked).toBe(true)
     expect(result.usage.keyId).toBe('remote-1')
     expect(h.rows.get(row.id)?.status).toBe('revoked')
+  })
+
+  it('keeps an undiscovered committed child pending when creation is not idempotent', async () => {
+    const h = makeHarness()
+    const row = h.insertProvisioning()
+    h.remote.set('hidden-original', {
+      id: 'hidden-original', key: 'original-secret', name: row.name!, product: row.product,
+      sourceKeyId: row.sourceKeyId, budgetUsd: 25, budgetSpent: 0,
+      expiresAt: row.expiresAt.toISOString(), revoked: false,
+    })
+    const manager = h.manager('router', {
+      provisioner: { ...h.provisioner, supportsIdempotentCreate: undefined, findCreatedKeys: async () => [] },
+    })
+    await expect(manager.ensureKey(h.identity())).rejects.toThrow('cleanup is pending')
+    expect(h.getCreateInputs()).toHaveLength(0)
+    expect(h.rows.get(row.id)?.status).toBe('revocation_pending')
+    expect(h.remote.get('hidden-original')?.revoked).toBe(false)
+    h.advance(60_000)
+    await h.manager('router').ensureKey(h.identity())
+    expect(h.remote.get('hidden-original')?.revoked).toBe(true)
+  })
+
+  it('probes an empty provisioning row with its persisted create identity', async () => {
+    const h = makeHarness()
+    const row = h.insertProvisioning()
+
+    const result = await h.manager('router').ensureKey(h.identity())
+    const inputs = h.getCreateInputs()
+
+    expect(inputs[0]).toMatchObject({
+      name: row.name,
+      idempotencyKey: row.idempotencyKey,
+      budgetUsd: row.budgetUsd,
+      expiresAt: row.expiresAt.toISOString(),
+    })
+    expect(inputs[1]?.idempotencyKey).not.toBe(row.idempotencyKey)
+    expect(h.remote.get('remote-1')?.revoked).toBe(true)
+    expect(row.status).toBe('revoked')
+    expect(result.usage.keyId).toBe('remote-2')
+  })
+
+  it('replays an idempotent create to revoke the original child hidden from discovery', async () => {
+    const h = makeHarness()
+    const row = h.insertProvisioning()
+    const original = await h.provisioner.createKey({ name: row.name!, product: row.product,
+      budgetUsd: row.budgetUsd, expiresAt: row.expiresAt.toISOString(), idempotencyKey: row.idempotencyKey! })
+    const manager = h.manager('router', {
+      provisioner: { ...h.provisioner, findCreatedKeys: async () => [] },
+    })
+    const result = await manager.ensureKey(h.identity())
+    if (!original.id) throw new Error('Fixture create did not return its original id')
+    expect(h.remote.get(original.id)?.revoked).toBe(true)
+    expect(h.remote.size).toBe(2)
+    expect(result.usage.keyId).not.toBe(original.id)
+    expect(h.getCreateInputs()[1]?.idempotencyKey).toBe(row.idempotencyKey)
+  })
+
+  it('keeps a legacy empty row pending instead of inventing a new create identity', async () => {
+    const h = makeHarness()
+    const row = h.insertProvisioning()
+    delete row.idempotencyKey
+
+    await expect(h.manager('router').ensureKey(h.identity())).rejects.toThrow('cleanup is pending')
+    expect(h.getCreateInputs()).toHaveLength(0)
+    expect(h.rows.get(row.id)?.status).toBe('revocation_pending')
+  })
+
+  it('retries an empty pending row when the caller supplies its full identity', async () => {
+    const h = makeHarness()
+    const row = h.insertProvisioning()
+    h.rows.set(row.id, { ...row, status: 'revocation_pending', nextRevocationAt: new Date(START) })
+
+    expect(await h.manager('router').retryPendingRevocations({
+      workspaceId: 'workspace-1',
+      ownerUserId: 'owner-1',
+    }, h.identity())).toBe(1)
+    expect(h.rows.get(row.id)?.status).toBe('revoked')
+    expect(h.remote.get('remote-1')?.revoked).toBe(true)
+  })
+
+  it('keeps a source-mismatched empty provisioning row pending instead of orphaning it', async () => {
+    const h = makeHarness()
+    const row = h.insertProvisioning({ sourceKeyId: 'old-source', sourceKeyFingerprint: 'old-fingerprint' })
+
+    await expect(h.manager('router').ensureKey(h.identity())).rejects.toThrow('cleanup is pending')
+    expect(h.rows.get(row.id)?.status).toBe('revocation_pending')
+    expect(h.rows.get(row.id)?.status).not.toBe('orphaned')
+  })
+
+  it('uses the recovery provisioner for historical reads and revokes after source rotation', async () => {
+    const h = makeHarness()
+    const first = await h.manager('router').ensureKey(h.identity())
+    const recoveryRevocations: string[] = []
+    const recoveryProvisioner: DurableWorkspaceKeyProvisioner = {
+      ...h.provisioner,
+      async revokeKey(id) {
+        recoveryRevocations.push(id)
+        return h.provisioner.revokeKey(id)
+      },
+    }
+    const sourceProvisioner: DurableWorkspaceKeyProvisioner = {
+      ...h.provisioner,
+      async getKey() { throw new Error('rotated source is no longer authorized') },
+      async revokeKey() { throw new Error('rotated source cannot revoke historical child') },
+      async findCreatedKeys() { throw new Error('rotated source cannot list historical children') },
+    }
+    const manager = createIdentityBoundWorkspaceKeyManager({
+      store: h.store,
+      provisioner: sourceProvisioner,
+      recoveryProvisioner,
+      crypto: {
+        async encrypt(value) { return `encrypted:${value}` },
+        async decrypt(value) { return value.slice('encrypted:'.length) },
+      },
+      product: 'router',
+      defaultBudgetUsd: 25,
+      now: () => new Date(START),
+    })
+
+    expect((await manager.getUsage(h.identity()))?.keyId).toBe(first.usage.keyId)
+    h.remote.get(first.usage.keyId)!.expiresAt = new Date(START - 1).toISOString()
+    const replacement = await manager.ensureKey(h.identity())
+
+    expect(recoveryRevocations).toContain(first.usage.keyId)
+    expect(replacement.usage.keyId).not.toBe(first.usage.keyId)
   })
 
   it('requires an explicit legacy-name resolver for pre-name provisioning rows', async () => {
@@ -556,6 +747,57 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(h.getRenewalCount()).toBeGreaterThan(0)
     expect([...h.rows.values()].some((row) => row.status === 'active')).toBe(false)
     expect([...h.remote.values()][0]?.revoked).toBe(true)
+  })
+
+  it('fences a paused creator when another worker retires its provisioning row', async () => {
+    const h = makeHarness()
+    h.setCreateDelay(20)
+    const inFlight = h.manager('router').ensureKey(h.identity())
+    await h.waitForCreateStart()
+    const row = [...h.rows.values()].find((candidate) => candidate.status === 'provisioning')
+    expect(row).toBeDefined()
+    row!.status = 'revoked'
+
+    await expect(inFlight).rejects.toThrow('retired before the remote id was recorded')
+    expect([...h.rows.values()].some((candidate) => candidate.status === 'active')).toBe(false)
+    expect([...h.remote.values()][0]?.revoked).toBe(true)
+  })
+
+  it.each(['record-remote', 'activate'] as const)('retains failed cleanup after a retired creator loses %s fencing', async stage => {
+    const h = makeHarness()
+    h.setCreateDelay(20)
+    const manager = h.manager('router')
+    const inFlight = manager.ensureKey(h.identity())
+    await h.waitForCreateStart()
+    const row = [...h.rows.values()].find(candidate => candidate.status === 'provisioning')!
+    if (stage === 'record-remote') row.status = 'revoked'
+    else h.store.conditionalWrites!.markActive = async () => { row.status = 'revoked'; return false }
+    h.failRevocationFor('remote-1')
+    await expect(inFlight).rejects.toThrow('retired before')
+    expect(h.remote.get('remote-1')?.revoked).toBe(false)
+    expect([...h.rows.values()].some(candidate => candidate.status === 'revocation_pending'
+      && candidate.keyId === 'remote-1')).toBe(true)
+    expect(row.status).toBe('revoked')
+    const restarted = h.manager('router')
+    await expect(restarted.ensureKey(h.identity())).rejects.toThrow('cleanup is pending')
+    expect(h.getCreateInputs()).toHaveLength(1)
+    h.advance(60_000)
+    expect(await restarted.retryPendingRevocations()).toBe(1)
+    expect(h.remote.get('remote-1')?.revoked).toBe(true)
+  })
+
+  it('reports a failed compensation write when both durable storage and revocation are unavailable', async () => {
+    const h = makeHarness()
+    h.setCreateDelay(20)
+    const inFlight = h.manager('router').ensureKey(h.identity())
+    await h.waitForCreateStart()
+    const row = [...h.rows.values()].find(candidate => candidate.status === 'provisioning')!
+    row.status = 'revoked'
+    h.store.insertProvisioning = async () => { throw new Error('storage unavailable') }
+    h.failRevocationFor('remote-1')
+    await expect(inFlight).rejects.toThrow('cleanup record could not be persisted')
+    expect(h.remote.get('remote-1')?.revoked).toBe(false)
+    expect([...h.rows.values()].some(candidate => candidate.status === 'revocation_pending')).toBe(false)
   })
 
   it('fails before remote spend when encryption is unavailable', async () => {
