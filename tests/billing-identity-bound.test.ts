@@ -763,6 +763,43 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect([...h.remote.values()][0]?.revoked).toBe(true)
   })
 
+  it.each(['record-remote', 'activate'] as const)('retains failed cleanup after a retired creator loses %s fencing', async stage => {
+    const h = makeHarness()
+    h.setCreateDelay(20)
+    const manager = h.manager('router')
+    const inFlight = manager.ensureKey(h.identity())
+    await h.waitForCreateStart()
+    const row = [...h.rows.values()].find(candidate => candidate.status === 'provisioning')!
+    if (stage === 'record-remote') row.status = 'revoked'
+    else h.store.conditionalWrites!.markActive = async () => { row.status = 'revoked'; return false }
+    h.failRevocationFor('remote-1')
+    await expect(inFlight).rejects.toThrow('retired before')
+    expect(h.remote.get('remote-1')?.revoked).toBe(false)
+    expect([...h.rows.values()].some(candidate => candidate.status === 'revocation_pending'
+      && candidate.keyId === 'remote-1')).toBe(true)
+    expect(row.status).toBe('revoked')
+    const restarted = h.manager('router')
+    await expect(restarted.ensureKey(h.identity())).rejects.toThrow('cleanup is pending')
+    expect(h.getCreateInputs()).toHaveLength(1)
+    h.advance(60_000)
+    expect(await restarted.retryPendingRevocations()).toBe(1)
+    expect(h.remote.get('remote-1')?.revoked).toBe(true)
+  })
+
+  it('reports a failed compensation write when both durable storage and revocation are unavailable', async () => {
+    const h = makeHarness()
+    h.setCreateDelay(20)
+    const inFlight = h.manager('router').ensureKey(h.identity())
+    await h.waitForCreateStart()
+    const row = [...h.rows.values()].find(candidate => candidate.status === 'provisioning')!
+    row.status = 'revoked'
+    h.store.insertProvisioning = async () => { throw new Error('storage unavailable') }
+    h.failRevocationFor('remote-1')
+    await expect(inFlight).rejects.toThrow('cleanup record could not be persisted')
+    expect(h.remote.get('remote-1')?.revoked).toBe(false)
+    expect([...h.rows.values()].some(candidate => candidate.status === 'revocation_pending')).toBe(false)
+  })
+
   it('fails before remote spend when encryption is unavailable', async () => {
     const h = makeHarness()
     let creates = 0

@@ -849,11 +849,26 @@ export function createIdentityBoundWorkspaceKeyManager(
       throw new Error('remote create returned no usable child key')
     }
 
-    onRemoteKey?.(provisioningRow, remoteId)
+    let cleanupRow = provisioningRow
+    onRemoteKey?.(cleanupRow, remoteId)
+
+    async function retainRetiredCreatorCleanup(): Promise<void> {
+      // A retired row cannot hold another pending transition. Persist the
+      // returned child separately before revocation so a failed revoke survives restart.
+      const retainedRow = { ...provisioningRow, id: operationId(), keyId: remoteId }
+      try {
+        await options.store.insertProvisioning(retainedRow)
+      } catch (cause) {
+        throw new Error('returned child cleanup record could not be persisted', { cause })
+      }
+      cleanupRow = retainedRow
+      onRemoteKey?.(cleanupRow, remoteId)
+    }
 
     try {
       const recorded = await markProvisioningRemote(options.store, { id: rowId, keyId: remoteId })
       if (!recorded) {
+        await retainRetiredCreatorCleanup()
         throw new Error('workspace child-key provisioning row was retired before the remote id was recorded')
       }
       const keyEncrypted = await options.crypto.encrypt(secret)
@@ -870,16 +885,17 @@ export function createIdentityBoundWorkspaceKeyManager(
         budgetUsd: activeBudgetUsd,
       })
       if (!activated) {
+        await retainRetiredCreatorCleanup()
         throw new Error('workspace child-key provisioning row was retired before activation')
       }
     } catch (error) {
       // A persistence failure must not strand the already-created remote key.
       try {
-        await markPending(rowId, error, false)
+        await markPending(cleanupRow.id, error, false)
       } catch {
         // revokePending below still has the remote id and attempts cleanup.
       }
-      await revokePending({ ...provisioningRow, keyId: remoteId, status: 'revocation_pending' }, identity)
+      await revokePending({ ...cleanupRow, keyId: remoteId, status: 'revocation_pending' }, identity)
       throw error
     }
 
