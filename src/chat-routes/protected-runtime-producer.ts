@@ -7,7 +7,7 @@ import {
 import { ProtectedModelSettlementError } from '../runtime/protected-model'
 import type { McpToolDefinition } from '../tools/mcp-rpc'
 import { createSandboxChatProducer } from './sandbox-producer'
-import type { ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
+import type { ChatRouteEvent, ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
 
 export interface ProtectedRuntimeChatOptions {
   profile: AgentProfile
@@ -161,13 +161,18 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
   return {
     ...producer,
     stream: (async function* () {
-      yield* producer.stream
+      let failure: ChatRouteEvent | undefined
+      for await (const event of producer.stream) {
+        if (event.type === 'error') failure = event
+        else yield event
+      }
       if (usage.inputTokens !== undefined && usage.outputTokens !== undefined && usage.costUsd !== undefined) {
         yield { type: 'usage' as const, usage: { promptTokens: usage.inputTokens,
           completionTokens: usage.outputTokens, providerCostUsd: usage.costUsd,
           reasoningTokens: usage.reasoningTokens, toolTokens,
           toolCallCount: toolCalls, budgetEnforced } }
       }
+      if (failure) yield failure
     })(),
     get model() { return model ?? profile.model?.default },
     usage: () => ({ ...usage }),

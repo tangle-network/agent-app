@@ -128,6 +128,7 @@ describe('protected Runtime chat producer', () => {
     ] })))
     const producer = createProtectedRuntimeChatProducer(options)
     const events = await drain(producer)
+    expect(events.findIndex(event => event.type === 'usage')).toBeLessThan(events.findIndex(event => event.type === 'error'))
     expect(effect).toHaveBeenCalledOnce()
     expect(events.some(event => event.type === 'error')).toBe(true)
     expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'failed' }))
