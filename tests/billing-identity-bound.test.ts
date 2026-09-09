@@ -157,9 +157,13 @@ function makeHarness() {
     },
   }
 
+  const createdByIdentity = new Map<string, RemoteKey>()
   const provisioner: DurableWorkspaceKeyProvisioner = {
+    supportsIdempotentCreate: true,
     async createKey(input) {
       createInputs.push(input)
+      const previous = createdByIdentity.get(input.idempotencyKey)
+      if (previous) return { id: previous.id, key: previous.key, budgetUsd: previous.budgetUsd, expiresAt: previous.expiresAt }
       createStartedResolve?.()
       createStartedResolve = null
       if (createDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, createDelayMs))
@@ -178,6 +182,7 @@ function makeHarness() {
         expiresAt: input.expiresAt,
         revoked: false,
       })
+      createdByIdentity.set(input.idempotencyKey, remote.get(remoteId)!)
       const failure = createFailure
       createFailure = null
       returnMissingId = false
@@ -396,6 +401,26 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(h.rows.get(row.id)?.status).toBe('revoked')
   })
 
+  it('keeps an undiscovered committed child pending when creation is not idempotent', async () => {
+    const h = makeHarness()
+    const row = h.insertProvisioning()
+    h.remote.set('hidden-original', {
+      id: 'hidden-original', key: 'original-secret', name: row.name!, product: row.product,
+      sourceKeyId: row.sourceKeyId, budgetUsd: 25, budgetSpent: 0,
+      expiresAt: row.expiresAt.toISOString(), revoked: false,
+    })
+    const manager = h.manager('router', {
+      provisioner: { ...h.provisioner, supportsIdempotentCreate: undefined, findCreatedKeys: async () => [] },
+    })
+    await expect(manager.ensureKey(h.identity())).rejects.toThrow('cleanup is pending')
+    expect(h.getCreateInputs()).toHaveLength(0)
+    expect(h.rows.get(row.id)?.status).toBe('revocation_pending')
+    expect(h.remote.get('hidden-original')?.revoked).toBe(false)
+    h.advance(60_000)
+    await h.manager('router').ensureKey(h.identity())
+    expect(h.remote.get('hidden-original')?.revoked).toBe(true)
+  })
+
   it('probes an empty provisioning row with its persisted create identity', async () => {
     const h = makeHarness()
     const row = h.insertProvisioning()
@@ -415,23 +440,29 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(result.usage.keyId).toBe('remote-2')
   })
 
-  it('recovers a legacy empty row without a persisted retry identity', async () => {
+  it('replays an idempotent create to revoke the original child hidden from discovery', async () => {
+    const h = makeHarness()
+    const row = h.insertProvisioning()
+    const original = await h.provisioner.createKey({ name: row.name!, product: row.product,
+      budgetUsd: row.budgetUsd, expiresAt: row.expiresAt.toISOString(), idempotencyKey: row.idempotencyKey! })
+    const manager = h.manager('router', {
+      provisioner: { ...h.provisioner, findCreatedKeys: async () => [] },
+    })
+    const result = await manager.ensureKey(h.identity())
+    expect(h.remote.get(original.id)?.revoked).toBe(true)
+    expect(h.remote.size).toBe(2)
+    expect(result.usage.keyId).not.toBe(original.id)
+    expect(h.getCreateInputs()[1]?.idempotencyKey).toBe(row.idempotencyKey)
+  })
+
+  it('keeps a legacy empty row pending instead of inventing a new create identity', async () => {
     const h = makeHarness()
     const row = h.insertProvisioning()
     delete row.idempotencyKey
-    h.setReturnMissingId(true)
 
-    const result = await h.manager('router').ensureKey(h.identity())
-    const inputs = h.getCreateInputs()
-
-    expect(inputs[0]).toMatchObject({
-      name: row.name,
-      idempotencyKey: `workspace-key:${row.id}`,
-    })
-    expect(inputs[1]?.idempotencyKey).not.toBe(inputs[0]?.idempotencyKey)
-    expect(h.remote.get('orphan-1')?.revoked).toBe(true)
-    expect(h.rows.get(row.id)?.status).toBe('revoked')
-    expect(result.usage.keyId).toBe('remote-2')
+    await expect(h.manager('router').ensureKey(h.identity())).rejects.toThrow('cleanup is pending')
+    expect(h.getCreateInputs()).toHaveLength(0)
+    expect(h.rows.get(row.id)?.status).toBe('revocation_pending')
   })
 
   it('retries an empty pending row when the caller supplies its full identity', async () => {
@@ -734,7 +765,9 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
   it('fails before remote spend when encryption is unavailable', async () => {
     const h = makeHarness()
     let creates = 0
-    const provisioner: DurableWorkspaceKeyProvisioner = {
+    const createdByIdentity = new Map<string, RemoteKey>()
+  const provisioner: DurableWorkspaceKeyProvisioner = {
+    supportsIdempotentCreate: true,
       ...h.provisioner,
       async createKey(input) {
         creates += 1

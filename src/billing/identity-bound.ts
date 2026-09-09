@@ -77,11 +77,9 @@ export interface DurableWorkspaceKeyCreateInput {
 
 /** The remote operations required by the durable manager. */
 export interface DurableWorkspaceKeyProvisioner {
-  /**
-   * Create one child key. Reusing `idempotencyKey` must be safe for the same
-   * request body. Providers without native idempotency still get crash-safe
-   * cleanup because the manager persists and searches the stable name.
-   */
+  /** True only when replay returns the original child for the persisted request identity. */
+  supportsIdempotentCreate?: true
+  /** Create one child key. Non-idempotent providers recover through stable-name discovery only. */
   createKey(input: DurableWorkspaceKeyCreateInput): Promise<DurableWorkspaceKeyCreateResult>
   getKey(id: string): Promise<{
     budgetUsd?: number | null
@@ -321,11 +319,6 @@ function errorMessage(error: unknown, fallback: string): string {
 
 function isProvisioningId(value: string): boolean {
   return value.startsWith('provisioning:')
-}
-
-function idempotencyKeyForRecord(row: Pick<DurableWorkspaceKeyRecord, 'id' | 'idempotencyKey'>): string {
-  const value = row.idempotencyKey?.trim()
-  return value || `workspace-key:${row.id}`
 }
 
 async function markProvisioningRemote(
@@ -572,14 +565,16 @@ export function createIdentityBoundWorkspaceKeyManager(
     identity: WorkspaceKeyIdentity | undefined,
     name: string,
   ): Promise<Array<{ id: string }> | null> {
-    if (!identity || !sameIdentity(row, identity, product)) return []
+    const idempotencyKey = row.idempotencyKey?.trim()
+    if (!identity || !sameIdentity(row, identity, product)
+      || !options.provisioner.supportsIdempotentCreate || !idempotencyKey) return []
     try {
       const created = await options.provisioner.createKey({
         name,
         product: row.product,
         budgetUsd: row.budgetUsd,
         expiresAt: row.expiresAt.toISOString(),
-        idempotencyKey: idempotencyKeyForRecord(row),
+        idempotencyKey,
       })
       const remoteId = created.id?.trim()
       if (remoteId) return [{ id: remoteId }]
@@ -592,7 +587,7 @@ export function createIdentityBoundWorkspaceKeyManager(
       })
       return null
     }
-    return (await provisioningCandidates({ ...row, name, keyId: `provisioning:${idempotencyKeyForRecord(row)}` }))?.candidates ?? []
+    return (await provisioningCandidates({ ...row, name, keyId: `provisioning:${idempotencyKey}` }))?.candidates ?? []
   }
 
   async function cleanupProvisioning(row: DurableWorkspaceKeyRecord, identity?: WorkspaceKeyIdentity): Promise<boolean> {
@@ -707,14 +702,13 @@ export function createIdentityBoundWorkspaceKeyManager(
       && (identity.workspaceId !== scopeInput.workspaceId || identity.ownerUserId !== scopeInput.ownerUserId)) {
       throw new Error('workspace child key retry identity does not match its scope')
     }
-    const activeIdentity = identity
     if (scopeInput) {
       const workspaceId = scopeInput.workspaceId.trim()
       const ownerUserId = scopeInput.ownerUserId.trim()
       if (!workspaceId || !ownerUserId) throw new Error('workspace child key retry scope is incomplete')
       const scope = scopeKey({ workspaceId, ownerUserId, product })
       return withLocalLock(scope, () => withDurableLease(scope, async () => (
-        await retryPendingRevocationsUnlocked({ workspaceId, ownerUserId }, activeIdentity)).completed))
+        await retryPendingRevocationsUnlocked({ workspaceId, ownerUserId }, identity)).completed))
     }
 
     if (identity) {
@@ -787,6 +781,7 @@ export function createIdentityBoundWorkspaceKeyManager(
     const name = (options.nameForIdentity?.(identity, mintOperationId) ?? defaultKeyName(identity, product, mintOperationId)).trim()
     if (!name) throw new Error('workspace child key remote name is required')
     const rowId = operationId()
+    const idempotencyKey = `workspace-key:${rowId}`
     const provisioningRow: DurableWorkspaceKeyProvisioningRecord = {
       id: rowId,
       workspaceId: identity.workspaceId,
@@ -796,7 +791,7 @@ export function createIdentityBoundWorkspaceKeyManager(
       sourceKeyId: sourceKeyId(identity),
       sourceKeyFingerprint: identity.sourceKeyFingerprint,
       name,
-      idempotencyKey: `workspace-key:${rowId}`,
+      idempotencyKey,
       keyId: `provisioning:${mintOperationId}`,
       keyEncrypted: '',
       budgetUsd,
@@ -816,7 +811,7 @@ export function createIdentityBoundWorkspaceKeyManager(
         product,
         budgetUsd,
         expiresAt: expiresAt.toISOString(),
-        idempotencyKey: idempotencyKeyForRecord(provisioningRow),
+        idempotencyKey,
       })
     } catch (error) {
       // Keep cleanup running even when the state write fails. The remote
