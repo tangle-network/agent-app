@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_98 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_99 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -55,6 +55,7 @@ _98 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 31 | `billing`, `crypto`, `knowledge`, `sandbox`, `tools`, `web` |
 | [`./profile`](api/profile.md) | 45 | `skills` |
 | [`./prompt`](api/prompt.md) | 3 | — |
+| [`./public-consultation`](api/public-consultation.md) | 11 | `chat-routes`, `stream`, `tools` |
 | [`./record`](api/record.md) | 33 | — |
 | [`./record/drizzle`](api/record-drizzle.md) | 22 | — |
 | [`./redact`](api/redact.md) | 15 | — |
@@ -552,6 +553,16 @@ Source: `src/prompt/index.ts` · 3 exports
 `AssembleResult`, `assembleSystemPrompt`, `AssembleSystemPromptInput`
 
 [Full API →](api/prompt.md)
+
+## `./public-consultation`
+
+Source: `src/public-consultation/index.ts` · 11 exports
+
+Depends on: `chat-routes`, `stream`, `tools`
+
+`ConsultationAgent`, `ConsultationConsumer`, `ConsultationExecution`, `ConsultationExecutionControl`, `ConsultationIdentity`, `createKnowledgePublication`, `createPublicConsultation`, `KnowledgePublication`, `PreparedConsultationExecution`, `PublicConsultationOptions`, `PublishedKnowledgePage`
+
+[Full API →](api/public-consultation.md)
 
 ## `./record`
 

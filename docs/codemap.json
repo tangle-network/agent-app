@@ -9288,6 +9288,84 @@
       ]
     },
     {
+      "id": "./public-consultation",
+      "source": "src/public-consultation/index.ts",
+      "dependsOn": [
+        "chat-routes",
+        "stream",
+        "tools"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "ConsultationAgent",
+          "kind": "interface",
+          "signature": "interface ConsultationAgent",
+          "doc": null
+        },
+        {
+          "name": "ConsultationConsumer",
+          "kind": "interface",
+          "signature": "interface ConsultationConsumer",
+          "doc": "Authenticated server identity."
+        },
+        {
+          "name": "ConsultationExecution",
+          "kind": "interface",
+          "signature": "interface ConsultationExecution",
+          "doc": null
+        },
+        {
+          "name": "ConsultationExecutionControl",
+          "kind": "interface",
+          "signature": "interface ConsultationExecutionControl",
+          "doc": null
+        },
+        {
+          "name": "ConsultationIdentity",
+          "kind": "interface",
+          "signature": "interface ConsultationIdentity",
+          "doc": null
+        },
+        {
+          "name": "createKnowledgePublication",
+          "kind": "function",
+          "signature": "(input: { id: string; revision: string; ownerId: string; systemPrompt: string; index: KnowledgeIndex; pageIds: readonly…",
+          "doc": "Select content at publication time, before any payer or model input exists."
+        },
+        {
+          "name": "createPublicConsultation",
+          "kind": "function",
+          "signature": "(options: PublicConsultationOptions) => { authorizeConsumer(agent: ConsultationAgent, consumer: ConsultationConsumer):…",
+          "doc": "Compose gateway admission, scoped knowledge and the maintained persisted chat route."
+        },
+        {
+          "name": "KnowledgePublication",
+          "kind": "interface",
+          "signature": "interface KnowledgePublication",
+          "doc": "A server-created publication."
+        },
+        {
+          "name": "PreparedConsultationExecution",
+          "kind": "type",
+          "signature": "type PreparedConsultationExecution",
+          "doc": null
+        },
+        {
+          "name": "PublicConsultationOptions",
+          "kind": "interface",
+          "signature": "interface PublicConsultationOptions",
+          "doc": null
+        },
+        {
+          "name": "PublishedKnowledgePage",
+          "kind": "interface",
+          "signature": "interface PublishedKnowledgePage",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./record",
       "source": "src/record/index.ts",
       "dependsOn": [],
