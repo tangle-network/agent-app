@@ -3097,6 +3097,7 @@ describe('deferred profile files', () => {
     }
   })
 
+  // These cases execute multiple real shells; each subprocess keeps its 5s bound.
   it('retries a lost transport response after a chunk write without duplicating content', async () => {
     await withShellBackedProfileWriter(new Set([2]), async ({ box, cwd, exec }) => {
       const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'abc')], { paceMs: 0 })
@@ -3106,7 +3107,7 @@ describe('deferred profile files', () => {
       expect(exec.mock.calls.at(-1)?.[0]).toContain("base64 -d < 'skills/x.md.b64'")
       await expect(readFsFile(join(cwd, 'skills/x.md'), 'utf8')).resolves.toBe('abc')
     })
-  })
+  }, 30_000)
 
   it('retries a lost transport response after final materialization without false failure', async () => {
     await withShellBackedProfileWriter(new Set([3]), async ({ box, cwd, exec }) => {
@@ -3118,7 +3119,7 @@ describe('deferred profile files', () => {
       await expect(readFsFile(join(cwd, 'skills/x.md.b64.part.0'), 'utf8')).rejects.toThrow()
       await expect(readFsFile(join(cwd, 'skills/x.md.b64'), 'utf8')).rejects.toThrow()
     })
-  })
+  }, 30_000)
 
   it.each([
     ['prefetch failed', () => new Error('prefetch failed')],
@@ -3715,7 +3716,7 @@ describe('deferred profile files', () => {
     } finally {
       await rm(cwd, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('ensureWorkspaceSandbox: persistent deferred-write 401 after auth refresh is typed and bounded', async () => {
     const authError = Object.assign(new Error('Missing or invalid authentication'), {

@@ -262,7 +262,17 @@ function main(scratch) {
 
   const inheritedPath = process.env.PATH
   if (!inheritedPath) throw new Error('PATH is required')
+  // Preserve managed network access without inheriting application credentials or Node flags.
+  const transportNames = [
+    'SSL_CERT_FILE', 'NIX_SSL_CERT_FILE', 'NODE_EXTRA_CA_CERTS', 'CURL_CA_BUNDLE',
+    'HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'NO_PROXY',
+    'https_proxy', 'http_proxy', 'all_proxy', 'no_proxy',
+  ]
+  const transportEnv = Object.fromEntries(
+    transportNames.filter((name) => process.env[name]).map((name) => [name, process.env[name]]),
+  )
   const env = {
+    ...transportEnv,
     PATH: inheritedPath,
     CI: 'true',
     HOME: home,

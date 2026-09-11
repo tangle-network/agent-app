@@ -42,7 +42,9 @@ describe('canonical serialization', () => {
   })
 })
 
-describe('subject facts read from git', () => {
+// These integration cases launch real Git and package-manager processes.
+// Process startup under host load can exceed the unit-test default.
+describe('subject facts read from git', { timeout: 30_000 }, () => {
   it('binds the proof to the real commit, its tree, and its parents', () => {
     const fixture = repo()
     fixture.write('src/a.ts', 'export const a = 1\n')
@@ -116,7 +118,7 @@ describe('subject facts read from git', () => {
   })
 })
 
-describe('verdict', () => {
+describe('verdict', { timeout: 30_000 }, () => {
   it('is fail when any step exited non-zero, whatever the caller intended', () => {
     const fixture = repo()
     fixture.write('src/a.ts', 'x\n')

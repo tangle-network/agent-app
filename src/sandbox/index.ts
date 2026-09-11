@@ -3072,7 +3072,7 @@ export async function resolveSandboxPromptBackend(
 
   const explicitModel = trimOrNull(options.model)
   const profileModel = trimOrNull(fullProfile.model?.default)
-  const profileProvider = !explicitModel && profileModel
+  const profileProvider = profileModel && (!explicitModel || explicitModel === profileModel)
     ? trimOrNull(fullProfile.model?.provider)
     : null
   const model = requireTransportableModel(
@@ -3095,7 +3095,9 @@ export async function resolveSandboxPromptBackend(
   const selectedProfile: AgentProfile = {
     ...fullProfile,
     harness,
-    ...(model ? { model: { ...fullProfile.model, default: model.model } } : {}),
+    // The materializer compares the profile and transport as provider-qualified
+    // identities. Authored provider evidence has already served preflight above.
+    ...(model ? { model: { ...fullProfile.model, provider: model.provider, default: model.model } } : {}),
   }
   // The deferred writer owns shell-composed files only. Supplied profiles
   // must retain their resources for the SDK to materialize this turn.

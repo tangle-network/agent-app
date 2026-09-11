@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { assertPrimeModelAgreement } from '@tangle-network/agent-profile-materialize'
 import type { AgentProfile } from '@tangle-network/agent-interface'
 import type { SandboxInstance } from '@tangle-network/sandbox/core'
 import { fingerprintAgentProfile } from '../profile/fingerprint'
@@ -67,7 +68,7 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     expect(backend.model).toMatchObject({ model: 'openai/gpt-5', provider: 'openai-compat', apiKey: 'transport-key', baseUrl: 'https://router.invalid' })
     expect(backend.profile).toMatchObject({
       ...selected,
-      model: { ...selected.model, reasoningEffort: 'high', maxVisibleOutputTokens: 700, maxReasoningTokens: 300, maxTotalOutputTokens: 800 },
+      model: { ...selected.model, provider: 'openai-compat', reasoningEffort: 'high', maxVisibleOutputTokens: 700, maxReasoningTokens: 300, maxTotalOutputTokens: 800 },
     })
     expect(selected).toEqual(original)
     expect(observed).toHaveBeenCalledExactlyOnceWith(await fingerprintAgentProfile(backend.profile, { model: backend.model.model, harness: backend.type }))
@@ -141,6 +142,25 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     expect(backend.model).toMatchObject({ model: 'gpt-5', provider: 'openai-compat', apiKey: 'transport-key' })
   })
 
+  it.each([undefined, 'custom-native-alias', ' custom-native-alias '])('retains authored provider evidence for an unchanged model (%s)', async (model) => {
+    const f = fixture()
+    const selected = profile()
+    selected.model = { default: 'custom-native-alias', provider: 'openai' }
+    const backend = await dispatch(lane, f, { profile: selected, model })
+    expect(backend.type).toBe('codex')
+    expect(backend.model).toMatchObject({ model: 'custom-native-alias', provider: 'openai-compat' })
+    expect(() => assertPrimeModelAgreement(backend.profile, backend.model)).not.toThrow()
+  })
+
+  it('discards authored provider evidence when an opaque model alias changes', async () => {
+    const f = fixture()
+    const selected = profile()
+    selected.model = { default: 'custom-native-alias', provider: 'openai' }
+    await expect(dispatch(lane, f, { profile: selected, model: 'different-native-alias' })).rejects.toThrow(/cannot run model/)
+    expect(f.streamPrompt).not.toHaveBeenCalled()
+    expect(f.driveTurn).not.toHaveBeenCalled()
+  })
+
   it.each([true, false])('does not reuse a stale profile provider for an explicit override (configured transport=%s)', async (configuredTransport) => {
     const f = fixture()
     if (!configuredTransport) f.shell.provider = { apiKey: 'transport-key' }
@@ -183,7 +203,7 @@ describe('profile preparation for product transports', () => {
       { provider: { providerName: 'openai-compat', allowKeylessModel: true } },
       { profile: selected, interactions: { question: true } },
     )
-    expect(backend.profile).toMatchObject(selected)
+    expect(backend.profile).toMatchObject({ ...selected, model: { ...selected.model, provider: 'openai-compat' } })
     expect(backend.type).toBe(selected.harness)
     expect(backend.model).toEqual({ model: selected.model?.default, provider: 'openai-compat' })
     expect(backend.interactions).toEqual({ question: true })
@@ -191,5 +211,44 @@ describe('profile preparation for product transports', () => {
 
   it('refuses missing profile authority instead of inventing an agent', async () => {
     await expect(resolveSandboxPromptBackend({}, {})).rejects.toThrow(/supply a profile/)
+  })
+})
+
+
+describe('installed materializer model agreement', () => {
+  it('detects the stale-provider mismatch that backend lowering must prevent', () => {
+    const selected = profile()
+    selected.model = { ...selected.model, default: 'anthropic/claude-sonnet-4' }
+    expect(() => assertPrimeModelAgreement(selected, {
+      provider: 'openai-compat', model: 'anthropic/claude-sonnet-4',
+    })).toThrow()
+  })
+
+  it.each([
+    { label: 'explicit provider change', model: 'anthropic/claude-sonnet-4', harness: 'opencode' as const, keyless: false },
+    { label: 'profile through router alias', model: undefined, harness: 'codex' as const, keyless: false },
+    { label: 'keyless profile through router', model: undefined, harness: 'codex' as const, keyless: true },
+  ])('preserves agreement for $label', async ({ model, harness, keyless }) => {
+    const selected = profile()
+    const backend = await resolveSandboxPromptBackend({
+      provider: {
+        providerName: 'openai-compat',
+        ...(keyless ? { allowKeylessModel: true } : { apiKey: 'delegated-key' }),
+      },
+    }, { profile: selected, model, harness })
+    expect(backend.model).toBeDefined()
+    expect(() => assertPrimeModelAgreement(backend.profile, backend.model!)).not.toThrow()
+    expect(backend.profile.model?.provider).toBe(backend.model?.provider)
+    expect(selected.model?.provider).toBe('openai')
+  })
+
+  it('validates a bare native model using authored evidence before lowering to transport identity', async () => {
+    const selected = profile()
+    selected.model = { provider: 'openai', default: 'gpt-5' }
+    const backend = await resolveSandboxPromptBackend({
+      provider: { providerName: 'openai-compat', apiKey: 'delegated-key' },
+    }, { profile: selected })
+    expect(backend.type).toBe('codex')
+    expect(() => assertPrimeModelAgreement(backend.profile, backend.model!)).not.toThrow()
   })
 })
