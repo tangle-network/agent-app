@@ -72,6 +72,15 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     expect(observed).toHaveBeenCalledExactlyOnceWith(await fingerprintAgentProfile(backend.profile, { model: backend.model.model, harness: backend.type }))
   })
 
+  it('retains supplied inline resources when shell files are deferred', async () => {
+    const f = fixture()
+    f.shell.deferProfileFiles = true
+    const selected = profile()
+    const backend = await dispatch(lane, f, { profile: selected })
+    expect(f.compose).not.toHaveBeenCalled()
+    expect(backend.profile.resources.files).toEqual(selected.resources?.files)
+  })
+
   it('stamps explicit turn model and harness overrides into the executed profile', async () => {
     const f = fixture()
     const selected = profile()
@@ -120,6 +129,23 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     const backend = await dispatch(lane, f, { profile: profile(), model: '   ' })
     expect(backend.model).toMatchObject({ provider: 'openai', model: 'openai/gpt-5', apiKey: 'profile-provider-key' })
     expect(backend.profile.model.default).toBe('openai/gpt-5')
+  })
+
+  it('uses the profile provider to validate a bare native model without replacing router transport', async () => {
+    const f = fixture()
+    const selected = profile()
+    selected.model = { default: 'gpt-5', provider: 'openai' }
+    const backend = await dispatch(lane, f, { profile: selected })
+    expect(backend.type).toBe('codex')
+    expect(backend.model).toMatchObject({ model: 'gpt-5', provider: 'openai-compat', apiKey: 'transport-key' })
+  })
+
+  it.each([true, false])('does not reuse a stale profile provider for an explicit override (configured transport=%s)', async (configuredTransport) => {
+    const f = fixture()
+    if (!configuredTransport) f.shell.provider = { apiKey: 'transport-key' }
+    await expect(dispatch(lane, f, { profile: profile(), model: 'gemini-3-pro' })).rejects.toThrow(/cannot run model/)
+    expect(f.streamPrompt).not.toHaveBeenCalled()
+    expect(f.driveTurn).not.toHaveBeenCalled()
   })
 
   it('uses shell defaults only when the selected profile has no model', async () => {

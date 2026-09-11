@@ -3062,24 +3062,36 @@ async function resolveSandboxPromptBackend(
   // preference differs from the default used to discover that preference.
   if (!options.profile && harness !== initialHarness) fullProfile = compose(harness)
 
+  const explicitModel = trimOrNull(options.model)
+  const profileModel = trimOrNull(fullProfile.model?.default)
+  const profileProvider = !explicitModel && profileModel
+    ? trimOrNull(fullProfile.model?.provider)
+    : null
   const model = requireTransportableModel(
     resolveModelSelection({
       ...shell.provider,
-      providerName: trimOrNull(shell.provider?.providerName) ?? fullProfile.model?.provider,
+      providerName: trimOrNull(shell.provider?.providerName) ?? profileProvider ?? undefined,
     }, {
-      model: trimOrNull(options.model) ?? trimOrNull(fullProfile.model?.default) ?? undefined,
+      model: explicitModel ?? profileModel ?? undefined,
       modelApiKey: options.modelApiKey,
     }),
     operation,
   )
-  if (model) assertHarnessModelCompatible(harness, model)
+  // Profile provider evidence belongs only to its own selected model; the
+  // transport provider may instead identify a router serving that vendor.
+  if (model) assertHarnessModelCompatible(harness, {
+    ...model,
+    provider: profileProvider ?? model.provider,
+  })
 
   const selectedProfile: AgentProfile = {
     ...fullProfile,
     harness,
     ...(model ? { model: { ...fullProfile.model, default: model.model } } : {}),
   }
-  const executionProfile = shell.deferProfileFiles
+  // The deferred writer owns shell-composed files only. Supplied profiles
+  // must retain their resources for the SDK to materialize this turn.
+  const executionProfile = shell.deferProfileFiles && !options.profile
     ? splitDeferredProfileFiles(selectedProfile).leanProfile
     : selectedProfile
   const profile = applyPromptTokenLimits(
