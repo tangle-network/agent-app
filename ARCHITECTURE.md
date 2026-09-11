@@ -93,7 +93,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | A new structured agent→app tool (proposal/citation/custom) | `tools` — `defineAppTool` + a dispatch case |
 | A bounded turn tool-loop or model/stream adapter | `runtime` |
 | Durable multi-step work (gates, budgets, schedules) | `missions` |
-| Per-turn sandbox streaming / question detection | `sandbox` |
+| Per-turn sandbox streaming / question detection | `sandbox` — `streamSandboxPrompt` and `driveSandboxTurn` accept one server-resolved `profile`; both share profile selection, validation, limits, and fingerprinting |
 | Preventing two requests from provisioning the same workspace box | `sandbox` — `runForegroundSandboxSingleFlight` over an inspectable claim store |
 | Completion checks / produced-state / eval bridge | `eval` (+ peer `agent-eval`) |
 | Integration-hub `/exec` calls | `integrations` |
