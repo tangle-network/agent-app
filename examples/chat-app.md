@@ -501,3 +501,27 @@ short-circuit; `beforeTurn` is the prompt-composition step; `lifecycle` is the
 `withHeartbeat` wrapper around silent waits. `handleChatTurn` stays the turn
 engine underneath — these only wrap its input, its producer stream, and its
 settle.
+
+## Carry the effective profile into Sandbox execution
+
+Resolve the profile on the server after authorizing the workspace and any user selections.
+Pass that complete profile as `profile` to `streamSandboxPrompt` or `driveSandboxTurn`.
+Both entrypoints use its harness, model, reasoning effort, permissions, and resources.
+They share compatibility checks, token limits, prompt limits, and the `onProfileResolved` observation.
+Credentials, session identifiers, cancellation, and interaction policy remain separate execution options.
+
+```ts
+const stream = streamSandboxPrompt(shell, box, prompt, {
+  profile: effectiveProfile,
+  modelApiKey: executionKey.apiKey,
+  sessionId: thread.id,
+  executionId: turn.id,
+  turnId: turn.id,
+  detach: true,
+})
+```
+
+The supplied profile bypasses `shell.profile`; compose product resources before dispatch.
+Existing callers can still use the shell composer and explicit per-turn selections.
+Selections override profile defaults, which override shell provider defaults.
+The dispatched profile records the effective model and harness, without copying credential values into it.

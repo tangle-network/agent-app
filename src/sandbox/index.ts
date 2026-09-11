@@ -25,7 +25,8 @@ import {
   type AppToolContext,
   type ToolHeaderNames,
 } from '../tools/index'
-import { assertHarnessModelCompatible, type Harness } from '../harness/index'
+import { assertHarnessModelCompatible, DEFAULT_HARNESS, isHarness, type Harness } from '../harness/index'
+import { mergeAgentProfiles } from '@tangle-network/agent-interface'
 import {
   resolveTangleExecutionEnvironment,
   trimOrNull,
@@ -2704,6 +2705,11 @@ export function applyPromptTokenLimits(
 
 /** Define options for configuring and controlling a streaming sandbox prompt session */
 export interface StreamSandboxPromptOptions {
+  /** Complete server-owned profile for this turn. Skips the shell's default composer.
+   * Credentials, admission, session identity, and interactions remain execution options.
+   * Explicit turn selections override this profile; otherwise its model and harness win
+   * over shell defaults. Never populate this field from an untrusted request body. */
+  profile?: AgentProfile
   sessionId?: string
   executionId?: string
   /** Stable idempotency key for one logical dispatch. Reuse it with the same
@@ -3028,6 +3034,76 @@ export function adaptSandboxStream(
   })()
 }
 
+/** Prepare one effective profile for both streamed and driven turns. */
+async function resolveSandboxPromptBackend(
+  shell: SandboxRuntimeConfig,
+  options: StreamSandboxPromptOptions,
+  operation: string,
+) {
+  const initialHarness = options.harness ?? options.profile?.harness ?? DEFAULT_HARNESS
+  if (!isHarness(initialHarness)) throw new Error(`Unsupported sandbox harness: ${initialHarness}`)
+  const extraMcp = mergeExtraMcp(
+    options.appToolMcp ?? {},
+    options.profile?.mcp ?? options.baseProfileMcp ?? {},
+    options.extraMcp,
+  )
+  const compose = (harness: Harness) => shell.profile({
+    systemPrompt: options.systemPrompt, extraMcp, harness,
+  })
+  let fullProfile = options.profile
+    ? mergeAgentProfiles(options.profile, {
+        ...(options.systemPrompt !== undefined ? { prompt: { systemPrompt: options.systemPrompt } } : {}),
+        ...(Object.keys(extraMcp).length > 0 ? { mcp: extraMcp } : {}),
+      })!
+    : compose(initialHarness)
+  const harness = options.harness ?? fullProfile.harness ?? DEFAULT_HARNESS
+  if (!isHarness(harness)) throw new Error(`Unsupported sandbox harness: ${harness}`)
+  // Older composers may place harness-native files. Recompose if their authored
+  // preference differs from the default used to discover that preference.
+  if (!options.profile && harness !== initialHarness) fullProfile = compose(harness)
+
+  const model = requireTransportableModel(
+    resolveModelSelection({
+      ...shell.provider,
+      providerName: trimOrNull(shell.provider?.providerName) ?? fullProfile.model?.provider,
+    }, {
+      model: trimOrNull(options.model) ?? trimOrNull(fullProfile.model?.default) ?? undefined,
+      modelApiKey: options.modelApiKey,
+    }),
+    operation,
+  )
+  if (model) assertHarnessModelCompatible(harness, model)
+
+  const selectedProfile: AgentProfile = {
+    ...fullProfile,
+    harness,
+    ...(model ? { model: { ...fullProfile.model, default: model.model } } : {}),
+  }
+  const executionProfile = shell.deferProfileFiles
+    ? splitDeferredProfileFiles(selectedProfile).leanProfile
+    : selectedProfile
+  const profile = applyPromptTokenLimits(
+    attachReasoningEffort(executionProfile, harness, options.effort),
+    {
+      maxVisibleOutputTokens: options.maxOutputTokens,
+      maxReasoningTokens: options.maxReasoningTokens,
+      maxTotalOutputTokens: options.maxTotalOutputTokens,
+    },
+  )
+  assertProfilePromptWithinBudget(
+    profile, shell.promptBudget ?? {}, `${operation} profile systemPrompt`, SHELL_PROMPT_BUDGET_HINT,
+  )
+  if (options.onProfileResolved) {
+    options.onProfileResolved(await fingerprintAgentProfile(profile, { model: model?.model, harness }))
+  }
+  return {
+    type: harness,
+    profile,
+    ...(model ? { model } : {}),
+    ...(options.interactions ? { interactions: options.interactions } : {}),
+  }
+}
+
 /** Resolve and stream AI-generated responses from a sandboxed environment based on input messages and options */
 export async function* streamSandboxPrompt(
   shell: SandboxRuntimeConfig,
@@ -3035,63 +3111,12 @@ export async function* streamSandboxPrompt(
   message: string | PromptInputPart[],
   options?: StreamSandboxPromptOptions,
 ): AsyncGenerator<unknown> {
-  const harness = options?.harness ?? 'opencode'
-  const model = requireTransportableModel(
-    resolveModelSelection(shell.provider, {
-      model: options?.model,
-      modelApiKey: options?.modelApiKey,
-    }),
-    'streamSandboxPrompt',
-  )
-
-  // Server-side enforcement of the harness↔model policy: a vendor-locked harness
-  // (claude-code/codex/kimi-code) must not be sent a foreign-provider model, even
-  // if the UI snap was bypassed. Provider-less ids pass (session's own config).
-  if (model?.model) assertHarnessModelCompatible(harness, model)
-
+  const backend = await resolveSandboxPromptBackend(shell, options ?? {}, 'streamSandboxPrompt')
   const prompt =
     typeof message === 'string'
       ? flattenHistory(message, options?.history)
       : mergeHistoryIntoParts(message, options?.history)
 
-  const appToolMcp = options?.appToolMcp ?? {}
-  const extraMcp = mergeExtraMcp(appToolMcp, options?.baseProfileMcp ?? {}, options?.extraMcp)
-
-  const fullProfile = shell.profile({ systemPrompt: options?.systemPrompt, extraMcp, harness })
-  // Deferred inline files already have an app-owned writer; do not rematerialize them per turn.
-  const profile = shell.deferProfileFiles ? splitDeferredProfileFiles(fullProfile).leanProfile : fullProfile
-  const profileWithLimits = applyPromptTokenLimits(
-    attachReasoningEffort(profile, harness, options?.effort),
-    {
-      maxVisibleOutputTokens: options?.maxOutputTokens,
-      maxReasoningTokens: options?.maxReasoningTokens,
-      maxTotalOutputTokens: options?.maxTotalOutputTokens,
-    },
-  )
-  // The per-turn backend can carry a system prompt the create-time profile
-  // never had (creative-agent does exactly that), so the budget is re-checked
-  // on the profile this turn actually executes.
-  assertProfilePromptWithinBudget(
-    profileWithLimits,
-    shell.promptBudget ?? {},
-    'streamSandboxPrompt profile systemPrompt',
-    SHELL_PROMPT_BUDGET_HINT,
-  )
-
-  // Fingerprint is taken HERE — the one place the final profile exists — so an
-  // observer proves what was executed rather than re-deriving what should be.
-  if (options?.onProfileResolved) {
-    options.onProfileResolved(
-      await fingerprintAgentProfile(profileWithLimits, { model: model?.model, harness }),
-    )
-  }
-
-  const backend = {
-    type: harness,
-    profile: profileWithLimits,
-    ...(model ? { model } : {}),
-    ...(options?.interactions ? { interactions: options.interactions } : {}),
-  }
   const stream = options?.detach
     ? detachedSandboxPromptEvents(box, prompt, options, backend)
     : box.streamPrompt(prompt, {
@@ -3461,40 +3486,12 @@ export async function driveSandboxTurn(
   message: string | PromptInputPart[],
   options: DriveSandboxTurnOptions,
 ): Promise<Outcome<TurnDriveResult>> {
-  const harness = options.harness ?? 'opencode'
-  // Resolved (and, for an explicit override/config model, enforced-transportable)
-  // BEFORE the try below: a misconfigured model is a deterministic config error,
-  // not a retryable transport blip, so it throws here rather than returning
-  // `fail(...)` — a driver re-ticking this session would otherwise retry it forever.
-  const model = requireTransportableModel(
-    resolveModelSelection(shell.provider, {
-      model: options.model,
-      modelApiKey: options.modelApiKey,
-    }),
-    'driveSandboxTurn',
-  )
-  if (model?.model) assertHarnessModelCompatible(harness, model)
+  // Configuration failures precede the retryable transport boundary.
+  const backend = await resolveSandboxPromptBackend(shell, options, 'driveSandboxTurn')
   const prompt =
     typeof message === 'string'
       ? flattenHistory(message, options.history)
       : mergeHistoryIntoParts(message, options.history)
-  const appToolMcp = options.appToolMcp ?? {}
-  const extraMcp = mergeExtraMcp(appToolMcp, options.baseProfileMcp ?? {}, options.extraMcp)
-  const fullProfile = shell.profile({ systemPrompt: options.systemPrompt, extraMcp, harness })
-  const executionProfile = shell.deferProfileFiles ? splitDeferredProfileFiles(fullProfile).leanProfile : fullProfile
-  const profile = attachReasoningEffort(
-    executionProfile,
-    harness,
-    options.effort,
-  )
-  // Autonomous lane: nobody is watching, so an empty answer from an oversized
-  // prompt would be recorded as a completed turn with no output.
-  assertProfilePromptWithinBudget(
-    profile,
-    shell.promptBudget ?? {},
-    'driveSandboxTurn profile systemPrompt',
-    SHELL_PROMPT_BUDGET_HINT,
-  )
   try {
     const drive = await box.driveTurn(prompt, {
       sessionId: options.sessionId,
@@ -3505,12 +3502,7 @@ export async function driveSandboxTurn(
       // Sandbox 0.37 drives through the session message lane, so a gateway
       // consumer can handle these events. Callers without one should omit
       // interactions so the run stays unattended.
-      backend: {
-        type: harness,
-        profile,
-        ...(model ? { model } : {}),
-        ...(options.interactions ? { interactions: options.interactions } : {}),
-      },
+      backend,
     } as Parameters<SandboxInstance['driveTurn']>[1])
     // The autonomous lane needs this most: a detached turn keeps the box
     // billable with nobody watching, and every tick that reports `running` is
