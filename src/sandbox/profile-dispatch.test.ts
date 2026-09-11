@@ -142,6 +142,25 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     expect(backend.model).toMatchObject({ model: 'gpt-5', provider: 'openai-compat', apiKey: 'transport-key' })
   })
 
+  it.each([undefined, 'custom-native-alias', ' custom-native-alias '])('retains authored provider evidence for an unchanged model (%s)', async (model) => {
+    const f = fixture()
+    const selected = profile()
+    selected.model = { default: 'custom-native-alias', provider: 'openai' }
+    const backend = await dispatch(lane, f, { profile: selected, model })
+    expect(backend.type).toBe('codex')
+    expect(backend.model).toMatchObject({ model: 'custom-native-alias', provider: 'openai-compat' })
+    expect(() => assertPrimeModelAgreement(backend.profile, backend.model)).not.toThrow()
+  })
+
+  it('discards authored provider evidence when an opaque model alias changes', async () => {
+    const f = fixture()
+    const selected = profile()
+    selected.model = { default: 'custom-native-alias', provider: 'openai' }
+    await expect(dispatch(lane, f, { profile: selected, model: 'different-native-alias' })).rejects.toThrow(/cannot run model/)
+    expect(f.streamPrompt).not.toHaveBeenCalled()
+    expect(f.driveTurn).not.toHaveBeenCalled()
+  })
+
   it.each([true, false])('does not reuse a stale profile provider for an explicit override (configured transport=%s)', async (configuredTransport) => {
     const f = fixture()
     if (!configuredTransport) f.shell.provider = { apiKey: 'transport-key' }

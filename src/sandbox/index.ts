@@ -3072,7 +3072,7 @@ export async function resolveSandboxPromptBackend(
 
   const explicitModel = trimOrNull(options.model)
   const profileModel = trimOrNull(fullProfile.model?.default)
-  const profileProvider = !explicitModel && profileModel
+  const profileProvider = profileModel && (!explicitModel || explicitModel === profileModel)
     ? trimOrNull(fullProfile.model?.provider)
     : null
   const model = requireTransportableModel(
