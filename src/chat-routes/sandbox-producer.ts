@@ -126,6 +126,11 @@ export interface SandboxChatProducerOptions {
    *  answer-bearing event. Default 60 seconds. Processing/lifecycle events do
    *  not extend it. */
   firstResponseTimeoutMs?: number
+  /** Forward `start`/`status`/`model-processing`/session lifecycle to the
+   *  client as it arrives instead of after the commit point, so a product can
+   *  show what a turn is waiting on. Default `false`. An abandoned model's
+   *  progress then stays on the wire; its answer and receipt never do. */
+  liveLifecycleEvents?: boolean
   /** Fired when a model is abandoned mid-chain (telemetry/alerting). The user
    *  already sees a transcript notice; this is for the operator. */
   onModelFallback?: (info: ModelFallbackInfo) => void
@@ -381,6 +386,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         : {}),
       ...(options.emptyTurnRetries !== undefined ? { emptyTurnRetries: options.emptyTurnRetries } : {}),
       ...(options.onEmptyTurnRetry ? { onEmptyTurnRetry: options.onEmptyTurnRetry } : {}),
+      ...(options.liveLifecycleEvents !== undefined ? { liveLifecycleEvents: options.liveLifecycleEvents } : {}),
       onFallback: (info) => {
         modelNoticeCount += 1
         pendingModelNotices.push({

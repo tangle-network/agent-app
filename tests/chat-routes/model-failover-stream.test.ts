@@ -934,3 +934,100 @@ describe('runDetachedTurn — failover attribution on the autonomous lane', () =
     expect(res.usedModelFallback).toBe(false)
   })
 })
+
+/**
+ * Lifecycle progress reaches the consumer BEFORE the attempt commits. Measured
+ * 2026-09-11 on a warm production box: OpenCode reports whole parts, so with a
+ * fully buffered probe the product received `start`/`status` 16 s late, at the
+ * same instant as the first model event, and could show nothing meanwhile.
+ */
+describe('streamWithModelFailover — live lifecycle progress', () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void
+    const promise = new Promise<T>((r) => { resolve = r })
+    return { promise, resolve }
+  }
+
+  it('yields start/status/model-processing while the model has produced nothing, then the answer once', async () => {
+    const release = deferred<void>()
+    async function* slowModel(): AsyncGenerator<unknown> {
+      yield { type: 'start', data: { id: 'r1' } }
+      yield { type: 'status', data: { status: 'started' } }
+      yield { type: 'model-processing', data: { phase: 'thinking', elapsedMs: 5000 } }
+      await release.promise
+      yield { type: 'message.part.updated', data: { part: { id: 'p1', type: 'text', text: 'ok' }, delta: 'ok' } }
+      yield { type: 'done', data: { outcome: { type: 'completed' } } }
+    }
+    const handle = streamWithModelFailover({ models: ['primary'], open: () => slowModel(), liveLifecycleEvents: true })
+    const iterator = handle.events
+    const early: string[] = []
+    for (let i = 0; i < 3; i += 1) {
+      const next = await iterator.next()
+      early.push(String((next.value as { type: string }).type))
+    }
+    expect(early).toEqual(['start', 'status', 'model-processing'])
+    expect(handle.servingModel()).toBeUndefined()
+    release.resolve()
+    const rest = (await collect(iterator)).map((event) => event.type)
+    expect(rest).toEqual(['message.part.updated', 'done'])
+    expect(handle.servingModel()).toBe('primary')
+  })
+
+  it('keeps step-start, empty text parts, and warnings buffered until the commit point', async () => {
+    const release = deferred<void>()
+    async function* model(): AsyncGenerator<unknown> {
+      yield { type: 'status', data: { status: 'started' } }
+      yield { type: 'message.part.updated', data: { part: { id: 's', type: 'step-start' } } }
+      yield { type: 'warning', data: { code: 'OPENCODE_PROVIDER_RETRY', message: 'retrying' } }
+      yield { type: 'message.part.updated', data: { part: { id: 'p1', type: 'text', text: '' } } }
+      await release.promise
+      yield { type: 'message.part.updated', data: { part: { id: 'p1', type: 'text', text: 'ok' }, delta: 'ok' } }
+      yield { type: 'done', data: { outcome: { type: 'completed' } } }
+    }
+    const handle = streamWithModelFailover({ models: ['primary'], open: () => model(), liveLifecycleEvents: true })
+    const first = await handle.events.next()
+    expect((first.value as { type: string }).type).toBe('status')
+    const pending = handle.events.next()
+    let settledEarly = false
+    void pending.then(() => { settledEarly = true })
+    await new Promise((r) => setTimeout(r, 20))
+    expect(settledEarly).toBe(false)
+    release.resolve()
+    const types = [String(((await pending).value as { type: string }).type), ...(await collect(handle.events)).map((event) => event.type)]
+    expect(types).toEqual(['message.part.updated', 'warning', 'message.part.updated', 'message.part.updated', 'done'])
+  })
+
+  it('still fails over after live progress from the dead model, without replaying that progress', async () => {
+    const handle = streamWithModelFailover({
+      models: ['dead', 'healthy'],
+      open: ({ model }) => feed(model === 'dead' ? DEAD_MODEL_SEQUENCE : HEALTHY_MODEL_SEQUENCE),
+      liveLifecycleEvents: true,
+    })
+    const events = await collect(handle.events)
+    const types = events.map((event) => event.type)
+    const deadStatuses = types.filter((type) => type === 'status').length
+    // Dead model: 3 live statuses; healthy model: 1. None replayed twice.
+    expect(deadStatuses).toBe(4)
+    expect(types.filter((type) => type === 'warning')).toHaveLength(0)
+    expect(handle.servingModel()).toBe('healthy')
+    expect(handle.usedFallback()).toBe(true)
+    expect(stepFinishTokenTotals(events)).toEqual([13954])
+  })
+
+  it('keeps the fully buffered probe by default', async () => {
+    const release = deferred<void>()
+    async function* model(): AsyncGenerator<unknown> {
+      yield { type: 'status', data: { status: 'started' } }
+      await release.promise
+      yield { type: 'message.part.updated', data: { part: { id: 'p1', type: 'text', text: 'ok' }, delta: 'ok' } }
+    }
+    const handle = streamWithModelFailover({ models: ['primary'], open: () => model() })
+    const pending = handle.events.next()
+    let settledEarly = false
+    void pending.then(() => { settledEarly = true })
+    await new Promise((r) => setTimeout(r, 20))
+    expect(settledEarly).toBe(false)
+    release.resolve()
+    expect((await pending).value).toMatchObject({ type: 'status' })
+  })
+})
