@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { assertPrimeModelAgreement } from '@tangle-network/agent-profile-materialize'
 import type { AgentProfile } from '@tangle-network/agent-interface'
 import type { SandboxInstance } from '@tangle-network/sandbox/core'
 import { fingerprintAgentProfile } from '../profile/fingerprint'
@@ -67,7 +68,7 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     expect(backend.model).toMatchObject({ model: 'openai/gpt-5', provider: 'openai-compat', apiKey: 'transport-key', baseUrl: 'https://router.invalid' })
     expect(backend.profile).toMatchObject({
       ...selected,
-      model: { ...selected.model, reasoningEffort: 'high', maxVisibleOutputTokens: 700, maxReasoningTokens: 300, maxTotalOutputTokens: 800 },
+      model: { ...selected.model, provider: 'openai-compat', reasoningEffort: 'high', maxVisibleOutputTokens: 700, maxReasoningTokens: 300, maxTotalOutputTokens: 800 },
     })
     expect(selected).toEqual(original)
     expect(observed).toHaveBeenCalledExactlyOnceWith(await fingerprintAgentProfile(backend.profile, { model: backend.model.model, harness: backend.type }))
@@ -183,7 +184,7 @@ describe('profile preparation for product transports', () => {
       { provider: { providerName: 'openai-compat', allowKeylessModel: true } },
       { profile: selected, interactions: { question: true } },
     )
-    expect(backend.profile).toMatchObject(selected)
+    expect(backend.profile).toMatchObject({ ...selected, model: { ...selected.model, provider: 'openai-compat' } })
     expect(backend.type).toBe(selected.harness)
     expect(backend.model).toEqual({ model: selected.model?.default, provider: 'openai-compat' })
     expect(backend.interactions).toEqual({ question: true })
@@ -191,5 +192,44 @@ describe('profile preparation for product transports', () => {
 
   it('refuses missing profile authority instead of inventing an agent', async () => {
     await expect(resolveSandboxPromptBackend({}, {})).rejects.toThrow(/supply a profile/)
+  })
+})
+
+
+describe('installed materializer model agreement', () => {
+  it('detects the stale-provider mismatch that backend lowering must prevent', () => {
+    const selected = profile()
+    selected.model = { ...selected.model, default: 'anthropic/claude-sonnet-4' }
+    expect(() => assertPrimeModelAgreement(selected, {
+      provider: 'openai-compat', model: 'anthropic/claude-sonnet-4',
+    })).toThrow()
+  })
+
+  it.each([
+    { label: 'explicit provider change', model: 'anthropic/claude-sonnet-4', harness: 'opencode' as const, keyless: false },
+    { label: 'profile through router alias', model: undefined, harness: 'codex' as const, keyless: false },
+    { label: 'keyless profile through router', model: undefined, harness: 'codex' as const, keyless: true },
+  ])('preserves agreement for $label', async ({ model, harness, keyless }) => {
+    const selected = profile()
+    const backend = await resolveSandboxPromptBackend({
+      provider: {
+        providerName: 'openai-compat',
+        ...(keyless ? { allowKeylessModel: true } : { apiKey: 'delegated-key' }),
+      },
+    }, { profile: selected, model, harness })
+    expect(backend.model).toBeDefined()
+    expect(() => assertPrimeModelAgreement(backend.profile, backend.model!)).not.toThrow()
+    expect(backend.profile.model?.provider).toBe(backend.model?.provider)
+    expect(selected.model?.provider).toBe('openai')
+  })
+
+  it('validates a bare native model using authored evidence before lowering to transport identity', async () => {
+    const selected = profile()
+    selected.model = { provider: 'openai', default: 'gpt-5' }
+    const backend = await resolveSandboxPromptBackend({
+      provider: { providerName: 'openai-compat', apiKey: 'delegated-key' },
+    }, { profile: selected })
+    expect(backend.type).toBe('codex')
+    expect(() => assertPrimeModelAgreement(backend.profile, backend.model!)).not.toThrow()
   })
 })
