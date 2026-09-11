@@ -1690,7 +1690,7 @@
           "name": "classifyTerminalFailure",
           "kind": "function",
           "signature": "(event: unknown) => TerminalFailure | null",
-          "doc": "Classify a terminal failure event."
+          "doc": null
         },
         {
           "name": "CompletedSandboxTurnSource",
@@ -1967,6 +1967,12 @@
           "kind": "function",
           "signature": "(event: { type?: unknown; }) => boolean",
           "doc": "True when this event should arm a draft write."
+        },
+        {
+          "name": "isLiveLifecycleEvent",
+          "kind": "function",
+          "signature": "(event: unknown) => boolean",
+          "doc": "Progress the consumer may see before the commit point: it names no model output and carries no billing receipt, so streaming it live cannot duplicate an answer or bill an abandoned attempt."
         },
         {
           "name": "MACRO_ENABLED_OOXML_SNIFFED_MIMES",

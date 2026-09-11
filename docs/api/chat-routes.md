@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-199 exports.
+200 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -584,7 +584,7 @@ interface ChatTurnUsage
 
 ### `classifyTerminalFailure`
 
-`function` — Classify a terminal failure event.
+`function`
 
 ```ts
 (event: unknown) => TerminalFailure | null
@@ -956,6 +956,14 @@ type FilePartPromotionOutcome
 
 ```ts
 (event: { type?: unknown; }) => boolean
+```
+
+### `isLiveLifecycleEvent`
+
+`function` — Progress the consumer may see before the commit point: it names no model output and carries no billing receipt, so streaming it live cannot duplicate an answer or bill an abandoned attempt.
+
+```ts
+(event: unknown) => boolean
 ```
 
 ### `MACRO_ENABLED_OOXML_SNIFFED_MIMES`

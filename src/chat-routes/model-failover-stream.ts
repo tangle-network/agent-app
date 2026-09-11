@@ -18,6 +18,14 @@
  * session — including its `step-finish` usage, which must never be billed) and
  * lets `runWithModelFailover` walk to the next model.
  *
+ * `liveLifecycleEvents` relaxes the buffer for progress only. `start`,
+ * `status`, `model-processing`, and session lifecycle carry no answer and no
+ * receipt, so a product may take them the moment they arrive and show what
+ * the turn is waiting on. Measured 2026-09-11 on a warm production box:
+ * OpenCode reports whole parts, so the buffer held every event for 16 s and
+ * the product could show nothing through provisioning and agent startup. Off
+ * by default: with it on, an abandoned model's progress stays in the stream.
+ *
  * The classification itself is `isUpstreamUnavailable` verbatim, so this path
  * inherits the measured facts from the 2026-07-25 outage — above all that an
  * outage is NOT always a thrown error: the sandbox RESOLVES a terminal `error`
@@ -171,6 +179,26 @@ interface TerminalFailure {
  * never by throwing. Both `data` and the whole record are offered to
  * `isUpstreamUnavailable` so a payload nested either way is caught.
  */
+/**
+ * Progress the consumer may see before the commit point: it names no model
+ * output and carries no billing receipt, so streaming it live cannot duplicate
+ * an answer or bill an abandoned attempt. `warning` and every
+ * `message.part.updated` (including `step-start`/`step-finish`) stay buffered.
+ */
+export function isLiveLifecycleEvent(event: unknown): boolean {
+  const type = asString(asRecord(event)?.type) ?? ''
+  return (
+    type === 'start' ||
+    type === 'execution.started' ||
+    type === 'status' ||
+    type === 'model-processing' ||
+    type === 'model.processing' ||
+    type === 'session.created' ||
+    type === 'session.updated' ||
+    type === 'session.idle'
+  )
+}
+
 export function classifyTerminalFailure(event: unknown): TerminalFailure | null {
   const record = asRecord(event)
   if (!record) return null
@@ -251,6 +279,14 @@ export interface ModelFailoverStreamOptions {
   firstResponseTimeoutMs?: number
   /** Override the commit-point rule. Default {@link isCommittingSandboxEvent}. */
   isCommitting?: (event: unknown) => boolean
+  /**
+   * Stream {@link isLiveLifecycleEvent} progress to the consumer as it arrives
+   * instead of holding it until the attempt commits. Default `false`, which
+   * keeps an abandoned model's events entirely off the wire. With it on, such
+   * an event is never replayed from the buffer, and one from an abandoned
+   * attempt stays in the stream — it describes the sandbox, not the answer.
+   */
+  liveLifecycleEvents?: boolean
   onFallback?: (info: ModelFallbackInfo) => void
   /**
    * How many times to RE-RUN THE SAME MODEL when a turn completes having
@@ -437,6 +473,8 @@ export function streamWithModelFailover(
     DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS,
     'firstResponseTimeoutMs',
   )
+  const liveLifecycle = options.liveLifecycleEvents === true
+  const progress = createProgressQueue()
   let serving: string | undefined
   let trail: ModelFailoverAttempt[] = []
   let fellBack = false
@@ -583,7 +621,11 @@ export function streamWithModelFailover(
         }
       }
 
-      buffered.push(event)
+      if (liveLifecycle && !failure && !commits && isLiveLifecycleEvent(event)) {
+        progress.push(event)
+      } else {
+        buffered.push(event)
+      }
       // A terminal NON-outage failure surfaces exactly as it does today.
       if (failure) {
         firstResponseDeadline.clear()
@@ -669,24 +711,35 @@ export function streamWithModelFailover(
 
   const events = (async function* (): AsyncGenerator<unknown, void, unknown> {
     let handle: AttemptCommit
+    // Progress arrives while the probe is still running. The queue closes only
+    // after the verdict settles, so every event pushed before it is delivered
+    // in order and ahead of the replayed buffer.
+    const settled = runWithModelFailover<AttemptOutcome>({
+      models: options.models,
+      run: probe,
+      // The probe has already classified the raw payload with
+      // `isUpstreamUnavailable`; this reads its verdict rather than
+      // re-classifying a wrapper object, so the two can never disagree.
+      isUnavailableResult: (result) => result.committed === false,
+      onFallback: (attempt, nextModel) => {
+        const info: ModelFallbackInfo = {
+          from: attempt.model,
+          to: nextModel,
+          reason: attempt.reason ?? 'upstream unavailable',
+        }
+        options.log?.('[chat-routes] model upstream unavailable; falling over', { ...info })
+        options.onFallback?.(info)
+      },
+    }).finally(() => progress.close())
+    // The verdict is read after the drain; mark the rejection handled until then.
+    settled.catch(() => undefined)
+    for (;;) {
+      const item = await progress.pull()
+      if (item === PROGRESS_CLOSED) break
+      yield item
+    }
     try {
-      const outcome = await runWithModelFailover<AttemptOutcome>({
-        models: options.models,
-        run: probe,
-        // The probe has already classified the raw payload with
-        // `isUpstreamUnavailable`; this reads its verdict rather than
-        // re-classifying a wrapper object, so the two can never disagree.
-        isUnavailableResult: (result) => result.committed === false,
-        onFallback: (attempt, nextModel) => {
-          const info: ModelFallbackInfo = {
-            from: attempt.model,
-            to: nextModel,
-            reason: attempt.reason ?? 'upstream unavailable',
-          }
-          options.log?.('[chat-routes] model upstream unavailable; falling over', { ...info })
-          options.onFallback?.(info)
-        },
-      })
+      const outcome = await settled
       serving = outcome.model
       trail = outcome.attempts
       fellBack = outcome.usedFallback
@@ -731,5 +784,43 @@ export function streamWithModelFailover(
     servingModel: () => serving,
     attempts: () => trail,
     usedFallback: () => fellBack,
+  }
+}
+
+const PROGRESS_CLOSED: unique symbol = Symbol('progress-closed')
+
+/**
+ * FIFO handoff from the probe (a plain promise chain) to the event generator.
+ * `close` is idempotent and queues one sentinel behind everything pushed
+ * before it, so a consumer never loses a progress event to the verdict.
+ */
+function createProgressQueue(): {
+  push(event: unknown): void
+  close(): void
+  pull(): Promise<unknown>
+} {
+  const items: unknown[] = []
+  const waiters: Array<(value: unknown) => void> = []
+  let closed = false
+  const deliver = (value: unknown): void => {
+    const waiter = waiters.shift()
+    if (waiter) waiter(value)
+    else items.push(value)
+  }
+  return {
+    push(event) {
+      if (closed) return
+      deliver(event)
+    },
+    close() {
+      if (closed) return
+      closed = true
+      deliver(PROGRESS_CLOSED)
+    },
+    pull() {
+      if (items.length > 0) return Promise.resolve(items.shift())
+      if (closed) return Promise.resolve(PROGRESS_CLOSED)
+      return new Promise((resolve) => waiters.push(resolve))
+    },
   }
 }
