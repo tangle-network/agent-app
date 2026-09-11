@@ -3097,7 +3097,8 @@ describe('deferred profile files', () => {
     }
   })
 
-  it('retries a lost transport response after a chunk write without duplicating content', async () => {
+  // These cases execute multiple real shells; each subprocess keeps its 5s bound.
+  it('retries a lost transport response after a chunk write without duplicating content', { timeout: 30_000 }, async () => {
     await withShellBackedProfileWriter(new Set([2]), async ({ box, cwd, exec }) => {
       const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'abc')], { paceMs: 0 })
 
@@ -3108,7 +3109,7 @@ describe('deferred profile files', () => {
     })
   })
 
-  it('retries a lost transport response after final materialization without false failure', async () => {
+  it('retries a lost transport response after final materialization without false failure', { timeout: 30_000 }, async () => {
     await withShellBackedProfileWriter(new Set([3]), async ({ box, cwd, exec }) => {
       const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'abc')], { paceMs: 0 })
 
@@ -3670,7 +3671,7 @@ describe('deferred profile files', () => {
     expect(exec).not.toHaveBeenCalled()
   })
 
-  it('ensureWorkspaceSandbox: refreshes runtime auth after one deferred-write 401 and retries idempotently', async () => {
+  it('ensureWorkspaceSandbox: refreshes runtime auth after one deferred-write 401 and retries idempotently', { timeout: 30_000 }, async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'agent-app-profile-write-auth-'))
     let calls = 0
     const exec = vi.fn().mockImplementation(async (cmd: string) => {
