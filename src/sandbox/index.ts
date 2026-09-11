@@ -3034,11 +3034,18 @@ export function adaptSandboxStream(
   })()
 }
 
-/** Prepare one effective profile for both streamed and driven turns. */
-async function resolveSandboxPromptBackend(
-  shell: SandboxRuntimeConfig,
+/** Configuration needed to prepare a turn without provisioning a workspace. */
+export type SandboxPromptConfig = Pick<SandboxRuntimeConfig, 'provider' | 'deferProfileFiles' | 'promptBudget'>
+  & Partial<Pick<SandboxRuntimeConfig, 'profile'>>
+
+/** Prepare one effective backend for SDK dispatch or product-specific transport.
+ * Supply a server-owned profile, or a shell composer for the default profile.
+ * Reuse the returned backend for preflight and dispatch so they inspect identical configuration.
+ */
+export async function resolveSandboxPromptBackend(
+  shell: SandboxPromptConfig,
   options: StreamSandboxPromptOptions,
-  operation: string,
+  operation = 'sandbox prompt',
 ) {
   const initialHarness = options.harness ?? options.profile?.harness ?? DEFAULT_HARNESS
   if (!isHarness(initialHarness)) throw new Error(`Unsupported sandbox harness: ${initialHarness}`)
@@ -3047,9 +3054,10 @@ async function resolveSandboxPromptBackend(
     options.profile?.mcp ?? options.baseProfileMcp ?? {},
     options.extraMcp,
   )
-  const compose = (harness: Harness) => shell.profile({
-    systemPrompt: options.systemPrompt, extraMcp, harness,
-  })
+  const compose = (harness: Harness) => {
+    if (!shell.profile) throw new Error(`${operation}: supply a profile or a shell profile composer`)
+    return shell.profile({ systemPrompt: options.systemPrompt, extraMcp, harness })
+  }
   let fullProfile = options.profile
     ? mergeAgentProfiles(options.profile, {
         ...(options.systemPrompt !== undefined ? { prompt: { systemPrompt: options.systemPrompt } } : {}),

@@ -4,6 +4,7 @@ import type { SandboxInstance } from '@tangle-network/sandbox/core'
 import { fingerprintAgentProfile } from '../profile/fingerprint'
 import {
   driveSandboxTurn,
+  resolveSandboxPromptBackend,
   streamSandboxPrompt,
   type SandboxRuntimeConfig,
   type StreamSandboxPromptOptions,
@@ -172,5 +173,23 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     await expect(dispatch(lane, f, { profile: profile() })).rejects.toThrow()
     expect(f.streamPrompt).not.toHaveBeenCalled()
     expect(f.driveTurn).not.toHaveBeenCalled()
+  })
+})
+
+describe('profile preparation for product transports', () => {
+  it('prepares a complete backend without provisioning configuration or a second profile composer', async () => {
+    const selected = profile()
+    const backend = await resolveSandboxPromptBackend(
+      { provider: { providerName: 'openai-compat', allowKeylessModel: true } },
+      { profile: selected, interactions: { question: true } },
+    )
+    expect(backend.profile).toMatchObject(selected)
+    expect(backend.type).toBe(selected.harness)
+    expect(backend.model).toEqual({ model: selected.model?.default, provider: 'openai-compat' })
+    expect(backend.interactions).toEqual({ question: true })
+  })
+
+  it('refuses missing profile authority instead of inventing an agent', async () => {
+    await expect(resolveSandboxPromptBackend({}, {})).rejects.toThrow(/supply a profile/)
   })
 })

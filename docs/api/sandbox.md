@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-185 exports.
+187 exports.
 
 ### `adaptSandboxStream`
 
@@ -782,6 +782,14 @@ interface ResolvedModel
 interface ResolveSandboxClientCredentialsOptions
 ```
 
+### `resolveSandboxPromptBackend`
+
+`function` — Prepare one effective backend for SDK dispatch or product-specific transport.
+
+```ts
+(shell: SandboxPromptConfig, options: StreamSandboxPromptOptions, operation?: string) => Promise<{ interactions?: { que…
+```
+
 ### `runForegroundSandboxSingleFlight`
 
 `function` — Run one foreground provision or adopt the ready result from its current owner.
@@ -964,6 +972,14 @@ interface SandboxPrewarmerOptions
 
 ```ts
 interface SandboxPrewarmScope
+```
+
+### `SandboxPromptConfig`
+
+`type` — Configuration needed to prepare a turn without provisioning a workspace.
+
+```ts
+type SandboxPromptConfig
 ```
 
 ### `SandboxPromptTokenLimits`

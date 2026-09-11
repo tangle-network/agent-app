@@ -10941,6 +10941,12 @@
           "doc": "Resolve options for obtaining sandbox client credentials from environment variables and classification"
         },
         {
+          "name": "resolveSandboxPromptBackend",
+          "kind": "function",
+          "signature": "(shell: SandboxPromptConfig, options: StreamSandboxPromptOptions, operation?: string) => Promise<{ interactions?: { que…",
+          "doc": "Prepare one effective backend for SDK dispatch or product-specific transport."
+        },
+        {
           "name": "runForegroundSandboxSingleFlight",
           "kind": "function",
           "signature": "<T>(options: ForegroundSandboxSingleFlightOptions<T>) => Promise<T>",
@@ -11077,6 +11083,12 @@
           "kind": "interface",
           "signature": "interface SandboxPrewarmScope",
           "doc": "The workspace a warm targets."
+        },
+        {
+          "name": "SandboxPromptConfig",
+          "kind": "type",
+          "signature": "type SandboxPromptConfig",
+          "doc": "Configuration needed to prepare a turn without provisioning a workspace."
         },
         {
           "name": "SandboxPromptTokenLimits",

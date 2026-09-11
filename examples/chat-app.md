@@ -525,3 +525,7 @@ The supplied profile bypasses `shell.profile`; compose product resources before 
 Existing callers can still use the shell composer and explicit per-turn selections.
 Selections override profile defaults, which override shell provider defaults.
 The dispatched profile records the effective model and harness, without copying credential values into it.
+
+Products with their own SDK transport can call `resolveSandboxPromptBackend` directly.
+It accepts only profile, provider, and preparation configuration; it does not require provisioning or storage adapters.
+Use its returned backend for both request-size checks and dispatch, preserving product-specific recovery and persistence.
