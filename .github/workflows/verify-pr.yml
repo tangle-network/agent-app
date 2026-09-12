@@ -1,81 +1,47 @@
 name: Verify PR
-
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-
 permissions:
   contents: read
-
 concurrency:
   group: verify-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
-
 jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    permissions:
-      contents: write
     env:
       NODE_OPTIONS: --max-old-space-size=12288
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - name: Record exact source
+        run: |
+          mkdir -p verification
+          git rev-parse HEAD > verification/commit.txt
+          git archive --format=tar.gz HEAD > verification/source.tar.gz
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile --ignore-scripts=false
-      - name: Generate API documentation
+      - run: pnpm install --frozen-lockfile --ignore-scripts=false > verification/install.log 2>&1 || { tail -60 verification/install.log; exit 1; }
+      - name: Verify generated documentation
         run: |
-          mkdir -p verification
-          pnpm docs:gen
-          git diff -- docs > verification/generated-docs.patch
-      - name: Commit only generated references
-        if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('node:fs');
-            const { owner, repo } = context.repo;
-            const pr = context.payload.pull_request;
-            const paths = ['docs/api/tangle.md', 'docs/codemap.json', 'docs/llms-full.txt'];
-            const head = (await github.rest.git.getRef({owner, repo, ref: `heads/${pr.head.ref}`})).data.object.sha;
-            if (head !== pr.head.sha) throw new Error('PR changed during generation; retry the new head');
-            const commit = (await github.rest.git.getCommit({owner, repo, commit_sha: head})).data;
-            const tree = [];
-            for (const path of paths) {
-              const content = fs.readFileSync(path, 'utf8');
-              const blob = (await github.rest.git.createBlob({owner, repo, content, encoding: 'utf-8'})).data;
-              const old = (await github.rest.repos.getContent({owner, repo, path, ref: head})).data;
-              if (old.sha !== blob.sha) tree.push({path, mode: '100644', type: 'blob', sha: blob.sha});
-            }
-            let testedHead = head;
-            if (tree.length) {
-              const updated = (await github.rest.git.createTree({owner, repo, base_tree: commit.tree.sha, tree})).data;
-              const next = (await github.rest.git.createCommit({owner, repo, tree: updated.sha, parents: [head], message: 'docs: regenerate broker token API references'})).data;
-              await github.rest.git.updateRef({owner, repo, ref: `heads/${pr.head.ref}`, sha: next.sha, force: false});
-              testedHead = next.sha;
-            }
-            fs.writeFileSync('verification/commit.txt', testedHead + '\n');
-      - name: Record actual tested inputs
-        run: |
-          git status --short > verification/worktree.txt
-          find src tests -type f -print0 | sort -z | xargs -0 sha256sum > verification/source-files.sha256
-          tar --exclude=node_modules --exclude=.git --exclude=verification --exclude=dist -czf verification/source.tar.gz .
-      - run: pnpm run typecheck
-      - run: pnpm run test:gates
-      - run: pnpm run build
-      - run: pnpm run test
-      - run: pnpm run test:generated
-      - run: pnpm run knip
-      - name: Retain verification inputs
+          pnpm docs:gen > verification/docs.log 2>&1
+          git diff --exit-code -- docs
+      - run: pnpm run typecheck > verification/typecheck.log 2>&1 || { cat verification/typecheck.log; exit 1; }
+      - run: pnpm run test:gates > verification/gates.log 2>&1 || { tail -80 verification/gates.log; exit 1; }
+      - run: pnpm run build > verification/build.log 2>&1 || { tail -80 verification/build.log; exit 1; }
+      - name: Test all source
+        run: pnpm exec vitest run --reporter=json --outputFile=verification/tests.json > verification/tests.log 2>&1 || { tail -100 verification/tests.log; exit 1; }
+      - run: pnpm run test:generated > verification/generated.log 2>&1 || { tail -100 verification/generated.log; exit 1; }
+      - run: pnpm run knip > verification/knip.log 2>&1 || { cat verification/knip.log; exit 1; }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: pr-verification-${{ github.event.pull_request.number }}
           path: verification/
