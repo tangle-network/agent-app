@@ -5,7 +5,7 @@ function setup(overrides: Partial<RequestApiKey> = {}) {
   const key = { keyId: 'key-a', ownerId: 'owner-a', scopes: ['workspace:read'],
     expiresAt: Date.now() + 60_000, ...overrides }
   const verify = vi.fn(async () => key as RequestApiKey | null)
-  const requiredScope = vi.fn(() => 'workspace:read' as string | null)
+  const requiredScope = vi.fn(() => 'workspace:read' as string | readonly string[] | null)
   const resolveIdentity = vi.fn(async (verified: RequestApiKey) => ({ user: { id: verified.ownerId } }))
   const claimRequest = vi.fn(async (_key: RequestApiKey, _requestId: string) => ({ allowed: true, retryAfterSeconds: 0 }))
   const authenticate = createApiKeyRequestAuth({ verify, requiredScope, resolveIdentity, claimRequest })
@@ -59,6 +59,27 @@ describe('private API key authentication', () => {
     const state = setup({ scopes })
     await expect(state.authenticate(request())).rejects.toMatchObject({ status: 403 })
     expect(state.resolveIdentity).not.toHaveBeenCalled()
+  })
+
+  it('requires every scope in a compound route policy', async () => {
+    const allowed = setup({ scopes: ['workspace:read', 'workspace:run'] })
+    allowed.requiredScope.mockReturnValue(['workspace:read', 'workspace:run'])
+    await expect(allowed.authenticate(request())).resolves.toEqual({ user: { id: 'owner-a' } })
+    expect(allowed.claimRequest).toHaveBeenCalledOnce()
+    for (const scopes of [['workspace:read'], ['workspace:run']]) {
+      const denied = setup({ scopes })
+      denied.requiredScope.mockReturnValue(['workspace:read', 'workspace:run'])
+      await expect(denied.authenticate(request())).rejects.toMatchObject({ status: 403 })
+      expect(denied.resolveIdentity).not.toHaveBeenCalled()
+      expect(denied.claimRequest).not.toHaveBeenCalled()
+    }
+  })
+
+  it.each([{ required: [] }, { required: new Array<string>(1) }, { required: [''] }, { required: ['workspace:read', ' '] }])('denies empty or malformed scope policies $required before verification', async ({ required }) => {
+    const state = setup()
+    state.requiredScope.mockReturnValue(required)
+    await expect(state.authenticate(request())).rejects.toMatchObject({ status: 403 })
+    expect(state.verify).not.toHaveBeenCalled()
   })
 
   it('denies unlisted routes before resolving owner or claiming quota', async () => {

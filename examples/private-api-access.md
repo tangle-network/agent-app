@@ -8,7 +8,10 @@ They do not issue browser sessions or replace workspace authorization.
 ## Server integration
 
 Configure the adapter with the existing key verifier, exact method/path scope map, owner lookup, and atomic request quota claim.
-Keys need an explicit scope and a finite expiry in Unix epoch milliseconds.
+Return one scope or an array of all required scopes from `requiredScope`; every listed permission must match exactly.
+For example, a run route can require `['records:read', 'records:run']`.
+An empty list or `null` denies the route.
+Keys need explicit scopes and a finite expiry in Unix epoch milliseconds.
 Retain the key ID in trusted run and revision metadata for attribution.
 Keep existing workspace membership checks, subscription admission, and execution budgets after authentication.
 
