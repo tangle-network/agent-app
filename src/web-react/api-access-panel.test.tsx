@@ -32,14 +32,14 @@ describe('ApiAccessPanel', () => {
     const input = vi.mocked(callbacks.onCreate).mock.calls[0]![0]
     expect(Date.parse(input.expiresAt) - Date.now()).toBeGreaterThan(6 * 86_400_000)
     expect(Date.parse(input.expiresAt) - Date.now()).toBeLessThanOrEqual(7 * 86_400_000)
-    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Save your key' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Save your key' })))
     const secret = screen.getByLabelText<HTMLInputElement>('New API key')
     expect(secret.type).toBe('password')
     expect(secret.value).toBe(fixtureKey)
     expect(screen.queryByText(fixtureKey)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'I’ve saved it' }))
     expect(screen.queryByLabelText('New API key')).toBeNull()
-    expect(document.activeElement).toBe(screen.getByLabelText('Name'))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Name')))
     expect(callbacks.onChanged).toHaveBeenCalledOnce()
   })
 
