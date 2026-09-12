@@ -75,7 +75,7 @@ describe('private API key authentication', () => {
     }
   })
 
-  it.each([{ required: [] }, { required: [''] }, { required: ['workspace:read', ' '] }])('denies empty or malformed scope policies $required before verification', async ({ required }) => {
+  it.each([{ required: [] }, { required: new Array<string>(1) }, { required: [''] }, { required: ['workspace:read', ' '] }])('denies empty or malformed scope policies $required before verification', async ({ required }) => {
     const state = setup()
     state.requiredScope.mockReturnValue(required)
     await expect(state.authenticate(request())).rejects.toMatchObject({ status: 403 })

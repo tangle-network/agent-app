@@ -34,7 +34,7 @@ export function createApiKeyRequestAuth<Key extends RequestApiKey, Identity>(
       throw denied(401, 'api_key.invalid', 'Invalid API key')
     }
     const requiredScope = options.requiredScope(request)
-    const requiredScopes = typeof requiredScope === 'string' ? [requiredScope] : requiredScope
+    const requiredScopes = typeof requiredScope === 'string' ? [requiredScope] : Array.from(requiredScope ?? [])
     if (!requiredScopes?.length || !requiredScopes.every(scope => typeof scope === 'string' && scope.trim())) {
       throw denied(403, 'api_key.route_denied', 'API key access is not enabled for this route')
     }
