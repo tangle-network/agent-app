@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=12288
-      VERIFICATION_DIR: ${{ runner.temp }}/agent-app-verification
+      VERIFICATION_DIR: /tmp/agent-app-verification-${{ github.run_id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
