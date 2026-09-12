@@ -167,6 +167,8 @@ The **complete, always-current reference** — every published subpath, its expo
 See **[`docs/CODEMAP.md`](./docs/CODEMAP.md)** for the rest — `/billing`, `/tangle`, `/object-store`, `/trace`, `/theme`, `/eval`, `/app-auth`, `/platform`, and more.
 
 `createApiKeyRequestAuth` from `/platform` lets private product routes accept existing scoped Bearer keys.
+`ApiAccessPanel` from `/web-react` provides reusable owner key creation, one-time copying, and revocation.
+See [private API adoption](examples/private-api-access.md) for server and owner-page integration.
 Provide the maintained key verifier, an exact route-to-scope policy, owner lookup, and an atomic request-quota claim.
 The adapter requires finite expiry and explicit scope, and never falls back to cookies when a supplied credential fails.
 Keep key issuance cookie-only and retain workspace authorization in each product route.

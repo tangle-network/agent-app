@@ -178,3 +178,5 @@ export function assertMediaUrl(url: string, what = 'media url'): void {
   }
   throw new Error(`${what} must be http(s) or a rooted /api/ path (${shown})`)
 }
+
+export { isWorkspaceFileExportable } from './file-export'
