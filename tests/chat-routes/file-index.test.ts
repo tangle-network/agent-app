@@ -41,6 +41,8 @@ describe('createSandboxFileIndexRoute', () => {
       { path: '/home/agent/node_modules/pkg/index.js', size: 40 },
       { path: '/home/agent/.git/HEAD', size: 10 },
       { path: '/home/agent/.env', size: 5 },
+      { path: '/home/agent/opencode.json', size: 50 },
+      { path: '/home/agent/OPENCODE.JSONC', size: 50 },
       { path: '/home/agent/dist/bundle.js', size: 900 },
       { path: '/home/agent/README.md', size: 30 },
     ])
@@ -158,6 +160,18 @@ describe('createSandboxFileIndexRoute', () => {
     const second = (await (await route(indexRequest())).json()) as FileIndexReadyResponse
     expect(second).toEqual(first)
     expect(treeCalls).toBe(1) // second request served from cache, no re-scan
+  })
+
+  it('filters private runtime files from a previously cached index', async () => {
+    const route = createSandboxFileIndexRoute({
+      authorize: async () => ({ status: 'ready', fs: fakeFs([]), root: '/root', cacheKey: 'ws-1' }),
+      cache: { get: async () => ({ status: 'ready', truncated: false, generatedAt: '2026-01-01', files: [
+        { path: 'opencode.json', name: 'opencode.json' },
+        { path: 'nested/OPENCODE.JSONC', name: 'OPENCODE.JSONC' },
+        { path: 'brief.md', name: 'brief.md' },
+      ] }), put: async () => {} },
+    })
+    expect(await (await route(indexRequest())).json()).toMatchObject({ files: [{ path: 'brief.md', name: 'brief.md' }] })
   })
 
   it('skips the cache when authorize omits a cacheKey', async () => {

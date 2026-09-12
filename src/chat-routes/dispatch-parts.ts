@@ -20,6 +20,7 @@
  * demotion math and emitted part shapes reproduce its dispatched prompt bytes).
  */
 
+import { isWorkspaceFileExportable } from '../web/file-export'
 import { flattenHistory, type PromptInputPart } from '../sandbox'
 import {
   statSandboxFileSize,
@@ -317,6 +318,9 @@ export async function buildDispatchParts(input: BuildDispatchPartsInput): Promis
   for (const mention of mentions) {
     if (!mention.path) {
       return { succeeded: false, error: `mention path must be non-empty: ${mention.name}` }
+    }
+    if (!isWorkspaceFileExportable(mention.path)) {
+      return { succeeded: false, error: `mention file is not exportable: ${mention.path}` }
     }
     const absPath = resolveMentionPath(mention.path)
     if (emittedAbsPaths.has(absPath)) continue

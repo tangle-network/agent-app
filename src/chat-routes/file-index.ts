@@ -18,6 +18,7 @@
  */
 
 import type { FileMention } from './wire'
+import { isWorkspaceFileExportable } from '../web/file-export'
 
 /** One entry from a structural `tree()` scan. Mirrors the sandbox SDK's
  *  `FileTreeFile` (`path`, `size`, `mtime`) — `mtime` is unused here so it's
@@ -131,7 +132,7 @@ const DEFAULT_IGNORE_SEGMENTS = [
  *  always ignored — this single rule covers most dot-prefixed VCS/tooling
  *  dirs and dotfiles without enumerating them. */
 function isIgnored(relPath: string, ignoreSegments: ReadonlySet<string>): boolean {
-  if (!relPath || relPath.startsWith('/') || relPath.includes('\\')) return true
+  if (!isWorkspaceFileExportable(relPath)) return true
   for (const segment of relPath.split('/')) {
     if (!segment) continue
     if (segment.startsWith('.')) return true
@@ -209,15 +210,16 @@ export function createSandboxFileIndexRoute(
       return Response.json({ status: 'warming' } satisfies FileIndexWarmingResponse)
     }
 
-    const cache = options.cache
-    if (cache && auth.cacheKey) {
-      const cached = await cache.get(auth.cacheKey)
-      if (cached) return Response.json(cached)
-    }
-
     const ignoreSegments = auth.ignore?.length
       ? new Set([...staticIgnore, ...auth.ignore])
       : staticIgnore
+    const cache = options.cache
+    if (cache && auth.cacheKey) {
+      const cached = await cache.get(auth.cacheKey)
+      if (cached) return Response.json({ ...cached,
+        files: cached.files.filter(file => !isIgnored(file.path, ignoreSegments)),
+      })
+    }
 
     let scan: SandboxTreeResult
     try {

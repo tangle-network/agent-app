@@ -10696,6 +10696,14 @@ Source: `src/platform/index.ts` · depends on `billing`, `runtime`, `web`
 interface AdminGuardOptions
 ```
 
+### `ApiKeyRequestAuthOptions`
+
+`interface`
+
+```ts
+interface ApiKeyRequestAuthOptions
+```
+
 ### `assertBillableBalance`
 
 `function` — Gate a billable turn: passes when enforcement is disabled (dev default), the tier allows overage, or remaining balance is positive.
@@ -10758,6 +10766,14 @@ interface BillableBalanceState
 
 ```ts
 <Session>(opts: AdminGuardOptions<Session>) => (request: Request) => Promise<Session>
+```
+
+### `createApiKeyRequestAuth`
+
+`function` — Adapt existing Bearer keys to private product routes without issuing sessions.
+
+```ts
+<Key extends RequestApiKey, Identity>(options: ApiKeyRequestAuthOptions<Key, Identity>) => (request: Request) => Promis…
 ```
 
 ### `createAuthGuard`
@@ -11038,6 +11054,14 @@ interface ProductSeatOfferPeriod
 
 ```ts
 (http: PlatformBillingHttp, userApiKey: string | null | undefined, policy?: Record<TanglePlanTier, TangleTierPolicy>) =…
+```
+
+### `RequestApiKey`
+
+`interface` — Verified key fields required to enter a product's private API routes.
+
+```ts
+interface RequestApiKey
 ```
 
 ### `ResolvedTangleHubBearer`
@@ -22787,6 +22811,14 @@ type FreeRouteLimitOutcome
 interface FreeRouteLimitResponseOptions
 ```
 
+### `isWorkspaceFileExportable`
+
+`function` — Workspace exports exclude runtime configuration and hidden credential stores.
+
+```ts
+(path: string) => boolean
+```
+
 ### `JsonObject`
 
 `type`
@@ -22974,6 +23006,38 @@ interface AgentActivityRecord
 
 ```ts
 interface AgentSessionControlsProps
+```
+
+### `ApiAccessKey`
+
+`interface`
+
+```ts
+interface ApiAccessKey
+```
+
+### `ApiAccessPanel`
+
+`function`
+
+```ts
+({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, expiryDays, defaultExpiryDays, on…
+```
+
+### `ApiAccessPanelProps`
+
+`interface`
+
+```ts
+interface ApiAccessPanelProps
+```
+
+### `ApiAccessScope`
+
+`interface`
+
+```ts
+interface ApiAccessScope
 ```
 
 ### `ATTACHMENT_ACCEPT`

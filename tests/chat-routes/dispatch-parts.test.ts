@@ -419,6 +419,18 @@ function mentionStub(size: number, base64: string): ReadSandboxMentionFn {
 }
 
 describe('buildDispatchParts — mentions', () => {
+  it.each(['opencode.json', 'nested/OPENCODE.JSONC', '.config/auth.json'])('rejects runtime mention before sandbox access: %s', async path => {
+    const reader = vi.fn(mentionStub(16, 'c3ludGhldGljLXNlY3JldA=='))
+    const resolveMentionPath = vi.fn((value: string) => `${VAULT_DIR}/${value}`)
+    const result = await buildDispatchParts(base({
+      mentions: [mention({ path, name: path, mentionKind: 'file' })],
+      box: FAKE_BOX, readSandboxMention: reader, resolveMentionPath,
+    }))
+    expect(result).toEqual({ succeeded: false, error: expect.stringContaining('not exportable') })
+    expect(reader).not.toHaveBeenCalled()
+    expect(resolveMentionPath).not.toHaveBeenCalled()
+  })
+
   it('inlines a small image mention as a data: URI (no path key)', async () => {
     const result = await buildDispatchParts(
       base({ mentions: [mention()], box: FAKE_BOX, readSandboxMention: mentionStub(12, 'c21hbGwtcGF5bG9hZA==') }),
