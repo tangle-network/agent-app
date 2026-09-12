@@ -110,6 +110,8 @@ export interface ProductEntitlement {
   /** Cumulative inference spend across the whole suite, in dollars. */
   lifetimeSpentUsd: number
   hasSeat: boolean
+  /** Platform access decision, including funded balance and identity policy. */
+  paidAccess?: boolean
   onFreeTier: boolean
   /** Present when the platform exposes catalog-backed commercial terms. */
   offer?: ProductSeatOffer
@@ -252,6 +254,7 @@ export function createPlatformBillingHttp(opts: PlatformBillingHttpOptions): Pla
           currentPeriodEnd?: string | null
           lifetimeSpentUsd?: number | null
           hasSeat?: boolean | null
+          paidAccess?: unknown
           onFreeTier?: boolean | null
           offer?: unknown
         }
@@ -264,6 +267,7 @@ export function createPlatformBillingHttp(opts: PlatformBillingHttpOptions): Pla
         currentPeriodEnd: data.currentPeriodEnd ?? null,
         lifetimeSpentUsd: data.lifetimeSpentUsd ?? 0,
         hasSeat,
+        ...('paidAccess' in data ? { paidAccess: data.paidAccess === true } : {}),
         // Product-funded free access is retired. Ignore stale server signals.
         onFreeTier: false,
         ...(offer ? { offer } : {}),
@@ -430,9 +434,9 @@ function unavailableEntitlement(): ProductEntitlement {
   }
 }
 
-/** Product access requires an active paid or trialing seat. */
+/** Honor platform access policy; older endpoints provide only seat authority. */
 export function isProductEntitled(ent: ProductEntitlement): boolean {
-  return ent.hasSeat
+  return ent.paidAccess === undefined ? ent.hasSeat === true : ent.paidAccess === true
 }
 
 // ── Bridge onto the /billing seam ───────────────────────────────────────────
