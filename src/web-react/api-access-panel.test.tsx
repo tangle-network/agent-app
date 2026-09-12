@@ -102,6 +102,72 @@ describe('ApiAccessPanel', () => {
     expect(vi.mocked(callbacks.onCreate).mock.calls[0]![0].scopes).toEqual(['records:write'])
   })
 
+  it('selects required permissions visibly and clears dependent permissions when a prerequisite is cleared', async () => {
+    const callbacks = props()
+    callbacks.access = [...callbacks.access, {
+      scope: 'records:run', label: 'Run agent', description: 'Run with your records.', requires: ['records:read'],
+    }]
+    render(<ApiAccessPanel {...callbacks} />)
+    const read = screen.getByRole<HTMLInputElement>('checkbox', { name: /Read records/ })
+    const run = screen.getByRole<HTMLInputElement>('checkbox', { name: /Run agent/ })
+    fireEvent.click(read)
+    fireEvent.click(run)
+    expect(read.checked).toBe(true)
+    expect(run.checked).toBe(true)
+    fireEvent.click(read)
+    expect(read.checked).toBe(false)
+    expect(run.checked).toBe(false)
+    fireEvent.click(run)
+    await create()
+    expect(vi.mocked(callbacks.onCreate).mock.calls[0]![0].scopes).toEqual(['records:run', 'records:read'])
+  })
+
+  it('expands transitive defaults and drops dependents when a required permission disappears', () => {
+    const callbacks = props()
+    callbacks.access = [callbacks.access[0]!,
+      { ...callbacks.access[1]!, requires: ['records:read'] },
+      { scope: 'records:run', label: 'Run agent', description: 'Run.', requires: ['records:write'] },
+    ]
+    callbacks.defaultScopes = ['records:run']
+    const { rerender } = render(<ApiAccessPanel {...callbacks} />)
+    expect(screen.getAllByRole<HTMLInputElement>('checkbox').every(input => input.checked)).toBe(true)
+    rerender(<ApiAccessPanel {...callbacks} access={callbacks.access.slice(1)} />)
+    expect(screen.getAllByRole<HTMLInputElement>('checkbox').every(input => !input.checked && input.disabled)).toBe(true)
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'My client' } })
+    fireEvent.submit(screen.getByRole('button', { name: 'Create key' }).closest('form')!)
+    expect(callbacks.onCreate).not.toHaveBeenCalled()
+    rerender(<ApiAccessPanel {...callbacks} />)
+    expect(screen.getAllByRole<HTMLInputElement>('checkbox').every(input => !input.checked)).toBe(true)
+  })
+
+  it('does not retain prerequisites added only for an unavailable default', async () => {
+    const callbacks = props()
+    callbacks.access = [...callbacks.access, {
+      scope: 'records:run', label: 'Run agent', description: 'Run.', requires: ['records:read', 'missing'],
+    }]
+    callbacks.defaultScopes = ['records:run']
+    const { rerender } = render(<ApiAccessPanel {...callbacks} />)
+    expect(screen.getAllByRole<HTMLInputElement>('checkbox').every(input => !input.checked)).toBe(true)
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'My client' } })
+    fireEvent.submit(screen.getByRole('button', { name: 'Create key' }).closest('form')!)
+    expect(callbacks.onCreate).not.toHaveBeenCalled()
+    rerender(<ApiAccessPanel {...callbacks} defaultScopes={['records:read', 'records:run']} key="independent-default" />)
+    await create()
+    expect(vi.mocked(callbacks.onCreate).mock.calls[0]![0].scopes).toEqual(['records:read'])
+  })
+
+  it('handles cyclic requirements without hanging or retaining a partially selected cycle', () => {
+    const callbacks = props()
+    callbacks.access = [
+      { ...callbacks.access[0]!, requires: ['records:write'] },
+      { ...callbacks.access[1]!, requires: ['records:read'] },
+    ]
+    render(<ApiAccessPanel {...callbacks} />)
+    expect(screen.getAllByRole<HTMLInputElement>('checkbox').every(input => input.checked)).toBe(true)
+    fireEvent.click(screen.getByRole('checkbox', { name: /Read records/ }))
+    expect(screen.getAllByRole<HTMLInputElement>('checkbox').every(input => !input.checked)).toBe(true)
+  })
+
   it('shows failed creation without exposing a secret or claiming success', async () => {
     const callbacks = props()
     callbacks.onCreate = vi.fn(async () => { throw new Error('Key store unavailable') })

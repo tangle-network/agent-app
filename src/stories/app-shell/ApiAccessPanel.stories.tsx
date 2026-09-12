@@ -10,6 +10,7 @@ const meta: Meta<typeof ApiAccessPanel> = {
     access: [
       { scope: 'records:read', label: 'Read records', description: 'Read your records and run status.' },
       { scope: 'records:write', label: 'Edit records', description: 'Create and edit your records.' },
+      { scope: 'records:run', label: 'Run agents', description: 'Requires read access.', requires: ['records:read'] },
     ],
     defaultScopes: ['records:read'],
     baseUrl: 'https://example.test',
