@@ -8462,7 +8462,7 @@
           "name": "isProductEntitled",
           "kind": "function",
           "signature": "(ent: ProductEntitlement) => boolean",
-          "doc": "Product access requires an active paid or trialing seat."
+          "doc": "Honor platform access policy; older endpoints provide only seat authority."
         },
         {
           "name": "isSeatBillingEnabled",

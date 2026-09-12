@@ -248,7 +248,7 @@ interface HubProxyRoutes
 
 ### `isProductEntitled`
 
-`function` — Product access requires an active paid or trialing seat.
+`function` — Honor platform access policy; older endpoints provide only seat authority.
 
 ```ts
 (ent: ProductEntitlement) => boolean
