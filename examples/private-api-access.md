@@ -36,6 +36,7 @@ import { ApiAccessPanel } from '@tangle-network/agent-app/web-react'
   access={[
     { scope: 'records:read', label: 'Read records', description: 'Read your records.' },
     { scope: 'records:write', label: 'Edit records', description: 'Create and edit your records.' },
+    { scope: 'records:run', label: 'Run agents', description: 'Run agents with your records.', requires: ['records:read'] },
   ]}
   defaultScopes={['records:read']}
   expiryDays={[1, 7, 30]}
@@ -51,6 +52,11 @@ import { ApiAccessPanel } from '@tangle-network/agent-app/web-react'
 `expiryDays` and `defaultExpiryDays` configure offered lifetimes in days; the defaults are `[1, 7, 30]` and `7`.
 The issuer must enforce its expiry policy independently.
 An empty or invalid choices list prevents creation.
+
+`requires` declares prerequisite permissions.
+Selecting a permission also selects its prerequisites; clearing a prerequisite clears dependent permissions.
+Defaults expand prerequisites, and unavailable prerequisites disable dependent choices.
+The server must enforce required scopes independently; checkbox dependencies only guide owner selection.
 
 `onCreate` receives `{ name, scopes, expiresAt }` and resolves to `{ id, key }` after successful persistence.
 `onRevoke` resolves only after the server confirms deletion; reject failures instead of reporting success.

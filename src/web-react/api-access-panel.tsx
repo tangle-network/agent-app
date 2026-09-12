@@ -11,6 +11,7 @@ export interface ApiAccessScope {
   scope: string
   label: string
   description: string
+  requires?: readonly string[]
 }
 
 export interface ApiAccessPanelProps {
@@ -34,6 +35,33 @@ const inputClass = 'h-11 w-full rounded-lg border border-input bg-background px-
 const buttonClass = 'inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50'
 const outlineClass = 'inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground disabled:opacity-50'
 
+function pruneScopes(scopes: readonly string[], access: readonly ApiAccessScope[]): string[] {
+  const offered = new Map(access.map(option => [option.scope, option]))
+  const selected = new Set(scopes.filter(scope => offered.has(scope)))
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const scope of selected) {
+      if (offered.get(scope)?.requires?.some(required => !selected.has(required))) {
+        selected.delete(scope)
+        changed = true
+      }
+    }
+  }
+  return [...selected]
+}
+
+function expandScopes(scopes: readonly string[], access: readonly ApiAccessScope[]): string[] {
+  const offered = new Map(access.map(option => [option.scope, option]))
+  const selected = new Set(scopes.filter(scope => offered.has(scope)))
+  for (const scope of selected) {
+    for (const required of offered.get(scope)?.requires ?? []) {
+      if (offered.has(required)) selected.add(required)
+    }
+  }
+  return pruneScopes([...selected], access)
+}
+
 export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHref, description,
   limitsDescription, expiryDays = defaultExpiryChoices, defaultExpiryDays = 7,
   onCreate, onRevoke, onChanged }: ApiAccessPanelProps) {
@@ -43,7 +71,7 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
   const fallbackDays = allowedDays.includes(defaultExpiryDays) ? defaultExpiryDays : allowedDays[0]
   const [days, setDays] = useState<number | undefined>(fallbackDays)
   const selectedDays = days !== undefined && allowedDays.includes(days) ? days : fallbackDays
-  const [scopes, setScopes] = useState<string[]>(() => defaultScopes.filter(scope => access.some(option => option.scope === scope)))
+  const [scopes, setScopes] = useState<string[]>(() => expandScopes(defaultScopes, access))
   const [creating, setCreating] = useState(false)
   const [revoking, setRevoking] = useState<string | null>(null)
   const [created, setCreated] = useState<{ id: string; key: string } | null>(null)
@@ -52,11 +80,11 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
   const keyHeading = useRef<HTMLHeadingElement>(null)
   const nameInput = useRef<HTMLInputElement>(null)
   const keyWasShown = useRef(false)
-  const selectedScopes = scopes.filter(scope => access.some(option => option.scope === scope))
+  const selectedScopes = pruneScopes(scopes, access)
 
   useEffect(() => {
     setScopes(current => {
-      const next = current.filter(scope => access.some(option => option.scope === scope))
+      const next = pruneScopes(current, access)
       return next.length === current.length ? current : next
     })
   }, [access])
@@ -73,7 +101,7 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
 
   async function createKey(event: FormEvent) {
     event.preventDefault()
-    const requestedScopes = scopes.filter(scope => access.some(option => option.scope === scope))
+    const requestedScopes = pruneScopes(scopes, access)
     if (!name.trim() || !requestedScopes.length || selectedDays === undefined || creating || created) return
     setCreating(true)
     setError(null)
@@ -158,17 +186,23 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
             </div>
             <fieldset className="space-y-3">
               <legend className="mb-3 text-sm font-medium">Permissions</legend>
-              {access.map(access => (
-                <label key={access.scope} className="flex cursor-pointer items-start gap-3">
-                  <input type="checkbox" className="mt-1 size-4 accent-primary" checked={selectedScopes.includes(access.scope)}
-                    onChange={event => setScopes(current => event.target.checked
-                      ? [...current, access.scope] : current.filter(scope => scope !== access.scope))} />
-                  <span className="text-sm">
-                    <span className="block font-medium">{access.label}</span>
-                    <span className="text-muted-foreground">{access.description}</span>
-                  </span>
-                </label>
-              ))}
+              {access.map(option => {
+                const unavailable = !expandScopes([option.scope], access).includes(option.scope)
+                return (
+                  <label key={option.scope} className="flex cursor-pointer items-start gap-3">
+                    <input type="checkbox" className="mt-1 size-4 accent-primary" checked={selectedScopes.includes(option.scope)}
+                      disabled={unavailable}
+                      onChange={event => setScopes(current => event.target.checked
+                        ? expandScopes([...current, option.scope], access)
+                        : pruneScopes(current.filter(scope => scope !== option.scope), access))} />
+                    <span className="text-sm">
+                      <span className="block font-medium">{option.label}</span>
+                      <span className="text-muted-foreground">{option.description}</span>
+                      {unavailable && <span className="block text-muted-foreground">Required permission unavailable.</span>}
+                    </span>
+                  </label>
+                )
+              })}
             </fieldset>
             {limitsDescription && <p className="text-xs text-muted-foreground">{limitsDescription}</p>}
             <button className={buttonClass} type="submit" disabled={creating || !name.trim() || !selectedScopes.length || selectedDays === undefined}>{creating ? 'Creating…' : 'Create key'}</button>
