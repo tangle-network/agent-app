@@ -253,3 +253,25 @@ describe('createPlatformBillingHttp.getProductEntitlement transport', () => {
     expect(isProductEntitled(ent)).toBe(false)
   })
 })
+
+
+describe('platform paid-access authority', () => {
+  it.each([
+    { paidAccess: true, hasSeat: false, expected: true },
+    { paidAccess: false, hasSeat: true, expected: false },
+    { paidAccess: 'true', hasSeat: true, expected: false },
+    { paidAccess: null, hasSeat: true, expected: false },
+  ])('honors paidAccess=$paidAccess over hasSeat=$hasSeat', async ({ paidAccess, hasSeat, expected }) => {
+    const http = createPlatformBillingHttp({
+      baseUrl: 'https://id.tangle.tools',
+      serviceToken: 'service-test-value',
+      productSlug: 'creative',
+      fetchImpl: async () => Response.json({ success: true, data: {
+        paidAccess, hasSeat, balance: 431.44, fundedBalance: 431.44,
+        emailVerified: true, productEnabled: true,
+      } }),
+    })
+    const entitlement = await getProductEntitlement(http, 'user-test-value', 'creative')
+    expect(isProductEntitled(entitlement)).toBe(expected)
+  })
+})
