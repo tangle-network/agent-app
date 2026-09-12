@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTempRepo, passingSteps, type TempRepo } from './proof-fixture'
 import {
   buildSignoffProof,
@@ -10,6 +10,13 @@ import {
   serializeSignoffProof,
   signoffKeyId,
 } from './proof-record'
+
+// Every test here spawns real `git` processes against a temp repository, so the
+// 5 s default budgets the host's scheduler rather than the assertion: on a
+// loaded machine these fail one at a time, each run picking a different test,
+// while passing standalone seconds later. docs/SIGNOFF.md calls raising such a
+// timeout the honest mitigation — the assertions are unchanged.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
 
 const KEY = new Uint8Array(32).fill(7)
 const OTHER_KEY = new Uint8Array(32).fill(9)
