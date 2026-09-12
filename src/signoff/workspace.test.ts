@@ -58,7 +58,8 @@ function fixtureRepo(): string {
   return repo
 }
 
-describe('materializeCleanTree', () => {
+// Real Git processes and filesystem work can exceed Vitest's five-second default under host contention.
+describe('materializeCleanTree', { timeout: 15_000 }, () => {
   it('LEAVES the warm cache, stale build and node_modules behind — the property the gate rests on', () => {
     const repo = fixtureRepo()
     const tree = materializeCleanTree({ repoDir: repo, dest: join(temp('signoff-dest-'), 'tree'), source: 'working-tree' })
