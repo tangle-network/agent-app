@@ -10,8 +10,8 @@ export interface RequestApiKey {
 export interface ApiKeyRequestAuthOptions<Key extends RequestApiKey, Identity> {
   /** Verify against the existing key store, including revocation and spending limits. */
   verify(authorization: string): Promise<Key | null>
-  /** Return an exact required scope, or null to deny this route and method. */
-  requiredScope(request: Request): string | null
+  /** Return one scope or all required scopes; null or an empty list denies the route. */
+  requiredScope(request: Request): string | readonly string[] | null
   /** Load the owner from product storage; retain normal workspace and tenant authorization. */
   resolveIdentity(key: Key): Promise<Identity | null>
   /** Atomically enforce the existing key's request quotas before admitting the request. */
@@ -34,7 +34,8 @@ export function createApiKeyRequestAuth<Key extends RequestApiKey, Identity>(
       throw denied(401, 'api_key.invalid', 'Invalid API key')
     }
     const requiredScope = options.requiredScope(request)
-    if (!requiredScope) {
+    const requiredScopes = typeof requiredScope === 'string' ? [requiredScope] : requiredScope
+    if (!requiredScopes?.length || !requiredScopes.every(scope => typeof scope === 'string' && scope.trim())) {
       throw denied(403, 'api_key.route_denied', 'API key access is not enabled for this route')
     }
     const key = await options.verify(`Bearer ${bearer[1]}`)
@@ -44,8 +45,8 @@ export function createApiKeyRequestAuth<Key extends RequestApiKey, Identity>(
     if (!Number.isSafeInteger(key.expiresAt) || key.expiresAt <= Date.now()) {
       throw denied(401, 'api_key.expired', 'An unexpired API key with a finite expiry is required')
     }
-    if (!Array.isArray(key.scopes) || !key.scopes.includes(requiredScope)) {
-      throw denied(403, 'api_key.insufficient_scope', `API key requires scope: ${requiredScope}`)
+    if (!Array.isArray(key.scopes) || !requiredScopes.every(scope => key.scopes.includes(scope))) {
+      throw denied(403, 'api_key.insufficient_scope', `API key requires scopes: ${requiredScopes.join(', ')}`)
     }
     const identity = await options.resolveIdentity(key)
     if (!identity) throw denied(401, 'api_key.invalid_owner', 'API key owner is unavailable')
