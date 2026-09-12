@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-423 exports.
+427 exports.
 
 ### `acceptRejectionReason`
 
@@ -76,6 +76,38 @@ interface AgentActivityRecord
 
 ```ts
 interface AgentSessionControlsProps
+```
+
+### `ApiAccessKey`
+
+`interface`
+
+```ts
+interface ApiAccessKey
+```
+
+### `ApiAccessPanel`
+
+`function`
+
+```ts
+({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, onCreate, onRevoke, onChanged }:…
+```
+
+### `ApiAccessPanelProps`
+
+`interface`
+
+```ts
+interface ApiAccessPanelProps
+```
+
+### `ApiAccessScope`
+
+`interface`
+
+```ts
+interface ApiAccessScope
 ```
 
 ### `ATTACHMENT_ACCEPT`

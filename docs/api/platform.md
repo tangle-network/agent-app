@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-67 exports.
+70 exports.
 
 ### `AdminGuardOptions`
 
@@ -12,6 +12,14 @@ Source: `src/platform/index.ts`
 
 ```ts
 interface AdminGuardOptions
+```
+
+### `ApiKeyRequestAuthOptions`
+
+`interface`
+
+```ts
+interface ApiKeyRequestAuthOptions
 ```
 
 ### `assertBillableBalance`
@@ -76,6 +84,14 @@ interface BillableBalanceState
 
 ```ts
 <Session>(opts: AdminGuardOptions<Session>) => (request: Request) => Promise<Session>
+```
+
+### `createApiKeyRequestAuth`
+
+`function` — Adapt existing Bearer keys to private product routes without issuing sessions.
+
+```ts
+<Key extends RequestApiKey, Identity>(options: ApiKeyRequestAuthOptions<Key, Identity>) => (request: Request) => Promis…
 ```
 
 ### `createAuthGuard`
@@ -356,6 +372,14 @@ interface ProductSeatOfferPeriod
 
 ```ts
 (http: PlatformBillingHttp, userApiKey: string | null | undefined, policy?: Record<TanglePlanTier, TangleTierPolicy>) =…
+```
+
+### `RequestApiKey`
+
+`interface` — Verified key fields required to enter a product's private API routes.
+
+```ts
+interface RequestApiKey
 ```
 
 ### `ResolvedTangleHubBearer`

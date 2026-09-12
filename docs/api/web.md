@@ -4,7 +4,7 @@
 
 Source: `src/web/index.ts`
 
-32 exports.
+33 exports.
 
 ### `addSecurityHeaders`
 
@@ -148,6 +148,14 @@ type FreeRouteLimitOutcome
 
 ```ts
 interface FreeRouteLimitResponseOptions
+```
+
+### `isWorkspaceFileExportable`
+
+`function` — Workspace exports exclude runtime configuration and hidden credential stores.
+
+```ts
+(path: string) => boolean
 ```
 
 ### `JsonObject`

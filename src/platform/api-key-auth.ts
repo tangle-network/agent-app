@@ -29,14 +29,15 @@ export function createApiKeyRequestAuth<Key extends RequestApiKey, Identity>(
   return async (request) => {
     const authorization = request.headers.get('Authorization')
     if (authorization === null) return null
-    if (!/^Bearer \S+$/.test(authorization)) {
+    const bearer = /^Bearer +(\S+)$/i.exec(authorization)
+    if (!bearer) {
       throw denied(401, 'api_key.invalid', 'Invalid API key')
     }
     const requiredScope = options.requiredScope(request)
     if (!requiredScope) {
       throw denied(403, 'api_key.route_denied', 'API key access is not enabled for this route')
     }
-    const key = await options.verify(authorization)
+    const key = await options.verify(`Bearer ${bearer[1]}`)
     if (!key || !key.keyId?.trim() || !key.ownerId?.trim()) {
       throw denied(401, 'api_key.invalid', 'Invalid API key')
     }

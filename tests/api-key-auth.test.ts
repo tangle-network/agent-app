@@ -31,11 +31,17 @@ describe('private API key authentication', () => {
     expect(ids[0]).not.toBe(ids[1])
   })
 
+  it.each(['bearer existing-key', 'BEARER existing-key', 'bEaReR   existing-key'])('accepts HTTP scheme casing and passes a canonical header for %s', async authorization => {
+    const state = setup()
+    expect(await state.authenticate(request(authorization))).toEqual({ user: { id: 'owner-a' } })
+    expect(state.verify).toHaveBeenCalledWith('Bearer existing-key')
+  })
+
   it('allows cookie fallback only when authorization is absent', async () => {
     const state = setup()
     expect(await state.authenticate(request(null))).toBeNull()
     expect(state.verify).not.toHaveBeenCalled()
-    for (const value of ['', 'Bearer ', 'Bearer one two', 'Payment proof', 'Operator token']) {
+    for (const value of ['', 'Bearer ', 'Bearer one two', 'Bearer\texisting-key', 'Payment proof', 'Operator token']) {
       await expect(state.authenticate(request(value))).rejects.toMatchObject({ status: 401 })
     }
     state.verify.mockResolvedValue(null)

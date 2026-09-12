@@ -8285,6 +8285,12 @@
           "doc": "Define options to resolve user session and control access based on allowed admin emails"
         },
         {
+          "name": "ApiKeyRequestAuthOptions",
+          "kind": "interface",
+          "signature": "interface ApiKeyRequestAuthOptions",
+          "doc": null
+        },
+        {
           "name": "assertBillableBalance",
           "kind": "function",
           "signature": "(state: BillableBalanceState, opts?: AssertBillableBalanceOptions) => void",
@@ -8331,6 +8337,12 @@
           "kind": "function",
           "signature": "<Session>(opts: AdminGuardOptions<Session>) => (request: Request) => Promise<Session>",
           "doc": "Non-admins (and empty allowlists) get 404, keeping the route invisible — better than a \"forbidden\" footprint that advertises its existence."
+        },
+        {
+          "name": "createApiKeyRequestAuth",
+          "kind": "function",
+          "signature": "<Key extends RequestApiKey, Identity>(options: ApiKeyRequestAuthOptions<Key, Identity>) => (request: Request) => Promis…",
+          "doc": "Adapt existing Bearer keys to private product routes without issuing sessions."
         },
         {
           "name": "createAuthGuard",
@@ -8541,6 +8553,12 @@
           "kind": "function",
           "signature": "(http: PlatformBillingHttp, userApiKey: string | null | undefined, policy?: Record<TanglePlanTier, TangleTierPolicy>) =…",
           "doc": "Read subscription + balance and project them onto the tier policy."
+        },
+        {
+          "name": "RequestApiKey",
+          "kind": "interface",
+          "signature": "interface RequestApiKey",
+          "doc": "Verified key fields required to enter a product's private API routes."
         },
         {
           "name": "ResolvedTangleHubBearer",
@@ -17623,6 +17641,12 @@
           "doc": null
         },
         {
+          "name": "isWorkspaceFileExportable",
+          "kind": "function",
+          "signature": "(path: string) => boolean",
+          "doc": "Workspace exports exclude runtime configuration and hidden credential stores."
+        },
+        {
           "name": "JsonObject",
           "kind": "type",
           "signature": "type JsonObject",
@@ -17779,6 +17803,30 @@
           "name": "AgentSessionControlsProps",
           "kind": "interface",
           "signature": "interface AgentSessionControlsProps",
+          "doc": null
+        },
+        {
+          "name": "ApiAccessKey",
+          "kind": "interface",
+          "signature": "interface ApiAccessKey",
+          "doc": null
+        },
+        {
+          "name": "ApiAccessPanel",
+          "kind": "function",
+          "signature": "({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, onCreate, onRevoke, onChanged }:…",
+          "doc": null
+        },
+        {
+          "name": "ApiAccessPanelProps",
+          "kind": "interface",
+          "signature": "interface ApiAccessPanelProps",
+          "doc": null
+        },
+        {
+          "name": "ApiAccessScope",
+          "kind": "interface",
+          "signature": "interface ApiAccessScope",
           "doc": null
         },
         {
