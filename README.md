@@ -166,6 +166,12 @@ The **complete, always-current reference** — every published subpath, its expo
 
 See **[`docs/CODEMAP.md`](./docs/CODEMAP.md)** for the rest — `/billing`, `/tangle`, `/object-store`, `/trace`, `/theme`, `/eval`, `/app-auth`, `/platform`, and more.
 
+`createApiKeyRequestAuth` from `/platform` lets private product routes accept existing scoped Bearer keys.
+Provide the maintained key verifier, an exact route-to-scope policy, owner lookup, and an atomic request-quota claim.
+The adapter requires finite expiry and explicit scope, and never falls back to cookies when a supplied credential fails.
+Keep key issuance cookie-only and retain workspace authorization in each product route.
+Execution still requires the product's billing checks; capped keys require a reservation and settlement path that enforces their cap.
+
 ### Missions: id shape and product columns
 
 Two `createMissionService` seams adopters hit on day one:
