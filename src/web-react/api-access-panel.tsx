@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 export interface ApiAccessKey {
   id: string
@@ -34,20 +34,42 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
   limitsDescription, onCreate, onRevoke, onChanged }: ApiAccessPanelProps) {
   const [name, setName] = useState('')
   const [days, setDays] = useState('7')
-  const [scopes, setScopes] = useState<string[]>(() => [...defaultScopes])
+  const [scopes, setScopes] = useState<string[]>(() => defaultScopes.filter(scope => access.some(option => option.scope === scope)))
   const [creating, setCreating] = useState(false)
   const [revoking, setRevoking] = useState<string | null>(null)
   const [created, setCreated] = useState<{ id: string; key: string } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const keyHeading = useRef<HTMLHeadingElement>(null)
+  const nameInput = useRef<HTMLInputElement>(null)
+  const keyWasShown = useRef(false)
+  const selectedScopes = scopes.filter(scope => access.some(option => option.scope === scope))
+
+  useEffect(() => {
+    setScopes(current => {
+      const next = current.filter(scope => access.some(option => option.scope === scope))
+      return next.length === current.length ? current : next
+    })
+  }, [access])
+
+  useEffect(() => {
+    if (created) {
+      keyHeading.current?.focus()
+      keyWasShown.current = true
+    } else if (keyWasShown.current) {
+      nameInput.current?.focus()
+      keyWasShown.current = false
+    }
+  }, [created])
 
   async function createKey(event: FormEvent) {
     event.preventDefault()
-    if (!name.trim() || !scopes.length || creating || created) return
+    const requestedScopes = scopes.filter(scope => access.some(option => option.scope === scope))
+    if (!name.trim() || !requestedScopes.length || creating || created) return
     setCreating(true)
     setError(null)
     try {
-      const result = await onCreate({ name: name.trim(), scopes,
+      const result = await onCreate({ name: name.trim(), scopes: requestedScopes,
         expiresAt: new Date(Date.now() + Number(days) * 86_400_000).toISOString() })
       if (!result.id || !result.key) throw new Error('Could not create key')
       setCreated({ id: result.id, key: result.key })
@@ -92,7 +114,7 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
 
         {created ? (
           <section aria-labelledby="save-api-key" className="space-y-4 rounded-xl border border-border bg-card p-5">
-            <h2 id="save-api-key" className="font-medium">Save your key</h2>
+            <h2 ref={keyHeading} tabIndex={-1} id="save-api-key" className="font-medium outline-none">Save your key</h2>
             <p className="text-sm text-muted-foreground">
               Copy it directly into your client’s secret storage. It is shown only now.
               Keep it out of chat messages and prompts.
@@ -116,7 +138,7 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
             <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium" htmlFor="key-name">Name</label>
-                <input id="key-name" className={inputClass} value={name} onChange={event => setName(event.target.value)} placeholder="Client on my server" maxLength={100} required autoComplete="off" />
+                <input ref={nameInput} id="key-name" className={inputClass} value={name} onChange={event => setName(event.target.value)} placeholder="Client on my server" maxLength={100} required autoComplete="off" />
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium" htmlFor="key-expiry">Expires in</label>
@@ -131,7 +153,7 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
               <legend className="mb-3 text-sm font-medium">Permissions</legend>
               {access.map(access => (
                 <label key={access.scope} className="flex cursor-pointer items-start gap-3">
-                  <input type="checkbox" className="mt-1 size-4 accent-primary" checked={scopes.includes(access.scope)}
+                  <input type="checkbox" className="mt-1 size-4 accent-primary" checked={selectedScopes.includes(access.scope)}
                     onChange={event => setScopes(current => event.target.checked
                       ? [...current, access.scope] : current.filter(scope => scope !== access.scope))} />
                   <span className="text-sm">
@@ -142,7 +164,7 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
               ))}
             </fieldset>
             {limitsDescription && <p className="text-xs text-muted-foreground">{limitsDescription}</p>}
-            <button className={buttonClass} type="submit" disabled={creating || !name.trim() || !scopes.length}>{creating ? 'Creating…' : 'Create key'}</button>
+            <button className={buttonClass} type="submit" disabled={creating || !name.trim() || !selectedScopes.length}>{creating ? 'Creating…' : 'Create key'}</button>
           </form>
         )}
 

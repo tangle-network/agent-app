@@ -32,12 +32,14 @@ describe('ApiAccessPanel', () => {
     const input = vi.mocked(callbacks.onCreate).mock.calls[0]![0]
     expect(Date.parse(input.expiresAt) - Date.now()).toBeGreaterThan(6 * 86_400_000)
     expect(Date.parse(input.expiresAt) - Date.now()).toBeLessThanOrEqual(7 * 86_400_000)
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Save your key' }))
     const secret = screen.getByLabelText<HTMLInputElement>('New API key')
     expect(secret.type).toBe('password')
     expect(secret.value).toBe(fixtureKey)
     expect(screen.queryByText(fixtureKey)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'I’ve saved it' }))
     expect(screen.queryByLabelText('New API key')).toBeNull()
+    expect(document.activeElement).toBe(screen.getByLabelText('Name'))
     expect(callbacks.onChanged).toHaveBeenCalledOnce()
   })
 
@@ -51,6 +53,30 @@ describe('ApiAccessPanel', () => {
     expect(input.scopes).toEqual(['records:read', 'records:write'])
     expect(Date.parse(input.expiresAt) - Date.now()).toBeGreaterThan(80_000_000)
     expect(Date.parse(input.expiresAt) - Date.now()).toBeLessThanOrEqual(86_400_000)
+  })
+
+  it('does not submit default scopes absent from the visible permissions', async () => {
+    const callbacks = props()
+    callbacks.defaultScopes = ['records:read', 'hidden:admin']
+    render(<ApiAccessPanel {...callbacks} />)
+    await create()
+    expect(vi.mocked(callbacks.onCreate).mock.calls[0]![0].scopes).toEqual(['records:read'])
+  })
+
+  it('drops a selected permission when the app removes it, even if it later returns', async () => {
+    const callbacks = props()
+    const { rerender } = render(<ApiAccessPanel {...callbacks} />)
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'My client' } })
+    rerender(<ApiAccessPanel {...callbacks} access={[callbacks.access[1]!]} />)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Create key' }).disabled).toBe(true)
+    fireEvent.submit(screen.getByRole('button', { name: 'Create key' }).closest('form')!)
+    expect(callbacks.onCreate).not.toHaveBeenCalled()
+    rerender(<ApiAccessPanel {...callbacks} />)
+    expect(screen.getByRole<HTMLInputElement>('checkbox', { name: /Read records/ }).checked).toBe(false)
+    fireEvent.click(screen.getByRole('checkbox', { name: /Edit records/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create key' }))
+    await screen.findByRole('heading', { name: 'Save your key' })
+    expect(vi.mocked(callbacks.onCreate).mock.calls[0]![0].scopes).toEqual(['records:write'])
   })
 
   it('shows failed creation without exposing a secret or claiming success', async () => {
