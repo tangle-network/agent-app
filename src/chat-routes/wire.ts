@@ -1,10 +1,11 @@
+import { isWorkspaceFileExportable } from '../web/file-export'
 import type { ReasoningEffort } from '@tangle-network/agent-interface'
 
 /**
  * Wire contract between the chat client (composer + `streamChatTurn`) and the
- * assembled server vertical (`createChatTurnRoutes`). Runtime-import-free on
- * purpose: `/web-react` re-exports these types into browser bundles, so nothing
- * here may reach a Node builtin or an engine package.
+ * assembled server vertical (`createChatTurnRoutes`). This module must remain
+ * browser-safe: `/web-react` re-exports these types into browser bundles, so
+ * imports must not reach a Node builtin or an engine package.
  *
  * The client part shape permits an absolute file path until the server converts
  * it to the URL required by the sandbox SDK. It is derived here, not imported,
@@ -476,6 +477,10 @@ function parseFileMention(value: unknown, index: number): FileMention {
 
   const pathCheck = validateSandboxMentionPath(record.path)
   if (!pathCheck.succeeded) throw new ChatTurnInputError(`mentions[${index}]: ${pathCheck.error}`)
+
+  if (!isWorkspaceFileExportable(record.path as string)) {
+    throw new ChatTurnInputError(`mentions[${index}]: file is not exportable`)
+  }
 
   const name = record.name
   if (typeof name !== 'string' || !name.trim()) {

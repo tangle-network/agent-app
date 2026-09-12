@@ -166,6 +166,10 @@ describe('parseFileMentions', () => {
     }
   })
 
+  it.each(['opencode.json', 'nested/OPENCODE.JSONC', '.config/auth.json'])('rejects runtime file mention %s', path => {
+    expect(() => parseFileMentions([mention({ path })])).toThrow(/not exportable/)
+  })
+
   it('fails loud on a traversal path, naming the entry (never sanitize-and-continue)', () => {
     expect(() => parseFileMentions([mention({ path: 'content/../../secrets.env' })]))
       .toThrow(/mentions\[0\].*\.\./)

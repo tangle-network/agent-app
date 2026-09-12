@@ -1419,13 +1419,13 @@ describe('createChatTurnRoutes — file mentions', () => {
     expect(seen?.body.mentions).toEqual([{ path: 'docs/a.md', name: 'a.md' }])
   })
 
-  it('rejects a traversal path with a 400 before any side effect', async () => {
+  it.each(['../../etc/passwd', 'opencode.json', 'nested/OPENCODE.JSONC', '.config/auth.json'])('rejects private or traversal mention %s with a 400 before side effects', async path => {
     const { routes, rows, ctx } = makeRoutes()
     const res = await routes.turn(
       turnRequest({
         threadId: 't-mentions-3',
         content: 'read it',
-        mentions: [{ path: '../../etc/passwd', name: 'passwd' }],
+        mentions: [{ path, name: 'private file' }],
       }),
       ctx,
     )
