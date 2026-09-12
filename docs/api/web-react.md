@@ -91,7 +91,7 @@ interface ApiAccessKey
 `function`
 
 ```ts
-({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, onCreate, onRevoke, onChanged }:…
+({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, expiryDays, defaultExpiryDays, on…
 ```
 
 ### `ApiAccessPanelProps`

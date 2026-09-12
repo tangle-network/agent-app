@@ -18,6 +18,8 @@ export interface ApiAccessPanelProps {
   access: readonly ApiAccessScope[]
   defaultScopes: readonly string[]
   baseUrl: string
+  expiryDays?: readonly number[]
+  defaultExpiryDays?: number
   accountHref?: string
   description?: string
   limitsDescription?: string
@@ -26,14 +28,21 @@ export interface ApiAccessPanelProps {
   onChanged: () => void
 }
 
+const defaultExpiryChoices = [1, 7, 30] as const
+
 const inputClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground'
 const buttonClass = 'inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50'
 const outlineClass = 'inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground disabled:opacity-50'
 
 export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHref, description,
-  limitsDescription, onCreate, onRevoke, onChanged }: ApiAccessPanelProps) {
+  limitsDescription, expiryDays = defaultExpiryChoices, defaultExpiryDays = 7,
+  onCreate, onRevoke, onChanged }: ApiAccessPanelProps) {
   const [name, setName] = useState('')
-  const [days, setDays] = useState('7')
+  const allowedDays = [...new Set(expiryDays)].filter(days => days > 0
+    && Number.isFinite(new Date(Date.now() + days * 86_400_000).getTime()))
+  const fallbackDays = allowedDays.includes(defaultExpiryDays) ? defaultExpiryDays : allowedDays[0]
+  const [days, setDays] = useState<number | undefined>(fallbackDays)
+  const selectedDays = days !== undefined && allowedDays.includes(days) ? days : fallbackDays
   const [scopes, setScopes] = useState<string[]>(() => defaultScopes.filter(scope => access.some(option => option.scope === scope)))
   const [creating, setCreating] = useState(false)
   const [revoking, setRevoking] = useState<string | null>(null)
@@ -65,12 +74,12 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
   async function createKey(event: FormEvent) {
     event.preventDefault()
     const requestedScopes = scopes.filter(scope => access.some(option => option.scope === scope))
-    if (!name.trim() || !requestedScopes.length || creating || created) return
+    if (!name.trim() || !requestedScopes.length || selectedDays === undefined || creating || created) return
     setCreating(true)
     setError(null)
     try {
       const result = await onCreate({ name: name.trim(), scopes: requestedScopes,
-        expiresAt: new Date(Date.now() + Number(days) * 86_400_000).toISOString() })
+        expiresAt: new Date(Date.now() + selectedDays * 86_400_000).toISOString() })
       if (!result.id || !result.key) throw new Error('Could not create key')
       setCreated({ id: result.id, key: result.key })
       setName('')
@@ -142,10 +151,8 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium" htmlFor="key-expiry">Expires in</label>
-                <select id="key-expiry" value={days} onChange={event => setDays(event.target.value)} className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm">
-                  <option value="1">1 day</option>
-                  <option value="7">7 days</option>
-                  <option value="30">30 days</option>
+                <select id="key-expiry" value={selectedDays ?? ''} onChange={event => setDays(Number(event.target.value))} className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm">
+                  {allowedDays.map(days => <option key={days} value={days}>{days} {days === 1 ? 'day' : 'days'}</option>)}
                 </select>
               </div>
             </div>
@@ -164,7 +171,7 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
               ))}
             </fieldset>
             {limitsDescription && <p className="text-xs text-muted-foreground">{limitsDescription}</p>}
-            <button className={buttonClass} type="submit" disabled={creating || !name.trim() || !selectedScopes.length}>{creating ? 'Creating…' : 'Create key'}</button>
+            <button className={buttonClass} type="submit" disabled={creating || !name.trim() || !selectedScopes.length || selectedDays === undefined}>{creating ? 'Creating…' : 'Create key'}</button>
           </form>
         )}
 

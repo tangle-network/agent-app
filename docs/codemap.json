@@ -17814,7 +17814,7 @@
         {
           "name": "ApiAccessPanel",
           "kind": "function",
-          "signature": "({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, onCreate, onRevoke, onChanged }:…",
+          "signature": "({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, expiryDays, defaultExpiryDays, on…",
           "doc": null
         },
         {

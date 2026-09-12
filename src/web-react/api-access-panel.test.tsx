@@ -55,6 +55,29 @@ describe('ApiAccessPanel', () => {
     expect(Date.parse(input.expiresAt) - Date.now()).toBeLessThanOrEqual(86_400_000)
   })
 
+  it('uses product lifetime choices and default, reconciling removed options', async () => {
+    const callbacks = props()
+    const { rerender } = render(<ApiAccessPanel {...callbacks} expiryDays={[30, 60]} defaultExpiryDays={60} />)
+    expect(screen.getByLabelText<HTMLSelectElement>('Expires in').value).toBe('60')
+    expect(screen.getAllByRole<HTMLOptionElement>('option').map(option => option.value)).toEqual(['30', '60'])
+    rerender(<ApiAccessPanel {...callbacks} expiryDays={[1]} defaultExpiryDays={60} />)
+    expect(screen.getByLabelText<HTMLSelectElement>('Expires in').value).toBe('1')
+    await create()
+    const remaining = Date.parse(vi.mocked(callbacks.onCreate).mock.calls[0]![0].expiresAt) - Date.now()
+    expect(remaining).toBeGreaterThan(80_000_000)
+    expect(remaining).toBeLessThanOrEqual(86_400_000)
+  })
+
+  it('refuses creation when product lifetime choices are empty or invalid', () => {
+    const callbacks = props()
+    render(<ApiAccessPanel {...callbacks} expiryDays={[0, -1, NaN, Infinity, Number.MAX_VALUE]} />)
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'My client' } })
+    const button = screen.getByRole<HTMLButtonElement>('button', { name: 'Create key' })
+    expect(button.disabled).toBe(true)
+    fireEvent.submit(button.closest('form')!)
+    expect(callbacks.onCreate).not.toHaveBeenCalled()
+  })
+
   it('does not submit default scopes absent from the visible permissions', async () => {
     const callbacks = props()
     callbacks.defaultScopes = ['records:read', 'hidden:admin']

@@ -35,6 +35,8 @@ import { ApiAccessPanel } from '@tangle-network/agent-app/web-react'
     { scope: 'records:write', label: 'Edit records', description: 'Create and edit your records.' },
   ]}
   defaultScopes={['records:read']}
+  expiryDays={[1, 7, 30]}
+  defaultExpiryDays={7}
   baseUrl="https://example.test"
   accountHref="/app/account"
   onCreate={createOwnerKey}
@@ -42,6 +44,10 @@ import { ApiAccessPanel } from '@tangle-network/agent-app/web-react'
   onChanged={refreshOwnerKeys}
 />
 ```
+
+`expiryDays` and `defaultExpiryDays` configure offered lifetimes in days; the defaults are `[1, 7, 30]` and `7`.
+The issuer must enforce its expiry policy independently.
+An empty or invalid choices list prevents creation.
 
 `onCreate` receives `{ name, scopes, expiresAt }` and resolves to `{ id, key }` after successful persistence.
 `onRevoke` resolves only after the server confirms deletion; reject failures instead of reporting success.
