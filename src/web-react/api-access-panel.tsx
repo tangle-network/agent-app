@@ -53,13 +53,21 @@ function pruneScopes(scopes: readonly string[], access: readonly ApiAccessScope[
 
 function expandScopes(scopes: readonly string[], access: readonly ApiAccessScope[]): string[] {
   const offered = new Map(access.map(option => [option.scope, option]))
-  const selected = new Set(scopes.filter(scope => offered.has(scope)))
-  for (const scope of selected) {
-    for (const required of offered.get(scope)?.requires ?? []) {
-      if (offered.has(required)) selected.add(required)
+  const selected = new Set<string>()
+  for (const scope of scopes) {
+    const closure = new Set([scope])
+    let available = true
+    for (const required of closure) {
+      const option = offered.get(required)
+      if (!option) {
+        available = false
+        break
+      }
+      for (const dependency of option.requires ?? []) closure.add(dependency)
     }
+    if (available) for (const required of closure) selected.add(required)
   }
-  return pruneScopes([...selected], access)
+  return [...selected]
 }
 
 export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHref, description,

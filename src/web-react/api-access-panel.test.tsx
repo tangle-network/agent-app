@@ -140,6 +140,22 @@ describe('ApiAccessPanel', () => {
     expect(screen.getAllByRole<HTMLInputElement>('checkbox').every(input => !input.checked)).toBe(true)
   })
 
+  it('does not retain prerequisites added only for an unavailable default', async () => {
+    const callbacks = props()
+    callbacks.access = [...callbacks.access, {
+      scope: 'records:run', label: 'Run agent', description: 'Run.', requires: ['records:read', 'missing'],
+    }]
+    callbacks.defaultScopes = ['records:run']
+    const { rerender } = render(<ApiAccessPanel {...callbacks} />)
+    expect(screen.getAllByRole<HTMLInputElement>('checkbox').every(input => !input.checked)).toBe(true)
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'My client' } })
+    fireEvent.submit(screen.getByRole('button', { name: 'Create key' }).closest('form')!)
+    expect(callbacks.onCreate).not.toHaveBeenCalled()
+    rerender(<ApiAccessPanel {...callbacks} defaultScopes={['records:read', 'records:run']} key="independent-default" />)
+    await create()
+    expect(vi.mocked(callbacks.onCreate).mock.calls[0]![0].scopes).toEqual(['records:read'])
+  })
+
   it('handles cyclic requirements without hanging or retaining a partially selected cycle', () => {
     const callbacks = props()
     callbacks.access = [
