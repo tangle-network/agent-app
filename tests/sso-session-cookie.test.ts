@@ -60,7 +60,7 @@ function betterAuthBackedStore(auth: TestAuth): TangleSsoAccountStore {
 
 const ssoClient: TangleSsoAuthClient = {
   authorizeUrl: ({ state }) => `https://id.example/cross-site/authorize?state=${encodeURIComponent(state)}`,
-  exchange: async () => ({ apiKey: 'sk-tan-key', user: { id: 'tu_1', email: 'ada@example.com', name: 'Ada' } }),
+  exchange: async () => ({ apiKey: 'sk-tan-key', emailVerified: true, user: { id: 'tu_1', email: 'ada@example.com', name: 'Ada' } }),
 }
 
 async function loginThroughCallback(handlers: TangleSsoHandlers, origin: string): Promise<Response> {

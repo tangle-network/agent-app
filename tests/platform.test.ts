@@ -6,6 +6,8 @@ import {
   createBetterAuthSessionCookieMinter,
   signSessionCookieValue,
   TangleSsoUserCreateError,
+  TangleSsoAccountConflictError,
+  resolveTangleSsoAccount,
   createHubProxyRoutes,
   isTangleBearerMissingError,
   resolveUserTangleHubBearer,
@@ -17,6 +19,7 @@ import {
   type TangleSsoAccountStore,
   type TangleSsoAuthClient,
   type TangleSsoExchangeResult,
+  type TangleSsoLocalAccount,
 } from '../src/platform/index'
 
 const SECRET = 'test-secret'
@@ -56,6 +59,106 @@ describe('signed sso state', () => {
   })
 })
 
+function localAccount(overrides: Partial<TangleSsoLocalAccount> = {}): TangleSsoLocalAccount {
+  return {
+    userId: 'local-1',
+    email: 'ada@example.com',
+    emailVerified: true,
+    platformUserId: null,
+    ...overrides,
+  }
+}
+
+function resolveAccount(overrides: {
+  email?: string
+  platformMatches?: readonly TangleSsoLocalAccount[]
+  emailMatches?: readonly TangleSsoLocalAccount[]
+  platformUserId?: string
+} = {}) {
+  return resolveTangleSsoAccount({
+    email: ' Ada@Example.com ',
+    platformUserId: 'tu-1',
+    platformMatches: [],
+    emailMatches: [],
+    ...overrides,
+  })
+}
+
+describe('resolveTangleSsoAccount', () => {
+  it('reuses the local row matched by the stable platform id', () => {
+    expect(resolveAccount({
+      platformMatches: [localAccount({ userId: 'local-platform', email: 'old@example.com', emailVerified: false, platformUserId: 'tu-1' })],
+    })).toEqual({ kind: 'existing', userId: 'local-platform', matchedBy: 'platform-id' })
+  })
+
+  it('rejects a platform id matched to one row when email belongs to another row', () => {
+    expect(resolveAccount({
+      platformMatches: [localAccount({ userId: 'local-platform', platformUserId: 'tu-1' })],
+      emailMatches: [localAccount({ userId: 'local-email', platformUserId: null })],
+    })).toEqual({ kind: 'reject', reason: 'platform-id-email-conflict' })
+  })
+
+  it('rejects an unverified same-email local row instead of falling back to it', () => {
+    expect(resolveAccount({
+      emailMatches: [localAccount({ emailVerified: false })],
+    })).toEqual({ kind: 'reject', reason: 'unverified-email' })
+  })
+
+  it('links a verified, unbound same-email local row', () => {
+    expect(resolveAccount({
+      emailMatches: [localAccount({ userId: 'verified-local' })],
+    })).toEqual({ kind: 'existing', userId: 'verified-local', matchedBy: 'verified-email' })
+  })
+
+  it('rejects a verified same-email row already bound to another platform id', () => {
+    expect(resolveAccount({
+      emailMatches: [localAccount({ platformUserId: 'tu-other' })],
+    })).toEqual({ kind: 'reject', reason: 'email-platform-id-conflict' })
+  })
+
+  it('rejects duplicate rows returned for one platform id', () => {
+    expect(resolveAccount({
+      platformMatches: [
+        localAccount({ userId: 'local-1', platformUserId: 'tu-1' }),
+        localAccount({ userId: 'local-2', platformUserId: 'tu-1' }),
+      ],
+    })).toEqual({ kind: 'reject', reason: 'ambiguous-platform-id' })
+  })
+
+  it('rejects duplicate rows returned for one email', () => {
+    expect(resolveAccount({
+      emailMatches: [localAccount(), localAccount({ userId: 'local-2' })],
+    })).toEqual({ kind: 'reject', reason: 'ambiguous-email' })
+  })
+
+  it('rejects a platform row that does not carry the requested stable id', () => {
+    expect(resolveAccount({
+      platformMatches: [localAccount({ platformUserId: 'tu-other' })],
+    })).toEqual({ kind: 'reject', reason: 'platform-match-mismatch' })
+  })
+
+  it('rejects an email row that does not carry the requested normalized email', () => {
+    expect(resolveAccount({
+      emailMatches: [localAccount({ email: 'other@example.com' })],
+    })).toEqual({ kind: 'reject', reason: 'email-match-mismatch' })
+  })
+
+  it.each([
+    ['blank email', { email: '   ' }, 'invalid-email'],
+    ['blank platform id', { platformUserId: '   ' }, 'invalid-platform-id'],
+  ] as const)('rejects %s before inspecting local matches', (_label, input, reason) => {
+    expect(resolveAccount({
+      ...input,
+      platformMatches: [localAccount({ platformUserId: 'tu-1' })],
+      emailMatches: [localAccount()],
+    })).toEqual({ kind: 'reject', reason })
+  })
+
+  it('creates a local row when neither identity matches', () => {
+    expect(resolveAccount()).toEqual({ kind: 'create' })
+  })
+})
+
 /** Recording fakes: auth client + store capturing call order and inputs. */
 function fakeHarness(overrides: {
   exchange?: (code: string) => Promise<TangleSsoExchangeResult>
@@ -70,7 +173,7 @@ function fakeHarness(overrides: {
       overrides.exchange ??
       (async (code) => {
         calls.push(`exchange:${code}`)
-        return { apiKey: 'sk-tan-user-key', user: { id: 'tu_1', email: 'a@b.co', name: 'Ada' }, plan: { tier: 'pro' } }
+        return { apiKey: 'sk-tan-user-key', emailVerified: true, user: { id: 'tu_1', email: 'a@b.co', name: 'Ada' }, plan: { tier: 'pro' } }
       }),
   }
   const store: TangleSsoAccountStore = {
@@ -131,7 +234,7 @@ describe('createTangleSsoHandlers — start', () => {
   it('adds Secure when secureCookies is set', async () => {
     const { handlers } = fakeHarness()
     const secure = createTangleSsoHandlers({
-      auth: { authorizeUrl: () => 'https://id.example/a', exchange: async () => ({ apiKey: '', user: { id: '', email: '' } }) },
+      auth: { authorizeUrl: () => 'https://id.example/a', exchange: async () => ({ apiKey: '', emailVerified: true, user: { id: '', email: '' } }) },
       store: {} as TangleSsoAccountStore,
       stateSecret: SECRET,
       sessionCookieSecret: AUTH_SECRET,
@@ -226,7 +329,7 @@ describe('createTangleSsoHandlers — callback', () => {
     const handlers = createTangleSsoHandlers({
       auth: {
         authorizeUrl: ({ state }) => `https://id.example/a?state=${encodeURIComponent(state)}`,
-        exchange: async () => ({ apiKey: 'k', user: { id: 'tu', email: 'e@x.co' } }),
+        exchange: async () => ({ apiKey: 'k', emailVerified: true, user: { id: 'tu', email: 'e@x.co' } }),
       },
       store: {} as TangleSsoAccountStore,
       stateSecret: SECRET,
@@ -267,6 +370,40 @@ describe('createTangleSsoHandlers — callback', () => {
     })
     const res = await startThenCallback(h)
     expect(res.headers.get('Location')).toBe('/login?error=tangle_user_create_failed')
+  })
+
+  it('TangleSsoAccountConflictError → tangle_account_conflict without creating a session', async () => {
+    const h = fakeHarness({
+      upsertUserByEmail: async () => {
+        throw new TangleSsoAccountConflictError('ambiguous-platform-id')
+      },
+    })
+    const res = await startThenCallback(h)
+    expect(res.headers.get('Location')).toBe('/login?error=tangle_account_conflict')
+    expect(h.calls).toEqual(['exchange:code_1'])
+    expect(h.saved.session).toBeUndefined()
+    expect(h.saved.link).toBeUndefined()
+  })
+
+  it.each([
+    ['false', { emailVerified: false }],
+    ['missing', {}],
+  ])('rejects a %s platform email proof before touching the account store', async (_label, proof) => {
+    const h = fakeHarness({
+      exchange: async () => ({
+        apiKey: 'sk-tan-user-key',
+        user: { id: 'tu_1', email: 'a@b.co', name: 'Ada' },
+        ...proof,
+      } as TangleSsoExchangeResult),
+      upsertUserByEmail: async () => {
+        throw new Error('account store must not run without platform proof')
+      },
+    })
+    const res = await startThenCallback(h)
+    expect(res.headers.get('Location')).toBe('/login?error=tangle_exchange_failed')
+    expect(h.saved.user).toBeUndefined()
+    expect(h.saved.session).toBeUndefined()
+    expect(h.saved.link).toBeUndefined()
   })
 
   it('other store errors propagate (fail loud)', async () => {

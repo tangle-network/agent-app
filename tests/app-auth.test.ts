@@ -248,7 +248,7 @@ describe('createAppAuth: email wiring', () => {
 describe('createAppAuth: Tangle SSO wiring', () => {
   const ssoClient: TangleSsoAuthClient = {
     authorizeUrl: ({ state }) => `https://id.tangle.tools/cross-site/authorize?state=${encodeURIComponent(state)}`,
-    exchange: async () => ({ apiKey: 'sk-tan-key', user: { id: 'tu_1', email: 'ada@example.com', name: 'Ada' } }),
+    exchange: async () => ({ apiKey: 'sk-tan-key', emailVerified: true, user: { id: 'tu_1', email: 'ada@example.com', name: 'Ada' } }),
   }
 
   /** Store persisting through better-auth's own adapter — the rows getSession

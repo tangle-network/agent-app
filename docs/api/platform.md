@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-70 exports.
+77 exports.
 
 ### `AdminGuardOptions`
 
@@ -278,6 +278,14 @@ interface HubProxyRoutes
 (plan: string | null | undefined) => TanglePlanTier
 ```
 
+### `normalizeTangleSsoEmail`
+
+`function` — Normalize an email for comparisons and persistence queries.
+
+```ts
+(email: string) => string
+```
+
 ### `parseAdminEmails`
 
 `function` — Comma/whitespace separated → trimmed, lowercased, empties dropped.
@@ -390,6 +398,14 @@ interface RequestApiKey
 interface ResolvedTangleHubBearer
 ```
 
+### `resolveTangleSsoAccount`
+
+`function` — Resolve a platform exchange against all local rows found by stable platform identity and normalized email.
+
+```ts
+(input: TangleSsoAccountResolutionInput) => TangleSsoAccountResolution
+```
+
 ### `resolveUserTangleHubBearer`
 
 `function` — Resolve the Tangle bearer used by the integration hub proxy.
@@ -486,6 +502,38 @@ type TangleHubBearerSource
 type TanglePlanTier
 ```
 
+### `TangleSsoAccountConflictError`
+
+`class` — Thrown by an account store when the verified SSO policy rejects a link.
+
+```ts
+class TangleSsoAccountConflictError
+```
+
+### `TangleSsoAccountConflictReason`
+
+`type` — Reasons a local account lookup must stop instead of linking an exchange.
+
+```ts
+type TangleSsoAccountConflictReason
+```
+
+### `TangleSsoAccountResolution`
+
+`type` — Result of applying the verified Tangle SSO account matching policy.
+
+```ts
+type TangleSsoAccountResolution
+```
+
+### `TangleSsoAccountResolutionInput`
+
+`interface` — Inputs for {@link resolveTangleSsoAccount}.
+
+```ts
+interface TangleSsoAccountResolutionInput
+```
+
 ### `TangleSsoAccountStore`
 
 `interface` — Account persistence seam.
@@ -524,6 +572,14 @@ interface TangleSsoHandlerOptions
 
 ```ts
 interface TangleSsoHandlers
+```
+
+### `TangleSsoLocalAccount`
+
+`interface` — Local account shape required by the verified Tangle SSO account policy.
+
+```ts
+interface TangleSsoLocalAccount
 ```
 
 ### `TangleSsoSessionCookieArgs`
