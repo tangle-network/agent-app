@@ -234,11 +234,22 @@ export class TangleSsoUserCreateError extends Error {
  * the token is always available to `saveTangleLink`.
  */
 export interface TangleSsoAccountStore {
-  /** Find-or-create the app-local user. `tangleUserId` is the platform's
-   *  stable user id — match on it first when the app stores it (emails are
-   *  mutable on the platform; the id is not), falling back to email for
-   *  first-time logins. */
-  upsertUserByEmail(input: { email: string; name: string | null; tangleUserId: string }): Promise<{ userId: string }>
+  /** Resolve the local account before any user, session, or link write.
+   * Implementations must query every candidate by stable platform id and
+   * normalized email, then apply `resolveTangleSsoAccount` (or an equivalent
+   * fail-closed policy). The callback rejects `kind: 'reject'` results before
+   * it calls `upsertUserByEmail`. */
+  resolveAccount(input: { email: string; platformUserId: string }): Promise<TangleSsoAccountResolution>
+  /** Find-or-create the app-local user selected by `resolveAccount`.
+   * `tangleUserId` is the platform's stable user id — match on it first when
+   * the app stores it (emails are mutable on the platform; the id is not),
+   * falling back to email for first-time logins. */
+  upsertUserByEmail(input: {
+    email: string
+    name: string | null
+    tangleUserId: string
+    resolution: Exclude<TangleSsoAccountResolution, { kind: 'reject' }>
+  }): Promise<{ userId: string }>
   /** Create an app session row; returns the session-cookie token value. */
   createSession(input: {
     userId: string
@@ -564,10 +575,19 @@ export function createTangleSsoHandlers(opts: TangleSsoHandlerOptions): TangleSs
 
       let userId: string
       try {
+        const email = normalizeTangleSsoEmail(exchanged.user.email)
+        const resolution = await opts.store.resolveAccount({
+          email,
+          platformUserId: exchanged.user.id,
+        })
+        if (resolution.kind === 'reject') {
+          throw new TangleSsoAccountConflictError(resolution.reason)
+        }
         ;({ userId } = await opts.store.upsertUserByEmail({
-          email: exchanged.user.email,
+          email,
           name: exchanged.user.name ?? null,
           tangleUserId: exchanged.user.id,
+          resolution,
         }))
       } catch (err) {
         if (err instanceof TangleSsoAccountConflictError) {
@@ -590,7 +610,7 @@ export function createTangleSsoHandlers(opts: TangleSsoHandlerOptions): TangleSs
         userId,
         sessionToken: token,
         tangleUserId: exchanged.user.id,
-        email: exchanged.user.email,
+        email: normalizeTangleSsoEmail(exchanged.user.email),
         name: exchanged.user.name ?? null,
         apiKey: exchanged.apiKey,
         planTier: exchanged.plan?.tier ?? null,

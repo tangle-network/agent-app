@@ -162,6 +162,7 @@ describe('resolveTangleSsoAccount', () => {
 /** Recording fakes: auth client + store capturing call order and inputs. */
 function fakeHarness(overrides: {
   exchange?: (code: string) => Promise<TangleSsoExchangeResult>
+  resolveAccount?: TangleSsoAccountStore['resolveAccount']
   upsertUserByEmail?: TangleSsoAccountStore['upsertUserByEmail']
 } = {}) {
   const calls: string[] = []
@@ -177,6 +178,10 @@ function fakeHarness(overrides: {
       }),
   }
   const store: TangleSsoAccountStore = {
+    async resolveAccount(input) {
+      calls.push('resolveAccount')
+      return overrides.resolveAccount ? overrides.resolveAccount(input) : { kind: 'create' }
+    },
     upsertUserByEmail:
       overrides.upsertUserByEmail ??
       (async (input) => {
@@ -281,8 +286,8 @@ describe('createTangleSsoHandlers — callback', () => {
     const res = await startThenCallback(h)
     expect(res.status).toBe(302)
     expect(res.headers.get('Location')).toBe('/app/x')
-    expect(h.calls).toEqual(['exchange:code_1', 'upsertUser', 'createSession', 'saveLink'])
-    expect(h.saved.user).toEqual({ email: 'a@b.co', name: 'Ada', tangleUserId: 'tu_1' })
+    expect(h.calls).toEqual(['exchange:code_1', 'resolveAccount', 'upsertUser', 'createSession', 'saveLink'])
+    expect(h.saved.user).toEqual({ email: 'a@b.co', name: 'Ada', tangleUserId: 'tu_1', resolution: { kind: 'create' } })
     expect(h.saved.session).toMatchObject({ ipAddress: '9.9.9.9' })
     expect(h.saved.link).toMatchObject({
       userId: 'u_1',
@@ -380,7 +385,21 @@ describe('createTangleSsoHandlers — callback', () => {
     })
     const res = await startThenCallback(h)
     expect(res.headers.get('Location')).toBe('/login?error=tangle_account_conflict')
-    expect(h.calls).toEqual(['exchange:code_1'])
+    expect(h.calls).toEqual(['exchange:code_1', 'resolveAccount'])
+    expect(h.saved.session).toBeUndefined()
+    expect(h.saved.link).toBeUndefined()
+  })
+
+  it('rejects a conflict result before upserting or creating a session', async () => {
+    const h = fakeHarness({
+      resolveAccount: async () => ({ kind: 'reject', reason: 'ambiguous-platform-id' }),
+      upsertUserByEmail: async () => {
+        throw new Error('upsert must not run after an account conflict')
+      },
+    })
+    const res = await startThenCallback(h)
+    expect(res.headers.get('Location')).toBe('/login?error=tangle_account_conflict')
+    expect(h.calls).toEqual(['exchange:code_1', 'resolveAccount'])
     expect(h.saved.session).toBeUndefined()
     expect(h.saved.link).toBeUndefined()
   })

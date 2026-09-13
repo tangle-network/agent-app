@@ -255,6 +255,9 @@ describe('createAppAuth: Tangle SSO wiring', () => {
    *  will read are exactly what a product DB would hold. */
   function adapterBackedStore(appAuth: AppAuth): TangleSsoAccountStore {
     return {
+      async resolveAccount() {
+        return { kind: 'create' }
+      },
       async upsertUserByEmail({ email, name }) {
         const ctx = await appAuth.auth.$context
         const user = await ctx.adapter.create<{ id: string }>({
@@ -284,6 +287,7 @@ describe('createAppAuth: Tangle SSO wiring', () => {
       sso: {
         client: ssoClient,
         store: {
+          resolveAccount: (i) => store.current!.resolveAccount(i),
           upsertUserByEmail: (i) => store.current!.upsertUserByEmail(i),
           createSession: (i) => store.current!.createSession(i),
           saveTangleLink: (i) => store.current!.saveTangleLink(i),
