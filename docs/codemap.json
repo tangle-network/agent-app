@@ -15348,7 +15348,7 @@
           "name": "BrokerTokenProvider",
           "kind": "interface",
           "signature": "interface BrokerTokenProvider",
-          "doc": "Provide and refresh broker bearer tokens, allowing forced token invalidation"
+          "doc": "Mint a separate single-use bearer for each execution attempt."
         },
         {
           "name": "BrokerTokenProviderOptions",
@@ -15372,7 +15372,7 @@
           "name": "createBrokerTokenProvider",
           "kind": "function",
           "signature": "(opts: BrokerTokenProviderOptions) => BrokerTokenProvider",
-          "doc": "Cache + auto-refresh a broker token for one grant."
+          "doc": "Mint a fresh broker token for every call, including concurrent calls."
         }
       ]
     },

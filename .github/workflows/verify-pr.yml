@@ -1,0 +1,51 @@
+name: Verify PR
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+concurrency:
+  group: verify-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+      VERIFICATION_DIR: /tmp/agent-app-verification-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Record exact source outside the audited tree
+        run: |
+          mkdir -p "$VERIFICATION_DIR"
+          git rev-parse HEAD > "$VERIFICATION_DIR/commit.txt"
+          git archive --format=tar.gz HEAD > "$VERIFICATION_DIR/source.tar.gz"
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Check release contract
+        run: node .github/scripts/test-publish-workflow.mjs
+      - run: pnpm install --frozen-lockfile --ignore-scripts=false > "$VERIFICATION_DIR/install.log" 2>&1 || { tail -60 "$VERIFICATION_DIR/install.log"; exit 1; }
+      - name: Verify generated documentation
+        run: |
+          pnpm docs:gen > "$VERIFICATION_DIR/docs.log" 2>&1
+          git diff --exit-code -- docs
+      - run: pnpm run typecheck > "$VERIFICATION_DIR/typecheck.log" 2>&1 || { cat "$VERIFICATION_DIR/typecheck.log"; exit 1; }
+      - run: pnpm run test:gates > "$VERIFICATION_DIR/gates.log" 2>&1 || { tail -80 "$VERIFICATION_DIR/gates.log"; exit 1; }
+      - run: pnpm run build > "$VERIFICATION_DIR/build.log" 2>&1 || { tail -80 "$VERIFICATION_DIR/build.log"; exit 1; }
+      - name: Test all source
+        run: pnpm exec vitest run --reporter=json --outputFile="$VERIFICATION_DIR/tests.json" > "$VERIFICATION_DIR/tests.log" 2>&1 || { tail -100 "$VERIFICATION_DIR/tests.log"; exit 1; }
+      - run: pnpm run test:generated > "$VERIFICATION_DIR/generated.log" 2>&1 || { tail -100 "$VERIFICATION_DIR/generated.log"; exit 1; }
+      - run: pnpm run knip > "$VERIFICATION_DIR/knip.log" 2>&1 || { cat "$VERIFICATION_DIR/knip.log"; exit 1; }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: pr-verification-${{ github.event.pull_request.number }}
+          path: ${{ env.VERIFICATION_DIR }}/
+          retention-days: 7

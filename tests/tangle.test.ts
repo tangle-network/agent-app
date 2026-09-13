@@ -25,69 +25,108 @@ describe('buildConsentUrl', () => {
   })
 })
 
-/** A fake minter recording calls + a controllable token, so the provider's
- *  caching/refresh is tested without the network. */
-function fakeMinter(token: Partial<BrokerToken> = {}): { minter: BrokerTokenMinter; mints: number } {
+/** Each mint creates a distinct bearer, as the Hub issuer does. */
+function fakeMinter(): { minter: BrokerTokenMinter; mints: number } {
   let mints = 0
-  const minter: BrokerTokenMinter = {
-    async mintBrokerToken() {
-      mints++
-      return { accessToken: `sk-tan-broker-${mints}`, expiresIn: 3600, scope: 'gmail.read', ...token }
-    },
-  }
   return {
-    minter,
-    get mints() {
-      return mints
+    minter: {
+      async mintBrokerToken() {
+        mints++
+        return { accessToken: `sk-tan-broker-${mints}`, expiresIn: 3600, scope: 'gmail.read' }
+      },
     },
+    get mints() { return mints },
   }
 }
 
-describe('createBrokerTokenProvider', () => {
-  it('mints once and caches across calls within the TTL', async () => {
-    let t = 1_000_000
-    const f = fakeMinter()
-    const p = createBrokerTokenProvider({ client: f.minter, clientId: 'c', clientSecret: 's', grantId: 'g', now: () => t })
-    expect(await p.getToken()).toBe('sk-tan-broker-1')
-    expect(await p.getToken()).toBe('sk-tan-broker-1')
-    expect(f.mints).toBe(1)
-  })
+function provider(client: BrokerTokenMinter) {
+  return createBrokerTokenProvider({ client, clientId: 'c', clientSecret: 's', grantId: 'g' })
+}
 
-  it('re-mints once inside the refresh-skew window before expiry', async () => {
-    let t = 1_000_000
-    const f = fakeMinter({ expiresIn: 100 }) // expires at +100s
-    const p = createBrokerTokenProvider({ client: f.minter, clientId: 'c', clientSecret: 's', grantId: 'g', refreshSkewMs: 30_000, now: () => t })
+describe('createBrokerTokenProvider', () => {
+  it('mints a new bearer for successive calls even within the TTL', async () => {
+    const f = fakeMinter()
+    const p = provider(f.minter)
     expect(await p.getToken()).toBe('sk-tan-broker-1')
-    t += 60_000 // 60s in: still >30s skew before the 100s expiry → cached
-    expect(await p.getToken()).toBe('sk-tan-broker-1')
-    expect(f.mints).toBe(1)
-    t += 20_000 // 80s in: within 30s of expiry → re-mint
     expect(await p.getToken()).toBe('sk-tan-broker-2')
     expect(f.mints).toBe(2)
   })
 
-  it('shares one in-flight mint across concurrent getToken calls (no thundering herd)', async () => {
-    let resolveMint!: (v: BrokerToken) => void
-    let mints = 0
-    const minter: BrokerTokenMinter = {
-      mintBrokerToken() {
-        mints++
-        return new Promise<BrokerToken>((res) => { resolveMint = res })
-      },
-    }
-    const p = createBrokerTokenProvider({ client: minter, clientId: 'c', clientSecret: 's', grantId: 'g' })
+  it('does not share an in-flight mint between concurrent callers', async () => {
+    const pending: Array<(token: BrokerToken) => void> = []
+    const p = provider({
+      mintBrokerToken: () => new Promise<BrokerToken>((resolve) => { pending.push(resolve) }),
+    })
     const a = p.getToken()
     const b = p.getToken()
-    resolveMint({ accessToken: 'sk-tan-broker-x', expiresIn: 3600, scope: '' })
-    expect(await a).toBe('sk-tan-broker-x')
-    expect(await b).toBe('sk-tan-broker-x')
-    expect(mints).toBe(1)
+    expect(pending).toHaveLength(2)
+    // Independent operations may resolve in either order.
+    pending[1]!({ accessToken: 'token-b', expiresIn: 3600, scope: '' })
+    pending[0]!({ accessToken: 'token-a', expiresIn: 3600, scope: '' })
+    expect(await a).toBe('token-a')
+    expect(await b).toBe('token-b')
   })
 
-  it('invalidate() forces a fresh mint on the next call', async () => {
-    let t = 1_000_000
+  it('supports a burst without reusing a consumed bearer', async () => {
     const f = fakeMinter()
-    const p = createBrokerTokenProvider({ client: f.minter, clientId: 'c', clientSecret: 's', grantId: 'g', now: () => t })
+    const p = provider(f.minter)
+    const tokens = await Promise.all(Array.from({ length: 8 }, () => p.getToken()))
+    const consumed = new Set<string>()
+    for (const token of tokens) {
+      // A second execution with the same token is a replay, not a cache hit.
+      expect(consumed.has(token)).toBe(false)
+      consumed.add(token)
+    }
+    expect(f.mints).toBe(8)
+  })
+
+  it('legacy clock and skew options do not enable caching', async () => {
+    const f = fakeMinter()
+    const p = createBrokerTokenProvider({
+      client: f.minter, clientId: 'c', clientSecret: 's', grantId: 'g',
+      now: () => 0, refreshSkewMs: 0,
+    })
+    expect(await p.getToken()).not.toBe(await p.getToken())
+    expect(f.mints).toBe(2)
+  })
+
+  it('propagates a failed mint without retrying it or poisoning later calls', async () => {
+    let attempts = 0
+    const p = provider({
+      async mintBrokerToken() {
+        if (++attempts === 1) throw new Error('issuer unavailable')
+        return { accessToken: 'fresh', expiresIn: 3600, scope: '' }
+      },
+    })
+    await expect(p.getToken()).rejects.toThrow('issuer unavailable')
+    expect(attempts).toBe(1)
+    expect(await p.getToken()).toBe('fresh')
+  })
+
+  it('forwards the exact grant and requested TTL for each mint', async () => {
+    const calls: Array<Parameters<BrokerTokenMinter['mintBrokerToken']>[0]> = []
+    const p = createBrokerTokenProvider({
+      client: {
+        async mintBrokerToken(input) {
+          calls.push(input)
+          return { accessToken: `token-${calls.length}`, expiresIn: 60, scope: '' }
+        },
+      },
+      clientId: 'c', clientSecret: 's', grantId: 'g', ttlSeconds: 60,
+    })
+    await p.getToken()
+    await p.getToken()
+    expect(calls).toEqual([
+      { clientId: 'c', clientSecret: 's', grantId: 'g', ttlSeconds: 60 },
+      { clientId: 'c', clientSecret: 's', grantId: 'g', ttlSeconds: 60 },
+    ])
+  })
+
+  it('retains invalidate as a compatibility no-op without minting', async () => {
+    const f = fakeMinter()
+    const p = provider(f.minter)
+    p.invalidate()
+    expect(f.mints).toBe(0)
     expect(await p.getToken()).toBe('sk-tan-broker-1')
     p.invalidate()
     expect(await p.getToken()).toBe('sk-tan-broker-2')

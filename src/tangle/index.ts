@@ -16,10 +16,10 @@
  *      (their Tangle session authorizes the app for a connection + scopes).
  *   2. On the callback, the consumer's client `exchangeAuthCode`s the `agc_`
  *      code into the first broker token + a durable grant.
- *   3. {@link createBrokerTokenProvider} — the runtime path: a cached provider
- *      that re-mints a fresh single-use broker token per `/v1/hub/exec` from the
- *      durable grant using only the app credentials (no user session). Caches
- *      until just before expiry so a burst of hub calls shares one mint.
+ *   3. {@link createBrokerTokenProvider} — the runtime path: each request mints
+ *      a fresh single-use broker token from the durable grant using only app
+ *      credentials (no user session). Neither tokens nor in-flight mint
+ *      promises may be shared between execution attempts.
  */
 
 /** A single-use hub bearer minted from a durable grant — mirrors
@@ -82,56 +82,41 @@ export interface BrokerTokenProviderOptions {
   grantId: string
   /** Requested token TTL (seconds). */
   ttlSeconds?: number
-  /** Re-mint this many ms BEFORE expiry so an in-flight call never uses a
-   *  just-expired token. Default 30s. */
+  /** @deprecated Retained for source compatibility. Single-use tokens are
+   *  never cached, so refresh skew is ignored. */
   refreshSkewMs?: number
-  /** Injectable clock (ms). Default `Date.now`. */
+  /** @deprecated Retained for source compatibility; no local expiry cache. */
   now?: () => number
 }
 
-/** Provide and refresh broker bearer tokens, allowing forced token invalidation */
+/** Mint a separate single-use bearer for each execution attempt. */
 export interface BrokerTokenProvider {
-  /** A valid `sk-tan-broker-` bearer, minting/refreshing as needed. */
+  /** Mint a fresh bearer for exactly one Hub execution; never cache or share it. */
   getToken(): Promise<string>
-  /** Force the next `getToken` to re-mint (e.g. after a 401 from the hub). */
+  /** Compatibility no-op: no bearer is cached. Does not revoke Hub grants or
+   *  already-issued tokens; revocation belongs to the authoritative Hub. */
   invalidate(): void
 }
 
 /**
- * Cache + auto-refresh a broker token for one grant. A burst of hub calls
- * shares a single mint; the token is re-minted once it's within `refreshSkewMs`
- * of expiry, or on demand via {@link BrokerTokenProvider.invalidate}.
- * Concurrent `getToken` calls during a mint share the same in-flight promise
- * (no thundering herd).
+ * Mint a fresh broker token for every call, including concurrent calls.
+ * A broker bearer is consumed by one Hub execution even when its TTL has not
+ * expired. Cache the durable grant, never the bearer or an in-flight mint.
+ * Mint failures propagate; this helper never retries an external action.
  */
 export function createBrokerTokenProvider(opts: BrokerTokenProviderOptions): BrokerTokenProvider {
-  const now = opts.now ?? (() => Date.now())
-  const skew = opts.refreshSkewMs ?? 30_000
-  let cached: { token: string; expiresAt: number } | null = null
-  let inflight: Promise<string> | null = null
-
-  async function mint(): Promise<string> {
-    const t = await opts.client.mintBrokerToken({
-      clientId: opts.clientId,
-      clientSecret: opts.clientSecret,
-      grantId: opts.grantId,
-      ttlSeconds: opts.ttlSeconds,
-    })
-    cached = { token: t.accessToken, expiresAt: now() + t.expiresIn * 1000 }
-    return t.accessToken
-  }
-
   return {
     async getToken() {
-      if (cached && now() < cached.expiresAt - skew) return cached.token
-      if (inflight) return inflight
-      inflight = mint().finally(() => {
-        inflight = null
+      const token = await opts.client.mintBrokerToken({
+        clientId: opts.clientId,
+        clientSecret: opts.clientSecret,
+        grantId: opts.grantId,
+        ttlSeconds: opts.ttlSeconds,
       })
-      return inflight
+      return token.accessToken
     },
     invalidate() {
-      cached = null
+      // No cached bearer to clear. Keep this method for existing callers.
     },
   }
 }
