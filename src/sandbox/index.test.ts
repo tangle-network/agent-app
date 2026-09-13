@@ -2093,6 +2093,32 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     }
   })
 
+  it('reuses an open box that still carries the domain list from its strict days', async () => {
+    // The platform keeps `allowDomains` attached after a migration to open.
+    // The field is ignored in open mode, so the box already has the policy
+    // asked for; comparing the list refused every reuse of Casework's
+    // production box on 2026-09-13.
+    const getEgress = vi.fn().mockResolvedValue({
+      policy: { mode: 'open', allowDomains: ['models.dev', 'legal.underwriting.tangle.tools'], includeImplicitDomains: false },
+      source: 'sandbox',
+    })
+    const update = vi.fn()
+    const running = fakeBox({
+      name: 'box-w1',
+      exec: vi.fn().mockResolvedValue({ stdout: 'alive\n', exitCode: 0 }),
+      egress: { get: getEgress, update },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      egressPolicy: { mode: 'open' },
+      migrateEgressPolicy: true,
+      bootstrap: vi.fn().mockResolvedValue({ succeeded: true, value: undefined }),
+    })
+
+    await expect(ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })).resolves.toBeDefined()
+    expect(update).not.toHaveBeenCalled()
+  })
+
   it('lets dispatch fail loud when a cached box dies without deleting the workspace', async () => {
     let alive = true
     const del = vi.fn().mockResolvedValue(undefined)
