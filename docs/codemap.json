@@ -8483,6 +8483,12 @@
           "doc": "'pro' | 'enterprise' pass through; anything else (null, unknown) → 'free'."
         },
         {
+          "name": "normalizeTangleSsoEmail",
+          "kind": "function",
+          "signature": "(email: string) => string",
+          "doc": "Normalize an email for comparisons and persistence queries."
+        },
+        {
           "name": "parseAdminEmails",
           "kind": "function",
           "signature": "(raw: string | null | undefined) => string[]",
@@ -8567,6 +8573,12 @@
           "doc": "Represent a resolved bearer token with its associated TangleHub bearer source"
         },
         {
+          "name": "resolveTangleSsoAccount",
+          "kind": "function",
+          "signature": "(input: TangleSsoAccountResolutionInput) => TangleSsoAccountResolution",
+          "doc": "Resolve a platform exchange against all local rows found by stable platform identity and normalized email."
+        },
+        {
           "name": "resolveUserTangleHubBearer",
           "kind": "function",
           "signature": "(opts: ResolveUserTangleHubBearerOptions) => Promise<ResolvedTangleHubBearer>",
@@ -8639,6 +8651,30 @@
           "doc": "Define available subscription tiers for the TanglePlan service"
         },
         {
+          "name": "TangleSsoAccountConflictError",
+          "kind": "class",
+          "signature": "class TangleSsoAccountConflictError",
+          "doc": "Thrown by an account store when the verified SSO policy rejects a link."
+        },
+        {
+          "name": "TangleSsoAccountConflictReason",
+          "kind": "type",
+          "signature": "type TangleSsoAccountConflictReason",
+          "doc": "Reasons a local account lookup must stop instead of linking an exchange."
+        },
+        {
+          "name": "TangleSsoAccountResolution",
+          "kind": "type",
+          "signature": "type TangleSsoAccountResolution",
+          "doc": "Result of applying the verified Tangle SSO account matching policy."
+        },
+        {
+          "name": "TangleSsoAccountResolutionInput",
+          "kind": "interface",
+          "signature": "interface TangleSsoAccountResolutionInput",
+          "doc": "Inputs for {@link resolveTangleSsoAccount}."
+        },
+        {
           "name": "TangleSsoAccountStore",
           "kind": "interface",
           "signature": "interface TangleSsoAccountStore",
@@ -8667,6 +8703,12 @@
           "kind": "interface",
           "signature": "interface TangleSsoHandlers",
           "doc": "Define handlers for SSO start and callback routes managing authentication flow and session cookies"
+        },
+        {
+          "name": "TangleSsoLocalAccount",
+          "kind": "interface",
+          "signature": "interface TangleSsoLocalAccount",
+          "doc": "Local account shape required by the verified Tangle SSO account policy."
         },
         {
           "name": "TangleSsoSessionCookieArgs",

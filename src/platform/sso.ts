@@ -85,6 +85,8 @@ export async function verifySignedSsoState(state: string, config: SsoStateConfig
 /** Describe the result of exchanging SSO credentials including API key, user info, and optional plan details */
 export interface TangleSsoExchangeResult {
   apiKey: string
+  /** The platform's canonical verified-email proof. */
+  emailVerified: boolean
   user: { id: string; email: string; name?: string | null }
   plan?: { tier: string } | null
 }
@@ -94,6 +96,124 @@ export interface TangleSsoExchangeResult {
 export interface TangleSsoAuthClient {
   authorizeUrl(options: { state: string; redirectUri?: string }): string
   exchange(code: string): Promise<TangleSsoExchangeResult>
+}
+
+/** Local account shape required by the verified Tangle SSO account policy.
+ * Consumers map their user/link tables into this shape before resolving an
+ * exchange. */
+export interface TangleSsoLocalAccount {
+  userId: string
+  email: string
+  emailVerified: boolean
+  platformUserId: string | null
+}
+
+/** Reasons a local account lookup must stop instead of linking an exchange. */
+export type TangleSsoAccountConflictReason =
+  | 'ambiguous-platform-id'
+  | 'platform-id-email-conflict'
+  | 'unverified-email'
+  | 'email-platform-id-conflict'
+  | 'ambiguous-email'
+  | 'invalid-platform-id'
+  | 'invalid-email'
+  | 'platform-match-mismatch'
+  | 'email-match-mismatch'
+
+/** Result of applying the verified Tangle SSO account matching policy. */
+export type TangleSsoAccountResolution =
+  | { kind: 'existing'; userId: string; matchedBy: 'platform-id' | 'verified-email' }
+  | { kind: 'create' }
+  | { kind: 'reject'; reason: TangleSsoAccountConflictReason }
+
+/** Inputs for {@link resolveTangleSsoAccount}. `platformUserId` is the
+ * platform's stable identity. */
+export interface TangleSsoAccountResolutionInput {
+  email: string
+  platformMatches: readonly TangleSsoLocalAccount[]
+  emailMatches: readonly TangleSsoLocalAccount[]
+  platformUserId: string
+}
+
+/** Normalize an email for comparisons and persistence queries. */
+export function normalizeTangleSsoEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
+function normalizedPlatformUserId(value: string | null | undefined): string | null {
+  const normalized = value?.trim()
+  return normalized ? normalized : null
+}
+
+/**
+ * Resolve a platform exchange against all local rows found by stable platform
+ * identity and normalized email.
+ *
+ * A stable platform id takes precedence over email. Every ambiguous or
+ * contradictory result rejects, and email fallback requires a verified local
+ * email that is not already bound to another platform id. The resolver is
+ * pure so each consumer can query its own schema, including schemas without
+ * unique indexes, then rerun it after an insert race.
+ */
+export function resolveTangleSsoAccount(
+  input: TangleSsoAccountResolutionInput,
+): TangleSsoAccountResolution {
+  const email = normalizeTangleSsoEmail(input.email)
+  const platformUserId = normalizedPlatformUserId(input.platformUserId)
+  if (!email) return { kind: 'reject', reason: 'invalid-email' }
+  if (!platformUserId) return { kind: 'reject', reason: 'invalid-platform-id' }
+
+  if (input.platformMatches.length > 1) {
+    return { kind: 'reject', reason: 'ambiguous-platform-id' }
+  }
+  if (input.emailMatches.length > 1) {
+    return { kind: 'reject', reason: 'ambiguous-email' }
+  }
+
+  if (input.platformMatches.some((account) => normalizedPlatformUserId(account.platformUserId) !== platformUserId)) {
+    return { kind: 'reject', reason: 'platform-match-mismatch' }
+  }
+  if (input.emailMatches.some((account) => normalizeTangleSsoEmail(account.email) !== email)) {
+    return { kind: 'reject', reason: 'email-match-mismatch' }
+  }
+
+  const platformMatch = input.platformMatches[0]
+  const emailMatch = input.emailMatches[0]
+
+  if (platformMatch) {
+    if (emailMatch && emailMatch.userId !== platformMatch.userId) {
+      return { kind: 'reject', reason: 'platform-id-email-conflict' }
+    }
+    return { kind: 'existing', userId: platformMatch.userId, matchedBy: 'platform-id' }
+  }
+
+  if (!emailMatch) return { kind: 'create' }
+  const existingPlatformUserId = normalizedPlatformUserId(emailMatch.platformUserId)
+  if (existingPlatformUserId === platformUserId) {
+    return { kind: 'existing', userId: emailMatch.userId, matchedBy: 'platform-id' }
+  }
+  if (emailMatch.emailVerified !== true) {
+    return { kind: 'reject', reason: 'unverified-email' }
+  }
+
+  if (existingPlatformUserId && existingPlatformUserId !== platformUserId) {
+    return { kind: 'reject', reason: 'email-platform-id-conflict' }
+  }
+
+  // The platform proof is already verified. A verified local email row is safe
+  // to link when it is unbound or already carries this same platform id.
+  return { kind: 'existing', userId: emailMatch.userId, matchedBy: 'verified-email' }
+}
+
+/** Thrown by an account store when the verified SSO policy rejects a link. */
+export class TangleSsoAccountConflictError extends Error {
+  readonly reason: TangleSsoAccountConflictReason
+
+  constructor(reason: TangleSsoAccountConflictReason, message = 'Tangle SSO account linking was rejected') {
+    super(message)
+    this.name = 'TangleSsoAccountConflictError'
+    this.reason = reason
+  }
 }
 
 /** Thrown by `upsertUserByEmail` when the app-local user row cannot be
@@ -114,11 +234,22 @@ export class TangleSsoUserCreateError extends Error {
  * the token is always available to `saveTangleLink`.
  */
 export interface TangleSsoAccountStore {
-  /** Find-or-create the app-local user. `tangleUserId` is the platform's
-   *  stable user id — match on it first when the app stores it (emails are
-   *  mutable on the platform; the id is not), falling back to email for
-   *  first-time logins. */
-  upsertUserByEmail(input: { email: string; name: string | null; tangleUserId: string }): Promise<{ userId: string }>
+  /** Resolve the local account before any user, session, or link write.
+   * Implementations must query every candidate by stable platform id and
+   * normalized email, then apply `resolveTangleSsoAccount` (or an equivalent
+   * fail-closed policy). The callback rejects `kind: 'reject'` results before
+   * it calls `upsertUserByEmail`. */
+  resolveAccount(input: { email: string; platformUserId: string }): Promise<TangleSsoAccountResolution>
+  /** Find-or-create the app-local user selected by `resolveAccount`.
+   * `tangleUserId` is the platform's stable user id — match on it first when
+   * the app stores it (emails are mutable on the platform; the id is not),
+   * falling back to email for first-time logins. */
+  upsertUserByEmail(input: {
+    email: string
+    name: string | null
+    tangleUserId: string
+    resolution: Exclude<TangleSsoAccountResolution, { kind: 'reject' }>
+  }): Promise<{ userId: string }>
   /** Create an app session row; returns the session-cookie token value. */
   createSession(input: {
     userId: string
@@ -437,15 +568,32 @@ export function createTangleSsoHandlers(opts: TangleSsoHandlerOptions): TangleSs
         log('[tangle-sso] exchange failed', err)
         return loginErrorRedirect('tangle_exchange_failed')
       }
+      if (exchanged.emailVerified !== true) {
+        log('[tangle-sso] exchange did not include a verified-email proof')
+        return loginErrorRedirect('tangle_exchange_failed')
+      }
 
       let userId: string
       try {
+        const email = normalizeTangleSsoEmail(exchanged.user.email)
+        const resolution = await opts.store.resolveAccount({
+          email,
+          platformUserId: exchanged.user.id,
+        })
+        if (resolution.kind === 'reject') {
+          throw new TangleSsoAccountConflictError(resolution.reason)
+        }
         ;({ userId } = await opts.store.upsertUserByEmail({
-          email: exchanged.user.email,
+          email,
           name: exchanged.user.name ?? null,
           tangleUserId: exchanged.user.id,
+          resolution,
         }))
       } catch (err) {
+        if (err instanceof TangleSsoAccountConflictError) {
+          log('[tangle-sso] account linking conflict', err)
+          return loginErrorRedirect('tangle_account_conflict')
+        }
         if (err instanceof TangleSsoUserCreateError) return loginErrorRedirect('tangle_user_create_failed')
         throw err
       }
@@ -462,7 +610,7 @@ export function createTangleSsoHandlers(opts: TangleSsoHandlerOptions): TangleSs
         userId,
         sessionToken: token,
         tangleUserId: exchanged.user.id,
-        email: exchanged.user.email,
+        email: normalizeTangleSsoEmail(exchanged.user.email),
         name: exchanged.user.name ?? null,
         apiKey: exchanged.apiKey,
         planTier: exchanged.plan?.tier ?? null,

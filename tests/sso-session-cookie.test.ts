@@ -37,6 +37,9 @@ type TestAuth = ReturnType<typeof makeAuth>
  *  sees exactly the rows a product DB would hold. */
 function betterAuthBackedStore(auth: TestAuth): TangleSsoAccountStore {
   return {
+    async resolveAccount() {
+      return { kind: 'create' }
+    },
     async upsertUserByEmail({ email, name }) {
       const ctx = await auth.$context
       const user = await ctx.adapter.create<{ id: string }>({
@@ -60,7 +63,7 @@ function betterAuthBackedStore(auth: TestAuth): TangleSsoAccountStore {
 
 const ssoClient: TangleSsoAuthClient = {
   authorizeUrl: ({ state }) => `https://id.example/cross-site/authorize?state=${encodeURIComponent(state)}`,
-  exchange: async () => ({ apiKey: 'sk-tan-key', user: { id: 'tu_1', email: 'ada@example.com', name: 'Ada' } }),
+  exchange: async () => ({ apiKey: 'sk-tan-key', emailVerified: true, user: { id: 'tu_1', email: 'ada@example.com', name: 'Ada' } }),
 }
 
 async function loginThroughCallback(handlers: TangleSsoHandlers, origin: string): Promise<Response> {
@@ -169,7 +172,12 @@ describe('SSO session cookie ↔ better-auth contract', () => {
   it('negative control: a raw unsigned cookie (the pre-seam behavior) reads back as a null session', async () => {
     const auth = makeAuth('http://localhost:3000')
     const store = betterAuthBackedStore(auth)
-    const { userId } = await store.upsertUserByEmail({ email: 'ada@example.com', name: 'Ada', tangleUserId: 'tu_1' })
+    const { userId } = await store.upsertUserByEmail({
+      email: 'ada@example.com',
+      name: 'Ada',
+      tangleUserId: 'tu_1',
+      resolution: { kind: 'create' },
+    })
     const { token } = await store.createSession({
       userId,
       expiresAt: new Date(Date.now() + 86_400_000),

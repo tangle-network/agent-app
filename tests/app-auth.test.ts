@@ -248,13 +248,16 @@ describe('createAppAuth: email wiring', () => {
 describe('createAppAuth: Tangle SSO wiring', () => {
   const ssoClient: TangleSsoAuthClient = {
     authorizeUrl: ({ state }) => `https://id.tangle.tools/cross-site/authorize?state=${encodeURIComponent(state)}`,
-    exchange: async () => ({ apiKey: 'sk-tan-key', user: { id: 'tu_1', email: 'ada@example.com', name: 'Ada' } }),
+    exchange: async () => ({ apiKey: 'sk-tan-key', emailVerified: true, user: { id: 'tu_1', email: 'ada@example.com', name: 'Ada' } }),
   }
 
   /** Store persisting through better-auth's own adapter — the rows getSession
    *  will read are exactly what a product DB would hold. */
   function adapterBackedStore(appAuth: AppAuth): TangleSsoAccountStore {
     return {
+      async resolveAccount() {
+        return { kind: 'create' }
+      },
       async upsertUserByEmail({ email, name }) {
         const ctx = await appAuth.auth.$context
         const user = await ctx.adapter.create<{ id: string }>({
@@ -284,6 +287,7 @@ describe('createAppAuth: Tangle SSO wiring', () => {
       sso: {
         client: ssoClient,
         store: {
+          resolveAccount: (i) => store.current!.resolveAccount(i),
           upsertUserByEmail: (i) => store.current!.upsertUserByEmail(i),
           createSession: (i) => store.current!.createSession(i),
           saveTangleLink: (i) => store.current!.saveTangleLink(i),
