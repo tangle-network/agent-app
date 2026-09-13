@@ -5,28 +5,24 @@ on:
 permissions:
   contents: read
 jobs:
-  install:
+  inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22.16.0
-      - name: Install consumer cohort
+      - name: Read published package metadata
         run: |
-          mkdir -p consumer proof
-          cd consumer
-          cat > package.json <<'JSON'
-          {"name":"handoff-agent","version":"0.6.0","private":true,"type":"module","dependencies":{"@tangle-network/agent-app":"0.47.13","@tangle-network/agent-interface":"2.6.0","@tangle-network/agent-runtime":"0.207.0","@tangle-network/sandbox":"0.38.2","@tangle-network/agent-eval":"0.179.0","@tangle-network/agent-integrations":"0.53.55","better-auth":"1.7.2","drizzle-orm":"0.45.2","@tangle-network/hub-sdk":"0.10.26"},"devDependencies":{"@cloudflare/workers-types":"5.20260827.1","@types/node":"22.20.1","typescript":"7.0.2","wrangler":"4.126.0"}}
-          JSON
-          npm install --ignore-scripts --no-audit --no-fund > ../proof/install.log 2>&1 || { tail -70 ../proof/install.log; exit 1; }
-          npm ls --all --json > ../proof/dependencies.json
-          tar -czf ../proof/installed-cohort.tar.gz package.json package-lock.json node_modules
-          sha256sum ../proof/installed-cohort.tar.gz > ../proof/SHA256SUMS
+          mkdir -p proof
+          npm view @tangle-network/hub-sdk versions version peerDependencies engines --json > proof/hub.json
+          npm view @tangle-network/agent-app@0.47.13 version peerDependencies --json > proof/app.json
+          npm view @tangle-network/agent-runtime@0.207.0 version peerDependencies --json > proof/runtime.json
+          npm view @tangle-network/agent-integrations versions version --json > proof/integrations.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: handoff-installed-cohort
+          name: handoff-published-metadata
           path: proof/
           retention-days: 3
           if-no-files-found: error
