@@ -33,17 +33,20 @@ The engine packages you actually use are **peer dependencies** — install the o
 pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 ```
 
-| Peer | Required by | Range |
-|---|---|---|
-| `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `>=0.180.0 <0.181.0` |
-| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `>=0.219.0 <0.220.0` |
-| `@tangle-network/agent-integrations` | `/integrations` | `>=0.53.55 <0.54.0` |
-| `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `^2.6.0` |
-| `@tangle-network/sandbox` | `/sandbox` | `>=0.38.2 <0.40.0` |
-| `@tangle-network/agent-knowledge` | `/knowledge-loop` | `^15.0.3` |
-| `@tangle-network/agent-profile-materialize` | `/skills-placement` | `>=0.18.1 <0.20.0` |
-| `@tangle-network/sandbox-ui` | `/brand`, `/work-product-react`, `/workspace-react` | `>=0.111.2 <0.114.0` |
-| `@tangle-network/ui` | `/brand`, `/work-product-react`, `/workspace-react` | `>=11.6.0 <12.0.0` |
+| Peer | Required by |
+|---|---|
+| `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` |
+| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` |
+| `@tangle-network/agent-integrations` | `/integrations` |
+| `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` |
+| `@tangle-network/sandbox` | `/sandbox` |
+| `@tangle-network/agent-knowledge` | `/knowledge-loop` |
+| `@tangle-network/agent-profile-materialize` | `/skills-placement` |
+| `@tangle-network/sandbox-ui` | `/brand`, `/work-product-react`, `/workspace-react` |
+| `@tangle-network/ui` | `/brand`, `/work-product-react`, `/workspace-react` |
+
+[package.json](./package.json) defines the supported peer ranges.
+Run `pnpm exec agent-app-peer-check` to check the installed dependencies.
 
 All of these except `agent-eval`, `agent-integrations`, and `agent-interface` are declared **optional** peers, so a product that never imports the subpath installs nothing.
 
