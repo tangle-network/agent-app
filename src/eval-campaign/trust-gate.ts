@@ -1,33 +1,14 @@
 /**
- * Trust gate — decides whether an ensemble's scores are allowed to be BELIEVED,
- * one level up from {@link aggregateJudgeVerdicts} (which only reduces ONE
- * artifact's raters to a composite). A composite is a number; this is the check
- * that the number means anything. It is the code "Enforced by" for the
- * measurement-validation skill's after-gate ("is this result allowed to be
- * believed").
- *
- * Three checks, each fail-loud and named in `trustReasons`:
- *   (1) inter-rater reliability over the corpus ≥ `irrFloor` — raters that
- *       disagree no better than chance carry no signal to optimize against.
- *   (2) per-item rater spread ≤ `spreadCeiling` — for EACH item, raters must
- *       converge on THAT item.
- *   (3) surviving raters per item ≥ `minSurvivors` — a mean over one or two
- *       raters is an anecdote, not an ensemble.
- *
- * CRITICAL metric semantics — per-item spread is rater disagreement about the
- * SAME item: `max(score) − min(score)` across the raters that scored THAT item
- * (max over its dimensions), never pooled across different items or across the
- * baseline/candidate sides. Pooling reads a genuine quality gap BETWEEN items as
- * "the raters split" and so trips the gate exactly when the finding is largest —
- * the failure mode the after-gate exists to prevent. The corpus IRR (check 1)
- * leans on the substrate's `interRaterReliability`, whose expected-disagreement
- * denominator already pools across items, so genuine item-to-item variation
- * RAISES reliability rather than lowering it.
+ * Summarize rater agreement, within-item spread, and surviving-judge coverage.
+ * Consumers choose the thresholds that a trustworthy result must satisfy.
+ * Agreement does not measure evaluator errors against independent controls.
+ * Use agent-eval/meta-eval's auditEvaluator when the consumer needs that separate evidence.
+ * Spread stays within each item so differences in task quality cannot mimic rater disagreement.
  */
 
 import {
   interRaterReliability,
-  type JudgeScore,
+  type DimensionJudgeScore,
   type JudgeVerdict,
 } from '@tangle-network/agent-eval'
 
@@ -110,14 +91,12 @@ function itemSpread<D extends string>(survivorVerdicts: JudgeVerdict<D>[]): numb
 }
 
 /**
- * Decide whether an ensemble's per-item verdicts are trustworthy enough to
- * believe a lift computed from them. Pure: no LLM, no I/O, no clock, no random —
+ * Check an ensemble against its configured agreement and coverage thresholds. Pure: no LLM, no I/O, no clock, no random —
  * the same `items` + `thresholds` always yield the same verdict.
  *
  * Sibling to {@link aggregateJudgeVerdicts}: that reduces ONE item's raters to a
- * composite; this audits the raters ACROSS items and reports whether the
- * composites are believable. Run it on the corpus of held-out items before
- * reporting any lift over their scores.
+ * composite; this summarizes agreement across the supplied items.
+ * A passing result does not establish evaluator accuracy or authorize a release.
  *
  * @throws if `items` is empty — an empty corpus has no measurable trust, and a
  *   silent `trustworthy: true` over zero evidence is the exact lie the gate
@@ -139,7 +118,7 @@ export function trustVerdicts<D extends string>(
   // lines up; per (item, dimension) one JudgeScore per rater, in item-then-
   // dimension order — the layout interRaterReliability chunks back into items.
   const maxRaters = items.reduce((m, it) => Math.max(m, survivors(it).length), 0)
-  const raterSeries: JudgeScore[][] = Array.from({ length: maxRaters }, () => [])
+  const raterSeries: DimensionJudgeScore[][] = Array.from({ length: maxRaters }, () => [])
   const perItemSpread: Record<string, number> = {}
   const splitItems: Array<{ itemId: string; spread: number }> = []
   const starvedItems: Array<{ itemId: string; n: number }> = []

@@ -7,7 +7,8 @@
 
 import { describe, expect, it } from 'vitest'
 
-import type { Scenario } from '@tangle-network/agent-eval/campaign'
+import { CostLedger } from '@tangle-network/agent-eval'
+import { inMemoryCampaignStorage, runCampaign, type Scenario } from '@tangle-network/agent-eval/campaign'
 import { buildEnsembleJudge } from './index'
 
 type Dim = 'accuracy' | 'tone'
@@ -52,6 +53,69 @@ describe('buildEnsembleJudge', () => {
       { key: 'accuracy', description: 'desc:accuracy' },
       { key: 'tone', description: 'desc:tone' },
     ])
+  })
+
+  it('records each paid ensemble call in the campaign cost account', async () => {
+    const costLedger = new CostLedger()
+    const judge = buildEnsembleJudge<Art, Scenario, Dim>({
+      name: 'paid-ensemble',
+      rubric: RUBRIC,
+      judgeReps: 2,
+      async scoreOne({ costLedger: account, costPhase, costTags, rep }) {
+        if (!account || !costPhase || !costTags) throw new Error('missing campaign cost context')
+        const paid = await account.runPaidCall({
+          channel: 'judge',
+          phase: costPhase,
+          actor: `fixture-judge-${rep}`,
+          tags: costTags,
+          execute: async () => ({ accuracy: 0.8, tone: 0.6 }),
+          receipt: () => ({ model: 'fixture-judge', inputTokens: 10, outputTokens: 2, actualCostUsd: 0.02 }),
+        })
+        if (!paid.succeeded) throw paid.error
+        return { model: `fixture-judge-${rep}`, perDimension: paid.value }
+      },
+    })
+    const result = await runCampaign({
+      runDir: 'mem://paid-ensemble',
+      storage: inMemoryCampaignStorage(),
+      scenarios: [scenario],
+      dispatch: async () => ({ text: 'fixture' }),
+      expectUsage: 'off',
+      judges: [judge],
+      costLedger,
+      costPhase: 'final',
+      costTags: { evaluation: 'fixture' },
+    })
+
+    expect(result.cells[0]?.error).toBeUndefined()
+    expect(result.aggregates.cost.totalCostUsd).toBeCloseTo(0.04)
+    expect(costLedger.list({ channel: 'judge', phase: 'final', tags: { evaluation: 'fixture' } })).toHaveLength(2)
+  })
+
+  it('invalidates cached judgments when the caller changes the evaluator revision', async () => {
+    const storage = inMemoryCampaignStorage()
+    let calls = 0
+    const evaluate = (revision: string) => runCampaign({
+      runDir: 'mem://versioned-ensemble',
+      storage,
+      scenarios: [scenario],
+      dispatch: async () => ({ text: 'fixture' }),
+      expectUsage: 'off',
+      judges: [buildEnsembleJudge<Art, Scenario, Dim>({
+        name: 'versioned-ensemble',
+        judgeVersion: revision,
+        rubric: RUBRIC,
+        async scoreOne() {
+          calls += 1
+          return { model: 'fixture-judge', perDimension: { accuracy: 1, tone: 1 } }
+        },
+      })],
+    })
+
+    const first = await evaluate('rubric-v1')
+    const second = await evaluate('rubric-v2')
+    expect(calls).toBe(2)
+    expect(second.manifestHash).not.toBe(first.manifestHash)
   })
 
   it('a single rep failing does NOT fail the cell — means over survivors', async () => {

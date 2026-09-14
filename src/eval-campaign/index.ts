@@ -36,6 +36,8 @@ import type {
 export interface EnsembleJudgeConfig<TArtifact, TScenario extends Scenario, D extends string> {
   /** Judge name — appears in traces and scorecards. */
   name: string
+  /** Scoring revision for campaign caches. Change it when rubric, model, or callback settings change. */
+  judgeVersion?: JudgeConfig<TArtifact, TScenario>['judgeVersion']
   /** Stable-ordered rubric dimensions. Drives the `JudgeDimension` list AND the
    *  reducer keys, so a judge that omits a dimension scores it 0 (never silently
    *  dropped). */
@@ -47,11 +49,9 @@ export interface EnsembleJudgeConfig<TArtifact, TScenario extends Scenario, D ex
    * `{ model, perDimension: null }` to record a judge failure WITHOUT killing
    * the ensemble; throw only on an unrecoverable error (the whole rep is then
    * treated as a failed judge).
+   * Use the supplied costLedger, costPhase, and costTags to record paid judge calls.
    */
-  scoreOne: (input: {
-    artifact: TArtifact
-    scenario: TScenario
-    signal: AbortSignal
+  scoreOne: (input: Parameters<JudgeConfig<TArtifact, TScenario>['score']>[0] & {
     rep: number
   }) => Promise<JudgeVerdict<D>>
   /** Independent judge calls per artifact, reduced by `aggregateJudgeVerdicts`.
@@ -85,10 +85,11 @@ export function buildEnsembleJudge<TArtifact, TScenario extends Scenario, D exte
   }
   return {
     name: cfg.name,
+    ...(cfg.judgeVersion === undefined ? {} : { judgeVersion: cfg.judgeVersion }),
     dimensions: cfg.rubric.map((key) => ({ key, description: cfg.describe?.(key) ?? key })),
-    async score({ artifact, scenario, signal }): Promise<JudgeScore> {
+    async score(input): Promise<JudgeScore> {
       const settled = await Promise.allSettled(
-        Array.from({ length: reps }, (_, rep) => cfg.scoreOne({ artifact, scenario, signal, rep })),
+        Array.from({ length: reps }, (_, rep) => cfg.scoreOne({ ...input, rep })),
       )
       const verdicts: JudgeVerdict<D>[] = settled.map((r, rep) =>
         r.status === 'fulfilled'
@@ -102,9 +103,8 @@ export function buildEnsembleJudge<TArtifact, TScenario extends Scenario, D exte
   }
 }
 
-// ── Trust gate — the after-gate ("is this result allowed to be believed") ────
-// One level up from `aggregateJudgeVerdicts`: it audits the raters ACROSS items
-// and reports whether the composites are believable before a lift is reported.
+// Agreement across items is distinct from evaluator accuracy against independent controls.
+// Consumers can opt into auditEvaluator from agent-eval/meta-eval for that separate evidence.
 export {
   trustVerdicts,
   type TrustItem,
