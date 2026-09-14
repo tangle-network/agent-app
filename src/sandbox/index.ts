@@ -575,8 +575,10 @@ export interface BuildAppToolMcpServersOptions {
    * `BuildHttpMcpServerOptions.tokenEnvKey` in `../tools/mcp`.
    *
    * The key must name a variable the box carries — placed by
-   * {@link SandboxRuntimeConfig.env} at creation, or injected from the platform
-   * secret store via {@link SandboxRuntimeConfig.secrets}.
+   * {@link SandboxRuntimeConfig.env} at creation, refreshed by
+   * {@link SandboxRuntimeConfig.runtimeEnv} before retained-box bootstrap, or
+   * injected from the platform secret store via
+   * {@link SandboxRuntimeConfig.secrets}.
    */
   tokenEnvKey: string
   ctx: AppToolContext

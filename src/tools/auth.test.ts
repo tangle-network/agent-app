@@ -30,10 +30,9 @@ describe('authenticateToolRequest — capability subject', () => {
   })
 
   // The reason this option exists. A token that must live in the BOX
-  // environment cannot be per-user: that environment is workspace-wide and
-  // written once at box creation, so a per-user token cannot be delivered — and
-  // one written there anyway is readable by every member of the workspace's
-  // box, so it was never per-user in the first place.
+  // environment cannot be per-user: that environment is workspace-wide;
+  // `env` writes at creation and `runtimeEnv` refreshes retained boxes, but a
+  // value written there is readable by every member of the workspace's box.
   it('verifies against the workspace when the product says the token is workspace-bound', async () => {
     const verifyToken = vi.fn().mockResolvedValue(true)
     const result = await authenticateToolRequest(toolRequest(fullHeaders()), {

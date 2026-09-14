@@ -24,13 +24,14 @@ export const DEFAULT_HEADER_NAMES: ToolHeaderNames = {
  * `'userId'` (default) is right when the product mints a token per user and can
  * deliver it per turn.
  *
- * `'workspaceId'` is the only workable choice when the token has to survive in
- * the BOX ENVIRONMENT. Since agent-interface 0.38 a credential may reach a
- * profile only as a reference the sandbox resolves from that environment, and
- * the environment is workspace-wide and written once at box creation. A
- * per-user token therefore cannot be delivered at all — and a per-user token
- * that IS written there was never per-user in any meaningful sense, because
- * every member of that workspace's box can read it.
+ * `'workspaceId'` is the only workable choice when the token lives in the BOX
+ * ENVIRONMENT. Since agent-interface 0.38 a credential may reach a profile
+ * only as a reference the sandbox resolves from that environment. `env` writes
+ * at creation and `runtimeEnv` can refresh retained boxes, but the environment
+ * remains workspace-wide. A per-user token therefore cannot be delivered as a
+ * safe box credential — and a per-user token that IS written there was never
+ * per-user in any meaningful sense, because every member of that workspace's
+ * box can read it.
  *
  * Binding the bearer to the workspace does NOT collapse the identity: the user
  * header is still required, still server-set, still returned on `ctx`, and is
