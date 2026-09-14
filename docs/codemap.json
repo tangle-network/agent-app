@@ -14409,7 +14409,7 @@
           "name": "createD1TurnEventStore",
           "kind": "function",
           "signature": "(db: D1LikeForTurns, options?: TurnEventStoreOptions) => TurnEventStore",
-          "doc": "Resolve a TurnEventStore that appends and reads turn events using a D1-like database interface"
+          "doc": null
         },
         {
           "name": "createMemoryTurnEventStore",
