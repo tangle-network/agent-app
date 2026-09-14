@@ -529,3 +529,22 @@ The dispatched profile records the effective model and harness, without copying 
 Products with their own SDK transport can call `resolveSandboxPromptBackend` directly.
 It accepts only profile, provider, and preparation configuration; it does not require provisioning or storage adapters.
 Use its returned backend for both request-size checks and dispatch, preserving product-specific recovery and persistence.
+
+## Renew workspace credentials
+
+Put expiring application credentials in `SandboxRuntimeConfig.runtimeEnv`, rather than creation-only `env` or a custom bootstrap hook.
+The shell resolves them on creation and before each reuse, resume, or recovery, even when liveness is cached.
+
+```ts
+runtimeEnv: async ({ workspaceId }) => ({
+  APP_TOOL_BEARER: await mintWorkspaceToolToken(workspaceId),
+}),
+```
+
+The product owns `mintWorkspaceToolToken` and throws when required credentials are unavailable.
+Profiles reference `APP_TOOL_BEARER` by name; credential values stay outside profile material.
+Values have workspace-wide authority, so this callback cannot carry per-user or per-request secrets.
+Static process configuration remains in `env`; Sandbox owns managed model and Hub credentials.
+On existing sandboxes, the shell awaits the SDK's `setRuntimeEnv` acknowledgement before bootstrap or dispatch.
+An update failure preserves the sandbox and prevents the turn from starting.
+Deploy the matching Sandbox runtime before adopting this callback; a package upgrade cannot update already-running sidecars.

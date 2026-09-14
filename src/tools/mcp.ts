@@ -23,16 +23,17 @@
  * name, and a reference to a key nothing places fails the turn at
  * materialization rather than running credential-less. The box env is what
  * `SandboxRuntimeConfig.env` (and the platform secret store via
- * `SandboxRuntimeConfig.secrets`) writes at sandbox creation, so the key must
- * name a variable one of those places — and it must therefore be a real
- * environment-variable name, which this module enforces.
+ * `SandboxRuntimeConfig.secrets`) writes at sandbox creation.
+ * `SandboxRuntimeConfig.runtimeEnv` can also supply expiring workspace
+ * credentials at creation and refresh them on retained boxes before
+ * bootstrap. The key must name a variable one of those places — and it must
+ * therefore be a real environment-variable name, which this module enforces.
  *
- * A per-request credential is only referenceable when the value written at box
- * creation is byte-identical to the one every later turn would mint (a
- * deterministic derivation such as an HMAC over the workspace id). A token
- * scoped narrower than the box — per-user, per-document — cannot be referenced
- * at all; {@link unresolvableSurfaceCredential} names that blocker instead of
- * emitting a reference that resolves to nothing.
+ * A workspace credential may be renewed through `runtimeEnv`; it still has
+ * workspace-wide authority because every member and turn shares the box. A
+ * token scoped narrower than the box — per-user, per-document — cannot be
+ * referenced safely; {@link unresolvableSurfaceCredential} names that blocker
+ * instead of emitting a reference that resolves to nothing.
  */
 import {
   agentProfileMcpServerSchema,
@@ -124,10 +125,11 @@ function assertProfileMcpServer<T extends AppToolMcpServer>(server: T, label: st
  * Refuse to mount a surface whose credential is scoped narrower than the box.
  *
  * A per-user or per-resource capability token is minted per request. The box
- * environment is written once at sandbox creation and shared by every turn and
- * every member of the workspace, so such a token can neither be placed there
- * ahead of time nor referenced from a per-turn profile. Widening the channel to
- * a workspace-bound token is not a substitute when the route authenticates the
+ * environment is shared by every turn and every member of the workspace;
+ * `env` writes at creation and `runtimeEnv` refreshes workspace-scoped values
+ * on retained boxes. Neither path provides a per-turn secret channel, so a
+ * narrower token cannot be referenced safely. Widening the channel to a
+ * workspace-bound token is not a substitute when the route authenticates the
  * CALLER: the agent can read its own box env, so it could forge that identity.
  *
  * Mounting the surface anyway would emit a plain-string `Authorization` header
@@ -140,7 +142,7 @@ export function unresolvableSurfaceCredential(surface: string): never {
   throw new Error(
     `The ${surface} MCP surface cannot be mounted: its capability token is scoped to a single ` +
       'user and resource, and an AgentProfile may only reference a credential the sandbox can ' +
-      'resolve from the box environment, which is workspace-wide and fixed at sandbox creation. ' +
+      'resolve from the box environment, which is workspace-wide even when runtimeEnv refreshes it. ' +
       'Mounting it needs a per-session secret channel on the sandbox API, or a route that ' +
       'authenticates the workspace rather than the caller.',
   )
@@ -159,12 +161,12 @@ export interface BuildHttpMcpServerOptions {
    * privately and the profile carries only the name.
    *
    * The key MUST name a variable the box actually carries (placed by
-   * `SandboxRuntimeConfig.env` at creation, or injected from the platform
-   * secret store via `SandboxRuntimeConfig.secrets`), and the value written
-   * there must be the token this route will accept for every turn — which in
-   * practice means a deterministic derivation (e.g. an HMAC over the workspace
-   * id), not a freshly-random per-request mint. A token scoped narrower than
-   * the box is not referenceable: see {@link unresolvableSurfaceCredential}.
+   * `SandboxRuntimeConfig.env` at creation, refreshed by
+   * `SandboxRuntimeConfig.runtimeEnv` before retained-box bootstrap, or
+   * injected from the platform secret store via
+   * `SandboxRuntimeConfig.secrets`). The value must be a workspace-scoped token
+   * this route accepts for the active box; a per-user or per-resource token is
+   * not referenceable: see {@link unresolvableSurfaceCredential}.
    */
   tokenEnvKey: string
   ctx: AppToolContext
@@ -225,9 +227,10 @@ export interface ScopedMcpServerEntryOptions {
    * {@link BuildHttpMcpServerOptions.tokenEnvKey}.
    *
    * A per-(user, resource) token cannot satisfy this: the box environment is
-   * workspace-wide and fixed at sandbox creation. A product whose channel needs
-   * one calls {@link unresolvableSurfaceCredential} rather than mounting an
-   * entry that cannot resolve.
+   * workspace-wide; `env` writes at creation and `runtimeEnv` refreshes
+   * workspace-scoped values on retained boxes. A product whose channel needs
+   * a narrower token calls {@link unresolvableSurfaceCredential} rather than
+   * mounting an entry that cannot resolve safely.
    */
   tokenEnvKey: string
   /** Override the channel's default tool-server description. */
