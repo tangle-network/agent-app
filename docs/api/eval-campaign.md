@@ -296,7 +296,7 @@ interface TrustVerdict
 
 ### `trustVerdicts`
 
-`function` — Decide whether an ensemble's per-item verdicts are trustworthy enough to believe a lift computed from them.
+`function` — Check an ensemble against its configured agreement and coverage thresholds.
 
 ```ts
 <D extends string>(items: readonly TrustItem<D>[], thresholds?: TrustThresholds) => TrustVerdict
