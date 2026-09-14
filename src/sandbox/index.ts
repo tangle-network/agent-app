@@ -2125,6 +2125,13 @@ function normalizedEgressPolicy(policy: EgressPolicy): string {
         .filter(Boolean),
     )].sort()
     normalized.includeImplicitDomains = policy.includeImplicitDomains !== false
+  } else {
+    // `allowDomains` and `includeImplicitDomains` are ignored in open and
+    // blocked modes, and the platform keeps a box's old strict list attached
+    // after a migration to open. Comparing them refused a box that already had
+    // exactly the policy asked for, and every reuse of that box after.
+    delete normalized.allowDomains
+    delete normalized.includeImplicitDomains
   }
   return JSON.stringify(canonicalizeJson(normalized))
 }
