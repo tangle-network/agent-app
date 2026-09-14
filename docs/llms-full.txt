@@ -18654,7 +18654,7 @@ interface BufferedTurnTap
 
 ### `createD1TurnEventStore`
 
-`function` — Resolve a TurnEventStore that appends and reads turn events using a D1-like database interface
+`function`
 
 ```ts
 (db: D1LikeForTurns, options?: TurnEventStoreOptions) => TurnEventStore
