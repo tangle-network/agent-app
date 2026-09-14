@@ -382,26 +382,19 @@ export interface SandboxRuntimeConfig {
   metadata: (harness: Harness) => Record<string, unknown>
   connectedIntegrationIds: (workspaceId: string) => Promise<string[]>
   /**
-   * Raw box environment written once at sandbox CREATION — deliberately plain
-   * strings, and the one place a credential value legitimately lives.
-   *
-   * This is the private side of the tagged-config contract, not profile
-   * material: an `AgentProfileMcpServer` may only carry a `secret-ref` naming a
-   * key, and the sandbox resolves that key against THIS map (or against the
-   * platform secret store fed by {@link SandboxRuntimeConfig.secrets}). So a
-   * `tokenEnvKey` passed to `buildAppToolMcpServers` must name a variable this
-   * seam places, or the reference resolves to nothing.
-   *
-   * It is NOT widened to tagged values: the sandbox SDK's create payload types
-   * `env` as `Record<string, string>`, and {@link assertEnvWithinLimits}
-   * measures those bytes against the kernel's per-entry `MAX_ARG_STRLEN`.
-   * Tagging it would make the box env reference itself.
-   *
-   * Values are workspace-wide and fixed for the box's lifetime, so a per-user
-   * or per-resource credential cannot be placed here — see
-   * `unresolvableSurfaceCredential` in `../tools/mcp`.
+   * Creation-only environment. Use runtimeEnv for expiring app credentials.
+   * Values remain private; profiles reference their names through secret-ref.
+   * Workspace-wide values cannot carry per-user or per-resource authority.
    */
   env: (ctx: SandboxBuildContext) => Promise<Record<string, string>>
+  /**
+   * Workspace app credentials resolved on creation and before every reuse,
+   * resume, or recovery. Fresh values override env in the creation payload.
+   * The SDK updates retained runtimes before bootstrap and refuses runtime-managed keys.
+   * Throw when required credentials cannot be minted; renewal failure preserves
+   * the sandbox and prevents dispatch. Requires the matching Sandbox runtime.
+   */
+  runtimeEnv?: (scope: SandboxScope) => Promise<Record<string, string>>
   files: (ctx: SandboxBuildContext) => Promise<AgentProfileFileMount[]>
   secrets: (workspaceId: string) => Promise<string[]>
   profile: (options: ProfileComposeOptions) => AgentProfile
@@ -2068,9 +2061,16 @@ export async function peekWorkspaceSandbox(
   return { status: 'running', box: match }
 }
 
-// The shared tail for handing back an existing (reused/resumed/recovered) box:
-// materialize deferred profile files, then run the product bootstrap. One
-// implementation so the reuse, resume, and recovery paths cannot drift.
+async function resolveWorkspaceRuntimeEnv(
+  shell: SandboxRuntimeConfig,
+  scope: SandboxScope,
+): Promise<Record<string, string>> {
+  const env = await shell.runtimeEnv?.(scope) ?? {}
+  assertEnvWithinLimits(env)
+  return env
+}
+
+// All retained-box paths renew credentials before the product bootstrap.
 async function finalizeExistingBox(
   shell: SandboxRuntimeConfig,
   client: Sandbox,
@@ -2097,6 +2097,10 @@ async function finalizeExistingBox(
     throw deferredProfileWriteFailed(stage, name, written.error)
   }
   const finalBox = written.value
+  const runtimeEnv = await resolveWorkspaceRuntimeEnv(shell, scope)
+  if (Object.keys(runtimeEnv).length > 0) {
+    await finalBox.setRuntimeEnv(runtimeEnv)
+  }
   if (shell.bootstrap) {
     const boot = await shell.bootstrap(finalBox, scope)
     if (!boot.succeeded) {
@@ -2451,11 +2455,13 @@ async function provisionWorkspaceSandbox(
     connectedIntegrationIds,
     ...(userId ? { userId } : {}),
   }
-  const [secrets, env, files] = await Promise.all([
+  const [secrets, creationEnv, runtimeEnv, files] = await Promise.all([
     shell.secrets(workspaceId),
     shell.env(buildCtx),
+    resolveWorkspaceRuntimeEnv(shell, scope),
     shell.files(buildCtx),
   ])
+  const env = { ...creationEnv, ...runtimeEnv }
   const fullProfile = shell.profile({ extraFiles: files, harness })
   // When deferring, strip inline files from the create payload and write them
   // into the box after it reaches running. Keeps the provision body under the
