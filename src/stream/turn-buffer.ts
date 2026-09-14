@@ -488,6 +488,9 @@ export const TURN_STATUS_SCOPE_MIGRATION_SQL = `ALTER TABLE turn_status ADD COLU
 export const TURN_STATUS_RETENTION_MIGRATION_SQL = 'CREATE INDEX IF NOT EXISTS idx_turn_status_retention ON turn_status (status, updatedAt);'
 
 /** Resolve a TurnEventStore that appends and reads turn events using a D1-like database interface */
+/** 100 D1 variables per statement, three per row. */
+const D1_APPEND_CHUNK = 33
+
 export function createD1TurnEventStore(
   db: D1LikeForTurns,
   options: TurnEventStoreOptions = {},
@@ -500,10 +503,18 @@ export function createD1TurnEventStore(
   return {
     async append(turnId, events) {
       if (!events.length) return
-      // One multi-row insert per flush window keeps write volume bounded.
-      const placeholders = events.map(() => '(?, ?, ?)').join(', ')
-      const values = events.flatMap((e) => [turnId, e.seq, e.event])
-      await db.prepare(`INSERT OR IGNORE INTO turn_events (turnId, seq, event) VALUES ${placeholders}`).bind(...values).run()
+      // One multi-row insert per flush window keeps write volume bounded, but
+      // D1 caps a statement at 100 bound variables, so a burst of more than 33
+      // events (a subagent finishing, a long tool result) failed the whole
+      // flush with `D1_ERROR: too many SQL variables` and killed the turn.
+      // Rows are appended in order across chunks; a partial failure leaves a
+      // prefix, which the ordered `seq` column already tolerates on replay.
+      for (let start = 0; start < events.length; start += D1_APPEND_CHUNK) {
+        const chunk = events.slice(start, start + D1_APPEND_CHUNK)
+        const placeholders = chunk.map(() => '(?, ?, ?)').join(', ')
+        const values = chunk.flatMap((e) => [turnId, e.seq, e.event])
+        await db.prepare(`INSERT OR IGNORE INTO turn_events (turnId, seq, event) VALUES ${placeholders}`).bind(...values).run()
+      }
     },
     async read(turnId, fromSeq) {
       const { results } = await db
