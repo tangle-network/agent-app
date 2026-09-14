@@ -24,7 +24,7 @@ interface BrokerTokenMinter
 
 ### `BrokerTokenProvider`
 
-`interface` — Provide and refresh broker bearer tokens, allowing forced token invalidation
+`interface` — Mint a separate single-use bearer for each execution attempt.
 
 ```ts
 interface BrokerTokenProvider
@@ -56,7 +56,7 @@ interface ConsentUrlInput
 
 ### `createBrokerTokenProvider`
 
-`function` — Cache + auto-refresh a broker token for one grant.
+`function` — Mint a fresh broker token for every call, including concurrent calls.
 
 ```ts
 (opts: BrokerTokenProviderOptions) => BrokerTokenProvider
