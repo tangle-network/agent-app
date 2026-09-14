@@ -162,6 +162,101 @@ beforeEach(() => {
   secretsDeleteMock.mockReset()
 })
 
+describe('workspace runtime environment renewal', () => {
+  const scope = { workspaceId: 'w1', userId: 'u1', harness: 'opencode' as const }
+
+  it('resolves runtime credentials once into the creation environment', async () => {
+    listMock.mockResolvedValue([])
+    const box = fakeBox({ setRuntimeEnv: vi.fn() })
+    createMock.mockResolvedValue(box)
+    const runtimeEnv = vi.fn().mockResolvedValue({ APP_TOKEN: 'first-token' })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { runtimeEnv })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).resolves.toBe(box)
+    expect(runtimeEnv).toHaveBeenCalledExactlyOnceWith({ workspaceId: 'w1', userId: 'u1' })
+    expect(createMock.mock.calls[0]![0].env).toEqual({ WORKSPACE_ID: 'w1', APP_TOKEN: 'first-token' })
+    expect(box.setRuntimeEnv).not.toHaveBeenCalled()
+  })
+
+  it('renews before bootstrap on every reuse, including a cached liveness check', async () => {
+    const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
+    const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'alive\n' })
+    const box = fakeBox({ setRuntimeEnv, exec })
+    listMock.mockResolvedValue([box])
+    const runtimeEnv = vi.fn()
+      .mockResolvedValueOnce({ APP_TOKEN: 'renewed-1' })
+      .mockResolvedValueOnce({ APP_TOKEN: 'renewed-2' })
+    const bootstrap = vi.fn(async () => {
+      expect(setRuntimeEnv).toHaveBeenCalledTimes(bootstrap.mock.calls.length)
+      return { succeeded: true as const, value: undefined }
+    })
+    const env = vi.fn().mockResolvedValue({ WORKSPACE_ID: 'w1' })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { env, runtimeEnv, bootstrap, livenessProbe: {} })
+
+    await ensureWorkspaceSandbox(shell, scope)
+    await ensureWorkspaceSandbox(shell, scope)
+    expect(setRuntimeEnv.mock.calls).toEqual([[{ APP_TOKEN: 'renewed-1' }], [{ APP_TOKEN: 'renewed-2' }]])
+    expect(env).not.toHaveBeenCalled()
+    expect(exec).toHaveBeenCalledOnce()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('renews the retained sandbox after resuming it', async () => {
+    const box = fakeBox({ setRuntimeEnv: vi.fn().mockResolvedValue(undefined) })
+    listMock.mockResolvedValueOnce([]).mockResolvedValueOnce([box])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      runtimeEnv: async () => ({ APP_TOKEN: 'after-resume' }),
+    })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).resolves.toBe(box)
+    expect(box.resume).toHaveBeenCalledOnce()
+    expect(box.setRuntimeEnv).toHaveBeenCalledExactlyOnceWith({ APP_TOKEN: 'after-resume' })
+    expect(box.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('preserves the sandbox and refuses bootstrap when renewal is rejected', async () => {
+    const failure = Object.assign(new Error('App environment endpoint unavailable'), {
+      status: 404, endpoint: '/config/config/app-env',
+    })
+    const box = fakeBox({ setRuntimeEnv: vi.fn().mockRejectedValue(failure) })
+    listMock.mockResolvedValue([box])
+    const bootstrap = vi.fn()
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      runtimeEnv: async () => ({ APP_TOKEN: 'renewed' }), bootstrap,
+    })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).rejects.toBe(failure)
+    expect(bootstrap).not.toHaveBeenCalled()
+    expect(box.delete).not.toHaveBeenCalled()
+    expect(box.stop).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses reuse when credentials cannot be minted', async () => {
+    const box = fakeBox({ setRuntimeEnv: vi.fn() })
+    listMock.mockResolvedValue([box])
+    const failure = new Error('Credential issuer unavailable')
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      runtimeEnv: async () => { throw failure },
+    })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).rejects.toBe(failure)
+    expect(box.setRuntimeEnv).not.toHaveBeenCalled()
+    expect(box.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('does not send an empty runtime environment to the SDK', async () => {
+    const box = fakeBox({ setRuntimeEnv: vi.fn() })
+    listMock.mockResolvedValue([box])
+    const runtimeEnv = vi.fn().mockResolvedValue({})
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, { runtimeEnv }), scope)
+    expect(runtimeEnv).toHaveBeenCalledOnce()
+    expect(box.setRuntimeEnv).not.toHaveBeenCalled()
+  })
+})
+
 describe('getClient credential-fingerprint cache', () => {
   it('reuses one client for the same apiKey+baseUrl', () => {
     const shell = shellFor({ apiKey: 'k1', baseUrl: 'https://s' })

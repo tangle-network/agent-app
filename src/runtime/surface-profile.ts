@@ -27,10 +27,10 @@
  * contract (`agent-interface` 0.38.0) the `Authorization` header is a
  * `secret-ref` naming a box-environment variable, which the sandbox resolves
  * privately; `build()` supplies that key NAME from server configuration and the
- * product writes the value into `SandboxRuntimeConfig.env` at box creation. The
- * value must be deterministic for the box's lifetime (an HMAC over the
- * workspace id, e.g. `createCapabilityToken` in ../tools), because a freshly
- * random per-request mint would never match what the box already carries.
+ * product writes the value through `SandboxRuntimeConfig.env` at creation or
+ * refreshes it through `SandboxRuntimeConfig.runtimeEnv` before retained-box
+ * bootstrap. The value remains workspace-scoped because every member and turn
+ * shares the box; runtime renewal does not create a per-user secret channel.
  */
 
 import type { AppToolMcpServer } from '../tools/mcp'
