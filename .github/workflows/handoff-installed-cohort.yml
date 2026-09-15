@@ -22,17 +22,21 @@ jobs:
           const devDependencies = ['@cloudflare/workers-types','@types/node','typescript','wrangler','esbuild'];
           const manifest = {name:'handoff-agent', version:'0.8.0', private:true, type:'module', dependencies:{}, devDependencies:{}};
           const evidence = {resolvedAt:new Date().toISOString(), packages:{}};
+          const read = (...args) => JSON.parse(execFileSync('npm',['view', ...args, '--json'], {encoding:'utf8'}));
+          const metadata = (name, tag = 'latest') => {
+            const versions = read(`${name}@${tag}`, 'version');
+            const version = Array.isArray(versions) ? versions.at(-1) : versions;
+            return read(`${name}@${version}`, 'version', 'gitHead', 'engines', 'dist', 'peerDependencies', 'peerDependenciesMeta');
+          };
           for (const kind of ['dependencies','devDependencies']) {
             for (const name of kind === 'dependencies' ? dependencies : devDependencies) {
-              const tag = name === '@types/node' ? '22' : 'latest';
-              const raw = JSON.parse(execFileSync('npm',['view', `${name}@${tag}`, '--json'], {encoding:'utf8'}));
-              const item = Array.isArray(raw) ? raw.at(-1) : raw;
+              const item = metadata(name, name === '@types/node' ? '22' : 'latest');
               manifest[kind][name] = item.version;
-              evidence.packages[name] = {version:item.version, gitHead:item.gitHead, engines:item.engines, dist:item.dist, peerDependencies:item.peerDependencies, peerDependenciesMeta:item.peerDependenciesMeta};
+              evidence.packages[name] = item;
+              writeFileSync('proof/published-metadata.json',JSON.stringify(evidence,null,2)+'\n');
             }
           }
-          const gateway = JSON.parse(execFileSync('npm',['view','@tangle-network/agent-gateway@latest','--json'],{encoding:'utf8'}));
-          evidence.gateway = gateway;
+          evidence.gateway = metadata('@tangle-network/agent-gateway');
           writeFileSync('consumer/package.json', JSON.stringify(manifest,null,2)+'\n');
           writeFileSync('proof/published-metadata.json',JSON.stringify(evidence,null,2)+'\n');
           JS
