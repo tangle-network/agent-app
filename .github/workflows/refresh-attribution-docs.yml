@@ -1,0 +1,51 @@
+# Temporary branch-scoped maintenance task; no release or external credentials.
+name: Refresh attribution docs
+on:
+  push:
+    branches: [feat/shared-conversation-attribution]
+    paths: [.github/workflows/refresh-attribution-docs.yml]
+permissions:
+  contents: read
+jobs:
+  docs:
+    if: github.repository == 'tangle-network/agent-app' && github.ref == 'refs/heads/feat/shared-conversation-attribution'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts=false
+      - run: pnpm docs:gen
+      - name: Commit only deterministic generated documentation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'JS'
+          import {execFileSync} from 'node:child_process';
+          const allowed=new Set(['docs/CODEMAP.md','docs/api/web.md','docs/codemap.json','docs/llms-full.txt','docs/llms.txt']);
+          const changed=execFileSync('git',['diff','--name-only'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
+          if(changed.some(path=>!allowed.has(path)))throw Error('Unexpected generated change: '+changed.join(', '));
+          JS
+          git add -- docs/CODEMAP.md docs/api/web.md docs/codemap.json docs/llms-full.txt docs/llms.txt
+          git diff --cached --quiet && exit 0
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'docs: regenerate web attribution API reference'
+          # Fast-forward only: a concurrent author update cannot be overwritten.
+          printf '%s\n' '#!/bin/sh' 'case "$1" in *Username*) echo x-access-token;; *) echo "$GH_TOKEN";; esac' > /tmp/docs-askpass
+          chmod 700 /tmp/docs-askpass
+          GIT_ASKPASS=/tmp/docs-askpass GIT_TERMINAL_PROMPT=0 git push https://github.com/tangle-network/agent-app.git HEAD:refs/heads/feat/shared-conversation-attribution
+          rm /tmp/docs-askpass
