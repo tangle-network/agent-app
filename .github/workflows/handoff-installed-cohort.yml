@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-      - name: Resolve current published versions and preserve metadata
+      - name: Resolve compatible current published versions
         run: |
           mkdir -p consumer proof
           node --input-type=module <<'JS'
@@ -21,18 +21,22 @@ jobs:
           const dependencies = ['@opentelemetry/exporter-trace-otlp-http','@opentelemetry/resources','@opentelemetry/sdk-trace-node','@tangle-network/agent-app','@tangle-network/agent-eval','@tangle-network/agent-integrations','@tangle-network/agent-interface','@tangle-network/agent-runtime','@tangle-network/hub-sdk','@tangle-network/sandbox','better-auth','drizzle-orm','viem'];
           const devDependencies = ['@cloudflare/workers-types','@types/node','typescript','wrangler','esbuild'];
           const manifest = {name:'handoff-agent', version:'0.8.0', private:true, type:'module', dependencies:{}, devDependencies:{}};
-          const evidence = {resolvedAt:new Date().toISOString(), packages:{}};
+          const evidence = {resolvedAt:new Date().toISOString(), packages:{}, selections:{}};
           const read = (...args) => JSON.parse(execFileSync('npm',['view', ...args, '--json'], {encoding:'utf8'}));
           const metadata = (name, tag = 'latest') => {
             const versions = read(`${name}@${tag}`, 'version');
             const version = Array.isArray(versions) ? versions.at(-1) : versions;
             return read(`${name}@${version}`, 'version', 'gitHead', 'engines', 'dist', 'peerDependencies', 'peerDependenciesMeta');
           };
+          const app = metadata('@tangle-network/agent-app');
           for (const kind of ['dependencies','devDependencies']) {
             for (const name of kind === 'dependencies' ? dependencies : devDependencies) {
-              const item = metadata(name, name === '@types/node' ? '22' : 'latest');
+              const latest = metadata(name, name === '@types/node' ? '22' : 'latest');
+              const range = name.startsWith('@tangle-network/') ? app.peerDependencies?.[name] : undefined;
+              const item = range ? metadata(name,range) : latest;
               manifest[kind][name] = item.version;
               evidence.packages[name] = item;
+              evidence.selections[name] = {latest:latest.version,selected:item.version,...(range?{peerRange:range,peerOwner:`@tangle-network/agent-app@${app.version}`}:{})};
               writeFileSync('proof/published-metadata.json',JSON.stringify(evidence,null,2)+'\n');
             }
           }
