@@ -17605,6 +17605,12 @@
           "doc": "Set-Cookie header value that deletes the cookie (empty value, Max-Age=0)."
         },
         {
+          "name": "ConversationGroupItem",
+          "kind": "interface",
+          "signature": "interface ConversationGroupItem",
+          "doc": "Renderer-neutral attribution."
+        },
+        {
           "name": "CookieOptions",
           "kind": "interface",
           "signature": "interface CookieOptions",
@@ -17680,6 +17686,18 @@
           "name": "FreeRouteLimitResponseOptions",
           "kind": "interface",
           "signature": "interface FreeRouteLimitResponseOptions",
+          "doc": null
+        },
+        {
+          "name": "groupConversationMessages",
+          "kind": "function",
+          "signature": "<T extends ConversationGroupItem>(items?: readonly T[]) => GroupedConversationItem<T>[]",
+          "doc": "Annotate assistant rows until an actual user message, speaker or conversation change."
+        },
+        {
+          "name": "GroupedConversationItem",
+          "kind": "type",
+          "signature": "type GroupedConversationItem",
           "doc": null
         },
         {

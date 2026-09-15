@@ -97,7 +97,7 @@ _99 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./vault`](api/vault.md) | 17 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
-| [`./web`](api/web.md) | 33 | — |
+| [`./web`](api/web.md) | 36 | — |
 | [`./web-react`](api/web-react.md) | 427 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/async`](api/web-react-async.md) | 35 | — |
 | [`./web-react/session-gateway`](api/web-react-session-gateway.md) | 22 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
@@ -924,9 +924,9 @@ Source: `src/vault/server.ts` · 8 exports
 
 ## `./web`
 
-Source: `src/web/index.ts` · 33 exports
+Source: `src/web/index.ts` · 36 exports
 
-`addSecurityHeaders`, `assertMediaUrl`, `checkFreeRouteLimit`, `checkRateLimit`, `clearCookieHeader`, `CookieOptions`, `extractRequestContext`, `FREE_ROUTE_BUDGETS`, `FreeRouteAllowance`, `FreeRouteClass`, `FreeRouteDenialReason`, `FreeRouteDimension`, `FreeRouteIdentity`, `FreeRouteLimitError`, `FreeRouteLimitInput`, `FreeRouteLimitOutcome`, `freeRouteLimitResponse`, `FreeRouteLimitResponseOptions`, `isWorkspaceFileExportable`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitBudget`, `RateLimitResult`, `readCookieValue`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `STANDARD_SECURITY_HEADERS`, `withFreeRouteLimit`, `WithFreeRouteLimitOptions`, `WORKSPACE_BUDGET_MULTIPLIER`
+`addSecurityHeaders`, `assertMediaUrl`, `checkFreeRouteLimit`, `checkRateLimit`, `clearCookieHeader`, `ConversationGroupItem`, `CookieOptions`, `extractRequestContext`, `FREE_ROUTE_BUDGETS`, `FreeRouteAllowance`, `FreeRouteClass`, `FreeRouteDenialReason`, `FreeRouteDimension`, `FreeRouteIdentity`, `FreeRouteLimitError`, `FreeRouteLimitInput`, `FreeRouteLimitOutcome`, `freeRouteLimitResponse`, `FreeRouteLimitResponseOptions`, `groupConversationMessages`, `GroupedConversationItem`, `isWorkspaceFileExportable`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitBudget`, `RateLimitResult`, `readCookieValue`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `STANDARD_SECURITY_HEADERS`, `withFreeRouteLimit`, `WithFreeRouteLimitOptions`, `WORKSPACE_BUDGET_MULTIPLIER`
 
 [Full API →](api/web.md)
 

@@ -4,7 +4,7 @@
 
 Source: `src/web/index.ts`
 
-33 exports.
+36 exports.
 
 ### `addSecurityHeaders`
 
@@ -44,6 +44,14 @@ Source: `src/web/index.ts`
 
 ```ts
 (opts: Omit<CookieOptions, "maxAgeSeconds">) => string
+```
+
+### `ConversationGroupItem`
+
+`interface` — Renderer-neutral attribution.
+
+```ts
+interface ConversationGroupItem
 ```
 
 ### `CookieOptions`
@@ -148,6 +156,22 @@ type FreeRouteLimitOutcome
 
 ```ts
 interface FreeRouteLimitResponseOptions
+```
+
+### `groupConversationMessages`
+
+`function` — Annotate assistant rows until an actual user message, speaker or conversation change.
+
+```ts
+<T extends ConversationGroupItem>(items?: readonly T[]) => GroupedConversationItem<T>[]
+```
+
+### `GroupedConversationItem`
+
+`type`
+
+```ts
+type GroupedConversationItem
 ```
 
 ### `isWorkspaceFileExportable`
