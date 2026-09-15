@@ -11,23 +11,43 @@ jobs:
     steps:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 22.16.0
-      - name: Install reviewed consumer cohort and missing optional peers
+          node-version: 22
+      - name: Resolve current published versions and preserve metadata
         run: |
           mkdir -p consumer proof
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { writeFileSync } from 'node:fs';
+          const dependencies = ['@opentelemetry/exporter-trace-otlp-http','@opentelemetry/resources','@opentelemetry/sdk-trace-node','@tangle-network/agent-app','@tangle-network/agent-eval','@tangle-network/agent-integrations','@tangle-network/agent-interface','@tangle-network/agent-runtime','@tangle-network/hub-sdk','@tangle-network/sandbox','better-auth','drizzle-orm','viem'];
+          const devDependencies = ['@cloudflare/workers-types','@types/node','typescript','wrangler','esbuild'];
+          const manifest = {name:'handoff-agent', version:'0.8.0', private:true, type:'module', dependencies:{}, devDependencies:{}};
+          const evidence = {resolvedAt:new Date().toISOString(), packages:{}};
+          for (const kind of ['dependencies','devDependencies']) {
+            for (const name of kind === 'dependencies' ? dependencies : devDependencies) {
+              const tag = name === '@types/node' ? '22' : 'latest';
+              const raw = JSON.parse(execFileSync('npm',['view', `${name}@${tag}`, '--json'], {encoding:'utf8'}));
+              const item = Array.isArray(raw) ? raw.at(-1) : raw;
+              manifest[kind][name] = item.version;
+              evidence.packages[name] = {version:item.version, gitHead:item.gitHead, engines:item.engines, dist:item.dist, peerDependencies:item.peerDependencies, peerDependenciesMeta:item.peerDependenciesMeta};
+            }
+          }
+          const gateway = JSON.parse(execFileSync('npm',['view','@tangle-network/agent-gateway@latest','--json'],{encoding:'utf8'}));
+          evidence.gateway = gateway;
+          writeFileSync('consumer/package.json', JSON.stringify(manifest,null,2)+'\n');
+          writeFileSync('proof/published-metadata.json',JSON.stringify(evidence,null,2)+'\n');
+          JS
+      - name: Install without bypassing peer validation
+        run: |
           cd consumer
-          cat > package.json <<'JSON'
-          {"name":"handoff-agent","version":"0.6.0","private":true,"type":"module","dependencies":{"@tangle-network/agent-app":"0.47.13","@tangle-network/agent-interface":"2.6.0","@tangle-network/agent-runtime":"0.207.0","@tangle-network/sandbox":"0.38.2","@tangle-network/agent-eval":"0.179.0","@tangle-network/agent-integrations":"0.53.55","better-auth":"1.7.2","drizzle-orm":"0.45.2","@tangle-network/hub-sdk":"0.11.0"},"devDependencies":{"@cloudflare/workers-types":"5.20260827.1","@types/node":"22.20.1","typescript":"7.0.2","wrangler":"4.126.0"}}
-          JSON
-          npm install --save-exact viem@2 @opentelemetry/sdk-trace-node@2 @opentelemetry/exporter-trace-otlp-http@0 @opentelemetry/resources@2 --ignore-scripts --no-audit --no-fund > ../proof/install.log 2>&1 || { tail -70 ../proof/install.log; exit 1; }
+          npm install --ignore-scripts --no-audit --no-fund > ../proof/install.log 2>&1 || { tail -80 ../proof/install.log; exit 1; }
           npm ls --all --json > ../proof/dependencies.json
-          cp package.json ../proof/resolved-package.json
+          cp package.json package-lock.json ../proof/
           tar -czf ../proof/installed-cohort.tar.gz package.json package-lock.json node_modules
           sha256sum ../proof/installed-cohort.tar.gz > ../proof/SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: handoff-installed-cohort
+          name: handoff-latest-cohort
           path: proof/
-          retention-days: 3
+          retention-days: 7
           if-no-files-found: error
