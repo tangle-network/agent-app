@@ -1,0 +1,182 @@
+/**
+ * Web-boundary utilities every agent app's routes hand-roll: JSON body parsing
+ * + narrowing, request-context extraction (real client IP behind Cloudflare),
+ * a KV-backed sliding-window rate limiter, the free-route budget policy built
+ * on it, and security response headers. Pure mechanism — no DB, no domain. The
+ * KV is a structural interface so this needs no `@cloudflare/workers-types`
+ * dependency.
+ */
+
+export * from './rate-limit'
+export * from './free-route-limit'
+
+export type JsonObject = Record<string, unknown>
+
+/** Parse + object-narrow a Request body. `[body, null]` on success, `[null,
+ *  errorResponse]` on a non-object body (callers `if (err) return err`). */
+export async function parseJsonObjectBody(request: Request): Promise<[JsonObject, null] | [null, Response]> {
+  let raw: unknown
+  try {
+    raw = await request.json()
+  } catch {
+    return [null, Response.json({ error: 'Invalid JSON body' }, { status: 400 })]
+  }
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return [null, Response.json({ error: 'Body must be a JSON object' }, { status: 400 })]
+  }
+  return [raw as JsonObject, null]
+}
+
+/** Narrow one required string field, 400 if missing/empty. */
+export function requireString(body: JsonObject, field: string): string | Response {
+  const v = body[field]
+  if (typeof v !== 'string' || v.length === 0) {
+    return Response.json({ error: `Missing or non-string field: ${field}` }, { status: 400 })
+  }
+  return v
+}
+
+/** Define the context of a request including IP address, user agent, timestamp, and request ID */
+export interface RequestContext {
+  ipAddress: string
+  userAgent: string
+  timestamp: string
+  requestId: string
+}
+
+/** Extract request context for audit trails. Uses `CF-Connecting-IP` for the
+ *  real client IP behind Cloudflare. */
+export function extractRequestContext(request: Request): RequestContext {
+  const ipAddress =
+    request.headers.get('CF-Connecting-IP') ??
+    request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ??
+    '0.0.0.0'
+  return {
+    ipAddress,
+    userAgent: request.headers.get('User-Agent') ?? '',
+    timestamp: new Date().toISOString(),
+    requestId: crypto.randomUUID(),
+  }
+}
+
+/** Define options for configuring cookie attributes and behavior */
+export interface CookieOptions {
+  name: string
+  /** Default '/'. */
+  path?: string
+  /** Default true. */
+  httpOnly?: boolean
+  /** Adds the `Secure` attribute. Default false. */
+  secure?: boolean
+  /** Default 'Lax'. */
+  sameSite?: 'Lax' | 'Strict' | 'None'
+  maxAgeSeconds?: number
+}
+
+/** Serialize a Set-Cookie header value: `name=encodeURIComponent(value)` plus
+ *  attributes in Path / HttpOnly / SameSite / Max-Age / Secure order.
+ *  Throws on `SameSite=None` without `secure` — browsers silently drop that
+ *  combination, which would otherwise fail invisibly. */
+export function serializeCookie(value: string, opts: CookieOptions): string {
+  if (opts.sameSite === 'None' && !opts.secure) {
+    throw new Error('SameSite=None cookies require secure: true (browsers reject them otherwise)')
+  }
+  const parts = [`${opts.name}=${encodeURIComponent(value)}`, `Path=${opts.path ?? '/'}`]
+  if (opts.httpOnly !== false) parts.push('HttpOnly')
+  parts.push(`SameSite=${opts.sameSite ?? 'Lax'}`)
+  if (opts.maxAgeSeconds !== undefined) parts.push(`Max-Age=${opts.maxAgeSeconds}`)
+  if (opts.secure) parts.push('Secure')
+  return parts.join('; ')
+}
+
+/** Set-Cookie header value that deletes the cookie (empty value, Max-Age=0). */
+export function clearCookieHeader(opts: Omit<CookieOptions, 'maxAgeSeconds'>): string {
+  return serializeCookie('', { ...opts, maxAgeSeconds: 0 })
+}
+
+/** Read + decode one cookie from a Cookie request header; null when absent. */
+export function readCookieValue(cookieHeader: string | null, name: string): string | null {
+  if (!cookieHeader) return null
+  for (const part of cookieHeader.split(/;\s*/)) {
+    const [cookieName, ...rest] = part.split('=')
+    if (cookieName === name) {
+      try {
+        return decodeURIComponent(rest.join('='))
+      } catch {
+        return null
+      }
+    }
+  }
+  return null
+}
+
+/** Define options for configuring security-related HTTP headers including disclaimers and retention labels */
+export interface SecurityHeaderOptions {
+  /** Product disclaimer (e.g. "AI-powered tool. Not legal advice."). Omitted if absent. */
+  disclaimer?: string
+  /** Data-retention label (e.g. "7-years"). Omitted if absent. */
+  retention?: string
+  /** Extra headers to set. */
+  extra?: Record<string, string>
+}
+
+/** Canonical generic response headers used by {@link addSecurityHeaders}.
+ * Exported so static-asset hosts can apply the same policy without copying
+ * values that silently drift from Worker/API responses. */
+export const STANDARD_SECURITY_HEADERS = Object.freeze({
+  'Strict-Transport-Security':
+    'max-age=31536000; includeSubDomains; preload',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Referrer-Policy': 'same-origin',
+  'X-XSS-Protection': '1; mode=block',
+} as const)
+
+/** Set standard security headers on a response (HSTS, nosniff, frame-options,
+ *  referrer-policy, XSS) + optional product disclaimer/retention. The security
+ *  set is generic; the disclaimer/retention are the product's. */
+export function addSecurityHeaders(response: Response, opts: SecurityHeaderOptions = {}): Response {
+  for (const [name, value] of Object.entries(STANDARD_SECURITY_HEADERS)) {
+    response.headers.set(name, value)
+  }
+  if (opts.disclaimer) response.headers.set('X-AI-Disclaimer', opts.disclaimer)
+  if (opts.retention) response.headers.set('X-Data-Retention', opts.retention)
+  for (const [k, v] of Object.entries(opts.extra ?? {})) response.headers.set(k, v)
+  return response
+}
+
+/** Local-sandbox / inline schemes a stored media reference must never use.
+ *  Reachable from neither a browser nor the product worker, and a `file:`/`data:`
+ *  url is the tell of an agent substituting local ffmpeg output for a real
+ *  provider artifact. `blob:` and `javascript:` are inert/active client schemes
+ *  with no server reachability. */
+const REJECTED_MEDIA_SCHEMES = ['file:', 'data:', 'blob:', 'javascript:', 'vbscript:'] as const
+
+/**
+ * Canonical media-reference boundary shared by every surface that persists a
+ * media url (sequences clips, design-canvas image/video src). The ONE rule:
+ * remote `http(s)` or a rooted `/api/` path are allowed; everything else is
+ * rejected, with a named reason for known-bad local/inline schemes so the
+ * thrown message is actionable for an LLM planner. The url is trimmed before
+ * the scheme check so leading whitespace cannot smuggle a rejected scheme past
+ * a naive `startsWith`.
+ *
+ * @param what - noun for the error message (e.g. 'media url', 'src').
+ */
+export function assertMediaUrl(url: string, what = 'media url'): void {
+  const trimmed = url.trim()
+  if (/^https?:\/\//i.test(trimmed)) return
+  if (trimmed.startsWith('/api/')) return
+  const shown = trimmed.length > 96 ? `${trimmed.slice(0, 96)}…` : trimmed
+  const lower = trimmed.toLowerCase()
+  if (
+    REJECTED_MEDIA_SCHEMES.some((scheme) => lower.startsWith(scheme)) ||
+    lower.startsWith('/tmp/') ||
+    lower.startsWith('/home/')
+  ) {
+    throw new Error(`${what} must reference a provider http(s) URL or a rooted /api/ path, not a local sandbox file (${shown})`)
+  }
+  throw new Error(`${what} must be http(s) or a rooted /api/ path (${shown})`)
+}
+
+export { isWorkspaceFileExportable } from './file-export'
