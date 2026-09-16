@@ -1,44 +1,47 @@
 ---
 name: eval-architect
-description: Build a measurement that scores an agent's REAL deliverable — not a proxy — for a product you've never seen before. Use when scaffolding or repairing the eval an Improve loop optimizes against. Get this wrong and every downstream optimization perfects a fiction.
+description: Build or repair evaluations that score the agent's actual deliverable through the production path, with independent controls and visible missing evidence.
 ---
 
-# Eval Architect — measure the real deliverable
+# Eval architect
 
-You are building the measurement an improvement loop will optimize against. **The loop optimizes whatever you measure.** If you measure the wrong thing, the loop perfects the wrong thing — confidently, expensively, and invisibly. The measurement is the product. Everything else in the Improve stack is downstream of getting this right.
+Build the measurement around the product's required outcome and actual execution path.
+Reuse maintained Eval contracts and existing product checks before creating another scorer.
 
-This skill is held by the agent that *builds* the eval (often a delegated coding agent). Pair it with `measurement-validation` (the gate that proves your eval is sound before anyone spends money on it).
+## Locate the deliverable
 
-## The cardinal question
+1. Inspect real runs to find the output channel: replies, validated tool calls, persisted artifacts, application state, or rendered UI.
+   Score the channel that carries the required outcome.
+2. Define the completion boundary for the task.
+   For work that accumulates across turns, evaluate the completed artifact and retain intermediate evidence needed to explain failures.
+3. Trace every consumer of the score, including completion checks, optimization selection, and release decisions.
+   When the output channel changes, update every affected consumer.
 
-**Where does this agent's deliverable actually land?** Prose in the reply? Validated tool calls? Persisted artifacts (vault docs, DB rows)? A PR? A rendered UI? Find out by inspecting *real runs* — never by assuming it's the chat text.
+## Build the checks
 
-> Worked failure (legal-agent, this is why the skill exists): the eval scored the assistant's chat prose. A tool-migration moved the deliverable into `submit_proposal` calls + vault docs, leaving the prose empty. Every scorer reading prose silently collapsed to ~0. The loop would have optimized an empty string. The deliverable had *moved* and the measurement didn't follow it.
+1. Map each requirement to observable evidence and an explicit failure condition.
+   Use answer keys when available; otherwise use independently justified constraints, executable checks, or calibrated judgment.
+   Keep unsupported requirements and missing evidence visible.
+2. Establish a simple baseline through the same entrypoint as the candidate.
+   Investigate surprising scores instead of assuming either the scorer or the agent caused them.
+3. Separate training, candidate selection, and final comparison evidence where the improvement claim requires those partitions.
+   Preserve scenario identities and shared source-unit mappings across baseline and candidate runs.
+4. Define critical failure checks separately from aggregate quality.
+   A favorable composite must not erase a failure that violates the product's requirements.
+5. Preserve scorer identity, actual cost receipts, execution failures, and diagnostic artifacts.
+   Change `judgeVersion` when an ensemble scorer's configuration changes.
 
-## Invariant (non-negotiable — violate these and the loop is a slot machine)
+## Prove the measurement
 
-1. **Score the produced artifact, not the conversation.** Locate the real output channel and score *that*.
-2. **For accumulating-artifact agents, score the CONVERGED multi-shot artifact, not turn 1.** Most real agents build their deliverable over several turns. Define a convergence criterion (e.g. the artifact stops growing for N shots) and score the converged state.
-3. **A held-out split exists and is never trained on.** No held-out → no honest gate → no trustworthy lift.
-4. **Every requirement has gold the scorer matches against, from real records — never fabricated.** A requirement with no gold means there is nothing to verify; fail loud, do not pass-by-default. A fluent hallucination that produced nothing must score 0, not 0.9.
+Run known positive and negative examples through the complete scoring path.
+Perturb a real deliverable so required behavior improves or regresses, then check that the score detects each change.
+Confirm that absent output and evaluator failure remain distinguishable from measured low quality.
+Report case coverage, detectable failures, uncertainty, and any requirements the evaluation cannot assess.
+A training gain without a final-comparison gain needs diagnosis; it does not identify the cause by itself.
 
-## Judgment (figure this out per product — the agentic core)
+## Then consider
 
-- What *is* the deliverable here, and where does it persist? Read the runtime events / tool calls / storage, not the transcript.
-- What is the convergence criterion for this agent's artifact? When has it stopped accumulating?
-- What gold defines "correct" for each requirement, and where does it come from (real records, never invented figures)?
-- Which dimensions matter, and what are their weights? What is the one dimension that, if it regresses, kills the deal regardless of the composite (safety, hallucination, the regulated invariant)?
-
-## Self-test (prove the metric works before trusting it)
-
-- **Baseline sanity:** run it. Is the score non-zero and plausible for a competent agent? A near-zero baseline usually means you're scoring the wrong channel, not that the agent is terrible.
-- **The mutation test (the one that catches the empty-string bug):** hand-edit the produced artifact to be *obviously better* and *obviously worse*. Does the score move in the right direction and magnitude? A metric that doesn't move under obvious changes is measuring the wrong thing.
-- **Audit EVERY scoring surface together.** Completion, quality, and the optimizer's own scorer all read *something*. When the deliverable's channel moves, all of them that read the old channel silently zero. (Session: completion + quality were fixed; the optimizer's own scorer was missed and only found by tracing. Three surfaces — enumerate them, don't assume one.)
-
-## Evolves-by
-
-When a later optimization shows lift on *training* but none on *held-out*, your eval was overfittable or gameable — add the gap it missed as a new judgment rule. The architect's judgment surface is itself optimized by the meta-eval *"did evals built this way yield real held-out lift, no critical regression?"* See `skill-evolution`.
-
-## Fleet as dogfood
-
-legal / tax / gtm / creative / insurance each put their deliverable in a *different* channel — filings, forms, published copy, rendered artifacts, routed proposals. The skill is general precisely because it forces you to *locate* the channel for the product in front of you rather than hardcode "the reply text."
+| Condition | Skill |
+|---|---|
+| The evaluation path executes and needs calibration or comparison checks | `measurement-validation` with the baseline and control results |
+| The validated measurement supports a candidate search | `surface-evolution` with the target surface, evidence, and resource limits |

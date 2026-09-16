@@ -1,38 +1,44 @@
 ---
 name: measurement-validation
-description: Prove a measurement is sound BEFORE spending money optimizing against it. The gate that decides whether an Improve run is allowed to start, and whether its result is allowed to be believed. Refuse metrics whose noise exceeds the effect, that have no held-out split, or whose evidence is incomplete.
+description: Check whether an evaluation supports an optimization or release decision through calibrated scoring, independent comparison units, and complete paired evidence.
 ---
 
-# Measurement Validation — earn the right to optimize
+# Measurement validation
 
-Optimization is only as trustworthy as the measurement under it. This skill is the gate on both ends: **before** a paid run (is this metric allowed to be optimized?) and **after** (is this result allowed to be believed?). It is the difference between an Improve button that is a product and one that is a slot machine.
+Check the measurement through the product's actual evaluation path before interpreting an optimization result.
+Separate exploratory evidence from evidence that satisfies a release policy.
 
-Held by both the orchestrator (`improve-conductor`) and the builder (`eval-architect`). It is the shared honesty contract.
+## Establish the measurement
 
-## Invariant (non-negotiable)
+1. State the user outcome, target population, independent comparison unit, and smallest useful effect.
+   Record the scoring revision, selection procedure, resource limits, and stopping rule before comparing candidates.
+2. Run a simple baseline and independent positive and negative controls through the scorer.
+   Use `auditEvaluator` from `@tangle-network/agent-eval/meta-eval` when the scorer needs an accuracy audit.
+   Report false acceptances, false rejections, and missing observations against the product's requirements.
+3. Check repeatability and choose enough independent units to resolve the intended effect.
+   Use `powerPreflight` to guide sampling and budget decisions.
+   An underpowered result can guide exploration; it cannot certify an improvement.
+4. Keep final comparison cases separate from training and candidate selection.
+   Register shared source units when several scenarios come from the same source.
+   Additional repetitions do not create new independent units.
 
-1. **Refuse to optimize if CV(metric) > the target delta.** If the run-to-run noise is bigger than the effect you're paying to move, the metric *cannot* validate the change — raise reps or fix the metric first. Do not tune against noise.
-2. **Refuse to report a lift over INCOMPLETE or UNPAIRED evidence.** Every held-out scenario must have a non-errored cell on *both* the baseline and the candidate side. Below the paired-n floor (≥3), the run is **invalid**, not a verdict. A lift computed over survivors is worse than no number.
-   > **Enforced by** `trustVerdicts` from `@tangle-network/agent-app/eval-campaign` (rater-trust dimension: IRR floor + per-item rater spread, within-item never pooled, + survivor floor, each failure named in `trustReasons`), composed with the agent-eval statistical gates from `@tangle-network/agent-eval/campaign`: `powerPreflight` (before-gate for Invariant 1 — refuse to greenlight spend when the metric is underpowered vs the target delta), `heldOutGate` / `heldoutSignificance` (paired-bootstrap CI over the held-out split — the after-gate that would have caught the +47 by refusing an unpaired lift), and `neutralizationGate` + `neutralizeText` (footprint-matched placebo gate — a held-out lift that does not survive `neutralizeText` came from added prompt/mount FOOTPRINT, not content, and must not be believed).
-3. **Every metric ties to a product-value claim** — "if this number moves, *this* user-visible outcome moves with it." No claim → it's a proxy → don't optimize it.
-4. **Below the data threshold of real outcomes, refuse to optimize** — state N and say why. You cannot improve what you have not yet observed enough of.
+## Assess the result
 
-> Worked failures (this is why the skill exists):
-> - **Noise read as signal:** ~6 optimization rounds were burned chasing ±0.15 run-to-run swings as if they were real. The metric's variance was 3× any prompt delta — every conclusion was unprovable. The bug was the *measurement*, not the model.
-> - **A lift that was a lie:** a GEPA run reported `heldOutLift = +47`. Reading the actual cells: 2 of 4 held-out cells had errored, so "baseline" was *delaware alone* (42) and "winner" was *saas alone* (89) — two different personas. The +47 was differencing unlike cells. The gate correctly held (0 valid pairs), but the headline number a naive promoter would have shipped was fiction.
+1. Inspect raw baseline and candidate cells, judge failures, pairing, and the registered unit mapping.
+   Missing or asymmetric evidence must remain visible and must block a promotion claim.
+2. Use Eval's `heldOutGate` or `heldoutSignificance` for the shared promotion decision.
+   Report its deciding interval, independent-unit count, eligibility, and vetoes.
+   The bootstrap diagnostic may differ from the deciding interval for binary outcomes.
+3. Use App's `trustVerdicts` to check rater agreement and surviving-judge coverage when an ensemble is present.
+   Agreement alone does not establish accuracy against independent controls or authorize release.
+4. Investigate null or surprising results before assigning a cause.
+   A control intervention supports a causal explanation only when it isolates the proposed mechanism.
+5. Retain actual costs, failures, exclusions, and uncertainty with the result.
+   Apply the product's release policy to the deciding evidence and record what the evidence cannot establish.
 
-## Judgment (figure this out per metric)
+## Then consider
 
-- How many reps establish variance for *this* metric? (Noisy targets need 5+, converged-artifact metrics fewer.)
-- Is an observed "noisy" result model variance, or a measurement smell? **Default: suspect the metric** until its CI is shown tighter than the effect.
-- Where might this metric diverge from real value (the Goodhart risk specific to this product)?
-
-## Self-test
-
-- Report **mean ± 95% CI over K converged rollouts.** Show CI < target delta *before* greenlighting spend. If you can't, you haven't earned the right to optimize yet.
-- Confirm the held-out split is disjoint from training and large enough that the paired-n floor survives an errored cell.
-- **Verify against ground truth, never the summary.** Read the actual cells / artifacts, not the provenance headline. (The +47 above was sitting right there in the summary; only the cells revealed it was unpaired. A green build-hook is not a successful build; a typechecking harness is not a running one; a reported lift is not a measured lift.)
-
-## Evolves-by
-
-Track promotions that passed validation but regressed in production → that's a missed variance source or an unguarded dimension; strengthen the preflight. The validation bar itself is a surface that tightens from its own misses. See `skill-evolution`.
+| Condition | Skill |
+|---|---|
+| Scoring or case coverage cannot test the required outcome | `eval-architect` with the failed controls and missing coverage |
+| Measurement supports a scoped optimization experiment | `improve-conductor` with the baseline, registered comparison, and resource limits |

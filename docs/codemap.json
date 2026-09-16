@@ -5635,7 +5635,7 @@
           "name": "TrustThresholds",
           "kind": "interface",
           "signature": "interface TrustThresholds",
-          "doc": "Thresholds for {@link trustVerdicts}."
+          "doc": "Configurable agreement and coverage thresholds for {@link trustVerdicts}."
         },
         {
           "name": "TrustVerdict",
@@ -5647,7 +5647,7 @@
           "name": "trustVerdicts",
           "kind": "function",
           "signature": "<D extends string>(items: readonly TrustItem<D>[], thresholds?: TrustThresholds) => TrustVerdict",
-          "doc": "Decide whether an ensemble's per-item verdicts are trustworthy enough to believe a lift computed from them."
+          "doc": "Check an ensemble against its configured agreement and coverage thresholds."
         }
       ]
     },

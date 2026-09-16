@@ -329,7 +329,7 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
         { name: 'c', run: ${JSON.stringify(sleeper(400))} },
       ]`,
     })
-    const report = await runSignoff({ repoDir: repo, cacheDir: temp('signoff-cache-'), source: 'head' })
+    const report = await runSignoff({ repoDir: repo, cacheDir: temp('signoff-cache-'), source: 'head', maxParallel: 3 })
 
     expect(report.ok).toBe(true)
     expect(peakConcurrency(report.steps)).toBe(3)
