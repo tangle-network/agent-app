@@ -1,6 +1,6 @@
 /**
- * trustVerdicts is the after-gate: it decides whether an ensemble's scores are
- * believable. These tests pin the three checks and — most importantly — the
+ * trustVerdicts checks an ensemble's agreement and coverage thresholds.
+ * These tests pin the three checks and the
  * spread semantics: agreeing raters across genuinely DIFFERENT items must stay
  * trustworthy (no pooled spread), while raters splitting on ONE item must trip
  * check (2) and name that item.

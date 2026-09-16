@@ -20,4 +20,3 @@ allowBuilds:
 
 overrides:
   esbuild: 0.28.1
-  '@tangle-network/agent-interface': 2.6.0

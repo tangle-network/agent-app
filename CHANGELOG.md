@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- Update evaluator, execution, knowledge, and profile dependencies as one supported set.
+  Generated applications use the same dependency versions.
+- Forward evaluator revisions and paid-call context through ensemble judges.
+  Campaign caches invalidate when `judgeVersion` changes, and paid calls retain campaign cost tags.
+- Clarify that rater agreement does not establish evaluator accuracy or authorize promotion.
+
 ### Added
 
 - Export renderer-neutral `groupConversationMessages` from the existing `/web`

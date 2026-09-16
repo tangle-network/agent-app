@@ -149,12 +149,13 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('1.9.0', range!)).toBe(false)
     expect(satisfiesRange('2.1.1', range!)).toBe(false)
     expect(satisfiesRange('2.5.9', range!)).toBe(false)
-    expect(satisfiesRange('2.6.0', range!)).toBe(true)
+    expect(satisfiesRange('2.6.0', range!)).toBe(false)
+    expect(satisfiesRange('2.6.1', range!)).toBe(true)
     expect(satisfiesRange('2.6.9', range!)).toBe(true)
     expect(satisfiesRange('3.0.0', range!)).toBe(false)
   })
 
-  it('supports the verified Runtime lines without claiming the next one', async () => {
+  it('supports the verified Runtime line without claiming the next one', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -162,10 +163,10 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.222.0', range!)).toBe(false)
-    expect(satisfiesRange('0.222.1', range!)).toBe(true)
-    expect(satisfiesRange('0.222.9', range!)).toBe(true)
-    expect(satisfiesRange('0.223.0', range!)).toBe(false)
+    expect(satisfiesRange('0.228.9', range!)).toBe(false)
+    expect(satisfiesRange('0.229.0', range!)).toBe(true)
+    expect(satisfiesRange('0.229.9', range!)).toBe(true)
+    expect(satisfiesRange('0.230.0', range!)).toBe(false)
   })
 
   // The floors this shell PUBLISHES must be satisfiable by the tree it is
