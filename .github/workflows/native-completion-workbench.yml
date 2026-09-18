@@ -18,10 +18,16 @@ jobs:
         with:
           node-version: 24
       - run: pnpm install --frozen-lockfile --ignore-scripts=false
-      - name: Retain installed package toolchain
-        run: tar -czf "$RUNNER_TEMP/app-dependencies.tar.gz" node_modules
+      - name: Retain tracked source and installed package toolchain
+        run: |
+          git rev-parse HEAD > "$RUNNER_TEMP/source-revision.txt"
+          git archive --format=tar.gz HEAD > "$RUNNER_TEMP/app-source.tar.gz"
+          tar -czf "$RUNNER_TEMP/app-dependencies.tar.gz" node_modules
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-completion-dependencies-${{ github.sha }}
-          path: ${{ runner.temp }}/app-dependencies.tar.gz
+          name: native-completion-toolchain-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/source-revision.txt
+            ${{ runner.temp }}/app-source.tar.gz
+            ${{ runner.temp }}/app-dependencies.tar.gz
           retention-days: 1
