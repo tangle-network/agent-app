@@ -43,8 +43,8 @@ importers:
         specifier: 0.10.0
         version: 0.10.0
       '@tangle-network/agent-integrations':
-        specifier: 0.53.55
-        version: 0.53.55(@types/node@24.13.3)
+        specifier: 0.54.0
+        version: 0.54.0(@types/node@24.13.3)
       '@tangle-network/agent-interface':
         specifier: 2.6.1
         version: 2.6.1
@@ -2212,8 +2212,8 @@ packages:
     resolution: {integrity: sha512-hHTpIrSkRsuew3NxiOI6S5uOEKDyW9uXt6CSqqcllmSv6KGq/Y7Sz3QOPSGiWkvrmVNtJknvkl5eZyTyZQ4wvg==}
     engines: {node: '>=22.13.0'}
 
-  '@tangle-network/agent-integrations@0.53.55':
-    resolution: {integrity: sha512-UvNBTo3D2SUOaLeG7rpHyl23cAXItYJjr5uHuE2XogA2/D378Y0RJmtpRczmAEaBbVIsaQqxR9RaOjzkYz3BJw==}
+  '@tangle-network/agent-integrations@0.54.0':
+    resolution: {integrity: sha512-cqq/jSCbkn6ecv1Z3g9mFggY6lcz6tYbavyorro7M67IAHSDEeO1/xhdGP0EJ+7ohstqQFWo03xXAkGcpUnAdg==}
     engines: {node: '>=20'}
 
   '@tangle-network/agent-interface@2.6.0':
@@ -7044,7 +7044,7 @@ snapshots:
     dependencies:
       hono: 4.13.5
 
-  '@tangle-network/agent-integrations@0.53.55(@types/node@24.13.3)':
+  '@tangle-network/agent-integrations@0.54.0(@types/node@24.13.3)':
     dependencies:
       '@duckdb/node-api': 1.5.5-r.2
       amqplib: 2.0.1
