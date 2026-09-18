@@ -53,28 +53,13 @@ export interface DetachedTurnWorkflowTickOptions<
   TPayload extends DetachedTurnWorkflowIdentity,
   TSettled,
 > {
-  /** The Workflow event. Its payload must keep the same session and turn ids. */
   event: CloudflareWorkflowEventLike<TPayload>
-  /** Cloudflare's durable step runner. */
   step: CloudflareWorkflowStepLike
-  /**
-   * Run exactly one `driveSandboxTurn`/`box.driveTurn` pass.
-   *
-   * The callback runs inside one `step.do`. A transport failure is thrown from
-   * that step so Cloudflare retries the pass with the same deterministic ids.
-   */
-  drive: (
-    payload: TPayload,
-  ) => Promise<DetachedTurnDriveOutcome>
-  /**
-   * Read the completed Sandbox cache/session records and persist the product's
-   * deterministic assistant row. This callback MUST be idempotent because a
-   * Worker can stop after the write and before the Workflow step commits.
-   */
+  /** One SDK drive pass. Rejected results must not enter the Workflow cache. */
+  drive: (payload: TPayload) => Promise<DetachedTurnDriveOutcome>
+  /** Must be idempotent: the Worker can stop after the write but before commit. */
   settle: (payload: TPayload, result: DetachedTurnTerminalResult) => Promise<TSettled>
-  /** Delay between one-tick drive passes. */
   pollDelay?: CloudflareWorkflowSleepDuration
-  /** Stable prefix for the Workflow's drive and wait step names. */
   stepName?: string
 }
 
@@ -94,12 +79,19 @@ function isKnownDriveState(state: unknown): state is DetachedTurnDriveState {
     || state === 'awaiting_plan_decision'
 }
 
+function checkedDriveResult(value: TurnDriveResult): TurnDriveResult {
+  const state = (value as { state?: unknown } | null)?.state
+  if (!isKnownDriveState(state)) {
+    throw new Error(`detached turn drive returned unknown state: ${String(state)}`)
+  }
+  return value
+}
+
 /**
- * Drive one detached Sandbox turn from a Cloudflare Workflow.
- *
- * Each drive step makes one prompt admission/status pass and returns promptly.
- * A running pass sleeps durably before the next pass. The final settlement is
- * also a step, so replayed Workflow execution never holds a live stream open.
+ * Drive a detached SDK turn with durable steps, not an HTTP waitUntil lifetime.
+ * Stable step names let an evicted Workflow resume without repeating committed
+ * passes. Validation belongs inside step.do so a transient malformed response
+ * is retried rather than committed permanently as a poisoned checkpoint.
  */
 export async function runDetachedTurnWorkflowTick<
   TPayload extends DetachedTurnWorkflowIdentity,
@@ -107,30 +99,26 @@ export async function runDetachedTurnWorkflowTick<
 >(
   options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>,
 ): Promise<TSettled> {
-  const payload = options.event?.payload
-  assertIdentity(payload)
+  assertIdentity(options.event?.payload)
+  // Never allow a callback to change the admission identity for later passes.
+  const payload = Object.freeze({ ...options.event.payload }) as TPayload
   const name = options.stepName ?? 'detached-turn'
   const delay = options.pollDelay ?? '5 seconds'
-
   let attempt = 0
   let terminalResult: DetachedTurnTerminalResult
   while (true) {
-    const driveResult = await options.step.do(`${name}:drive:${attempt}`, async () => {
+    const driveResult = checkedDriveResult(await options.step.do(`${name}:drive:${attempt}`, async () => {
       const outcome = await options.drive(payload)
       if (!outcome.succeeded) throw outcome.error
-      return outcome.value
-    })
-    const state = (driveResult as { state?: unknown } | null)?.state
-    if (!isKnownDriveState(state)) {
-      throw new Error(`detached turn drive returned unknown state: ${String(state)}`)
-    }
-    if (state !== 'running') {
+      return checkedDriveResult(outcome.value)
+    }))
+    // Validate replayed values as well, including checkpoints from older code.
+    if (driveResult.state !== 'running') {
       terminalResult = driveResult as DetachedTurnTerminalResult
       break
     }
     await options.step.sleep(`${name}:wait:${attempt}`, delay)
     attempt += 1
   }
-
   return options.step.do(`${name}:settle`, () => options.settle(payload, terminalResult))
 }
