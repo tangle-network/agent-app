@@ -20,7 +20,7 @@ jobs:
           import { writeFileSync } from 'node:fs';
           const dependencies = ['@opentelemetry/exporter-trace-otlp-http','@opentelemetry/resources','@opentelemetry/sdk-trace-node','@tangle-network/agent-app','@tangle-network/agent-eval','@tangle-network/agent-integrations','@tangle-network/agent-interface','@tangle-network/agent-runtime','@tangle-network/hub-sdk','@tangle-network/sandbox','better-auth','drizzle-orm','viem'];
           const devDependencies = ['@cloudflare/workers-types','@types/node','typescript','wrangler','esbuild'];
-          const manifest = {name:'handoff-agent', version:'0.8.0', private:true, type:'module', dependencies:{}, devDependencies:{}};
+          const manifest = {name:'handoff-agent', version:'0.9.0', private:true, type:'module', dependencies:{}, devDependencies:{}};
           const evidence = {resolvedAt:new Date().toISOString(), packages:{}, selections:{}};
           const read = (...args) => JSON.parse(execFileSync('npm',['view', ...args, '--json'], {encoding:'utf8'}));
           const metadata = (name, tag = 'latest') => {
@@ -50,6 +50,13 @@ jobs:
           npm install --ignore-scripts --no-audit --no-fund > ../proof/install.log 2>&1 || { tail -80 ../proof/install.log; exit 1; }
           npm ls --all --json > ../proof/dependencies.json
           cp package.json package-lock.json ../proof/
+          node --input-type=module <<'JS'
+          import { writeFileSync } from 'node:fs';
+          const channels = await import('@tangle-network/agent-integrations/conversation-events');
+          const hub = await import('@tangle-network/hub-sdk');
+          const report = {channelExports:Object.keys(channels), channels:channels.listConversationChannels?.() ?? null, hubExports:Object.keys(hub)};
+          writeFileSync('../proof/messaging-exports.json',JSON.stringify(report,null,2));
+          JS
           tar -czf ../proof/installed-cohort.tar.gz package.json package-lock.json node_modules
           sha256sum ../proof/installed-cohort.tar.gz > ../proof/SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
