@@ -1,0 +1,448 @@
+diff --git a/docs/turn-observation.md b/docs/turn-observation.md
+index 224edd5..6517924 100644
+--- a/docs/turn-observation.md
++++ b/docs/turn-observation.md
+@@ -28,3 +28,22 @@ A buffer, cursor or `waitUntil` promise is not a durable job owner. Cloudflare H
+ The focused tests simulate successful-step replay and independently test read-side framing. They do not establish deployed Workflow behavior, sandbox survival, arbitrary-duration service limits, or a product's adoption of durable settlement. GTM's hosted recorder consumes the read-side helpers; GTM still needs a durable owner for its completion path before claiming browser-independent completion.
+ 
+ Reference: https://developers.cloudflare.com/workers/platform/limits/ and the existing `src/preset-cloudflare/detached-turn-workflow.ts`.
++
++## Exact completed-turn recovery
++
++Use `readCompletedSandboxTurn` for the keyed result and completed message of one
++session/turn. It never reads the session's latest aggregate result: that result
++can belong to a newer turn by the time the request arrives. A healthy absent
++read returns `null`; unavailable or inconsistent evidence without an exact
++record throws and must be retried as a read, not interpreted as permission to
++start another execution. Either independently exact record can still recover
++the turn when the other read is unavailable.
++
++`runDetachedTurn` preserves errors from status reads, completed-result reads,
++buffer resets and terminal status writes. Re-streaming an existing running
++buffer requires a successful `resetBuffer`. This is buffer integrity, not an
++execution dispatcher: the supplied source must still attach to the original
++execution. A completed buffer without either a retained result or its assistant
++row is not reported as an empty success. Cached recovery keeps usage already
++stored on that row when a newer exact receipt omits it; measured zero remains
++zero and unknown usage is not synthesized.
+diff --git a/src/chat-routes/completed-sandbox-turn.ts b/src/chat-routes/completed-sandbox-turn.ts
+index 4856618..66cb396 100644
+--- a/src/chat-routes/completed-sandbox-turn.ts
++++ b/src/chat-routes/completed-sandbox-turn.ts
+@@ -148,9 +148,9 @@ function hasUsage(usage: ChatTurnUsage): boolean {
+ }
+ 
+ /**
+- * Read the exact completed turn. The session-level result is consulted only
+- * when the matching completed assistant message is still the latest message;
+- * otherwise that result could belong to a newer turn on the same session.
++ * Read the exact completed turn from its keyed cache and completed message.
++ * Never borrow a session-wide aggregate from a concurrently advancing session.
++ * Observation failure is retryable and distinct from successful absent reads.
+  */
+ export async function readCompletedSandboxTurn(
+   box: CompletedSandboxTurnSource,
+@@ -205,24 +205,22 @@ export async function readCompletedSandboxTurn(
+     })
+   }
+ 
+-  if (!cached && !message) return null
+-
+-  let result = cached ? asRecord(cached.result) : undefined
+-  const latestConversationMessage = messages
+-    .filter((candidate) => candidate.role === 'user' || candidate.role === 'assistant')
+-    .at(-1)
+-  if (!result && message && latestConversationMessage === message) {
+-    try {
+-      result = asRecord(await session.result())
+-    } catch (error) {
+-      log?.('[chat-routes] completed Sandbox session result lookup failed', {
+-        turnId,
+-        sessionId,
+-        error: String(error),
+-      })
++  if (!cached && !message) {
++    // A failed read is unknown, not proof that the turn is absent. The durable
++    // owner must retry observation rather than admit another execution.
++    if (cacheOutcome.status === 'rejected' || messagesOutcome.status === 'rejected') {
++      throw new Error('Completed Sandbox turn could not be verified; retry the exact read')
+     }
++    if (rawCached || matchingCount > 1) {
++      throw new Error('Completed Sandbox turn identity is inconsistent; reconciliation is required')
++    }
++    return null
+   }
+ 
++  // Only turn-addressed evidence is safe. A newer turn can complete between
++  // reading the message list and reading a session-wide aggregate result.
++  const result = cached ? asRecord(cached.result) : undefined
++
+   const recovered = message ? normalizedMessageParts(message) : null
+   const text = textFromResult(result) ?? recovered?.derivedText
+   const resultUsage = usageFromResult(result)
+diff --git a/src/chat-routes/detached-turn.ts b/src/chat-routes/detached-turn.ts
+index c216b02..dd703a2 100644
+--- a/src/chat-routes/detached-turn.ts
++++ b/src/chat-routes/detached-turn.ts
+@@ -130,8 +130,8 @@ export interface DetachedTurnOptions {
+    *  A crash mid-run leaves buffered rows at seqs 1..N with status `running`;
+    *  re-streaming restarts the tap's seq at 0 and would duplicate/interleave
+    *  rows. Wire this (delete `turnId`'s buffered events) so a retry is clean.
+-   *  Unset, a re-stream over a `running` buffer is still attempted but logged
+-   *  as a possible-duplication hazard. */
++   *  A re-stream over an existing `running` buffer requires this operation to
++   *  succeed. Missing or failed reset leaves the existing stream untouched. */
+   resetBuffer?: (turnId: string) => Promise<void>
+   /** Own the durable assistant row for this turn instead of returning the body
+    *  for the caller to insert — and keep it in step with the stream.
+@@ -221,6 +221,19 @@ function cachedResultFrom(
+   final: DetachedTurnFinal | null,
+   persisted?: DraftStoredMessage,
+ ): DetachedTurnResult {
++  if (!final && !persisted) {
++    throw new Error('Completed turn has no retained result or assistant row; retry exact recovery')
++  }
++  // A text-only recovery must not erase usage already stored for this turn.
++  // Unknown values stay absent; an explicit measured zero is preserved.
++  const usage: ChatTurnUsage = {}
++  for (const key of [
++    'inputTokens', 'outputTokens', 'reasoningTokens',
++    'cacheReadTokens', 'cacheWriteTokens', 'costUsd',
++  ] as const) {
++    const value = final?.usage?.[key] ?? persisted?.[key]
++    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) usage[key] = value
++  }
+   return {
+     state: 'completed',
+     text: final?.text ?? persisted?.content ?? '',
+@@ -228,7 +241,7 @@ function cachedResultFrom(
+       final?.parts ??
+       (persisted?.parts as DetachedTurnParts | null | undefined) ??
+       [],
+-    usage: final?.usage ?? {},
++    usage,
+     cached: true,
+   }
+ }
+@@ -368,22 +381,11 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
+ 
+   const completed = async (): Promise<DetachedTurnFinal | null> => {
+     if (!opts.completedResult) return null
+-    try {
+-      return (await opts.completedResult()) ?? null
+-    } catch (err) {
+-      opts.log?.('[chat-routes] runDetachedTurn completedResult lookup failed', { turnId, err: String(err) })
+-      return null
+-    }
++    // An unavailable authoritative read must not become a fresh stream.
++    return (await opts.completedResult()) ?? null
+   }
+ 
+-  let prior: string | null = null
+-  try {
+-    prior = await store.getStatus(turnId)
+-  } catch (err) {
+-    // A transient store blip must NOT silently fall through to a full re-stream
+-    // (which would duplicate a completed turn's buffer) — surface it.
+-    opts.log?.('[chat-routes] runDetachedTurn getStatus failed; treating as no prior', { turnId, err: String(err) })
+-  }
++  const prior = await store.getStatus(turnId)
+ 
+   if (prior === 'complete') {
+     const persisted = await persistedRow()
+@@ -400,21 +402,16 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
+     // completed, settle the stuck `running` buffer and return it.
+     const final = await completed()
+     if (final) {
+-      await store.setStatus(turnId, 'complete', scopeId).catch((err) => {
+-        opts.log?.('[chat-routes] runDetachedTurn failed to settle a completed running turn', { turnId, err: String(err) })
+-      })
++      await store.setStatus(turnId, 'complete', scopeId)
+       const persisted = await persistedRow()
+       return await settleRow(cachedResultFrom(final, persisted), persisted)
+     }
+     // Genuine re-run: clear the partial buffer first, or the fresh tap's seq
+     // (restarting at 0) interleaves with the orphaned rows.
+-    if (opts.resetBuffer) {
+-      await opts.resetBuffer(turnId).catch((err) => {
+-        opts.log?.('[chat-routes] runDetachedTurn resetBuffer failed; re-stream may duplicate rows', { turnId, err: String(err) })
+-      })
+-    } else {
+-      opts.log?.('[chat-routes] runDetachedTurn re-streaming over a running buffer without resetBuffer; rows may duplicate', { turnId })
++    if (!opts.resetBuffer) {
++      throw new Error('Detached turn recovery requires resetBuffer before replaying an existing stream')
+     }
++    await opts.resetBuffer(turnId)
+   }
+ 
+   const tap = createBufferedTurnTap({
+diff --git a/src/chat-routes/draft-persistence.ts b/src/chat-routes/draft-persistence.ts
+index ff16cfe..44ee240 100644
+--- a/src/chat-routes/draft-persistence.ts
++++ b/src/chat-routes/draft-persistence.ts
+@@ -42,7 +42,7 @@ import { toChatMessageParts, type ChatMessagePart } from '../chat-store/parts'
+ import type { ChatTurnUsage } from './turn-routes'
+ 
+ /** Message row shape the writer reads back when re-entering a turn. */
+-export interface DraftStoredMessage {
++export interface DraftStoredMessage extends Pick<AssistantRowValues, keyof ChatTurnUsage> {
+   id: string
+   role: 'user' | 'assistant' | 'system' | 'tool'
+   content: string
+diff --git a/src/preset-cloudflare/detached-turn-workflow.test.ts b/src/preset-cloudflare/detached-turn-workflow.test.ts
+index a1acd91..c88dbc6 100644
+--- a/src/preset-cloudflare/detached-turn-workflow.test.ts
++++ b/src/preset-cloudflare/detached-turn-workflow.test.ts
+@@ -38,12 +38,16 @@ describe('runDetachedTurnWorkflowTick', () => {
+       { succeeded: true, value: { state: 'completed', text: 'done', result: {} } },
+     ]
+     const drive = vi.fn(async (received: typeof payload) => {
+-      expect(received).toBe(payload)
++      expect(received).toStrictEqual(payload)
++      expect(received).not.toBe(payload)
++      expect(Object.isFrozen(received)).toBe(true)
+       return states.shift()!
+     })
+     const settled = { persisted: true }
+     const settle = vi.fn(async (received: typeof payload, result: DetachedTurnTerminalResult) => {
+-      expect(received).toBe(payload)
++      expect(received).toStrictEqual(payload)
++      expect(received).not.toBe(payload)
++      expect(Object.isFrozen(received)).toBe(true)
+       expect(result).toEqual({ state: 'completed', text: 'done', result: {} })
+       return settled
+     })
+diff --git a/tests/chat-routes/completed-sandbox-turn.test.ts b/tests/chat-routes/completed-sandbox-turn.test.ts
+index 5573ed6..ab7183e 100644
+--- a/tests/chat-routes/completed-sandbox-turn.test.ts
++++ b/tests/chat-routes/completed-sandbox-turn.test.ts
+@@ -210,7 +210,7 @@ describe('readCompletedSandboxTurn', () => {
+     await expect(readCompletedSandboxTurn(box, {
+       turnId: 'turn-1',
+       sessionId: 'session-1',
+-    })).resolves.toBeNull()
++    })).rejects.toThrow('Completed Sandbox turn identity is inconsistent')
+   })
+ 
+   it('fails closed instead of guessing between duplicate completed messages', async () => {
+@@ -229,7 +229,7 @@ describe('readCompletedSandboxTurn', () => {
+     await expect(readCompletedSandboxTurn(box, {
+       turnId: 'turn-1',
+       sessionId: 'session-1',
+-    })).resolves.toBeNull()
++    })).rejects.toThrow('Completed Sandbox turn identity is inconsistent')
+   })
+ 
+   it('recovers from the exact session message when the short-lived cache is unavailable', async () => {
+diff --git a/tests/chat-routes/exact-recovery-failures.test.ts b/tests/chat-routes/exact-recovery-failures.test.ts
+new file mode 100644
+index 0000000..f11f83c
+--- /dev/null
++++ b/tests/chat-routes/exact-recovery-failures.test.ts
+@@ -0,0 +1,206 @@
++import { describe, expect, it, vi } from 'vitest'
++import {
++  readCompletedSandboxTurn,
++  runDetachedTurn,
++  type CompletedSandboxTurnSource,
++} from '../../src/chat-routes/index'
++import { createMemoryTurnEventStore } from '../../src/stream/index'
++
++const identity = { turnId: 'turn', sessionId: 'session' }
++function recoverySource(input: { cache?: unknown; messages?: unknown[]; cacheError?: boolean; messagesError?: boolean } = {}) {
++  const aggregate = vi.fn(async () => ({ response: 'A newer turn finished', usage: { inputTokens: 99_999 } }))
++  const box = {
++    findCompletedTurn: vi.fn(async () => {
++      if (input.cacheError) throw new Error('cache unavailable')
++      return input.cache ?? null
++    }),
++    session: vi.fn(() => ({
++      messages: vi.fn(async () => {
++        if (input.messagesError) throw new Error('messages unavailable')
++        return input.messages ?? []
++      }),
++      result: aggregate,
++    })),
++  } as unknown as CompletedSandboxTurnSource
++  return { box, aggregate }
++}
++const completedMessage = () => ({
++  id: 'assistant', role: 'assistant', timestamp: '2030-01-01T00:00:00Z',
++  metadata: { turnId: 'turn', completed: true },
++  parts: [{ type: 'text', id: 'text', text: 'The original answer' }],
++})
++
++describe('exact completed-turn recovery', () => {
++  it.each([{ cacheError: true }, { messagesError: true }, { cacheError: true, messagesError: true }])(
++    'does not treat unavailable evidence as absence: %j', async input => {
++      await expect(readCompletedSandboxTurn(recoverySource(input).box, identity)).rejects.toThrow('could not be verified')
++    },
++  )
++  it('does not read a session aggregate that may have advanced after the message read', async () => {
++    const source = recoverySource({ messages: [completedMessage()] })
++    const result = await readCompletedSandboxTurn(source.box, identity)
++    expect(result?.text).toBe('The original answer')
++    expect(result?.usage).toBeUndefined()
++    expect(source.aggregate).not.toHaveBeenCalled()
++  })
++  it('retains message-specific usage while the cache is unavailable', async () => {
++    const message = completedMessage()
++    const source = recoverySource({ cacheError: true, messages: [{ ...message, parts: [
++      ...message.parts, { type: 'step-finish', tokens: { input: 7, output: 2 }, cost: 0.01 },
++    ] }] })
++    await expect(readCompletedSandboxTurn(source.box, identity)).resolves.toMatchObject({
++      text: 'The original answer', usage: { inputTokens: 7, outputTokens: 2, costUsd: 0.01 },
++    })
++    expect(source.aggregate).not.toHaveBeenCalled()
++  })
++  it('recovers an independently keyed cache when session reads fail', async () => {
++    const source = recoverySource({ messagesError: true, cache: {
++      ...identity, completedAt: '2030-01-01T00:00:00Z', result: { response: 'Keyed result', usage: { inputTokens: 8 } },
++    } })
++    await expect(readCompletedSandboxTurn(source.box, identity)).resolves.toMatchObject({ text: 'Keyed result' })
++  })
++  it('healthy absent reads remain a non-completed result', async () => {
++    await expect(readCompletedSandboxTurn(recoverySource().box, identity)).resolves.toBeNull()
++  })
++})
++
++function forbiddenEvents() {
++  const opened = vi.fn()
++  const events = (async function* () {
++    opened()
++    yield { type: 'result', data: { finalText: 'Unexpected replay' } }
++  })()
++  return { opened, events }
++}
++
++describe('detached recovery admission guards', () => {
++  it('refuses to consume a source when its retained status is unavailable', async () => {
++    const store = createMemoryTurnEventStore()
++    vi.spyOn(store, 'getStatus').mockRejectedValue(new Error('status unavailable'))
++    const source = forbiddenEvents()
++    await expect(runDetachedTurn({ store, turnId: 'turn', scopeId: 'thread', events: source.events }))
++      .rejects.toThrow('status unavailable')
++    expect(source.opened).not.toHaveBeenCalled()
++  })
++
++  it.each(['running', 'complete'] as const)('does not reopen %s when its exact result cannot be read', async status => {
++    const store = createMemoryTurnEventStore()
++    await store.setStatus('turn', status, 'thread')
++    const source = forbiddenEvents()
++    const resetBuffer = vi.fn(async () => undefined)
++    await expect(runDetachedTurn({
++      store, turnId: 'turn', scopeId: 'thread', events: source.events, resetBuffer,
++      completedResult: async () => { throw new Error('completion unavailable') },
++    })).rejects.toThrow('completion unavailable')
++    expect(source.opened).not.toHaveBeenCalled()
++    expect(resetBuffer).not.toHaveBeenCalled()
++    expect(await store.getStatus('turn')).toBe(status)
++  })
++
++  it.each([false, true])('refuses an absent/failed reset before replay: failure=%s', async failReset => {
++    const store = createMemoryTurnEventStore()
++    await store.setStatus('turn', 'running', 'thread')
++    const retained = [{ seq: 7, event: '{"type":"text","text":"Retained"}' }]
++    await store.append('turn', retained)
++    const source = forbiddenEvents()
++    await expect(runDetachedTurn({
++      store, turnId: 'turn', scopeId: 'thread', events: source.events,
++      completedResult: async () => null,
++      ...(failReset ? { resetBuffer: async () => { throw new Error('reset unavailable') } } : {}),
++    })).rejects.toThrow(failReset ? 'reset unavailable' : 'requires resetBuffer')
++    expect(source.opened).not.toHaveBeenCalled()
++    expect(await store.read('turn', 0)).toEqual(retained)
++  })
++
++  it('returns the exact completed result without another stream or buffer reset', async () => {
++    const store = createMemoryTurnEventStore()
++    await store.setStatus('turn', 'running', 'thread')
++    const source = forbiddenEvents()
++    const resetBuffer = vi.fn(async () => undefined)
++    await expect(runDetachedTurn({
++      store, turnId: 'turn', scopeId: 'thread', events: source.events, resetBuffer,
++      completedResult: async () => ({ text: 'Retained result', usage: { inputTokens: 8 } }),
++    })).resolves.toMatchObject({ state: 'completed', cached: true, text: 'Retained result' })
++    expect(source.opened).not.toHaveBeenCalled()
++    expect(resetBuffer).not.toHaveBeenCalled()
++    expect(await store.getStatus('turn')).toBe('complete')
++  })
++
++  it('does not acknowledge a failed terminal-status write as successful settlement', async () => {
++    const store = createMemoryTurnEventStore()
++    await store.setStatus('turn', 'running', 'thread')
++    vi.spyOn(store, 'setStatus').mockRejectedValueOnce(new Error('status write unavailable'))
++    const source = forbiddenEvents()
++    await expect(runDetachedTurn({
++      store, turnId: 'turn', scopeId: 'thread', events: source.events,
++      completedResult: async () => ({ text: 'Remote completion' }),
++    })).rejects.toThrow('status write unavailable')
++    expect(source.opened).not.toHaveBeenCalled()
++    expect(await store.getStatus('turn')).toBe('running')
++  })
++
++  it('the shared completion reader propagates uncertainty through the detached wrapper', async () => {
++    const store = createMemoryTurnEventStore()
++    await store.setStatus('turn', 'running', 'thread')
++    const source = forbiddenEvents()
++    const remote = recoverySource({ cacheError: true, messagesError: true })
++    const resetBuffer = vi.fn(async () => undefined)
++    await expect(runDetachedTurn({
++      store, turnId: 'turn', scopeId: 'thread', events: source.events, resetBuffer,
++      completedResult: () => readCompletedSandboxTurn(remote.box, identity),
++    })).rejects.toThrow('could not be verified')
++    expect(source.opened).not.toHaveBeenCalled()
++    expect(resetBuffer).not.toHaveBeenCalled()
++  })
++})
++
++
++describe('cached completion evidence', () => {
++  it('does not fabricate an empty success when both retained result and row are missing', async () => {
++    const store = createMemoryTurnEventStore()
++    await store.setStatus('turn', 'complete', 'thread')
++    const source = forbiddenEvents()
++    await expect(runDetachedTurn({
++      store, turnId: 'turn', scopeId: 'thread', events: source.events,
++      completedResult: async () => null,
++    })).rejects.toThrow('no retained result or assistant row')
++    expect(source.opened).not.toHaveBeenCalled()
++  })
++
++  it.each([undefined, { inputTokens: 0, costUsd: 0 }])(
++    'keeps exact persisted usage unless the completed receipt supplies a measurement: %j', async override => {
++      const store = createMemoryTurnEventStore()
++      await store.setStatus('turn', 'complete', 'thread')
++      const source = forbiddenEvents()
++      const row = {
++        id: 'assistant:turn', role: 'assistant' as const, content: 'Persisted answer',
++        inputTokens: 11, outputTokens: 4, reasoningTokens: 2,
++        cacheReadTokens: 3, cacheWriteTokens: 1, costUsd: 0.12,
++      }
++      const updateMessage = vi.fn(async () => row)
++      const result = await runDetachedTurn({
++        store, turnId: 'turn', scopeId: 'thread', events: source.events,
++        completedResult: async () => ({ text: 'Persisted answer', usage: override }),
++        persist: { threadId: 'thread', store: {
++          listMessages: async () => [row], appendMessage: vi.fn(async () => row), updateMessage,
++        } },
++      })
++      const usage = { inputTokens: 11, outputTokens: 4, reasoningTokens: 2,
++        cacheReadTokens: 3, cacheWriteTokens: 1, costUsd: 0.12, ...override }
++      expect(result).toMatchObject({ cached: true, usage })
++      expect(updateMessage).toHaveBeenCalledWith('assistant:turn', expect.objectContaining(usage))
++      expect(source.opened).not.toHaveBeenCalled()
++    },
++  )
++
++  it('keeps absent usage unknown rather than manufacturing a zero receipt', async () => {
++    const store = createMemoryTurnEventStore()
++    await store.setStatus('turn', 'complete', 'thread')
++    const source = forbiddenEvents()
++    const result = await runDetachedTurn({ store, turnId: 'turn', scopeId: 'thread', events: source.events,
++      completedResult: async () => ({ text: 'Completed without reported usage' }),
++    })
++    expect(result.usage).toEqual({})
++    expect(source.opened).not.toHaveBeenCalled()
++  })
++})
