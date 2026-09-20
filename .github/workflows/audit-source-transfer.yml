@@ -14,22 +14,50 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
       - name: Select the exact reviewed source without this workflow
-        run: git checkout --detach f16426d62e081394fbb247efede09e45be59d170
+        run: |
+          git checkout --detach f16426d62e081394fbb247efede09e45be59d170
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tests/test-quality.test.ts')
+          s = p.read_text()
+          old = r'  /\bassert[A-Za-z]*\s*\(/, // assert(...) and assertSomething(...) — throwing helpers'
+          assert s.count(old) == 1
+          s = s.replace(old, old + '\n' + r'  /\bassert\.(?:ok|equal|strictEqual|deepEqual|deepStrictEqual|notEqual|notStrictEqual|notDeepEqual|notDeepStrictEqual|throws|doesNotThrow|match|doesNotMatch|ifError|fail)\s*\(/, // node:assert methods throw on a failed assertion')
+          needle = "  it('no test body is assertion-free', () => {"
+          addition = """  it.each(['equal', 'deepEqual', 'ok', 'throws', 'match'])('recognizes callable node:assert.%s assertions', (method) => {
+              const body = `{ assert.${method}(actual, expected) }`
+              expect(ASSERTION_SIGNALS.some(signal => signal.test(body))).toBe(true)
+            })
+
+            it.each(['{ assert.equal }', '{ assert.unrecognized(actual) }'])('does not count an assertion reference or unknown method: %s', (body) => {
+              expect(ASSERTION_SIGNALS.some(signal => signal.test(body))).toBe(false)
+            })
+
+          """
+          # Normalize only the indentation introduced by this Python literal.
+          addition = addition.splitlines(keepends=True)
+          addition = ''.join([addition[0], *[line[2:] if line.startswith('  ') else line for line in addition[1:]]])
+          assert s.count(needle) == 1
+          s = s.replace(needle, addition + needle)
+          p.write_text(s)
+          import hashlib
+          assert hashlib.sha256(p.read_bytes()).hexdigest() == 'cb83ca5a2e3845e395b29708da450b2e6787153e43ab3d6a1e27b3f2b289271e'
+          PY
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 24
       - run: pnpm install --frozen-lockfile
-      - name: Regenerate existing API references and verify source
+      - name: Regenerate existing references and verify package source
         run: |
           set -o pipefail
           pnpm docs:gen |& tee "$RUNNER_TEMP/docs.log"
-          git add docs
+          git add docs tests/test-quality.test.ts
           pnpm typecheck |& tee "$RUNNER_TEMP/typecheck.log"
-          pnpm exec vitest run tests/chat-routes src/preset-cloudflare/detached-turn-workflow.test.ts tests/preset-cloudflare/detached-turn-workflow-recovery.test.ts --maxWorkers=2 |& tee "$RUNNER_TEMP/tests.log"
+          pnpm test -- --maxWorkers=2 |& tee "$RUNNER_TEMP/tests.log"
           pnpm docs:gen
           git diff --exit-code
-      - name: Retain only the verified generated documentation tree
+      - name: Retain the verified source tree
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
@@ -37,14 +65,15 @@ jobs:
             const crypto = require('node:crypto'); const assert = require('node:assert/strict');
             const { execFileSync } = require('node:child_process');
             const expected = {
-              'docs/CODEMAP.md': '725506e47638b7832a457cbfb6336888d72123eb37fa5c53d32d81f61ccb9d1d',
+              'docs/CODEMAP.md': 'a6ad0da1514a57312617fc2d174889687fa007888ce653d890758f95cdcb26d0',
               'docs/api/chat-routes.md': 'b2e3e7c6b12f716f838c328e05d471de566fd4ce1fbf0dffe58be32b9b56a557',
               'docs/api/preset-cloudflare.md': 'b5472ad2b68de72b7d23b9df69831333508a794ffcd9bcf5c28dfd2a62889d8a',
               'docs/api/stream.md': 'd9f994168d9ed4a0fff4e4c8cd3fcfd9d5b064a86c83f5a52ef78c362fc8bc6c',
               'docs/api/web.md': 'fc4f6914252e2aa859c6914366c082fa857aed709e23316edd8980d0fc1656e9',
-              'docs/codemap.json': '624dc207ae0728383ed00919c0e17123c02f2f10aeffe20a66a53e0948f66858',
-              'docs/llms-full.txt': 'f4e8d5d10faa6d72ed575d1abc0889446e142372ffef4a3a6ac2fad1e54aba84',
-              'docs/llms.txt': '5d6a5cf3ef7ae42d4f2ef447e979a0f07d21ca99a3d67193ed488b0d3940b78a',
+              'docs/codemap.json': '9fc84499a9ca907bbecbd9a1d01cfdddda15a86a96a843702aa7bfa064d94d44',
+              'docs/llms-full.txt': '8eadb1026cb0dd38c0b3ae1019f7499588c1df1213c3130aa6dd5c0df9246b8d',
+              'docs/llms.txt': '0a9eb742882b790bc896e93eb8775f3d7ec2c769d170565fa2b907eb7c645680',
+              'tests/test-quality.test.ts': 'cb83ca5a2e3845e395b29708da450b2e6787153e43ab3d6a1e27b3f2b289271e',
             };
             const parent = 'f16426d62e081394fbb247efede09e45be59d170';
             const { owner, repo } = context.repo;
