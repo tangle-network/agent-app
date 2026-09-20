@@ -42,7 +42,7 @@ import { toChatMessageParts, type ChatMessagePart } from '../chat-store/parts'
 import type { ChatTurnUsage } from './turn-routes'
 
 /** Message row shape the writer reads back when re-entering a turn. */
-export interface DraftStoredMessage {
+export interface DraftStoredMessage extends Pick<AssistantRowValues, keyof ChatTurnUsage> {
   id: string
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string

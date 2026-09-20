@@ -148,9 +148,9 @@ function hasUsage(usage: ChatTurnUsage): boolean {
 }
 
 /**
- * Read the exact completed turn. The session-level result is consulted only
- * when the matching completed assistant message is still the latest message;
- * otherwise that result could belong to a newer turn on the same session.
+ * Read the exact completed turn from its keyed cache and completed message.
+ * Never borrow a session-wide aggregate from a concurrently advancing session.
+ * Observation failure is retryable and distinct from successful absent reads.
  */
 export async function readCompletedSandboxTurn(
   box: CompletedSandboxTurnSource,
@@ -205,23 +205,21 @@ export async function readCompletedSandboxTurn(
     })
   }
 
-  if (!cached && !message) return null
-
-  let result = cached ? asRecord(cached.result) : undefined
-  const latestConversationMessage = messages
-    .filter((candidate) => candidate.role === 'user' || candidate.role === 'assistant')
-    .at(-1)
-  if (!result && message && latestConversationMessage === message) {
-    try {
-      result = asRecord(await session.result())
-    } catch (error) {
-      log?.('[chat-routes] completed Sandbox session result lookup failed', {
-        turnId,
-        sessionId,
-        error: String(error),
-      })
+  if (!cached && !message) {
+    // A failed read is unknown, not proof that the turn is absent. The durable
+    // owner must retry observation rather than admit another execution.
+    if (cacheOutcome.status === 'rejected' || messagesOutcome.status === 'rejected') {
+      throw new Error('Completed Sandbox turn could not be verified; retry the exact read')
     }
+    if (rawCached || matchingCount > 1) {
+      throw new Error('Completed Sandbox turn identity is inconsistent; reconciliation is required')
+    }
+    return null
   }
+
+  // Only turn-addressed evidence is safe. A newer turn can complete between
+  // reading the message list and reading a session-wide aggregate result.
+  const result = cached ? asRecord(cached.result) : undefined
 
   const recovered = message ? normalizedMessageParts(message) : null
   const text = textFromResult(result) ?? recovered?.derivedText

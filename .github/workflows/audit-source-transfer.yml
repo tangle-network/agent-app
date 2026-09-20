@@ -1,4 +1,4 @@
-name: Verify isolated recovery source
+name: Verify generated recovery documentation
 on:
   push:
     branches: [audit-transfer/recovery-contract-20260918]
@@ -13,64 +13,63 @@ jobs:
         with:
           fetch-depth: 2
           persist-credentials: false
-      - name: Restore the exact candidate on its upstream parent
-        run: |
-          cp .audit-transfer/manifest.json "$RUNNER_TEMP/manifest.json"
-          cp .audit-transfer/source.patch "$RUNNER_TEMP/source.patch"
-          python3 - <<'PY'
-          import hashlib,json,os,pathlib,subprocess
-          root=pathlib.Path(os.environ['RUNNER_TEMP'])
-          manifest=json.loads((root/'manifest.json').read_text())
-          assert hashlib.sha256((root/'source.patch').read_bytes()).hexdigest()==manifest['patchSha256']
-          subprocess.run(['git','checkout','--detach',manifest['base']],check=True)
-          subprocess.run(['git','apply','--check',str(root/'source.patch')],check=True)
-          subprocess.run(['git','apply','--index',str(root/'source.patch')],check=True)
-          subprocess.run(['git','rm',manifest['deleted']],check=True)
-          PY
+      - name: Select the exact reviewed source without this workflow
+        run: git checkout --detach f16426d62e081394fbb247efede09e45be59d170
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 24
       - run: pnpm install --frozen-lockfile
-      - name: Verify existing and new recovery contracts
+      - name: Regenerate existing API references and verify source
         run: |
           set -o pipefail
-          pnpm exec vitest run tests/chat-routes src/preset-cloudflare/detached-turn-workflow.test.ts tests/preset-cloudflare/detached-turn-workflow-recovery.test.ts --maxWorkers=2 |& tee "$RUNNER_TEMP/tests.log"
+          pnpm docs:gen |& tee "$RUNNER_TEMP/docs.log"
+          git add docs
           pnpm typecheck |& tee "$RUNNER_TEMP/typecheck.log"
-          git diff --exit-code -- src tests docs package.json pnpm-lock.yaml
-      - name: Store verified source tree without changing a branch
+          pnpm exec vitest run tests/chat-routes src/preset-cloudflare/detached-turn-workflow.test.ts tests/preset-cloudflare/detached-turn-workflow-recovery.test.ts --maxWorkers=2 |& tee "$RUNNER_TEMP/tests.log"
+          pnpm docs:gen
+          git diff --exit-code
+      - name: Retain only the verified generated documentation tree
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
-            const fs = require('node:fs'); const path = require('node:path'); const crypto = require('node:crypto');
-            const { execFileSync } = require('node:child_process'); const assert = require('node:assert/strict');
-            const manifest = JSON.parse(fs.readFileSync(path.join(process.env.RUNNER_TEMP, 'manifest.json'), 'utf8'));
+            const fs = require('node:fs'); const path = require('node:path');
+            const crypto = require('node:crypto'); const assert = require('node:assert/strict');
+            const { execFileSync } = require('node:child_process');
+            const expected = {
+              'docs/CODEMAP.md': '725506e47638b7832a457cbfb6336888d72123eb37fa5c53d32d81f61ccb9d1d',
+              'docs/api/chat-routes.md': 'b2e3e7c6b12f716f838c328e05d471de566fd4ce1fbf0dffe58be32b9b56a557',
+              'docs/api/preset-cloudflare.md': 'b5472ad2b68de72b7d23b9df69831333508a794ffcd9bcf5c28dfd2a62889d8a',
+              'docs/api/stream.md': 'd9f994168d9ed4a0fff4e4c8cd3fcfd9d5b064a86c83f5a52ef78c362fc8bc6c',
+              'docs/api/web.md': 'fc4f6914252e2aa859c6914366c082fa857aed709e23316edd8980d0fc1656e9',
+              'docs/codemap.json': '624dc207ae0728383ed00919c0e17123c02f2f10aeffe20a66a53e0948f66858',
+              'docs/llms-full.txt': 'f4e8d5d10faa6d72ed575d1abc0889446e142372ffef4a3a6ac2fad1e54aba84',
+              'docs/llms.txt': '5d6a5cf3ef7ae42d4f2ef447e979a0f07d21ca99a3d67193ed488b0d3940b78a',
+            };
+            const parent = 'f16426d62e081394fbb247efede09e45be59d170';
             const { owner, repo } = context.repo;
-            const current = await github.rest.git.getRef({ owner, repo, ref: 'heads/main' });
-            assert.equal(current.data.object.sha, manifest.base, 'Upstream changed; reconcile before publication');
-            const actual = execFileSync('git', ['diff', '--cached', '--name-only'], {encoding:'utf8'}).trim().split('\n').sort();
-            assert.deepEqual(actual, [...Object.keys(manifest.files), manifest.deleted].sort());
-            const tree = [];
-            for (const [file, digest] of Object.entries(manifest.files)) {
-              assert.match(file, /^(src|tests|docs)\//); assert.ok(!file.split('/').includes('..'));
+            const actual = execFileSync('git', ['diff','--cached','--name-only'], {encoding:'utf8'}).trim().split('\n').sort();
+            assert.deepEqual(actual, Object.keys(expected).sort());
+            const current = await github.rest.git.getRef({owner,repo,ref:'heads/fix/exact-recovery-contract'});
+            assert.equal(current.data.object.sha,parent,'Reviewed branch changed');
+            const entries = [];
+            for (const [file,digest] of Object.entries(expected)) {
               const content = fs.readFileSync(file);
-              assert.equal(crypto.createHash('sha256').update(content).digest('hex'), digest, `Changed candidate: ${file}`);
-              const blob = await github.rest.git.createBlob({owner, repo, content: content.toString('base64'), encoding:'base64'});
-              tree.push({path:file, mode:'100644', type:'blob', sha:blob.data.sha});
+              assert.equal(crypto.createHash('sha256').update(content).digest('hex'),digest,file);
+              const blob = await github.rest.git.createBlob({owner,repo,content:content.toString('base64'),encoding:'base64'});
+              entries.push({path:file,mode:'100644',type:'blob',sha:blob.data.sha});
             }
-            tree.push({path:manifest.deleted, mode:'100644', type:'blob', sha:null});
-            const created = await github.rest.git.createTree({owner, repo, base_tree:manifest.tree, tree});
-            assert.equal(created.data.sha, execFileSync('git', ['write-tree'], {encoding:'utf8'}).trim());
-            const receipt = {repository:`${owner}/${repo}`, parent:manifest.base, tree:created.data.sha, files:manifest.files, deleted:manifest.deleted, verification:'frozen install; chat-routes and Workflow tests; full source typecheck', runId:context.runId};
-            fs.writeFileSync(path.join(process.env.RUNNER_TEMP,'verified-tree.json'), JSON.stringify(receipt,null,2));
-            console.log(JSON.stringify(receipt));
+            const created = await github.rest.git.createTree({owner,repo,base_tree:'ecd277731952cc918f32fdb1181efa38362e5879',tree:entries});
+            assert.equal(created.data.sha,execFileSync('git',['write-tree'],{encoding:'utf8'}).trim());
+            fs.writeFileSync(path.join(process.env.RUNNER_TEMP,'verified-tree.json'),JSON.stringify({repository:`${owner}/${repo}`,parent,tree:created.data.sha,files:expected,runId:context.runId},null,2));
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: verified-recovery-source-${{ github.run_id }}
+          name: verified-recovery-docs-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/verified-tree.json
-            ${{ runner.temp }}/tests.log
+            ${{ runner.temp }}/docs.log
             ${{ runner.temp }}/typecheck.log
+            ${{ runner.temp }}/tests.log
           if-no-files-found: ignore
           retention-days: 3
