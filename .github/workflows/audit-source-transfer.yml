@@ -18,29 +18,24 @@ jobs:
           git checkout --detach f16426d62e081394fbb247efede09e45be59d170
           python3 - <<'PY'
           from pathlib import Path
+          import hashlib
           p = Path('tests/test-quality.test.ts')
           s = p.read_text()
           old = r'  /\bassert[A-Za-z]*\s*\(/, // assert(...) and assertSomething(...) — throwing helpers'
           assert s.count(old) == 1
           s = s.replace(old, old + '\n' + r'  /\bassert\.(?:ok|equal|strictEqual|deepEqual|deepStrictEqual|notEqual|notStrictEqual|notDeepEqual|notDeepStrictEqual|throws|doesNotThrow|match|doesNotMatch|ifError|fail)\s*\(/, // node:assert methods throw on a failed assertion')
           needle = "  it('no test body is assertion-free', () => {"
-          addition = """  it.each(['equal', 'deepEqual', 'ok', 'throws', 'match'])('recognizes callable node:assert.%s assertions', (method) => {
-              const body = `{ assert.${method}(actual, expected) }`
-              expect(ASSERTION_SIGNALS.some(signal => signal.test(body))).toBe(true)
-            })
-
-            it.each(['{ assert.equal }', '{ assert.unrecognized(actual) }'])('does not count an assertion reference or unknown method: %s', (body) => {
-              expect(ASSERTION_SIGNALS.some(signal => signal.test(body))).toBe(false)
-            })
-
-          """
-          # Normalize only the indentation introduced by this Python literal.
-          addition = addition.splitlines(keepends=True)
-          addition = ''.join([addition[0], *[line[2:] if line.startswith('  ') else line for line in addition[1:]]])
+          addition = '\n'.join([
+            "  it.each(['equal', 'deepEqual', 'ok', 'throws', 'match'])('recognizes callable node:assert.%s assertions', (method) => {",
+            '    const body = `{ assert.${method}(actual, expected) }`',
+            '    expect(ASSERTION_SIGNALS.some(signal => signal.test(body))).toBe(true)',
+            '  })', '',
+            "  it.each(['{ assert.equal }', '{ assert.unrecognized(actual) }'])('does not count an assertion reference or unknown method: %s', (body) => {",
+            '    expect(ASSERTION_SIGNALS.some(signal => signal.test(body))).toBe(false)',
+            '  })', '', '',
+          ])
           assert s.count(needle) == 1
-          s = s.replace(needle, addition + needle)
-          p.write_text(s)
-          import hashlib
+          p.write_text(s.replace(needle, addition + needle))
           assert hashlib.sha256(p.read_bytes()).hexdigest() == 'cb83ca5a2e3845e395b29708da450b2e6787153e43ab3d6a1e27b3f2b289271e'
           PY
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
@@ -54,7 +49,7 @@ jobs:
           pnpm docs:gen |& tee "$RUNNER_TEMP/docs.log"
           git add docs tests/test-quality.test.ts
           pnpm typecheck |& tee "$RUNNER_TEMP/typecheck.log"
-          pnpm test -- --maxWorkers=2 |& tee "$RUNNER_TEMP/tests.log"
+          pnpm exec vitest run --maxWorkers=2 |& tee "$RUNNER_TEMP/tests.log"
           pnpm docs:gen
           git diff --exit-code
       - name: Retain the verified source tree
