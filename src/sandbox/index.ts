@@ -612,7 +612,8 @@ export interface EnsureWorkspaceSandboxOptions {
   userId?: string
   harness: Harness
   // When set, both the running-reuse and stopped-resume short-circuits are
-  // skipped and any name-matched box is deleted before create. This is the
+  // skipped and any name-matched box is removed before create. Replacement
+  // fails if removal remains pending after the SDK's bounded wait. This is the
   // ONLY way a liveness-failed box is discarded: a failed probe triggers a
   // state-preserving stop→resume recovery (or a SandboxRecoveryFailedError),
   // never a delete — delete deprovisions the persistent workspace (#299).
@@ -1520,8 +1521,12 @@ async function listStopped(
 
 async function deleteBox(box: SandboxInstance): Promise<Outcome<void>> {
   try {
-    await box.delete()
+    const acknowledgement = await box.delete({ until: 'removed' })
     livenessVerifiedAt.delete(box.id)
+    // Creation reuses this box's name as its idempotency key.
+    if (acknowledgement.removal === 'pending') {
+      return fail(new Error(`sandbox ${box.id} removal is still pending; retry replacement after removal completes`))
+    }
     return ok(undefined)
   } catch (err) {
     return fail(err)
@@ -2203,7 +2208,7 @@ async function assertExistingBoxEgress(
   )
 }
 
-/** Resolve or create a workspace sandbox instance with optional reuse and progress tracking */
+/** Reuse a workspace sandbox, or remove its previous runtime before provisioning a replacement. */
 export async function ensureWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
@@ -2347,7 +2352,11 @@ async function provisionWorkspaceSandbox(
   const resumeTimeout = shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS
 
   // Stage 1 — running-box reuse (skipped on forceNew).
-  const existing = await listRunning(client, name)
+  let existing = await listRunning(client, name)
+  if (forceNew && existing.succeeded && !existing.value) {
+    existing = await listStopped(client, name)
+  }
+  if (forceNew && !existing.succeeded) throw existing.error
   if (existing.succeeded && existing.value) {
     const found = existing.value
     if (forceNew) {

@@ -56,13 +56,13 @@ importers:
         version: 0.20.1(@tangle-network/agent-interface@2.6.1)
       '@tangle-network/agent-runtime':
         specifier: 0.231.1
-        version: 0.231.1(@tangle-network/agent-eval@0.182.0)(@tangle-network/agent-interface@2.6.1)(@tangle-network/sandbox@0.40.2(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
+        version: 0.231.1(@tangle-network/agent-eval@0.182.0)(@tangle-network/agent-interface@2.6.1)(@tangle-network/sandbox@0.43.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
       '@tangle-network/brand':
         specifier: 1.5.0
         version: 1.5.0(react@19.2.8)
       '@tangle-network/sandbox':
-        specifier: 0.40.2
-        version: 0.40.2(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
+        specifier: 0.43.0
+        version: 0.43.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       '@tangle-network/sandbox-ui':
         specifier: 0.113.3
         version: 0.113.3(9d6b3ea301e53b12b06a836f6fcb6d5f)
@@ -2312,8 +2312,8 @@ packages:
       yjs:
         optional: true
 
-  '@tangle-network/sandbox@0.40.2':
-    resolution: {integrity: sha512-QvniJ2OuEG0AAxOolb+tUiFtzDBvI6/FdOpEKgvjeDue6elLsRB+dCF+3TFtBVwu9kgC0IrSIYLBKV/TXMW9UQ==}
+  '@tangle-network/sandbox@0.43.0':
+    resolution: {integrity: sha512-f7oxTJkJLlo6cAVcdrK8VFA/utF1nZCHR1ieaay4j3bgpFryXyzfXqd5a2VG5CJwVTp0gtn85t6DDm1sWxxThQ==}
     peerDependencies:
       '@mastra/core': ^1.36.0
       '@modelcontextprotocol/sdk': ^1.30.0
@@ -7103,7 +7103,7 @@ snapshots:
     dependencies:
       '@tangle-network/agent-interface': 2.6.1
 
-  '@tangle-network/agent-runtime@0.231.1(@tangle-network/agent-eval@0.182.0)(@tangle-network/agent-interface@2.6.1)(@tangle-network/sandbox@0.40.2(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
+  '@tangle-network/agent-runtime@0.231.1(@tangle-network/agent-eval@0.182.0)(@tangle-network/agent-interface@2.6.1)(@tangle-network/sandbox@0.43.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
     dependencies:
       '@tangle-network/agent-core': 0.9.6
       '@tangle-network/agent-eval': 0.182.0
@@ -7111,7 +7111,7 @@ snapshots:
       '@tangle-network/agent-knowledge': 17.0.2(@tangle-network/agent-eval@0.182.0)(@tangle-network/agent-interface@2.6.1)
       '@tangle-network/agent-profile-materialize': 0.19.0(@tangle-network/agent-interface@2.6.1)
       '@tangle-network/agent-trace-contract': 1.0.2
-      '@tangle-network/sandbox': 0.40.2(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
+      '@tangle-network/sandbox': 0.43.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       tar-stream: 3.2.1
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
@@ -7157,7 +7157,7 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
 
-  '@tangle-network/sandbox@0.40.2(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))':
+  '@tangle-network/sandbox@0.43.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))':
     dependencies:
       '@tangle-network/agent-core': 0.9.6
       '@tangle-network/agent-interface': 2.6.1

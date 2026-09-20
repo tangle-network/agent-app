@@ -18,7 +18,8 @@
     "knowledge:ingest": "node scripts/knowledge-ingest.mjs"
   },
   "dependencies": {
-    "@tangle-network/agent-app": "__AGENT_APP_VERSION__"
+    "@tangle-network/agent-app": "__AGENT_APP_VERSION__",
+    "@tangle-network/sandbox": "0.43.0"
   },
   "peerDependencies": {
     "@tangle-network/agent-eval": "0.182.0",

@@ -138,7 +138,10 @@ function fakeBox(over: Partial<SandboxInstance> = {}): SandboxInstance {
     } as never,
     waitFor: vi.fn().mockResolvedValue(undefined),
     refresh: vi.fn().mockResolvedValue(undefined),
-    delete: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn<SandboxInstance['delete']>().mockResolvedValue({
+      sandboxId: over.id ?? 'sandbox-1',
+      outcome: 'destroyed',
+    }),
     stop: vi.fn().mockResolvedValue(undefined),
     resume: vi.fn().mockResolvedValue(undefined),
     streamPrompt: vi.fn(),
@@ -382,19 +385,68 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
-  it('deletes and recreates on harness mismatch', async () => {
-    const stale = fakeBox({ name: 'box-w1', metadata: { harness: 'claude-code' } })
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      Promise.resolve(status === 'running' ? [stale] : []),
-    )
-    createMock.mockResolvedValue(fakeBox())
-    await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
-    expect(stale.delete).toHaveBeenCalledTimes(1)
-    expect(createMock).toHaveBeenCalledTimes(1)
-    const payload = createMock.mock.calls[0]![0]
-    expect(payload.backend.type).toBe('opencode')
-    expect(payload.metadata).toEqual({ harness: 'opencode' })
-    expect(payload.secrets).toEqual(['SECRET_A'])
+  describe.each([
+    { reason: 'forceNew', status: 'running', harness: 'opencode', forceNew: true },
+    { reason: 'harness mismatch', status: 'running', harness: 'claude-code', forceNew: false },
+    { reason: 'forceNew from stopped', status: 'stopped', harness: 'opencode', forceNew: true },
+  ] as const)('replacement on $reason', (scenario) => {
+    const options = { workspaceId: 'w1', harness: 'opencode', forceNew: scenario.forceNew } as const
+    let stale: SandboxInstance
+    let replacement: SandboxInstance
+
+    beforeEach(() => {
+      stale = fakeBox({ metadata: { harness: scenario.harness } })
+      replacement = fakeBox({ id: 'sandbox-2' })
+      listMock.mockImplementation(({ status }: { status: string }) =>
+        Promise.resolve(status === scenario.status ? [stale] : []),
+      )
+      createMock.mockResolvedValue(replacement)
+    })
+
+    it('waits for removal before creating with the same idempotency key', async () => {
+      type Acknowledgement = Awaited<ReturnType<SandboxInstance['delete']>>
+      let finishRemoval!: (value: Acknowledgement) => void
+      const removal = new Promise<Acknowledgement>((resolve) => { finishRemoval = resolve })
+      vi.mocked(stale.delete).mockImplementation(async (options) => options?.until === 'removed'
+        ? removal
+        : { sandboxId: stale.id, outcome: 'destroyed', removal: 'pending' })
+
+      const provision = ensureWorkspaceSandbox(shell(), options)
+
+      await vi.waitFor(() => expect(stale.delete).toHaveBeenCalledOnce())
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(createMock).not.toHaveBeenCalled()
+      finishRemoval({ sandboxId: stale.id, outcome: 'destroyed', removal: 'complete' })
+
+      await expect(provision).resolves.toBe(replacement)
+      expect(createMock).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+        idempotencyKey: stale.name,
+        backend: expect.objectContaining({ type: 'opencode' }),
+        metadata: { harness: 'opencode' },
+        secrets: ['SECRET_A'],
+      }))
+    })
+
+    it('refuses replacement when removal is still pending', async () => {
+      vi.mocked(stale.delete).mockResolvedValue({
+        sandboxId: stale.id,
+        outcome: 'destroyed',
+        removal: 'pending',
+      })
+
+      await expect(ensureWorkspaceSandbox(shell(), options)).rejects.toMatchObject({
+        cause: new Error(`sandbox ${stale.id} removal is still pending; retry replacement after removal completes`),
+      })
+
+      expect(stale.delete).toHaveBeenCalledExactlyOnceWith({ until: 'removed' })
+      expect(createMock).not.toHaveBeenCalled()
+    })
+
+    it('accepts inline removal without an optional removal field', async () => {
+      await expect(ensureWorkspaceSandbox(shell(), options)).resolves.toBe(replacement)
+
+      expect(createMock).toHaveBeenCalledOnce()
+    })
   })
 
   it('surfaces a typed error when a mismatched box cannot be deleted (no silent swallow)', async () => {
@@ -1000,20 +1052,6 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(stopped.resume).toHaveBeenCalledTimes(2)
     expect(del).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('forceNew still deletes the existing box and creates a replacement', async () => {
-    const del = vi.fn().mockResolvedValue(undefined)
-    const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, delete: del })
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      status === 'running' ? Promise.resolve([running]) : Promise.resolve([]),
-    )
-    createMock.mockResolvedValue(fakeBox())
-
-    await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode', forceNew: true })
-
-    expect(del).toHaveBeenCalledOnce()
-    expect(createMock).toHaveBeenCalledOnce()
   })
 })
 
@@ -2063,24 +2101,6 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     createMock.mockReset()
     getMock.mockReset()
     sandboxCtor.mockReset()
-  })
-
-  it('forceNew deletes a name-matched running box and creates fresh', async () => {
-    const del = vi.fn().mockResolvedValue(undefined)
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      status === 'running'
-        ? Promise.resolve([fakeBox({ name: 'box-w1', delete: del })])
-        : Promise.resolve([]),
-    )
-    const created = fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never })
-    createMock.mockResolvedValue(created)
-    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
-      workspaceId: 'w1',
-      harness: 'opencode',
-      forceNew: true,
-    })
-    expect(del).toHaveBeenCalledOnce()
-    expect(createMock).toHaveBeenCalledOnce()
   })
 
   it.each([undefined, 100, 600_000])('reuses a healthy idle runtime without requiring a CLI process (%s)', async (execTimeoutMs) => {
