@@ -38,12 +38,16 @@ describe('runDetachedTurnWorkflowTick', () => {
       { succeeded: true, value: { state: 'completed', text: 'done', result: {} } },
     ]
     const drive = vi.fn(async (received: typeof payload) => {
-      expect(received).toBe(payload)
+      expect(received).toStrictEqual(payload)
+      expect(received).not.toBe(payload)
+      expect(Object.isFrozen(received)).toBe(true)
       return states.shift()!
     })
     const settled = { persisted: true }
     const settle = vi.fn(async (received: typeof payload, result: DetachedTurnTerminalResult) => {
-      expect(received).toBe(payload)
+      expect(received).toStrictEqual(payload)
+      expect(received).not.toBe(payload)
+      expect(Object.isFrozen(received)).toBe(true)
       expect(result).toEqual({ state: 'completed', text: 'done', result: {} })
       return settled
     })
