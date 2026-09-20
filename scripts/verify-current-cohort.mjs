@@ -1,24 +1,28 @@
-// Temporary read-only migration workbench. Resolve registry releases, retain
-// their exact metadata and lock, then run source checks. Nothing is published.
+// Temporary read-only migration workbench. Its tested changes are committed
+// normally before this script is removed. No publishing or deployment occurs.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import assert from 'node:assert/strict'
-const names = ['agent-runtime','sandbox','agent-knowledge','agent-interface','agent-integrations','agent-gateway']
-const published = Object.fromEntries(names.map(short => {
+const published = {}
+for (const short of ['agent-runtime','sandbox','agent-knowledge','agent-interface','agent-integrations','agent-gateway']) {
   const name = `@tangle-network/${short}`
-  // Runtime main declares support for the native SDK through <0.46.0. Verify
-  // that exact version actually exists in the registry; never infer publication
-  // from a Git commit, disable peer checks, or substitute a vendored SDK.
-  const selector = short === 'agent-runtime' ? `${name}@0.246.0` : name
+  // Inspect actual published stable versions, not a version read from Git main
+  // or an older latest tag. These packages use numeric three-part versions.
+  const available = JSON.parse(execFileSync('pnpm',['view',name,'versions','--json'],{encoding:'utf8'}))
+  const stable = available.filter(version => /^\d+\.\d+\.\d+$/.test(version)).sort((a,b) => {
+    const aa=a.split('.').map(Number), bb=b.split('.').map(Number)
+    return aa[0]-bb[0] || aa[1]-bb[1] || aa[2]-bb[2]
+  })
+  assert.ok(stable.length, `No published stable version for ${name}`)
+  const selector = `${name}@${stable.at(-1)}`
   const info = JSON.parse(execFileSync('pnpm',['view',selector,'version','peerDependencies','--json'],{encoding:'utf8'}))
-  assert.equal(typeof info.version,'string',`Missing registry version for ${selector}`)
-  if(short === 'agent-runtime') assert.equal(info.version,'0.246.0')
-  return [name,info]
-}))
-writeFileSync(`${process.env.VERIFICATION_DIR}/registry.json`,JSON.stringify(published,null,2)+'\n')
+  assert.equal(info.version,stable.at(-1),`Registry identity mismatch for ${selector}`)
+  published[name]=info
+  writeFileSync(`${process.env.VERIFICATION_DIR}/registry.json`,JSON.stringify(published,null,2)+'\n')
+}
 const versions = Object.fromEntries(Object.entries(published).map(([name,info])=>[name,info.version]))
-// Retain the newest Eval family explicitly accepted by Runtime and Knowledge.
-// Independent latest tags are not evidence of a compatible installation.
+// Preserve the current Eval family until the engine peers accept its successor.
+// The normal strict install and complete source/consumer gates still apply.
 versions['@tangle-network/agent-eval']='0.182.0'
 const minorRange = version => { const [major,minor] = version.split('.').map(Number); return `>=${version} <${major}.${minor+1}.0` }
 const ranges = {
