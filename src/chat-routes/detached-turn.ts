@@ -130,8 +130,8 @@ export interface DetachedTurnOptions {
    *  A crash mid-run leaves buffered rows at seqs 1..N with status `running`;
    *  re-streaming restarts the tap's seq at 0 and would duplicate/interleave
    *  rows. Wire this (delete `turnId`'s buffered events) so a retry is clean.
-   *  Unset, a re-stream over a `running` buffer is still attempted but logged
-   *  as a possible-duplication hazard. */
+   *  A re-stream over an existing `running` buffer requires this operation to
+   *  succeed. Missing or failed reset leaves the existing stream untouched. */
   resetBuffer?: (turnId: string) => Promise<void>
   /** Own the durable assistant row for this turn instead of returning the body
    *  for the caller to insert — and keep it in step with the stream.
@@ -221,6 +221,19 @@ function cachedResultFrom(
   final: DetachedTurnFinal | null,
   persisted?: DraftStoredMessage,
 ): DetachedTurnResult {
+  if (!final && !persisted) {
+    throw new Error('Completed turn has no retained result or assistant row; retry exact recovery')
+  }
+  // A text-only recovery must not erase usage already stored for this turn.
+  // Unknown values stay absent; an explicit measured zero is preserved.
+  const usage: ChatTurnUsage = {}
+  for (const key of [
+    'inputTokens', 'outputTokens', 'reasoningTokens',
+    'cacheReadTokens', 'cacheWriteTokens', 'costUsd',
+  ] as const) {
+    const value = final?.usage?.[key] ?? persisted?.[key]
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) usage[key] = value
+  }
   return {
     state: 'completed',
     text: final?.text ?? persisted?.content ?? '',
@@ -228,7 +241,7 @@ function cachedResultFrom(
       final?.parts ??
       (persisted?.parts as DetachedTurnParts | null | undefined) ??
       [],
-    usage: final?.usage ?? {},
+    usage,
     cached: true,
   }
 }
@@ -368,22 +381,11 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
 
   const completed = async (): Promise<DetachedTurnFinal | null> => {
     if (!opts.completedResult) return null
-    try {
-      return (await opts.completedResult()) ?? null
-    } catch (err) {
-      opts.log?.('[chat-routes] runDetachedTurn completedResult lookup failed', { turnId, err: String(err) })
-      return null
-    }
+    // An unavailable authoritative read must not become a fresh stream.
+    return (await opts.completedResult()) ?? null
   }
 
-  let prior: string | null = null
-  try {
-    prior = await store.getStatus(turnId)
-  } catch (err) {
-    // A transient store blip must NOT silently fall through to a full re-stream
-    // (which would duplicate a completed turn's buffer) — surface it.
-    opts.log?.('[chat-routes] runDetachedTurn getStatus failed; treating as no prior', { turnId, err: String(err) })
-  }
+  const prior = await store.getStatus(turnId)
 
   if (prior === 'complete') {
     const persisted = await persistedRow()
@@ -400,21 +402,16 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
     // completed, settle the stuck `running` buffer and return it.
     const final = await completed()
     if (final) {
-      await store.setStatus(turnId, 'complete', scopeId).catch((err) => {
-        opts.log?.('[chat-routes] runDetachedTurn failed to settle a completed running turn', { turnId, err: String(err) })
-      })
+      await store.setStatus(turnId, 'complete', scopeId)
       const persisted = await persistedRow()
       return await settleRow(cachedResultFrom(final, persisted), persisted)
     }
     // Genuine re-run: clear the partial buffer first, or the fresh tap's seq
     // (restarting at 0) interleaves with the orphaned rows.
-    if (opts.resetBuffer) {
-      await opts.resetBuffer(turnId).catch((err) => {
-        opts.log?.('[chat-routes] runDetachedTurn resetBuffer failed; re-stream may duplicate rows', { turnId, err: String(err) })
-      })
-    } else {
-      opts.log?.('[chat-routes] runDetachedTurn re-streaming over a running buffer without resetBuffer; rows may duplicate', { turnId })
+    if (!opts.resetBuffer) {
+      throw new Error('Detached turn recovery requires resetBuffer before replaying an existing stream')
     }
+    await opts.resetBuffer(turnId)
   }
 
   const tap = createBufferedTurnTap({

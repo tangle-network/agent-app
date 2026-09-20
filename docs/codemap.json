@@ -2236,7 +2236,7 @@
           "name": "readCompletedSandboxTurn",
           "kind": "function",
           "signature": "(box: CompletedSandboxTurnSource, options: ReadCompletedSandboxTurnOptions) => Promise<DetachedTurnFinal | null>",
-          "doc": "Read the exact completed turn."
+          "doc": "Read the exact completed turn from its keyed cache and completed message."
         },
         {
           "name": "ReadCompletedSandboxTurnOptions",
@@ -9063,7 +9063,7 @@
           "name": "runDetachedTurnWorkflowTick",
           "kind": "function",
           "signature": "<TPayload extends DetachedTurnWorkflowIdentity, TSettled>(options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>)…",
-          "doc": "Drive one detached Sandbox turn from a Cloudflare Workflow."
+          "doc": "Drive a detached SDK turn with durable steps, not an HTTP waitUntil lifetime."
         },
         {
           "name": "VaultKv",
@@ -14400,6 +14400,18 @@
           "doc": "Collapses text-part artifacts of unstable upstream segment identity: the same text arriving under two keys (id-less delta stream, then an id-bearing snapshot) folds into two segments, and interleaved…"
         },
         {
+          "name": "consumeTurnStream",
+          "kind": "function",
+          "signature": "(body: AsyncIterable<Uint8Array<ArrayBufferLike>>, options: ConsumeTurnStreamOptions) => Promise<TurnObservation>",
+          "doc": "Consume one viewing connection."
+        },
+        {
+          "name": "ConsumeTurnStreamOptions",
+          "kind": "interface",
+          "signature": "interface ConsumeTurnStreamOptions",
+          "doc": null
+        },
+        {
           "name": "createBufferedTurnTap",
           "kind": "function",
           "signature": "(opts: BufferedTurnOptions) => BufferedTurnTap",
@@ -14526,6 +14538,18 @@
           "doc": "Normalize tool-related events into a standardized message.part.updated format"
         },
         {
+          "name": "observeTurnEvent",
+          "kind": "function",
+          "signature": "(previous: TurnObservation, raw: unknown) => TurnObservationUpdate",
+          "doc": "Reduce an observed frame."
+        },
+        {
+          "name": "parseTurnObservation",
+          "kind": "function",
+          "signature": "(value?: unknown) => TurnObservation",
+          "doc": null
+        },
+        {
           "name": "PersistedChatMessageForTurn",
           "kind": "interface",
           "signature": "interface PersistedChatMessageForTurn",
@@ -14638,6 +14662,18 @@
           "kind": "interface",
           "signature": "interface TurnEventStoreOptions",
           "doc": "Configure running-turn lease evaluation."
+        },
+        {
+          "name": "TurnObservation",
+          "kind": "interface",
+          "signature": "interface TurnObservation",
+          "doc": "Read-side checkpoints for native chat NDJSON."
+        },
+        {
+          "name": "TurnObservationUpdate",
+          "kind": "interface",
+          "signature": "interface TurnObservationUpdate",
+          "doc": null
         },
         {
           "name": "TurnStatus",
@@ -17581,6 +17617,18 @@
           "doc": "Set standard security headers on a response (HSTS, nosniff, frame-options, referrer-policy, XSS) + optional product disclaimer/retention."
         },
         {
+          "name": "ApiKeyFetch",
+          "kind": "type",
+          "signature": "type ApiKeyFetch",
+          "doc": null
+        },
+        {
+          "name": "ApiKeyFetchOptions",
+          "kind": "interface",
+          "signature": "interface ApiKeyFetchOptions",
+          "doc": "A credential-bearing client for one application origin, not a web fetch tool."
+        },
+        {
           "name": "assertMediaUrl",
           "kind": "function",
           "signature": "(url: string, what?: string) => void",
@@ -17615,6 +17663,12 @@
           "kind": "interface",
           "signature": "interface CookieOptions",
           "doc": "Define options for configuring cookie attributes and behavior"
+        },
+        {
+          "name": "createApiKeyFetch",
+          "kind": "function",
+          "signature": "(options: ApiKeyFetchOptions) => ApiKeyFetch",
+          "doc": "No redirects, cookie fallback, hidden retries, or model-selected credential destination."
         },
         {
           "name": "extractRequestContext",

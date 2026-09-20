@@ -75,7 +75,7 @@ _99 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./spend`](api/spend.md) | 60 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
-| [`./stream`](api/stream.md) | 51 | `interactions`, `plans` |
+| [`./stream`](api/stream.md) | 57 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 70 | — |
 | [`./studio-react`](api/studio-react.md) | 47 | `studio`, `web-react` |
 | [`./tangle`](api/tangle.md) | 7 | — |
@@ -97,7 +97,7 @@ _99 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./vault`](api/vault.md) | 17 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
-| [`./web`](api/web.md) | 36 | — |
+| [`./web`](api/web.md) | 39 | — |
 | [`./web-react`](api/web-react.md) | 427 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/async`](api/web-react-async.md) | 35 | — |
 | [`./web-react/session-gateway`](api/web-react-session-gateway.md) | 22 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
@@ -732,11 +732,11 @@ Source: `src/store/index.ts` · 16 exports
 
 ## `./stream`
 
-Source: `src/stream/index.ts` · 51 exports
+Source: `src/stream/index.ts` · 57 exports
 
 Depends on: `interactions`, `plans`
 
-`asRecord`, `asString`, `attachmentPartKey`, `BufferedTurnEvent`, `BufferedTurnOptions`, `BufferedTurnTap`, `buildUserTextParts`, `coalesceChatStreamEvents`, `coalesceDeltas`, `collapseRedundantTextParts`, `createBufferedTurnTap`, `createD1TurnEventStore`, `createMemoryTurnEventStore`, `D1BoundForTurns`, `D1LikeForTurns`, `DEFAULT_RUNNING_TURN_LEASE_MS`, `DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS`, `draftAssistantParts`, `encodeEvent`, `finalizeAssistantParts`, `finalizePendingInteractionParts`, `getPartKey`, `JsonRecord`, `mergePersistedPart`, `messageHasTurnId`, `MISSING_TOOL_TERMINAL_ERROR`, `MISSING_TOOL_TERMINAL_REASON`, `normalizeClientTurnId`, `normalizePersistedPart`, `normalizeTime`, `normalizeToolEvent`, `PersistedChatMessageForTurn`, `pumpBufferedTurn`, `PumpBufferedTurnOptions`, `replayTurnEvents`, `ReplayTurnEventsOptions`, `resolveChatTurn`, `ResolvedChatTurn`, `resolveToolId`, `resolveToolName`, `stampReplaySeq`, `StreamEvent`, `terminalizeDanglingAssistantToolUpdates`, `terminalizeDanglingToolPart`, `terminalizeDanglingToolParts`, `TURN_EVENTS_MIGRATION_SQL`, `TURN_STATUS_RETENTION_MIGRATION_SQL`, `TURN_STATUS_SCOPE_MIGRATION_SQL`, `TurnEventStore`, `TurnEventStoreOptions`, `TurnStatus`
+`asRecord`, `asString`, `attachmentPartKey`, `BufferedTurnEvent`, `BufferedTurnOptions`, `BufferedTurnTap`, `buildUserTextParts`, `coalesceChatStreamEvents`, `coalesceDeltas`, `collapseRedundantTextParts`, `consumeTurnStream`, `ConsumeTurnStreamOptions`, `createBufferedTurnTap`, `createD1TurnEventStore`, `createMemoryTurnEventStore`, `D1BoundForTurns`, `D1LikeForTurns`, `DEFAULT_RUNNING_TURN_LEASE_MS`, `DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS`, `draftAssistantParts`, `encodeEvent`, `finalizeAssistantParts`, `finalizePendingInteractionParts`, `getPartKey`, `JsonRecord`, `mergePersistedPart`, `messageHasTurnId`, `MISSING_TOOL_TERMINAL_ERROR`, `MISSING_TOOL_TERMINAL_REASON`, `normalizeClientTurnId`, `normalizePersistedPart`, `normalizeTime`, `normalizeToolEvent`, `observeTurnEvent`, `parseTurnObservation`, `PersistedChatMessageForTurn`, `pumpBufferedTurn`, `PumpBufferedTurnOptions`, `replayTurnEvents`, `ReplayTurnEventsOptions`, `resolveChatTurn`, `ResolvedChatTurn`, `resolveToolId`, `resolveToolName`, `stampReplaySeq`, `StreamEvent`, `terminalizeDanglingAssistantToolUpdates`, `terminalizeDanglingToolPart`, `terminalizeDanglingToolParts`, `TURN_EVENTS_MIGRATION_SQL`, `TURN_STATUS_RETENTION_MIGRATION_SQL`, `TURN_STATUS_SCOPE_MIGRATION_SQL`, `TurnEventStore`, `TurnEventStoreOptions`, `TurnObservation`, `TurnObservationUpdate`, `TurnStatus`
 
 [Full API →](api/stream.md)
 
@@ -924,9 +924,9 @@ Source: `src/vault/server.ts` · 8 exports
 
 ## `./web`
 
-Source: `src/web/index.ts` · 36 exports
+Source: `src/web/index.ts` · 39 exports
 
-`addSecurityHeaders`, `assertMediaUrl`, `checkFreeRouteLimit`, `checkRateLimit`, `clearCookieHeader`, `ConversationGroupItem`, `CookieOptions`, `extractRequestContext`, `FREE_ROUTE_BUDGETS`, `FreeRouteAllowance`, `FreeRouteClass`, `FreeRouteDenialReason`, `FreeRouteDimension`, `FreeRouteIdentity`, `FreeRouteLimitError`, `FreeRouteLimitInput`, `FreeRouteLimitOutcome`, `freeRouteLimitResponse`, `FreeRouteLimitResponseOptions`, `groupConversationMessages`, `GroupedConversationItem`, `isWorkspaceFileExportable`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitBudget`, `RateLimitResult`, `readCookieValue`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `STANDARD_SECURITY_HEADERS`, `withFreeRouteLimit`, `WithFreeRouteLimitOptions`, `WORKSPACE_BUDGET_MULTIPLIER`
+`addSecurityHeaders`, `ApiKeyFetch`, `ApiKeyFetchOptions`, `assertMediaUrl`, `checkFreeRouteLimit`, `checkRateLimit`, `clearCookieHeader`, `ConversationGroupItem`, `CookieOptions`, `createApiKeyFetch`, `extractRequestContext`, `FREE_ROUTE_BUDGETS`, `FreeRouteAllowance`, `FreeRouteClass`, `FreeRouteDenialReason`, `FreeRouteDimension`, `FreeRouteIdentity`, `FreeRouteLimitError`, `FreeRouteLimitInput`, `FreeRouteLimitOutcome`, `freeRouteLimitResponse`, `FreeRouteLimitResponseOptions`, `groupConversationMessages`, `GroupedConversationItem`, `isWorkspaceFileExportable`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitBudget`, `RateLimitResult`, `readCookieValue`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `STANDARD_SECURITY_HEADERS`, `withFreeRouteLimit`, `WithFreeRouteLimitOptions`, `WORKSPACE_BUDGET_MULTIPLIER`
 
 [Full API →](api/web.md)
 

@@ -240,7 +240,7 @@ interface PresetToolHandlerOptions
 
 ### `runDetachedTurnWorkflowTick`
 
-`function` — Drive one detached Sandbox turn from a Cloudflare Workflow.
+`function` — Drive a detached SDK turn with durable steps, not an HTTP waitUntil lifetime.
 
 ```ts
 <TPayload extends DetachedTurnWorkflowIdentity, TSettled>(options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>)…

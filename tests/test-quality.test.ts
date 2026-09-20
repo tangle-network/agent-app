@@ -101,6 +101,7 @@ const ASSERTION_SIGNALS = [
   /\bexpect\s*\(/,
   /\bexpect\./, // expect.assertions / expect.hasAssertions / expect.poll
   /\bassert[A-Za-z]*\s*\(/, // assert(...) and assertSomething(...) — throwing helpers
+  /\bassert\.(?:ok|equal|strictEqual|deepEqual|deepStrictEqual|notEqual|notStrictEqual|notDeepEqual|notDeepStrictEqual|throws|doesNotThrow|match|doesNotMatch|ifError|fail)\s*\(/, // node:assert methods throw on a failed assertion
   /\bexpectTypeOf\b/, // compile-time assertion; `pnpm typecheck` is its runner
   /\bassertType\b/,
   /\b(?:get|find)(?:By|All)[A-Za-z]*\s*\(/, // testing-library queries throw on miss
@@ -156,6 +157,15 @@ describe('test-quality gate: every test can fail', () => {
     expect(found?.body).toContain('expect(1).toBe(2)')
     // A brace-counting bug that stopped at the first `}` would miss the tail.
     expect(found?.body.endsWith('}')).toBe(true)
+  })
+
+  it.each(['equal', 'deepEqual', 'ok', 'throws', 'match'])('recognizes callable node:assert.%s assertions', (method) => {
+    const body = `{ assert.${method}(actual, expected) }`
+    expect(ASSERTION_SIGNALS.some(signal => signal.test(body))).toBe(true)
+  })
+
+  it.each(['{ assert.equal }', '{ assert.unrecognized(actual) }'])('does not count an assertion reference or unknown method: %s', (body) => {
+    expect(ASSERTION_SIGNALS.some(signal => signal.test(body))).toBe(false)
   })
 
   it('no test body is assertion-free', () => {

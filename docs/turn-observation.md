@@ -28,3 +28,22 @@ A buffer, cursor or `waitUntil` promise is not a durable job owner. Cloudflare H
 The focused tests simulate successful-step replay and independently test read-side framing. They do not establish deployed Workflow behavior, sandbox survival, arbitrary-duration service limits, or a product's adoption of durable settlement. GTM's hosted recorder consumes the read-side helpers; GTM still needs a durable owner for its completion path before claiming browser-independent completion.
 
 Reference: https://developers.cloudflare.com/workers/platform/limits/ and the existing `src/preset-cloudflare/detached-turn-workflow.ts`.
+
+## Exact completed-turn recovery
+
+Use `readCompletedSandboxTurn` for the keyed result and completed message of one
+session/turn. It never reads the session's latest aggregate result: that result
+can belong to a newer turn by the time the request arrives. A healthy absent
+read returns `null`; unavailable or inconsistent evidence without an exact
+record throws and must be retried as a read, not interpreted as permission to
+start another execution. Either independently exact record can still recover
+the turn when the other read is unavailable.
+
+`runDetachedTurn` preserves errors from status reads, completed-result reads,
+buffer resets and terminal status writes. Re-streaming an existing running
+buffer requires a successful `resetBuffer`. This is buffer integrity, not an
+execution dispatcher: the supplied source must still attach to the original
+execution. A completed buffer without either a retained result or its assistant
+row is not reported as an empty success. Cached recovery keeps usage already
+stored on that row when a newer exact receipt omits it; measured zero remains
+zero and unknown usage is not synthesized.

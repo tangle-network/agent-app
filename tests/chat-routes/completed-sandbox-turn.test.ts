@@ -210,7 +210,7 @@ describe('readCompletedSandboxTurn', () => {
     await expect(readCompletedSandboxTurn(box, {
       turnId: 'turn-1',
       sessionId: 'session-1',
-    })).resolves.toBeNull()
+    })).rejects.toThrow('Completed Sandbox turn identity is inconsistent')
   })
 
   it('fails closed instead of guessing between duplicate completed messages', async () => {
@@ -229,7 +229,7 @@ describe('readCompletedSandboxTurn', () => {
     await expect(readCompletedSandboxTurn(box, {
       turnId: 'turn-1',
       sessionId: 'session-1',
-    })).resolves.toBeNull()
+    })).rejects.toThrow('Completed Sandbox turn identity is inconsistent')
   })
 
   it('recovers from the exact session message when the short-lived cache is unavailable', async () => {
