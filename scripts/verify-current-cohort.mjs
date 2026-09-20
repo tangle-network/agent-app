@@ -6,8 +6,13 @@ import assert from 'node:assert/strict'
 const names = ['agent-runtime','sandbox','agent-knowledge','agent-interface','agent-integrations','agent-gateway']
 const published = Object.fromEntries(names.map(short => {
   const name = `@tangle-network/${short}`
-  const info = JSON.parse(execFileSync('pnpm',['view',name,'version','peerDependencies','--json'],{encoding:'utf8'}))
-  assert.equal(typeof info.version,'string',`Missing registry version for ${name}`)
+  // Runtime main declares support for the native SDK through <0.46.0. Verify
+  // that exact version actually exists in the registry; never infer publication
+  // from a Git commit, disable peer checks, or substitute a vendored SDK.
+  const selector = short === 'agent-runtime' ? `${name}@0.246.0` : name
+  const info = JSON.parse(execFileSync('pnpm',['view',selector,'version','peerDependencies','--json'],{encoding:'utf8'}))
+  assert.equal(typeof info.version,'string',`Missing registry version for ${selector}`)
+  if(short === 'agent-runtime') assert.equal(info.version,'0.246.0')
   return [name,info]
 }))
 writeFileSync(`${process.env.VERIFICATION_DIR}/registry.json`,JSON.stringify(published,null,2)+'\n')
