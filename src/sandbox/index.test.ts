@@ -462,11 +462,13 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
-  it('preserves a stopped-box lookup error instead of creating with the same identity', async () => {
+  it.each([false, true])('preserves a stopped-box lookup error instead of creating (forceNew=%s)', async (forceNew) => {
     const error = new Error('list down')
-    listMock.mockRejectedValue(error)
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([]) : Promise.reject(error),
+    )
     await expect(
-      ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' }),
+      ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode', forceNew }),
     ).rejects.toBe(error)
     expect(createMock).not.toHaveBeenCalled()
   })
