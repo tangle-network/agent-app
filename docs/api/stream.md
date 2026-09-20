@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-51 exports.
+57 exports.
 
 ### `asRecord`
 
@@ -84,6 +84,22 @@ interface BufferedTurnTap
 
 ```ts
 (parts: JsonRecord[]) => JsonRecord[]
+```
+
+### `consumeTurnStream`
+
+`function` — Consume one viewing connection.
+
+```ts
+(body: AsyncIterable<Uint8Array<ArrayBufferLike>>, options: ConsumeTurnStreamOptions) => Promise<TurnObservation>
+```
+
+### `ConsumeTurnStreamOptions`
+
+`interface`
+
+```ts
+interface ConsumeTurnStreamOptions
 ```
 
 ### `createBufferedTurnTap`
@@ -254,6 +270,22 @@ type JsonRecord
 (event: StreamEvent) => StreamEvent
 ```
 
+### `observeTurnEvent`
+
+`function` — Reduce an observed frame.
+
+```ts
+(previous: TurnObservation, raw: unknown) => TurnObservationUpdate
+```
+
+### `parseTurnObservation`
+
+`function`
+
+```ts
+(value?: unknown) => TurnObservation
+```
+
 ### `PersistedChatMessageForTurn`
 
 `interface` — Define the structure of a chat message stored for a specific conversation turn
@@ -404,6 +436,22 @@ interface TurnEventStore
 
 ```ts
 interface TurnEventStoreOptions
+```
+
+### `TurnObservation`
+
+`interface` — Read-side checkpoints for native chat NDJSON.
+
+```ts
+interface TurnObservation
+```
+
+### `TurnObservationUpdate`
+
+`interface`
+
+```ts
+interface TurnObservationUpdate
 ```
 
 ### `TurnStatus`

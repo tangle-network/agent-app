@@ -2895,7 +2895,7 @@ type ReadAttachmentFn
 
 ### `readCompletedSandboxTurn`
 
-`function` — Read the exact completed turn.
+`function` — Read the exact completed turn from its keyed cache and completed message.
 
 ```ts
 (box: CompletedSandboxTurnSource, options: ReadCompletedSandboxTurnOptions) => Promise<DetachedTurnFinal | null>
@@ -11697,7 +11697,7 @@ interface PresetToolHandlerOptions
 
 ### `runDetachedTurnWorkflowTick`
 
-`function` — Drive one detached Sandbox turn from a Cloudflare Workflow.
+`function` — Drive a detached SDK turn with durable steps, not an HTTP waitUntil lifetime.
 
 ```ts
 <TPayload extends DetachedTurnWorkflowIdentity, TSettled>(options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>)…
@@ -18644,6 +18644,22 @@ interface BufferedTurnTap
 (parts: JsonRecord[]) => JsonRecord[]
 ```
 
+### `consumeTurnStream`
+
+`function` — Consume one viewing connection.
+
+```ts
+(body: AsyncIterable<Uint8Array<ArrayBufferLike>>, options: ConsumeTurnStreamOptions) => Promise<TurnObservation>
+```
+
+### `ConsumeTurnStreamOptions`
+
+`interface`
+
+```ts
+interface ConsumeTurnStreamOptions
+```
+
 ### `createBufferedTurnTap`
 
 `function` — The buffering core.
@@ -18812,6 +18828,22 @@ type JsonRecord
 (event: StreamEvent) => StreamEvent
 ```
 
+### `observeTurnEvent`
+
+`function` — Reduce an observed frame.
+
+```ts
+(previous: TurnObservation, raw: unknown) => TurnObservationUpdate
+```
+
+### `parseTurnObservation`
+
+`function`
+
+```ts
+(value?: unknown) => TurnObservation
+```
+
 ### `PersistedChatMessageForTurn`
 
 `interface` — Define the structure of a chat message stored for a specific conversation turn
@@ -18962,6 +18994,22 @@ interface TurnEventStore
 
 ```ts
 interface TurnEventStoreOptions
+```
+
+### `TurnObservation`
+
+`interface` — Read-side checkpoints for native chat NDJSON.
+
+```ts
+interface TurnObservation
+```
+
+### `TurnObservationUpdate`
+
+`interface`
+
+```ts
+interface TurnObservationUpdate
 ```
 
 ### `TurnStatus`
@@ -22731,6 +22779,22 @@ Source: `src/web/index.ts`
 (response: Response, opts?: SecurityHeaderOptions) => Response
 ```
 
+### `ApiKeyFetch`
+
+`type`
+
+```ts
+type ApiKeyFetch
+```
+
+### `ApiKeyFetchOptions`
+
+`interface` — A credential-bearing client for one application origin, not a web fetch tool.
+
+```ts
+interface ApiKeyFetchOptions
+```
+
 ### `assertMediaUrl`
 
 `function` — Canonical media-reference boundary shared by every surface that persists a media url (sequences clips, design-canvas image/video src).
@@ -22777,6 +22841,14 @@ interface ConversationGroupItem
 
 ```ts
 interface CookieOptions
+```
+
+### `createApiKeyFetch`
+
+`function` — No redirects, cookie fallback, hidden retries, or model-selected credential destination.
+
+```ts
+(options: ApiKeyFetchOptions) => ApiKeyFetch
 ```
 
 ### `extractRequestContext`

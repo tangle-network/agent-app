@@ -4,7 +4,7 @@
 
 Source: `src/web/index.ts`
 
-36 exports.
+39 exports.
 
 ### `addSecurityHeaders`
 
@@ -12,6 +12,22 @@ Source: `src/web/index.ts`
 
 ```ts
 (response: Response, opts?: SecurityHeaderOptions) => Response
+```
+
+### `ApiKeyFetch`
+
+`type`
+
+```ts
+type ApiKeyFetch
+```
+
+### `ApiKeyFetchOptions`
+
+`interface` — A credential-bearing client for one application origin, not a web fetch tool.
+
+```ts
+interface ApiKeyFetchOptions
 ```
 
 ### `assertMediaUrl`
@@ -60,6 +76,14 @@ interface ConversationGroupItem
 
 ```ts
 interface CookieOptions
+```
+
+### `createApiKeyFetch`
+
+`function` — No redirects, cookie fallback, hidden retries, or model-selected credential destination.
+
+```ts
+(options: ApiKeyFetchOptions) => ApiKeyFetch
 ```
 
 ### `extractRequestContext`

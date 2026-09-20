@@ -37,7 +37,9 @@ it('rejects a changed identity even on an already observed ordinal', () => {
   assert.throws(() => observeTurnEvent(state, { seq: 1, type: 'turn', turnId: 'another' }), /identity changed/)
 })
 for (const seq of [0, -2, 1.5, '1', Number.MAX_SAFE_INTEGER + 1]) {
-  it(`rejects invalid ordinal ${seq}`, () => assert.throws(() => observeTurnEvent(observed(), { type: 'text', seq })))
+  it(`rejects invalid ordinal ${seq}`, () => {
+    assert.throws(() => observeTurnEvent(observed(), { type: 'text', seq }))
+  })
 }
 for (const status of ['complete', 'completed']) {
   it(`understands the ${status} terminal protocol`, () => {

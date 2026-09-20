@@ -1312,7 +1312,7 @@ type ReadAttachmentFn
 
 ### `readCompletedSandboxTurn`
 
-`function` — Read the exact completed turn.
+`function` — Read the exact completed turn from its keyed cache and completed message.
 
 ```ts
 (box: CompletedSandboxTurnSource, options: ReadCompletedSandboxTurnOptions) => Promise<DetachedTurnFinal | null>
