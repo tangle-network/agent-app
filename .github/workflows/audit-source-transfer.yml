@@ -11,11 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          fetch-depth: 2
+          ref: f16426d62e081394fbb247efede09e45be59d170
           persist-credentials: false
-      - name: Select the exact reviewed source without this workflow
+      - name: Apply the checked assertion compatibility changes
         run: |
-          git checkout --detach f16426d62e081394fbb247efede09e45be59d170
           python3 - <<'PY'
           from pathlib import Path
           import hashlib
@@ -37,6 +36,13 @@ jobs:
           assert s.count(needle) == 1
           p.write_text(s.replace(needle, addition + needle))
           assert hashlib.sha256(p.read_bytes()).hexdigest() == 'cb83ca5a2e3845e395b29708da450b2e6787153e43ab3d6a1e27b3f2b289271e'
+          p = Path('tests/stream/turn-observation.test.ts')
+          s = p.read_text()
+          old = "  it(`rejects invalid ordinal ${seq}`, () => assert.throws(() => observeTurnEvent(observed(), { type: 'text', seq })))"
+          new = "  it(`rejects invalid ordinal ${seq}`, () => {\n    assert.throws(() => observeTurnEvent(observed(), { type: 'text', seq }))\n  })"
+          assert s.count(old) == 1
+          p.write_text(s.replace(old, new))
+          assert hashlib.sha256(p.read_bytes()).hexdigest() == 'f479fb1c1aefcf0ee6ad33b4b4399ac52be1c88806299b705aae4a5feb5725ed'
           PY
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
@@ -47,7 +53,7 @@ jobs:
         run: |
           set -o pipefail
           pnpm docs:gen |& tee "$RUNNER_TEMP/docs.log"
-          git add docs tests/test-quality.test.ts
+          git add docs tests/test-quality.test.ts tests/stream/turn-observation.test.ts
           pnpm typecheck |& tee "$RUNNER_TEMP/typecheck.log"
           pnpm exec vitest run --maxWorkers=2 |& tee "$RUNNER_TEMP/tests.log"
           pnpm docs:gen
@@ -69,6 +75,7 @@ jobs:
               'docs/llms-full.txt': '8eadb1026cb0dd38c0b3ae1019f7499588c1df1213c3130aa6dd5c0df9246b8d',
               'docs/llms.txt': '0a9eb742882b790bc896e93eb8775f3d7ec2c769d170565fa2b907eb7c645680',
               'tests/test-quality.test.ts': 'cb83ca5a2e3845e395b29708da450b2e6787153e43ab3d6a1e27b3f2b289271e',
+              'tests/stream/turn-observation.test.ts': 'f479fb1c1aefcf0ee6ad33b4b4399ac52be1c88806299b705aae4a5feb5725ed',
             };
             const parent = 'f16426d62e081394fbb247efede09e45be59d170';
             const { owner, repo } = context.repo;
