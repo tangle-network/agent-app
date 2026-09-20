@@ -1,0 +1,72 @@
+name: Verify proposed native customer cohort
+on:
+  push:
+    branches: [feat/current-customer-cohort]
+permissions:
+  contents: read
+concurrency:
+  group: current-customer-cohort
+  cancel-in-progress: true
+jobs:
+  verify:
+    if: github.repository == 'tangle-network/agent-app' && github.ref == 'refs/heads/feat/current-customer-cohort'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      VERIFICATION_DIR: /tmp/current-customer-cohort
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+      - name: Resolve the declared migration, without production credentials
+        run: |
+          mkdir -p "$VERIFICATION_DIR"
+          git rev-parse HEAD > "$VERIFICATION_DIR/base.txt"
+          node scripts/verify-current-cohort.mjs
+          pnpm install --no-frozen-lockfile --ignore-scripts > "$VERIFICATION_DIR/install.log" 2>&1 || { tail -80 "$VERIFICATION_DIR/install.log"; exit 1; }
+          pnpm rebuild > "$VERIFICATION_DIR/native-build.log" 2>&1 || { tail -80 "$VERIFICATION_DIR/native-build.log"; exit 1; }
+      - name: Full source typecheck
+        id: types
+        continue-on-error: true
+        run: pnpm typecheck > "$VERIFICATION_DIR/typecheck.log" 2>&1 || { cat "$VERIFICATION_DIR/typecheck.log"; exit 1; }
+      - name: Full source suite
+        id: tests
+        continue-on-error: true
+        run: pnpm exec vitest run --maxWorkers=2 --reporter=json --outputFile="$VERIFICATION_DIR/tests.json" > "$VERIFICATION_DIR/tests.log" 2>&1 || { tail -100 "$VERIFICATION_DIR/tests.log"; exit 1; }
+      - name: Build and regenerate maintained docs
+        id: build
+        continue-on-error: true
+        run: |
+          pnpm build > "$VERIFICATION_DIR/build.log" 2>&1 || { tail -100 "$VERIFICATION_DIR/build.log"; exit 1; }
+          pnpm docs:gen > "$VERIFICATION_DIR/docs.log" 2>&1 || { tail -80 "$VERIFICATION_DIR/docs.log"; exit 1; }
+      - name: Retain the exact proposed source and lock for ordinary API commit
+        if: always()
+        run: |
+          mkdir -p "$VERIFICATION_DIR"
+          cp package.json pnpm-lock.yaml "$VERIFICATION_DIR/"
+          git diff --binary > "$VERIFICATION_DIR/cohort.patch"
+          tar --exclude=node_modules --exclude=.git --exclude=dist --exclude=coverage --exclude=playground/node_modules --exclude=playground/dist -czf "$VERIFICATION_DIR/proposed-source.tar.gz" .
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: proposed-customer-cohort
+          path: ${{ env.VERIFICATION_DIR }}/
+          retention-days: 3
+      - name: Require native report and source checks
+        if: always()
+        env:
+          TYPES: ${{ steps.types.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+        run: |
+          test "$TYPES" = success && test "$TESTS" = success && test "$BUILD" = success
+          node --input-type=module - <<'JS'
+          import { readFileSync } from 'node:fs';
+          const result = JSON.parse(readFileSync(`${process.env.VERIFICATION_DIR}/tests.json`, 'utf8'));
+          if (!result.success || result.numFailedTests !== 0 || !(result.numPassedTests > 0)) throw new Error('Native suite is not passing');
+          JS
