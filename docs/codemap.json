@@ -10013,19 +10013,19 @@
           "name": "CertifiedDelivery",
           "kind": "interface",
           "signature": "interface CertifiedDelivery",
-          "doc": "Resolve and manage certified profiles with refresh and composition capabilities"
+          "doc": "Adapt certified prompt guidance without granting execution authority."
         },
         {
           "name": "CertifiedDeliveryConfig",
-          "kind": "interface",
-          "signature": "interface CertifiedDeliveryConfig",
-          "doc": "Define configuration options for delivering certified artifacts to a specified tenant target"
+          "kind": "type",
+          "signature": "type CertifiedDeliveryConfig",
+          "doc": "Pull coordinates, refresh cadence and timeout owned by the shared source."
         },
         {
           "name": "createCertifiedDelivery",
           "kind": "function",
-          "signature": "(config: CertifiedDeliveryConfig) => CertifiedDelivery",
-          "doc": "Build a certified-delivery transform for one agent target."
+          "signature": "(config: CertifiedPromptSourceOptions) => CertifiedDelivery",
+          "doc": null
         },
         {
           "name": "createOpenAICompatStreamTurn",
@@ -10181,7 +10181,7 @@
           "name": "ResolvedAgentProfile",
           "kind": "interface",
           "signature": "interface ResolvedAgentProfile",
-          "doc": "The agent's resolved profile surfaces for one turn — the things a delivered / certified `AgentProfile` can change."
+          "doc": "Prompt and explicitly authorized tools resolved by the application for one turn."
         },
         {
           "name": "ResolvedTangleExecutionKey",

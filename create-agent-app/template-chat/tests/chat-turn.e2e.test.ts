@@ -513,7 +513,7 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
       input_tokens: 40,
       output_tokens: 20,
       reasoning_tokens: 5,
-      tool_tokens: 0,
+      tool_tokens: null, // The producer did not report this subset.
       tool_call_count: 1,
       provider_cost_nanodollars: 12_300_000,
       total_cost_nanodollars: 12_300_000,
@@ -727,10 +727,10 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
     expect(receivedLimits).toMatchObject({
       maxInputTokens: config.gateway.maxProviderInputTokens,
       maxOutputTokens: 321,
-      maxReasoningTokens: 321,
-      maxToolTokens: 321,
       maxToolCalls: 8,
     })
+    expect(receivedLimits).not.toHaveProperty('maxReasoningTokens')
+    expect(receivedLimits).not.toHaveProperty('maxToolTokens')
     expect(receivedLimits?.maxProviderCostUsd).toBeGreaterThan(0)
   })
 
