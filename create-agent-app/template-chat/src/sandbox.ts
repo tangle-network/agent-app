@@ -145,12 +145,10 @@ export function createSandboxProduce(env: AppEnv) {
           ...(executionLimits?.maxReasoningTokens
             ? { maxReasoningTokens: executionLimits.maxReasoningTokens }
             : {}),
+          // Gateway output is inclusive of reasoning. Keep the same total
+          // ceiling even when a separate reasoning subset was authorized.
           ...(executionLimits?.maxOutputTokens !== undefined
-            && executionLimits.maxReasoningTokens !== undefined
-            ? {
-                maxTotalOutputTokens:
-                  executionLimits.maxOutputTokens + executionLimits.maxReasoningTokens,
-              }
+            ? { maxTotalOutputTokens: executionLimits.maxOutputTokens }
             : {}),
           harness: config.harness,
           systemPrompt: config.systemPrompt,
