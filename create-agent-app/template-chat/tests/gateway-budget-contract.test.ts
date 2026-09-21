@@ -46,7 +46,9 @@ async function dispatch(limits: ChatTurnProduceArgs<void>['executionLimits']) {
   })
   for await (const _event of producer.stream) { /* Drain the actual producer. */ }
   expect(boundary.stream).toHaveBeenCalledTimes(1)
-  return boundary.stream.mock.calls[0][3]
+  const call = boundary.stream.mock.calls[0]
+  if (!call) throw new Error('The actual producer did not call the native stream boundary')
+  return call[3]
 }
 
 describe('Gateway inclusive output budget at the native sandbox boundary', () => {
