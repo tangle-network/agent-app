@@ -7,6 +7,11 @@ const COMPOSED = {
   artifacts: {},
 }
 const response = (body: unknown) => Response.json(body)
+function pendingResponse() {
+  let resolve!: (value: Response) => void
+  const promise = new Promise<Response>(done => { resolve = done })
+  return { promise, resolve }
+}
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('Runtime certified source through the application profile seam', () => {
@@ -21,7 +26,7 @@ describe('Runtime certified source through the application profile seam', () => 
 
   it('makes composition wait for a forced refresh of a warm source', async () => {
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(60_000)
-    const pending = Promise.withResolvers<Response>()
+    const pending = pendingResponse()
     const fetchImpl = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(response(COMPOSED))
       .mockImplementationOnce(async () => pending.promise)
@@ -46,7 +51,7 @@ describe('Runtime certified source through the application profile seam', () => 
   })
 
   it('coalesces explicit refreshes rather than adding a second application cache', async () => {
-    const pending = Promise.withResolvers<Response>()
+    const pending = pendingResponse()
     const fetchImpl = vi.fn(async () => pending.promise)
     const delivery = createCertifiedDelivery({ target: 'test-agent', apiKey: 'k', fetchImpl })
     const refreshes = [delivery.refresh(), delivery.refresh(), delivery.refresh()]

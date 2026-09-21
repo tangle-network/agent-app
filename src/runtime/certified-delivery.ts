@@ -1,7 +1,7 @@
 /**
  * Application profile composition using Runtime's certified-guidance source.
  *
- * The shell adapts the prompt source to `createAgentRuntime.composeProfile`;
+ * The shell adapts the prompt source to the application's resolved profile;
  * Runtime owns pulling, cache lifetime, concurrent refresh and retained guidance.
  * Only prompt-compatible guidance is folded here. Tool definitions, execution
  * permissions, MCP servers and files are not installed from certified material.
