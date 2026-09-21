@@ -11,7 +11,7 @@ jobs:
   verify:
     if: github.repository == 'tangle-network/agent-app' && github.ref == 'refs/heads/feat/current-customer-cohort'
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 65
     env:
       NODE_OPTIONS: --max-old-space-size=4096
       VERIFICATION_DIR: /tmp/current-customer-cohort
@@ -23,6 +23,15 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
+      - name: Require the normally published Runtime release
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if pnpm view @tangle-network/agent-runtime@0.247.0 version --json > /tmp/runtime-version.json 2>/dev/null && node -e "if(require('/tmp/runtime-version.json')!=='0.247.0') process.exit(1)"; then exit 0; fi
+            sleep 10
+          done
+          echo '::error::Runtime 0.247.0 is not available; do not substitute an older or unpublished implementation.'
+          exit 1
       - name: Prepare the explicitly reviewed dependency migration
         shell: bash
         run: |
@@ -49,6 +58,8 @@ jobs:
             'create-agent-app/template-chat/tests/chat-turn.e2e.test.ts',
             'scripts/verify-current-cohort.mjs',
             '.github/workflows/current-cohort-workbench.yml',
+            'docs/api/runtime.md', 'docs/codemap.json', 'docs/llms-full.txt',
+            'docs/llms.txt', 'docs/CODEMAP.md',
           }
           changed = set(subprocess.check_output(['git','diff','--name-only'],text=True).splitlines())
           if changed - allowed:
@@ -58,10 +69,22 @@ jobs:
           git diff --cached --check
           git config user.name "$(git show -s --format=%an HEAD)"
           git config user.email "$(git show -s --format=%ae HEAD)"
-          git commit -m 'feat: adopt the verified native customer SDK cohort and inclusive budget contract'
+          git commit -m 'feat: adopt current native controls and shared certified delivery'
           git rev-parse HEAD > "$VERIFICATION_DIR/candidate.txt"
           git archive --format=tar.gz HEAD > "$VERIFICATION_DIR/source.tar.gz"
           git diff "$(cat "$VERIFICATION_DIR/base.txt")" HEAD > "$VERIFICATION_DIR/retained.patch"
+      - name: Capture the installed development toolchain
+        run: |
+          mkdir -p "$RUNNER_TEMP/cohort-toolchain"
+          tar -czf "$RUNNER_TEMP/cohort-toolchain/dependencies.tar.gz" node_modules
+          tar -czf "$RUNNER_TEMP/cohort-toolchain/node-runtime.tar.gz" -C "$(dirname "$(dirname "$(command -v node)")")" bin lib
+          cp "$VERIFICATION_DIR/source.tar.gz" "$VERIFICATION_DIR/candidate.txt" "$RUNNER_TEMP/cohort-toolchain/"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: current-cohort-toolchain
+          path: ${{ runner.temp }}/cohort-toolchain/
+          retention-days: 1
+          compression-level: 0
       - name: Run the unchanged source-head merge gate
         id: signoff
         continue-on-error: true

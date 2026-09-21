@@ -1,10 +1,10 @@
 // Temporary dependency maintenance, removed from the retained source commit.
-// Exact versions below were resolved from the registry and source-checked.
+// Consume registry artifacts only; no copied runtime source or hidden fallback.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import assert from 'node:assert/strict'
 const versions = {
-  '@tangle-network/agent-runtime': '0.246.0',
+  '@tangle-network/agent-runtime': '0.247.0',
   '@tangle-network/sandbox': '0.45.0',
   '@tangle-network/agent-knowledge': '17.0.2',
   '@tangle-network/agent-eval': '0.182.0',
@@ -20,10 +20,11 @@ for (const [name, version] of Object.entries(versions)) {
 }
 writeFileSync(`${process.env.VERIFICATION_DIR}/registry.json`, JSON.stringify(published, null, 2) + '\n')
 const ranges = {
-  '@tangle-network/agent-runtime': '>=0.246.0 <0.247.0',
+  '@tangle-network/agent-runtime': '>=0.247.0 <0.248.0',
   '@tangle-network/sandbox': '>=0.45.0 <0.46.0',
   '@tangle-network/agent-integrations': '>=0.54.2 <0.55.0',
   '@tangle-network/agent-knowledge': '^17.0.2',
+  '@tangle-network/agent-interface': '^2.10.0',
 }
 for (const file of ['package.json', 'create-agent-app/template/_package.json', 'create-agent-app/template-chat/_package.json']) {
   const manifest = JSON.parse(readFileSync(file, 'utf8'))
@@ -41,11 +42,11 @@ function replaceOnce(file, before, after) {
   assert.equal(source.split(before).length, 2, `Source changed; review ${file} before retrying`)
   writeFileSync(file, source.replace(before, after))
 }
-for (const [before, after] of [['0.231.0','0.245.999'],['0.231.1','0.246.0'],['0.231.9','0.246.999'],['0.232.0','0.247.0']]) {
+for (const [before, after] of [['0.231.0','0.246.999'],['0.231.1','0.247.0'],['0.231.9','0.247.999'],['0.232.0','0.248.0'],['2.6.0','2.9.999'],['2.6.1','2.10.0'],['2.6.9','2.10.999']]) {
   replaceOnce('src/peer-floors/check.test.ts', `satisfiesRange('${before}', range!)`, `satisfiesRange('${after}', range!)`)
 }
 // Gateway input/output are inclusive totals; reasoning/tool counts are optional
-// subsets. A missing measured subset is unknown, not a zero observation.
+// subsets. Missing subset telemetry is unknown, not a measured zero.
 replaceOnce('create-agent-app/template-chat/tests/chat-turn.e2e.test.ts',
   '      tool_tokens: 0,', '      tool_tokens: null, // The producer did not report this subset.')
 replaceOnce('create-agent-app/template-chat/tests/chat-turn.e2e.test.ts',
@@ -53,7 +54,6 @@ replaceOnce('create-agent-app/template-chat/tests/chat-turn.e2e.test.ts',
 replaceOnce('create-agent-app/template-chat/tests/chat-turn.e2e.test.ts',
   '    expect(receivedLimits?.maxProviderCostUsd).toBeGreaterThan(0)',
   "    expect(receivedLimits).not.toHaveProperty('maxReasoningTokens')\n    expect(receivedLimits).not.toHaveProperty('maxToolTokens')\n    expect(receivedLimits?.maxProviderCostUsd).toBeGreaterThan(0)")
-// Do not turn a subset into extra output authority at the native SDK boundary.
 replaceOnce('create-agent-app/template-chat/src/sandbox.ts',
   `          ...(executionLimits?.maxOutputTokens !== undefined
             && executionLimits.maxReasoningTokens !== undefined
