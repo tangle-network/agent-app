@@ -116,6 +116,7 @@ describe('createChatTurnRoutes — durable completion handoff', () => {
           handoffStarted()
           throwOnNextAppend = replayAppendThrows
           await args.handoffCompletion!()
+          expect(replayAppendFailed).toBe(replayAppendThrows)
 
           // This is the external Workflow settlement that was registered before
           // handoff. It must survive every later route event and EOF.
@@ -153,7 +154,6 @@ describe('createChatTurnRoutes — durable completion handoff', () => {
     const turnId = response.headers.get('x-turn-id')!
 
     expect(nativeDispatched).toBe(true)
-    expect(replayAppendFailed).toBe(replayAppendThrows)
     expect(lines.some((line) => line.type === 'text' && line.text === 'live after handoff')).toBe(true)
     expect(observed).toContain('error')
     expect(await turnStore.getStatus(turnId)).toBe('complete')
