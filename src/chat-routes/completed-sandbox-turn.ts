@@ -141,6 +141,21 @@ function projectMessageParts(parts: JsonRecord[], finalText: string): JsonRecord
   return finalizeAssistantParts(order, map, finalText)
 }
 
+/**
+ * Recover the durable content a Sandbox recorder attached to one assistant
+ * message. The caller is responsible for proving that the message belongs to
+ * the exact terminal turn; this projection deliberately makes no conclusion
+ * about whether that terminal state was completed or interrupted.
+ */
+export function recoverSandboxAssistantMessage(message: SessionMessage): DetachedTurnFinal {
+  const recovered = normalizedMessageParts(message)
+  return {
+    ...(recovered.derivedText ? { text: recovered.derivedText } : {}),
+    ...(hasUsage(recovered.usage) ? { usage: recovered.usage } : {}),
+    parts: projectMessageParts(recovered.parts, recovered.derivedText),
+  }
+}
+
 function hasUsage(usage: ChatTurnUsage): boolean {
   return Object.values(usage).some((value) =>
     typeof value === 'number' && Number.isFinite(value),

@@ -42,23 +42,34 @@ export interface CloudflareWorkflowStepLike {
 /** The states returned by the Sandbox `driveTurn` primitive. */
 export type DetachedTurnDriveState = TurnDriveResult['state']
 
+/** The small state contract a durable tick needs. Product observers may carry
+ * a richer terminal receipt than Sandbox's `TurnDriveResult`. */
+export interface DetachedTurnDriveResultLike {
+  state: DetachedTurnDriveState
+}
+
 /** The terminal result passed to product settlement. */
-export type DetachedTurnTerminalResult = Exclude<TurnDriveResult, { state: 'running' }>
+export type DetachedTurnTerminalResult<
+  TResult extends DetachedTurnDriveResultLike = TurnDriveResult,
+> = Exclude<TResult, { state: 'running' }>
 
 /** A drive call's retryable transport boundary. */
-export type DetachedTurnDriveOutcome = Outcome<TurnDriveResult>
+export type DetachedTurnDriveOutcome<
+  TResult extends DetachedTurnDriveResultLike = TurnDriveResult,
+> = Outcome<TResult>
 
 /** Options for one durable detached-turn Workflow run. */
 export interface DetachedTurnWorkflowTickOptions<
   TPayload extends DetachedTurnWorkflowIdentity,
   TSettled,
+  TResult extends DetachedTurnDriveResultLike = TurnDriveResult,
 > {
   event: CloudflareWorkflowEventLike<TPayload>
   step: CloudflareWorkflowStepLike
   /** One SDK drive pass. Rejected results must not enter the Workflow cache. */
-  drive: (payload: TPayload) => Promise<DetachedTurnDriveOutcome>
+  drive: (payload: TPayload) => Promise<DetachedTurnDriveOutcome<TResult>>
   /** Must be idempotent: the Worker can stop after the write but before commit. */
-  settle: (payload: TPayload, result: DetachedTurnTerminalResult) => Promise<TSettled>
+  settle: (payload: TPayload, result: DetachedTurnTerminalResult<TResult>) => Promise<TSettled>
   pollDelay?: CloudflareWorkflowSleepDuration
   stepName?: string
 }
@@ -79,7 +90,7 @@ function isKnownDriveState(state: unknown): state is DetachedTurnDriveState {
     || state === 'awaiting_plan_decision'
 }
 
-function checkedDriveResult(value: TurnDriveResult): TurnDriveResult {
+function checkedDriveResult<TResult extends DetachedTurnDriveResultLike>(value: TResult): TResult {
   const state = (value as { state?: unknown } | null)?.state
   if (!isKnownDriveState(state)) {
     throw new Error(`detached turn drive returned unknown state: ${String(state)}`)
@@ -96,8 +107,9 @@ function checkedDriveResult(value: TurnDriveResult): TurnDriveResult {
 export async function runDetachedTurnWorkflowTick<
   TPayload extends DetachedTurnWorkflowIdentity,
   TSettled,
+  TResult extends DetachedTurnDriveResultLike = TurnDriveResult,
 >(
-  options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>,
+  options: DetachedTurnWorkflowTickOptions<TPayload, TSettled, TResult>,
 ): Promise<TSettled> {
   assertIdentity(options.event?.payload)
   // Never allow a callback to change the admission identity for later passes.
@@ -105,16 +117,16 @@ export async function runDetachedTurnWorkflowTick<
   const name = options.stepName ?? 'detached-turn'
   const delay = options.pollDelay ?? '5 seconds'
   let attempt = 0
-  let terminalResult: DetachedTurnTerminalResult
+  let terminalResult: DetachedTurnTerminalResult<TResult>
   while (true) {
-    const driveResult = checkedDriveResult(await options.step.do(`${name}:drive:${attempt}`, async () => {
+    const driveResult = checkedDriveResult(await options.step.do<TResult>(`${name}:drive:${attempt}`, async () => {
       const outcome = await options.drive(payload)
       if (!outcome.succeeded) throw outcome.error
       return checkedDriveResult(outcome.value)
     }))
     // Validate replayed values as well, including checkpoints from older code.
     if (driveResult.state !== 'running') {
-      terminalResult = driveResult as DetachedTurnTerminalResult
+      terminalResult = driveResult as DetachedTurnTerminalResult<TResult>
       break
     }
     await options.step.sleep(`${name}:wait:${attempt}`, delay)

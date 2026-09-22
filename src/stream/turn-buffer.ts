@@ -179,6 +179,16 @@ export interface BufferedTurnTap {
   /** Settle the turn: final flush + set status. Call after the producer resolves
    *  ('complete') or rejects ('error'). 'error' flushes what was produced first. */
   done(status?: Extract<TurnStatus, 'complete' | 'error'>): Promise<void>
+  /**
+   * Give terminal-status ownership to an external durable runner. Stops this
+   * tap's running-lease renewal and flushes its current projection, but keeps
+   * `onEvent` available as an append-only live-observation path. Call it again
+   * when observation ends to flush events received after the handoff.
+   *
+   * A caller MUST have registered that durable owner before detaching: this
+   * method intentionally writes no replacement status.
+   */
+  detach(): Promise<void>
 }
 
 /**
@@ -202,6 +212,7 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
   let lastFlush = Date.now()
   let started = false
   let settled = false
+  let detached = false
   let renewalTimer: ReturnType<typeof setTimeout> | undefined
   let renewal: Promise<void> = Promise.resolve()
   let lastRenewedAt = 0
@@ -216,7 +227,7 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
   }
 
   function scheduleRenewal(): void {
-    if (settled || !opts.scopeId) return
+    if (settled || detached || !opts.scopeId) return
     clearRenewalTimer()
     const elapsedMs = Math.max(0, Date.now() - lastRenewedAt)
     const delayMs = Math.max(1, runningTurnRenewIntervalMs - elapsedMs)
@@ -232,7 +243,7 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
   }
 
   async function renewLease(): Promise<void> {
-    if (settled || !opts.scopeId) return
+    if (settled || detached || !opts.scopeId) return
     clearRenewalTimer()
     lastRenewedAt = Date.now()
     renewal = renewal
@@ -254,6 +265,10 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
   async function ensureStarted(): Promise<void> {
     if (started) return
     started = true
+    // An external durable owner may have detached before the first observed
+    // event. It owns status from that point, so this tap must never resurrect
+    // its running lease.
+    if (detached) return
     await opts.store.setStatus(opts.turnId, 'running', opts.scopeId)
     lastRenewedAt = Date.now()
     scheduleRenewal()
@@ -266,6 +281,7 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
       // awaiting remote I/O. A real event (including the route heartbeat)
       // therefore also renews any lease whose interval has elapsed.
       if (
+        !detached &&
         opts.scopeId &&
         Date.now() - lastRenewedAt >= runningTurnRenewIntervalMs
       ) {
@@ -289,6 +305,10 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
     },
     async done(status = 'complete') {
       await ensureStarted()
+      if (detached) {
+        await flush()
+        return
+      }
       settled = true
       clearRenewalTimer()
       await renewal
@@ -299,6 +319,15 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
       }
       await flush()
       await opts.store.setStatus(opts.turnId, 'complete', opts.scopeId)
+    },
+    async detach() {
+      detached = true
+      clearRenewalTimer()
+      // A renewal already queued before detach may be writing `running`. Wait
+      // for it before returning so the durable owner can safely publish a
+      // terminal status after the awaited handoff.
+      await renewal
+      await flush()
     },
   }
 }
