@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Wait for SDK removal before replacing a workspace sandbox under the same idempotency key.
+  Reject pending removal, and apply `forceNew` to stopped sandboxes as well as running sandboxes.
 - Update evaluator, execution, knowledge, and profile dependencies as one supported set.
   Generated applications use the same dependency versions.
 - Forward evaluator revisions and paid-call context through ensemble judges.
