@@ -13726,7 +13726,7 @@ interface DriveSandboxTurnOptions
 
 ### `ensureWorkspaceSandbox`
 
-`function` — Resolve or create a workspace sandbox instance with optional reuse and progress tracking
+`function` — Reuse a workspace sandbox, or remove its previous runtime before provisioning a replacement.
 
 ```ts
 (shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance>

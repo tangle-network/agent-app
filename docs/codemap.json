@@ -10638,7 +10638,7 @@
           "name": "ensureWorkspaceSandbox",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance>",
-          "doc": "Resolve or create a workspace sandbox instance with optional reuse and progress tracking"
+          "doc": "Reuse a workspace sandbox, or remove its previous runtime before provisioning a replacement."
         },
         {
           "name": "EnsureWorkspaceSandboxOptions",
