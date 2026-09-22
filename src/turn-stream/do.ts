@@ -517,6 +517,8 @@ export class TurnStreamDO {
         return jsonResponse({ error: 'Invalid turn-event row' }, 400)
       }
     }
+    const status = await this.state.storage.get<string>(TURN_STREAM_STORAGE_KEYS.turnStatus)
+    if (status === 'complete' || status === 'error') return jsonResponse({ appended: 0 })
     for (const row of events as Array<{ seq: number; event: string }>) {
       await this.state.storage.put(turnEventStorageKey(row.seq), row.event)
     }

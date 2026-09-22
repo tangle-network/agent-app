@@ -386,6 +386,18 @@ describe('TurnStreamDO turn-event storage (TurnEventStore contract)', () => {
       now.mockRestore()
     }
   })
+
+  it.each(['complete', 'error'] as const)('fences appends after %s through the real adapter and DO', async (status) => {
+    const { namespace } = harness()
+    const store = createDurableObjectTurnEventStore(namespace)
+
+    await store.setStatus(`terminal-${status}`, 'running', THREAD)
+    await store.append(`terminal-${status}`, [{ seq: 1, event: 'before' }])
+    await store.setStatus(`terminal-${status}`, status, THREAD)
+    await store.append(`terminal-${status}`, [{ seq: 2, event: 'too-late' }])
+
+    expect(await store.read(`terminal-${status}`, 0)).toEqual([{ seq: 1, event: 'before' }])
+  })
 })
 
 describe('TurnStreamDO product endpoint seam', () => {
