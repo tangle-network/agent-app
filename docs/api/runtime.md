@@ -48,7 +48,7 @@ interface CatalogModel
 
 ### `CertifiedDelivery`
 
-`interface` — Resolve and manage certified profiles with refresh and composition capabilities
+`interface` — Adapt certified prompt guidance without granting execution authority.
 
 ```ts
 interface CertifiedDelivery
@@ -56,18 +56,18 @@ interface CertifiedDelivery
 
 ### `CertifiedDeliveryConfig`
 
-`interface` — Define configuration options for delivering certified artifacts to a specified tenant target
+`type` — Pull coordinates, refresh cadence and timeout owned by the shared source.
 
 ```ts
-interface CertifiedDeliveryConfig
+type CertifiedDeliveryConfig
 ```
 
 ### `createCertifiedDelivery`
 
-`function` — Build a certified-delivery transform for one agent target.
+`function`
 
 ```ts
-(config: CertifiedDeliveryConfig) => CertifiedDelivery
+(config: CertifiedPromptSourceOptions) => CertifiedDelivery
 ```
 
 ### `createOpenAICompatStreamTurn`
@@ -272,7 +272,7 @@ class ProtectedModelSettlementError
 
 ### `ResolvedAgentProfile`
 
-`interface` — The agent's resolved profile surfaces for one turn — the things a delivered / certified `AgentProfile` can change.
+`interface` — Prompt and explicitly authorized tools resolved by the application for one turn.
 
 ```ts
 interface ResolvedAgentProfile
