@@ -1186,6 +1186,52 @@ describe('streamSandboxPrompt seam', () => {
     })
   })
 
+  it('fails and closes the source on a terminal process-failure status', async () => {
+    let nextCalls = 0
+    let sourceClosed = 0
+    const source: AsyncIterable<unknown> = {
+      [Symbol.asyncIterator]() {
+        return {
+          async next() {
+            nextCalls += 1
+            if (nextCalls === 1) {
+              return {
+                done: false,
+                value: {
+                  type: 'status',
+                  data: {
+                    type: 'status',
+                    status: 'failed',
+                    detail: 'Process exited with code null (killed by SIGTERM)',
+                  },
+                },
+              }
+            }
+            // This is the SDK failure mode: no terminal event follows the
+            // status, so a consumer that pulls again waits forever.
+            return new Promise<IteratorResult<unknown>>(() => {})
+          },
+          async return() {
+            sourceClosed += 1
+            return { done: true, value: undefined }
+          },
+        }
+      },
+    }
+    const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(source) })
+    const stream = streamSandboxPrompt(shell(), box, 'hello')
+
+    await expect(stream.next()).resolves.toMatchObject({
+      done: false,
+      value: expect.objectContaining({ type: 'status' }),
+    })
+    await expect(stream.next()).rejects.toThrow(
+      'Process exited with code null (killed by SIGTERM)',
+    )
+    expect(nextCalls).toBe(1)
+    expect(sourceClosed).toBeGreaterThan(0)
+  })
+
   it('detached mode admits once, then replays the exact session execution', async () => {
     async function* events() {
       yield { type: 'execution.started', data: { executionId: 'exec-1', sessionId: 'thread-1' } }

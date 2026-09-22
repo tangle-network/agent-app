@@ -281,6 +281,37 @@ function sandboxStreamErrorMessage(data: unknown): string {
   }
 }
 
+interface SandboxStatusFailure {
+  status: 'failed' | 'error'
+  message: string
+  code?: string
+}
+
+/**
+ * The sandbox sidecar emits process failures as `status` frames. The SDK's
+ * stream reader currently treats only `error` and `done` as terminal, so a
+ * failed status can be followed by an indefinitely open read. Recognize the
+ * frame at this boundary, where it can be converted to the producer's
+ * existing terminal-error vocabulary.
+ */
+function sandboxStatusFailure(event: JsonRecord): SandboxStatusFailure | null {
+  if (asString(event.type) !== 'status') return null
+  const data = asRecord(event.data)
+  const status = asString(data?.status) ?? asString(event.status)
+  if (status !== 'failed' && status !== 'error') return null
+
+  const message =
+    asString(data?.detail) ??
+    asString(data?.message) ??
+    asString(data?.error) ??
+    asString(data?.reason) ??
+    asString(event.detail) ??
+    asString(event.message) ??
+    `Sandbox stream reported ${status}`
+  const code = asString(data?.code) ?? asString(event.code)
+  return { status, message, ...(code ? { code } : {}) }
+}
+
 function toProducerWireEvent(event: JsonRecord): ProducerWireEvent {
   return event as unknown as ProducerWireEvent
 }
@@ -496,6 +527,19 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
     }
   }
 
+  function* emitStreamError(event: JsonRecord): Generator<ProducerWireEvent, void, unknown> {
+    const message = sandboxStreamErrorMessage(event.data)
+    const errorContent = fullText.trim()
+      ? `The sandbox model stream stopped before a clean completion.\n\nError: ${message}`
+      : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`
+    const errorDelta = fullText ? `\n\n---\n${errorContent}` : errorContent
+    fullText += errorDelta
+    interactionOutcome = 'expired'
+    yield { type: 'text', text: errorDelta }
+    yield* emitTerminalizedTools()
+    yield toProducerWireEvent(event)
+  }
+
   async function* stream(): AsyncGenerator<ProducerWireEvent, void, unknown> {
     try {
       for await (const raw of source) {
@@ -510,6 +554,24 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         const event: StreamEvent = normalized.type === 'message.part.updated'
           ? normalized
           : { type: record.type, data: asRecord(record.data) }
+
+        const statusFailure = sandboxStatusFailure(record)
+        if (statusFailure) {
+          // Keep the sidecar status visible to raw consumers, then synthesize
+          // the terminal event the route and clients already understand. The
+          // return is deliberate: it closes a source that can otherwise wait
+          // forever for the SDK's missing terminal frame.
+          yield toProducerWireEvent(record)
+          yield* emitStreamError({
+            type: 'error',
+            data: {
+              message: statusFailure.message,
+              code: statusFailure.code ?? 'sandbox.stream_failed',
+              details: { sourceStatus: statusFailure.status },
+            },
+          })
+          return
+        }
 
         if (event.type === 'message.part.updated') {
           const part = asRecord(event.data?.part)
@@ -774,16 +836,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         }
 
         if (event.type === 'error') {
-          const message = sandboxStreamErrorMessage(event.data)
-          const errorContent = fullText.trim()
-            ? `The sandbox model stream stopped before a clean completion.\n\nError: ${message}`
-            : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`
-          const errorDelta = fullText ? `\n\n---\n${errorContent}` : errorContent
-          fullText += errorDelta
-          interactionOutcome = 'expired'
-          yield { type: 'text', text: errorDelta }
-          yield* emitTerminalizedTools()
-          yield toProducerWireEvent(record)
+          yield* emitStreamError(record)
           continue
         }
 

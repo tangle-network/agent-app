@@ -3116,6 +3116,15 @@ export async function* streamSandboxPrompt(
       if (severedFinishReason && isTerminalPromptEvent(event)) {
         throw new Error(`sandbox model stream severed mid-turn (reason="${severedFinishReason}")`)
       }
+      const statusFailure = classifySandboxStatusFailure(event)
+      if (statusFailure) {
+        // Keep the sidecar frame available to observers, then fail immediately.
+        // The SDK currently waits for `done`/`error` only, so a process failure
+        // status can otherwise leave this generator awaiting the next event
+        // forever after the sidecar has already stopped.
+        yield event
+        throw sandboxStatusFailureError(statusFailure)
+      }
       if (options?.disallowQuestions) {
         const q = detectInteractiveQuestion(event)
         if (q) {
@@ -3534,6 +3543,44 @@ export type SandboxStepTransition =
 
 function asPlainRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
+}
+
+interface SandboxStatusFailure {
+  status: 'failed' | 'error'
+  message: string
+  code?: string
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined
+}
+
+/** Recognize a terminal process status before the SDK waits for another frame. */
+function classifySandboxStatusFailure(event: unknown): SandboxStatusFailure | null {
+  const root = asPlainRecord(event)
+  if (!root || root.type !== 'status') return null
+  const data = asPlainRecord(root.data)
+  const status = nonEmptyString(data?.status) ?? nonEmptyString(root.status)
+  if (status !== 'failed' && status !== 'error') return null
+  const message =
+    nonEmptyString(data?.detail) ??
+    nonEmptyString(data?.message) ??
+    nonEmptyString(data?.error) ??
+    nonEmptyString(data?.reason) ??
+    nonEmptyString(root.detail) ??
+    nonEmptyString(root.message) ??
+    `Sandbox stream reported ${status}`
+  const code = nonEmptyString(data?.code) ?? nonEmptyString(data?.errorCode) ?? nonEmptyString(root.code)
+  return { status, message, ...(code ? { code } : {}) }
+}
+
+function sandboxStatusFailureError(failure: SandboxStatusFailure): Error & { code?: string; errorCode?: string } {
+  const error = new Error(failure.message) as Error & { code?: string; errorCode?: string }
+  if (failure.code) {
+    error.code = failure.code
+    error.errorCode = failure.code
+  }
+  return error
 }
 
 /** Resolve the severed stream event to a corresponding sandbox step transition or null */

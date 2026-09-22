@@ -1088,6 +1088,76 @@ describe('createChatTurnRoutes — product seams', () => {
     expect(calls[0]!.assistantMessageId).toBeNull()
   })
 
+  it('promotes a failed sandbox status into a terminal error before the source can hang', async () => {
+    let nextCalls = 0
+    let sourceClosed = 0
+    const calls: Array<{ failed: boolean; failureReason?: string; finalText: string }> = []
+    const lifecycleEvents: string[] = []
+    const events: AsyncIterable<unknown> = {
+      [Symbol.asyncIterator]() {
+        return {
+          async next() {
+            nextCalls += 1
+            if (nextCalls === 1) {
+              return {
+                done: false,
+                value: {
+                  type: 'status',
+                  data: {
+                    type: 'status',
+                    status: 'failed',
+                    detail: 'Process exited with code null (killed by SIGTERM)',
+                  },
+                },
+              }
+            }
+            // The SDK currently waits forever after this status frame. The
+            // producer must close the source instead of pulling this promise.
+            return new Promise<IteratorResult<unknown>>(() => {})
+          },
+          async return() {
+            sourceClosed += 1
+            return { done: true, value: undefined }
+          },
+        }
+      },
+    }
+    const { routes, rows, ctx, pending, turnStore } = makeRoutes({
+      produce: () => createSandboxChatProducer({ events }),
+      onTurnComplete: async ({ failed, failureReason, finalText }) => {
+        calls.push({ failed, ...(failureReason ? { failureReason } : {}), finalText })
+      },
+      lifecycle: {
+        onTurnStart: () => { lifecycleEvents.push('start') },
+        onTurnError: () => { lifecycleEvents.push('error') },
+      },
+    })
+
+    const lines = await readLines(
+      (await routes.turn(turnRequest({ threadId: 't-status-failed', content: 'q' }), ctx)).body!,
+    )
+    await Promise.all(pending)
+
+    expect(nextCalls).toBe(1)
+    expect(sourceClosed).toBeGreaterThan(0)
+    expect(lines).toContainEqual(expect.objectContaining({
+      type: 'error',
+      data: expect.objectContaining({
+        message: expect.stringContaining('Process exited with code null (killed by SIGTERM)'),
+      }),
+    }))
+    expect(await turnStore.getStatus(lines[0]!.turnId as string)).toBe('error')
+    expect(rows.find((row) => row.role === 'assistant')?.content).toContain(
+      'Process exited with code null (killed by SIGTERM)',
+    )
+    expect(calls).toEqual([expect.objectContaining({
+      failed: true,
+      failureReason: expect.stringContaining('Process exited with code null (killed by SIGTERM)'),
+      finalText: expect.stringContaining('Process exited with code null (killed by SIGTERM)'),
+    })])
+    expect(lifecycleEvents).toEqual(['start', 'error'])
+  })
+
   it('persists partial content and reports failed:true when the producer catches a severed stream', async () => {
     const calls: Array<{ failed: boolean; failureReason?: string; finalText: string; assistantMessageId: string | null }> = []
     const { routes, rows, ctx, pending } = makeRoutes({
