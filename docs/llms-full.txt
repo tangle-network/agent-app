@@ -1597,6 +1597,14 @@ Source: `src/chat-routes/index.ts` · depends on `chat-store`, `interactions`, `
 type AbortAttachmentWriteFn
 ```
 
+### `aggregateNativeCompletionReceipts`
+
+`function` — Assemble admitted exact receipts in dispatch order.
+
+```ts
+(turns: readonly NativeCompletionTurnReceipt[]) => NativeCompletionReceipt
+```
+
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
 `const` — Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats `sniffBinary` can identify from content among the accepted types.
@@ -2653,12 +2661,76 @@ class ModelFailoverTimeoutError
 interface ModelFallbackInfo
 ```
 
+### `NativeCompletionAdmission`
+
+`interface`
+
+```ts
+interface NativeCompletionAdmission
+```
+
+### `NativeCompletionAdmissionStore`
+
+`interface` — Product persistence for the one admission that authorizes this observer.
+
+```ts
+interface NativeCompletionAdmissionStore
+```
+
+### `NativeCompletionObservation`
+
+`type`
+
+```ts
+type NativeCompletionObservation
+```
+
+### `NativeCompletionObservationOptions`
+
+`interface`
+
+```ts
+interface NativeCompletionObservationOptions
+```
+
+### `NativeCompletionReceipt`
+
+`interface`
+
+```ts
+interface NativeCompletionReceipt
+```
+
+### `NativeCompletionSessionSource`
+
+`type` — The official Sandbox reads needed for exact native completion observation.
+
+```ts
+type NativeCompletionSessionSource
+```
+
+### `NativeCompletionTurnReceipt`
+
+`interface` — One exact turn receipt before an admission's ordered aggregate.
+
+```ts
+interface NativeCompletionTurnReceipt
+```
+
 ### `normalizeChatPromptForSandbox`
 
 `function` — Convert the browser-safe chat attachment contract into the current sandbox prompt contract.
 
 ```ts
 (prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]
+```
+
+### `observeNativeCompletion`
+
+`function` — Observe only the turns admitted under `executionId`.
+
+```ts
+(options: NativeCompletionObservationOptions) => Promise<NativeCompletionObservation>
 ```
 
 ### `OOXML_PRESENTATION_MACRO_ENABLED_MIME`
@@ -2939,6 +3011,14 @@ interface ReconcileStaleTurnLockOptions
 
 ```ts
 interface ReconcileStaleTurnLockResult
+```
+
+### `recoverSandboxAssistantMessage`
+
+`function` — Recover the durable content a Sandbox recorder attached to one assistant message.
+
+```ts
+(message: SessionMessage) => DetachedTurnFinal
 ```
 
 ### `resolveChatAttachments`
@@ -11461,7 +11541,7 @@ Source: `src/preflight/cli.ts` · depends on `alerting`, `signoff`
 
 ## `./preset-cloudflare`
 
-Source: `src/preset-cloudflare/index.ts` · depends on `billing`, `crypto`, `knowledge`, `sandbox`, `tools`, `web`
+Source: `src/preset-cloudflare/index.ts` · depends on `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`, `web`
 
 ### `CloudflareHeadersRule`
 
@@ -11647,6 +11727,22 @@ interface DrizzleSqliteCoreLike
 interface EnsureCloudflareWorkflowInstanceResult
 ```
 
+### `NativeCompletionWorkflowOptions`
+
+`interface`
+
+```ts
+interface NativeCompletionWorkflowOptions
+```
+
+### `NativeCompletionWorkflowPayload`
+
+`interface` — Stable identity required to resume a registered native completion.
+
+```ts
+interface NativeCompletionWorkflowPayload
+```
+
 ### `PRESET_MIGRATION_SQL`
 
 `const` — Plain DDL for the preset schema — run by a consumer to create the tables with ZERO drizzle (`for (const sql of PRESET_MIGRATION_SQL) await db.prepare(sql).run()`, or paste into a `.sql` migration).
@@ -11700,7 +11796,15 @@ interface PresetToolHandlerOptions
 `function` — Drive a detached SDK turn with durable steps, not an HTTP waitUntil lifetime.
 
 ```ts
-<TPayload extends DetachedTurnWorkflowIdentity, TSettled>(options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>)…
+<TPayload extends DetachedTurnWorkflowIdentity, TSettled, TResult extends DetachedTurnDriveResultLike = TurnDriveResult…
+```
+
+### `runNativeCompletionWorkflow`
+
+`function` — Drive exact observation through durable retry steps, then run the terminal sequence once.
+
+```ts
+<TPayload extends NativeCompletionWorkflowPayload, TMessageId>(options: NativeCompletionWorkflowOptions<TPayload, TMess…
 ```
 
 ### `VaultKv`

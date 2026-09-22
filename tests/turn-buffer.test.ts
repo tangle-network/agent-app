@@ -279,6 +279,21 @@ describe('pumpBufferedTurn + replayTurnEvents', () => {
     ])
   })
 
+  it('flushes detached events before terminal status and fences later appends', async () => {
+    const store = createMemoryTurnEventStore()
+    const tap = createBufferedTurnTap({ store, turnId: 'handoff-race' })
+
+    await tap.onEvent(text('before'))
+    await tap.detach()
+    await tap.onEvent(text('after'))
+    await store.setStatus('handoff-race', 'complete')
+    await tap.onEvent(text('too late'))
+
+    const rows = await collect(replayTurnEvents({ store, turnId: 'handoff-race', pollMs: 1 }))
+    expect(rows.filter((row) => row.seq > 0).map((row) => JSON.parse(row.event).event.text)).toEqual(['before', 'after'])
+    expect(JSON.parse(rows.at(-1)!.event)).toEqual({ type: 'turn_status', status: 'complete' })
+  })
+
   it('follows a still-running turn until it completes', async () => {
     const store = createMemoryTurnEventStore()
     await store.setStatus('t4', 'running')
@@ -343,20 +358,24 @@ describe('turn-event retention', () => {
 
   async function seed(store: TurnEventStore, now: { value: number }) {
     now.value = 100
-    await store.setStatus('old-complete', 'complete', 'thread-1')
+    await store.setStatus('old-complete', 'running', 'thread-1')
     await store.append('old-complete', [{ seq: 1, event: 'old-complete-event' }])
+    await store.setStatus('old-complete', 'complete', 'thread-1')
 
     now.value = 200
-    await store.setStatus('old-error', 'error', 'thread-1')
+    await store.setStatus('old-error', 'running', 'thread-1')
     await store.append('old-error', [{ seq: 1, event: 'old-error-event' }])
+    await store.setStatus('old-error', 'error', 'thread-1')
 
     now.value = 300
-    await store.setStatus('at-cutoff', 'complete', 'thread-1')
+    await store.setStatus('at-cutoff', 'running', 'thread-1')
     await store.append('at-cutoff', [{ seq: 1, event: 'at-cutoff-event' }])
+    await store.setStatus('at-cutoff', 'complete', 'thread-1')
 
     now.value = 400
-    await store.setStatus('new-complete', 'complete', 'thread-1')
+    await store.setStatus('new-complete', 'running', 'thread-1')
     await store.append('new-complete', [{ seq: 1, event: 'new-complete-event' }])
+    await store.setStatus('new-complete', 'complete', 'thread-1')
 
     now.value = 0
     await store.setStatus('old-running', 'running', 'thread-1')
@@ -368,10 +387,12 @@ describe('turn-event retention', () => {
     const d1 = d1TurnStore()
     try {
       for (const store of [memory, d1.store]) {
-        await store.setStatus('delete-me', 'complete', 'thread-1')
+        await store.setStatus('delete-me', 'running', 'thread-1')
         await store.append('delete-me', [{ seq: 1, event: 'delete-me-event' }])
-        await store.setStatus('keep-me', 'complete', 'thread-1')
+        await store.setStatus('delete-me', 'complete', 'thread-1')
+        await store.setStatus('keep-me', 'running', 'thread-1')
         await store.append('keep-me', [{ seq: 1, event: 'keep-me-event' }])
+        await store.setStatus('keep-me', 'complete', 'thread-1')
 
         await store.deleteTurn!('delete-me')
 
@@ -426,8 +447,9 @@ describe('turn-event retention', () => {
   it('rolls back event deletion when the status deletion fails', async () => {
     const d1 = d1TurnStore()
     try {
-      await d1.store.setStatus('atomic-turn', 'complete', 'thread-1')
+      await d1.store.setStatus('atomic-turn', 'running', 'thread-1')
       await d1.store.append('atomic-turn', [{ seq: 1, event: 'atomic-event' }])
+      await d1.store.setStatus('atomic-turn', 'complete', 'thread-1')
       d1.exec(`
         CREATE TRIGGER fail_turn_status_delete
         BEFORE DELETE ON turn_status
@@ -447,8 +469,9 @@ describe('turn-event retention', () => {
   it('rolls back pruning when terminal status deletion fails', async () => {
     const d1 = d1TurnStore()
     try {
-      await d1.store.setStatus('prune-atomic-turn', 'error', 'thread-1')
+      await d1.store.setStatus('prune-atomic-turn', 'running', 'thread-1')
       await d1.store.append('prune-atomic-turn', [{ seq: 1, event: 'prune-atomic-event' }])
+      await d1.store.setStatus('prune-atomic-turn', 'error', 'thread-1')
       d1.exec(`
         CREATE TRIGGER fail_terminal_status_delete
         BEFORE DELETE ON turn_status

@@ -75,6 +75,7 @@ import {
   replayTurnEvents,
   resolveChatTurn,
   stampReplaySeq,
+  type BufferedTurnTap,
   type PersistedChatMessageForTurn,
   type TurnEventStore,
 } from '../stream/index'
@@ -292,6 +293,17 @@ export interface ChatTurnProduceArgs<TContext> {
    *    resolved without a usable id.
    *  - a string — the row id, for `contextGate`, `beforeTurn`, and `produce`. */
   userMessageId?: string | null
+  /**
+   * Transfer completion ownership to a product-owned durable runner. The
+   * product MUST first register that runner durably, then await this callback
+   * before dispatching native execution. Once it resolves, this route remains
+   * a live event projector only: it no longer writes or settles the assistant
+   * transcript, lifecycle hooks, lock, or replay-buffer status.
+   *
+   * Optional for source compatibility with synthetic producers. Every
+   * `createChatTurnRoutes` invocation supplies it before `produce` runs.
+   */
+  handoffCompletion?: () => Promise<void>
 }
 
 /** One event as it crosses the route: the producer's own vocabulary, or an
@@ -830,6 +842,35 @@ export function createChatTurnRoutes<TContext = void>(
     // insert, `beforeTurn`'s patch after that), so a seam that captured the
     // object never sees it change underneath. `produce` reads the last
     // version because the engine defers its first pull.
+    // A product calls this only after it has durably registered the external
+    // completion owner and before it dispatches native execution. Keeping the
+    // public field optional preserves existing synthetic producers; this
+    // assembled route always supplies it to the real `produce` invocation.
+    let draft: AssistantDraftWriter | undefined
+    let tap: BufferedTurnTap | undefined
+    let completionHandoff = false
+    let completionHandoffPromise: Promise<void> | undefined
+    const handoffCompletion = (): Promise<void> => {
+      if (!completionHandoffPromise) {
+        completionHandoffPromise = (async () => {
+          // Switch first: an event arriving while the prior draft write closes
+          // must stay live-only and cannot arm another draft write or renewal.
+          completionHandoff = true
+          try {
+            await tap?.detach()
+          } catch (err) {
+            log('[chat-routes] turn buffer detach failed', {
+              turnId: turnStreamId,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          }
+          // `close` waits for the draft writer's in-flight write. The durable
+          // owner can therefore safely replace that draft after this resolves.
+          await draft?.close()
+        })()
+      }
+      return completionHandoffPromise
+    }
     let produceArgs: ChatTurnProduceArgs<TContext> = {
       request,
       body: payload,
@@ -839,6 +880,7 @@ export function createChatTurnRoutes<TContext = void>(
       executionId,
       turnStreamId,
       priorMessages: chatTurn.priorMessages,
+      handoffCompletion,
       ...(ctx?.executionLimits ? { executionLimits: ctx.executionLimits } : {}),
     }
 
@@ -849,7 +891,10 @@ export function createChatTurnRoutes<TContext = void>(
     let lockHandle: unknown
     let lockReleased = false
     const releaseLock = async (): Promise<void> => {
-      if (!lockAcquired || lockReleased) return
+      // `handoffCompletion` transfers the route-acquired lock to the durable
+      // owner too. Keep the legacy contextGate `{proceed:'handoff'}` path
+      // unchanged when that callback was never invoked.
+      if (completionHandoff || !lockAcquired || lockReleased) return
       lockReleased = true
       try {
         await options.turnLock!.release(lockHandle)
@@ -872,7 +917,6 @@ export function createChatTurnRoutes<TContext = void>(
     // synchronously before the drain — the drain would otherwise be the only
     // path that runs the terminal hook.
     let producer: ChatTurnRouteProducer | undefined
-    let draft: AssistantDraftWriter | undefined
     // Set once persistence settles; `undefined` means it never ran.
     let assistantMessageId: string | null | undefined
     /** The assistant row this turn ended with. Falls back to the draft writer
@@ -964,6 +1008,7 @@ export function createChatTurnRoutes<TContext = void>(
         }
         if (!gate.proceed) {
           await releaseLock()
+          if (completionHandoff) return gate.response
           // A gated turn is still a TURN, and until now it was the one answer
           // path that fired no lifecycle hook at all — `turnStarted` is set
           // further down, so an early return here left telemetry with no record
@@ -1004,7 +1049,7 @@ export function createChatTurnRoutes<TContext = void>(
       // Durability tap: every engine event buffers (coalesced) so a dropped
       // client replays the tail. Live delivery rides the Response body, not the
       // tap, so `write` is intentionally absent.
-      const tap = createBufferedTurnTap({
+      tap = createBufferedTurnTap({
         store: options.turnStore,
         turnId: turnStreamId,
         scopeId: payload.threadId,
@@ -1012,6 +1057,7 @@ export function createChatTurnRoutes<TContext = void>(
       })
       const turnMarker = { type: 'turn', turnId: turnStreamId }
       await tap.onEvent(turnMarker)
+      if (completionHandoff) await tap.detach()
 
       // Durable projection: the turn buffer above serves LIVE reconnect; this
       // keeps the persisted transcript at most one cadence interval behind, so
@@ -1039,6 +1085,10 @@ export function createChatTurnRoutes<TContext = void>(
           ...(options.transformFinalText ? { transformText: options.transformFinalText } : {}),
           log,
         })
+        // `contextGate` / `beforeTurn` may have handed ownership off before
+        // the writer existed. Close this late-created writer immediately so it
+        // cannot receive a later live event.
+        if (completionHandoff) await draft.close()
       }
 
       turnStartedAtMs = Date.now()
@@ -1085,14 +1135,15 @@ export function createChatTurnRoutes<TContext = void>(
               runFailed = true
               lastFailureData = event.data
             }
-            await tap.onEvent(event)
+            await tap!.onEvent(event)
             // Synchronous bookkeeping; the write it may start is fire-and-
             // forget, so store latency never back-pressures the live stream.
-            draft?.notify(event)
+            if (!completionHandoff) draft?.notify(event)
             if (options.onEvent) await options.onEvent(event, context)
           },
           ...(options.transformFinalText ? { transformFinalText: options.transformFinalText } : {}),
           persistAssistantMessage: async ({ finalText }) => {
+            if (completionHandoff) return
             if (ctx?.cancelOnDisconnect && request.signal.aborted) {
               await draft?.discard()
               assistantMessageId = null
@@ -1168,7 +1219,8 @@ export function createChatTurnRoutes<TContext = void>(
                 // (not a throw) still lands here — so surface `runFailed` so the
                 // product skips billing an errored turn instead of marking it
                 // complete with empty text.
-                onTurnComplete: ({ identity: turnIdentity, finalText }: { identity: ChatTurnIdentity; finalText: string }) => {
+                onTurnComplete: async ({ identity: turnIdentity, finalText }: { identity: ChatTurnIdentity; finalText: string }) => {
+                  if (completionHandoff) return
                   // Read AFTER the drain, so the model reported to billing is
                   // the one that actually served — a fallback included.
                   const failoverInfo = producer?.modelFailover?.()
@@ -1219,6 +1271,13 @@ export function createChatTurnRoutes<TContext = void>(
         // to close the writer, and an unawaited write would race the isolate's
         // teardown — leaving a torn row instead of a clean partial one for a
         // re-entered turn to adopt.
+        if (completionHandoff) {
+          // The external owner settles transcript, lifecycle, lock and replay
+          // status. Flush only the post-handoff live projection; EOF is an
+          // observation stop, never a terminal verdict for that owner.
+          await tap.detach()
+          return
+        }
         if (ctx?.cancelOnDisconnect && request.signal.aborted) {
           await draft?.discard()
         } else {
@@ -1260,8 +1319,10 @@ export function createChatTurnRoutes<TContext = void>(
       // lifecycle-start, tap setup, engine construction, tee). If the turn had
       // already started, settle the lifecycle with `onTurnError` (close the
       // span) — the drain never ran to do it. Then release the lock, propagate.
-      if (turnStarted) await fireTerminalLifecycle(true, err)
-      await releaseLock()
+      if (!completionHandoff) {
+        if (turnStarted) await fireTerminalLifecycle(true, err)
+        await releaseLock()
+      }
       throw err
     }
   }

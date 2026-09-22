@@ -4,7 +4,7 @@
 
 Source: `src/preset-cloudflare/index.ts`
 
-31 exports.
+34 exports.
 
 ### `CloudflareHeadersRule`
 
@@ -190,6 +190,22 @@ interface DrizzleSqliteCoreLike
 interface EnsureCloudflareWorkflowInstanceResult
 ```
 
+### `NativeCompletionWorkflowOptions`
+
+`interface`
+
+```ts
+interface NativeCompletionWorkflowOptions
+```
+
+### `NativeCompletionWorkflowPayload`
+
+`interface` — Stable identity required to resume a registered native completion.
+
+```ts
+interface NativeCompletionWorkflowPayload
+```
+
 ### `PRESET_MIGRATION_SQL`
 
 `const` — Plain DDL for the preset schema — run by a consumer to create the tables with ZERO drizzle (`for (const sql of PRESET_MIGRATION_SQL) await db.prepare(sql).run()`, or paste into a `.sql` migration).
@@ -243,7 +259,15 @@ interface PresetToolHandlerOptions
 `function` — Drive a detached SDK turn with durable steps, not an HTTP waitUntil lifetime.
 
 ```ts
-<TPayload extends DetachedTurnWorkflowIdentity, TSettled>(options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>)…
+<TPayload extends DetachedTurnWorkflowIdentity, TSettled, TResult extends DetachedTurnDriveResultLike = TurnDriveResult…
+```
+
+### `runNativeCompletionWorkflow`
+
+`function` — Drive exact observation through durable retry steps, then run the terminal sequence once.
+
+```ts
+<TPayload extends NativeCompletionWorkflowPayload, TMessageId>(options: NativeCompletionWorkflowOptions<TPayload, TMess…
 ```
 
 ### `VaultKv`

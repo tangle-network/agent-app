@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-200 exports.
+210 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -12,6 +12,14 @@ Source: `src/chat-routes/index.ts`
 
 ```ts
 type AbortAttachmentWriteFn
+```
+
+### `aggregateNativeCompletionReceipts`
+
+`function` — Assemble admitted exact receipts in dispatch order.
+
+```ts
+(turns: readonly NativeCompletionTurnReceipt[]) => NativeCompletionReceipt
 ```
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
@@ -1070,12 +1078,76 @@ class ModelFailoverTimeoutError
 interface ModelFallbackInfo
 ```
 
+### `NativeCompletionAdmission`
+
+`interface`
+
+```ts
+interface NativeCompletionAdmission
+```
+
+### `NativeCompletionAdmissionStore`
+
+`interface` — Product persistence for the one admission that authorizes this observer.
+
+```ts
+interface NativeCompletionAdmissionStore
+```
+
+### `NativeCompletionObservation`
+
+`type`
+
+```ts
+type NativeCompletionObservation
+```
+
+### `NativeCompletionObservationOptions`
+
+`interface`
+
+```ts
+interface NativeCompletionObservationOptions
+```
+
+### `NativeCompletionReceipt`
+
+`interface`
+
+```ts
+interface NativeCompletionReceipt
+```
+
+### `NativeCompletionSessionSource`
+
+`type` — The official Sandbox reads needed for exact native completion observation.
+
+```ts
+type NativeCompletionSessionSource
+```
+
+### `NativeCompletionTurnReceipt`
+
+`interface` — One exact turn receipt before an admission's ordered aggregate.
+
+```ts
+interface NativeCompletionTurnReceipt
+```
+
 ### `normalizeChatPromptForSandbox`
 
 `function` — Convert the browser-safe chat attachment contract into the current sandbox prompt contract.
 
 ```ts
 (prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]
+```
+
+### `observeNativeCompletion`
+
+`function` — Observe only the turns admitted under `executionId`.
+
+```ts
+(options: NativeCompletionObservationOptions) => Promise<NativeCompletionObservation>
 ```
 
 ### `OOXML_PRESENTATION_MACRO_ENABLED_MIME`
@@ -1356,6 +1428,14 @@ interface ReconcileStaleTurnLockOptions
 
 ```ts
 interface ReconcileStaleTurnLockResult
+```
+
+### `recoverSandboxAssistantMessage`
+
+`function` — Recover the durable content a Sandbox recorder attached to one assistant message.
+
+```ts
+(message: SessionMessage) => DetachedTurnFinal
 ```
 
 ### `resolveChatAttachments`

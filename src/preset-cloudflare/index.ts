@@ -70,6 +70,12 @@ export {
 } from './detached-turn-workflow'
 
 export {
+  runNativeCompletionWorkflow,
+  type NativeCompletionWorkflowOptions,
+  type NativeCompletionWorkflowPayload,
+} from './native-completion-workflow'
+
+export {
   renderCloudflareHeadersFile,
   type CloudflareHeadersRule,
 } from './headers'

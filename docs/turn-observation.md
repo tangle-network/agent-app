@@ -25,7 +25,9 @@ A buffer, cursor or `waitUntil` promise is not a durable job owner. Cloudflare H
 
 `runDetachedTurnWorkflowTick` validates the SDK result inside `step.do` before it is committed. A malformed provider response can then be retried, rather than being replayed indefinitely from a poisoned step. A copied, frozen top-level admission payload prevents drive callbacks from changing session/turn identity between passes. Settlement remains caller-owned and must be idempotent; an external write may have succeeded before its step acknowledgement was lost.
 
-The focused tests simulate successful-step replay and independently test read-side framing. They do not establish deployed Workflow behavior, sandbox survival, arbitrary-duration service limits, or a product's adoption of durable settlement. GTM's hosted recorder consumes the read-side helpers; GTM still needs a durable owner for its completion path before claiming browser-independent completion.
+The focused tests simulate successful-step replay and independently test read-side framing.
+They do not establish deployed Workflow behavior, sandbox survival, or arbitrary-duration service limits.
+Each product must verify its deployed completion path by leaving a running turn and checking the retained result.
 
 Reference: https://developers.cloudflare.com/workers/platform/limits/ and the existing `src/preset-cloudflare/detached-turn-workflow.ts`.
 
@@ -47,3 +49,49 @@ execution. A completed buffer without either a retained result or its assistant
 row is not reported as an empty success. Cached recovery keeps usage already
 stored on that row when a newer exact receipt omits it; measured zero remains
 zero and unknown usage is not synthesized.
+
+## Native chat completion
+
+Use `observeNativeCompletion` with `runNativeCompletionWorkflow` when another request dispatches the native execution.
+The observer reads admitted execution records and never sends a prompt or cancels work.
+It preserves partial output from failed turns and aggregates receipts in admission order.
+Missing usage remains unknown.
+
+Register the Workflow before native dispatch, using stable session, execution, and replay identities.
+Then call `await args.handoffCompletion()` from the assembled route's producer.
+That handoff stops request-owned transcript writes, terminal hooks, replay status writes, and lock release.
+Live events can continue while the Workflow owns completion.
+The default route retains its existing behavior when no handoff occurs.
+
+```ts
+await runNativeCompletionWorkflow({
+  event,
+  step,
+  observe: async payload => observeNativeCompletion({
+    source: await resolveSandbox(payload),
+    admissionStore,
+    executionId: payload.turnId,
+    sessionId: payload.sessionId,
+    turnId: payload.turnId,
+    registeredAt: payload.registeredAt,
+  }),
+  prepare: prepareProductOutput,
+  persistTranscript: persistStableAssistantRow,
+  settle: settleProductRecords,
+  finalizeBuffer: finishReplay,
+  releaseLock: releaseProductLock,
+})
+```
+
+Products own their storage, authorization, continuation policy, billing ownership, and file reconciliation.
+Reserve each continuation atomically before dispatch and prevent new admissions after closure.
+An expired owner lease may close only under the observer's terminal or absent-dispatch checks.
+Use one product finalizer for live and recovered output, including successful files from failed executions.
+Promote files before deciding whether an answer contains visible output.
+
+`prepare` and `settle` run outside enclosing Workflow steps so products can compose named steps without nesting `step.do`.
+Their effects must be idempotent.
+The helper checkpoints transcript persistence, replay completion, and lock release.
+Settlement may return a revised receipt when reconciliation discovers a terminal failure.
+That receipt updates the assistant row before replay completion.
+A rejected settlement leaves the lock held for recovery.
