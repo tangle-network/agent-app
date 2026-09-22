@@ -206,6 +206,43 @@ describe('observeNativeCompletion', () => {
     expect(observed).toEqual({ state: 'running' })
   })
 
+  it('uses registration time when a closed admission has no close timestamps', async () => {
+    const observed = await observeNativeCompletion({
+      source: source({ status: { id: 'session-1', status: 'completed', latestExecutionId: 'turn-1' } }),
+      admissionStore: store({
+        ...admission,
+        closedAt: undefined,
+        updatedAt: undefined,
+      }),
+      executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1',
+      registeredAt: 100, now: 102, receiptDeadlineMs: 1,
+    })
+
+    expect(observed).toMatchObject({
+      state: 'failed',
+      receipt: { error: 'Admitted native execution did not produce an exact completion: turn-1' },
+    })
+  })
+
+  it('recognizes a structurally reported Sandbox not-found without a runtime import', async () => {
+    const session = {
+      status: vi.fn(async () => { throw { name: 'NotFoundError', code: 'NOT_FOUND', status: 404 } }),
+      runs: vi.fn(async () => []),
+      messages: vi.fn(async () => []),
+      result: vi.fn(async () => null),
+    }
+    const observed = await observeNativeCompletion({
+      source: {
+        findCompletedTurn: vi.fn(async () => null),
+        session: vi.fn(() => session),
+      } as unknown as NativeCompletionSessionSource,
+      admissionStore: store({ ...admission, state: 'open', ownerLeaseUntil: 10_000 }),
+      executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 0, now: 100,
+    })
+
+    expect(observed).toEqual({ state: 'running' })
+  })
+
   it('does not let a different latest execution prove this admitted turn completed', async () => {
     const observed = await observeNativeCompletion({
       source: source({ status: { id: 'session-1', status: 'completed', latestExecutionId: 'other-turn' } }),

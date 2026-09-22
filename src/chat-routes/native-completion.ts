@@ -4,7 +4,7 @@
  * `driveTurn`, or cancels a run.
  */
 
-import { NotFoundError, type SandboxInstance, type SessionInfo, type SessionMessage } from '@tangle-network/sandbox'
+import type { SandboxInstance, SessionInfo, SessionMessage } from '@tangle-network/sandbox'
 import type { ChatTurnUsage } from './turn-routes'
 import { readCompletedSandboxTurn, recoverSandboxAssistantMessage } from './completed-sandbox-turn'
 
@@ -87,6 +87,11 @@ function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined
+}
+
+function isSandboxNotFoundError(value: unknown): boolean {
+  const error = record(value)
+  return error?.name === 'NotFoundError' || error?.code === 'NOT_FOUND' || error?.status === 404
 }
 
 function attribution(result: Record<string, unknown> | undefined): Pick<
@@ -209,7 +214,7 @@ export async function observeNativeCompletion(
     try {
       status = await session.status()
     } catch (error) {
-      if (!(error instanceof NotFoundError)) throw error
+      if (!isSandboxNotFoundError(error)) throw error
       status = null
     }
   }
@@ -297,7 +302,9 @@ export async function observeNativeCompletion(
       })
       continue
     }
-    const closedAt = timestamp(admission.closedAt) ?? timestamp(admission.updatedAt) ?? now
+    const closedAt = timestamp(admission.closedAt)
+      ?? timestamp(admission.updatedAt)
+      ?? options.registeredAt
     if (now - closedAt < (options.receiptDeadlineMs ?? DEFAULT_RECEIPT_DEADLINE_MS)) return { state: 'running' }
     recovered.push(missingTurnReceipt(
       turnId,

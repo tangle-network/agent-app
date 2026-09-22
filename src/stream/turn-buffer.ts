@@ -36,6 +36,11 @@ export interface BufferedTurnEvent {
 
 /** Manage and query turn events and their lifecycle statuses within a scoped event store */
 export interface TurnEventStore {
+  /**
+   * Append rows while the turn is live. Implementations must ignore rows that
+   * arrive after `setStatus` publishes `complete` or `error`; the terminal
+   * status is the replay fence for a detached live projection.
+   */
   append(turnId: string, events: BufferedTurnEvent[]): Promise<void>
   read(turnId: string, fromSeq: number): Promise<BufferedTurnEvent[]>
   /** Record turn lifecycle. `scopeId` (a thread/session id) is optional and lets
@@ -182,8 +187,10 @@ export interface BufferedTurnTap {
   /**
    * Give terminal-status ownership to an external durable runner. Stops this
    * tap's running-lease renewal and flushes its current projection, but keeps
-   * `onEvent` available as an append-only live-observation path. Call it again
-   * when observation ends to flush events received after the handoff.
+   * `onEvent` available as an append-only live-observation path. Events
+   * received after the handoff flush before this method's caller continues,
+   * so a durable owner cannot publish terminal status ahead of an observed
+   * event. Call it again when observation ends to flush any final event.
    *
    * A caller MUST have registered that durable owner before detaching: this
    * method intentionally writes no replacement status.
@@ -301,7 +308,7 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
           clientGone = true
         }
       }
-      if (Date.now() - lastFlush >= flushIntervalMs) await flush()
+      if (detached || Date.now() - lastFlush >= flushIntervalMs) await flush()
     },
     async done(status = 'complete') {
       await ensureStarted()
@@ -542,7 +549,20 @@ export function createD1TurnEventStore(
         const chunk = events.slice(start, start + D1_APPEND_CHUNK)
         const placeholders = chunk.map(() => '(?, ?, ?)').join(', ')
         const values = chunk.flatMap((e) => [turnId, e.seq, e.event])
-        await db.prepare(`INSERT OR IGNORE INTO turn_events (turnId, seq, event) VALUES ${placeholders}`).bind(...values).run()
+        await db
+          .prepare(
+            `WITH pending(turnId, seq, event) AS (VALUES ${placeholders})
+             INSERT OR IGNORE INTO turn_events (turnId, seq, event)
+             SELECT pending.turnId, pending.seq, pending.event
+             FROM pending
+             WHERE NOT EXISTS (
+               SELECT 1 FROM turn_status
+               WHERE turn_status.turnId = pending.turnId
+                 AND turn_status.status IN ('complete', 'error')
+             )`,
+          )
+          .bind(...values)
+          .run()
       }
     },
     async read(turnId, fromSeq) {
@@ -613,6 +633,7 @@ export function createMemoryTurnEventStore(
   )
   return {
     async append(turnId, rows) {
+      if (status.get(turnId) === 'complete' || status.get(turnId) === 'error') return
       const list = events.get(turnId) ?? []
       list.push(...rows)
       events.set(turnId, list)

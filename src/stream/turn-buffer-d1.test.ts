@@ -47,4 +47,16 @@ describe('createD1TurnEventStore.append', () => {
     await store.append('turn-2', [{ seq: 1, event: '{}' }, { seq: 2, event: '{}' }])
     expect((sqlite.prepare('SELECT count(*) AS n FROM turn_events').get() as { n: number }).n).toBe(2)
   })
+
+  it('ignores rows appended after terminal status', async () => {
+    const { sqlite, db } = d1Like()
+    const store = createD1TurnEventStore(db as never)
+    await store.setStatus('terminal', 'running')
+    await store.append('terminal', [{ seq: 1, event: 'before' }])
+    await store.setStatus('terminal', 'complete')
+    await store.append('terminal', [{ seq: 2, event: 'too-late' }])
+
+    expect(await store.read('terminal', 0)).toEqual([{ seq: 1, event: 'before' }])
+    sqlite.close()
+  })
 })
