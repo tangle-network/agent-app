@@ -36,7 +36,7 @@ async function readLines(body: ReadableStream<Uint8Array>): Promise<Array<Record
 }
 
 describe('createChatTurnRoutes — durable completion handoff', () => {
-  it('leaves settlement to the registered durable owner while continuing live projection', async () => {
+  it.each([false, true])('leaves settlement to the registered durable owner while continuing live projection (replay append throws: %s)', async (replayAppendThrows) => {
     const rows: StoredMessage[] = []
     const assistantDraftWriteStarted = deferred()
     const releaseAssistantDraftWrite = deferred()
@@ -70,7 +70,20 @@ describe('createChatTurnRoutes — durable completion handoff', () => {
         return null
       },
     }
-    const turnStore = createMemoryTurnEventStore()
+    const memoryTurnStore = createMemoryTurnEventStore()
+    let throwOnNextAppend = false
+    let replayAppendFailed = false
+    const turnStore = {
+      ...memoryTurnStore,
+      append: vi.fn(async (...args: Parameters<typeof memoryTurnStore.append>) => {
+        if (throwOnNextAppend) {
+          throwOnNextAppend = false
+          replayAppendFailed = true
+          throw new Error('replay append unavailable')
+        }
+        return memoryTurnStore.append(...args)
+      }),
+    }
     const pending: Promise<unknown>[] = []
     let nativeDispatched = false
     let handoffStarted!: () => void
@@ -101,6 +114,7 @@ describe('createChatTurnRoutes — durable completion handoff', () => {
           yield { type: 'text', text: 'route draft' }
           await assistantDraftWriteStarted.promise
           handoffStarted()
+          throwOnNextAppend = replayAppendThrows
           await args.handoffCompletion!()
 
           // This is the external Workflow settlement that was registered before
@@ -138,6 +152,8 @@ describe('createChatTurnRoutes — durable completion handoff', () => {
     await Promise.all(pending)
     const turnId = response.headers.get('x-turn-id')!
 
+    expect(nativeDispatched).toBe(true)
+    expect(replayAppendFailed).toBe(replayAppendThrows)
     expect(lines.some((line) => line.type === 'text' && line.text === 'live after handoff')).toBe(true)
     expect(observed).toContain('error')
     expect(await turnStore.getStatus(turnId)).toBe('complete')

@@ -856,7 +856,14 @@ export function createChatTurnRoutes<TContext = void>(
           // Switch first: an event arriving while the prior draft write closes
           // must stay live-only and cannot arm another draft write or renewal.
           completionHandoff = true
-          await tap?.detach()
+          try {
+            await tap?.detach()
+          } catch (err) {
+            log('[chat-routes] turn buffer detach failed', {
+              turnId: turnStreamId,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          }
           // `close` waits for the draft writer's in-flight write. The durable
           // owner can therefore safely replace that draft after this resolves.
           await draft?.close()
