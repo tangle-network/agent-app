@@ -2,8 +2,8 @@
  * Browser adapter for the Sandbox session gateway.
  *
  * The Sandbox SDK owns the WebSocket, reconnect, replay, cursor persistence,
- * and raw event delivery. This module only composes that client with a
- * product-owned grant endpoint and decodes the gateway's event envelope.
+ * event decoding, and raw event delivery. This module only composes that
+ * client with a product-owned grant endpoint and app callbacks.
  *
  * Keep this entry separate from `web-react`: `@tangle-network/sandbox` is an
  * optional peer, and the dynamic import keeps it out of apps without a
@@ -35,63 +35,14 @@ export type SessionStreamGrantResponse =
   | ({ available: true } & SessionStreamGrant)
   | { available: false; reason?: SessionGrantUnavailableReason }
 
-/** A decoded event from the raw Sandbox gateway payload. */
+/** A decoded event delivered by the Sandbox SDK. */
 export interface GatewayTurnEvent {
   type: string
   data?: Record<string, unknown>
 }
 
-/** Event types that terminate a Sandbox execution. */
-export const GATEWAY_TERMINAL_EVENT_TYPES: ReadonlySet<string> = new Set([
-  'done',
-  'error',
-  'result',
-  'session.run.completed',
-  'session.run.failed',
-])
-
-/** Gateway bookkeeping events that are not turn feedback. */
-export const GATEWAY_TRANSPORT_NOTICE_TYPES: ReadonlySet<string> = new Set([
-  'connection.established',
-  'heartbeat',
-  'ping',
-  'pong',
-])
-
-/** Report whether a decoded event ends the execution. */
-export function isTerminalGatewayEvent(type: string): boolean {
-  return GATEWAY_TERMINAL_EVENT_TYPES.has(type)
-}
-
-/** Report whether a decoded event is gateway bookkeeping. */
-export function isGatewayTransportNotice(type: string): boolean {
-  return GATEWAY_TRANSPORT_NOTICE_TYPES.has(type)
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
-}
-
-/**
- * Decode one raw `onAgentEvent` payload into the event shape a turn reducer
- * consumes. The gateway carries both message-lane and run/stream envelopes.
- */
-export function gatewayFrameToTurnEvent(raw: unknown): GatewayTurnEvent | null {
-  if (!isRecord(raw)) return null
-
-  const type = typeof raw.type === 'string' ? raw.type.trim() : ''
-  if (type) {
-    const { type: _ignored, properties, ...rest } = raw
-    return { type, data: isRecord(properties) ? properties : rest }
-  }
-
-  // The gateway's terminal broadcast can lose its event type. The outcome is
-  // the stable completion marker in that frame shape.
-  if (isRecord(raw.outcome) || typeof raw.outcome === 'string') {
-    return { type: 'done', data: raw }
-  }
-
-  return null
 }
 
 /** Parse a grant response. Invalid or unavailable responses are soft misses. */
@@ -169,7 +120,6 @@ export function createSessionStreamGrantFetcher(
 export interface SessionGatewayClientLike {
   connect(): void
   disconnect(): void
-  replay(since: number): void | Promise<void>
   clearReplayState(): void
 }
 
@@ -190,8 +140,12 @@ export interface SessionGatewayClientConfigLike {
   replayStorage?: ReplayCursorStorage
   onTokenRefresh?: () => Promise<{ token: string; expiresAt: number }>
   handlers?: {
-    onAgentEvent?: (channel: string, data: unknown, sequenceId?: number) => void
-    onBackpressureWarning?: (dropped: number, since: number, totalDropped?: number) => void
+    onTurnEvent?: (
+      event: GatewayTurnEvent,
+      channel: string,
+      terminal: boolean,
+      sequenceId?: number,
+    ) => void
     onTokenExpired?: () => void
     onError?: (message: string, code?: string) => void
   }
@@ -218,6 +172,8 @@ export interface SessionGatewayLiveViewHandlers {
 /** A handle that stops one gateway attachment. */
 export interface SessionGatewayLiveViewAttachment {
   close(): void
+  /** End the session and discard its SDK replay cursor. */
+  end(): void
 }
 
 /** Structural connector returned by {@link createSessionGatewayLane}. */
@@ -233,12 +189,7 @@ export interface SessionGatewayLaneOptions {
   replayStorage?: ReplayCursorStorage | null
   /** Override the SDK client constructor for tests or another compatible client. */
   createClient?: SessionGatewayClientFactory
-  /** Maximum sequence ids retained for duplicate suppression. */
-  appliedSeqCap?: number
 }
-
-/** Default bound on applied sequence ids retained by one attachment. */
-export const APPLIED_SEQ_CAP = 100_000
 
 async function defaultCreateClient(
   config: SessionGatewayClientConfigLike,
@@ -271,7 +222,6 @@ function defaultReplayStorage(): ReplayCursorStorage | undefined {
 export function createSessionGatewayLane(
   options: SessionGatewayLaneOptions,
 ): SessionGatewayLiveViewConnector {
-  const cap = options.appliedSeqCap ?? APPLIED_SEQ_CAP
   const createClient = options.createClient ?? defaultCreateClient
 
   return async (handlers) => {
@@ -283,9 +233,9 @@ export function createSessionGatewayLane(
     }
     if (!grant || handlers.signal.aborted) return null
 
-    const appliedSeqs = new Set<number>()
     let firstTurnEventSent = false
     let closed = false
+    let ended = false
     let client: SessionGatewayClientLike
 
     const replayStorage =
@@ -307,41 +257,15 @@ export function createSessionGatewayLane(
         return { token: refreshed.token, expiresAt: refreshed.expiresAt }
       },
       handlers: {
-        onAgentEvent: (_channel, data, sequenceId) => {
+        onTurnEvent: (event, _channel, terminal, _sequenceId) => {
           if (closed) return
-          if (typeof sequenceId === 'number' && Number.isSafeInteger(sequenceId) && sequenceId >= 0) {
-            if (appliedSeqs.has(sequenceId)) return
-            if (appliedSeqs.size < cap) appliedSeqs.add(sequenceId)
-          }
-
-          const event = gatewayFrameToTurnEvent(data)
-          if (!event || isGatewayTransportNotice(event.type)) return
 
           if (!firstTurnEventSent) {
             firstTurnEventSent = true
             handlers.onFirstTurnEvent?.()
           }
           handlers.onEvent(event)
-          if (isTerminalGatewayEvent(event.type)) handlers.onTerminal?.()
-        },
-        onBackpressureWarning: (_dropped, since) => {
-          if (closed) return
-          try {
-            const replay = client.replay(since)
-            if (replay && typeof replay.then === 'function') {
-              void replay.catch((error: unknown) => {
-                if (!closed) {
-                  handlers.onUnusable?.(
-                    `replay failed: ${error instanceof Error ? error.message : String(error)}`,
-                  )
-                }
-              })
-            }
-          } catch (error) {
-            handlers.onUnusable?.(
-              `replay failed: ${error instanceof Error ? error.message : String(error)}`,
-            )
-          }
+          if (terminal) handlers.onTerminal?.()
         },
         onTokenExpired: () => {
           if (!closed) handlers.onUnusable?.('token expired')
@@ -373,12 +297,16 @@ export function createSessionGatewayLane(
       close: () => {
         if (closed) return
         closed = true
-        appliedSeqs.clear()
-        // The next attachment starts with a fresh dedupe set. The SDK cursor
-        // is therefore cleared with the socket rather than reused against a
-        // different reducer state.
-        client.clearReplayState()
         client.disconnect()
+      },
+      end: () => {
+        if (ended) return
+        ended = true
+        client.clearReplayState()
+        if (!closed) {
+          closed = true
+          client.disconnect()
+        }
       },
     }
   }

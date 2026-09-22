@@ -2,33 +2,15 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import {
-  APPLIED_SEQ_CAP,
   createSessionGatewayLane,
   createSessionStreamGrantFetcher,
-  gatewayFrameToTurnEvent,
-  isGatewayTransportNotice,
-  isTerminalGatewayEvent,
   parseSessionStreamGrant,
+  type GatewayTurnEvent,
   type SessionGatewayClientConfigLike,
   type SessionGatewayClientLike,
   type SessionGatewayLiveViewHandlers,
   type SessionStreamGrant,
 } from '../../src/web-react/session-gateway'
-
-const messageLaneFrame = (type: string, properties: Record<string, unknown>) => ({
-  type,
-  properties,
-})
-
-const runStreamFrame = (type: string, payload: Record<string, unknown>) => ({
-  type,
-  ...payload,
-})
-
-const terminalFrame = (outcome: Record<string, unknown>) => ({
-  outcome,
-  tokenUsage: { inputTokens: 10, outputTokens: 20 },
-})
 
 const GRANT: SessionStreamGrant = {
   url: 'wss://sandbox.example/session',
@@ -42,13 +24,11 @@ function fakeGatewayClient() {
     connect: 0,
     disconnect: 0,
     clearReplayState: 0,
-    replay: [] as number[],
   }
   let config: SessionGatewayClientConfigLike | null = null
   const client: SessionGatewayClientLike = {
     connect: () => void (calls.connect += 1),
     disconnect: () => void (calls.disconnect += 1),
-    replay: (since) => void calls.replay.push(since),
     clearReplayState: () => void (calls.clearReplayState += 1),
   }
 
@@ -62,10 +42,13 @@ function fakeGatewayClient() {
       config = nextConfig
       return client
     },
-    emit: (data: unknown, sequenceId?: number) =>
-      config?.handlers?.onAgentEvent?.(`session:${config.sessionId}`, data, sequenceId),
-    backpressure: (dropped: number, since: number) =>
-      config?.handlers?.onBackpressureWarning?.(dropped, since, dropped),
+    emit: (event: GatewayTurnEvent, sequenceId?: number, terminal = false) =>
+      config?.handlers?.onTurnEvent?.(
+        event,
+        `session:${config.sessionId}`,
+        terminal,
+        sequenceId,
+      ),
     fail: (message: string, code?: string) => config?.handlers?.onError?.(message, code),
     expire: () => config?.handlers?.onTokenExpired?.(),
   }
@@ -87,50 +70,6 @@ function recordingHandlers(signal = new AbortController().signal) {
   }
   return { handlers, state }
 }
-
-describe('gatewayFrameToTurnEvent', () => {
-  it('reads message-lane payloads from properties', () => {
-    expect(
-      gatewayFrameToTurnEvent(
-        messageLaneFrame('message.part.updated', { part: { id: 'p1' }, delta: 'Hello' }),
-      ),
-    ).toEqual({
-      type: 'message.part.updated',
-      data: { part: { id: 'p1' }, delta: 'Hello' },
-    })
-  })
-
-  it('reads run-stream payloads from inline fields', () => {
-    expect(gatewayFrameToTurnEvent(runStreamFrame('token', { value: 'Step 1' }))).toEqual({
-      type: 'token',
-      data: { value: 'Step 1' },
-    })
-  })
-
-  it('re-types a typeless terminal frame and preserves its payload', () => {
-    const frame = terminalFrame({ status: 'completed' })
-    expect(gatewayFrameToTurnEvent(frame)).toEqual({ type: 'done', data: frame })
-  })
-
-  it('rejects frames without a type or completion outcome', () => {
-    expect(gatewayFrameToTurnEvent({ foo: 'bar' })).toBeNull()
-    expect(gatewayFrameToTurnEvent(null)).toBeNull()
-    expect(gatewayFrameToTurnEvent(['a'])).toBeNull()
-  })
-})
-
-describe('gateway event classification', () => {
-  it('classifies terminal and transport-notice types', () => {
-    for (const type of ['done', 'error', 'result', 'session.run.completed', 'session.run.failed']) {
-      expect(isTerminalGatewayEvent(type)).toBe(true)
-    }
-    for (const type of ['connection.established', 'heartbeat', 'ping', 'pong']) {
-      expect(isGatewayTransportNotice(type)).toBe(true)
-    }
-    expect(isTerminalGatewayEvent('text')).toBe(false)
-    expect(isGatewayTransportNotice('text')).toBe(false)
-  })
-})
 
 describe('parseSessionStreamGrant', () => {
   it('accepts a complete WebSocket grant', () => {
@@ -209,14 +148,14 @@ describe('createSessionGatewayLane', () => {
     expect(fake.config?.sessionId).toBe(GRANT.sessionId)
     expect(fake.config?.autoReconnect).toBe(true)
 
-    fake.emit(messageLaneFrame('message.part.updated', { delta: 'Hello' }), 1)
-    fake.emit(terminalFrame({ status: 'completed' }), 2)
+    fake.emit({ type: 'message.part.updated', data: { delta: 'Hello' } }, 1)
+    fake.emit({ type: 'done', data: { status: 'completed' } }, 2, true)
 
     expect(state.events.map((event) => event.type)).toEqual(['message.part.updated', 'done'])
     expect(state.terminal).toBe(1)
   })
 
-  it('does not count transport notices as first-turn feedback', async () => {
+  it('receives events already decoded and classified by the SDK', async () => {
     const fake = fakeGatewayClient()
     const { handlers, state } = recordingHandlers()
     await createSessionGatewayLane({
@@ -225,16 +164,12 @@ describe('createSessionGatewayLane', () => {
       replayStorage: null,
     })(handlers)
 
-    fake.emit({ type: 'connection.established' }, 1)
-    fake.emit({ type: 'heartbeat' }, 2)
-    expect(state.firstTurnEvent).toBe(0)
-    expect(state.events).toEqual([])
-
-    fake.emit(messageLaneFrame('message.part.updated', { delta: 'x' }), 3)
+    fake.emit({ type: 'message.part.updated', data: { delta: 'x' } }, 3)
     expect(state.firstTurnEvent).toBe(1)
+    expect(state.events).toEqual([{ type: 'message.part.updated', data: { delta: 'x' } }])
   })
 
-  it('uses a sequence set so replay fills holes without duplicating overlaps', async () => {
+  it('leaves sequence dedupe to the SDK', async () => {
     const fake = fakeGatewayClient()
     const { handlers, state } = recordingHandlers()
     await createSessionGatewayLane({
@@ -243,7 +178,10 @@ describe('createSessionGatewayLane', () => {
       replayStorage: null,
     })(handlers)
 
-    const frame = (sequenceId: number) => messageLaneFrame('token', { value: `v${sequenceId}` })
+    const frame = (sequenceId: number) => ({
+      type: 'token',
+      data: { value: `v${sequenceId}` },
+    })
     fake.emit(frame(1), 1)
     fake.emit(frame(2), 2)
     fake.emit(frame(5), 5)
@@ -251,36 +189,14 @@ describe('createSessionGatewayLane', () => {
     fake.emit(frame(4), 4)
     fake.emit(frame(5), 5)
 
-    expect(state.events.map((event) => event.data?.value)).toEqual(['v1', 'v2', 'v5', 'v3', 'v4'])
-  })
-
-  it('requests replay after a backpressure warning', async () => {
-    const fake = fakeGatewayClient()
-    const { handlers } = recordingHandlers()
-    await createSessionGatewayLane({
-      fetchGrant: async () => GRANT,
-      createClient: fake.create,
-      replayStorage: null,
-    })(handlers)
-
-    fake.backpressure(12, 42)
-    expect(fake.calls.replay).toEqual([42])
-  })
-
-  it('reports replay failure instead of leaving an unhandled rejection', async () => {
-    const fake = fakeGatewayClient()
-    const replayError = new Error('socket closed')
-    fake.client.replay = () => Promise.reject(replayError)
-    const { handlers, state } = recordingHandlers()
-    await createSessionGatewayLane({
-      fetchGrant: async () => GRANT,
-      createClient: fake.create,
-      replayStorage: null,
-    })(handlers)
-
-    fake.backpressure(1, 7)
-    await Promise.resolve()
-    expect(state.unusable).toEqual(['replay failed: socket closed'])
+    expect(state.events.map((event) => event.data?.value)).toEqual([
+      'v1',
+      'v2',
+      'v5',
+      'v3',
+      'v4',
+      'v5',
+    ])
   })
 
   it('returns the token refresher result to the SDK without updating twice', async () => {
@@ -365,7 +281,7 @@ describe('createSessionGatewayLane', () => {
     expect(fake.calls.connect).toBe(0)
   })
 
-  it('clears SDK replay state and disconnects exactly once on close', async () => {
+  it('keeps SDK replay state on close and clears it only on end', async () => {
     const fake = fakeGatewayClient()
     const { handlers } = recordingHandlers()
     const attachment = await createSessionGatewayLane({
@@ -376,28 +292,40 @@ describe('createSessionGatewayLane', () => {
 
     attachment?.close()
     attachment?.close()
-    expect(fake.calls.clearReplayState).toBe(1)
+    expect(fake.calls.clearReplayState).toBe(0)
     expect(fake.calls.disconnect).toBe(1)
+
+    const second = fakeGatewayClient()
+    const secondAttachment = await createSessionGatewayLane({
+      fetchGrant: async () => GRANT,
+      createClient: second.create,
+      replayStorage: null,
+    })(handlers)
+    secondAttachment?.end()
+    secondAttachment?.end()
+    expect(second.calls.clearReplayState).toBe(1)
+    expect(second.calls.disconnect).toBe(1)
+
+    attachment?.end()
+    expect(fake.calls.clearReplayState).toBe(1)
   })
 
-  it('uses localStorage by default and supports a bounded sequence set', async () => {
+  it('uses localStorage by default and forwards SDK-normalized events', async () => {
     const fake = fakeGatewayClient()
     const { handlers, state } = recordingHandlers()
     await createSessionGatewayLane({
       fetchGrant: async () => GRANT,
       createClient: fake.create,
-      appliedSeqCap: 2,
     })(handlers)
 
     expect(fake.config?.enableReplayPersistence).toBe(true)
     expect(fake.config?.replayStorage).toBe(window.localStorage)
 
-    const frame = messageLaneFrame('token', { value: 'v' })
+    const frame = { type: 'token', data: { value: 'v' } }
     fake.emit(frame, 1)
     fake.emit(frame, 2)
     fake.emit(frame, 3)
     fake.emit(frame, 3)
     expect(state.events).toHaveLength(4)
-    expect(APPLIED_SEQ_CAP).toBe(100_000)
   })
 })
