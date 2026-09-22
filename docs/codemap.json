@@ -1261,6 +1261,12 @@
           "doc": "Clean up a write whose function threw after the store may have committed."
         },
         {
+          "name": "aggregateNativeCompletionReceipts",
+          "kind": "function",
+          "signature": "(turns: readonly NativeCompletionTurnReceipt[]) => NativeCompletionReceipt",
+          "doc": "Assemble admitted exact receipts in dispatch order."
+        },
+        {
           "name": "ALLOWED_ATTACHMENT_SNIFFED_MIMES",
           "kind": "const",
           "signature": "ReadonlySet<string>",
@@ -2053,10 +2059,58 @@
           "doc": "Fired when a model is abandoned and the next one is about to be tried."
         },
         {
+          "name": "NativeCompletionAdmission",
+          "kind": "interface",
+          "signature": "interface NativeCompletionAdmission",
+          "doc": null
+        },
+        {
+          "name": "NativeCompletionAdmissionStore",
+          "kind": "interface",
+          "signature": "interface NativeCompletionAdmissionStore",
+          "doc": "Product persistence for the one admission that authorizes this observer."
+        },
+        {
+          "name": "NativeCompletionObservation",
+          "kind": "type",
+          "signature": "type NativeCompletionObservation",
+          "doc": null
+        },
+        {
+          "name": "NativeCompletionObservationOptions",
+          "kind": "interface",
+          "signature": "interface NativeCompletionObservationOptions",
+          "doc": null
+        },
+        {
+          "name": "NativeCompletionReceipt",
+          "kind": "interface",
+          "signature": "interface NativeCompletionReceipt",
+          "doc": null
+        },
+        {
+          "name": "NativeCompletionSessionSource",
+          "kind": "type",
+          "signature": "type NativeCompletionSessionSource",
+          "doc": "The official Sandbox reads needed for exact native completion observation."
+        },
+        {
+          "name": "NativeCompletionTurnReceipt",
+          "kind": "interface",
+          "signature": "interface NativeCompletionTurnReceipt",
+          "doc": "One exact turn receipt before an admission's ordered aggregate."
+        },
+        {
           "name": "normalizeChatPromptForSandbox",
           "kind": "function",
           "signature": "(prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]",
           "doc": "Convert the browser-safe chat attachment contract into the current sandbox prompt contract."
+        },
+        {
+          "name": "observeNativeCompletion",
+          "kind": "function",
+          "signature": "(options: NativeCompletionObservationOptions) => Promise<NativeCompletionObservation>",
+          "doc": "Observe only the turns admitted under `executionId`."
         },
         {
           "name": "OOXML_PRESENTATION_MACRO_ENABLED_MIME",
@@ -2267,6 +2321,12 @@
           "kind": "interface",
           "signature": "interface ReconcileStaleTurnLockResult",
           "doc": "Describe the outcome of reconciling a stale turn lock including release status and diagnostics"
+        },
+        {
+          "name": "recoverSandboxAssistantMessage",
+          "kind": "function",
+          "signature": "(message: SessionMessage) => DetachedTurnFinal",
+          "doc": "Recover the durable content a Sandbox recorder attached to one assistant message."
         },
         {
           "name": "resolveChatAttachments",
@@ -8877,6 +8937,7 @@
       "source": "src/preset-cloudflare/index.ts",
       "dependsOn": [
         "billing",
+        "chat-routes",
         "crypto",
         "knowledge",
         "sandbox",
@@ -9024,6 +9085,18 @@
           "doc": null
         },
         {
+          "name": "NativeCompletionWorkflowOptions",
+          "kind": "interface",
+          "signature": "interface NativeCompletionWorkflowOptions",
+          "doc": null
+        },
+        {
+          "name": "NativeCompletionWorkflowPayload",
+          "kind": "interface",
+          "signature": "interface NativeCompletionWorkflowPayload",
+          "doc": "Stable identity required to resume a registered native completion."
+        },
+        {
           "name": "PRESET_MIGRATION_SQL",
           "kind": "const",
           "signature": "readonly string[]",
@@ -9062,8 +9135,14 @@
         {
           "name": "runDetachedTurnWorkflowTick",
           "kind": "function",
-          "signature": "<TPayload extends DetachedTurnWorkflowIdentity, TSettled>(options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>)…",
+          "signature": "<TPayload extends DetachedTurnWorkflowIdentity, TSettled, TResult extends DetachedTurnDriveResultLike = TurnDriveResult…",
           "doc": "Drive a detached SDK turn with durable steps, not an HTTP waitUntil lifetime."
+        },
+        {
+          "name": "runNativeCompletionWorkflow",
+          "kind": "function",
+          "signature": "<TPayload extends NativeCompletionWorkflowPayload, TMessageId>(options: NativeCompletionWorkflowOptions<TPayload, TMess…",
+          "doc": "Drive exact observation through durable retry steps, then run the terminal sequence once."
         },
         {
           "name": "VaultKv",
