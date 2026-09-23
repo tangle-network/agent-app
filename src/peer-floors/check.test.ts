@@ -169,9 +169,10 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.257.0', range!)).toBe(false)
   })
 
-  // Runtime 0.256 admits Eval >=0.183.0 <0.185.0 and Sandbox >=0.36.4 <0.48.0.
-  // This shell keeps the earlier verified minor of each, admits the minor its
-  // own dev install runs, and claims nothing past it.
+  // Runtime 0.256 (agent-runtime#1333) declares Eval >=0.183.0 <0.185.0 and
+  // Sandbox >=0.36.4 <0.48.0. This shell keeps the earlier minor of each, which
+  // 0.49.4 verified on the same application code, admits the minor its own dev
+  // install runs, and claims nothing past it.
   it.each([
     ['@tangle-network/agent-eval', ['0.182.999'], ['0.183.0', '0.184.0', '0.184.999'], ['0.185.0']],
     ['@tangle-network/sandbox', ['0.44.999'], ['0.45.0', '0.46.0', '0.46.999'], ['0.47.0']],
