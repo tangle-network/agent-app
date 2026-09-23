@@ -252,12 +252,71 @@ describe('createTangleSsoHandlers — start', () => {
     void handlers
   })
 
-  it('falls back to the default path for absent and protocol-relative redirects', async () => {
+})
+
+/** Values a browser resolves off this origin. `//host` is protocol-relative;
+ *  in the WHATWG parser a backslash is a path separator for special schemes,
+ *  so `/\\host` is `//host`; tab and newline are stripped before parsing, so
+ *  `/\t/host` is `//host` too; and dot-segment removal turns `/.//host`,
+ *  `/a/..//host` and `/%2e%2e//host` into a `//host` pathname while the
+ *  parsed origin stays put. A prefix check on `/` and `//` passes most of
+ *  these, and an origin check on the input alone passes the last group. */
+const OFF_ORIGIN_REDIRECTS = [
+  '//attacker.example',
+  '//attacker.example/x',
+  '/\\attacker.example',
+  '/\\/attacker.example',
+  '/\\\\/attacker.example',
+  '\\/attacker.example',
+  '/\t/attacker.example',
+  '/\n/attacker.example',
+  '/.//attacker.example',
+  '/..//attacker.example',
+  '/a/..//attacker.example',
+  '/%2e%2e//attacker.example',
+  '/x/%2E%2E//attacker.example',
+  'https://attacker.example',
+  'javascript:alert(1)',
+]
+
+function startUrl(redirect?: string): string {
+  return redirect === undefined
+    ? 'https://my.app/auth/tangle/start'
+    : `https://my.app/auth/tangle/start?redirect=${encodeURIComponent(redirect)}`
+}
+
+describe('createTangleSsoHandlers — redirect path stays on this origin', () => {
+  it.each(OFF_ORIGIN_REDIRECTS)('start: %j falls back to the default path', async (value) => {
     const { handlers } = fakeHarness()
-    for (const qs of ['', '?redirect=//evil.com/x', '?redirect=https://evil.com']) {
-      const res = await handlers.start(new Request(`https://my.app/auth/tangle/start${qs}`))
-      expect(stateCookieFrom(res).payload.r).toBe('/app')
-    }
+    const res = await handlers.start(new Request(startUrl(value)))
+    expect(stateCookieFrom(res).payload.r).toBe('/app')
+  })
+
+  it.each(OFF_ORIGIN_REDIRECTS)('callback: a state cookie carrying %j redirects to the default path', async (value) => {
+    const h = fakeHarness()
+    const res = await startThenCallback(h, (query, cookie) => {
+      const { s } = JSON.parse(decodeURIComponent(cookie.slice('app_tangle_state='.length))) as { s: string }
+      return { query, cookie: `app_tangle_state=${encodeURIComponent(JSON.stringify({ s, r: value }))}` }
+    })
+    expect(res.status).toBe(302)
+    expect(res.headers.get('Location')).toBe('/app')
+  })
+
+  it.each([
+    ['/', '/'],
+    ['/app/x', '/app/x'],
+    ['/dashboard?x=1#y', '/dashboard?x=1#y'],
+    ['/app?q=hello world', '/app?q=hello%20world'],
+  ])('start: %j is kept as %j', async (value, expected) => {
+    const { handlers } = fakeHarness()
+    const res = await handlers.start(new Request(startUrl(value)))
+    expect(stateCookieFrom(res).payload.r).toBe(expected)
+  })
+
+  it('start: an absent redirect falls back to the default path', async () => {
+    const { handlers } = fakeHarness()
+    const res = await handlers.start(new Request(startUrl()))
+    expect(stateCookieFrom(res).payload.r).toBe('/app')
   })
 })
 

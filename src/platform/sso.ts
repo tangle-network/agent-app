@@ -454,10 +454,39 @@ export interface TangleSsoHandlers {
   callback(request: Request): Promise<Response>
 }
 
-/** Accept only same-origin absolute paths (rejects `//host` protocol-relative URLs). */
+/** Redirect targets must stay on this app's origin. A prefix check on `/`
+ *  and `//` is not enough: in the WHATWG parser a backslash is a path
+ *  separator for special schemes, so `/\host` resolves to `https://host/`,
+ *  and tab or newline are stripped before parsing, so `/\t/host` is `//host`.
+ *  Parse the value against a fixed origin and accept it only when that origin
+ *  survives; the result is the parser's normalised path, query and fragment.
+ *  Backslash and control characters are rejected up front as well, so the
+ *  decision does not rest on one parser's handling of them.
+ *
+ *  The input staying on-origin is not enough either: dot-segment removal
+ *  turns `/.//host` or `/a/..//host` into the pathname `//host` with the
+ *  origin intact, and a browser resolves that Location off-origin. So the
+ *  emitted value must itself resolve on-origin and come back unchanged. */
+const REDIRECT_REFERENCE_ORIGIN = 'https://redirect-reference.invalid'
+
 function sanitizeRedirectPath(value: string | null, fallback: string): string {
-  if (value && value.startsWith('/') && !value.startsWith('//')) return value
-  return fallback
+  if (!value || !value.startsWith('/') || /[\\\u0000-\u001f\u007f]/.test(value)) return fallback
+  const path = resolveOnReferenceOrigin(value)
+  if (path === null || resolveOnReferenceOrigin(path) !== path) return fallback
+  return path
+}
+
+/** `path + search + hash` of `value` resolved against the reference origin,
+ *  or null when the parse fails or lands on another origin. */
+function resolveOnReferenceOrigin(value: string): string | null {
+  let url: URL
+  try {
+    url = new URL(value, REDIRECT_REFERENCE_ORIGIN)
+  } catch {
+    return null
+  }
+  if (url.origin !== REDIRECT_REFERENCE_ORIGIN) return null
+  return `${url.pathname}${url.search}${url.hash}`
 }
 
 function redirectResponse(location: string, headers = new Headers()): Response {
