@@ -6010,6 +6010,12 @@
           "doc": null
         },
         {
+          "name": "CONVERSATION_TOOLS_OFF",
+          "kind": "const",
+          "signature": "readonly [\"bash\", \"glob\", \"grep\", \"task\", \"todowrite\", \"webfetch\", \"skill\"]",
+          "doc": "Harness tools a texting or calling assistant does not use."
+        },
+        {
           "name": "createHostedAgent",
           "kind": "function",
           "signature": "(config: HostedAgentConfig) => { ask: (message: HostedMessage, options: { deadline: number; }) => Promise<AskResult>; c…",
@@ -6020,6 +6026,12 @@
           "kind": "const",
           "signature": "BoxPolicy",
           "doc": null
+        },
+        {
+          "name": "DEFAULT_HOSTED_MODEL",
+          "kind": "const",
+          "signature": "\"openai/gpt-5.6-luna\"",
+          "doc": "The model for a profile without `model.default`."
         },
         {
           "name": "HostedAgent",

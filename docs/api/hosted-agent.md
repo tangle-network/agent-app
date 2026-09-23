@@ -4,7 +4,7 @@
 
 Source: `src/hosted-agent/index.ts`
 
-14 exports.
+16 exports.
 
 ### `Allowance`
 
@@ -30,6 +30,14 @@ type AskResult
 interface BoxPolicy
 ```
 
+### `CONVERSATION_TOOLS_OFF`
+
+`const` — Harness tools a texting or calling assistant does not use.
+
+```ts
+readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
+```
+
 ### `createHostedAgent`
 
 `function`
@@ -44,6 +52,14 @@ interface BoxPolicy
 
 ```ts
 BoxPolicy
+```
+
+### `DEFAULT_HOSTED_MODEL`
+
+`const` — The model for a profile without `model.default`.
+
+```ts
+"openai/gpt-5.6-luna"
 ```
 
 ### `HostedAgent`
