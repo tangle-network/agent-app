@@ -204,7 +204,9 @@ export function createHostedAgent(config: HostedAgentConfig) {
     const text = message.text.trim()
     if (!text || text.length > 8000 || !/^[\w-]{1,120}$/.test(message.turnId)) return { state: 'declined' }
     const user = (await sha256(message.userId)).slice(0, 32)
-    const admittedKey = `turn:${message.turnId}`
+    // Scoped to the person: a voice ticket is model-supplied, so a turn id
+    // admitted for one person must not skip another person's allowance.
+    const admittedKey = `turn:${user}:${message.turnId}`
     if (!await store.get(admittedKey)) {
       const decision = await admit(message, user)
       if (decision === 'ignore') return { state: 'declined' }
