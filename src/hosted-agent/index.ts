@@ -111,10 +111,6 @@ const GONE = new Set(['failed', 'deleted'])
 const encode = (text: string) => new TextEncoder().encode(text)
 const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('')
 const sha256 = async (value: string) => hex(await crypto.subtle.digest('SHA-256', encode(value)))
-async function hmac(secret: string, value: string): Promise<string> {
-  const key = await crypto.subtle.importKey('raw', encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  return hex(await crypto.subtle.sign('HMAC', key, encode(value)))
-}
 /** Compares digests, so the time taken reveals nothing about the secret. */
 async function equal(given: string | null | undefined, expected: string): Promise<boolean> {
   if (!given) return false
@@ -123,6 +119,9 @@ async function equal(given: string | null | undefined, expected: string): Promis
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
   return diff === 0
 }
+const CALL_TTL_MS = 2 * 3_600_000
+/** 43 url-safe characters from 32 random bytes. */
+const randomToken = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const b64 = (text: string) => btoa(String.fromCharCode(...encode(text))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const unb64 = (text: string) => new TextDecoder().decode(Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)))
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -308,8 +307,11 @@ export function createHostedAgent(config: HostedAgentConfig) {
       const phone = normalizeAddress(body.phone ?? '')
       if (!phone?.startsWith('+')) return json({ admit: false, say: 'Sorry, I can only take calls from a visible number.' })
       if (await store.get(`stop:${(await sha256(phone)).slice(0, 32)}`)) return json({ admit: false, say: 'You unsubscribed from this line.' })
-      const claims = b64(JSON.stringify({ phone, exp: Date.now() + 2 * 3_600_000 }))
-      return json({ admit: true, callToken: `hvt.${claims}.${await hmac(secret, claims)}` })
+      // ph0ny accepts only an opaque token matching ^[A-Za-z0-9_-]{16,128}$,
+      // so the caller's number stays here and the token is its random key.
+      const callToken = randomToken()
+      await store.put(`vcall:${callToken}`, JSON.stringify({ phone, exp: Date.now() + CALL_TTL_MS }), { expirationTtl: CALL_TTL_MS / 1000 })
+      return json({ admit: true, callToken })
     },
 
     /**
@@ -319,9 +321,10 @@ export function createHostedAgent(config: HostedAgentConfig) {
     async voiceAsk(request: Request): Promise<Response> {
       const secret = config.voiceSecret
       if (!secret || !await equal(request.headers.get('authorization'), `Bearer ${secret}`)) return json({ error: 'unauthorized' }, 401)
-      const [tag, claims, signature] = (request.headers.get('x-voice-call-token') ?? '').split('.')
-      if (tag !== 'hvt' || !claims || !await equal(signature, await hmac(secret, claims))) return json({ status: 'error', error: 'call_not_admitted' }, 403)
-      const call = JSON.parse(unb64(claims)) as { phone: string; exp: number }
+      const token = request.headers.get('x-voice-call-token') ?? ''
+      const admitted = /^[A-Za-z0-9_-]{16,128}$/.test(token) ? await store.get(`vcall:${token}`) : null
+      if (!admitted) return json({ status: 'error', error: 'call_not_admitted' }, 403)
+      const call = JSON.parse(admitted) as { phone: string; exp: number }
       if (call.exp < Date.now()) return json({ status: 'error', error: 'call_expired' }, 403)
       const body = await request.json().catch(() => null) as { utterance?: string; ticket?: string } | null
       // A ticket carries its own turn id and question, so a retry after a
