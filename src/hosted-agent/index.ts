@@ -332,7 +332,15 @@ export function createHostedAgent(config: HostedAgentConfig) {
       const [turnId, asked] = body?.ticket ? body.ticket.split('.') : [`v-${crypto.randomUUID()}`, b64(body?.utterance ?? '')]
       if (!turnId || !asked) return json({ status: 'error', error: 'missing_utterance' }, 400)
       try {
-        const result = await ask({ userId: call.phone, channel: 'voice', text: unb64(asked), turnId }, { deadline: Date.now() + (config.voiceBudgetMs ?? 8000) })
+        // ph0ny drops the tool call at its own timeout, and resuming an idle
+        // box can take longer than the budget. Answer 'pending' at the
+        // budget regardless; every step is idempotent by turn id, so the
+        // ticket call continues where this one stopped.
+        const budgetMs = config.voiceBudgetMs ?? 8000
+        const result = await Promise.race([
+          ask({ userId: call.phone, channel: 'voice', text: unb64(asked), turnId }, { deadline: Date.now() + budgetMs }),
+          sleep(budgetMs).then((): AskResult => ({ state: 'pending' })),
+        ])
         if (result.state === 'pending') return json({ status: 'pending', ticket: `${turnId}.${asked}` })
         if (result.state === 'declined') return json({ status: 'complete', answer: result.reply ?? 'I cannot answer that right now.' })
         return json({ status: 'complete', answer: result.text })
