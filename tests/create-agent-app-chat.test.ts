@@ -22,6 +22,7 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, mkdtempSync, existsSync, mkdirSync, symlinkSync, readFileSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { minimumVersionGte } from './test-utils/version-ranges'
 
 const REPO = resolve(__dirname, '..')
 const CLI = join(REPO, 'create-agent-app', 'index.mjs')
@@ -73,20 +74,6 @@ function linkDeps(projectDir: string) {
   // resolve through the copied payload's parent — the project's node_modules —
   // exactly as they would after a real install.
   link(join(nm, 'zod'), join(REPO, 'node_modules', 'zod'))
-}
-
-// "1.2.3" (after stripping a `^`/`>=` prefix) → comparable numeric tuple.
-function minVersion(range: string): number[] {
-  return range.replace(/^[~^>=\s]+/, '').split('.').map(Number)
-}
-
-function versionGte(a: number[], b: number[]): boolean {
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const x = a[i] ?? 0
-    const y = b[i] ?? 0
-    if (x !== y) return x > y
-  }
-  return true
 }
 
 describe('create-agent-app --chat scaffolder', () => {
@@ -164,7 +151,7 @@ describe('create-agent-app --chat scaffolder', () => {
       const floor = appPkg.peerDependencies[name]
       expect(floor, `template declares ${name} but it is not an agent-app peer`).toBeTruthy()
       expect(
-        versionGte(minVersion(range), minVersion(floor as string)),
+        minimumVersionGte(range, floor as string),
         `template pins ${name}@${range}, below agent-app's peer floor ${floor}`,
       ).toBe(true)
     }
