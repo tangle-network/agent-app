@@ -6018,8 +6018,20 @@
         {
           "name": "createHostedAgent",
           "kind": "function",
-          "signature": "(config: HostedAgentConfig) => { ask: (message: HostedMessage, options: { deadline: number; }) => Promise<AskResult>; c…",
+          "signature": "(config: HostedAgentConfig) => { ask: (message: HostedMessage, options: { deadline: number; trace?: TurnTrace | undefin…",
           "doc": null
+        },
+        {
+          "name": "debugCommand",
+          "kind": "function",
+          "signature": "(text: string) => boolean | null",
+          "doc": "`true` for DEBUG ON, `false` for DEBUG OFF, `null` for any other text."
+        },
+        {
+          "name": "debugFooter",
+          "kind": "function",
+          "signature": "(agent: string, turnId: string, trace: TurnTrace, totalMs?: number | undefined) => string",
+          "doc": "The owner's ⚙ line."
         },
         {
           "name": "DEFAULT_BOX_POLICY",
@@ -6084,8 +6096,14 @@
         {
           "name": "NOTICE",
           "kind": "const",
-          "signature": "{ readonly stopped: \"You are unsubscribed. Text START to talk again.\"; readonly started: \"Welcome back. Text me anytime…",
+          "signature": "{ readonly debugOn: \"Debug on. Each reply now ends with a ⚙ line: agent, harness, model, box, time, tokens, cost, tools…",
           "doc": null
+        },
+        {
+          "name": "TurnTrace",
+          "kind": "interface",
+          "signature": "interface TurnTrace",
+          "doc": "What one turn reports about itself, for the owner's debug line."
         }
       ]
     },
