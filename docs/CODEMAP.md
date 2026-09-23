@@ -30,7 +30,7 @@ _100 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
 | [`./harness`](api/harness.md) | 14 | — |
-| [`./hosted-agent`](api/hosted-agent.md) | 14 | — |
+| [`./hosted-agent`](api/hosted-agent.md) | 16 | — |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `brand`, `intakes` |
 | [`./intakes-react/lazy`](api/intakes-react-lazy.md) | 2 | `brand`, `intakes` |
@@ -331,9 +331,9 @@ Source: `src/harness/index.ts` · 14 exports
 
 ## `./hosted-agent`
 
-Source: `src/hosted-agent/index.ts` · 14 exports
+Source: `src/hosted-agent/index.ts` · 16 exports
 
-`Allowance`, `AskResult`, `BoxPolicy`, `createHostedAgent`, `DEFAULT_BOX_POLICY`, `HostedAgent`, `HostedAgentConfig`, `HostedAgentError`, `HostedAgentStore`, `HostedChannel`, `HostedInbound`, `HostedMessage`, `normalizeAddress`, `NOTICE`
+`Allowance`, `AskResult`, `BoxPolicy`, `CONVERSATION_TOOLS_OFF`, `createHostedAgent`, `DEFAULT_BOX_POLICY`, `DEFAULT_HOSTED_MODEL`, `HostedAgent`, `HostedAgentConfig`, `HostedAgentError`, `HostedAgentStore`, `HostedChannel`, `HostedInbound`, `HostedMessage`, `normalizeAddress`, `NOTICE`
 
 [Full API →](api/hosted-agent.md)
 

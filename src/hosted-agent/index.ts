@@ -41,7 +41,12 @@ export type Allowance = 'answer' | 'ignore' | { reply: string }
 export interface HostedAgentConfig {
   /** The developer's Tangle API key (Sandbox and Hub). */
   apiKey: string
-  /** The persona, model and tools every person's box runs. */
+  /**
+   * The persona every person's box runs. A profile without `model.default`
+   * runs {@link DEFAULT_HOSTED_MODEL}, and a profile without `tools` runs with
+   * {@link CONVERSATION_TOOLS_OFF} turned off. Set `tools` to choose your own,
+   * for example on a harness that cannot turn those tools off.
+   */
   profile: AgentProfile
   /** Backend harness type, such as `opencode`; the runtime default when omitted. */
   harness?: string
@@ -79,6 +84,36 @@ export const DEFAULT_BOX_POLICY: BoxPolicy = {
   cpuCores: 1, memoryMB: 2048, diskGB: 10,
   idleTimeoutSeconds: 600, maxLifetimeSeconds: 86_400, deleteAfterStoppedSeconds: 7 * 86_400,
   allowDomains: ['router.tangle.tools'],
+}
+
+/**
+ * Harness tools a texting or calling assistant does not use. Their
+ * descriptions present every turn as coding work: a shell, file search,
+ * sub-agents, to-do lists, skills and web fetch. File read, write and edit
+ * stay, so a persona can keep notes such as `memory.md`.
+ */
+export const CONVERSATION_TOOLS_OFF = ['bash', 'glob', 'grep', 'task', 'todowrite', 'webfetch', 'skill'] as const
+
+/**
+ * The model for a profile without `model.default`. It gave the most useful
+ * on-topic replies among four Router models on the same five texts and calls
+ * (2026-09-23), within the latency of the others.
+ */
+export const DEFAULT_HOSTED_MODEL = 'openai/gpt-5.6-luna'
+
+/** The profile a person's box runs: the developer's profile over the conversation defaults. */
+function conversationProfile(profile: AgentProfile): AgentProfile {
+  return {
+    ...profile,
+    model: { ...profile.model, default: profile.model?.default ?? DEFAULT_HOSTED_MODEL },
+    // A profile that sets `tools` owns its tool set.
+    ...(profile.tools ? {} : {
+      tools: Object.fromEntries(CONVERSATION_TOOLS_OFF.map(tool => [tool, false])),
+      // The sandbox's preview policy grants the shell unless its permission
+      // is denied, so turning the tool off alone leaves the shell in place.
+      permissions: { bash: 'deny' as const, ...profile.permissions },
+    }),
+  }
 }
 
 export type AskResult =
@@ -148,8 +183,9 @@ export function createHostedAgent(config: HostedAgentConfig) {
   const wallCapMs = config.turnWallCapMs ?? 120_000
   const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
   const hub = new HubClient({ baseUrl: config.hubUrl ?? 'https://id.tangle.tools', apiKey: config.apiKey })
-  const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile: config.profile }
-  const profileTag = sha256(JSON.stringify(config.profile)).then(hash => hash.slice(0, 8))
+  const profile = conversationProfile(config.profile)
+  const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile }
+  const profileTag = sha256(JSON.stringify(profile)).then(hash => hash.slice(0, 8))
 
   /** The person's running box: created on the first message, resumed later,
    *  replaced when the platform deleted it. Null when the deadline passed. */

@@ -29,6 +29,13 @@ ph0ny's voice agent then calls `POST /voice/ask` through its `ask_workspace` web
 | Turn wall time | 2 minutes |
 | STOP / START | STOP silences the line for that person; START resumes it |
 
+## Model and tools
+
+Juno runs `openai/gpt-5.6-luna`, the kit's default for hosted conversations.
+The kit turns off the harness tools that a texting assistant does not use: the shell, file search, sub-agents, to-do lists, skills and web fetch.
+Juno keeps file read, write and edit for its `memory.md` notes.
+Set `model.default` or `tools` in the persona to choose your own.
+
 ## Deploy
 
 ```sh
