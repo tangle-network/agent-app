@@ -13,7 +13,7 @@
  */
 
 import { describe, it } from 'vitest'
-import { SandboxClient } from '@tangle-network/sandbox'
+import { Sandbox } from '@tangle-network/sandbox'
 
 import { isUpstreamUnavailable } from '../../src/model-resolution/failover'
 import { classifyTerminalFailure } from '../../src/chat-routes/model-failover-stream'
@@ -28,7 +28,7 @@ describe.skipIf(!LIVE)('LIVE PROBE: per-model terminal event shapes', () => {
   it(
     'prints the verbatim terminal event and its classification for each candidate',
     async () => {
-      const client = new SandboxClient({
+      const client = new Sandbox({
         apiKey: process.env.SANDBOX_API_KEY!,
         baseUrl: process.env.SANDBOX_API_URL ?? 'https://sandbox.tangle.tools',
       })
@@ -44,7 +44,7 @@ describe.skipIf(!LIVE)('LIVE PROBE: per-model terminal event shapes', () => {
         let threw: string | undefined
         try {
           const stream = box.streamPrompt('Reply with the single word: ok', {
-            model,
+            backend: { model: { model } },
             sessionId: `probe-${model.replace(/[^a-z0-9]/gi, '-')}-${Date.now()}`,
           }) as AsyncIterable<unknown>
           for await (const ev of stream) {

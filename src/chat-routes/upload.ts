@@ -6,8 +6,8 @@
  *   ≤ inlineMaxBytes (700 KiB default) → inline `data:` URI part — rides the
  *     turn body directly, no sandbox round trip.
  *   > inlineMaxBytes → written into the sandbox workspace (base64 through the
- *     structural `write` seam — `box.fs` satisfies it) and referenced by
- *     `path`. Mandatory two-step: the gateway caps request bodies at ~1 MiB,
+ *     structural `write` seam — `box.fs` satisfies it) and referenced by an
+ *     absolute image path or encoded file URL. Mandatory two-step: the gateway caps request bodies at ~1 MiB,
  *     so a large file can never ride the prompt POST.
  *
  * The sink is structural (no sandbox-SDK import); products pass `box.fs`.
@@ -25,7 +25,10 @@
  * instead of widening this route to cover both models.
  */
 
-import type { ChatTurnFilePartInput } from './wire'
+import {
+  sandboxPathToFileUrl,
+  type ChatTurnMediaPartInput,
+} from './wire'
 
 /** 700 KiB: base64 inflates ~4/3, so an inline part stays comfortably under
  *  the ~1 MiB gateway body cap alongside the JSON envelope. */
@@ -48,7 +51,7 @@ export type UploadAuthorization =
       /** Where large files land. Absent/null: only inline uploads are
        *  accepted and an over-inline-cap file is rejected with 413. */
       sink?: SandboxUploadSink | null
-      /** Per-request override of the workspace directory large files go to. */
+  /** Per-request override of the absolute workspace directory large files go to. */
       uploadDir?: string
     }
   | { ok: false; response: Response }
@@ -62,7 +65,7 @@ export interface CreateUploadRouteOptions {
   inlineMaxBytes?: number
   /** Hard per-file cap. Default {@link UPLOAD_MAX_FILE_BYTES}. */
   maxFileBytes?: number
-  /** Workspace directory for path-ref files. Default `'uploads'`. */
+  /** Absolute workspace directory for large files. Default `/home/agent/uploads`. */
   uploadDir?: string
 }
 
@@ -75,7 +78,7 @@ export interface UploadedChatFile {
   /** True when the part carries the bytes inline (`data:` URI). */
   inline: boolean
   /** Echo this back verbatim in `ChatTurnRequestPayload.parts`. */
-  part: ChatTurnFilePartInput
+  part: ChatTurnMediaPartInput
 }
 
 /** Path-safe file name: basename only, conservative charset, length-capped. */
@@ -100,6 +103,17 @@ function uploadError(status: number, code: string, error: string): Response {
   return Response.json({ code, error }, { status })
 }
 
+function normalizeUploadDir(value: string): string {
+  const trimmed = value.replace(/\/+$/, '')
+  if (!trimmed.startsWith('/') || trimmed.includes('\\')) {
+    throw new Error(`uploadDir must be an absolute POSIX path: ${value}`)
+  }
+  if (trimmed.split('/').some((segment) => segment === '.' || segment === '..')) {
+    throw new Error(`uploadDir must not contain traversal segments: ${value}`)
+  }
+  return trimmed
+}
+
 /** Create an upload route handler that authorizes requests and processes file uploads with size limits */
 export function createUploadRoute(options: CreateUploadRouteOptions): (request: Request) => Promise<Response> {
   const inlineMaxBytes = options.inlineMaxBytes ?? UPLOAD_INLINE_MAX_BYTES
@@ -109,7 +123,7 @@ export function createUploadRoute(options: CreateUploadRouteOptions): (request: 
     const auth = await options.authorize({ request })
     if (!auth.ok) return auth.response
     const sink = auth.sink ?? null
-    const uploadDir = (auth.uploadDir ?? options.uploadDir ?? 'uploads').replace(/\/+$/, '')
+    const uploadDir = normalizeUploadDir(auth.uploadDir ?? options.uploadDir ?? '/home/agent/uploads')
 
     let form: FormData
     try {
@@ -129,7 +143,7 @@ export function createUploadRoute(options: CreateUploadRouteOptions): (request: 
     for (const file of files) {
       const name = sanitizeUploadFilename(file.name)
       const mediaType = file.type || 'application/octet-stream'
-      const partType: ChatTurnFilePartInput['type'] = mediaType.startsWith('image/') ? 'image' : 'file'
+      const isImage = mediaType.startsWith('image/')
 
       if (file.size > maxFileBytes) {
         return uploadError(
@@ -148,12 +162,19 @@ export function createUploadRoute(options: CreateUploadRouteOptions): (request: 
           size: file.size,
           mediaType,
           inline: true,
-          part: {
-            type: partType,
-            filename: name,
-            mediaType,
-            url: `data:${mediaType};base64,${base64}`,
-          },
+          part: isImage
+            ? {
+                type: 'image',
+                filename: name,
+                mediaType,
+                url: `data:${mediaType};base64,${base64}`,
+              }
+            : {
+                type: 'file',
+                filename: name,
+                mediaType,
+                url: `data:${mediaType};base64,${base64}`,
+              },
         })
         continue
       }
@@ -174,7 +195,9 @@ export function createUploadRoute(options: CreateUploadRouteOptions): (request: 
         size: file.size,
         mediaType,
         inline: false,
-        part: { type: partType, filename: name, mediaType, path },
+        part: isImage
+          ? { type: 'image', filename: name, mediaType, path }
+          : { type: 'file', filename: name, mediaType, url: sandboxPathToFileUrl(path) },
       })
     }
 

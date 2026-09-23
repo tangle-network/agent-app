@@ -49,7 +49,7 @@ describe('createUploadRoute', () => {
     })
   })
 
-  it('writes a large file to the sandbox as base64 and returns a path-ref part', async () => {
+  it('writes a large file to the sandbox and returns an encoded file URL', async () => {
     const { sink, writes } = recordingSink()
     const bytes = new Uint8Array(64).fill(7)
     const route = createUploadRoute({
@@ -62,12 +62,13 @@ describe('createUploadRoute', () => {
     const { files } = await res.json() as { files: UploadedChatFile[] }
     expect(files[0]).toMatchObject({ inline: false, mediaType: 'application/pdf' })
     expect(files[0]!.part.type).toBe('file')
-    expect(files[0]!.part.url).toBeUndefined()
-    expect(files[0]!.part.path).toMatch(/^uploads\/[0-9a-f-]+-report\.pdf$/)
+    if (files[0]!.part.type !== 'file') throw new Error('expected a file part')
+    expect(files[0]!.part.url).toMatch(/^file:\/\/\/home\/agent\/uploads\/[0-9a-f-]+-report\.pdf$/)
+    const writtenPath = new URL(files[0]!.part.url).pathname
 
     expect(writes).toHaveLength(1)
     expect(writes[0]).toMatchObject({
-      path: files[0]!.part.path,
+      path: writtenPath,
       content: bytesToBase64(bytes),
       options: { encoding: 'base64' },
     })
@@ -120,10 +121,40 @@ describe('createUploadRoute', () => {
   it('honors the per-request uploadDir override from authorize', async () => {
     const { sink, writes } = recordingSink()
     const route = createUploadRoute({
-      authorize: async () => ({ ok: true, sink, uploadDir: 'workspaces/ws-1/uploads' }),
+      authorize: async () => ({ ok: true, sink, uploadDir: '/home/agent/workspaces/ws-1/uploads' }),
       inlineMaxBytes: 1,
     })
     await route(uploadRequest([{ name: 'a.txt', type: 'text/plain', bytes: new Uint8Array(8) }]))
-    expect(writes[0]!.path.startsWith('workspaces/ws-1/uploads/')).toBe(true)
+    expect(writes[0]!.path.startsWith('/home/agent/workspaces/ws-1/uploads/')).toBe(true)
+  })
+
+  it('rejects relative and traversing upload directories before writing', async () => {
+    for (const uploadDir of ['uploads', '/home/agent/../root']) {
+      const { sink, writes } = recordingSink()
+      const route = createUploadRoute({
+        authorize: async () => ({ ok: true, sink, uploadDir }),
+        inlineMaxBytes: 1,
+      })
+      await expect(
+        route(uploadRequest([{ name: 'a.txt', type: 'text/plain', bytes: new Uint8Array(8) }])),
+      ).rejects.toThrow(/uploadDir/)
+      expect(writes).toHaveLength(0)
+    }
+  })
+
+  it('percent-encodes a file URL while writing to the exact absolute path', async () => {
+    const { sink, writes } = recordingSink()
+    const route = createUploadRoute({
+      authorize: async () => ({ ok: true, sink, uploadDir: '/home/agent/my uploads' }),
+      inlineMaxBytes: 1,
+    })
+    const response = await route(
+      uploadRequest([{ name: 'a.txt', type: 'text/plain', bytes: new Uint8Array(8) }]),
+    )
+    const { files } = (await response.json()) as { files: UploadedChatFile[] }
+    const part = files[0]!.part
+    if (part.type !== 'file') throw new Error('expected a file part')
+    expect(part.url).toContain('/home/agent/my%20uploads/')
+    expect(decodeURIComponent(new URL(part.url).pathname)).toBe(writes[0]!.path)
   })
 })

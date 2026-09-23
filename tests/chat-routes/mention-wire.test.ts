@@ -27,27 +27,28 @@ describe('mediaTypeForMentionPath', () => {
 })
 
 describe('fileMentionsToParts', () => {
-  it('emits path-only parts — never a url (the url/path XOR invariant)', () => {
+  const resolvePath = (path: string) => `/home/agent/${path}`
+
+  it('emits absolute image paths and encoded file URLs', () => {
     const mentions: FileMention[] = [
       { path: 'src/app.ts', name: 'app.ts' },
       { path: 'assets/logo.png', name: 'logo.png' },
     ]
-    const parts = fileMentionsToParts(mentions)
+    const parts = fileMentionsToParts(mentions, { resolvePath })
     expect(parts).toEqual([
-      { type: 'file', filename: 'app.ts', path: 'src/app.ts' },
-      { type: 'image', filename: 'logo.png', path: 'assets/logo.png', mediaType: 'image/png' },
+      { type: 'file', filename: 'app.ts', url: 'file:///home/agent/src/app.ts' },
+      { type: 'image', filename: 'logo.png', path: '/home/agent/assets/logo.png', mediaType: 'image/png' },
     ])
-    for (const part of parts) {
-      expect(part.url).toBeUndefined()
-      expect(part.path).toBeTruthy()
-    }
   })
 
   it('discriminates image vs file by extension', () => {
-    const [imagePart, filePart] = fileMentionsToParts([
-      { path: 'a.gif', name: 'a.gif' },
-      { path: 'a.pdf', name: 'a.pdf' },
-    ])
+    const [imagePart, filePart] = fileMentionsToParts(
+      [
+        { path: 'a.gif', name: 'a.gif' },
+        { path: 'a.pdf', name: 'a.pdf' },
+      ],
+      { resolvePath },
+    )
     expect(imagePart!.type).toBe('image')
     expect(filePart!.type).toBe('file')
     expect(filePart!.mediaType).toBeUndefined()
@@ -57,11 +58,15 @@ describe('fileMentionsToParts', () => {
     const parts = fileMentionsToParts([{ path: 'notes.md', name: 'notes.md' }], {
       resolvePath: (p) => `/home/agent/vault/${p}`,
     })
-    expect(parts[0]!.path).toBe('/home/agent/vault/notes.md')
+    expect(parts[0]).toEqual({
+      type: 'file',
+      filename: 'notes.md',
+      url: 'file:///home/agent/vault/notes.md',
+    })
   })
 
   it('returns an empty array for an empty mention list', () => {
-    expect(fileMentionsToParts([])).toEqual([])
+    expect(fileMentionsToParts([], { resolvePath })).toEqual([])
   })
 })
 
@@ -223,8 +228,8 @@ describe('parseFileMentions', () => {
     const parsed: FileMention[] = parseFileMentions([
       mention({ path: 'assets/logo.png', name: 'logo.png' }),
     ])
-    expect(fileMentionsToParts(parsed)).toEqual([
-      { type: 'image', filename: 'logo.png', path: 'assets/logo.png', mediaType: 'image/png' },
+    expect(fileMentionsToParts(parsed, { resolvePath: (path) => `/home/agent/${path}` })).toEqual([
+      { type: 'image', filename: 'logo.png', path: '/home/agent/assets/logo.png', mediaType: 'image/png' },
     ])
   })
 })

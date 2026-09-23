@@ -428,10 +428,10 @@
     "@tangle-network/agent-integrations": "^0.44.0",
     "@tangle-network/agent-interface": "0.34.0",
     "@tangle-network/agent-knowledge": "6.0.0",
-    "@tangle-network/agent-profile-materialize": "0.8.0",
+    "@tangle-network/agent-profile-materialize": "0.9.0",
     "@tangle-network/agent-runtime": "0.106.0",
     "@tangle-network/brand": "^1.0.0",
-    "@tangle-network/sandbox": "^0.10.5",
+    "@tangle-network/sandbox": "0.13.0",
     "@tangle-network/sandbox-ui": "^0.72.0",
     "@tangle-network/ui": "^11.0.0",
     "@testing-library/dom": "^10.4.1",
@@ -468,10 +468,10 @@
     "@tangle-network/agent-integrations": ">=0.44.0",
     "@tangle-network/agent-interface": "0.34.0",
     "@tangle-network/agent-knowledge": "6.0.0",
-    "@tangle-network/agent-profile-materialize": "0.8.0",
+    "@tangle-network/agent-profile-materialize": "0.9.0",
     "@tangle-network/agent-runtime": "0.106.0",
     "@tangle-network/brand": ">=1.0.0",
-    "@tangle-network/sandbox": ">=0.9.7",
+    "@tangle-network/sandbox": "0.13.0",
     "@tangle-network/sandbox-ui": ">=0.72.0",
     "@xyflow/react": ">=12.0.0",
     "better-auth": ">=1.6.16",
@@ -540,6 +540,11 @@
     "zod": "^4.4.3"
   },
   "pnpm": {
+    "overrides": {
+      "@tangle-network/agent-profile-materialize": "file:/tmp/agent-stack-local/tangle-network-agent-profile-materialize-0.9.0.tgz",
+      "@tangle-network/agent-runtime": "file:/tmp/agent-stack-local/tangle-network-agent-runtime-0.106.0.tgz",
+      "@tangle-network/sandbox": "file:/tmp/agent-stack-local/tangle-network-sandbox-0.13.0.tgz"
+    },
     "onlyBuiltDependencies": [
       "better-sqlite3"
     ]

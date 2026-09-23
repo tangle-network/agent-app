@@ -47,6 +47,12 @@ function isMediaPart(part: PromptInputPart): part is Extract<PromptInputPart, { 
   return part.type === 'image' || part.type === 'file'
 }
 
+function expectedFilePart(filename: string, absolutePath: string, mediaType: string) {
+  const url = new URL('file:///')
+  url.pathname = absolutePath
+  return { type: 'file' as const, filename, mediaType, url: url.href }
+}
+
 describe('buildDispatchParts — parts[0] text', () => {
   it('is byte-identical to input.text', async () => {
     const result = await buildDispatchParts(base({ text: 'exact prompt text\nwith a newline' }))
@@ -105,7 +111,7 @@ describe('buildDispatchParts — path demotion', () => {
     expect('url' in (part as object)).toBe(false)
   })
 
-  it('demotes an oversize file to a path-only part (no mediaType/filename/url keys)', async () => {
+  it('demotes an oversize file to a file URL', async () => {
     const result = await buildDispatchParts(
       base({
         attachments: [attachment({ type: 'file', path: 'uploads/big.csv', name: 'big.csv', mediaType: 'text/csv' })],
@@ -114,7 +120,9 @@ describe('buildDispatchParts — path demotion', () => {
     )
     expect(result.succeeded).toBe(true)
     if (!result.succeeded) return
-    expect(result.value[1]).toEqual({ type: 'file', path: `${VAULT_DIR}/uploads/big.csv` })
+    expect(result.value[1]).toEqual(
+      expectedFilePart('big.csv', `${VAULT_DIR}/uploads/big.csv`, 'text/csv'),
+    )
   })
 
   it('forces demotion of an otherwise-inlinable image when systemPrompt consumes the budget', async () => {
@@ -144,7 +152,9 @@ describe('buildDispatchParts — path demotion', () => {
     expect(result.succeeded).toBe(true)
     if (!result.succeeded) return
     expect(result.value[1]).toEqual({ type: 'image', filename: 'pic.png', mediaType: 'image/png', path: `${VAULT_DIR}/uploads/pic.png` })
-    expect(result.value[2]).toEqual({ type: 'file', path: `${VAULT_DIR}/uploads/notes.txt` })
+    expect(result.value[2]).toEqual(
+      expectedFilePart('notes.txt', `${VAULT_DIR}/uploads/notes.txt`, 'text/plain'),
+    )
   })
 })
 
@@ -180,7 +190,9 @@ describe('buildDispatchParts — budget math', () => {
     const [, first, second] = result.value
     expect(first?.type).toBe('file')
     if (first?.type === 'file') expect(typeof first.url).toBe('string')
-    expect(second).toEqual({ type: 'file', path: `${VAULT_DIR}/uploads/two.bin` })
+    expect(second).toEqual(
+      expectedFilePart('two.bin', `${VAULT_DIR}/uploads/two.bin`, 'application/octet-stream'),
+    )
   })
 })
 
@@ -254,8 +266,8 @@ describe('buildDispatchParts — fail-loud paths', () => {
   })
 })
 
-describe('buildDispatchParts — url/path exclusivity invariant', () => {
-  it('every emitted media part has exactly one of a data: url or an absolute path', async () => {
+describe('buildDispatchParts — current media locations', () => {
+  it('emits URL-based files and images with exactly one URL or path', async () => {
     const result = await buildDispatchParts(
       base({
         attachments: [attachment(), attachment({ type: 'file', path: 'uploads/big.csv', name: 'big.csv', mediaType: 'text/csv' })],
@@ -269,8 +281,9 @@ describe('buildDispatchParts — url/path exclusivity invariant', () => {
     if (!result.succeeded) return
     for (const part of result.value) {
       if (!isMediaPart(part)) continue
-      const hasUrl = typeof part.url === 'string' && part.url.startsWith('data:')
-      const hasPath = typeof part.path === 'string' && part.path.startsWith('/')
+      const hasUrl = typeof part.url === 'string' && part.url.length > 0
+      const hasPath = part.type === 'image' && typeof part.path === 'string' && part.path.startsWith('/')
+      if (part.type === 'file') expect(part.url).toMatch(/^(?:data|file):/u)
       expect(hasUrl).not.toBe(hasPath)
       expect(hasUrl || hasPath).toBe(true)
     }
@@ -295,7 +308,7 @@ describe('buildDispatchParts — profile wire reserve', () => {
     if (!withProfile.succeeded) return
     const part = withProfile.value[1]
     expect(part).not.toHaveProperty('url')
-    if (part && isMediaPart(part)) expect(part.path).toBe(`${VAULT_DIR}/uploads/pic.png`)
+    if (part?.type === 'image') expect(part.path).toBe(`${VAULT_DIR}/uploads/pic.png`)
   })
 
   it('final size check includes the profile rider', async () => {
@@ -363,7 +376,7 @@ describe('buildDispatchParts — mentions', () => {
     expect(reader.mock.calls[0]![2]).toEqual({ readBytes: false })
   })
 
-  it('ships a non-image mention as a bare in-box path part (stat only, no bytes)', async () => {
+  it('ships a non-image mention as an in-box file URL (stat only, no bytes)', async () => {
     const reader = vi.fn(async (_box: SandboxExecChannel, _path: string, _options: { readBytes: boolean }) => ({
       succeeded: true as const,
       value: { size: 42 },
@@ -373,7 +386,9 @@ describe('buildDispatchParts — mentions', () => {
     )
     expect(result.succeeded).toBe(true)
     if (!result.succeeded) return
-    expect(result.value[1]).toEqual({ type: 'file', path: `${VAULT_DIR}/notes.md` })
+    expect(result.value[1]).toEqual(
+      expectedFilePart('notes.md', `${VAULT_DIR}/notes.md`, 'application/octet-stream'),
+    )
     expect(reader).toHaveBeenCalledTimes(1)
     expect(reader.mock.calls[0]![2]).toEqual({ readBytes: false })
   })
@@ -389,7 +404,9 @@ describe('buildDispatchParts — mentions', () => {
     )
     expect(result.succeeded).toBe(true)
     if (!result.succeeded) return
-    expect(result.value[1]).toEqual({ type: 'file', path: `${VAULT_DIR}/${path}` })
+    expect(result.value[1]).toEqual(
+      expectedFilePart('Q3 review — final.md', `${VAULT_DIR}/${path}`, 'application/octet-stream'),
+    )
     expect(reader.mock.calls[0]![1]).toBe(`${VAULT_DIR}/${path}`)
   })
 
@@ -413,7 +430,7 @@ describe('buildDispatchParts — mentions', () => {
     expect(result.error).toContain('box')
   })
 
-  it('every emitted mention media part satisfies the url/path exclusivity invariant', async () => {
+  it('every emitted mention media part uses the current location shape', async () => {
     const result = await buildDispatchParts(
       base({
         mentions: [mention(), mention({ mentionKind: 'file', path: 'notes.md', name: 'notes.md' })],
@@ -425,8 +442,9 @@ describe('buildDispatchParts — mentions', () => {
     if (!result.succeeded) return
     for (const part of result.value) {
       if (!isMediaPart(part)) continue
-      const hasUrl = typeof part.url === 'string' && part.url.startsWith('data:')
-      const hasPath = typeof part.path === 'string' && part.path.startsWith('/')
+      const hasUrl = typeof part.url === 'string' && part.url.length > 0
+      const hasPath = part.type === 'image' && typeof part.path === 'string' && part.path.startsWith('/')
+      if (part.type === 'file') expect(part.url).toMatch(/^(?:data|file):/u)
       expect(hasUrl).not.toBe(hasPath)
       expect(hasUrl || hasPath).toBe(true)
     }

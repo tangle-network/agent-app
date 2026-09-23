@@ -39,8 +39,8 @@ import type {
   AgentProfileFileMount,
   AgentProfileMcpServer,
   AgentProfileResourceRef,
-} from '@tangle-network/sandbox'
-import { mergeAgentProfiles } from '@tangle-network/sandbox'
+} from '@tangle-network/agent-interface'
+import { mergeAgentProfiles } from '@tangle-network/agent-interface'
 import { profile } from '@tangle-network/agent-eval'
 import {
   composeShellResources,
@@ -301,14 +301,16 @@ export function composeAgentProfile(
   return pruneEmptyResourceChannels(merged)
 }
 
-/** Drop empty resource channels the SDK merge normalizes in (`tools`/`skills`/
- *  `agents`/`commands`: `[]`), so the composed profile's wire payload carries
+/** Drop absent or empty resource channels the SDK merge normalizes in, so the
+ *  composed profile's wire payload carries
  *  only the channels that actually have content — one canonical shape every app
  *  emits, instead of a sidecar payload full of empty arrays. */
 function pruneEmptyResourceChannels(profile: AgentProfile): AgentProfile {
   if (!profile.resources) return profile
   const kept = Object.fromEntries(
-    Object.entries(profile.resources).filter(([, value]) => !(Array.isArray(value) && value.length === 0)),
+    Object.entries(profile.resources).filter(
+      ([, value]) => value !== undefined && !(Array.isArray(value) && value.length === 0),
+    ),
   ) as AgentProfile['resources']
   const out: AgentProfile = { ...profile, resources: kept }
   if (kept && Object.keys(kept).length === 0) delete out.resources

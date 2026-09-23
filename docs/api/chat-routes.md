@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-150 exports.
+153 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -192,7 +192,7 @@ interface BuildDispatchPartsInput
 
 ### `ChatAttachmentInput`
 
-`interface` — `POST` turn-body entry describing a file already uploaded to the product's store (vault/object-store) — distinct from an inline {@link * ChatTurnFilePartInput} (which carries bytes) and from a {@link…
+`interface` — `POST` turn-body entry describing a file already uploaded to the product's store (vault/object-store) — distinct from an inline {@link * ChatTurnMediaPartInput} (which carries bytes) and from a {@lin…
 
 ```ts
 interface ChatAttachmentInput
@@ -248,7 +248,7 @@ interface ChatTurnAuthorizeArgs
 
 ### `ChatTurnFilePartInput`
 
-`interface` — A non-text prompt part the upload route hands back and the client echoes on send.
+`interface` — A file prompt part.
 
 ```ts
 interface ChatTurnFilePartInput
@@ -268,6 +268,14 @@ type ChatTurnGateResult
 
 ```ts
 interface ChatTurnHeartbeat
+```
+
+### `ChatTurnImagePartInput`
+
+`interface` — An image prompt part.
+
+```ts
+interface ChatTurnImagePartInput
 ```
 
 ### `ChatTurnInputError`
@@ -334,6 +342,14 @@ interface ChatTurnLock
 type ChatTurnLockResult
 ```
 
+### `ChatTurnMediaPartInput`
+
+`type`
+
+```ts
+type ChatTurnMediaPartInput
+```
+
 ### `ChatTurnMessageStore`
 
 `interface` — What the route persists — a structural subset of `/chat-store`'s `ChatStore`, so `createChatStore(db, tables)` satisfies it directly and a product with its own persistence adapts without importing dr…
@@ -352,7 +368,7 @@ interface ChatTurnModelFailover
 
 ### `ChatTurnPartInput`
 
-`type` — Resolve input as either a text part or a file part of a chat turn
+`type` — Resolve input as either a text or media part of a chat turn.
 
 ```ts
 type ChatTurnPartInput
@@ -672,10 +688,10 @@ interface FileMention
 
 ### `fileMentionsToParts`
 
-`function` — Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…
+`function` — Maps resolved file mentions to current Sandbox media parts.
 
 ```ts
-(mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
+(mentions: readonly FileMention[], opts: FileMentionsToPartsOptions) => ChatTurnMediaPartInput[]
 ```
 
 ### `FileMentionsToPartsOptions`
@@ -811,7 +827,7 @@ type OpenModelStream
 `function` — Validates the untyped `parts` array off the wire.
 
 ```ts
-(raw: unknown) => ChatTurnFilePartInput[]
+(raw: unknown) => ChatTurnMediaPartInput[]
 ```
 
 ### `parseFileMentions`
@@ -1052,6 +1068,14 @@ interface SandboxFileTreeSource
 
 ```ts
 type SandboxMentionPathCheck
+```
+
+### `sandboxPathToFileUrl`
+
+`function` — Convert an absolute sandbox path to the encoded URL required by file input parts.
+
+```ts
+(path: string) => string
 ```
 
 ### `SandboxTreeFile`

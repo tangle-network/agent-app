@@ -27,10 +27,6 @@ vi.mock('@tangle-network/sandbox', () => ({
       sandboxCtor(opts)
     }
   },
-  mergeAgentProfiles: (base: unknown, overlay: unknown) => ({
-    ...(base as Record<string, unknown>),
-    ...(overlay as Record<string, unknown>),
-  }),
 }))
 
 import {
@@ -80,8 +76,8 @@ import type {
   AgentProfile,
   AgentProfileFileMount,
   AgentProfileMcpServer,
-  SandboxInstance,
-} from '@tangle-network/sandbox'
+} from '@tangle-network/agent-interface'
+import type { SandboxInstance } from '@tangle-network/sandbox'
 
 const PROFILE: AgentProfile = { name: 'test' } as AgentProfile
 
@@ -550,7 +546,7 @@ describe('pure seam helpers', () => {
     const parts: PromptInputPart[] = [
       { type: 'image', url: 'https://img/1.png' },
       { type: 'text', text: 'describe this' },
-      { type: 'file', filename: 'notes.txt' },
+      { type: 'file', filename: 'notes.txt', url: 'file:///workspace/notes.txt' },
     ]
     const merged = mergeHistoryIntoParts(parts, [
       { role: 'user', content: 'earlier question' },
@@ -562,7 +558,7 @@ describe('pure seam helpers', () => {
         type: 'text',
         text: 'User: earlier question\n\nAssistant: earlier answer\n\nUser: describe this',
       },
-      { type: 'file', filename: 'notes.txt' },
+      { type: 'file', filename: 'notes.txt', url: 'file:///workspace/notes.txt' },
     ])
   })
 
@@ -728,7 +724,7 @@ describe('mintSandboxScopedToken', () => {
     const box = {
       mintScopedToken: vi.fn().mockRejectedValue(new Error('forbidden (403)')),
     } as unknown as SandboxInstance
-    const r = await mintSandboxScopedToken(box, { scope: 'session' })
+    const r = await mintSandboxScopedToken(box, { scope: 'read-only' })
     expect(r.succeeded).toBe(false)
     if (!r.succeeded) expect(r.error.message).toContain('403')
   })

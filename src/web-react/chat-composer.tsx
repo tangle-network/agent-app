@@ -23,6 +23,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
+import type { ChatTurnMediaPartInput } from '../chat-routes/wire'
 
 // ── glyphs (no icon-library dependency) ───────────────────────────────────
 
@@ -80,14 +81,7 @@ function UploadGlyph({ className }: { className?: string }) {
 /** Prompt-part descriptor an uploaded file carries (the upload route's
  *  `UploadedChatFile.part`), echoed back in the turn body on send. Mirrors
  *  `/chat-routes`' wire shape structurally — no server import here. */
-export interface ComposerFilePart {
-  type: 'image' | 'file'
-  filename?: string
-  mediaType?: string
-  url?: string
-  path?: string
-  content?: string
-}
+export type ComposerFilePart = ChatTurnMediaPartInput
 
 export interface ComposerFile {
   id: string

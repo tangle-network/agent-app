@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-252 exports.
+254 exports.
 
 ### `activityTone`
 
@@ -176,7 +176,7 @@ interface CatalogModel
 
 ### `ChatAttachmentInput`
 
-`interface` — `POST` turn-body entry describing a file already uploaded to the product's store (vault/object-store) — distinct from an inline {@link * ChatTurnFilePartInput} (which carries bytes) and from a {@link…
+`interface` — `POST` turn-body entry describing a file already uploaded to the product's store (vault/object-store) — distinct from an inline {@link * ChatTurnMediaPartInput} (which carries bytes) and from a {@lin…
 
 ```ts
 interface ChatAttachmentInput
@@ -368,15 +368,31 @@ interface ChatToolCallInfo
 
 ### `ChatTurnFilePartInput`
 
-`interface` — A non-text prompt part the upload route hands back and the client echoes on send.
+`interface` — A file prompt part.
 
 ```ts
 interface ChatTurnFilePartInput
 ```
 
+### `ChatTurnImagePartInput`
+
+`interface` — An image prompt part.
+
+```ts
+interface ChatTurnImagePartInput
+```
+
+### `ChatTurnMediaPartInput`
+
+`type`
+
+```ts
+type ChatTurnMediaPartInput
+```
+
 ### `ChatTurnPartInput`
 
-`type` — Resolve input as either a text part or a file part of a chat turn
+`type` — Resolve input as either a text or media part of a chat turn.
 
 ```ts
 type ChatTurnPartInput
@@ -440,10 +456,10 @@ interface ComposerFile
 
 ### `ComposerFilePart`
 
-`interface` — Prompt-part descriptor an uploaded file carries (the upload route's `UploadedChatFile.part`), echoed back in the turn body on send.
+`type` — Prompt-part descriptor an uploaded file carries (the upload route's `UploadedChatFile.part`), echoed back in the turn body on send.
 
 ```ts
-interface ComposerFilePart
+type ComposerFilePart
 ```
 
 ### `ComposerMentionProp`
@@ -824,10 +840,10 @@ interface FileMention
 
 ### `fileMentionsToParts`
 
-`function` — Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…
+`function` — Maps resolved file mentions to current Sandbox media parts.
 
 ```ts
-(mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
+(mentions: readonly FileMention[], opts: FileMentionsToPartsOptions) => ChatTurnMediaPartInput[]
 ```
 
 ### `FlowWaterfall`

@@ -236,6 +236,24 @@ describe('createChatTurnRoutes — turn', () => {
     expect(body.code).toBe('PROMPT_PARTS_TOO_LARGE')
   })
 
+  it('rejects retired and ambiguous attachment shapes', async () => {
+    const { routes, ctx } = makeRoutes()
+    const invalidParts = [
+      { type: 'file', filename: 'old.txt', path: '/home/agent/old.txt' },
+      { type: 'file', filename: 'old.txt', content: 'legacy bytes' },
+      { type: 'file', url: 'file:///home/agent/missing-name.txt' },
+      { type: 'image', filename: 'missing.png' },
+      { type: 'image', filename: 'ambiguous.png', url: 'https://example.com/a.png', path: '/home/agent/a.png' },
+    ]
+    for (const part of invalidParts) {
+      const response = await routes.turn(
+        turnRequest({ threadId: 't-1', content: 'inspect', parts: [part] }),
+        ctx,
+      )
+      expect(response.status, JSON.stringify(part)).toBe(400)
+    }
+  })
+
   it('short-circuits with the authorize seam response', async () => {
     const { routes, rows, ctx } = makeRoutes({
       authorize: async () => ({ ok: false, response: Response.json({ error: 'nope' }, { status: 401 }) }),

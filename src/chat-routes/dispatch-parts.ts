@@ -5,8 +5,8 @@
  * blocks); each attachment or mention becomes one media part. An attachment
  * (read from the product store via the injected reader) draws the inline byte
  * budget first; a mention (read from the LIVE box) takes what is left. A file
- * inlines as a `data:` URI when it fits the remaining budget, otherwise demotes
- * to an in-box path part so the whole request stays under the proxy cap. Every
+ * inlines as a `data:` URI when it fits the remaining budget, otherwise uses a
+ * `file:` URL for its in-box path so the request stays under the proxy cap. Every
  * media part is deduped by its resolved absolute path. This module only
  * produces the parts array; the caller decides when a turn dispatches parts
  * instead of a plain string.
@@ -61,6 +61,13 @@ function byteLen(value: string): number {
   return new TextEncoder().encode(value).length
 }
 
+function fileUrlForAbsolutePath(absolutePath: string): string | undefined {
+  if (!absolutePath.startsWith('/')) return undefined
+  const url = new URL('file:///')
+  url.pathname = absolutePath
+  return url.href
+}
+
 /**
  * Default mention reader: stats the in-box file (which also proves it still
  * exists — a since-deleted mention fails loud here), then reads its bytes only
@@ -85,14 +92,12 @@ async function readSandboxMention(
   return { succeeded: true, value: { size: stat.value, base64: bytesToBase64(read.value.bytes) } }
 }
 
-/** HARD INVARIANT: a media part (`image`/`file`) must carry exactly one of a
- *  non-empty `data:` URL or a non-empty absolute path — never both, never
- *  neither. The OpenCode adapter falls back to `part.url || part.path || ""`,
- *  so a part violating this silently degrades to an empty target instead of
- *  failing loud. */
+/** HARD INVARIANT: a file must carry a URL, while an image must carry exactly
+ *  one URL or absolute path. */
 function violatesUrlPathXor(part: PromptInputPart): boolean {
   if (part.type === 'text') return false
-  const hasUrl = typeof part.url === 'string' && part.url.startsWith('data:')
+  const hasUrl = typeof part.url === 'string' && part.url.length > 0
+  if (part.type === 'file') return !hasUrl
   const hasPath = typeof part.path === 'string' && part.path.startsWith('/')
   return hasUrl === hasPath
 }
@@ -226,12 +231,8 @@ export async function buildDispatchParts(input: BuildDispatchPartsInput): Promis
       continue
     }
 
-    // File part. Sidecar's file-part zod union is tried [Legacy: {path
-    // required, content?} strips mediaType/filename] then [AISDK: {filename
-    // required, url required, mediaType?}] — so an inline file part must carry
-    // `filename` + `url` and no `path` key at all, while a path-based file part
-    // must carry only `path` (mediaType/filename would be stripped by the
-    // Legacy branch anyway).
+    // File parts always use the current filename + URL shape. Large files point
+    // at their in-box path with a file URL instead of using the removed path key.
     const fileMediaType = mediaType ?? 'application/octet-stream'
     const inlinePart: PromptInputPart = {
       type: 'file',
@@ -244,7 +245,16 @@ export async function buildDispatchParts(input: BuildDispatchPartsInput): Promis
       parts.push(inlinePart)
       runningInline += cost
     } else {
-      parts.push({ type: 'file', path: absPath })
+      const url = fileUrlForAbsolutePath(absPath)
+      if (!url) {
+        return { succeeded: false, error: `resolved attachment path must be absolute: ${absPath}` }
+      }
+      parts.push({
+        type: 'file',
+        filename: attachment.name,
+        mediaType: fileMediaType,
+        url,
+      })
     }
   }
 
@@ -303,13 +313,20 @@ export async function buildDispatchParts(input: BuildDispatchPartsInput): Promis
       }
     }
 
-    // Path-only mention: an image keeps its `mediaType`, everything else is a
-    // bare `file` path (the sidecar's Legacy file-part branch strips extra keys).
-    parts.push(
-      isImage && mediaType
-        ? { type: 'image', filename: mention.name, mediaType, path: absPath }
-        : { type: 'file', path: absPath },
-    )
+    if (isImage && mediaType) {
+      parts.push({ type: 'image', filename: mention.name, mediaType, path: absPath })
+    } else {
+      const url = fileUrlForAbsolutePath(absPath)
+      if (!url) {
+        return { succeeded: false, error: `resolved mention path must be absolute: ${absPath}` }
+      }
+      parts.push({
+        type: 'file',
+        filename: mention.name,
+        mediaType: 'application/octet-stream',
+        url,
+      })
+    }
   }
 
   for (const part of parts) {

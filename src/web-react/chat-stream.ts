@@ -32,6 +32,8 @@ import {
 export {
   chatTurnRequestInit,
   type ChatTurnFilePartInput,
+  type ChatTurnImagePartInput,
+  type ChatTurnMediaPartInput,
   type ChatTurnPartInput,
   type ChatTurnRequestPayload,
   type ProducerTextEvent,

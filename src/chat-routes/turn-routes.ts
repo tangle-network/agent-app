@@ -72,7 +72,7 @@ import {
   ChatTurnInputError,
   parseChatTurnParts,
   parseFileMentions,
-  type ChatTurnFilePartInput,
+  type ChatTurnMediaPartInput,
   type ChatTurnPartInput,
   type ChatTurnRequestPayload,
   type FileMention,
@@ -448,7 +448,7 @@ function errorResponse(err: ChatTurnInputError): Response {
 interface ParsedTurnBody {
   payload: ChatTurnRequestPayload
   content: string
-  fileParts: ChatTurnFilePartInput[]
+  fileParts: ChatTurnMediaPartInput[]
   mentions: FileMention[]
   turnId: string | undefined
 }
@@ -501,7 +501,7 @@ function validateTurnBody(body: Record<string, unknown>, maxInlinePartBytes: num
  *  `resolvePath` seam), so the route never dispatches them itself. */
 function userPartsWithFiles(
   userParts: Array<Record<string, unknown>>,
-  fileParts: ChatTurnFilePartInput[],
+  fileParts: ChatTurnMediaPartInput[],
   mentions: FileMention[],
 ): ChatMessagePart[] {
   return toChatMessageParts([

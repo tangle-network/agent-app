@@ -41,7 +41,7 @@
  * import never reaches the Vite SSR bundle.
  */
 
-import type { AgentProfileFileMount, AgentProfileResourceRef } from '@tangle-network/sandbox'
+import type { AgentProfileFileMount, AgentProfileResourceRef } from '@tangle-network/agent-interface'
 
 /** Construct the inline arm of the SDK's `AgentProfileResourceRef`. Inlined here
  *  so this leaf subpath stays type-only over `@tangle-network/sandbox` — it

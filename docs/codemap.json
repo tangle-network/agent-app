@@ -2007,7 +2007,7 @@
         {
           "name": "getClient",
           "kind": "function",
-          "signature": "(shell: SandboxRuntimeConfig) => SandboxClient",
+          "signature": "(shell: SandboxRuntimeConfig) => Sandbox",
           "doc": "Resolve a synchronous sandbox client from provided runtime configuration credentials"
         },
         {
@@ -2703,7 +2703,7 @@
         {
           "name": "mintSandboxScopedToken",
           "kind": "function",
-          "signature": "(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; ttlMinutes?: number | undefi…",
+          "signature": "(box: SandboxInstance, options: MintScopedTokenOptions) => Promise<Outcome<ScopedTokenResult>>",
           "doc": "Mint a scoped token for an already-provisioned box (e.g."
         },
         {
@@ -6209,7 +6209,7 @@
           "name": "ChatAttachmentInput",
           "kind": "interface",
           "signature": "interface ChatAttachmentInput",
-          "doc": "`POST` turn-body entry describing a file already uploaded to the product's store (vault/object-store) — distinct from an inline {@link * ChatTurnFilePartInput} (which carries bytes) and from a {@link…"
+          "doc": "`POST` turn-body entry describing a file already uploaded to the product's store (vault/object-store) — distinct from an inline {@link * ChatTurnMediaPartInput} (which carries bytes) and from a {@lin…"
         },
         {
           "name": "ChatAttachmentKind",
@@ -6251,7 +6251,7 @@
           "name": "ChatTurnFilePartInput",
           "kind": "interface",
           "signature": "interface ChatTurnFilePartInput",
-          "doc": "A non-text prompt part the upload route hands back and the client echoes on send."
+          "doc": "A file prompt part."
         },
         {
           "name": "ChatTurnGateResult",
@@ -6264,6 +6264,12 @@
           "kind": "interface",
           "signature": "interface ChatTurnHeartbeat",
           "doc": "Keepalive emitted while the producer is quiet (long tool calls, first-token wait) so client watchdogs stay re-armed."
+        },
+        {
+          "name": "ChatTurnImagePartInput",
+          "kind": "interface",
+          "signature": "interface ChatTurnImagePartInput",
+          "doc": "An image prompt part."
         },
         {
           "name": "ChatTurnInputError",
@@ -6314,6 +6320,12 @@
           "doc": "Single-flight lock verdict — acquired (with an opaque handle passed back to `release`), or already held (short-circuit with the product's 409-style `Response`)."
         },
         {
+          "name": "ChatTurnMediaPartInput",
+          "kind": "type",
+          "signature": "type ChatTurnMediaPartInput",
+          "doc": null
+        },
+        {
           "name": "ChatTurnMessageStore",
           "kind": "interface",
           "signature": "interface ChatTurnMessageStore",
@@ -6329,7 +6341,7 @@
           "name": "ChatTurnPartInput",
           "kind": "type",
           "signature": "type ChatTurnPartInput",
-          "doc": "Resolve input as either a text part or a file part of a chat turn"
+          "doc": "Resolve input as either a text or media part of a chat turn."
         },
         {
           "name": "ChatTurnProduceArgs",
@@ -6568,8 +6580,8 @@
         {
           "name": "fileMentionsToParts",
           "kind": "function",
-          "signature": "(mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]",
-          "doc": "Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…"
+          "signature": "(mentions: readonly FileMention[], opts: FileMentionsToPartsOptions) => ChatTurnMediaPartInput[]",
+          "doc": "Maps resolved file mentions to current Sandbox media parts."
         },
         {
           "name": "FileMentionsToPartsOptions",
@@ -6670,7 +6682,7 @@
         {
           "name": "parseChatTurnParts",
           "kind": "function",
-          "signature": "(raw: unknown) => ChatTurnFilePartInput[]",
+          "signature": "(raw: unknown) => ChatTurnMediaPartInput[]",
           "doc": "Validates the untyped `parts` array off the wire."
         },
         {
@@ -6852,6 +6864,12 @@
           "kind": "type",
           "signature": "type SandboxMentionPathCheck",
           "doc": "Represent the result of a sandbox mention path check indicating success or failure with an error message"
+        },
+        {
+          "name": "sandboxPathToFileUrl",
+          "kind": "function",
+          "signature": "(path: string) => string",
+          "doc": "Convert an absolute sandbox path to the encoded URL required by file input parts."
         },
         {
           "name": "SandboxTreeFile",
@@ -13662,7 +13680,7 @@
         {
           "name": "getClient",
           "kind": "function",
-          "signature": "(shell: SandboxRuntimeConfig) => SandboxClient",
+          "signature": "(shell: SandboxRuntimeConfig) => Sandbox",
           "doc": "Resolve a synchronous sandbox client from provided runtime configuration credentials"
         },
         {
@@ -13710,7 +13728,7 @@
         {
           "name": "mintSandboxScopedToken",
           "kind": "function",
-          "signature": "(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; ttlMinutes?: number | undefi…",
+          "signature": "(box: SandboxInstance, options: MintScopedTokenOptions) => Promise<Outcome<ScopedTokenResult>>",
           "doc": "Mint a scoped token for an already-provisioned box (e.g."
         },
         {
@@ -18654,7 +18672,7 @@
           "name": "ChatAttachmentInput",
           "kind": "interface",
           "signature": "interface ChatAttachmentInput",
-          "doc": "`POST` turn-body entry describing a file already uploaded to the product's store (vault/object-store) — distinct from an inline {@link * ChatTurnFilePartInput} (which carries bytes) and from a {@link…"
+          "doc": "`POST` turn-body entry describing a file already uploaded to the product's store (vault/object-store) — distinct from an inline {@link * ChatTurnMediaPartInput} (which carries bytes) and from a {@lin…"
         },
         {
           "name": "ChatAttachmentKind",
@@ -18798,13 +18816,25 @@
           "name": "ChatTurnFilePartInput",
           "kind": "interface",
           "signature": "interface ChatTurnFilePartInput",
-          "doc": "A non-text prompt part the upload route hands back and the client echoes on send."
+          "doc": "A file prompt part."
+        },
+        {
+          "name": "ChatTurnImagePartInput",
+          "kind": "interface",
+          "signature": "interface ChatTurnImagePartInput",
+          "doc": "An image prompt part."
+        },
+        {
+          "name": "ChatTurnMediaPartInput",
+          "kind": "type",
+          "signature": "type ChatTurnMediaPartInput",
+          "doc": null
         },
         {
           "name": "ChatTurnPartInput",
           "kind": "type",
           "signature": "type ChatTurnPartInput",
-          "doc": "Resolve input as either a text part or a file part of a chat turn"
+          "doc": "Resolve input as either a text or media part of a chat turn."
         },
         {
           "name": "chatTurnRequestInit",
@@ -18850,8 +18880,8 @@
         },
         {
           "name": "ComposerFilePart",
-          "kind": "interface",
-          "signature": "interface ComposerFilePart",
+          "kind": "type",
+          "signature": "type ComposerFilePart",
           "doc": "Prompt-part descriptor an uploaded file carries (the upload route's `UploadedChatFile.part`), echoed back in the turn body on send."
         },
         {
@@ -19139,8 +19169,8 @@
         {
           "name": "fileMentionsToParts",
           "kind": "function",
-          "signature": "(mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]",
-          "doc": "Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…"
+          "signature": "(mentions: readonly FileMention[], opts: FileMentionsToPartsOptions) => ChatTurnMediaPartInput[]",
+          "doc": "Maps resolved file mentions to current Sandbox media parts."
         },
         {
           "name": "FlowWaterfall",

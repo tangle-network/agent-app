@@ -23,8 +23,8 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { SandboxClient } from '@tangle-network/sandbox'
-import type { AgentProfile } from '@tangle-network/sandbox'
+import { Sandbox } from '@tangle-network/sandbox'
+import type { AgentProfile } from '@tangle-network/agent-interface'
 
 import {
   createChatTurnRoutes,
@@ -76,7 +76,7 @@ function liveShell(): SandboxRuntimeConfig {
 const tables = createChatTables({ workspaceTable: workspacesTable })
 
 async function liveBox() {
-  const client = new SandboxClient({
+  const client = new Sandbox({
     apiKey: process.env.SANDBOX_API_KEY!,
     baseUrl: process.env.SANDBOX_API_URL ?? 'https://sandbox.tangle.tools',
   })
@@ -131,7 +131,7 @@ async function runLiveTurn(
           opened.push(model)
           console.log(`[live] open attempt ${attempt} -> ${model}`)
           const raw = box.streamPrompt('What is the capital of France? Answer in one short sentence.', {
-            model,
+            backend: { model: { model } },
             sessionId: `${thread.id}-${attempt}`,
           }) as AsyncIterable<unknown>
           // Dump the VERBATIM upstream events for the failing attempt. This is

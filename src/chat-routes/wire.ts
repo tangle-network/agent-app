@@ -5,7 +5,7 @@
  * reach a Node builtin or an engine package.
  *
  * The part shape mirrors the sandbox SDK's `PromptInputPart` structurally
- * (text | image | file with filename/mediaType/url/path/content) — derived
+ * (text | image | file) — derived
  * here, not imported, so the client bundle never touches the SDK.
  */
 
@@ -14,21 +14,29 @@ export interface ChatTurnTextPartInput {
   text: string
 }
 
-/** A non-text prompt part the upload route hands back and the client echoes
- *  on send. `url` carries an inline `data:` URI for small files; `path` is a
- *  sandbox workspace reference for large ones (the >1 MiB gateway body cap
- *  makes the two-step upload mandatory). */
-export interface ChatTurnFilePartInput {
-  type: 'image' | 'file'
+/** An image prompt part. Images may use an inline/remote URL or an absolute
+ *  sandbox path. */
+export interface ChatTurnImagePartInput {
+  type: 'image'
   filename?: string
   mediaType?: string
   url?: string
   path?: string
-  content?: string
 }
 
-/** Resolve input as either a text part or a file part of a chat turn */
-export type ChatTurnPartInput = ChatTurnTextPartInput | ChatTurnFilePartInput
+/** A file prompt part. Sandbox 0.13 accepts files only as a named URL; local
+ *  sandbox files use an encoded `file:` URL. */
+export interface ChatTurnFilePartInput {
+  type: 'file'
+  filename: string
+  mediaType?: string
+  url: string
+}
+
+export type ChatTurnMediaPartInput = ChatTurnImagePartInput | ChatTurnFilePartInput
+
+/** Resolve input as either a text or media part of a chat turn. */
+export type ChatTurnPartInput = ChatTurnTextPartInput | ChatTurnMediaPartInput
 
 // ── producer stream vocabulary ───────────────────────────────────────────────
 
@@ -138,7 +146,7 @@ export type ChatAttachmentKind = 'image' | 'file'
 
 /** `POST` turn-body entry describing a file already uploaded to the product's
  *  store (vault/object-store) — distinct from an inline {@link
- *  ChatTurnFilePartInput} (which carries bytes) and from a {@link FileMention}
+ *  ChatTurnMediaPartInput} (which carries bytes) and from a {@link FileMention}
  *  (a sandbox path the box already holds). The route resolves this field with
  *  {@link resolveChatAttachments}: every path is re-validated and every size is
  *  re-derived from the stored body, so nothing here is trusted as sent. */
@@ -157,7 +165,7 @@ export interface ChatTurnRequestPayload {
   threadId: string
   content?: string
   /** Non-text parts from the upload route, echoed back verbatim. */
-  parts?: ChatTurnFilePartInput[]
+  parts?: ChatTurnMediaPartInput[]
   /** `@`-picked file mentions for this turn — path references into the
    *  workspace sandbox, NOT uploads, so they travel in their own field rather
    *  than as `parts` entries. A product whose `parts` field is already spoken
@@ -276,8 +284,7 @@ function partByteSize(part: ChatTurnPartInput): number {
   let bytes = 0
   if (part.type === 'text') return part.text.length
   if (part.url) bytes += part.url.length
-  if (part.content) bytes += part.content.length
-  if (part.path) bytes += part.path.length
+  if (part.type === 'image' && part.path) bytes += part.path.length
   return bytes
 }
 
@@ -295,7 +302,10 @@ export function assertPromptPartsWithinCap(
   const total = promptPartsByteSize(parts)
   if (total <= maxBytes) return
   const largest = [...parts].sort((a, b) => partByteSize(b) - partByteSize(a))[0]
-  const largestName = largest && largest.type !== 'text' ? largest.filename ?? largest.path ?? largest.type : 'text'
+  const largestName =
+    largest && largest.type !== 'text'
+      ? largest.filename ?? (largest.type === 'image' ? largest.path : undefined) ?? largest.url ?? largest.type
+      : 'text'
   throw new ChatTurnInputError(
     `Inline prompt parts total ${total}B, over the ${maxBytes}B budget (largest: ${largestName}, ${largest ? partByteSize(largest) : 0}B). ` +
       'Upload large files through the upload route so they travel as sandbox path references.',
@@ -365,27 +375,42 @@ export interface FileMentionsToPartsOptions {
   /** Resolve a mention's workspace-relative path to the absolute path the
    *  dispatched part should carry (e.g. a host prefixing the in-box vault
    *  root). Default: identity — the path travels unchanged. */
-  resolvePath?: (path: string) => string
+  resolvePath: (path: string) => string
 }
 
-/** Maps resolved file mentions to path-only `ChatTurnFilePartInput`s —
- *  `image` vs `file` by extension, and always a `path`, never a `url` (the
- *  url/path XOR invariant: a mention is a sandbox path reference, never
- *  inline bytes). */
+/** Convert an absolute sandbox path to the encoded URL required by file input
+ *  parts. */
+export function sandboxPathToFileUrl(path: string): string {
+  if (!path.startsWith('/')) {
+    throw new Error(`sandboxPathToFileUrl requires an absolute path: ${path}`)
+  }
+  const url = new URL('file:///')
+  url.pathname = path
+  return url.href
+}
+
+/** Maps resolved file mentions to current Sandbox media parts. Images carry
+ *  an absolute path; files carry an encoded `file:` URL. */
 export function fileMentionsToParts(
   mentions: readonly FileMention[],
-  opts: FileMentionsToPartsOptions = {},
-): ChatTurnFilePartInput[] {
-  const resolvePath = opts.resolvePath ?? ((path: string) => path)
+  opts: FileMentionsToPartsOptions,
+): ChatTurnMediaPartInput[] {
   return mentions.map((mention) => {
     const mediaType = mediaTypeForMentionPath(mention.path)
-    const part: ChatTurnFilePartInput = {
-      type: mediaType ? 'image' : 'file',
-      filename: mention.name,
-      path: resolvePath(mention.path),
+    const path = opts.resolvePath(mention.path)
+    if (mediaType) {
+      return {
+        type: 'image',
+        filename: mention.name,
+        mediaType,
+        path,
+      }
     }
-    if (mediaType) part.mediaType = mediaType
-    return part
+    return {
+      type: 'file',
+      filename: mention.name,
+      url: sandboxPathToFileUrl(path),
+    }
   })
 }
 
@@ -519,7 +544,7 @@ export function parseFileMentions(raw: unknown): FileMention[] {
 
 /** Validates the untyped `parts` array off the wire. Returns the typed parts
  *  or throws `ChatTurnInputError` (400) naming the offending entry. */
-export function parseChatTurnParts(raw: unknown): ChatTurnFilePartInput[] {
+export function parseChatTurnParts(raw: unknown): ChatTurnMediaPartInput[] {
   if (raw === undefined || raw === null) return []
   if (!Array.isArray(raw)) throw new ChatTurnInputError('parts must be an array')
   return raw.map((entry, index) => {
@@ -530,21 +555,42 @@ export function parseChatTurnParts(raw: unknown): ChatTurnFilePartInput[] {
     if (part.type !== 'image' && part.type !== 'file') {
       throw new ChatTurnInputError(`parts[${index}].type must be 'image' or 'file'`)
     }
-    for (const key of ['filename', 'mediaType', 'url', 'path', 'content'] as const) {
+    for (const key of ['filename', 'mediaType', 'url', 'path'] as const) {
       if (part[key] !== undefined && typeof part[key] !== 'string') {
         throw new ChatTurnInputError(`parts[${index}].${key} must be a string`)
       }
     }
-    if (!part.url && !part.path && !part.content) {
-      throw new ChatTurnInputError(`parts[${index}] needs a url, path, or content`)
+    if (part.content !== undefined) {
+      throw new ChatTurnInputError(`parts[${index}].content is not supported; use url`)
+    }
+    if (part.type === 'file') {
+      if (typeof part.filename !== 'string' || part.filename.length === 0) {
+        throw new ChatTurnInputError(`parts[${index}].filename is required for files`)
+      }
+      if (typeof part.url !== 'string' || part.url.length === 0) {
+        throw new ChatTurnInputError(`parts[${index}].url is required for files`)
+      }
+      if (part.path !== undefined) {
+        throw new ChatTurnInputError(`parts[${index}].path is not supported for files; use a file: url`)
+      }
+      return {
+        type: 'file',
+        filename: part.filename,
+        ...(part.mediaType !== undefined ? { mediaType: part.mediaType as string } : {}),
+        url: part.url,
+      }
+    }
+    const hasUrl = typeof part.url === 'string' && part.url.length > 0
+    const hasPath = typeof part.path === 'string' && part.path.length > 0
+    if (hasUrl === hasPath) {
+      throw new ChatTurnInputError(`parts[${index}] image needs exactly one url or path`)
     }
     return {
-      type: part.type,
+      type: 'image',
       ...(part.filename !== undefined ? { filename: part.filename as string } : {}),
       ...(part.mediaType !== undefined ? { mediaType: part.mediaType as string } : {}),
       ...(part.url !== undefined ? { url: part.url as string } : {}),
       ...(part.path !== undefined ? { path: part.path as string } : {}),
-      ...(part.content !== undefined ? { content: part.content as string } : {}),
     }
   })
 }

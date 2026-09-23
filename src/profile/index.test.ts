@@ -3,7 +3,7 @@ import type {
   AgentProfile,
   AgentProfileFileMount,
   AgentProfileMcpServer,
-} from '@tangle-network/sandbox'
+} from '@tangle-network/agent-interface'
 import {
   assertSystemPromptWithinBudget,
   composeAgentProfile,

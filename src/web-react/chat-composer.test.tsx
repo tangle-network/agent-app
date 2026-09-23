@@ -128,7 +128,7 @@ describe('ChatComposer', () => {
 
   it('allows a file-only send when onSendParts is wired', () => {
     const onSendParts = vi.fn()
-    const part = { type: 'file' as const, filename: 'doc.pdf', path: 'uploads/doc.pdf' }
+    const part = { type: 'file' as const, filename: 'doc.pdf', url: 'file:///home/agent/uploads/doc.pdf' }
     render(
       <ChatComposer
         onSendParts={onSendParts}

@@ -2595,7 +2595,7 @@ interface FlowTrace
 `function` — Resolve a synchronous sandbox client from provided runtime configuration credentials
 
 ```ts
-(shell: SandboxRuntimeConfig) => SandboxClient
+(shell: SandboxRuntimeConfig) => Sandbox
 ```
 
 ### `getPartKey`
@@ -3523,7 +3523,7 @@ interface MemberSyncSeam
 `function` — Mint a scoped token for an already-provisioned box (e.g.
 
 ```ts
-(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; ttlMinutes?: number | undefi…
+(box: SandboxInstance, options: MintScopedTokenOptions) => Promise<Outcome<ScopedTokenResult>>
 ```
 
 ### `mintTerminalProxyToken`
