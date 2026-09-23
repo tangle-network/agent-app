@@ -170,12 +170,13 @@ describe('this package audits itself', () => {
   })
 
   // Runtime 0.256 (agent-runtime#1333) declares Eval >=0.183.0 <0.185.0 and
-  // Sandbox >=0.36.4 <0.48.0. This shell keeps the earlier minor of each, which
-  // 0.49.4 verified on the same application code, admits the minor its own dev
-  // install runs, and claims nothing past it.
+  // Sandbox >=0.36.4 <0.48.0. This shell keeps the floor of each that 0.49.4
+  // verified on the same application code, admits the minor its own dev install
+  // runs, and claims nothing past it. Sandbox 0.46 ran the same code before the
+  // dev install moved to 0.47.
   it.each([
     ['@tangle-network/agent-eval', ['0.182.999'], ['0.183.0', '0.184.0', '0.184.999'], ['0.185.0']],
-    ['@tangle-network/sandbox', ['0.44.999'], ['0.45.0', '0.46.0', '0.46.999'], ['0.47.0']],
+    ['@tangle-network/sandbox', ['0.44.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999'], ['0.48.0']],
   ])('keeps the %s peer on the verified window', async (name, below, admitted, above) => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
