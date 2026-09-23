@@ -33,6 +33,7 @@
     "src/intakes/api.ts",
     "src/intakes/drizzle.ts",
     "src/intakes/index.ts",
+    "src/hosted-agent/index.ts",
     "src/integrations/index.ts",
     "src/interactions/index.ts",
     "src/knowledge-loop/index.ts",

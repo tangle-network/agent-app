@@ -59,7 +59,7 @@ agent→app side channel; `defineAppTool` registers product tools here)* ·
 *(bridge + re-exports agent-eval)* · `sandbox` → crypto/harness/runtime/tools
 *(per-turn streaming)* · `trace` → missions *(flow observability)* · `config` →
 knowledge/runtime · `knowledge-loop` → config · `profile` → skills · `run` →
-harness · `platform` → billing/runtime/web · `preset-cloudflare` →
+harness · `platform` → billing/runtime/web · `hosted-agent` *(a person's text or call answered from their own isolated box; peers `sandbox`, `hub-sdk`, `agent-integrations`)* · `preset-cloudflare` →
 billing/crypto/knowledge/tools/web · `turn-stream` → stream/chat-routes
 *(shared DO-backed turn replay/broadcast/lock; structural Cloudflare, server-only)*.
 
@@ -97,6 +97,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | Preventing two requests from provisioning the same workspace box | `sandbox` — `runForegroundSandboxSingleFlight` over an inspectable claim store |
 | Completion checks / produced-state / eval bridge | `eval` (+ peer `agent-eval`) |
 | Integration-hub `/exec` calls | `integrations` |
+| An agent people text or call, each person in their own isolated sandbox | `hosted-agent` — `createHostedAgent` (Hub line callback → queue → `respond`; ph0ny `voiceHook`/`voiceAsk`; allowance hook). Peers: `sandbox`, `hub-sdk`, `agent-integrations`. Reference Worker: [`examples/hosted-agent`](./examples/hosted-agent) |
 | Per-workspace key mint/rotate/budget | `billing` |
 | Resumable chat turns (buffer/replay/coalesce) | `stream` — see [`examples/resumable-turns.md`](./examples/resumable-turns.md) |
 | The whole assembled chat turn route (auth → persist → stream → interactions) | `chat-routes` — `createChatTurnRoutes` (peer `agent-runtime`). Product seams — all STABLE, graduated in #227 once each had two independent consumers (`turnLock` · `contextGate` · `beforeTurn` · `onRawEvent` · `lifecycle` · `heartbeat`, plus the `authorize` result's `insertUserMessage`); kept FLAT top-level for back-compat — plus `transformFinalText` (pre-persist redaction over the final-text scalar AND every persisted TEXT part) and `onTurnComplete(failed, failureReason)` run-failure surfacing |

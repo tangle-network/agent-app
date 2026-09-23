@@ -212,6 +212,11 @@
       "import": "./dist/integrations/index.js",
       "default": "./dist/integrations/index.js"
     },
+    "./hosted-agent": {
+      "types": "./dist/hosted-agent/index.d.ts",
+      "import": "./dist/hosted-agent/index.js",
+      "default": "./dist/hosted-agent/index.js"
+    },
     "./interactions": {
       "types": "./dist/interactions/index.d.ts",
       "import": "./dist/interactions/index.js",
@@ -543,6 +548,7 @@
     "@tangle-network/agent-profile-materialize": "0.20.1",
     "@tangle-network/agent-runtime": "0.249.1",
     "@tangle-network/brand": "1.5.0",
+    "@tangle-network/hub-sdk": "0.14.2",
     "@tangle-network/sandbox": "0.45.0",
     "@tangle-network/sandbox-ui": "0.113.3",
     "@tangle-network/ui": "11.9.0",
@@ -603,6 +609,7 @@
     "@tangle-network/agent-profile-materialize": ">=0.20.1 <0.21.0",
     "@tangle-network/agent-runtime": ">=0.249.1 <0.250.0",
     "@tangle-network/brand": ">=1.5.0",
+    "@tangle-network/hub-sdk": ">=0.12.6 <0.15.0",
     "@tangle-network/sandbox": ">=0.45.0 <0.46.0",
     "@tangle-network/sandbox-ui": ">=0.113.3 <0.114.0",
     "@tangle-network/ui": ">=11.6.0 <12.0.0",
@@ -701,6 +708,9 @@
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "@tangle-network/hub-sdk": {
       "optional": true
     }
   },
