@@ -257,8 +257,10 @@ describe('createTangleSsoHandlers — start', () => {
 /** Values a browser resolves off this origin. `//host` is protocol-relative;
  *  in the WHATWG parser a backslash is a path separator for special schemes,
  *  so `/\\host` is `//host`; tab and newline are stripped before parsing, so
- *  `/\t/host` is `//host` too. A prefix check on `/` and `//` passes most of
- *  these. */
+ *  `/\t/host` is `//host` too; and dot-segment removal turns `/.//host`,
+ *  `/a/..//host` and `/%2e%2e//host` into a `//host` pathname while the
+ *  parsed origin stays put. A prefix check on `/` and `//` passes most of
+ *  these, and an origin check on the input alone passes the last group. */
 const OFF_ORIGIN_REDIRECTS = [
   '//attacker.example',
   '//attacker.example/x',
@@ -268,6 +270,11 @@ const OFF_ORIGIN_REDIRECTS = [
   '\\/attacker.example',
   '/\t/attacker.example',
   '/\n/attacker.example',
+  '/.//attacker.example',
+  '/..//attacker.example',
+  '/a/..//attacker.example',
+  '/%2e%2e//attacker.example',
+  '/x/%2E%2E//attacker.example',
   'https://attacker.example',
   'javascript:alert(1)',
 ]
