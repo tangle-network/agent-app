@@ -5417,7 +5417,7 @@
           "name": "extractProducedState",
           "kind": "function",
           "signature": "(events: readonly RuntimeEventLike[]) => ProducedState",
-          "doc": "Normalize a run's runtime event stream into `ProducedState`."
+          "doc": "Normalize an emission-ordered stream into its latest observed produced state."
         },
         {
           "name": "GateFn",

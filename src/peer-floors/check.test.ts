@@ -163,11 +163,29 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.248.999', range!)).toBe(false)
-    expect(satisfiesRange('0.249.0', range!)).toBe(false)
-    expect(satisfiesRange('0.249.1', range!)).toBe(true)
-    expect(satisfiesRange('0.249.999', range!)).toBe(true)
-    expect(satisfiesRange('0.250.0', range!)).toBe(false)
+    expect(satisfiesRange('0.255.999', range!)).toBe(false)
+    expect(satisfiesRange('0.256.0', range!)).toBe(true)
+    expect(satisfiesRange('0.256.999', range!)).toBe(true)
+    expect(satisfiesRange('0.257.0', range!)).toBe(false)
+  })
+
+  // Runtime 0.256 admits Eval >=0.183.0 <0.185.0 and Sandbox >=0.36.4 <0.48.0.
+  // This shell keeps the earlier verified minor of each, admits the minor its
+  // own dev install runs, and claims nothing past it.
+  it.each([
+    ['@tangle-network/agent-eval', ['0.182.999'], ['0.183.0', '0.184.0', '0.184.999'], ['0.185.0']],
+    ['@tangle-network/sandbox', ['0.44.999'], ['0.45.0', '0.46.0', '0.46.999'], ['0.47.0']],
+  ])('keeps the %s peer on the verified window', async (name, below, admitted, above) => {
+    const root = join(here, '..', '..')
+    const own = JSON.parse(
+      await readFile(join(root, 'package.json'), 'utf8'),
+    ) as { peerDependencies?: Record<string, string> }
+    const range = own.peerDependencies?.[name]
+
+    expect(range).toBeDefined()
+    for (const version of below) expect(satisfiesRange(version, range!)).toBe(false)
+    for (const version of admitted) expect(satisfiesRange(version, range!)).toBe(true)
+    for (const version of above) expect(satisfiesRange(version, range!)).toBe(false)
   })
 
   // The floors this shell PUBLISHES must be satisfiable by the tree it is

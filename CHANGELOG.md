@@ -4,6 +4,10 @@
 
 ### Changed
 
+- Accept Eval 0.184 alongside 0.183, and Sandbox 0.46 alongside 0.45.
+  Require Runtime 0.256, the first Runtime release whose Eval peer admits 0.184.
+  Development and generated applications use Eval 0.184.0, Runtime 0.256.0,
+  Interface 2.11.0, Knowledge 17.1.1 and Sandbox 0.46.0.
 - Wait for SDK removal before replacing a workspace sandbox under the same idempotency key.
   Reject pending removal, and apply `forceNew` to stopped sandboxes as well as running sandboxes.
 - Update evaluator, execution, knowledge, and profile dependencies as one supported set.
