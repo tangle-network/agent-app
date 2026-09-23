@@ -5986,6 +5986,98 @@
       ]
     },
     {
+      "id": "./hosted-agent",
+      "source": "src/hosted-agent/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "Allowance",
+          "kind": "type",
+          "signature": "type Allowance",
+          "doc": "What the allowance hook decides for one new message."
+        },
+        {
+          "name": "AskResult",
+          "kind": "type",
+          "signature": "type AskResult",
+          "doc": null
+        },
+        {
+          "name": "BoxPolicy",
+          "kind": "interface",
+          "signature": "interface BoxPolicy",
+          "doc": null
+        },
+        {
+          "name": "createHostedAgent",
+          "kind": "function",
+          "signature": "(config: HostedAgentConfig) => { ask: (message: HostedMessage, options: { deadline: number; }) => Promise<AskResult>; c…",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_BOX_POLICY",
+          "kind": "const",
+          "signature": "BoxPolicy",
+          "doc": null
+        },
+        {
+          "name": "HostedAgent",
+          "kind": "type",
+          "signature": "type HostedAgent",
+          "doc": null
+        },
+        {
+          "name": "HostedAgentConfig",
+          "kind": "interface",
+          "signature": "interface HostedAgentConfig",
+          "doc": null
+        },
+        {
+          "name": "HostedAgentError",
+          "kind": "class",
+          "signature": "class HostedAgentError",
+          "doc": null
+        },
+        {
+          "name": "HostedAgentStore",
+          "kind": "interface",
+          "signature": "interface HostedAgentStore",
+          "doc": "Durable key-value storage."
+        },
+        {
+          "name": "HostedChannel",
+          "kind": "type",
+          "signature": "type HostedChannel",
+          "doc": null
+        },
+        {
+          "name": "HostedInbound",
+          "kind": "interface",
+          "signature": "interface HostedInbound",
+          "doc": "A Hub delivery that passed authentication, in a form a queue can carry."
+        },
+        {
+          "name": "HostedMessage",
+          "kind": "interface",
+          "signature": "interface HostedMessage",
+          "doc": null
+        },
+        {
+          "name": "normalizeAddress",
+          "kind": "function",
+          "signature": "(value: string) => string | null",
+          "doc": "One address per person: E.164 for anything phone-shaped, else lowercase."
+        },
+        {
+          "name": "NOTICE",
+          "kind": "const",
+          "signature": "{ readonly stopped: \"You are unsubscribed. Text START to talk again.\"; readonly started: \"Welcome back. Text me anytime…",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./intakes",
       "source": "src/intakes/index.ts",
       "dependsOn": [],
