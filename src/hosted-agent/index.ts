@@ -282,6 +282,8 @@ export function createHostedAgent(config: HostedAgentConfig) {
   // The peer range admits older Sandbox minors for other subpaths; named instances arrived in 0.50.
   if (!('instances' in sandbox)) throw new HostedAgentError('sandbox_too_old', 'hosted-agent needs @tangle-network/sandbox 0.50 or later.')
   const hub = new HubClient({ baseUrl: config.hubUrl ?? 'https://id.tangle.tools', apiKey: config.apiKey })
+  // The Hub SDK peer range admits older minors for apps that do not host agents; the allowance meter arrived in 0.17.
+  if (!('allowances' in hub)) throw new HostedAgentError('hub_sdk_too_old', 'hosted-agent needs @tangle-network/hub-sdk 0.17 or later.')
   const profile = conversationProfile(config.profile)
   const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile }
   const profileTag = sha256(JSON.stringify(profile)).then(hash => hash.slice(0, 8))
