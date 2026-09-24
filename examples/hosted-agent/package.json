@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tangle-network/agent-app": "^0.49.11",
+    "@tangle-network/agent-app": "^0.49.15",
     "@tangle-network/agent-integrations": "0.54.3",
     "@tangle-network/hub-sdk": "0.17.0",
     "@tangle-network/sandbox": "0.50.0"
