@@ -363,8 +363,11 @@ export function createHostedAgent(config: HostedAgentConfig) {
     const session = await box.session(sessionId).status()
     if (!session) await box.createSession({ sessionId, retention: 'workspace', backend })
     if (trace) {
-      trace.harness = session?.backend ?? config.harness
-      trace.model = session?.model
+      // A new session names its harness and model only once the runtime has
+      // created it, so the owner's debug turn reads it once more.
+      const info = session ?? await box.session(sessionId).status()
+      trace.harness = info?.backend ?? config.harness
+      trace.model = info?.effectiveBackend?.model ?? info?.model
     }
     const asked = message.channel === 'voice' ? `[Phone call. Answer in one to three short spoken sentences.]\n${text}` : text
     // The first turn in a new session or box inherits the person's recent

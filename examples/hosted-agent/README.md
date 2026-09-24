@@ -1,6 +1,6 @@
-# Juno: a hosted agent people text and call
+# Braid: a hosted agent people text and call
 
-Juno is an agent that people text on iMessage or call on the phone.
+Braid is an agent that people text on iMessage or call on the phone.
 Each person gets their own isolated Tangle sandbox with its own memory.
 The app's Tangle API key pays for every sandbox, model turn and reply; the person pays nothing.
 
@@ -9,7 +9,7 @@ All of the hosted-agent behavior comes from `@tangle-network/agent-app/hosted-ag
 
 ## How a message flows
 
-1. A person texts `connect @<handle>` to Inkbox's shared iMessage line, then texts Juno.
+1. A person texts `connect @<handle>` to Inkbox's shared iMessage line, then texts Braid.
 2. Hub signs the event and calls `POST /hub`. The Worker authenticates it and puts it on a queue.
 3. The queue consumer finds the person's sandbox. The first message creates a fresh isolated box from the persona; later messages resume it.
 4. The consumer runs one conversation turn in that box and sends the reply through Hub.
@@ -33,9 +33,9 @@ ph0ny's voice agent then calls `POST /voice/ask` through its `ask_workspace` web
 
 ## Model and tools
 
-Juno runs `openai/gpt-5.6-luna`, the kit's default for hosted conversations.
+Braid runs `openai/gpt-5.6-luna`, the kit's default for hosted conversations.
 The kit turns off the harness tools that a texting assistant does not use: the shell, file search, sub-agents, to-do lists, skills and web fetch.
-Juno keeps file read, write and edit for its `memory.md` notes.
+Braid keeps file read, write and edit for its `memory.md` notes.
 Set `model.default` or `tools` in the persona to choose your own.
 
 ## Deploy
@@ -57,7 +57,7 @@ Text `DEBUG ON` from the `OWNER_PHONE` number.
 Each reply to you then ends with one line, for example:
 
 ```
-⚙ Juno · opencode · gemini-2.5-flash-lite · warm · 6.2s (run 3.1s) · 1.2k→180 tok · $0.00070 · 2 tools · t-32ab9c
+⚙ Braid · opencode · gemini-2.5-flash-lite · warm · 6.2s (run 3.1s) · 1.2k→180 tok · $0.00070 · 2 tools · t-32ab9c
 ```
 
 It names the harness, model, box state before the turn, time from the text to the reply with the sandbox run time, tokens, cost, tool calls and turn.

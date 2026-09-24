@@ -12,8 +12,8 @@ const env = process.env as Record<string, string>
 for (const name of ['TANGLE_API_KEY', 'HUB_CALLBACK_SECRET', 'CONNECTION_ID', 'IDENTITY_ID', 'WORKER_URL']) {
   if (!env[name]) throw new Error(`${name} is required`)
 }
-const juno = createHostedAgent({ apiKey: env.TANGLE_API_KEY, profile: persona, store: { get: async () => null, put: async () => {} } })
-const subscription = await juno.connect({
+const braid = createHostedAgent({ apiKey: env.TANGLE_API_KEY, profile: persona, store: { get: async () => null, put: async () => {} } })
+const subscription = await braid.connect({
   connectionId: env.CONNECTION_ID, identityId: env.IDENTITY_ID,
   callbackUrl: `${env.WORKER_URL.replace(/\/+$/, '')}/hub`, secret: env.HUB_CALLBACK_SECRET,
 })
