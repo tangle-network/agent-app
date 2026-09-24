@@ -5992,12 +5992,6 @@
       "error": null,
       "exports": [
         {
-          "name": "Allowance",
-          "kind": "type",
-          "signature": "type Allowance",
-          "doc": "What the allowance hook decides for one new message."
-        },
-        {
           "name": "AskResult",
           "kind": "type",
           "signature": "type AskResult",
@@ -6030,20 +6024,8 @@
         {
           "name": "createHostedAgent",
           "kind": "function",
-          "signature": "(config: HostedAgentConfig) => { ask: (message: HostedMessage, options: { deadline: number; trace?: TurnTrace | undefin…",
+          "signature": "(config: HostedAgentConfig) => { attachLine(connectionId: string): Promise<LineAttachment>; voiceHook(request: Request)…",
           "doc": null
-        },
-        {
-          "name": "debugCommand",
-          "kind": "function",
-          "signature": "(text: string) => boolean | null",
-          "doc": "`true` for DEBUG ON, `false` for DEBUG OFF, `null` for any other text."
-        },
-        {
-          "name": "debugFooter",
-          "kind": "function",
-          "signature": "(agent: string, turnId: string, trace: TurnTrace, totalMs?: number | undefined) => string",
-          "doc": "The owner's ⚙ line."
         },
         {
           "name": "DEFAULT_BOX_POLICY",
@@ -6085,25 +6067,7 @@
           "name": "HostedAgentStore",
           "kind": "interface",
           "signature": "interface HostedAgentStore",
-          "doc": "Durable key-value storage for STOP state, the debug switch, call tokens and recent turns."
-        },
-        {
-          "name": "HostedChannel",
-          "kind": "type",
-          "signature": "type HostedChannel",
-          "doc": null
-        },
-        {
-          "name": "HostedInbound",
-          "kind": "interface",
-          "signature": "interface HostedInbound",
-          "doc": "A Hub delivery that passed authentication, in a form a queue can carry."
-        },
-        {
-          "name": "HostedMessage",
-          "kind": "interface",
-          "signature": "interface HostedMessage",
-          "doc": null
+          "doc": "Durable key-value storage for voice call tokens."
         },
         {
           "name": "HostedTurnOptions",
@@ -6136,22 +6100,16 @@
           "doc": "Identical non-transient failures in a row after which a host fails a turn."
         },
         {
-          "name": "normalizeAddress",
-          "kind": "function",
-          "signature": "(value: string) => string | null",
-          "doc": "One address per person: E.164 for anything phone-shaped, else lowercase."
-        },
-        {
-          "name": "NOTICE",
-          "kind": "const",
-          "signature": "{ readonly debugOn: \"Debug on. Each reply now ends with a ⚙ line: agent, harness, model, box, time, tokens, cost, tools…",
-          "doc": null
-        },
-        {
           "name": "PendingDetail",
           "kind": "interface",
           "signature": "interface PendingDetail",
           "doc": "Where an unfinished turn stands."
+        },
+        {
+          "name": "PERSON_KEY_PREFIX",
+          "kind": "const",
+          "signature": "\"hosted:\"",
+          "doc": "Each person's box is the developer's named instance with this prefix."
         },
         {
           "name": "runHostedTurn",
@@ -6212,12 +6170,6 @@
           "kind": "type",
           "signature": "type TurnStep",
           "doc": null
-        },
-        {
-          "name": "TurnTrace",
-          "kind": "interface",
-          "signature": "interface TurnTrace",
-          "doc": "What one turn reports about itself, for the owner's debug line."
         }
       ]
     },

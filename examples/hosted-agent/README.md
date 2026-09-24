@@ -9,34 +9,32 @@ All of the hosted-agent behavior comes from `@tangle-network/agent-app/hosted-ag
 
 ## How a message flows
 
-1. A person texts `connect @<handle>` to Inkbox's shared iMessage line, then texts Braid.
-2. Hub signs the event and calls `POST /hub`. The Worker authenticates it and puts it on a queue.
-3. The queue consumer admits the message on the Platform meter `hosted-agent`, which counts each person's turns once (`hub.allowances`).
-4. It asks the Platform for the person's sandbox (`sandbox.instances`). The first message creates a fresh isolated box from the persona; later messages resume it.
-5. The consumer runs one conversation turn in that box and sends the reply through Hub.
+1. A person texts Braid's line (an Inkbox iMessage identity).
+2. Tangle Hub receives it, finds the sender's member and thread, and runs the turn in the sender's own sandbox: the app's named instance `hosted:` plus a hash of their number.
+   The first message creates a fresh isolated box from the persona; later messages resume it.
+3. Hub sends the reply on the same line.
 
-A call follows the same path to the same box.
-ph0ny answers the phone and calls `POST /voice/hook` to admit the caller.
-ph0ny's voice agent then calls `POST /voice/ask` through its `ask_workspace` webhook tool.
+Texts never reach the Worker.
+A call reaches the same box and the same thread:
+ph0ny answers the phone and calls `POST /voice/hook` to admit the caller, then its voice agent calls `POST /voice/ask` through its `ask_workspace` webhook tool.
 
 ## Limits
 
 | What | Default |
 |---|---|
-| Sandbox per person | 1 CPU, 2 GB memory, 10 GB disk, egress to `router.tangle.tools` only |
+| Sandbox per person | 1 CPU, 2 GB memory, 10 GB disk, egress to `router.tangle.tools` only, none of the app's secrets |
 | Idle suspend | 10 minutes; the next message resumes the same box |
 | Deleted box, or one that fails to start for 60 s | the Platform gives the next message a fresh box |
-| Free answers | 30 per person per UTC day (`freeTurnsPerDay`), counted by the Platform meter `hosted-agent` (`hub.allowances`); a plan set on the meter wins, and `allow` decides the paywall past it |
-| Turn wall time | 2 minutes |
-| STOP / START | STOP silences the line for that person; START resumes it |
-| Persona change | a new session in the same box; it inherits the person's last 6,000 characters of conversation |
+| Texts | 30 per person per UTC day (`freeTurnsPerDay`), counted by Hub |
+| Turn wall time | 10 minutes for a text; 2 minutes for a spoken question |
+| STOP / START | STOP silences the line for that person; START resumes it (Hub) |
 | New `TANGLE_API_KEY` | the Platform refuses to resume a box under another key and never replaces it for that; use a key from the same account lineage |
 
 ## Model and tools
 
 Braid runs `openai/gpt-5.6-luna`, the kit's default for hosted conversations.
 The kit turns off the harness tools that a texting assistant does not use: the shell, file search, sub-agents, to-do lists, skills and web fetch.
-Braid keeps file read, write and edit for its `memory.md` notes.
+Braid keeps file read, write and edit for its `memory.md` notes, in its own box per person.
 Set `model.default` or `tools` in the persona to choose your own.
 
 ## Deploy
@@ -44,38 +42,23 @@ Set `model.default` or `tools` in the persona to choose your own.
 ```sh
 pnpm install
 wrangler kv namespace create juno-users      # put the id in wrangler.jsonc
-wrangler queues create juno-turns
 wrangler secret put TANGLE_API_KEY           # the app's Tangle key; it pays for everything
-wrangler secret put HUB_CALLBACK_SECRET      # 32+ random bytes
 wrangler secret put VOICE_SECRET             # 32+ random bytes
-wrangler secret put OWNER_PHONE              # optional: your own phone, E.164, for DEBUG ON
+wrangler secret put OWNER_PHONE              # your own phone, E.164: the line's owner
 wrangler deploy
 ```
-
-## Debug line
-
-Text `DEBUG ON` from the `OWNER_PHONE` number.
-Each reply to you then ends with one line, for example:
-
-```
-⚙ Braid · opencode · gpt-5.6-luna · box 0.3s · 6.2s (run 3.1s) · 1.2k→180 tok · $0.00070 · 2 tools · t-32ab9c
-```
-
-It names the harness, model, time the Platform took to hand over the running box, time from the text to the reply with the sandbox run time, tokens, cost, tool calls and turn.
-A figure the run does not report is left out.
-Text `DEBUG OFF` to stop.
-Anyone else who texts `DEBUG ON` gets an ordinary answer.
 
 ## Connect an iMessage identity
 
 1. Create an Inkbox identity with iMessage enabled, and an agent-scoped Inkbox key for it.
 2. Connect it to Hub under the app's Tangle account: `hub.connections.connectApiKey('inkbox', key)`.
-3. Route its messages to the Worker:
+3. Attach it as Braid's line:
 
 ```sh
-TANGLE_API_KEY=... HUB_CALLBACK_SECRET=... CONNECTION_ID=hubconn_... \
-IDENTITY_ID=<inkbox identity uuid> WORKER_URL=https://<worker>.workers.dev pnpm setup
+TANGLE_API_KEY=... OWNER_PHONE=+1... CONNECTION_ID=hubconn_... pnpm setup
 ```
+
+Hub's line timeline (`client.lines.threads(lineId).messages(threadId)`) records when each text arrived, was answered and was sent.
 
 ## Connect voice (ph0ny)
 

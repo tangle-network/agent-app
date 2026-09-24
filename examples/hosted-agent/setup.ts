@@ -1,20 +1,26 @@
-import { createHostedAgent } from '@tangle-network/agent-app/hosted-agent'
-import { persona } from './src/worker'
+import { HubClient } from '@tangle-network/hub-sdk'
+import { braid } from './src/worker'
 
 /**
- * One-time: route an Inkbox iMessage identity, already connected to Hub under
- * this app's Tangle account, to the deployed Worker.
+ * One-time: attach an Inkbox iMessage identity, already connected to Hub
+ * under this app's Tangle account, as Braid's line. Hub then routes each text
+ * to the sender's own box and replies itself.
  *
- *   TANGLE_API_KEY=... HUB_CALLBACK_SECRET=... CONNECTION_ID=hubconn_... \
- *   IDENTITY_ID=<inkbox identity uuid> WORKER_URL=https://juno.example.workers.dev npx tsx setup.ts
+ *   TANGLE_API_KEY=... OWNER_PHONE=+1... CONNECTION_ID=hubconn_... npx tsx setup.ts
+ *
+ * An app that routed the identity to its own Worker before (an event
+ * subscription) has that subscription removed first, since Hub refuses a line
+ * that another route would also answer.
  */
 const env = process.env as Record<string, string>
-for (const name of ['TANGLE_API_KEY', 'HUB_CALLBACK_SECRET', 'CONNECTION_ID', 'IDENTITY_ID', 'WORKER_URL']) {
+for (const name of ['TANGLE_API_KEY', 'OWNER_PHONE', 'CONNECTION_ID']) {
   if (!env[name]) throw new Error(`${name} is required`)
 }
-const braid = createHostedAgent({ apiKey: env.TANGLE_API_KEY, profile: persona, store: { get: async () => null, put: async () => {} } })
-const subscription = await braid.connect({
-  connectionId: env.CONNECTION_ID, identityId: env.IDENTITY_ID,
-  callbackUrl: `${env.WORKER_URL.replace(/\/+$/, '')}/hub`, secret: env.HUB_CALLBACK_SECRET,
-})
-console.log(`subscription ${subscription.id} ${subscription.status} ${subscription.event}`)
+const hub = new HubClient({ baseUrl: 'https://id.tangle.tools', apiKey: env.TANGLE_API_KEY })
+for (const subscription of (await hub.eventSubscriptions.list()).subscriptions) {
+  if (subscription.clientReference !== `hosted-agent:${env.CONNECTION_ID}` || subscription.status !== 'active') continue
+  await hub.eventSubscriptions.delete(subscription.id)
+  console.log(`removed subscription ${subscription.id}`)
+}
+const attachment = await braid({ TANGLE_API_KEY: env.TANGLE_API_KEY, OWNER_PHONE: env.OWNER_PHONE }).attachLine(env.CONNECTION_ID)
+console.log(`line ${attachment.lineId} attachment ${attachment.id} ${attachment.status} keyPrefix ${attachment.instance?.keyPrefix}`)
