@@ -83,11 +83,20 @@ function assertIdentity(payload: DetachedTurnWorkflowIdentity): void {
   }
 }
 
+// Keyed by the SDK's own union, so a state a new Sandbox adds fails this
+// package's build instead of retrying a settled turn as "unknown" forever.
+const DRIVE_STATES: Record<DetachedTurnDriveState, true> = {
+  running: true,
+  completed: true,
+  failed: true,
+  awaiting_plan_decision: true,
+  blocked_on_approval: true,
+  awaiting_question: true,
+  awaiting_interaction: true,
+}
+
 function isKnownDriveState(state: unknown): state is DetachedTurnDriveState {
-  return state === 'running'
-    || state === 'completed'
-    || state === 'failed'
-    || state === 'awaiting_plan_decision'
+  return typeof state === 'string' && Object.hasOwn(DRIVE_STATES, state)
 }
 
 function checkedDriveResult<TResult extends DetachedTurnDriveResultLike>(value: TResult): TResult {

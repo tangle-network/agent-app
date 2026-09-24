@@ -3525,6 +3525,9 @@ export interface DriveSandboxTurnOptions extends StreamSandboxPromptOptions {
 //   - `running`   → the turn is still executing; re-tick after a delay of your choosing.
 //   - `completed` → terminal; `.text` / `.result` hold the payload.
 //   - `failed`    → terminal and deterministic; re-invoking will not change it (do not retry).
+//   - `awaiting_plan_decision`, `blocked_on_approval`, `awaiting_question`,
+//     `awaiting_interaction` → the turn settled waiting on a decision. Sandbox
+//     0.45 reports the last three as `failed`.
 /** Resolve a sandbox turn by processing a message with given configuration and options */
 export async function driveSandboxTurn(
   shell: SandboxRuntimeConfig,
