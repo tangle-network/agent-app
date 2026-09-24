@@ -1,45 +1,53 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * The kit keeps no box binding and no turn counter of its own: each person's
- * box comes from the platform's named instances, and each turn is admitted on
- * the Hub allowance meter. The Sandbox and Hub clients are replaced at their
- * package boundary; the turn engine, the store and the kit's policy are real.
+ * The kit routes no text and keeps no box binding, conversation or counter:
+ * Hub lines route each text to the sender's own box, and the kit answers
+ * calls from that box and thread. The Sandbox client is replaced at its
+ * package boundary; the turn engine and the kit's policy are real.
  */
 
 const platform = vi.hoisted(() => ({
+  fromConnection: vi.fn(),
+  attach: vi.fn(),
+  list: vi.fn(),
+  members: vi.fn(),
+  threads: vi.fn(),
   ensure: vi.fn(),
   waitForRunning: vi.fn(),
-  admit: vi.fn(),
-  plan: vi.fn(),
-  setPlan: vi.fn(),
 }))
 
 vi.mock('@tangle-network/sandbox/core', () => {
   class InstanceRestartingError extends Error {
-    readonly code = 'INSTANCE_RESTARTING'
     constructor() { super('restarting'); this.name = 'InstanceRestartingError' }
   }
   class Sandbox {
+    lines = {
+      fromConnection: platform.fromConnection,
+      attach: platform.attach,
+      list: platform.list,
+      members: () => ({ list: platform.members }),
+      threads: () => ({ list: platform.threads }),
+    }
     instances = { ensure: platform.ensure }
     waitForRunning = platform.waitForRunning
   }
-  return { Sandbox, InstanceRestartingError }
+  async function lineInstanceKey(prefix: string, address: string) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(address))
+    return `${prefix}${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32)}`
+  }
+  return { Sandbox, InstanceRestartingError, lineInstanceKey }
 })
 
-vi.mock('@tangle-network/hub-sdk', () => ({
-  HubClient: class {
-    allowances = { admit: platform.admit, plan: platform.plan, setPlan: platform.setPlan }
-  },
-  authenticateHubEventRequest: vi.fn(),
-}))
+// The mock's error takes no arguments.
+const InstanceRestartingError = (await import('@tangle-network/sandbox/core')).InstanceRestartingError as unknown as new () => Error
+const { createHostedAgent, CONVERSATION_TOOLS_OFF, DEFAULT_HOSTED_MODEL } = await import('../src/hosted-agent')
 
-const { InstanceRestartingError } = await import('@tangle-network/sandbox/core')
-const { createHostedAgent, NOTICE } = await import('../src/hosted-agent')
+const OWNER = '+15550100001'
+const CALLER = '+15550100002'
+const SECRET = 'voice-secret-0123456789'
 
-const PHONE = '+15550100001'
-
-async function member(phone: string): Promise<string> {
+async function hash(phone: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(phone))
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32)
 }
@@ -50,115 +58,117 @@ function memoryStore() {
 }
 
 function runningBox(status = 'running') {
-  const sessions = new Set<string>()
+  const sessions = new Set<string>(['lth_caller'])
   return {
     id: 'sbx_person', status,
     session: (id: string) => ({ status: async () => (sessions.has(id) ? { backend: 'opencode' } : null) }),
     createSession: vi.fn(async ({ sessionId }: { sessionId: string }) => { sessions.add(sessionId) }),
-    driveConversationTurn: vi.fn(async () => ({ state: 'completed', text: 'Hi, I am Braid.', result: {}, usage: {} })),
+    driveConversationTurn: vi.fn(async () => ({ state: 'completed', text: 'You told me you moved to Lisbon.', result: {}, usage: {} })),
   }
 }
 
-const admitted = { decision: 'admit', tier: 'free', paywall: false, turns: { used: 1, limit: 30 }, usd: null, day: '2026-09-24', resetsAt: '' }
-
-function agent(overrides: Partial<Parameters<typeof createHostedAgent>[0]> = {}) {
+function agent() {
   const store = memoryStore()
-  return { store, agent: createHostedAgent({ apiKey: 'sk-tan-test', profile: { name: 'Braid' }, store, freeTurnsPerDay: 30, ...overrides }) }
+  return { store, agent: createHostedAgent({ apiKey: 'sk-tan-test', profile: { name: 'Braid' }, owner: OWNER, store, voiceSecret: SECRET, freeTurnsPerDay: 30 }) }
 }
 
-const message = (turnId = 't-1') => ({ userId: PHONE, channel: 'imessage' as const, text: 'hello', turnId })
-const soon = () => ({ deadline: Date.now() + 60_000 })
+const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
+  new Request(`https://braid.test${path}`, { method: 'POST', headers: { authorization: `Bearer ${SECRET}`, ...headers }, body: JSON.stringify(body) })
+
+async function admit(braid: ReturnType<typeof agent>['agent'], phone = CALLER): Promise<string> {
+  const res = await braid.voiceHook(post('/voice/hook', { event: 'admit', phone }))
+  const body = await res.json() as { admit: boolean; callToken: string }
+  expect(body.admit).toBe(true)
+  return body.callToken
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
-  platform.plan.mockResolvedValue({ configured: false })
-  platform.setPlan.mockResolvedValue({})
-  platform.admit.mockResolvedValue(admitted)
+  platform.list.mockResolvedValue([{ id: 'ln_braid', attachment: { instance: { keyPrefix: 'hosted:' } } }])
+  platform.members.mockResolvedValue([{ id: 'lmb_caller', address: CALLER }])
+  platform.threads.mockResolvedValue([{ id: 'lth_caller', memberId: 'lmb_caller', sessionId: 'lth_caller' }])
 })
 
-describe('hosted agent on the platform', () => {
-  it('runs the turn in the box the platform keeps for the person, admitted once on the meter', async () => {
+describe('hosted agent on Hub lines', () => {
+  it('attaches the line so each texter runs in their own box under the kit keys', async () => {
+    platform.fromConnection.mockResolvedValue({ id: 'ln_braid' })
+    platform.attach.mockResolvedValue({ id: 'lat_1' })
+    const { agent: braid } = agent()
+
+    await braid.attachLine('hubconn_braid')
+
+    expect(platform.fromConnection).toHaveBeenCalledWith({ connectionId: 'hubconn_braid', transport: 'imessage', clientReference: 'hosted-agent' })
+    const attached = platform.attach.mock.calls[0]![0]
+    expect(attached).toMatchObject({
+      number: 'ln_braid', mode: 'shared', unknownSenders: 'guest',
+      members: [{ address: OWNER, role: 'owner' }],
+      roles: { owner: { context: 'own', tools: 'act' }, guest: { context: 'own', tools: 'act' } },
+      limits: { turnsPerMemberPerDay: 30 },
+      instance: { keyPrefix: 'hosted:', create: {
+        resources: { cpuCores: 1, memoryMB: 2048, diskGB: 10 },
+        egressPolicy: { mode: 'strict', allowDomains: ['router.tangle.tools'], includeImplicitDomains: false },
+        idleTimeoutSeconds: 600 } },
+    })
+    // Hub runs texts with the conversation defaults: the default model, and no shell.
+    const profile = attached.respond.backend.profile
+    expect(attached.respond.kind).toBe('agent')
+    expect(profile.model.default).toBe(DEFAULT_HOSTED_MODEL)
+    expect(Object.keys(profile.tools)).toEqual([...CONVERSATION_TOOLS_OFF])
+    expect(profile.permissions.bash).toBe('deny')
+  })
+
+  it('answers a call in the caller\'s box and text thread', async () => {
     const box = runningBox()
     platform.ensure.mockResolvedValue({ box })
     const { agent: braid, store } = agent()
+    const token = await admit(braid)
 
-    expect(await braid.ask(message(), soon())).toEqual({ state: 'answered', text: 'Hi, I am Braid.' })
+    const res = await braid.voiceAsk(post('/voice/ask', { utterance: 'where do I live?' }, { 'x-voice-call-token': token }))
 
-    const person = await member(PHONE)
-    const ensured = platform.ensure.mock.calls[0]![0]
-    expect(ensured).toMatchObject({
-      key: `hosted:${person}`,
-      create: { secrets: [], sshEnabled: false, metadata: { hostedUser: person },
-        egressPolicy: { mode: 'strict', allowDomains: ['router.tangle.tools'], includeImplicitDomains: false } },
-    })
-    expect(ensured.adopt).toBeUndefined()
-    expect(ensured.profile.version).toMatch(/^[0-9a-f]{8}$/)
-    // The session binds the same profile version the platform records.
-    expect(box.createSession.mock.calls[0]![0].sessionId).toBe(`hosted-${person}-${ensured.profile.version}`)
-    expect(platform.admit).toHaveBeenCalledWith('hosted-agent', { member: person, role: 'member', turnId: 't-1', channel: 'imessage' })
-    expect(platform.setPlan).toHaveBeenCalledWith('hosted-agent', expect.objectContaining({ free: { turnsPerDay: 30, usdPerDay: null } }))
-    // The store keeps the conversation only: no box binding, no counters, no admission marks.
-    expect([...store.data.keys()]).toEqual([`convo:${person}`])
+    expect(await res.json()).toEqual({ status: 'complete', answer: 'You told me you moved to Lisbon.' })
+    expect(platform.ensure.mock.calls[0]![0]).toMatchObject({ key: `hosted:${await hash(CALLER)}`,
+      create: { secrets: [], sshEnabled: false } })
+    const [prompt, options] = box.driveConversationTurn.mock.calls[0]! as unknown as [string, { sessionId: string }]
+    expect(options.sessionId).toBe('lth_caller')
+    expect(prompt).toContain('where do I live?')
+    expect(box.createSession).not.toHaveBeenCalled()
+    // The call remembers its session, so later questions skip the lookup.
+    expect(JSON.parse(store.data.get(`vcall:${token}`)!).session).toBe('lth_caller')
+    await braid.voiceAsk(post('/voice/ask', { utterance: 'and my name?' }, { 'x-voice-call-token': token }))
+    expect(platform.threads).toHaveBeenCalledTimes(1)
   })
 
-  it('adopts the box this kit made before the platform kept instances', async () => {
-    platform.ensure.mockResolvedValue({ box: runningBox() })
-    const { agent: braid, store } = agent()
-    store.data.set(`box:${await member(PHONE)}`, 'sbx_before')
-
-    await braid.ask(message(), soon())
-
-    expect(platform.ensure.mock.calls[0]![0].adopt).toBe('sbx_before')
-  })
-
-  it('leaves a plan already set on the meter alone and admits the owner as owner', async () => {
-    platform.plan.mockResolvedValue({ configured: true })
-    platform.ensure.mockResolvedValue({ box: runningBox() })
-    const { agent: braid } = agent({ owner: '(555) 010-0001', meter: 'braid' })
-
-    await braid.ask(message(), soon())
-
-    expect(platform.setPlan).not.toHaveBeenCalled()
-    expect(platform.admit).toHaveBeenCalledWith('braid', expect.objectContaining({ role: 'owner' }))
-  })
-
-  it('asks allow only when paying would lift the limit, and runs no box for a refused turn', async () => {
-    const allow = vi.fn(async () => ({ reply: 'Subscribe: https://pay.example/braid' }))
-    const { agent: braid } = agent({ allow })
-
-    platform.admit.mockResolvedValueOnce({ ...admitted, decision: 'paywall', paywall: true, turns: { used: 30, limit: 30 } })
-    expect(await braid.ask(message('t-2'), soon())).toEqual({ state: 'declined', reply: 'Subscribe: https://pay.example/braid' })
-    expect(allow).toHaveBeenCalledWith(message('t-2'), 30)
-
-    platform.admit.mockResolvedValueOnce({ ...admitted, decision: 'allowance_reached', tier: 'paid', turns: { used: 200, limit: 200 } })
-    expect(await braid.ask(message('t-3'), soon())).toEqual({ state: 'declined', reply: NOTICE.limit })
-    expect(allow).toHaveBeenCalledTimes(1)
-    expect(platform.ensure).not.toHaveBeenCalled()
-  })
-
-  it('keeps the turn pending while the platform restarts a box that cannot start', async () => {
-    const record = { key: 'hosted:x', generation: 1, sandboxId: 'sbx_person', profileVersion: null, unstartableSince: 0, createdAt: 0, updatedAt: 0 }
-    platform.ensure.mockRejectedValue(new InstanceRestartingError('restarting', record, new Error('CONTAINER_START_FAILED'), 30_000))
-    const { agent: braid } = agent()
-
-    expect(await braid.ask(message(), soon())).toEqual({ state: 'pending' })
-  })
-
-  it('keeps the turn pending when the box is still starting at the deadline', async () => {
-    platform.ensure.mockResolvedValue({ box: runningBox('starting') })
-    const { agent: braid } = agent()
-
-    expect(await braid.ask(message(), { deadline: Date.now() + 500 })).toEqual({ state: 'pending' })
-    expect(platform.waitForRunning).not.toHaveBeenCalled()
-  })
-
-  it('waits for a starting box until the deadline', async () => {
-    const box = runningBox('starting')
+  it('gives a caller who never texted their own voice session in their box', async () => {
+    const box = runningBox()
     platform.ensure.mockResolvedValue({ box })
-    platform.waitForRunning.mockResolvedValue(runningBox())
+    platform.members.mockResolvedValue([])
     const { agent: braid } = agent()
+    const token = await admit(braid, OWNER)
 
-    expect(await braid.ask(message(), soon())).toEqual({ state: 'answered', text: 'Hi, I am Braid.' })
-    expect(platform.waitForRunning).toHaveBeenCalledWith('sbx_person', { timeoutMs: expect.any(Number) })
+    await braid.voiceAsk(post('/voice/ask', { utterance: 'hi' }, { 'x-voice-call-token': token }))
+
+    expect(box.createSession.mock.calls[0]![0].sessionId).toBe(`voice-${await hash(OWNER)}`)
+  })
+
+  it('returns a ticket while the platform restarts a box that cannot start', async () => {
+    platform.ensure.mockRejectedValue(new InstanceRestartingError())
+    const { agent: braid } = agent()
+    const token = await admit(braid)
+
+    const body = await (await braid.voiceAsk(post('/voice/ask', { utterance: 'hi' }, { 'x-voice-call-token': token }))).json() as { status: string; ticket: string }
+
+    expect(body.status).toBe('pending')
+    expect(body.ticket).toMatch(/^v-[\w-]+\.[\w-]+$/)
+  })
+
+  it('refuses a call without the secret, a hidden number, or an unknown token', async () => {
+    const { agent: braid } = agent()
+    expect((await braid.voiceHook(post('/voice/hook', { event: 'admit', phone: CALLER }, { authorization: 'Bearer wrong' }))).status).toBe(401)
+    expect(await (await braid.voiceHook(post('/voice/hook', { event: 'admit', phone: 'anonymous' }))).json()).toMatchObject({ admit: false })
+    expect((await braid.voiceAsk(post('/voice/ask', { utterance: 'hi' }, { 'x-voice-call-token': 'x'.repeat(43) }))).status).toBe(403)
+  })
+
+  it('needs the owner as an E.164 number', () => {
+    expect(() => createHostedAgent({ apiKey: 'sk-tan-test', profile: {}, owner: '555-0100' })).toThrow(/E\.164/)
   })
 })

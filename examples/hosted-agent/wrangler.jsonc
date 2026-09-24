@@ -5,20 +5,7 @@
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
-  "alias": {
-    "@opentelemetry/sdk-trace-node": "./src/no-otel.ts",
-    "@opentelemetry/exporter-trace-otlp-http": "./src/no-otel.ts",
-    "@opentelemetry/resources": "./src/no-otel.ts",
-    "@opentelemetry/semantic-conventions": "./src/no-otel.ts"
-  },
-  // STOP state, the owner's debug switch, voice call tokens and recent turns.
-  // The Platform keeps each person's box and counts their turns.
-  "kv_namespaces": [{ "binding": "USERS", "id": "c7e80e2612474a25b4fe1a0c29487de4" }],
-  // Hub gives a callback 10 s; a first answer can take minutes, so the callback
-  // only enqueues and the consumer (15 min wall time) answers.
-  "queues": {
-    "producers": [{ "binding": "TURNS", "queue": "juno-turns" }],
-    "consumers": [{ "queue": "juno-turns", "max_batch_size": 1, "max_retries": 8 }]
-  }
-  // Secrets: wrangler secret put TANGLE_API_KEY | HUB_CALLBACK_SECRET | VOICE_SECRET
+  // Voice call tokens. Hub keeps each person's box, thread and daily count.
+  "kv_namespaces": [{ "binding": "USERS", "id": "c7e80e2612474a25b4fe1a0c29487de4" }]
+  // Secrets: wrangler secret put TANGLE_API_KEY | VOICE_SECRET | OWNER_PHONE
 }

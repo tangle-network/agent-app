@@ -4,15 +4,7 @@
 
 Source: `src/hosted-agent/index.ts`
 
-38 exports.
-
-### `Allowance`
-
-`type` — What the allowance hook decides for one new message.
-
-```ts
-type Allowance
-```
+30 exports.
 
 ### `AskResult`
 
@@ -59,23 +51,7 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 `function`
 
 ```ts
-(config: HostedAgentConfig) => { ask: (message: HostedMessage, options: { deadline: number; trace?: TurnTrace | undefin…
-```
-
-### `debugCommand`
-
-`function` — `true` for DEBUG ON, `false` for DEBUG OFF, `null` for any other text.
-
-```ts
-(text: string) => boolean | null
-```
-
-### `debugFooter`
-
-`function` — The owner's ⚙ line.
-
-```ts
-(agent: string, turnId: string, trace: TurnTrace, totalMs?: number | undefined) => string
+(config: HostedAgentConfig) => { attachLine(connectionId: string): Promise<LineAttachment>; voiceHook(request: Request)…
 ```
 
 ### `DEFAULT_BOX_POLICY`
@@ -128,34 +104,10 @@ class HostedAgentError
 
 ### `HostedAgentStore`
 
-`interface` — Durable key-value storage for STOP state, the debug switch, call tokens and recent turns.
+`interface` — Durable key-value storage for voice call tokens.
 
 ```ts
 interface HostedAgentStore
-```
-
-### `HostedChannel`
-
-`type`
-
-```ts
-type HostedChannel
-```
-
-### `HostedInbound`
-
-`interface` — A Hub delivery that passed authentication, in a form a queue can carry.
-
-```ts
-interface HostedInbound
-```
-
-### `HostedMessage`
-
-`interface`
-
-```ts
-interface HostedMessage
 ```
 
 ### `HostedTurnOptions`
@@ -198,28 +150,20 @@ interface HostedTurnPorts
 3
 ```
 
-### `normalizeAddress`
-
-`function` — One address per person: E.164 for anything phone-shaped, else lowercase.
-
-```ts
-(value: string) => string | null
-```
-
-### `NOTICE`
-
-`const`
-
-```ts
-{ readonly debugOn: "Debug on. Each reply now ends with a ⚙ line: agent, harness, model, box, time, tokens, cost, tools…
-```
-
 ### `PendingDetail`
 
 `interface` — Where an unfinished turn stands.
 
 ```ts
 interface PendingDetail
+```
+
+### `PERSON_KEY_PREFIX`
+
+`const` — Each person's box is the developer's named instance with this prefix.
+
+```ts
+"hosted:"
 ```
 
 ### `runHostedTurn`
@@ -300,12 +244,4 @@ type TurnReply
 
 ```ts
 type TurnStep
-```
-
-### `TurnTrace`
-
-`interface` — What one turn reports about itself, for the owner's debug line.
-
-```ts
-interface TurnTrace
 ```
