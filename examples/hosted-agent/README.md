@@ -53,7 +53,8 @@ wrangler deploy
 
 1. Create an Inkbox identity with iMessage enabled, and an agent-scoped Inkbox key for it.
 2. Connect it to Hub under the app's Tangle account: `hub.connections.connectApiKey('inkbox', key)`.
-3. Attach it as Braid's line. The Worker does this with the app's key:
+3. Attach it as Braid's line. The Worker does this with the app's key.
+   An app that ran an earlier version of this example can omit `connectionId`: the Worker moves the connection it routed before.
 
 ```sh
 curl -X POST https://<worker>/setup -H "authorization: Bearer $SETUP_SECRET" \

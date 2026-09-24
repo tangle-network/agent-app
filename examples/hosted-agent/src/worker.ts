@@ -63,12 +63,17 @@ async function setup(request: Request, env: Env): Promise<Response> {
   if (!env.SETUP_SECRET || given.byteLength !== expected.byteLength || !crypto.subtle.timingSafeEqual(given, expected)) {
     return new Response('not found', { status: 404 })
   }
-  const { connectionId } = await request.json() as { connectionId: string }
   const hub = (path: string, init?: RequestInit) =>
     fetch(`https://id.tangle.tools/v1/hub/${path}`, { ...init, headers: { authorization: `Bearer ${env.TANGLE_API_KEY}` } })
-  const listed = await (await hub('event-subscriptions')).json() as { data: { subscriptions: Array<{ id: string; clientReference: string }> } }
-  for (const subscription of listed.data.subscriptions) {
-    if (subscription.clientReference === `hosted-agent:${connectionId}`) await hub(`event-subscriptions/${subscription.id}`, { method: 'DELETE' })
+  const listed = await (await hub('event-subscriptions')).json() as {
+    data: { subscriptions: Array<{ id: string; clientReference: string; connectionId: string }> }
+  }
+  const earlier = listed.data.subscriptions.filter(s => s.clientReference.startsWith('hosted-agent:'))
+  // Without a connection id, move the connection an earlier version of this app routed.
+  const { connectionId = earlier[0]?.connectionId } = await request.json().catch(() => ({})) as { connectionId?: string }
+  if (!connectionId) return Response.json({ error: 'connectionId is required' }, { status: 400 })
+  for (const subscription of earlier) {
+    if (subscription.connectionId === connectionId) await hub(`event-subscriptions/${subscription.id}`, { method: 'DELETE' })
   }
   try {
     return Response.json(await braid(env).attachLine(connectionId))
