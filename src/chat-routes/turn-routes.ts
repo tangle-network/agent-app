@@ -372,7 +372,25 @@ interface ChatTurnLifecycleBase<TContext> {
   executionId: string
   turnStreamId: string
   context: TContext
+  /** Flat span attributes for the hosted assistant trace contract. */
+  otelAttributes: ChatTurnOtelAttributes
 }
+
+/** Values shared by the turn span and its downstream sandbox and Router spans. */
+export interface ChatTurnOtelAttributes {
+  'workspace.id': string
+  'assistant.id': string
+  'run.id': string
+  'outcome.status': 'running' | 'succeeded' | 'failed' | 'gated' | 'partial' | 'unknown'
+  'outcome.reason'?: string
+  'gen_ai.operation.name': 'chat'
+  'gen_ai.request.model'?: string
+  'gen_ai.response.model'?: string
+  'gen_ai.provider.name'?: string
+  'gen_ai.usage.input_tokens'?: number
+  'gen_ai.usage.output_tokens'?: number
+}
+
 /** Define lifecycle start event with context and timestamp for a chat turn */
 export interface ChatTurnLifecycleStart<TContext> extends ChatTurnLifecycleBase<TContext> {
   startedAt: number
@@ -464,6 +482,8 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   /** Names the product in `deriveExecutionId` so retries land on the same
    *  substrate execution. */
   projectId: string
+  /** Server-resolved assistant id when one project serves multiple assistants. */
+  assistantId?(args: { identity: ChatTurnIdentity; context: TContext }): string
   /** Authenticate + authorize the caller for a turn or a replay. The only
    *  product-supplied access step: session auth, thread/workspace access,
    *  seat/balance gates, rate limits all live here. */
@@ -828,6 +848,7 @@ export function createChatTurnRoutes<TContext = void>(
       sessionId: payload.threadId,
       turnIndex: chatTurn.turnIndex,
     })
+    const assistantId = options.assistantId?.({ identity, context })?.trim() || options.projectId
     const turnStreamId = crypto.randomUUID()
 
     const prompt: string | ChatTurnPartInput[] =
@@ -933,6 +954,34 @@ export function createChatTurnRoutes<TContext = void>(
     // Set when `contextGate` answered the turn without running the producer.
     let gatedTurn = false
 
+    const otelAttributes = (
+      status: ChatTurnOtelAttributes['outcome.status'],
+      reason?: string,
+    ): ChatTurnOtelAttributes => {
+      const attribution = producer?.modelAttribution?.()
+      const usage = producer?.usage?.()
+      const servedModel = attribution?.servedModel || producer?.model
+      const inputTokens = usage?.inputTokens
+      const outputTokens = usage?.outputTokens
+      return {
+        'workspace.id': identity.tenantId,
+        'assistant.id': assistantId,
+        'run.id': executionId,
+        'outcome.status': status,
+        'gen_ai.operation.name': 'chat',
+        ...(reason ? { 'outcome.reason': reason } : {}),
+        ...(attribution?.requestedModel ? { 'gen_ai.request.model': attribution.requestedModel } : {}),
+        ...(servedModel ? { 'gen_ai.response.model': servedModel } : {}),
+        ...(attribution?.servedProvider ? { 'gen_ai.provider.name': attribution.servedProvider } : {}),
+        ...(inputTokens !== undefined && Number.isSafeInteger(inputTokens) && inputTokens >= 0
+          ? { 'gen_ai.usage.input_tokens': inputTokens }
+          : {}),
+        ...(outputTokens !== undefined && Number.isSafeInteger(outputTokens) && outputTokens >= 0
+          ? { 'gen_ai.usage.output_tokens': outputTokens }
+          : {}),
+      }
+    }
+
     // Exactly one terminal lifecycle hook, after the turn settles (idempotent).
     // Failure is this route's own verdict (`runFailed` from error/failed
     // events, or a drain/sync throw), not the engine's envelope.
@@ -947,12 +996,14 @@ export function createChatTurnRoutes<TContext = void>(
           await lifecycle.onTurnError?.({
             identity, executionId, turnStreamId, context, durationMs,
             error: terminalError ?? lastFailureData ?? new Error('chat turn failed'),
+            otelAttributes: otelAttributes('failed', 'turn_error'),
           })
         } else {
           const failoverInfo = producer?.modelFailover?.()
           const attribution = producer?.modelAttribution?.()
           await lifecycle.onTurnComplete?.({
             identity, executionId, turnStreamId, context, durationMs,
+            otelAttributes: otelAttributes(gatedTurn ? 'gated' : 'succeeded', gatedTurn ? 'context_gate' : undefined),
             finalText: producer?.finalText() ?? '',
             usage: producer?.usage?.() ?? {},
             assistantMessageId: assistantRowId(),
@@ -1027,6 +1078,7 @@ export function createChatTurnRoutes<TContext = void>(
             try {
               await options.lifecycle.onTurnStart({
                 identity, executionId, turnStreamId, context, startedAt: turnStartedAtMs,
+                otelAttributes: otelAttributes('running'),
               })
             } catch (err) {
               log('[chat-routes] lifecycle.onTurnStart failed', {
@@ -1097,6 +1149,7 @@ export function createChatTurnRoutes<TContext = void>(
         try {
           await options.lifecycle.onTurnStart({
             identity, executionId, turnStreamId, context, startedAt: turnStartedAtMs,
+            otelAttributes: otelAttributes('running'),
           })
         } catch (err) {
           log('[chat-routes] lifecycle.onTurnStart failed', {
