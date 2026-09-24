@@ -63,6 +63,8 @@ export interface HostedAgentConfig {
    * come back tomorrow. Retries of an admitted message never reach this hook.
    */
   allow?: (message: HostedMessage, usedToday: number) => Allowance | Promise<Allowance>
+  /** Throw HostedAnswerRejected for a definite policy refusal; other errors retry without delivery. Return canonical text to replace the model answer. */
+  validateAnswer?: (input: { message: HostedMessage; answer: string }) => string | void | Promise<string | void>
   /**
    * The owner's own address (E.164 phone). Only this sender can text DEBUG ON
    * or DEBUG OFF; while on, each reply to them ends with one ⚙ line naming the
@@ -172,6 +174,7 @@ const RESUMABLE = new Set(['stopped', 'expired'])
 const GONE = new Set(['failed', 'deleted'])
 /** How much of a person's recent conversation a new session inherits. */
 const CARRY_CHARS = 6000
+const HUB_REPLY_CHARS = 1500
 const CARRY_HEAD = '[Your conversation with this person so far. Your instructions may have changed since; follow the current ones.]'
 const CARRY_NOW = '[Their new message:]'
 
@@ -265,6 +268,11 @@ export class HostedAgentError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = 'HostedAgentError' }
 }
 
+/** A definite host policy refusal. An unavailable validator must throw a different error so the delivery retries. */
+export class HostedAnswerRejected extends Error {
+  constructor() { super('The host rejected this answer.'); this.name = 'HostedAnswerRejected' }
+}
+
 export function createHostedAgent(config: HostedAgentConfig) {
   const store = config.store
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
@@ -355,6 +363,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
     const conversationKey = `convo:${user}`
     let declined: AskResult | undefined
     let conversation: Conversation | undefined, at = ''
+    let approvedAnswer: string | undefined
     const outcome = await runHostedTurn({ turnId: message.turnId, text }, {
       async admit() {
         if (await store.get(admittedKey)) return null
@@ -392,9 +401,26 @@ export function createHostedAgent(config: HostedAgentConfig) {
         return carried ? `${CARRY_HEAD}\n${carried}\n${CARRY_NOW}\n${asked}` : asked
       },
       async answered(answer) {
+        let delivered = answer
+        if (config.validateAnswer) {
+          try {
+            const canonical = await config.validateAnswer({ message, answer })
+            if (canonical !== undefined) {
+              if (typeof canonical !== 'string') throw new HostedAnswerRejected()
+              delivered = canonical
+            }
+            if (!delivered.trim() || delivered.includes('\0') || (message.channel === 'imessage' && delivered.length > HUB_REPLY_CHARS)) {
+              throw new HostedAnswerRejected()
+            }
+          } catch (error) {
+            if (error instanceof HostedAnswerRejected) throw new HostedAgentError('answer_rejected', 'The host rejected this answer before delivery.')
+            throw new HostedAgentError('answer_validation_unavailable', 'The host could not validate this answer.')
+          }
+        }
+        approvedAnswer = delivered
         // Concurrent turns may drop one another's entry; the box keeps the full record.
         const turns = (conversation?.turns ?? []).filter(([id]) => id !== message.turnId)
-        turns.push([message.turnId, message.channel === 'voice' ? `(on a call) ${text}` : text, answer])
+        turns.push([message.turnId, message.channel === 'voice' ? `(on a call) ${text}` : text, delivered])
         while (turns.length > 1 && JSON.stringify(turns).length > CARRY_CHARS) turns.shift()
         await store.put(conversationKey, JSON.stringify({ at, turns } satisfies Conversation))
       },
@@ -415,7 +441,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
       },
     }, { wallCapMs, timeoutMs: 8000, until: options.deadline })
     if (declined) return declined
-    if (outcome.ok === true) return { state: 'answered', text: outcome.text }
+    if (outcome.ok === true) return { state: 'answered', text: approvedAnswer ?? outcome.text }
     // A thrown failure is rethrown, so the caller's retry policy decides it.
     if (outcome.ok === 'pending') {
       if (outcome.cause !== undefined) throw outcome.cause
@@ -483,18 +509,28 @@ export function createHostedAgent(config: HostedAgentConfig) {
           if (result.state === 'pending') return 'pending'
           if (result.state === 'declined' && !result.reply) return 'ignored'
           text = result.state === 'answered' ? result.text : result.reply!
-          if (trace && result.state === 'answered') {
+          // A validated answer must reach Hub exactly as the host approved it.
+          if (trace && result.state === 'answered' && !config.validateAnswer) {
             const totalMs = event.occurredAt !== null && event.occurredAt !== undefined ? Date.now() - event.occurredAt : undefined
-            text = `${text.slice(0, 1300)}\n\n${debugFooter(config.profile.name ?? 'agent', turnId, trace, totalMs)}`
+            const footer = `\n\n${debugFooter(config.profile.name ?? 'agent', turnId, trace, totalMs)}`
+            text = `${text.slice(0, 1300)}${footer}`
           }
         }
       } catch (error) {
+        if (error instanceof HostedAgentError && error.code === 'answer_rejected') {
+          console.error(`[hosted-agent] turn=${turnId} code=answer_rejected`)
+          return 'ignored'
+        }
+        if (error instanceof HostedAgentError && error.code === 'answer_validation_unavailable') {
+          console.error(`[hosted-agent] turn=${turnId} code=answer_validation_unavailable`)
+          throw error
+        }
         // A failed turn fails the same way on every retry; anything else may clear.
         if (!(error instanceof HostedAgentError) && !options.lastAttempt) throw error
         console.error(`[hosted-agent] turn=${turnId} ${describe(error)}`)
         text = NOTICE.unavailable
       }
-      const plan = buildMessagingReply(inbound.event, text.slice(0, 1500), `reply-${turnId}`)
+      const plan = buildMessagingReply(inbound.event, config.validateAnswer ? text : text.slice(0, HUB_REPLY_CHARS), `reply-${turnId}`)
       if (!plan.ok) return 'ignored'
       // Hub replays the first result for a retry with this key and input.
       await hub.tools.invoke(plan.reply.action, plan.reply.input, { connectionId: inbound.connectionId, idempotencyKey: plan.reply.idempotencyKey })

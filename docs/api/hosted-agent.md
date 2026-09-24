@@ -4,7 +4,7 @@
 
 Source: `src/hosted-agent/index.ts`
 
-38 exports.
+39 exports.
 
 ### `Allowance`
 
@@ -132,6 +132,14 @@ class HostedAgentError
 
 ```ts
 interface HostedAgentStore
+```
+
+### `HostedAnswerRejected`
+
+`class` — A definite host policy refusal.
+
+```ts
+class HostedAnswerRejected
 ```
 
 ### `HostedChannel`

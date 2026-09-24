@@ -14,6 +14,18 @@ All of the hosted-agent behavior comes from `@tangle-network/agent-app/hosted-ag
 3. The queue consumer finds the person's sandbox. The first message creates a fresh isolated box from the persona; later messages resume it.
 4. The consumer runs one conversation turn in that box and sends the reply through Hub.
 
+## Answer policy
+
+A host can provide `validateAnswer({ message, answer })` in `createHostedAgent` config.
+The callback runs after the sandbox answers and before the answer enters app carry-over memory or Hub delivery.
+Throw `HostedAnswerRejected` for a definite policy refusal.
+Throw any other error when source verification is unavailable; the queue retries without delivering an unchecked reply.
+Return canonical text when the host must replace the model's answer; that exact text is stored and delivered.
+An iMessage answer over 1,500 characters is withheld so delivery never strips a checked citation.
+The owner debug footer is omitted for validated answers to keep the delivered text exact.
+A definite refusal withholds the message, logs `answer_rejected`, and sends no fallback apology.
+The product owns its source and citation checks; the shared kit only enforces their result at the delivery boundary.
+
 A call follows the same path to the same box.
 ph0ny answers the phone and calls `POST /voice/hook` to admit the caller.
 ph0ny's voice agent then calls `POST /voice/ask` through its `ask_workspace` webhook tool.

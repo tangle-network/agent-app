@@ -7904,6 +7904,14 @@ class HostedAgentError
 interface HostedAgentStore
 ```
 
+### `HostedAnswerRejected`
+
+`class` — A definite host policy refusal.
+
+```ts
+class HostedAnswerRejected
+```
+
 ### `HostedChannel`
 
 `type`

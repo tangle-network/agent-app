@@ -6088,6 +6088,12 @@
           "doc": "Durable key-value storage."
         },
         {
+          "name": "HostedAnswerRejected",
+          "kind": "class",
+          "signature": "class HostedAnswerRejected",
+          "doc": "A definite host policy refusal."
+        },
+        {
           "name": "HostedChannel",
           "kind": "type",
           "signature": "type HostedChannel",
