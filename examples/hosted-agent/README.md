@@ -45,6 +45,7 @@ wrangler kv namespace create juno-users      # put the id in wrangler.jsonc
 wrangler secret put TANGLE_API_KEY           # the app's Tangle key; it pays for everything
 wrangler secret put VOICE_SECRET             # 32+ random bytes
 wrangler secret put OWNER_PHONE              # your own phone, E.164: the line's owner
+wrangler secret put SETUP_SECRET             # 32+ random bytes; delete it after setup
 wrangler deploy
 ```
 
@@ -52,10 +53,12 @@ wrangler deploy
 
 1. Create an Inkbox identity with iMessage enabled, and an agent-scoped Inkbox key for it.
 2. Connect it to Hub under the app's Tangle account: `hub.connections.connectApiKey('inkbox', key)`.
-3. Attach it as Braid's line:
+3. Attach it as Braid's line. The Worker does this with the app's key:
 
 ```sh
-TANGLE_API_KEY=... OWNER_PHONE=+1... CONNECTION_ID=hubconn_... pnpm setup
+curl -X POST https://<worker>/setup -H "authorization: Bearer $SETUP_SECRET" \
+  -H 'content-type: application/json' -d '{"connectionId":"hubconn_..."}'
+wrangler secret delete SETUP_SECRET
 ```
 
 Hub's line timeline (`client.lines.threads(lineId).messages(threadId)`) records when each text arrived, was answered and was sent.
