@@ -6004,10 +6004,22 @@
           "doc": null
         },
         {
+          "name": "AUTHORITY_ENDED",
+          "kind": "const",
+          "signature": "\"authority_ended\"",
+          "doc": "Refusal detail when the host's `authorize` check fails."
+        },
+        {
           "name": "BoxPolicy",
           "kind": "interface",
           "signature": "interface BoxPolicy",
           "doc": null
+        },
+        {
+          "name": "chatOnlyBackend",
+          "kind": "function",
+          "signature": "(backend: BackendConfig) => BackendConfig",
+          "doc": "A space member who may chat only: no shell and no file writes in the shared box."
         },
         {
           "name": "CONVERSATION_TOOLS_OFF",
@@ -6044,6 +6056,12 @@
           "kind": "const",
           "signature": "\"openai/gpt-5.6-luna\"",
           "doc": "The model for a profile without `model.default`."
+        },
+        {
+          "name": "describeFailure",
+          "kind": "function",
+          "signature": "(error: unknown) => TurnFailure",
+          "doc": "The code omits the message, which can carry ids or times that differ on every repeat of one cause."
         },
         {
           "name": "HostedAgent",
@@ -6088,6 +6106,36 @@
           "doc": null
         },
         {
+          "name": "HostedTurnOptions",
+          "kind": "interface",
+          "signature": "interface HostedTurnOptions",
+          "doc": null
+        },
+        {
+          "name": "HostedTurnPorts",
+          "kind": "interface",
+          "signature": "interface HostedTurnPorts",
+          "doc": "Storage and policy a host supplies for one message."
+        },
+        {
+          "name": "isTransientFailure",
+          "kind": "function",
+          "signature": "(failure: Pick<TurnFailure, \"status\" | \"name\" | \"reason\">) => boolean",
+          "doc": null
+        },
+        {
+          "name": "MAX_MESSAGE_CHARS",
+          "kind": "const",
+          "signature": "8000",
+          "doc": null
+        },
+        {
+          "name": "MAX_REPEATED_FAILURES",
+          "kind": "const",
+          "signature": "3",
+          "doc": "Identical non-transient failures in a row after which a host fails a turn."
+        },
+        {
           "name": "normalizeAddress",
           "kind": "function",
           "signature": "(value: string) => string | null",
@@ -6097,6 +6145,72 @@
           "name": "NOTICE",
           "kind": "const",
           "signature": "{ readonly debugOn: \"Debug on. Each reply now ends with a ⚙ line: agent, harness, model, box, time, tokens, cost, tools…",
+          "doc": null
+        },
+        {
+          "name": "PendingDetail",
+          "kind": "interface",
+          "signature": "interface PendingDetail",
+          "doc": "Where an unfinished turn stands."
+        },
+        {
+          "name": "runHostedTurn",
+          "kind": "function",
+          "signature": "<Box extends TurnBox>(turn: { turnId: string; text: string; }, ports: HostedTurnPorts<Box>, options: HostedTurnOptions)…",
+          "doc": "One non-blocking pass for one message."
+        },
+        {
+          "name": "settleHostedTurn",
+          "kind": "function",
+          "signature": "(pass: () => Promise<TurnOutcome>, options: { deadline: number; pollMs?: number | undefined; signal?: AbortSignal | und…",
+          "doc": "Repeat passes until the turn settles, for a caller that holds a connection open (a voice question, say)."
+        },
+        {
+          "name": "TurnBox",
+          "kind": "interface",
+          "signature": "interface TurnBox",
+          "doc": "The part of a Sandbox box one turn uses."
+        },
+        {
+          "name": "TurnFailure",
+          "kind": "interface",
+          "signature": "interface TurnFailure",
+          "doc": "A thrown value as a stable code plus a secret-free message for a log line."
+        },
+        {
+          "name": "TurnObserver",
+          "kind": "interface",
+          "signature": "interface TurnObserver",
+          "doc": "What a pass reports while it runs."
+        },
+        {
+          "name": "TurnOutcome",
+          "kind": "type",
+          "signature": "type TurnOutcome",
+          "doc": "`cause` is what a port or the Sandbox threw, when a throw left the turn pending."
+        },
+        {
+          "name": "TurnPending",
+          "kind": "class",
+          "signature": "class TurnPending",
+          "doc": "A port throws this to report a turn that is not ready yet, such as a box still starting."
+        },
+        {
+          "name": "TurnRefusal",
+          "kind": "type",
+          "signature": "type TurnRefusal",
+          "doc": "The one turn engine for a hosted agent, whatever hosts it."
+        },
+        {
+          "name": "TurnReply",
+          "kind": "type",
+          "signature": "type TurnReply",
+          "doc": null
+        },
+        {
+          "name": "TurnStep",
+          "kind": "type",
+          "signature": "type TurnStep",
           "doc": null
         },
         {
