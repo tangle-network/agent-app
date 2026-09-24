@@ -1,0 +1,64 @@
+# Temporary dependency-generation job for pro/channels-kit; removed once its
+# generated manifest/lockfile/docs are committed. This is not a verification pass.
+name: Channels dependency generation
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: channels-bootstrap-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  generate:
+    if: github.head_ref == 'pro/channels-kit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+      OUTPUT: /tmp/channels-bootstrap
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Generate dependency update with the real package manager
+        run: |
+          mkdir -p "$OUTPUT"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.devDependencies['@tangle-network/sandbox'] = '0.52.1';
+          pkg.devDependencies['@tangle-network/agent-runtime'] = '0.266.0';
+          pkg.peerDependencies['@tangle-network/sandbox'] += ' || ^0.52.0';
+          pkg.peerDependencies['@tangle-network/agent-runtime'] = '>=0.262.0 <0.267.0';
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          JS
+          pnpm install --no-frozen-lockfile --ignore-scripts > "$OUTPUT/install.log" 2>&1
+          cp package.json pnpm-lock.yaml "$OUTPUT/"
+          git diff --binary -- package.json pnpm-lock.yaml > "$OUTPUT/dependencies.patch"
+      - name: Generate public documentation
+        run: |
+          pnpm docs:gen > "$OUTPUT/docs.log" 2>&1
+          git add --intent-to-add -- docs
+          git diff --binary -- docs > "$OUTPUT/docs.patch"
+      - name: Preserve dependency-only local validation environment
+        if: always()
+        run: |
+          if [ -d node_modules ]; then
+            tar -czf "$OUTPUT/node_modules.tar.gz" node_modules
+            cp "$(command -v node)" "$OUTPUT/node"
+            npm pack pnpm@11.24.0 --pack-destination "$OUTPUT" > "$OUTPUT/pnpm-pack.log" 2>&1
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: channels-bootstrap-${{ github.event.pull_request.head.sha }}
+          path: /tmp/channels-bootstrap/
+          retention-days: 2
+          compression-level: 0
