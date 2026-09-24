@@ -2,6 +2,9 @@ import { authenticateHubEventRequest, HubClient, type HubProviderEvent } from '@
 import { buildMessagingReply, normalizeConversationEvent } from '@tangle-network/agent-integrations/conversation-events'
 import type { AgentProfile, BackendConfig, SandboxInstance } from '@tangle-network/sandbox'
 import { Sandbox, SandboxError } from '@tangle-network/sandbox/core'
+import { runHostedTurn, TurnPending } from './engine'
+
+export * from './engine'
 
 /**
  * A hosted agent: a person texts or calls a line, and the agent answers from
@@ -340,61 +343,82 @@ export function createHostedAgent(config: HostedAgentConfig) {
     // Scoped to the person: a voice ticket is model-supplied, so a turn id
     // admitted for one person must not skip another person's allowance.
     const admittedKey = `turn:${user}:${message.turnId}`
-    if (!await store.get(admittedKey)) {
-      const decision = await admit(message, user)
-      if (decision === 'ignore') return { state: 'declined' }
-      if (decision !== 'answer') return { state: 'declined', reply: decision.reply }
-      await store.put(admittedKey, '1', { expirationTtl: TWO_DAYS })
-    }
-    // A retried delivery finds the box it woke already warm, so the first
-    // attempt's view of the box is kept for the turn.
-    const trace = options.trace, traceKey = `trace:${user}:${message.turnId}`
-    const box = await ensureBox(user, options.deadline, trace)
-    if (trace) {
-      const first = await store.get(traceKey)
-      if (first) trace.box = first
-      else if (trace.box) await store.put(traceKey, trace.box, { expirationTtl: TWO_DAYS })
-    }
-    if (!box) return { state: 'pending' }
     // A session binds its backend when created, and the runtime would give a
     // bare session its generic default assistant. A new profile starts a new
     // session, so the persona always matches the one in force.
     const sessionId = `hosted-${user}-${await profileTag}`
-    const session = await box.session(sessionId).status()
-    if (!session) await box.createSession({ sessionId, retention: 'workspace', backend })
-    if (trace) {
-      // A new session names its harness and model only once the runtime has
-      // created it, so the owner's debug turn reads it once more.
-      const info = session ?? await box.session(sessionId).status()
-      trace.harness = info?.backend ?? config.harness
-      trace.model = info?.effectiveBackend?.model ?? info?.model
-    }
-    const asked = message.channel === 'voice' ? `[Phone call. Answer in one to three short spoken sentences.]\n${text}` : text
-    // The first turn in a new session or box inherits the person's recent
-    // turns. A retry before that turn completes carries them again, so a
-    // failed first attempt loses nothing.
-    const conversationKey = `convo:${user}`, at = `${box.id}/${sessionId}`
-    const stored = await store.get(conversationKey)
-    const conversation: Conversation = stored ? JSON.parse(stored) as Conversation : { at, turns: [] }
-    const carried = conversation.at === at ? '' : conversation.turns.map(([, them, you]) => `Them: ${them}\nYou: ${you}`).join('\n')
-    const prompt = carried ? `${CARRY_HEAD}\n${carried}\n${CARRY_NOW}\n${asked}` : asked
-    for (;;) {
-      const result = await box.driveConversationTurn(prompt, { sessionId, turnId: message.turnId, wallCapMs, timeoutMs: 8000 })
-      if (result.state === 'completed') {
-        const answer = result.text.trim()
-        if (!answer) throw new HostedAgentError('empty_reply', 'The turn completed with no reply text.')
-        if (trace) noteResult(trace, result.result, result.usage)
+    const trace = options.trace, traceKey = `trace:${user}:${message.turnId}`
+    const conversationKey = `convo:${user}`
+    let declined: AskResult | undefined
+    let conversation: Conversation | undefined, at = ''
+    const outcome = await runHostedTurn({ turnId: message.turnId, text }, {
+      async admit() {
+        if (await store.get(admittedKey)) return null
+        const decision = await admit(message, user)
+        if (decision === 'answer') {
+          await store.put(admittedKey, '1', { expirationTtl: TWO_DAYS })
+          return null
+        }
+        declined = decision === 'ignore' ? { state: 'declined' } : { state: 'declined', reply: decision.reply }
+        return { ok: false, reason: 'refused', detail: 'declined' }
+      },
+      async box() {
+        const box = await ensureBox(user, options.deadline, trace)
+        // A retried delivery finds the box it woke already warm, so the first
+        // attempt's view of the box is kept for the turn.
+        if (trace) {
+          const first = await store.get(traceKey)
+          if (first) trace.box = first
+          else if (trace.box) await store.put(traceKey, trace.box, { expirationTtl: TWO_DAYS })
+        }
+        if (!box) throw new TurnPending('box_starting', true)
+        return box
+      },
+      sessionId,
+      backend: async () => backend,
+      async prompt(box) {
+        const asked = message.channel === 'voice' ? `[Phone call. Answer in one to three short spoken sentences.]\n${text}` : text
+        // The first turn in a new session or box inherits the person's recent
+        // turns. A retry before that turn completes carries them again, so a
+        // failed first attempt loses nothing.
+        at = `${box.id}/${sessionId}`
+        const stored = await store.get(conversationKey)
+        conversation = stored ? JSON.parse(stored) as Conversation : { at, turns: [] }
+        const carried = conversation.at === at ? '' : conversation.turns.map(([, them, you]) => `Them: ${them}\nYou: ${you}`).join('\n')
+        return carried ? `${CARRY_HEAD}\n${carried}\n${CARRY_NOW}\n${asked}` : asked
+      },
+      async answered(answer) {
         // Concurrent turns may drop one another's entry; the box keeps the full record.
-        const turns = conversation.turns.filter(([id]) => id !== message.turnId)
+        const turns = (conversation?.turns ?? []).filter(([id]) => id !== message.turnId)
         turns.push([message.turnId, message.channel === 'voice' ? `(on a call) ${text}` : text, answer])
         while (turns.length > 1 && JSON.stringify(turns).length > CARRY_CHARS) turns.shift()
         await store.put(conversationKey, JSON.stringify({ at, turns } satisfies Conversation))
-        return { state: 'answered', text: answer }
-      }
-      if (result.state === 'failed') throw new HostedAgentError('turn_failed', result.error)
-      if (Date.now() + 2000 > options.deadline) return { state: 'pending' }
-      await sleep(2000)
+      },
+      classify: error => error instanceof HostedAgentError ? { ok: false, reason: 'unavailable', detail: error.code } : undefined,
+      observe: {
+        readCreatedSession: Boolean(trace),
+        session(info) {
+          if (!trace) return
+          trace.harness = info.harness ?? config.harness
+          trace.model = info.model
+        },
+        drive(result) {
+          if (trace && result.state === 'completed') noteResult(trace, result.result, result.usage)
+        },
+        failure(step, failure) {
+          console.error(`[hosted-agent] turn=${message.turnId} step=${step} code=${failure.code} message=${JSON.stringify(failure.message)}`)
+        },
+      },
+    }, { wallCapMs, timeoutMs: 8000, until: options.deadline })
+    if (declined) return declined
+    if (outcome.ok === true) return { state: 'answered', text: outcome.text }
+    // A thrown failure is rethrown, so the caller's retry policy decides it.
+    if (outcome.ok === 'pending') {
+      if (outcome.cause !== undefined) throw outcome.cause
+      return { state: 'pending' }
     }
+    const code = outcome.detail ?? outcome.reason
+    throw new HostedAgentError(code === 'agent_failed' ? 'turn_failed' : code, `The turn ended without an answer (${code}).`)
   }
 
   return {
