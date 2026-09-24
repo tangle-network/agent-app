@@ -162,11 +162,11 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    // Runtime 0.261.1 is the first Runtime whose Sandbox peer admits 0.50.
-    expect(satisfiesRange('0.261.0', range!)).toBe(false)
-    expect(satisfiesRange('0.261.1', range!)).toBe(true)
-    expect(satisfiesRange('0.261.999', range!)).toBe(true)
-    expect(satisfiesRange('0.262.0', range!)).toBe(false)
+    // Runtime 0.262.0 is the first Runtime whose Sandbox peer admits 0.50.
+    expect(satisfiesRange('0.261.999', range!)).toBe(false)
+    expect(satisfiesRange('0.262.0', range!)).toBe(true)
+    expect(satisfiesRange('0.262.999', range!)).toBe(true)
+    expect(satisfiesRange('0.263.0', range!)).toBe(false)
   })
 
   // Each window starts at the floor the verified Runtime line admits (Eval) or
