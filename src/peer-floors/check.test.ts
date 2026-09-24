@@ -173,7 +173,7 @@ describe('this package audits itself', () => {
   // the floor this application code ran on (Sandbox 0.45), admits the minor the
   // dev install runs, and claims nothing past it. The Runtime refuses Sandbox
   // 0.48, so the shell refuses it too. Sandbox 0.50 adds the named instances
-  // that hosted apps keep each person's box on.
+  // that `hosted-agent` keeps each person's box on.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
     ['@tangle-network/agent-eval', ['0.184.999'], ['0.185.0', '0.186.0', '0.186.999'], ['0.187.0']],
     ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999'], ['0.51.0']],

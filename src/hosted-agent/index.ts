@@ -1,7 +1,7 @@
 import { authenticateHubEventRequest, HubClient, type HubProviderEvent } from '@tangle-network/hub-sdk'
 import { buildMessagingReply, normalizeConversationEvent } from '@tangle-network/agent-integrations/conversation-events'
 import type { AgentProfile, BackendConfig, SandboxInstance } from '@tangle-network/sandbox'
-import { Sandbox, SandboxError } from '@tangle-network/sandbox/core'
+import { InstanceRestartingError, Sandbox } from '@tangle-network/sandbox/core'
 import { runHostedTurn, TurnPending } from './engine'
 
 export * from './engine'
@@ -11,18 +11,20 @@ export * from './engine'
  * that person's own isolated sandbox. The developer's Tangle API key pays for
  * every box, model turn and reply.
  *
- * Each person gets one fresh isolated box built from the published profile,
- * never a copy of the developer's box. Later messages resume the same box and
- * the same conversation, so text and voice share one memory. A new profile
- * starts a new session, and a deleted box or a new API key starts a new box;
- * either way the person's recent conversation carries over from the store.
+ * The platform keeps each person's box and counts their turns: each person
+ * is one Sandbox instance (`sandbox.instances`), a fresh isolated box built
+ * from the published profile, and one member of a Hub allowance meter.
+ * Later messages resume the same box and conversation, so text and voice
+ * share one memory. A new profile starts a new session in the same box; a
+ * replaced box starts a new one. Either way the person's recent conversation
+ * carries over from the store.
  *
  * Every step is idempotent by the message's turn id: a retried delivery
- * settles the same sandbox turn and replays the same Hub send. So the caller
- * may retry any failure, and needs no dedupe table.
+ * settles the same sandbox turn, the same allowance admission and the same
+ * Hub send. So the caller may retry any failure, and needs no dedupe table.
  */
 
-/** Durable key-value storage. A Cloudflare KV namespace satisfies it. */
+/** Durable key-value storage for STOP state, the debug switch, call tokens and recent turns. A Cloudflare KV namespace satisfies it. */
 export interface HostedAgentStore {
   get(key: string): Promise<string | null>
   put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>
@@ -55,11 +57,21 @@ export interface HostedAgentConfig {
   /** Backend harness type, such as `opencode`; the runtime default when omitted. */
   harness?: string
   store: HostedAgentStore
-  /** Answers per person per UTC day before `allow` must decide. Default 20. */
+  /**
+   * The Platform meter that counts this agent's turns (Hub
+   * `hub.allowances`). Each person is one member. Default `hosted-agent`.
+   */
+  meter?: string
+  /**
+   * Answers per person per UTC day before `allow` must decide. Default 20.
+   * Written to the meter's plan when the meter has none; a plan already set
+   * on the Platform wins.
+   */
   freeTurnsPerDay?: number
   /**
-   * Decide a new message after the free allowance is used, for example reply
-   * with a checkout link. Without it, a person past the allowance is told to
+   * Decide a new message past the free allowance when paying would lift the
+   * limit (the Platform's `paywall` decision), for example reply with a
+   * checkout link. Without it, or past the paid allowance, a person is told to
    * come back tomorrow. Retries of an admitted message never reach this hook.
    */
   allow?: (message: HostedMessage, usedToday: number) => Allowance | Promise<Allowance>
@@ -129,7 +141,7 @@ function conversationProfile(profile: AgentProfile): AgentProfile {
 /** What one turn reports about itself, for the owner's debug line. A figure
  *  the run did not report stays undefined and is left out of the line. */
 export interface TurnTrace {
-  /** Box before the turn: `warm`, `resumed` or `new`. */
+  /** Time the platform took to hand over the person's running box, such as `box 0.3s`. */
   box?: string
   harness?: string
   model?: string
@@ -167,9 +179,6 @@ const IMESSAGE_EVENT = 'inkbox.imessage.received'
 const IMESSAGE_REPLY = 'inkbox.imessage.reply'
 const STOP = /^(stop|stopall|unsubscribe|cancel|end|quit)$/i
 const START = /^(start|unstop|resume)$/i
-const TWO_DAYS = 2 * 86_400
-const RESUMABLE = new Set(['stopped', 'expired'])
-const GONE = new Set(['failed', 'deleted'])
 /** How much of a person's recent conversation a new session inherits. */
 const CARRY_CHARS = 6000
 const CARRY_HEAD = '[Your conversation with this person so far. Your instructions may have changed since; follow the current ones.]'
@@ -270,48 +279,38 @@ export function createHostedAgent(config: HostedAgentConfig) {
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
   const wallCapMs = config.turnWallCapMs ?? 120_000
   const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
+  // The peer range admits older Sandbox minors for other subpaths; named instances arrived in 0.50.
+  if (!('instances' in sandbox)) throw new HostedAgentError('sandbox_too_old', 'hosted-agent needs @tangle-network/sandbox 0.50 or later.')
   const hub = new HubClient({ baseUrl: config.hubUrl ?? 'https://id.tangle.tools', apiKey: config.apiKey })
+  // The Hub SDK peer range admits older minors for apps that do not host agents; the allowance meter arrived in 0.17.
+  if (!('allowances' in hub)) throw new HostedAgentError('hub_sdk_too_old', 'hosted-agent needs @tangle-network/hub-sdk 0.17 or later.')
   const profile = conversationProfile(config.profile)
   const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile }
   const profileTag = sha256(JSON.stringify(profile)).then(hash => hash.slice(0, 8))
 
-  /** Resume a stopped box. False when an earlier API key made it: the platform
-   *  resumes a box only under the key lineage that created it. */
-  async function resumed(box: SandboxInstance): Promise<boolean> {
+  /** The person's running box, kept by the platform. Null when the deadline passed while it starts. */
+  async function ensureBox(user: string, deadline: number): Promise<SandboxInstance | null> {
+    let box: SandboxInstance
     try {
-      await box.resume()
-      return true
+      ({ box } = await sandbox.instances.ensure({
+        key: `hosted:${user}`,
+        profile: { version: await profileTag, backend },
+        // A box this kit made before the platform kept instances keeps its files.
+        adopt: await store.get(`box:${user}`) ?? undefined,
+        create: {
+          name: `hosted-${user.slice(0, 24)}`,
+          resources: { cpuCores: policy.cpuCores, memoryMB: policy.memoryMB, diskGB: policy.diskGB },
+          secrets: [], sshEnabled: false,
+          egressPolicy: { mode: 'strict', allowDomains: policy.allowDomains, includeImplicitDomains: false },
+          idleTimeoutSeconds: policy.idleTimeoutSeconds, maxLifetimeSeconds: policy.maxLifetimeSeconds,
+          deleteAfterStoppedSeconds: policy.deleteAfterStoppedSeconds, metadata: { hostedUser: user },
+        },
+      }))
     } catch (error) {
-      if (error instanceof SandboxError && error.code === 'SANDBOX_ATTRIBUTION_MISMATCH') return false
+      // The platform replaces a box that keeps failing to start; until then the turn waits.
+      if (error instanceof InstanceRestartingError) throw new TurnPending('box_restarting', true)
       throw error
     }
-  }
-
-  /** The person's running box: created on the first message, resumed later,
-   *  replaced when the platform deleted it. Null when the deadline passed. */
-  async function ensureBox(user: string, deadline: number, trace?: TurnTrace): Promise<SandboxInstance | null> {
-    const key = `box:${user}`
-    const known = await store.get(key)
-    let box = known ? await sandbox.get(known) : null
-    if (trace) trace.box = !box || GONE.has(box.status) ? 'new' : RESUMABLE.has(box.status) ? 'resumed' : 'warm'
-    if (box && RESUMABLE.has(box.status) && !await resumed(box)) {
-      box = null
-      if (trace) trace.box = 'new'
-    }
-    if (!box || GONE.has(box.status)) {
-      // The key names the box it replaces, so concurrent first messages and
-      // retries converge on one allocation instead of each creating a box.
-      box = await sandbox.createIsolated({
-        name: `hosted-${user.slice(0, 24)}`, idempotencyKey: known ? `hosted-${user}-after-${known}` : `hosted-${user}`,
-        resources: { cpuCores: policy.cpuCores, memoryMB: policy.memoryMB, diskGB: policy.diskGB },
-        backend, secrets: [], sshEnabled: false,
-        egressPolicy: { mode: 'strict', allowDomains: policy.allowDomains, includeImplicitDomains: false },
-        idleTimeoutSeconds: policy.idleTimeoutSeconds, maxLifetimeSeconds: policy.maxLifetimeSeconds,
-        deleteAfterStoppedSeconds: policy.deleteAfterStoppedSeconds, metadata: { hostedUser: user },
-      })
-      await store.put(key, box.id)
-    }
-    if (RESUMABLE.has(box.status) && !await resumed(box)) throw new HostedAgentError('box_foreign', 'A new box was made under another API key.')
     if (box.status === 'running') return box
     const timeoutMs = deadline - Date.now()
     if (timeoutMs < 1000) return null
@@ -323,20 +322,29 @@ export function createHostedAgent(config: HostedAgentConfig) {
     }
   }
 
-  /** Admit a new message once: STOP/START, the free allowance, then `allow`. */
+  const meter = config.meter ?? 'hosted-agent'
+  const owner = config.owner ? normalizeAddress(config.owner) : null
+  /** Give the meter the configured allowance once, unless it already has a plan. */
+  let planned: Promise<void> | undefined
+  const ensurePlan = () => planned ??= (async () => {
+    if ((await hub.allowances.plan(meter)).configured) return
+    await hub.allowances.setPlan(meter, { free: { turnsPerDay: config.freeTurnsPerDay ?? 20, usdPerDay: null }, paid: null,
+      spendResourceType: null })
+  })().catch(error => { planned = undefined; throw error })
+
+  /** Admit a new message once: STOP/START, then the Platform's allowance, then `allow`. */
   async function admit(message: HostedMessage, user: string): Promise<Allowance> {
     const stopKey = `stop:${user}`
     if (message.channel !== 'voice' && STOP.test(message.text.trim())) { await store.put(stopKey, '1'); return { reply: NOTICE.stopped } }
     if (message.channel !== 'voice' && START.test(message.text.trim())) { await store.put(stopKey, ''); return { reply: NOTICE.started } }
     if (await store.get(stopKey)) return 'ignore'
-    const dayKey = `turns:${user}:${new Date().toISOString().slice(0, 10)}`
-    // KV has no atomic increment, so concurrent messages may overshoot the
-    // allowance by a few; the sponsor key's budget is the hard ceiling.
-    const used = Number(await store.get(dayKey) ?? 0)
-    const decision = used < (config.freeTurnsPerDay ?? 20) ? 'answer'
-      : config.allow ? await config.allow(message, used) : { reply: NOTICE.limit }
-    if (decision === 'answer') await store.put(dayKey, String(used + 1), { expirationTtl: TWO_DAYS })
-    return decision
+    await ensurePlan()
+    // The Platform counts atomically and never counts one turn id twice.
+    const allowance = await hub.allowances.admit(meter, { member: user, role: message.userId === owner ? 'owner' : 'member',
+      turnId: message.turnId, channel: message.channel })
+    if (allowance.decision === 'admit') return 'answer'
+    // Past the paid allowance, nothing the person buys lifts today's limit.
+    return allowance.decision === 'paywall' && config.allow ? await config.allow(message, allowance.turns.used) : { reply: NOTICE.limit }
   }
 
   /** Run one message in the person's box until it answers or `deadline`. */
@@ -344,37 +352,25 @@ export function createHostedAgent(config: HostedAgentConfig) {
     const text = message.text.trim()
     if (!text || text.length > 8000 || !/^[\w-]{1,120}$/.test(message.turnId)) return { state: 'declined' }
     const user = (await sha256(message.userId)).slice(0, 32)
-    // Scoped to the person: a voice ticket is model-supplied, so a turn id
-    // admitted for one person must not skip another person's allowance.
-    const admittedKey = `turn:${user}:${message.turnId}`
     // A session binds its backend when created, and the runtime would give a
     // bare session its generic default assistant. A new profile starts a new
     // session, so the persona always matches the one in force.
     const sessionId = `hosted-${user}-${await profileTag}`
-    const trace = options.trace, traceKey = `trace:${user}:${message.turnId}`
+    const trace = options.trace
     const conversationKey = `convo:${user}`
     let declined: AskResult | undefined
     let conversation: Conversation | undefined, at = ''
     const outcome = await runHostedTurn({ turnId: message.turnId, text }, {
+      // The allowance counts a turn id once per person and admits its retries
+      // again, so a model-supplied voice ticket cannot spend another person's turn.
       async admit() {
-        if (await store.get(admittedKey)) return null
         const decision = await admit(message, user)
-        if (decision === 'answer') {
-          await store.put(admittedKey, '1', { expirationTtl: TWO_DAYS })
-          return null
-        }
+        if (decision === 'answer') return null
         declined = decision === 'ignore' ? { state: 'declined' } : { state: 'declined', reply: decision.reply }
         return { ok: false, reason: 'refused', detail: 'declined' }
       },
       async box() {
-        const box = await ensureBox(user, options.deadline, trace)
-        // A retried delivery finds the box it woke already warm, so the first
-        // attempt's view of the box is kept for the turn.
-        if (trace) {
-          const first = await store.get(traceKey)
-          if (first) trace.box = first
-          else if (trace.box) await store.put(traceKey, trace.box, { expirationTtl: TWO_DAYS })
-        }
+        const box = await ensureBox(user, options.deadline)
         if (!box) throw new TurnPending('box_starting', true)
         return box
       },
@@ -401,6 +397,9 @@ export function createHostedAgent(config: HostedAgentConfig) {
       classify: error => error instanceof HostedAgentError ? { ok: false, reason: 'unavailable', detail: error.code } : undefined,
       observe: {
         readCreatedSession: Boolean(trace),
+        span(step, ms) {
+          if (trace && step === 'ensure') trace.box ??= `box ${seconds(ms)}`
+        },
         session(info) {
           if (!trace) return
           trace.harness = info.harness ?? config.harness

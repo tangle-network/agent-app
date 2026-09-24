@@ -61,8 +61,8 @@ importers:
         specifier: 1.5.0
         version: 1.5.0(react@19.2.8)
       '@tangle-network/hub-sdk':
-        specifier: 0.14.2
-        version: 0.14.2(@opentelemetry/semantic-conventions@1.43.0)
+        specifier: 0.17.0
+        version: 0.17.0(@opentelemetry/semantic-conventions@1.43.0)
       '@tangle-network/sandbox':
         specifier: 0.50.0
         version: 0.50.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
@@ -2277,8 +2277,8 @@ packages:
       react:
         optional: true
 
-  '@tangle-network/hub-sdk@0.14.2':
-    resolution: {integrity: sha512-ApWr9g3icSPvdpdU6PVu86inDjiJIytvxS9+rAGLYYp6igRJwK1oNz1a8M2tnKlVpwqL1MSbySfidOU1Oqj8ww==}
+  '@tangle-network/hub-sdk@0.17.0':
+    resolution: {integrity: sha512-H2hOVmUvrwmfLlM0amnTPrMi37gCkTSzlCs1I74swn2T0e7OB0l4tj9l0SGyfLWCMHdETtE3L9ke8t1RUqqLtA==}
 
   '@tangle-network/sandbox-ui@0.113.3':
     resolution: {integrity: sha512-nQTs41jeASzQwJTbsn+FYk+C9tNTOFIpb9XMNCKKuZA9zcB+Mnh2/fr4b8xR43GsYSt3QQeflqxSDT4aWaSaew==}
@@ -7183,7 +7183,7 @@ snapshots:
     optionalDependencies:
       react: 19.2.8
 
-  '@tangle-network/hub-sdk@0.14.2(@opentelemetry/semantic-conventions@1.43.0)':
+  '@tangle-network/hub-sdk@0.17.0(@opentelemetry/semantic-conventions@1.43.0)':
     dependencies:
       '@tangle-network/sdk-telemetry': 0.1.20(@opentelemetry/semantic-conventions@1.43.0)
     transitivePeerDependencies:

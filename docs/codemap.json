@@ -6085,7 +6085,7 @@
           "name": "HostedAgentStore",
           "kind": "interface",
           "signature": "interface HostedAgentStore",
-          "doc": "Durable key-value storage."
+          "doc": "Durable key-value storage for STOP state, the debug switch, call tokens and recent turns."
         },
         {
           "name": "HostedChannel",

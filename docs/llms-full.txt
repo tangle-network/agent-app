@@ -7898,7 +7898,7 @@ class HostedAgentError
 
 ### `HostedAgentStore`
 
-`interface` — Durable key-value storage.
+`interface` — Durable key-value storage for STOP state, the debug switch, call tokens and recent turns.
 
 ```ts
 interface HostedAgentStore
