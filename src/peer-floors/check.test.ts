@@ -143,15 +143,14 @@ describe('this package audits itself', () => {
     ) as { peerDependencies?: Record<string, string> }
     const range = own.peerDependencies?.['@tangle-network/agent-interface']
 
-    // Interface minors are additive. Require the first minor that supplies
-    // this package's APIs, admit later 2.x minors, and reject the next major.
+    // Interface minors are additive. Require the minor the verified Runtime line
+    // requires, admit later 2.x minors, and reject the next major.
     expect(range).toBeDefined()
     expect(satisfiesRange('1.9.0', range!)).toBe(false)
     expect(satisfiesRange('2.1.1', range!)).toBe(false)
-    expect(satisfiesRange('2.5.9', range!)).toBe(false)
-    expect(satisfiesRange('2.9.999', range!)).toBe(false)
-    expect(satisfiesRange('2.10.0', range!)).toBe(true)
-    expect(satisfiesRange('2.10.999', range!)).toBe(true)
+    expect(satisfiesRange('2.10.999', range!)).toBe(false)
+    expect(satisfiesRange('2.11.0', range!)).toBe(true)
+    expect(satisfiesRange('2.12.0', range!)).toBe(true)
     expect(satisfiesRange('3.0.0', range!)).toBe(false)
   })
 
@@ -163,11 +162,46 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.248.999', range!)).toBe(false)
-    expect(satisfiesRange('0.249.0', range!)).toBe(false)
-    expect(satisfiesRange('0.249.1', range!)).toBe(true)
-    expect(satisfiesRange('0.249.999', range!)).toBe(true)
-    expect(satisfiesRange('0.250.0', range!)).toBe(false)
+    expect(satisfiesRange('0.258.999', range!)).toBe(false)
+    expect(satisfiesRange('0.259.0', range!)).toBe(true)
+    expect(satisfiesRange('0.259.999', range!)).toBe(true)
+    expect(satisfiesRange('0.260.0', range!)).toBe(false)
+  })
+
+  // Each window starts at the floor the verified Runtime line admits (Eval) or
+  // the floor this application code ran on (Sandbox 0.45), admits the minor the
+  // dev install runs, and claims nothing past it. The Runtime refuses Sandbox
+  // 0.48, so the shell refuses it too.
+  const verifiedWindows: Array<[string, string[], string[], string[]]> = [
+    ['@tangle-network/agent-eval', ['0.184.999'], ['0.185.0', '0.186.0', '0.186.999'], ['0.187.0']],
+    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999'], ['0.50.0']],
+    ['@tangle-network/agent-interface', ['2.10.999'], ['2.11.0', '2.12.0'], ['3.0.0']],
+  ]
+
+  it.each(verifiedWindows)('keeps the %s peer on the verified window', async (name, below, admitted, above) => {
+    const root = join(here, '..', '..')
+    const own = JSON.parse(
+      await readFile(join(root, 'package.json'), 'utf8'),
+    ) as { peerDependencies?: Record<string, string> }
+    const range = own.peerDependencies?.[name]
+
+    expect(range).toBeDefined()
+    for (const version of below) expect(satisfiesRange(version, range!)).toBe(false)
+    for (const version of admitted) expect(satisfiesRange(version, range!)).toBe(true)
+    for (const version of above) expect(satisfiesRange(version, range!)).toBe(false)
+  })
+
+  // A shell window the required Runtime refuses is a contract no consumer can
+  // install. Read the Runtime this repo develops against, not a comment about it.
+  it.each(verifiedWindows)('admits only %s versions the installed Runtime admits', async (name, _below, admitted) => {
+    const root = join(here, '..', '..')
+    const runtime = JSON.parse(
+      await readFile(join(root, 'node_modules', '@tangle-network', 'agent-runtime', 'package.json'), 'utf8'),
+    ) as { version: string; peerDependencies?: Record<string, string> }
+    const range = runtime.peerDependencies?.[name]
+
+    expect(range, `Runtime ${runtime.version} declares no ${name} peer`).toBeDefined()
+    for (const version of admitted) expect(satisfiesRange(version, range!), `${version} vs ${range}`).toBe(true)
   })
 
   // The floors this shell PUBLISHES must be satisfiable by the tree it is

@@ -91,6 +91,28 @@ describe('runDetachedTurnWorkflowTick', () => {
     expect(settle).not.toHaveBeenCalled()
   })
 
+  // Sandbox 0.49 reports these settled outcomes as their own states; 0.45
+  // reported them as `failed`. Either way the turn is over for this Workflow.
+  it.each([
+    { state: 'blocked_on_approval', approval: {}, result: {} },
+    { state: 'awaiting_question', question: {}, result: {} },
+    { state: 'awaiting_interaction', interaction: {}, result: {} },
+  ])('settles a turn the SDK reports as $state', async (value) => {
+    const workflow = step()
+    const drive = vi.fn(async () => ({ succeeded: true as const, value } as unknown as DetachedTurnDriveOutcome))
+    const settle = vi.fn(async (_payload: unknown, result: DetachedTurnTerminalResult) => result.state)
+
+    await expect(
+      runDetachedTurnWorkflowTick({
+        event: { payload: { sessionId: 'session-1', turnId: 'turn-1' } },
+        step: workflow.value,
+        drive,
+        settle,
+      }),
+    ).resolves.toBe(value.state)
+    expect(drive).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects an unknown drive state instead of persisting it', async () => {
     const workflow = step()
     const drive = vi.fn(async () => ({

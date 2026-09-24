@@ -235,7 +235,9 @@ export async function runHostedTurn<Box extends TurnBox>(turn: { turnId: string;
       return refusal('unavailable', 'agent_failed')
     // Interaction and plan approval are not exposed over messaging. The wall
     // cap cancels a turn that waits on one, which frees the session.
-    case 'awaiting_plan_decision': return refusal('refused', 'needs_decision')
+    // Sandbox 0.45 reported approval and question outcomes as `failed`.
+    case 'awaiting_plan_decision': case 'blocked_on_approval': case 'awaiting_question': case 'awaiting_interaction':
+      return refusal('refused', 'needs_decision')
     case 'running': case 'awaiting_input': case 'not_admitted':
       return { ok: 'pending', detail: { step: 'turn', code: result.state, transient: true } }
   }
