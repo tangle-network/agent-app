@@ -144,8 +144,7 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-interface']
 
     // Interface minors are additive. Require the minor the verified Runtime line
-    // requires (Runtime 0.256 declares ^2.11.0), admit later 2.x minors, and
-    // reject the next major.
+    // requires, admit later 2.x minors, and reject the next major.
     expect(range).toBeDefined()
     expect(satisfiesRange('1.9.0', range!)).toBe(false)
     expect(satisfiesRange('2.1.1', range!)).toBe(false)
@@ -163,19 +162,19 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.255.999', range!)).toBe(false)
-    expect(satisfiesRange('0.256.0', range!)).toBe(true)
-    expect(satisfiesRange('0.256.999', range!)).toBe(true)
-    expect(satisfiesRange('0.257.0', range!)).toBe(false)
+    expect(satisfiesRange('0.258.999', range!)).toBe(false)
+    expect(satisfiesRange('0.259.0', range!)).toBe(true)
+    expect(satisfiesRange('0.259.999', range!)).toBe(true)
+    expect(satisfiesRange('0.260.0', range!)).toBe(false)
   })
 
-  // This shell keeps the Eval and Sandbox floors that 0.49.4 verified on the
-  // same application code, admits the minor its own dev install runs, and
-  // claims nothing past it. Sandbox 0.46 ran the same code before the dev
-  // install moved to 0.47.
+  // Each window starts at the floor the verified Runtime line admits (Eval) or
+  // the floor this application code ran on (Sandbox 0.45), admits the minor the
+  // dev install runs, and claims nothing past it. The Runtime refuses Sandbox
+  // 0.48, so the shell refuses it too.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
-    ['@tangle-network/agent-eval', ['0.182.999'], ['0.183.0', '0.184.0', '0.184.999'], ['0.185.0']],
-    ['@tangle-network/sandbox', ['0.44.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999'], ['0.48.0']],
+    ['@tangle-network/agent-eval', ['0.184.999'], ['0.185.0', '0.186.0', '0.186.999'], ['0.187.0']],
+    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999'], ['0.50.0']],
     ['@tangle-network/agent-interface', ['2.10.999'], ['2.11.0', '2.12.0'], ['3.0.0']],
   ]
 

@@ -4,11 +4,13 @@
 
 ### Changed
 
-- Accept Eval 0.184 alongside 0.183, and Sandbox 0.46 and 0.47 alongside 0.45.
-  Require Runtime 0.256, the first Runtime release whose Eval peer admits 0.184,
-  and Interface 2.11, the Interface floor Runtime 0.256 requires.
-  Development and generated applications use Eval 0.184.0, Runtime 0.256.0,
-  Interface 2.12.0, Knowledge 17.1.1 and Sandbox 0.47.0.
+- Require Runtime 0.259 and admit the Eval, Sandbox and Interface versions it admits.
+  The Eval peer is `>=0.185.0 <0.187.0`, the window Runtime 0.259 declares.
+  Sandbox 0.46, 0.47 and 0.49 join 0.45; Runtime 0.259 refuses Sandbox 0.48, and so does this package.
+  Interface 2.11 and Knowledge 17.1.2 are the new floors: Runtime 0.259 requires Interface 2.11,
+  and Knowledge 17.1.1 and older refuse Eval 0.185.
+  Development and generated applications use Eval 0.186.2, Runtime 0.259.0,
+  Interface 2.12.0, Knowledge 17.1.2 and Sandbox 0.49.0.
 - Wait for SDK removal before replacing a workspace sandbox under the same idempotency key.
   Reject pending removal, and apply `forceNew` to stopped sandboxes as well as running sandboxes.
 - Update evaluator, execution, knowledge, and profile dependencies as one supported set.
