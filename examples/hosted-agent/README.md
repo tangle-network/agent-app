@@ -25,7 +25,7 @@ ph0ny's voice agent then calls `POST /voice/ask` through its `ask_workspace` web
 | Sandbox per person | 1 CPU, 2 GB memory, 10 GB disk, egress to `router.tangle.tools` only |
 | Idle suspend | 10 minutes; the next message resumes the same box |
 | Deleted box | the next message gets a fresh box |
-| Free answers | 30 per person per UTC day (`freeTurnsPerDay`); `allow` decides after that |
+| Free answers | 30 per person per UTC day (`freeTurnsPerDay`), counted by the Platform meter `hosted-agent` (`hub.allowances`); `allow` decides after that |
 | Turn wall time | 2 minutes |
 | STOP / START | STOP silences the line for that person; START resumes it |
 | Persona change | a new session; it inherits the person's last 6,000 characters of conversation |
