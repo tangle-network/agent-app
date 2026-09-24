@@ -25,10 +25,9 @@ const EXPECTED_SKILL_DIR: Record<Harness, string | null> = {
   'factory-droids': null,
   pi: '.pi/skills',
   hermes: null,
-  forge: null,
+  gemini: null,
   openclaw: 'skills',
   acp: null,
-  cursor: null,
   'cli-base': null,
 }
 

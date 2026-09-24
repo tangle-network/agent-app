@@ -15,7 +15,8 @@ describe('harness taxonomy + coercion', () => {
   it('recognizes known harnesses, rejects everything else', () => {
     expect(isHarness('opencode')).toBe(true)
     expect(isHarness('codex')).toBe(true)
-    expect(isHarness('cursor')).toBe(true)
+    expect(isHarness('gemini')).toBe(true)
+    expect(isHarness('cursor')).toBe(false)
     expect(isHarness('not-a-harness')).toBe(false)
     expect(isHarness(undefined)).toBe(false)
     expect(isHarness(42)).toBe(false)

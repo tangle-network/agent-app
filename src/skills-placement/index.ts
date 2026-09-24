@@ -24,13 +24,10 @@ import { composeSkills, renderInlineSkills, type ComposedSkills, type SkillEntry
 
 /** agent-app `Harness` -> platform `HarnessId`, identity-mapped for exactly
  *  the harnesses the platform map covers. Harnesses absent here (`amp`,
- *  `factory-droids`, `forge`, `acp`, `cursor`, `cli-base`) resolve to `null` —
+ *  `factory-droids`, `gemini`, `acp`, `cli-base`) resolve to `null` —
  *  {@link composeSkillsForHarness} refuses by default rather than silently
  *  delivering `inline`; a caller that genuinely needs `inline` on one of
- *  these opts in explicitly (`onNoSkillDir: 'inline'`). `cursor`'s adapter
- *  supports `resources.skills` bespokely but isn't in the platform map yet;
- *  treating it as unbridged is the safe posture until the map covers it,
- *  rather than guessing its cwd skill dir here. */
+ *  these opts in explicitly (`onNoSkillDir: 'inline'`). */
 const HARNESS_BRIDGE: Partial<Record<Harness, HarnessId>> = {
   opencode: 'opencode',
   'claude-code': 'claude-code',
