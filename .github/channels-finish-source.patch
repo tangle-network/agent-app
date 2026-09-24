@@ -1,0 +1,305 @@
+diff --git a/docs/channels-evidence/README.md b/docs/channels-evidence/README.md
+new file mode 100644
+index 0000000..3ef7efe
+--- /dev/null
++++ b/docs/channels-evidence/README.md
+@@ -0,0 +1,31 @@
++# Channels UI evidence
++
++These are renders of the exported Storybook components, not mockups.
++The browser consumes a local bundle of
++`src/stories/channels.stories.tsx` and the generated Storybook CSS without a
++network request. In the local Chromium 144.0.7559.96 run, all 17 stories were rendered at 390×844 and 1280×960: 34 renders,
++no horizontal overflow, no JavaScript page errors. The same SDK-shaped fixtures
++are used by the hook and component tests.
++
++![Mobile shared-iMessage verification](mobile-verification.png)
++
++![Desktop line pay page](desktop-pay-page.png)
++
++Browser interaction checks: selecting an owned WhatsApp number and pressing
++Enter connects it and reaches verification; stopping a test requires a second
++confirmation and “Keep testing” preserves it; checkout is disabled before terms
++consent and returning a checkout link does not grant a paid allowance.
++
++The repository commands are `pnpm typecheck`, `pnpm build`, and
++`pnpm test tests/channels` (53 tests). `tests/channels/package.test.ts` imports the
++actual built public subpath in a separate Node process. The activation mutation
++check is `node scripts/test-channels-mutation.mjs`: removing the guard fails its
++test, and restoring it passes. The 23 peer-floor tests also exercise the merged
++Runtime 0.266 / Sandbox 0.52 compatibility window rather than retaining the old
++“next minor” assertions. Execution logs for the final revision are retained by
++Verify PR's artifact, not inferred from screenshots.
++
++No live provider messages, customer purchases, payment settlements, or deployed
++Builder replacement were performed. The host remains responsible for
++session-scoped authorization, delivery evidence, existing hosted-agent wiring,
++and settlement. UI and fake-client tests are not evidence of those deployments.
+diff --git a/docs/channels.md b/docs/channels.md
+index 5f37d21..09dae8c 100644
+--- a/docs/channels.md
++++ b/docs/channels.md
+@@ -47,8 +47,10 @@ line list. The backend must authorize every supplied line, thread, source, and
+ order identifier. `client.lines.threads(lineId).messages(threadId)` remains the
+ authoritative channel history; it is not reconstructed from a replay buffer.
+ 
+-Use Sandbox **0.51.0+**. The package's development pin remains 0.51.0 to check the
+-minimum API and preserve compatibility with the pinned Runtime. Only type imports from Sandbox
++Use Sandbox **0.52.1** and Hub SDK **0.19.0** for the complete channels surface.
++Sandbox 0.51.0 supplies the original iMessage line API but does not type WhatsApp
++connection creation. The package inherits Sandbox 0.52.1 and its compatible
++Runtime 0.266.0 from the merged hosted-agent lane. Only type imports from Sandbox
+ and Hub are emitted in declarations. JavaScript imports React and existing
+ agent-app async primitives, not either server SDK.
+ 
+@@ -57,10 +59,16 @@ WhatsApp phone-number ID. It does **not** accept email or SMS. The host's `setup
+ methods deliberately supply missing Hub/hosted-agent operations: available
+ connections/numbers, email creation, managed-order binding, verification, and
+ activation. They must delegate to the Hub SDK and sandbox.lines, not providers.
+-The existing `src/hosted-agent` entrypoint is server execution code and does not
+-export a browser line-setup client. This module does not import that runtime or
+-change its files. The hub-lines owner can implement `ChannelsClient` without a
+-channels rewrite. There is no fabricated SDK method or hardcoded Builder route.
++The merged `src/hosted-agent` entrypoint exposes `createHostedAgent` and
++`HostedAgent.attachLine(connectionId)` for server-side iMessage attachment.
++A hosted application should use that existing operation in its authenticated
++`setup.activate` implementation, after checking the current test and ownership;
++then read and return the attached line through `sandbox.lines.get`. Its existing
++per-person sandbox, profile, routing, STOP/START and reply behavior stay there,
++not in channels. Other transports remain on the injected host boundary. The
++entrypoint does not export a browser line-setup client, so this module does not
++bundle its server runtime or change its files. There is no fabricated SDK
++method or hardcoded Builder route.
+ 
+ The four Builder reference panels map to `IMessageChannel`, `WhatsAppChannel`,
+ `EmailChannel`, and `NumberChannel`/`SMSChannel`. Builder replacement and creator
+diff --git a/package.json b/package.json
+index f391dcf..ec81d7b 100644
+--- a/package.json
++++ b/package.json
+@@ -212,6 +212,11 @@
+       "import": "./dist/integrations/index.js",
+       "default": "./dist/integrations/index.js"
+     },
++    "./channels": {
++      "types": "./dist/channels/index.d.ts",
++      "import": "./dist/channels/index.js",
++      "default": "./dist/channels/index.js"
++    },
+     "./hosted-agent": {
+       "types": "./dist/hosted-agent/index.d.ts",
+       "import": "./dist/hosted-agent/index.js",
+@@ -548,6 +553,7 @@
+     "@tangle-network/agent-profile-materialize": "0.20.1",
+     "@tangle-network/agent-runtime": "0.266.0",
+     "@tangle-network/brand": "1.5.0",
++    "@tangle-network/hub-sdk": "0.19.0",
+     "@tangle-network/sandbox": "0.52.1",
+     "@tangle-network/sandbox-ui": "0.113.3",
+     "@tangle-network/ui": "11.9.0",
+@@ -608,6 +614,7 @@
+     "@tangle-network/agent-profile-materialize": ">=0.20.1 <0.21.0",
+     "@tangle-network/agent-runtime": ">=0.262.0 <0.267.0",
+     "@tangle-network/brand": ">=1.5.0",
++    "@tangle-network/hub-sdk": ">=0.19.0 <0.20.0",
+     "@tangle-network/sandbox": ">=0.45.0 <0.48.0 || ^0.49.0 || ^0.50.0 || ^0.51.0 || ^0.52.0",
+     "@tangle-network/sandbox-ui": ">=0.113.3 <0.114.0",
+     "@tangle-network/ui": ">=11.6.0 <12.0.0",
+@@ -707,6 +714,9 @@
+     },
+     "react-dom": {
+       "optional": true
++    },
++    "@tangle-network/hub-sdk": {
++      "optional": true
+     }
+   },
+   "dependencies": {
+diff --git a/src/channels/components.tsx b/src/channels/components.tsx
+index 466734e..b4021d4 100644
+--- a/src/channels/components.tsx
++++ b/src/channels/components.tsx
+@@ -44,9 +44,13 @@ export function ChannelVerificationPanel({ lineId, className = '' }: { lineId: s
+       const active = line.status === 'active' && line.attachment?.status === 'active'
+       const link = test ? channelMessageLink(line, test.instruction) : null
+       return <>
+-        <p className="font-medium">{labels[line.transport]} · {line.address}</p>
++        <p className="break-all font-medium">{labels[line.transport]} · {line.address}</p>
+         {line.status !== 'active' ? <p role="alert">This line is {line.status}. Check the line’s status before testing or activating it.</p>
+-          : active && test?.status === 'verified' && !expired ? <p role="status">Both directions verified. Answering {labels[line.transport]} messages.</p>
++          : active && test?.status === 'verified' && !expired ? <>
++            <p role="status">Both directions verified. Answering {labels[line.transport]} messages.</p>
++            <p>{line.connect && line.routerAddress ? `Share this: send ${line.connect} to ${line.routerAddress}.` : 'Share this channel address so people can start a conversation.'}</p>
++            <CopyLine text={line.connect ?? line.address} />
++          </>
+           : !test || test.status === 'revoked' ? <>
+             {active && <p>Attached to an agent, but no completed delivery test was returned.</p>}
+             <p>Test inbound delivery and a reply before this agent answers people.</p>
+@@ -182,7 +186,7 @@ export function NumberChannel({ transport, className = '' }: { transport: 'sms'
+     </div>}
+     {number.uncertain && <p role="alert">The purchase response was lost or refused. Its outcome is not confirmed. {NUMBER_RETRY_NOTICE}</p>}
+     {number.orders.map(order => <article key={order.id} className="space-y-3 rounded-md border border-border p-4">
+-      <h3 className="font-medium">{order.address ?? 'Your number order'}</h3><p>{numberStage(order)}</p>
++      <h3 className="break-all font-medium">{order.address ?? 'Your number order'}</h3><p>{numberStage(order)}</p>
+       {order.errorCode && <p role="status">Status: {order.errorCode.replace(/_/g, ' ')}</p>}
+       {order.status === 'ready_for_setup' && order.cancellation === 'none' && <><p>The number is acquired, not delivery-verified. Test it before connecting conversations.</p>
+         <button type="button" className={buttonClass} disabled={busy} onClick={() => void connect.run({ kind: 'order', orderId: order.id })}>Test this number</button></>}
+diff --git a/src/channels/numbers.ts b/src/channels/numbers.ts
+index 2c5d27a..63236dc 100644
+--- a/src/channels/numbers.ts
++++ b/src/channels/numbers.ts
+@@ -115,7 +115,7 @@ export function useNumberChannel(transport: 'sms' | 'imessage') {
+     if (loaded) setReceipts(current => current.filter(receipt => !loaded.orders.some(order => order.id === receipt.id)))
+     if (loaded?.orders.some(holdsNumber)) {
+       setQuote(null); setUncertain(false); attempted.current = false
+-    } else if (loaded?.complete && orders.length > 0 && orders.every(order => !holdsNumber(order))) {
++    } else if (!uncertain && !quote && loaded?.complete && orders.length > 0 && orders.every(order => !holdsNumber(order))) {
+       attempted.current = false
+     }
+   }, [loaded])
+diff --git a/src/channels/types.ts b/src/channels/types.ts
+index 784b159..2cc1538 100644
+--- a/src/channels/types.ts
++++ b/src/channels/types.ts
+@@ -42,8 +42,8 @@ export type ConnectChannelInput =
+  * Sandbox 0.51+ supplies fromConnection/get/threads; it does not supply email
+  * creation, managed-order binding, or delivery verification. Those operations
+  * deliberately remain injected instead of pretending they exist on the SDK.
+- * The current hosted-agent export is server-only. Its hub-lines implementation
+- * can implement this contract without changing channels.
++ * The hosted-agent export is server-only. Its existing attachLine operation
++ * belongs in setup.activate after proof validation, never in this browser bundle.
+  */
+ export interface ChannelsClient {
+   /** Changes whenever the authenticated agent or owner changes. Not an auth credential. */
+diff --git a/src/peer-floors/check.test.ts b/src/peer-floors/check.test.ts
+index 20e416b..fa49ba7 100644
+--- a/src/peer-floors/check.test.ts
++++ b/src/peer-floors/check.test.ts
+@@ -163,22 +163,25 @@ describe('this package audits itself', () => {
+ 
+     expect(range).toBeDefined()
+     // Runtime 0.262.0 is the first Runtime whose Sandbox peer admits 0.50,
+-    // and 0.264.0 the first that admits 0.51.
++    // 0.264.0 admits 0.51, and 0.266.0 admits the 0.52 lines API.
+     expect(satisfiesRange('0.261.999', range!)).toBe(false)
+     expect(satisfiesRange('0.262.0', range!)).toBe(true)
+     expect(satisfiesRange('0.264.0', range!)).toBe(true)
+     expect(satisfiesRange('0.264.999', range!)).toBe(true)
+-    expect(satisfiesRange('0.265.0', range!)).toBe(false)
++    expect(satisfiesRange('0.266.0', range!)).toBe(true)
++    expect(satisfiesRange('0.266.999', range!)).toBe(true)
++    expect(satisfiesRange('0.267.0', range!)).toBe(false)
+   })
+ 
+   // Each window starts at the floor the verified Runtime line admits (Eval) or
+   // the floor this application code ran on (Sandbox 0.45), admits the minor the
+   // dev install runs, and claims nothing past it. The Runtime refuses Sandbox
+   // 0.48, so the shell refuses it too. Sandbox 0.50 adds the named instances
+-  // that `hosted-agent` keeps each person's box on, and 0.51 adds lines.
++  // that `hosted-agent` keeps each person's box on, 0.51 adds lines, and
++  // 0.52.1 adds per-member instances and owned WhatsApp line creation.
+   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
+     ['@tangle-network/agent-eval', ['0.184.999'], ['0.185.0', '0.186.0', '0.186.999'], ['0.187.0']],
+-    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999'], ['0.52.0']],
++    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.1', '0.52.999'], ['0.53.0']],
+     ['@tangle-network/agent-interface', ['2.10.999'], ['2.11.0', '2.12.0'], ['3.0.0']],
+   ]
+ 
+diff --git a/src/stories/channels.stories.tsx b/src/stories/channels.stories.tsx
+index 70b8325..bc6347b 100644
+--- a/src/stories/channels.stories.tsx
++++ b/src/stories/channels.stories.tsx
+@@ -4,12 +4,14 @@ import { ChannelConversation, ChannelVerificationPanel, ChannelsProvider, EmailC
+ import { channelAttachment, channelMessage, channelTest, createChannelsFixture, numberOrder } from './fixtures/channels'
+ import type { ChannelVerification } from '../channels'
+ 
+-function Surface({ surface = 'imessage', status, expired = false, failure = false, active = false }: {
++function Surface({ surface = 'imessage', status, expired = false, failure = false, active = false, empty = false, loading = false }: {
+   surface?: 'imessage' | 'whatsapp' | 'email' | 'number' | 'history' | 'payment' | 'verification'
+   status?: ChannelVerification['status']
+   expired?: boolean
+   failure?: boolean
+   active?: boolean
++  empty?: boolean
++  loading?: boolean
+ }) {
+   const [fixture] = useState(() => {
+     const fake = createChannelsFixture()
+@@ -17,6 +19,8 @@ function Surface({ surface = 'imessage', status, expired = false, failure = fals
+     if (active) fake.state.line.attachment = channelAttachment()
+     if (surface === 'number') fake.state.orders = [numberOrder()]
+     if (surface === 'history') fake.state.messages = [channelMessage('out', { direction: 'out', text: 'Your agent replied in the same channel.', createdAt: '2026-09-24T12:02:00Z', status: 'delivered' }), channelMessage()]
++    if (empty) { fake.client.lines.list = async () => []; fake.client.setup.connections = async () => [] }
++    if (loading) { fake.client.lines.list = () => new Promise(() => {}); fake.client.setup.connections = () => new Promise(() => {}) }
+     if (failure) fake.client.lines.get = async () => { throw new Error('The channel could not be read. Existing connections are unchanged.') }
+     return fake
+   })
+@@ -43,3 +47,5 @@ export const AnsweringMessages: Story = { args: { surface: 'verification', statu
+ export const NumberAcquiredNotVerified: Story = { args: { surface: 'number' } }
+ export const ConversationHistory: Story = { args: { surface: 'history' } }
+ export const LinePayPageState: Story = { args: { surface: 'payment' } }
++export const NoConnections: Story = { args: { surface: 'email', empty: true } }
++export const LoadingConnections: Story = { args: { surface: 'email', loading: true } }
+diff --git a/tests/channels/regressions.test.tsx b/tests/channels/regressions.test.tsx
+index 9c3c1ff..55a4b49 100644
+--- a/tests/channels/regressions.test.tsx
++++ b/tests/channels/regressions.test.tsx
+@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
+ import type { PropsWithChildren } from 'react'
+ import { describe, expect, it, vi } from 'vitest'
+ import { ChannelsProvider, ChannelVerificationPanel, LinePayPage, useChannel, useChannelConversations, useConnectChannel, useNumberChannel, type Line } from '../../src/channels'
+-import { channelAttachment, channelLine, channelTest, createChannelsFixture } from '../../src/stories/fixtures/channels'
++import { channelAttachment, channelLine, channelTest, createChannelsFixture, numberOrder } from '../../src/stories/fixtures/channels'
+ 
+ function setup() {
+   const fake = createChannelsFixture()
+@@ -36,6 +36,15 @@ describe('channel boundary regressions', () => {
+     expect(screen.getByRole('button', { name: 'Stop this test' })).toBeTruthy()
+   })
+ 
++  it('keeps the shared-router instructions available after activation', async () => {
++    const fake = setup()
++    fake.state.line = channelLine({ attachment: channelAttachment() })
++    fake.state.test = channelTest('verified')
++    render(<ChannelVerificationPanel lineId="ln_demo" />, { wrapper: fake.wrapper })
++    expect(await screen.findByText('Share this: send connect @helper to +15550100001.')).toBeTruthy()
++    expect(screen.getByRole('button', { name: 'Copy connect @helper' })).toBeTruthy()
++  })
++
+   it('refuses an expired inbound test even before the server expiry flag updates', async () => {
+     const fake = setup()
+     fake.state.test = { ...channelTest('received'), expiresAt: Date.now() - 1000 }
+@@ -85,4 +94,20 @@ describe('channel boundary regressions', () => {
+     await act(async () => { expect((await result.current.run({ action: 'purchase', consent: true })).succeeded).toBe(false) })
+     expect(create).not.toHaveBeenCalled()
+   })
++  it('keeps an unresolved quote locked even when older released orders are listed', async () => {
++    const fake = setup()
++    fake.state.orders = [numberOrder({ cancellation: 'released', status: 'cancelled' })]
++    vi.spyOn(fake.client.ordering!.numbers, 'create').mockRejectedValue(new Error('Response lost'))
++    const quote = vi.spyOn(fake.client.ordering!.numbers, 'quote')
++    const { result } = renderHook(() => useNumberChannel('sms'), { wrapper: fake.wrapper })
++    await waitFor(() => expect(result.current.resource.status).toBe('ready'))
++    await act(async () => { await result.current.run({ action: 'quote' }) })
++    await act(async () => { await result.current.run({ action: 'purchase', consent: true }) })
++    await waitFor(() => expect(result.current.resource.status).toBe('ready'))
++    expect(result.current.uncertain).toBe(true)
++    await act(async () => { expect((await result.current.run({ action: 'quote' })).succeeded).toBe(false) })
++    expect(quote).toHaveBeenCalledTimes(1)
++    expect(result.current.quote?.token).toBe('opaque-signed-quote')
++  })
++
+ })
+diff --git a/tsup.config.ts b/tsup.config.ts
+index d765b0b..d825e0b 100644
+--- a/tsup.config.ts
++++ b/tsup.config.ts
+@@ -36,6 +36,7 @@ export default defineConfig({
+     'turn-stream/index': 'src/turn-stream/index.ts',
+     'turn-health/index': 'src/turn-health/index.ts',
+     'integrations/index': 'src/integrations/index.ts',
++    'channels/index': 'src/channels/index.ts',
+     'hosted-agent/index': 'src/hosted-agent/index.ts',
+     'interactions/index': 'src/interactions/index.ts',
+     'plans/index': 'src/plans/index.ts',

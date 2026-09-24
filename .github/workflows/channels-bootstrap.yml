@@ -1,64 +1,117 @@
-# Temporary dependency-generation job for pro/channels-kit; removed once its
-# generated manifest/lockfile/docs are committed. This is not a verification pass.
-name: Channels dependency generation
+# Temporary, branch-scoped finalization of verified channel sources and generated
+# lock/docs. It is removed through the GitHub connector after its commit lands.
+name: Channels finalization
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: channels-bootstrap-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
-  generate:
-    if: github.head_ref == 'pro/channels-kit'
+  finalize:
+    if: github.head_ref == 'pro/channels-kit' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=12288
-      OUTPUT: /tmp/channels-bootstrap
+      OUTPUT: /tmp/channels-finalization
+      BASE: 78103de89fc3a4b5a73a676fe19b58fed7277a43
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
           persist-credentials: false
+      - name: Integrate current main without changing hosted-agent ownership
+        run: |
+          mkdir -p "$OUTPUT"
+          test "$(git rev-parse origin/main)" = "$BASE"
+          git rev-parse HEAD > "$OUTPUT/start.txt"
+          cp .github/channels-finish-source.patch "$OUTPUT/source.patch"
+          cp .github/workflows/channels-bootstrap.yml "$OUTPUT/finalizer.yml"
+          START=$(cat "$OUTPUT/start.txt")
+          git read-tree --reset -u "$BASE"
+          git checkout "$START" -- src/channels src/stories/channels.stories.tsx src/stories/fixtures/channels.ts tests/channels scripts/test-channels-mutation.mjs docs/channels.md knip.json .github/workflows/verify-pr.yml tests/browser-safe-subpaths.test.ts
+          git apply --index "$OUTPUT/source.patch"
+          git diff --cached --check
+          git diff --cached --exit-code "$BASE" -- src/hosted-agent
+          git write-tree > "$OUTPUT/source-tree.txt"
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - name: Generate dependency update with the real package manager
+      - name: Install and regenerate the real lockfile
+        run: pnpm install --no-frozen-lockfile --ignore-scripts=false > "$OUTPUT/install.log" 2>&1 || { tail -100 "$OUTPUT/install.log"; exit 1; }
+      - name: Verify source and built public subpath
         run: |
-          mkdir -p "$OUTPUT"
+          pnpm typecheck > "$OUTPUT/typecheck.log" 2>&1
+          pnpm build > "$OUTPUT/build.log" 2>&1
+          pnpm test tests/channels --reporter=json --outputFile="$OUTPUT/channels-tests.json" > "$OUTPUT/channels-tests.log" 2>&1
+          node scripts/test-channels-mutation.mjs > "$OUTPUT/channels-mutation.log" 2>&1
+          pnpm test:gates > "$OUTPUT/gates.log" 2>&1
+          pnpm test --reporter=json --outputFile="$OUTPUT/tests.json" > "$OUTPUT/tests.log" 2>&1
+          pnpm test:generated > "$OUTPUT/generated.log" 2>&1
+          pnpm knip > "$OUTPUT/knip.log" 2>&1
+          pnpm docs:gen > "$OUTPUT/docs.log" 2>&1
+          pnpm build-storybook > "$OUTPUT/storybook.log" 2>&1
+      - name: Capture actual browser evidence from exported stories
+        run: |
+          BROWSER=$(command -v google-chrome || command -v chromium)
+          "$BROWSER" --version > "$OUTPUT/browser-version.txt"
           node --input-type=module <<'JS'
           import fs from 'node:fs';
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          pkg.devDependencies['@tangle-network/sandbox'] = '0.52.1';
-          pkg.devDependencies['@tangle-network/agent-runtime'] = '0.266.0';
-          pkg.peerDependencies['@tangle-network/sandbox'] += ' || ^0.52.0';
-          pkg.peerDependencies['@tangle-network/agent-runtime'] = '>=0.262.0 <0.267.0';
-          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          import { createRequire } from 'node:module';
+          const require = createRequire(process.cwd() + '/package.json');
+          const esbuild = createRequire(require.resolve('tsup'))('esbuild');
+          const css = fs.readFileSync('storybook-static/assets/' + fs.readdirSync('storybook-static/assets').find(name => /^iframe-.*\.css$/.test(name)), 'utf8');
+          for (const [file, story] of [['mobile', 'WaitingForInbound'], ['desktop', 'LinePayPageState']]) {
+            const bundle = esbuild.buildSync({stdin: {contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import meta, * as stories from './src/stories/channels.stories'; createRoot(document.getElementById('root')).render(React.createElement(meta.component, stories.${story}.args));`, resolveDir: process.cwd(), loader: 'tsx'}, bundle: true, format: 'iife', platform: 'browser', jsx: 'automatic', write: false, define: {'process.env.NODE_ENV': '"production"'}}).outputFiles[0].text;
+            fs.writeFileSync(process.env.OUTPUT + '/' + file + '.html', '<!doctype html><html class="dark" data-theme="dark"><head><meta charset="utf-8"><style>' + css + '</style><style>body{padding:24px;background:hsl(var(--background))}</style></head><body><div id="root"></div><script>' + bundle.replaceAll('</script', '<\\/script') + '</script></body></html>');
+          }
           JS
-          pnpm install --no-frozen-lockfile --ignore-scripts > "$OUTPUT/install.log" 2>&1
-          cp package.json pnpm-lock.yaml "$OUTPUT/"
-          git diff --binary -- package.json pnpm-lock.yaml > "$OUTPUT/dependencies.patch"
-      - name: Generate public documentation
+          mkdir -p docs/channels-evidence
+          "$BROWSER" --headless --no-sandbox --disable-gpu --virtual-time-budget=5000 --window-size=390,844 --screenshot="$PWD/docs/channels-evidence/mobile-verification.png" "file://$OUTPUT/mobile.html" > "$OUTPUT/browser-mobile.log" 2>&1
+          "$BROWSER" --headless --no-sandbox --disable-gpu --virtual-time-budget=5000 --window-size=1280,960 --screenshot="$PWD/docs/channels-evidence/desktop-pay-page.png" "file://$OUTPUT/desktop.html" > "$OUTPUT/browser-desktop.log" 2>&1
+          "$BROWSER" --headless --no-sandbox --disable-gpu --virtual-time-budget=5000 --dump-dom "file://$OUTPUT/mobile.html" > "$OUTPUT/mobile.dom.html" 2>/dev/null
+          grep -q '<code[^>]*>connect @helper</code>' "$OUTPUT/mobile.dom.html"
+          "$BROWSER" --headless --no-sandbox --disable-gpu --virtual-time-budget=5000 --dump-dom "file://$OUTPUT/desktop.html" > "$OUTPUT/desktop.dom.html" 2>/dev/null
+          grep -q 'Continue to checkout</button>' "$OUTPUT/desktop.dom.html"
+      - name: Commit generated files and verified integration only to this PR branch
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          pnpm docs:gen > "$OUTPUT/docs.log" 2>&1
-          git add --intent-to-add -- docs
-          git diff --binary -- docs > "$OUTPUT/docs.patch"
-      - name: Preserve dependency-only local validation environment
+          START=$(cat "$OUTPUT/start.txt")
+          git diff --exit-code -- src tests scripts tsup.config.ts knip.json
+          git add -- package.json pnpm-lock.yaml docs
+          git diff --cached --exit-code "$BASE" -- src/hosted-agent
+          git diff --cached --check
+          # Keep this workflow identical to START. The connector removes it next;
+          # the Actions token does not create or modify workflow files.
+          mkdir -p .github/workflows
+          cp "$OUTPUT/finalizer.yml" .github/workflows/channels-bootstrap.yml
+          git add .github/workflows/channels-bootstrap.yml
+          TREE=$(git write-tree)
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          COMMIT=$(printf '%s\n' 'feat(channels): integrate main, verified UI and generated public package' | git commit-tree "$TREE" -p "$START" -p "$BASE")
+          git update-ref HEAD "$COMMIT"
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push origin HEAD:refs/heads/pro/channels-kit
+          printf '%s\n' "$COMMIT" > "$OUTPUT/commit.txt"
+          printf '%s\n' "$TREE" > "$OUTPUT/tree.txt"
+          git archive --format=tar.gz HEAD > "$OUTPUT/source.tar.gz"
+      - name: Preserve native SQLite binding for exact local replay
         if: always()
         run: |
-          if [ -d node_modules ]; then
-            tar -czf "$OUTPUT/node_modules.tar.gz" node_modules
-            cp "$(command -v node)" "$OUTPUT/node"
-            npm pack pnpm@11.24.0 --pack-destination "$OUTPUT" > "$OUTPUT/pnpm-pack.log" 2>&1
-          fi
+          mkdir -p "$OUTPUT/native"
+          find node_modules/.pnpm/better-sqlite3* -name '*.node' -exec cp '{}' "$OUTPUT/native/" \; || true
+          git diff --binary "$BASE" > "$OUTPUT/review.diff"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: channels-bootstrap-${{ github.event.pull_request.head.sha }}
-          path: /tmp/channels-bootstrap/
-          retention-days: 2
-          compression-level: 0
+          name: channels-finalization-${{ github.event.pull_request.head.sha }}
+          path: /tmp/channels-finalization/
+          retention-days: 7
