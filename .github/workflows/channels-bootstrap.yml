@@ -49,13 +49,13 @@ jobs:
         run: |
           pnpm typecheck > "$OUTPUT/typecheck.log" 2>&1
           pnpm build > "$OUTPUT/build.log" 2>&1
+          pnpm docs:gen > "$OUTPUT/docs.log" 2>&1
           pnpm test tests/channels --reporter=json --outputFile="$OUTPUT/channels-tests.json" > "$OUTPUT/channels-tests.log" 2>&1
           node scripts/test-channels-mutation.mjs > "$OUTPUT/channels-mutation.log" 2>&1
           pnpm test:gates > "$OUTPUT/gates.log" 2>&1
           pnpm test --reporter=json --outputFile="$OUTPUT/tests.json" > "$OUTPUT/tests.log" 2>&1
           pnpm test:generated > "$OUTPUT/generated.log" 2>&1
           pnpm knip > "$OUTPUT/knip.log" 2>&1
-          pnpm docs:gen > "$OUTPUT/docs.log" 2>&1
           pnpm build-storybook > "$OUTPUT/storybook.log" 2>&1
       - name: Capture actual browser evidence from exported stories
         run: |
@@ -109,6 +109,8 @@ jobs:
           mkdir -p "$OUTPUT/native"
           find node_modules/.pnpm/better-sqlite3* -name '*.node' -exec cp '{}' "$OUTPUT/native/" \; || true
           git diff --binary "$BASE" > "$OUTPUT/review.diff"
+          cp package.json pnpm-lock.yaml "$OUTPUT/"
+          tar -czf "$OUTPUT/generated-docs.tar.gz" docs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
