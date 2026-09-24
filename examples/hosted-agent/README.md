@@ -28,6 +28,8 @@ ph0ny's voice agent then calls `POST /voice/ask` through its `ask_workspace` web
 | Free answers | 30 per person per UTC day (`freeTurnsPerDay`); `allow` decides after that |
 | Turn wall time | 2 minutes |
 | STOP / START | STOP silences the line for that person; START resumes it |
+| Persona change | a new session; it inherits the person's last 6,000 characters of conversation |
+| New `TANGLE_API_KEY` | a fresh box, because a box resumes only under the key that created it; the conversation carries over, box files do not |
 
 ## Model and tools
 
