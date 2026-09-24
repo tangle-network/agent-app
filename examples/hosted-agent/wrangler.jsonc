@@ -11,7 +11,8 @@
     "@opentelemetry/resources": "./src/no-otel.ts",
     "@opentelemetry/semantic-conventions": "./src/no-otel.ts"
   },
-  // Person -> sandbox binding, daily allowance and STOP state.
+  // STOP state, the owner's debug switch, voice call tokens and recent turns.
+  // The Platform keeps each person's box and counts their turns.
   "kv_namespaces": [{ "binding": "USERS", "id": "c7e80e2612474a25b4fe1a0c29487de4" }],
   // Hub gives a callback 10 s; a first answer can take minutes, so the callback
   // only enqueues and the consumer (15 min wall time) answers.

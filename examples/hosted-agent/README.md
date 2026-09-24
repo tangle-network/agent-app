@@ -11,8 +11,9 @@ All of the hosted-agent behavior comes from `@tangle-network/agent-app/hosted-ag
 
 1. A person texts `connect @<handle>` to Inkbox's shared iMessage line, then texts Braid.
 2. Hub signs the event and calls `POST /hub`. The Worker authenticates it and puts it on a queue.
-3. The queue consumer finds the person's sandbox. The first message creates a fresh isolated box from the persona; later messages resume it.
-4. The consumer runs one conversation turn in that box and sends the reply through Hub.
+3. The queue consumer admits the message on the Platform meter `hosted-agent`, which counts each person's turns once (`hub.allowances`).
+4. It asks the Platform for the person's sandbox (`sandbox.instances`). The first message creates a fresh isolated box from the persona; later messages resume it.
+5. The consumer runs one conversation turn in that box and sends the reply through Hub.
 
 A call follows the same path to the same box.
 ph0ny answers the phone and calls `POST /voice/hook` to admit the caller.
@@ -24,12 +25,12 @@ ph0ny's voice agent then calls `POST /voice/ask` through its `ask_workspace` web
 |---|---|
 | Sandbox per person | 1 CPU, 2 GB memory, 10 GB disk, egress to `router.tangle.tools` only |
 | Idle suspend | 10 minutes; the next message resumes the same box |
-| Deleted box | the next message gets a fresh box |
-| Free answers | 30 per person per UTC day (`freeTurnsPerDay`), counted by the Platform meter `hosted-agent` (`hub.allowances`); `allow` decides after that |
+| Deleted box, or one that fails to start for 60 s | the Platform gives the next message a fresh box |
+| Free answers | 30 per person per UTC day (`freeTurnsPerDay`), counted by the Platform meter `hosted-agent` (`hub.allowances`); a plan set on the meter wins, and `allow` decides the paywall past it |
 | Turn wall time | 2 minutes |
 | STOP / START | STOP silences the line for that person; START resumes it |
-| Persona change | a new session; it inherits the person's last 6,000 characters of conversation |
-| New `TANGLE_API_KEY` | a fresh box, because a box resumes only under the key that created it; the conversation carries over, box files do not |
+| Persona change | a new session in the same box; it inherits the person's last 6,000 characters of conversation |
+| New `TANGLE_API_KEY` | the Platform refuses to resume a box under another key and never replaces it for that; use a key from the same account lineage |
 
 ## Model and tools
 
@@ -57,10 +58,10 @@ Text `DEBUG ON` from the `OWNER_PHONE` number.
 Each reply to you then ends with one line, for example:
 
 ```
-⚙ Braid · opencode · gemini-2.5-flash-lite · warm · 6.2s (run 3.1s) · 1.2k→180 tok · $0.00070 · 2 tools · t-32ab9c
+⚙ Braid · opencode · gpt-5.6-luna · box 0.3s · 6.2s (run 3.1s) · 1.2k→180 tok · $0.00070 · 2 tools · t-32ab9c
 ```
 
-It names the harness, model, box state before the turn, time from the text to the reply with the sandbox run time, tokens, cost, tool calls and turn.
+It names the harness, model, time the Platform took to hand over the running box, time from the text to the reply with the sandbox run time, tokens, cost, tool calls and turn.
 A figure the run does not report is left out.
 Text `DEBUG OFF` to stop.
 Anyone else who texts `DEBUG ON` gets an ordinary answer.
