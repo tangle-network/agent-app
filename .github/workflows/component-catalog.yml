@@ -1,0 +1,91 @@
+name: Component catalog
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm build-storybook
+      - name: Read the shared catalog attestor at an immutable revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: tangle-network/sandbox-ui
+          ref: e57326f593b8262d873ed4e55a56d2dd5e924d94
+          path: .catalog-tools
+          sparse-checkout: scripts/build-catalog-manifest.mjs
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - run: node .catalog-tools/scripts/build-catalog-manifest.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: agent-app-catalog-${{ github.sha }}
+          path: storybook-static
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy:
+    needs: build
+    if: >-
+      (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      deployments: write
+    concurrency:
+      group: agent-app-catalog-${{ github.event.pull_request.number || 'main' }}
+      cancel-in-progress: false
+    env:
+      CATALOG_BRANCH: ${{ github.event_name == 'pull_request' && format('review-pr-{0}', github.event.pull_request.number) || 'main' }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: agent-app-catalog-${{ github.sha }}
+          path: storybook-static
+      - uses: cloudflare/wrangler-action@25853364521e0d392ece9b0c1e97a4b37b638087
+        id: deploy
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy storybook-static --project-name=agent-app-storybook --branch=${{ env.CATALOG_BRANCH }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify this exact catalog at the immutable deployment URL
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const expected = JSON.parse(readFileSync('storybook-static/catalog-manifest.json', 'utf8'));
+          const url = new URL(process.env.DEPLOYMENT_URL);
+          if (url.protocol !== 'https:' || !url.hostname.endsWith('.pages.dev') || url.username || url.password) throw new Error('Missing or invalid immutable Pages URL');
+          let observed;
+          for (let attempt = 0; attempt < 6; attempt++) {
+            try {
+              const response = await fetch(new URL('/catalog-manifest.json', url), { signal: AbortSignal.timeout(10000), redirect: 'error' });
+              if (response.ok) { observed = await response.json(); break; }
+            } catch {}
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+          }
+          if (observed?.sourceSha !== expected.sourceSha || observed?.indexSha256 !== expected.indexSha256) throw new Error('Hosted catalog differs from the built artifact');
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Component review\n\nImmutable catalog: ${url.href}\n\nSource: \`${expected.sourceSha}\`\n\nFixture review does not establish product-flow success or visual approval.\n`);
+          NODE
