@@ -59,6 +59,12 @@ export interface HostedAgentConfig {
    * come back tomorrow. Retries of an admitted message never reach this hook.
    */
   allow?: (message: HostedMessage, usedToday: number) => Allowance | Promise<Allowance>
+  /**
+   * The owner's own address (E.164 phone). Only this sender can text DEBUG ON
+   * or DEBUG OFF; while on, each reply to them ends with one ⚙ line naming the
+   * harness, model, box, time, tokens, cost and tools of that turn.
+   */
+  owner?: string
   /** Shared secret for the ph0ny call hook and `ask_workspace` webhook tool. */
   voiceSecret?: string
   /** How long one `ask_workspace` call may wait before it returns a ticket. Default 8 s. */
@@ -116,6 +122,22 @@ function conversationProfile(profile: AgentProfile): AgentProfile {
   }
 }
 
+/** What one turn reports about itself, for the owner's debug line. A figure
+ *  the run did not report stays undefined and is left out of the line. */
+export interface TurnTrace {
+  /** Box before the turn: `warm`, `resumed` or `new`. */
+  box?: string
+  harness?: string
+  model?: string
+  /** Sandbox clock: the run's own start to finish. */
+  runMs?: number
+  inputTokens?: number
+  outputTokens?: number
+  reasoningTokens?: number
+  costUsd?: number
+  tools?: number
+}
+
 export type AskResult =
   | { state: 'answered'; text: string }
   | { state: 'declined'; reply?: string }
@@ -129,6 +151,8 @@ export interface HostedInbound {
 }
 
 export const NOTICE = {
+  debugOn: 'Debug on. Each reply now ends with a ⚙ line: agent, harness, model, box, time, tokens, cost, tools and turn. Text DEBUG OFF to stop.',
+  debugOff: 'Debug off. Replies no longer carry the ⚙ line.',
   stopped: 'You are unsubscribed. Text START to talk again.',
   started: 'Welcome back. Text me anytime. Reply STOP to stop.',
   limit: 'You have used today\'s free messages. Talk tomorrow!',
@@ -173,6 +197,50 @@ export function normalizeAddress(value: string): string | null {
   return `+${digits.length === 10 && !trimmed.startsWith('+') ? `1${digits}` : digits}`
 }
 
+/** `true` for DEBUG ON, `false` for DEBUG OFF, `null` for any other text. */
+export function debugCommand(text: string): boolean | null {
+  const match = /^debug\s+(on|off)$/i.exec(text.trim())
+  return match ? match[1]!.toLowerCase() === 'on' : null
+}
+
+const num = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined
+const seconds = (ms: number) => ms < 10_000 ? `${(Math.max(0, ms) / 1000).toFixed(1)}s` : `${Math.round(ms / 1000)}s`
+const count = (n: number) => n < 1000 ? String(n) : n < 10_000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n / 1000)}k`
+
+/** The owner's ⚙ line. `totalMs` runs from the provider's receipt of the text to now. */
+export function debugFooter(agent: string, turnId: string, trace: TurnTrace, totalMs?: number): string {
+  const parts = [agent]
+  if (trace.harness) parts.push(trace.harness)
+  if (trace.model) parts.push(trace.model.split('/').at(-1)!)
+  if (trace.box) parts.push(trace.box)
+  if (totalMs !== undefined) parts.push(`${seconds(totalMs)}${trace.runMs !== undefined ? ` (run ${seconds(trace.runMs)})` : ''}`)
+  else if (trace.runMs !== undefined) parts.push(`run ${seconds(trace.runMs)}`)
+  if (trace.inputTokens !== undefined && trace.outputTokens !== undefined) {
+    parts.push(`${count(trace.inputTokens)}→${count(trace.outputTokens)} tok${trace.reasoningTokens ? ` (${count(trace.reasoningTokens)} thinking)` : ''}`)
+  }
+  // Zero on a turn that used tokens means the harness had no price for the model.
+  if (trace.costUsd !== undefined && (trace.costUsd > 0 || !trace.outputTokens)) {
+    parts.push(trace.costUsd >= 0.01 ? `$${trace.costUsd.toFixed(3)}` : `$${trace.costUsd.toPrecision(2)}`)
+  }
+  if (trace.tools !== undefined) parts.push(`${trace.tools} tool${trace.tools === 1 ? '' : 's'}`)
+  parts.push(turnId.slice(0, 8))
+  return `⚙ ${parts.join(' · ')}`
+}
+
+/** Model, tokens, cost, tools and run time from a finished turn, as far as it reports them. */
+function noteResult(trace: TurnTrace, result: Record<string, unknown>, usage?: { inputTokens?: number; outputTokens?: number }) {
+  // The SDK's typed usage carries counts only; the harness's own record also carries cost.
+  const reported = (result.tokenUsage ?? {}) as Record<string, unknown>
+  const timing = (result.timing ?? {}) as Record<string, unknown>
+  const started = num(timing.startedAt), completed = num(timing.completedAt)
+  if (started !== undefined && completed !== undefined) trace.runMs = completed - started
+  trace.inputTokens = num(usage?.inputTokens) ?? num(reported.inputTokens)
+  trace.outputTokens = num(usage?.outputTokens) ?? num(reported.outputTokens)
+  trace.reasoningTokens = num(reported.reasoningTokens)
+  if (result.usdKnown !== false) trace.costUsd = num(reported.cost)
+  if (Array.isArray(result.toolInvocations)) trace.tools = result.toolInvocations.length
+}
+
 export class HostedAgentError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = 'HostedAgentError' }
 }
@@ -189,10 +257,11 @@ export function createHostedAgent(config: HostedAgentConfig) {
 
   /** The person's running box: created on the first message, resumed later,
    *  replaced when the platform deleted it. Null when the deadline passed. */
-  async function ensureBox(user: string, deadline: number): Promise<SandboxInstance | null> {
+  async function ensureBox(user: string, deadline: number, trace?: TurnTrace): Promise<SandboxInstance | null> {
     const key = `box:${user}`
     const known = await store.get(key)
     let box = known ? await sandbox.get(known) : null
+    if (trace) trace.box = !box || GONE.has(box.status) ? 'new' : RESUMABLE.has(box.status) ? 'resumed' : 'warm'
     if (!box || GONE.has(box.status)) {
       // The key names the box it replaces, so concurrent first messages and
       // retries converge on one allocation instead of each creating a box.
@@ -235,7 +304,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
   }
 
   /** Run one message in the person's box until it answers or `deadline`. */
-  async function ask(message: HostedMessage, options: { deadline: number }): Promise<AskResult> {
+  async function ask(message: HostedMessage, options: { deadline: number; trace?: TurnTrace }): Promise<AskResult> {
     const text = message.text.trim()
     if (!text || text.length > 8000 || !/^[\w-]{1,120}$/.test(message.turnId)) return { state: 'declined' }
     const user = (await sha256(message.userId)).slice(0, 32)
@@ -248,19 +317,33 @@ export function createHostedAgent(config: HostedAgentConfig) {
       if (decision !== 'answer') return { state: 'declined', reply: decision.reply }
       await store.put(admittedKey, '1', { expirationTtl: TWO_DAYS })
     }
-    const box = await ensureBox(user, options.deadline)
+    // A retried delivery finds the box it woke already warm, so the first
+    // attempt's view of the box is kept for the turn.
+    const trace = options.trace, traceKey = `trace:${user}:${message.turnId}`
+    const box = await ensureBox(user, options.deadline, trace)
+    if (trace) {
+      const first = await store.get(traceKey)
+      if (first) trace.box = first
+      else if (trace.box) await store.put(traceKey, trace.box, { expirationTtl: TWO_DAYS })
+    }
     if (!box) return { state: 'pending' }
     // A session binds its backend when created, and the runtime would give a
     // bare session its generic default assistant. A new profile starts a new
     // conversation, so the persona always matches the one in force.
     const sessionId = `hosted-${user}-${await profileTag}`
-    if (!await box.session(sessionId).status()) await box.createSession({ sessionId, retention: 'workspace', backend })
+    const session = await box.session(sessionId).status()
+    if (!session) await box.createSession({ sessionId, retention: 'workspace', backend })
+    if (trace) {
+      trace.harness = session?.backend ?? config.harness
+      trace.model = session?.model
+    }
     const prompt = message.channel === 'voice' ? `[Phone call. Answer in one to three short spoken sentences.]\n${text}` : text
     for (;;) {
       const result = await box.driveConversationTurn(prompt, { sessionId, turnId: message.turnId, wallCapMs, timeoutMs: 8000 })
       if (result.state === 'completed') {
         const answer = result.text.trim()
         if (!answer) throw new HostedAgentError('empty_reply', 'The turn completed with no reply text.')
+        if (trace) noteResult(trace, result.result, result.usage)
         return { state: 'answered', text: answer }
       }
       if (result.state === 'failed') throw new HostedAgentError('turn_failed', result.error)
@@ -311,13 +394,27 @@ export function createHostedAgent(config: HostedAgentConfig) {
       const userId = normalizeAddress(event.sender.id ?? '')
       if (!userId || !event.text?.trim() || event.isGroup || event.historyOnly) return 'ignored'
       const turnId = `t-${(await sha256(inbound.runId)).slice(0, 40)}`
+      // Only the configured owner toggles debug; anyone else's DEBUG ON is an ordinary message.
+      const isOwner = Boolean(config.owner) && normalizeAddress(config.owner!) === userId
+      const debugKey = `debug:${(await sha256(userId)).slice(0, 32)}`
+      const toggle = isOwner ? debugCommand(event.text) : null
+      const trace: TurnTrace | undefined = isOwner && toggle === null && await store.get(debugKey) ? {} : undefined
       let text: string
       try {
-        const result = await ask({ userId, channel: 'imessage', text: event.text, turnId },
-          { deadline: Date.now() + wallCapMs + 60_000 })
-        if (result.state === 'pending') return 'pending'
-        if (result.state === 'declined' && !result.reply) return 'ignored'
-        text = result.state === 'answered' ? result.text : result.reply!
+        if (toggle !== null) {
+          await store.put(debugKey, toggle ? '1' : '')
+          text = toggle ? NOTICE.debugOn : NOTICE.debugOff
+        } else {
+          const result = await ask({ userId, channel: 'imessage', text: event.text, turnId },
+            { deadline: Date.now() + wallCapMs + 60_000, trace })
+          if (result.state === 'pending') return 'pending'
+          if (result.state === 'declined' && !result.reply) return 'ignored'
+          text = result.state === 'answered' ? result.text : result.reply!
+          if (trace && result.state === 'answered') {
+            const totalMs = event.occurredAt !== null && event.occurredAt !== undefined ? Date.now() - event.occurredAt : undefined
+            text = `${text.slice(0, 1300)}\n\n${debugFooter(config.profile.name ?? 'agent', turnId, trace, totalMs)}`
+          }
+        }
       } catch (error) {
         // A failed turn fails the same way on every retry; anything else may clear.
         if (!(error instanceof HostedAgentError) && !options.lastAttempt) throw error

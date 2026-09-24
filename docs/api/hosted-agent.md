@@ -4,7 +4,7 @@
 
 Source: `src/hosted-agent/index.ts`
 
-16 exports.
+19 exports.
 
 ### `Allowance`
 
@@ -43,7 +43,23 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 `function`
 
 ```ts
-(config: HostedAgentConfig) => { ask: (message: HostedMessage, options: { deadline: number; }) => Promise<AskResult>; c…
+(config: HostedAgentConfig) => { ask: (message: HostedMessage, options: { deadline: number; trace?: TurnTrace | undefin…
+```
+
+### `debugCommand`
+
+`function` — `true` for DEBUG ON, `false` for DEBUG OFF, `null` for any other text.
+
+```ts
+(text: string) => boolean | null
+```
+
+### `debugFooter`
+
+`function` — The owner's ⚙ line.
+
+```ts
+(agent: string, turnId: string, trace: TurnTrace, totalMs?: number | undefined) => string
 ```
 
 ### `DEFAULT_BOX_POLICY`
@@ -131,5 +147,13 @@ interface HostedMessage
 `const`
 
 ```ts
-{ readonly stopped: "You are unsubscribed. Text START to talk again."; readonly started: "Welcome back. Text me anytime…
+{ readonly debugOn: "Debug on. Each reply now ends with a ⚙ line: agent, harness, model, box, time, tokens, cost, tools…
+```
+
+### `TurnTrace`
+
+`interface` — What one turn reports about itself, for the owner's debug line.
+
+```ts
+interface TurnTrace
 ```

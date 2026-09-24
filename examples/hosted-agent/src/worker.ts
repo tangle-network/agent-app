@@ -11,6 +11,8 @@ export interface Env {
   TANGLE_API_KEY: string
   HUB_CALLBACK_SECRET: string
   VOICE_SECRET: string
+  /** Your own phone (E.164). Texting DEBUG ON from it adds a ⚙ line to each reply to you. */
+  OWNER_PHONE?: string
   USERS: KVNamespace
   TURNS: Queue<HostedInbound>
 }
@@ -37,6 +39,7 @@ const agent = (env: Env) => createHostedAgent({
   profile: persona,
   store: env.USERS,
   voiceSecret: env.VOICE_SECRET,
+  owner: env.OWNER_PHONE,
   freeTurnsPerDay: 30,
 })
 

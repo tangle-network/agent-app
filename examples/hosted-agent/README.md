@@ -45,8 +45,23 @@ wrangler queues create juno-turns
 wrangler secret put TANGLE_API_KEY           # the app's Tangle key; it pays for everything
 wrangler secret put HUB_CALLBACK_SECRET      # 32+ random bytes
 wrangler secret put VOICE_SECRET             # 32+ random bytes
+wrangler secret put OWNER_PHONE              # optional: your own phone, E.164, for DEBUG ON
 wrangler deploy
 ```
+
+## Debug line
+
+Text `DEBUG ON` from the `OWNER_PHONE` number.
+Each reply to you then ends with one line, for example:
+
+```
+⚙ Juno · opencode · gemini-2.5-flash-lite · warm · 6.2s (run 3.1s) · 1.2k→180 tok · $0.00070 · 2 tools · t-32ab9c
+```
+
+It names the harness, model, box state before the turn, time from the text to the reply with the sandbox run time, tokens, cost, tool calls and turn.
+A figure the run does not report is left out.
+Text `DEBUG OFF` to stop.
+Anyone else who texts `DEBUG ON` gets an ordinary answer.
 
 ## Connect an iMessage identity
 
