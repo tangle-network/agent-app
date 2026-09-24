@@ -80,7 +80,8 @@ IDENTITY_ID=<inkbox identity uuid> WORKER_URL=https://<worker>.workers.dev pnpm 
 
 1. Create a ph0ny agent with a webhook tool named `ask_workspace`:
    `POST https://<worker>/voice/ask`, header `Authorization: Bearer <VOICE_SECRET>`, `forwardCallToken: true`, `timeoutMs: 10000`, parameters `{ utterance, ticket }`.
-   Tell the voice agent to call it for every question, and to call it again with the `ticket` when it answers `pending`.
+   Tell the voice agent to answer general questions itself, to use ph0ny's built-in `look_up` tool for current facts, and to call `ask_workspace` for anything about the caller or what they told Braid before.
+   When `ask_workspace` answers `pending`, ph0ny collects the `ticket` itself and reads the answer out at the caller's next pause, so the voice agent should not call again.
 2. Bind a ph0ny number: `PATCH /v1/phone-numbers/:id` with `{ agentId, callHook: { url: "https://<worker>/voice/hook", headers: { Authorization: "Bearer <VOICE_SECRET>" } } }`.
 
 Caller ID identifies a caller but does not authenticate them.
