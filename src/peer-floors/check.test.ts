@@ -162,19 +162,21 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.258.999', range!)).toBe(false)
-    expect(satisfiesRange('0.259.0', range!)).toBe(true)
-    expect(satisfiesRange('0.259.999', range!)).toBe(true)
-    expect(satisfiesRange('0.260.0', range!)).toBe(false)
+    // Runtime 0.262.0 is the first Runtime whose Sandbox peer admits 0.50.
+    expect(satisfiesRange('0.261.999', range!)).toBe(false)
+    expect(satisfiesRange('0.262.0', range!)).toBe(true)
+    expect(satisfiesRange('0.262.999', range!)).toBe(true)
+    expect(satisfiesRange('0.263.0', range!)).toBe(false)
   })
 
   // Each window starts at the floor the verified Runtime line admits (Eval) or
   // the floor this application code ran on (Sandbox 0.45), admits the minor the
   // dev install runs, and claims nothing past it. The Runtime refuses Sandbox
-  // 0.48, so the shell refuses it too.
+  // 0.48, so the shell refuses it too. Sandbox 0.50 adds the named instances
+  // that hosted apps keep each person's box on.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
     ['@tangle-network/agent-eval', ['0.184.999'], ['0.185.0', '0.186.0', '0.186.999'], ['0.187.0']],
-    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999'], ['0.50.0']],
+    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999'], ['0.51.0']],
     ['@tangle-network/agent-interface', ['2.10.999'], ['2.11.0', '2.12.0'], ['3.0.0']],
   ]
 
