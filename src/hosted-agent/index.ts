@@ -245,15 +245,19 @@ export function debugFooter(agent: string, turnId: string, trace: TurnTrace, tot
 
 /** Model, tokens, cost, tools and run time from a finished turn, as far as it reports them. */
 function noteResult(trace: TurnTrace, result: Record<string, unknown>, usage?: { inputTokens?: number; outputTokens?: number }) {
-  // The SDK's typed usage carries counts only; the harness's own record also carries cost.
-  const reported = (result.tokenUsage ?? {}) as Record<string, unknown>
+  // A completed turn arrives as the run's own record (`tokenUsage`, `timing`,
+  // `toolInvocations`) or as the platform's cached summary (`usage`, `costUsd`).
+  // Both count every prompt token; the SDK's typed usage counts only the
+  // uncached tail on the summary (3 of 1,214), so it is the fallback. The
+  // summary's `durationMs` is not the run time, so that shape has none.
+  const reported = (result.tokenUsage ?? result.usage ?? {}) as Record<string, unknown>
   const timing = (result.timing ?? {}) as Record<string, unknown>
   const started = num(timing.startedAt), completed = num(timing.completedAt)
   if (started !== undefined && completed !== undefined) trace.runMs = completed - started
-  trace.inputTokens = num(usage?.inputTokens) ?? num(reported.inputTokens)
-  trace.outputTokens = num(usage?.outputTokens) ?? num(reported.outputTokens)
+  trace.inputTokens = num(reported.inputTokens) ?? num(usage?.inputTokens)
+  trace.outputTokens = num(reported.outputTokens) ?? num(usage?.outputTokens)
   trace.reasoningTokens = num(reported.reasoningTokens)
-  if (result.usdKnown !== false) trace.costUsd = num(reported.cost)
+  if (result.usdKnown !== false) trace.costUsd = num(reported.cost) ?? num(result.costUsd) ?? num(result.totalCostUsd)
   if (Array.isArray(result.toolInvocations)) trace.tools = result.toolInvocations.length
 }
 
