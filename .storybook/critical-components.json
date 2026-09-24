@@ -1,0 +1,5 @@
+[
+  { "component": "ChatComposer", "source": "src/web-react/chat-composer.tsx", "storyFile": "src/stories/chat-controls/ChatComposer.stories.tsx", "task": "Compose, attach, submit and recover a request" },
+  { "component": "AgentSessionControls", "source": "src/web-react/agent-session-controls.tsx", "storyFile": "src/stories/chat-controls/AgentSessionControls.stories.tsx", "task": "Choose the actual execution controls" },
+  { "component": "VaultPane", "source": "src/vault/VaultPane.tsx", "storyFile": "src/stories/vault/VaultPane.stories.tsx", "task": "Inspect the private knowledge surface" }
+]
