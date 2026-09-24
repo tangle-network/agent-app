@@ -4,7 +4,7 @@
 
 Source: `src/interactions/index.ts`
 
-64 exports.
+65 exports.
 
 ### `abortSession`
 
@@ -251,7 +251,7 @@ type InteractionData
 `function` — Reads a wire request into the client's pending `ChatInteraction`.
 
 ```ts
-(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
+(request: InteractionRequest) => ChatInteraction
 ```
 
 ### `InteractionOutcome`
@@ -280,10 +280,10 @@ type InteractionPersistedPart
 
 ### `InteractionRequest`
 
-`type`
+`interface`
 
 ```ts
-type InteractionRequest
+interface InteractionRequest
 ```
 
 ### `InteractionRequestWire`
@@ -307,7 +307,7 @@ type InteractionRouteLogger
 `function` — Builds the persisted/streamed `interaction` part from a wire request.
 
 ```ts
-(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
+(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…
 ```
 
 ### `isRenderableInteractionKind`
@@ -320,7 +320,7 @@ type InteractionRouteLogger
 
 ### `isSafeInteractionFieldKey`
 
-`function` — Answer/field keys the sidecar will accept: identifier-safe and never a prototype-pollution vector.
+`function` — Whether Interface accepts a field name, including its reserved-key protections.
 
 ```ts
 (key: string) => boolean
@@ -347,7 +347,7 @@ type InteractionRouteLogger
 `function` — Outstanding (unanswered) interactions for the session — the sidecar's registry is authoritative, so this is the reconnect/reload source of truth.
 
 ```ts
-(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<{ id: string; kind: string; title: str…
+(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<InteractionRequest[]>>
 ```
 
 ### `mapInteractionRespondFailure`
@@ -428,6 +428,14 @@ type ParseInteractionAnswersResult
 
 ```ts
 type ParseInteractionResult
+```
+
+### `PersistableInteractionAnswer`
+
+`interface` — Answer data safe to retain after the one-use sidecar delivery.
+
+```ts
+interface PersistableInteractionAnswer
 ```
 
 ### `persistedPartToInteraction`
@@ -512,7 +520,7 @@ interface SidecarSessionState
 
 ### `validateInteractionAnswerBody`
 
-`function` — Validates the client POST body: `{ id, outcome, data?
+`function` — Validates the client POST body through Interface's canonical data schema.
 
 ```ts
 (body: Record<string, unknown>) => InteractionAnswerBodyValidation

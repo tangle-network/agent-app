@@ -5,12 +5,13 @@ import {
   type ChatStreamCallbacks,
 } from './chat-stream'
 import type { ChatInteraction } from './chat-interactions'
+import { interactionRequestFixture } from '../../tests/helpers/interaction-request'
 
 // A well-formed sidecar `interaction` ask: a `question` with one text field.
 // Matches the wire shape the sidecar emits and a real chat consumer already
 // parses — `{type:'interaction', data:{request}}`.
 function questionRequest() {
-  return {
+  return interactionRequestFixture({
     id: 'ask-1',
     kind: 'question',
     title: 'Which segment should we target first?',
@@ -18,7 +19,7 @@ function questionRequest() {
     answerSpec: {
       fields: [{ type: 'text', name: 'answer', label: 'Your answer' }],
     },
-  }
+  })
 }
 
 function interactionLine(): string {

@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
+import type { InteractionRequestMaterial } from '@tangle-network/agent-interface'
 import {
   consumeChatStream,
   streamChatTurn,
@@ -25,6 +26,7 @@ import {
 } from '../../src/interactions/index'
 import type { ChatInteractionPart, ChatMessagePart, ChatStepFinishPart, ChatToolPart } from '../../src/chat-store/index'
 import { createMiniApp, MINI_APP_MODEL, type MiniApp, type ProducerEvent } from './mini-app'
+import { interactionRequestFixture } from '../helpers/interaction-request'
 
 const BASE = 'http://localhost:3000'
 
@@ -107,8 +109,11 @@ const FULL_TURN_SCRIPT: ProducerEvent[] = [
   },
 ]
 
-function question(id: string, overrides: Partial<InteractionRequestWire> = {}): InteractionRequestWire {
-  return {
+function question(
+  id: string,
+  overrides: Partial<Omit<InteractionRequestMaterial, 'id' | 'binding'>> = {},
+): InteractionRequestWire {
+  return interactionRequestFixture({
     id,
     kind: 'question',
     title: 'Which tone should the summary use?',
@@ -128,7 +133,7 @@ function question(id: string, overrides: Partial<InteractionRequestWire> = {}): 
       ],
     },
     ...overrides,
-  } as InteractionRequestWire
+  })
 }
 
 // ── scenario 1: full turn ────────────────────────────────────────────────────

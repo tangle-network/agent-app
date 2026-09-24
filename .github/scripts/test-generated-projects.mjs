@@ -100,6 +100,21 @@ function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`)
 }
 
+function writePersistableAnswerTypeProbe(project) {
+  writeFileSync(
+    join(project, 'src', 'persistable-answer-type-probe.ts'),
+    `import type { BeforeInteractionAnswerArgs } from '@tangle-network/agent-app/interactions'\n` +
+      `import type { InteractionAnswers } from '@tangle-network/agent-app/web-react'\n\n` +
+      `const persisted: InteractionAnswers = { confirmation: true }\n` +
+      `// @ts-expect-error One-use secret handles are wire values, not durable transcript answers.\n` +
+      `const rejected: InteractionAnswers = { secret: { kind: 'secret_handle', handleId: 'secret-1', oneUse: true } }\n\n` +
+      `const callbackAnswer: BeforeInteractionAnswerArgs['answer'] = { ok: true, id: 'ask-1', outcome: 'accepted', data: persisted }\n` +
+      `// @ts-expect-error Persistence callbacks cannot accept one-use secret handles either.\n` +
+      `const rejectedCallback: BeforeInteractionAnswerArgs['answer'] = { ok: true, id: 'ask-1', outcome: 'accepted', data: { secret: { kind: 'secret_handle', handleId: 'secret-1', oneUse: true } } }\n\n` +
+      `void persisted\nvoid rejected\nvoid callbackAnswer\nvoid rejectedCallback\n`,
+  )
+}
+
 function assertToolVersions(env) {
   const npmPackage = JSON.parse(readFileSync(npmPackagePath, 'utf8'))
   assertEqual(npmPackage.version, NPM_VERSION, 'installed npm package version')
@@ -173,6 +188,7 @@ function installAndRunScaffolder({
 
   generatedPackage.dependencies['@tangle-network/agent-app'] = `file:${packedAgentApp}`
   writeJson(packagePath, generatedPackage)
+  writePersistableAnswerTypeProbe(project)
 
   run('pnpm', ['install', '--strict-peer-dependencies', '--store-dir', storeDir], { cwd: project, env })
   run('pnpm', ['typecheck'], { cwd: project, env })

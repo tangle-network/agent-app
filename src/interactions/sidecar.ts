@@ -10,6 +10,7 @@
  * session id) — no sandbox-SDK import, so any box-resolution strategy works.
  */
 
+import { InteractionRequestSchema } from '@tangle-network/agent-interface'
 import type { InteractionData, InteractionOutcome, InteractionRequestWire } from './contract'
 
 /** Describe error details including code, message, and upstream HTTP status for sidecar interactions */
@@ -112,7 +113,22 @@ export async function listSessionInteractions(
       error: { code: 'MALFORMED_RESPONSE', message: 'sidecar list returned no interactions array', status: 200 },
     }
   }
-  return { succeeded: true, value: data.interactions as InteractionRequestWire[] }
+  const interactions: InteractionRequestWire[] = []
+  for (const [index, interaction] of data.interactions.entries()) {
+    const parsed = InteractionRequestSchema.safeParse(interaction)
+    if (!parsed.success) {
+      return {
+        succeeded: false,
+        error: {
+          code: 'MALFORMED_RESPONSE',
+          message: `sidecar interaction at index ${index} failed the Interface request contract`,
+          status: 200,
+        },
+      }
+    }
+    interactions.push(parsed.data)
+  }
+  return { succeeded: true, value: interactions }
 }
 
 /** Resolves one interaction. `data` is required by the sidecar only for

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { runDetachedTurn, type AssistantDraftStore } from '../../src/chat-routes/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
+import { interactionRequestFixture } from '../helpers/interaction-request'
 
 function partUpdated(part: Record<string, unknown>, delta?: string): Record<string, unknown> {
   return { type: 'message.part.updated', data: { part, ...(delta !== undefined ? { delta } : {}) } }
@@ -381,7 +382,14 @@ describe('runDetachedTurn', () => {
       // resolves it so an unattended autonomous run cannot deadlock.
       yield {
         type: 'interaction',
-        data: { request: { id: 'ask-1', kind: 'shell_permission', title: 'ok?', answerSpec: { fields: [] } } },
+        data: {
+          request: interactionRequestFixture({
+            id: 'ask-1',
+            kind: 'shell_permission',
+            title: 'ok?',
+            answerSpec: { fields: [] },
+          }),
+        },
       }
       yield { type: 'result', data: { finalText: 'done' } }
     }

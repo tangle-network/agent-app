@@ -11,6 +11,7 @@ import type { ChatMessagePart } from '../../src/chat-store/parts'
 import type { InteractionRequestWire } from '../../src/interactions/index'
 import { planToPersistedPart, type ChatPlan } from '../../src/plans/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
+import { interactionRequestFixture } from '../helpers/interaction-request'
 
 // ── fakes ────────────────────────────────────────────────────────────────────
 
@@ -1163,7 +1164,7 @@ describe('createChatTurnRoutes — persisted message ids', () => {
 
 describe('createChatTurnRoutes — interactions composition', () => {
   function wireQuestion(id: string): InteractionRequestWire {
-    return {
+    return interactionRequestFixture({
       id,
       kind: 'question',
       title: 'Proceed?',
@@ -1177,7 +1178,7 @@ describe('createChatTurnRoutes — interactions composition', () => {
           options: [{ value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }],
         }],
       },
-    } as InteractionRequestWire
+    })
   }
 
   it('answers a sidecar ask round-trip through the composed /interactions route', async () => {

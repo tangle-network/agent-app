@@ -25,9 +25,15 @@
  */
 
 import {
+  InteractionDataSchema,
+  InteractionFieldNameSchema,
+  InteractionSecretReferenceSchema,
+  type InteractionSecretReference,
+} from '@tangle-network/agent-interface'
+import {
   interactionFromWireRequest,
-  isSafeInteractionFieldKey,
   questionInteractionContentSignature,
+  type InteractionAnswers,
   type InteractionData,
   type InteractionRequestWire,
 } from './contract'
@@ -49,8 +55,15 @@ export type InteractionAnswerBodyValidation =
   | { ok: true; id: string; outcome: InteractionClientOutcome; data?: InteractionData }
   | { ok: false; error: string }
 
-/** Validates the client POST body: `{ id, outcome, data? }` with
- *  identifier-safe field keys and primitive/string-array values only. */
+/** Answer data safe to retain after the one-use sidecar delivery. */
+export interface PersistableInteractionAnswer {
+  ok: true
+  id: string
+  outcome: InteractionClientOutcome
+  data?: InteractionAnswers
+}
+
+/** Validates the client POST body through Interface's canonical data schema. */
 export function validateInteractionAnswerBody(body: Record<string, unknown>): InteractionAnswerBodyValidation {
   const id = typeof body.id === 'string' && body.id ? body.id : null
   if (!id) return { ok: false, error: 'Missing interaction id' }
@@ -62,20 +75,44 @@ export function validateInteractionAnswerBody(body: Record<string, unknown>): In
   if (!body.data || typeof body.data !== 'object' || Array.isArray(body.data)) {
     return { ok: false, error: 'Invalid data: expected an object of field values' }
   }
-  const data: InteractionData = {}
-  for (const [key, value] of Object.entries(body.data)) {
-    if (!isSafeInteractionFieldKey(key)) {
-      return { ok: false, error: 'Invalid data: field names must contain only letters, numbers, underscores, or hyphens' }
-    }
-    const validValue =
-      typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ||
-      (Array.isArray(value) && value.every((item) => typeof item === 'string'))
-    if (!validValue) {
-      return { ok: false, error: 'Invalid data: field values must be strings, numbers, booleans, or string arrays' }
-    }
-    data[key] = value as InteractionData[string]
+  if (Object.getOwnPropertyNames(body.data).some((key) => !InteractionFieldNameSchema.safeParse(key).success)) {
+    return { ok: false, error: 'Invalid data: field names and values must match the interaction contract' }
   }
-  return { ok: true, id, outcome, data }
+  const parsed = InteractionDataSchema.safeParse(body.data)
+  if (!parsed.success) {
+    return { ok: false, error: 'Invalid data: field names and values must match the interaction contract' }
+  }
+  return { ok: true, id, outcome, data: parsed.data }
+}
+
+function isInteractionSecretReference(
+  value: InteractionData[string],
+): value is InteractionSecretReference {
+  return InteractionSecretReferenceSchema.safeParse(value).success
+}
+
+function persistenceProjection(
+  answer: Extract<InteractionAnswerBodyValidation, { ok: true }>,
+): PersistableInteractionAnswer {
+  if (answer.data === undefined) {
+    return { ok: true, id: answer.id, outcome: answer.outcome }
+  }
+  const data: InteractionAnswers = {}
+  for (const [key, value] of Object.entries(answer.data)) {
+    // Interface secret handles are one-use capabilities for the sidecar. They
+    // never cross the persistence callback boundary, even as opaque ids.
+    if (isInteractionSecretReference(value)) continue
+    data[key] = Array.isArray(value) ? [...value] : value
+  }
+  return { ok: true, id: answer.id, outcome: answer.outcome, data }
+}
+
+function persistenceBody(
+  body: Record<string, unknown>,
+  answer: PersistableInteractionAnswer,
+): Record<string, unknown> {
+  const { data: _transientData, ...routing } = body
+  return answer.data === undefined ? routing : { ...routing, data: answer.data }
 }
 
 /** Provide logging methods for warnings and errors in interaction routes */
@@ -134,10 +171,10 @@ export interface ResolveInteractionConnectionArgs {
 /** Describe the arguments provided before processing an interaction answer including request, body, and connection details */
 export interface BeforeInteractionAnswerArgs {
   request: Request
-  /** Original parsed body, including product routing fields. */
+  /** Parsed body with product routing fields and only persistable answer values. */
   body: Record<string, unknown>
-  /** Shared validation result; products never need to parse the answer again. */
-  answer: Extract<InteractionAnswerBodyValidation, { ok: true }>
+  /** Validated durable values; one-use secret handles exist only on the sidecar POST. */
+  answer: PersistableInteractionAnswer
   connection: SidecarInteractionsConnection
   /** The route's single authoritative pre-answer sidecar snapshot. */
   outstanding: InteractionRequestWire[]
@@ -231,12 +268,14 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
     }
     const validation = validateInteractionAnswerBody(body)
     if (!validation.ok) return Response.json({ error: validation.error }, { status: 400 })
+    const persistableAnswer = persistenceProjection(validation)
+    const callbackBody = persistenceBody(body, persistableAnswer)
     const attemptKey = typeof body.attemptKey === 'string' ? body.attemptKey.trim() : ''
     if (options.durable && !attemptKey) {
       return Response.json({ error: 'Missing attemptKey for durable interaction answer' }, { status: 400 })
     }
 
-    const resolution = await options.resolveConnection({ request, intent: 'answer', body })
+    const resolution = await options.resolveConnection({ request, intent: 'answer', body: callbackBody })
     if (!resolution.ok) {
       if ('response' in resolution) return resolution.response
       return mapInteractionRespondFailure(
@@ -275,8 +314,8 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
 
     const lifecycleArgs: BeforeInteractionAnswerArgs = {
       request,
-      body,
-      answer: validation,
+      body: callbackBody,
+      answer: persistableAnswer,
       connection,
       outstanding: before.succeeded ? before.value : [],
       ...(answeredRequest ? { answeredRequest } : {}),

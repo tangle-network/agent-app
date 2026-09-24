@@ -7,13 +7,14 @@ import {
   stampInteractionAnswers,
   type InteractionRequestWire,
 } from '../src/interactions/index'
+import { interactionRequestFixture } from './helpers/interaction-request'
 
-const request: InteractionRequestWire = {
+const request: InteractionRequestWire = interactionRequestFixture({
   id: 'ask-1',
   kind: 'question',
   title: 'Choose a tone',
   answerSpec: { fields: [] },
-}
+})
 
 describe('persisted interaction answers', () => {
   it('strictly parses and copies accepted selections', () => {
@@ -27,12 +28,24 @@ describe('persisted interaction answers', () => {
 
   it('accepts the full interaction value contract and rejects unsafe or nested values', () => {
     expect(parseInteractionAnswers(JSON.parse('{"__proto__":["x"]}'))).toMatchObject({ succeeded: false })
+    expect(parseInteractionAnswers({ 'custom answer!': 'yes' })).toEqual({
+      succeeded: true,
+      value: { 'custom answer!': 'yes' },
+    })
     expect(parseInteractionAnswers({ tone: 'Formal', count: 2, confirmed: true })).toEqual({
       succeeded: true,
       value: { tone: 'Formal', count: 2, confirmed: true },
     })
     expect(parseInteractionAnswers({ tone: [1] })).toMatchObject({ succeeded: false })
     expect(parseInteractionAnswers({ tone: { nested: true } })).toMatchObject({ succeeded: false })
+    expect(
+      parseInteractionAnswers({
+        secret: { kind: 'secret_handle', handleId: 'secret-1', oneUse: true },
+      }),
+    ).toMatchObject({
+      succeeded: false,
+      error: 'interaction answer secret cannot persist a one-use secret handle',
+    })
   })
 
   it('round-trips answers through the persisted interaction codec', () => {

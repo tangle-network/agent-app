@@ -10,6 +10,8 @@
 // "waiting on the user", not "model working".
 
 import {
+  InteractionDataSchema,
+  InteractionFieldNameSchema,
   InteractionRequestSchema,
   type InteractionData,
   type InteractionField,
@@ -40,10 +42,9 @@ export function isRenderableInteractionKind(kind: string): boolean {
   return RENDERABLE_INTERACTION_KINDS.has(kind)
 }
 
-/** Answer/field keys the sidecar will accept: identifier-safe and never a
- *  prototype-pollution vector. */
+/** Whether Interface accepts a field name, including its reserved-key protections. */
 export function isSafeInteractionFieldKey(key: string): boolean {
-  return /^[A-Za-z0-9_-]+$/.test(key) && key !== '__proto__' && key !== 'constructor' && key !== 'prototype'
+  return InteractionFieldNameSchema.safeParse(key).success
 }
 
 // ---------------------------------------------------------------------------
@@ -99,15 +100,19 @@ export function parseInteractionAnswers(value: unknown): ParseInteractionAnswers
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return { succeeded: false, error: 'interaction answers must be an object' }
   }
-  const answers: InteractionAnswers = {}
-  for (const [key, selection] of Object.entries(value as Record<string, unknown>)) {
+  for (const key of Object.getOwnPropertyNames(value)) {
     if (!isSafeInteractionFieldKey(key)) {
       return { succeeded: false, error: `interaction answers contain an unsafe field key: ${key}` }
     }
-    const valid = typeof selection === 'string' || typeof selection === 'number' || typeof selection === 'boolean' ||
-      (Array.isArray(selection) && selection.every((item) => typeof item === 'string'))
-    if (!valid) {
-      return { succeeded: false, error: `interaction answer ${key} must be a string, number, boolean, or string array` }
+  }
+  const parsed = InteractionDataSchema.safeParse(value)
+  if (!parsed.success) {
+    return { succeeded: false, error: 'interaction answers do not match the Interface data contract' }
+  }
+  const answers: InteractionAnswers = {}
+  for (const [key, selection] of Object.entries(parsed.data)) {
+    if (typeof selection === 'object' && !Array.isArray(selection)) {
+      return { succeeded: false, error: `interaction answer ${key} cannot persist a one-use secret handle` }
     }
     answers[key] = Array.isArray(selection) ? [...selection] : selection
   }

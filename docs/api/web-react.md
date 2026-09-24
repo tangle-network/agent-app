@@ -1195,7 +1195,7 @@ type InteractionData
 `function` — Reads a wire request into the client's pending `ChatInteraction`.
 
 ```ts
-(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
+(request: InteractionRequest) => ChatInteraction
 ```
 
 ### `InteractionOutcome`
@@ -1256,10 +1256,10 @@ interface InteractionQuestionCardProps
 
 ### `InteractionRequest`
 
-`type`
+`interface`
 
 ```ts
-type InteractionRequest
+interface InteractionRequest
 ```
 
 ### `InteractionRequestWire`
@@ -1307,7 +1307,7 @@ type InteractionSubmitResult
 `function` — Builds the persisted/streamed `interaction` part from a wire request.
 
 ```ts
-(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
+(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…
 ```
 
 ### `isChatAttachmentPart`
@@ -1344,7 +1344,7 @@ type InteractionSubmitResult
 
 ### `isSafeInteractionFieldKey`
 
-`function` — Answer/field keys the sidecar will accept: identifier-safe and never a prototype-pollution vector.
+`function` — Whether Interface accepts a field name, including its reserved-key protections.
 
 ```ts
 (key: string) => boolean
@@ -1363,7 +1363,7 @@ type InteractionSubmitResult
 `function` — Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s).
 
 ```ts
-(interaction: ChatInteraction, data: Record<string, string | number | boolean | string[]>) => string
+(interaction: ChatInteraction, data: InteractionData) => string
 ```
 
 ### `LinkLikeComponent`
@@ -2251,7 +2251,7 @@ type RecordGridWriteOutcome
 `function` — Reload restore from the answer route's GET list.
 
 ```ts
-(list: ChatInteraction[], outstanding: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"…
+(list: ChatInteraction[], outstanding: InteractionRequest[], options?: RestoreChatInteractionsOptions) => ChatInteracti…
 ```
 
 ### `RestoreChatInteractionsOptions`

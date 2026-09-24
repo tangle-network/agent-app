@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { InteractionRequestMaterial } from '@tangle-network/agent-interface'
 
 import {
   createInteractionAnswerRoute,
@@ -11,6 +12,7 @@ import {
   type InteractionRequestWire,
   type SidecarInteractionsConnection,
 } from '../src/interactions/index'
+import { interactionRequestFixture } from './helpers/interaction-request'
 
 // ── fake sidecar ─────────────────────────────────────────────────────────────
 // In-memory stand-in for the sandbox sidecar's
@@ -18,8 +20,11 @@ import {
 // POST resolves one. Configurable so tests can exercise the failure contract
 // (404 gone, 400 invalid answer, 501 unsupported, accepted-but-not-released).
 
-function wireQuestion(id: string, overrides: Partial<InteractionRequestWire> = {}): InteractionRequestWire {
-  return {
+function wireQuestion(
+  id: string,
+  overrides: Partial<Omit<InteractionRequestMaterial, 'id' | 'binding'>> = {},
+): InteractionRequestWire {
+  return interactionRequestFixture({
     id,
     kind: 'question',
     title: 'Which tone do you prefer?',
@@ -37,7 +42,7 @@ function wireQuestion(id: string, overrides: Partial<InteractionRequestWire> = {
       }],
     },
     ...overrides,
-  } as InteractionRequestWire
+  })
 }
 
 interface FakeSidecarOptions {
@@ -154,6 +159,23 @@ describe('sidecar interactions client', () => {
     expect(result).toMatchObject({ succeeded: false, error: { code: 'MALFORMED_RESPONSE', status: 200 } })
   })
 
+  it('fails loud when a listed request bypasses the Interface identity contract', async () => {
+    const legacyRequest = {
+      id: 'ask-legacy',
+      kind: 'question',
+      title: 'Missing execution identity',
+      answerSpec: { fields: [] },
+    }
+    const sidecar = fakeSidecar([], {
+      listResponse: {
+        status: 200,
+        body: JSON.stringify({ data: { interactions: [legacyRequest] } }),
+      },
+    })
+    const result = await listSessionInteractions(connectionFor(sidecar))
+    expect(result).toMatchObject({ succeeded: false, error: { code: 'MALFORMED_RESPONSE', status: 200 } })
+  })
+
   it('POSTs { id, outcome, data } and treats 2xx as success', async () => {
     const sidecar = fakeSidecar([wireQuestion('ask-1')])
     const result = await respondToSessionInteraction(connectionFor(sidecar), {
@@ -185,13 +207,34 @@ describe('validateInteractionAnswerBody', () => {
     })
   })
 
+  it('accepts Interface secret handles on the transient answer wire', () => {
+    expect(validateInteractionAnswerBody({
+      id: 'ask-1',
+      outcome: 'accepted',
+      data: { apiKey: { kind: 'secret_handle', handleId: 'secret-1', oneUse: true } },
+    })).toEqual({
+      ok: true,
+      id: 'ask-1',
+      outcome: 'accepted',
+      data: { apiKey: { kind: 'secret_handle', handleId: 'secret-1', oneUse: true } },
+    })
+  })
+
+  it('accepts every field-name shape permitted by Interface', () => {
+    expect(validateInteractionAnswerBody({
+      id: 'ask-1',
+      outcome: 'accepted',
+      data: { 'custom answer!': 'yes' },
+    })).toMatchObject({ ok: true, data: { 'custom answer!': 'yes' } })
+  })
+
   it.each([
     [{ outcome: 'accepted' }, 'Missing interaction id'],
     [{ id: 'ask-1', outcome: 'cancelled' }, 'Invalid outcome: expected accepted or declined'],
     [{ id: 'ask-1', outcome: 'accepted', data: ['nope'] }, 'Invalid data: expected an object of field values'],
-    [{ id: 'ask-1', outcome: 'accepted', data: { 'bad key!': 'x' } }, 'Invalid data: field names must contain only letters, numbers, underscores, or hyphens'],
-    [{ id: 'ask-1', outcome: 'accepted', data: { q0: { nested: true } } }, 'Invalid data: field values must be strings, numbers, booleans, or string arrays'],
-    [{ id: 'ask-1', outcome: 'accepted', data: { q0: [1, 2] } }, 'Invalid data: field values must be strings, numbers, booleans, or string arrays'],
+    [{ id: 'ask-1', outcome: 'accepted', data: { ' trailing ': 'x' } }, 'Invalid data: field names and values must match the interaction contract'],
+    [{ id: 'ask-1', outcome: 'accepted', data: { q0: { nested: true } } }, 'Invalid data: field names and values must match the interaction contract'],
+    [{ id: 'ask-1', outcome: 'accepted', data: { q0: [1, 2] } }, 'Invalid data: field names and values must match the interaction contract'],
   ])('rejects %j', (body, error) => {
     expect(validateInteractionAnswerBody(body as Record<string, unknown>)).toEqual({ ok: false, error })
   })
@@ -247,6 +290,116 @@ describe('createInteractionAnswerRoute list', () => {
 // ── route factory: answer ────────────────────────────────────────────────────
 
 describe('createInteractionAnswerRoute answer', () => {
+  it('delivers secret handles only to the sidecar and strips them from persistence inputs', async () => {
+    const sidecar = fakeSidecar([wireQuestion('ask-1')])
+    const resolverBodies: Record<string, unknown>[] = []
+    const persistenceAnswers: BeforeInteractionAnswerArgs['answer'][] = []
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async (args) => {
+        if (args.body) resolverBodies.push(args.body)
+        return { ok: true, connection: connectionFor(sidecar) }
+      },
+      beforeAnswer: async (args) => {
+        persistenceAnswers.push(args.answer)
+      },
+      durable: {
+        guarantee: 'reconciled',
+        prepare: async (args) => {
+          persistenceAnswers.push(args.answer)
+          return {}
+        },
+        reconcile: async () => ({ settled: false }),
+        acknowledge: async (args) => {
+          persistenceAnswers.push(args.answer)
+        },
+        finalize: async (args) => {
+          persistenceAnswers.push(args.answer)
+        },
+      },
+      logger: { warn: vi.fn(), error: vi.fn() },
+    })
+    const secretHandle = { kind: 'secret_handle', handleId: 'secret-1', oneUse: true } as const
+
+    const response = await route.answer(
+      answerRequest({
+        id: 'ask-1',
+        outcome: 'accepted',
+        data: { apiKey: secretHandle, note: 'retain me' },
+        attemptKey: 'attempt-1',
+        workspaceId: 'ws-1',
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(resolverBodies).toEqual([
+      {
+        id: 'ask-1',
+        outcome: 'accepted',
+        data: { note: 'retain me' },
+        attemptKey: 'attempt-1',
+        workspaceId: 'ws-1',
+      },
+    ])
+    expect(persistenceAnswers).toEqual([
+      { ok: true, id: 'ask-1', outcome: 'accepted', data: { note: 'retain me' } },
+      { ok: true, id: 'ask-1', outcome: 'accepted', data: { note: 'retain me' } },
+      { ok: true, id: 'ask-1', outcome: 'accepted', data: { note: 'retain me' } },
+      { ok: true, id: 'ask-1', outcome: 'accepted', data: { note: 'retain me' } },
+    ])
+    expect(sidecar.calls.find((call) => call.method === 'POST')?.body).toEqual({
+      id: 'ask-1',
+      outcome: 'accepted',
+      data: { apiKey: secretHandle, note: 'retain me' },
+    })
+  })
+
+  it('strips secret handles from durable recovery and failure callbacks', async () => {
+    const sidecar = fakeSidecar([wireQuestion('ask-1')], {
+      respondError: { status: 500, code: 'INTERNAL', message: 'sidecar failed' },
+    })
+    const persistenceAnswers: BeforeInteractionAnswerArgs['answer'][] = []
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      durable: {
+        guarantee: 'reconciled',
+        prepare: async (args) => {
+          persistenceAnswers.push(args.answer)
+          return {}
+        },
+        reconcile: async (args) => {
+          persistenceAnswers.push(args.answer)
+          return { settled: false }
+        },
+        acknowledge: async () => {},
+        finalize: async () => {},
+        fail: async (args) => {
+          persistenceAnswers.push(args.answer)
+        },
+      },
+      logger: { warn: vi.fn(), error: vi.fn() },
+    })
+    const secretHandle = { kind: 'secret_handle', handleId: 'secret-1', oneUse: true } as const
+
+    const response = await route.answer(answerRequest({
+      id: 'ask-1',
+      outcome: 'accepted',
+      data: { apiKey: secretHandle, note: 'retain me' },
+      attemptKey: 'attempt-1',
+    }))
+
+    expect(response.status).toBe(503)
+    expect(persistenceAnswers).toEqual([
+      { ok: true, id: 'ask-1', outcome: 'accepted', data: { note: 'retain me' } },
+      { ok: true, id: 'ask-1', outcome: 'accepted', data: { note: 'retain me' } },
+      { ok: true, id: 'ask-1', outcome: 'accepted', data: { note: 'retain me' } },
+    ])
+    expect(sidecar.calls.find((call) => call.method === 'POST')?.body).toEqual({
+      id: 'ask-1',
+      outcome: 'accepted',
+      data: { apiKey: secretHandle, note: 'retain me' },
+    })
+  })
+
   it('resolves one ask against the sidecar and verifies the run unblocked', async () => {
     const sidecar = fakeSidecar([wireQuestion('ask-1')])
     const route = routeFor(sidecar)

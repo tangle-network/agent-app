@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createSandboxChatProducer } from '../../src/chat-routes/index'
+import { interactionRequestFixture } from '../helpers/interaction-request'
 
 function partUpdated(part: Record<string, unknown>, delta?: string): Record<string, unknown> {
   return { type: 'message.part.updated', data: { part, ...(delta !== undefined ? { delta } : {}) } }
@@ -20,10 +21,12 @@ function interaction(id: string, kind: string): Record<string, unknown> {
     type: 'interaction',
     data: {
       request: {
-        id,
-        kind,
-        title: 'Need input',
-        answerSpec: { fields: [] },
+        ...interactionRequestFixture({
+          id,
+          kind,
+          title: 'Need input',
+          answerSpec: { fields: [] },
+        }),
       },
     },
   }
@@ -609,7 +612,14 @@ describe('createSandboxChatProducer', () => {
       events: feed([
         {
           type: 'interaction',
-          data: { request: { id: 'q-1', kind: 'question', title: 'Need input', answerSpec: { fields: [] } } },
+          data: {
+            request: interactionRequestFixture({
+              id: 'q-1',
+              kind: 'question',
+              title: 'Need input',
+              answerSpec: { fields: [] },
+            }),
+          },
         },
         { type: 'interaction.cancel', data: { id: 'q-1', reason: 'timeout' } },
       ]),

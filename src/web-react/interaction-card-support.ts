@@ -11,6 +11,7 @@ import type {
   ChatInteractionField,
   ChatInteractionStatus,
   ChatSelectField,
+  InteractionAnswerValue,
   InteractionAnswers,
   InteractionData,
 } from './chat-interactions'
@@ -72,7 +73,7 @@ export function fieldValuesFromAnswers(
 }
 
 /** The submitted value for one field, or null when it has no answer yet. */
-export function fieldAnswer(field: ChatInteractionField, values: FieldValues): InteractionData[string] | null {
+export function fieldAnswer(field: ChatInteractionField, values: FieldValues): InteractionAnswerValue | null {
   const value = values[field.name] ?? {}
   if (field.type === 'select') {
     const custom = (field as ChatSelectField).allowCustom === true ? value.custom?.trim() : undefined
@@ -91,8 +92,8 @@ export function fieldAnswer(field: ChatInteractionField, values: FieldValues): I
 
 /** All required fields answered → the respond payload; else null (not
  *  submittable yet). Optional unanswered fields are omitted. */
-export function buildAnswerData(fields: ChatInteractionField[], values: FieldValues): InteractionData | null {
-  const data: InteractionData = {}
+export function buildAnswerData(fields: ChatInteractionField[], values: FieldValues): InteractionAnswers | null {
+  const data: InteractionAnswers = {}
   for (const field of fields) {
     const answer = fieldAnswer(field, values)
     if (answer === null) {

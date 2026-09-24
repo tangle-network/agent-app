@@ -13,6 +13,7 @@ import {
 } from './use-chat-interactions'
 import type { ChatInteraction } from './chat-interactions'
 import type { InteractionRequestWire } from './chat-interactions'
+import { interactionRequestFixture } from '../../tests/helpers/interaction-request'
 
 afterEach(cleanup)
 
@@ -28,12 +29,12 @@ function question(id: string, overrides: Partial<ChatInteraction> = {}): ChatInt
 }
 
 function wireRequest(id: string, title = 'Which tone?'): InteractionRequestWire {
-  return {
+  return interactionRequestFixture({
     id,
     kind: 'question',
     title,
     answerSpec: { fields: [{ type: 'text', name: 'q0', label: title, required: true }] },
-  } as InteractionRequestWire
+  })
 }
 
 describe('interaction reducers', () => {

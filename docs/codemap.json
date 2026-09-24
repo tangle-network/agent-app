@@ -6279,7 +6279,7 @@
         {
           "name": "interactionFromWireRequest",
           "kind": "function",
-          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
+          "signature": "(request: InteractionRequest) => ChatInteraction",
           "doc": "Reads a wire request into the client's pending `ChatInteraction`."
         },
         {
@@ -6302,8 +6302,8 @@
         },
         {
           "name": "InteractionRequest",
-          "kind": "type",
-          "signature": "type InteractionRequest",
+          "kind": "interface",
+          "signature": "interface InteractionRequest",
           "doc": null
         },
         {
@@ -6321,7 +6321,7 @@
         {
           "name": "interactionToPersistedPart",
           "kind": "function",
-          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
+          "signature": "(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…",
           "doc": "Builds the persisted/streamed `interaction` part from a wire request."
         },
         {
@@ -6334,7 +6334,7 @@
           "name": "isSafeInteractionFieldKey",
           "kind": "function",
           "signature": "(key: string) => boolean",
-          "doc": "Answer/field keys the sidecar will accept: identifier-safe and never a prototype-pollution vector."
+          "doc": "Whether Interface accepts a field name, including its reserved-key protections."
         },
         {
           "name": "isTerminalInteractionStatus",
@@ -6351,7 +6351,7 @@
         {
           "name": "listSessionInteractions",
           "kind": "function",
-          "signature": "(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<{ id: string; kind: string; title: str…",
+          "signature": "(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<InteractionRequest[]>>",
           "doc": "Outstanding (unanswered) interactions for the session — the sidecar's registry is authoritative, so this is the reconnect/reload source of truth."
         },
         {
@@ -6413,6 +6413,12 @@
           "kind": "type",
           "signature": "type ParseInteractionResult",
           "doc": "Resolve interaction parsing outcome as success with value or failure with error message"
+        },
+        {
+          "name": "PersistableInteractionAnswer",
+          "kind": "interface",
+          "signature": "interface PersistableInteractionAnswer",
+          "doc": "Answer data safe to retain after the one-use sidecar delivery."
         },
         {
           "name": "persistedPartToInteraction",
@@ -6478,7 +6484,7 @@
           "name": "validateInteractionAnswerBody",
           "kind": "function",
           "signature": "(body: Record<string, unknown>) => InteractionAnswerBodyValidation",
-          "doc": "Validates the client POST body: `{ id, outcome, data?"
+          "doc": "Validates the client POST body through Interface's canonical data schema."
         }
       ]
     },
@@ -17531,7 +17537,7 @@
         {
           "name": "interactionFromWireRequest",
           "kind": "function",
-          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
+          "signature": "(request: InteractionRequest) => ChatInteraction",
           "doc": "Reads a wire request into the client's pending `ChatInteraction`."
         },
         {
@@ -17578,8 +17584,8 @@
         },
         {
           "name": "InteractionRequest",
-          "kind": "type",
-          "signature": "type InteractionRequest",
+          "kind": "interface",
+          "signature": "interface InteractionRequest",
           "doc": null
         },
         {
@@ -17615,7 +17621,7 @@
         {
           "name": "interactionToPersistedPart",
           "kind": "function",
-          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
+          "signature": "(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…",
           "doc": "Builds the persisted/streamed `interaction` part from a wire request."
         },
         {
@@ -17646,7 +17652,7 @@
           "name": "isSafeInteractionFieldKey",
           "kind": "function",
           "signature": "(key: string) => boolean",
-          "doc": "Answer/field keys the sidecar will accept: identifier-safe and never a prototype-pollution vector."
+          "doc": "Whether Interface accepts a field name, including its reserved-key protections."
         },
         {
           "name": "isTerminalInteractionStatus",
@@ -17657,7 +17663,7 @@
         {
           "name": "lateAnswerMessage",
           "kind": "function",
-          "signature": "(interaction: ChatInteraction, data: Record<string, string | number | boolean | string[]>) => string",
+          "signature": "(interaction: ChatInteraction, data: InteractionData) => string",
           "doc": "Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s)."
         },
         {
@@ -18323,7 +18329,7 @@
         {
           "name": "restoreChatInteractions",
           "kind": "function",
-          "signature": "(list: ChatInteraction[], outstanding: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"…",
+          "signature": "(list: ChatInteraction[], outstanding: InteractionRequest[], options?: RestoreChatInteractionsOptions) => ChatInteracti…",
           "doc": "Reload restore from the answer route's GET list."
         },
         {
