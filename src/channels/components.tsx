@@ -3,7 +3,7 @@ import { useChannelsClient } from './context'
 import { useChannel, useChannelConnections, useChannelConversation, useChannelConversations, useChannels, useConnectChannel, useWhatsAppNumbers, verificationExpired } from './hooks'
 import { NUMBER_CHARGE_NOTICE, NUMBER_RETRY_NOTICE, numberStage, useNumberChannel } from './numbers'
 import type { Line, LineTransport } from './types'
-import { ChannelFailure, ChannelState, buttonClass, inputClass, panelClass } from './ui'
+import { ChannelFailure, ChannelState, buttonClass, primaryButtonClass, inputClass, panelClass } from './ui'
 
 const labels: Record<LineTransport, string> = { imessage: 'iMessage', whatsapp: 'WhatsApp', sms: 'SMS', email: 'Email' }
 
@@ -46,28 +46,28 @@ export function ChannelVerificationPanel({ lineId, className = '' }: { lineId: s
       return <>
         <p className="font-medium">{labels[line.transport]} · {line.address}</p>
         {line.status !== 'active' ? <p role="alert">This line is {line.status}. Check the line’s status before testing or activating it.</p>
-          : active && test?.status === 'verified' ? <p role="status">Both directions verified. Answering {labels[line.transport]} messages.</p>
+          : active && test?.status === 'verified' && !expired ? <p role="status">Both directions verified. Answering {labels[line.transport]} messages.</p>
           : !test || test.status === 'revoked' ? <>
             {active && <p>Attached to an agent, but no completed delivery test was returned.</p>}
             <p>Test inbound delivery and a reply before this agent answers people.</p>
-            <button type="button" className={buttonClass} disabled={busy} onClick={() => act('start')}>Start channel test</button>
+            <button type="button" className={primaryButtonClass} disabled={busy} onClick={() => act('start')}>Start channel test</button>
           </> : expired ? <p role="alert">This test expired. Stop it before starting a new test.</p>
           : test.status === 'verified' ? <><p>Both directions verified. Messaging is not turned on yet.</p>
-            <button type="button" className={buttonClass} disabled={busy} onClick={() => act('activate')}>Turn on messaging</button></>
+            <button type="button" className={primaryButtonClass} disabled={busy} onClick={() => act('activate')}>Turn on messaging</button></>
           : test.status === 'configuring' ? <><p>Connecting incoming messages to Tangle.</p>
-            <button type="button" className={buttonClass} disabled={busy} onClick={() => act('resume')}>Check setup</button></>
+            <button type="button" className={primaryButtonClass} disabled={busy} onClick={() => act('resume')}>Check setup</button></>
           : test.status === 'waiting' ? <>
             {line.connect && line.routerAddress && <><p>First, send this to {line.routerAddress}. The router replies with your agent’s number.</p><CopyLine text={line.connect} /></>}
             <p>{line.transport === 'email' ? `From another email address, send this line to ${line.address}.` : line.connect ? 'Then send this in the conversation the router opens:' : `From your phone, send this to ${line.address}:`}</p>
             <CopyLine text={test.instruction} />
-            {link && <a className={buttonClass} href={link} target={line.transport === 'whatsapp' ? '_blank' : undefined} rel="noopener noreferrer">Open {line.transport === 'email' ? 'Email' : line.transport === 'whatsapp' ? 'WhatsApp' : 'Messages'}</a>}
-          </> : test.status === 'received' ? <><p role="status">Your test message arrived.</p><button type="button" className={buttonClass} disabled={busy} onClick={() => act('send')}>Send test reply</button></>
+            {link && <a className={primaryButtonClass} href={link} target={line.transport === 'whatsapp' ? '_blank' : undefined} rel="noopener noreferrer">Open {line.transport === 'email' ? 'Email' : line.transport === 'whatsapp' ? 'WhatsApp' : 'Messages'}</a>}
+          </> : test.status === 'received' ? <><p role="status">Your test message arrived.</p><button type="button" className={primaryButtonClass} disabled={busy} onClick={() => act('send')}>Send test reply</button></>
           : test.status === 'sending' ? <p role="status">The test reply is being sent. Do not send another.</p>
-          : test.status === 'uncertain' ? <><p role="alert">The reply result is uncertain. Check its status instead of sending another.</p><button type="button" className={buttonClass} disabled={busy} onClick={() => act('resume')}>Check reply status</button></>
+          : test.status === 'uncertain' ? <><p role="alert">The reply result is uncertain. Check its status instead of sending another.</p><button type="button" className={primaryButtonClass} disabled={busy} onClick={() => act('resume')}>Check reply status</button></>
           : test.status === 'needs_review' ? <p role="alert">Incoming message setup needs operator review. No delivery success is claimed.</p>
           : <p>Reply with the CONFIRM line in the message you received, in the same conversation.</p>}
         {test?.error && <p role="alert" className="text-destructive">{test.error}</p>}
-        {test && test.status !== 'revoked' && !(active && test.status === 'verified') && <>
+        {test && test.status !== 'revoked' && !(active && test.status === 'verified' && !expired) && <>
           {!confirming ? <button type="button" className={buttonClass} disabled={busy} onClick={() => setConfirming(true)}>Stop this test</button> : <fieldset className="space-y-2"><legend>Stop this test and revoke its setup?</legend>
             <button type="button" className={buttonClass} disabled={busy} onClick={async () => { const outcome = await channel.run({ action: 'reset', confirm: true }); if (outcome.succeeded) setConfirming(false) }}>Confirm stop</button>{' '}
             <button type="button" className={buttonClass} disabled={busy} onClick={() => setConfirming(false)}>Keep testing</button>
@@ -115,7 +115,7 @@ function ConnectionPicker({ transport, onConnected }: { transport: Exclude<LineT
         </select></label>}</ChannelState>}
       </>}
       <p className="text-sm text-muted-foreground">Connect an owned line, then test both directions. Each person must message first. Permissions remain managed in Tangle Hub.</p>
-      <button type="submit" className={buttonClass} disabled={busy || !connectionId || (transport === 'email' && !address.trim()) || (transport === 'whatsapp' && (!numberId || !showNumbers || numbers.status !== 'ready'))}>{busy ? 'Connecting…' : 'Connect channel'}</button>
+      <button type="submit" className={primaryButtonClass} disabled={busy || !connectionId || (transport === 'email' && !address.trim()) || (transport === 'whatsapp' && (!numberId || !showNumbers || numbers.status !== 'ready'))}>{busy ? 'Connecting…' : 'Connect channel'}</button>
     </form>}</ChannelState>
     <ChannelFailure state={connect.state} />
   </>
@@ -161,16 +161,16 @@ export function NumberChannel({ transport, className = '' }: { transport: 'sms' 
   const [lineId, setLineId] = useState('')
   const connect = useConnectChannel(line => setLineId(line.id))
   useEffect(() => { setConsent(false) }, [number.quote?.token])
-  useEffect(() => { setCancelId(null); setLineId('') }, [transport, client])
+  useEffect(() => { setCancelId(null); setLineId(''); connect.reset() }, [transport, client, connect.reset])
   const busy = number.state.status === 'pending' || connect.state.status === 'pending'
   const money = (cents: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
   return <section className={`${panelClass} ${className}`} aria-label={`${labels[transport]} number`} aria-busy={busy}>
-    <h2 className="text-lg font-semibold">Get an {labels[transport]} number</h2>
+    <h2 className="text-lg font-semibold">Get a {labels[transport]} number</h2>
     {!client.ordering ? <p>Number ordering is unavailable. Existing numbers are unchanged.</p> : <ChannelState resource={number.resource} empty="Number availability has not been confirmed.">{({ readiness, complete }) => <>
       {!readiness.configured && <p>New orders are disabled. Existing numbers still require separate cancellation.</p>}
       {!complete && <p role="alert">The order list is incomplete. New purchases are disabled until ownership can be confirmed.</p>}
       {number.held && <p>This agent already holds an order for this transport. Cancel and release it before ordering another.</p>}
-      <button type="button" className={buttonClass} disabled={busy || !complete || !readiness.configured || !readiness.transports.includes(transport) || !!number.held || number.uncertain} onClick={() => void number.run({ action: 'quote' })}>See activation price</button>
+      <button type="button" className={primaryButtonClass} disabled={busy || !complete || !readiness.configured || !readiness.transports.includes(transport) || !!number.held || number.uncertain} onClick={() => void number.run({ action: 'quote' })}>See activation price</button>
     </>}</ChannelState>}
     {number.quote && <div className="space-y-3 rounded-md border border-border p-4">
       <h3 className="font-medium">Activation · {money(number.quote.activationCents)}</h3>
@@ -178,7 +178,7 @@ export function NumberChannel({ transport, className = '' }: { transport: 'sms' 
       <p>{NUMBER_CHARGE_NOTICE}</p>
       <label className="flex items-start gap-2"><input type="checkbox" checked={consent} disabled={busy} onChange={event => setConsent(event.target.checked)} />I authorize this one-time activation charge. The number is not live until channel setup is complete.</label>
       {!number.uncertain && number.quote.expiresAt <= Date.now() && <p role="alert">This quote expired. Read a new activation price before ordering.</p>}
-      <button type="button" className={buttonClass} disabled={busy || !consent || !number.quote.terms.trim() || (!number.uncertain && number.quote.expiresAt <= Date.now())} onClick={() => void number.run({ action: 'purchase', consent })}>{number.uncertain ? 'Retry approved purchase' : `Order for ${money(number.quote.activationCents)}`}</button>
+      <button type="button" className={primaryButtonClass} disabled={busy || !consent || !number.quote.terms.trim() || (!number.uncertain && number.quote.expiresAt <= Date.now())} onClick={() => void number.run({ action: 'purchase', consent })}>{number.uncertain ? 'Retry approved purchase' : `Order for ${money(number.quote.activationCents)}`}</button>
     </div>}
     {number.uncertain && <p role="alert">The purchase response was lost or refused. Its outcome is not confirmed. {NUMBER_RETRY_NOTICE}</p>}
     {number.orders.map(order => <article key={order.id} className="space-y-3 rounded-md border border-border p-4">

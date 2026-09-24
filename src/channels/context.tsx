@@ -3,7 +3,7 @@ import type { ChannelsClient } from './types'
 
 const Context = createContext<{ client: ChannelsClient; pollInterval: number | false } | null>(null)
 
-/** Mount below authentication. Changing client/scope remounts all channel state. */
+/** Mount below authentication. Changing scope remounts all channel state. */
 export function ChannelsProvider({ client, pollInterval = 3000, children }: {
   client: ChannelsClient
   /** Poll after a read settles, never concurrently. false disables polling. */

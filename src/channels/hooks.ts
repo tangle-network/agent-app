@@ -84,7 +84,7 @@ export function useChannel(lineId: string) {
   const { client } = useChannelsContext()
   const resource = useChannelResource(async context => {
     const [line, verification] = await Promise.all([client.lines.get(lineId), client.setup.verification(lineId, context)])
-    if (line.id !== lineId || (verification && verification.lineId !== lineId)) throw new Error('Channel binding changed. Reload channel setup.')
+    if (line.id !== lineId || (line.attachment && line.attachment.lineId !== lineId) || (verification && verification.lineId !== lineId)) throw new Error('Channel binding changed. Reload channel setup.')
     return { line, verification }
   }, [lineId], !!lineId)
   const mutation = useChannelMutation<{ action: VerificationAction; confirm?: boolean }, void>(async ({ action, confirm }) => {
@@ -107,7 +107,7 @@ export function useChannel(lineId: string) {
     if (action === 'activate') {
       if (test.status !== 'verified') throw new Error('Verify inbound delivery and the test reply before activation.')
       const activated = await client.setup.activate(lineId, test.id)
-      if (activated.id !== lineId || activated.status !== 'active' || activated.attachment?.status !== 'active') throw new Error('Messaging activation was not confirmed.')
+      if (activated.id !== lineId || activated.status !== 'active' || activated.attachment?.status !== 'active' || activated.attachment.lineId !== lineId) throw new Error('Messaging activation was not confirmed.')
     } else if (action === 'send') {
       if (test.status !== 'received') throw new Error('Wait for the inbound test message before sending a reply.')
       await client.setup.send(lineId, test.id)
@@ -122,7 +122,11 @@ export function useChannel(lineId: string) {
 
 export function useChannelConversations(lineId: string) {
   const { client } = useChannelsContext()
-  return useChannelResource(() => client.lines.threads(lineId).list(), [lineId], !!lineId)
+  return useChannelResource(async () => {
+    const threads = await client.lines.threads(lineId).list()
+    if (threads.some(thread => thread.lineId !== lineId)) throw new Error('The thread response belongs to another line.')
+    return threads
+  }, [lineId], !!lineId)
 }
 
 export function useChannelConversation(lineId: string, threadId: string) {
