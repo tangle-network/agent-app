@@ -1,7 +1,7 @@
 import { authenticateHubEventRequest, HubClient, type HubProviderEvent } from '@tangle-network/hub-sdk'
 import { buildMessagingReply, normalizeConversationEvent } from '@tangle-network/agent-integrations/conversation-events'
 import type { AgentProfile, BackendConfig, SandboxInstance } from '@tangle-network/sandbox'
-import { Sandbox } from '@tangle-network/sandbox/core'
+import { Sandbox, SandboxError } from '@tangle-network/sandbox/core'
 
 /**
  * A hosted agent: a person texts or calls a line, and the agent answers from
@@ -10,8 +10,9 @@ import { Sandbox } from '@tangle-network/sandbox/core'
  *
  * Each person gets one fresh isolated box built from the published profile,
  * never a copy of the developer's box. Later messages resume the same box and
- * the same conversation, so text and voice share one memory. A box the
- * platform deleted is replaced by a fresh one instead of blocking the person.
+ * the same conversation, so text and voice share one memory. A new profile
+ * starts a new session, and a deleted box or a new API key starts a new box;
+ * either way the person's recent conversation carries over from the store.
  *
  * Every step is idempotent by the message's turn id: a retried delivery
  * settles the same sandbox turn and replays the same Hub send. So the caller
@@ -166,6 +167,18 @@ const START = /^(start|unstop|resume)$/i
 const TWO_DAYS = 2 * 86_400
 const RESUMABLE = new Set(['stopped', 'expired'])
 const GONE = new Set(['failed', 'deleted'])
+/** How much of a person's recent conversation a new session inherits. */
+const CARRY_CHARS = 6000
+const CARRY_HEAD = '[Your conversation with this person so far. Your instructions may have changed since; follow the current ones.]'
+const CARRY_NOW = '[Their new message:]'
+
+/** A person's recent turns, kept outside the box so a new session or box can continue them. */
+interface Conversation {
+  /** The box and session the turns last ran in. */
+  at: string
+  /** Oldest first: turn id, what they said, what the agent answered. */
+  turns: Array<[string, string, string]>
+}
 
 const encode = (text: string) => new TextEncoder().encode(text)
 const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('')
@@ -255,6 +268,18 @@ export function createHostedAgent(config: HostedAgentConfig) {
   const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile }
   const profileTag = sha256(JSON.stringify(profile)).then(hash => hash.slice(0, 8))
 
+  /** Resume a stopped box. False when an earlier API key made it: the platform
+   *  resumes a box only under the key lineage that created it. */
+  async function resumed(box: SandboxInstance): Promise<boolean> {
+    try {
+      await box.resume()
+      return true
+    } catch (error) {
+      if (error instanceof SandboxError && error.code === 'SANDBOX_ATTRIBUTION_MISMATCH') return false
+      throw error
+    }
+  }
+
   /** The person's running box: created on the first message, resumed later,
    *  replaced when the platform deleted it. Null when the deadline passed. */
   async function ensureBox(user: string, deadline: number, trace?: TurnTrace): Promise<SandboxInstance | null> {
@@ -262,6 +287,10 @@ export function createHostedAgent(config: HostedAgentConfig) {
     const known = await store.get(key)
     let box = known ? await sandbox.get(known) : null
     if (trace) trace.box = !box || GONE.has(box.status) ? 'new' : RESUMABLE.has(box.status) ? 'resumed' : 'warm'
+    if (box && RESUMABLE.has(box.status) && !await resumed(box)) {
+      box = null
+      if (trace) trace.box = 'new'
+    }
     if (!box || GONE.has(box.status)) {
       // The key names the box it replaces, so concurrent first messages and
       // retries converge on one allocation instead of each creating a box.
@@ -275,7 +304,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
       })
       await store.put(key, box.id)
     }
-    if (RESUMABLE.has(box.status)) await box.resume()
+    if (RESUMABLE.has(box.status) && !await resumed(box)) throw new HostedAgentError('box_foreign', 'A new box was made under another API key.')
     if (box.status === 'running') return box
     const timeoutMs = deadline - Date.now()
     if (timeoutMs < 1000) return null
@@ -329,7 +358,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
     if (!box) return { state: 'pending' }
     // A session binds its backend when created, and the runtime would give a
     // bare session its generic default assistant. A new profile starts a new
-    // conversation, so the persona always matches the one in force.
+    // session, so the persona always matches the one in force.
     const sessionId = `hosted-${user}-${await profileTag}`
     const session = await box.session(sessionId).status()
     if (!session) await box.createSession({ sessionId, retention: 'workspace', backend })
@@ -337,13 +366,26 @@ export function createHostedAgent(config: HostedAgentConfig) {
       trace.harness = session?.backend ?? config.harness
       trace.model = session?.model
     }
-    const prompt = message.channel === 'voice' ? `[Phone call. Answer in one to three short spoken sentences.]\n${text}` : text
+    const asked = message.channel === 'voice' ? `[Phone call. Answer in one to three short spoken sentences.]\n${text}` : text
+    // The first turn in a new session or box inherits the person's recent
+    // turns. A retry before that turn completes carries them again, so a
+    // failed first attempt loses nothing.
+    const conversationKey = `convo:${user}`, at = `${box.id}/${sessionId}`
+    const stored = await store.get(conversationKey)
+    const conversation: Conversation = stored ? JSON.parse(stored) as Conversation : { at, turns: [] }
+    const carried = conversation.at === at ? '' : conversation.turns.map(([, them, you]) => `Them: ${them}\nYou: ${you}`).join('\n')
+    const prompt = carried ? `${CARRY_HEAD}\n${carried}\n${CARRY_NOW}\n${asked}` : asked
     for (;;) {
       const result = await box.driveConversationTurn(prompt, { sessionId, turnId: message.turnId, wallCapMs, timeoutMs: 8000 })
       if (result.state === 'completed') {
         const answer = result.text.trim()
         if (!answer) throw new HostedAgentError('empty_reply', 'The turn completed with no reply text.')
         if (trace) noteResult(trace, result.result, result.usage)
+        // Concurrent turns may drop one another's entry; the box keeps the full record.
+        const turns = conversation.turns.filter(([id]) => id !== message.turnId)
+        turns.push([message.turnId, message.channel === 'voice' ? `(on a call) ${text}` : text, answer])
+        while (turns.length > 1 && JSON.stringify(turns).length > CARRY_CHARS) turns.shift()
+        await store.put(conversationKey, JSON.stringify({ at, turns } satisfies Conversation))
         return { state: 'answered', text: answer }
       }
       if (result.state === 'failed') throw new HostedAgentError('turn_failed', result.error)
