@@ -1,7 +1,7 @@
 import { createHostedAgent, type HostedInbound } from '@tangle-network/agent-app/hosted-agent'
 
 /**
- * Juno: an agent people text or call. Each person gets their own isolated
+ * Braid: an agent people text or call. Each person gets their own isolated
  * sandbox with its own memory, and every cost bills to this app's Tangle key.
  *
  *   iMessage  person -> Inkbox shared line -> Hub -> POST /hub -> queue -> answer -> Hub reply
@@ -18,11 +18,11 @@ export interface Env {
 }
 
 export const persona = {
-  name: 'Juno',
+  name: 'Braid',
   model: { default: 'openai/gpt-5.6-luna' },
   prompt: {
     systemPrompt: [
-      'Your name is Juno. You are a friend people text: warm, curious, direct and brief.',
+      'Your name is Braid. You are a friend people text: warm, curious, direct and brief.',
       'You are not a coding assistant. Talk about the person\'s life and plans; never offer to write, review or refactor code.',
       'Write like a person texting: one to three short sentences, no markdown, no lists, no links unless asked.',
       'You remember people. When someone tells you something lasting about themselves (their name, plans, people,',
@@ -32,7 +32,7 @@ export const persona = {
       'You are texting or on a call with them now, but you only answer when they reach out: you cannot message them later,',
       'set reminders, or look up live facts such as weather or news. Never promise a follow-up or a reminder; say plainly',
       'what you cannot do and how they can do it themselves.',
-      'If asked what you are, say you are Juno, an AI; do not name the model or company behind you.',
+      'If asked what you are, say you are Braid, an AI; do not name the model or company behind you.',
     ].join(' '),
   },
 }
@@ -56,19 +56,19 @@ export default {
     }
     if (request.method === 'POST' && pathname === '/voice/hook') return agent(env).voiceHook(request)
     if (request.method === 'POST' && pathname === '/voice/ask') return agent(env).voiceAsk(request)
-    return new Response('Juno is a Tangle hosted agent. Text or call to talk.\n')
+    return new Response('Braid is a Tangle hosted agent. Text or call to talk.\n')
   },
 
   async queue(batch, env) {
-    const juno = agent(env)
+    const braid = agent(env)
     for (const message of batch.messages) {
       try {
-        const outcome = await juno.respond(message.body, { lastAttempt: message.attempts >= 6 })
+        const outcome = await braid.respond(message.body, { lastAttempt: message.attempts >= 6 })
         if (outcome === 'pending') message.retry({ delaySeconds: 10 })
         else message.ack()
-        console.log(`[juno] run=${message.body.runId} attempt=${message.attempts} outcome=${outcome}`)
+        console.log(`[braid] run=${message.body.runId} attempt=${message.attempts} outcome=${outcome}`)
       } catch (error) {
-        console.error(`[juno] run=${message.body.runId} attempt=${message.attempts} error=${String(error).slice(0, 300)}`)
+        console.error(`[braid] run=${message.body.runId} attempt=${message.attempts} error=${String(error).slice(0, 300)}`)
         message.retry({ delaySeconds: 20 })
       }
     }
