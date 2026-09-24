@@ -4,12 +4,14 @@ import { ChannelConversation, ChannelVerificationPanel, ChannelsProvider, EmailC
 import { channelAttachment, channelMessage, channelTest, createChannelsFixture, numberOrder } from './fixtures/channels'
 import type { ChannelVerification } from '../channels'
 
-function Surface({ surface = 'imessage', status, expired = false, failure = false, active = false }: {
+function Surface({ surface = 'imessage', status, expired = false, failure = false, active = false, empty = false, loading = false }: {
   surface?: 'imessage' | 'whatsapp' | 'email' | 'number' | 'history' | 'payment' | 'verification'
   status?: ChannelVerification['status']
   expired?: boolean
   failure?: boolean
   active?: boolean
+  empty?: boolean
+  loading?: boolean
 }) {
   const [fixture] = useState(() => {
     const fake = createChannelsFixture()
@@ -17,6 +19,8 @@ function Surface({ surface = 'imessage', status, expired = false, failure = fals
     if (active) fake.state.line.attachment = channelAttachment()
     if (surface === 'number') fake.state.orders = [numberOrder()]
     if (surface === 'history') fake.state.messages = [channelMessage('out', { direction: 'out', text: 'Your agent replied in the same channel.', createdAt: '2026-09-24T12:02:00Z', status: 'delivered' }), channelMessage()]
+    if (empty) { fake.client.lines.list = async () => []; fake.client.setup.connections = async () => [] }
+    if (loading) { fake.client.lines.list = () => new Promise(() => {}); fake.client.setup.connections = () => new Promise(() => {}) }
     if (failure) fake.client.lines.get = async () => { throw new Error('The channel could not be read. Existing connections are unchanged.') }
     return fake
   })
@@ -43,3 +47,5 @@ export const AnsweringMessages: Story = { args: { surface: 'verification', statu
 export const NumberAcquiredNotVerified: Story = { args: { surface: 'number' } }
 export const ConversationHistory: Story = { args: { surface: 'history' } }
 export const LinePayPageState: Story = { args: { surface: 'payment' } }
+export const NoConnections: Story = { args: { surface: 'email', empty: true } }
+export const LoadingConnections: Story = { args: { surface: 'email', loading: true } }

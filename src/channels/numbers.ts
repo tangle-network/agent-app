@@ -115,7 +115,7 @@ export function useNumberChannel(transport: 'sms' | 'imessage') {
     if (loaded) setReceipts(current => current.filter(receipt => !loaded.orders.some(order => order.id === receipt.id)))
     if (loaded?.orders.some(holdsNumber)) {
       setQuote(null); setUncertain(false); attempted.current = false
-    } else if (loaded?.complete && orders.length > 0 && orders.every(order => !holdsNumber(order))) {
+    } else if (!uncertain && !quote && loaded?.complete && orders.length > 0 && orders.every(order => !holdsNumber(order))) {
       attempted.current = false
     }
   }, [loaded])

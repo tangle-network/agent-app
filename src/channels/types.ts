@@ -42,8 +42,8 @@ export type ConnectChannelInput =
  * Sandbox 0.51+ supplies fromConnection/get/threads; it does not supply email
  * creation, managed-order binding, or delivery verification. Those operations
  * deliberately remain injected instead of pretending they exist on the SDK.
- * The current hosted-agent export is server-only. Its hub-lines implementation
- * can implement this contract without changing channels.
+ * The hosted-agent export is server-only. Its existing attachLine operation
+ * belongs in setup.activate after proof validation, never in this browser bundle.
  */
 export interface ChannelsClient {
   /** Changes whenever the authenticated agent or owner changes. Not an auth credential. */

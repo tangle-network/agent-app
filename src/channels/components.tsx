@@ -44,9 +44,13 @@ export function ChannelVerificationPanel({ lineId, className = '' }: { lineId: s
       const active = line.status === 'active' && line.attachment?.status === 'active'
       const link = test ? channelMessageLink(line, test.instruction) : null
       return <>
-        <p className="font-medium">{labels[line.transport]} · {line.address}</p>
+        <p className="break-all font-medium">{labels[line.transport]} · {line.address}</p>
         {line.status !== 'active' ? <p role="alert">This line is {line.status}. Check the line’s status before testing or activating it.</p>
-          : active && test?.status === 'verified' && !expired ? <p role="status">Both directions verified. Answering {labels[line.transport]} messages.</p>
+          : active && test?.status === 'verified' && !expired ? <>
+            <p role="status">Both directions verified. Answering {labels[line.transport]} messages.</p>
+            <p>{line.connect && line.routerAddress ? `Share this: send ${line.connect} to ${line.routerAddress}.` : 'Share this channel address so people can start a conversation.'}</p>
+            <CopyLine text={line.connect ?? line.address} />
+          </>
           : !test || test.status === 'revoked' ? <>
             {active && <p>Attached to an agent, but no completed delivery test was returned.</p>}
             <p>Test inbound delivery and a reply before this agent answers people.</p>
@@ -182,7 +186,7 @@ export function NumberChannel({ transport, className = '' }: { transport: 'sms' 
     </div>}
     {number.uncertain && <p role="alert">The purchase response was lost or refused. Its outcome is not confirmed. {NUMBER_RETRY_NOTICE}</p>}
     {number.orders.map(order => <article key={order.id} className="space-y-3 rounded-md border border-border p-4">
-      <h3 className="font-medium">{order.address ?? 'Your number order'}</h3><p>{numberStage(order)}</p>
+      <h3 className="break-all font-medium">{order.address ?? 'Your number order'}</h3><p>{numberStage(order)}</p>
       {order.errorCode && <p role="status">Status: {order.errorCode.replace(/_/g, ' ')}</p>}
       {order.status === 'ready_for_setup' && order.cancellation === 'none' && <><p>The number is acquired, not delivery-verified. Test it before connecting conversations.</p>
         <button type="button" className={buttonClass} disabled={busy} onClick={() => void connect.run({ kind: 'order', orderId: order.id })}>Test this number</button></>}

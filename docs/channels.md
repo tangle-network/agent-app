@@ -47,8 +47,10 @@ line list. The backend must authorize every supplied line, thread, source, and
 order identifier. `client.lines.threads(lineId).messages(threadId)` remains the
 authoritative channel history; it is not reconstructed from a replay buffer.
 
-Use Sandbox **0.51.0+**. The package's development pin remains 0.51.0 to check the
-minimum API and preserve compatibility with the pinned Runtime. Only type imports from Sandbox
+Use Sandbox **0.52.1** and Hub SDK **0.19.0** for the complete channels surface.
+Sandbox 0.51.0 supplies the original iMessage line API but does not type WhatsApp
+connection creation. The package inherits Sandbox 0.52.1 and its compatible
+Runtime 0.266.0 from the merged hosted-agent lane. Only type imports from Sandbox
 and Hub are emitted in declarations. JavaScript imports React and existing
 agent-app async primitives, not either server SDK.
 
@@ -57,10 +59,16 @@ WhatsApp phone-number ID. It does **not** accept email or SMS. The host's `setup
 methods deliberately supply missing Hub/hosted-agent operations: available
 connections/numbers, email creation, managed-order binding, verification, and
 activation. They must delegate to the Hub SDK and sandbox.lines, not providers.
-The existing `src/hosted-agent` entrypoint is server execution code and does not
-export a browser line-setup client. This module does not import that runtime or
-change its files. The hub-lines owner can implement `ChannelsClient` without a
-channels rewrite. There is no fabricated SDK method or hardcoded Builder route.
+The merged `src/hosted-agent` entrypoint exposes `createHostedAgent` and
+`HostedAgent.attachLine(connectionId)` for server-side iMessage attachment.
+A hosted application should use that existing operation in its authenticated
+`setup.activate` implementation, after checking the current test and ownership;
+then read and return the attached line through `sandbox.lines.get`. Its existing
+per-person sandbox, profile, routing, STOP/START and reply behavior stay there,
+not in channels. Other transports remain on the injected host boundary. The
+entrypoint does not export a browser line-setup client, so this module does not
+bundle its server runtime or change its files. There is no fabricated SDK
+method or hardcoded Builder route.
 
 The four Builder reference panels map to `IMessageChannel`, `WhatsAppChannel`,
 `EmailChannel`, and `NumberChannel`/`SMSChannel`. Builder replacement and creator

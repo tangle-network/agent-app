@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { PropsWithChildren } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ChannelsProvider, ChannelVerificationPanel, LinePayPage, useChannel, useChannelConversations, useConnectChannel, useNumberChannel, type Line } from '../../src/channels'
-import { channelAttachment, channelLine, channelTest, createChannelsFixture } from '../../src/stories/fixtures/channels'
+import { channelAttachment, channelLine, channelTest, createChannelsFixture, numberOrder } from '../../src/stories/fixtures/channels'
 
 function setup() {
   const fake = createChannelsFixture()
@@ -34,6 +34,15 @@ describe('channel boundary regressions', () => {
     expect(await screen.findByText(/This test expired/)).toBeTruthy()
     expect(screen.queryByText(/Both directions verified. Answering/)).toBeNull()
     expect(screen.getByRole('button', { name: 'Stop this test' })).toBeTruthy()
+  })
+
+  it('keeps the shared-router instructions available after activation', async () => {
+    const fake = setup()
+    fake.state.line = channelLine({ attachment: channelAttachment() })
+    fake.state.test = channelTest('verified')
+    render(<ChannelVerificationPanel lineId="ln_demo" />, { wrapper: fake.wrapper })
+    expect(await screen.findByText('Share this: send connect @helper to +15550100001.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Copy connect @helper' })).toBeTruthy()
   })
 
   it('refuses an expired inbound test even before the server expiry flag updates', async () => {
@@ -85,4 +94,20 @@ describe('channel boundary regressions', () => {
     await act(async () => { expect((await result.current.run({ action: 'purchase', consent: true })).succeeded).toBe(false) })
     expect(create).not.toHaveBeenCalled()
   })
+  it('keeps an unresolved quote locked even when older released orders are listed', async () => {
+    const fake = setup()
+    fake.state.orders = [numberOrder({ cancellation: 'released', status: 'cancelled' })]
+    vi.spyOn(fake.client.ordering!.numbers, 'create').mockRejectedValue(new Error('Response lost'))
+    const quote = vi.spyOn(fake.client.ordering!.numbers, 'quote')
+    const { result } = renderHook(() => useNumberChannel('sms'), { wrapper: fake.wrapper })
+    await waitFor(() => expect(result.current.resource.status).toBe('ready'))
+    await act(async () => { await result.current.run({ action: 'quote' }) })
+    await act(async () => { await result.current.run({ action: 'purchase', consent: true }) })
+    await waitFor(() => expect(result.current.resource.status).toBe('ready'))
+    expect(result.current.uncertain).toBe(true)
+    await act(async () => { expect((await result.current.run({ action: 'quote' })).succeeded).toBe(false) })
+    expect(quote).toHaveBeenCalledTimes(1)
+    expect(result.current.quote?.token).toBe('opaque-signed-quote')
+  })
+
 })
