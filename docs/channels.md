@@ -70,6 +70,12 @@ entrypoint does not export a browser line-setup client, so this module does not
 bundle its server runtime or change its files. There is no fabricated SDK
 method or hardcoded Builder route.
 
+For hosted iMessage, the authenticated `lines.fromConnection` adapter must use
+the same server-selected connection and client reference as `attachLine`
+(`hosted-agent` in the current implementation). Do not trust a browser-supplied
+reference for ownership. Keep the acquired and verified line ID unchanged; the
+hook rejects activation responses that switch the line or attachment binding.
+
 The four Builder reference panels map to `IMessageChannel`, `WhatsAppChannel`,
 `EmailChannel`, and `NumberChannel`/`SMSChannel`. Builder replacement and creator
 payouts are separate work. `NumberChannel` handles acquisition of SMS/iMessage

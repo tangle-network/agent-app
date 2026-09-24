@@ -47,6 +47,8 @@ jobs:
           git add --intent-to-add -- docs
           git diff --binary -- docs > "$VERIFICATION_DIR/docs.patch"
           git diff --exit-code -- docs
+      - name: Verify committed-source signoff
+        run: pnpm signoff --source head --json "$VERIFICATION_DIR/signoff.json" > "$VERIFICATION_DIR/signoff.log" 2>&1 || { tail -120 "$VERIFICATION_DIR/signoff.log"; exit 1; }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
