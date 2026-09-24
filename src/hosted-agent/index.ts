@@ -55,12 +55,21 @@ export interface HostedAgentConfig {
   /** Backend harness type, such as `opencode`; the runtime default when omitted. */
   harness?: string
   store: HostedAgentStore
-  /** Answers per person per UTC day before `allow` must decide. Default 20. */
+  /**
+   * The Platform meter that counts this agent's turns (Hub
+   * `hub.allowances`). Each person is one member. Default `hosted-agent`.
+   */
+  meter?: string
+  /**
+   * Answers per person per UTC day before `allow` must decide. Default 20.
+   * Written to the meter's plan when the meter has none; a plan already set
+   * on the Platform wins.
+   */
   freeTurnsPerDay?: number
   /**
-   * Decide a new message after the free allowance is used, for example reply
-   * with a checkout link. Without it, a person past the allowance is told to
-   * come back tomorrow. Retries of an admitted message never reach this hook.
+   * Decide a new message the Platform did not admit, for example reply with a
+   * checkout link. Without it, a person past the allowance is told to come
+   * back tomorrow. Retries of an admitted message never reach this hook.
    */
   allow?: (message: HostedMessage, usedToday: number) => Allowance | Promise<Allowance>
   /**
@@ -323,20 +332,26 @@ export function createHostedAgent(config: HostedAgentConfig) {
     }
   }
 
-  /** Admit a new message once: STOP/START, the free allowance, then `allow`. */
+  const meter = config.meter ?? 'hosted-agent'
+  /** Give the meter the configured allowance once, unless it already has a plan. */
+  let planned: Promise<void> | undefined
+  const ensurePlan = () => planned ??= (async () => {
+    if ((await hub.allowances.plan(meter)).configured) return
+    await hub.allowances.setPlan(meter, { free: { turnsPerDay: config.freeTurnsPerDay ?? 20, usdPerDay: null }, paid: null,
+      spendResourceType: null })
+  })().catch(error => { planned = undefined; throw error })
+
+  /** Admit a new message once: STOP/START, then the Platform's allowance, then `allow`. */
   async function admit(message: HostedMessage, user: string): Promise<Allowance> {
     const stopKey = `stop:${user}`
     if (message.channel !== 'voice' && STOP.test(message.text.trim())) { await store.put(stopKey, '1'); return { reply: NOTICE.stopped } }
     if (message.channel !== 'voice' && START.test(message.text.trim())) { await store.put(stopKey, ''); return { reply: NOTICE.started } }
     if (await store.get(stopKey)) return 'ignore'
-    const dayKey = `turns:${user}:${new Date().toISOString().slice(0, 10)}`
-    // KV has no atomic increment, so concurrent messages may overshoot the
-    // allowance by a few; the sponsor key's budget is the hard ceiling.
-    const used = Number(await store.get(dayKey) ?? 0)
-    const decision = used < (config.freeTurnsPerDay ?? 20) ? 'answer'
-      : config.allow ? await config.allow(message, used) : { reply: NOTICE.limit }
-    if (decision === 'answer') await store.put(dayKey, String(used + 1), { expirationTtl: TWO_DAYS })
-    return decision
+    await ensurePlan()
+    // The Platform counts atomically and never counts one turn id twice.
+    const allowance = await hub.allowances.admit(meter, { member: user, turnId: message.turnId, channel: message.channel })
+    if (allowance.decision === 'admit') return 'answer'
+    return config.allow ? await config.allow(message, allowance.turns.used) : { reply: NOTICE.limit }
   }
 
   /** Run one message in the person's box until it answers or `deadline`. */
