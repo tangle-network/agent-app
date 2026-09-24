@@ -137,7 +137,8 @@ describe('hosted agent on the platform', () => {
   })
 
   it('keeps the turn pending while the platform restarts a box that cannot start', async () => {
-    platform.ensure.mockRejectedValue(new InstanceRestartingError())
+    const record = { key: 'hosted:x', generation: 1, sandboxId: 'sbx_person', profileVersion: null, unstartableSince: 0, createdAt: 0, updatedAt: 0 }
+    platform.ensure.mockRejectedValue(new InstanceRestartingError('restarting', record, new Error('CONTAINER_START_FAILED'), 30_000))
     const { agent: braid } = agent()
 
     expect(await braid.ask(message(), soon())).toEqual({ state: 'pending' })

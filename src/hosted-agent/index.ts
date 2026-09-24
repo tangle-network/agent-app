@@ -11,28 +11,20 @@ export * from './engine'
  * that person's own isolated sandbox. The developer's Tangle API key pays for
  * every box, model turn and reply.
  *
- * The platform keeps each person's box and counts their turns. Each person
+ * The platform keeps each person's box and counts their turns: each person
  * is one Sandbox instance (`sandbox.instances`), a fresh isolated box built
- * from the published profile, never a copy of the developer's box: the
- * platform creates it, resumes it, and replaces it when it was deleted or
- * cannot start. Each person is one member of a Hub allowance meter, which
- * admits each turn once and decides the paywall past the free allowance.
- *
- * Later messages resume the same box and the same conversation, so text and
- * voice share one memory. A new profile starts a new session in the same box,
- * and a replaced box starts a new one; either way the person's recent
- * conversation carries over from the store.
+ * from the published profile, and one member of a Hub allowance meter.
+ * Later messages resume the same box and conversation, so text and voice
+ * share one memory. A new profile starts a new session in the same box; a
+ * replaced box starts a new one. Either way the person's recent conversation
+ * carries over from the store.
  *
  * Every step is idempotent by the message's turn id: a retried delivery
  * settles the same sandbox turn, the same allowance admission and the same
  * Hub send. So the caller may retry any failure, and needs no dedupe table.
  */
 
-/**
- * Durable key-value storage for what stays with the app: STOP state, the
- * owner's debug switch, voice call tokens and each person's recent turns. A
- * Cloudflare KV namespace satisfies it.
- */
+/** Durable key-value storage for STOP state, the debug switch, call tokens and recent turns. A Cloudflare KV namespace satisfies it. */
 export interface HostedAgentStore {
   get(key: string): Promise<string | null>
   put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>
