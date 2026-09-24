@@ -4,8 +4,7 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true },
-  // Voice call tokens. Hub keeps each person's box, thread and daily count.
-  "kv_namespaces": [{ "binding": "USERS", "id": "c7e80e2612474a25b4fe1a0c29487de4" }]
-  // Secrets: wrangler secret put TANGLE_API_KEY | VOICE_SECRET | OWNER_PHONE
+  "observability": { "enabled": true }
+  // Hub keeps each person's box, thread, daily count and calls.
+  // Secrets: wrangler secret put TANGLE_API_KEY | OWNER_PHONE | SETUP_SECRET
 }

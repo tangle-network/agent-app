@@ -5,20 +5,17 @@ import { createHostedAgent } from '@tangle-network/agent-app/hosted-agent'
  * sandbox with its own memory, and every cost bills to this app's Tangle key.
  *
  *   iMessage  person -> Inkbox line -> Tangle Hub -> the person's own box -> Hub reply
- *   voice     person -> ph0ny number -> POST /voice/hook (admit) -> ask_workspace -> POST /voice/ask
+ *   voice     person -> Inkbox line -> Tangle Hub -> ph0ny agent -> ask_workspace -> the same box and thread
  *
- * Texts never reach this Worker: Hub routes them once `POST /setup` has
- * attached the line.
+ * Texts and calls never reach this Worker: Hub routes them once `POST /setup`
+ * has attached the line.
  */
 export interface Env {
   TANGLE_API_KEY: string
-  VOICE_SECRET: string
   /** Your own phone (E.164): the line's owner. */
   OWNER_PHONE: string
   /** Enables `POST /setup` while set. */
   SETUP_SECRET?: string
-  /** Voice call tokens. */
-  USERS: KVNamespace
 }
 
 export const persona = {
@@ -46,16 +43,15 @@ const braid = (env: Env) => createHostedAgent({
   profile: persona,
   owner: env.OWNER_PHONE,
   freeTurnsPerDay: 30,
-  store: env.USERS,
-  voiceSecret: env.VOICE_SECRET,
 })
 
 /**
  * One-time: attach an Inkbox iMessage identity, already connected to Hub under
- * this app's Tangle account, as Braid's line. It runs here because the Worker
- * holds the app's key. A Hub event subscription an earlier version of this
- * app made on the connection is removed first: Hub refuses a line that
- * another route would also answer.
+ * this app's Tangle account, as Braid's line, and with `voice` take calls on
+ * it through that ph0ny agent. It runs here because the Worker holds the
+ * app's key. A Hub event subscription an earlier version of this app made on
+ * the connection is removed first: Hub refuses a line that another route
+ * would also answer.
  */
 async function setup(request: Request, env: Env): Promise<Response> {
   const given = new TextEncoder().encode(request.headers.get('authorization') ?? '')
@@ -70,13 +66,16 @@ async function setup(request: Request, env: Env): Promise<Response> {
   }
   const earlier = listed.data.subscriptions.filter(s => s.clientReference.startsWith('hosted-agent:'))
   // Without a connection id, move the connection an earlier version of this app routed.
-  const { connectionId = earlier[0]?.connectionId } = await request.json().catch(() => ({})) as { connectionId?: string }
+  const { connectionId = earlier[0]?.connectionId, voice } = await request.json().catch(() => ({})) as {
+    connectionId?: string
+    voice?: { ph0nyConnectionId: string; ph0nyAgentId: string }
+  }
   if (!connectionId) return Response.json({ error: 'connectionId is required' }, { status: 400 })
   for (const subscription of earlier) {
     if (subscription.connectionId === connectionId) await hub(`event-subscriptions/${subscription.id}`, { method: 'DELETE' })
   }
   try {
-    return Response.json(await braid(env).attachLine(connectionId))
+    return Response.json(await braid(env).attachLine(connectionId, { voice }))
   } catch (error) {
     return Response.json({ error: String(error).slice(0, 500) }, { status: 502 })
   }
@@ -86,8 +85,6 @@ export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url)
     if (request.method === 'POST' && pathname === '/setup') return setup(request, env)
-    if (request.method === 'POST' && pathname === '/voice/hook') return braid(env).voiceHook(request)
-    if (request.method === 'POST' && pathname === '/voice/ask') return braid(env).voiceAsk(request)
     return new Response('Braid is a Tangle hosted agent. Text or call to talk.\n')
   },
 } satisfies ExportedHandler<Env>
