@@ -144,8 +144,6 @@ export function createHostedAgent(config: HostedAgentConfig) {
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
   const wallCapMs = config.turnWallCapMs ?? 120_000
   const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
-  // The peer range admits older Sandbox minors for other subpaths; lines arrived in 0.51.
-  if (!('lines' in sandbox)) throw new HostedAgentError('sandbox_too_old', 'hosted-agent needs @tangle-network/sandbox 0.51 or later.')
   if (!E164.test(config.owner)) throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number, such as +15550100001.')
   const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile: conversationProfile(config.profile) }
   const create: LineInstanceCreate = {
