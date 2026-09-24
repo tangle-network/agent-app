@@ -11,6 +11,9 @@
   and Knowledge 17.1.1 and older refuse Eval 0.185.
   Development and generated applications use Eval 0.186.2, Runtime 0.259.0,
   Interface 2.12.0, Knowledge 17.1.2 and Sandbox 0.49.0.
+- Settle turns that Sandbox 0.49 reports as `blocked_on_approval`, `awaiting_question` or `awaiting_interaction`.
+  Sandbox 0.45 reported these outcomes as `failed`. The detached-turn Workflow rejected them as unknown states and retried a settled turn.
+  A hosted turn now answers each one as `needs_decision`, as it does a plan decision.
 - Wait for SDK removal before replacing a workspace sandbox under the same idempotency key.
   Reject pending removal, and apply `forceNew` to stopped sandboxes as well as running sandboxes.
 - Update evaluator, execution, knowledge, and profile dependencies as one supported set.
