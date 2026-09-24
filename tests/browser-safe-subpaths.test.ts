@@ -32,6 +32,7 @@ const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')) as {
  *  react/lazy family is derived dynamically below. */
 const BROWSER_NONREACT = new Set([
   'catalog',
+  'channels',
   'theme',
   'stream',
   'trace',

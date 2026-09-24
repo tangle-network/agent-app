@@ -212,6 +212,11 @@
       "import": "./dist/integrations/index.js",
       "default": "./dist/integrations/index.js"
     },
+    "./channels": {
+      "types": "./dist/channels/index.d.ts",
+      "import": "./dist/channels/index.js",
+      "default": "./dist/channels/index.js"
+    },
     "./hosted-agent": {
       "types": "./dist/hosted-agent/index.d.ts",
       "import": "./dist/hosted-agent/index.js",
