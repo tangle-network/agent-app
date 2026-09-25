@@ -105,7 +105,7 @@ describe('hosted agent on Hub lines', () => {
       roles: { owner: { context: 'own', tools: 'act' }, guest: { context: 'own', tools: 'act' } },
       limits: { turnsPerMemberPerDay: 30 },
       instance: { keyPrefix: 'hosted:', create: {
-        resources: { cpuCores: 1, memoryMB: 2048, diskGB: 10 },
+        resources: { cpuCores: 2, memoryMB: 2048, diskGB: 2 },
         egressPolicy: { mode: 'strict', allowDomains: ['router.tangle.tools'], includeImplicitDomains: false },
         idleTimeoutSeconds: 600 } },
     })
