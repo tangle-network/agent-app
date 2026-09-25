@@ -26,7 +26,7 @@ export interface HostedAgentConfig {
   profile: AgentProfile
   /** Backend harness type, such as `opencode`; the runtime default when omitted. */
   harness?: string
-  /** The owner's own phone (E.164), the line's first member. */
+  /** The owner's address on the chosen transport: E.164 phone or email. */
   owner: string
   /** Texts Hub answers per person per UTC day. Default 20. */
   freeTurnsPerDay?: number
@@ -106,7 +106,7 @@ export class HostedAgentError extends Error {
 }
 
 export function createHostedAgent(config: HostedAgentConfig) {
-  if (!E164.test(config.owner)) throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number, such as +15550100001.')
+  if (!E164.test(config.owner) && !EMAIL.test(config.owner)) throw new HostedAgentError('owner_invalid', 'owner must be an E.164 phone number or email address.')
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
   const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
   const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile: conversationProfile(config.profile) }
@@ -132,20 +132,43 @@ export function createHostedAgent(config: HostedAgentConfig) {
      * subscription on the connection first; Hub refuses a line that another
      * route would also answer.
      */
-    async attachLine(connectionId: string, options: { voice?: LineVoiceOptions } = {}): Promise<Line> {
-      const line = await sandbox.lines.fromConnection({ connectionId, transport: 'imessage', clientReference: 'hosted-agent' })
+    async attachLine(connectionId: string, options: {
+      transport?: 'imessage' | 'email' | 'whatsapp'
+      mode?: 'personal' | 'shared'
+      /** Required for WhatsApp because one Linq connection may own several numbers. */
+      phoneNumberId?: string
+      voice?: LineVoiceOptions
+    } = {}): Promise<Line> {
+      const transport = options.transport ?? 'imessage'
+      const mode = options.mode ?? 'shared'
+      if (transport === 'email' && !EMAIL.test(config.owner))
+        throw new HostedAgentError('owner_transport_mismatch', 'email lines require an email owner address.')
+      if (transport !== 'email' && !E164.test(config.owner))
+        throw new HostedAgentError('owner_transport_mismatch', `${transport} lines require an E.164 owner address.`)
+      if (transport === 'whatsapp' && !options.phoneNumberId)
+        throw new HostedAgentError('phone_number_required', 'WhatsApp lines require phoneNumberId.')
+      if (transport !== 'whatsapp' && options.phoneNumberId)
+        throw new HostedAgentError('phone_number_not_allowed', 'phoneNumberId is only valid for WhatsApp lines.')
+      const line = await sandbox.lines.fromConnection(
+        transport === 'whatsapp'
+          ? { connectionId, transport, phoneNumberId: options.phoneNumberId!, clientReference: 'hosted-agent' }
+          : { connectionId, transport, clientReference: 'hosted-agent' },
+      )
       await sandbox.lines.attach({
         number: line.id,
-        mode: 'shared',
+        mode,
         members: [{ address: config.owner, role: 'owner' }],
-        unknownSenders: 'guest',
-        roles: { owner: PERSON, guest: PERSON },
+        unknownSenders: mode === 'shared' ? 'guest' : 'reject',
+        roles: mode === 'shared' ? { owner: PERSON, guest: PERSON } : { owner: PERSON },
         respond: { kind: 'agent', backend },
         limits: { turnsPerMemberPerDay: config.freeTurnsPerDay ?? 20 },
         instance: { keyPrefix: PERSON_KEY_PREFIX, create },
         clientReference: 'hosted-agent',
       })
-      if (options.voice) await sandbox.lines.enableVoice(line.id, options.voice)
+      if (options.voice) {
+        if (transport !== 'imessage') throw new HostedAgentError('voice_transport_unsupported', 'Voice is supported only on iMessage lines.')
+        await sandbox.lines.enableVoice(line.id, options.voice)
+      }
       return sandbox.lines.get(line.id)
     },
   }
