@@ -125,8 +125,12 @@ export function createHostedAgent(config: HostedAgentConfig) {
      * texts it each get their own box and thread. With `voice`, calls to the
      * line reach the caller's box and thread through that ph0ny agent; Hub
      * admits only members, so a caller texts once before calling. Safe to
-     * repeat with the same config. Remove any Hub event subscription on the
-     * connection first; Hub refuses a line that another route would also answer.
+     * repeat with the same config. Hub refuses a changed profile, box or
+     * limit on an attached line: detach it first
+     * (`DELETE /v1/lines/:id/attachment`). Each person keeps their box and
+     * its memory, and their thread starts over. Remove any Hub event
+     * subscription on the connection first; Hub refuses a line that another
+     * route would also answer.
      */
     async attachLine(connectionId: string, options: { voice?: LineVoiceOptions } = {}): Promise<Line> {
       const line = await sandbox.lines.fromConnection({ connectionId, transport: 'imessage', clientReference: 'hosted-agent' })
