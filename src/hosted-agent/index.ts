@@ -45,8 +45,17 @@ export interface BoxPolicy {
   allowDomains: string[]
 }
 
+/**
+ * Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the
+ * platform's hourly floor. A person's box starts OpenCode on their first text
+ * and after every idle stop, and that start is CPU-bound: on one core it took
+ * 6.1 s after a resume and 8.4 s on a new box, on two cores 3.5 s and 3.4 s
+ * (production, 2026-09-24). A disk no larger than the platform's warm seed
+ * lets a new person's box be claimed from the warm pool: create took 2.1-2.7 s
+ * instead of 5.3-7.0 s (2026-09-25).
+ */
 export const DEFAULT_BOX_POLICY: BoxPolicy = {
-  cpuCores: 1, memoryMB: 2048, diskGB: 10,
+  cpuCores: 2, memoryMB: 2048, diskGB: 2,
   idleTimeoutSeconds: 600, maxLifetimeSeconds: 86_400, deleteAfterStoppedSeconds: 7 * 86_400,
   allowDomains: ['router.tangle.tools'],
 }
