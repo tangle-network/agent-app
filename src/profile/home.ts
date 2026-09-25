@@ -1,5 +1,5 @@
 import type { AgentProfile, AgentProfileFileMount } from '@tangle-network/agent-interface'
-import { mergeAgentProfiles } from '@tangle-network/agent-interface'
+import { defineInlineResource, mergeAgentProfiles } from '@tangle-network/agent-interface'
 
 export const DEFAULT_HOME_LIMITS = {
   'AGENTS.md': 12_000,
@@ -60,7 +60,7 @@ After answering enough to be useful:
 `
 
 function inline(path: string, content: string): AgentProfileFileMount {
-  return { path, resource: { kind: 'inline', name: `default-home:${path}`, content } }
+  return { path, resource: defineInlineResource(`default-home:${path}`, content) }
 }
 
 export function defaultHomeFiles(): AgentProfileFileMount[] {
