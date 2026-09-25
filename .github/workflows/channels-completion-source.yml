@@ -1,0 +1,31 @@
+name: Channels completion source
+on:
+  push:
+    branches: [pro/channels-kit]
+    paths: [.github/workflows/channels-completion-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Record exact package and current main sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/source"
+          git archive HEAD | gzip > "$RUNNER_TEMP/source/channels-kit.tar.gz"
+          git archive origin/main | gzip > "$RUNNER_TEMP/source/main.tar.gz"
+          git rev-parse HEAD > "$RUNNER_TEMP/source/head.txt"
+          git rev-parse origin/main > "$RUNNER_TEMP/source/main.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: channels-integration-source
+          path: ${{ runner.temp }}/source
+          retention-days: 3
+          compression-level: 0
