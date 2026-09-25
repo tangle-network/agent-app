@@ -7776,36 +7776,12 @@ interface ResolveSessionHarnessInput
 
 Source: `src/hosted-agent/index.ts`
 
-### `AskResult`
-
-`type`
-
-```ts
-type AskResult
-```
-
-### `AUTHORITY_ENDED`
-
-`const` — Refusal detail when the host's `authorize` check fails.
-
-```ts
-"authority_ended"
-```
-
 ### `BoxPolicy`
 
 `interface`
 
 ```ts
 interface BoxPolicy
-```
-
-### `chatOnlyBackend`
-
-`function` — A space member who may chat only: no shell and no file writes in the shared box.
-
-```ts
-(backend: BackendConfig) => BackendConfig
 ```
 
 ### `CONVERSATION_TOOLS_OFF`
@@ -7821,7 +7797,7 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 `function`
 
 ```ts
-(config: HostedAgentConfig) => { attachLine(connectionId: string): Promise<LineAttachment>; voiceHook(request: Request)…
+(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { voice?: LineVoiceOptions | undefined; }):…
 ```
 
 ### `DEFAULT_BOX_POLICY`
@@ -7840,14 +7816,6 @@ BoxPolicy
 "openai/gpt-5.6-luna"
 ```
 
-### `describeFailure`
-
-`function` — The code omits the message, which can carry ids or times that differ on every repeat of one cause.
-
-```ts
-(error: unknown) => TurnFailure
-```
-
 ### `HostedAgent`
 
 `type`
@@ -7858,7 +7826,7 @@ type HostedAgent
 
 ### `HostedAgentConfig`
 
-`interface`
+`interface` — A hosted agent: people text or call a line, and each person is answered from their own isolated sandbox.
 
 ```ts
 interface HostedAgentConfig
@@ -7872,148 +7840,12 @@ interface HostedAgentConfig
 class HostedAgentError
 ```
 
-### `HostedAgentStore`
-
-`interface` — Durable key-value storage for voice call tokens.
-
-```ts
-interface HostedAgentStore
-```
-
-### `HostedTurnOptions`
-
-`interface`
-
-```ts
-interface HostedTurnOptions
-```
-
-### `HostedTurnPorts`
-
-`interface` — Storage and policy a host supplies for one message.
-
-```ts
-interface HostedTurnPorts
-```
-
-### `isTransientFailure`
-
-`function`
-
-```ts
-(failure: Pick<TurnFailure, "status" | "name" | "reason">) => boolean
-```
-
-### `MAX_MESSAGE_CHARS`
-
-`const`
-
-```ts
-8000
-```
-
-### `MAX_REPEATED_FAILURES`
-
-`const` — Identical non-transient failures in a row after which a host fails a turn.
-
-```ts
-3
-```
-
-### `PendingDetail`
-
-`interface` — Where an unfinished turn stands.
-
-```ts
-interface PendingDetail
-```
-
 ### `PERSON_KEY_PREFIX`
 
 `const` — Each person's box is the developer's named instance with this prefix.
 
 ```ts
 "hosted:"
-```
-
-### `runHostedTurn`
-
-`function` — One non-blocking pass for one message.
-
-```ts
-<Box extends TurnBox>(turn: { turnId: string; text: string; }, ports: HostedTurnPorts<Box>, options: HostedTurnOptions)…
-```
-
-### `settleHostedTurn`
-
-`function` — Repeat passes until the turn settles, for a caller that holds a connection open (a voice question, say).
-
-```ts
-(pass: () => Promise<TurnOutcome>, options: { deadline: number; pollMs?: number | undefined; signal?: AbortSignal | und…
-```
-
-### `TurnBox`
-
-`interface` — The part of a Sandbox box one turn uses.
-
-```ts
-interface TurnBox
-```
-
-### `TurnFailure`
-
-`interface` — A thrown value as a stable code plus a secret-free message for a log line.
-
-```ts
-interface TurnFailure
-```
-
-### `TurnObserver`
-
-`interface` — What a pass reports while it runs.
-
-```ts
-interface TurnObserver
-```
-
-### `TurnOutcome`
-
-`type` — `cause` is what a port or the Sandbox threw, when a throw left the turn pending.
-
-```ts
-type TurnOutcome
-```
-
-### `TurnPending`
-
-`class` — A port throws this to report a turn that is not ready yet, such as a box still starting.
-
-```ts
-class TurnPending
-```
-
-### `TurnRefusal`
-
-`type` — The one turn engine for a hosted agent, whatever hosts it.
-
-```ts
-type TurnRefusal
-```
-
-### `TurnReply`
-
-`type`
-
-```ts
-type TurnReply
-```
-
-### `TurnStep`
-
-`type`
-
-```ts
-type TurnStep
 ```
 
 
