@@ -1,5 +1,5 @@
 import type { AgentProfile, BackendConfig, LineVoiceOptions } from '@tangle-network/sandbox'
-import { type Line, type LineInstanceCreate, Sandbox } from '@tangle-network/sandbox/core'
+import { type Line, type LineFromConnectionInput, type LineInstanceCreate, type LineTransport, Sandbox } from '@tangle-network/sandbox/core'
 
 /**
  * A hosted agent: people text or call a line, and each person is answered
@@ -106,7 +106,6 @@ export class HostedAgentError extends Error {
 }
 
 export function createHostedAgent(config: HostedAgentConfig) {
-  if (!E164.test(config.owner)) throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number, such as +15550100001.')
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
   const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
   const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile: conversationProfile(config.profile) }
@@ -120,8 +119,8 @@ export function createHostedAgent(config: HostedAgentConfig) {
 
   return {
     /**
-     * Attach an Inkbox iMessage identity, connected to Hub under the
-     * developer's account, as this agent's line: the owner and anyone who
+     * Attach an iMessage, WhatsApp, or email connection already owned by Hub
+     * as this agent's line: the owner and anyone who
      * texts it each get their own box and thread. With `voice`, calls to the
      * line reach the caller's box and thread through that ph0ny agent; Hub
      * admits only members, so a caller texts once before calling. Safe to
@@ -132,8 +131,29 @@ export function createHostedAgent(config: HostedAgentConfig) {
      * subscription on the connection first; Hub refuses a line that another
      * route would also answer.
      */
-    async attachLine(connectionId: string, options: { voice?: LineVoiceOptions } = {}): Promise<Line> {
-      const line = await sandbox.lines.fromConnection({ connectionId, transport: 'imessage', clientReference: 'hosted-agent' })
+    async attachLine(
+      connectionId: string,
+      options: { transport?: Exclude<LineTransport, 'sms'>; phoneNumberId?: string; voice?: LineVoiceOptions } = {},
+    ): Promise<Line> {
+      const transport = options.transport ?? 'imessage'
+      if (transport === 'email') {
+        if (!EMAIL.test(config.owner)) throw new HostedAgentError('owner_not_email', 'owner must be an email address for an email line.')
+      } else if (!E164.test(config.owner)) {
+        throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number, such as +15550100001.')
+      }
+      if (transport === 'whatsapp' && !options.phoneNumberId) {
+        throw new HostedAgentError('whatsapp_phone_number_required', 'phoneNumberId is required for a WhatsApp line.')
+      }
+      if (transport !== 'whatsapp' && options.phoneNumberId) {
+        throw new HostedAgentError('phone_number_not_supported', 'phoneNumberId is only valid for a WhatsApp line.')
+      }
+      if (options.voice && transport !== 'imessage') {
+        throw new HostedAgentError('voice_transport_unsupported', 'voice is currently supported only on iMessage lines.')
+      }
+      const input: LineFromConnectionInput = transport === 'whatsapp'
+        ? { connectionId, transport, phoneNumberId: options.phoneNumberId!, clientReference: 'hosted-agent' }
+        : { connectionId, transport, clientReference: 'hosted-agent' }
+      const line = await sandbox.lines.fromConnection(input)
       await sandbox.lines.attach({
         number: line.id,
         mode: 'shared',
