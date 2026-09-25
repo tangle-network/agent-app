@@ -6031,7 +6031,7 @@
           "name": "DEFAULT_BOX_POLICY",
           "kind": "const",
           "signature": "BoxPolicy",
-          "doc": null
+          "doc": "Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the platform's hourly floor."
         },
         {
           "name": "DEFAULT_HOSTED_MODEL",

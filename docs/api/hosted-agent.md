@@ -56,7 +56,7 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 
 ### `DEFAULT_BOX_POLICY`
 
-`const`
+`const` — Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the platform's hourly floor.
 
 ```ts
 BoxPolicy
