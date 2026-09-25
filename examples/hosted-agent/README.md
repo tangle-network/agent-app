@@ -64,6 +64,14 @@ wrangler secret delete SETUP_SECRET
 
 Hub's line timeline (`client.lines.threads(lineId).messages(threadId)`) records when each text arrived, was answered and was sent.
 
+To change the persona, box or daily limit later, detach the line, deploy, and run setup again.
+Hub refuses a changed attachment on an attached line with 409 `Line is attached; detach it before attaching it differently`.
+Each person keeps their box and its `memory.md`; their thread starts over.
+
+```sh
+curl -X DELETE https://sandbox.tangle.tools/v1/lines/<line id>/attachment -H "authorization: Bearer $TANGLE_API_KEY"
+```
+
 ## Connect voice (ph0ny)
 
 1. Create a ph0ny agent for the line's calls.
