@@ -75,6 +75,7 @@ export function defaultHomeFiles(): AgentProfileFileMount[] {
 }
 
 /** Add the platform home without replacing an app's own files. App mounts win on path collision. */
+/** Compose the general Tangle assistant substrate. Product/business behavior belongs in later preset and skill overlays. */
 export function withDefaultAgentHome(profile: AgentProfile): AgentProfile {
   // mergeAgentProfiles concatenates file mounts, so drop a home file the app already mounts.
   const owned = new Set((profile.resources?.files ?? []).map(file => file.path))
