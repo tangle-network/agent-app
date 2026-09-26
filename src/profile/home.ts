@@ -76,7 +76,9 @@ export function defaultHomeFiles(): AgentProfileFileMount[] {
 
 /** Add the platform home without replacing an app's own files. App mounts win on path collision. */
 export function withDefaultAgentHome(profile: AgentProfile): AgentProfile {
-  const home: AgentProfile = { resources: { files: defaultHomeFiles() } }
+  // mergeAgentProfiles concatenates file mounts, so drop a home file the app already mounts.
+  const owned = new Set((profile.resources?.files ?? []).map(file => file.path))
+  const home: AgentProfile = { resources: { files: defaultHomeFiles().filter(file => !owned.has(file.path)) } }
   const merged = mergeAgentProfiles(home, profile)
   if (!merged) throw new Error('withDefaultAgentHome: merge unexpectedly returned undefined')
   return merged

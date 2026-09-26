@@ -5988,7 +5988,9 @@
     {
       "id": "./hosted-agent",
       "source": "src/hosted-agent/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "profile"
+      ],
       "error": null,
       "exports": [
         {
@@ -9295,10 +9297,22 @@
           "doc": "Project corpus entries onto SDK file mounts at a relative path under `<anchor>/`."
         },
         {
+          "name": "DEFAULT_HOME_LIMITS",
+          "kind": "const",
+          "signature": "{ readonly 'AGENTS.md': 12000; readonly 'SOUL.md': 8000; readonly 'IDENTITY.md': 4000; readonly 'USER.md': 4000; readon…",
+          "doc": null
+        },
+        {
           "name": "DEFAULT_MAX_SYSTEM_PROMPT_BYTES",
           "kind": "const",
           "signature": "40000",
           "doc": "Byte budget on the FINAL composed `prompt.systemPrompt`."
+        },
+        {
+          "name": "defaultHomeFiles",
+          "kind": "function",
+          "signature": "() => AgentProfileFileMount[]",
+          "doc": null
         },
         {
           "name": "diffProfileFingerprints",
@@ -9491,6 +9505,12 @@
           "kind": "function",
           "signature": "(userSkills: UserSkill[]) => AgentProfileFileMount[]",
           "doc": "Project per-user skills onto SDK file mounts at the harness skill-discovery path."
+        },
+        {
+          "name": "withDefaultAgentHome",
+          "kind": "function",
+          "signature": "(profile: AgentProfile) => AgentProfile",
+          "doc": "Add the platform home without replacing an app's own files."
         }
       ]
     },

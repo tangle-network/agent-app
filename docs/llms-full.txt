@@ -7774,7 +7774,7 @@ interface ResolveSessionHarnessInput
 
 ## `./hosted-agent`
 
-Source: `src/hosted-agent/index.ts`
+Source: `src/hosted-agent/index.ts` · depends on `profile`
 
 ### `BoxPolicy`
 
@@ -11993,12 +11993,28 @@ interface CorpusLoadResult
 (corpus: CorpusEntry[], anchor: string) => AgentProfileFileMount[]
 ```
 
+### `DEFAULT_HOME_LIMITS`
+
+`const`
+
+```ts
+{ readonly 'AGENTS.md': 12000; readonly 'SOUL.md': 8000; readonly 'IDENTITY.md': 4000; readonly 'USER.md': 4000; readon…
+```
+
 ### `DEFAULT_MAX_SYSTEM_PROMPT_BYTES`
 
 `const` — Byte budget on the FINAL composed `prompt.systemPrompt`.
 
 ```ts
 40000
+```
+
+### `defaultHomeFiles`
+
+`function`
+
+```ts
+() => AgentProfileFileMount[]
 ```
 
 ### `diffProfileFingerprints`
@@ -12255,6 +12271,14 @@ interface UserSkill
 
 ```ts
 (userSkills: UserSkill[]) => AgentProfileFileMount[]
+```
+
+### `withDefaultAgentHome`
+
+`function` — Add the platform home without replacing an app's own files.
+
+```ts
+(profile: AgentProfile) => AgentProfile
 ```
 
 
