@@ -34,12 +34,18 @@ build_expected_release_tree() {
   local commit=$1
   local root_file="$WORK/expected-package.json"
   local create_file="$WORK/expected-create-package.json"
+  local changelog_file="$WORK/expected-CHANGELOG.md"
+  local subjects_file="$WORK/release-subjects.txt"
   local index_file="$WORK/expected.index"
   git show "$commit:package.json" > "$root_file"
   git show "$commit:create-agent-app/package.json" > "$create_file"
-  EXPECTED_VERSION="$VERSION" node - "$root_file" "$create_file" <<'NODE'
+  git show "$commit:CHANGELOG.md" > "$changelog_file"
+  last_tag=$(git describe --tags --abbrev=0 --match 'v*' "$commit")
+  git log --no-merges --format=%s "$last_tag..$commit" > "$subjects_file"
+  EXPECTED_VERSION="$VERSION" node - "$root_file" "$create_file" "$changelog_file" "$subjects_file" <<'NODE'
 const fs = require('node:fs')
-const files = process.argv.slice(2)
+const [rootFile, createFile, changelogFile, subjectsFile] = process.argv.slice(2)
+const files = [rootFile, createFile]
 const manifests = files.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')))
 if (manifests[0].name !== '@tangle-network/agent-app' || manifests[1].name !== '@tangle-network/create-agent-app') {
   throw new Error('unexpected package names')
@@ -52,14 +58,25 @@ for (let index = 0; index < files.length; index += 1) {
   manifests[index].version = process.env.EXPECTED_VERSION
   fs.writeFileSync(files[index], `${JSON.stringify(manifests[index], null, 2)}\n`)
 }
+let changelog = fs.readFileSync(changelogFile, 'utf8')
+const subjects = fs.readFileSync(subjectsFile, 'utf8').split('\n').filter(Boolean)
+if (/^## Unreleased$/m.test(changelog)) {
+  changelog = changelog.replace(/^## Unreleased$/m, `## ${process.env.EXPECTED_VERSION}`)
+} else {
+  const notes = subjects.map((subject) => `- ${subject}`).join('\n')
+  changelog = changelog.replace(/^# Changelog\s*/m, `# Changelog\n\n## ${process.env.EXPECTED_VERSION}\n\n${notes}\n\n`)
+}
+fs.writeFileSync(changelogFile, changelog)
 NODE
 
-  local root_blob create_blob
+  local root_blob create_blob changelog_blob
   root_blob=$(git hash-object -w "$root_file")
   create_blob=$(git hash-object -w "$create_file")
+  changelog_blob=$(git hash-object -w "$changelog_file")
   GIT_INDEX_FILE="$index_file" git read-tree "$commit^{tree}"
   GIT_INDEX_FILE="$index_file" git update-index --cacheinfo "100644,$root_blob,package.json"
   GIT_INDEX_FILE="$index_file" git update-index --cacheinfo "100644,$create_blob,create-agent-app/package.json"
+  GIT_INDEX_FILE="$index_file" git update-index --cacheinfo "100644,$changelog_blob,CHANGELOG.md"
   GIT_INDEX_FILE="$index_file" git write-tree
 }
 
@@ -73,8 +90,8 @@ validate_existing_release() {
   git merge-base --is-ancestor "$release_sha" refs/remotes/origin/main ||
     die "Existing $TAG_REF is not on origin/main."
   mapfile -t changed < <(git diff --name-only "$BASE_SHA" "$release_sha" | LC_ALL=C sort)
-  [[ ${#changed[@]} -eq 2 && "${changed[0]}" == 'create-agent-app/package.json' && "${changed[1]}" == 'package.json' ]] ||
-    die "Existing $TAG_REF changes files other than the two package manifests."
+  [[ ${#changed[@]} -eq 3 && "${changed[0]}" == 'CHANGELOG.md' && "${changed[1]}" == 'create-agent-app/package.json' && "${changed[2]}" == 'package.json' ]] ||
+    die "Existing $TAG_REF changes files other than release-owned version and changelog metadata."
   [[ $(git log -1 --format=%s "$release_sha") == "chore(release): $VERSION [skip release]" ]] ||
     die "Existing $TAG_REF has an unexpected commit message."
   expected_tree=$(build_expected_release_tree "$BASE_SHA")
@@ -124,14 +141,17 @@ prepare_release_manifests() {
   expected_tree=$(build_expected_release_tree "$BASE_SHA")
   git show "$expected_tree:package.json" > package.json
   git show "$expected_tree:create-agent-app/package.json" > create-agent-app/package.json
+  git show "$expected_tree:CHANGELOG.md" > CHANGELOG.md
   mapfile -t changed < <(git diff --name-only HEAD -- | LC_ALL=C sort)
-  [[ ${#changed[@]} -eq 2 && "${changed[0]}" == 'create-agent-app/package.json' && "${changed[1]}" == 'package.json' ]] ||
-    die 'Release preparation changed files other than the two package manifests.'
+  [[ ${#changed[@]} -eq 3 && "${changed[0]}" == 'CHANGELOG.md' && "${changed[1]}" == 'create-agent-app/package.json' && "${changed[2]}" == 'package.json' ]] ||
+    die 'Release preparation changed files other than release-owned version and changelog metadata.'
   [[ $(git hash-object package.json) == $(git rev-parse "$expected_tree:package.json") ]] ||
     die 'Prepared Agent App manifest differs from the release tree.'
   [[ $(git hash-object create-agent-app/package.json) == $(git rev-parse "$expected_tree:create-agent-app/package.json") ]] ||
     die 'Prepared create-agent-app manifest differs from the release tree.'
-  echo "Prepared package manifests for v$VERSION."
+  [[ $(git hash-object CHANGELOG.md) == $(git rev-parse "$expected_tree:CHANGELOG.md") ]] ||
+    die 'Prepared changelog differs from the release tree.'
+  echo "Prepared package manifests and changelog for v$VERSION."
 }
 
 dispatch_release() {
