@@ -7797,7 +7797,7 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 `function`
 
 ```ts
-(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { voice?: LineVoiceOptions | undefined; }):…
+(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { transport?: "email" | "imessage" | "whats…
 ```
 
 ### `DEFAULT_BOX_POLICY`

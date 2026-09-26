@@ -100,6 +100,7 @@ function conversationProfile(profile: AgentProfile): AgentProfile {
 /** Each person runs in their own box, so no member shares a disk and each may use the persona's tools. */
 const PERSON = { context: 'own', tools: 'act' } as const
 const E164 = /^\+[1-9]\d{6,14}$/
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export class HostedAgentError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = 'HostedAgentError' }
@@ -120,9 +121,12 @@ export function createHostedAgent(config: HostedAgentConfig) {
 
   return {
     /**
-     * Attach an Inkbox iMessage identity, connected to Hub under the
-     * developer's account, as this agent's line: the owner and anyone who
-     * texts it each get their own box and thread. With `voice`, calls to the
+     * Attach a Hub connection the developer owns as this agent's line:
+     * an Inkbox iMessage identity (default), its email mailbox, or a Linq
+     * WhatsApp number (`phoneNumberId`). The owner's address must match the
+     * transport. In `shared` mode (default) the owner and anyone who texts it
+     * each get their own box and thread; `personal` admits the owner only.
+     * With `voice` (iMessage lines only), calls to the
      * line reach the caller's box and thread through that ph0ny agent; Hub
      * admits only members, so a caller texts once before calling. Safe to
      * repeat with the same config. Hub refuses a changed profile, box or
@@ -149,6 +153,8 @@ export function createHostedAgent(config: HostedAgentConfig) {
         throw new HostedAgentError('phone_number_required', 'WhatsApp lines require phoneNumberId.')
       if (transport !== 'whatsapp' && options.phoneNumberId)
         throw new HostedAgentError('phone_number_not_allowed', 'phoneNumberId is only valid for WhatsApp lines.')
+      if (options.voice && transport !== 'imessage')
+        throw new HostedAgentError('voice_transport_unsupported', 'Voice is supported only on iMessage lines.')
       const line = await sandbox.lines.fromConnection(
         transport === 'whatsapp'
           ? { connectionId, transport, phoneNumberId: options.phoneNumberId!, clientReference: 'hosted-agent' }
@@ -165,10 +171,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
         instance: { keyPrefix: PERSON_KEY_PREFIX, create },
         clientReference: 'hosted-agent',
       })
-      if (options.voice) {
-        if (transport !== 'imessage') throw new HostedAgentError('voice_transport_unsupported', 'Voice is supported only on iMessage lines.')
-        await sandbox.lines.enableVoice(line.id, options.voice)
-      }
+      if (options.voice) await sandbox.lines.enableVoice(line.id, options.voice)
       return sandbox.lines.get(line.id)
     },
   }
