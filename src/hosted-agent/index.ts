@@ -107,7 +107,7 @@ export class HostedAgentError extends Error {
 }
 
 export function createHostedAgent(config: HostedAgentConfig) {
-  if (!E164.test(config.owner) && !EMAIL.test(config.owner)) throw new HostedAgentError('owner_invalid', 'owner must be an E.164 phone number or email address.')
+  if (!E164.test(config.owner) && !EMAIL.test(config.owner)) throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number or email address.')
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
   const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
   const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile: conversationProfile(config.profile) }
