@@ -514,6 +514,14 @@
       "types": "./dist/public-consultation/index.d.ts",
       "import": "./dist/public-consultation/index.js",
       "default": "./dist/public-consultation/index.js"
+    },
+    "./general-agent": {
+      "types": "./dist/general-agent/index.d.ts",
+      "import": "./dist/general-agent/index.js"
+    },
+    "./general-agent/home": {
+      "types": "./dist/general-agent/home.d.ts",
+      "import": "./dist/general-agent/home.js"
     }
   },
   "scripts": {
@@ -710,6 +718,14 @@
     }
   },
   "dependencies": {
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@tangle-network/tcloud": "0.5.2",
+    "@tangle-network/browser-agent-driver": "0.36.1",
+    "@tangle-network/hub-sdk": "0.19.1",
+    "playwright": "1.63.0",
+    "@ai-sdk/google": "3.0.127",
+    "@ai-sdk/anthropic": "3.0.122",
+    "@anthropic-ai/sdk": "0.128.0"
   }
 }

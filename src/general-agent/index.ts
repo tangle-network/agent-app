@@ -61,9 +61,11 @@ export function generalAgentProfile(config: GeneralAgentConfig): AgentProfile {
     mcp: {
       ...merged.mcp,
       router_web: { transport: 'http', url: 'https://router.tangle.tools/v1/search/mcp',
-        headers: { Authorization: { kind: 'secret-ref', key: 'TANGLE_API_KEY', format: 'bearer' } } },
+        headers: { Authorization: { kind: 'secret-ref', key: 'OPENAI_API_KEY', format: 'bearer' } } },
       general: { transport: 'stdio', command: 'node', args: [{ kind: 'public', value: entry }],
-        env: { TANGLE_BROWSER_PROXY: { kind: 'public', value: config.browserProxy },
+        env: { OPENAI_API_KEY: { kind: 'secret-ref', key: 'OPENAI_API_KEY' },
+          TANGLE_API_KEY_FILE: { kind: 'secret-ref', key: 'TANGLE_API_KEY_FILE' },
+          TANGLE_BROWSER_PROXY: { kind: 'public', value: config.browserProxy },
           TANGLE_GENERAL_MODEL: { kind: 'public', value: config.model ?? merged.model?.default ?? DEFAULT_HOSTED_MODEL } } },
     },
     // Mutable home is seeded by the runtime, never per-turn resource copies.
@@ -120,3 +122,5 @@ export function createTangleAgent(config: GeneralAgentConfig) {
     },
   }
 }
+
+export { configureAgentHeartbeat, agentHeartbeatDefinition, type AgentHeartbeatConfig } from './heartbeat'

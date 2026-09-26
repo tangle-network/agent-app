@@ -1,12 +1,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { HubClient } from '@tangle-network/hub-sdk'
+import { HubClient, resolveHubAuth } from '@tangle-network/hub-sdk'
 import { TCloudClient } from '@tangle-network/tcloud'
 import { z } from 'zod'
 import { execFile } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile, readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import { initializeGeneralHome, inspectGeneralHome } from './home'
@@ -14,10 +14,14 @@ import { initializeGeneralHome, inspectGeneralHome } from './home'
 const exec = promisify(execFile)
 const require = createRequire(import.meta.url)
 const router = 'https://router.tangle.tools/v1'
-const apiKey = process.env.TANGLE_API_KEY
-if (!apiKey) throw new Error('Missing sandbox-scoped TANGLE_API_KEY; do not substitute an owner root key')
+const apiKey = process.env.OPENAI_API_KEY
+if (!apiKey) throw new Error('Missing sandbox Router proxy credential; refusing owner-key fallback')
+const credentialFile = process.env.TANGLE_API_KEY_FILE
+if (!credentialFile) throw new Error('Missing refreshable sandbox Hub credential file')
 const cloud = new TCloudClient({ apiKey, baseURL: router, model: process.env.TANGLE_GENERAL_MODEL, retry: false, timeout: 180_000 })
-const hub = new HubClient({ apiKey, baseUrl: 'https://id.tangle.tools' })
+const hub = new HubClient({ baseUrl: 'https://id.tangle.tools', authHeaders: async () => ({
+  Authorization: 'Bearer ' + resolveHubAuth({ TANGLE_API_KEY: (await readFile(credentialFile, 'utf8')).trim() }),
+}) })
 const home = await initializeGeneralHome()
 const server = new McpServer({ name: 'tangle-general-agent', version: '1.0.0' })
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] })
