@@ -1198,6 +1198,292 @@
       ]
     },
     {
+      "id": "./channels",
+      "source": "src/channels/index.ts",
+      "dependsOn": [
+        "web-react"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "ChannelConnect",
+          "kind": "function",
+          "signature": "({ transport, initialLineId, className }: ChannelConnectProps) => Element",
+          "doc": "Select an existing line or connect an owned source, then verify it."
+        },
+        {
+          "name": "ChannelConnection",
+          "kind": "interface",
+          "signature": "interface ChannelConnection",
+          "doc": null
+        },
+        {
+          "name": "ChannelConnectProps",
+          "kind": "interface",
+          "signature": "interface ChannelConnectProps",
+          "doc": null
+        },
+        {
+          "name": "ChannelConversation",
+          "kind": "function",
+          "signature": "({ lineId, threadId, className }: { lineId: string; threadId: string; className?: string | undefined; }) => Element",
+          "doc": "Read-only history."
+        },
+        {
+          "name": "ChannelConversations",
+          "kind": "function",
+          "signature": "({ lineId, className }: { lineId: string; className?: string | undefined; }) => Element",
+          "doc": "A channel's separate member threads."
+        },
+        {
+          "name": "channelMessageLink",
+          "kind": "function",
+          "signature": "(line: Line, instruction: string) => string | null",
+          "doc": "User-facing deep links, not provider API calls."
+        },
+        {
+          "name": "ChannelNumber",
+          "kind": "interface",
+          "signature": "interface ChannelNumber",
+          "doc": null
+        },
+        {
+          "name": "ChannelReadContext",
+          "kind": "interface",
+          "signature": "interface ChannelReadContext",
+          "doc": null
+        },
+        {
+          "name": "ChannelsClient",
+          "kind": "interface",
+          "signature": "interface ChannelsClient",
+          "doc": "The one authenticated, agent-scoped boundary."
+        },
+        {
+          "name": "ChannelsProvider",
+          "kind": "function",
+          "signature": "({ client, pollInterval, children }: { client: ChannelsClient; pollInterval?: number | false | undefined; children: Rea…",
+          "doc": "Mount below authentication."
+        },
+        {
+          "name": "ChannelVerification",
+          "kind": "interface",
+          "signature": "interface ChannelVerification",
+          "doc": "Public evidence only."
+        },
+        {
+          "name": "ChannelVerificationPanel",
+          "kind": "function",
+          "signature": "({ lineId, className }: { lineId: string; className?: string | undefined; }) => Element",
+          "doc": "Delivery evidence comes exclusively from the host."
+        },
+        {
+          "name": "ConnectChannelInput",
+          "kind": "type",
+          "signature": "type ConnectChannelInput",
+          "doc": null
+        },
+        {
+          "name": "EmailChannel",
+          "kind": "function",
+          "signature": "(props: TransportPanelProps) => Element",
+          "doc": null
+        },
+        {
+          "name": "holdsNumber",
+          "kind": "function",
+          "signature": "(order: HubNumberOrder) => boolean",
+          "doc": null
+        },
+        {
+          "name": "HubNumberOrder",
+          "kind": "interface",
+          "signature": "interface HubNumberOrder",
+          "doc": null
+        },
+        {
+          "name": "HubNumberQuote",
+          "kind": "interface",
+          "signature": "interface HubNumberQuote",
+          "doc": null
+        },
+        {
+          "name": "HubNumberReadiness",
+          "kind": "interface",
+          "signature": "interface HubNumberReadiness",
+          "doc": null
+        },
+        {
+          "name": "IMessageChannel",
+          "kind": "function",
+          "signature": "(props: TransportPanelProps) => Element",
+          "doc": null
+        },
+        {
+          "name": "Line",
+          "kind": "interface",
+          "signature": "interface Line",
+          "doc": null
+        },
+        {
+          "name": "LineAttachment",
+          "kind": "interface",
+          "signature": "interface LineAttachment",
+          "doc": null
+        },
+        {
+          "name": "LineFromConnectionInput",
+          "kind": "type",
+          "signature": "type LineFromConnectionInput",
+          "doc": "Input to `client.lines.fromConnection()`."
+        },
+        {
+          "name": "LineMessage",
+          "kind": "interface",
+          "signature": "interface LineMessage",
+          "doc": null
+        },
+        {
+          "name": "LinePayment",
+          "kind": "interface",
+          "signature": "interface LinePayment",
+          "doc": null
+        },
+        {
+          "name": "LinePayPage",
+          "kind": "function",
+          "signature": "({ lineId, className }: { lineId: string; className?: string | undefined; }) => Element",
+          "doc": "End-user allowance/checkout page, not number acquisition or creator payouts."
+        },
+        {
+          "name": "LineThread",
+          "kind": "interface",
+          "signature": "interface LineThread",
+          "doc": null
+        },
+        {
+          "name": "LineTransport",
+          "kind": "type",
+          "signature": "type LineTransport",
+          "doc": "The transport a line carries."
+        },
+        {
+          "name": "NUMBER_CHARGE_NOTICE",
+          "kind": "const",
+          "signature": "\"This is a one-time activation charge. Tangle does not bill recurring carrier rental for this number. Your provider’s m…",
+          "doc": null
+        },
+        {
+          "name": "NUMBER_RETRY_NOTICE",
+          "kind": "const",
+          "signature": "\"Retry uses the same approved quote, not a new purchase. Do not order again while the result is unknown.\"",
+          "doc": null
+        },
+        {
+          "name": "NumberChannel",
+          "kind": "function",
+          "signature": "({ transport, className }: { transport: \"sms\" | \"imessage\"; className?: string | undefined; }) => Element",
+          "doc": "A transport's managed number activation, with explicit consent and cancellation."
+        },
+        {
+          "name": "numberStage",
+          "kind": "function",
+          "signature": "(order: HubNumberOrder) => string",
+          "doc": null
+        },
+        {
+          "name": "safeCheckoutUrl",
+          "kind": "function",
+          "signature": "(value: string) => string",
+          "doc": "Only same-origin relative paths or credential-free HTTPS checkout URLs."
+        },
+        {
+          "name": "SMSChannel",
+          "kind": "function",
+          "signature": "(props: TransportPanelProps) => Element",
+          "doc": null
+        },
+        {
+          "name": "useChannel",
+          "kind": "function",
+          "signature": "(lineId: string) => { run: (input: { action: VerificationAction; confirm?: boolean | undefined; }) => Promise<MutationO…",
+          "doc": null
+        },
+        {
+          "name": "useChannelConnections",
+          "kind": "function",
+          "signature": "(transport: LineTransport) => AsyncResourceState<ChannelConnection[]>",
+          "doc": null
+        },
+        {
+          "name": "useChannelConversation",
+          "kind": "function",
+          "signature": "(lineId: string, threadId: string) => AsyncResourceState<LineMessage[]>",
+          "doc": null
+        },
+        {
+          "name": "useChannelConversations",
+          "kind": "function",
+          "signature": "(lineId: string) => AsyncResourceState<LineThread[]>",
+          "doc": null
+        },
+        {
+          "name": "useChannels",
+          "kind": "function",
+          "signature": "() => AsyncResourceState<Line[]>",
+          "doc": null
+        },
+        {
+          "name": "useChannelsClient",
+          "kind": "function",
+          "signature": "() => ChannelsClient",
+          "doc": null
+        },
+        {
+          "name": "useConnectChannel",
+          "kind": "function",
+          "signature": "(onConnected?: ((line: Line) => void) | undefined) => { run: (input: ConnectChannelInput) => Promise<MutationOutcome<Li…",
+          "doc": "Connect only acquires/binds a line."
+        },
+        {
+          "name": "useLinePayment",
+          "kind": "function",
+          "signature": "(lineId: string) => { available: boolean; run: (input: { consent: boolean; }) => Promise<MutationOutcome<string>>; stat…",
+          "doc": null
+        },
+        {
+          "name": "useNumberChannel",
+          "kind": "function",
+          "signature": "(transport: \"sms\" | \"imessage\") => { run: (input: { action: \"quote\"; } | { action: \"purchase\"; consent: boolean; } | {…",
+          "doc": "Hub owns prices, terms, idempotency, funding, and cancellation."
+        },
+        {
+          "name": "useWhatsAppNumbers",
+          "kind": "function",
+          "signature": "(connectionId: string) => AsyncResourceState<ChannelNumber[]>",
+          "doc": null
+        },
+        {
+          "name": "VerificationAction",
+          "kind": "type",
+          "signature": "type VerificationAction",
+          "doc": null
+        },
+        {
+          "name": "verificationExpired",
+          "kind": "function",
+          "signature": "(test: ChannelVerification, now?: number) => boolean",
+          "doc": null
+        },
+        {
+          "name": "WhatsAppChannel",
+          "kind": "function",
+          "signature": "(props: TransportPanelProps) => Element",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./chat-react",
       "source": "src/chat-react/index.tsx",
       "dependsOn": [
@@ -3237,7 +3523,7 @@
         {
           "name": "collectSlots",
           "kind": "function",
-          "signature": "(document: SceneDocument) => Map<string, { pageId: string; elementId: string; kind: \"text\" | \"image\" | \"rect\" | \"ellips…",
+          "signature": "(document: SceneDocument) => Map<string, { pageId: string; elementId: string; kind: \"text\" | \"image\" | \"rect\" | \"line\"…",
           "doc": "All slot names declared across the document — the template's fillable surface."
         },
         {
@@ -3489,7 +3775,7 @@
         {
           "name": "SCENE_ELEMENT_KINDS",
           "kind": "const",
-          "signature": "readonly (\"text\" | \"image\" | \"rect\" | \"ellipse\" | \"line\" | \"video\" | \"group\")[]",
+          "signature": "readonly (\"text\" | \"image\" | \"rect\" | \"line\" | \"ellipse\" | \"video\" | \"group\")[]",
           "doc": "Define all valid kinds of scene elements used in the application"
         },
         {
@@ -3693,7 +3979,7 @@
         {
           "name": "validateSlotValue",
           "kind": "function",
-          "signature": "(slotName: string, elementKind: \"text\" | \"image\" | \"rect\" | \"ellipse\" | \"line\" | \"video\" | \"group\", value: string) => v…",
+          "signature": "(slotName: string, elementKind: \"text\" | \"image\" | \"rect\" | \"line\" | \"ellipse\" | \"video\" | \"group\", value: string) => v…",
           "doc": "Validates that a slot binding value matches the slot element's kind."
         },
         {
@@ -6836,7 +7122,7 @@
         {
           "name": "respondToSessionInteraction",
           "kind": "function",
-          "signature": "(connection: SidecarInteractionsConnection, response: { id: string; outcome: \"declined\" | \"cancelled\" | \"accepted\"; dat…",
+          "signature": "(connection: SidecarInteractionsConnection, response: { id: string; outcome: \"cancelled\" | \"declined\" | \"accepted\"; dat…",
           "doc": "Resolves one interaction."
         },
         {
@@ -10598,7 +10884,7 @@
         {
           "name": "attachReasoningEffort",
           "kind": "function",
-          "signature": "(profile: AgentProfile, _harness: Harness, effort: \"auto\" | \"none\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" |…",
+          "signature": "(profile: AgentProfile, _harness: Harness, effort: \"none\" | \"auto\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" |…",
           "doc": "Attach explicit effort through the portable model contract consumed by providers."
         },
         {
@@ -19989,7 +20275,7 @@
         {
           "name": "resolveChatInteraction",
           "kind": "function",
-          "signature": "(list: ChatInteraction[], id: string, status: \"answered\" | \"declined\" | \"cancelled\" | \"expired\", answers?: InteractionA…",
+          "signature": "(list: ChatInteraction[], id: string, status: \"cancelled\" | \"answered\" | \"declined\" | \"expired\", answers?: InteractionA…",
           "doc": "Marks one ask resolved locally (the card's `onResolved`)."
         },
         {

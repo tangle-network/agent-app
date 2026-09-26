@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.49.23",
+  "version": "0.49.24",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -211,6 +211,11 @@
       "types": "./dist/integrations/index.d.ts",
       "import": "./dist/integrations/index.js",
       "default": "./dist/integrations/index.js"
+    },
+    "./channels": {
+      "types": "./dist/channels/index.d.ts",
+      "import": "./dist/channels/index.js",
+      "default": "./dist/channels/index.js"
     },
     "./hosted-agent": {
       "types": "./dist/hosted-agent/index.d.ts",
@@ -548,6 +553,7 @@
     "@tangle-network/agent-profile-materialize": "0.20.1",
     "@tangle-network/agent-runtime": "0.274.0",
     "@tangle-network/brand": "1.5.0",
+    "@tangle-network/hub-sdk": "0.19.0",
     "@tangle-network/sandbox": "0.53.0",
     "@tangle-network/sandbox-ui": "0.113.3",
     "@tangle-network/ui": "11.9.0",
@@ -608,6 +614,7 @@
     "@tangle-network/agent-profile-materialize": ">=0.20.1 <0.21.0",
     "@tangle-network/agent-runtime": ">=0.262.0 <0.275.0",
     "@tangle-network/brand": ">=1.5.0",
+    "@tangle-network/hub-sdk": ">=0.19.0 <0.20.0",
     "@tangle-network/sandbox": ">=0.45.0 <0.48.0 || ^0.49.0 || ^0.50.0 || ^0.51.0 || ^0.52.0 || ^0.53.0",
     "@tangle-network/sandbox-ui": ">=0.113.3 <0.114.0",
     "@tangle-network/ui": ">=11.6.0 <12.0.0",
@@ -706,6 +713,9 @@
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "@tangle-network/hub-sdk": {
       "optional": true
     }
   },
