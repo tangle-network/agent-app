@@ -4,7 +4,7 @@
 
 Source: `src/profile/index.ts`
 
-45 exports.
+48 exports.
 
 ### `assertProfilePromptWithinBudget`
 
@@ -102,12 +102,28 @@ interface CorpusLoadResult
 (corpus: CorpusEntry[], anchor: string) => AgentProfileFileMount[]
 ```
 
+### `DEFAULT_HOME_LIMITS`
+
+`const`
+
+```ts
+{ readonly 'AGENTS.md': 12000; readonly 'SOUL.md': 8000; readonly 'IDENTITY.md': 4000; readonly 'USER.md': 4000; readon…
+```
+
 ### `DEFAULT_MAX_SYSTEM_PROMPT_BYTES`
 
 `const` — Byte budget on the FINAL composed `prompt.systemPrompt`.
 
 ```ts
 40000
+```
+
+### `defaultHomeFiles`
+
+`function`
+
+```ts
+() => AgentProfileFileMount[]
 ```
 
 ### `diffProfileFingerprints`
@@ -364,4 +380,12 @@ interface UserSkill
 
 ```ts
 (userSkills: UserSkill[]) => AgentProfileFileMount[]
+```
+
+### `withDefaultAgentHome`
+
+`function` — Compose the general Tangle assistant home under an app profile.
+
+```ts
+(profile: AgentProfile) => AgentProfile
 ```

@@ -60,7 +60,8 @@ describe('hosted agent on Hub lines', () => {
     expect(attached.respond.kind).toBe('agent')
     expect(profile.model.default).toBe(DEFAULT_HOSTED_MODEL)
     expect(Object.keys(profile.tools)).toEqual([...CONVERSATION_TOOLS_OFF])
-    expect(profile.permissions.bash).toBe('deny')
+    // A general hosted assistant keeps its shell inside its own strict-egress box.
+    expect(profile.permissions.bash).toBeUndefined()
     expect(platform.enableVoice).not.toHaveBeenCalled()
   })
 
@@ -80,6 +81,15 @@ describe('hosted agent on Hub lines', () => {
     expect(backend.type).toBe('opencode')
     expect(backend.profile).toMatchObject({ model: { default: 'anthropic/claude-sonnet-5' }, tools: { bash: true } })
     expect(backend.profile.permissions).toBeUndefined()
+  })
+
+  it('seeds the default home under the app profile, and an app file replaces the platform file at its path', async () => {
+    const agents = { path: 'AGENTS.md', resource: { kind: 'inline' as const, name: 'app-agents', content: 'app' } }
+    await createHostedAgent({ apiKey: 'sk-tan-test', owner: OWNER, profile: { resources: { files: [agents] } } }).attachLine('hubconn_braid')
+
+    const files = platform.attach.mock.calls[0]![0].respond.backend.profile.resources.files as Array<{ path: string; resource: { name: string } }>
+    expect(files.map(file => file.path).sort()).toEqual(['AGENTS.md', 'BOOTSTRAP.md', 'IDENTITY.md', 'MEMORY.md', 'SOUL.md', 'USER.md'])
+    expect(files.find(file => file.path === 'AGENTS.md')!.resource.name).toBe('app-agents')
   })
 
   it('needs the owner as an E.164 number', () => {

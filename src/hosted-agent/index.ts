@@ -1,5 +1,6 @@
 import type { AgentProfile, BackendConfig, LineVoiceOptions } from '@tangle-network/sandbox'
 import { type Line, type LineInstanceCreate, Sandbox } from '@tangle-network/sandbox/core'
+import { withDefaultAgentHome } from '../profile/home'
 
 /**
  * A hosted agent: people text or call a line, and each person is answered
@@ -68,12 +69,12 @@ export const DEFAULT_BOX_POLICY: BoxPolicy = {
 export const PERSON_KEY_PREFIX = 'hosted:'
 
 /**
- * Harness tools a texting or calling assistant does not use. Their
- * descriptions present every turn as coding work: a shell, file search,
- * sub-agents, to-do lists, skills and web fetch. File read, write and edit
- * stay, so a persona can keep notes such as `memory.md`.
+ * Harness orchestration tools a general hosted assistant does not need by default.
+ * Shell/file access, skills and web fetch stay available: the hosted assistant is
+ * a general sandbox agent, not a chat-only bot. Products may still provide an
+ * explicit `tools` map to narrow or widen this set.
  */
-export const CONVERSATION_TOOLS_OFF = ['bash', 'glob', 'grep', 'task', 'todowrite', 'webfetch', 'skill'] as const
+export const CONVERSATION_TOOLS_OFF = ['task', 'todowrite'] as const
 
 /**
  * The model for a profile without `model.default`. It gave the most useful
@@ -84,15 +85,14 @@ export const DEFAULT_HOSTED_MODEL = 'openai/gpt-5.6-luna'
 
 /** The profile a person's box runs: the developer's profile over the conversation defaults. */
 function conversationProfile(profile: AgentProfile): AgentProfile {
+  const homed = withDefaultAgentHome(profile)
   return {
-    ...profile,
-    model: { ...profile.model, default: profile.model?.default ?? DEFAULT_HOSTED_MODEL },
+    ...homed,
+    model: { ...homed.model, default: homed.model?.default ?? DEFAULT_HOSTED_MODEL },
     // A profile that sets `tools` owns its tool set.
-    ...(profile.tools ? {} : {
+    ...(homed.tools ? {} : {
       tools: Object.fromEntries(CONVERSATION_TOOLS_OFF.map(tool => [tool, false])),
-      // The sandbox's preview policy grants the shell unless its permission
-      // is denied, so turning the tool off alone leaves the shell in place.
-      permissions: { bash: 'deny' as const, ...profile.permissions },
+      permissions: { ...homed.permissions },
     }),
   }
 }
