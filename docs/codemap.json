@@ -6292,7 +6292,7 @@
         {
           "name": "createHostedAgent",
           "kind": "function",
-          "signature": "(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { voice?: LineVoiceOptions | undefined; }):…",
+          "signature": "(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { transport?: \"email\" | \"imessage\" | \"whats…",
           "doc": null
         },
         {
