@@ -163,24 +163,29 @@ describe('this package audits itself', () => {
 
     expect(range).toBeDefined()
     // Runtime 0.262.0 is the first Runtime whose Sandbox peer admits 0.50,
-    // 0.264.0 the first that admits 0.51, and 0.266.0 the first that admits 0.52.
+    // 0.264.0 the first that admits 0.51, 0.266.0 the first that admits 0.52,
+    // and 0.273.5 the first that admits 0.53. 0.274 is the verified line.
     expect(satisfiesRange('0.261.999', range!)).toBe(false)
     expect(satisfiesRange('0.262.0', range!)).toBe(true)
     expect(satisfiesRange('0.264.0', range!)).toBe(true)
     expect(satisfiesRange('0.266.0', range!)).toBe(true)
-    expect(satisfiesRange('0.266.999', range!)).toBe(true)
-    expect(satisfiesRange('0.267.0', range!)).toBe(false)
+    expect(satisfiesRange('0.273.5', range!)).toBe(true)
+    expect(satisfiesRange('0.274.0', range!)).toBe(true)
+    expect(satisfiesRange('0.274.999', range!)).toBe(true)
+    expect(satisfiesRange('0.275.0', range!)).toBe(false)
   })
 
   // Each window starts at the floor the verified Runtime line admits (Eval) or
   // the floor this application code ran on (Sandbox 0.45), admits the minor the
   // dev install runs, and claims nothing past it. The Runtime refuses Sandbox
   // 0.48, so the shell refuses it too. Sandbox 0.50 adds the named instances
-  // that `hosted-agent` keeps each person's box on, 0.51 adds lines, and 0.52
-  // runs each line member in their own named instance.
+  // that `hosted-agent` keeps each person's box on, 0.51 adds lines, 0.52
+  // runs each line member in their own named instance, and 0.53 adds email lines.
+  // Eval keeps the 0.185 floor that Runtime 0.262 to 0.271 admit; the admitted
+  // rows below are the ones the installed Runtime (0.274.0, Eval >=0.188.0 <0.191.0) admits.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
-    ['@tangle-network/agent-eval', ['0.184.999'], ['0.185.0', '0.186.0', '0.186.999'], ['0.187.0']],
-    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999'], ['0.53.0']],
+    ['@tangle-network/agent-eval', ['0.184.999'], ['0.188.0', '0.190.0', '0.190.999'], ['0.191.0']],
+    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999'], ['0.54.0']],
     ['@tangle-network/agent-interface', ['2.10.999'], ['2.11.0', '2.12.0'], ['3.0.0']],
   ]
 

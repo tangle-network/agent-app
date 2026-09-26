@@ -31,7 +31,7 @@ _101 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
 | [`./harness`](api/harness.md) | 14 | — |
-| [`./hosted-agent`](api/hosted-agent.md) | 30 | — |
+| [`./hosted-agent`](api/hosted-agent.md) | 9 | — |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `brand`, `intakes` |
 | [`./intakes-react/lazy`](api/intakes-react-lazy.md) | 2 | `brand`, `intakes` |
@@ -342,9 +342,9 @@ Source: `src/harness/index.ts` · 14 exports
 
 ## `./hosted-agent`
 
-Source: `src/hosted-agent/index.ts` · 30 exports
+Source: `src/hosted-agent/index.ts` · 9 exports
 
-`AskResult`, `AUTHORITY_ENDED`, `BoxPolicy`, `chatOnlyBackend`, `CONVERSATION_TOOLS_OFF`, `createHostedAgent`, `DEFAULT_BOX_POLICY`, `DEFAULT_HOSTED_MODEL`, `describeFailure`, `HostedAgent`, `HostedAgentConfig`, `HostedAgentError`, `HostedAgentStore`, `HostedTurnOptions`, `HostedTurnPorts`, `isTransientFailure`, `MAX_MESSAGE_CHARS`, `MAX_REPEATED_FAILURES`, `PendingDetail`, `PERSON_KEY_PREFIX`, `runHostedTurn`, `settleHostedTurn`, `TurnBox`, `TurnFailure`, `TurnObserver`, `TurnOutcome`, `TurnPending`, `TurnRefusal`, `TurnReply`, `TurnStep`
+`BoxPolicy`, `CONVERSATION_TOOLS_OFF`, `createHostedAgent`, `DEFAULT_BOX_POLICY`, `DEFAULT_HOSTED_MODEL`, `HostedAgent`, `HostedAgentConfig`, `HostedAgentError`, `PERSON_KEY_PREFIX`
 
 [Full API →](api/hosted-agent.md)
 
