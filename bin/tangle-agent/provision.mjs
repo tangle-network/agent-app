@@ -10,7 +10,7 @@ const name = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/)
 const role = z.enum(['owner', 'manager', 'staff', 'vendor', 'finance', 'practitioner'])
 const envKey = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
 const domain = z.string().regex(/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9-]+$/)
-const backend = z.object({ type: z.literal('opencode').optional(), profile: agentProfileSchema }).strict()
+const backend = z.object({ type: z.literal('opencode').optional(), profile: z.record(z.string(), z.unknown()).transform(value => agentProfileSchema.parse(value)) }).strict()
 const configSchema = z.object({
   version: z.literal(1),
   keyPrefix: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:@-]{0,99}$/),
@@ -24,7 +24,7 @@ const configSchema = z.object({
   allowDomains: z.array(domain).max(95).default([]),
   resources: z.object({ cpuCores: z.number().int().min(2).max(64).default(2),
     memoryMB: z.number().int().min(4096).max(262144).default(4096), diskGB: z.number().int().min(10).max(2048).default(20) }).strict().prefault({}),
-  baseProfile: agentProfileSchema.default({}),
+  baseProfile: z.record(z.string(), z.unknown()).default({}).transform(value => agentProfileSchema.parse(value)),
   scopedServers: z.record(z.string(), z.array(name).min(1).max(16)).default({}),
   members: z.array(z.object({ address: z.string().regex(/^\+[1-9]\d{6,14}$/), role,
     label: z.string().min(1).max(60), backend: backend.optional(),
