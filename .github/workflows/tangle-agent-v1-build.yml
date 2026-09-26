@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: pro/tangle-agent-v1-20260925
-      - name: Wire existing package exports and pinned client dependencies
+      - name: Wire existing exports and verified published clients
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/tangle-agent-build"
@@ -21,14 +21,16 @@ jobs:
           import json
           from pathlib import Path
           p=Path('package.json'); package=json.loads(p.read_text())
-          package['exports']['./general-agent']={'types':'./dist/general-agent/index.d.ts','import':'./dist/general-agent/index.js'}
-          package['exports']['./general-agent/home']={'types':'./dist/general-agent/home.d.ts','import':'./dist/general-agent/home.js'}
-          package.setdefault('dependencies',{}).update({'@modelcontextprotocol/sdk':'1.30.0','@tangle-network/tcloud':'0.47.0','@tangle-network/browser-agent-driver':'0.36.1','@tangle-network/hub-sdk':'0.19.1'})
+          for name in ['index','home']:
+            subpath='./general-agent'+('/home' if name=='home' else '')
+            package['exports'][subpath]={'types':f'./dist/general-agent/{name}.d.ts','import':f'./dist/general-agent/{name}.js'}
+          package.setdefault('dependencies',{}).update({'@modelcontextprotocol/sdk':'1.30.0','@tangle-network/tcloud':'0.5.2','@tangle-network/browser-agent-driver':'0.36.1','@tangle-network/hub-sdk':'0.19.1'})
           p.write_text(json.dumps(package,indent=2)+'\n')
           p=Path('tsup.config.ts'); source=p.read_text()
           marker="    'hosted-agent/index': 'src/hosted-agent/index.ts',"
           assert marker in source
-          source=source.replace(marker,marker+"\n    'general-agent/index': 'src/general-agent/index.ts',\n    'general-agent/home': 'src/general-agent/home.ts',\n    'general-agent/server': 'src/general-agent/server.ts',",1)
+          if "'general-agent/index'" not in source:
+            source=source.replace(marker,marker+"\n    'general-agent/index': 'src/general-agent/index.ts',\n    'general-agent/home': 'src/general-agent/home.ts',\n    'general-agent/server': 'src/general-agent/server.ts',",1)
           p.write_text(source)
           PY
           npm install --global pnpm@10.23.0
@@ -36,8 +38,10 @@ jobs:
           git add package.json pnpm-lock.yaml tsup.config.ts
           git config user.name tangletools
           git config user.email hello@tangle.tools
-          git commit -m 'build: publish general-agent entries and pin the existing tool clients'
-          git push origin HEAD:refs/heads/pro/tangle-agent-v1-20260925
+          if ! git diff --cached --quiet; then
+            git commit -m 'build: publish general-agent entries with verified pinned clients'
+            git push origin HEAD:refs/heads/pro/tangle-agent-v1-20260925
+          fi
           git rev-parse HEAD > "$RUNNER_TEMP/tangle-agent-build/REVISION"
       - name: Real frozen package install
         run: |
@@ -51,6 +55,10 @@ jobs:
         run: |
           set -euo pipefail
           pnpm pack --pack-destination "$RUNNER_TEMP/tangle-agent-build"
+      - name: Export exact source
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/tangle-agent-build"
           git archive --format=tar HEAD src/general-agent package.json tsup.config.ts > "$RUNNER_TEMP/tangle-agent-build/source.tar"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
