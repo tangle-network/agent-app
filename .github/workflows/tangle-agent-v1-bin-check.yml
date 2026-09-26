@@ -1,0 +1,100 @@
+name: Tangle agent executable verification
+on:
+  push:
+    branches: [feat/default-agent-home]
+    paths: [.github/workflows/tangle-agent-v1-bin-check.yml]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/default-agent-home
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - name: Reconcile package owners and commit the executable source
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/tangle-agent-bin
+          python3 .github/scripts/integrate-tangle-agent-bin.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('bin/tangle-agent/provision.mjs'); s=p.read_text()
+          old='diskGB: z.number().int().min(10).max(2048).default(20) }).strict().default({}),'
+          assert old in s
+          s=s.replace(old,'diskGB: z.number().int().min(10).max(2048).default(20) }).strict().prefault({}),')
+          p.write_text(s)
+          PY
+          pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile 2>&1 | tee /tmp/tangle-agent-bin/resolve.log
+          git diff --check
+          git add bin src/hosted-agent/index.ts package.json pnpm-lock.yaml
+          git rm .github/scripts/integrate-tangle-agent-bin.py .github/workflows/tangle-agent-v1-bin-check.yml
+          git rm --ignore-unmatch .github/workflows/tangle-agent-v1-package.yml
+          git -c user.name=tangletools -c user.email=hello@tangle.tools commit -m 'feat: package the executable general agent with existing media and home owners'
+          git push origin HEAD:feat/default-agent-home
+          git rev-parse HEAD > /tmp/tangle-agent-bin/REVISION
+      - name: Install and compile the real package
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee /tmp/tangle-agent-bin/install.log
+          pnpm typecheck 2>&1 | tee /tmp/tangle-agent-bin/typecheck.log
+          pnpm build 2>&1 | tee /tmp/tangle-agent-bin/build.log
+          find bin/tangle-agent -name '*.mjs' -exec node --check '{}' \;
+          node --check bin/tangle-agent.mjs
+      - name: Exercise actual bootstrap and profile composition without a live service
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS' 2>&1 | tee /tmp/tangle-agent-bin/local-run.log
+          import { mkdtemp, writeFile, readFile, unlink, stat } from 'node:fs/promises'
+          import { tmpdir } from 'node:os'
+          import { join } from 'node:path'
+          import assert from 'node:assert/strict'
+          import { initializeHome, checkpointHome } from './bin/tangle-agent/home.mjs'
+          import { buildGeneralAgent } from './bin/tangle-agent/provision.mjs'
+          const home=await mkdtemp(join(tmpdir(),'tangle-agent-home-'))
+          await initializeHome(home)
+          await writeFile(join(home,'MEMORY.md'),'Persistence probe: real local filesystem.\n')
+          await unlink(join(home,'BOOTSTRAP.md'))
+          const checkpoint=await checkpointHome(home)
+          await initializeHome(home)
+          assert.match(await readFile(join(home,'MEMORY.md'),'utf8'), /Persistence probe/)
+          await assert.rejects(stat(join(home,'BOOTSTRAP.md')), {code:'ENOENT'})
+          const plan=buildGeneralAgent({version:1,keyPrefix:'probe:',environment:'universal',imageModel:'probe-image',videoModel:'probe-video',chromium:'/usr/bin/chromium',members:[{address:'+15550100001',role:'owner',label:'Probe'}],lines:[{id:'ln_probe',transport:'imessage'}]})
+          assert.equal(plan.attachments[0].instance.create.resources.memoryMB,4096)
+          assert.equal(plan.attachments[0].instance.create.egressPolicy.mode,'strict')
+          assert.equal(plan.attachments[0].respond.rolePolicy.roles.owner.kind,'general')
+          console.log(JSON.stringify({checkpoint,plan:'canonical profile parsed; no network calls',bootstrap:'not recreated',memory:'retained'}))
+          await import('./bin/tangle-agent/runtime.mjs')
+          console.log('Published BrowserAgent, TCloud and MCP SDK imports resolved; no request sent.')
+          JS
+      - name: Regenerate public API docs and verify packed executable paths
+        run: |
+          set -euo pipefail
+          pnpm docs:gen 2>&1 | tee /tmp/tangle-agent-bin/docs.log
+          git add docs
+          if ! git diff --cached --quiet; then
+            git -c user.name=tangletools -c user.email=hello@tangle.tools commit -m 'docs: regenerate the general-agent package API'
+            git push origin HEAD:feat/default-agent-home
+          fi
+          pnpm pack --pack-destination /tmp/tangle-agent-bin
+          tar -tf /tmp/tangle-agent-bin/tangle-network-agent-app-*.tgz | grep 'package/bin/tangle-agent' | tee /tmp/tangle-agent-bin/packed-paths.log
+          git rev-parse HEAD > /tmp/tangle-agent-bin/REVISION
+      - name: Retain verification source
+        if: always()
+        run: |
+          mkdir -p /tmp/tangle-agent-bin
+          git archive --format=tar HEAD > /tmp/tangle-agent-bin/source.tar
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: tangle-agent-executable-check
+          path: /tmp/tangle-agent-bin/
+          retention-days: 3
