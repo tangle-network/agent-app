@@ -1,0 +1,29 @@
+name: Tangle agent v1 dependency contracts
+on:
+  push:
+    branches: [pro/tangle-agent-v1-20260925]
+    paths: [.github/workflows/tangle-agent-v1-contracts.yml]
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fetch published clients without lifecycle scripts
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tangle-v1-contracts"
+          cd "$RUNNER_TEMP/tangle-v1-contracts"
+          for package in '@tangle-network/tcloud@latest' '@tangle-network/browser-agent-driver@0.36.1' '@tangle-network/hub-sdk@0.19.1' '@tangle-network/sandbox@0.54.0'; do
+            npm view "$package" name version dist.integrity dist.tarball --json >> registry.jsonl
+            npm pack --ignore-scripts --quiet "$package"
+          done
+          sha256sum *.tgz > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: tangle-agent-v1-general-clients
+          path: ${{ runner.temp }}/tangle-v1-contracts/
+          if-no-files-found: error
+          retention-days: 1
