@@ -12,6 +12,7 @@
     "src/brand-extraction/index.ts",
     "src/brand/index.tsx",
     "src/catalog/index.ts",
+    "src/channels/index.ts",
     "src/chat-react/index.tsx",
     "src/chat-routes/index.ts",
     "src/chat-store/index.ts",
