@@ -7786,10 +7786,10 @@ interface BoxPolicy
 
 ### `CONVERSATION_TOOLS_OFF`
 
-`const` — Harness tools a texting or calling assistant does not use.
+`const` — Harness orchestration tools a general hosted assistant does not need by default.
 
 ```ts
-readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
+readonly ["task", "todowrite"]
 ```
 
 ### `createHostedAgent`
@@ -12275,7 +12275,7 @@ interface UserSkill
 
 ### `withDefaultAgentHome`
 
-`function` — Add the platform home without replacing an app's own files.
+`function` — Compose the general Tangle assistant home under an app profile.
 
 ```ts
 (profile: AgentProfile) => AgentProfile

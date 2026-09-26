@@ -384,7 +384,7 @@ interface UserSkill
 
 ### `withDefaultAgentHome`
 
-`function` — Add the platform home without replacing an app's own files.
+`function` — Compose the general Tangle assistant home under an app profile.
 
 ```ts
 (profile: AgentProfile) => AgentProfile

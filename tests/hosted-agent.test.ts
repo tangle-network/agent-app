@@ -60,7 +60,8 @@ describe('hosted agent on Hub lines', () => {
     expect(attached.respond.kind).toBe('agent')
     expect(profile.model.default).toBe(DEFAULT_HOSTED_MODEL)
     expect(Object.keys(profile.tools)).toEqual([...CONVERSATION_TOOLS_OFF])
-    expect(profile.permissions.bash).toBe('deny')
+    // A general hosted assistant keeps its shell inside its own strict-egress box.
+    expect(profile.permissions.bash).toBeUndefined()
     expect(platform.enableVoice).not.toHaveBeenCalled()
   })
 

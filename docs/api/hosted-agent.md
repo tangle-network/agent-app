@@ -16,10 +16,10 @@ interface BoxPolicy
 
 ### `CONVERSATION_TOOLS_OFF`
 
-`const` — Harness tools a texting or calling assistant does not use.
+`const` — Harness orchestration tools a general hosted assistant does not need by default.
 
 ```ts
-readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
+readonly ["task", "todowrite"]
 ```
 
 ### `createHostedAgent`

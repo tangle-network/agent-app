@@ -6002,8 +6002,8 @@
         {
           "name": "CONVERSATION_TOOLS_OFF",
           "kind": "const",
-          "signature": "readonly [\"bash\", \"glob\", \"grep\", \"task\", \"todowrite\", \"webfetch\", \"skill\"]",
-          "doc": "Harness tools a texting or calling assistant does not use."
+          "signature": "readonly [\"task\", \"todowrite\"]",
+          "doc": "Harness orchestration tools a general hosted assistant does not need by default."
         },
         {
           "name": "createHostedAgent",
@@ -9510,7 +9510,7 @@
           "name": "withDefaultAgentHome",
           "kind": "function",
           "signature": "(profile: AgentProfile) => AgentProfile",
-          "doc": "Add the platform home without replacing an app's own files."
+          "doc": "Compose the general Tangle assistant home under an app profile."
         }
       ]
     },
