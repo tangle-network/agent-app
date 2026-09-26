@@ -104,7 +104,7 @@ interface CorpusLoadResult
 
 ### `DEFAULT_HOME_LIMITS`
 
-`const`
+`const` — Unicode code-point budgets.
 
 ```ts
 { readonly 'AGENTS.md': 12000; readonly 'SOUL.md': 8000; readonly 'IDENTITY.md': 4000; readonly 'USER.md': 4000; readon…

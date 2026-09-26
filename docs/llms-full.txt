@@ -7776,12 +7776,44 @@ interface ResolveSessionHarnessInput
 
 Source: `src/hosted-agent/index.ts` · depends on `profile`
 
+### `AgentHomeWorkflow`
+
+`interface`
+
+```ts
+interface AgentHomeWorkflow
+```
+
+### `AgentHomeWorkflowOptions`
+
+`interface`
+
+```ts
+interface AgentHomeWorkflowOptions
+```
+
+### `agentHomeWorkflows`
+
+`function` — Definitions only.
+
+```ts
+(options: AgentHomeWorkflowOptions) => AgentHomeWorkflow[]
+```
+
 ### `BoxPolicy`
 
 `interface`
 
 ```ts
 interface BoxPolicy
+```
+
+### `buildGeneralAgentProfile`
+
+`function` — Uses the published Sandbox Router builder.
+
+```ts
+(options?: GeneralAgentProfileOptions) => Promise<AgentProfile>
 ```
 
 ### `CONVERSATION_TOOLS_OFF`
@@ -7800,6 +7832,14 @@ readonly ["task", "todowrite"]
 (config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { voice?: LineVoiceOptions | undefined; }):…
 ```
 
+### `createTangleAgent`
+
+`function` — General agents use the SDK's line attachment route.
+
+```ts
+(options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: LineVoiceOptions | undefined) => Promis…
+```
+
 ### `DEFAULT_BOX_POLICY`
 
 `const` — Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the platform's hourly floor.
@@ -7814,6 +7854,38 @@ BoxPolicy
 
 ```ts
 "openai/gpt-5.6-luna"
+```
+
+### `GENERAL_AGENT_MODEL`
+
+`const`
+
+```ts
+"openai/gpt-5.6-luna"
+```
+
+### `GENERAL_AGENT_SYSTEM_PROMPT`
+
+`const`
+
+```ts
+string
+```
+
+### `GeneralAgentMember`
+
+`type`
+
+```ts
+type GeneralAgentMember
+```
+
+### `GeneralAgentProfileOptions`
+
+`interface`
+
+```ts
+interface GeneralAgentProfileOptions
 ```
 
 ### `HostedAgent`
@@ -7846,6 +7918,14 @@ class HostedAgentError
 
 ```ts
 "hosted:"
+```
+
+### `TangleAgentOptions`
+
+`interface`
+
+```ts
+interface TangleAgentOptions
 ```
 
 
@@ -11995,7 +12075,7 @@ interface CorpusLoadResult
 
 ### `DEFAULT_HOME_LIMITS`
 
-`const`
+`const` — Unicode code-point budgets.
 
 ```ts
 { readonly 'AGENTS.md': 12000; readonly 'SOUL.md': 8000; readonly 'IDENTITY.md': 4000; readonly 'USER.md': 4000; readon…

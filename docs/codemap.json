@@ -5994,10 +5994,34 @@
       "error": null,
       "exports": [
         {
+          "name": "AgentHomeWorkflow",
+          "kind": "interface",
+          "signature": "interface AgentHomeWorkflow",
+          "doc": null
+        },
+        {
+          "name": "AgentHomeWorkflowOptions",
+          "kind": "interface",
+          "signature": "interface AgentHomeWorkflowOptions",
+          "doc": null
+        },
+        {
+          "name": "agentHomeWorkflows",
+          "kind": "function",
+          "signature": "(options: AgentHomeWorkflowOptions) => AgentHomeWorkflow[]",
+          "doc": "Definitions only."
+        },
+        {
           "name": "BoxPolicy",
           "kind": "interface",
           "signature": "interface BoxPolicy",
           "doc": null
+        },
+        {
+          "name": "buildGeneralAgentProfile",
+          "kind": "function",
+          "signature": "(options?: GeneralAgentProfileOptions) => Promise<AgentProfile>",
+          "doc": "Uses the published Sandbox Router builder."
         },
         {
           "name": "CONVERSATION_TOOLS_OFF",
@@ -6012,6 +6036,12 @@
           "doc": null
         },
         {
+          "name": "createTangleAgent",
+          "kind": "function",
+          "signature": "(options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: LineVoiceOptions | undefined) => Promis…",
+          "doc": "General agents use the SDK's line attachment route."
+        },
+        {
           "name": "DEFAULT_BOX_POLICY",
           "kind": "const",
           "signature": "BoxPolicy",
@@ -6022,6 +6052,30 @@
           "kind": "const",
           "signature": "\"openai/gpt-5.6-luna\"",
           "doc": "The model for a profile without `model.default`."
+        },
+        {
+          "name": "GENERAL_AGENT_MODEL",
+          "kind": "const",
+          "signature": "\"openai/gpt-5.6-luna\"",
+          "doc": null
+        },
+        {
+          "name": "GENERAL_AGENT_SYSTEM_PROMPT",
+          "kind": "const",
+          "signature": "string",
+          "doc": null
+        },
+        {
+          "name": "GeneralAgentMember",
+          "kind": "type",
+          "signature": "type GeneralAgentMember",
+          "doc": null
+        },
+        {
+          "name": "GeneralAgentProfileOptions",
+          "kind": "interface",
+          "signature": "interface GeneralAgentProfileOptions",
+          "doc": null
         },
         {
           "name": "HostedAgent",
@@ -6046,6 +6100,12 @@
           "kind": "const",
           "signature": "\"hosted:\"",
           "doc": "Each person's box is the developer's named instance with this prefix."
+        },
+        {
+          "name": "TangleAgentOptions",
+          "kind": "interface",
+          "signature": "interface TangleAgentOptions",
+          "doc": null
         }
       ]
     },
@@ -9300,7 +9360,7 @@
           "name": "DEFAULT_HOME_LIMITS",
           "kind": "const",
           "signature": "{ readonly 'AGENTS.md': 12000; readonly 'SOUL.md': 8000; readonly 'IDENTITY.md': 4000; readonly 'USER.md': 4000; readon…",
-          "doc": null
+          "doc": "Unicode code-point budgets."
         },
         {
           "name": "DEFAULT_MAX_SYSTEM_PROMPT_BYTES",

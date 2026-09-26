@@ -1,6 +1,8 @@
+import { HOME_MAINTENANCE } from './home-maintenance'
 import type { AgentProfile, AgentProfileFileMount } from '@tangle-network/agent-interface'
 import { defineInlineResource, mergeAgentProfiles } from '@tangle-network/agent-interface'
 
+/** Unicode code-point budgets. The home command also bounds UTF-8 bytes. */
 export const DEFAULT_HOME_LIMITS = {
   'AGENTS.md': 12_000,
   'SOUL.md': 8_000,
@@ -71,19 +73,27 @@ export function defaultHomeFiles(): AgentProfileFileMount[] {
     inline('USER.md', ''),
     inline('MEMORY.md', ''),
     inline('BOOTSTRAP.md', BOOTSTRAP),
+    inline('.tangle/home.py', HOME_MAINTENANCE),
   ]
 }
 
 /**
- * Compose the general Tangle assistant home under an app profile. An app file
- * at the same path replaces the platform file. Product behavior belongs in
+ * Compose the general Tangle assistant home under an app profile. An app may seed its own mutable files. AGENTS.md stays platform-owned. Product behavior belongs in
  * later preset and skill overlays.
  */
 export function withDefaultAgentHome(profile: AgentProfile): AgentProfile {
   // mergeAgentProfiles concatenates file mounts, so drop a home file the app already mounts.
+  for (const file of profile.resources?.files ?? []) {
+    if (file.path === 'AGENTS.md' && (file.resource.kind !== 'inline' || file.resource.content !== AGENTS)) {
+      throw new Error('AGENTS.md is platform-owned; put business rules in skills and preset instructions')
+    }
+  }
   const owned = new Set((profile.resources?.files ?? []).map(file => file.path))
   const home: AgentProfile = { resources: { files: defaultHomeFiles().filter(file => !owned.has(file.path)) } }
   const merged = mergeAgentProfiles(home, profile)
   if (!merged) throw new Error('withDefaultAgentHome: merge unexpectedly returned undefined')
+  merged.prompt = { ...merged.prompt, instructions: [...(merged.prompt?.instructions ?? []),
+    'Read the home files. Use python3 .tangle/home.py for bounded home reads, writes, bootstrap and consolidation. It consumes JSON on stdin. Never stage the entire sandbox with git add .',
+  ] }
   return merged
 }

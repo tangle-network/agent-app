@@ -4,7 +4,31 @@
 
 Source: `src/hosted-agent/index.ts`
 
-9 exports.
+19 exports.
+
+### `AgentHomeWorkflow`
+
+`interface`
+
+```ts
+interface AgentHomeWorkflow
+```
+
+### `AgentHomeWorkflowOptions`
+
+`interface`
+
+```ts
+interface AgentHomeWorkflowOptions
+```
+
+### `agentHomeWorkflows`
+
+`function` — Definitions only.
+
+```ts
+(options: AgentHomeWorkflowOptions) => AgentHomeWorkflow[]
+```
 
 ### `BoxPolicy`
 
@@ -12,6 +36,14 @@ Source: `src/hosted-agent/index.ts`
 
 ```ts
 interface BoxPolicy
+```
+
+### `buildGeneralAgentProfile`
+
+`function` — Uses the published Sandbox Router builder.
+
+```ts
+(options?: GeneralAgentProfileOptions) => Promise<AgentProfile>
 ```
 
 ### `CONVERSATION_TOOLS_OFF`
@@ -30,6 +62,14 @@ readonly ["task", "todowrite"]
 (config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { voice?: LineVoiceOptions | undefined; }):…
 ```
 
+### `createTangleAgent`
+
+`function` — General agents use the SDK's line attachment route.
+
+```ts
+(options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: LineVoiceOptions | undefined) => Promis…
+```
+
 ### `DEFAULT_BOX_POLICY`
 
 `const` — Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the platform's hourly floor.
@@ -44,6 +84,38 @@ BoxPolicy
 
 ```ts
 "openai/gpt-5.6-luna"
+```
+
+### `GENERAL_AGENT_MODEL`
+
+`const`
+
+```ts
+"openai/gpt-5.6-luna"
+```
+
+### `GENERAL_AGENT_SYSTEM_PROMPT`
+
+`const`
+
+```ts
+string
+```
+
+### `GeneralAgentMember`
+
+`type`
+
+```ts
+type GeneralAgentMember
+```
+
+### `GeneralAgentProfileOptions`
+
+`interface`
+
+```ts
+interface GeneralAgentProfileOptions
 ```
 
 ### `HostedAgent`
@@ -76,4 +148,12 @@ class HostedAgentError
 
 ```ts
 "hosted:"
+```
+
+### `TangleAgentOptions`
+
+`interface`
+
+```ts
+interface TangleAgentOptions
 ```

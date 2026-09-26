@@ -152,3 +152,8 @@ export function createHostedAgent(config: HostedAgentConfig) {
 }
 
 export type HostedAgent = ReturnType<typeof createHostedAgent>
+
+export { buildGeneralAgentProfile, createTangleAgent, GENERAL_AGENT_MODEL, GENERAL_AGENT_SYSTEM_PROMPT } from './general'
+export type { GeneralAgentProfileOptions, GeneralAgentMember, TangleAgentOptions } from './general'
+export { agentHomeWorkflows } from './workflows'
+export type { AgentHomeWorkflowOptions, AgentHomeWorkflow } from './workflows'

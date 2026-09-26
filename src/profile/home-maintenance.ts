@@ -3,7 +3,6 @@ export const HOME_MAINTENANCE = String.raw`#!/usr/bin/env python3
 """Bounded home maintenance. JSON input/output; diagnostics never contain file bodies.
 This command enforces its own write contract. It is not a filesystem security boundary.
 """
-import contextlib
 import datetime
 import fcntl
 import hashlib
@@ -145,15 +144,21 @@ def commit():
         if checked(path).exists():
             read(path)
             existing.append(path)
-    # This separate index cannot stage code, credentials, harness logs or browser state.
-    git('add', '--all', '--', *[path for path in CAPS if checked(path).exists() or path in git('ls-files').splitlines()], 'memory')
+    # Stage only individually validated home paths, including tracked deletions.
+    tracked = list(filter(None, git('ls-files', '-z').split('\0')))
+    staged = sorted(set(existing + tracked))
+    for path in staged:
+        checked(path)
+    if staged:
+        git('add', '--all', '--', *staged)
     changes = git('diff', '--cached', '--name-only')
     if changes:
         git('commit', '-m', 'home: ' + datetime.datetime.now(datetime.timezone.utc).isoformat())
-    heads = subprocess.run(['git', '--git-dir=' + str(GIT), 'rev-parse', '--verify', 'HEAD'],
-                           text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=10)
-    return {'commit': heads.stdout.strip() if heads.returncode == 0 else None,
-            'changed': bool(changes), 'paths': existing}
+    try:
+        head = git('rev-parse', '--verify', 'HEAD')
+    except RuntimeError:
+        head = None
+    return {'commit': head, 'changed': bool(changes), 'paths': existing}
 
 
 def main():
