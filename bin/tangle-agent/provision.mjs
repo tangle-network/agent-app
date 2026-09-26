@@ -23,14 +23,15 @@ const configSchema = z.object({
   proxyEnv: envKey.default('HTTPS_PROXY'), routerKeyEnv: envKey.default('OPENCODE_MODEL_API_KEY'),
   allowDomains: z.array(domain).max(95).default([]),
   resources: z.object({ cpuCores: z.number().int().min(2).max(64).default(2),
-    memoryMB: z.number().int().min(4096).max(262144).default(4096), diskGB: z.number().int().min(10).max(2048).default(20) }).strict().default({}),
+    memoryMB: z.number().int().min(4096).max(262144).default(4096), diskGB: z.number().int().min(10).max(2048).default(20) }).strict().prefault({}),
   baseProfile: agentProfileSchema.default({}),
   scopedServers: z.record(z.string(), z.array(name).min(1).max(16)).default({}),
   members: z.array(z.object({ address: z.string().regex(/^\+[1-9]\d{6,14}$/), role,
-    label: z.string().min(1).max(60), backend: backend.optional() }).strict()).min(1).max(50),
+    label: z.string().min(1).max(60), backend: backend.optional(),
+    secretNames: z.array(z.string().regex(/^TANGLE_AGENT_PRODUCT_[A-Z0-9_]{1,96}$/)).max(16).optional() }).strict()).min(1).max(50),
   lines: z.array(z.object({ id: z.string().regex(/^ln_[A-Za-z0-9_-]+$/),
     transport: z.enum(['imessage', 'whatsapp']),
-    voice: z.object({ ph0nyConnectionId: z.string().min(1), ph0nyAgentId: z.string().min(1) }).strict().optional(),
+    voice: z.object({ ph0nyConnectionId: z.string().min(1), ph0nyAgentId: z.string().min(1), outboundFrom: z.string().regex(/^\+[1-9]\d{6,14}$/) }).strict().optional(),
   }).strict()).min(1).max(8),
   heartbeat: z.object({ lineId: z.string().min(1), owner: z.string().regex(/^\+[1-9]\d{6,14}$/),
     cron: z.string().min(1).default('*/30 * * * *'), timezone: z.string().min(1),
@@ -54,7 +55,7 @@ export function buildGeneralAgent(configInput) {
       if (!servers?.length || !member.backend) throw new Error(`Scoped ${member.role} needs an enrolled product backend and named MCP servers`)
       grants[member.role] = { kind: 'scoped', mcpServers: servers }
     }
-    if (member.backend) members[member.address] = { backend: member.backend }
+    if (member.backend) members[member.address] = { backend: member.backend, ...(member.secretNames ? { secretNames: member.secretNames } : {}) }
   }
   const substrate = agentProfileSchema.parse({
     name: 'tangle-agent-v1', model: { default: config.model },
@@ -81,6 +82,19 @@ export function buildGeneralAgent(configInput) {
   // replace the published general-tool server or remount the durable home.
   const profile = mergeAgentProfiles(config.baseProfile, substrate)
   if (!profile) throw new Error('General profile composition failed')
+  for (const line of config.lines) {
+    if (!line.voice) continue
+    const { ph0nyConnectionId, ph0nyAgentId, outboundFrom } = line.voice
+    const capabilities = ['phony.start_outbound_call', 'phony.get_call']
+    const existing = profile.connections?.find(value => value.connectionId === ph0nyConnectionId)
+    if (existing) {
+      if (!existing.capabilities.includes('*')) existing.capabilities = [...new Set([...existing.capabilities, ...capabilities])]
+    } else {
+      profile.connections = [...(profile.connections ?? []), { connectionId: ph0nyConnectionId, capabilities }]
+    }
+    profile.prompt.instructions.push(`Voice line ${line.id}: use the connected ph0ny tools with agentId ${ph0nyAgentId} and the operator-attested fromNumber ${outboundFrom}. A call requires owner approval and actual consent. For a call to the owner, the enrolled owner address is ${config.members.filter(member => member.role === 'owner').map(member => member.address).join(', ')}. The Hub call hook rechecks membership and uses the destination member's own role and private workspace. Return the actual call id; a start response is not proof of a connected call.`)
+  }
+  agentProfileSchema.parse(profile)
   const forbidden = new Set(['AGENTS.md', 'SOUL.md', 'IDENTITY.md', 'USER.md', 'MEMORY.md', 'BOOTSTRAP.md'])
   for (const mount of profile.resources?.files ?? []) {
     if (forbidden.has(mount.path) || mount.path.startsWith(config.home + '/')) {
@@ -112,7 +126,7 @@ export function buildGeneralAgent(configInput) {
     // JSON is valid YAML and avoids interpolation/quoting errors from member data.
     heartbeat = JSON.stringify({ name: `Tangle agent ${config.keyPrefix} heartbeat`, enabled: false,
       on: { schedule: { cron: h.cron, timezone: h.timezone } },
-      do: [{ 'agent.run': { line: { id: h.lineId, member: h.owner }, prompt: h.prompt } }],
+      do: [{ 'agent.run': { line: { id: h.lineId, member: h.owner, purpose: 'heartbeat', timezone: h.timezone }, prompt: h.prompt } }],
     }, null, 2)
   }
   return { config, attachments, heartbeat }

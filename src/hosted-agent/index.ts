@@ -157,3 +157,5 @@ export { buildGeneralAgentProfile, createTangleAgent, GENERAL_AGENT_MODEL, GENER
 export type { GeneralAgentProfileOptions, GeneralAgentMember, TangleAgentOptions } from './general'
 export { agentHomeWorkflows } from './workflows'
 export type { AgentHomeWorkflowOptions, AgentHomeWorkflow } from './workflows'
+
+export { defaultHomeFiles, DEFAULT_HOME_LIMITS } from "../profile/home"

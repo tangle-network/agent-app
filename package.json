@@ -38,7 +38,8 @@
     "agent-app-peer-check": "./dist/peer-floors/cli.js",
     "agent-app-spend-check": "./dist/spend/cli.js",
     "agent-app-signoff": "./dist/signoff/cli.js",
-    "agent-app-verify-proof": "./dist/signoff/proof-cli.js"
+    "agent-app-verify-proof": "./dist/signoff/proof-cli.js",
+    "tangle-agent": "bin/tangle-agent.mjs"
   },
   "exports": {
     "./package.json": "./package.json",
@@ -596,19 +597,27 @@
     "viem": "^2.56.0",
     "vitest": "^4.1.11",
     "y-protocols": "^1.0.7",
-    "yjs": "^13.6.32"
+    "yjs": "^13.6.32",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@tangle-network/browser-agent-driver": "^0.36.1",
+    "@tangle-network/hub-sdk": "^0.19.1",
+    "@tangle-network/tcloud": "^0.5.2",
+    "playwright": "^1.63.0",
+    "@anthropic-ai/sdk": "^0.93.0",
+    "@ai-sdk/google": "^3.0.33",
+    "@ai-sdk/anthropic": "^3.0.49"
   },
   "peerDependencies": {
     "@firecrawl/pdf-inspector-wasm": ">=0.1.3",
     "@huggingface/transformers": ">=3",
     "@tangle-network/agent-eval": ">=0.185.0 <0.191.0",
-    "@tangle-network/agent-integrations": ">=0.54.2 <0.56.0",
+    "@tangle-network/agent-integrations": ">=0.54.2 <0.57.0",
     "@tangle-network/agent-interface": "^2.11.0",
     "@tangle-network/agent-knowledge": "^17.1.2",
     "@tangle-network/agent-profile-materialize": ">=0.20.1 <0.21.0",
     "@tangle-network/agent-runtime": ">=0.262.0 <0.275.0",
     "@tangle-network/brand": ">=1.5.0",
-    "@tangle-network/sandbox": ">=0.45.0 <0.48.0 || ^0.49.0 || ^0.50.0 || ^0.51.0 || ^0.52.0 || ^0.53.0",
+    "@tangle-network/sandbox": ">=0.45.0 <0.48.0 || ^0.49.0 || ^0.50.0 || ^0.51.0 || ^0.52.0 || ^0.53.0 || ^0.54.0 || ^0.55.0 || ^0.56.0",
     "@tangle-network/sandbox-ui": ">=0.113.3 <0.114.0",
     "@tangle-network/ui": ">=11.6.0 <12.0.0",
     "@tiptap/core": ">=3.28.0 <4.0.0",
@@ -627,7 +636,12 @@
     "react-dom": ">=18",
     "react-konva": ">=18",
     "react-router": ">=8.3.0",
-    "resend": ">=6"
+    "resend": ">=6",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@tangle-network/browser-agent-driver": "^0.36.1",
+    "@tangle-network/hub-sdk": "^0.19.1",
+    "@tangle-network/tcloud": "^0.5.2",
+    "playwright": "^1.63.0"
   },
   "peerDependenciesMeta": {
     "@firecrawl/pdf-inspector-wasm": {
@@ -706,6 +720,21 @@
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "@tangle-network/browser-agent-driver": {
+      "optional": true
+    },
+    "@tangle-network/hub-sdk": {
+      "optional": true
+    },
+    "@tangle-network/tcloud": {
+      "optional": true
+    },
+    "playwright": {
       "optional": true
     }
   },
