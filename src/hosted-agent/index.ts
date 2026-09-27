@@ -2,36 +2,26 @@ import type { AgentProfile, BackendConfig, LineVoiceOptions } from '@tangle-netw
 import { type Line, type LineInstanceCreate, Sandbox } from '@tangle-network/sandbox/core'
 
 /**
- * A hosted agent: people text or call a line, and each person is answered
- * from their own isolated sandbox. The developer's Tangle API key pays for
- * every box, model turn, reply and call.
- *
- * The platform does the work. {@link HostedAgent.attachLine} attaches the
- * line to Tangle Hub with one sandbox per person: Hub routes each text and
- * call to the person's box (the named instance {@link PERSON_KEY_PREFIX} plus
- * a hash of their number), keeps one thread per person, handles STOP and
- * START, counts each person's texts per day, and sends the reply. A call on
- * the line runs in the same box and thread, so text and voice share one memory.
+ * A hosted agent assembled over Hub lines. Hub owns admission, STOP/START,
+ * per-member threads, sandbox instances, limits and delivery. The developer's
+ * Tangle key pays for the work. This kit runs no message loop or scheduler.
  */
-
 export interface HostedAgentConfig {
-  /** The developer's Tangle API key. */
   apiKey: string
-  /**
-   * The persona every person's box runs. A profile without `model.default`
-   * runs {@link DEFAULT_HOSTED_MODEL}, and a profile without `tools` runs with
-   * {@link CONVERSATION_TOOLS_OFF} turned off. Set `tools` to choose your own,
-   * for example on a harness that cannot turn those tools off.
-   */
+  /** The persona and tools every admitted person's isolated box runs. */
   profile: AgentProfile
-  /** Backend harness type, such as `opencode`; the runtime default when omitted. */
   harness?: string
-  /** The owner's address on the chosen transport: E.164 phone or email. */
+  /** E.164 phone number, or the declared owner's email address. */
   owner: string
-  /** Texts Hub answers per person per UTC day. Default 20. */
   freeTurnsPerDay?: number
   box?: Partial<BoxPolicy>
   sandboxUrl?: string
+  /**
+   * Explicit instance namespace, only when intentionally sharing retained
+   * state across lines or migrating a legacy attachment. New lines otherwise
+   * get a namespace derived from their immutable Hub line id.
+   */
+  instanceKeyPrefix?: string
 }
 
 export interface BoxPolicy {
@@ -45,15 +35,6 @@ export interface BoxPolicy {
   allowDomains: string[]
 }
 
-/**
- * Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the
- * platform's hourly floor. A person's box starts OpenCode on their first text
- * and after every idle stop, and that start is CPU-bound: on one core it took
- * 6.1 s after a resume and 8.4 s on a new box, on two cores 3.5 s and 3.4 s
- * (production, 2026-09-24). A disk no larger than the platform's warm seed
- * lets a new person's box be claimed from the warm pool: create took 2.1-2.7 s
- * instead of 5.3-7.0 s (2026-09-25).
- */
 export const DEFAULT_BOX_POLICY: BoxPolicy = {
   cpuCores: 2, memoryMB: 2048, diskGB: 2,
   idleTimeoutSeconds: 600, maxLifetimeSeconds: 86_400, deleteAfterStoppedSeconds: 7 * 86_400,
@@ -61,53 +42,52 @@ export const DEFAULT_BOX_POLICY: BoxPolicy = {
 }
 
 /**
- * Each person's box is the developer's named instance with this prefix. It is
- * the key this kit used before Hub routed its texts, so every existing
- * person keeps their box.
+ * Legacy namespace. Lines created by the earlier kit have clientReference
+ * `hosted-agent`; they retain this prefix even after detach/reattach. New
+ * lines use `hosted:<line-id>:` so two assistants never share a person's disk
+ * by accident. Use the returned attachment's instance.keyPrefix to address
+ * its member instances with the Sandbox SDK's lineInstanceKey.
  */
 export const PERSON_KEY_PREFIX = 'hosted:'
 
-/**
- * Harness tools a texting or calling assistant does not use. Their
- * descriptions present every turn as coding work: a shell, file search,
- * sub-agents, to-do lists, skills and web fetch. File read, write and edit
- * stay, so a persona can keep notes such as `memory.md`.
- */
+/** File read/write/edit remain available for persona-owned notes. */
 export const CONVERSATION_TOOLS_OFF = ['bash', 'glob', 'grep', 'task', 'todowrite', 'webfetch', 'skill'] as const
-
-/**
- * The model for a profile without `model.default`. It gave the most useful
- * on-topic replies among four Router models on the same five texts and calls
- * (2026-09-23), within the latency of the others.
- */
 export const DEFAULT_HOSTED_MODEL = 'openai/gpt-5.6-luna'
 
-/** The profile a person's box runs: the developer's profile over the conversation defaults. */
 function conversationProfile(profile: AgentProfile): AgentProfile {
   return {
     ...profile,
     model: { ...profile.model, default: profile.model?.default ?? DEFAULT_HOSTED_MODEL },
-    // A profile that sets `tools` owns its tool set.
     ...(profile.tools ? {} : {
       tools: Object.fromEntries(CONVERSATION_TOOLS_OFF.map(tool => [tool, false])),
-      // The sandbox's preview policy grants the shell unless its permission
-      // is denied, so turning the tool off alone leaves the shell in place.
       permissions: { bash: 'deny' as const, ...profile.permissions },
     }),
   }
 }
 
-/** Each person runs in their own box, so no member shares a disk and each may use the persona's tools. */
 const PERSON = { context: 'own', tools: 'act' } as const
 const E164 = /^\+[1-9]\d{6,14}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const KEY_PREFIX = /^[A-Za-z0-9._:@-]{1,100}$/
+
+export interface HostedAgentLineOptions {
+  transport?: 'imessage' | 'email' | 'whatsapp'
+  /** Email defaults to personal. Other transports default to shared. */
+  mode?: 'personal' | 'shared'
+  /** Required only for WhatsApp: one connection can own several numbers. */
+  phoneNumberId?: string
+  voice?: LineVoiceOptions
+}
 
 export class HostedAgentError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = 'HostedAgentError' }
 }
 
 export function createHostedAgent(config: HostedAgentConfig) {
-  if (!E164.test(config.owner) && !EMAIL.test(config.owner)) throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number or email address.')
+  if (config.owner.length > 320 || (!E164.test(config.owner) && !EMAIL.test(config.owner)))
+    throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number or email address.')
+  if (config.instanceKeyPrefix !== undefined && !KEY_PREFIX.test(config.instanceKeyPrefix))
+    throw new HostedAgentError('invalid_instance_prefix', 'instanceKeyPrefix must be 1-100 letters, digits or . _ : @ - characters.')
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
   const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
   const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile: conversationProfile(config.profile) }
@@ -121,30 +101,25 @@ export function createHostedAgent(config: HostedAgentConfig) {
 
   return {
     /**
-     * Attach a Hub connection the developer owns as this agent's line:
-     * an Inkbox iMessage identity (default), its email mailbox, or a Linq
-     * WhatsApp number (`phoneNumberId`). The owner's address must match the
-     * transport. In `shared` mode (default) the owner and anyone who texts it
-     * each get their own box and thread; `personal` admits the owner only.
-     * With `voice` (iMessage lines only), calls to the
-     * line reach the caller's box and thread through that ph0ny agent; Hub
-     * admits only members, so a caller texts once before calling. Safe to
-     * repeat with the same config. Hub refuses a changed profile, box or
-     * limit on an attached line: detach it first
-     * (`DELETE /v1/lines/:id/attachment`). Each person keeps their box and
-     * its memory, and their thread starts over. Remove any Hub event
-     * subscription on the connection first; Hub refuses a line that another
-     * route would also answer.
+     * Attach an owned Inkbox iMessage identity, Inkbox mailbox, or Linq
+     * WhatsApp number. Hub already deduplicates by provider identity; a
+     * global clientReference would prevent the owner's second line.
+     *
+     * Phone shared mode admits guests into isolated boxes. Email admits
+     * declared members only, in either mode. Hub challenges an email sender
+     * before running their first turn. Add further declared email members
+     * through sandbox.lines.members(line.id).add(), not guest admission.
+     *
+     * Repeating the same attachment is idempotent. Changed profiles or
+     * policies require an explicit detach. Existing Hub event subscriptions
+     * that would also answer must be explicitly removed by their owner.
+     * This call never removes them or rewrites an existing attachment.
      */
-    async attachLine(connectionId: string, options: {
-      transport?: 'imessage' | 'email' | 'whatsapp'
-      mode?: 'personal' | 'shared'
-      /** Required for WhatsApp because one Linq connection may own several numbers. */
-      phoneNumberId?: string
-      voice?: LineVoiceOptions
-    } = {}): Promise<Line> {
+    async attachLine(connectionId: string, options: HostedAgentLineOptions = {}): Promise<Line> {
       const transport = options.transport ?? 'imessage'
-      const mode = options.mode ?? 'shared'
+      const mode = options.mode ?? (transport === 'email' ? 'personal' : 'shared')
+      if (!['imessage', 'email', 'whatsapp'].includes(transport) || !['personal', 'shared'].includes(mode))
+        throw new HostedAgentError('unsupported_line_options', 'Unsupported line transport or mode.')
       if (transport === 'email' && !EMAIL.test(config.owner))
         throw new HostedAgentError('owner_transport_mismatch', 'email lines require an email owner address.')
       if (transport !== 'email' && !E164.test(config.owner))
@@ -157,18 +132,22 @@ export function createHostedAgent(config: HostedAgentConfig) {
         throw new HostedAgentError('voice_transport_unsupported', 'Voice is supported only on iMessage lines.')
       const line = await sandbox.lines.fromConnection(
         transport === 'whatsapp'
-          ? { connectionId, transport, phoneNumberId: options.phoneNumberId!, clientReference: 'hosted-agent' }
-          : { connectionId, transport, clientReference: 'hosted-agent' },
+          ? { connectionId, transport, phoneNumberId: options.phoneNumberId! }
+          : { connectionId, transport },
       )
+      const keyPrefix = config.instanceKeyPrefix
+        ?? line.attachment?.instance?.keyPrefix
+        ?? (line.clientReference === 'hosted-agent' ? PERSON_KEY_PREFIX : `${PERSON_KEY_PREFIX}${line.id}:`)
+      const guests = mode === 'shared' && transport !== 'email'
       await sandbox.lines.attach({
         number: line.id,
         mode,
         members: [{ address: config.owner, role: 'owner' }],
-        unknownSenders: mode === 'shared' ? 'guest' : 'reject',
-        roles: mode === 'shared' ? { owner: PERSON, guest: PERSON } : { owner: PERSON },
+        unknownSenders: guests ? 'guest' : 'reject',
+        roles: guests ? { owner: PERSON, guest: PERSON } : { owner: PERSON },
         respond: { kind: 'agent', backend },
         limits: { turnsPerMemberPerDay: config.freeTurnsPerDay ?? 20 },
-        instance: { keyPrefix: PERSON_KEY_PREFIX, create },
+        instance: { keyPrefix, create },
         clientReference: 'hosted-agent',
       })
       if (options.voice) await sandbox.lines.enableVoice(line.id, options.voice)
