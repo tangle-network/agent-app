@@ -10,21 +10,48 @@ permissions:
 jobs:
   package:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: e8854f80b97e55b4a1fa07d7efe30afb0b829961
+          persist-credentials: false
+          path: caller
+      - name: Archive caller source for review
+        run: |
+          mkdir -p "$RUNNER_TEMP/oidc-source"
+          git -C caller archive HEAD -o "$RUNNER_TEMP/oidc-source/agent-app.tar"
+          git -C caller rev-parse HEAD > "$RUNNER_TEMP/oidc-source/agent-app.commit"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: oidc-caller-source
+          path: ${{ runner.temp }}/oidc-source
+          retention-days: 3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: tangle-network/agent-runtime
+          ref: 68532c2c76e6dea3c3d66c5977a9c269fef5b3f5
+          persist-credentials: false
+          path: runtime
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          package_json_file: runtime/package.json
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-      - name: Read published runtime identity
-        shell: bash
+      - name: Build exact merged runtime
+        working-directory: runtime
         run: |
           set -euo pipefail
-          npm view @tangle-network/agent-runtime dist-tags --json
-          npm view @tangle-network/agent-runtime@latest version dist.tarball dist.integrity --json
-          npm view @tangle-network/agent-runtime@0.278.1 version --json || true
-          mkdir -p "$RUNNER_TEMP/oidc-package"
-          cd "$RUNNER_TEMP/oidc-package"
-          npm pack @tangle-network/agent-runtime@latest --ignore-scripts --json > pack.json
-          node -e 'const fs=require("node:fs"); const p=JSON.parse(fs.readFileSync("pack.json","utf8"))[0]; console.log(JSON.stringify({name:p.name,version:p.version,filename:p.filename,integrity:p.integrity})); fs.writeFileSync("filename",p.filename)'
-          tar -xzf "$(cat filename)"
-          node --input-type=module -e 'const p=await import("./package/dist/platform.js"); console.log(JSON.stringify({PlatformOidcClient:typeof p.PlatformOidcClient,createPkcePair:typeof p.createPkcePair})); if(typeof p.PlatformOidcClient!=="function" || typeof p.createPkcePair!=="function") process.exit(1)'
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm build
+          mkdir -p "$RUNNER_TEMP/oidc-runtime"
+          pnpm pack --pack-destination "$RUNNER_TEMP/oidc-runtime"
+          git rev-parse HEAD > "$RUNNER_TEMP/oidc-runtime/SOURCE_COMMIT"
+          sha256sum "$RUNNER_TEMP/oidc-runtime/"*.tgz > "$RUNNER_TEMP/oidc-runtime/SHA256SUMS"
+          node --input-type=module -e 'const p=await import("./dist/platform.js"); console.log(JSON.stringify({PlatformOidcClient:typeof p.PlatformOidcClient,createPkcePair:typeof p.createPkcePair})); if(typeof p.PlatformOidcClient!=="function" || typeof p.createPkcePair!=="function") process.exit(1)'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: oidc-runtime-build
+          path: ${{ runner.temp }}/oidc-runtime
+          retention-days: 3
