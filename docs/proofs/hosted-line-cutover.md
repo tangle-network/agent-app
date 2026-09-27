@@ -38,7 +38,7 @@ Set `SANDBOX_URL` to the staging Sandbox API that forwards to the candidate Hub.
 ```bash
 : "${SANDBOX_URL:?}" "${CONNECTION_ID:?}" "${PROFILE_FILE:?}" "${OWNER_ADDRESS:?}" "${TRANSPORT:?}" "${MODE:?}"
 read -rsp 'Staging owner API key: ' TANGLE_API_KEY; echo
-export TANGLE_API_KEY ROOT
+export TANGLE_API_KEY ROOT SANDBOX_URL CONNECTION_ID PROFILE_FILE OWNER_ADDRESS TRANSPORT MODE PHONE_NUMBER_ID
 node --input-type=module <<'JS' | tee "$ROOT/attach.json"
 import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';

@@ -156,7 +156,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
       validate(transport, options, true)
       // A single literal reference aliases an owner's email and iMessage
       // lines. Include transport and connection without exceeding Hub's bound.
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${transport}:${connectionId}`))
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${transport}:${connectionId}:${options.phoneNumberId ?? ""}`))
       const suffix = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32)
       const clientReference = config.attachment?.clientReference ?? `hosted-agent:${suffix}`
       const line = await sandbox.lines.fromConnection(transport === 'whatsapp'

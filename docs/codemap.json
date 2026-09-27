@@ -6287,25 +6287,25 @@
           "name": "CONVERSATION_TOOLS_OFF",
           "kind": "const",
           "signature": "readonly [\"bash\", \"glob\", \"grep\", \"task\", \"todowrite\", \"webfetch\", \"skill\"]",
-          "doc": "Harness tools a texting or calling assistant does not use."
+          "doc": null
         },
         {
           "name": "createHostedAgent",
           "kind": "function",
-          "signature": "(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { transport?: \"email\" | \"imessage\" | \"whats…",
+          "signature": "(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: HostedAgentLineOptions): Promise<Line>; att…",
           "doc": null
         },
         {
           "name": "DEFAULT_BOX_POLICY",
           "kind": "const",
           "signature": "BoxPolicy",
-          "doc": "Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the platform's hourly floor."
+          "doc": null
         },
         {
           "name": "DEFAULT_HOSTED_MODEL",
           "kind": "const",
           "signature": "\"openai/gpt-5.6-luna\"",
-          "doc": "The model for a profile without `model.default`."
+          "doc": null
         },
         {
           "name": "HostedAgent",
@@ -6314,10 +6314,16 @@
           "doc": null
         },
         {
+          "name": "HostedAgentAttachment",
+          "kind": "type",
+          "signature": "type HostedAgentAttachment",
+          "doc": null
+        },
+        {
           "name": "HostedAgentConfig",
           "kind": "interface",
           "signature": "interface HostedAgentConfig",
-          "doc": "A hosted agent: people text or call a line, and each person is answered from their own isolated sandbox."
+          "doc": "Hub owns delivery, member threads, consent and execution."
         },
         {
           "name": "HostedAgentError",
@@ -6326,10 +6332,22 @@
           "doc": null
         },
         {
+          "name": "HostedAgentLineOptions",
+          "kind": "interface",
+          "signature": "interface HostedAgentLineOptions",
+          "doc": null
+        },
+        {
+          "name": "HostedAgentTransport",
+          "kind": "type",
+          "signature": "type HostedAgentTransport",
+          "doc": null
+        },
+        {
           "name": "PERSON_KEY_PREFIX",
           "kind": "const",
           "signature": "\"hosted:\"",
-          "doc": "Each person's box is the developer's named instance with this prefix."
+          "doc": "Legacy default."
         }
       ]
     },
