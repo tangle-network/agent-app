@@ -46,17 +46,17 @@ importers:
         specifier: 0.55.0
         version: 0.55.0(@types/node@24.13.3)
       '@tangle-network/agent-interface':
-        specifier: 2.12.0
-        version: 2.12.0
+        specifier: 2.13.0
+        version: 2.13.0
       '@tangle-network/agent-knowledge':
-        specifier: 17.1.5
-        version: 17.1.5(@tangle-network/agent-eval@0.197.0)(@tangle-network/agent-interface@2.12.0)
+        specifier: 17.1.8
+        version: 17.1.8(@tangle-network/agent-eval@0.197.0)(@tangle-network/agent-interface@2.13.0)
       '@tangle-network/agent-profile-materialize':
         specifier: 0.20.1
-        version: 0.20.1(@tangle-network/agent-interface@2.12.0)
+        version: 0.20.1(@tangle-network/agent-interface@2.13.0)
       '@tangle-network/agent-runtime':
-        specifier: 0.277.0
-        version: 0.277.0(@tangle-network/agent-eval@0.197.0)(@tangle-network/agent-interface@2.12.0)(@tangle-network/sandbox@0.53.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
+        specifier: github:tangle-network/agent-runtime#a3d2eb6a2d523caec56edb438be026339b8b5b27
+        version: https://codeload.github.com/tangle-network/agent-runtime/tar.gz/a3d2eb6a2d523caec56edb438be026339b8b5b27(@tangle-network/agent-eval@0.197.0)(@tangle-network/agent-interface@2.13.0)(@tangle-network/sandbox@0.53.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
       '@tangle-network/brand':
         specifier: 1.5.0
         version: 1.5.0(react@19.2.8)
@@ -68,7 +68,7 @@ importers:
         version: 0.53.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       '@tangle-network/sandbox-ui':
         specifier: 0.113.3
-        version: 0.113.3(17928ee178c22e28bf752b6f78cf73d5)
+        version: 0.113.3(7dbaeadc577d966855555257ab21b32c)
       '@tangle-network/ui':
         specifier: 11.9.0
         version: 11.9.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.5.0(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.2)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
@@ -2230,16 +2230,8 @@ packages:
   '@tangle-network/agent-interface@1.9.0':
     resolution: {integrity: sha512-HB43+EjiMFYQ+sA4h6FNd1pP81jm6HmOfo5Enfd9FZm0NrTWufK2WbbCUpoGgrnbG1vJv8h/Ly/YevnGTZ5baw==}
 
-  '@tangle-network/agent-interface@2.12.0':
-    resolution: {integrity: sha512-kUsQp/cZ3j/0US9CAEmlSfXjsVIAx/oZKkdk86XK61yo0fB6020OeI7RdhVGqKI18xXlPUMDqLvi/i1jZuoLOQ==}
-
-  '@tangle-network/agent-knowledge@17.1.5':
-    resolution: {integrity: sha512-mwneEy91rPDlojUXfq9OKCtSeKe6lJ0wGhItgg7/fCg+wNw4KFVTdQwDFKMtnrpywlkwNKsW5/TifM+sf+/QdA==}
-    engines: {node: '>=20.19.0'}
-    hasBin: true
-    peerDependencies:
-      '@tangle-network/agent-eval': '>=0.182.0 <0.191.0'
-      '@tangle-network/agent-interface': ^2.0.0
+  '@tangle-network/agent-interface@2.13.0':
+    resolution: {integrity: sha512-gBOlHyw7iDbMBLLqmZqIZ2hVg9bRBOU5Hmyo31w5sGOWxXQYqSAwqqUlGe5klHRefOW7souT71i5B/dEKdbbFA==}
 
   '@tangle-network/agent-knowledge@17.1.8':
     resolution: {integrity: sha512-2EmyJOxnZSJR2QIdeLnUbQiiXACtkDMjIkcYl/cyVZrFyTpMmvqPyaP/8aR8OVtktyLR/RsP8oyujFrwbeAyew==}
@@ -2254,14 +2246,15 @@ packages:
     peerDependencies:
       '@tangle-network/agent-interface': ^2.6.1
 
-  '@tangle-network/agent-runtime@0.277.0':
-    resolution: {integrity: sha512-rTLubUjUzmOSLunuCK253qEDy2uynEv+2naBvJP2APMvj394KiBQwX8lnKOY+/OA3VGFy2TxXnFXcnOQc7wh5Q==}
+  '@tangle-network/agent-runtime@https://codeload.github.com/tangle-network/agent-runtime/tar.gz/a3d2eb6a2d523caec56edb438be026339b8b5b27':
+    resolution: {gitHosted: true, integrity: sha512-Ex6R3G+743HENvbJ02mJH1ZdqsYiDLMYPOOowt7PG3xUP56Inrie2f+jpuz0MfXX67BC/rUPainFffQ5Pm9QMw==, tarball: https://codeload.github.com/tangle-network/agent-runtime/tar.gz/a3d2eb6a2d523caec56edb438be026339b8b5b27}
+    version: 0.278.1
     engines: {node: '>=22.13.0'}
     hasBin: true
     peerDependencies:
-      '@tangle-network/agent-eval': '>=0.191.0 <0.194.0'
-      '@tangle-network/agent-interface': ^2.11.0
-      '@tangle-network/sandbox': '>=0.36.4 <0.48.0 || ^0.49.0-0 || ^0.50.0 || ^0.51.0 || ^0.52.0 || ^0.53.0 || ^0.54.0'
+      '@tangle-network/agent-eval': '>=0.197.0 <0.198.0'
+      '@tangle-network/agent-interface': ^2.13.0
+      '@tangle-network/sandbox': '>=0.36.4 <0.48.0 || ^0.49.0-0 || ^0.50.0 || ^0.51.0 || ^0.52.0 || ^0.53.0 || ^0.54.0 || ^0.55.0'
 
   '@tangle-network/agent-trace-contract@1.3.0':
     resolution: {integrity: sha512-kvWKftAShL9TB8F945TII4Wj2vpH/MfCNtU2aoChqWZIB8Kt9AzqJKisZimUw7fRouLKSm1uOw9FsdX09vsXEQ==}
@@ -7064,7 +7057,7 @@ snapshots:
 
   '@tangle-network/agent-core@0.9.6':
     dependencies:
-      '@tangle-network/agent-interface': 2.12.0
+      '@tangle-network/agent-interface': 2.13.0
       zod: 4.5.4
 
   '@tangle-network/agent-docs@0.2.1':
@@ -7076,7 +7069,7 @@ snapshots:
       '@asteasolutions/zod-to-openapi': 9.1.0(zod@4.5.4)
       '@hono/node-server': 2.1.1(hono@4.13.5)
       '@tangle-network/agent-core': 0.9.6
-      '@tangle-network/agent-interface': 2.12.0
+      '@tangle-network/agent-interface': 2.13.0
       '@tangle-network/agent-trace-contract': 1.3.0
       hono: 4.13.5
       linear-sum-assignment: 1.0.9
@@ -7127,39 +7120,31 @@ snapshots:
       spdx-expression-parse: 5.0.0
       zod: 4.4.3
 
-  '@tangle-network/agent-interface@2.12.0':
+  '@tangle-network/agent-interface@2.13.0':
     dependencies:
       '@noble/hashes': 2.4.0
       spdx-expression-parse: 5.0.0
       zod: 4.5.4
 
-  '@tangle-network/agent-knowledge@17.1.5(@tangle-network/agent-eval@0.197.0)(@tangle-network/agent-interface@2.12.0)':
+  '@tangle-network/agent-knowledge@17.1.8(@tangle-network/agent-eval@0.197.0)(@tangle-network/agent-interface@2.13.0)':
     dependencies:
       '@tangle-network/agent-eval': 0.197.0
-      '@tangle-network/agent-interface': 2.12.0
+      '@tangle-network/agent-interface': 2.13.0
       '@types/proper-lockfile': 4.1.4
       proper-lockfile: 4.1.2
       zod: 4.5.4
 
-  '@tangle-network/agent-knowledge@17.1.8(@tangle-network/agent-eval@0.197.0)(@tangle-network/agent-interface@2.12.0)':
+  '@tangle-network/agent-profile-materialize@0.20.1(@tangle-network/agent-interface@2.13.0)':
     dependencies:
-      '@tangle-network/agent-eval': 0.197.0
-      '@tangle-network/agent-interface': 2.12.0
-      '@types/proper-lockfile': 4.1.4
-      proper-lockfile: 4.1.2
-      zod: 4.5.4
+      '@tangle-network/agent-interface': 2.13.0
 
-  '@tangle-network/agent-profile-materialize@0.20.1(@tangle-network/agent-interface@2.12.0)':
-    dependencies:
-      '@tangle-network/agent-interface': 2.12.0
-
-  '@tangle-network/agent-runtime@0.277.0(@tangle-network/agent-eval@0.197.0)(@tangle-network/agent-interface@2.12.0)(@tangle-network/sandbox@0.53.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
+  '@tangle-network/agent-runtime@https://codeload.github.com/tangle-network/agent-runtime/tar.gz/a3d2eb6a2d523caec56edb438be026339b8b5b27(@tangle-network/agent-eval@0.197.0)(@tangle-network/agent-interface@2.13.0)(@tangle-network/sandbox@0.53.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
     dependencies:
       '@tangle-network/agent-core': 0.9.6
       '@tangle-network/agent-eval': 0.197.0
-      '@tangle-network/agent-interface': 2.12.0
-      '@tangle-network/agent-knowledge': 17.1.8(@tangle-network/agent-eval@0.197.0)(@tangle-network/agent-interface@2.12.0)
-      '@tangle-network/agent-profile-materialize': 0.20.1(@tangle-network/agent-interface@2.12.0)
+      '@tangle-network/agent-interface': 2.13.0
+      '@tangle-network/agent-knowledge': 17.1.8(@tangle-network/agent-eval@0.197.0)(@tangle-network/agent-interface@2.13.0)
+      '@tangle-network/agent-profile-materialize': 0.20.1(@tangle-network/agent-interface@2.13.0)
       '@tangle-network/agent-trace-contract': 1.3.0
       '@tangle-network/sandbox': 0.53.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       tar-stream: 3.2.1
@@ -7187,13 +7172,13 @@ snapshots:
       - '@opentelemetry/semantic-conventions'
       - langfuse-node
 
-  '@tangle-network/sandbox-ui@0.113.3(17928ee178c22e28bf752b6f78cf73d5)':
+  '@tangle-network/sandbox-ui@0.113.3(7dbaeadc577d966855555257ab21b32c)':
     dependencies:
       '@lobehub/icons-static-svg': 1.94.0
       '@pierre/diffs': 1.3.6(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-dropdown-menu': 2.1.24(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-select': 2.3.7(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@tangle-network/agent-interface': 2.12.0
+      '@tangle-network/agent-interface': 2.13.0
       '@tangle-network/brand': 1.5.0(react@19.2.8)
       '@tangle-network/ui': 11.9.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.5.0(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.2)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
       diff: 9.0.0
@@ -7222,7 +7207,7 @@ snapshots:
   '@tangle-network/sandbox@0.53.0(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))':
     dependencies:
       '@tangle-network/agent-core': 0.9.6
-      '@tangle-network/agent-interface': 2.12.0
+      '@tangle-network/agent-interface': 2.13.0
       zod: 4.5.4
     optionalDependencies:
       viem: 2.56.0(typescript@7.0.2)(zod@4.4.3)

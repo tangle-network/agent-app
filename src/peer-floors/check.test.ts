@@ -149,8 +149,9 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('1.9.0', range!)).toBe(false)
     expect(satisfiesRange('2.1.1', range!)).toBe(false)
     expect(satisfiesRange('2.10.999', range!)).toBe(false)
-    expect(satisfiesRange('2.11.0', range!)).toBe(true)
-    expect(satisfiesRange('2.12.0', range!)).toBe(true)
+    expect(satisfiesRange('2.11.0', range!)).toBe(false)
+    expect(satisfiesRange('2.12.0', range!)).toBe(false)
+    expect(satisfiesRange('2.13.0', range!)).toBe(true)
     expect(satisfiesRange('3.0.0', range!)).toBe(false)
   })
 
@@ -162,17 +163,12 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    // Runtime 0.262.0 is the first Runtime whose Sandbox peer admits 0.50,
-    // 0.264.0 the first that admits 0.51, 0.266.0 the first that admits 0.52,
-    // and 0.273.5 the first that admits 0.53. 0.274 is the verified line.
-    expect(satisfiesRange('0.261.999', range!)).toBe(false)
-    expect(satisfiesRange('0.262.0', range!)).toBe(true)
-    expect(satisfiesRange('0.264.0', range!)).toBe(true)
-    expect(satisfiesRange('0.266.0', range!)).toBe(true)
-    expect(satisfiesRange('0.273.5', range!)).toBe(true)
-    expect(satisfiesRange('0.274.0', range!)).toBe(true)
-    expect(satisfiesRange('0.274.999', range!)).toBe(true)
-    expect(satisfiesRange('0.275.0', range!)).toBe(false)
+    // The OIDC transport requires the runtime that includes PR #1410.
+    expect(satisfiesRange('0.277.0', range!)).toBe(false)
+    expect(satisfiesRange('0.278.0', range!)).toBe(false)
+    expect(satisfiesRange('0.278.1', range!)).toBe(true)
+    expect(satisfiesRange('0.278.999', range!)).toBe(true)
+    expect(satisfiesRange('0.279.0', range!)).toBe(false)
   })
 
   // Each window starts at the floor the verified Runtime line admits (Eval) or
@@ -186,7 +182,7 @@ describe('this package audits itself', () => {
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
     ['@tangle-network/agent-eval', ['0.184.999'], ['0.188.0', '0.190.0', '0.190.999'], ['0.191.0']],
     ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999'], ['0.54.0']],
-    ['@tangle-network/agent-interface', ['2.10.999'], ['2.11.0', '2.12.0'], ['3.0.0']],
+    ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0'], ['3.0.0']],
   ]
 
   it.each(verifiedWindows)('keeps the %s peer on the verified window', async (name, below, admitted, above) => {

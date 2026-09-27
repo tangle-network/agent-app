@@ -27,6 +27,8 @@ import {
   type TangleSsoAccountStore,
   type TangleSsoAuthClient,
   type TangleSsoHandlers,
+  type TangleOidcSsoAccountStore,
+  type TangleOidcSsoAuthClient,
 } from '../platform/sso'
 
 const DEFAULT_STATE_COOKIE = 'tangle_sso_state'
@@ -78,6 +80,7 @@ export interface AppAuthSocialConfig {
  *  `__Secure-`/prefixed cookie that `auth.api.getSession` accepts) — so the
  *  product no longer touches `better-auth/crypto` itself. */
 export interface AppAuthSsoConfig {
+  protocol?: 'legacy'
   /** Platform wire client (authorizeUrl + exchange). */
   client: TangleSsoAuthClient
   /** Product persistence: user upsert, session row, platform link. */
@@ -99,6 +102,13 @@ export interface AppAuthSsoConfig {
   loginPath?: string
   /** Failure log hook (e.g. console.error). Default no-op. */
   log?: (message: string, error?: unknown) => void
+}
+
+/** Registered OIDC client configuration. Login does not mint an API key. */
+export interface AppAuthOidcSsoConfig extends Omit<AppAuthSsoConfig, 'protocol' | 'client' | 'store'> {
+  protocol: 'oidc'
+  client: TangleOidcSsoAuthClient
+  store: TangleOidcSsoAccountStore
 }
 
 /** Define the structure for application authentication data including users, sessions, accounts, and verifications */
@@ -149,7 +159,7 @@ export interface AppAuthConfig {
    *  Default 300. */
   sessionCookieCacheSeconds?: number | false
   /** Tangle cross-site SSO (start/callback handlers). */
-  sso?: AppAuthSsoConfig
+  sso?: AppAuthSsoConfig | AppAuthOidcSsoConfig
   /** Where guards redirect unauthenticated page requests. Default '/login'. */
   loginPath?: string
   /** Merged over the factory's `advanced` block (cookiePrefix stays unless
@@ -361,9 +371,11 @@ export function createAppAuth(config: AppAuthConfig): AppAuth {
         'createAppAuth: sso requires `secret` (or sso.stateSecret) — the signed-state CSRF cookie needs an HMAC secret',
       )
     }
+    const transport = config.sso.protocol === 'oidc'
+      ? { protocol: 'oidc' as const, auth: config.sso.client, store: config.sso.store }
+      : { protocol: 'legacy' as const, auth: config.sso.client, store: config.sso.store }
     sso = createTangleSsoHandlers({
-      auth: config.sso.client,
-      store: config.sso.store,
+      ...transport,
       stateSecret,
       callbackUrl: config.sso.callbackUrl,
       stateCookieName: config.sso.stateCookieName ?? DEFAULT_STATE_COOKIE,
