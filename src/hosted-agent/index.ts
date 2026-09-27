@@ -35,6 +35,15 @@ export interface BoxPolicy {
   allowDomains: string[]
 }
 
+/**
+ * Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the
+ * platform's hourly floor. A person's box starts OpenCode on their first text
+ * and after every idle stop, and that start is CPU-bound: on one core it took
+ * 6.1 s after a resume and 8.4 s on a new box, on two cores 3.5 s and 3.4 s
+ * (production, 2026-09-24). A disk no larger than the platform's warm seed
+ * lets a new person's box be claimed from the warm pool: create took 2.1-2.7 s
+ * instead of 5.3-7.0 s (2026-09-25).
+ */
 export const DEFAULT_BOX_POLICY: BoxPolicy = {
   cpuCores: 2, memoryMB: 2048, diskGB: 2,
   idleTimeoutSeconds: 600, maxLifetimeSeconds: 86_400, deleteAfterStoppedSeconds: 7 * 86_400,
@@ -50,8 +59,19 @@ export const DEFAULT_BOX_POLICY: BoxPolicy = {
  */
 export const PERSON_KEY_PREFIX = 'hosted:'
 
-/** File read/write/edit remain available for persona-owned notes. */
+/**
+ * Harness tools a texting or calling assistant does not use. Their
+ * descriptions present every turn as coding work: a shell, file search,
+ * sub-agents, to-do lists, skills and web fetch. File read, write and edit
+ * stay, so a persona can keep notes such as `memory.md`.
+ */
 export const CONVERSATION_TOOLS_OFF = ['bash', 'glob', 'grep', 'task', 'todowrite', 'webfetch', 'skill'] as const
+
+/**
+ * The model for a profile without `model.default`. It gave the most useful
+ * on-topic replies among four Router models on the same five texts and calls
+ * (2026-09-23), within the latency of the others.
+ */
 export const DEFAULT_HOSTED_MODEL = 'openai/gpt-5.6-luna'
 
 function conversationProfile(profile: AgentProfile): AgentProfile {
@@ -72,7 +92,7 @@ const KEY_PREFIX = /^[A-Za-z0-9._:@-]{1,100}$/
 
 export interface HostedAgentLineOptions {
   transport?: 'imessage' | 'email' | 'whatsapp'
-  /** Email defaults to personal. Other transports default to shared. */
+  /** Omitted preserves an active attachment's admission policy. New email lines default to personal; new phone lines to shared. */
   mode?: 'personal' | 'shared'
   /** Required only for WhatsApp: one connection can own several numbers. */
   phoneNumberId?: string
@@ -102,13 +122,17 @@ export function createHostedAgent(config: HostedAgentConfig) {
   return {
     /**
      * Attach an owned Inkbox iMessage identity, Inkbox mailbox, or Linq
-     * WhatsApp number. Hub already deduplicates by provider identity; a
-     * global clientReference would prevent the owner's second line.
+     * WhatsApp number. Hub deduplicates iMessage/email by connection and
+     * transport, and WhatsApp by connection, transport and owned number id.
+     * Its unique indexes and insert-race recovery enforce that identity even
+     * without a clientReference. A global reference would prevent a second
+     * line; inventing a new reference would conflict with legacy WhatsApp lines.
      *
-     * Phone shared mode admits guests into isolated boxes. Email admits
-     * declared members only, in either mode. Hub challenges an email sender
-     * before running their first turn. Add further declared email members
-     * through sandbox.lines.members(line.id).add(), not guest admission.
+     * New phone shared mode admits guests into isolated boxes. New email
+     * lines admit declared members only. Omit mode to keep an active line's
+     * mode, roles and unknown-sender policy unchanged. Changing an existing
+     * policy is an explicit detach/attach migration, never a setup side effect.
+     * Hub remains authoritative if an old policy is no longer supported.
      *
      * Repeating the same attachment is idempotent. Changed profiles or
      * policies require an explicit detach. Existing Hub event subscriptions
@@ -117,8 +141,8 @@ export function createHostedAgent(config: HostedAgentConfig) {
      */
     async attachLine(connectionId: string, options: HostedAgentLineOptions = {}): Promise<Line> {
       const transport = options.transport ?? 'imessage'
-      const mode = options.mode ?? (transport === 'email' ? 'personal' : 'shared')
-      if (!['imessage', 'email', 'whatsapp'].includes(transport) || !['personal', 'shared'].includes(mode))
+      if (!['imessage', 'email', 'whatsapp'].includes(transport) ||
+          (options.mode !== undefined && !['personal', 'shared'].includes(options.mode)))
         throw new HostedAgentError('unsupported_line_options', 'Unsupported line transport or mode.')
       if (transport === 'email' && !EMAIL.test(config.owner))
         throw new HostedAgentError('owner_transport_mismatch', 'email lines require an email owner address.')
@@ -135,6 +159,10 @@ export function createHostedAgent(config: HostedAgentConfig) {
           ? { connectionId, transport, phoneNumberId: options.phoneNumberId! }
           : { connectionId, transport },
       )
+      const retained = options.mode === undefined && line.attachment?.status === 'active' ? line.attachment : undefined
+      if (retained?.unknownSenders === 'onboard')
+        throw new HostedAgentError('line_policy_migration_required', 'This line uses onboard admission. Manage it through Hub; the hosted-agent kit will not replace its policy.')
+      const mode = options.mode ?? retained?.mode ?? (transport === 'email' ? 'personal' : 'shared')
       const keyPrefix = config.instanceKeyPrefix
         ?? line.attachment?.instance?.keyPrefix
         ?? (line.clientReference === 'hosted-agent' ? PERSON_KEY_PREFIX : `${PERSON_KEY_PREFIX}${line.id}:`)
@@ -143,8 +171,8 @@ export function createHostedAgent(config: HostedAgentConfig) {
         number: line.id,
         mode,
         members: [{ address: config.owner, role: 'owner' }],
-        unknownSenders: guests ? 'guest' : 'reject',
-        roles: guests ? { owner: PERSON, guest: PERSON } : { owner: PERSON },
+        unknownSenders: retained?.unknownSenders ?? (guests ? 'guest' : 'reject'),
+        roles: retained?.roles ?? (guests ? { owner: PERSON, guest: PERSON } : { owner: PERSON }),
         respond: { kind: 'agent', backend },
         limits: { turnsPerMemberPerDay: config.freeTurnsPerDay ?? 20 },
         instance: { keyPrefix, create },
