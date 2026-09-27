@@ -59,8 +59,13 @@ async function setup(request: Request, env: Env): Promise<Response> {
   } catch (error) {
     if (error instanceof HostedAgentError)
       return Response.json({ error: error.code, message: error.message }, { status: 400 })
+    if (record(error) && error.status === 409)
+      return Response.json({
+        error: 'line_setup_conflict',
+        message: 'This connection is already routed. For an older Braid deployment, explicitly remove its hosted-agent event subscription in Hub, then repeat setup. For an attached line, use its existing configuration or explicitly detach before changing it. Setup has not removed either route.',
+      }, { status: 409 })
     // Provider evidence and credentials never become a public response.
-    return Response.json({ error: 'line_setup_failed', message: 'Check the owned Hub connection and any conflicting attachment or event subscription.' }, { status: 502 })
+    return Response.json({ error: 'line_setup_failed', message: 'Check the owned Hub connection and provider readiness.' }, { status: 502 })
   }
 }
 
