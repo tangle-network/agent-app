@@ -1,0 +1,30 @@
+name: OIDC caller package check
+
+on:
+  push:
+    branches: [gtr/oidc-caller-build-20260926]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Read published runtime identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm view @tangle-network/agent-runtime dist-tags --json
+          npm view @tangle-network/agent-runtime@latest version dist.tarball dist.integrity --json
+          npm view @tangle-network/agent-runtime@0.278.1 version --json || true
+          mkdir -p "$RUNNER_TEMP/oidc-package"
+          cd "$RUNNER_TEMP/oidc-package"
+          npm pack @tangle-network/agent-runtime@latest --ignore-scripts --json > pack.json
+          node -e 'const fs=require("node:fs"); const p=JSON.parse(fs.readFileSync("pack.json","utf8"))[0]; console.log(JSON.stringify({name:p.name,version:p.version,filename:p.filename,integrity:p.integrity})); fs.writeFileSync("filename",p.filename)'
+          tar -xzf "$(cat filename)"
+          node --input-type=module -e 'const p=await import("./package/dist/platform.js"); console.log(JSON.stringify({PlatformOidcClient:typeof p.PlatformOidcClient,createPkcePair:typeof p.createPkcePair})); if(typeof p.PlatformOidcClient!=="function" || typeof p.createPkcePair!=="function") process.exit(1)'
