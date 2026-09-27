@@ -1,57 +1,66 @@
-name: OIDC caller package check
-
+name: OIDC caller install and build
 on:
   push:
     branches: [gtr/oidc-caller-build-20260926]
-
 permissions:
-  contents: read
-
+  contents: write
+concurrency:
+  group: oidc-caller-build
+  cancel-in-progress: true
 jobs:
-  package:
+  caller:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: e8854f80b97e55b4a1fa07d7efe30afb0b829961
+          fetch-depth: 0
           persist-credentials: false
-          path: caller
-      - name: Archive caller source for review
-        run: |
-          mkdir -p "$RUNNER_TEMP/oidc-source"
-          git -C caller archive HEAD -o "$RUNNER_TEMP/oidc-source/agent-app.tar"
-          git -C caller rev-parse HEAD > "$RUNNER_TEMP/oidc-source/agent-app.commit"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: oidc-caller-source
-          path: ${{ runner.temp }}/oidc-source
-          retention-days: 3
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: tangle-network/agent-runtime
-          ref: 68532c2c76e6dea3c3d66c5977a9c269fef5b3f5
-          persist-credentials: false
-          path: runtime
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
-        with:
-          package_json_file: runtime/package.json
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-      - name: Build exact merged runtime
-        working-directory: runtime
+      - name: Apply caller-only edits to the pinned base
         run: |
           set -euo pipefail
-          pnpm install --frozen-lockfile --ignore-scripts
-          pnpm build
-          mkdir -p "$RUNNER_TEMP/oidc-runtime"
-          pnpm pack --pack-destination "$RUNNER_TEMP/oidc-runtime"
-          git rev-parse HEAD > "$RUNNER_TEMP/oidc-runtime/SOURCE_COMMIT"
-          sha256sum "$RUNNER_TEMP/oidc-runtime/"*.tgz > "$RUNNER_TEMP/oidc-runtime/SHA256SUMS"
-          node --input-type=module -e 'const p=await import("./dist/platform.js"); console.log(JSON.stringify({PlatformOidcClient:typeof p.PlatformOidcClient,createPkcePair:typeof p.createPkcePair})); if(typeof p.PlatformOidcClient!=="function" || typeof p.createPkcePair!=="function") process.exit(1)'
+          mkdir -p "$RUNNER_TEMP/oidc-proof"
+          git worktree add --detach "$RUNNER_TEMP/caller" e8854f80b97e55b4a1fa07d7efe30afb0b829961
+          python3 .gtr/app-edit.py "$RUNNER_TEMP/caller"
+          git -C "$RUNNER_TEMP/caller" diff --check
+      - name: Install and verify the generated lockfile
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/caller"
+          pnpm install --no-frozen-lockfile --ignore-scripts 2>&1 | tee "$RUNNER_TEMP/oidc-proof/install.log"
+          pnpm install --frozen-lockfile --ignore-scripts 2>&1 | tee "$RUNNER_TEMP/oidc-proof/frozen-install.log"
+      - name: Commit only source, proof instructions and generated lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/caller"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/platform/sso.ts src/app-auth/index.ts src/peer-floors/check.test.ts package.json pnpm-lock.yaml scripts/oidc-live-proof.mjs docs/OIDC-CALLER-GTR.md
+          git diff --cached --check
+          git commit -m 'feat(auth): use registered OIDC clients with PKCE and token persistence'
+          gh auth setup-git
+          git push origin HEAD:refs/heads/feat/oidc-caller-migration
+          git rev-parse HEAD | tee "$RUNNER_TEMP/oidc-proof/commit.txt"
+          git archive HEAD -o "$RUNNER_TEMP/oidc-proof/agent-app-source.tar"
+      - name: Build the real package
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/caller"
+          pnpm build 2>&1 | tee "$RUNNER_TEMP/oidc-proof/build.log"
+          node --check scripts/oidc-live-proof.mjs
+          node --input-type=module -e 'const app=await import("./dist/platform/index.js"); const rt=await import("@tangle-network/agent-runtime/platform"); if(typeof app.createTangleSsoHandlers!=="function" || typeof rt.PlatformOidcClient!=="function") throw new Error("Missing caller exports"); console.log(JSON.stringify({caller:typeof app.createTangleSsoHandlers,oidc:typeof rt.PlatformOidcClient}));'
+          pnpm pack --pack-destination "$RUNNER_TEMP/oidc-proof"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
         with:
-          name: oidc-runtime-build
-          path: ${{ runner.temp }}/oidc-runtime
-          retention-days: 3
+          name: oidc-caller-build-evidence
+          path: ${{ runner.temp }}/oidc-proof
+          retention-days: 7
