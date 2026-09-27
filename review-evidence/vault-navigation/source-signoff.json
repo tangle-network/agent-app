@@ -1,0 +1,133 @@
+{
+  "ok": true,
+  "startedAt": "2026-09-27T21:37:41.285Z",
+  "repo": {
+    "root": "/home/drew/code/_wt/agent-app-vault-mobile-20260927",
+    "head": "091d96d52cb58c687827733a4c8e2d5d58a36654",
+    "branch": "fix/vault-pane-mobile-navigation-20260927",
+    "source": "head",
+    "dirty": false,
+    "diffSha256": null,
+    "untrackedFiles": [],
+    "carriedFiles": []
+  },
+  "host": {
+    "node": "v24.20.0",
+    "nodePinned": "24.18.0",
+    "nodePinSource": ".nvmrc",
+    "packageManager": "pnpm 11.24.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpus": 2
+  },
+  "wallClockMs": 521937,
+  "serialMs": 613840,
+  "seedBase": 733938339,
+  "reproduce": "agent-app-signoff /home/drew/code/_wt/agent-app-vault-mobile-20260927 --source head --seed 733938339 --keep-going",
+  "workspace": "/home/drew/.cache/agent-app-signoff/trees/agent-app-vault-mobile-20260927-3897944",
+  "install": {
+    "command": "pnpm install --frozen-lockfile --ignore-scripts=false --store-dir \"/home/drew/.cache/agent-app-signoff/stores/74b1b6711af4cf7ec81e5ad9312ad7c13c47eddc833224b2291be5a58ec9b010\"",
+    "exitCode": 0,
+    "durationMs": 30917
+  },
+  "steps": [
+    {
+      "name": "typecheck",
+      "status": "passed",
+      "durationMs": 19773,
+      "attempts": [
+        {
+          "command": "pnpm run typecheck",
+          "seed": null,
+          "exitCode": 0,
+          "signal": null,
+          "durationMs": 19773,
+          "timedOut": false
+        }
+      ]
+    },
+    {
+      "name": "incident-class gates",
+      "status": "passed",
+      "durationMs": 21063,
+      "attempts": [
+        {
+          "command": "pnpm run test:gates",
+          "seed": null,
+          "exitCode": 0,
+          "signal": null,
+          "durationMs": 21063,
+          "timedOut": false
+        }
+      ]
+    },
+    {
+      "name": "build",
+      "status": "passed",
+      "durationMs": 10864,
+      "attempts": [
+        {
+          "command": "pnpm run build",
+          "seed": null,
+          "exitCode": 0,
+          "signal": null,
+          "durationMs": 10864,
+          "timedOut": false
+        }
+      ]
+    },
+    {
+      "name": "unit tests",
+      "status": "passed",
+      "durationMs": 473690,
+      "attempts": [
+        {
+          "command": "pnpm run test --sequence.shuffle.files=true --sequence.seed=1830218333",
+          "seed": 1830218333,
+          "exitCode": 0,
+          "signal": null,
+          "durationMs": 253675,
+          "timedOut": false
+        },
+        {
+          "command": "pnpm run test --sequence.shuffle.files=true --sequence.seed=2122679144",
+          "seed": 2122679144,
+          "exitCode": 0,
+          "signal": null,
+          "durationMs": 220015,
+          "timedOut": false
+        }
+      ]
+    },
+    {
+      "name": "generated projects",
+      "status": "passed",
+      "durationMs": 51549,
+      "attempts": [
+        {
+          "command": "pnpm run test:generated",
+          "seed": null,
+          "exitCode": 0,
+          "signal": null,
+          "durationMs": 51549,
+          "timedOut": false
+        }
+      ]
+    },
+    {
+      "name": "dead-surface (knip)",
+      "status": "passed",
+      "durationMs": 5984,
+      "attempts": [
+        {
+          "command": "pnpm run knip",
+          "seed": null,
+          "exitCode": 0,
+          "signal": null,
+          "durationMs": 5984,
+          "timedOut": false
+        }
+      ]
+    }
+  ]
+}
