@@ -31,13 +31,12 @@ jobs:
           pnpm build 2>&1 | tee verification/build.log
           find bin/tangle-agent -name '*.mjs' -exec node --check '{}' \;
           node --check bin/tangle-agent.mjs
+          node --check scripts/collect-agent-line-proof.mjs
       - name: Exercise the installed home as the real non-root user
         run: |
           set -euo pipefail
           sudo useradd --create-home --shell /bin/bash tangleproof
           sudo "$(command -v node)" bin/tangle-agent.mjs install-home tangleproof | tee verification/home-install.json
-          # The runner's checkout is not traversable by another UID. Copy only
-          # these credential-free programs, not .git, node_modules or runner secrets.
           sudo install -d -m 0755 /opt/tangle-proof/scripts /opt/tangle-proof/bin/tangle-agent
           sudo install -m 0644 scripts/prove-protected-home.mjs /opt/tangle-proof/scripts/
           sudo install -m 0644 bin/tangle-agent/home.mjs /opt/tangle-proof/bin/tangle-agent/
@@ -57,7 +56,13 @@ jobs:
           assert.equal(plan.attachments[0].instance.create.egressPolicy.mode, 'strict')
           assert.equal(plan.attachments[0].respond.rolePolicy.roles.owner.kind, 'general')
           assert.equal(plan.attachments[0].unknownSenders, 'reject')
-          assert.equal(JSON.parse(plan.heartbeat).on.schedule.cron, '0 8-22 * * *')
+          assert.equal(plan.workflows.length, 2)
+          const heartbeat = JSON.parse(plan.workflows.find(job => job.purpose === 'heartbeat').yaml)
+          const nightly = JSON.parse(plan.workflows.find(job => job.purpose === 'consolidation').yaml)
+          assert.equal(heartbeat.on.schedule.cron, '0 8-22 * * *')
+          assert.equal(nightly.on.schedule.cron, '0 3 * * *')
+          assert.equal(heartbeat.enabled, false)
+          assert.equal(nightly.enabled, false)
           await import('./bin/tangle-agent/runtime.mjs')
           console.log(JSON.stringify({ plan: 'canonical profile parsed', imports: 'published SDKs resolved', providerRequests: 0 }))
           JS
