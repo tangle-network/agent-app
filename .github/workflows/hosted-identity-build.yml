@@ -1,0 +1,38 @@
+name: Hosted identity build
+on:
+  push:
+    branches: [feat/hosted-builder-identity-20260926]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Registry install and actual package build
+        run: |
+          corepack enable
+          corepack install
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm pack --pack-destination /tmp
+      - name: Capture exact source and build input
+        if: always()
+        run: |
+          git rev-parse HEAD > /tmp/kit-head.txt
+          tar --exclude=.git --exclude=node_modules --exclude=.turbo --exclude=coverage -czf /tmp/kit-source.tar.gz .
+          if [ -d node_modules/.pnpm ]; then tar -czf /tmp/kit-dependencies.tar.gz node_modules; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kit-cutover-source
+          retention-days: 1
+          path: |
+            /tmp/kit-head.txt
+            /tmp/kit-source.tar.gz
+            /tmp/kit-dependencies.tar.gz
+            /tmp/tangle-network-agent-app-*.tgz
