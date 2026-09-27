@@ -31,7 +31,7 @@ describe('invokeIntegrationHub', () => {
     }) as unknown as typeof fetch
     const out = await invokeIntegrationHub({ userId: 'u1', toolName: READ_TOOL, args: { q: 'x' } }, { apiKeyResolver: okKey, fetchImpl, env })
     expect(seen.url).toBe('https://id.tangle.tools/v1/hub/exec')
-    expect((seen.init.headers as Record<string, string>).Authorization).toBe('Bearer sk-tan-user')
+    expect(new Headers(seen.init.headers).get('authorization')).toBe('Bearer sk-tan-user')
     expect(out.status).toBe(200)
     expect(out.body).toMatchObject({ success: true, path: 'gmail.default.list', result: { messages: [{ id: 'm1' }] } })
   })
@@ -40,7 +40,8 @@ describe('invokeIntegrationHub', () => {
     let calls = 0
     const fetchImpl = (async () => { calls++; return jsonResponse(403, { success: false, error: { code: 'HUB_APPROVAL_REQUIRED', message: 'needs approval', details: { approval: { id: 'appr-1' } } } }) }) as unknown as typeof fetch
     const out = await invokeIntegrationHub({ userId: 'u1', toolName: WRITE_TOOL }, { apiKeyResolver: okKey, fetchImpl, env })
-    expect(calls).toBe(1)
+    // The SDK also asks the capability endpoint. Neither request grants approval.
+    expect(calls).toBe(2)
     expect(out.status).toBe(409)
     expect(out.body).toMatchObject({ success: false, code: 'HUB_APPROVAL_REQUIRED', approval: { id: 'appr-1' } })
   })

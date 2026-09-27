@@ -16942,7 +16942,7 @@
           "name": "OpenAIFunctionTool",
           "kind": "interface",
           "signature": "interface OpenAIFunctionTool",
-          "doc": "A minimal OpenAI Chat Completions function-tool shape — structurally compatible with `@tangle-network/agent-runtime`'s `OpenAIChatTool` without importing it (keeps this package runtime-free)."
+          "doc": "Published Runtime tool descriptor with the description and schema required by app tools."
         },
         {
           "name": "outcomeStatus",
@@ -17283,7 +17283,9 @@
     {
       "id": "./turn-health",
       "source": "src/turn-health/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "alerting"
+      ],
       "error": null,
       "exports": [
         {
