@@ -53,8 +53,6 @@ jobs:
           }
           next.peerDependencies['@tangle-network/agent-integrations'] = ours.peerDependencies['@tangle-network/agent-integrations']
           next.peerDependencies['@tangle-network/sandbox'] = ours.peerDependencies['@tangle-network/sandbox']
-          // Resolve the published Runtime's actual Eval range, not the incompatible
-          // 0.197/0.277 pairing recently added to main. Record exact resolved pins.
           const runtimeVersion = next.devDependencies['@tangle-network/agent-runtime']
           const runtime = JSON.parse(execFileSync('npm', ['view', `@tangle-network/agent-runtime@${runtimeVersion}`, '--json'], { encoding: 'utf8' }))
           const versions = JSON.parse(execFileSync('npm', ['view', `@tangle-network/agent-eval@${runtime.peerDependencies['@tangle-network/agent-eval']}`, 'version', '--json'], { encoding: 'utf8' }))
@@ -62,8 +60,6 @@ jobs:
           if (runtime.dependencies?.['@tangle-network/agent-knowledge']) next.devDependencies['@tangle-network/agent-knowledge'] = runtime.dependencies['@tangle-network/agent-knowledge']
           writeFileSync('package.json', JSON.stringify(next, null, 2) + '\n')
           git('checkout', 'origin/main', '--', 'pnpm-lock.yaml', 'tests/hosted-agent.test.ts')
-          // The current PR file already preserves personal/shared, email, WhatsApp,
-          // and voice options. Keep that implementation and its chat-only guest.
           writeFileSync('src/hosted-agent/index.ts', git('show', 'HEAD:src/hosted-agent/index.ts'))
           const testPath = 'tests/hosted-agent.test.ts'
           const test = readFileSync(testPath, 'utf8')
@@ -90,7 +86,10 @@ jobs:
           set -euo pipefail
           sudo useradd --create-home --shell /bin/bash tangleproof
           sudo "$(command -v node)" bin/tangle-agent.mjs install-home tangleproof | tee verification/home-install.json
-          sudo -u tangleproof env TANGLE_HOME_PROOF_DISPOSABLE=1 "$(command -v node)" "$PWD/scripts/prove-protected-home.mjs" | tee verification/home-proof.jsonl
+          sudo install -d -m 0755 /opt/tangle-proof/scripts /opt/tangle-proof/bin/tangle-agent
+          sudo install -m 0644 scripts/prove-protected-home.mjs /opt/tangle-proof/scripts/
+          sudo install -m 0644 bin/tangle-agent/home.mjs /opt/tangle-proof/bin/tangle-agent/
+          sudo -u tangleproof env TANGLE_HOME_PROOF_DISPOSABLE=1 "$(command -v node)" /opt/tangle-proof/scripts/prove-protected-home.mjs | tee verification/home-proof.jsonl
           pnpm pack --pack-destination verification
           tar -tf verification/tangle-network-agent-app-*.tgz | grep 'package/bin/tangle-agent' > verification/packed-paths.txt
       - name: Commit only the verified reconciliation to the requested PR
