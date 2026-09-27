@@ -59,7 +59,7 @@ interface AppToolDescriptor
 `function` — Attach explicit effort through the portable model contract consumed by providers.
 
 ```ts
-(profile: AgentProfile, _harness: Harness, effort: "auto" | "none" | "minimal" | "low" | "medium" | "high" | "xhigh" |…
+(profile: AgentProfile, _harness: Harness, effort: "none" | "auto" | "minimal" | "low" | "medium" | "high" | "xhigh" |…
 ```
 
 ### `buildAppToolMcpServers`
