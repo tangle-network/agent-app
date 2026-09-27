@@ -104,7 +104,7 @@ type VaultOperationPhase
 
 ### `VaultPane`
 
-`function`
+`function` — Browse and edit files in the available pane width.
 
 ```ts
 (props: VaultPaneProps) => Element
