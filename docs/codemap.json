@@ -6292,7 +6292,7 @@
         {
           "name": "createHostedAgent",
           "kind": "function",
-          "signature": "(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { transport?: \"email\" | \"imessage\" | \"whats…",
+          "signature": "(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: HostedAgentLineOptions): Promise<Line>; }",
           "doc": null
         },
         {
@@ -6317,7 +6317,7 @@
           "name": "HostedAgentConfig",
           "kind": "interface",
           "signature": "interface HostedAgentConfig",
-          "doc": "A hosted agent: people text or call a line, and each person is answered from their own isolated sandbox."
+          "doc": "A hosted agent assembled over Hub lines."
         },
         {
           "name": "HostedAgentError",
@@ -6326,10 +6326,16 @@
           "doc": null
         },
         {
+          "name": "HostedAgentLineOptions",
+          "kind": "interface",
+          "signature": "interface HostedAgentLineOptions",
+          "doc": null
+        },
+        {
           "name": "PERSON_KEY_PREFIX",
           "kind": "const",
           "signature": "\"hosted:\"",
-          "doc": "Each person's box is the developer's named instance with this prefix."
+          "doc": "Legacy namespace."
         }
       ]
     },

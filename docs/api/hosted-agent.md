@@ -4,7 +4,7 @@
 
 Source: `src/hosted-agent/index.ts`
 
-9 exports.
+10 exports.
 
 ### `BoxPolicy`
 
@@ -27,7 +27,7 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 `function`
 
 ```ts
-(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { transport?: "email" | "imessage" | "whats…
+(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: HostedAgentLineOptions): Promise<Line>; }
 ```
 
 ### `DEFAULT_BOX_POLICY`
@@ -56,7 +56,7 @@ type HostedAgent
 
 ### `HostedAgentConfig`
 
-`interface` — A hosted agent: people text or call a line, and each person is answered from their own isolated sandbox.
+`interface` — A hosted agent assembled over Hub lines.
 
 ```ts
 interface HostedAgentConfig
@@ -70,9 +70,17 @@ interface HostedAgentConfig
 class HostedAgentError
 ```
 
+### `HostedAgentLineOptions`
+
+`interface`
+
+```ts
+interface HostedAgentLineOptions
+```
+
 ### `PERSON_KEY_PREFIX`
 
-`const` — Each person's box is the developer's named instance with this prefix.
+`const` — Legacy namespace.
 
 ```ts
 "hosted:"
