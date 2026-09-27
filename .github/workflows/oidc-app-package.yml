@@ -1,0 +1,58 @@
+name: Prepare shared OIDC caller package
+on:
+  push:
+    branches: [gtr/oidc-caller-build-20260926]
+    paths: [.github/workflows/oidc-app-package.yml]
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 10b34b02d5e6f3681d1232b02adc45552c8398ba
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Build pinned caller
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 10b34b02d5e6f3681d1232b02adc45552c8398ba
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm build
+          mkdir -p "$RUNNER_TEMP/oidc-tarball" "$RUNNER_TEMP/oidc-package"
+          pnpm pack --pack-destination "$RUNNER_TEMP/oidc-tarball"
+          tar -xzf "$RUNNER_TEMP"/oidc-tarball/*.tgz -C "$RUNNER_TEMP/oidc-package" --strip-components=1
+      - name: Publish immutable prepared Git dependency
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/oidc-package"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          delete pkg.scripts;
+          delete pkg.devDependencies;
+          delete pkg.packageManager;
+          pkg.tangleBuild = { sourceRepository: 'tangle-network/agent-app', sourceCommit: '10b34b02d5e6f3681d1232b02adc45552c8398ba', workflowRun: process.env.GITHUB_RUN_ID };
+          if (JSON.stringify(pkg).includes('catalog:') || JSON.stringify(pkg).includes('workspace:')) throw new Error('Unresolved workspace dependency');
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          NODE
+          printf '%s\n' 'Built from tangle-network/agent-app at 10b34b02d5e6f3681d1232b02adc45552c8398ba (PR #658).' 'Prepared Git dependency only. Do not merge this branch to main.' > BUILD_PROVENANCE.md
+          git init -q
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .
+          git commit -m 'build: immutable shared OIDC caller from 10b34b02'
+          git remote add origin https://github.com/tangle-network/agent-app.git
+          gh auth setup-git
+          test -z "$(git ls-remote --heads origin refs/heads/build/oidc-10b34b02)"
+          git push origin HEAD:refs/heads/build/oidc-10b34b02
+          git rev-parse HEAD
