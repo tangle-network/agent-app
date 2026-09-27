@@ -1,0 +1,55 @@
+name: Hosted line cutover build
+on:
+  push:
+    branches: [fix/hosted-line-cutover-contract]
+    paths: [.github/workflows/hosted-line-cutover-build.yml]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+      - name: Preserve the WhatsApp number in the line idempotency reference
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/hosted-agent/index.ts')
+          s=p.read_text()
+          old='new TextEncoder().encode(`${transport}:${connectionId}`)'
+          new='new TextEncoder().encode(`${transport}:${connectionId}:${options.phoneNumberId ?? ""}`)'
+          assert old in s or new in s
+          p.write_text(s.replace(old,new))
+          p=Path('docs/proofs/hosted-line-cutover.md')
+          s=p.read_text().replace('export TANGLE_API_KEY ROOT','export TANGLE_API_KEY ROOT SANDBOX_URL CONNECTION_ID PROFILE_FILE OWNER_ADDRESS TRANSPORT MODE PHONE_NUMBER_ID')
+          p.write_text(s)
+          PY
+      - name: Install, build and check actual types
+        run: |
+          corepack enable
+          corepack install
+          pnpm install --frozen-lockfile --ignore-scripts=false > /tmp/install.log 2>&1 || { tail -80 /tmp/install.log; exit 1; }
+          pnpm run typecheck
+          pnpm run build > /tmp/build.log 2>&1 || { tail -80 /tmp/build.log; exit 1; }
+          tail -20 /tmp/build.log
+      - name: Regenerate the exported API documentation
+        run: pnpm run docs:gen
+      - name: Import the compiled factory
+        run: node --input-type=module -e 'import {createHostedAgent} from "./dist/hosted-agent/index.js"; if(typeof createHostedAgent!=="function")throw Error("missing hosted-agent export"); console.log("built factory imported")'
+      - name: Commit generated docs and exact reviewed source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/hosted-agent/index.ts docs
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix(hosted-agent): pin WhatsApp references and refresh API documentation'
+            git push origin HEAD:fix/hosted-line-cutover-contract
+          fi
+          git rev-parse HEAD
