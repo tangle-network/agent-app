@@ -32,8 +32,6 @@ export interface HostedAgentConfig {
   freeTurnsPerDay?: number
   box?: Partial<BoxPolicy>
   sandboxUrl?: string
-  /** Platform control-plane origin paired with sandboxUrl. Defaults to production. */
-  platformUrl?: string
 }
 
 export interface BoxPolicy {
@@ -116,15 +114,13 @@ export function createHostedAgent(config: HostedAgentConfig) {
   if (!E164.test(config.owner) && !EMAIL.test(config.owner)) throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number or email address.')
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
   const sandboxUrl = config.sandboxUrl ?? 'https://sandbox.tangle.tools'
-  const platformUrl = config.platformUrl ?? 'https://id.tangle.tools'
-  const platformHost = new URL(platformUrl).hostname
-  if (!platformHost) throw new HostedAgentError('platform_url_invalid', 'platformUrl must name a host.')
   // General hosted turns may receive purpose-bound Platform capabilities
-  // (currently managed previews). Their bearer is valid only at its dedicated
-  // endpoint, and the guest never receives the developer's account key. Keep
-  // strict egress while making the platform-owned capability transport usable.
-  const allowDomains = [...new Set([...policy.allowDomains, platformHost])]
-  const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: sandboxUrl, platformUrl, timeoutMs: 20_000 })
+  // (currently managed previews). Their bearer is valid only at the dedicated
+  // Platform endpoint, and the guest never receives the developer's account
+  // key. Keep strict egress while making that production control transport
+  // usable. Custom deployments can include their control host in box.allowDomains.
+  const allowDomains = [...new Set([...policy.allowDomains, 'id.tangle.tools'])]
+  const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: sandboxUrl, timeoutMs: 20_000 })
   const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile: conversationProfile(config.profile) }
   const create: LineInstanceCreate = {
     name: 'hosted-person',
