@@ -59,7 +59,7 @@ interface AppToolDescriptor
 `function` — Attach explicit effort through the portable model contract consumed by providers.
 
 ```ts
-(profile: AgentProfile, _harness: Harness, effort: "none" | "auto" | "minimal" | "low" | "medium" | "high" | "xhigh" |…
+(profile: AgentProfile, _harness: any, effort: any) => AgentProfile
 ```
 
 ### `buildAppToolMcpServers`
@@ -139,7 +139,7 @@ interface BuildSandboxToolFileMountsOptions
 `function` — Aggregate a sandbox prompt event stream down to the turn's one final answer.
 
 ```ts
-(events: AsyncIterable<unknown>, message: string | PromptInputPart[], history?: { role: "user" | "assistant"; content:…
+(events: AsyncIterable<unknown>, message: string | never[], history?: { role: "user" | "assistant"; content: string; }[…
 ```
 
 ### `createD1PrewarmClaimStore`
@@ -259,7 +259,7 @@ SandboxResourceConfig
 `function` — Resolve a sandbox turn by processing a message with given configuration and options
 
 ```ts
-(shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options: DriveSandboxTurnOptio…
+(shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | never[], options: DriveSandboxTurnOptions) => Pro…
 ```
 
 ### `DriveSandboxTurnOptions`
@@ -499,7 +499,7 @@ interface MemberSyncSeam
 `function` — History-aware equivalent of flattenHistory for multimodal prompt parts: the transcript is folded into the first text part (image/file parts carry no text to prepend to) rather than replacing the mess…
 
 ```ts
-(parts: PromptInputPart[], history?: { role: "user" | "assistant"; content: string; }[] | undefined) => PromptInputPart…
+(parts: never[], history?: { role: "user" | "assistant"; content: string; }[] | undefined) => never[]
 ```
 
 ### `mintSandboxScopedToken`
@@ -803,7 +803,7 @@ interface ResolveSandboxClientCredentialsOptions
 `function` — Resolve a sandbox prompt by streaming it and aggregating the turn down to one final string.
 
 ```ts
-(shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…
+(shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | never[], options?: StreamSandboxPromptOptions | u…
 ```
 
 ### `runSandboxToolPathSetup`
@@ -1032,7 +1032,7 @@ type SandboxRecoveryPhase
 
 ### `SandboxResourceConfig`
 
-`interface` — Define configuration parameters for sandbox resource allocation and lifecycle management
+`interface` — Configure sandbox resources and lifecycle limits.
 
 ```ts
 interface SandboxResourceConfig
@@ -1224,10 +1224,10 @@ interface StoppedSandboxResumeRecovery
 
 ### `StorageConfig`
 
-`interface` — S3-compatible storage provider configuration (BYOS3 - Bring Your Own S3).
+`value`
 
 ```ts
-interface StorageConfig
+StorageConfig
 ```
 
 ### `storeSecret`
@@ -1243,7 +1243,7 @@ interface StorageConfig
 `function` — Resolve and stream AI-generated responses from a sandboxed environment based on input messages and options
 
 ```ts
-(shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…
+(shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | never[], options?: StreamSandboxPromptOptions | u…
 ```
 
 ### `StreamSandboxPromptOptions`
