@@ -48,20 +48,40 @@ jobs:
     permissions: {}
     outputs:
       available: ${{ steps.presence.outputs.available }}
+      target: ${{ steps.presence.outputs.target }}
+      branch: ${{ steps.presence.outputs.branch }}
     steps:
       - id: presence
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          if [[ "$GITHUB_EVENT_NAME" == 'pull_request' && "$PR_HEAD_REPO" == "$GITHUB_REPOSITORY" ]]; then
+            TARGET='preview'
+            BRANCH="review-pr-$PR_NUMBER"
+          elif [[ "$GITHUB_EVENT_NAME" != 'pull_request' && "$GITHUB_REF" == 'refs/heads/main' ]]; then
+            TARGET='main'
+            BRANCH='main'
+          else
+            TARGET='none'
+            BRANCH=''
+          fi
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
           if [[ -n "$CLOUDFLARE_API_TOKEN" && -n "$CLOUDFLARE_ACCOUNT_ID" ]]; then
             echo 'available=true' >> "$GITHUB_OUTPUT"
           else
             echo 'available=false' >> "$GITHUB_OUTPUT"
-            if [[ "$GITHUB_EVENT_NAME" != 'pull_request' && "$GITHUB_REF" == 'refs/heads/main' ]]; then
+            if [[ "$TARGET" == 'main' ]]; then
               echo '::error::Cloudflare Actions secrets are missing for the main catalog deploy.'
               echo 'Configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID through the approved secret owner.'
               exit 1
+            elif [[ "$TARGET" == 'preview' ]]; then
+              echo '::notice::Catalog preview skipped because Cloudflare Actions secrets are missing.'
+              echo 'Catalog preview was skipped because CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are missing.' >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
 
@@ -69,9 +89,7 @@ jobs:
     needs: [build, deployment-credentials]
     if: >-
       needs.deployment-credentials.outputs.available == 'true' &&
-      ((github.event_name != 'pull_request' && github.ref == 'refs/heads/main') ||
-       (github.event_name == 'pull_request' &&
-        github.event.pull_request.head.repo.full_name == github.repository))
+      needs.deployment-credentials.outputs.target != 'none'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -81,7 +99,7 @@ jobs:
       group: agent-app-catalog-${{ github.event.pull_request.number || 'main' }}
       cancel-in-progress: false
     env:
-      CATALOG_BRANCH: ${{ github.event_name == 'pull_request' && format('review-pr-{0}', github.event.pull_request.number) || 'main' }}
+      CATALOG_BRANCH: ${{ needs.deployment-credentials.outputs.branch }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
