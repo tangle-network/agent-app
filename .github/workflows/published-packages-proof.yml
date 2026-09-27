@@ -40,6 +40,29 @@ jobs:
           set -o pipefail
           pnpm build 2>&1 | tee evidence/build.log
           node --check scripts/prove-published-hub.mjs
+      - name: Install packed candidate in a real consumer
+        run: |
+          set -euo pipefail
+          repo="$PWD"
+          mkdir -p "$RUNNER_TEMP/app-package" "$RUNNER_TEMP/app-consumer"
+          pnpm pack --pack-destination "$RUNNER_TEMP/app-package" > evidence/pack.log
+          package_file=$(node -p "process.env.RUNNER_TEMP + '/app-package/tangle-network-agent-app-' + require('./package.json').version + '.tgz'")
+          test -f "$package_file"
+          sha256sum "$package_file" > evidence/package-sha256.txt
+          printf '{"name":"gtr-app-consumer","private":true,"type":"module"}\n' > "$RUNNER_TEMP/app-consumer/package.json"
+          cp scripts/prove-published-hub.mjs "$RUNNER_TEMP/app-consumer/"
+          cd "$RUNNER_TEMP/app-consumer"
+          pnpm add "$package_file" @tangle-network/hub-sdk@0.19.2 @tangle-network/agent-integrations@0.55.0 2>&1 | tee "$repo/evidence/consumer-install.log"
+          node --input-type=module - <<'JS' | tee "$repo/evidence/consumer-import.log"
+          import { invokeIntegrationHub } from '@tangle-network/agent-app/integrations';
+          import { integrationToolName } from '@tangle-network/agent-integrations/catalog';
+          import { HubClient } from '@tangle-network/hub-sdk';
+          if ([invokeIntegrationHub, integrationToolName, HubClient].some(value => typeof value !== 'function')) {
+            throw new Error('A required published entrypoint is unavailable');
+          }
+          console.log(JSON.stringify({ installedEntrypoints: true, liveRequestRun: false }));
+          JS
+          cp pnpm-lock.yaml "$repo/evidence/consumer-lock.yaml"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
