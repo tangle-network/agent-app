@@ -1,34 +1,18 @@
 import type { AgentProfile, BackendConfig, LineVoiceOptions } from '@tangle-network/sandbox'
 import { type Line, type LineInstanceCreate, Sandbox } from '@tangle-network/sandbox/core'
 
-/**
- * A hosted agent: people text or call a line, and each person is answered
- * from their own isolated sandbox. The developer's Tangle API key pays for
- * every box, model turn, reply and call.
- *
- * The platform does the work. {@link HostedAgent.attachLine} attaches the
- * line to Tangle Hub with one sandbox per person: Hub routes each text and
- * call to the person's box (the named instance {@link PERSON_KEY_PREFIX} plus
- * a hash of their number), keeps one thread per person, handles STOP and
- * START, counts each person's texts per day, and sends the reply. A call on
- * the line runs in the same box and thread, so text and voice share one memory.
- */
-
 export interface HostedAgentConfig {
-  /** The developer's Tangle API key. */
+  /** The developer's Tangle API key. Used only for platform requests. */
   apiKey: string
-  /**
-   * The persona every person's box runs. A profile without `model.default`
-   * runs {@link DEFAULT_HOSTED_MODEL}, and a profile without `tools` runs with
-   * {@link CONVERSATION_TOOLS_OFF} turned off. Set `tools` to choose your own,
-   * for example on a harness that cannot turn those tools off.
-   */
+  /** Stable application identity. Different assistants must use different ids.
+   * Omit only for existing single-assistant installations using `hosted:`. */
+  id?: string
   profile: AgentProfile
-  /** Backend harness type, such as `opencode`; the runtime default when omitted. */
   harness?: string
-  /** The owner's address on the chosen transport: E.164 phone or email. */
+  /** E.164 phone number, or an email address for an email line. */
   owner: string
-  /** Texts Hub answers per person per UTC day. Default 20. */
+  /** Additional declared members in shared mode. Each has an isolated sandbox. */
+  members?: Array<{ address: string; label?: string }>
   freeTurnsPerDay?: number
   box?: Partial<BoxPolicy>
   sandboxUrl?: string
@@ -41,73 +25,90 @@ export interface BoxPolicy {
   idleTimeoutSeconds: number
   maxLifetimeSeconds: number
   deleteAfterStoppedSeconds: number
-  /** Egress allow-list. The default reaches the model router only. */
   allowDomains: string[]
 }
 
-/**
- * Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the
- * platform's hourly floor. A person's box starts OpenCode on their first text
- * and after every idle stop, and that start is CPU-bound: on one core it took
- * 6.1 s after a resume and 8.4 s on a new box, on two cores 3.5 s and 3.4 s
- * (production, 2026-09-24). A disk no larger than the platform's warm seed
- * lets a new person's box be claimed from the warm pool: create took 2.1-2.7 s
- * instead of 5.3-7.0 s (2026-09-25).
- */
 export const DEFAULT_BOX_POLICY: BoxPolicy = {
   cpuCores: 2, memoryMB: 2048, diskGB: 2,
   idleTimeoutSeconds: 600, maxLifetimeSeconds: 86_400, deleteAfterStoppedSeconds: 7 * 86_400,
   allowDomains: ['router.tangle.tools'],
 }
 
-/**
- * Each person's box is the developer's named instance with this prefix. It is
- * the key this kit used before Hub routed its texts, so every existing
- * person keeps their box.
- */
+/** Legacy namespace. Named assistants never share this namespace. */
 export const PERSON_KEY_PREFIX = 'hosted:'
-
-/**
- * Harness tools a texting or calling assistant does not use. Their
- * descriptions present every turn as coding work: a shell, file search,
- * sub-agents, to-do lists, skills and web fetch. File read, write and edit
- * stay, so a persona can keep notes such as `memory.md`.
- */
 export const CONVERSATION_TOOLS_OFF = ['bash', 'glob', 'grep', 'task', 'todowrite', 'webfetch', 'skill'] as const
-
-/**
- * The model for a profile without `model.default`. It gave the most useful
- * on-topic replies among four Router models on the same five texts and calls
- * (2026-09-23), within the latency of the others.
- */
 export const DEFAULT_HOSTED_MODEL = 'openai/gpt-5.6-luna'
 
-/** The profile a person's box runs: the developer's profile over the conversation defaults. */
 function conversationProfile(profile: AgentProfile): AgentProfile {
   return {
     ...profile,
     model: { ...profile.model, default: profile.model?.default ?? DEFAULT_HOSTED_MODEL },
-    // A profile that sets `tools` owns its tool set.
     ...(profile.tools ? {} : {
       tools: Object.fromEntries(CONVERSATION_TOOLS_OFF.map(tool => [tool, false])),
-      // The sandbox's preview policy grants the shell unless its permission
-      // is denied, so turning the tool off alone leaves the shell in place.
       permissions: { bash: 'deny' as const, ...profile.permissions },
     }),
   }
 }
 
-/** Each person runs in their own box, so no member shares a disk and each may use the persona's tools. */
 const PERSON = { context: 'own', tools: 'act' } as const
 const E164 = /^\+[1-9]\d{6,14}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
 export class HostedAgentError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = 'HostedAgentError' }
 }
 
+export interface HostedAgentIdentity {
+  /** The contract revision, not a package version. */
+  revision: 1
+  id: string | null
+  clientReference: string
+  instanceKeyPrefix: string
+}
+
+export interface HostedLineOptions {
+  transport?: 'imessage' | 'email' | 'whatsapp'
+  mode?: 'personal' | 'shared'
+  phoneNumberId?: string
+  /** Shared phone lines default to guest admission. Email requires declared members. */
+  unknownSenders?: 'reject' | 'guest'
+  voice?: LineVoiceOptions
+}
+
+function address(value: string): string {
+  const normalized = value.trim()
+  return normalized.includes('@') ? normalized.toLowerCase() : normalized
+}
+
+async function digest(value: string): Promise<string> {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 24)
+}
+
+/**
+ * The kit describes a hosted agent. Hub owns enrollment, STOP/START, turns,
+ * delivery and per-member named instances. No messages or secrets are stored here.
+ */
 export function createHostedAgent(config: HostedAgentConfig) {
-  if (!E164.test(config.owner) && !EMAIL.test(config.owner)) throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number or email address.')
+  const owner = address(config.owner)
+  if (!E164.test(owner) && !EMAIL.test(owner)) throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number or email address.')
+  if (config.id !== undefined && !ID.test(config.id)) throw new HostedAgentError('invalid_id', 'id must be 1-64 letters, digits, underscores or hyphens.')
+  const turns = config.freeTurnsPerDay ?? 20
+  if (!Number.isInteger(turns) || turns < 1 || turns > 10_000) throw new HostedAgentError('invalid_turn_limit', 'freeTurnsPerDay must be an integer from 1 to 10000.')
+  const declared = (config.members ?? []).map(member => ({ ...member, address: address(member.address) }))
+  if (declared.length > 49 || new Set([owner, ...declared.map(member => member.address)]).size !== declared.length + 1)
+    throw new HostedAgentError('invalid_members', 'Declare at most 49 additional members, without duplicates or the owner.')
+  for (const member of declared) {
+    if ((!E164.test(member.address) && !EMAIL.test(member.address)) || (member.label !== undefined && (!member.label.trim() || member.label.length > 60)))
+      throw new HostedAgentError('invalid_members', 'Each member needs a valid address and an optional label of 1-60 characters.')
+  }
+  const identity: Readonly<HostedAgentIdentity> = Object.freeze({
+    revision: 1,
+    id: config.id ?? null,
+    clientReference: config.id ? `hosted-agent:${config.id}` : 'hosted-agent',
+    instanceKeyPrefix: config.id ? `${PERSON_KEY_PREFIX}${config.id}:` : PERSON_KEY_PREFIX,
+  })
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
   const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
   const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile: conversationProfile(config.profile) }
@@ -120,56 +121,53 @@ export function createHostedAgent(config: HostedAgentConfig) {
   }
 
   return {
+    identity,
     /**
-     * Attach a Hub connection the developer owns as this agent's line:
-     * an Inkbox iMessage identity (default), its email mailbox, or a Linq
-     * WhatsApp number (`phoneNumberId`). The owner's address must match the
-     * transport. In `shared` mode (default) the owner and anyone who texts it
-     * each get their own box and thread; `personal` admits the owner only.
-     * With `voice` (iMessage lines only), calls to the
-     * line reach the caller's box and thread through that ph0ny agent; Hub
-     * admits only members, so a caller texts once before calling. Safe to
-     * repeat with the same config. Hub refuses a changed profile, box or
-     * limit on an attached line: detach it first
-     * (`DELETE /v1/lines/:id/attachment`). Each person keeps their box and
-     * its memory, and their thread starts over. Remove any Hub event
-     * subscription on the connection first; Hub refuses a line that another
-     * route would also answer.
+     * Attach one owned connection. Personal mode admits only the owner. Shared
+     * mode gives every declared or admitted member a private instance and thread.
+     * A named assistant's instance namespace and attachment reference are stable
+     * across retries and releases, but distinct from every other assistant.
+     * Existing attachments with different configuration are never detached here.
      */
-    async attachLine(connectionId: string, options: {
-      transport?: 'imessage' | 'email' | 'whatsapp'
-      mode?: 'personal' | 'shared'
-      /** Required for WhatsApp because one Linq connection may own several numbers. */
-      phoneNumberId?: string
-      voice?: LineVoiceOptions
-    } = {}): Promise<Line> {
+    async attachLine(connectionId: string, options: HostedLineOptions = {}): Promise<Line> {
       const transport = options.transport ?? 'imessage'
       const mode = options.mode ?? 'shared'
-      if (transport === 'email' && !EMAIL.test(config.owner))
-        throw new HostedAgentError('owner_transport_mismatch', 'email lines require an email owner address.')
-      if (transport !== 'email' && !E164.test(config.owner))
-        throw new HostedAgentError('owner_transport_mismatch', `${transport} lines require an E.164 owner address.`)
+      const unknownSenders = options.unknownSenders ?? (mode === 'shared' && transport !== 'email' ? 'guest' : 'reject')
+      const matches = transport === 'email' ? EMAIL : E164
+      if (![owner, ...declared.map(member => member.address)].every(value => matches.test(value)))
+        throw new HostedAgentError('owner_transport_mismatch', `${transport} lines require ${transport === 'email' ? 'email' : 'E.164'} member addresses.`)
+      if (mode === 'personal' && (declared.length > 0 || unknownSenders !== 'reject'))
+        throw new HostedAgentError('personal_owner_only', 'Personal lines admit the owner only.')
+      if (transport === 'email' && unknownSenders !== 'reject')
+        throw new HostedAgentError('email_declared_members_only', 'Email lines require declared members and reject unknown senders.')
       if (transport === 'whatsapp' && !options.phoneNumberId)
         throw new HostedAgentError('phone_number_required', 'WhatsApp lines require phoneNumberId.')
       if (transport !== 'whatsapp' && options.phoneNumberId)
         throw new HostedAgentError('phone_number_not_allowed', 'phoneNumberId is only valid for WhatsApp lines.')
       if (options.voice && transport !== 'imessage')
         throw new HostedAgentError('voice_transport_unsupported', 'Voice is supported only on iMessage lines.')
+      // A connection may own several WhatsApp numbers. Creation references must
+      // distinguish those resources without putting private addresses in refs.
+      const clientReference = config.id
+        ? `${identity.clientReference}:${await digest(JSON.stringify([connectionId, transport, options.phoneNumberId ?? null]))}`
+        : identity.clientReference
       const line = await sandbox.lines.fromConnection(
         transport === 'whatsapp'
-          ? { connectionId, transport, phoneNumberId: options.phoneNumberId!, clientReference: 'hosted-agent' }
-          : { connectionId, transport, clientReference: 'hosted-agent' },
+          ? { connectionId, transport, phoneNumberId: options.phoneNumberId!, clientReference }
+          : { connectionId, transport, clientReference },
       )
+      if (config.id && line.attachment?.status === 'active' && line.attachment.clientReference !== identity.clientReference)
+        throw new HostedAgentError('line_attached_elsewhere', 'Detach the existing attachment explicitly before assigning this line to another assistant.')
       await sandbox.lines.attach({
         number: line.id,
         mode,
-        members: [{ address: config.owner, role: 'owner' }],
-        unknownSenders: mode === 'shared' ? 'guest' : 'reject',
-        roles: mode === 'shared' ? { owner: PERSON, guest: PERSON } : { owner: PERSON },
+        members: [{ address: owner, role: 'owner' }, ...declared.map(member => ({ ...member, role: 'member' }))],
+        unknownSenders,
+        roles: mode === 'shared' ? { owner: PERSON, member: PERSON, guest: PERSON } : { owner: PERSON },
         respond: { kind: 'agent', backend },
-        limits: { turnsPerMemberPerDay: config.freeTurnsPerDay ?? 20 },
-        instance: { keyPrefix: PERSON_KEY_PREFIX, create },
-        clientReference: 'hosted-agent',
+        limits: { turnsPerMemberPerDay: turns },
+        instance: { keyPrefix: identity.instanceKeyPrefix, create },
+        clientReference: identity.clientReference,
       })
       if (options.voice) await sandbox.lines.enableVoice(line.id, options.voice)
       return sandbox.lines.get(line.id)
