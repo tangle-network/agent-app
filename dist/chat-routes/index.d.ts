@@ -1,0 +1,29 @@
+/**
+ * `/chat-routes` — the assembled server chat vertical (issue #188 Phase 1).
+ *
+ * Subpath-only (NOT re-exported from the root barrel): `turn-routes` imports
+ * the optional `@tangle-network/agent-runtime` peer at module top, same rule
+ * as `/app-auth`. The browser-safe wire contract lives in `./wire` and is
+ * re-exported through `/web-react`'s chat-stream glue.
+ */
+export * from './wire';
+export * from './binary-sniff';
+export * from './attachment-validation';
+export * from './turn-routes';
+export * from './gateway-adapter';
+export * from './stale-turn-lock';
+export * from './sandbox-producer';
+export * from './protected-runtime-producer';
+export * from './model-failover-stream';
+export * from './draft-persistence';
+export * from './detached-turn';
+export * from './completed-sandbox-turn';
+export * from './native-completion';
+export * from './durable-projection';
+export * from './upload';
+export * from './file-index';
+export * from './attachment-store';
+export * from './resolve-attachments';
+export * from './attachment-upload';
+export * from './dispatch-parts';
+export * from './promote-file-part';

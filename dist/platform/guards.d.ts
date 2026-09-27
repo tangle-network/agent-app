@@ -1,0 +1,79 @@
+/**
+ * Request guards for agent-app routes: session auth (302 redirect for pages,
+ * JSON 401 for APIs), admin allowlisting (404 — the route stays invisible to
+ * non-admins), and the billable-balance gate (402 with a stable code).
+ * Session resolution is a seam; thrown Responses follow the router convention
+ * of surfacing a thrown Response as the route result.
+ */
+/** Define options for configuring authentication guard behavior and session retrieval */
+export interface AuthGuardOptions<Session> {
+    /** e.g. a better-auth `auth.api.getSession` wrapped by the app. */
+    getSession(request: Request): Promise<Session | null | undefined>;
+    /** Default '/login'. */
+    loginPath?: string;
+}
+/** Resolve user authentication and session requirements for page and API requests */
+export interface AuthGuard<Session> {
+    /** Page guard — throws a 302 redirect Response to `loginPath`. */
+    requireUser(request: Request): Promise<Session>;
+    /** API guard — throws JSON 401 `{ error: 'Unauthorized', code: 'auth.unauthenticated' }`. */
+    requireApiUser(request: Request): Promise<Session>;
+    /** `apiResponse` selects the 401 JSON path over the redirect. */
+    requireSession(request: Request, opts?: {
+        apiResponse?: boolean;
+    }): Promise<Session>;
+    getOptionalSession(request: Request): Promise<Session | null>;
+}
+/** Create an authentication guard that enforces session presence and handles unauthorized access responses */
+export declare function createAuthGuard<Session>(opts: AuthGuardOptions<Session>): AuthGuard<Session>;
+/** Resolve a value or an HTTP response indicating failure in a guarded operation */
+export type GuardResolution<T> = {
+    ok: true;
+    value: T;
+} | {
+    ok: false;
+    response: Response;
+};
+/**
+ * Adapt a guard that THROWS a Response (the quartet above — the router
+ * convention) to the `{ok: true, value} | {ok: false, response}` resolution
+ * shape the route factories take (`/chat-routes` `authorize`,
+ * `/interactions` `resolveConnection`, `/chat-routes` upload `authorize`).
+ * Every product wrote this try/catch by hand; it lives here once.
+ */
+export declare function guardResolution<T>(run: () => Promise<T>): Promise<GuardResolution<T>>;
+/** Comma/whitespace separated → trimmed, lowercased, empties dropped. */
+export declare function parseAdminEmails(raw: string | null | undefined): string[];
+/** Define options to resolve user session and control access based on allowed admin emails */
+export interface AdminGuardOptions<Session> {
+    requireUser(request: Request): Promise<Session>;
+    emailOf(session: Session): string | null | undefined;
+    /** Resolved per request; an EMPTY allowlist refuses everyone. */
+    allowedEmails(): string[];
+}
+/** Non-admins (and empty allowlists) get 404, keeping the route invisible —
+ *  better than a "forbidden" footprint that advertises its existence. */
+export declare function createAdminGuard<Session>(opts: AdminGuardOptions<Session>): (request: Request) => Promise<Session>;
+/** Describe the billable balance state including overage permission and remaining USD balance */
+export interface BillableBalanceState {
+    overageAllowed: boolean;
+    remainingBalanceUsd: number;
+}
+/** Define options to assert and customize billable balance enforcement behavior */
+export interface AssertBillableBalanceOptions {
+    env?: Record<string, string | undefined>;
+    /** App-specific enforcement override flag (e.g. 'GTM_BILLING_ENFORCEMENT'),
+     *  fed to `isTangleBillingEnforcementDisabled`. */
+    enforcementEnvVar?: string;
+    /** Default 'Add balance or upgrade your plan to invoke this agent.'. */
+    errorMessage?: string;
+    /** Merged into the 402 JSON body (e.g. `{ organizationId }`). */
+    errorBody?: Record<string, unknown>;
+}
+/**
+ * Gate a billable turn: passes when enforcement is disabled (dev default),
+ * the tier allows overage, or remaining balance is positive. Otherwise throws
+ * a 402 Response with the stable `billing.balance_required` code so clients
+ * can route to the billing screen.
+ */
+export declare function assertBillableBalance(state: BillableBalanceState, opts?: AssertBillableBalanceOptions): void;

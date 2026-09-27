@@ -1,0 +1,251 @@
+/**
+ * Seams between the design-canvas editor's engine and components, mirroring
+ * the sequences-react pattern: interface-only so layers build independently.
+ *
+ * Persistence: the command stack executes optimistically against local state
+ * and emits `SceneOperation[]` through `DesignCanvasProps.onApplyOperations`.
+ * The host's apply returns the new revision (and the server document when it
+ * re-minted ids); a rejected promise rolls the command back. Drag gestures
+ * coalesce: pointer moves mutate volatile state, ONE command (final attrs,
+ * inverse = pre-gesture attrs) executes on release — undo is per-gesture,
+ * never per-pixel.
+ */
+import type { Bounds, SceneDocument, SceneElement, ScenePage } from '../design-canvas/model';
+import type { SceneOperation } from '../design-canvas/operations';
+import type { CanvasRenderPalette } from '../theme/theme';
+/** Define the state of the editor scene including document, view settings, and selection details */
+export interface EditorSceneState {
+    document: SceneDocument;
+    activePageId: string;
+    selectedElementIds: string[];
+    /** Pixels per document px. */
+    zoom: number;
+    panX: number;
+    panY: number;
+    gridEnabled: boolean;
+    /** Document px between grid lines. */
+    gridSize: number;
+    snapEnabled: boolean;
+    showRulers: boolean;
+    showBleed: boolean;
+}
+/** Define a command with execution, undo, and operation methods for scene editing and persistence */
+export interface SceneCommand {
+    label: string;
+    execute(state: EditorSceneState): EditorSceneState;
+    undo(state: EditorSceneState): EditorSceneState;
+    operations(): SceneOperation[];
+    /**
+     * The inverse operation sequence for server-side persistence of an undo.
+     * Most commands return an exact inverse (e.g. set_attrs → prior set_attrs,
+     * add_element → delete_element). deletePageCommand returns add_page +
+     * per-element add_element ops restoring the full page snapshot.
+     */
+    inverseOperations(): SceneOperation[];
+}
+/** Manage and track scene commands with undo, redo, and state subscription capabilities */
+export interface SceneCommandStack {
+    execute(command: SceneCommand): void;
+    /** Apply the top-of-done-stack inverse and return the command (callers use
+     *  `command.inverseOperations()` to persist the undo to the server). */
+    undo(): SceneCommand;
+    /** Re-execute the top-of-redo-stack and return the command (callers use
+     *  `command.operations()` to persist the redo to the server). */
+    redo(): SceneCommand;
+    canUndo(): boolean;
+    canRedo(): boolean;
+    subscribe(listener: () => void): () => void;
+    getState(): EditorSceneState;
+    /** Update volatile view state (zoom/pan/selection/toggles) without touching
+     *  history — view changes are never undo steps. */
+    setView(patch: Partial<Omit<EditorSceneState, 'document'>>): void;
+    /** Rebase onto a server refresh WITHOUT clearing history (history holds
+     *  operations, not snapshots). */
+    reset(document: SceneDocument): void;
+    /**
+     * Remove a specific command from the undo stack and apply its inverse to
+     * the current state. Called by the persistence layer when a save rejects
+     * AFTER the user may have made further edits.
+     *
+     * Invariant: for commands that operate on disjoint attributes, rollback is
+     * identity for all commands executed after the rolled-back one — their net
+     * effect is preserved. For overlapping attr edits (same element, same field)
+     * the result is defined but not guaranteed to be semantically correct; the
+     * caller should trigger an onResyncRequired fetch in that case.
+     *
+     * If `command` is not found in the undo stack (stale or double-fire
+     * rejection handler), this is a safe no-op.
+     */
+    rollback(command: SceneCommand): void;
+}
+/** Define snap target categories for aligning elements within a layout system */
+export type SnapTargetKind = 'grid' | 'element-edge' | 'element-center' | 'page-edge' | 'page-center' | 'guide';
+/** Define a target position and kind for snapping elements on a page */
+export interface SnapTarget {
+    /** Page-coordinate position of the snap line. */
+    position: number;
+    kind: SnapTargetKind;
+}
+/** Define vertical and horizontal collections of snap targets for alignment purposes */
+export interface SnapTargets {
+    vertical: SnapTarget[];
+    horizontal: SnapTarget[];
+}
+/** Define the result of a snap operation including coordinates and active snap lines */
+export interface SnapResult {
+    x: number;
+    y: number;
+    /** Lines to render while the gesture holds the snap. */
+    activeVertical: SnapTarget | null;
+    activeHorizontal: SnapTarget | null;
+}
+/** Resolve snapping targets and apply snapping logic to moving elements within the editor scene */
+export interface SnapEngine {
+    /** Collect targets for a gesture: other elements' edges/centers, page
+     *  edges/center, saved guides, and grid lines when enabled. `excludeIds`
+     *  removes the dragged elements' own geometry. */
+    collectTargets(state: EditorSceneState, excludeIds: string[]): SnapTargets;
+    /** Snap a moving AABB. Threshold is SCREEN pixels, divided by zoom. */
+    apply(bounds: Bounds, targets: SnapTargets, thresholdPx: number, zoom: number): SnapResult;
+}
+/** Define methods and properties to calculate zoom and pan transformations between document and screen coordinates */
+export interface ZoomPanMath {
+    minZoom: number;
+    maxZoom: number;
+    /** Zoom about a screen point so the document point under the cursor stays
+     *  fixed (wheel-zoom-to-cursor). Returns the clamped new view. */
+    zoomAtPoint(state: {
+        zoom: number;
+        panX: number;
+        panY: number;
+    }, factor: number, screenX: number, screenY: number): {
+        zoom: number;
+        panX: number;
+        panY: number;
+    };
+    /** Fit the active page into a viewport with padding. */
+    fitPage(page: {
+        width: number;
+        height: number;
+    }, viewport: {
+        width: number;
+        height: number;
+    }, paddingPx?: number): {
+        zoom: number;
+        panX: number;
+        panY: number;
+    };
+    documentToScreen(state: {
+        zoom: number;
+        panX: number;
+        panY: number;
+    }, x: number, y: number): {
+        x: number;
+        y: number;
+    };
+    screenToDocument(state: {
+        zoom: number;
+        panX: number;
+        panY: number;
+    }, x: number, y: number): {
+        x: number;
+        y: number;
+    };
+}
+/** Resolve the result of applying a scene update including revision and optional normalized document */
+export interface ApplySceneResult {
+    rev: number;
+    /** Present when the server re-minted ids or normalized the document; the
+     *  editor rebases onto it. */
+    document?: SceneDocument;
+}
+/**
+ * What the chrome's Export control collects and hands to the workspace's
+ * export callback. The workspace (which owns the Konva stage) renders the
+ * page to a data URL with these params and forwards the full result to
+ * {@link DesignCanvasProps.onExport}. The chrome is Konva-free, so it cannot
+ * produce the data URL itself — it only chooses the format and scale.
+ */
+export interface ExportTriggerOptions {
+    format: 'png' | 'jpeg';
+    /** Output scale multiplier (1 = page size, 2 = retina). */
+    pixelRatio: number;
+}
+/**
+ * Editor capability mode.
+ * - `'edit'` (default): the full authoring editor — insert panel, page
+ *   add/duplicate/delete, layers, grid/snap/ruler/bleed toggles, group/ungroup,
+ *   z-order. This is the designer surface.
+ * - `'review'`: a lean review/tweak surface for agent-authored output. The
+ *   minimal toolbar exposes only safe direct edits (undo/redo, fit/zoom). The
+ *   insert panel, blank-page-create, and authoring controls are hidden. Drag,
+ *   select, double-click-to-edit-text, image swap, the agent panel, and
+ *   gallery/thumbnail/export all stay. Additive and backward-compatible.
+ */
+export type DesignCanvasMode = 'edit' | 'review';
+/** Define properties and callbacks for configuring and controlling the design canvas editor */
+export interface DesignCanvasProps {
+    document: SceneDocument;
+    /** Revision the document was loaded at; threaded through saves. */
+    rev: number;
+    canWrite: boolean;
+    /** Editor capability mode. Default `'edit'` (full authoring editor). Set
+     *  `'review'` for a lean reviewer that hides authoring controls but keeps
+     *  drag/select/text-edit/image-swap and the agent panel. */
+    mode?: DesignCanvasMode;
+    /** Persist operations. Resolve with the new revision; reject to roll back.
+     *  A stale-revision failure should resolve AFTER refetch with the fresh
+     *  document so the editor rebases instead of fighting. */
+    onApplyOperations(operations: SceneOperation[]): Promise<ApplySceneResult>;
+    onSelectionChange?(elements: SceneElement[]): void;
+    /** Host panels: agent chat (right), asset/template browser (left). */
+    renderAgentPanel?(ctx: {
+        selectedElements: SceneElement[];
+        activePageId: string;
+    }): React.ReactNode;
+    renderSidePanel?(ctx: {
+        selectedElements: SceneElement[];
+        activePageId: string;
+        activePage: ScenePage;
+    }): React.ReactNode;
+    /** Export hook — host persists the rendered blob (upload → asset row). */
+    onExport?(result: {
+        pageId: string;
+        format: 'png' | 'jpeg';
+        dataUrl: string;
+        pixelRatio: number;
+    }): Promise<void>;
+    /**
+     * Optional caller-supplied default for the export popover. The chrome's
+     * Export control opens with this format/scale pre-selected. Omitted →
+     * PNG @ 1x.
+     */
+    exportDefaults?: ExportTriggerOptions;
+    className?: string;
+    /** Konva render palette — the full hex colors the bitmap canvas paints with
+     *  (grid, snap guides, selection handles, placeholders). Konva cannot resolve
+     *  `var(--…)`, so the host supplies the active theme's `canvasRender` here
+     *  (e.g. `darkTheme.canvasRender` under a dark surface). Omitted →
+     *  `lightTheme.canvasRender`, which keeps light-mode rendering byte-identical
+     *  to the historical hardcoded values. */
+    render?: CanvasRenderPalette;
+    /** Fit the active page to the viewport once, on the first non-zero measurement. Default true. Set false to keep zoom:1/pan:0 (e.g. when restoring a saved viewport). */
+    fitOnMount?: boolean;
+    /** Called once after the first real (non-zero) measurement, after the initial fit is applied (or skipped when fitOnMount is false). */
+    onReady?(): void;
+    /** Show the branded in-canvas empty state (three doors: template, add element,
+     *  ask the agent) while the active page has no elements and the user can write.
+     *  Default true. Additive and backward-compatible. */
+    showEmptyState?: boolean;
+    /** Wire the empty state's "Ask the agent" door. Typically focuses the agent
+     *  panel (`renderAgentPanel`). Omitted → that door is hidden. */
+    onAskAgent?(): void;
+    /** Field label for the page-size preset control. Overridable so a consumer
+     *  can use the clearer "Page size"; defaults to "Preset" for back-compat. */
+    pageSizeLabel?: string;
+    /** Title/aria for the "turn on print bleed" action. Defaults to
+     *  "Show print bleed" (the outcome), not the print-shop term "bleed". */
+    enableBleedLabel?: string;
+    /** Label/aria for the zoom fit action. Defaults to "Fit to screen". */
+    fitLabel?: string;
+}

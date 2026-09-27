@@ -1,0 +1,296 @@
+/**
+ * `/turn-stream` core — the pure, substrate-free half of the shared durable
+ * turn replay/broadcast/lock channel (issue #221).
+ *
+ * Extracted from the reference consumer's hand-rolled Durable Object
+ * (gtm-agent `SessionStreamDO` + `session-broadcast.ts`): the per-turn
+ * segment store that backs reconnect replay over a live socket, the
+ * single-flight chat-turn lock record and its release fences, and the wire
+ * contract (channel keys, endpoint paths, request/response bodies) shared by
+ * the DO transport shell (`./do`) and the worker-side adapters
+ * (`./adapters`). Everything here is plain data + functions — no
+ * `cloudflare:workers`, no storage, no sockets — so the semantics are
+ * unit-testable in Node and the DO stays a thin shell.
+ *
+ * ── The two-lane rule (measured, not assumed) ────────────────────────────
+ *
+ * A 4-arm A/B on production (sandbox.tangle.tools, SDK 0.12.0, one box, one
+ * gateway client per arm) established which sandbox lane a browser can see:
+ *
+ *   | turn driver                          | raw turn events | seen at gateway |
+ *   | ------------------------------------ | --------------- | --------------- |
+ *   | `box.streamPrompt()` (run/stream)    | 71 / 527 / 408  | 0 / 0 / 0       |
+ *   | `box.session(id).sendMessage()`      | 297             | 297             |
+ *   | `box.driveTurn()` (Sandbox 0.37+)    | —               | SDK contract    |
+ *
+ * `POST /agents/run/stream` publishes nothing to the sidecar session event
+ * bus, so a `SessionGatewayClient` attached to that session receives zero
+ * turn events — three different session-id strategies all got 0, the id was
+ * not the variable. `POST /agents/sessions/{id}/messages` publishes to the
+ * bus and the gateway delivered every frame, byte-matching the sidecar tail.
+ * Sandbox 0.37 admits `driveTurn` through the session message lane, so the
+ * gateway can observe it. That is an SDK contract, not a new production count.
+ *
+ * Consequences for this module, and they cut both ways:
+ *
+ * 1. INTERACTIVE sandbox turns should be driven on the message lane and
+ *    tailed by the browser through `box.mintScopedToken({ scope: 'session' })`
+ *    + `SessionGatewayClient`. Re-broadcasting those same events through the
+ *    per-turn SEGMENT buffer below duplicates the SDK and adds a worker hop.
+ *    That half is `@deprecated` (see the tags on {@link createSegmentStore},
+ *    {@link appendSegmentEvent}, {@link replayActiveSegment} and
+ *    `broadcastTurnStreamEvent` in `./adapters`).
+ * 2. Detached turns driven through `dispatchPrompt({ detach: true })` or
+ *    `streamPrompt` remain on the run/stream lane and need a buffer when a
+ *    browser must tail them. Sandbox 0.37 `driveTurn` is different: it uses
+ *    the session message lane and the gateway can observe it. The buffer
+ *    remains the path for stream/dispatch runs and has no SDK replacement.
+ * 3. The LOCK and the per-workspace SIGNALS have no gateway equivalent at
+ *    all (the gateway is per-session and read-only). They stay canonical.
+ *
+ * Server-side resume of a run/stream turn is also already solved by the SDK
+ * and needs nothing here: `box.streamPrompt('', { executionId, lastEventId })`
+ * replays strictly after the cursor without re-dispatching — measured across
+ * a SIGKILL mid-run and a fresh process resuming from the cursor alone:
+ * 0 lost, 0 duplicated, 0 out-of-order, ids 1..517 contiguous.
+ */
+/** One event on a turn-stream channel. `seq` is monotonic within a turn
+ *  segment and assigned by {@link appendSegmentEvent} on arrival at the DO. */
+export interface TurnStreamEvent {
+    type: string;
+    data?: unknown;
+    timestamp: number;
+    seq?: number;
+}
+/** Terminal run markers: they close a turn segment and auto-release the
+ *  channel's chat-turn lock for the segment's execution.
+ *
+ *  KEPT (not deprecated with the segment buffer): the lock auto-release
+ *  reads it. A product that stops broadcasting turn events to the thread
+ *  channel loses only that auto-release — the cooperative release on settle
+ *  (`createDurableTurnLock().release`) and `reconcileStaleDurableTurnLock`
+ *  both still fire, which is what actually frees a wedged lane. */
+export declare function isTerminalRunEvent(type: string): boolean;
+/** Define the scope level for acquiring a turn lock within thread or workspace contexts */
+export type TurnLockScope = 'thread' | 'workspace';
+/** Generate a unique string key combining workspace and thread identifiers.
+ *
+ *  KEPT: thread-scope LOCKS are keyed on it (see {@link turnLockChannelKey}).
+ *  Only its second use — addressing a live-viewer socket for interactive
+ *  sandbox-turn rebroadcast — is superseded by the session gateway. */
+export declare function threadChannelKey(workspaceId: string, threadId: string): string;
+/** Generate a unique channel key based on the given workspace identifier.
+ *
+ *  KEPT and canonical: the per-workspace signal channel (`thread.created`,
+ *  `thread.activity`) plus workspace-scope locks. The session gateway is
+ *  per-SESSION and read-only, so it cannot carry either. */
+export declare function workspaceChannelKey(workspaceId: string): string;
+/** The channel a lock lives on: workspace-scope locks serialize every thread
+ *  in the workspace (one shared sandbox), thread-scope locks serialize one
+ *  thread (router lane). Same keying as the reference consumer, so a product
+ *  swapping its fork for this package contends on identical instances. */
+export declare function turnLockChannelKey(workspaceId: string, threadId: string, scope: TurnLockScope): string;
+/** Generate a storage channel key string for a given turn identifier.
+ *
+ *  KEPT and canonical: durable turn-event rows for stream/dispatch detached
+ *  runs live on this instance. Those run/stream paths do not reach the
+ *  session gateway, so this is how a browser tails one. */
+export declare function turnStorageChannelKey(turnId: string): string;
+/** Generate a unique channel key string based on the provided scope identifier.
+ *
+ *  KEPT and canonical: backs `TurnEventStore.listRunning`, which is how a
+ *  reloaded client rediscovers an in-flight DETACHED turn. */
+export declare function scopeIndexChannelKey(scopeId: string): string;
+/** DEPRECATED (interactive turn-rebroadcast buffer) — represent a segment of a turn containing events, sequence limit, and terminal status.
+ *
+ *  @deprecated Part of the interactive turn-rebroadcast buffer — see the
+ *  two-lane rule in this file's header. Removal is a major-version change. */
+export interface TurnSegment {
+    events: TurnStreamEvent[];
+    maxSeq: number;
+    terminal: boolean;
+}
+/** DEPRECATED (interactive turn-rebroadcast buffer) — define a store managing segments and tracking the active execution identifier.
+ *
+ *  @deprecated Part of the interactive turn-rebroadcast buffer — see the
+ *  two-lane rule in this file's header. Removal is a major-version change. */
+export interface SegmentStore {
+    segments: Map<string, TurnSegment>;
+    activeExecutionId: string | null;
+}
+/** DEPRECATED (interactive turn-rebroadcast buffer) — per-turn replay window. Generous enough for normal turns; a turn that
+ *  exceeds it loses its earliest deltas from replay (a late resumer
+ *  self-heals via the final `result` event + loader revalidation).
+ *
+ *  @deprecated Sizes the interactive turn-rebroadcast buffer only. The
+ *  stream/dispatch detached lanes' durable rows (`turnEvent:` storage) are
+ *  uncapped and are not affected. */
+export declare const MAX_SEGMENT_EVENTS = 2000;
+/** Recent `thread.created` markers kept for late-connecting sidebars.
+ *
+ *  KEPT: a workspace-level signal, not a turn rebroadcast. */
+export declare const MAX_RECENT_CREATED = 50;
+/** A responding marker older than this is treated as stale, so a dropped
+ *  `end` broadcast can't leave a permanently-stuck "responding" dot. */
+export declare const ACTIVITY_TTL_MS: number;
+/** DEPRECATED (interactive sandbox-turn rebroadcast; the SDK's session gateway replaces it) — create a SegmentStore with initialized segments and no active execution ID.
+ *
+ *  @deprecated Backs the interactive sandbox-turn rebroadcast, which the
+ *  sandbox SDK already does better (measured: run/stream → 0 frames at the
+ *  gateway, message lane → 297/297; see the two-lane rule in this file's
+ *  header). Sandbox turns: drive on `box.session(id).sendMessage()` and let
+ *  the browser attach with `box.mintScopedToken({ scope: 'session' })` +
+ *  `SessionGatewayClient`. Sandbox-FREE turns: `/stream`'s
+ *  `replayTurnEvents` (`GET /chat/stream/:turnId`) already follows a running
+ *  turn from a cursor. Stream/dispatch detached turns keep the durable
+ *  turn-event rows —
+ *  they are a different, non-deprecated lane. Removal is a major-version
+ *  change; nothing is deleted here. */
+export declare function createSegmentStore(): SegmentStore;
+/**
+ * DEPRECATED (interactive turn-rebroadcast buffer) — append a per-turn event to
+ * its execution's segment, assigning a monotonic
+ * `seq`. A `session.run.started` (or the first-seen event for an execution)
+ * opens a fresh segment, makes it active, and drops prior turns' buffers so a
+ * resumer only ever replays the current turn. A terminal run event marks the
+ * segment terminal. Returns the seq-stamped event to broadcast.
+ *
+ * @deprecated The interactive rebroadcast half — {@link createSegmentStore}
+ * names the replacement per lane; this file's header holds the measurement.
+ */
+export declare function appendSegmentEvent(store: SegmentStore, executionId: string, incoming: TurnStreamEvent, maxEvents?: number): TurnStreamEvent;
+/**
+ * DEPRECATED (interactive turn-rebroadcast buffer; the SDK replays losslessly on
+ * both lanes) — events of the active, non-terminal turn with `seq > afterSeq`,
+ * i.e. what a
+ * (re)connecting client replays before going live. A terminal (finished) turn
+ * replays nothing: the client falls back to the loader's persisted row.
+ *
+ * @deprecated The interactive rebroadcast half — {@link createSegmentStore}
+ * names the replacement per lane. The SDK's own reconnect replay is
+ * `SessionGatewayClient` + `lastEventId` (browser) or
+ * `box.streamPrompt('', { executionId, lastEventId })` (worker); both were
+ * measured lossless.
+ */
+export declare function replayActiveSegment(store: SegmentStore, afterSeq: number): TurnStreamEvent[];
+/**
+ * Remove responding entries (threadId → startedAt) older than `ttlMs`, so a
+ * dropped `end` broadcast can't leave a permanently-stuck dot. Mutates
+ * `active` and returns the removed thread ids.
+ */
+export declare function pruneStaleThreads(active: Map<string, number>, now: number, ttlMs: number): string[];
+/** Default lifetime of an unreleased lock. Long enough that a legitimately
+ *  slow sandbox turn never loses its guard mid-run; the way OUT of a wedge is
+ *  never the TTL but `reconcileStaleTurnLock` (in `/chat-routes`), which
+ *  probes the execution's actual state.
+ *
+ *  Everything from here down is the LOCK, and it is fully KEPT. The sandbox
+ *  SDK ships no single-flight primitive — the session gateway is a read-only
+ *  fanout — so moving a product to the message lane changes nothing about
+ *  who is allowed to start a turn. */
+export declare const TURN_LOCK_TTL_MS: number;
+/** The stored single-flight lock. Field-compatible with the reference
+ *  consumer's `ChatTurnLock` so adoption is a swap, not a migration. */
+export interface DurableTurnLock {
+    workspaceId: string;
+    threadId: string;
+    scope: TurnLockScope;
+    executionId: string;
+    lockId: string;
+    startedAt: number;
+    expiresAt: number;
+    turnId?: string;
+    /** The turn released this lock, but a product-owned post-turn task (e.g.
+     *  file persistence reading the box) is still running, so the release is
+     *  parked on the lock until the task settles. Written only through the DO's
+     *  defer seam — the base package never sets it on its own. */
+    releasePending?: boolean;
+}
+/** Define input parameters required to acquire a turn-based lock in a workspace thread */
+export interface TurnLockAcquireInput {
+    workspaceId: string;
+    threadId: string;
+    scope: TurnLockScope;
+    executionId: string;
+    lockId: string;
+    turnId?: string;
+}
+/** Resolve the result of attempting to acquire a turn lock indicating success or active lock status */
+export type TurnLockAcquireResult = {
+    acquired: true;
+    lock: DurableTurnLock;
+} | {
+    acquired: false;
+    active: DurableTurnLock;
+};
+/** Define input parameters required to release a turn lock in a specific workspace thread */
+export interface TurnLockReleaseInput {
+    workspaceId: string;
+    threadId: string;
+    scope: TurnLockScope;
+    executionId: string;
+    lockId: string;
+}
+/** Fenced out-of-band release (stop button, stale-lock reconciliation). The
+ *  fences make it refuse a SUCCESSOR lock: `interruptedAt` must not precede
+ *  the lock's own start, and when either side names a turn, both must name
+ *  the same one. */
+export interface TurnLockInterruptedReleaseInput {
+    workspaceId: string;
+    threadId: string;
+    /** Try only this scope; omit to try workspace then thread. */
+    scope?: TurnLockScope;
+    interruptedAt: number;
+    turnId?: string;
+}
+/** `stored` is what the DO read from storage; expired locks are dead. */
+export declare function activeTurnLock(stored: DurableTurnLock | undefined, now: number): DurableTurnLock | null;
+/** Create a durable turn lock object with timing and scope based on input parameters */
+export declare function createTurnLock(input: TurnLockAcquireInput, now: number, ttlMs?: number): DurableTurnLock;
+/** A cooperative release must present the lock's own identity — both the
+ *  execution and the lockId minted at acquire — so a retry of a PREVIOUS turn
+ *  can never release the current one. `lockId` is optional only for the DO's
+ *  internal terminal-event auto-release, which knows the execution but not
+ *  the caller-held lockId. */
+export declare function turnLockMatchesRelease(active: DurableTurnLock, input: {
+    executionId: string;
+    lockId?: string;
+}): boolean;
+/**
+ * The interrupted/stale release fence. `interruptedAt` is the instant the
+ * releasing evidence was observed (the stop click, the stale-lock probe) —
+ * a lock STARTED after that instant is a successor the evidence says nothing
+ * about, so it survives. When the lock recorded a client turnId, the release
+ * must name the same turn; a lock without one refuses a turn-specific
+ * release (it cannot prove it is that turn).
+ */
+export declare function interruptedReleaseApplies(active: DurableTurnLock, input: {
+    threadId: string;
+    interruptedAt: number;
+    turnId?: string;
+}): boolean;
+/** Provide constant paths for managing chat turn streams and locks */
+export declare const TURN_STREAM_PATHS: {
+    readonly broadcast: '/broadcast';
+    readonly lockAcquire: '/chat-turn-lock/acquire';
+    readonly lockRelease: '/chat-turn-lock/release';
+    readonly lockReleaseInterrupted: '/chat-turn-lock/release-interrupted';
+    readonly turnEventsAppend: '/turn-events/append';
+    readonly turnEventsRead: '/turn-events/read';
+    readonly turnStatusSet: '/turn-status/set';
+    readonly turnStatusGet: '/turn-status/get';
+    readonly scopeStatusSet: '/turn-scope/set';
+    readonly scopeRunningList: '/turn-scope/running';
+};
+/** Storage keys inside a DO instance. Exported for subclass coexistence —
+ *  a product extending the DO must not collide with these. */
+export declare const TURN_STREAM_STORAGE_KEYS: {
+    readonly lock: 'chatTurnLock';
+    readonly activeThreads: 'activeThreads';
+    readonly turnStatus: 'turnStatus';
+    readonly turnScope: 'turnScopeIndex';
+    readonly turnEventPrefix: 'turnEvent:';
+};
+/** Zero-padded seq so DO storage `list({ prefix })` returns rows in replay
+ *  order without a sort. 10 digits holds any realistic turn. */
+export declare function turnEventStorageKey(seq: number): string;
