@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   build:
+    needs: deployment-credentials
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -80,9 +81,8 @@ jobs:
           fi
 
           echo "target=$TARGET" >> "$GITHUB_OUTPUT"
-          if [[ "$TARGET" != 'none' ]]; then
-            echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
-          fi
+          # Keep the output contract explicit; deploy checks target before using branch.
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
   deploy:
     needs: [build, deployment-credentials]
