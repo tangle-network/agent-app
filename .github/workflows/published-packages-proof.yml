@@ -39,6 +39,7 @@ jobs:
         run: |
           set -o pipefail
           pnpm build 2>&1 | tee evidence/build.log
+          node --check scripts/prove-published-hub.mjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
