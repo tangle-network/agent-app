@@ -58,15 +58,20 @@ jobs:
             echo 'available=true' >> "$GITHUB_OUTPUT"
           else
             echo 'available=false' >> "$GITHUB_OUTPUT"
+            if [[ "$GITHUB_EVENT_NAME" != 'pull_request' && "$GITHUB_REF" == 'refs/heads/main' ]]; then
+              echo '::error::Cloudflare Actions secrets are missing for the main catalog deploy.'
+              echo 'Configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID through the approved secret owner.'
+              exit 1
+            fi
           fi
 
   deploy:
     needs: [build, deployment-credentials]
     if: >-
-      (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' &&
-       github.event.pull_request.head.repo.full_name == github.repository &&
-       needs.deployment-credentials.outputs.available == 'true')
+      needs.deployment-credentials.outputs.available == 'true' &&
+      ((github.event_name != 'pull_request' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
