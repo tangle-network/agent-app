@@ -32,6 +32,8 @@ export interface HostedAgentConfig {
   freeTurnsPerDay?: number
   box?: Partial<BoxPolicy>
   sandboxUrl?: string
+  /** Platform control-plane origin paired with sandboxUrl. Defaults to production. */
+  platformUrl?: string
 }
 
 export interface BoxPolicy {
@@ -41,7 +43,11 @@ export interface BoxPolicy {
   idleTimeoutSeconds: number
   maxLifetimeSeconds: number
   deleteAfterStoppedSeconds: number
-  /** Egress allow-list. The default reaches the model router only. */
+  /**
+   * Application egress allow-list. The HostedAgent runtime also grants the
+   * exact Platform control host used for purpose-bound native capabilities
+   * such as preview publication; no owner credential is placed in the box.
+   */
   allowDomains: string[]
 }
 
@@ -109,12 +115,21 @@ export class HostedAgentError extends Error {
 export function createHostedAgent(config: HostedAgentConfig) {
   if (!E164.test(config.owner) && !EMAIL.test(config.owner)) throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number or email address.')
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
-  const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
+  const sandboxUrl = config.sandboxUrl ?? 'https://sandbox.tangle.tools'
+  const platformUrl = config.platformUrl ?? 'https://id.tangle.tools'
+  const platformHost = new URL(platformUrl).hostname
+  if (!platformHost) throw new HostedAgentError('platform_url_invalid', 'platformUrl must name a host.')
+  // General hosted turns may receive purpose-bound Platform capabilities
+  // (currently managed previews). Their bearer is valid only at its dedicated
+  // endpoint, and the guest never receives the developer's account key. Keep
+  // strict egress while making the platform-owned capability transport usable.
+  const allowDomains = [...new Set([...policy.allowDomains, platformHost])]
+  const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: sandboxUrl, platformUrl, timeoutMs: 20_000 })
   const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile: conversationProfile(config.profile) }
   const create: LineInstanceCreate = {
     name: 'hosted-person',
     resources: { cpuCores: policy.cpuCores, memoryMB: policy.memoryMB, diskGB: policy.diskGB },
-    egressPolicy: { mode: 'strict', allowDomains: policy.allowDomains, includeImplicitDomains: false },
+    egressPolicy: { mode: 'strict', allowDomains, includeImplicitDomains: false },
     idleTimeoutSeconds: policy.idleTimeoutSeconds, maxLifetimeSeconds: policy.maxLifetimeSeconds,
     deleteAfterStoppedSeconds: policy.deleteAfterStoppedSeconds,
   }
