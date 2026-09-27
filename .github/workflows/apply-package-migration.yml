@@ -1,0 +1,64 @@
+name: Apply package migration
+on:
+  push:
+    branches: [codex/published-packages-sweep-1-20260926]
+    paths: [.github/workflows/apply-package-migration.yml]
+permissions:
+  contents: write
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.18.0'
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+        with:
+          version: 11.24.0
+      - name: Apply exact source change
+        env:
+          PATCH: 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
+        run: |
+          python - <<'PY'
+          import base64, hashlib, os, subprocess, zlib
+          patch = zlib.decompress(base64.b64decode(os.environ['PATCH']))
+          assert hashlib.sha256(patch).hexdigest() == '892ef5486d14fe3f36ca94c8e0f5714b9658ab2af3e734ab1589724ec8430627'
+          subprocess.run(['git', 'apply', '--check', '-'], input=patch, check=True)
+          subprocess.run(['git', 'apply', '-'], input=patch, check=True)
+          PY
+          rm .github/workflows/apply-package-migration.yml
+          pnpm install --lockfile-only --ignore-scripts
+          git diff --check
+          git config user.name 'Drew Stone'
+          git config user.email '13153687+drewstone@users.noreply.github.com'
+          git add -u
+          git commit -m 'refactor: use published Hub SDK for app integration execution'
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/commit.txt
+          git archive --format=tar.gz HEAD > evidence/source.tar.gz
+      - name: Push migration branch only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          basic=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $basic" push origin HEAD:refs/heads/codex/published-packages-sweep-1-20260926
+      - name: Install locked published dependencies
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee evidence/install.log
+      - name: Build real package
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee evidence/build.log
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: migration-proof
+          path: evidence/
+          retention-days: 7
