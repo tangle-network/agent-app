@@ -28,7 +28,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/oidc-proof"
           git worktree add --detach "$RUNNER_TEMP/caller" e8854f80b97e55b4a1fa07d7efe30afb0b829961
           python3 .gtr/app-edit.py "$RUNNER_TEMP/caller"
-          git -C "$RUNNER_TEMP/caller" diff --check
+          cd "$RUNNER_TEMP/caller"
+          npm view @tangle-network/agent-knowledge@17.1.8 version peerDependencies --json | tee "$RUNNER_TEMP/oidc-proof/knowledge-peer.json"
+          node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("package.json","utf8")); p.devDependencies["@tangle-network/agent-knowledge"]="17.1.8"; fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n");'
+          git diff --check
       - name: Install and verify the generated lockfile
         run: |
           set -euo pipefail
