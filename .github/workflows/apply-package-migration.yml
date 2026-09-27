@@ -34,6 +34,10 @@ jobs:
           j['devDependencies']['@tangle-network/agent-interface'] = '2.13.0'
           j['devDependencies']['@tangle-network/sandbox'] = '0.54.2'
           j['peerDependencies']['@tangle-network/sandbox'] += ' || ^0.54.0'
+          # Runtime 0.277.0 accepts eval <0.194. Knowledge 17.1.8 accepts this
+          # cohort too. Do not suppress peer errors or widen a dependency's contract.
+          j['devDependencies']['@tangle-network/agent-eval'] = '0.193.2'
+          j['devDependencies']['@tangle-network/agent-knowledge'] = '17.1.8'
           p.write_text(json.dumps(j, indent=2) + '\n')
           p = Path('src/integrations/index.ts')
           s = p.read_text()
@@ -74,7 +78,7 @@ jobs:
           git config user.name 'Drew Stone'
           git config user.email '13153687+drewstone@users.noreply.github.com'
           git add -u
-          git commit -m 'refactor: use published Hub SDK for app integration execution'
+          git commit -m 'refactor: use published Hub SDK and a compatible runtime cohort'
           mkdir -p evidence
           git rev-parse HEAD > evidence/commit.txt
           git archive --format=tar.gz HEAD > evidence/source.tar.gz
