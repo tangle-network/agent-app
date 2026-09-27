@@ -11617,7 +11617,7 @@
           "name": "SandboxResourceConfig",
           "kind": "interface",
           "signature": "interface SandboxResourceConfig",
-          "doc": "Define configuration parameters for sandbox resource allocation and lifecycle management"
+          "doc": "Configure sandbox resources and lifecycle limits."
         },
         {
           "name": "SandboxRestoreSpec",
