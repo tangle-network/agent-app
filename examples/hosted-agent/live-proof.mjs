@@ -68,14 +68,12 @@ export default async function run(input) {
   if (result.exitCode !== 0) throw new Error('Scheduled sandbox command failed');
   return { sandboxId: box.id, key: input.key, ...JSON.parse(result.stdout.trim()) };
 }`
-  // The platform supplies a short-lived owner-scoped key. No credential is
-  // stored in workflow YAML. This is work in the sandbox, not a forged text.
   const definition = { name: 'assistant-proof-' + randomUUID().slice(0, 8), on: { schedule: { cron: '* * * * *', timezone: 'UTC' } },
     do: [{ 'script.run': { timeoutMs: 120000, input: { key: state.key, sandboxId: state.thread.sandboxId, marker }, source } }] }
   const workflow = await hub.workflows.create(JSON.stringify(definition))
-  await save('workflow', { id: workflow.id, marker, sandboxId: state.thread.sandboxId, key: state.key })
   console.log('Created scheduled workflow ' + workflow.id + '. No manual run is issued.')
   try {
+    await save('workflow', { id: workflow.id, marker, sandboxId: state.thread.sandboxId, key: state.key })
     const deadline = Date.now() + 240000
     let run
     while (Date.now() < deadline) {
@@ -84,7 +82,6 @@ export default async function run(input) {
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
     assert.ok(run, 'The real schedule did not fire within the proof window')
-    // Stop future firings as soon as one run exists. The queued run remains.
     await hub.workflows.setEnabled(workflow.id, false)
     const detail = await hub.workflows.waitForRun(workflow.id, run.id, { timeoutMs: 180000 })
     await save('scheduled-run', detail)
@@ -98,7 +95,6 @@ export default async function run(input) {
     await save('scheduled-file', document)
     console.log(JSON.stringify({ workflowId: workflow.id, runId: run.id, sandboxId: box.id, ...document }, null, 2))
   } finally {
-    // A failing pause is an actionable error, not a successful cleanup.
     await hub.workflows.setEnabled(workflow.id, false)
   }
 } else if (command === 'pause') {
@@ -108,7 +104,14 @@ export default async function run(input) {
 } else if (command === 'detach') {
   const line = await load('line')
   assert.equal(required('CONFIRM_LINE_ID'), line.id, 'Confirm the exact disposable line id')
-  await sandbox.lines.detach(line.id)
+  // Operator cleanup only. The installed 0.53 SDK has no global lines.detach;
+  // that verb ships in 0.54.2. Keep the proof on its declared registry floor.
+  const response = await sandbox.fetch('/v1/lines/' + encodeURIComponent(line.id) + '/attachment', { method: 'DELETE' })
+  const receipt = await response.json()
+  assert.ok(response.ok, 'Line detach failed: HTTP ' + response.status)
+  assert.equal(receipt.success, true)
+  assert.equal(typeof receipt.data?.detached, 'boolean')
+  await save('detach', { status: response.status, ...receipt })
   console.log('Detached ' + line.id + '. Its sandbox and receipts are retained.')
 } else {
   throw new Error('Use setup, inspect, schedule, pause, or detach')
