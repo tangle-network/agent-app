@@ -1,0 +1,131 @@
+{
+  "sourceHead": "091d96d52cb58c687827733a4c8e2d5d58a36654",
+  "sourceHashes": {
+    "src/vault/VaultPane.tsx": "85874d03e22d6c5e2238cecac68ad7ac7d5c5c6b2b6fbb5255b22f070574af79",
+    "src/stories/vault/VaultPane.stories.tsx": "bfad75492b330269486935f38ee50d3aa45e0d6cc56f7152940f5f105ee17153"
+  },
+  "at": "2026-09-27T21:39:00.889Z",
+  "context": "Maintained Agent App Storybook surface, source imports and local story data port. This does not prove GTM persistence.",
+  "errors": [],
+  "layouts": [
+    {
+      "label": "narrow-pane-desktop-viewport",
+      "viewport": 1280,
+      "documentWidth": 1280,
+      "tree": {
+        "x": 0,
+        "width": 0,
+        "right": 0,
+        "display": "none"
+      },
+      "document": {
+        "x": 12,
+        "width": 366,
+        "right": 378,
+        "display": "flex"
+      },
+      "navigation": {
+        "x": 12,
+        "width": 366,
+        "right": 378,
+        "display": "flex"
+      }
+    },
+    {
+      "label": "wide-pane-after-dirty-edit",
+      "viewport": 1280,
+      "documentWidth": 1280,
+      "tree": {
+        "x": 12,
+        "width": 368,
+        "right": 380,
+        "display": "flex"
+      },
+      "document": {
+        "x": 380,
+        "width": 568,
+        "right": 948,
+        "display": "flex"
+      },
+      "navigation": {
+        "x": 0,
+        "width": 0,
+        "right": 0,
+        "display": "none"
+      }
+    },
+    {
+      "label": "document-open-resized-to320",
+      "viewport": 1280,
+      "documentWidth": 1280,
+      "tree": {
+        "x": 0,
+        "width": 0,
+        "right": 0,
+        "display": "none"
+      },
+      "document": {
+        "x": 12,
+        "width": 296,
+        "right": 308,
+        "display": "flex"
+      },
+      "navigation": {
+        "x": 12,
+        "width": 296,
+        "right": 308,
+        "display": "flex"
+      }
+    },
+    {
+      "label": "files-open-wide-then-narrow",
+      "viewport": 1280,
+      "documentWidth": 1280,
+      "tree": {
+        "x": 12,
+        "width": 296,
+        "right": 308,
+        "display": "flex"
+      },
+      "document": {
+        "x": 0,
+        "width": 0,
+        "right": 0,
+        "display": "none"
+      },
+      "navigation": {
+        "x": 12,
+        "width": 296,
+        "right": 308,
+        "display": "flex"
+      }
+    },
+    {
+      "label": "390viewport-document",
+      "viewport": 390,
+      "documentWidth": 390,
+      "tree": {
+        "x": 0,
+        "width": 0,
+        "right": 0,
+        "display": "none"
+      },
+      "document": {
+        "x": 12,
+        "width": 366,
+        "right": 378,
+        "display": "flex"
+      },
+      "navigation": {
+        "x": 12,
+        "width": 366,
+        "right": 378,
+        "display": "flex"
+      }
+    }
+  ],
+  "keyboardFilesFocus": true,
+  "editorRemainsMounted": true,
+  "savedReopened": true,
+  "passed": true
+}

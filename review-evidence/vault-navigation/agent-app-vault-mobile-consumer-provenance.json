@@ -1,0 +1,9 @@
+{
+  "appSource": "091d96d52cb58c687827733a4c8e2d5d58a36654",
+  "tarball": "/home/drew/.local/state/fleet/recovery/session-recovery-20260926/agent-app-vault-mobile-artifacts/tangle-network-agent-app-0.49.28.tgz",
+  "sha256": "c23071c7874f714ba609d1fabb94733235f96b4d8947ada4e27b33d6f53df423",
+  "gtmSource": "eb3ba54ec69ae9e70114a49442ef4cc66a8d1013",
+  "gtmDependenciesSource": "0d7f384d220e562a847d6dfe0765d99f2f30b520",
+  "cssSource": "ab8a70119ae053f37273cd07927f5807bc4f7933",
+  "boundary": "Candidate-only local package pin; no publication or production signoff claim"
+}
