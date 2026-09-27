@@ -48,7 +48,7 @@ describe('hosted agent on Hub lines', () => {
     expect(attached).toMatchObject({
       number: 'ln_braid', mode: 'shared', unknownSenders: 'guest',
       members: [{ address: OWNER, role: 'owner' }],
-      roles: { owner: { context: 'own', tools: 'act' }, guest: { context: 'own', tools: 'act' } },
+      roles: { owner: { context: 'own', tools: 'act' }, guest: { context: 'own', tools: 'chat' } },
       limits: { turnsPerMemberPerDay: 30 },
       instance: { keyPrefix: 'hosted:', create: {
         resources: { cpuCores: 2, memoryMB: 2048, diskGB: 2 },
@@ -60,8 +60,7 @@ describe('hosted agent on Hub lines', () => {
     expect(attached.respond.kind).toBe('agent')
     expect(profile.model.default).toBe(DEFAULT_HOSTED_MODEL)
     expect(Object.keys(profile.tools)).toEqual([...CONVERSATION_TOOLS_OFF])
-    // A general hosted assistant keeps its shell inside its own strict-egress box.
-    expect(profile.permissions.bash).toBeUndefined()
+    expect(profile.permissions.bash).toBe('deny')
     expect(platform.enableVoice).not.toHaveBeenCalled()
   })
 
@@ -83,16 +82,27 @@ describe('hosted agent on Hub lines', () => {
     expect(backend.profile.permissions).toBeUndefined()
   })
 
-  it('seeds the default home under the app profile, and an app file replaces the platform file at its path', async () => {
-    const agents = { path: 'AGENTS.md', resource: { kind: 'inline' as const, name: 'app-agents', content: 'app' } }
-    await createHostedAgent({ apiKey: 'sk-tan-test', owner: OWNER, profile: { resources: { files: [agents] } } }).attachLine('hubconn_braid')
-
-    const files = platform.attach.mock.calls[0]![0].respond.backend.profile.resources.files as Array<{ path: string; resource: { name: string } }>
-    expect(files.map(file => file.path).sort()).toEqual(['AGENTS.md', 'BOOTSTRAP.md', 'IDENTITY.md', 'MEMORY.md', 'SOUL.md', 'USER.md'])
-    expect(files.find(file => file.path === 'AGENTS.md')!.resource.name).toBe('app-agents')
+  it('needs the owner as an E.164 number or email', () => {
+    expect(() => createHostedAgent({ apiKey: 'sk-tan-test', profile: {}, owner: '555-0100' })).toThrow(/E\.164/)
   })
 
-  it('needs the owner as an E.164 number', () => {
-    expect(() => createHostedAgent({ apiKey: 'sk-tan-test', profile: {}, owner: '555-0100' })).toThrow(/E\.164/)
+  it('attaches a WhatsApp number through its Linq phone number id', async () => {
+    await braid().attachLine('hubconn_linq', { transport: 'whatsapp', phoneNumberId: 'pn_1' })
+    expect(platform.fromConnection).toHaveBeenCalledWith({ connectionId: 'hubconn_linq', transport: 'whatsapp', phoneNumberId: 'pn_1', clientReference: 'hosted-agent' })
+  })
+
+  it('refuses a request Hub would refuse before creating or attaching a line', async () => {
+    const voice = { ph0nyConnectionId: 'hubconn_phony_1', ph0nyAgentId: 'agent_1' }
+    await expect(braid().attachLine('hubconn_linq', { transport: 'whatsapp', phoneNumberId: 'pn_1', voice })).rejects.toThrow(/iMessage/)
+    await expect(braid().attachLine('hubconn_linq', { transport: 'whatsapp' })).rejects.toThrow(/phoneNumberId/)
+    await expect(braid().attachLine('hubconn_mail', { transport: 'email' })).rejects.toThrow(/email owner/)
+    expect(platform.fromConnection).not.toHaveBeenCalled()
+    expect(platform.attach).not.toHaveBeenCalled()
+  })
+
+  it('admits only the owner on a personal line', async () => {
+    await braid().attachLine('hubconn_braid', { mode: 'personal' })
+    expect(platform.attach.mock.calls[0]![0]).toMatchObject({ mode: 'personal', unknownSenders: 'reject', roles: { owner: { context: 'own', tools: 'act' } } })
+    expect(platform.attach.mock.calls[0]![0].roles.guest).toBeUndefined()
   })
 })

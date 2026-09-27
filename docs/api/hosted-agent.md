@@ -4,7 +4,7 @@
 
 Source: `src/hosted-agent/index.ts`
 
-19 exports.
+23 exports.
 
 ### `AgentHomeWorkflow`
 
@@ -24,7 +24,7 @@ interface AgentHomeWorkflowOptions
 
 ### `agentHomeWorkflows`
 
-`function` — Definitions only.
+`function` — Platform owns timing, admission, approvals, persistence and DM delivery.
 
 ```ts
 (options: AgentHomeWorkflowOptions) => AgentHomeWorkflow[]
@@ -48,10 +48,10 @@ interface BoxPolicy
 
 ### `CONVERSATION_TOOLS_OFF`
 
-`const` — Harness orchestration tools a general hosted assistant does not need by default.
+`const` — Legacy conversation defaults only.
 
 ```ts
-readonly ["task", "todowrite"]
+readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 ```
 
 ### `createHostedAgent`
@@ -59,7 +59,7 @@ readonly ["task", "todowrite"]
 `function`
 
 ```ts
-(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { voice?: LineVoiceOptions | undefined; }):…
+(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { transport?: "email" | "imessage" | "whats…
 ```
 
 ### `createTangleAgent`
@@ -70,20 +70,44 @@ readonly ["task", "todowrite"]
 (options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: LineVoiceOptions | undefined) => Promis…
 ```
 
+### `DEFAULT_AGENT_HOME`
+
+`const`
+
+```ts
+"/var/lib/tangle-agent/home"
+```
+
 ### `DEFAULT_BOX_POLICY`
 
-`const` — Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the platform's hourly floor.
+`const`
 
 ```ts
 BoxPolicy
 ```
 
+### `DEFAULT_HOME_LIMITS`
+
+`const` — Unicode code-point budgets.
+
+```ts
+{ readonly 'AGENTS.md': 12000; readonly 'SOUL.md': 8000; readonly 'IDENTITY.md': 4000; readonly 'USER.md': 4000; readon…
+```
+
 ### `DEFAULT_HOSTED_MODEL`
 
-`const` — The model for a profile without `model.default`.
+`const`
 
 ```ts
 "openai/gpt-5.6-luna"
+```
+
+### `defaultHomeFiles`
+
+`function` — Canonical seed records.
+
+```ts
+() => AgentProfileFileMount[]
 ```
 
 ### `GENERAL_AGENT_MODEL`
@@ -128,7 +152,7 @@ type HostedAgent
 
 ### `HostedAgentConfig`
 
-`interface` — A hosted agent: people text or call a line, and each person is answered from their own isolated sandbox.
+`interface` — The existing public conversation kit.
 
 ```ts
 interface HostedAgentConfig
@@ -144,7 +168,7 @@ class HostedAgentError
 
 ### `PERSON_KEY_PREFIX`
 
-`const` — Each person's box is the developer's named instance with this prefix.
+`const`
 
 ```ts
 "hosted:"
@@ -156,4 +180,12 @@ class HostedAgentError
 
 ```ts
 interface TangleAgentOptions
+```
+
+### `withDefaultAgentHome`
+
+`function` — Compose home instructions, not per-turn writes to persistent memory.
+
+```ts
+(profile: AgentProfile) => AgentProfile
 ```

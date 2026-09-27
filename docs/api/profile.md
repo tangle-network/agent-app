@@ -120,7 +120,7 @@ interface CorpusLoadResult
 
 ### `defaultHomeFiles`
 
-`function`
+`function` — Canonical seed records.
 
 ```ts
 () => AgentProfileFileMount[]
@@ -384,7 +384,7 @@ interface UserSkill
 
 ### `withDefaultAgentHome`
 
-`function` — Compose the general Tangle assistant home under an app profile.
+`function` — Compose home instructions, not per-turn writes to persistent memory.
 
 ```ts
 (profile: AgentProfile) => AgentProfile

@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.49.23",
+  "version": "0.49.26",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -212,6 +212,11 @@
       "types": "./dist/integrations/index.d.ts",
       "import": "./dist/integrations/index.js",
       "default": "./dist/integrations/index.js"
+    },
+    "./channels": {
+      "types": "./dist/channels/index.d.ts",
+      "import": "./dist/channels/index.js",
+      "default": "./dist/channels/index.js"
     },
     "./hosted-agent": {
       "types": "./dist/hosted-agent/index.d.ts",
@@ -541,14 +546,15 @@
     "@storybook/react-vite": "^10.5.10",
     "@tailwindcss/postcss": "^4.3.3",
     "@tangle-network/agent-docs": "0.2.1",
-    "@tangle-network/agent-eval": "0.190.1",
+    "@tangle-network/agent-eval": "0.193.2",
     "@tangle-network/agent-gateway": "0.11.4",
     "@tangle-network/agent-integrations": "0.55.0",
     "@tangle-network/agent-interface": "2.12.0",
-    "@tangle-network/agent-knowledge": "17.1.5",
+    "@tangle-network/agent-knowledge": "^17.1.6",
     "@tangle-network/agent-profile-materialize": "0.20.1",
-    "@tangle-network/agent-runtime": "0.274.0",
+    "@tangle-network/agent-runtime": "0.277.0",
     "@tangle-network/brand": "1.5.0",
+    "@tangle-network/hub-sdk": "^0.19.1",
     "@tangle-network/sandbox": "0.53.0",
     "@tangle-network/sandbox-ui": "0.113.3",
     "@tangle-network/ui": "11.9.0",
@@ -600,7 +606,6 @@
     "yjs": "^13.6.32",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@tangle-network/browser-agent-driver": "^0.36.1",
-    "@tangle-network/hub-sdk": "^0.19.1",
     "@tangle-network/tcloud": "^0.5.2",
     "playwright": "^1.63.0",
     "@anthropic-ai/sdk": "^0.93.0",
@@ -610,13 +615,14 @@
   "peerDependencies": {
     "@firecrawl/pdf-inspector-wasm": ">=0.1.3",
     "@huggingface/transformers": ">=3",
-    "@tangle-network/agent-eval": ">=0.185.0 <0.191.0",
+    "@tangle-network/agent-eval": ">=0.185.0 <0.198.0",
     "@tangle-network/agent-integrations": ">=0.54.2 <0.57.0",
     "@tangle-network/agent-interface": "^2.11.0",
     "@tangle-network/agent-knowledge": "^17.1.2",
     "@tangle-network/agent-profile-materialize": ">=0.20.1 <0.21.0",
-    "@tangle-network/agent-runtime": ">=0.262.0 <0.275.0",
+    "@tangle-network/agent-runtime": ">=0.262.0 <0.278.0",
     "@tangle-network/brand": ">=1.5.0",
+    "@tangle-network/hub-sdk": "^0.19.1",
     "@tangle-network/sandbox": ">=0.45.0 <0.48.0 || ^0.49.0 || ^0.50.0 || ^0.51.0 || ^0.52.0 || ^0.53.0 || ^0.54.0 || ^0.55.0 || ^0.56.0",
     "@tangle-network/sandbox-ui": ">=0.113.3 <0.114.0",
     "@tangle-network/ui": ">=11.6.0 <12.0.0",
@@ -639,7 +645,6 @@
     "resend": ">=6",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@tangle-network/browser-agent-driver": "^0.36.1",
-    "@tangle-network/hub-sdk": "^0.19.1",
     "@tangle-network/tcloud": "^0.5.2",
     "playwright": "^1.63.0"
   },
@@ -722,13 +727,13 @@
     "react-dom": {
       "optional": true
     },
+    "@tangle-network/hub-sdk": {
+      "optional": true
+    },
     "@modelcontextprotocol/sdk": {
       "optional": true
     },
     "@tangle-network/browser-agent-driver": {
-      "optional": true
-    },
-    "@tangle-network/hub-sdk": {
       "optional": true
     },
     "@tangle-network/tcloud": {
