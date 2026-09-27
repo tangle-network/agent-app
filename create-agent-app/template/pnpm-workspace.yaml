@@ -12,6 +12,10 @@ minimumReleaseAgeExclude:
 
 overrides:
   zod: 4.4.3
+  # This template pins Interface 2.12. The reviewed materializer in the kit
+  # lockfile is 0.20.1; 0.20.3 requires Interface 2.13 and breaks a fresh
+  # strict-peer install through Knowledge's floating dependency.
+  '@tangle-network/agent-profile-materialize': 0.20.1
 
 allowBuilds:
   '@ax-llm/ax': false
