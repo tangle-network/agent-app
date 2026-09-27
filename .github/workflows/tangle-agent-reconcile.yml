@@ -1,0 +1,35 @@
+name: Tangle agent source reconciliation
+on:
+  push:
+    branches: [feat/default-agent-home]
+    paths: [.github/workflows/tangle-agent-reconcile.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Capture three-way merge inputs without changing source
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/reconcile"
+          mkdir -p "$out"
+          head=$(git rev-parse HEAD)
+          main=$(git rev-parse refs/remotes/origin/main)
+          base=$(git merge-base "$head" "$main")
+          printf '%s\n' "$head" > "$out/HEAD"
+          printf '%s\n' "$main" > "$out/MAIN"
+          printf '%s\n' "$base" > "$out/BASE"
+          git archive "$head" > "$out/head.tar"
+          git archive "$main" > "$out/main.tar"
+          git archive "$base" > "$out/base.tar"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: agent-reconcile-${{ github.sha }}
+          path: ${{ runner.temp }}/reconcile/
+          retention-days: 1
+          if-no-files-found: error
