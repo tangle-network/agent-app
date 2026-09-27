@@ -50,6 +50,9 @@ jobs:
           test -f "$package_file"
           sha256sum "$package_file" > evidence/package-sha256.txt
           printf '{"name":"gtr-app-consumer","private":true,"type":"module"}\n' > "$RUNNER_TEMP/app-consumer/package.json"
+          # Match the repository's existing explicit refusal of optional SSH native builds.
+          # Do not turn off peer validation or silently permit dependency scripts.
+          printf 'allowBuilds:\n  cpu-features: false\n  ssh2: false\n' > "$RUNNER_TEMP/app-consumer/pnpm-workspace.yaml"
           cp scripts/prove-published-hub.mjs "$RUNNER_TEMP/app-consumer/"
           cd "$RUNNER_TEMP/app-consumer"
           pnpm add "$package_file" @tangle-network/hub-sdk@0.19.2 @tangle-network/agent-integrations@0.55.0 2>&1 | tee "$repo/evidence/consumer-install.log"
@@ -63,6 +66,7 @@ jobs:
           console.log(JSON.stringify({ installedEntrypoints: true, liveRequestRun: false }));
           JS
           cp pnpm-lock.yaml "$repo/evidence/consumer-lock.yaml"
+          cp pnpm-workspace.yaml "$repo/evidence/consumer-build-policy.yaml"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:

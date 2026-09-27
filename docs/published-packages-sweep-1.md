@@ -9,6 +9,8 @@ Migration: `650b485ee7dab1bb816ea083b3c73e8ab4828cf8`.
 
 [The migration execution](https://github.com/tangle-network/agent-app/actions/runs/36299740338) passed frozen installation and the real `tsup && tsc -p tsconfig.build.json` build. Its artifact's `commit.txt` identifies the built commit. The bootstrap job committed the migration before building, so its initial checkout SHA is different. The bootstrap workflow is deleted from the final tree. The retained proof workflow is read-only.
 
+The first isolated consumer install exposed pnpm's dependency-script approval gate for `cpu-features` and `ssh2`. The consumer recipe now explicitly refuses those optional native builds, matching this repository's existing `pnpm-workspace.yaml`. It does not disable peer validation or automatically approve dependency scripts. The retained workflow runs the same packed consumer install and checks the installed entrypoints.
+
 No real Hub action or consuming application's main user flow was run by the author. Those acceptance results are operator-pending. A successful library build is not a live-flow pass.
 
 ## Inventory and boundaries
@@ -80,6 +82,7 @@ package_file=$(node -p "require('node:path').resolve('.gtr-private/tangle-networ
 test -f "$package_file"
 consumer=$(mktemp -d)
 printf '{"name":"gtr-app-consumer","private":true,"type":"module"}\n' > "$consumer/package.json"
+printf 'allowBuilds:\n  cpu-features: false\n  ssh2: false\n' > "$consumer/pnpm-workspace.yaml"
 cp scripts/prove-published-hub.mjs "$consumer/"
 cd "$consumer"
 pnpm add "$package_file" @tangle-network/hub-sdk@0.19.2 @tangle-network/agent-integrations@0.55.0 \
