@@ -1,13 +1,19 @@
 /**
- * Application wiring for Hub integration invocation.
- * Agent Integrations owns catalog names. Hub SDK owns the HTTP protocol,
- * bearer authentication, envelope validation and credential redaction.
- * Products supply their user-key resolver and domain catalog.
+ * Integration-hub WIRING — the agent→hub invocation path every Tangle agent app
+ * forks. The integration ENGINE (catalog, connectors, OAuth, policy) is
+ * `@tangle-network/agent-integrations` (a peer dependency); this module is the
+ * thin app-side wiring on top: a typed client over the platform hub's
+ * `POST /v1/hub/exec`, MCP-tool-name → hub-action-path resolution, and the
+ * per-turn invoke flow the `integration_invoke` tool calls.
+ *
+ * The product supplies its own catalog (which connectors it uses) and its own
+ * per-user api-key resolver (the `apiKeyResolver` seam) — this module owns
+ * neither credentials nor the action catalog.
  */
 import { parseIntegrationToolName } from '@tangle-network/agent-integrations/catalog'
 import { HubClient, HubSdkError } from '@tangle-network/hub-sdk'
 
-/** Error codes returned by Hub execution. */
+/** `{ success: false }` codes the hub returns on `/exec`. */
 export type HubExecErrorCode =
   | 'HUB_APPROVAL_REQUIRED'
   | 'HUB_POLICY_DENIED'
@@ -17,29 +23,39 @@ export type HubExecErrorCode =
   | 'HUB_NOT_FOUND'
   | string
 
-/** Callers must inspect succeeded before reading result. */
+/** Outcome of a hub `/exec` call. Callers MUST inspect `succeeded` before
+ *  reading `result` — a denied or approval-gated write resolves with
+ *  `succeeded: false` and a populated `code`, never a thrown silent failure. */
 export type HubExecResult =
   | { succeeded: true; result: unknown }
   | { succeeded: false; code: HubExecErrorCode; message: string; approval?: unknown }
 
-/** Configuration for the compatibility Hub execution facade. */
+/** Define configuration options for initializing a Hub execution client */
 export interface HubExecClientOptions {
+  /** Platform base URL (e.g. `TANGLE_PLATFORM_URL`). */
   baseUrl: string
-  /** The calling user's Hub principal bearer. */
+  /** Calling user's Tangle API key — the hub principal bearer. */
   bearer: string
+  /** Test seam. Defaults to global `fetch`. */
   fetchImpl?: typeof fetch
 }
 
-/** A resolved integration catalog action. */
+/** The provider/connector/action a hub action path addresses, plus the dotted
+ *  `path` the hub `/exec` endpoint expects. */
 export interface ParsedIntegrationAction {
   providerId: string
   connectorId: string
   actionId: string
-  /** provider.connector.action */
+  /** `provider.connector.action`. */
   path: string
 }
 
-/** Resolve a catalog MCP tool name without claiming non-integration tools. */
+/**
+ * Resolve an MCP tool name (the opaque `int_…` catalog name the agent calls)
+ * into the dotted hub action path. Returns `undefined` when the name is not a
+ * catalog integration tool, so the chat loop routes non-integration calls
+ * elsewhere instead of misrouting them to the hub.
+ */
 export function resolveIntegrationAction(toolName: string): ParsedIntegrationAction | undefined {
   let parsed: { providerId: string; connectorId: string; actionId: string }
   try {
@@ -51,27 +67,23 @@ export function resolveIntegrationAction(toolName: string): ParsedIntegrationAct
   return { ...parsed, path: `${parsed.providerId}.${parsed.connectorId}.${parsed.actionId}` }
 }
 
-/** Compatibility facade over the published Hub SDK. Policy refusals remain
- * values so existing approval UIs do not change. Transport failures still
- * throw, as they did before the migration. */
+/** Typed client over the platform hub `/v1/hub/exec`. The hub holds the user's
+ *  credentials, resolves the connection from the bearer principal, evaluates
+ *  per-action policy (read → allow, write/destructive → approval), and runs the
+ *  action server-side. Never throws on a policy block — a gated write is a
+ *  normal `succeeded: false` outcome. */
 export class HubExecClient {
   private readonly hub: HubClient
 
   constructor(options: HubExecClientOptions) {
     if (!options.baseUrl) throw new Error('HubExecClient: baseUrl is required')
     if (!options.bearer) throw new Error('HubExecClient: bearer is required')
-    this.hub = new HubClient({
-      baseUrl: options.baseUrl,
-      apiKey: options.bearer,
-      fetch: options.fetchImpl,
-    })
+    this.hub = new HubClient({ baseUrl: options.baseUrl, apiKey: options.bearer, fetch: options.fetchImpl })
   }
 
   async exec(input: { path: string; actionInput?: unknown; connectionId?: string }): Promise<HubExecResult> {
     try {
-      const response = await this.hub.tools.invoke(input.path, input.actionInput, {
-        connectionId: input.connectionId,
-      })
+      const response = await this.hub.tools.invoke(input.path, input.actionInput, { connectionId: input.connectionId })
       return { succeeded: true, result: response.result }
     } catch (error) {
       if (!(error instanceof HubSdkError)) throw error
@@ -83,27 +95,36 @@ export class HubExecClient {
   }
 }
 
-/** Input for the application integration-invoke route. */
+/** Define input parameters for invoking a hub tool with user ID, tool name, and optional arguments */
 export interface HubInvokeInput {
   userId: string
+  /** The MCP tool name the agent called (`int_<provider>_<connector>_<action>`). */
   toolName: string
   args?: Record<string, unknown>
 }
-/** Application HTTP outcome, including approval-required responses. */
+/** Describe the outcome of a hub invocation including status and response body */
 export interface HubInvokeOutcome {
   status: number
   body: Record<string, unknown>
 }
-/** User authority is resolved on the server, never from model arguments. */
+/** Define dependencies for invoking hub operations including API key resolution and optional configuration */
 export interface HubInvokeDeps {
+  /** Resolve the user's Tangle API key (the hub principal bearer). Required —
+   *  the product binds its own session-key resolver. Null → user not linked. */
   apiKeyResolver: (userId: string) => Promise<string | null>
+  /** Platform base URL. Defaults to `env.TANGLE_PLATFORM_URL`. */
   baseUrl?: string
   fetchImpl?: typeof fetch
   env?: Record<string, string | undefined>
 }
 
-/** Resolve the user's key, invoke the published Hub client, and preserve the
- * application's existing 200/400/401/409/502 response contract. */
+/**
+ * Resolve + execute one integration tool call through the hub: resolve the
+ * per-user bearer, map the MCP tool name to the hub action path, forward to
+ * `/v1/hub/exec`, and shape the route response (200 ok / 401 not-linked /
+ * 400 unknown-tool / 409 approval-required / 502 hub-error). A write that's
+ * approval-gated surfaces verbatim as 409, never silently executed.
+ */
 export async function invokeIntegrationHub(input: HubInvokeInput, deps: HubInvokeDeps): Promise<HubInvokeOutcome> {
   const env = deps.env ?? (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
   const baseUrl = deps.baseUrl ?? env.TANGLE_PLATFORM_URL?.trim()
@@ -113,7 +134,7 @@ export async function invokeIntegrationHub(input: HubInvokeInput, deps: HubInvok
   if (!action) return { status: 400, body: { error: `Unsupported integration tool: ${input.toolName}` } }
 
   const bearer = await deps.apiKeyResolver(input.userId)
-  if (!bearer) return { status: 401, body: { error: 'Tangle account not linked: connect integrations from the app first' } }
+  if (!bearer) return { status: 401, body: { error: 'Tangle account not linked — connect integrations from the app first' } }
 
   const client = new HubExecClient({ baseUrl, bearer, fetchImpl: deps.fetchImpl })
   const outcome = await client.exec({ path: action.path, actionInput: input.args ?? {} })
