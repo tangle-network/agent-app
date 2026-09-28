@@ -93,7 +93,7 @@
 .tangle-lines__billing > div { border-bottom: 1px solid var(--tl-border); display: grid; gap: .1rem 1rem; grid-template-columns: 9rem minmax(0, 1fr); padding: .85rem 0; }
 .tangle-lines__billing dt { color: var(--tl-muted); font-size: .85rem; }
 .tangle-lines__billing dd { font-size: .91rem; font-weight: 600; margin: 0; }
-.tangle-lines__billing p { color: var(--tl-muted); font-size: .81rem; grid-column: 2; }
+.tangle-lines__billing dd.tangle-lines__billing-detail { color: var(--tl-muted); font-size: .81rem; font-weight: 400; grid-column: 2; }
 
 @media (max-width: 600px) {
   .tangle-lines__heading { align-items: start; }
@@ -102,5 +102,5 @@
   .tangle-lines__confirm { justify-content: flex-start; }
   .tangle-lines__fields { grid-template-columns: 1fr; }
   .tangle-lines__billing > div { grid-template-columns: 1fr; }
-  .tangle-lines__billing p { grid-column: 1; }
+  .tangle-lines__billing dd.tangle-lines__billing-detail { grid-column: 1; }
 }

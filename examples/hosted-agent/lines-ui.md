@@ -30,10 +30,12 @@ A dedicated number uses its existing owned connection.
 This UI does not order or buy a number.
 
 `LineMembers` uses the line attachment's role map.
+Pass a `scopeKey` that changes with the authenticated viewer or workspace.
 For a one-member product, pass `maxMembers={1}` and `allowRemoveLastOwner` only when the server permits freeing the line.
 If owner enrollment differs from a normal invitation, set `canAdd={false}` and keep that enrollment in a verified product action.
 Hub marks a newly invited address as `invited` until its first message; STOP changes the state to `stopped`.
 The member must send START to resume replies.
+The server must enforce member caps and last-owner rules because another client can change membership between reads.
 
 `LineBilling` displays the payer and daily allowance supplied by the server.
 Set `linePayer.kind` or `turnPayer.kind` to `unverified` when the billed identity cannot be confirmed.

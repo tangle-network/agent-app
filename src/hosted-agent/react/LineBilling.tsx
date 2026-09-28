@@ -15,19 +15,19 @@ export function LineBilling({ view }: LineBillingProps) {
       <div>
         <dt>Line</dt>
         <dd>{view.linePayer.kind === 'workspace' ? view.linePayer.label : 'Payer not verified'}</dd>
-        {view.linePayer.kind === 'workspace' && <p>Charged to {view.workspaceName}.</p>}
+        {view.linePayer.kind === 'workspace' && <dd className="tangle-lines__billing-detail">Charged to {view.workspaceName}.</dd>}
       </div>
       <div>
         <dt>Agent turns</dt>
         <dd>{view.turnPayer.kind === 'unverified' ? 'Payer not verified' : view.turnPayer.label}</dd>
-        {view.turnPayer.kind === 'member' && <p>Each member pays for their own admitted turns.</p>}
+        {view.turnPayer.kind === 'member' && <dd className="tangle-lines__billing-detail">Each member pays for their own admitted turns.</dd>}
       </div>
       <div>
         <dt>Allowance</dt>
         {view.allowance ? <>
           <dd>{view.allowance.turnsPerMemberPerDay} turns per member each day</dd>
           {view.allowance.used !== undefined && view.allowance.limit !== undefined &&
-            <p>{view.allowance.used} of {view.allowance.limit} turns used{view.allowance.resetsAt ? ` · resets ${resetTime(view.allowance.resetsAt)}` : ''}</p>}
+            <dd className="tangle-lines__billing-detail">{view.allowance.used} of {view.allowance.limit} turns used{view.allowance.resetsAt ? ` · resets ${resetTime(view.allowance.resetsAt)}` : ''}</dd>}
         </> : <dd>No allowance reported</dd>}
       </div>
     </dl>

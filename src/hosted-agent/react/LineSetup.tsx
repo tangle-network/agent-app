@@ -36,7 +36,13 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   const clientRef = useRef(client)
   clientRef.current = client
   const sequence = useRef(0)
-  const [snapshot, setSnapshot] = useState<LineSetupSnapshot | null>(null)
+  const currentScope = useRef(scopeKey)
+  const currentTarget = useRef(initialTargetId)
+  const confirmButton = useRef<HTMLButtonElement>(null)
+  currentScope.current = scopeKey
+  currentTarget.current = initialTargetId
+  const [loadedSnapshot, setLoadedSnapshot] = useState<{ scopeKey: string; initialTargetId: string | undefined; value: LineSetupSnapshot } | null>(null)
+  const snapshot = loadedSnapshot?.scopeKey === scopeKey && loadedSnapshot.initialTargetId === initialTargetId ? loadedSnapshot.value : null
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,19 +53,23 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   const [phoneNumberId, setPhoneNumberId] = useState('')
   const [confirmLineId, setConfirmLineId] = useState<string | null>(null)
 
+  function stillCurrent(): boolean {
+    return currentScope.current === scopeKey && currentTarget.current === initialTargetId
+  }
+
   async function reload(): Promise<LineSetupSnapshot | null> {
     const request = ++sequence.current
     try {
       const next = await clientRef.current.load()
-      if (request !== sequence.current) return null
-      setSnapshot(next)
+      if (request !== sequence.current || !stillCurrent()) return null
+      setLoadedSnapshot({ scopeKey, initialTargetId, value: next })
       setError(null)
       setTargetId(current => next.targets.some(target => target.id === current)
         ? current : next.targets.find(target => target.id === initialTargetId)?.id ?? next.targets[0]?.id ?? '')
       setLoading(false)
       return next
     } catch (cause) {
-      if (request !== sequence.current) return null
+      if (request !== sequence.current || !stillCurrent()) return null
       setError(message(cause))
       setLoading(false)
       return null
@@ -68,12 +78,22 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
 
   useEffect(() => {
     setLoading(true)
-    setSnapshot(null)
+    setLoadedSnapshot(null)
     setError(null)
+    setBusy(false)
+    setKind('handle')
+    setChoiceKey('')
     setTargetId(initialTargetId ?? '')
+    setBoxMode('per-member')
+    setPhoneNumberId('')
+    setConfirmLineId(null)
     void reload()
     return () => { sequence.current++ }
   }, [scopeKey, initialTargetId])
+
+  useEffect(() => {
+    if (confirmLineId) confirmButton.current?.focus()
+  }, [confirmLineId])
 
   const allChoices = snapshot ? choicesFor(snapshot) : []
   const choices = snapshot ? allChoices.filter(choice => !snapshot.lines.some(line =>
@@ -100,7 +120,9 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
         targetId: selectedTarget.id,
         boxMode: selectedMode,
       })
+      if (!stillCurrent()) return
       const updated = await reload()
+      if (!stillCurrent()) return
       if (!updated) {
         onNotice?.({ kind: 'error', message: 'Line connected, but its current status could not be loaded.' })
         return
@@ -108,11 +130,12 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
       const line = updated.lines.find(item => item.connectionId === selected.connection.id && item.transport === selected.identity.transport)
       onNotice?.({ kind: 'success', message: line?.answering ? 'The line is answering.' : 'Line connected. Add a member to start answers.' })
     } catch (cause) {
+      if (!stillCurrent()) return
       const detail = message(cause)
       setError(detail)
       onNotice?.({ kind: 'error', message: detail })
     } finally {
-      setBusy(false)
+      if (stillCurrent()) setBusy(false)
     }
   }
 
@@ -122,17 +145,20 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
     setError(null)
     try {
       await clientRef.current.disconnect(lineId)
+      if (!stillCurrent()) return
       setConfirmLineId(null)
       const updated = await reload()
+      if (!stillCurrent()) return
       onNotice?.(updated
         ? { kind: 'success', message: 'The line stopped answering.' }
         : { kind: 'error', message: 'Line disconnected, but its current status could not be loaded.' })
     } catch (cause) {
+      if (!stillCurrent()) return
       const detail = message(cause)
       setError(detail)
       onNotice?.({ kind: 'error', message: detail })
     } finally {
-      setBusy(false)
+      if (stillCurrent()) setBusy(false)
     }
   }
 
@@ -166,9 +192,9 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
                 : <p>{line.lastTurn.kind === 'none' ? 'No turns yet.' : 'Turn history unavailable.'}</p>}
             </div>
             {canManage && line.canDisconnect && line.targetId !== null && line.status === 'active' && <div className="tangle-lines__row-actions">
-              {confirmLineId === line.id ? <div className="tangle-lines__confirm">
+              {confirmLineId === line.id ? <div className="tangle-lines__confirm" role="group" aria-label={`Disconnect ${line.address}?`}>
                 <span>Disconnect this line?</span>
-                <button type="button" className="tangle-lines__danger" disabled={busy} onClick={() => void disconnect(line.id)}>Disconnect</button>
+                <button ref={confirmButton} type="button" className="tangle-lines__danger" disabled={busy} onClick={() => void disconnect(line.id)}>Disconnect</button>
                 <button type="button" disabled={busy} onClick={() => setConfirmLineId(null)}>Keep line</button>
               </div> : <button type="button" className="tangle-lines__quiet" disabled={busy} onClick={() => setConfirmLineId(line.id)}>Disconnect line</button>}
             </div>}

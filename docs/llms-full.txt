@@ -8463,7 +8463,7 @@ interface LineMemberRole
 `function` — Manage Hub line members while keeping consent and STOP authority with the sender.
 
 ```ts
-({ lineId, client, roles, canManage, canAdd, maxMembers, allowRoleChange, allowRemoveLastOwner, onNotice }: LineMembers…
+({ lineId, scopeKey, client, roles, canManage, canAdd, maxMembers, allowRoleChange, allowRemoveLastOwner, onNotice }: L…
 ```
 
 ### `LineMembersClient`

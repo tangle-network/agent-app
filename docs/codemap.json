@@ -6518,7 +6518,7 @@
         {
           "name": "LineMembers",
           "kind": "function",
-          "signature": "({ lineId, client, roles, canManage, canAdd, maxMembers, allowRoleChange, allowRemoveLastOwner, onNotice }: LineMembers…",
+          "signature": "({ lineId, scopeKey, client, roles, canManage, canAdd, maxMembers, allowRoleChange, allowRemoveLastOwner, onNotice }: L…",
           "doc": "Manage Hub line members while keeping consent and STOP authority with the sender."
         },
         {

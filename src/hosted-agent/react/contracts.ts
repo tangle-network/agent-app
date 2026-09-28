@@ -94,6 +94,8 @@ export interface LineMembersClient {
 
 export interface LineMembersProps {
   lineId: string
+  /** Changes when the authenticated viewer or workspace changes. */
+  scopeKey: string
   client: LineMembersClient
   /** The attached line's actual role map, including any chat-only role. */
   roles: readonly LineMemberRole[]

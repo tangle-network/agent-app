@@ -14,71 +14,93 @@ function errorMessage(cause: unknown): string {
 }
 
 /** Manage Hub line members while keeping consent and STOP authority with the sender. */
-export function LineMembers({ lineId, client, roles, canManage, canAdd = true, maxMembers, allowRoleChange = true, allowRemoveLastOwner = false, onNotice }: LineMembersProps) {
+export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd = true, maxMembers, allowRoleChange = true, allowRemoveLastOwner = false, onNotice }: LineMembersProps) {
   const clientRef = useRef(client)
   clientRef.current = client
   const sequence = useRef(0)
-  const [members, setMembers] = useState<LineMember[] | null>(null)
+  const currentLine = useRef(lineId)
+  const currentScope = useRef(scopeKey)
+  const confirmButton = useRef<HTMLButtonElement>(null)
+  currentLine.current = lineId
+  currentScope.current = scopeKey
+  const [memberSnapshot, setMemberSnapshot] = useState<{ lineId: string; scopeKey: string; members: LineMember[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [address, setAddress] = useState('')
   const [label, setLabel] = useState('')
   const [role, setRole] = useState('member')
   const [busy, setBusy] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const members = memberSnapshot?.lineId === lineId && memberSnapshot.scopeKey === scopeKey ? memberSnapshot.members : null
+
+  function stillCurrent(): boolean {
+    return currentLine.current === lineId && currentScope.current === scopeKey
+  }
 
   async function reload(): Promise<boolean> {
     const request = ++sequence.current
     try {
       const next = await clientRef.current.list(lineId)
-      if (request !== sequence.current) return false
-      setMembers(next)
+      if (request !== sequence.current || !stillCurrent()) return false
+      setMemberSnapshot({ lineId, scopeKey, members: next })
       setError(null)
       return true
     } catch (cause) {
-      if (request !== sequence.current) return false
+      if (request !== sequence.current || !stillCurrent()) return false
       setError(errorMessage(cause))
       return false
     }
   }
 
   useEffect(() => {
-    setMembers(null)
+    setMemberSnapshot(null)
     setError(null)
+    setAddress('')
+    setLabel('')
+    setRole('member')
+    setConfirmId(null)
+    setBusy(null)
     void reload()
     return () => { sequence.current++ }
-  }, [lineId])
+  }, [lineId, scopeKey])
+
+  useEffect(() => {
+    if (confirmId) confirmButton.current?.focus()
+  }, [confirmId])
 
   const selectedRole = roles.some(item => item.value === role) ? role : roles.find(item => item.value === 'member')?.value ?? roles[0]?.value ?? ''
   const activeMembers = members?.filter(member => member.status !== 'removed').length ?? 0
   const activeOwners = members?.filter(member => member.role === 'owner' && member.status !== 'removed').length ?? 0
 
-  async function mutate(key: string, action: () => Promise<void>, success: string) {
+  async function mutate(key: string, action: () => Promise<void>, success: string, onSuccess?: () => void) {
     if (busy) return
     setBusy(key)
     setError(null)
     try {
       await action()
+      if (!stillCurrent()) return
+      onSuccess?.()
       const refreshed = await reload()
+      if (!stillCurrent()) return
       onNotice?.(refreshed
         ? { kind: 'success', message: success }
         : { kind: 'error', message: 'Member updated, but the current member list could not be loaded.' })
     } catch (cause) {
+      if (!stillCurrent()) return
       const detail = errorMessage(cause)
       setError(detail)
       onNotice?.({ kind: 'error', message: detail })
     } finally {
-      setBusy(null)
+      if (stillCurrent()) setBusy(null)
     }
   }
 
   function add() {
     const trimmed = address.trim()
-    if (!trimmed || !selectedRole) return
-    void mutate('add', async () => {
-      await clientRef.current.add(lineId, { address: trimmed, role: selectedRole, ...(label.trim() ? { label: label.trim() } : {}) })
+    if (!trimmed || !selectedRole || members === null || (maxMembers !== undefined && activeMembers >= maxMembers)) return
+    void mutate('add', () => clientRef.current.add(lineId, { address: trimmed, role: selectedRole, ...(label.trim() ? { label: label.trim() } : {}) }), 'Member invited. Their first message confirms consent.', () => {
       setAddress('')
       setLabel('')
-    }, 'Member invited. Their first message confirms consent.')
+    })
   }
 
   return <section className="tangle-lines" aria-label="Line members">
@@ -110,9 +132,9 @@ export function LineMembers({ lineId, client, roles, canManage, canAdd = true, m
                   {roles.map(item => <option key={item.value} value={item.value}>{item.label}{item.tools === 'chat' ? ' · chat only' : ''}</option>)}
                 </select>
               </label> : <span className="tangle-lines__role">{roles.find(item => item.value === member.role)?.label ?? member.role}</span>}
-              {confirmId === member.id ? <div className="tangle-lines__confirm">
+              {confirmId === member.id ? <div className="tangle-lines__confirm" role="group" aria-label={`Remove ${member.label || member.address}?`}>
                 <span>Remove {member.label || member.address}?</span>
-                <button type="button" className="tangle-lines__danger" disabled={busy !== null} onClick={() => void mutate(member.id, async () => { await clientRef.current.remove(lineId, member.id); setConfirmId(null) }, 'Member removed.')}>Remove</button>
+                <button ref={confirmButton} type="button" className="tangle-lines__danger" disabled={busy !== null} onClick={() => void mutate(member.id, () => clientRef.current.remove(lineId, member.id), 'Member removed.', () => setConfirmId(null))}>Remove</button>
                 <button type="button" disabled={busy !== null} onClick={() => setConfirmId(null)}>Keep</button>
               </div> : <button type="button" className="tangle-lines__quiet" disabled={busy !== null} onClick={() => setConfirmId(member.id)}>Remove</button>}
             </> : <span className="tangle-lines__role">{roles.find(item => item.value === member.role)?.label ?? member.role}</span>}
@@ -121,7 +143,7 @@ export function LineMembers({ lineId, client, roles, canManage, canAdd = true, m
       })}
     </div>}
 
-    {canManage && canAdd && (maxMembers === undefined || activeMembers < maxMembers) && <div className="tangle-lines__setup">
+    {canManage && canAdd && members !== null && (maxMembers === undefined || activeMembers < maxMembers) && <div className="tangle-lines__setup">
       <h3>Invite a member</h3>
       <p>Hub marks the address as invited. The member confirms by messaging the line.</p>
       <div className="tangle-lines__fields">
