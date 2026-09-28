@@ -40,8 +40,7 @@ describe('invokeIntegrationHub', () => {
     let calls = 0
     const fetchImpl = (async () => { calls++; return jsonResponse(403, { success: false, error: { code: 'HUB_APPROVAL_REQUIRED', message: 'needs approval', details: { approval: { id: 'appr-1' } } } }) }) as unknown as typeof fetch
     const out = await invokeIntegrationHub({ userId: 'u1', toolName: WRITE_TOOL }, { apiKeyResolver: okKey, fetchImpl, env })
-    // The SDK also asks the capability endpoint; it does not grant approval.
-    expect(calls).toBe(2)
+    expect(calls).toBe(1)
     expect(out.status).toBe(409)
     expect(out.body).toMatchObject({ success: false, code: 'HUB_APPROVAL_REQUIRED', approval: { id: 'appr-1' } })
   })
