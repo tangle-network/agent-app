@@ -15152,7 +15152,7 @@ type SandboxRecoveryPhase
 
 ### `SandboxResourceConfig`
 
-`interface` — Define configuration parameters for sandbox resource allocation and lifecycle management
+`interface` — Configure sandbox resources and lifecycle limits.
 
 ```ts
 interface SandboxResourceConfig
@@ -23328,7 +23328,7 @@ type VaultOperationPhase
 
 ### `VaultPane`
 
-`function`
+`function` — Browse and edit files in the available pane width.
 
 ```ts
 (props: VaultPaneProps) => Element
