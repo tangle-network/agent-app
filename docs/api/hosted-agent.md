@@ -4,7 +4,7 @@
 
 Source: `src/hosted-agent/index.ts`
 
-23 exports.
+26 exports.
 
 ### `AgentHomeWorkflow`
 
@@ -48,7 +48,7 @@ interface BoxPolicy
 
 ### `CONVERSATION_TOOLS_OFF`
 
-`const` — Legacy conversation defaults only.
+`const`
 
 ```ts
 readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
@@ -59,7 +59,7 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 `function`
 
 ```ts
-(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { transport?: "email" | "imessage" | "whats…
+(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: HostedAgentLineOptions): Promise<Line>; att…
 ```
 
 ### `createTangleAgent`
@@ -150,9 +150,17 @@ interface GeneralAgentProfileOptions
 type HostedAgent
 ```
 
+### `HostedAgentAttachment`
+
+`type`
+
+```ts
+type HostedAgentAttachment
+```
+
 ### `HostedAgentConfig`
 
-`interface` — The existing public conversation kit.
+`interface` — The public conversation kit.
 
 ```ts
 interface HostedAgentConfig
@@ -166,9 +174,25 @@ interface HostedAgentConfig
 class HostedAgentError
 ```
 
+### `HostedAgentLineOptions`
+
+`interface`
+
+```ts
+interface HostedAgentLineOptions
+```
+
+### `HostedAgentTransport`
+
+`type`
+
+```ts
+type HostedAgentTransport
+```
+
 ### `PERSON_KEY_PREFIX`
 
-`const`
+`const` — Legacy default.
 
 ```ts
 "hosted:"

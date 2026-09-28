@@ -34,8 +34,34 @@ export interface GeneralAgentProfileOptions {
   model?: string
 }
 
+function generalAgentProfile(profile: AgentProfile): AgentProfile {
+  if (Object.hasOwn(profile, 'interactions')) {
+    throw new Error('A general-agent profile cannot override backend permission interactions')
+  }
+  return agentProfileSchema.parse(profile)
+}
+
+function generalAgentBackend(backend: BackendConfig = {}): BackendConfig {
+  if (backend.type !== undefined && backend.type !== 'opencode') {
+    throw new Error('General-agent members require the OpenCode approval backend')
+  }
+  if (backend.interactions?.permission === false) {
+    throw new Error('General-agent members cannot disable permission interactions')
+  }
+  return {
+    ...backend,
+    ...(backend.profile === undefined ? {} : { profile: generalAgentProfile(backend.profile) }),
+    type: 'opencode',
+    interactions: { ...backend.interactions, permission: true },
+  }
+}
+
 /** Uses the published Sandbox Router builder. No provider client or search protocol is reimplemented. */
 export async function buildGeneralAgentProfile(options: GeneralAgentProfileOptions = {}): Promise<AgentProfile> {
+  const preset = generalAgentProfile(options.preset ?? {})
+  if (preset.prompt?.systemPrompt) {
+    throw new Error('A general-agent preset adds prompt.instructions and skills, not a replacement system prompt')
+  }
   const model = options.model ?? GENERAL_AGENT_MODEL
   const search = await fetchTangleRouterSearchConfig({ model, apiKeyEnv: 'TANGLE_API_KEY' })
   const routerProfile = buildTangleRouterSearchProfile(search, { model })
@@ -45,10 +71,6 @@ export async function buildGeneralAgentProfile(options: GeneralAgentProfileOptio
       || new URL(server.url).origin !== 'https://router.tangle.tools') {
       throw new Error('General agent research must use the Tangle Router HTTPS origin')
     }
-  }
-  const preset = agentProfileSchema.parse(options.preset ?? {})
-  if (preset.prompt?.systemPrompt) {
-    throw new Error('A general-agent preset adds prompt.instructions and skills, not a replacement system prompt')
   }
   const skill = defineInlineResource('general-agent', GENERAL_AGENT_SKILL)
   const base: AgentProfile = {
@@ -129,15 +151,15 @@ export function createTangleAgent(options: TangleAgentOptions) {
         throw new Error('Members in one role must use the same named product surface, with separate actor credentials')
       }
       grants[member.role] = grant
-      memberBackends[member.address] = { backend: member.backend }
+      memberBackends[member.address] = { backend: generalAgentBackend(member.backend) }
     } else {
       grants[member.role] = { kind: 'general' }
-      if (member.backend) memberBackends[member.address] = { backend: member.backend }
+      if (member.backend) memberBackends[member.address] = { backend: generalAgentBackend(member.backend) }
     }
   }
   const sandbox = new Sandbox({ apiKey: options.apiKey,
     baseUrl: options.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 30_000 })
-  const backend: BackendConfig = { type: 'opencode', profile: agentProfileSchema.parse(options.profile) }
+  const backend = generalAgentBackend({ profile: options.profile })
   const attachment = {
     mode: 'shared' as const, unknownSenders: 'reject' as const,
     roles,

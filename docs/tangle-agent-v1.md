@@ -13,6 +13,13 @@ Record the reviewed heads with `gh pr view NUMBER --repo tangle-network/REPO --j
 
 No step below was run on Drew's line by this document. CI compilation and an installed Linux ownership proof are not evidence of a deployed Tangle sandbox, provider request or delivered message.
 
+The API and manifest pin OpenCode with `interactions.permission: true` for the default backend and every member override.
+They reject other harnesses, disabled permission interactions, and interaction settings misplaced inside a profile.
+These settings alone do not prove image capability.
+Before execution, ADC must check each actual member instance for `interactions.exactBeforeToolApproval === true`.
+A false, missing, or unavailable flag must refuse execution.
+Keep the general line unused until the admission gate, matching image, and actual engine approval workflow are proved.
+
 ## Build the actual image from registry packages
 
 Use a clean agent-app checkout. Export exact published registry versions and the platform's actual digest-pinned computer-use base image. The base must contain its normal sidecar, Node >=22, Python, Git, sudo, Chromium and virtual display. TANGLE_RUNTIME_USER must name its actual non-root runtime user. Do not put operator keys into build arguments or image layers.

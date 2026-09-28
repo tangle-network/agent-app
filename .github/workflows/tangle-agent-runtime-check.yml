@@ -47,15 +47,35 @@ jobs:
           node --input-type=module <<'JS' 2>&1 | tee verification/runtime.log
           import assert from 'node:assert/strict'
           import { buildGeneralAgent } from './bin/tangle-agent/provision.mjs'
-          const plan = buildGeneralAgent({ version: 1, keyPrefix: 'probe:', environment: 'universal',
+          const manifest = { version: 1, keyPrefix: 'probe:', environment: 'universal',
             imageModel: 'probe-image', videoModel: 'probe-video', chromium: '/usr/bin/chromium',
             members: [{ address: '+15550100001', role: 'owner', label: 'Probe' }],
             lines: [{ id: 'ln_probe', transport: 'imessage' }],
-            heartbeat: { lineId: 'ln_probe', owner: '+15550100001', timezone: 'America/Los_Angeles' } })
+            heartbeat: { lineId: 'ln_probe', owner: '+15550100001', timezone: 'America/Los_Angeles' } }
+          const plan = buildGeneralAgent(manifest)
           assert.equal(plan.attachments[0].instance.create.resources.memoryMB, 4096)
           assert.equal(plan.attachments[0].instance.create.egressPolicy.mode, 'strict')
           assert.equal(plan.attachments[0].respond.rolePolicy.roles.owner.kind, 'general')
+          assert.equal(plan.attachments[0].respond.backend.type, 'opencode')
+          assert.equal(plan.attachments[0].respond.backend.interactions.permission, true)
           assert.equal(plan.attachments[0].unknownSenders, 'reject')
+          assert.throws(() => buildGeneralAgent({ ...manifest,
+            baseProfile: { interactions: { permission: false } } }), /permission interactions/)
+          assert.throws(() => buildGeneralAgent({ ...manifest, members: [{
+            ...manifest.members[0], backend: { type: 'opencode', profile: { name: 'Override' },
+              interactions: { permission: false } },
+          }] }), /interactions|Unrecognized/i)
+          assert.throws(() => buildGeneralAgent({ ...manifest, members: [{
+            ...manifest.members[0], backend: { type: 'codex', profile: { name: 'Override' } },
+          }] }), /opencode/i)
+          assert.throws(() => buildGeneralAgent({ ...manifest, members: [{
+            ...manifest.members[0], backend: { profile: { name: 'Override', interactions: { permission: false } } },
+          }] }), /permission interactions/)
+          const memberPlan = buildGeneralAgent({ ...manifest, members: [{
+            ...manifest.members[0], backend: { profile: { name: 'Owner override' } },
+          }] })
+          assert.equal(memberPlan.attachments[0].respond.rolePolicy.members['+15550100001'].backend.type, 'opencode')
+          assert.equal(memberPlan.attachments[0].respond.rolePolicy.members['+15550100001'].backend.interactions.permission, true)
           assert.equal(plan.workflows.length, 2)
           const heartbeat = JSON.parse(plan.workflows.find(job => job.purpose === 'heartbeat').yaml)
           const nightly = JSON.parse(plan.workflows.find(job => job.purpose === 'consolidation').yaml)

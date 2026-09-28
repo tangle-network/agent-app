@@ -6313,12 +6313,12 @@
           "name": "CONVERSATION_TOOLS_OFF",
           "kind": "const",
           "signature": "readonly [\"bash\", \"glob\", \"grep\", \"task\", \"todowrite\", \"webfetch\", \"skill\"]",
-          "doc": "Legacy conversation defaults only."
+          "doc": null
         },
         {
           "name": "createHostedAgent",
           "kind": "function",
-          "signature": "(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: { transport?: \"email\" | \"imessage\" | \"whats…",
+          "signature": "(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: HostedAgentLineOptions): Promise<Line>; att…",
           "doc": null
         },
         {
@@ -6388,10 +6388,16 @@
           "doc": null
         },
         {
+          "name": "HostedAgentAttachment",
+          "kind": "type",
+          "signature": "type HostedAgentAttachment",
+          "doc": null
+        },
+        {
           "name": "HostedAgentConfig",
           "kind": "interface",
           "signature": "interface HostedAgentConfig",
-          "doc": "The existing public conversation kit."
+          "doc": "The public conversation kit."
         },
         {
           "name": "HostedAgentError",
@@ -6400,10 +6406,22 @@
           "doc": null
         },
         {
+          "name": "HostedAgentLineOptions",
+          "kind": "interface",
+          "signature": "interface HostedAgentLineOptions",
+          "doc": null
+        },
+        {
+          "name": "HostedAgentTransport",
+          "kind": "type",
+          "signature": "type HostedAgentTransport",
+          "doc": null
+        },
+        {
           "name": "PERSON_KEY_PREFIX",
           "kind": "const",
           "signature": "\"hosted:\"",
-          "doc": null
+          "doc": "Legacy default."
         },
         {
           "name": "TangleAgentOptions",

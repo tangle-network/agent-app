@@ -11,8 +11,12 @@ const name = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/)
 const role = z.enum(['owner', 'manager', 'staff', 'vendor', 'finance', 'practitioner'])
 const envKey = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
 const domain = z.string().regex(/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9-]+$/)
-const backend = z.object({ type: z.literal('opencode').optional(),
-  profile: z.record(z.string(), z.unknown()).transform(value => agentProfileSchema.parse(value)) }).strict()
+const protectedProfile = z.record(z.string(), z.unknown()).superRefine((value, context) => {
+  if (Object.hasOwn(value, 'interactions')) context.addIssue({ code: 'custom',
+    message: 'A general-agent profile cannot override backend permission interactions' })
+}).transform(value => agentProfileSchema.parse(value))
+const backend = z.object({ type: z.literal('opencode').optional(), profile: protectedProfile }).strict()
+  .transform(value => ({ ...value, type: 'opencode', interactions: { permission: true } }))
 const configSchema = z.object({
   version: z.literal(1),
   keyPrefix: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:@-]{0,99}$/),
@@ -27,7 +31,7 @@ const configSchema = z.object({
   resources: z.object({ cpuCores: z.number().int().min(2).max(64).default(2),
     memoryMB: z.number().int().min(4096).max(262144).default(4096),
     diskGB: z.number().int().min(10).max(2048).default(20) }).strict().prefault({}),
-  baseProfile: z.record(z.string(), z.unknown()).default({}).transform(value => agentProfileSchema.parse(value)),
+  baseProfile: protectedProfile.prefault({}),
   scopedServers: z.record(z.string(), z.array(name).min(1).max(16)).default({}),
   members: z.array(z.object({ address: z.string().regex(/^\+[1-9]\d{6,14}$/), role,
     label: z.string().min(1).max(60), backend: backend.optional(),
@@ -98,8 +102,9 @@ export function buildGeneralAgent(configInput) {
     profile.prompt.instructions.push(`Voice line ${line.id}: use the connected ph0ny tools with agentId ${ph0nyAgentId} and the operator-attested fromNumber ${outboundFrom}. The enrolled owner destination is ${config.members.find(member => member.role === 'owner').address}. Wait for owner approval and actual consent. The call hook rechecks membership and binds the destination member's role and private workspace. Report the actual call id and connected/completed state, not a submission alone.`)
   }
   agentProfileSchema.parse(profile)
-  const respond = { kind: 'agent', backend: { type: 'opencode', profile },
-    rolePolicy: { version: 1, roles: grants, members } }
+  const respond = { kind: 'agent', backend: {
+    type: 'opencode', profile, interactions: { permission: true },
+  }, rolePolicy: { version: 1, roles: grants, members } }
   const attachments = config.lines.map(line => ({
     number: line.id, mode: 'shared', unknownSenders: 'reject', roles,
     members: config.members.map(({ address, role, label }) => ({ address, role, label })),
@@ -159,5 +164,5 @@ export async function provision(path, apply = false) {
     workflows.push({ purpose: job.purpose, workflow })
   }
   console.log(JSON.stringify({ receipts, workflows,
-    next: 'Owner must text first. Verify the actual runtime UID, protected home, scoped vendor denial and installed tools; then enable the two disabled Hub workflows.' }, null, 2))
+    next: 'Do not use this attachment until ADC checks exact native approval on each member instance and the local allow/deny effect-sink proof passes. Then the owner must text first. Verify the actual runtime UID, protected home, scoped vendor denial and installed tools before enabling the two disabled Hub workflows.' }, null, 2))
 }

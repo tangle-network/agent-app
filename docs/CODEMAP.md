@@ -31,7 +31,7 @@ _101 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
 | [`./harness`](api/harness.md) | 14 | — |
-| [`./hosted-agent`](api/hosted-agent.md) | 23 | `profile` |
+| [`./hosted-agent`](api/hosted-agent.md) | 26 | `profile` |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `brand`, `intakes` |
 | [`./intakes-react/lazy`](api/intakes-react-lazy.md) | 2 | `brand`, `intakes` |
@@ -342,11 +342,11 @@ Source: `src/harness/index.ts` · 14 exports
 
 ## `./hosted-agent`
 
-Source: `src/hosted-agent/index.ts` · 23 exports
+Source: `src/hosted-agent/index.ts` · 26 exports
 
 Depends on: `profile`
 
-`AgentHomeWorkflow`, `AgentHomeWorkflowOptions`, `agentHomeWorkflows`, `BoxPolicy`, `buildGeneralAgentProfile`, `CONVERSATION_TOOLS_OFF`, `createHostedAgent`, `createTangleAgent`, `DEFAULT_AGENT_HOME`, `DEFAULT_BOX_POLICY`, `DEFAULT_HOME_LIMITS`, `DEFAULT_HOSTED_MODEL`, `defaultHomeFiles`, `GENERAL_AGENT_MODEL`, `GENERAL_AGENT_SYSTEM_PROMPT`, `GeneralAgentMember`, `GeneralAgentProfileOptions`, `HostedAgent`, `HostedAgentConfig`, `HostedAgentError`, `PERSON_KEY_PREFIX`, `TangleAgentOptions`, `withDefaultAgentHome`
+`AgentHomeWorkflow`, `AgentHomeWorkflowOptions`, `agentHomeWorkflows`, `BoxPolicy`, `buildGeneralAgentProfile`, `CONVERSATION_TOOLS_OFF`, `createHostedAgent`, `createTangleAgent`, `DEFAULT_AGENT_HOME`, `DEFAULT_BOX_POLICY`, `DEFAULT_HOME_LIMITS`, `DEFAULT_HOSTED_MODEL`, `defaultHomeFiles`, `GENERAL_AGENT_MODEL`, `GENERAL_AGENT_SYSTEM_PROMPT`, `GeneralAgentMember`, `GeneralAgentProfileOptions`, `HostedAgent`, `HostedAgentAttachment`, `HostedAgentConfig`, `HostedAgentError`, `HostedAgentLineOptions`, `HostedAgentTransport`, `PERSON_KEY_PREFIX`, `TangleAgentOptions`, `withDefaultAgentHome`
 
 [Full API →](api/hosted-agent.md)
 
