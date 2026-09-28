@@ -67,6 +67,19 @@ export const Empty: Story = {
 }
 
 /** Typed — Send enabled. */
+/** Focused — the card ring stays visible without an outline inside the input. */
+export const KeyboardFocus: Story = {
+  name: 'Keyboard focus',
+  render: () => (
+    <ChatComposer
+      autoFocus
+      onSend={(message) => console.log('send', message)}
+      placeholder=Message the agent…
+      controls={useModelPill()}
+    />
+  ),
+}
+
 export const Typed: Story = {
   render: () => (
     <ChatComposer

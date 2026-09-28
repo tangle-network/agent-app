@@ -1076,7 +1076,8 @@ export function ChatComposer({
       rows={minRows}
       style={{ minHeight: inputMinHeight, maxHeight }}
       aria-label="Message input"
-      className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+      data-composer-input
+      className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground focus:outline-none placeholder:text-muted-foreground disabled:opacity-50"
     />
   )
 
@@ -1255,7 +1256,7 @@ export function ChatComposer({
       <div
         ref={cardRef}
         data-testid="composer-card"
-        className={`flex flex-col gap-1.5 rounded-2xl border border-card-edge bg-card px-3 py-2.5 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15 ${
+        className={`flex flex-col gap-1.5 rounded-2xl border border-card-edge bg-card px-3 py-2.5 transition focus-within:border-ring/40 focus-within:ring-2 focus-within:ring-ring/15 ${
           floating ? 'shadow-raised' : ''
         }`}
       >

@@ -371,10 +371,27 @@
  * An outline, not a `ring-*` box-shadow, because an outline is not painted by
  * the element's own background/shadow stack — it cannot be covered by a sibling
  * and it needs no `ring-offset-color` matched to whatever surface it sits on.
+ *
+ * The rule lives in `@layer base` for the same contract. Tailwind v4 hosts put
+ * every utility in `@layer utilities`, and an UNLAYERED rule beats ANY layered
+ * one regardless of specificity — measured in the playground, where the bare
+ * floor out-painted even `.focus\:outline-none:focus` and painted a second
+ * strong outline inside the composer card's own ring. In v4's declared order
+ * (`theme, base, components, utilities`) base sits under utilities, and in
+ * unlayered v3 hosts an unlayered utility beats a layered floor, so the
+ * opt-out above wins in both and the specificity ladder in this comment is
+ * no longer hostage to stylesheet import order.
  */
-:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
+@layer base {
+  :focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  /* The composer card owns keyboard feedback through its themeable ring. */
+  [data-composer-input]:focus-visible {
+    outline: none;
+  }
 }
 
 [data-theme='dark'],
