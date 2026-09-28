@@ -52,7 +52,7 @@ describe('hosted agent on Hub lines', () => {
       limits: { turnsPerMemberPerDay: 30 },
       instance: { keyPrefix: 'hosted:', create: {
         resources: { cpuCores: 2, memoryMB: 2048, diskGB: 2 },
-        egressPolicy: { mode: 'strict', allowDomains: ['router.tangle.tools'], includeImplicitDomains: false },
+        egressPolicy: { mode: 'strict', allowDomains: ['router.tangle.tools', 'id.tangle.tools'], includeImplicitDomains: false },
         idleTimeoutSeconds: 600 } },
     })
     // Hub runs turns with the conversation defaults: the default model, and no shell.
