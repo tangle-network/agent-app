@@ -14,8 +14,10 @@
 
 import {
   Component,
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -32,6 +34,7 @@ import type {
   VaultOperation,
   VaultOperationFailure,
   VaultOperationPhase,
+  VaultPaneHandle,
   VaultPaneProps,
   VaultRichParts,
   VaultTreeNode,
@@ -298,7 +301,7 @@ function OperationErrorAlert({
  * Below 45rem, Files and the selected document share one pane.
  * Switching panes keeps the editor mounted and preserves unsaved changes.
  */
-export function VaultPane(props: VaultPaneProps) {
+export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function VaultPane(props, ref) {
   const {
     port,
     renderTree,
@@ -385,11 +388,14 @@ export function VaultPane(props: VaultPaneProps) {
     () => collectTreePaths(tree, { files: new Set<string>(), directories: new Set<string>() }),
     [tree],
   )
-  const filePaths = treePaths.files
-  const resolvedSelectedPath = useMemo(
-    () => selectedPath ? resolveFilePath(selectedPath, filePaths) : null,
-    [selectedPath, filePaths],
-  )
+  const resolvedSelectedPath = useMemo(() => {
+    if (!selectedPath) return null
+    const listed = resolveTreePath(selectedPath, treePaths)
+    if (listed?.type === 'directory') return null
+    // A committed file can be readable before an older tree snapshot lists it.
+    // The data port owns validation and missing-file errors for explicit paths.
+    return listed?.path ?? selectedPath
+  }, [selectedPath, treePaths])
   // The clicked folder, resolved against the CURRENT tree — a folder that a
   // refresh removed stops being the active one on its own, so neither the
   // search scope nor the create target can point at a directory that is gone.
@@ -569,6 +575,8 @@ export function VaultPane(props: VaultPaneProps) {
     },
     [isDirty, selectedPath, commitPath, showDocument],
   )
+
+  useImperativeHandle(ref, () => ({ openFile: guardedOpen }), [guardedOpen])
 
   // Clicking a folder makes it the vault's active folder: the search narrows to
   // it and a new file lands inside it. Clicking it again clears that — the same
@@ -1018,7 +1026,7 @@ export function VaultPane(props: VaultPaneProps) {
       </div>
     </EditorErrorBoundary>
   )
-}
+})
 
 function SourceEditor({
   path,

@@ -4,14 +4,22 @@
 
 Source: `src/vault/lazy.tsx`
 
-2 exports.
+3 exports.
+
+### `VaultPaneHandle`
+
+`interface` — File navigation requested by controls outside the pane.
+
+```ts
+interface VaultPaneHandle
+```
 
 ### `VaultPaneLazy`
 
 `function` — Resolve VaultPane component lazily to optimize loading and improve performance
 
 ```ts
-LazyExoticComponent<(props: VaultPaneProps) => Element>
+LazyExoticComponent<ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>>
 ```
 
 ### `VaultPaneProps`

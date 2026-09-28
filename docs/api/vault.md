@@ -4,7 +4,7 @@
 
 Source: `src/vault/index.ts`
 
-17 exports.
+18 exports.
 
 ### `ConfirmDialog`
 
@@ -107,7 +107,15 @@ type VaultOperationPhase
 `function` — Browse and edit files in the available pane width.
 
 ```ts
-(props: VaultPaneProps) => Element
+ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>
+```
+
+### `VaultPaneHandle`
+
+`interface` — File navigation requested by controls outside the pane.
+
+```ts
+interface VaultPaneHandle
 ```
 
 ### `VaultPaneProps`

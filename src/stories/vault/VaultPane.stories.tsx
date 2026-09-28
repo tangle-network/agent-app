@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import { VaultPane } from '../../vault/VaultPane'
-import type { VaultDataPort, VaultTreeNode } from '../../vault/contracts'
+import type { VaultDataPort, VaultPaneHandle, VaultTreeNode } from '../../vault/contracts'
 
 const files: VaultTreeNode[] = [{ name: 'brief.md', path: 'brief.md', type: 'file' }]
 const content = '# Release brief\n\nReview the current evidence before approving the release.\n\nKeep this document open while refreshing.'
@@ -54,8 +54,9 @@ export default meta
 export const ExistingDocument: StoryObj<typeof RefreshingVault> = {}
 
 
-function ResponsiveVault() {
-  const [width, setWidth] = useState(390)
+function ResponsiveVault({ externalNavigation = false }: { externalNavigation?: boolean }) {
+  const paneRef = useRef<VaultPaneHandle>(null)
+  const [width, setWidth] = useState(externalNavigation ? 960 : 390)
   const [path, setPath] = useState<string | null>('brief.md')
   const port = useMemo<VaultDataPort>(() => {
     const documents = new Map([
@@ -76,8 +77,23 @@ function ResponsiveVault() {
       async deleteFile(path) { documents.delete(path) },
     }
   }, [])
+  async function openNewArtifact() {
+    const nextPath = await port.createFile('artifact.md')
+    await port.writeFile(nextPath, '# Fresh artifact\n\nThis file was created after the tree was loaded.')
+    paneRef.current?.openFile(nextPath)
+  }
   return (
     <div className="flex h-[700px] max-w-full flex-col gap-3 p-3" style={{ width }}>
+      {externalNavigation && (
+        <div className="flex flex-wrap gap-3">
+          <button type="button" className="rounded border border-border px-3 py-2" onClick={() => void openNewArtifact()}>
+            Open new artifact
+          </button>
+          <button type="button" className="rounded border border-border px-3 py-2" onClick={() => paneRef.current?.openFile('missing.md')}>
+            Open missing file
+          </button>
+        </div>
+      )}
       <label className="flex items-center gap-3 text-sm">
         Pane width
         <input
@@ -92,6 +108,7 @@ function ResponsiveVault() {
         <span>{width}px</span>
       </label>
       <VaultPane
+        ref={paneRef}
         port={port}
         selectedPath={path}
         onSelectedPathChange={setPath}
@@ -125,4 +142,15 @@ function ResponsiveVault() {
 
 export const ResponsiveNavigation: StoryObj<typeof RefreshingVault> = {
   render: () => <ResponsiveVault />,
+}
+
+export const ExternalFileNavigation: StoryObj<typeof RefreshingVault> = {
+  render: () => <ResponsiveVault externalNavigation />,
+  parameters: {
+    docs: {
+      description: {
+        story: 'An in-memory component fixture. External navigation confirms a dirty draft, reads a newly created file without refreshing the tree, and shows missing-file errors. This does not prove backend persistence.',
+      },
+    },
+  },
 }
