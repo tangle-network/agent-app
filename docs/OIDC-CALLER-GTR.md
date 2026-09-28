@@ -16,18 +16,13 @@ misrepresent authorization. At agent-dev-container commit
 `8f55447acc236f046ff18f7c1c54a59fd0029818`, `src/platform/oidc.ts` returns OIDC
 tokens and verified userinfo, not a funded API key.
 
-## Installable runtime pin
+## Published dependencies
 
-Agent-app Actions run 36296798328 observed npm latest 0.277.0 without either
-OIDC export, and 404 for 0.278.1. This branch instead pins
-`github:tangle-network/agent-runtime#a3d2eb6a2d523caec56edb438be026339b8b5b27`.
-That immutable Git commit contains the built runtime package from source
-`68532c2c76e6dea3c3d66c5977a9c269fef5b3f5`, prepared in runtime Actions run
-36297073605. It reuses #1410. No client implementation is copied into this
-repository. The package has resolved catalog dependencies and no install
-scripts. Its `tangleBuild` metadata records the source and run. The prepared
-build branch must not be merged into runtime main. Replace the pin only after
-verifying the corresponding npm package exports and integrity.
+The caller uses Runtime 0.282.2 from npm, with Eval 0.199.1 and Interface 2.13.0.
+Knowledge 17.1.10 satisfies that tuple.
+Both scaffolds use the same published Runtime and Eval versions.
+The OIDC configuration receives the maintained Runtime client and PKCE generator.
+Legacy SSO imports remain independent of the optional Runtime package.
 
 ## Invariants
 
@@ -50,22 +45,31 @@ unpublished session. Cleanup errors are logged without credentials. A provider
 outage, crash, or error inside the runtime exchange can leave an unrevoked grant.
 There is no claim of atomic cleanup across the application and provider.
 
-## Evidence status
+## Proof boundary
 
-No staging browser login, client registration, refresh, disconnect, or revoked
-refresh success is claimed in this document. Build results belong to the linked
-Actions receipts. The proof listener below uses the built library and real HTTP
-to the provider. Its in-memory store is a single-process proof fixture, not a
-production persistence recommendation. This does not prove an unmigrated
-vertical agent. Do not mark the proof passed without the actual receipts.
+The listener uses the installed library and real HTTP requests to the configured issuer.
+Its local SQLite store encrypts account details and grants through the maintained field-crypto module.
+Only hashed session handles reach the database.
+A separate private key file preserves encryption and signed-state keys across process restarts.
+Each database is bound to one issuer, client, and callback.
+Use one listener process per database.
+
+The listener persists rotated credentials before checking userinfo or responding.
+Refresh and disconnect share a per-session operation lock.
+A failed lifecycle operation leaves the grant blocked on disk, including after a restart.
+This local proof store does not replace a product's production storage.
+
+A local issuer proves the actual local Platform service, not a staging or production deployment.
+Record the issuer source, registered clients, package artifact, and final HTTP outcomes with the demonstration.
+Preserve failures and distinguish source checks from completed browser flows.
 
 ## Exact GTR procedure
 
-Use Node 22.13 or newer, Git, Corepack, a browser, a disposable verified staging
-account, and two existing-provider client registrations. The Platform operator
-must supply `STAGING_ID_ORIGIN`, `FIRST_PARTY_CLIENT_ID` and
-`THIRD_PARTY_CLIENT_ID`, plus a secret for each confidential client. Record the
-registration IDs and method in the receipt, never the secrets.
+Use Node 22.13 or newer, Git, Corepack, a browser, and an authorized disposable account.
+Create two client registrations through the existing provider.
+The Platform operator supplies the issuer origin, both client IDs, and confidential-client secrets.
+Record registration IDs and methods in the receipt.
+Keep secrets in private files.
 
 Register both clients in the existing `oauthClient` registry. Allow
 `authorization_code` and `refresh_token`, require S256 PKCE, and grant
@@ -85,9 +89,10 @@ corepack pnpm install --frozen-lockfile --ignore-scripts 2>&1 | tee /tmp/tangle-
 corepack pnpm build 2>&1 | tee /tmp/tangle-oidc-gtr/build.log
 git rev-parse HEAD | tee /tmp/tangle-oidc-gtr/commit.txt
 export GTR_ORIGIN=http://127.0.0.1:8789
-export TANGLE_OIDC_ISSUER="$STAGING_ID_ORIGIN"
+export TANGLE_OIDC_ISSUER="$OIDC_ISSUER_ORIGIN"
 export TANGLE_OIDC_CLIENT_ID="$FIRST_PARTY_CLIENT_ID"
 export TANGLE_OIDC_CLIENT_SECRET="${FIRST_PARTY_CLIENT_SECRET:-}"
+export GTR_OIDC_STORE_PATH=/tmp/tangle-oidc-gtr/first-party.sqlite
 node scripts/oidc-live-proof.mjs | tee /tmp/tangle-oidc-gtr/first-party.jsonl
 ```
 
@@ -97,12 +102,14 @@ operator's sandbox routing, and set `HOST=0.0.0.0`.
 
 Open `GTR_ORIGIN` with browser Network preservation enabled. Click Sign in.
 Capture the authorize origin, path, client_id, redirect_uri, response_type,
-scope and code_challenge_method. Complete the actual staging sign-in and
+scope and code_challenge_method. Complete the configured provider sign-in and
 consent. Capture the consent screenshot and final application URL. Redact
 codes, state, verifier, cookies and Authorization headers from shared evidence.
 
 Click Session. Require HTTP 200, the expected subject, and
-`refreshAvailable=true`. Click Refresh twice. Require HTTP 200 each time,
+`refreshAvailable=true`. Stop and restart the listener with the same database, issuer, client, and callback.
+Reopen the application and require the same authenticated session.
+Click Refresh twice. Require HTTP 200 each time,
 `subjectUnchanged=true`, `accessChanged=true`, and `refreshRotated=true`.
 Record the token hashes and `provider_http` records. The second refresh must
 use the stored replacement credential rather than the original one.
@@ -113,18 +120,14 @@ token to the real token endpoint. Require HTTP 200 from the caller,
 only `invalid_grant`, not a network failure or `invalid_client`. Click Session
 again. Require HTTP 401. Record the response and the provider HTTP records.
 
-Stop the listener. Set the third-party client ID and secret. Run the listener
-with `/tmp/tangle-oidc-gtr/third-party.jsonl` as its log file. Repeat sign-in,
-consent, both refreshes, disconnect, and the rejected revoked refresh. All
+Stop the listener.
+Set the third-party client ID, secret, and a separate third-party.sqlite store path.
+Use a separate third-party JSONL log.
+Repeat sign-in, consent, restart, both refreshes, disconnect, and the rejected revoked refresh.
+All
 provider authorization, token, userinfo and revoke requests must use the same
-staging server under `/api/auth/oauth2/*`. There must be no request to
+configured issuer under `/api/auth/oauth2/*`. There must be no request to
 `/cross-site/authorize`, `/cross-site/exchange`, or `/v1/apps/oauth/token`.
-
-Finally start another login and change one character of state in the returned
-callback URL. Require `tangle_state_mismatch`, a cleared state cookie, and no
-token request. Repeat by changing the verifier in the state cookie without
-changing its MAC. Require the same outcome. These negative checks do not replace
-the positive sign-in receipt.
 
 Attach the source commit, install/build exit codes, registration IDs, app and
 issuer URLs, sanitized HTTP records, screenshots, and both JSONL files. Do not
