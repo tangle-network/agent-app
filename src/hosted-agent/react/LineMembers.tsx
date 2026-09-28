@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { LineMember } from '@tangle-network/sandbox'
 import type { LineMembersProps } from './contracts'
+
+const useBrowserLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : useEffect
 
 const STATUS: Record<LineMember['status'], { label: string; detail: string }> = {
   invited: { label: 'Awaiting consent', detail: 'The first message from this address confirms consent.' },
@@ -18,14 +20,15 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
   const clientRef = useRef(client)
   clientRef.current = client
   const sequence = useRef(0)
-  const currentLine = useRef(lineId)
-  const currentScope = useRef(scopeKey)
+  const incarnation = useRef(0)
   const confirmButton = useRef<HTMLButtonElement>(null)
   const heading = useRef<HTMLHeadingElement>(null)
   const removeTriggers = useRef(new Map<string, HTMLButtonElement>())
   const restoreFocusTo = useRef<string | null>(null)
-  currentLine.current = lineId
-  currentScope.current = scopeKey
+  useBrowserLayoutEffect(() => {
+    incarnation.current++
+    return () => { incarnation.current++ }
+  }, [lineId, scopeKey])
   const [memberSnapshot, setMemberSnapshot] = useState<{ lineId: string; scopeKey: string; members: LineMember[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshFailed, setRefreshFailed] = useState(false)
@@ -36,21 +39,21 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const members = memberSnapshot?.lineId === lineId && memberSnapshot.scopeKey === scopeKey ? memberSnapshot.members : null
 
-  function stillCurrent(): boolean {
-    return currentLine.current === lineId && currentScope.current === scopeKey
+  function stillCurrent(requestIncarnation: number): boolean {
+    return requestIncarnation === incarnation.current
   }
 
-  async function reload(): Promise<boolean> {
+  async function reload(requestIncarnation: number): Promise<boolean> {
     const request = ++sequence.current
     try {
       const next = await clientRef.current.list(lineId)
-      if (request !== sequence.current || !stillCurrent()) return false
+      if (request !== sequence.current || !stillCurrent(requestIncarnation)) return false
       setMemberSnapshot({ lineId, scopeKey, members: next })
       setError(null)
       setRefreshFailed(false)
       return true
     } catch (cause) {
-      if (request !== sequence.current || !stillCurrent()) return false
+      if (request !== sequence.current || !stillCurrent(requestIncarnation)) return false
       setError(errorMessage(cause))
       setRefreshFailed(true)
       return false
@@ -59,9 +62,10 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
 
   async function retry() {
     if (busy) return
+    const requestIncarnation = incarnation.current
     setBusy('refresh')
-    try { await reload() }
-    finally { if (stillCurrent()) setBusy(null) }
+    try { await reload(requestIncarnation) }
+    finally { if (stillCurrent(requestIncarnation)) setBusy(null) }
   }
 
   function closeConfirmation(memberId: string) {
@@ -79,7 +83,7 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
     setConfirmId(null)
     restoreFocusTo.current = null
     setBusy(null)
-    void reload()
+    void reload(incarnation.current)
     return () => { sequence.current++ }
   }, [lineId, scopeKey])
 
@@ -102,24 +106,25 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
 
   async function mutate(key: string, action: () => Promise<void>, success: string, onSuccess?: () => void) {
     if (busy || refreshFailed) return
+    const requestIncarnation = incarnation.current
     setBusy(key)
     setError(null)
     try {
       await action()
-      if (!stillCurrent()) return
-      const refreshed = await reload()
-      if (!stillCurrent()) return
+      if (!stillCurrent(requestIncarnation)) return
+      const refreshed = await reload(requestIncarnation)
+      if (!stillCurrent(requestIncarnation)) return
       onSuccess?.()
       onNotice?.(refreshed
         ? { kind: 'success', message: success }
         : { kind: 'error', message: 'Member updated, but the current member list could not be loaded.' })
     } catch (cause) {
-      if (!stillCurrent()) return
+      if (!stillCurrent(requestIncarnation)) return
       const detail = errorMessage(cause)
       setError(detail)
       onNotice?.({ kind: 'error', message: detail })
     } finally {
-      if (stillCurrent()) setBusy(null)
+      if (stillCurrent(requestIncarnation)) setBusy(null)
     }
   }
 
