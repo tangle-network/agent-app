@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 100f9660e3fe378cde85b876554c646293ab07d9
+          ref: 88ddede816cb705effba7c94a7537675aec515f6
           persist-credentials: false
       - run: |
           mkdir -p /tmp/source
