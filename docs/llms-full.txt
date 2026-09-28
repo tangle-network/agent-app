@@ -23403,7 +23403,15 @@ type VaultOperationPhase
 `function` — Browse and edit files in the available pane width.
 
 ```ts
-(props: VaultPaneProps) => Element
+ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>
+```
+
+### `VaultPaneHandle`
+
+`interface` — File navigation requested by controls outside the pane.
+
+```ts
+interface VaultPaneHandle
 ```
 
 ### `VaultPaneProps`
@@ -23443,12 +23451,20 @@ interface VaultTreeRenderProps
 
 Source: `src/vault/lazy.tsx`
 
+### `VaultPaneHandle`
+
+`interface` — File navigation requested by controls outside the pane.
+
+```ts
+interface VaultPaneHandle
+```
+
 ### `VaultPaneLazy`
 
 `function` — Resolve VaultPane component lazily to optimize loading and improve performance
 
 ```ts
-LazyExoticComponent<(props: VaultPaneProps) => Element>
+LazyExoticComponent<ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>>
 ```
 
 ### `VaultPaneProps`

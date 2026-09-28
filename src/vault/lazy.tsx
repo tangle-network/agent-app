@@ -6,9 +6,9 @@
  */
 
 import { lazy } from 'react'
-import type { VaultPaneProps } from './contracts'
+import type { VaultPaneHandle, VaultPaneProps } from './contracts'
 
-export type { VaultPaneProps }
+export type { VaultPaneHandle, VaultPaneProps }
 
 /** Resolve VaultPane component lazily to optimize loading and improve performance */
 export const VaultPaneLazy = lazy(

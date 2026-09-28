@@ -96,8 +96,8 @@ _101 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./trace`](api/trace.md) | 33 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting` |
 | [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `stream` |
-| [`./vault`](api/vault.md) | 17 | — |
-| [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
+| [`./vault`](api/vault.md) | 18 | — |
+| [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
 | [`./web`](api/web.md) | 39 | — |
 | [`./web-react`](api/web-react.md) | 427 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
@@ -924,17 +924,17 @@ Depends on: `chat-routes`, `stream`
 
 ## `./vault`
 
-Source: `src/vault/index.ts` · 17 exports
+Source: `src/vault/index.ts` · 18 exports
 
-`ConfirmDialog`, `ConfirmDialogProps`, `VaultArtifactRenderProps`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneProps`, `VaultRichParts`, `VaultTreeNode`, `VaultTreeRenderProps`
+`ConfirmDialog`, `ConfirmDialogProps`, `VaultArtifactRenderProps`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneHandle`, `VaultPaneProps`, `VaultRichParts`, `VaultTreeNode`, `VaultTreeRenderProps`
 
 [Full API →](api/vault.md)
 
 ## `./vault/lazy`
 
-Source: `src/vault/lazy.tsx` · 2 exports
+Source: `src/vault/lazy.tsx` · 3 exports
 
-`VaultPaneLazy`, `VaultPaneProps`
+`VaultPaneHandle`, `VaultPaneLazy`, `VaultPaneProps`
 
 [Full API →](api/vault-lazy.md)
 

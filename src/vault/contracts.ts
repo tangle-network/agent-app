@@ -102,6 +102,15 @@ export interface VaultMarkdownCodec {
   serialize(parts: VaultRichParts): string
 }
 
+/** File navigation requested by controls outside the pane. */
+export interface VaultPaneHandle {
+  /**
+   * Request a file, confirming unsaved edits before changing selection.
+   * The path need not appear in the current tree; the data port validates and reads it.
+   */
+  openFile: (path: string) => void
+}
+
 /** Props the pane passes to the product's tree renderer (e.g. RichFileTree). */
 export interface VaultTreeRenderProps {
   root: VaultTreeNode

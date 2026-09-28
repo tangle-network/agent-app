@@ -18086,8 +18086,14 @@
         {
           "name": "VaultPane",
           "kind": "function",
-          "signature": "(props: VaultPaneProps) => Element",
+          "signature": "ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>",
           "doc": "Browse and edit files in the available pane width."
+        },
+        {
+          "name": "VaultPaneHandle",
+          "kind": "interface",
+          "signature": "interface VaultPaneHandle",
+          "doc": "File navigation requested by controls outside the pane."
         },
         {
           "name": "VaultPaneProps",
@@ -18122,9 +18128,15 @@
       "error": null,
       "exports": [
         {
+          "name": "VaultPaneHandle",
+          "kind": "interface",
+          "signature": "interface VaultPaneHandle",
+          "doc": "File navigation requested by controls outside the pane."
+        },
+        {
           "name": "VaultPaneLazy",
           "kind": "function",
-          "signature": "LazyExoticComponent<(props: VaultPaneProps) => Element>",
+          "signature": "LazyExoticComponent<ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>>",
           "doc": "Resolve VaultPane component lazily to optimize loading and improve performance"
         },
         {
