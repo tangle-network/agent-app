@@ -11,6 +11,7 @@
  * (an ops webhook, and stderr). No new channel is invented here.
  */
 
+import { postSlackAlert } from '../alerting/slack.js'
 import { describeReason, type TurnHealthReason, type TurnHealthSeverity } from './classify.js'
 
 /** One deliverable alert. */
@@ -139,19 +140,20 @@ export function createSlackBotAlertSink(options: {
         ...alert.details.map((d) => `• ${d}`),
         `_${new Date(alert.at).toISOString()}_`,
       ]
-      const response = await fetchImpl('https://slack.com/api/chat.postMessage', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          Authorization: `Bearer ${options.botToken}`,
-        },
-        body: JSON.stringify({ channel: options.channel, text: lines.join('\n') }),
+      const outcome = await postSlackAlert({
+        token: options.botToken, channel: options.channel, text: lines.join('\n'), attempts: 1,
+        // Preserve the public minimal-fetch seam without owning a second Slack
+        // request builder or response parser. Real callers use native fetch.
+        fetchImpl: options.fetchImpl ? (async (url, init) => {
+          const response = await fetchImpl(String(url), {
+            method: init?.method ?? 'POST',
+            headers: Object.fromEntries(new Headers(init?.headers)),
+            body: String(init?.body ?? ''),
+          })
+          return new Response(await response.text?.() ?? '', { status: response.status })
+        }) : undefined,
       })
-      if (!response.ok) throw new Error(`slack chat.postMessage responded ${response.status}`)
-      const body = (await response.text?.()) ?? ''
-      if (body && !/"ok"\s*:\s*true/.test(body)) {
-        throw new Error(`slack rejected the alert: ${body.slice(0, 200)}`)
-      }
+      if (!outcome.delivered) throw new Error(`Slack alert failed (${outcome.reason}): ${outcome.detail}`)
     },
   }
 }

@@ -22354,7 +22354,7 @@ interface TimedEvent
 
 ## `./turn-health`
 
-Source: `src/turn-health/index.ts`
+Source: `src/turn-health/index.ts` · depends on `alerting`
 
 ### `AlertSink`
 
