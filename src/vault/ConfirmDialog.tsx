@@ -1,6 +1,6 @@
 /**
  * Self-contained confirm dialog — no dialog library. A focus-trapped modal with
- * Escape-to-cancel and native form submission, used for create / delete / discard-unsaved
+ * Escape-to-cancel and Enter from text inputs, used for create / delete / discard-unsaved
  * flows so the pane carries zero UI-kit dependency.
  */
 
@@ -34,7 +34,7 @@ export function ConfirmDialog({
   onCancel,
   children,
 }: ConfirmDialogProps) {
-  const panelRef = useRef<HTMLFormElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const confirmRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -48,6 +48,19 @@ export function ConfirmDialog({
     if (event.key === 'Escape') {
       event.preventDefault()
       onCancel()
+      return
+    }
+    const target = event.target
+    if (
+      event.key === 'Enter'
+      && !event.defaultPrevented
+      && !event.nativeEvent.isComposing
+      && !confirmDisabled
+      && target instanceof HTMLInputElement
+      && ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(target.type)
+    ) {
+      event.preventDefault()
+      onConfirm()
       return
     }
     if (event.key !== 'Tab') return
@@ -72,16 +85,12 @@ export function ConfirmDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
-      <form
+      <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onKeyDown={onKeyDown}
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (!confirmDisabled) onConfirm()
-        }}
         className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg"
       >
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
@@ -97,7 +106,8 @@ export function ConfirmDialog({
           </button>
           <button
             ref={confirmRef}
-            type="submit"
+            type="button"
+            onClick={onConfirm}
             disabled={confirmDisabled}
             className={`inline-flex h-8 items-center rounded-md px-3 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 ${
               destructive
@@ -108,7 +118,7 @@ export function ConfirmDialog({
             {confirmLabel}
           </button>
         </div>
-      </form>
+      </div>
     </div>
   )
 }

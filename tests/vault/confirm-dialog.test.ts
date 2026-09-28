@@ -81,14 +81,50 @@ describe('ConfirmDialog', () => {
     expect(onConfirm).not.toHaveBeenCalled()
   })
 
-  it('input submission and direct submission respect the disabled confirmation', async () => {
+  it('input Enter respects the disabled confirmation', async () => {
     const user = userEvent.setup()
     const { onConfirm } = mount({
       confirmDisabled: true,
       children: createElement('input', { 'aria-label': 'New file path' }),
     })
     await user.type(screen.getByRole('textbox', { name: 'New file path' }), 'notes.md{Enter}')
-    fireEvent.submit(screen.getByRole('dialog'))
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
+  it.each(['pointer', 'Enter', 'Space'])('a child action button does not confirm via %s', async (activation) => {
+    const user = userEvent.setup()
+    const onPreview = vi.fn()
+    const { onConfirm, onCancel } = mount({
+      children: createElement('button', { onClick: onPreview }, 'Preview'),
+    })
+    const preview = screen.getByRole('button', { name: 'Preview' })
+    if (activation === 'pointer') await user.click(preview)
+    else {
+      preview.focus()
+      await user.keyboard(activation === 'Space' ? ' ' : '{Enter}')
+    }
+    expect(onPreview).toHaveBeenCalledTimes(1)
+    expect(onConfirm).not.toHaveBeenCalled()
+    expect(onCancel).not.toHaveBeenCalled()
+  })
+
+  it('leaves an input Enter consumed by the child alone', async () => {
+    const user = userEvent.setup()
+    const { onConfirm } = mount({
+      children: createElement('input', {
+        'aria-label': 'New file path',
+        onKeyDown: (event) => { if (event.key === 'Enter') event.preventDefault() },
+      }),
+    })
+    await user.type(screen.getByRole('textbox', { name: 'New file path' }), 'notes.md{Enter}')
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
+  it('leaves input-method composition Enter alone', () => {
+    const { onConfirm } = mount({
+      children: createElement('input', { 'aria-label': 'New file path' }),
+    })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'New file path' }), { key: 'Enter', isComposing: true })
     expect(onConfirm).not.toHaveBeenCalled()
   })
 

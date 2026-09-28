@@ -30,12 +30,21 @@ function KeyboardConfirmation({ create = false }: { create?: boolean }) {
         onCancel={() => { setOutcome('Cancel selected'); setOpen(false) }}
       >
         {create && (
-          <input
-            aria-label="New file path"
-            value={path}
-            onChange={(event) => setPath(event.target.value)}
-            className="h-9 w-full rounded border border-border bg-background px-3"
-          />
+          <div className="space-y-2">
+            <input
+              aria-label="New file path"
+              value={path}
+              onChange={(event) => setPath(event.target.value)}
+              className="h-9 w-full rounded border border-border bg-background px-3"
+            />
+            {/* Public dialog children do not require form-aware button markup. */}
+            <button
+              className="rounded border border-border px-3 py-2 text-sm"
+              onClick={() => { setPath('notes.md'); setOutcome('Template selected') }}
+            >
+              Use template
+            </button>
+          </div>
         )}
       </ConfirmDialog>
     </div>
