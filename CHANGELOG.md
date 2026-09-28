@@ -1,9 +1,5 @@
 # Changelog
 
-## Unreleased
-
-- fix(hosted-agent): ignore line callbacks from an earlier scope incarnation
-
 ## 0.49.33
 
 - refactor(integrations): use the published Hub SDK for actions
