@@ -76,6 +76,7 @@ harness/missions/runtime/trace *(chat shell + observability; `react`)* ·
 `sequences-react` → sequences *(`react`; lazy `@huggingface/transformers` for
 transcription)* · `studio-react` → studio *(`react`, `lucide-react`,
 `react-router`)* · `intakes-react` · `teams-react` ·
+`hosted-agent/react` *(line setup, members, and billing over authenticated host callbacks)* ·
 `openui-react` → openui *(`react` only — the renderer stays the product's own
 import, so this forces no UI peer)* ·
 `vault` · `theme`/`styles`/`tailwind-preset` *(design tokens — the single source
@@ -98,6 +99,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | Completion checks / produced-state / eval bridge | `eval` (+ peer `agent-eval`) |
 | Integration-hub `/exec` calls | `integrations` |
 | An agent people text or call, each person in their own isolated sandbox | `hosted-agent` — `createHostedAgent`: `attachLine` gives a Hub line one box per person (Hub routes, counts and replies to texts); ph0ny `voiceHook`/`voiceAsk` answer calls from the same box and thread. Peer: `sandbox`. Reference Worker: [`examples/hosted-agent`](./examples/hosted-agent) |
+| A page to connect owned lines and manage members | `hosted-agent/react` — `LineSetup`, `LineMembers`, and `LineBilling` over authenticated callbacks backed by `sandbox.lines` and Hub. Import `hosted-agent/react/styles` for its CSS. The host supplies workspace-scoped lines and verified payer facts. |
 | Per-workspace key mint/rotate/budget | `billing` |
 | Resumable chat turns (buffer/replay/coalesce) | `stream` — see [`examples/resumable-turns.md`](./examples/resumable-turns.md) |
 | The whole assembled chat turn route (auth → persist → stream → interactions) | `chat-routes` — `createChatTurnRoutes` (peer `agent-runtime`). Product seams — all STABLE, graduated in #227 once each had two independent consumers (`turnLock` · `contextGate` · `beforeTurn` · `onRawEvent` · `lifecycle` · `heartbeat`, plus the `authorize` result's `insertUserMessage`); kept FLAT top-level for back-compat — plus `transformFinalText` (pre-persist redaction over the final-text scalar AND every persisted TEXT part) and `onTurnComplete(failed, failureReason)` run-failure surfacing |
