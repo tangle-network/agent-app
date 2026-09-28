@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.49.35
+
+- fix(agent-app): remove duplicate composer focus outline
+
 ## 0.49.34
 
 - fix(hosted-agent): fence stale line callbacks by scope incarnation (#671)
