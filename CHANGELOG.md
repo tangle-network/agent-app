@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.49.31
+
+- docs(alerting): record shared transport dependency
+- refactor(alerting): retain the shared Slack transport migration
+- refactor(platform): remove copied Hub, Slack and runtime tool contracts
+- ci(sweep): build and commit the published-client migration
+- chore(sweep): stage verified client and contract consolidation
+- refactor(integrations): preserve public documentation and error contract
+- refactor(integrations): delegate Hub transport to the published SDK
+
 ## 0.49.30
 
 ### Changed
