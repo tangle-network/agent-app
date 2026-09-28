@@ -104,11 +104,13 @@ export interface AppAuthSsoConfig {
   log?: (message: string, error?: unknown) => void
 }
 
-/** Registered OIDC client configuration. Login does not mint an API key. */
+/** Registered OIDC client configuration. The caller supplies Runtime PKCE; login does not mint an API key. */
 export interface AppAuthOidcSsoConfig extends Omit<AppAuthSsoConfig, 'protocol' | 'client' | 'store'> {
   protocol: 'oidc'
   client: TangleOidcSsoAuthClient
   store: TangleOidcSsoAccountStore
+  /** Pass the Runtime's `createPkcePair` helper from the OIDC-only caller. */
+  createPkcePair: () => Promise<{ verifier: string; challenge: string }>
 }
 
 /** Define the structure for application authentication data including users, sessions, accounts, and verifications */
@@ -372,7 +374,7 @@ export function createAppAuth(config: AppAuthConfig): AppAuth {
       )
     }
     const transport = config.sso.protocol === 'oidc'
-      ? { protocol: 'oidc' as const, auth: config.sso.client, store: config.sso.store }
+      ? { protocol: 'oidc' as const, auth: config.sso.client, store: config.sso.store, createPkcePair: config.sso.createPkcePair }
       : { protocol: 'legacy' as const, auth: config.sso.client, store: config.sso.store }
     sso = createTangleSsoHandlers({
       ...transport,

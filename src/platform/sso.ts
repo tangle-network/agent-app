@@ -5,7 +5,6 @@
  * session cookie minting remain shared.
  */
 
-import type { OidcTokens, PlatformOidcClient } from '@tangle-network/agent-runtime/platform'
 import { clearCookieHeader, readCookieValue, serializeCookie } from '../web/index'
 
 const DEFAULT_STATE_TTL_SECONDS = 600
@@ -98,11 +97,41 @@ export interface TangleSsoAuthClient {
   exchange(code: string): Promise<TangleSsoExchangeResult>
 }
 
-/** The runtime owns the OIDC wire protocol and its types. */
-export type TangleOidcSsoAuthClient = Pick<
-  PlatformOidcClient,
-  'authorizeUrl' | 'exchange' | 'refresh' | 'userinfo' | 'revoke'
->
+/** Token fields the callback persists from the runtime's OIDC exchange. */
+export interface TangleOidcSsoTokens {
+  accessToken: string
+  tokenType: string
+  expiresIn?: number
+  refreshToken?: string
+  idToken?: string
+  scope?: string
+}
+
+/** Verified identity returned by the runtime's OIDC userinfo lookup. */
+export interface TangleOidcSsoUser {
+  id: string
+  email: string
+  emailVerified: true
+  name?: string
+}
+
+/** The caller needs only the OIDC operations used by this callback. Keeping
+ *  this structural prevents legacy consumers from needing the optional
+ *  Runtime peer just to load the SSO declarations. */
+export interface TangleOidcSsoAuthClient {
+  authorizeUrl(options: {
+    state: string
+    codeChallenge: string
+    nonce?: string
+    prompt?: 'login' | 'consent' | 'none'
+    loginHint?: string
+  }): string
+  exchange(code: string, codeVerifier: string): Promise<{
+    tokens: TangleOidcSsoTokens
+    user: TangleOidcSsoUser
+  }>
+  revoke(token: string, tokenTypeHint?: 'access_token' | 'refresh_token'): Promise<void>
+}
 
 /** Local account shape required by the verified Tangle SSO account policy.
  * Consumers map their user/link tables into this shape before resolving an
@@ -281,16 +310,20 @@ export interface TangleSsoAccountStore {
  * disconnect must serialize updates to the same grant.
  */
 export interface TangleOidcSsoAccountStore extends Omit<TangleSsoAccountStore, 'saveTangleLink'> {
+  /** Atomically bind the grant to this exact session. If persistence partially
+   * fails, `deleteSession` must remove every row and credential for it. */
   saveTangleLink(input: {
     userId: string
     sessionToken: string
     tangleUserId: string
     email: string
     name: string | null
-    tokens: OidcTokens
+    tokens: TangleOidcSsoTokens
     accessTokenExpiresAt: Date
   }): Promise<void>
-  /** Remove an unpublished local session if callback persistence fails. */
+  /** Remove an unpublished local session if callback persistence fails.
+   * This must also remove any grant rows or credentials partially written by
+   * a rejected `saveTangleLink`, keyed by this exact session token. */
   deleteSession(input: { sessionToken: string }): Promise<void>
 }
 
@@ -467,11 +500,13 @@ export interface TangleSsoHandlerOptions {
   now?: () => number
 }
 
-/** Registered OIDC client with a separate token persistence contract. */
+/** Registered OIDC client and token store. The OIDC caller supplies the Runtime PKCE helper. */
 export interface TangleOidcSsoHandlerOptions extends Omit<TangleSsoHandlerOptions, 'protocol' | 'auth' | 'store'> {
   protocol: 'oidc'
   auth: TangleOidcSsoAuthClient
   store: TangleOidcSsoAccountStore
+  /** Pass the Runtime's `createPkcePair` helper from the OIDC-only caller. */
+  createPkcePair: () => Promise<{ verifier: string; challenge: string }>
 }
 
 /** Define handlers for SSO start and callback routes managing authentication flow and session cookies */
@@ -630,8 +665,7 @@ export function createTangleSsoHandlers(
       const payload: StateCookiePayload = { s: state, r: redirectPath }
       let authorizationUrl: string
       if (opts.protocol === 'oidc') {
-        const { createPkcePair } = await import('@tangle-network/agent-runtime/platform')
-        const pkce = await createPkcePair()
+        const pkce = await opts.createPkcePair()
         payload.v = pkce.verifier
         payload.m = await hmacHex(opts.stateSecret, stateBinding(payload, opts.callbackUrl))
         authorizationUrl = opts.auth.authorizeUrl({ state, codeChallenge: pkce.challenge })
@@ -667,7 +701,7 @@ export function createTangleSsoHandlers(
         return loginErrorRedirect('tangle_state_mismatch')
       }
       const tokenRequestedAt = now()
-      let oidcTokens: OidcTokens | undefined
+      let oidcTokens: TangleOidcSsoTokens | undefined
       let legacyExchange: TangleSsoExchangeResult | undefined
       let createdSession: string | undefined
       let committed = false
@@ -728,19 +762,24 @@ export function createTangleSsoHandlers(
           name: exchanged.user.name ?? null,
         }
         if (opts.protocol === 'oidc') {
+          const headers = new Headers()
+          headers.append('Set-Cookie', clearCookieHeader(stateCookieOpts))
+          const sessionCookies = await mintSessionCookies({ token, expiresAt, ttlSeconds: sessionTtlSeconds, secure: opts.secureCookies })
+          for (const cookie of sessionCookies) headers.append('Set-Cookie', cookie)
+          const response = redirectResponse(sanitizeRedirectPath(payload.r, defaultRedirectPath), headers)
           await opts.store.saveTangleLink({
             ...link,
             tokens: oidcTokens!,
             accessTokenExpiresAt: new Date(tokenRequestedAt + oidcTokens!.expiresIn! * 1000),
           })
-        } else {
-          await opts.store.saveTangleLink({ ...link, apiKey: legacyExchange!.apiKey, planTier: legacyExchange!.plan?.tier ?? null })
+          committed = true
+          return response
         }
+        await opts.store.saveTangleLink({ ...link, apiKey: legacyExchange!.apiKey, planTier: legacyExchange!.plan?.tier ?? null })
         const headers = new Headers()
         headers.append('Set-Cookie', clearCookieHeader(stateCookieOpts))
         const sessionCookies = await mintSessionCookies({ token, expiresAt, ttlSeconds: sessionTtlSeconds, secure: opts.secureCookies })
         for (const cookie of sessionCookies) headers.append('Set-Cookie', cookie)
-        committed = true
         return redirectResponse(sanitizeRedirectPath(payload.r, defaultRedirectPath), headers)
       } catch (error) {
         if (opts.protocol !== 'oidc') throw error

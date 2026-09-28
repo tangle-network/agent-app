@@ -2,7 +2,7 @@
 import { createServer } from 'node:http'
 import { randomBytes, createHash } from 'node:crypto'
 import { createTangleSsoHandlers } from '../dist/platform/index.js'
-import { PlatformOidcClient, PlatformAuthError } from '@tangle-network/agent-runtime/platform'
+import { PlatformOidcClient, PlatformAuthError, createPkcePair } from '@tangle-network/agent-runtime/platform'
 
 const required = (name) => {
   const value = process.env[name]?.trim()
@@ -35,7 +35,7 @@ const client = new PlatformOidcClient({
   },
 })
 const handlers = createTangleSsoHandlers({
-  protocol: 'oidc', auth: client,
+  protocol: 'oidc', auth: client, createPkcePair,
   callbackUrl: `${origin}/auth/tangle/callback`, stateCookieName: stateName,
   stateSecret: randomBytes(32).toString('hex'), secureCookies: secure,
   defaultRedirectPath: '/', loginPath: '/', sessionTtlSeconds: 3600,

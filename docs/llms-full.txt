@@ -11748,18 +11748,34 @@ interface TangleOidcSsoAccountStore
 
 ### `TangleOidcSsoAuthClient`
 
-`type` — The runtime owns the OIDC wire protocol and its types.
+`interface` — The caller needs only the OIDC operations used by this callback.
 
 ```ts
-type TangleOidcSsoAuthClient
+interface TangleOidcSsoAuthClient
 ```
 
 ### `TangleOidcSsoHandlerOptions`
 
-`interface` — Registered OIDC client with a separate token persistence contract.
+`interface` — Registered OIDC client and token store.
 
 ```ts
 interface TangleOidcSsoHandlerOptions
+```
+
+### `TangleOidcSsoTokens`
+
+`interface` — Token fields the callback persists from the runtime's OIDC exchange.
+
+```ts
+interface TangleOidcSsoTokens
+```
+
+### `TangleOidcSsoUser`
+
+`interface` — Verified identity returned by the runtime's OIDC userinfo lookup.
+
+```ts
+interface TangleOidcSsoUser
 ```
 
 ### `TanglePlanTier`

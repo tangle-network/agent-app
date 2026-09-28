@@ -9084,15 +9084,27 @@
         },
         {
           "name": "TangleOidcSsoAuthClient",
-          "kind": "type",
-          "signature": "type TangleOidcSsoAuthClient",
-          "doc": "The runtime owns the OIDC wire protocol and its types."
+          "kind": "interface",
+          "signature": "interface TangleOidcSsoAuthClient",
+          "doc": "The caller needs only the OIDC operations used by this callback."
         },
         {
           "name": "TangleOidcSsoHandlerOptions",
           "kind": "interface",
           "signature": "interface TangleOidcSsoHandlerOptions",
-          "doc": "Registered OIDC client with a separate token persistence contract."
+          "doc": "Registered OIDC client and token store."
+        },
+        {
+          "name": "TangleOidcSsoTokens",
+          "kind": "interface",
+          "signature": "interface TangleOidcSsoTokens",
+          "doc": "Token fields the callback persists from the runtime's OIDC exchange."
+        },
+        {
+          "name": "TangleOidcSsoUser",
+          "kind": "interface",
+          "signature": "interface TangleOidcSsoUser",
+          "doc": "Verified identity returned by the runtime's OIDC userinfo lookup."
         },
         {
           "name": "TanglePlanTier",
