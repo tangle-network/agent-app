@@ -31,7 +31,7 @@ _101 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
 | [`./harness`](api/harness.md) | 14 | — |
-| [`./hosted-agent`](api/hosted-agent.md) | 9 | — |
+| [`./hosted-agent`](api/hosted-agent.md) | 12 | — |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `brand`, `intakes` |
 | [`./intakes-react/lazy`](api/intakes-react-lazy.md) | 2 | `brand`, `intakes` |
@@ -94,7 +94,7 @@ _101 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./theme/tailwind-preset`](api/theme-tailwind-preset.md) | 1 | — |
 | [`./tools`](api/tools.md) | 66 | `crypto`, `eval`, `openui` |
 | [`./trace`](api/trace.md) | 33 | `missions` |
-| [`./turn-health`](api/turn-health.md) | 32 | — |
+| [`./turn-health`](api/turn-health.md) | 32 | `alerting` |
 | [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `stream` |
 | [`./vault`](api/vault.md) | 17 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
@@ -342,9 +342,9 @@ Source: `src/harness/index.ts` · 14 exports
 
 ## `./hosted-agent`
 
-Source: `src/hosted-agent/index.ts` · 9 exports
+Source: `src/hosted-agent/index.ts` · 12 exports
 
-`BoxPolicy`, `CONVERSATION_TOOLS_OFF`, `createHostedAgent`, `DEFAULT_BOX_POLICY`, `DEFAULT_HOSTED_MODEL`, `HostedAgent`, `HostedAgentConfig`, `HostedAgentError`, `PERSON_KEY_PREFIX`
+`BoxPolicy`, `CONVERSATION_TOOLS_OFF`, `createHostedAgent`, `DEFAULT_BOX_POLICY`, `DEFAULT_HOSTED_MODEL`, `HostedAgent`, `HostedAgentAttachment`, `HostedAgentConfig`, `HostedAgentError`, `HostedAgentLineOptions`, `HostedAgentTransport`, `PERSON_KEY_PREFIX`
 
 [Full API →](api/hosted-agent.md)
 
@@ -903,6 +903,8 @@ Depends on: `missions`
 ## `./turn-health`
 
 Source: `src/turn-health/index.ts` · 32 exports
+
+Depends on: `alerting`
 
 `AlertSink`, `AlertThrottleStore`, `classifyTurnOutcome`, `createConsoleAlertSink`, `createD1TurnHealthSource`, `createGuardedAlertSink`, `createMemoryThrottleStore`, `createMultiAlertSink`, `createSlackBotAlertSink`, `createThrottledAlertSink`, `createTurnHealthLifecycle`, `createWebhookAlertSink`, `D1LikeForHealth`, `describeReason`, `FetchLike`, `PersistedTurnRow`, `SHELL_ERROR_REPLY_PREFIXES`, `SweepOptions`, `SweepResult`, `sweepSilentFailures`, `turnAlert`, `TurnHealthAlert`, `TurnHealthCompleteInfo`, `TurnHealthErrorInfo`, `TurnHealthLifecycle`, `TurnHealthLifecycleOptions`, `TurnHealthReason`, `TurnHealthSeverity`, `TurnHealthSource`, `TurnHealthVerdict`, `TurnOutcomeInput`, `UnansweredThread`
 
