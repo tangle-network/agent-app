@@ -35,7 +35,7 @@ export type LineLastTurn =
   | { kind: 'unavailable' }
 
 /** The line fields the SDK returns, with the app's target and latest turn joined on. */
-export interface LineSetupLine extends Pick<Line, 'id' | 'connectionId' | 'transport' | 'address' | 'connect' | 'routerAddress' | 'status'> {
+export interface LineSetupLine extends Pick<Line, 'id' | 'connectionId' | 'transport' | 'address' | 'connect' | 'routerAddress' | 'providerNumberId' | 'status'> {
   /** True only while an active Hub attachment routes messages to an agent or box. */
   answering: boolean
   /** The viewer may disconnect this line. A workspace list can include other agents' lines. */

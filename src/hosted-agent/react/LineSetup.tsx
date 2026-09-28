@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Line } from '@tangle-network/sandbox'
 import type {
   LineBoxMode, LineConnectionOption, LineIdentityKind, LineIdentityOption,
-  LineSetupProps, LineSetupSnapshot,
+  LineSetupLine, LineSetupProps, LineSetupSnapshot,
 } from './contracts'
 
 const TRANSPORT: Record<Line['transport'], string> = {
@@ -29,6 +29,19 @@ function choicesFor(snapshot: LineSetupSnapshot): Choice[] {
     connection,
     identity,
   })))
+}
+
+function canOfferReconnect(line: LineSetupLine, choice: Choice): boolean {
+  if (line.connectionId !== choice.connection.id || line.transport !== choice.identity.transport || line.targetId !== null) return false
+  if (line.providerNumberId === null) return line.transport !== 'whatsapp' && !choice.identity.phoneNumberId && !choice.identity.requiresPhoneNumberId
+  return choice.identity.phoneNumberId === line.providerNumberId ||
+    (!choice.identity.phoneNumberId && choice.identity.requiresPhoneNumberId === true)
+}
+
+function matchesLineIdentity(line: LineSetupLine, identity: LineIdentityOption, numberId: string): boolean {
+  if (line.transport !== identity.transport) return false
+  if (line.providerNumberId === null) return line.transport !== 'whatsapp' && !identity.phoneNumberId && !identity.requiresPhoneNumberId
+  return numberId === line.providerNumberId
 }
 
 /** Set up an owned identity through a host route backed by sandbox.lines and Hub. */
@@ -96,9 +109,11 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   }, [confirmLineId])
 
   const allChoices = snapshot ? choicesFor(snapshot) : []
-  const choices = snapshot ? allChoices.filter(choice => !snapshot.lines.some(line =>
-    line.status !== 'released' && line.transport === choice.identity.transport &&
-    (line.connectionId !== choice.connection.id || line.targetId !== null))) : []
+  const choices = snapshot ? allChoices.filter(choice => {
+    const occupied = snapshot.lines.filter(line => line.status !== 'released' && line.transport === choice.identity.transport)
+    const [line] = occupied
+    return occupied.length === 0 || (occupied.length === 1 && line !== undefined && canOfferReconnect(line, choice))
+  }) : []
   const availableKinds = (['handle', 'number', 'email'] as const).filter(value => choices.some(choice => choice.identity.kind === value))
   const selectedKind = availableKinds.includes(kind) ? kind : availableKinds[0]
   const kindChoices = choices.filter(choice => choice.identity.kind === selectedKind)
@@ -107,11 +122,15 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   const selectedMode = selectedTarget?.modes.includes(boxMode) ? boxMode : selectedTarget?.modes[0]
   const enteredNumber = selected?.identity.phoneNumberId ?? phoneNumberId.trim()
   const needsNumber = selected?.identity.transport === 'whatsapp' || selected?.identity.requiresPhoneNumberId
-  const reconnecting = selected && snapshot?.lines.some(line => line.status !== 'released' &&
-    line.connectionId === selected.connection.id && line.transport === selected.identity.transport && line.targetId === null)
+  const occupied = selected && snapshot?.lines.filter(line => line.status !== 'released' && line.transport === selected.identity.transport)
+  const [occupiedLine] = occupied || []
+  const reconnectChoice = Boolean(selected && occupied?.length === 1 && occupiedLine && canOfferReconnect(occupiedLine, selected))
+  const reconnecting = Boolean(reconnectChoice && selected && occupiedLine &&
+    matchesLineIdentity(occupiedLine, selected.identity, enteredNumber))
+  const blockedByExistingLine = Boolean(occupied?.length && !reconnecting)
 
   async function connect() {
-    if (!selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || busy) return
+    if (!selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine || busy) return
     setBusy(true)
     setError(null)
     try {
@@ -129,7 +148,8 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
         onNotice?.({ kind: 'error', message: 'Line connected, but its current status could not be loaded.' })
         return
       }
-      const line = updated.lines.find(item => item.connectionId === selected.connection.id && item.transport === selected.identity.transport)
+      const line = updated.lines.find(item => item.status !== 'released' && item.connectionId === selected.connection.id &&
+        item.transport === selected.identity.transport && item.providerNumberId === (enteredNumber || null))
       onNotice?.({ kind: 'success', message: line?.answering ? 'The line is answering.' : 'Line connected. Add a member to start answers.' })
     } catch (cause) {
       if (!stillCurrent()) return
@@ -237,8 +257,9 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
                   <input value={phoneNumberId} onChange={event => setPhoneNumberId(event.target.value)} autoComplete="off" placeholder="Number ID from Hub" />
                 </label>}
               </div>
-              <button className="tangle-lines__primary" type="button" disabled={busy || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber)} onClick={() => void connect()}>
-                {busy ? (reconnecting ? 'Reconnecting…' : 'Connecting…') : `${reconnecting ? 'Reconnect' : 'Connect'} ${selected ? TRANSPORT[selected.identity.transport] : 'line'}`}
+              {reconnectChoice && blockedByExistingLine && <p className="tangle-lines__warning">Enter this line's current provider number ID to reconnect.</p>}
+              <button className="tangle-lines__primary" type="button" disabled={busy || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine} onClick={() => void connect()}>
+                {busy ? (reconnectChoice ? 'Reconnecting…' : 'Connecting…') : `${reconnectChoice ? 'Reconnect' : 'Connect'} ${selected ? TRANSPORT[selected.identity.transport] : 'line'}`}
               </button>
             </>}
       </div>}

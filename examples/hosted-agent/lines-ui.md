@@ -9,6 +9,9 @@ This subpath needs `@tangle-network/sandbox` 0.55.2 or newer for its line types 
 Set `answering` from an active SDK line attachment, not from `line.status` alone.
 Set `lastTurn` to `latest`, `none`, or `unavailable` so a failed history read never looks like an empty conversation.
 Set `canDisconnect` only for lines this viewer may detach.
+Pass the SDK's `providerNumberId` on every line, including `null` for transports without one.
+For a WhatsApp connection with several numbers, expose each owned number as a separate identity with its provider number ID.
+When Hub requires manual entry, set `requiresPhoneNumberId`; reconnect enables only when the entered ID matches the disconnected line.
 The UI allows one non-released line per transport in that workspace.
 The server must enforce the same rule because two browser requests can race.
 
@@ -40,3 +43,7 @@ The server must enforce member caps and last-owner rules because another client 
 `LineBilling` displays the payer and daily allowance supplied by the server.
 Set `linePayer.kind` or `turnPayer.kind` to `unverified` when the billed identity cannot be confirmed.
 Member-paid turns need the platform's member-pay API; a label in this component does not change payment routing.
+
+Storybook contains connected, disconnected, empty, loading, error, and reconnect states under `Hosted agent/Lines`.
+The interactive setup and member stories run in both agent-app light and dark themes.
+Hosts overriding `--line-kit-accent` should set `--line-kit-accent-foreground` to a readable text color for that accent.
