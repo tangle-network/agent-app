@@ -7,8 +7,12 @@ minimumReleaseAge: 1440
 minimumReleaseAgeStrict: true
 minimumReleaseAgeIgnoreMissingTime: false
 strictPeerDependencies: true
+peerDependencyRules:
+  allowedVersions:
+    '@ph0ny/sdk@0.1.2>typescript': '7.0.2'
 minimumReleaseAgeExclude:
   - '@tangle-network/*'
+  - '@ph0ny/sdk@0.1.2'
 
 allowBuilds:
   '@ax-llm/ax': false

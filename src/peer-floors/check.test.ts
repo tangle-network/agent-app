@@ -176,12 +176,13 @@ describe('this package audits itself', () => {
   // dev install runs, and claims nothing past it. The Runtime refuses Sandbox
   // 0.48, so the shell refuses it too. Sandbox 0.50 adds the named instances
   // that `hosted-agent` keeps each person's box on, 0.51 adds lines, 0.52
-  // runs each line member in their own named instance, and 0.53 adds email lines.
+  // runs each line member in their own named instance, 0.53 adds email lines,
+  // and 0.55 adds the global line detach the hosted-agent kit uses.
   // The published Runtime 0.282.2 requires Eval 0.199.x. Shared examples must
   // satisfy both ranges.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
-    ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.999'], ['0.200.0']],
-    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999'], ['0.54.0']],
+    ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.1', '0.199.999'], ['0.200.0']],
+    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999', '0.54.0', '0.55.2'], ['0.56.0']],
     ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0'], ['3.0.0']],
   ]
 

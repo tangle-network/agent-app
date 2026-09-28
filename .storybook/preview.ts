@@ -2,6 +2,7 @@ import type { Decorator, Preview } from '@storybook/react'
 import '../src/theme/tokens.css'
 import './storybook.css'
 import '../src/studio-react/studio.css'
+import '../src/hosted-agent/react/lines.css'
 // AFTER tokens.css on purpose: brand-themes.css ties `:root`/`.dark` in
 // specificity and must win by source order (see the note inside that file).
 import './brand-themes.css'

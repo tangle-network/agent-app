@@ -6444,6 +6444,141 @@
       ]
     },
     {
+      "id": "./hosted-agent/react",
+      "source": "src/hosted-agent/react/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "ConnectableLineTransport",
+          "kind": "type",
+          "signature": "type ConnectableLineTransport",
+          "doc": null
+        },
+        {
+          "name": "LineAnswerTarget",
+          "kind": "interface",
+          "signature": "interface LineAnswerTarget",
+          "doc": null
+        },
+        {
+          "name": "LineBilling",
+          "kind": "function",
+          "signature": "({ view }: LineBillingProps) => Element",
+          "doc": "Read-only billing facts from the line attachment and Hub allowance status."
+        },
+        {
+          "name": "LineBillingProps",
+          "kind": "interface",
+          "signature": "interface LineBillingProps",
+          "doc": null
+        },
+        {
+          "name": "LineBillingView",
+          "kind": "interface",
+          "signature": "interface LineBillingView",
+          "doc": null
+        },
+        {
+          "name": "LineBoxMode",
+          "kind": "type",
+          "signature": "type LineBoxMode",
+          "doc": null
+        },
+        {
+          "name": "LineConnectInput",
+          "kind": "interface",
+          "signature": "interface LineConnectInput",
+          "doc": null
+        },
+        {
+          "name": "LineConnectionOption",
+          "kind": "interface",
+          "signature": "interface LineConnectionOption",
+          "doc": null
+        },
+        {
+          "name": "LineIdentityKind",
+          "kind": "type",
+          "signature": "type LineIdentityKind",
+          "doc": null
+        },
+        {
+          "name": "LineIdentityOption",
+          "kind": "interface",
+          "signature": "interface LineIdentityOption",
+          "doc": "An owned identity that Hub can turn into a line through sandbox.lines.fromConnection()."
+        },
+        {
+          "name": "LineLastTurn",
+          "kind": "type",
+          "signature": "type LineLastTurn",
+          "doc": null
+        },
+        {
+          "name": "LineMemberRole",
+          "kind": "interface",
+          "signature": "interface LineMemberRole",
+          "doc": null
+        },
+        {
+          "name": "LineMembers",
+          "kind": "function",
+          "signature": "({ lineId, scopeKey, client, roles, canManage, canAdd, maxMembers, allowRoleChange, allowRemoveLastOwner, onNotice }: L…",
+          "doc": "Manage Hub line members while keeping consent and STOP authority with the sender."
+        },
+        {
+          "name": "LineMembersClient",
+          "kind": "interface",
+          "signature": "interface LineMembersClient",
+          "doc": null
+        },
+        {
+          "name": "LineMembersProps",
+          "kind": "interface",
+          "signature": "interface LineMembersProps",
+          "doc": null
+        },
+        {
+          "name": "LineSetup",
+          "kind": "function",
+          "signature": "({ client, scopeKey, initialTargetId, canManage, onNotice }: LineSetupProps) => Element",
+          "doc": "Set up an owned identity through a host route backed by sandbox.lines and Hub."
+        },
+        {
+          "name": "LineSetupClient",
+          "kind": "interface",
+          "signature": "interface LineSetupClient",
+          "doc": "The host authenticates these calls and composes the published Sandbox SDK and Hub clients."
+        },
+        {
+          "name": "LineSetupLine",
+          "kind": "interface",
+          "signature": "interface LineSetupLine",
+          "doc": "The line fields the SDK returns, with the app's target and latest turn joined on."
+        },
+        {
+          "name": "LineSetupProps",
+          "kind": "interface",
+          "signature": "interface LineSetupProps",
+          "doc": null
+        },
+        {
+          "name": "LineSetupSnapshot",
+          "kind": "interface",
+          "signature": "interface LineSetupSnapshot",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./hosted-agent/react/styles",
+      "source": "src/hosted-agent/react/styles.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": []
+    },
+    {
       "id": "./intakes",
       "source": "src/intakes/index.ts",
       "dependsOn": [],

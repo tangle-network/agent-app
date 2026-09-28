@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
  * every consumer's client bundle crashes on module load (legal-agent #256,
  * tax-agent #372). The old readdir walked only top-level `*-react` DIRS, so
  * NESTED browser entries (`web-react/terminal`, `design-canvas-react/engine`,
- * every `*-react/lazy`, `vault/lazy`) were never checked — the exact blind spot
+ * every `*-react/lazy`, `vault/lazy`, `hosted-agent/react`) were never checked — the exact blind spot
  * that reopens the crash class. This derives the set straight from the shipped
  * `exports` map instead, so a new nested react/lazy entry is covered the moment
  * it is published.
@@ -50,11 +50,11 @@ const BROWSER_NONREACT = new Set([
   'openui',
 ])
 
-/** Browser-intended when a client bundle imports it: the whole `*-react` family
- *  (incl. nested `/engine`, `/lazy`, `/terminal`), any `/lazy` split
+/** Browser-intended when a client bundle imports it: the whole `*-react` family,
+ *  `hosted-agent/react`, and nested `/engine`, `/lazy`, or `/terminal` entries
  *  (browser-safe by construction), or a known pure-mechanism subpath. */
 function isBrowserIntended(subpath: string): boolean {
-  return /-react(\/|$)/.test(subpath) || subpath.endsWith('/lazy') || BROWSER_NONREACT.has(subpath)
+  return /-react(\/|$)/.test(subpath) || subpath.startsWith('hosted-agent/react') || subpath.endsWith('/lazy') || BROWSER_NONREACT.has(subpath)
 }
 
 function importTarget(entry: { import?: string; default?: string } | string): string | undefined {
