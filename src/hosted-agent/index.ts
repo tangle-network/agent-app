@@ -137,7 +137,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
       mode,
       members,
       unknownSenders: config.attachment?.unknownSenders ?? retained?.unknownSenders ?? (mode === 'shared' && transport !== 'email' ? 'guest' : 'reject'),
-      roles: config.attachment?.roles ?? retained?.roles ?? (mode === 'shared' ? { owner: PERSON, guest: PERSON } : { owner: PERSON }),
+      roles: config.attachment?.roles ?? retained?.roles ?? (mode === 'shared' ? { owner: PERSON, member: PERSON, guest: PERSON } : { owner: PERSON }),
       respond: { kind: 'agent', backend },
       limits: { turnsPerMemberPerDay: config.freeTurnsPerDay ?? 20, ...config.attachment?.limits },
       instance: config.attachment?.instance ?? { keyPrefix: PERSON_KEY_PREFIX, create },
