@@ -1,0 +1,24 @@
+{
+  "lineConfirmationFocused": "Disconnect",
+  "lineKeepFocused": "Disconnect line",
+  "lineSuccessFocused": "Lines",
+  "memberConfirmationFocused": "Remove",
+  "memberKeepFocused": "Remove",
+  "memberSuccessFocused": "Members",
+  "connectRefresh": {
+    "retryVisible": true,
+    "staleActionDisabled": true,
+    "recovered": true
+  },
+  "disconnectRefresh": {
+    "retryVisible": true,
+    "staleActionDisabled": true,
+    "recovered": true
+  },
+  "memberRefresh": {
+    "retryVisible": true,
+    "staleActionDisabled": true,
+    "recovered": true
+  },
+  "pageErrors": []
+}

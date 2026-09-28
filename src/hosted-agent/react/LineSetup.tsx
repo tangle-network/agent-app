@@ -52,11 +52,15 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   const currentScope = useRef(scopeKey)
   const currentTarget = useRef(initialTargetId)
   const confirmButton = useRef<HTMLButtonElement>(null)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const disconnectTriggers = useRef(new Map<string, HTMLButtonElement>())
+  const restoreFocusTo = useRef<string | null>(null)
   currentScope.current = scopeKey
   currentTarget.current = initialTargetId
   const [loadedSnapshot, setLoadedSnapshot] = useState<{ scopeKey: string; initialTargetId: string | undefined; value: LineSetupSnapshot } | null>(null)
   const snapshot = loadedSnapshot?.scopeKey === scopeKey && loadedSnapshot.initialTargetId === initialTargetId ? loadedSnapshot.value : null
   const [loading, setLoading] = useState(true)
+  const [refreshFailed, setRefreshFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [kind, setKind] = useState<LineIdentityKind>('handle')
@@ -77,6 +81,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
       if (request !== sequence.current || !stillCurrent()) return null
       setLoadedSnapshot({ scopeKey, initialTargetId, value: next })
       setError(null)
+      setRefreshFailed(false)
       setTargetId(current => next.targets.some(target => target.id === current)
         ? current : next.targets.find(target => target.id === initialTargetId)?.id ?? next.targets[0]?.id ?? '')
       setLoading(false)
@@ -84,15 +89,28 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
     } catch (cause) {
       if (request !== sequence.current || !stillCurrent()) return null
       setError(message(cause))
+      setRefreshFailed(true)
       setLoading(false)
       return null
     }
+  }
+
+  function retry() {
+    if (loading) return
+    setLoading(true)
+    void reload()
+  }
+
+  function closeConfirmation(lineId: string) {
+    restoreFocusTo.current = lineId
+    setConfirmLineId(null)
   }
 
   useEffect(() => {
     setLoading(true)
     setLoadedSnapshot(null)
     setError(null)
+    setRefreshFailed(false)
     setBusy(false)
     setKind('handle')
     setChoiceKey('')
@@ -100,6 +118,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
     setBoxMode('per-member')
     setPhoneNumberId('')
     setConfirmLineId(null)
+    restoreFocusTo.current = null
     void reload()
     return () => { sequence.current++ }
   }, [scopeKey, initialTargetId])
@@ -107,6 +126,15 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   useEffect(() => {
     if (confirmLineId) confirmButton.current?.focus()
   }, [confirmLineId])
+
+  useEffect(() => {
+    const lineId = restoreFocusTo.current
+    if (confirmLineId !== null || lineId === null) return
+    restoreFocusTo.current = null
+    const trigger = disconnectTriggers.current.get(lineId)
+    if (trigger && !trigger.disabled) trigger.focus()
+    else heading.current?.focus()
+  }, [confirmLineId, snapshot, refreshFailed])
 
   const allChoices = snapshot ? choicesFor(snapshot) : []
   const choices = snapshot ? allChoices.filter(choice => {
@@ -130,7 +158,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   const blockedByExistingLine = Boolean(occupied?.length && !reconnecting)
 
   async function connect() {
-    if (!selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine || busy) return
+    if (!selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine || busy || loading || refreshFailed) return
     setBusy(true)
     setError(null)
     try {
@@ -162,15 +190,15 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   }
 
   async function disconnect(lineId: string) {
-    if (busy) return
+    if (busy || loading || refreshFailed) return
     setBusy(true)
     setError(null)
     try {
       await clientRef.current.disconnect(lineId)
       if (!stillCurrent()) return
-      setConfirmLineId(null)
       const updated = await reload()
       if (!stillCurrent()) return
+      closeConfirmation(lineId)
       onNotice?.(updated
         ? { kind: 'success', message: 'The line stopped answering.' }
         : { kind: 'error', message: 'Line disconnected, but its current status could not be loaded.' })
@@ -187,7 +215,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   return <section className="tangle-lines" aria-label="Agent lines">
     <header className="tangle-lines__heading">
       <div>
-        <h2>Lines</h2>
+        <h2 ref={heading} tabIndex={-1}>Lines</h2>
         {snapshot && <p>{snapshot.workspaceName} can use one line per transport.</p>}
       </div>
       {snapshot && <span className="tangle-lines__count">{snapshot.lines.filter(line => line.answering).length} answering</span>}
@@ -195,7 +223,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
 
     {error && <div className="tangle-lines__error" role="alert">
       <span>{error}</span>
-      {!snapshot && <button type="button" onClick={() => { setLoading(true); void reload() }}>Retry</button>}
+      {(!snapshot || refreshFailed) && <button type="button" disabled={loading} onClick={retry}>Retry</button>}
     </div>}
     {loading && <p className="tangle-lines__muted" role="status">Loading lines…</p>}
 
@@ -216,9 +244,9 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
             {canManage && line.canDisconnect && line.targetId !== null && line.status === 'active' && <div className="tangle-lines__row-actions">
               {confirmLineId === line.id ? <div className="tangle-lines__confirm" role="group" aria-label={`Disconnect ${line.address}?`}>
                 <span>Disconnect this line?</span>
-                <button ref={confirmButton} type="button" className="tangle-lines__danger" disabled={busy} onClick={() => void disconnect(line.id)}>Disconnect</button>
-                <button type="button" disabled={busy} onClick={() => setConfirmLineId(null)}>Keep line</button>
-              </div> : <button type="button" className="tangle-lines__quiet" disabled={busy} onClick={() => setConfirmLineId(line.id)}>Disconnect line</button>}
+                <button ref={confirmButton} type="button" className="tangle-lines__danger" disabled={busy || loading || refreshFailed} onClick={() => void disconnect(line.id)}>Disconnect</button>
+                <button type="button" disabled={busy} onClick={() => closeConfirmation(line.id)}>Keep line</button>
+              </div> : <button ref={node => { if (node) disconnectTriggers.current.set(line.id, node); else disconnectTriggers.current.delete(line.id) }} type="button" className="tangle-lines__quiet" disabled={busy || loading || refreshFailed} onClick={() => setConfirmLineId(line.id)}>Disconnect line</button>}
             </div>}
           </div>)}
       </div>
@@ -228,10 +256,10 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
         <p>Choose an identity already connected in Hub. Billing details appear below.</p>
         {snapshot.connections === null ? <div className="tangle-lines__error" role="status">
           <span>Hub connections could not be read. Check Hub access and try again.</span>
-          <button type="button" disabled={loading} onClick={() => { setLoading(true); void reload() }}>Retry</button>
+          <button type="button" disabled={loading} onClick={retry}>Retry</button>
         </div>
           : availableKinds.length === 0 ? <p className="tangle-lines__empty">
-            Connect an owned handle, number, or mailbox in Hub, then <button type="button" disabled={loading} onClick={() => { setLoading(true); void reload() }}>reload</button>.
+            Connect an owned handle, number, or mailbox in Hub, then <button type="button" disabled={loading} onClick={retry}>reload</button>.
           </p>
             : <>
               <div className="tangle-lines__kinds" role="group" aria-label="Identity type">
@@ -258,7 +286,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
                 </label>}
               </div>
               {reconnectChoice && blockedByExistingLine && <p className="tangle-lines__warning">Enter this line's current provider number ID to reconnect.</p>}
-              <button className="tangle-lines__primary" type="button" disabled={busy || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine} onClick={() => void connect()}>
+              <button className="tangle-lines__primary" type="button" disabled={busy || loading || refreshFailed || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine} onClick={() => void connect()}>
                 {busy ? (reconnectChoice ? 'Reconnecting…' : 'Connecting…') : `${reconnectChoice ? 'Reconnect' : 'Connect'} ${selected ? TRANSPORT[selected.identity.transport] : 'line'}`}
               </button>
             </>}

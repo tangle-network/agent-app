@@ -21,10 +21,14 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
   const currentLine = useRef(lineId)
   const currentScope = useRef(scopeKey)
   const confirmButton = useRef<HTMLButtonElement>(null)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const removeTriggers = useRef(new Map<string, HTMLButtonElement>())
+  const restoreFocusTo = useRef<string | null>(null)
   currentLine.current = lineId
   currentScope.current = scopeKey
   const [memberSnapshot, setMemberSnapshot] = useState<{ lineId: string; scopeKey: string; members: LineMember[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [refreshFailed, setRefreshFailed] = useState(false)
   const [address, setAddress] = useState('')
   const [label, setLabel] = useState('')
   const [role, setRole] = useState('member')
@@ -43,21 +47,37 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
       if (request !== sequence.current || !stillCurrent()) return false
       setMemberSnapshot({ lineId, scopeKey, members: next })
       setError(null)
+      setRefreshFailed(false)
       return true
     } catch (cause) {
       if (request !== sequence.current || !stillCurrent()) return false
       setError(errorMessage(cause))
+      setRefreshFailed(true)
       return false
     }
+  }
+
+  async function retry() {
+    if (busy) return
+    setBusy('refresh')
+    try { await reload() }
+    finally { if (stillCurrent()) setBusy(null) }
+  }
+
+  function closeConfirmation(memberId: string) {
+    restoreFocusTo.current = memberId
+    setConfirmId(null)
   }
 
   useEffect(() => {
     setMemberSnapshot(null)
     setError(null)
+    setRefreshFailed(false)
     setAddress('')
     setLabel('')
     setRole('member')
     setConfirmId(null)
+    restoreFocusTo.current = null
     setBusy(null)
     void reload()
     return () => { sequence.current++ }
@@ -67,20 +87,29 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
     if (confirmId) confirmButton.current?.focus()
   }, [confirmId])
 
+  useEffect(() => {
+    const memberId = restoreFocusTo.current
+    if (confirmId !== null || memberId === null) return
+    restoreFocusTo.current = null
+    const trigger = removeTriggers.current.get(memberId)
+    if (trigger && !trigger.disabled) trigger.focus()
+    else heading.current?.focus()
+  }, [confirmId, members, refreshFailed])
+
   const selectedRole = roles.some(item => item.value === role) ? role : roles.find(item => item.value === 'member')?.value ?? roles[0]?.value ?? ''
   const activeMembers = members?.filter(member => member.status !== 'removed').length ?? 0
   const activeOwners = members?.filter(member => member.role === 'owner' && member.status !== 'removed').length ?? 0
 
   async function mutate(key: string, action: () => Promise<void>, success: string, onSuccess?: () => void) {
-    if (busy) return
+    if (busy || refreshFailed) return
     setBusy(key)
     setError(null)
     try {
       await action()
       if (!stillCurrent()) return
-      onSuccess?.()
       const refreshed = await reload()
       if (!stillCurrent()) return
+      onSuccess?.()
       onNotice?.(refreshed
         ? { kind: 'success', message: success }
         : { kind: 'error', message: 'Member updated, but the current member list could not be loaded.' })
@@ -105,12 +134,12 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
 
   return <section className="tangle-lines" aria-label="Line members">
     <header className="tangle-lines__heading">
-      <div><h2>Members</h2><p>Each address controls its own consent and STOP state.</p></div>
+      <div><h2 ref={heading} tabIndex={-1}>Members</h2><p>Each address controls its own consent and STOP state.</p></div>
       {members && <span className="tangle-lines__count">{activeMembers} {activeMembers === 1 ? 'member' : 'members'}</span>}
     </header>
     {error && <div className="tangle-lines__error" role="alert">
       <span>{error}</span>
-      {members === null && <button type="button" onClick={() => void reload()}>Retry</button>}
+      {(members === null || refreshFailed) && <button type="button" disabled={busy !== null} onClick={() => void retry()}>Retry</button>}
     </div>}
     {members === null ? !error && <p className="tangle-lines__muted" role="status">Loading members…</p> : <div className="tangle-lines__list">
       {members.length === 0 && <p className="tangle-lines__empty">{canAdd ? 'No members yet. Invite an address that you own or have permission to add.' : 'No members yet.'}</p>}
@@ -127,16 +156,16 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
           <div className="tangle-lines__row-actions">
             {editable ? <>
               {allowRoleChange && !lastOwner ? <label className="tangle-lines__compact-label">Role
-                <select value={member.role} disabled={busy !== null} onChange={event => void mutate(member.id, () => clientRef.current.update(lineId, member.id, { role: event.target.value }), 'Role updated.')}>
+                <select value={member.role} disabled={busy !== null || refreshFailed} onChange={event => void mutate(member.id, () => clientRef.current.update(lineId, member.id, { role: event.target.value }), 'Role updated.')}>
                   {!roles.some(item => item.value === member.role) && <option value={member.role}>{member.role}</option>}
                   {roles.map(item => <option key={item.value} value={item.value}>{item.label}{item.tools === 'chat' ? ' · chat only' : ''}</option>)}
                 </select>
               </label> : <span className="tangle-lines__role">{roles.find(item => item.value === member.role)?.label ?? member.role}</span>}
               {confirmId === member.id ? <div className="tangle-lines__confirm" role="group" aria-label={`Remove ${member.label || member.address}?`}>
                 <span>Remove {member.label || member.address}?</span>
-                <button ref={confirmButton} type="button" className="tangle-lines__danger" disabled={busy !== null} onClick={() => void mutate(member.id, () => clientRef.current.remove(lineId, member.id), 'Member removed.', () => setConfirmId(null))}>Remove</button>
-                <button type="button" disabled={busy !== null} onClick={() => setConfirmId(null)}>Keep</button>
-              </div> : <button type="button" className="tangle-lines__quiet" disabled={busy !== null} onClick={() => setConfirmId(member.id)}>Remove</button>}
+                <button ref={confirmButton} type="button" className="tangle-lines__danger" disabled={busy !== null || refreshFailed} onClick={() => void mutate(member.id, () => clientRef.current.remove(lineId, member.id), 'Member removed.', () => closeConfirmation(member.id))}>Remove</button>
+                <button type="button" disabled={busy !== null} onClick={() => closeConfirmation(member.id)}>Keep</button>
+              </div> : <button ref={node => { if (node) removeTriggers.current.set(member.id, node); else removeTriggers.current.delete(member.id) }} type="button" className="tangle-lines__quiet" disabled={busy !== null || refreshFailed} onClick={() => setConfirmId(member.id)}>Remove</button>}
             </> : <span className="tangle-lines__role">{roles.find(item => item.value === member.role)?.label ?? member.role}</span>}
           </div>
         </div>
@@ -159,7 +188,7 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
           </select>
         </label>
       </div>
-      <button type="button" className="tangle-lines__primary" disabled={busy !== null || !address.trim() || !selectedRole} onClick={add}>
+      <button type="button" className="tangle-lines__primary" disabled={busy !== null || refreshFailed || !address.trim() || !selectedRole} onClick={add}>
         {busy === 'add' ? 'Inviting…' : 'Invite member'}
       </button>
     </div>}

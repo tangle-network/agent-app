@@ -5,8 +5,8 @@ These captures show the integration in a local production build with harness aut
 The API fixture supplies an owned email connection, one agent, a member, and allowance data.
 This is visual and workflow evidence; it does not prove a Hub or provider turn.
 
-Source for the Builder fixture: agent-app `af931e2` and Builder `9eaf361` plus its pending hosted-line integration diff.
-Builder later committed that integration at `04acb0c`.
+Source for the refreshed Builder fixture: agent-app `4644733` tarball and Builder `7ef314c`.
+The tarball SHA-256 was `29a1d0ebcd8e144bfdd64cf8257c5d880c36f772442b584cc02e7f4b4d14f730`.
 Target: Chromium at `http://127.0.0.1:8807/app/launch/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`, with a local harness cookie.
 The route is not a public deployment.
 
@@ -20,11 +20,11 @@ The UI then showed one answering line, an invited member awaiting sender consent
 Disconnect stopped answering; reloading showed the detached line and a `Reconnect Email` action for the same identity.
 The fixture kept that state during the local browser flow only.
 
-The [desktop uncut WebM](after/desktop/workflow-visual-fixture.webm) records 10.84 seconds of browser interaction.
-The [mobile uncut WebM](after/mobile/workflow-visual-fixture.webm) records 8.84 seconds.
-The [desktop 2× MP4](after/desktop/workflow-visual-fixture-2x.mp4) and [mobile 2× MP4](after/mobile/workflow-visual-fixture-2x.mp4) are fast playback copies of those browser recordings.
+The [desktop uncut WebM](after/desktop/workflow-visual-fixture.webm) records 13.16 seconds of browser interaction.
+The [mobile uncut WebM](after/mobile/workflow-visual-fixture.webm) records 12.92 seconds.
+The [desktop 2× MP4](after/desktop/workflow-visual-fixture-2x.mp4) and [mobile 2× MP4](after/mobile/workflow-visual-fixture-2x.mp4) are fast playback copies (6.68 and 6.56 seconds).
 All videos start after server boot and harness authentication; they stop after the browser reload.
-Both uncut WebM files decode without errors.
+All four videos decode without errors and played in Chromium; playback advanced in each file.
 
 Separate browser passes captured [desktop loading](after/desktop/launch-lines-loading.png), [empty](after/desktop/launch-lines-empty.png), and [503 error](after/desktop/launch-lines-error.png) states.
 Equivalent [mobile loading](after/mobile/launch-lines-loading.png), [empty](after/mobile/launch-lines-empty.png), and [503 error](after/mobile/launch-lines-error.png) captures are included.
@@ -53,3 +53,9 @@ No page exceptions occurred across these stories.
 The disconnect confirmation story rendered its action and moved keyboard focus to Disconnect.
 For two numbers on one WhatsApp connection, only the detached line's provider number appeared as a reconnect choice.
 In the manual-number story, an empty or different ID kept Reconnect disabled; the exact ID enabled it.
+
+The [retry and focus browser check](storybook/retry-focus-check.json) exercises keyboard confirmation and recovery after a successful write with a failed next read.
+The browser showed [setup Retry](storybook/story-refresh-error-setup.png) and [member Retry](storybook/story-refresh-error-members.png) while stale mutation actions were disabled.
+Retry recovered connect, disconnect, and invite views without a page exception.
+Keep returned focus to the original trigger for both confirmation types.
+After a successful disconnect or removal deleted that trigger, focus moved to the section heading.

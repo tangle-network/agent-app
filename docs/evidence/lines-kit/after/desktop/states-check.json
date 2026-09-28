@@ -8,6 +8,8 @@
     "retry recovered"
   ],
   "browserErrors": [
+    "network: http://127.0.0.1:8807/api/agents/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/launch net::ERR_ABORTED",
+    "network: http://127.0.0.1:8807/api/agents/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/launch net::ERR_ABORTED",
     "console: Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
   ]
 }

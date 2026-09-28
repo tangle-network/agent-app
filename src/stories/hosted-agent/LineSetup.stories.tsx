@@ -4,7 +4,7 @@ import { userEvent, within } from 'storybook/test'
 import { LineSetup } from '../../hosted-agent/react'
 import type { LineSetupSnapshot } from '../../hosted-agent/react'
 import {
-  createSetupClient, setupConnected, setupDisconnected, setupEmpty,
+  createSetupClient, createSetupRefreshFailureClient, setupConnected, setupDisconnected, setupEmpty,
   setupManualNumberReconnect, setupMultiNumberDisconnected,
 } from './fixtures'
 
@@ -18,12 +18,14 @@ const meta: Meta<typeof LineSetup> = {
 export default meta
 type Story = StoryObj<typeof LineSetup>
 
-function SetupFixture({ snapshot, scopeKey, initialTargetId }: {
+function SetupFixture({ snapshot, scopeKey, initialTargetId, failRefreshAfterMutation = false }: {
   snapshot: LineSetupSnapshot
   scopeKey: string
   initialTargetId?: string
+  failRefreshAfterMutation?: boolean
 }) {
-  const client = useMemo(() => createSetupClient(snapshot), [snapshot])
+  const client = useMemo(() => failRefreshAfterMutation
+    ? createSetupRefreshFailureClient(snapshot) : createSetupClient(snapshot), [snapshot, failRefreshAfterMutation])
   return <LineSetup client={client} scopeKey={scopeKey} canManage initialTargetId={initialTargetId} />
 }
 
@@ -35,6 +37,25 @@ export const DisconnectConfirmation: Story = {
   render: () => <SetupFixture snapshot={setupConnected} scopeKey="storybook-confirmation" initialTargetId="agent_guide" />,
   play: async ({ canvasElement }) => {
     await userEvent.click(await within(canvasElement).findByRole('button', { name: 'Disconnect line' }))
+  },
+}
+
+export const RefreshAfterConnectError: Story = {
+  render: () => <SetupFixture snapshot={setupEmpty} scopeKey="storybook-connect-refresh-error" failRefreshAfterMutation />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: 'Connect Email' }))
+    await canvas.findByText('The updated line could not be loaded.')
+  },
+}
+
+export const RefreshAfterDisconnectError: Story = {
+  render: () => <SetupFixture snapshot={setupConnected} scopeKey="storybook-disconnect-refresh-error" failRefreshAfterMutation />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: 'Disconnect line' }))
+    await userEvent.click(await canvas.findByRole('button', { name: /^Disconnect$/ }))
+    await canvas.findByText('The updated line could not be loaded.')
   },
 }
 

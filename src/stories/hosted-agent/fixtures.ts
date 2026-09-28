@@ -126,6 +126,24 @@ export function createSetupClient(initial: LineSetupSnapshot): LineSetupClient {
   }
 }
 
+/** Let a mutation succeed, fail its next read once, then allow Retry to recover. */
+export function createSetupRefreshFailureClient(initial: LineSetupSnapshot): LineSetupClient {
+  const client = createSetupClient(initial)
+  let failNextLoad = false
+  return {
+    ...client,
+    async load() {
+      if (failNextLoad) {
+        failNextLoad = false
+        throw new Error('The updated line could not be loaded.')
+      }
+      return client.load()
+    },
+    async connect(input) { await client.connect(input); failNextLoad = true },
+    async disconnect(lineId) { await client.disconnect(lineId); failNextLoad = true },
+  }
+}
+
 export const memberRoles = [
   { value: 'owner', label: 'Owner', tools: 'act' },
   { value: 'manager', label: 'Manager', tools: 'act' },
@@ -174,6 +192,25 @@ export function createMembersClient(initial: LineMember[]): LineMembersClient {
       if (!row) throw new Error('Member not found.')
       row.status = 'removed'
     },
+  }
+}
+
+/** Retain the successful write while the next member list read fails once. */
+export function createMembersRefreshFailureClient(initial: LineMember[]): LineMembersClient {
+  const client = createMembersClient(initial)
+  let failNextList = false
+  return {
+    ...client,
+    async list(lineId) {
+      if (failNextList) {
+        failNextList = false
+        throw new Error('The updated member list could not be loaded.')
+      }
+      return client.list(lineId)
+    },
+    async add(lineId, input) { await client.add(lineId, input); failNextList = true },
+    async update(lineId, memberId, patch) { await client.update(lineId, memberId, patch); failNextList = true },
+    async remove(lineId, memberId) { await client.remove(lineId, memberId); failNextList = true },
   }
 }
 

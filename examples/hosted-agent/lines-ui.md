@@ -14,6 +14,8 @@ For a WhatsApp connection with several numbers, expose each owned number as a se
 When Hub requires manual entry, set `requiresPhoneNumberId`; reconnect enables only when the entered ID matches the disconnected line.
 The UI allows one non-released line per transport in that workspace.
 The server must enforce the same rule because two browser requests can race.
+If a write succeeds but the next read fails, the components keep the stale view visible with Retry and disable its mutation actions.
+Confirmations return focus to their trigger on cancel, or to the section heading when the completed action removes that trigger.
 
 The server uses the published clients:
 
@@ -44,6 +46,6 @@ The server must enforce member caps and last-owner rules because another client 
 Set `linePayer.kind` or `turnPayer.kind` to `unverified` when the billed identity cannot be confirmed.
 Member-paid turns need the platform's member-pay API; a label in this component does not change payment routing.
 
-Storybook contains connected, disconnected, empty, loading, error, and reconnect states under `Hosted agent/Lines`.
+Storybook contains connected, disconnected, empty, loading, error, post-mutation refresh failure, and reconnect states under `Hosted agent/Lines`.
 The interactive setup and member stories run in both agent-app light and dark themes.
 Hosts overriding `--line-kit-accent` should set `--line-kit-accent-foreground` to a readable text color for that accent.
