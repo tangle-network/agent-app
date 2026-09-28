@@ -112,7 +112,7 @@ export function LineMembers({ lineId, scopeKey, client, roles, canManage, canAdd
       <span>{error}</span>
       {members === null && <button type="button" onClick={() => void reload()}>Retry</button>}
     </div>}
-    {members === null ? <p className="tangle-lines__muted" role="status">Loading members…</p> : <div className="tangle-lines__list">
+    {members === null ? !error && <p className="tangle-lines__muted" role="status">Loading members…</p> : <div className="tangle-lines__list">
       {members.length === 0 && <p className="tangle-lines__empty">{canAdd ? 'No members yet. Invite an address that you own or have permission to add.' : 'No members yet.'}</p>}
       {members.map(member => {
         const lastOwner = member.role === 'owner' && activeOwners <= 1

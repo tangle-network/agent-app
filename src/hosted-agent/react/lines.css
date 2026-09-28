@@ -44,8 +44,8 @@
 .tangle-lines__row-main code { color: var(--tl-text); font-size: .92em; font-weight: 600; white-space: nowrap; }
 .tangle-lines__eyebrow { color: var(--tl-muted); display: block; font-size: .79rem; margin-bottom: .25rem; }
 .tangle-lines__row-actions { align-items: end; display: flex; flex-direction: column; gap: .5rem; }
-.tangle-lines__row-actions button, .tangle-lines__error button { background: none; border: 0; color: var(--tl-accent); padding: .25rem 0; white-space: nowrap; }
-.tangle-lines__row-actions button:hover, .tangle-lines__error button:hover { text-decoration: underline; }
+.tangle-lines__row-actions button, .tangle-lines__error button, .tangle-lines__empty button { background: none; border: 0; color: var(--tl-accent); padding: .25rem 0; white-space: nowrap; }
+.tangle-lines__row-actions button:hover, .tangle-lines__error button:hover, .tangle-lines__empty button:hover { text-decoration: underline; }
 .tangle-lines__confirm { align-items: center; display: flex; flex-wrap: wrap; gap: .65rem; justify-content: flex-end; max-width: 20rem; }
 .tangle-lines__confirm span { color: var(--tl-muted); font-size: .84rem; }
 .tangle-lines__confirm .tangle-lines__danger { color: var(--tl-danger); }

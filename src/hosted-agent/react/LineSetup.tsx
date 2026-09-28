@@ -107,6 +107,8 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   const selectedMode = selectedTarget?.modes.includes(boxMode) ? boxMode : selectedTarget?.modes[0]
   const enteredNumber = selected?.identity.phoneNumberId ?? phoneNumberId.trim()
   const needsNumber = selected?.identity.transport === 'whatsapp' || selected?.identity.requiresPhoneNumberId
+  const reconnecting = selected && snapshot?.lines.some(line => line.status !== 'released' &&
+    line.connectionId === selected.connection.id && line.transport === selected.identity.transport && line.targetId === null)
 
   async function connect() {
     if (!selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || busy) return
@@ -204,8 +206,13 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
       {canManage && (snapshot.connections === null || choices.length > 0 || allChoices.length === 0) && <div className="tangle-lines__setup">
         <h3>Connect an identity you own</h3>
         <p>Choose an identity already connected in Hub. Billing details appear below.</p>
-        {snapshot.connections === null ? <div className="tangle-lines__error" role="status">Hub connections could not be read. Retry after checking Hub access.</div>
-          : availableKinds.length === 0 ? <p className="tangle-lines__empty">Connect an owned handle, number, or mailbox in Hub, then reload.</p>
+        {snapshot.connections === null ? <div className="tangle-lines__error" role="status">
+          <span>Hub connections could not be read. Check Hub access and try again.</span>
+          <button type="button" disabled={loading} onClick={() => { setLoading(true); void reload() }}>Retry</button>
+        </div>
+          : availableKinds.length === 0 ? <p className="tangle-lines__empty">
+            Connect an owned handle, number, or mailbox in Hub, then <button type="button" disabled={loading} onClick={() => { setLoading(true); void reload() }}>reload</button>.
+          </p>
             : <>
               <div className="tangle-lines__kinds" role="group" aria-label="Identity type">
                 {availableKinds.map(value => <button key={value} type="button" aria-pressed={selectedKind === value} onClick={() => { setKind(value); setChoiceKey(''); setPhoneNumberId('') }}>{IDENTITY[value]}</button>)}
@@ -231,7 +238,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
                 </label>}
               </div>
               <button className="tangle-lines__primary" type="button" disabled={busy || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber)} onClick={() => void connect()}>
-                {busy ? 'Connecting…' : `Connect ${selected ? TRANSPORT[selected.identity.transport] : 'line'}`}
+                {busy ? (reconnecting ? 'Reconnecting…' : 'Connecting…') : `${reconnecting ? 'Reconnect' : 'Connect'} ${selected ? TRANSPORT[selected.identity.transport] : 'line'}`}
               </button>
             </>}
       </div>}
