@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.49.34
+
+- fix(hosted-agent): fence stale line callbacks by scope incarnation (#671)
+- docs(create-agent-app): clarify published chat quickstart and artifact limits [skip release] (#670)
+- feat(hosted-agent): add reusable line management UI [skip release]
+- fix(vault): guard external file navigation [skip release]
+- fix(vault): preserve focused dialog keyboard actions [skip release]
+- feat(auth): add registered OIDC callers [skip release]
+- feat(tangle-agent): add general runtime and persistent home [skip release]
+- fix(hosted-agent): keep preview control reachable under strict egress
+
 ## 0.49.33
 
 - refactor(integrations): use the published Hub SDK for actions
