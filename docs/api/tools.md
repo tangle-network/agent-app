@@ -360,7 +360,7 @@ interface McpToolDefinition
 
 ### `OpenAIFunctionTool`
 
-`interface` — Published Runtime tool descriptor with the description and schema required by app tools.
+`interface` — A minimal OpenAI Chat Completions function-tool shape — structurally compatible with `@tangle-network/agent-runtime`'s `OpenAIChatTool` without importing it (keeps this package runtime-free).
 
 ```ts
 interface OpenAIFunctionTool

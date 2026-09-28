@@ -1,4 +1,3 @@
-import { HubClient, HubSdkError } from '@tangle-network/hub-sdk'
 import { createHostedAgent } from '@tangle-network/agent-app/hosted-agent'
 
 /**
@@ -60,28 +59,25 @@ async function setup(request: Request, env: Env): Promise<Response> {
   if (!env.SETUP_SECRET || given.byteLength !== expected.byteLength || !crypto.subtle.timingSafeEqual(given, expected)) {
     return new Response('not found', { status: 404 })
   }
-  const body = await request.json().catch(() => null) as {
-    connectionId?: unknown
+  const hub = (path: string, init?: RequestInit) =>
+    fetch(`https://id.tangle.tools/v1/hub/${path}`, { ...init, headers: { authorization: `Bearer ${env.TANGLE_API_KEY}` } })
+  const listed = await (await hub('event-subscriptions')).json() as {
+    data: { subscriptions: Array<{ id: string; clientReference: string; connectionId: string }> }
+  }
+  const earlier = listed.data.subscriptions.filter(s => s.clientReference.startsWith('hosted-agent:'))
+  // Without a connection id, move the connection an earlier version of this app routed.
+  const { connectionId = earlier[0]?.connectionId, voice } = await request.json().catch(() => ({})) as {
+    connectionId?: string
     voice?: { ph0nyConnectionId: string; ph0nyAgentId: string }
-  } | null
-  if (!body || (body.connectionId !== undefined && typeof body.connectionId !== 'string')) {
-    return Response.json({ error: 'A JSON setup body with a connectionId is required' }, { status: 400 })
+  }
+  if (!connectionId) return Response.json({ error: 'connectionId is required' }, { status: 400 })
+  for (const subscription of earlier) {
+    if (subscription.connectionId === connectionId) await hub(`event-subscriptions/${subscription.id}`, { method: 'DELETE' })
   }
   try {
-    const hub = new HubClient({ baseUrl: 'https://id.tangle.tools', apiKey: env.TANGLE_API_KEY })
-    const { subscriptions } = await hub.eventSubscriptions.list()
-    const earlier = subscriptions.filter(s => s.clientReference?.startsWith('hosted-agent:'))
-    const candidates = [...new Set(earlier.map(s => s.connectionId))]
-    // Never choose an arbitrary identity when several legacy routes exist.
-    const connectionId = body.connectionId ?? (candidates.length === 1 ? candidates[0] : undefined)
-    if (!connectionId) return Response.json({ error: 'connectionId is required' }, { status: 400 })
-    for (const subscription of earlier) {
-      if (subscription.connectionId === connectionId) await hub.eventSubscriptions.delete(subscription.id)
-    }
-    return Response.json(await braid(env).attachLine(connectionId, { voice: body.voice }))
+    return Response.json(await braid(env).attachLine(connectionId, { voice }))
   } catch (error) {
-    // SDK errors already redact credentials. Do not echo arbitrary provider bodies.
-    return Response.json({ error: error instanceof HubSdkError ? error.code : 'line_setup_failed' }, { status: 502 })
+    return Response.json({ error: String(error).slice(0, 500) }, { status: 502 })
   }
 }
 

@@ -11,7 +11,6 @@
  * neither credentials nor the action catalog.
  */
 import { parseIntegrationToolName } from '@tangle-network/agent-integrations/catalog'
-import { HubClient, HubSdkError } from '@tangle-network/hub-sdk'
 
 /** `{ success: false }` codes the hub returns on `/exec`. */
 export type HubExecErrorCode =
@@ -67,30 +66,53 @@ export function resolveIntegrationAction(toolName: string): ParsedIntegrationAct
   return { ...parsed, path: `${parsed.providerId}.${parsed.connectorId}.${parsed.actionId}` }
 }
 
+interface HubEnvelope {
+  success: boolean
+  data?: { result?: unknown }
+  error?: { code?: string; message?: string; details?: { approval?: unknown } }
+}
+
 /** Typed client over the platform hub `/v1/hub/exec`. The hub holds the user's
  *  credentials, resolves the connection from the bearer principal, evaluates
  *  per-action policy (read → allow, write/destructive → approval), and runs the
  *  action server-side. Never throws on a policy block — a gated write is a
  *  normal `succeeded: false` outcome. */
 export class HubExecClient {
-  private readonly hub: HubClient
+  private readonly baseUrl: string
+  private readonly bearer: string
+  private readonly fetchImpl: typeof fetch
 
   constructor(options: HubExecClientOptions) {
     if (!options.baseUrl) throw new Error('HubExecClient: baseUrl is required')
     if (!options.bearer) throw new Error('HubExecClient: bearer is required')
-    this.hub = new HubClient({ baseUrl: options.baseUrl, apiKey: options.bearer, fetch: options.fetchImpl })
+    this.baseUrl = options.baseUrl.replace(/\/+$/, '')
+    this.bearer = options.bearer
+    this.fetchImpl = options.fetchImpl ?? fetch
   }
 
   async exec(input: { path: string; actionInput?: unknown; connectionId?: string }): Promise<HubExecResult> {
+    const response = await this.fetchImpl(`${this.baseUrl}/v1/hub/exec`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.bearer}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ path: input.path, input: input.actionInput, connectionId: input.connectionId }),
+    })
+    const envelope = await this.readEnvelope(response)
+    if (response.ok && envelope.success) return { succeeded: true, result: envelope.data?.result }
+    return {
+      succeeded: false,
+      code: envelope.error?.code ?? `HUB_HTTP_${response.status}`,
+      message: envelope.error?.message ?? `Hub /exec returned ${response.status}`,
+      approval: envelope.error?.details?.approval,
+    }
+  }
+
+  private async readEnvelope(response: Response): Promise<HubEnvelope> {
+    const text = await response.text()
+    if (!text) return { success: false, error: { code: `HUB_HTTP_${response.status}`, message: `Hub returned ${response.status} with no body` } }
     try {
-      const response = await this.hub.tools.invoke(input.path, input.actionInput, { connectionId: input.connectionId })
-      return { succeeded: true, result: response.result }
-    } catch (error) {
-      if (!(error instanceof HubSdkError)) throw error
-      const details = error.details
-      const approval = typeof details === 'object' && details !== null && 'approval' in details
-        ? details.approval : undefined
-      return { succeeded: false, code: error.code, message: error.message, approval }
+      return JSON.parse(text) as HubEnvelope
+    } catch {
+      return { success: false, error: { code: 'HUB_BAD_RESPONSE', message: `Hub returned non-JSON (${response.status}): ${text.slice(0, 200)}` } }
     }
   }
 }
@@ -126,7 +148,7 @@ export interface HubInvokeDeps {
  * approval-gated surfaces verbatim as 409, never silently executed.
  */
 export async function invokeIntegrationHub(input: HubInvokeInput, deps: HubInvokeDeps): Promise<HubInvokeOutcome> {
-  const env = deps.env ?? (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
+  const env = deps.env ?? (process.env as Record<string, string | undefined>)
   const baseUrl = deps.baseUrl ?? env.TANGLE_PLATFORM_URL?.trim()
   if (!baseUrl) return { status: 500, body: { error: 'TANGLE_PLATFORM_URL is not configured' } }
 

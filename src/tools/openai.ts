@@ -1,4 +1,3 @@
-import type { OpenAIChatTool } from '@tangle-network/agent-runtime'
 import { OPENUI_INTERACTIVE_AUTHORING_GUIDE } from '../openui/authoring'
 import type { AppToolTaxonomy, BuildAppToolsOptions } from './types'
 
@@ -14,9 +13,16 @@ export function isAppToolName(name: string): name is AppToolName {
   return NAME_SET.has(name)
 }
 
-/** Published Runtime tool descriptor with the description and schema required by app tools. */
-export interface OpenAIFunctionTool extends OpenAIChatTool {
-  function: OpenAIChatTool['function'] & Required<Pick<OpenAIChatTool['function'], 'description' | 'parameters'>>
+/** A minimal OpenAI Chat Completions function-tool shape — structurally
+ *  compatible with `@tangle-network/agent-runtime`'s `OpenAIChatTool` without
+ *  importing it (keeps this package runtime-free). */
+export interface OpenAIFunctionTool {
+  type: 'function'
+  function: {
+    name: string
+    description: string
+    parameters: Record<string, unknown>
+  }
 }
 
 /**
