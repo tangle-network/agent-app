@@ -47,6 +47,7 @@ export interface BoxPolicy {
   idleTimeoutSeconds: number
   maxLifetimeSeconds: number
   deleteAfterStoppedSeconds: number
+  /** App domains. The runtime also admits the exact Platform preview-control host. */
   allowDomains: string[]
 }
 
@@ -86,6 +87,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
   if (!config.client && !config.apiKey)
     throw new HostedAgentError('credential_required', 'Supply an API key or an authenticated Sandbox client.')
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
+  const allowDomains = [...new Set([...policy.allowDomains, 'id.tangle.tools'])]
   const sandbox = config.client ?? new Sandbox({ apiKey: config.apiKey!, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
   const backend: BackendConfig = config.backend ?? {
     ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}),
@@ -94,7 +96,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
   const create: LineInstanceCreate = {
     name: 'hosted-person',
     resources: { cpuCores: policy.cpuCores, memoryMB: policy.memoryMB, diskGB: policy.diskGB },
-    egressPolicy: { mode: 'strict', allowDomains: policy.allowDomains, includeImplicitDomains: false },
+    egressPolicy: { mode: 'strict', allowDomains, includeImplicitDomains: false },
     idleTimeoutSeconds: policy.idleTimeoutSeconds, maxLifetimeSeconds: policy.maxLifetimeSeconds,
     deleteAfterStoppedSeconds: policy.deleteAfterStoppedSeconds,
   }
