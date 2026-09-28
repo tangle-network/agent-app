@@ -37,7 +37,8 @@ git -C "$SEED" config user.email test@example.com
 mkdir -p "$SEED/create-agent-app"
 printf '{"name":"@tangle-network/agent-app","version":"1.2.3","description":"app"}\n' > "$SEED/package.json"
 printf '{"name":"@tangle-network/create-agent-app","version":"1.2.3","description":"create"}\n' > "$SEED/create-agent-app/package.json"
-git -C "$SEED" add package.json create-agent-app/package.json
+printf '# Changelog\n\n## Unreleased\n\n- Initial package.\n' > "$SEED/CHANGELOG.md"
+git -C "$SEED" add package.json create-agent-app/package.json CHANGELOG.md
 git -C "$SEED" commit --quiet -m base
 git -C "$SEED" branch -M main
 git -C "$SEED" remote add origin "$ORIGIN"
@@ -93,10 +94,10 @@ run_prepare() {
     BASE_SHA="$BASE" VERSION='1.2.4' bash "$SCRIPT" prepare >/dev/null
   )
   mapfile -t changed < <(git -C "$work" diff --name-only | LC_ALL=C sort)
-  [[ ${#changed[@]} -eq 2 && "${changed[0]}" == 'create-agent-app/package.json' && "${changed[1]}" == 'package.json' ]]
+  [[ ${#changed[@]} -eq 3 && "${changed[0]}" == 'CHANGELOG.md' && "${changed[1]}" == 'create-agent-app/package.json' && "${changed[2]}" == 'package.json' ]]
   [[ $(node -p "require('$work/package.json').version") == 1.2.4 ]]
   [[ $(node -p "require('$work/create-agent-app/package.json').version") == 1.2.4 ]]
-  git -C "$work" restore package.json create-agent-app/package.json
+  git -C "$work" restore package.json create-agent-app/package.json CHANGELOG.md
   printf 'unexpected\n' > "$work/unexpected.txt"
   git -C "$work" add unexpected.txt
   if (
@@ -116,6 +117,10 @@ forge_release() {
   git -C "$work" config user.name test
   git -C "$work" config user.email test@example.com
   git -C "$work" checkout --quiet --detach "$BASE"
+  (
+    cd "$work"
+    BASE_SHA="$BASE" VERSION='1.2.4' bash "$SCRIPT" prepare >/dev/null
+  )
   MUTATION="$mutation" node - "$work/package.json" "$work/create-agent-app/package.json" <<'NODE'
 const fs = require('node:fs')
 const [rootFile, createFile] = process.argv.slice(2)
@@ -129,7 +134,7 @@ if (process.env.MUTATION === 'modify') create.description = 'redirected package'
 fs.writeFileSync(rootFile, `${JSON.stringify(root, null, 2)}\n`)
 fs.writeFileSync(createFile, `${JSON.stringify(create, null, 2)}\n`)
 NODE
-  git -C "$work" add package.json create-agent-app/package.json
+  git -C "$work" add package.json create-agent-app/package.json CHANGELOG.md
   git -C "$work" commit --quiet -m 'chore(release): 1.2.4 [skip release]'
   local forged
   forged=$(git -C "$work" rev-parse HEAD)

@@ -17387,7 +17387,9 @@
     {
       "id": "./turn-health",
       "source": "src/turn-health/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "alerting"
+      ],
       "error": null,
       "exports": [
         {
