@@ -31,7 +31,7 @@ describe('invokeIntegrationHub', () => {
     }) as unknown as typeof fetch
     const out = await invokeIntegrationHub({ userId: 'u1', toolName: READ_TOOL, args: { q: 'x' } }, { apiKeyResolver: okKey, fetchImpl, env })
     expect(seen.url).toBe('https://id.tangle.tools/v1/hub/exec')
-    expect((seen.init.headers as Record<string, string>).Authorization).toBe('Bearer sk-tan-user')
+    expect(new Headers(seen.init.headers).get('authorization')).toBe('Bearer sk-tan-user')
     expect(out.status).toBe(200)
     expect(out.body).toMatchObject({ success: true, path: 'gmail.default.list', result: { messages: [{ id: 'm1' }] } })
   })

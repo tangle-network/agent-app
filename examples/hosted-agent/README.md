@@ -10,7 +10,7 @@ All of the hosted-agent behavior comes from `@tangle-network/agent-app/hosted-ag
 ## How a message flows
 
 1. A person texts Braid's line (an Inkbox iMessage identity).
-2. Tangle Hub receives it, finds the sender's member and thread, and runs the turn in the sender's own sandbox: the app's named instance `hosted:` plus a hash of their number.
+2. Tangle Hub receives it, finds the sender's member and thread, and runs the turn in the sender's own sandbox: the line's named instance `hosted:<line-id>:` plus a hash of their address.
    The first message creates a fresh isolated box from the persona; later messages resume it.
 3. Hub sends the reply on the same line.
 
@@ -24,7 +24,7 @@ Texts and calls never reach the Worker.
 
 | What | Default |
 |---|---|
-| Sandbox per person | 1 CPU, 2 GB memory, 10 GB disk, egress to `router.tangle.tools` only, none of the app's secrets |
+| Sandbox per person | 2 CPUs, 2 GB memory, 2 GB disk, strict egress to the model router and explicitly admitted control hosts; no app secrets |
 | Idle suspend | 10 minutes; the next message resumes the same box |
 | Deleted box, or one that fails to start for 60 s | the Platform gives the next message a fresh box |
 | Texts | 30 per person per UTC day (`freeTurnsPerDay`), counted by Hub |
@@ -44,7 +44,7 @@ Set `model.default` or `tools` in the persona to choose your own.
 ```sh
 pnpm install
 wrangler secret put TANGLE_API_KEY           # the app's Tangle key; it pays for everything
-wrangler secret put OWNER_PHONE              # your own phone, E.164: the line's owner
+wrangler secret put OWNER_ADDRESS            # E.164 phone or email address: the line's owner
 wrangler secret put SETUP_SECRET             # 32+ random bytes; delete it after setup
 wrangler deploy
 ```
@@ -53,8 +53,9 @@ wrangler deploy
 
 1. Create an Inkbox identity with iMessage enabled, and an agent-scoped Inkbox key for it.
 2. Connect it to Hub under the app's Tangle account: `hub.connections.connectApiKey('inkbox', key)`.
-3. Attach it as Braid's line. The Worker does this with the app's key.
-   An app that ran an earlier version of this example can omit `connectionId`: the Worker moves the connection it routed before.
+3. Attach it as Braid's line. Pass the owned connection id explicitly.
+   Setup never removes an existing event subscription.
+   If Hub reports a routing conflict, inspect and migrate that subscription in Hub before retrying.
 
 ```sh
 curl -X POST https://<worker>/setup -H "authorization: Bearer $SETUP_SECRET" \
@@ -63,6 +64,8 @@ wrangler secret delete SETUP_SECRET
 ```
 
 Hub's line timeline (`client.lines.threads(lineId).messages(threadId)`) records when each text arrived, was answered and was sent.
+The `assistant.mjs` and `live-proof.mjs` scripts provide an operator flow for setup, real message inspection, and scheduled-work evidence.
+They require an owned disposable connection and do not send a provider message themselves.
 
 To change the persona, box or daily limit later, detach the line, deploy, and run setup again.
 Hub refuses a changed attachment on an attached line with 409 `Line is attached; detach it before attaching it differently`.

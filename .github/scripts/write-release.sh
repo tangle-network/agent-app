@@ -35,20 +35,21 @@ build_expected_release_tree() {
   local root_file="$WORK/expected-package.json"
   local create_file="$WORK/expected-create-package.json"
   local changelog_file="$WORK/expected-CHANGELOG.md"
-  local subjects_file="$WORK/release-subjects.txt"
+  local messages_file="$WORK/release-commits.txt"
   local index_file="$WORK/expected.index"
   git show "$commit:package.json" > "$root_file"
   git show "$commit:create-agent-app/package.json" > "$create_file"
   git show "$commit:CHANGELOG.md" > "$changelog_file"
   # The isolated release writer fetches history without tags.
   local last_release range
-  last_release=$(git log -1 --format=%H --extended-regexp \
+  last_release=$(git log --first-parent -1 --format=%H --extended-regexp \
     --grep='^chore\(release\): [0-9]+\.[0-9]+\.[0-9]+ \[skip release\]$' "$commit")
   range=${last_release:+$last_release..}$commit
-  git log --no-merges --format=%s "$range" > "$subjects_file"
-  EXPECTED_VERSION="$VERSION" node - "$root_file" "$create_file" "$changelog_file" "$subjects_file" <<'NODE'
+  # Branch commits can describe discarded work; release notes follow merged changes.
+  git log --first-parent --format='%B%x00' "$range" > "$messages_file"
+  EXPECTED_VERSION="$VERSION" node - "$root_file" "$create_file" "$changelog_file" "$messages_file" <<'NODE'
 const fs = require('node:fs')
-const [rootFile, createFile, changelogFile, subjectsFile] = process.argv.slice(2)
+const [rootFile, createFile, changelogFile, messagesFile] = process.argv.slice(2)
 const files = [rootFile, createFile]
 const manifests = files.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')))
 if (manifests[0].name !== '@tangle-network/agent-app' || manifests[1].name !== '@tangle-network/create-agent-app') {
@@ -63,7 +64,13 @@ for (let index = 0; index < files.length; index += 1) {
   fs.writeFileSync(files[index], `${JSON.stringify(manifests[index], null, 2)}\n`)
 }
 let changelog = fs.readFileSync(changelogFile, 'utf8')
-const subjects = fs.readFileSync(subjectsFile, 'utf8').split('\n').filter(Boolean)
+const subjects = fs.readFileSync(messagesFile, 'utf8').split('\0').map((message) => {
+  const [subject, ...body] = message.trim().split('\n')
+  if (/^Merge pull request #\d+ from /.test(subject)) {
+    return body.find((line) => line.trim())?.trim() || subject
+  }
+  return subject
+}).filter(Boolean)
 if (/^## Unreleased$/m.test(changelog)) {
   changelog = changelog.replace(/^## Unreleased$/m, `## ${process.env.EXPECTED_VERSION}`)
 } else {
