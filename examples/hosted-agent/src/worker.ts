@@ -1,20 +1,13 @@
-import { createHostedAgent } from '@tangle-network/agent-app/hosted-agent'
+import { createHostedAgent, HostedAgentError } from '@tangle-network/agent-app/hosted-agent'
 
-/**
- * Braid: an agent people text or call. Each person gets their own isolated
- * sandbox with its own memory, and every cost bills to this app's Tangle key.
- *
- *   iMessage  person -> Inkbox line -> Tangle Hub -> the person's own box -> Hub reply
- *   voice     person -> Inkbox line -> Tangle Hub -> ph0ny agent -> ask_workspace -> the same box and thread
- *
- * Texts and calls never reach this Worker: Hub routes them once `POST /setup`
- * has attached the line.
- */
+type HostedAgentLineOptions = NonNullable<Parameters<ReturnType<typeof createHostedAgent>['attachLine']>[1]>
+
+/** Hub receives messages. This Worker only installs an explicitly selected line. */
 export interface Env {
   TANGLE_API_KEY: string
-  /** Your own phone (E.164): the line's owner. */
-  OWNER_PHONE: string
-  /** Enables `POST /setup` while set. */
+  /** Email or E.164 address. OWNER_PHONE is retained for existing deployments. */
+  OWNER_ADDRESS?: string
+  OWNER_PHONE?: string
   SETUP_SECRET?: string
 }
 
@@ -24,67 +17,63 @@ export const persona = {
   prompt: {
     systemPrompt: [
       'Your name is Braid. You are a friend people text: warm, curious, direct and brief.',
-      'You are not a coding assistant. Talk about the person\'s life and plans; never offer to write, review or refactor code.',
-      'Write like a person texting: one to three short sentences, no markdown, no lists, no links unless asked.',
-      'You remember people. When someone tells you something lasting about themselves (their name, plans, people,',
-      'preferences, what they are working on), append one line to memory.md in your workspace. Read memory.md',
-      'when it would help you answer, so you can follow up on what they told you before.',
-      'Ask at most one question at a time. Say plainly when you do not know something.',
-      'You are texting or on a call with them now, but you only answer when they reach out: you cannot message them later,',
-      'set reminders, or look up live facts such as weather or news. Never promise a follow-up or a reminder; say plainly',
-      'what you cannot do and how they can do it themselves.',
-      'If asked what you are, say you are Braid, an AI; do not name the model or company behind you.',
+      'You are not a coding assistant. Talk about the person\'s life and plans.',
+      'Write one to three short sentences. Ask at most one question at a time.',
+      'When someone tells you a lasting fact about themselves, append it to memory.md.',
+      'Read memory.md when it helps you answer. Never claim a file write succeeded without a tool result.',
+      'You only answer when they reach out. This example has no reminder or live-search tool.',
+      'Never promise a later message, reminder or live lookup. Say plainly when you do not know.',
+      'If asked what you are, say you are Braid, an AI.',
     ].join(' '),
   },
 }
 
-const braid = (env: Env) => createHostedAgent({
-  apiKey: env.TANGLE_API_KEY,
-  profile: persona,
-  owner: env.OWNER_PHONE,
-  freeTurnsPerDay: 30,
-})
+function record(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
 
-/**
- * One-time: attach an Inkbox iMessage identity, already connected to Hub under
- * this app's Tangle account, as Braid's line, and with `voice` take calls on
- * it through that ph0ny agent. It runs here because the Worker holds the
- * app's key. A Hub event subscription an earlier version of this app made on
- * the connection is removed first: Hub refuses a line that another route
- * would also answer.
- */
+/** No implicit connection discovery, webhook deletion or provider credentials. */
 async function setup(request: Request, env: Env): Promise<Response> {
   const given = new TextEncoder().encode(request.headers.get('authorization') ?? '')
   const expected = new TextEncoder().encode(`Bearer ${env.SETUP_SECRET}`)
-  if (!env.SETUP_SECRET || given.byteLength !== expected.byteLength || !crypto.subtle.timingSafeEqual(given, expected)) {
+  if (!env.SETUP_SECRET || given.byteLength !== expected.byteLength || !crypto.subtle.timingSafeEqual(given, expected))
     return new Response('not found', { status: 404 })
-  }
-  const hub = (path: string, init?: RequestInit) =>
-    fetch(`https://id.tangle.tools/v1/hub/${path}`, { ...init, headers: { authorization: `Bearer ${env.TANGLE_API_KEY}` } })
-  const listed = await (await hub('event-subscriptions')).json() as {
-    data: { subscriptions: Array<{ id: string; clientReference: string; connectionId: string }> }
-  }
-  const earlier = listed.data.subscriptions.filter(s => s.clientReference.startsWith('hosted-agent:'))
-  // Without a connection id, move the connection an earlier version of this app routed.
-  const { connectionId = earlier[0]?.connectionId, voice } = await request.json().catch(() => ({})) as {
-    connectionId?: string
-    voice?: { ph0nyConnectionId: string; ph0nyAgentId: string }
-  }
-  if (!connectionId) return Response.json({ error: 'connectionId is required' }, { status: 400 })
-  for (const subscription of earlier) {
-    if (subscription.connectionId === connectionId) await hub(`event-subscriptions/${subscription.id}`, { method: 'DELETE' })
+  const owner = env.OWNER_ADDRESS ?? env.OWNER_PHONE
+  if (!owner) return Response.json({ error: 'owner_not_configured' }, { status: 503 })
+  let body: unknown
+  try { body = await request.json() } catch { return Response.json({ error: 'invalid_json' }, { status: 400 }) }
+  if (!record(body) || typeof body.connectionId !== 'string' || !body.connectionId.trim() || body.connectionId.length > 256)
+    return Response.json({ error: 'connectionId is required' }, { status: 400 })
+  if ((body.transport !== undefined && !['imessage', 'email', 'whatsapp'].includes(String(body.transport))) ||
+      (body.mode !== undefined && !['personal', 'shared'].includes(String(body.mode))) ||
+      (body.phoneNumberId !== undefined && (typeof body.phoneNumberId !== 'string' || !body.phoneNumberId.trim() || body.phoneNumberId.length > 256)) ||
+      (body.voice !== undefined && (!record(body.voice) || typeof body.voice.ph0nyConnectionId !== 'string' || typeof body.voice.ph0nyAgentId !== 'string')))
+    return Response.json({ error: 'invalid_line_options' }, { status: 400 })
+  const options: HostedAgentLineOptions = {
+    transport: body.transport as HostedAgentLineOptions['transport'],
+    mode: body.mode as HostedAgentLineOptions['mode'],
+    phoneNumberId: body.phoneNumberId as string | undefined,
+    voice: body.voice as HostedAgentLineOptions['voice'],
   }
   try {
-    return Response.json(await braid(env).attachLine(connectionId, { voice }))
+    const agent = createHostedAgent({ apiKey: env.TANGLE_API_KEY, profile: persona, owner, freeTurnsPerDay: 30 })
+    return Response.json(await agent.attachLine(body.connectionId, options))
   } catch (error) {
-    return Response.json({ error: String(error).slice(0, 500) }, { status: 502 })
+    if (error instanceof HostedAgentError)
+      return Response.json({ error: error.code, message: error.message }, { status: 400 })
+    if (record(error) && error.status === 409)
+      return Response.json({
+        error: 'line_setup_conflict',
+        message: 'This connection is already routed. For an older Braid deployment, explicitly remove its hosted-agent event subscription in Hub, then repeat setup. For an attached line, use its existing configuration or explicitly detach before changing it. Setup has not removed either route.',
+      }, { status: 409 })
+    // Provider evidence and credentials never become a public response.
+    return Response.json({ error: 'line_setup_failed', message: 'Check the owned Hub connection and provider readiness.' }, { status: 502 })
   }
 }
 
 export default {
   async fetch(request, env) {
-    const { pathname } = new URL(request.url)
-    if (request.method === 'POST' && pathname === '/setup') return setup(request, env)
-    return new Response('Braid is a Tangle hosted agent. Text or call to talk.\n')
+    if (request.method === 'POST' && new URL(request.url).pathname === '/setup') return setup(request, env)
+    return new Response('Braid is a Tangle hosted agent. Contact its configured line.\n')
   },
 } satisfies ExportedHandler<Env>

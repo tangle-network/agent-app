@@ -2,7 +2,7 @@
  * Integration-hub WIRING — the agent→hub invocation path every Tangle agent app
  * forks. The integration ENGINE (catalog, connectors, OAuth, policy) is
  * `@tangle-network/agent-integrations` (a peer dependency); this module is the
- * thin app-side wiring on top: a typed client over the platform hub's
+ * thin app-side wiring on top: an outcome adapter over hub-sdk's
  * `POST /v1/hub/exec`, MCP-tool-name → hub-action-path resolution, and the
  * per-turn invoke flow the `integration_invoke` tool calls.
  *
@@ -10,6 +10,7 @@
  * per-user api-key resolver (the `apiKeyResolver` seam) — this module owns
  * neither credentials nor the action catalog.
  */
+import { HubClient, HubSdkError } from '@tangle-network/hub-sdk'
 import { parseIntegrationToolName } from '@tangle-network/agent-integrations/catalog'
 
 /** `{ success: false }` codes the hub returns on `/exec`. */
@@ -66,53 +67,26 @@ export function resolveIntegrationAction(toolName: string): ParsedIntegrationAct
   return { ...parsed, path: `${parsed.providerId}.${parsed.connectorId}.${parsed.actionId}` }
 }
 
-interface HubEnvelope {
-  success: boolean
-  data?: { result?: unknown }
-  error?: { code?: string; message?: string; details?: { approval?: unknown } }
-}
-
-/** Typed client over the platform hub `/v1/hub/exec`. The hub holds the user's
- *  credentials, resolves the connection from the bearer principal, evaluates
- *  per-action policy (read → allow, write/destructive → approval), and runs the
- *  action server-side. Never throws on a policy block — a gated write is a
- *  normal `succeeded: false` outcome. */
+/** Product outcome adapter over the published Hub transport. Never grants approval. */
 export class HubExecClient {
-  private readonly baseUrl: string
-  private readonly bearer: string
-  private readonly fetchImpl: typeof fetch
+  private readonly hub: HubClient
 
   constructor(options: HubExecClientOptions) {
     if (!options.baseUrl) throw new Error('HubExecClient: baseUrl is required')
     if (!options.bearer) throw new Error('HubExecClient: bearer is required')
-    this.baseUrl = options.baseUrl.replace(/\/+$/, '')
-    this.bearer = options.bearer
-    this.fetchImpl = options.fetchImpl ?? fetch
+    this.hub = new HubClient({ baseUrl: options.baseUrl, apiKey: options.bearer, fetch: options.fetchImpl })
   }
 
   async exec(input: { path: string; actionInput?: unknown; connectionId?: string }): Promise<HubExecResult> {
-    const response = await this.fetchImpl(`${this.baseUrl}/v1/hub/exec`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${this.bearer}`, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ path: input.path, input: input.actionInput, connectionId: input.connectionId }),
-    })
-    const envelope = await this.readEnvelope(response)
-    if (response.ok && envelope.success) return { succeeded: true, result: envelope.data?.result }
-    return {
-      succeeded: false,
-      code: envelope.error?.code ?? `HUB_HTTP_${response.status}`,
-      message: envelope.error?.message ?? `Hub /exec returned ${response.status}`,
-      approval: envelope.error?.details?.approval,
-    }
-  }
-
-  private async readEnvelope(response: Response): Promise<HubEnvelope> {
-    const text = await response.text()
-    if (!text) return { success: false, error: { code: `HUB_HTTP_${response.status}`, message: `Hub returned ${response.status} with no body` } }
     try {
-      return JSON.parse(text) as HubEnvelope
-    } catch {
-      return { success: false, error: { code: 'HUB_BAD_RESPONSE', message: `Hub returned non-JSON (${response.status}): ${text.slice(0, 200)}` } }
+      // No approve flag. Hub still decides whether this exact action is permitted.
+      const result = await this.hub.tools.invoke(input.path, input.actionInput, { connectionId: input.connectionId })
+      return { succeeded: true, result: result.result }
+    } catch (error) {
+      if (!(error instanceof HubSdkError)) throw error
+      const details = error.details
+      const approval = details && typeof details === 'object' && 'approval' in details ? details.approval : undefined
+      return { succeeded: false, code: error.code, message: error.message, ...(approval !== undefined ? { approval } : {}) }
     }
   }
 }
@@ -148,7 +122,7 @@ export interface HubInvokeDeps {
  * approval-gated surfaces verbatim as 409, never silently executed.
  */
 export async function invokeIntegrationHub(input: HubInvokeInput, deps: HubInvokeDeps): Promise<HubInvokeOutcome> {
-  const env = deps.env ?? (process.env as Record<string, string | undefined>)
+  const env = deps.env ?? (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
   const baseUrl = deps.baseUrl ?? env.TANGLE_PLATFORM_URL?.trim()
   if (!baseUrl) return { status: 500, body: { error: 'TANGLE_PLATFORM_URL is not configured' } }
 

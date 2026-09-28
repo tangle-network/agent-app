@@ -8829,7 +8829,7 @@ Source: `src/integrations/index.ts`
 
 ### `HubExecClient`
 
-`class` — Typed client over the platform hub `/v1/hub/exec`.
+`class` — Product outcome adapter over the published Hub transport.
 
 ```ts
 class HubExecClient

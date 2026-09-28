@@ -22,6 +22,11 @@ Keep the general line unused until the admission gate, matching image, and actua
 
 ## Build the actual image from registry packages
 
+The browser driver includes `ai-sdk-provider-claude-code`, whose Claude Agent SDK requires the `@anthropic-ai/sdk` peer.
+Keep that SDK installed in the development and image dependency cohorts.
+Knip excludes this peer from unused-import detection because App source does not import it directly.
+A lockfile refresh must still pass strict peer validation.
+
 Use a clean agent-app checkout. Export exact published registry versions and the platform's actual digest-pinned computer-use base image. The base must contain its normal sidecar, Node >=22, Python, Git, sudo, Chromium and virtual display. TANGLE_RUNTIME_USER must name its actual non-root runtime user. Do not put operator keys into build arguments or image layers.
 
 ```bash

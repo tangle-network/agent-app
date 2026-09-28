@@ -124,6 +124,7 @@
     "tsc"
   ],
   "ignoreDependencies": [
+    "@anthropic-ai/sdk",
     "@tangle-network/agent-gateway",
     "@tangle-network/agent-profile-materialize",
     "@xterm/addon-fit",

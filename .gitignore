@@ -6,3 +6,6 @@ dist
 
 .playwright-mcp/
 storybook-static/
+
+# Private live acceptance evidence
+.gtr-private/

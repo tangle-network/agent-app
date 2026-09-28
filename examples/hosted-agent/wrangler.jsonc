@@ -6,5 +6,5 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true }
   // Hub keeps each person's box, thread, daily count and calls.
-  // Secrets: wrangler secret put TANGLE_API_KEY | OWNER_PHONE | SETUP_SECRET
+  // Secrets: wrangler secret put TANGLE_API_KEY | OWNER_ADDRESS | SETUP_SECRET
 }

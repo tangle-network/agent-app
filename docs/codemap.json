@@ -6823,7 +6823,7 @@
           "name": "HubExecClient",
           "kind": "class",
           "signature": "class HubExecClient",
-          "doc": "Typed client over the platform hub `/v1/hub/exec`."
+          "doc": "Product outcome adapter over the published Hub transport."
         },
         {
           "name": "HubExecClientOptions",
