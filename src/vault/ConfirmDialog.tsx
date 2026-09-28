@@ -1,6 +1,6 @@
 /**
  * Self-contained confirm dialog — no dialog library. A focus-trapped modal with
- * Esc-to-cancel and Enter-to-confirm, used for create / delete / discard-unsaved
+ * Escape-to-cancel and native form submission, used for create / delete / discard-unsaved
  * flows so the pane carries zero UI-kit dependency.
  */
 
@@ -34,7 +34,7 @@ export function ConfirmDialog({
   onCancel,
   children,
 }: ConfirmDialogProps) {
-  const panelRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLFormElement>(null)
   const confirmRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -48,11 +48,6 @@ export function ConfirmDialog({
     if (event.key === 'Escape') {
       event.preventDefault()
       onCancel()
-      return
-    }
-    if (event.key === 'Enter' && !confirmDisabled) {
-      event.preventDefault()
-      onConfirm()
       return
     }
     if (event.key !== 'Tab') return
@@ -77,12 +72,16 @@ export function ConfirmDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
-      <div
+      <form
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onKeyDown={onKeyDown}
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (!confirmDisabled) onConfirm()
+        }}
         className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg"
       >
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
@@ -98,8 +97,7 @@ export function ConfirmDialog({
           </button>
           <button
             ref={confirmRef}
-            type="button"
-            onClick={onConfirm}
+            type="submit"
             disabled={confirmDisabled}
             className={`inline-flex h-8 items-center rounded-md px-3 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 ${
               destructive
@@ -110,7 +108,7 @@ export function ConfirmDialog({
             {confirmLabel}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   )
 }
