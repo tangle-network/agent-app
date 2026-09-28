@@ -1,6 +1,6 @@
 /**
  * Self-contained confirm dialog — no dialog library. A focus-trapped modal with
- * Esc-to-cancel and Enter-to-confirm, used for create / delete / discard-unsaved
+ * Escape-to-cancel and Enter from text inputs, used for create / delete / discard-unsaved
  * flows so the pane carries zero UI-kit dependency.
  */
 
@@ -50,7 +50,15 @@ export function ConfirmDialog({
       onCancel()
       return
     }
-    if (event.key === 'Enter' && !confirmDisabled) {
+    const target = event.target
+    if (
+      event.key === 'Enter'
+      && !event.defaultPrevented
+      && !event.nativeEvent.isComposing
+      && !confirmDisabled
+      && target instanceof HTMLInputElement
+      && ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(target.type)
+    ) {
       event.preventDefault()
       onConfirm()
       return
