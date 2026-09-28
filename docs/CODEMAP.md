@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_100 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_101 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -14,6 +14,7 @@ _100 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./brand`](api/brand.md) | 5 | — |
 | [`./brand-extraction`](api/brand-extraction.md) | 19 | — |
 | [`./catalog`](api/catalog.md) | 10 | `runtime` |
+| [`./channels`](api/channels.md) | 46 | `web-react` |
 | [`./chat-react`](api/chat-react.md) | 5 | `web-react` |
 | [`./chat-routes`](api/chat-routes.md) | 210 | `chat-store`, `interactions`, `model-resolution`, `plans`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `web` |
 | [`./chat-store`](api/chat-store.md) | 64 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
@@ -178,6 +179,16 @@ Depends on: `runtime`
 `buildCatalog`, `CatalogModel`, `catalogModelForId`, `fetchModelCatalog`, `isChatCapableModel`, `ModelCatalog`, `normalizeModelId`, `resolveCatalogModelId`, `RouterModel`, `sortModelsByFreshness`
 
 [Full API →](api/catalog.md)
+
+## `./channels`
+
+Source: `src/channels/index.ts` · 46 exports
+
+Depends on: `web-react`
+
+`ChannelConnect`, `ChannelConnection`, `ChannelConnectProps`, `ChannelConversation`, `ChannelConversations`, `channelMessageLink`, `ChannelNumber`, `ChannelReadContext`, `ChannelsClient`, `ChannelsProvider`, `ChannelVerification`, `ChannelVerificationPanel`, `ConnectChannelInput`, `EmailChannel`, `holdsNumber`, `HubNumberOrder`, `HubNumberQuote`, `HubNumberReadiness`, `IMessageChannel`, `Line`, `LineAttachment`, `LineFromConnectionInput`, `LineMessage`, `LinePayment`, `LinePayPage`, `LineThread`, `LineTransport`, `NUMBER_CHARGE_NOTICE`, `NUMBER_RETRY_NOTICE`, `NumberChannel`, `numberStage`, `safeCheckoutUrl`, `SMSChannel`, `useChannel`, `useChannelConnections`, `useChannelConversation`, `useChannelConversations`, `useChannels`, `useChannelsClient`, `useConnectChannel`, `useLinePayment`, `useNumberChannel`, `useWhatsAppNumbers`, `VerificationAction`, `verificationExpired`, `WhatsAppChannel`
+
+[Full API →](api/channels.md)
 
 ## `./chat-react`
 

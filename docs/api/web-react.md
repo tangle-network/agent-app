@@ -2651,7 +2651,7 @@ type RecordGridWriteOutcome
 `function` — Marks one ask resolved locally (the card's `onResolved`).
 
 ```ts
-(list: ChatInteraction[], id: string, status: "answered" | "declined" | "cancelled" | "expired", answers?: InteractionA…
+(list: ChatInteraction[], id: string, status: "cancelled" | "answered" | "declined" | "expired", answers?: InteractionA…
 ```
 
 ### `resolveProvenanceStanding`
