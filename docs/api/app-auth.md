@@ -4,7 +4,7 @@
 
 Source: `src/app-auth/index.ts`
 
-11 exports.
+12 exports.
 
 ### `AppAuth`
 
@@ -44,6 +44,14 @@ interface AppAuthEmailConfig
 
 ```ts
 type AppAuthInstance
+```
+
+### `AppAuthOidcSsoConfig`
+
+`interface` — Registered OIDC client configuration.
+
+```ts
+interface AppAuthOidcSsoConfig
 ```
 
 ### `AppAuthSchema`
