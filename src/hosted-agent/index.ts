@@ -15,6 +15,9 @@ export interface HostedAgentLineOptions {
 }
 
 /**
+ * The public conversation kit. Each person has an isolated sandbox.
+ * This compatibility API is separate from the role-governed general-agent
+ * provisioning path (`createTangleAgent` and `tangle-agent`).
  * Hub owns delivery, member threads, consent and execution. A host keeps its
  * product catalog and billing policy, then passes that policy to this kit.
  */
@@ -74,6 +77,8 @@ function conversationProfile(profile: AgentProfile): AgentProfile {
 }
 
 const PERSON = { context: 'own', tools: 'act' } as const
+// New shared-line guests are chat-only; trusted host policy may name other roles.
+const GUEST = { context: 'own', tools: 'chat' } as const
 const E164 = /^\+[1-9]\d{6,14}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -146,7 +151,9 @@ export function createHostedAgent(config: HostedAgentConfig) {
       mode,
       members: declaredMembers,
       unknownSenders: config.attachment?.unknownSenders ?? retained?.unknownSenders ?? (mode === 'shared' && transport !== 'email' ? 'guest' : 'reject'),
-      roles: config.attachment?.roles ?? retained?.roles ?? (mode === 'shared' ? { owner: PERSON, member: PERSON, guest: PERSON } : { owner: PERSON }),
+      roles: config.attachment?.roles ?? retained?.roles ?? (mode === 'shared'
+        ? { owner: PERSON, member: PERSON, guest: GUEST }
+        : { owner: PERSON }),
       respond: { kind: 'agent', backend },
       limits: {
         ...retained?.limits,
@@ -189,3 +196,8 @@ export function createHostedAgent(config: HostedAgentConfig) {
 }
 
 export type HostedAgent = ReturnType<typeof createHostedAgent>
+export { buildGeneralAgentProfile, createTangleAgent, GENERAL_AGENT_MODEL, GENERAL_AGENT_SYSTEM_PROMPT } from './general'
+export type { GeneralAgentProfileOptions, GeneralAgentMember, TangleAgentOptions } from './general'
+export { agentHomeWorkflows } from './workflows'
+export type { AgentHomeWorkflowOptions, AgentHomeWorkflow } from './workflows'
+export { defaultHomeFiles, DEFAULT_HOME_LIMITS, DEFAULT_AGENT_HOME, withDefaultAgentHome } from '../profile/home'

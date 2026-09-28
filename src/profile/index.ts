@@ -313,3 +313,5 @@ export type {
   ProfileFingerprint,
   ProfileFingerprintContext,
 } from './fingerprint'
+
+export { DEFAULT_HOME_LIMITS, defaultHomeFiles, withDefaultAgentHome } from './home'

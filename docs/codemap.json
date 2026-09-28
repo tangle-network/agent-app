@@ -6274,14 +6274,40 @@
     {
       "id": "./hosted-agent",
       "source": "src/hosted-agent/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "profile"
+      ],
       "error": null,
       "exports": [
+        {
+          "name": "AgentHomeWorkflow",
+          "kind": "interface",
+          "signature": "interface AgentHomeWorkflow",
+          "doc": null
+        },
+        {
+          "name": "AgentHomeWorkflowOptions",
+          "kind": "interface",
+          "signature": "interface AgentHomeWorkflowOptions",
+          "doc": null
+        },
+        {
+          "name": "agentHomeWorkflows",
+          "kind": "function",
+          "signature": "(options: AgentHomeWorkflowOptions) => AgentHomeWorkflow[]",
+          "doc": "Platform owns timing, admission, approvals, persistence and DM delivery."
+        },
         {
           "name": "BoxPolicy",
           "kind": "interface",
           "signature": "interface BoxPolicy",
           "doc": null
+        },
+        {
+          "name": "buildGeneralAgentProfile",
+          "kind": "function",
+          "signature": "(options?: GeneralAgentProfileOptions) => Promise<AgentProfile>",
+          "doc": "Uses the published Sandbox Router builder."
         },
         {
           "name": "CONVERSATION_TOOLS_OFF",
@@ -6296,15 +6322,63 @@
           "doc": null
         },
         {
+          "name": "createTangleAgent",
+          "kind": "function",
+          "signature": "(options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: LineVoiceOptions | undefined) => Promis…",
+          "doc": "General agents use the SDK's line attachment route."
+        },
+        {
+          "name": "DEFAULT_AGENT_HOME",
+          "kind": "const",
+          "signature": "\"/var/lib/tangle-agent/home\"",
+          "doc": null
+        },
+        {
           "name": "DEFAULT_BOX_POLICY",
           "kind": "const",
           "signature": "BoxPolicy",
           "doc": null
         },
         {
+          "name": "DEFAULT_HOME_LIMITS",
+          "kind": "const",
+          "signature": "{ readonly 'AGENTS.md': 12000; readonly 'SOUL.md': 8000; readonly 'IDENTITY.md': 4000; readonly 'USER.md': 4000; readon…",
+          "doc": "Unicode code-point budgets."
+        },
+        {
           "name": "DEFAULT_HOSTED_MODEL",
           "kind": "const",
           "signature": "\"openai/gpt-5.6-luna\"",
+          "doc": null
+        },
+        {
+          "name": "defaultHomeFiles",
+          "kind": "function",
+          "signature": "() => AgentProfileFileMount[]",
+          "doc": "Canonical seed records."
+        },
+        {
+          "name": "GENERAL_AGENT_MODEL",
+          "kind": "const",
+          "signature": "\"openai/gpt-5.6-luna\"",
+          "doc": null
+        },
+        {
+          "name": "GENERAL_AGENT_SYSTEM_PROMPT",
+          "kind": "const",
+          "signature": "string",
+          "doc": null
+        },
+        {
+          "name": "GeneralAgentMember",
+          "kind": "type",
+          "signature": "type GeneralAgentMember",
+          "doc": null
+        },
+        {
+          "name": "GeneralAgentProfileOptions",
+          "kind": "interface",
+          "signature": "interface GeneralAgentProfileOptions",
           "doc": null
         },
         {
@@ -6323,7 +6397,7 @@
           "name": "HostedAgentConfig",
           "kind": "interface",
           "signature": "interface HostedAgentConfig",
-          "doc": "Hub owns delivery, member threads, consent and execution."
+          "doc": "The public conversation kit."
         },
         {
           "name": "HostedAgentError",
@@ -6348,6 +6422,18 @@
           "kind": "const",
           "signature": "\"hosted:\"",
           "doc": "Legacy default."
+        },
+        {
+          "name": "TangleAgentOptions",
+          "kind": "interface",
+          "signature": "interface TangleAgentOptions",
+          "doc": null
+        },
+        {
+          "name": "withDefaultAgentHome",
+          "kind": "function",
+          "signature": "(profile: AgentProfile) => AgentProfile",
+          "doc": "Compose home instructions, not per-turn writes to persistent memory."
         }
       ]
     },
@@ -9599,10 +9685,22 @@
           "doc": "Project corpus entries onto SDK file mounts at a relative path under `<anchor>/`."
         },
         {
+          "name": "DEFAULT_HOME_LIMITS",
+          "kind": "const",
+          "signature": "{ readonly 'AGENTS.md': 12000; readonly 'SOUL.md': 8000; readonly 'IDENTITY.md': 4000; readonly 'USER.md': 4000; readon…",
+          "doc": "Unicode code-point budgets."
+        },
+        {
           "name": "DEFAULT_MAX_SYSTEM_PROMPT_BYTES",
           "kind": "const",
           "signature": "40000",
           "doc": "Byte budget on the FINAL composed `prompt.systemPrompt`."
+        },
+        {
+          "name": "defaultHomeFiles",
+          "kind": "function",
+          "signature": "() => AgentProfileFileMount[]",
+          "doc": "Canonical seed records."
         },
         {
           "name": "diffProfileFingerprints",
@@ -9795,6 +9893,12 @@
           "kind": "function",
           "signature": "(userSkills: UserSkill[]) => AgentProfileFileMount[]",
           "doc": "Project per-user skills onto SDK file mounts at the harness skill-discovery path."
+        },
+        {
+          "name": "withDefaultAgentHome",
+          "kind": "function",
+          "signature": "(profile: AgentProfile) => AgentProfile",
+          "doc": "Compose home instructions, not per-turn writes to persistent memory."
         }
       ]
     },

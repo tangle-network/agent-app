@@ -12,10 +12,12 @@ minimumReleaseAgeExclude:
 
 allowBuilds:
   '@ax-llm/ax': false
+  '@tangle-network/browser-agent-driver': true
   better-sqlite3: true
   canvas: true
   cpu-features: false
   esbuild: true
+  ffmpeg-static: false
   ssh2: false
 
 overrides:

@@ -26,7 +26,7 @@ vi.mock('@tangle-network/sandbox/core', () => {
   return { Sandbox }
 })
 
-const { createHostedAgent, CONVERSATION_TOOLS_OFF, DEFAULT_HOSTED_MODEL } = await import('../src/hosted-agent')
+const { createHostedAgent, createTangleAgent, buildGeneralAgentProfile, CONVERSATION_TOOLS_OFF, DEFAULT_HOSTED_MODEL } = await import('../src/hosted-agent')
 
 const OWNER = '+15550100001'
 const braid = () => createHostedAgent({ apiKey: 'sk-tan-test', profile: { name: 'Braid' }, owner: OWNER, freeTurnsPerDay: 30 })
@@ -39,7 +39,7 @@ beforeEach(() => {
 })
 
 describe('hosted agent on Hub lines', () => {
-  it('attaches the line so each texter runs in their own box under the kit keys', async () => {
+  it('keeps unknown shared-line guests chat-only while the owner retains tools', async () => {
     const line = await braid().attachLine('hubconn_braid')
 
     expect(line.id).toBe('ln_braid')
@@ -48,7 +48,7 @@ describe('hosted agent on Hub lines', () => {
     expect(attached).toMatchObject({
       number: 'ln_braid', mode: 'shared', unknownSenders: 'guest',
       members: [{ address: OWNER, role: 'owner' }],
-      roles: { owner: { context: 'own', tools: 'act' }, guest: { context: 'own', tools: 'act' } },
+      roles: { owner: { context: 'own', tools: 'act' }, guest: { context: 'own', tools: 'chat' } },
       limits: { turnsPerMemberPerDay: 30 },
       instance: { keyPrefix: 'hosted:ln_braid:', create: {
         resources: { cpuCores: 2, memoryMB: 2048, diskGB: 2 },
@@ -104,5 +104,65 @@ describe('hosted agent on Hub lines', () => {
     await braid().attachLine('hubconn_braid', { mode: 'personal' })
     expect(platform.attach.mock.calls[0]![0]).toMatchObject({ mode: 'personal', unknownSenders: 'reject', roles: { owner: { context: 'own', tools: 'act' } } })
     expect(platform.attach.mock.calls[0]![0].roles.guest).toBeUndefined()
+  })
+})
+
+
+describe('general agent approval configuration', () => {
+  const options = () => ({ apiKey: 'local-test-key', instanceKey: 'general-test',
+    profile: { name: 'General' }, members: [{ address: OWNER, role: 'owner' as const }] })
+
+  it('keeps OpenCode approval enabled for the default and each member backend', async () => {
+    platform.get.mockResolvedValue({ id: 'ln_general', status: 'active' })
+    await createTangleAgent({ ...options(), members: [
+      { address: OWNER, role: 'owner', backend: { profile: { name: 'Owner' }, interactions: { question: true } } },
+      { address: '+15550100002', role: 'staff', productServers: ['product'], backend: { profile: { name: 'Staff' } } },
+    ] }).attachExistingLine('ln_general')
+    const respond = platform.attach.mock.calls[0]![0].respond
+    expect(respond.backend).toMatchObject({ type: 'opencode', interactions: { permission: true } })
+    expect(respond.rolePolicy.members[OWNER].backend).toMatchObject({
+      type: 'opencode', interactions: { permission: true, question: true },
+    })
+    expect(respond.rolePolicy.members['+15550100002'].backend).toMatchObject({
+      type: 'opencode', interactions: { permission: true },
+    })
+  })
+
+  it('rejects a different member harness before touching the SDK', () => {
+    expect(() => createTangleAgent({ ...options(), members: [
+      { address: OWNER, role: 'owner', backend: { type: 'codex' } },
+    ] })).toThrow(/OpenCode/)
+    expect(platform.attach).not.toHaveBeenCalled()
+  })
+
+  it('rejects disabled permission interactions for general members', () => {
+    expect(() => createTangleAgent({ ...options(), members: [
+      { address: OWNER, role: 'owner', backend: { interactions: { permission: false } } },
+    ] })).toThrow(/permission interactions/)
+  })
+
+  it('rejects disabled permission interactions for scoped members', () => {
+    expect(() => createTangleAgent({ ...options(), members: [
+      ...options().members,
+      { address: '+15550100002', role: 'staff', productServers: ['product'],
+        backend: { interactions: { permission: false } } },
+    ] })).toThrow(/permission interactions/)
+  })
+
+  it('rejects misplaced interaction overrides in the default profile', () => {
+    const profile = { name: 'General', interactions: { permission: false } }
+    expect(() => createTangleAgent({ ...options(), profile })).toThrow(/permission interactions/)
+  })
+
+  it('rejects misplaced interaction overrides in a member profile', () => {
+    const profile = { name: 'Member', interactions: { permission: false } }
+    expect(() => createTangleAgent({ ...options(), members: [
+      { address: OWNER, role: 'owner', backend: { profile } },
+    ] })).toThrow(/permission interactions/)
+  })
+
+  it('rejects misplaced preset interactions before fetching Router configuration', async () => {
+    const preset = { name: 'Preset', interactions: { permission: false } }
+    await expect(buildGeneralAgentProfile({ preset })).rejects.toThrow(/permission interactions/)
   })
 })
