@@ -112,8 +112,10 @@ async function route(request) {
     }
     // Cleanup failure is not evidence that the refresh request was rejected.
     if (unexpected) {
-      try { await client.revoke(unexpected.refreshToken || revokedRefresh, 'refresh_token') } catch {}
-      try { await client.revoke(unexpected.accessToken, 'access_token') } catch {}
+      const cleanupGrant = { ...unexpected, refreshToken: unexpected.refreshToken || revokedRefresh, scope: unexpected.scope || session.tokens.scope }
+      await store.saveRefreshedTokens(token, cleanupGrant)
+      await client.revoke(cleanupGrant.refreshToken, 'refresh_token')
+      await client.revoke(cleanupGrant.accessToken, 'access_token')
     }
     await store.deleteSession({ sessionToken: token })
     const evidence = { kind: 'disconnect', revokedRefreshRejected: rejected, revokedRefreshStatus: status, refresh_sha256: sha(revokedRefresh) }
