@@ -40,8 +40,12 @@ build_expected_release_tree() {
   git show "$commit:package.json" > "$root_file"
   git show "$commit:create-agent-app/package.json" > "$create_file"
   git show "$commit:CHANGELOG.md" > "$changelog_file"
-  last_tag=$(git describe --tags --abbrev=0 --match 'v*' "$commit")
-  git log --no-merges --format=%s "$last_tag..$commit" > "$subjects_file"
+  # The isolated release writer fetches history without tags.
+  local last_release range
+  last_release=$(git log -1 --format=%H --extended-regexp \
+    --grep='^chore\(release\): [0-9]+\.[0-9]+\.[0-9]+ \[skip release\]$' "$commit")
+  range=${last_release:+$last_release..}$commit
+  git log --no-merges --format=%s "$range" > "$subjects_file"
   EXPECTED_VERSION="$VERSION" node - "$root_file" "$create_file" "$changelog_file" "$subjects_file" <<'NODE'
 const fs = require('node:fs')
 const [rootFile, createFile, changelogFile, subjectsFile] = process.argv.slice(2)
@@ -97,7 +101,7 @@ validate_existing_release() {
   expected_tree=$(build_expected_release_tree "$BASE_SHA")
   actual_tree=$(git rev-parse "$release_sha^{tree}")
   [[ "$actual_tree" == "$expected_tree" ]] ||
-    die "Existing $TAG_REF does not exactly match $BASE_SHA with only package versions changed."
+    die "Existing $TAG_REF does not exactly match $BASE_SHA with only release-owned metadata changed."
 }
 
 create_release() {
