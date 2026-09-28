@@ -1,4 +1,6 @@
-import { createHostedAgent, HostedAgentError, type HostedAgentLineOptions } from '@tangle-network/agent-app/hosted-agent'
+import { createHostedAgent, HostedAgentError } from '@tangle-network/agent-app/hosted-agent'
+
+type HostedAgentLineOptions = NonNullable<Parameters<ReturnType<typeof createHostedAgent>['attachLine']>[1]>
 
 /** Hub receives messages. This Worker only installs an explicitly selected line. */
 export interface Env {

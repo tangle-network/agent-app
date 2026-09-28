@@ -12,9 +12,6 @@ minimumReleaseAgeExclude:
 
 overrides:
   zod: 4.4.3
-  # Keep the reviewed materializer cohort with this template's Interface 2.12.
-  # Version 0.20.3 requires 2.13; do not relax strict peer validation to install it.
-  '@tangle-network/agent-profile-materialize': 0.20.1
 
 allowBuilds:
   '@ax-llm/ax': false

@@ -4,7 +4,7 @@
 
 Source: `src/hosted-agent/index.ts`
 
-10 exports.
+12 exports.
 
 ### `BoxPolicy`
 
@@ -16,7 +16,7 @@ interface BoxPolicy
 
 ### `CONVERSATION_TOOLS_OFF`
 
-`const` — Harness tools a texting or calling assistant does not use.
+`const`
 
 ```ts
 readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
@@ -27,12 +27,12 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 `function`
 
 ```ts
-(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: HostedAgentLineOptions): Promise<Line>; }
+(config: HostedAgentConfig) => { attachLine(connectionId: string, options?: HostedAgentLineOptions): Promise<Line>; att…
 ```
 
 ### `DEFAULT_BOX_POLICY`
 
-`const` — Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the platform's hourly floor.
+`const`
 
 ```ts
 BoxPolicy
@@ -40,7 +40,7 @@ BoxPolicy
 
 ### `DEFAULT_HOSTED_MODEL`
 
-`const` — The model for a profile without `model.default`.
+`const`
 
 ```ts
 "openai/gpt-5.6-luna"
@@ -54,9 +54,17 @@ BoxPolicy
 type HostedAgent
 ```
 
+### `HostedAgentAttachment`
+
+`type`
+
+```ts
+type HostedAgentAttachment
+```
+
 ### `HostedAgentConfig`
 
-`interface` — A hosted agent assembled over Hub lines.
+`interface` — Hub owns delivery, member threads, consent and execution.
 
 ```ts
 interface HostedAgentConfig
@@ -78,9 +86,17 @@ class HostedAgentError
 interface HostedAgentLineOptions
 ```
 
+### `HostedAgentTransport`
+
+`type`
+
+```ts
+type HostedAgentTransport
+```
+
 ### `PERSON_KEY_PREFIX`
 
-`const` — Legacy namespace.
+`const` — Legacy default.
 
 ```ts
 "hosted:"

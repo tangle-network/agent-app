@@ -293,6 +293,11 @@ function OperationErrorAlert({
   )
 }
 
+/**
+ * Browse and edit files in the available pane width.
+ * Below 45rem, Files and the selected document share one pane.
+ * Switching panes keeps the editor mounted and preserves unsaved changes.
+ */
 export function VaultPane(props: VaultPaneProps) {
   const {
     port,
@@ -325,6 +330,24 @@ export function VaultPane(props: VaultPaneProps) {
   const [treeError, setTreeError] = useState<TreeFailureState | null>(null)
   const [internalPath, setInternalPath] = useState<string | null>(null)
   const selectedPath = controlled ? (controlledPath ?? null) : internalPath
+  const [filesOpen, setFilesOpen] = useState(false)
+  const showFiles = filesOpen || !selectedPath
+  const searchRef = useRef<HTMLInputElement>(null)
+  const documentRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setFilesOpen(false)
+  }, [selectedPath])
+
+  const showDocument = useCallback(() => {
+    const focused = document.activeElement
+    setFilesOpen(false)
+    requestAnimationFrame(() => {
+      if (document.activeElement === focused || document.activeElement === document.body) {
+        documentRef.current?.focus({ preventScroll: true })
+      }
+    })
+  }, [])
 
   const [selectedFile, setSelectedFile] = useState<VaultFile | null>(null)
   const [fileLoading, setFileLoading] = useState(false)
@@ -533,14 +556,18 @@ export function VaultPane(props: VaultPaneProps) {
 
   const guardedOpen = useCallback(
     (path: string) => {
-      if (path === selectedPath) return
+      if (path === selectedPath) {
+        showDocument()
+        return
+      }
       if (isDirty) {
         setPendingNav({ type: 'open', path })
         return
       }
+      showDocument()
       commitPath(path)
     },
-    [isDirty, selectedPath, commitPath],
+    [isDirty, selectedPath, commitPath, showDocument],
   )
 
   // Clicking a folder makes it the vault's active folder: the search narrows to
@@ -580,12 +607,13 @@ export function VaultPane(props: VaultPaneProps) {
     setIsDirty(false)
     if (!nav) return
     if (nav.type === 'open') {
+      showDocument()
       commitPath(nav.path)
     } else {
       commitPath(null)
       setSelectedFile(null)
     }
-  }, [pendingNav, commitPath])
+  }, [pendingNav, commitPath, showDocument])
 
   const showRichMode = useCallback(() => {
     setEditorMode((mode) => {
@@ -710,187 +738,227 @@ export function VaultPane(props: VaultPaneProps) {
 
   return (
     <EditorErrorBoundary onReset={() => { commitPath(null); setSelectedFile(null) }}>
-      <div className={`flex min-h-0 flex-1 overflow-hidden ${className ?? ''}`}>
-        <div className="flex w-[23rem] min-w-[23rem] flex-col border-r border-border bg-background">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-            <div className="min-w-0 flex-1">
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={activeFolder ? `Search ${activeFolder}…` : 'Search…'}
-                aria-label="Search vault"
-                className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              {headerActions}
+      <div className={`flex min-h-0 min-w-0 flex-1 overflow-hidden ${className ?? ''}`}>
+        <div className="@container/vault flex min-w-0 flex-1 flex-col">
+          <nav aria-label="Vault navigation" className="flex shrink-0 items-center gap-1 border-b border-border p-2 @[45rem]/vault:hidden">
+            <button
+              type="button"
+              aria-pressed={showFiles}
+              onClick={() => {
+                const focused = document.activeElement
+                setFilesOpen(true)
+                requestAnimationFrame(() => {
+                  if (document.activeElement === focused || document.activeElement === document.body) {
+                    searchRef.current?.focus()
+                  }
+                })
+              }}
+              className={`shrink-0 rounded-md px-3 py-2 text-sm ${showFiles ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+            >
+              Files
+            </button>
+            {selectedPath && (
               <button
                 type="button"
-                aria-label="Refresh vault"
-                onClick={() => void refresh()}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-pressed={!showFiles}
+                onClick={showDocument}
+                title={selectedPath}
+                className={`min-w-0 truncate rounded-md px-3 py-2 text-sm ${!showFiles ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:bg-muted'}`}
               >
-                ↻
+                {selectedPath.split('/').pop()}
               </button>
-              {canWrite && (
-                <button
-                  type="button"
-                  aria-label={activeFolder ? `New vault file in ${activeFolder}` : 'New vault file'}
-                  onClick={() => { setCreateError(null); setNewPath(activeFolder ? `${activeFolder}/` : ''); setCreateOpen(true) }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
-                >
-                  +
-                </button>
+            )}
+          </nav>
+          <div className="flex min-h-0 min-w-0 flex-1">
+            <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col border-r border-border bg-background @[45rem]/vault:flex @[45rem]/vault:w-[23rem] @[45rem]/vault:min-w-[23rem] @[45rem]/vault:flex-none`}>
+              <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <input
+                    ref={searchRef}
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={activeFolder ? `Search ${activeFolder}…` : 'Search…'}
+                    aria-label="Search vault"
+                    className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
+                  />
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {headerActions}
+                  <button
+                    type="button"
+                    aria-label="Refresh vault"
+                    onClick={() => void refresh()}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    ↻
+                  </button>
+                  {canWrite && (
+                    <button
+                      type="button"
+                      aria-label={activeFolder ? `New vault file in ${activeFolder}` : 'New vault file'}
+                      onClick={() => { setCreateError(null); setNewPath(activeFolder ? `${activeFolder}/` : ''); setCreateOpen(true) }}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
+              </div>
+              {activeFolder && (
+                <div className="flex items-center gap-1.5 border-b border-border bg-muted/40 px-4 py-1.5 text-xs">
+                  <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span data-vault-folder className="min-w-0 flex-1 truncate font-medium text-foreground" title={activeFolder}>
+                    {activeFolder}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Clear the active folder"
+                    onClick={() => setFolderPath(null)}
+     className="shrink-0 rounded px-1 text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                  >
+                    Clear
+                  </button>
+                </div>
               )}
-            </div>
-          </div>
-          {activeFolder && (
-            <div className="flex items-center gap-1.5 border-b border-border bg-muted/40 px-4 py-1.5 text-xs">
-              <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span data-vault-folder className="min-w-0 flex-1 truncate font-medium text-foreground" title={activeFolder}>
-                {activeFolder}
-              </span>
-              <button
-                type="button"
-                aria-label="Clear the active folder"
-                onClick={() => setFolderPath(null)}
- className="shrink-0 rounded px-1 text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+              <div
+                className="flex-1 overflow-y-auto"
+                onClickCapture={(event) => {
+                  const target = treeClickTarget(event)
+                  if (target) handleTreeSelect(target.path)
+                }}
               >
-                Clear
-              </button>
-            </div>
-          )}
-          <div
-            className="flex-1 overflow-y-auto"
-            onClickCapture={(event) => {
-              const target = treeClickTarget(event)
-              if (target) handleTreeSelect(target.path)
-            }}
-          >
-            {treeContent}
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {selectedFile && (
-            <div className={`flex shrink-0 items-center justify-between border-b border-border px-4 py-1.5 ${pathBarClassName ?? 'bg-card'}`}>
-              <span data-vault-path className="truncate text-xs font-medium text-foreground">{selectedFile.path}</span>
-              <div className="flex items-center gap-1">
-                {canWrite && isMarkdownCapable && (
-                  <div className="mr-1 flex items-center gap-1">
-                    <button
-                      type="button"
-                      aria-label="Edit as rich text"
-                      aria-pressed={editorMode === 'rich'}
-                      onClick={showRichMode}
-                      className={`inline-flex h-7 items-center rounded px-2 text-xs transition-colors ${
-                        editorMode === 'rich'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                      }`}
-                    >
-                      Rich
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Edit as source"
-                      aria-pressed={editorMode === 'source'}
-                      onClick={showSourceMode}
-                      className={`inline-flex h-7 items-center rounded px-2 text-xs transition-colors ${
-                        editorMode === 'source'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                      }`}
-                    >
-                      Source
-                    </button>
-                  </div>
-                )}
-                {renderDock && !persistentDock && (
-                  <button
-                    type="button"
-                    aria-label={dockToggleCfg.label}
-                    aria-pressed={dockOpen}
-                    disabled={(dockToggleCfg.disabledWhenDirty ?? true) && isDirty}
-                    title={(dockToggleCfg.disabledWhenDirty ?? true) && isDirty ? 'Save your changes first' : (dockToggleCfg.title ?? dockToggleCfg.label)}
-                    onClick={() => setDockOpen((v) => !v)}
-                    className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs transition-colors disabled:pointer-events-none disabled:opacity-40 ${
-                      dockOpen
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    }`}
-                  >
-                    {dockToggleCfg.label}
-                  </button>
-                )}
-                {onDownloadFile && (
-                  <button
-                    type="button"
-                    aria-label="Download this file"
-                    title="Download file"
-                    onClick={() => onDownloadFile(selectedFile)}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <Download className="h-4 w-4" />
-                  </button>
-                )}
-                {canWrite && (
-                  <button
-                    type="button"
-                    aria-label="Delete this file"
-                    title="Delete file"
-                    onClick={() => { setDeleteError(null); setDeleteOpen(true) }}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
+                {treeContent}
               </div>
             </div>
-          )}
-          {selectedFile && saveError && (
-            <OperationErrorAlert
-              message={saveError.message}
-              retryLabel="Retry save"
-              onRetry={() => void saveCurrent()}
-              onDismiss={() => setSaveError(null)}
-            />
-          )}
-          {readError && selectedFile?.path === resolvedSelectedPath && (
-            <OperationErrorAlert
-              message={readError}
-              retryLabel="Retry file refresh"
-              onRetry={() => setReloadNonce((n) => n + 1)}
-              onDismiss={() => setReadError(null)}
-            />
-          )}
-          <div className="flex-1 overflow-hidden">
-            {fileLoading && selectedFile?.path !== resolvedSelectedPath ? (
-              <EditorSkeleton />
-            ) : readError && selectedFile?.path !== resolvedSelectedPath ? (
-              <ReadErrorState message={readError} onRetry={() => setReloadNonce((n) => n + 1)} />
-            ) : selectedFile && canWrite && isMarkdownCapable && editorMode === 'source' ? (
-              <SourceEditor
-                path={selectedFile.path}
-                content={sourceDraft}
-                saving={saving}
-                dirty={isDirty}
-                onChange={onSourceChange}
-                onSave={() => void saveCurrent()}
-              />
-            ) : selectedFile ? (
-              renderArtifact({
-                file: selectedFile,
-                loading: false,
-                mode: editorMode,
-                canWrite,
-                richDraft,
-                dirty: isDirty,
-                onRichChange,
-                onSave: () => void saveCurrent(),
-              })
-            ) : null}
+
+            <div
+              ref={documentRef}
+              role="region"
+              aria-label="Vault document"
+              tabIndex={-1}
+              className={`${showFiles ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden @[45rem]/vault:flex`}
+            >
+              {selectedFile && (
+                <div className={`flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-1.5 ${pathBarClassName ?? 'bg-card'}`}>
+                  <span data-vault-path className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{selectedFile.path}</span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {canWrite && isMarkdownCapable && (
+                      <div className="mr-1 flex items-center gap-1">
+                        <button
+                          type="button"
+                          aria-label="Edit as rich text"
+                          aria-pressed={editorMode === 'rich'}
+                          onClick={showRichMode}
+                          className={`inline-flex h-7 items-center rounded px-2 text-xs transition-colors ${
+                            editorMode === 'rich'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          }`}
+                        >
+                          Rich
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Edit as source"
+                          aria-pressed={editorMode === 'source'}
+                          onClick={showSourceMode}
+                          className={`inline-flex h-7 items-center rounded px-2 text-xs transition-colors ${
+                            editorMode === 'source'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          }`}
+                        >
+                          Source
+                        </button>
+                      </div>
+                    )}
+                    {renderDock && !persistentDock && (
+                      <button
+                        type="button"
+                        aria-label={dockToggleCfg.label}
+                        aria-pressed={dockOpen}
+                        disabled={(dockToggleCfg.disabledWhenDirty ?? true) && isDirty}
+                        title={(dockToggleCfg.disabledWhenDirty ?? true) && isDirty ? 'Save your changes first' : (dockToggleCfg.title ?? dockToggleCfg.label)}
+                        onClick={() => setDockOpen((v) => !v)}
+                        className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs transition-colors disabled:pointer-events-none disabled:opacity-40 ${
+                          dockOpen
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        }`}
+                      >
+                        {dockToggleCfg.label}
+                      </button>
+                    )}
+                    {onDownloadFile && (
+                      <button
+                        type="button"
+                        aria-label="Download this file"
+                        title="Download file"
+                        onClick={() => onDownloadFile(selectedFile)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <Download className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canWrite && (
+                      <button
+                        type="button"
+                        aria-label="Delete this file"
+                        title="Delete file"
+                        onClick={() => { setDeleteError(null); setDeleteOpen(true) }}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              {selectedFile && saveError && (
+                <OperationErrorAlert
+                  message={saveError.message}
+                  retryLabel="Retry save"
+                  onRetry={() => void saveCurrent()}
+                  onDismiss={() => setSaveError(null)}
+                />
+              )}
+              {readError && selectedFile?.path === resolvedSelectedPath && (
+                <OperationErrorAlert
+                  message={readError}
+                  retryLabel="Retry file refresh"
+                  onRetry={() => setReloadNonce((n) => n + 1)}
+                  onDismiss={() => setReadError(null)}
+                />
+              )}
+              <div className="flex-1 overflow-hidden">
+                {fileLoading && selectedFile?.path !== resolvedSelectedPath ? (
+                  <EditorSkeleton />
+                ) : readError && selectedFile?.path !== resolvedSelectedPath ? (
+                  <ReadErrorState message={readError} onRetry={() => setReloadNonce((n) => n + 1)} />
+                ) : selectedFile && canWrite && isMarkdownCapable && editorMode === 'source' ? (
+                  <SourceEditor
+                    path={selectedFile.path}
+                    content={sourceDraft}
+                    saving={saving}
+                    dirty={isDirty}
+                    onChange={onSourceChange}
+                    onSave={() => void saveCurrent()}
+                  />
+                ) : selectedFile ? (
+                  renderArtifact({
+                    file: selectedFile,
+                    loading: false,
+                    mode: editorMode,
+                    canWrite,
+                    richDraft,
+                    dirty: isDirty,
+                    onRichChange,
+                    onSave: () => void saveCurrent(),
+                  })
+                ) : null}
+              </div>
+            </div>
           </div>
         </div>
 

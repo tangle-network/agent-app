@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-/** The kit attaches the line; Hub routes the messages and owns their state. */
+/**
+ * The kit routes no text or call and keeps no box binding, conversation or
+ * counter: it attaches the line to Hub, and Hub routes each text and call to
+ * the sender's own box. The Sandbox client is replaced at its package
+ * boundary; the kit's policy is real.
+ */
+
 const platform = vi.hoisted(() => ({
   fromConnection: vi.fn(),
   attach: vi.fn(),
@@ -21,19 +27,21 @@ vi.mock('@tangle-network/sandbox/core', () => {
 })
 
 const { createHostedAgent, CONVERSATION_TOOLS_OFF, DEFAULT_HOSTED_MODEL } = await import('../src/hosted-agent')
+
 const OWNER = '+15550100001'
 const braid = () => createHostedAgent({ apiKey: 'sk-tan-test', profile: { name: 'Braid' }, owner: OWNER, freeTurnsPerDay: 30 })
 
 beforeEach(() => {
   vi.clearAllMocks()
-  platform.fromConnection.mockResolvedValue({ id: 'ln_braid' })
+  platform.fromConnection.mockImplementation(async ({ transport, phoneNumberId }) => ({ id: 'ln_braid', transport, providerNumberId: phoneNumberId ?? null }))
   platform.attach.mockResolvedValue({ id: 'lat_1' })
-  platform.get.mockResolvedValue({ id: 'ln_braid', attachment: { id: 'lat_1' }, voice: null })
+  platform.get.mockResolvedValue({ id: 'ln_braid', transport: 'imessage', attachment: { id: 'lat_1' }, voice: null })
 })
 
 describe('hosted agent on Hub lines', () => {
   it('attaches the line so each texter runs in their own box under the kit keys', async () => {
     const line = await braid().attachLine('hubconn_braid')
+
     expect(line.id).toBe('ln_braid')
     expect(platform.fromConnection).toHaveBeenCalledWith({ connectionId: 'hubconn_braid', transport: 'imessage' })
     const attached = platform.attach.mock.calls[0]![0]
@@ -47,6 +55,7 @@ describe('hosted agent on Hub lines', () => {
         egressPolicy: { mode: 'strict', allowDomains: ['router.tangle.tools'], includeImplicitDomains: false },
         idleTimeoutSeconds: 600 } },
     })
+    // Hub runs turns with the conversation defaults: the default model, and no shell.
     const profile = attached.respond.backend.profile
     expect(attached.respond.kind).toBe('agent')
     expect(profile.model.default).toBe(DEFAULT_HOSTED_MODEL)
@@ -58,6 +67,7 @@ describe('hosted agent on Hub lines', () => {
   it('turns on voice after the attachment, so a call reaches the same box and thread', async () => {
     const voice = { ph0nyConnectionId: 'hubconn_phony_1', ph0nyAgentId: 'agent_1' }
     await braid().attachLine('hubconn_braid', { voice })
+
     expect(platform.enableVoice).toHaveBeenCalledWith('ln_braid', voice)
     expect(platform.attach.mock.invocationCallOrder[0]!).toBeLessThan(platform.enableVoice.mock.invocationCallOrder[0]!)
   })
@@ -65,6 +75,7 @@ describe('hosted agent on Hub lines', () => {
   it('keeps a profile that chooses its own model and tools', async () => {
     await createHostedAgent({ apiKey: 'sk-tan-test', owner: OWNER, harness: 'opencode',
       profile: { model: { default: 'anthropic/claude-sonnet-5' }, tools: { bash: true } } }).attachLine('hubconn_braid')
+
     const { backend } = platform.attach.mock.calls[0]![0].respond
     expect(backend.type).toBe('opencode')
     expect(backend.profile).toMatchObject({ model: { default: 'anthropic/claude-sonnet-5' }, tools: { bash: true } })
@@ -84,7 +95,7 @@ describe('hosted agent on Hub lines', () => {
     const voice = { ph0nyConnectionId: 'hubconn_phony_1', ph0nyAgentId: 'agent_1' }
     await expect(braid().attachLine('hubconn_linq', { transport: 'whatsapp', phoneNumberId: 'pn_1', voice })).rejects.toThrow(/iMessage/)
     await expect(braid().attachLine('hubconn_linq', { transport: 'whatsapp' })).rejects.toThrow(/phoneNumberId/)
-    await expect(braid().attachLine('hubconn_mail', { transport: 'email' })).rejects.toThrow(/email owner/)
+    await expect(braid().attachLine('hubconn_mail', { transport: 'email' })).rejects.toThrow(/Member address does not match email/)
     expect(platform.fromConnection).not.toHaveBeenCalled()
     expect(platform.attach).not.toHaveBeenCalled()
   })
