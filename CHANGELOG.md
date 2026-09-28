@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.49.33
+
+- refactor(integrations): use the published Hub SDK for actions
+- fix(hosted-agent): make example setup explicit and preserve Hub routes (#654)
+- fix(release): describe merged changes in generated notes
+
 ## 0.49.32
 
 - fix(hosted-agent): retain active line policy on reattach
