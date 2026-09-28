@@ -1,0 +1,7 @@
+{
+  "entrypoint": "http://127.0.0.1:8807/app/launch/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source": "production build on local Builder harness; line API visual fixture",
+  "flow": "connect, verified-owner enrollment, member consent state, disconnect, reload",
+  "confirmationFocus": "Disconnect",
+  "browserErrors": []
+}
