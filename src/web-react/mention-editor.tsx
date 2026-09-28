@@ -187,12 +187,14 @@ export function buildMentionExtension(
 }
 
 /** Matches the composer textarea's own text treatment so the two input modes
- *  render identically (`text-base leading-6`, the same padding). `outline-none`
- *  is safe for the same reason as on that textarea: the composer card this
- *  editor mounts into draws the keyboard indicator through `focus-within:`,
- *  so a second outline inside the card would double the ring. */
+ *  render identically (`text-base leading-6`, the same padding). The compound
+ *  `focus:outline-none` (never the bare utility, which only ties the
+ *  tokens.css `:focus-visible` floor) is required for the same reason as on
+ *  that textarea: the composer card this editor mounts into draws the
+ *  keyboard indicator through `focus-within:`, so a second outline inside the
+ *  card would double the ring. */
 const EDITOR_CLASS =
-  'w-full whitespace-pre-wrap break-words bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none'
+  'w-full whitespace-pre-wrap break-words bg-transparent px-1.5 py-1 text-base leading-6 text-foreground focus:outline-none'
 
 /** Trailing debounce on the suggestion fetch so a fast typist doesn't hit the
  * provider once per keystroke. Fixed rather than a prop — 100ms is well under
@@ -304,6 +306,7 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
             role: 'textbox',
             'aria-multiline': 'true',
             'aria-label': 'Message input',
+            'data-composer-input': '',
             'aria-haspopup': 'listbox',
           },
           handleKeyDown: (_view, event) => {
