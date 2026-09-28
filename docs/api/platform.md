@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-77 exports.
+82 exports.
 
 ### `AdminGuardOptions`
 
@@ -147,7 +147,7 @@ interface BillableBalanceState
 `function` — Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies
 
 ```ts
-(opts: TangleSsoHandlerOptions) => TangleSsoHandlers
+(opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions) => TangleSsoHandlers
 ```
 
 ### `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`
@@ -492,6 +492,46 @@ class TangleBearerMissingError
 
 ```ts
 type TangleHubBearerSource
+```
+
+### `TangleOidcSsoAccountStore`
+
+`interface` — OIDC tokens are server-side credentials, not API keys.
+
+```ts
+interface TangleOidcSsoAccountStore
+```
+
+### `TangleOidcSsoAuthClient`
+
+`interface` — The caller needs only the OIDC operations used by this callback.
+
+```ts
+interface TangleOidcSsoAuthClient
+```
+
+### `TangleOidcSsoHandlerOptions`
+
+`interface` — Registered OIDC client and token store.
+
+```ts
+interface TangleOidcSsoHandlerOptions
+```
+
+### `TangleOidcSsoTokens`
+
+`interface` — Token fields the callback persists from the runtime's OIDC exchange.
+
+```ts
+interface TangleOidcSsoTokens
+```
+
+### `TangleOidcSsoUser`
+
+`interface` — Verified identity returned by the runtime's OIDC userinfo lookup.
+
+```ts
+interface TangleOidcSsoUser
 ```
 
 ### `TanglePlanTier`

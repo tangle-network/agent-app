@@ -7,7 +7,7 @@ _103 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | Entry | Exports | Depends on |
 |---|---|---|
 | [`./alerting`](api/alerting.md) | 8 | — |
-| [`./app-auth`](api/app-auth.md) | 11 | `platform` |
+| [`./app-auth`](api/app-auth.md) | 12 | `platform` |
 | [`./assets`](api/assets.md) | 44 | — |
 | [`./assistant`](api/assistant.md) | 56 | `runtime`, `web-react` |
 | [`./billing`](api/billing.md) | 34 | — |
@@ -53,7 +53,7 @@ _103 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./peer-floors/check`](api/peer-floors-check.md) | 23 | `signoff` |
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 1 | `signoff` |
 | [`./plans`](api/plans.md) | 12 | — |
-| [`./platform`](api/platform.md) | 77 | `billing`, `runtime`, `web` |
+| [`./platform`](api/platform.md) | 82 | `billing`, `runtime`, `web` |
 | [`./preflight`](api/preflight.md) | 16 | `alerting`, `signoff` |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | `alerting`, `signoff` |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 34 | `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`, `web` |
@@ -122,11 +122,11 @@ Source: `src/alerting/index.ts` · 8 exports
 
 ## `./app-auth`
 
-Source: `src/app-auth/index.ts` · 11 exports
+Source: `src/app-auth/index.ts` · 12 exports
 
 Depends on: `platform`
 
-`AppAuth`, `AppAuthConfig`, `AppAuthEmailClient`, `AppAuthEmailConfig`, `AppAuthInstance`, `AppAuthSchema`, `AppAuthSession`, `AppAuthSocialConfig`, `AppAuthSocialProviderConfig`, `AppAuthSsoConfig`, `createAppAuth`
+`AppAuth`, `AppAuthConfig`, `AppAuthEmailClient`, `AppAuthEmailConfig`, `AppAuthInstance`, `AppAuthOidcSsoConfig`, `AppAuthSchema`, `AppAuthSession`, `AppAuthSocialConfig`, `AppAuthSocialProviderConfig`, `AppAuthSsoConfig`, `createAppAuth`
 
 [Full API →](api/app-auth.md)
 
@@ -536,11 +536,11 @@ Source: `src/plans/index.ts` · 12 exports
 
 ## `./platform`
 
-Source: `src/platform/index.ts` · 77 exports
+Source: `src/platform/index.ts` · 82 exports
 
 Depends on: `billing`, `runtime`, `web`
 
-`AdminGuardOptions`, `ApiKeyRequestAuthOptions`, `assertBillableBalance`, `AssertBillableBalanceOptions`, `AuthGuard`, `AuthGuardOptions`, `BetterAuthSessionCookieMinterOptions`, `BetterAuthSessionCookieSource`, `BillableBalanceState`, `createAdminGuard`, `createApiKeyRequestAuth`, `createAuthGuard`, `createBetterAuthSessionCookieMinter`, `createHubProxyRoutes`, `createPlatformBillingHttp`, `createSignedSsoState`, `createTanglePlatformBillingClient`, `createTangleSsoHandlers`, `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`, `DEFAULT_TANGLE_TIER_POLICY`, `FREE_TIER_SPEND_CAP_USD`, `getProductEntitlement`, `guardResolution`, `GuardResolution`, `HubClientLike`, `HubProxyContext`, `HubProxyRouteArgs`, `HubProxyRoutes`, `isPlatformBillingHttpError`, `isPlatformHubErrorLike`, `isProductEntitled`, `isSeatBillingEnabled`, `isTangleBearerMissingError`, `normalizeTanglePlanTier`, `normalizeTangleSsoEmail`, `parseAdminEmails`, `PlatformBalanceSnapshot`, `PlatformBillingHttp`, `PlatformBillingHttpError`, `PlatformBillingHttpOptions`, `PlatformIdentityStore`, `PlatformSubscriptionInfo`, `PlatformUsageProductRow`, `ProductEntitlement`, `ProductSeatOffer`, `ProductSeatOfferPeriod`, `readTangleTierState`, `RequestApiKey`, `ResolvedTangleHubBearer`, `resolveTangleSsoAccount`, `resolveUserTangleHubBearer`, `resolveUserTangleHubBearerForUser`, `ResolveUserTangleHubBearerForUserOptions`, `ResolveUserTangleHubBearerOptions`, `SeatBillingFlagOptions`, `seatCheckoutUrl`, `SeatStatus`, `signSessionCookieValue`, `SsoStateConfig`, `TangleBearerMissingError`, `TangleHubBearerSource`, `TanglePlanTier`, `TangleSsoAccountConflictError`, `TangleSsoAccountConflictReason`, `TangleSsoAccountResolution`, `TangleSsoAccountResolutionInput`, `TangleSsoAccountStore`, `TangleSsoAuthClient`, `TangleSsoExchangeResult`, `TangleSsoHandlerOptions`, `TangleSsoHandlers`, `TangleSsoLocalAccount`, `TangleSsoSessionCookieArgs`, `TangleSsoUserCreateError`, `TangleTierPolicy`, `TangleTierState`, `verifySignedSsoState`
+`AdminGuardOptions`, `ApiKeyRequestAuthOptions`, `assertBillableBalance`, `AssertBillableBalanceOptions`, `AuthGuard`, `AuthGuardOptions`, `BetterAuthSessionCookieMinterOptions`, `BetterAuthSessionCookieSource`, `BillableBalanceState`, `createAdminGuard`, `createApiKeyRequestAuth`, `createAuthGuard`, `createBetterAuthSessionCookieMinter`, `createHubProxyRoutes`, `createPlatformBillingHttp`, `createSignedSsoState`, `createTanglePlatformBillingClient`, `createTangleSsoHandlers`, `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`, `DEFAULT_TANGLE_TIER_POLICY`, `FREE_TIER_SPEND_CAP_USD`, `getProductEntitlement`, `guardResolution`, `GuardResolution`, `HubClientLike`, `HubProxyContext`, `HubProxyRouteArgs`, `HubProxyRoutes`, `isPlatformBillingHttpError`, `isPlatformHubErrorLike`, `isProductEntitled`, `isSeatBillingEnabled`, `isTangleBearerMissingError`, `normalizeTanglePlanTier`, `normalizeTangleSsoEmail`, `parseAdminEmails`, `PlatformBalanceSnapshot`, `PlatformBillingHttp`, `PlatformBillingHttpError`, `PlatformBillingHttpOptions`, `PlatformIdentityStore`, `PlatformSubscriptionInfo`, `PlatformUsageProductRow`, `ProductEntitlement`, `ProductSeatOffer`, `ProductSeatOfferPeriod`, `readTangleTierState`, `RequestApiKey`, `ResolvedTangleHubBearer`, `resolveTangleSsoAccount`, `resolveUserTangleHubBearer`, `resolveUserTangleHubBearerForUser`, `ResolveUserTangleHubBearerForUserOptions`, `ResolveUserTangleHubBearerOptions`, `SeatBillingFlagOptions`, `seatCheckoutUrl`, `SeatStatus`, `signSessionCookieValue`, `SsoStateConfig`, `TangleBearerMissingError`, `TangleHubBearerSource`, `TangleOidcSsoAccountStore`, `TangleOidcSsoAuthClient`, `TangleOidcSsoHandlerOptions`, `TangleOidcSsoTokens`, `TangleOidcSsoUser`, `TanglePlanTier`, `TangleSsoAccountConflictError`, `TangleSsoAccountConflictReason`, `TangleSsoAccountResolution`, `TangleSsoAccountResolutionInput`, `TangleSsoAccountStore`, `TangleSsoAuthClient`, `TangleSsoExchangeResult`, `TangleSsoHandlerOptions`, `TangleSsoHandlers`, `TangleSsoLocalAccount`, `TangleSsoSessionCookieArgs`, `TangleSsoUserCreateError`, `TangleTierPolicy`, `TangleTierState`, `verifySignedSsoState`
 
 [Full API →](api/platform.md)
 
