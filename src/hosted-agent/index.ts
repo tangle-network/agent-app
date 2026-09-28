@@ -131,6 +131,8 @@ export function createHostedAgent(config: HostedAgentConfig) {
     if (retained?.unknownSenders === 'onboard')
       throw new HostedAgentError('line_policy_migration_required', 'This line uses onboard admission. Manage it through Hub; the hosted-agent kit will not replace its policy.')
     const mode = options.mode ?? retained?.mode ?? 'shared'
+    const keyPrefix = line.attachment?.instance?.keyPrefix
+      ?? (line.clientReference === 'hosted-agent' ? PERSON_KEY_PREFIX : `${PERSON_KEY_PREFIX}${line.id}:`)
     await sandbox.lines.attach({
       ...config.attachment,
       number: line.id,
@@ -140,7 +142,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
       roles: config.attachment?.roles ?? retained?.roles ?? (mode === 'shared' ? { owner: PERSON, member: PERSON, guest: PERSON } : { owner: PERSON }),
       respond: { kind: 'agent', backend },
       limits: { turnsPerMemberPerDay: config.freeTurnsPerDay ?? 20, ...config.attachment?.limits },
-      instance: config.attachment?.instance ?? { keyPrefix: PERSON_KEY_PREFIX, create },
+      instance: config.attachment?.instance ?? { keyPrefix, create },
       clientReference: config.attachment?.clientReference ?? 'hosted-agent',
     })
     if (options.voice) await sandbox.lines.enableVoice(line.id, options.voice)

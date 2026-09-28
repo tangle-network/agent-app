@@ -50,7 +50,7 @@ describe('hosted agent on Hub lines', () => {
       members: [{ address: OWNER, role: 'owner' }],
       roles: { owner: { context: 'own', tools: 'act' }, guest: { context: 'own', tools: 'act' } },
       limits: { turnsPerMemberPerDay: 30 },
-      instance: { keyPrefix: 'hosted:', create: {
+      instance: { keyPrefix: 'hosted:ln_braid:', create: {
         resources: { cpuCores: 2, memoryMB: 2048, diskGB: 2 },
         egressPolicy: { mode: 'strict', allowDomains: ['router.tangle.tools'], includeImplicitDomains: false },
         idleTimeoutSeconds: 600 } },
