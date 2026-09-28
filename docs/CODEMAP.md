@@ -31,7 +31,7 @@ _101 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
 | [`./harness`](api/harness.md) | 14 | — |
-| [`./hosted-agent`](api/hosted-agent.md) | 12 | — |
+| [`./hosted-agent`](api/hosted-agent.md) | 26 | `profile` |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `brand`, `intakes` |
 | [`./intakes-react/lazy`](api/intakes-react-lazy.md) | 2 | `brand`, `intakes` |
@@ -55,7 +55,7 @@ _101 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./preflight`](api/preflight.md) | 16 | `alerting`, `signoff` |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | `alerting`, `signoff` |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 34 | `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`, `web` |
-| [`./profile`](api/profile.md) | 45 | `skills` |
+| [`./profile`](api/profile.md) | 48 | `skills` |
 | [`./prompt`](api/prompt.md) | 3 | — |
 | [`./public-consultation`](api/public-consultation.md) | 11 | `chat-routes`, `stream`, `tools` |
 | [`./record`](api/record.md) | 33 | — |
@@ -342,9 +342,11 @@ Source: `src/harness/index.ts` · 14 exports
 
 ## `./hosted-agent`
 
-Source: `src/hosted-agent/index.ts` · 12 exports
+Source: `src/hosted-agent/index.ts` · 26 exports
 
-`BoxPolicy`, `CONVERSATION_TOOLS_OFF`, `createHostedAgent`, `DEFAULT_BOX_POLICY`, `DEFAULT_HOSTED_MODEL`, `HostedAgent`, `HostedAgentAttachment`, `HostedAgentConfig`, `HostedAgentError`, `HostedAgentLineOptions`, `HostedAgentTransport`, `PERSON_KEY_PREFIX`
+Depends on: `profile`
+
+`AgentHomeWorkflow`, `AgentHomeWorkflowOptions`, `agentHomeWorkflows`, `BoxPolicy`, `buildGeneralAgentProfile`, `CONVERSATION_TOOLS_OFF`, `createHostedAgent`, `createTangleAgent`, `DEFAULT_AGENT_HOME`, `DEFAULT_BOX_POLICY`, `DEFAULT_HOME_LIMITS`, `DEFAULT_HOSTED_MODEL`, `defaultHomeFiles`, `GENERAL_AGENT_MODEL`, `GENERAL_AGENT_SYSTEM_PROMPT`, `GeneralAgentMember`, `GeneralAgentProfileOptions`, `HostedAgent`, `HostedAgentAttachment`, `HostedAgentConfig`, `HostedAgentError`, `HostedAgentLineOptions`, `HostedAgentTransport`, `PERSON_KEY_PREFIX`, `TangleAgentOptions`, `withDefaultAgentHome`
 
 [Full API →](api/hosted-agent.md)
 
@@ -558,11 +560,11 @@ Depends on: `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`,
 
 ## `./profile`
 
-Source: `src/profile/index.ts` · 45 exports
+Source: `src/profile/index.ts` · 48 exports
 
 Depends on: `skills`
 
-`assertProfilePromptWithinBudget`, `assertSkillDeliveryDisjoint`, `assertSystemPromptWithinBudget`, `composeAgentProfile`, `ComposedSkills`, `ComposeProfileBudget`, `composeShellResources`, `ComposeShellResourcesInput`, `composeSkills`, `CorpusEntry`, `CorpusLoadResult`, `corpusSkills`, `DEFAULT_MAX_SYSTEM_PROMPT_BYTES`, `diffProfileFingerprints`, `EvolvableSectionInput`, `fingerprintAgentProfile`, `formatProfileDrift`, `GlobModules`, `largestPromptSections`, `LoadCorpusOptions`, `loadMarkdownCorpus`, `makeEvolvableSection`, `mergeComposedSkills`, `parseCorpusSkills`, `ParsedSkill`, `parseSkillFrontmatter`, `profile`, `ProfileChannels`, `ProfileDrift`, `ProfileDriftEntry`, `ProfileFingerprint`, `ProfileFingerprintContext`, `ProfileOverlay`, `registrySkills`, `renderInlineSkills`, `renderSkillIndex`, `SkillDeliveryMode`, `SkillEntry`, `skillEntryFromMarkdown`, `SkillFrontmatter`, `skillMountPath`, `skillRefs`, `stripComments`, `UserSkill`, `userSkillMounts`
+`assertProfilePromptWithinBudget`, `assertSkillDeliveryDisjoint`, `assertSystemPromptWithinBudget`, `composeAgentProfile`, `ComposedSkills`, `ComposeProfileBudget`, `composeShellResources`, `ComposeShellResourcesInput`, `composeSkills`, `CorpusEntry`, `CorpusLoadResult`, `corpusSkills`, `DEFAULT_HOME_LIMITS`, `DEFAULT_MAX_SYSTEM_PROMPT_BYTES`, `defaultHomeFiles`, `diffProfileFingerprints`, `EvolvableSectionInput`, `fingerprintAgentProfile`, `formatProfileDrift`, `GlobModules`, `largestPromptSections`, `LoadCorpusOptions`, `loadMarkdownCorpus`, `makeEvolvableSection`, `mergeComposedSkills`, `parseCorpusSkills`, `ParsedSkill`, `parseSkillFrontmatter`, `profile`, `ProfileChannels`, `ProfileDrift`, `ProfileDriftEntry`, `ProfileFingerprint`, `ProfileFingerprintContext`, `ProfileOverlay`, `registrySkills`, `renderInlineSkills`, `renderSkillIndex`, `SkillDeliveryMode`, `SkillEntry`, `skillEntryFromMarkdown`, `SkillFrontmatter`, `skillMountPath`, `skillRefs`, `stripComments`, `UserSkill`, `userSkillMounts`, `withDefaultAgentHome`
 
 [Full API →](api/profile.md)
 

@@ -1,6 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
+    "bin/tangle-agent/**/*.mjs",
     "src/**/*.stories.{ts,tsx}",
     "src/**/*.test.{ts,tsx}",
     "src/stories/fixtures/**/*.ts",
@@ -123,6 +124,7 @@
     "tsc"
   ],
   "ignoreDependencies": [
+    "@anthropic-ai/sdk",
     "@tangle-network/agent-gateway",
     "@tangle-network/agent-profile-materialize",
     "@xterm/addon-fit",

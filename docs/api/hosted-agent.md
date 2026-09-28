@@ -4,7 +4,31 @@
 
 Source: `src/hosted-agent/index.ts`
 
-12 exports.
+26 exports.
+
+### `AgentHomeWorkflow`
+
+`interface`
+
+```ts
+interface AgentHomeWorkflow
+```
+
+### `AgentHomeWorkflowOptions`
+
+`interface`
+
+```ts
+interface AgentHomeWorkflowOptions
+```
+
+### `agentHomeWorkflows`
+
+`function` — Platform owns timing, admission, approvals, persistence and DM delivery.
+
+```ts
+(options: AgentHomeWorkflowOptions) => AgentHomeWorkflow[]
+```
 
 ### `BoxPolicy`
 
@@ -12,6 +36,14 @@ Source: `src/hosted-agent/index.ts`
 
 ```ts
 interface BoxPolicy
+```
+
+### `buildGeneralAgentProfile`
+
+`function` — Uses the published Sandbox Router builder.
+
+```ts
+(options?: GeneralAgentProfileOptions) => Promise<AgentProfile>
 ```
 
 ### `CONVERSATION_TOOLS_OFF`
@@ -30,6 +62,22 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 (config: HostedAgentConfig) => { attachLine(connectionId: string, options?: HostedAgentLineOptions): Promise<Line>; att…
 ```
 
+### `createTangleAgent`
+
+`function` — General agents use the SDK's line attachment route.
+
+```ts
+(options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: LineVoiceOptions | undefined) => Promis…
+```
+
+### `DEFAULT_AGENT_HOME`
+
+`const`
+
+```ts
+"/var/lib/tangle-agent/home"
+```
+
 ### `DEFAULT_BOX_POLICY`
 
 `const`
@@ -38,12 +86,60 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 BoxPolicy
 ```
 
+### `DEFAULT_HOME_LIMITS`
+
+`const` — Unicode code-point budgets.
+
+```ts
+{ readonly 'AGENTS.md': 12000; readonly 'SOUL.md': 8000; readonly 'IDENTITY.md': 4000; readonly 'USER.md': 4000; readon…
+```
+
 ### `DEFAULT_HOSTED_MODEL`
 
 `const`
 
 ```ts
 "openai/gpt-5.6-luna"
+```
+
+### `defaultHomeFiles`
+
+`function` — Canonical seed records.
+
+```ts
+() => AgentProfileFileMount[]
+```
+
+### `GENERAL_AGENT_MODEL`
+
+`const`
+
+```ts
+"openai/gpt-5.6-luna"
+```
+
+### `GENERAL_AGENT_SYSTEM_PROMPT`
+
+`const`
+
+```ts
+string
+```
+
+### `GeneralAgentMember`
+
+`type`
+
+```ts
+type GeneralAgentMember
+```
+
+### `GeneralAgentProfileOptions`
+
+`interface`
+
+```ts
+interface GeneralAgentProfileOptions
 ```
 
 ### `HostedAgent`
@@ -64,7 +160,7 @@ type HostedAgentAttachment
 
 ### `HostedAgentConfig`
 
-`interface` — Hub owns delivery, member threads, consent and execution.
+`interface` — The public conversation kit.
 
 ```ts
 interface HostedAgentConfig
@@ -100,4 +196,20 @@ type HostedAgentTransport
 
 ```ts
 "hosted:"
+```
+
+### `TangleAgentOptions`
+
+`interface`
+
+```ts
+interface TangleAgentOptions
+```
+
+### `withDefaultAgentHome`
+
+`function` — Compose home instructions, not per-turn writes to persistent memory.
+
+```ts
+(profile: AgentProfile) => AgentProfile
 ```

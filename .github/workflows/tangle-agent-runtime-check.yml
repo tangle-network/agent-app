@@ -1,0 +1,100 @@
+name: General agent runtime verification
+on:
+  push:
+    branches: [feat/default-agent-home]
+    paths: [.github/workflows/tangle-agent-runtime-check.yml]
+  pull_request:
+    paths: ['bin/tangle-agent*', 'bin/tangle-agent/**', 'src/hosted-agent/**', 'src/profile/home*', 'scripts/prove-protected-home.mjs']
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+      - name: Build the actual package
+        run: |
+          set -euo pipefail
+          mkdir -p verification
+          pnpm install --frozen-lockfile 2>&1 | tee verification/install.log
+          pnpm typecheck 2>&1 | tee verification/types.log
+          pnpm build 2>&1 | tee verification/build.log
+          find bin/tangle-agent -name '*.mjs' -exec node --check '{}' \;
+          node --check bin/tangle-agent.mjs
+          node --check scripts/collect-agent-line-proof.mjs
+      - name: Exercise the installed home as the real non-root user
+        run: |
+          set -euo pipefail
+          sudo useradd --create-home --shell /bin/bash tangleproof
+          sudo "$(command -v node)" bin/tangle-agent.mjs install-home tangleproof | tee verification/home-install.json
+          sudo install -d -m 0755 /opt/tangle-proof/scripts /opt/tangle-proof/bin/tangle-agent
+          sudo install -m 0644 scripts/prove-protected-home.mjs /opt/tangle-proof/scripts/
+          sudo install -m 0644 bin/tangle-agent/home.mjs /opt/tangle-proof/bin/tangle-agent/
+          sudo -u tangleproof env TANGLE_HOME_PROOF_DISPOSABLE=1 "$(command -v node)" /opt/tangle-proof/scripts/prove-protected-home.mjs | tee verification/home-proof.jsonl
+      - name: Compose the actual canonical general profile without provider effects
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS' 2>&1 | tee verification/runtime.log
+          import assert from 'node:assert/strict'
+          import { buildGeneralAgent } from './bin/tangle-agent/provision.mjs'
+          const manifest = { version: 1, keyPrefix: 'probe:', environment: 'universal',
+            imageModel: 'probe-image', videoModel: 'probe-video', chromium: '/usr/bin/chromium',
+            members: [{ address: '+15550100001', role: 'owner', label: 'Probe' }],
+            lines: [{ id: 'ln_probe', transport: 'imessage' }],
+            heartbeat: { lineId: 'ln_probe', owner: '+15550100001', timezone: 'America/Los_Angeles' } }
+          const plan = buildGeneralAgent(manifest)
+          assert.equal(plan.attachments[0].instance.create.resources.memoryMB, 4096)
+          assert.equal(plan.attachments[0].instance.create.egressPolicy.mode, 'strict')
+          assert.equal(plan.attachments[0].respond.rolePolicy.roles.owner.kind, 'general')
+          assert.equal(plan.attachments[0].respond.backend.type, 'opencode')
+          assert.equal(plan.attachments[0].respond.backend.interactions.permission, true)
+          assert.equal(plan.attachments[0].unknownSenders, 'reject')
+          assert.throws(() => buildGeneralAgent({ ...manifest,
+            baseProfile: { interactions: { permission: false } } }), /permission interactions/)
+          assert.throws(() => buildGeneralAgent({ ...manifest, members: [{
+            ...manifest.members[0], backend: { type: 'opencode', profile: { name: 'Override' },
+              interactions: { permission: false } },
+          }] }), /interactions|Unrecognized/i)
+          assert.throws(() => buildGeneralAgent({ ...manifest, members: [{
+            ...manifest.members[0], backend: { type: 'codex', profile: { name: 'Override' } },
+          }] }), /opencode/i)
+          assert.throws(() => buildGeneralAgent({ ...manifest, members: [{
+            ...manifest.members[0], backend: { profile: { name: 'Override', interactions: { permission: false } } },
+          }] }), /permission interactions/)
+          const memberPlan = buildGeneralAgent({ ...manifest, members: [{
+            ...manifest.members[0], backend: { profile: { name: 'Owner override' } },
+          }] })
+          assert.equal(memberPlan.attachments[0].respond.rolePolicy.members['+15550100001'].backend.type, 'opencode')
+          assert.equal(memberPlan.attachments[0].respond.rolePolicy.members['+15550100001'].backend.interactions.permission, true)
+          assert.equal(plan.workflows.length, 2)
+          const heartbeat = JSON.parse(plan.workflows.find(job => job.purpose === 'heartbeat').yaml)
+          const nightly = JSON.parse(plan.workflows.find(job => job.purpose === 'consolidation').yaml)
+          assert.equal(heartbeat.on.schedule.cron, '0 8-22 * * *')
+          assert.equal(nightly.on.schedule.cron, '0 3 * * *')
+          assert.equal(heartbeat.enabled, false)
+          assert.equal(nightly.enabled, false)
+          await import('./bin/tangle-agent/runtime.mjs')
+          console.log(JSON.stringify({ plan: 'canonical profile parsed', imports: 'published SDKs resolved', providerRequests: 0 }))
+          JS
+      - name: Verify the installed executable is packaged
+        run: |
+          set -euo pipefail
+          pnpm pack --pack-destination verification
+          tar -tf verification/tangle-network-agent-app-*.tgz | grep 'package/bin/tangle-agent' | tee verification/packed-paths.log
+          git rev-parse HEAD > verification/REVISION
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: general-agent-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+          path: verification/
+          retention-days: 3
