@@ -127,23 +127,32 @@ export function createHostedAgent(config: HostedAgentConfig) {
       throw new HostedAgentError('line_transport_mismatch', 'The existing line uses another transport.')
     if (options.phoneNumberId && line.providerNumberId !== options.phoneNumberId)
       throw new HostedAgentError('line_number_mismatch', 'The existing line is pinned to another WhatsApp number.')
-    const retained = options.mode === undefined && line.attachment?.status === 'active' ? line.attachment : undefined
+    const retained = line.attachment?.status === 'active' ? line.attachment : undefined
     if (retained?.unknownSenders === 'onboard')
       throw new HostedAgentError('line_policy_migration_required', 'This line uses onboard admission. Manage it through Hub; the hosted-agent kit will not replace its policy.')
     const mode = options.mode ?? retained?.mode ?? 'shared'
+    const declaredMembers = config.attachment?.members ?? (retained
+      ? (await sandbox.lines.members(line.id).list())
+        .filter(member => member.source === 'declared')
+        .map(member => ({ address: member.address, role: member.role, label: member.label ?? undefined }))
+      : members)
     const keyPrefix = line.attachment?.instance?.keyPrefix
       ?? (line.clientReference === 'hosted-agent' ? PERSON_KEY_PREFIX : `${PERSON_KEY_PREFIX}${line.id}:`)
     await sandbox.lines.attach({
       ...config.attachment,
       number: line.id,
       mode,
-      members,
+      members: declaredMembers,
       unknownSenders: config.attachment?.unknownSenders ?? retained?.unknownSenders ?? (mode === 'shared' && transport !== 'email' ? 'guest' : 'reject'),
       roles: config.attachment?.roles ?? retained?.roles ?? (mode === 'shared' ? { owner: PERSON, member: PERSON, guest: PERSON } : { owner: PERSON }),
       respond: { kind: 'agent', backend },
-      limits: { turnsPerMemberPerDay: config.freeTurnsPerDay ?? 20, ...config.attachment?.limits },
-      instance: config.attachment?.instance ?? { keyPrefix, create },
-      clientReference: config.attachment?.clientReference ?? 'hosted-agent',
+      limits: {
+        ...retained?.limits,
+        turnsPerMemberPerDay: config.freeTurnsPerDay ?? retained?.limits.turnsPerMemberPerDay ?? 20,
+        ...config.attachment?.limits,
+      },
+      instance: config.attachment?.instance ?? retained?.instance ?? { keyPrefix, create },
+      clientReference: config.attachment?.clientReference ?? retained?.clientReference ?? 'hosted-agent',
     })
     if (options.voice) await sandbox.lines.enableVoice(line.id, options.voice)
     return sandbox.lines.get(line.id)
