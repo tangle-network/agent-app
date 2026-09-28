@@ -122,7 +122,7 @@ export interface HubInvokeDeps {
  * approval-gated surfaces verbatim as 409, never silently executed.
  */
 export async function invokeIntegrationHub(input: HubInvokeInput, deps: HubInvokeDeps): Promise<HubInvokeOutcome> {
-  const env = deps.env ?? (process.env as Record<string, string | undefined>)
+  const env = deps.env ?? (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
   const baseUrl = deps.baseUrl ?? env.TANGLE_PLATFORM_URL?.trim()
   if (!baseUrl) return { status: 500, body: { error: 'TANGLE_PLATFORM_URL is not configured' } }
 
