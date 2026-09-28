@@ -33,9 +33,9 @@ const braid = () => createHostedAgent({ apiKey: 'sk-tan-test', profile: { name: 
 
 beforeEach(() => {
   vi.clearAllMocks()
-  platform.fromConnection.mockResolvedValue({ id: 'ln_braid' })
+  platform.fromConnection.mockImplementation(async ({ transport, phoneNumberId }) => ({ id: 'ln_braid', transport, providerNumberId: phoneNumberId ?? null }))
   platform.attach.mockResolvedValue({ id: 'lat_1' })
-  platform.get.mockResolvedValue({ id: 'ln_braid', attachment: { id: 'lat_1' }, voice: null })
+  platform.get.mockResolvedValue({ id: 'ln_braid', transport: 'imessage', attachment: { id: 'lat_1' }, voice: null })
 })
 
 describe('hosted agent on Hub lines', () => {
@@ -43,14 +43,14 @@ describe('hosted agent on Hub lines', () => {
     const line = await braid().attachLine('hubconn_braid')
 
     expect(line.id).toBe('ln_braid')
-    expect(platform.fromConnection).toHaveBeenCalledWith({ connectionId: 'hubconn_braid', transport: 'imessage', clientReference: 'hosted-agent' })
+    expect(platform.fromConnection).toHaveBeenCalledWith({ connectionId: 'hubconn_braid', transport: 'imessage' })
     const attached = platform.attach.mock.calls[0]![0]
     expect(attached).toMatchObject({
       number: 'ln_braid', mode: 'shared', unknownSenders: 'guest',
       members: [{ address: OWNER, role: 'owner' }],
       roles: { owner: { context: 'own', tools: 'act' }, guest: { context: 'own', tools: 'act' } },
       limits: { turnsPerMemberPerDay: 30 },
-      instance: { keyPrefix: 'hosted:', create: {
+      instance: { keyPrefix: 'hosted:ln_braid:', create: {
         resources: { cpuCores: 2, memoryMB: 2048, diskGB: 2 },
         egressPolicy: { mode: 'strict', allowDomains: ['router.tangle.tools'], includeImplicitDomains: false },
         idleTimeoutSeconds: 600 } },
@@ -88,14 +88,14 @@ describe('hosted agent on Hub lines', () => {
 
   it('attaches a WhatsApp number through its Linq phone number id', async () => {
     await braid().attachLine('hubconn_linq', { transport: 'whatsapp', phoneNumberId: 'pn_1' })
-    expect(platform.fromConnection).toHaveBeenCalledWith({ connectionId: 'hubconn_linq', transport: 'whatsapp', phoneNumberId: 'pn_1', clientReference: 'hosted-agent' })
+    expect(platform.fromConnection).toHaveBeenCalledWith({ connectionId: 'hubconn_linq', transport: 'whatsapp', phoneNumberId: 'pn_1' })
   })
 
   it('refuses a request Hub would refuse before creating or attaching a line', async () => {
     const voice = { ph0nyConnectionId: 'hubconn_phony_1', ph0nyAgentId: 'agent_1' }
     await expect(braid().attachLine('hubconn_linq', { transport: 'whatsapp', phoneNumberId: 'pn_1', voice })).rejects.toThrow(/iMessage/)
     await expect(braid().attachLine('hubconn_linq', { transport: 'whatsapp' })).rejects.toThrow(/phoneNumberId/)
-    await expect(braid().attachLine('hubconn_mail', { transport: 'email' })).rejects.toThrow(/email owner/)
+    await expect(braid().attachLine('hubconn_mail', { transport: 'email' })).rejects.toThrow(/Member address does not match email/)
     expect(platform.fromConnection).not.toHaveBeenCalled()
     expect(platform.attach).not.toHaveBeenCalled()
   })

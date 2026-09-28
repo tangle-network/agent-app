@@ -1,37 +1,43 @@
 import type { AgentProfile, BackendConfig, LineVoiceOptions } from '@tangle-network/sandbox'
 import { type Line, type LineInstanceCreate, Sandbox } from '@tangle-network/sandbox/core'
 
-/**
- * A hosted agent: people text or call a line, and each person is answered
- * from their own isolated sandbox. The developer's Tangle API key pays for
- * every box, model turn, reply and call.
- *
- * The platform does the work. {@link HostedAgent.attachLine} attaches the
- * line to Tangle Hub with one sandbox per person: Hub routes each text and
- * call to the person's box (the named instance {@link PERSON_KEY_PREFIX} plus
- * a hash of their number), keeps one thread per person, handles STOP and
- * START, counts each person's texts per day, and sends the reply. A call on
- * the line runs in the same box and thread, so text and voice share one memory.
- */
+/** Native Hub options. The kit does not keep a second membership or execution store. */
+type NativeAttachment = Parameters<Sandbox['lines']['attach']>[0]
+export type HostedAgentAttachment = Partial<Omit<NativeAttachment, 'number' | 'mode' | 'respond'>>
+export type HostedAgentTransport = 'imessage' | 'whatsapp' | 'email'
 
+export interface HostedAgentLineOptions {
+  transport?: HostedAgentTransport
+  mode?: 'personal' | 'shared'
+  /** Required when creating a WhatsApp line on a connection with several numbers. */
+  phoneNumberId?: string
+  voice?: LineVoiceOptions
+}
+
+/**
+ * Hub owns delivery, member threads, consent and execution. A host keeps its
+ * product catalog and billing policy, then passes that policy to this kit.
+ */
 export interface HostedAgentConfig {
-  /** The developer's Tangle API key. */
-  apiKey: string
-  /**
-   * The persona every person's box runs. A profile without `model.default`
-   * runs {@link DEFAULT_HOSTED_MODEL}, and a profile without `tools` runs with
-   * {@link CONVERSATION_TOOLS_OFF} turned off. Set `tools` to choose your own,
-   * for example on a harness that cannot turn those tools off.
-   */
+  /** Developer's Tangle API key. Required unless an authenticated client is supplied. */
+  apiKey?: string
+  /** Reuse the host's authenticated SDK client, including its timeout and tracing. */
+  client?: Pick<Sandbox, 'lines'>
   profile: AgentProfile
-  /** Backend harness type, such as `opencode`; the runtime default when omitted. */
   harness?: string
-  /** The owner's address on the chosen transport: E.164 phone or email. */
+  /** A saved release can supply its complete, already-validated backend unchanged. */
+  backend?: BackendConfig
+  /** E.164 phone, or an email address (also accepted as an iMessage Apple ID). */
   owner: string
-  /** Texts Hub answers per person per UTC day. Default 20. */
   freeTurnsPerDay?: number
   box?: Partial<BoxPolicy>
   sandboxUrl?: string
+  /**
+   * Host-selected members, roles, limits, instance namespace and reference.
+   * Use a distinct instance.keyPrefix per assistant to keep their disks apart.
+   * Supplying this never bypasses Hub's validation or owner checks.
+   */
+  attachment?: HostedAgentAttachment
 }
 
 export interface BoxPolicy {
@@ -41,63 +47,31 @@ export interface BoxPolicy {
   idleTimeoutSeconds: number
   maxLifetimeSeconds: number
   deleteAfterStoppedSeconds: number
-  /** Egress allow-list. The default reaches the model router only. */
   allowDomains: string[]
 }
 
-/**
- * Two cores and a 2 GB disk cost what one core and 10 GB cost: both bill the
- * platform's hourly floor. A person's box starts OpenCode on their first text
- * and after every idle stop, and that start is CPU-bound: on one core it took
- * 6.1 s after a resume and 8.4 s on a new box, on two cores 3.5 s and 3.4 s
- * (production, 2026-09-24). A disk no larger than the platform's warm seed
- * lets a new person's box be claimed from the warm pool: create took 2.1-2.7 s
- * instead of 5.3-7.0 s (2026-09-25).
- */
 export const DEFAULT_BOX_POLICY: BoxPolicy = {
   cpuCores: 2, memoryMB: 2048, diskGB: 2,
   idleTimeoutSeconds: 600, maxLifetimeSeconds: 86_400, deleteAfterStoppedSeconds: 7 * 86_400,
   allowDomains: ['router.tangle.tools'],
 }
 
-/**
- * Each person's box is the developer's named instance with this prefix. It is
- * the key this kit used before Hub routed its texts, so every existing
- * person keeps their box.
- */
+/** Legacy default. Hosts running several assistants should supply their own namespace. */
 export const PERSON_KEY_PREFIX = 'hosted:'
-
-/**
- * Harness tools a texting or calling assistant does not use. Their
- * descriptions present every turn as coding work: a shell, file search,
- * sub-agents, to-do lists, skills and web fetch. File read, write and edit
- * stay, so a persona can keep notes such as `memory.md`.
- */
 export const CONVERSATION_TOOLS_OFF = ['bash', 'glob', 'grep', 'task', 'todowrite', 'webfetch', 'skill'] as const
-
-/**
- * The model for a profile without `model.default`. It gave the most useful
- * on-topic replies among four Router models on the same five texts and calls
- * (2026-09-23), within the latency of the others.
- */
 export const DEFAULT_HOSTED_MODEL = 'openai/gpt-5.6-luna'
 
-/** The profile a person's box runs: the developer's profile over the conversation defaults. */
 function conversationProfile(profile: AgentProfile): AgentProfile {
   return {
     ...profile,
     model: { ...profile.model, default: profile.model?.default ?? DEFAULT_HOSTED_MODEL },
-    // A profile that sets `tools` owns its tool set.
     ...(profile.tools ? {} : {
       tools: Object.fromEntries(CONVERSATION_TOOLS_OFF.map(tool => [tool, false])),
-      // The sandbox's preview policy grants the shell unless its permission
-      // is denied, so turning the tool off alone leaves the shell in place.
       permissions: { bash: 'deny' as const, ...profile.permissions },
     }),
   }
 }
 
-/** Each person runs in their own box, so no member shares a disk and each may use the persona's tools. */
 const PERSON = { context: 'own', tools: 'act' } as const
 const E164 = /^\+[1-9]\d{6,14}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -107,10 +81,16 @@ export class HostedAgentError extends Error {
 }
 
 export function createHostedAgent(config: HostedAgentConfig) {
-  if (!E164.test(config.owner) && !EMAIL.test(config.owner)) throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number or email address.')
+  if (!E164.test(config.owner) && !EMAIL.test(config.owner))
+    throw new HostedAgentError('owner_not_e164', 'owner must be an E.164 phone number or email address.')
+  if (!config.client && !config.apiKey)
+    throw new HostedAgentError('credential_required', 'Supply an API key or an authenticated Sandbox client.')
   const policy = { ...DEFAULT_BOX_POLICY, ...config.box }
-  const sandbox = new Sandbox({ apiKey: config.apiKey, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
-  const backend: BackendConfig = { ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}), profile: conversationProfile(config.profile) }
+  const sandbox = config.client ?? new Sandbox({ apiKey: config.apiKey!, baseUrl: config.sandboxUrl ?? 'https://sandbox.tangle.tools', timeoutMs: 20_000 })
+  const backend: BackendConfig = config.backend ?? {
+    ...(config.harness ? { type: config.harness as BackendConfig['type'] } : {}),
+    profile: conversationProfile(config.profile),
+  }
   const create: LineInstanceCreate = {
     name: 'hosted-person',
     resources: { cpuCores: policy.cpuCores, memoryMB: policy.memoryMB, diskGB: policy.diskGB },
@@ -118,61 +98,90 @@ export function createHostedAgent(config: HostedAgentConfig) {
     idleTimeoutSeconds: policy.idleTimeoutSeconds, maxLifetimeSeconds: policy.maxLifetimeSeconds,
     deleteAfterStoppedSeconds: policy.deleteAfterStoppedSeconds,
   }
+  const members = config.attachment?.members ?? [{ address: config.owner, role: 'owner' }]
+
+  function validate(transport: HostedAgentTransport, options: HostedAgentLineOptions, creating: boolean) {
+    if (!['imessage', 'whatsapp', 'email'].includes(transport))
+      throw new HostedAgentError('transport_unsupported', 'Use an iMessage, WhatsApp or email line.')
+    if (options.mode !== undefined && options.mode !== 'personal' && options.mode !== 'shared')
+      throw new HostedAgentError('mode_invalid', 'mode must be personal or shared.')
+    for (const address of [config.owner, ...members.map(member => member.address)]) {
+      const valid = transport === 'email' ? EMAIL.test(address)
+        : transport === 'whatsapp' ? E164.test(address) : E164.test(address) || EMAIL.test(address)
+      if (!valid) throw new HostedAgentError('owner_transport_mismatch', `Member address does not match ${transport}.`)
+    }
+    if (creating && transport === 'whatsapp' && !options.phoneNumberId)
+      throw new HostedAgentError('phone_number_required', 'WhatsApp lines require phoneNumberId.')
+    if (transport !== 'whatsapp' && options.phoneNumberId)
+      throw new HostedAgentError('phone_number_not_allowed', 'phoneNumberId is only valid for WhatsApp lines.')
+    if (options.voice && transport !== 'imessage')
+      throw new HostedAgentError('voice_transport_unsupported', 'Voice is supported only on iMessage lines.')
+    if (transport === 'email' && config.attachment?.unknownSenders && config.attachment.unknownSenders !== 'reject')
+      throw new HostedAgentError('email_declared_members_required', 'Email lines admit declared members only.')
+  }
+
+  async function attach(line: Line, options: HostedAgentLineOptions): Promise<Line> {
+    const transport = line.transport as HostedAgentTransport
+    validate(transport, options, false)
+    if (options.transport && options.transport !== transport)
+      throw new HostedAgentError('line_transport_mismatch', 'The existing line uses another transport.')
+    if (options.phoneNumberId && line.providerNumberId !== options.phoneNumberId)
+      throw new HostedAgentError('line_number_mismatch', 'The existing line is pinned to another WhatsApp number.')
+    const retained = line.attachment?.status === 'active' ? line.attachment : undefined
+    if (retained?.unknownSenders === 'onboard')
+      throw new HostedAgentError('line_policy_migration_required', 'This line uses onboard admission. Manage it through Hub; the hosted-agent kit will not replace its policy.')
+    const mode = options.mode ?? retained?.mode ?? 'shared'
+    const declaredMembers = config.attachment?.members ?? (retained
+      ? (await sandbox.lines.members(line.id).list())
+        .filter(member => member.source === 'declared')
+        .map(member => ({ address: member.address, role: member.role, label: member.label ?? undefined }))
+      : members)
+    const keyPrefix = line.attachment?.instance?.keyPrefix
+      ?? (line.clientReference === 'hosted-agent' ? PERSON_KEY_PREFIX : `${PERSON_KEY_PREFIX}${line.id}:`)
+    await sandbox.lines.attach({
+      ...config.attachment,
+      number: line.id,
+      mode,
+      members: declaredMembers,
+      unknownSenders: config.attachment?.unknownSenders ?? retained?.unknownSenders ?? (mode === 'shared' && transport !== 'email' ? 'guest' : 'reject'),
+      roles: config.attachment?.roles ?? retained?.roles ?? (mode === 'shared' ? { owner: PERSON, member: PERSON, guest: PERSON } : { owner: PERSON }),
+      respond: { kind: 'agent', backend },
+      limits: {
+        ...retained?.limits,
+        turnsPerMemberPerDay: config.freeTurnsPerDay ?? retained?.limits.turnsPerMemberPerDay ?? 20,
+        ...config.attachment?.limits,
+      },
+      instance: config.attachment?.instance ?? retained?.instance ?? { keyPrefix, create },
+      clientReference: config.attachment?.clientReference ?? retained?.clientReference ?? 'hosted-agent',
+    })
+    if (options.voice) await sandbox.lines.enableVoice(line.id, options.voice)
+    return sandbox.lines.get(line.id)
+  }
 
   return {
     /**
-     * Attach a Hub connection the developer owns as this agent's line:
-     * an Inkbox iMessage identity (default), its email mailbox, or a Linq
-     * WhatsApp number (`phoneNumberId`). The owner's address must match the
-     * transport. In `shared` mode (default) the owner and anyone who texts it
-     * each get their own box and thread; `personal` admits the owner only.
-     * With `voice` (iMessage lines only), calls to the
-     * line reach the caller's box and thread through that ph0ny agent; Hub
-     * admits only members, so a caller texts once before calling. Safe to
-     * repeat with the same config. Hub refuses a changed profile, box or
-     * limit on an attached line: detach it first
-     * (`DELETE /v1/lines/:id/attachment`). Each person keeps their box and
-     * its memory, and their thread starts over. Remove any Hub event
-     * subscription on the connection first; Hub refuses a line that another
-     * route would also answer.
+     * Create an address from an owned connection and attach it. Shared email
+     * admits declared members only. Hub authenticates each mailbox by reply.
+     * Other shared transports can admit isolated guests. Personal admits one
+     * owner. Remove competing subscriptions before calling this method.
      */
-    async attachLine(connectionId: string, options: {
-      transport?: 'imessage' | 'email' | 'whatsapp'
-      mode?: 'personal' | 'shared'
-      /** Required for WhatsApp because one Linq connection may own several numbers. */
-      phoneNumberId?: string
-      voice?: LineVoiceOptions
-    } = {}): Promise<Line> {
+    async attachLine(connectionId: string, options: HostedAgentLineOptions = {}): Promise<Line> {
       const transport = options.transport ?? 'imessage'
-      const mode = options.mode ?? 'shared'
-      if (transport === 'email' && !EMAIL.test(config.owner))
-        throw new HostedAgentError('owner_transport_mismatch', 'email lines require an email owner address.')
-      if (transport !== 'email' && !E164.test(config.owner))
-        throw new HostedAgentError('owner_transport_mismatch', `${transport} lines require an E.164 owner address.`)
-      if (transport === 'whatsapp' && !options.phoneNumberId)
-        throw new HostedAgentError('phone_number_required', 'WhatsApp lines require phoneNumberId.')
-      if (transport !== 'whatsapp' && options.phoneNumberId)
-        throw new HostedAgentError('phone_number_not_allowed', 'phoneNumberId is only valid for WhatsApp lines.')
-      if (options.voice && transport !== 'imessage')
-        throw new HostedAgentError('voice_transport_unsupported', 'Voice is supported only on iMessage lines.')
-      const line = await sandbox.lines.fromConnection(
-        transport === 'whatsapp'
-          ? { connectionId, transport, phoneNumberId: options.phoneNumberId!, clientReference: 'hosted-agent' }
-          : { connectionId, transport, clientReference: 'hosted-agent' },
-      )
-      await sandbox.lines.attach({
-        number: line.id,
-        mode,
-        members: [{ address: config.owner, role: 'owner' }],
-        unknownSenders: mode === 'shared' ? 'guest' : 'reject',
-        roles: mode === 'shared' ? { owner: PERSON, guest: PERSON } : { owner: PERSON },
-        respond: { kind: 'agent', backend },
-        limits: { turnsPerMemberPerDay: config.freeTurnsPerDay ?? 20 },
-        instance: { keyPrefix: PERSON_KEY_PREFIX, create },
-        clientReference: 'hosted-agent',
-      })
-      if (options.voice) await sandbox.lines.enableVoice(line.id, options.voice)
-      return sandbox.lines.get(line.id)
+      validate(transport, options, true)
+      // Hub deduplicates by provider identity. A new reference would conflict
+      // with an existing WhatsApp line created by an earlier kit.
+      const line = await sandbox.lines.fromConnection(transport === 'whatsapp'
+        ? { connectionId, transport, phoneNumberId: options.phoneNumberId! }
+        : { connectionId, transport })
+      return attach(line, options)
+    },
+    /**
+     * Attach an already-created owner-scoped line. Used during a host cutover
+     * so the line id, connection, named-instance namespace and payer survive.
+     * A 409 remains a 409. This method never detaches a competing attachment.
+     */
+    async attachExistingLine(lineId: string, options: HostedAgentLineOptions = {}): Promise<Line> {
+      return attach(await sandbox.lines.get(lineId), options)
     },
   }
 }
