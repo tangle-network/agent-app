@@ -127,14 +127,17 @@ export function createHostedAgent(config: HostedAgentConfig) {
       throw new HostedAgentError('line_transport_mismatch', 'The existing line uses another transport.')
     if (options.phoneNumberId && line.providerNumberId !== options.phoneNumberId)
       throw new HostedAgentError('line_number_mismatch', 'The existing line is pinned to another WhatsApp number.')
-    const mode = options.mode ?? 'shared'
+    const retained = options.mode === undefined && line.attachment?.status === 'active' ? line.attachment : undefined
+    if (retained?.unknownSenders === 'onboard')
+      throw new HostedAgentError('line_policy_migration_required', 'This line uses onboard admission. Manage it through Hub; the hosted-agent kit will not replace its policy.')
+    const mode = options.mode ?? retained?.mode ?? 'shared'
     await sandbox.lines.attach({
       ...config.attachment,
       number: line.id,
       mode,
       members,
-      unknownSenders: config.attachment?.unknownSenders ?? (mode === 'shared' && transport !== 'email' ? 'guest' : 'reject'),
-      roles: config.attachment?.roles ?? (mode === 'shared' ? { owner: PERSON, guest: PERSON } : { owner: PERSON }),
+      unknownSenders: config.attachment?.unknownSenders ?? retained?.unknownSenders ?? (mode === 'shared' && transport !== 'email' ? 'guest' : 'reject'),
+      roles: config.attachment?.roles ?? retained?.roles ?? (mode === 'shared' ? { owner: PERSON, guest: PERSON } : { owner: PERSON }),
       respond: { kind: 'agent', backend },
       limits: { turnsPerMemberPerDay: config.freeTurnsPerDay ?? 20, ...config.attachment?.limits },
       instance: config.attachment?.instance ?? { keyPrefix: PERSON_KEY_PREFIX, create },
@@ -154,14 +157,11 @@ export function createHostedAgent(config: HostedAgentConfig) {
     async attachLine(connectionId: string, options: HostedAgentLineOptions = {}): Promise<Line> {
       const transport = options.transport ?? 'imessage'
       validate(transport, options, true)
-      // A single literal reference aliases an owner's email and iMessage
-      // lines. Include transport and connection without exceeding Hub's bound.
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${transport}:${connectionId}:${options.phoneNumberId ?? ""}`))
-      const suffix = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 32)
-      const clientReference = config.attachment?.clientReference ?? `hosted-agent:${suffix}`
+      // Hub deduplicates by provider identity. A new reference would conflict
+      // with an existing WhatsApp line created by an earlier kit.
       const line = await sandbox.lines.fromConnection(transport === 'whatsapp'
-        ? { connectionId, transport, phoneNumberId: options.phoneNumberId!, clientReference }
-        : { connectionId, transport, clientReference })
+        ? { connectionId, transport, phoneNumberId: options.phoneNumberId! }
+        : { connectionId, transport })
       return attach(line, options)
     },
     /**
