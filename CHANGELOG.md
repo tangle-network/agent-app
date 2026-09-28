@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.49.32
+
+- fix(hosted-agent): retain active line policy on reattach
+- fix(hosted-agent): isolate default member instances per line
+- fix(hosted-agent): include declared member role
+- fix(hosted-agent): preserve existing line policy and provider identity
+- chore(hosted-agent): remove completed one-time documentation build workflow
+- fix(hosted-agent): pin WhatsApp references and refresh API documentation
+- build(hosted-agent): regenerate public docs and build the exact kit candidate
+- docs(hosted-agent): add exact install, build and real-line GTR proof
+- fix(hosted-agent): preserve host bindings and admit declared shared email members
+
+## 0.49.31
+
+- docs(alerting): record shared transport dependency
+- refactor(alerting): retain the shared Slack transport migration
+- refactor(platform): remove copied Hub, Slack and runtime tool contracts
+- ci(sweep): build and commit the published-client migration
+- chore(sweep): stage verified client and contract consolidation
+- refactor(integrations): preserve public documentation and error contract
+- refactor(integrations): delegate Hub transport to the published SDK
+
 ## 0.49.30
 
 ### Changed
