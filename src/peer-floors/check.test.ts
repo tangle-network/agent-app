@@ -177,10 +177,10 @@ describe('this package audits itself', () => {
   // 0.48, so the shell refuses it too. Sandbox 0.50 adds the named instances
   // that `hosted-agent` keeps each person's box on, 0.51 adds lines, 0.52
   // runs each line member in their own named instance, and 0.53 adds email lines.
-  // Eval keeps the 0.185 floor that Runtime 0.262 to 0.271 admit; the admitted
-  // rows below are the ones the installed Runtime (0.274.0, Eval >=0.188.0 <0.191.0) admits.
+  // This shell supports the 0.185–0.198 Eval range, but the pinned OIDC Runtime
+  // 0.278.1 admits only 0.197.x. The shared examples must satisfy both ranges.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
-    ['@tangle-network/agent-eval', ['0.184.999'], ['0.188.0', '0.190.0', '0.190.999'], ['0.191.0']],
+    ['@tangle-network/agent-eval', ['0.184.999'], ['0.197.0'], ['0.198.0']],
     ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999'], ['0.54.0']],
     ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0'], ['3.0.0']],
   ]

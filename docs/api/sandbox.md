@@ -1032,7 +1032,7 @@ type SandboxRecoveryPhase
 
 ### `SandboxResourceConfig`
 
-`interface` — Define configuration parameters for sandbox resource allocation and lifecycle management
+`interface` — Configure sandbox resources and lifecycle limits.
 
 ```ts
 interface SandboxResourceConfig
