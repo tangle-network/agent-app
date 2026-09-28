@@ -149,12 +149,13 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('1.9.0', range!)).toBe(false)
     expect(satisfiesRange('2.1.1', range!)).toBe(false)
     expect(satisfiesRange('2.10.999', range!)).toBe(false)
-    expect(satisfiesRange('2.11.0', range!)).toBe(true)
-    expect(satisfiesRange('2.12.0', range!)).toBe(true)
+    expect(satisfiesRange('2.11.0', range!)).toBe(false)
+    expect(satisfiesRange('2.12.0', range!)).toBe(false)
+    expect(satisfiesRange('2.13.0', range!)).toBe(true)
     expect(satisfiesRange('3.0.0', range!)).toBe(false)
   })
 
-  it('supports the verified Runtime line without claiming the next one', async () => {
+  it('supports the published Runtime 0.282 line without claiming the next one', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -162,18 +163,12 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    // Runtime 0.262.0 is the first Runtime whose Sandbox peer admits 0.50,
-    // 0.264.0 the first that admits 0.51, 0.266.0 the first that admits 0.52,
-    // and 0.273.5 the first that admits 0.53. 0.274 is the verified line.
-    expect(satisfiesRange('0.261.999', range!)).toBe(false)
-    expect(satisfiesRange('0.262.0', range!)).toBe(true)
-    expect(satisfiesRange('0.264.0', range!)).toBe(true)
-    expect(satisfiesRange('0.266.0', range!)).toBe(true)
-    expect(satisfiesRange('0.273.5', range!)).toBe(true)
-    expect(satisfiesRange('0.274.0', range!)).toBe(true)
-    expect(satisfiesRange('0.277.0', range!)).toBe(true)
-    expect(satisfiesRange('0.277.999', range!)).toBe(true)
-    expect(satisfiesRange('0.278.0', range!)).toBe(false)
+    // The OIDC caller is verified against the published Runtime 0.282.2.
+    expect(satisfiesRange('0.281.999', range!)).toBe(false)
+    expect(satisfiesRange('0.282.0', range!)).toBe(false)
+    expect(satisfiesRange('0.282.2', range!)).toBe(true)
+    expect(satisfiesRange('0.282.999', range!)).toBe(true)
+    expect(satisfiesRange('0.283.0', range!)).toBe(false)
   })
 
   // Each window starts at the floor the verified Runtime line admits (Eval) or
@@ -182,16 +177,12 @@ describe('this package audits itself', () => {
   // 0.48, so the shell refuses it too. Sandbox 0.50 adds the named instances
   // that `hosted-agent` keeps each person's box on, 0.51 adds lines, 0.52
   // runs each line member in their own named instance, and 0.53 adds email lines.
-  // Eval keeps the 0.185 floor this shell has declared since the 0.185 line;
-  // its own ceiling (<0.198.0) matches the exact 0.197.0 it pins. Runtime
-  // 0.274 to 0.277 all declare a narrower Eval peer, >=0.191.0 <0.194.0
-  // (Runtime has not yet widened past 0.197.0's Eval release) — the admitted
-  // examples below have to sit inside BOTH windows at once, because the next
-  // `it.each` checks the same list against the installed Runtime's window.
+  // The published Runtime 0.282.2 requires Eval 0.199.x. Shared examples must
+  // satisfy both ranges.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
-    ['@tangle-network/agent-eval', ['0.184.999'], ['0.191.0', '0.193.0', '0.193.999'], ['0.198.0']],
+    ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.999'], ['0.200.0']],
     ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999'], ['0.54.0']],
-    ['@tangle-network/agent-interface', ['2.10.999'], ['2.11.0', '2.12.0'], ['3.0.0']],
+    ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0'], ['3.0.0']],
   ]
 
   it.each(verifiedWindows)('keeps the %s peer on the verified window', async (name, below, admitted, above) => {

@@ -1,10 +1,8 @@
 /**
- * Cross-site Tangle SSO for agent apps: signed-state CSRF cookies plus the
- * full start/callback orchestration against the platform's /cross-site
- * bridge. The platform wire client and account persistence are structural
- * seams (`TangleSsoAuthClient` / `TangleSsoAccountStore`), so this module
- * never imports agent-runtime, an auth framework, or a database driver.
- * WebCrypto only — runs in workerd without node compatibility flags.
+ * Tangle SSO for agent apps. OIDC callers use the registered runtime client
+ * with S256 PKCE. Legacy API-key callers remain explicit during migration.
+ * OIDC never falls back to cross-site exchange. Account matching and native
+ * session cookie minting remain shared.
  */
 
 import { clearCookieHeader, readCookieValue, serializeCookie } from '../web/index'
@@ -70,14 +68,15 @@ export async function verifySignedSsoState(state: string, config: SsoStateConfig
   const parts = state.split('.')
   if (parts.length !== 3) return false
   const [random, timestamp, mac] = parts
-  if (!random || !timestamp || !mac) return false
+  if (!random || !timestamp || !mac || !/^[0-9a-z]+$/.test(timestamp)) return false
   const expected = await hmacHex(config.secret, `${random}.${timestamp}`)
   if (!constantTimeEqual(mac, expected)) return false
   const mintedAt = parseInt(timestamp, 36)
   if (!Number.isFinite(mintedAt)) return false
   const now = config.now ?? Date.now
   const ttlMs = config.ttlMs ?? DEFAULT_STATE_TTL_SECONDS * 1000
-  return now() - mintedAt <= ttlMs
+  const age = now() - mintedAt
+  return age >= 0 && age <= ttlMs
 }
 
 // ── Seams ───────────────────────────────────────────────────────────────────
@@ -96,6 +95,42 @@ export interface TangleSsoExchangeResult {
 export interface TangleSsoAuthClient {
   authorizeUrl(options: { state: string; redirectUri?: string }): string
   exchange(code: string): Promise<TangleSsoExchangeResult>
+}
+
+/** Token fields the callback persists from the runtime's OIDC exchange. */
+export interface TangleOidcSsoTokens {
+  accessToken: string
+  tokenType: string
+  expiresIn?: number
+  refreshToken?: string
+  idToken?: string
+  scope?: string
+}
+
+/** Verified identity returned by the runtime's OIDC userinfo lookup. */
+export interface TangleOidcSsoUser {
+  id: string
+  email: string
+  emailVerified: true
+  name?: string
+}
+
+/** The caller needs only the OIDC operations used by this callback. Keeping
+ *  this structural prevents legacy consumers from needing the optional
+ *  Runtime peer just to load the SSO declarations. */
+export interface TangleOidcSsoAuthClient {
+  authorizeUrl(options: {
+    state: string
+    codeChallenge: string
+    nonce?: string
+    prompt?: 'login' | 'consent' | 'none'
+    loginHint?: string
+  }): string
+  exchange(code: string, codeVerifier: string): Promise<{
+    tokens: TangleOidcSsoTokens
+    user: TangleOidcSsoUser
+  }>
+  revoke(token: string, tokenTypeHint?: 'access_token' | 'refresh_token'): Promise<void>
 }
 
 /** Local account shape required by the verified Tangle SSO account policy.
@@ -269,6 +304,29 @@ export interface TangleSsoAccountStore {
   }): Promise<void>
 }
 
+/**
+ * OIDC tokens are server-side credentials, not API keys. Implementations must
+ * encrypt them at rest and bind them to the exact local session. Refresh and
+ * disconnect must serialize updates to the same grant.
+ */
+export interface TangleOidcSsoAccountStore extends Omit<TangleSsoAccountStore, 'saveTangleLink'> {
+  /** Atomically bind the grant to this exact session. If persistence partially
+   * fails, `deleteSession` must remove every row and credential for it. */
+  saveTangleLink(input: {
+    userId: string
+    sessionToken: string
+    tangleUserId: string
+    email: string
+    name: string | null
+    tokens: TangleOidcSsoTokens
+    accessTokenExpiresAt: Date
+  }): Promise<void>
+  /** Remove an unpublished local session if callback persistence fails.
+   * This must also remove any grant rows or credentials partially written by
+   * a rejected `saveTangleLink`, keyed by this exact session token. */
+  deleteSession(input: { sessionToken: string }): Promise<void>
+}
+
 // ── Session cookie ──────────────────────────────────────────────────────────
 
 /** Successful-login context handed to the `setSessionCookie` seam. */
@@ -397,6 +455,7 @@ export function createBetterAuthSessionCookieMinter(
 
 /** Define configuration options for handling Tangle SSO authentication and session management */
 export interface TangleSsoHandlerOptions {
+  protocol?: 'legacy'
   auth: TangleSsoAuthClient
   store: TangleSsoAccountStore
   /** HMAC secret for the state cookie. */
@@ -439,6 +498,15 @@ export interface TangleSsoHandlerOptions {
   /** Failure log hook (e.g. console.error). Default no-op. */
   log?: (message: string, error?: unknown) => void
   now?: () => number
+}
+
+/** Registered OIDC client and token store. The OIDC caller supplies the Runtime PKCE helper. */
+export interface TangleOidcSsoHandlerOptions extends Omit<TangleSsoHandlerOptions, 'protocol' | 'auth' | 'store'> {
+  protocol: 'oidc'
+  auth: TangleOidcSsoAuthClient
+  store: TangleOidcSsoAccountStore
+  /** Pass the Runtime's `createPkcePair` helper from the OIDC-only caller. */
+  createPkcePair: () => Promise<{ verifier: string; challenge: string }>
 }
 
 /** Define handlers for SSO start and callback routes managing authentication flow and session cookies */
@@ -491,6 +559,8 @@ function resolveOnReferenceOrigin(value: string): string | null {
 
 function redirectResponse(location: string, headers = new Headers()): Response {
   headers.set('Location', location)
+  headers.set('Cache-Control', 'no-store')
+  headers.set('Referrer-Policy', 'no-referrer')
   return new Response(null, { status: 302, headers })
 }
 
@@ -507,29 +577,47 @@ function clientIp(request: Request): string | null {
 interface StateCookiePayload {
   s: string
   r: string
+  v?: string
+  m?: string
 }
 
 function parseStateCookiePayload(raw: string | null): StateCookiePayload | null {
-  if (!raw) return null
+  if (!raw || raw.length > 4096) return null
   try {
     const parsed = JSON.parse(raw) as unknown
     if (parsed === null || typeof parsed !== 'object') return null
-    const { s, r } = parsed as Record<string, unknown>
+    const { s, r, v, m } = parsed as Record<string, unknown>
     if (typeof s !== 'string' || typeof r !== 'string') return null
-    return { s, r }
-  } catch {
-    return null
-  }
+    return { s, r, ...(typeof v === 'string' ? { v } : {}), ...(typeof m === 'string' ? { m } : {}) }
+  } catch { return null }
+}
+
+function stateBinding(payload: StateCookiePayload, callbackUrl: string): string {
+  return JSON.stringify([payload.s, payload.r, payload.v ?? null, callbackUrl])
 }
 
 /** Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies */
-export function createTangleSsoHandlers(opts: TangleSsoHandlerOptions): TangleSsoHandlers {
+export function createTangleSsoHandlers(
+  opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions,
+): TangleSsoHandlers {
   if (!opts.stateSecret) throw new Error('TangleSsoHandlerOptions.stateSecret is required')
   if (!opts.callbackUrl) throw new Error('TangleSsoHandlerOptions.callbackUrl is required')
   if (!opts.stateCookieName) throw new Error('TangleSsoHandlerOptions.stateCookieName is required')
-
+  const callbackUrl = new URL(opts.callbackUrl)
+  if (opts.protocol === 'oidc') {
+    if (opts.stateSecret.length < 32) throw new Error('OIDC stateSecret must contain at least 32 characters')
+    if (callbackUrl.username || callbackUrl.password || callbackUrl.hash || callbackUrl.search) {
+      throw new Error('OIDC callbackUrl must be fixed and have no credentials, query, or fragment')
+    }
+    const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(callbackUrl.hostname)
+    if (callbackUrl.protocol !== 'https:' && !(callbackUrl.protocol === 'http:' && loopback)) {
+      throw new Error('OIDC requires HTTPS except on loopback')
+    }
+    if (callbackUrl.protocol === 'https:' && !opts.secureCookies) {
+      throw new Error('OIDC HTTPS callbacks require Secure cookies')
+    }
+  }
   const sessionCookieName = opts.sessionCookieName ?? DEFAULT_SESSION_COOKIE
-
   let mintSessionCookies: (args: TangleSsoSessionCookieArgs) => Promise<readonly string[]>
   if (opts.setSessionCookie) {
     const seam = opts.setSessionCookie
@@ -544,117 +632,173 @@ export function createTangleSsoHandlers(opts: TangleSsoHandlerOptions): TangleSs
       }),
     ]
   } else {
-    throw new Error(
-      'TangleSsoHandlerOptions requires setSessionCookie or sessionCookieSecret: ' +
-        'better-auth only accepts HMAC-signed (and, on https, __Secure--prefixed) session cookies, ' +
-        'so an unsigned default would mint sessions that read back null',
-    )
+    throw new Error('TangleSsoHandlerOptions requires setSessionCookie or sessionCookieSecret')
   }
   const sessionTtlSeconds = opts.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS
   const stateTtlSeconds = opts.stateTtlSeconds ?? DEFAULT_STATE_TTL_SECONDS
-  const defaultRedirectPath = opts.defaultRedirectPath ?? DEFAULT_REDIRECT_PATH
-  const loginPath = opts.loginPath ?? DEFAULT_LOGIN_PATH
+  if (!Number.isFinite(stateTtlSeconds) || stateTtlSeconds <= 0
+    || !Number.isFinite(sessionTtlSeconds) || sessionTtlSeconds <= 0) {
+    throw new Error('SSO lifetimes must be positive and finite')
+  }
+  const defaultRedirectPath = sanitizeRedirectPath(opts.defaultRedirectPath ?? DEFAULT_REDIRECT_PATH, DEFAULT_REDIRECT_PATH)
+  const loginPath = sanitizeRedirectPath(opts.loginPath ?? DEFAULT_LOGIN_PATH, DEFAULT_LOGIN_PATH)
   const log = opts.log ?? (() => {})
   const now = opts.now ?? Date.now
   const stateConfig: SsoStateConfig = { secret: opts.stateSecret, ttlMs: stateTtlSeconds * 1000, now }
-
   const stateCookieOpts = { name: opts.stateCookieName, secure: opts.secureCookies }
-
   function loginErrorRedirect(code: string): Response {
     const headers = new Headers()
     headers.append('Set-Cookie', clearCookieHeader(stateCookieOpts))
-    return redirectResponse(`${loginPath}?error=${code}`, headers)
+    const target = new URL(loginPath, REDIRECT_REFERENCE_ORIGIN)
+    target.searchParams.set('error', code)
+    return redirectResponse(`${target.pathname}${target.search}${target.hash}`, headers)
   }
-
   return {
     async start(request) {
+      if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
       const url = new URL(request.url)
+      if (opts.protocol === 'oidc' && url.origin !== callbackUrl.origin) {
+        return loginErrorRedirect('tangle_origin_mismatch')
+      }
       const redirectPath = sanitizeRedirectPath(url.searchParams.get('redirect'), defaultRedirectPath)
       const state = await createSignedSsoState(stateConfig)
-      const cookie = serializeCookie(JSON.stringify({ s: state, r: redirectPath }), {
+      const payload: StateCookiePayload = { s: state, r: redirectPath }
+      let authorizationUrl: string
+      if (opts.protocol === 'oidc') {
+        const pkce = await opts.createPkcePair()
+        payload.v = pkce.verifier
+        payload.m = await hmacHex(opts.stateSecret, stateBinding(payload, opts.callbackUrl))
+        authorizationUrl = opts.auth.authorizeUrl({ state, codeChallenge: pkce.challenge })
+        if (new URL(authorizationUrl).searchParams.get('redirect_uri') !== opts.callbackUrl) {
+          throw new Error('PlatformOidcClient.redirectUri must equal callbackUrl')
+        }
+      } else {
+        authorizationUrl = opts.auth.authorizeUrl({ state, redirectUri: opts.callbackUrl })
+      }
+      const cookie = serializeCookie(JSON.stringify(payload), {
         ...stateCookieOpts,
         maxAgeSeconds: stateTtlSeconds,
       })
       const headers = new Headers()
       headers.append('Set-Cookie', cookie)
-      return redirectResponse(opts.auth.authorizeUrl({ state, redirectUri: opts.callbackUrl }), headers)
+      return redirectResponse(authorizationUrl, headers)
     },
-
     async callback(request) {
+      if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
       const url = new URL(request.url)
+      if (opts.protocol === 'oidc'
+        && (url.origin !== callbackUrl.origin || url.pathname !== callbackUrl.pathname)) {
+        return loginErrorRedirect('tangle_origin_mismatch')
+      }
       const code = url.searchParams.get('code')
       const stateFromPlatform = url.searchParams.get('state')
-      if (!code || !stateFromPlatform) return loginErrorRedirect('tangle_callback_missing')
-
+      if (!code || !stateFromPlatform || url.searchParams.has('error')) return loginErrorRedirect('tangle_callback_missing')
       const payload = parseStateCookiePayload(readCookieValue(request.headers.get('cookie'), opts.stateCookieName))
-      if (!payload || payload.s !== stateFromPlatform) return loginErrorRedirect('tangle_state_mismatch')
+      if (!payload || !constantTimeEqual(payload.s, stateFromPlatform)) return loginErrorRedirect('tangle_state_mismatch')
       if (!(await verifySignedSsoState(payload.s, stateConfig))) return loginErrorRedirect('tangle_state_mismatch')
-
-      let exchanged: TangleSsoExchangeResult
-      try {
-        exchanged = await opts.auth.exchange(code)
-      } catch (err) {
-        log('[tangle-sso] exchange failed', err)
-        return loginErrorRedirect('tangle_exchange_failed')
+      if (opts.protocol === 'oidc' && (!payload.v || !/^[A-Za-z0-9_-]{43,128}$/.test(payload.v)
+        || !payload.m || !constantTimeEqual(payload.m, await hmacHex(opts.stateSecret, stateBinding(payload, opts.callbackUrl))))) {
+        return loginErrorRedirect('tangle_state_mismatch')
       }
-      if (exchanged.emailVerified !== true) {
-        log('[tangle-sso] exchange did not include a verified-email proof')
-        return loginErrorRedirect('tangle_exchange_failed')
-      }
-
-      let userId: string
+      const tokenRequestedAt = now()
+      let oidcTokens: TangleOidcSsoTokens | undefined
+      let legacyExchange: TangleSsoExchangeResult | undefined
+      let createdSession: string | undefined
+      let committed = false
       try {
-        const email = normalizeTangleSsoEmail(exchanged.user.email)
-        const resolution = await opts.store.resolveAccount({
-          email,
-          platformUserId: exchanged.user.id,
+        let exchanged: { user: TangleSsoExchangeResult['user']; emailVerified: boolean }
+        try {
+          if (opts.protocol === 'oidc') {
+            const result = await opts.auth.exchange(code, payload.v!)
+            oidcTokens = result.tokens
+            if (!oidcTokens.refreshToken || !Number.isFinite(oidcTokens.expiresIn) || oidcTokens.expiresIn! <= 0) {
+              throw new Error('OIDC requires offline_access and a finite access-token lifetime')
+            }
+            exchanged = { user: result.user, emailVerified: result.user.emailVerified }
+          } else {
+            legacyExchange = await opts.auth.exchange(code)
+            exchanged = legacyExchange
+          }
+        } catch {
+          log('[tangle-sso] exchange failed')
+          return loginErrorRedirect('tangle_exchange_failed')
+        }
+        if (exchanged.emailVerified !== true) {
+          log('[tangle-sso] exchange did not include a verified-email proof')
+          return loginErrorRedirect('tangle_exchange_failed')
+        }
+        let userId: string
+        try {
+          const email = normalizeTangleSsoEmail(exchanged.user.email)
+          const resolution = await opts.store.resolveAccount({ email, platformUserId: exchanged.user.id })
+          if (resolution.kind === 'reject') throw new TangleSsoAccountConflictError(resolution.reason)
+          ;({ userId } = await opts.store.upsertUserByEmail({
+            email,
+            name: exchanged.user.name ?? null,
+            tangleUserId: exchanged.user.id,
+            resolution,
+          }))
+        } catch (err) {
+          if (err instanceof TangleSsoAccountConflictError) {
+            log('[tangle-sso] account linking conflict', err.reason)
+            return loginErrorRedirect('tangle_account_conflict')
+          }
+          if (err instanceof TangleSsoUserCreateError) return loginErrorRedirect('tangle_user_create_failed')
+          throw err
+        }
+        const expiresAt = new Date(now() + sessionTtlSeconds * 1000)
+        const { token } = await opts.store.createSession({
+          userId,
+          expiresAt,
+          ipAddress: clientIp(request),
+          userAgent: request.headers.get('user-agent'),
         })
-        if (resolution.kind === 'reject') {
-          throw new TangleSsoAccountConflictError(resolution.reason)
-        }
-        ;({ userId } = await opts.store.upsertUserByEmail({
-          email,
-          name: exchanged.user.name ?? null,
+        createdSession = token
+        const link = {
+          userId,
+          sessionToken: token,
           tangleUserId: exchanged.user.id,
-          resolution,
-        }))
-      } catch (err) {
-        if (err instanceof TangleSsoAccountConflictError) {
-          log('[tangle-sso] account linking conflict', err)
-          return loginErrorRedirect('tangle_account_conflict')
+          email: normalizeTangleSsoEmail(exchanged.user.email),
+          name: exchanged.user.name ?? null,
         }
-        if (err instanceof TangleSsoUserCreateError) return loginErrorRedirect('tangle_user_create_failed')
-        throw err
+        if (opts.protocol === 'oidc') {
+          const headers = new Headers()
+          headers.append('Set-Cookie', clearCookieHeader(stateCookieOpts))
+          const sessionCookies = await mintSessionCookies({ token, expiresAt, ttlSeconds: sessionTtlSeconds, secure: opts.secureCookies })
+          for (const cookie of sessionCookies) headers.append('Set-Cookie', cookie)
+          const response = redirectResponse(sanitizeRedirectPath(payload.r, defaultRedirectPath), headers)
+          await opts.store.saveTangleLink({
+            ...link,
+            tokens: oidcTokens!,
+            accessTokenExpiresAt: new Date(tokenRequestedAt + oidcTokens!.expiresIn! * 1000),
+          })
+          committed = true
+          return response
+        }
+        await opts.store.saveTangleLink({ ...link, apiKey: legacyExchange!.apiKey, planTier: legacyExchange!.plan?.tier ?? null })
+        const headers = new Headers()
+        headers.append('Set-Cookie', clearCookieHeader(stateCookieOpts))
+        const sessionCookies = await mintSessionCookies({ token, expiresAt, ttlSeconds: sessionTtlSeconds, secure: opts.secureCookies })
+        for (const cookie of sessionCookies) headers.append('Set-Cookie', cookie)
+        return redirectResponse(sanitizeRedirectPath(payload.r, defaultRedirectPath), headers)
+      } catch (error) {
+        if (opts.protocol !== 'oidc') throw error
+        log('[tangle-sso] local session persistence failed')
+        return loginErrorRedirect('tangle_session_failed')
+      } finally {
+        if (opts.protocol === 'oidc' && !committed) {
+          if (createdSession) {
+            try { await opts.store.deleteSession({ sessionToken: createdSession }) }
+            catch { log('[tangle-sso] unpublished session cleanup failed') }
+          }
+          if (oidcTokens) {
+            try { if (oidcTokens.refreshToken) await opts.auth.revoke(oidcTokens.refreshToken, 'refresh_token') }
+            catch { log('[tangle-sso] rejected grant refresh revocation failed') }
+            try { await opts.auth.revoke(oidcTokens.accessToken, 'access_token') }
+            catch { log('[tangle-sso] rejected grant access revocation failed') }
+          }
+        }
       }
-
-      const expiresAt = new Date(now() + sessionTtlSeconds * 1000)
-      const { token } = await opts.store.createSession({
-        userId,
-        expiresAt,
-        ipAddress: clientIp(request),
-        userAgent: request.headers.get('user-agent'),
-      })
-
-      await opts.store.saveTangleLink({
-        userId,
-        sessionToken: token,
-        tangleUserId: exchanged.user.id,
-        email: normalizeTangleSsoEmail(exchanged.user.email),
-        name: exchanged.user.name ?? null,
-        apiKey: exchanged.apiKey,
-        planTier: exchanged.plan?.tier ?? null,
-      })
-
-      const headers = new Headers()
-      headers.append('Set-Cookie', clearCookieHeader(stateCookieOpts))
-      const sessionCookies = await mintSessionCookies({
-        token,
-        expiresAt,
-        ttlSeconds: sessionTtlSeconds,
-        secure: opts.secureCookies,
-      })
-      for (const cookie of sessionCookies) headers.append('Set-Cookie', cookie)
-      return redirectResponse(sanitizeRedirectPath(payload.r, defaultRedirectPath), headers)
     },
   }
 }

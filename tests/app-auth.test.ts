@@ -290,7 +290,7 @@ describe('createAppAuth: Tangle SSO wiring', () => {
           resolveAccount: (i) => store.current!.resolveAccount(i),
           upsertUserByEmail: (i) => store.current!.upsertUserByEmail(i),
           createSession: (i) => store.current!.createSession(i),
-          saveTangleLink: (i) => store.current!.saveTangleLink(i),
+          saveTangleLink: (i: Parameters<TangleSsoAccountStore['saveTangleLink']>[0]) => store.current!.saveTangleLink(i),
         },
         callbackUrl: 'https://my.app/auth/tangle/callback',
       },

@@ -99,6 +99,12 @@
           "doc": "The configured better-auth instance, typed at better-auth's base surface (`handler`, `api`, `$context`, `$Infer`)."
         },
         {
+          "name": "AppAuthOidcSsoConfig",
+          "kind": "interface",
+          "signature": "interface AppAuthOidcSsoConfig",
+          "doc": "Registered OIDC client configuration."
+        },
+        {
           "name": "AppAuthSchema",
           "kind": "interface",
           "signature": "interface AppAuthSchema",
@@ -8895,7 +8901,7 @@
         {
           "name": "createTangleSsoHandlers",
           "kind": "function",
-          "signature": "(opts: TangleSsoHandlerOptions) => TangleSsoHandlers",
+          "signature": "(opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions) => TangleSsoHandlers",
           "doc": "Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies"
         },
         {
@@ -9155,6 +9161,36 @@
           "kind": "type",
           "signature": "type TangleHubBearerSource",
           "doc": "Hub bearer provenance mirrors the execution-key source union."
+        },
+        {
+          "name": "TangleOidcSsoAccountStore",
+          "kind": "interface",
+          "signature": "interface TangleOidcSsoAccountStore",
+          "doc": "OIDC tokens are server-side credentials, not API keys."
+        },
+        {
+          "name": "TangleOidcSsoAuthClient",
+          "kind": "interface",
+          "signature": "interface TangleOidcSsoAuthClient",
+          "doc": "The caller needs only the OIDC operations used by this callback."
+        },
+        {
+          "name": "TangleOidcSsoHandlerOptions",
+          "kind": "interface",
+          "signature": "interface TangleOidcSsoHandlerOptions",
+          "doc": "Registered OIDC client and token store."
+        },
+        {
+          "name": "TangleOidcSsoTokens",
+          "kind": "interface",
+          "signature": "interface TangleOidcSsoTokens",
+          "doc": "Token fields the callback persists from the runtime's OIDC exchange."
+        },
+        {
+          "name": "TangleOidcSsoUser",
+          "kind": "interface",
+          "signature": "interface TangleOidcSsoUser",
+          "doc": "Verified identity returned by the runtime's OIDC userinfo lookup."
         },
         {
           "name": "TanglePlanTier",
