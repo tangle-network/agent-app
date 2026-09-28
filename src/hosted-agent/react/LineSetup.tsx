@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Line } from '@tangle-network/sandbox'
 import type {
   LineBoxMode, LineConnectionOption, LineIdentityKind, LineIdentityOption,
   LineSetupLine, LineSetupProps, LineSetupSnapshot,
 } from './contracts'
+
+const useBrowserLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : useEffect
 
 const TRANSPORT: Record<Line['transport'], string> = {
   imessage: 'iMessage', sms: 'SMS', whatsapp: 'WhatsApp', email: 'Email',
@@ -49,14 +51,15 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   const clientRef = useRef(client)
   clientRef.current = client
   const sequence = useRef(0)
-  const currentScope = useRef(scopeKey)
-  const currentTarget = useRef(initialTargetId)
+  const incarnation = useRef(0)
   const confirmButton = useRef<HTMLButtonElement>(null)
   const heading = useRef<HTMLHeadingElement>(null)
   const disconnectTriggers = useRef(new Map<string, HTMLButtonElement>())
   const restoreFocusTo = useRef<string | null>(null)
-  currentScope.current = scopeKey
-  currentTarget.current = initialTargetId
+  useBrowserLayoutEffect(() => {
+    incarnation.current++
+    return () => { incarnation.current++ }
+  }, [scopeKey, initialTargetId])
   const [loadedSnapshot, setLoadedSnapshot] = useState<{ scopeKey: string; initialTargetId: string | undefined; value: LineSetupSnapshot } | null>(null)
   const snapshot = loadedSnapshot?.scopeKey === scopeKey && loadedSnapshot.initialTargetId === initialTargetId ? loadedSnapshot.value : null
   const [loading, setLoading] = useState(true)
@@ -70,15 +73,15 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   const [phoneNumberId, setPhoneNumberId] = useState('')
   const [confirmLineId, setConfirmLineId] = useState<string | null>(null)
 
-  function stillCurrent(): boolean {
-    return currentScope.current === scopeKey && currentTarget.current === initialTargetId
+  function stillCurrent(requestIncarnation: number): boolean {
+    return requestIncarnation === incarnation.current
   }
 
-  async function reload(): Promise<LineSetupSnapshot | null> {
+  async function reload(requestIncarnation: number): Promise<LineSetupSnapshot | null> {
     const request = ++sequence.current
     try {
       const next = await clientRef.current.load()
-      if (request !== sequence.current || !stillCurrent()) return null
+      if (request !== sequence.current || !stillCurrent(requestIncarnation)) return null
       setLoadedSnapshot({ scopeKey, initialTargetId, value: next })
       setError(null)
       setRefreshFailed(false)
@@ -87,7 +90,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
       setLoading(false)
       return next
     } catch (cause) {
-      if (request !== sequence.current || !stillCurrent()) return null
+      if (request !== sequence.current || !stillCurrent(requestIncarnation)) return null
       setError(message(cause))
       setRefreshFailed(true)
       setLoading(false)
@@ -98,7 +101,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   function retry() {
     if (loading) return
     setLoading(true)
-    void reload()
+    void reload(incarnation.current)
   }
 
   function closeConfirmation(lineId: string) {
@@ -119,7 +122,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
     setPhoneNumberId('')
     setConfirmLineId(null)
     restoreFocusTo.current = null
-    void reload()
+    void reload(incarnation.current)
     return () => { sequence.current++ }
   }, [scopeKey, initialTargetId])
 
@@ -159,6 +162,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
 
   async function connect() {
     if (!selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine || busy || loading || refreshFailed) return
+    const requestIncarnation = incarnation.current
     setBusy(true)
     setError(null)
     try {
@@ -169,9 +173,9 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
         targetId: selectedTarget.id,
         boxMode: selectedMode,
       })
-      if (!stillCurrent()) return
-      const updated = await reload()
-      if (!stillCurrent()) return
+      if (!stillCurrent(requestIncarnation)) return
+      const updated = await reload(requestIncarnation)
+      if (!stillCurrent(requestIncarnation)) return
       if (!updated) {
         onNotice?.({ kind: 'error', message: 'Line connected, but its current status could not be loaded.' })
         return
@@ -180,35 +184,36 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
         item.transport === selected.identity.transport && item.providerNumberId === (enteredNumber || null))
       onNotice?.({ kind: 'success', message: line?.answering ? 'The line is answering.' : 'Line connected. Add a member to start answers.' })
     } catch (cause) {
-      if (!stillCurrent()) return
+      if (!stillCurrent(requestIncarnation)) return
       const detail = message(cause)
       setError(detail)
       onNotice?.({ kind: 'error', message: detail })
     } finally {
-      if (stillCurrent()) setBusy(false)
+      if (stillCurrent(requestIncarnation)) setBusy(false)
     }
   }
 
   async function disconnect(lineId: string) {
     if (busy || loading || refreshFailed) return
+    const requestIncarnation = incarnation.current
     setBusy(true)
     setError(null)
     try {
       await clientRef.current.disconnect(lineId)
-      if (!stillCurrent()) return
-      const updated = await reload()
-      if (!stillCurrent()) return
+      if (!stillCurrent(requestIncarnation)) return
+      const updated = await reload(requestIncarnation)
+      if (!stillCurrent(requestIncarnation)) return
       closeConfirmation(lineId)
       onNotice?.(updated
         ? { kind: 'success', message: 'The line stopped answering.' }
         : { kind: 'error', message: 'Line disconnected, but its current status could not be loaded.' })
     } catch (cause) {
-      if (!stillCurrent()) return
+      if (!stillCurrent(requestIncarnation)) return
       const detail = message(cause)
       setError(detail)
       onNotice?.({ kind: 'error', message: detail })
     } finally {
-      if (stillCurrent()) setBusy(false)
+      if (stillCurrent(requestIncarnation)) setBusy(false)
     }
   }
 
