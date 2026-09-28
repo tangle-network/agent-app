@@ -52,3 +52,77 @@ const meta: Meta<typeof RefreshingVault> = {
 }
 export default meta
 export const ExistingDocument: StoryObj<typeof RefreshingVault> = {}
+
+
+function ResponsiveVault() {
+  const [width, setWidth] = useState(390)
+  const [path, setPath] = useState<string | null>('brief.md')
+  const port = useMemo<VaultDataPort>(() => {
+    const documents = new Map([
+      ['brief.md', content],
+      ['notes.md', '# Notes\n\nKeep unsaved work while browsing files.'],
+    ])
+    return {
+      async listTree() {
+        return [...documents.keys()].map((path) => ({ name: path, path, type: 'file' as const }))
+      },
+      async readFile(path) {
+        const content = documents.get(path)
+        if (content === undefined) throw new Error('File not found')
+        return { path, content }
+      },
+      async writeFile(path, next) { documents.set(path, next) },
+      async createFile(path) { documents.set(path, ''); return path },
+      async deleteFile(path) { documents.delete(path) },
+    }
+  }, [])
+  return (
+    <div className="flex h-[700px] max-w-full flex-col gap-3 p-3" style={{ width }}>
+      <label className="flex items-center gap-3 text-sm">
+        Pane width
+        <input
+          aria-label="Pane width"
+          type="range"
+          min={320}
+          max={960}
+          value={width}
+          onChange={(event) => setWidth(Number(event.target.value))}
+          className="min-w-0 flex-1"
+        />
+        <span>{width}px</span>
+      </label>
+      <VaultPane
+        port={port}
+        selectedPath={path}
+        onSelectedPathChange={setPath}
+        codec={codec}
+        renderTree={({ root, onSelect }) => (
+          <div className="flex flex-col p-2">
+            {root.children?.map((file) => (
+              <button key={file.path} type="button" className="rounded p-3 text-left hover:bg-muted" onClick={() => onSelect(file.path)}>
+                {file.name}
+              </button>
+            ))}
+          </div>
+        )}
+        renderArtifact={({ richDraft, onRichChange, onSave, dirty }) => (
+          <div className="flex h-full min-h-0 flex-col gap-3 p-3">
+            <textarea
+              aria-label="Document text"
+              value={String(richDraft)}
+              onChange={(event) => onRichChange(event.target.value)}
+              className="min-h-0 w-full flex-1 resize-none rounded border border-border bg-background p-3"
+            />
+            <button type="button" disabled={!dirty} onClick={onSave} className="self-end rounded bg-primary px-3 py-2 text-primary-foreground disabled:opacity-50">
+              Save document
+            </button>
+          </div>
+        )}
+      />
+    </div>
+  )
+}
+
+export const ResponsiveNavigation: StoryObj<typeof RefreshingVault> = {
+  render: () => <ResponsiveVault />,
+}

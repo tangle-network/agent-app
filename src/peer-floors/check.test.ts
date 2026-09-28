@@ -171,8 +171,9 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.266.0', range!)).toBe(true)
     expect(satisfiesRange('0.273.5', range!)).toBe(true)
     expect(satisfiesRange('0.274.0', range!)).toBe(true)
-    expect(satisfiesRange('0.274.999', range!)).toBe(true)
-    expect(satisfiesRange('0.275.0', range!)).toBe(false)
+    expect(satisfiesRange('0.277.0', range!)).toBe(true)
+    expect(satisfiesRange('0.277.999', range!)).toBe(true)
+    expect(satisfiesRange('0.278.0', range!)).toBe(false)
   })
 
   // Each window starts at the floor the verified Runtime line admits (Eval) or
@@ -181,10 +182,14 @@ describe('this package audits itself', () => {
   // 0.48, so the shell refuses it too. Sandbox 0.50 adds the named instances
   // that `hosted-agent` keeps each person's box on, 0.51 adds lines, 0.52
   // runs each line member in their own named instance, and 0.53 adds email lines.
-  // Eval keeps the 0.185 floor that Runtime 0.262 to 0.271 admit; the admitted
-  // rows below are the ones the installed Runtime (0.274.0, Eval >=0.188.0 <0.191.0) admits.
+  // Eval keeps the 0.185 floor this shell has declared since the 0.185 line;
+  // its own ceiling (<0.198.0) matches the exact 0.197.0 it pins. Runtime
+  // 0.274 to 0.277 all declare a narrower Eval peer, >=0.191.0 <0.194.0
+  // (Runtime has not yet widened past 0.197.0's Eval release) — the admitted
+  // examples below have to sit inside BOTH windows at once, because the next
+  // `it.each` checks the same list against the installed Runtime's window.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
-    ['@tangle-network/agent-eval', ['0.184.999'], ['0.188.0', '0.190.0', '0.190.999'], ['0.191.0']],
+    ['@tangle-network/agent-eval', ['0.184.999'], ['0.191.0', '0.193.0', '0.193.999'], ['0.198.0']],
     ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999'], ['0.54.0']],
     ['@tangle-network/agent-interface', ['2.10.999'], ['2.11.0', '2.12.0'], ['3.0.0']],
   ]

@@ -11635,7 +11635,7 @@
           "name": "SandboxResourceConfig",
           "kind": "interface",
           "signature": "interface SandboxResourceConfig",
-          "doc": "Define configuration parameters for sandbox resource allocation and lifecycle management"
+          "doc": "Configure sandbox resources and lifecycle limits."
         },
         {
           "name": "SandboxRestoreSpec",
@@ -17945,7 +17945,7 @@
           "name": "VaultPane",
           "kind": "function",
           "signature": "(props: VaultPaneProps) => Element",
-          "doc": null
+          "doc": "Browse and edit files in the available pane width."
         },
         {
           "name": "VaultPaneProps",

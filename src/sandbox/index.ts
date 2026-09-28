@@ -220,12 +220,18 @@ export async function resolveSandboxClientCredentials(
   )
 }
 
-/** Define configuration parameters for sandbox resource allocation and lifecycle management */
+/**
+ * Configure sandbox resources and lifecycle limits.
+ * Set `advisory` for application defaults that the Sandbox API may clamp to account limits.
+ * Omit it when the requested allocation must be honored or rejected.
+ */
 export interface SandboxResourceConfig {
   image: string
   cpuCores: number
   memoryMB: number
   diskGB: number
+  /** Let the Sandbox API clamp these resource defaults to the account's limits. */
+  advisory?: boolean
   maxLifetimeSeconds: number
   idleTimeoutSeconds: number
 }
@@ -2531,6 +2537,7 @@ async function provisionWorkspaceSandbox(
       cpuCores: resources.cpuCores,
       memoryMB: resources.memoryMB,
       diskGB: resources.diskGB,
+      ...(resources.advisory !== undefined ? { advisory: resources.advisory } : {}),
     },
   } as CreatePayload
 
