@@ -1,0 +1,41 @@
+name: Regenerate lifecycle API documentation
+on:
+  push:
+    branches: [audit/regenerate-lifecycle-docs-20260929]
+    paths: [.github/workflows/regenerate-lifecycle-docs.yml]
+permissions:
+  contents: write
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 26efc2d3e8371dc6a78cdd56fc1263a4396006d9
+          fetch-depth: 1
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+      - name: Use the unchanged supported dependency lock
+        run: pnpm install --frozen-lockfile --ignore-scripts=false
+      - name: Generate through the maintained documentation command
+        run: |
+          pnpm docs:gen
+          git diff --check
+          python3 - <<'PY'
+          import subprocess
+          allowed = {'docs/CODEMAP.md','docs/codemap.json','docs/llms-full.txt','docs/llms.txt'}
+          changed = subprocess.check_output(['git','diff','--name-only'], text=True).splitlines()
+          assert all(p in allowed or p.startswith('docs/api/') for p in changed), changed
+          PY
+      - name: Commit generated docs to the unchanged feature head
+        run: |
+          branch=refactor/shared-lifecycle-consolidation-20260929
+          expected=26efc2d3e8371dc6a78cdd56fc1263a4396006d9
+          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$expected"
+          if git diff --quiet; then exit 0; fi
+          git add docs/CODEMAP.md docs/codemap.json docs/llms-full.txt docs/llms.txt docs/api
+          git -c user.name='github-actions[bot]' -c user.email='github-actions[bot]@users.noreply.github.com' commit -m 'docs: regenerate lifecycle API references with supported peers'
+          git push origin "HEAD:refs/heads/$branch"
