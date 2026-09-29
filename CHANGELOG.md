@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.0
+
+- fix(auth)!: release corrected identity contract at 0.50.0
+- fix(peers): admit verified engine cohorts [skip release]
+- fix(auth): enforce keyless identity SSO contract
+
 ## 0.49.38
 
 - feat(auth): support identity-only first-party SSO
