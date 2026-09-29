@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.6
+
+- fix(chat): recover provider quota failures without duplicate error text (#689)
+- feat(workspace): register sandbox apps in agent workspace (#688)
+
 ## 0.50.5
 
 - refactor: bind recovery to provisioning attempts and preserve typed turn history (#687)
