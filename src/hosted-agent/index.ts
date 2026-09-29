@@ -1,3 +1,4 @@
+import { resolveHostedLine } from './line-identity'
 import type { AgentProfile, BackendConfig, LineVoiceOptions } from '@tangle-network/sandbox'
 import { type Line, type LineInstanceCreate, Sandbox } from '@tangle-network/sandbox/core'
 
@@ -9,7 +10,7 @@ export type HostedAgentTransport = 'imessage' | 'whatsapp' | 'email'
 export interface HostedAgentLineOptions {
   transport?: HostedAgentTransport
   mode?: 'personal' | 'shared'
-  /** Required when creating a WhatsApp line on a connection with several numbers. */
+  /** Select a registered iMessage provider number; required for WhatsApp. Omit for an Inkbox identity. */
   phoneNumberId?: string
   voice?: LineVoiceOptions
 }
@@ -119,8 +120,8 @@ export function createHostedAgent(config: HostedAgentConfig) {
     }
     if (creating && transport === 'whatsapp' && !options.phoneNumberId)
       throw new HostedAgentError('phone_number_required', 'WhatsApp lines require phoneNumberId.')
-    if (transport !== 'whatsapp' && options.phoneNumberId)
-      throw new HostedAgentError('phone_number_not_allowed', 'phoneNumberId is only valid for WhatsApp lines.')
+    if (transport === 'email' && options.phoneNumberId)
+      throw new HostedAgentError('phone_number_not_allowed', 'Email lines do not accept phoneNumberId.')
     if (options.voice && transport !== 'imessage')
       throw new HostedAgentError('voice_transport_unsupported', 'Voice is supported only on iMessage lines.')
     if (transport === 'email' && config.attachment?.unknownSenders && config.attachment.unknownSenders !== 'reject')
@@ -133,7 +134,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
     if (options.transport && options.transport !== transport)
       throw new HostedAgentError('line_transport_mismatch', 'The existing line uses another transport.')
     if (options.phoneNumberId && line.providerNumberId !== options.phoneNumberId)
-      throw new HostedAgentError('line_number_mismatch', 'The existing line is pinned to another WhatsApp number.')
+      throw new HostedAgentError('line_number_mismatch', 'The existing line is pinned to another provider number.')
     const retained = line.attachment?.status === 'active' ? line.attachment : undefined
     if (retained?.unknownSenders === 'onboard')
       throw new HostedAgentError('line_policy_migration_required', 'This line uses onboard admission. Manage it through Hub; the hosted-agent kit will not replace its policy.')
@@ -179,9 +180,7 @@ export function createHostedAgent(config: HostedAgentConfig) {
       validate(transport, options, true)
       // Hub deduplicates by provider identity. A new reference would conflict
       // with an existing WhatsApp line created by an earlier kit.
-      const line = await sandbox.lines.fromConnection(transport === 'whatsapp'
-        ? { connectionId, transport, phoneNumberId: options.phoneNumberId! }
-        : { connectionId, transport })
+      const line = await resolveHostedLine(sandbox, { connectionId, transport, ...(options.phoneNumberId ? { phoneNumberId: options.phoneNumberId } : {}) })
       return attach(line, options)
     },
     /**

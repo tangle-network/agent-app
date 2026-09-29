@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- fix(hosted-agent): honor an explicitly selected registered iMessage number in both hosted-agent APIs. Resolve exact owned line identity through the published SDK; never fall back to another number. WhatsApp requires its number and email rejects one. No provider client or number purchase is added.
+
 ## 0.49.35
 
 - fix(agent-app): remove duplicate composer focus outline

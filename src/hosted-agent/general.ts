@@ -1,3 +1,4 @@
+import { resolveHostedLine } from './line-identity'
 import {
   agentProfileSchema, defineInlineResource, mergeAgentProfiles,
   type AgentProfile,
@@ -187,12 +188,9 @@ export function createTangleAgent(options: TangleAgentOptions) {
     /** Exact integration point for the Mac-lane line id. Never silently detach an existing attachment. */
     attachExistingLine: attach,
     async attachLine(connectionId: string, channel:
-      | { transport: 'imessage'; voice?: LineVoiceOptions }
+      | { transport: 'imessage'; phoneNumberId?: string; voice?: LineVoiceOptions }
       | { transport: 'whatsapp'; phoneNumberId: string }): Promise<Line> {
-      const input = channel.transport === 'whatsapp'
-        ? { connectionId, transport: 'whatsapp' as const, phoneNumberId: channel.phoneNumberId }
-        : { connectionId, transport: 'imessage' as const }
-      const line = await sandbox.lines.fromConnection(input)
+      const line = await resolveHostedLine(sandbox, { connectionId, transport: channel.transport, ...('phoneNumberId' in channel && channel.phoneNumberId ? { phoneNumberId: channel.phoneNumberId } : {}) })
       return attach(line.id, channel.transport === 'imessage' ? channel.voice : undefined)
     },
   }
