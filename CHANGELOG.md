@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.49.36
+
+- fix(composer): keep focus ring on card (#673)
+
 ## 0.49.35
 
 - fix(agent-app): remove duplicate composer focus outline
