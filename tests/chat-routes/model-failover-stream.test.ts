@@ -92,6 +92,9 @@ const EMPTY_COMPLETED_SEQUENCE: Array<Record<string, unknown>> = [
   { type: 'done', data: { requestId: 'b450d3c1-32e9-4bc0-a0fa-a1ce6564ca37', outcome: { type: 'completed' } }, id: '9' },
 ]
 
+const OPENCODE_QUOTA_MESSAGE =
+  'opencode execution failed: No provider served model "claude-fable-5" (provider_quota_exhausted)... (exit code 1)'
+
 async function* feed(events: Array<Record<string, unknown>>): AsyncGenerator<unknown> {
   for (const event of events) yield event
 }
@@ -164,6 +167,27 @@ describe('classifyTerminalFailure — the RESOLVED outage shape', () => {
       outage: true,
       code: 'provider_inference_unavailable',
     })
+  })
+
+  it('normalizes the message-only OpenCode quota code for the terminal error', () => {
+    expect(classifyTerminalFailure({
+      type: 'error',
+      data: { message: OPENCODE_QUOTA_MESSAGE },
+    })).toMatchObject({ outage: true, code: 'provider_quota_exhausted' })
+  })
+
+  it('preserves the structured OpenCode quota code', () => {
+    expect(classifyTerminalFailure({
+      type: 'error',
+      data: { code: 'provider_quota_exhausted', message: 'Provider quota exhausted' },
+    })).toMatchObject({ outage: true, code: 'provider_quota_exhausted' })
+  })
+
+  it('does not treat an ordinary terminal 409 as an upstream outage', () => {
+    expect(classifyTerminalFailure({
+      type: 'error',
+      data: { status: 409, message: 'The request conflicts with the current session state.' },
+    })).toMatchObject({ outage: false })
   })
 
   it('classifies a non-outage terminal failure as terminal but NOT an outage', () => {
@@ -375,7 +399,12 @@ describe('streamWithModelFailover — over the verbatim sequences', () => {
     expect(handle.servingModel()).toBe('gpt-5-mini')
     expect(handle.usedFallback()).toBe(true)
     expect(handle.attempts()).toEqual([
-      { model: 'dead-model', ok: false, reason: expect.stringContaining('provider inference is unavailable') },
+      {
+        model: 'dead-model',
+        ok: false,
+        reason: expect.stringContaining('provider inference is unavailable'),
+        errorCode: 'provider_inference_unavailable',
+      },
       { model: 'gpt-5-mini', ok: true },
     ])
     // The healthy sequence flows through COMPLETE and in order…
@@ -813,7 +842,7 @@ describe('createSandboxChatProducer — failover wiring', () => {
     const terminal = events.find((e) => (e as { type?: string }).type === 'error') as
       | { data?: { code?: string } }
       | undefined
-    expect(terminal?.data?.code).toBe('sandbox.stream_failed')
+    expect(terminal?.data?.code).toBe('provider_inference_unavailable')
     expect(producer.modelFailover?.()).toMatchObject({
       attempts: [
         expect.objectContaining({ model: 'dead-a', ok: false }),
