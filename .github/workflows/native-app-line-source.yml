@@ -1,0 +1,32 @@
+name: Capture native application-line source
+on:
+  push:
+    branches: [ops/native-app-line-source-20260928]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 47cb2f3a39622ee36f5257e89c4d75b045a411c3
+          persist-credentials: false
+      - run: |
+          mkdir -p "$RUNNER_TEMP/review-source"
+          git archive HEAD -o "$RUNNER_TEMP/review-source/source.tar.gz"
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/review-source/identity.txt"
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: tar -czf "$RUNNER_TEMP/review-source/dependencies.tar.gz" node_modules
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: native-app-line-source
+          path: ${{ runner.temp }}/review-source/
+          retention-days: 3
+          compression-level: 0
