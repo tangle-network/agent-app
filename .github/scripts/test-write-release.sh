@@ -228,4 +228,20 @@ run_release advanced-no-tag 1.2.6 > "$TMP/advanced.log"
 grep -Fq 'main advanced from tested commit' "$TMP/advanced.log"
 [[ $(wc -l < "$DISPATCH_LOG") -eq 3 ]]
 
-echo 'write release script: ok (16 cases)'
+git -C "$SEED" commit --quiet --allow-empty -m 'fix(auth)!: require identity discriminator'
+BASE=$(git -C "$SEED" rev-parse HEAD)
+git --git-dir="$ORIGIN" fetch --quiet "$SEED" "$BASE"
+git --git-dir="$ORIGIN" update-ref refs/heads/main "$BASE"
+STAGED_WRITER="$TMP/staged-writer"
+mkdir -p "$STAGED_WRITER"
+cp "$SCRIPT" "$STAGED_WRITER/write-release.sh"
+cp "$ROOT/.github/scripts/next-release-version.mjs" "$STAGED_WRITER/next-release-version.mjs"
+SCRIPT="$STAGED_WRITER/write-release.sh"
+fails 'expected next release 1.3.0' run_release wrong-minor 1.2.6
+run_release minor 1.3.0 >/dev/null
+MINOR_TAG=$(git --git-dir="$ORIGIN" rev-parse refs/tags/v1.3.0)
+[[ $(git --git-dir="$ORIGIN" rev-parse "$MINOR_TAG^") == "$BASE" ]]
+[[ $(git --git-dir="$ORIGIN" show "$MINOR_TAG:package.json" | node -p "JSON.parse(require('fs').readFileSync(0)).version") == 1.3.0 ]]
+run_validate minor-valid 1.3.0 "$MINOR_TAG" >/dev/null
+
+echo 'write release script: ok (patch and breaking-minor transitions)'
