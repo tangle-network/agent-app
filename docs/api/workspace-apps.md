@@ -27,15 +27,15 @@ Source: `src/workspace-apps/index.ts`
 `function` — Portable instructions for an agent profile that builds workspace apps.
 
 ```ts
-({ publishTool, listTool, }: WorkspaceAppBuilderInstructionsOptions) => string[]
+(options: WorkspaceAppBuilderInstructionsOptions) => string[]
 ```
 
 ### `WorkspaceAppBuilderInstructionsOptions`
 
-`interface`
+`type`
 
 ```ts
-interface WorkspaceAppBuilderInstructionsOptions
+type WorkspaceAppBuilderInstructionsOptions
 ```
 
 ### `workspaceAppFromPreviewLink`

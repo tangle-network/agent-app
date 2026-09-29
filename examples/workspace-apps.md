@@ -4,7 +4,15 @@ A workspace app is a real HTTP application running in the agent's sandbox.
 The agent can build and revise it in a dedicated conversation.
 The product registers a stable app ID so people can reopen the app from the workspace rail.
 
-The host can compose the builder profile with `workspaceAppBuilderInstructions({ publishTool: 'apps.publish', listTool: 'apps.list' })`.
+For a coding agent without a product MCP credential, compose its profile with
+workspaceAppBuilderInstructions({ manifestPath: 'workspace-apps.json' }).
+The agent builds each runnable project under apps/<id>, with a package.json dev script.
+Its HTTP server must bind 0.0.0.0 and use PORT when supplied.
+The agent writes only { "apps": [{ "id": "...", "name": "...", "projectPath": "apps/<id>" }] } to that host-scoped session manifest.
+The host reads and validates the manifest, launches each project through the Sandbox SDK, creates the preview link, and registers the app.
+The manifest contains no URL, credential, sandbox ID, or arbitrary command.
+
+A tool-capable host can instead use workspaceAppBuilderInstructions({ publishTool: 'apps.publish', listTool: 'apps.list' }).
 The host owns the build conversation, agent profile, app store, route, and authorization.
 It tells the agent the name of its publish tool and the required result.
 The agent starts an HTTP server in its sandbox and calls that tool with an app ID, name, and listening port.
