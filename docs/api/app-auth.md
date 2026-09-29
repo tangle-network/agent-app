@@ -4,7 +4,7 @@
 
 Source: `src/app-auth/index.ts`
 
-12 exports.
+13 exports.
 
 ### `AppAuth`
 
@@ -36,6 +36,14 @@ interface AppAuthEmailClient
 
 ```ts
 interface AppAuthEmailConfig
+```
+
+### `AppAuthIdentitySsoConfig`
+
+`interface` — First-party identity login; no Platform API key is issued or stored.
+
+```ts
+interface AppAuthIdentitySsoConfig
 ```
 
 ### `AppAuthInstance`

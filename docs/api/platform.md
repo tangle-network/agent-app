@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-82 exports.
+85 exports.
 
 ### `AdminGuardOptions`
 
@@ -147,7 +147,7 @@ interface BillableBalanceState
 `function` — Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies
 
 ```ts
-(opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions) => TangleSsoHandlers
+(opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions | TangleIdentitySsoHandlerOptions) => TangleSsoHandlers
 ```
 
 ### `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`
@@ -492,6 +492,30 @@ class TangleBearerMissingError
 
 ```ts
 type TangleHubBearerSource
+```
+
+### `TangleIdentitySsoAccountStore`
+
+`interface` — Persist only the stable identity link for a first-party app.
+
+```ts
+interface TangleIdentitySsoAccountStore
+```
+
+### `TangleIdentitySsoAuthClient`
+
+`interface` — First-party login exchanges identity without minting a Platform API key.
+
+```ts
+interface TangleIdentitySsoAuthClient
+```
+
+### `TangleIdentitySsoHandlerOptions`
+
+`interface`
+
+```ts
+interface TangleIdentitySsoHandlerOptions
 ```
 
 ### `TangleOidcSsoAccountStore`
