@@ -155,7 +155,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('3.0.0', range!)).toBe(false)
   })
 
-  it('supports the published Runtime 0.282 line without claiming the next one', async () => {
+  it('supports the published Runtime 0.282 and 0.283 lines', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -163,25 +163,44 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    // The OIDC caller is verified against the published Runtime 0.282.2.
+    // The OIDC caller is verified against published Runtime 0.282.2 and 0.283.0.
     expect(satisfiesRange('0.281.999', range!)).toBe(false)
     expect(satisfiesRange('0.282.0', range!)).toBe(false)
     expect(satisfiesRange('0.282.2', range!)).toBe(true)
     expect(satisfiesRange('0.282.999', range!)).toBe(true)
-    expect(satisfiesRange('0.283.0', range!)).toBe(false)
+    expect(satisfiesRange('0.283.0', range!)).toBe(true)
+    expect(satisfiesRange('0.283.999', range!)).toBe(true)
+    expect(satisfiesRange('0.284.0', range!)).toBe(false)
   })
 
-  // Each window starts at the floor the verified Runtime line admits (Eval) or
-  // the floor this application code ran on (Sandbox 0.45), admits the minor the
-  // dev install runs, and claims nothing past it. The Runtime refuses Sandbox
+  it('admits the tested Integrations lines without admitting 0.58', async () => {
+    const root = join(here, '..', '..')
+    const own = JSON.parse(
+      await readFile(join(root, 'package.json'), 'utf8'),
+    ) as { peerDependencies?: Record<string, string> }
+    const range = own.peerDependencies?.['@tangle-network/agent-integrations']
+
+    expect(range).toBeDefined()
+    for (const version of ['0.54.1', '0.58.0', '0.58.999', '0.60.0']) {
+      expect(satisfiesRange(version, range!)).toBe(false)
+    }
+    for (const version of ['0.54.2', '0.57.0', '0.59.0', '0.59.999']) {
+      expect(satisfiesRange(version, range!)).toBe(true)
+    }
+  })
+
+  // Each window starts at the floor this application code ran on, admits the
+  // newer minor tested in an installed consumer, and claims nothing past it.
+  // The Runtime refuses Sandbox
   // 0.48, so the shell refuses it too. Sandbox 0.50 adds the named instances
   // that `hosted-agent` keeps each person's box on, 0.51 adds lines, 0.52
   // runs each line member in their own named instance, 0.53 adds email lines,
   // and 0.55 adds the global line detach the hosted-agent kit uses.
-  // The published Runtime 0.282.2 requires Eval 0.199.x. Shared examples must
-  // satisfy both ranges.
+  // Published Runtime 0.283.0 and Knowledge 17.1.10 still require Eval 0.199.x.
+  // Eval 0.200.x is valid for the optional Eval-only subpaths; a consumer that
+  // also installs Runtime or Knowledge needs their peer contracts corrected.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
-    ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.1', '0.199.999'], ['0.200.0']],
+    ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.1', '0.199.999', '0.200.0', '0.200.1', '0.200.999'], ['0.201.0']],
     ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999', '0.54.0', '0.55.2'], ['0.56.0']],
     ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0'], ['3.0.0']],
   ]
@@ -199,9 +218,9 @@ describe('this package audits itself', () => {
     for (const version of above) expect(satisfiesRange(version, range!)).toBe(false)
   })
 
-  // A shell window the required Runtime refuses is a contract no consumer can
-  // install. Read the Runtime this repo develops against, not a comment about it.
-  it.each(verifiedWindows)('admits only %s versions the installed Runtime admits', async (name, _below, admitted) => {
+  // The generated default installs Runtime. Check the shared peer overlap that
+  // it can install today; Eval-only consumers may use the wider Eval window.
+  it.each(verifiedWindows)('retains a %s window the installed Runtime admits', async (name, _below, admitted) => {
     const root = join(here, '..', '..')
     const runtime = JSON.parse(
       await readFile(join(root, 'node_modules', '@tangle-network', 'agent-runtime', 'package.json'), 'utf8'),
@@ -209,7 +228,11 @@ describe('this package audits itself', () => {
     const range = runtime.peerDependencies?.[name]
 
     expect(range, `Runtime ${runtime.version} declares no ${name} peer`).toBeDefined()
-    for (const version of admitted) expect(satisfiesRange(version, range!), `${version} vs ${range}`).toBe(true)
+    const sharedAdmitted = name === '@tangle-network/agent-eval'
+      ? admitted.filter((version) => version.startsWith('0.199.'))
+      : admitted
+    expect(sharedAdmitted.length).toBeGreaterThan(0)
+    for (const version of sharedAdmitted) expect(satisfiesRange(version, range!), `${version} vs ${range}`).toBe(true)
   })
 
   // The floors this shell PUBLISHES must be satisfiable by the tree it is
