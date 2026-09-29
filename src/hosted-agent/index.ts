@@ -201,6 +201,3 @@ export type { GeneralAgentProfileOptions, GeneralAgentMember, TangleAgentOptions
 export { agentHomeWorkflows } from './workflows'
 export type { AgentHomeWorkflowOptions, AgentHomeWorkflow } from './workflows'
 export { defaultHomeFiles, DEFAULT_HOME_LIMITS, DEFAULT_AGENT_HOME, withDefaultAgentHome } from '../profile/home'
-
-export * from './application'
-export * from './workspace-line'

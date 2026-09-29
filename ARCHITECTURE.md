@@ -59,7 +59,7 @@ agent→app side channel; `defineAppTool` registers product tools here)* ·
 *(bridge + re-exports agent-eval)* · `sandbox` → crypto/harness/runtime/tools
 *(per-turn streaming)* · `trace` → missions *(flow observability)* · `config` →
 knowledge/runtime · `knowledge-loop` → config · `profile` → skills · `run` →
-harness · `platform` → billing/runtime/web · `hosted-agent` *(a person's text or call answered from their own isolated box; peer `sandbox`)* · `preset-cloudflare` →
+harness · `platform` → billing/runtime/web · `hosted-agent` *(a person's text or call answered from their own isolated box; peer `sandbox`)* · `hosted-agent/application` *(native application callback and workspace attachment; Sandbox 0.58.1 or later)* · `preset-cloudflare` →
 billing/crypto/knowledge/tools/web · `turn-stream` → stream/chat-routes
 *(shared DO-backed turn replay/broadcast/lock; structural Cloudflare, server-only)*.
 

@@ -4,7 +4,39 @@
 
 Source: `src/hosted-agent/react/index.ts`
 
-20 exports.
+24 exports.
+
+### `ApplicationLineConnectInput`
+
+`interface`
+
+```ts
+interface ApplicationLineConnectInput
+```
+
+### `ApplicationLineSetup`
+
+`function` — Nominate a sender explicitly, then use the existing connection and disconnect UI.
+
+```ts
+(props: ApplicationLineSetupProps) => Element
+```
+
+### `ApplicationLineSetupClient`
+
+`interface`
+
+```ts
+interface ApplicationLineSetupClient
+```
+
+### `ApplicationLineSetupProps`
+
+`interface`
+
+```ts
+interface ApplicationLineSetupProps
+```
 
 ### `ConnectableLineTransport`
 
@@ -131,7 +163,7 @@ interface LineMembersProps
 `function` — Set up an owned identity through a host route backed by sandbox.lines and Hub.
 
 ```ts
-({ client, scopeKey, initialTargetId, canManage, onNotice }: LineSetupProps) => Element
+({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect, showConnectionSetup, onNotice }: LineSetupPro…
 ```
 
 ### `LineSetupClient`

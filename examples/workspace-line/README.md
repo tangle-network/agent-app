@@ -5,7 +5,7 @@ A messaging line enters the application's existing conversation and accepted tas
 ## Four host operations
 
 ```ts
-import { createApplicationLineHandler } from '@tangle-network/agent-app/hosted-agent'
+import { createApplicationLineHandler } from '@tangle-network/agent-app/hosted-agent/application'
 
 export const POST = createApplicationLineHandler({
   authenticate: lineAuthority.authenticate,
@@ -31,7 +31,7 @@ Hub retains the returned execution ID. Thereafter `acceptedExecutionId` pins rec
 ## Attach an existing workspace
 
 ```ts
-import { attachWorkspaceLine } from '@tangle-network/agent-app/hosted-agent'
+import { attachWorkspaceLine } from '@tangle-network/agent-app/hosted-agent/application'
 
 await attachWorkspaceLine({
   box: authorizedPreparedWorkspace,
@@ -66,7 +66,10 @@ A message limit is not a dollar cap. Enforce compute spend at the service paying
 
 ## Release and proof
 
-This addition depends on the native application-backed Lines SDK and server change in agent-dev-container #8499. Use the maintained source-linked development build for cross-repository verification, then normal SDK/Runtime/Agent App publication and consumer lock generation. No version is fabricated here and no node_modules patch is a release artifact.
+The `hosted-agent/application` server entrypoint requires Sandbox 0.58.1 or later in the 0.58 series.
+The existing `hosted-agent` entrypoint remains importable with older Sandbox versions in the package's peer range.
+This addition depends on the native application-backed Lines SDK and server change in agent-dev-container #8499.
+Pin published SDK, Runtime and Agent App archives before consumer lock generation.
 
 Deploy native callback support before enabling the host flag. Use a disposable owned test line and consenting sender. Do not reattach an existing assistant's production line. The management client must use existing authorized application access, not a short-lived compute child: Lines retains that caller's key ID. Expiry/revocation ends the grant; do not extend a compute token indefinitely or expose application keys to the agent.
 

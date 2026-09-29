@@ -223,6 +223,11 @@
       "import": "./dist/hosted-agent/index.js",
       "default": "./dist/hosted-agent/index.js"
     },
+    "./hosted-agent/application": {
+      "types": "./dist/hosted-agent/application.d.ts",
+      "import": "./dist/hosted-agent/application.js",
+      "default": "./dist/hosted-agent/application.js"
+    },
     "./hosted-agent/react": {
       "types": "./dist/hosted-agent/react/index.d.ts",
       "import": "./dist/hosted-agent/react/index.js",

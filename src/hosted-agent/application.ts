@@ -8,6 +8,8 @@ import {
   type LineApplicationState,
 } from '@tangle-network/sandbox/core'
 
+export { attachWorkspaceLine } from './workspace-line'
+
 /** Missing is an affirmative storage observation, never an error fallback. */
 export type ApplicationLineObservation = LineApplicationState | { state: 'missing' }
 

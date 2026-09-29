@@ -36,6 +36,7 @@
     "src/intakes/drizzle.ts",
     "src/intakes/index.ts",
     "src/hosted-agent/index.ts",
+    "src/hosted-agent/application.ts",
     "src/hosted-agent/react/index.ts",
     "src/hosted-agent/react/styles.ts",
     "src/integrations/index.ts",

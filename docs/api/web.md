@@ -227,7 +227,7 @@ interface KvLike
 `function` — Parse + object-narrow a Request body.
 
 ```ts
-(request: Request) => Promise<[JsonObject, null] | [null, Response]>
+(request: Request, options?: { maxBytes?: number | undefined; }) => Promise<[JsonObject, null] | [null, Response]>
 ```
 
 ### `RateLimitBudget`
