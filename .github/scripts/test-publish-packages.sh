@@ -108,6 +108,13 @@ run env REGISTRY_VERIFY_ATTEMPTS=3 REGISTRY_VERIFY_DELAY_SECONDS=0 bash "$SCRIPT
 grep -Fq '@tangle-network/agent-app@1.2.3 published and confirmed' "$TMP/delayed.log"
 
 reset
+printf '80\n' > "$TMP/state/root.delay"
+run env REGISTRY_VERIFY_DELAY_SECONDS=0 bash "$SCRIPT" publish agent-app "$ROOT_TGZ" > "$TMP/slow-registry.log"
+[[ $(grep -c '^publish|' "$TMP/npm.log") -eq 1 ]]
+[[ $(grep -c '^view|' "$TMP/npm.log") -eq 81 ]]
+grep -Fq '@tangle-network/agent-app@1.2.3 published and confirmed' "$TMP/slow-registry.log"
+
+reset
 printf '10\n' > "$TMP/state/root.delay"
 fails 'not visible after 2 registry checks' run env REGISTRY_VERIFY_ATTEMPTS=2 REGISTRY_VERIFY_DELAY_SECONDS=0 bash "$SCRIPT" publish agent-app "$ROOT_TGZ"
 [[ $(grep -c '^publish|' "$TMP/npm.log") -eq 1 ]]

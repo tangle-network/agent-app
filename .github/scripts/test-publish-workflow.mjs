@@ -139,8 +139,8 @@ for (const command of [
 ]) {
   check(node22Job.includes(command), `Node 22 compatibility omits ${command}`)
 }
-check(packageJob.includes('needs: node_22_compatibility'), 'auto release does not wait for Node 22 compatibility')
-check(packageJob.includes('needs.node_22_compatibility.result == \'success\''), 'auto release does not require a passing Node 22 compatibility job')
+check(!/^    needs:/m.test(packageJob), 'package verification waits for another job')
+check(!packageJob.includes('needs.node_22_compatibility'), 'package verification reads a sequential Node 22 result')
 
 const autoSteps = [
   ['Prepare release manifests', 'write-release.sh prepare'],
