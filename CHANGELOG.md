@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.49.37
+
+- chore(agent-app): align supported UI peers
+- fix(hub-sdk): accept 0.20.x as optional peer [skip release]
+
 ## 0.49.36
 
 - fix(composer): keep focus ring on card (#673)
