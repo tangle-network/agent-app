@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.3
+
+- refactor(channels): separate read-only conversation capabilities
+
 ## 0.50.2
 
 - feat(lines): clarify application setup hierarchy
