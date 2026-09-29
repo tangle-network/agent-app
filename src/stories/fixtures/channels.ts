@@ -4,7 +4,7 @@ export function channelLine(overrides: Partial<Line> = {}): Line {
   const value = {
     id: 'ln_demo', transport: 'imessage' as const, address: '@helper', connect: 'connect @helper', routerAddress: '+15550100001',
     connectionId: 'conn_demo', providerNumberId: null, label: 'Helper', clientReference: 'agent:demo',
-    status: 'active' as const, voice: null, attachment: null,
+    status: 'active' as const, voice: null, workspace: null, attachment: null,
     createdAt: '2026-09-24T12:00:00Z', updatedAt: '2026-09-24T12:00:00Z',
   }
   return { ...value, ...overrides }
@@ -12,8 +12,8 @@ export function channelLine(overrides: Partial<Line> = {}): Line {
 
 export function channelAttachment(): LineAttachment {
   return {
-    id: 'att_demo', lineId: 'ln_demo', sandboxId: 'box_demo', mode: 'personal', unknownSenders: 'reject',
-    roles: { owner: { context: 'own', tools: 'chat' } }, respond: { kind: 'agent' },
+    id: 'att_demo', lineId: 'ln_demo', sandboxId: 'box_demo', mode: 'personal', payer: 'owner', unknownSenders: 'reject',
+    roles: { owner: { context: 'own', tools: 'chat' } }, respond: { kind: 'agent', acknowledgement: true },
     limits: { turnsPerMemberPerDay: 20, noticesPerSenderPerDay: 2, noticesPerLinePerDay: 20 },
     status: 'active', clientReference: 'agent:demo', createdAt: '2026-09-24T12:00:00Z', updatedAt: '2026-09-24T12:00:00Z',
   }
