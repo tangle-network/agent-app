@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { confirmWrite, rejectWrite, useAsyncResource, useConfirmedMutation } from '../web-react/async'
 import type { AsyncLoadContext, AsyncResourceState, MutationOutcome } from '../web-react/async'
-import { useChannelsContext } from './context'
+import { useChannelsClient, useChannelsContext } from './context'
 import type { ChannelVerification, ConnectChannelInput, Line, LineTransport } from './types'
 
 /** Reuse the kit's abort/sequence-aware read machine; polling never overlaps a read. */
@@ -46,18 +46,18 @@ export function useChannels() {
 }
 
 export function useChannelConnections(transport: LineTransport) {
-  const { client } = useChannelsContext()
+  const client = useChannelsClient()
   return useChannelResource(context => client.setup.connections(transport, context), [transport], true, false)
 }
 
 export function useWhatsAppNumbers(connectionId: string) {
-  const { client } = useChannelsContext()
+  const client = useChannelsClient()
   return useChannelResource(context => client.setup.whatsappNumbers(connectionId, context), [connectionId], !!connectionId, false)
 }
 
 /** Connect only acquires/binds a line. It never labels it verified or activates replies. */
 export function useConnectChannel(onConnected?: (line: Line) => void) {
-  const { client } = useChannelsContext()
+  const client = useChannelsClient()
   return useChannelMutation<ConnectChannelInput, Line>(async input => {
     if (input.kind === 'connection') {
       if (!input.input.connectionId.trim()) throw new Error('Choose a connection.')
@@ -81,7 +81,7 @@ export function verificationExpired(test: ChannelVerification, now = Date.now())
 export type VerificationAction = 'start' | 'resume' | 'send' | 'activate' | 'reset'
 
 export function useChannel(lineId: string) {
-  const { client } = useChannelsContext()
+  const client = useChannelsClient()
   const resource = useChannelResource(async context => {
     const [line, verification] = await Promise.all([client.lines.get(lineId), client.setup.verification(lineId, context)])
     if (line.id !== lineId || (line.attachment && line.attachment.lineId !== lineId) || (verification && verification.lineId !== lineId)) throw new Error('Channel binding changed. Reload channel setup.')

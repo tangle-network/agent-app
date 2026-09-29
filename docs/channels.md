@@ -141,3 +141,24 @@ restores the exact source and requires a pass. Storybook's Channels group shares
 the same typed fixtures and covers source selection, proof, failure, acquired
 numbers, history, and pay-page states. This is UI/control-plane contract coverage,
 not a live-provider delivery or payment-settlement claim.
+
+## Read-only conversations
+
+Use `ChannelsReadClient` when a page only displays lines and their conversations.
+`ChannelsProvider` accepts this smaller contract; no setup, ordering, or delivery
+verification methods are required. Existing `ChannelsClient` implementations
+remain compatible. Management components and `useChannelsClient` require the
+full management contract and refuse a read-only client before a write.
+
+```tsx
+import { ChannelsProvider, ChannelConversations, type ChannelsReadClient } from '@tangle-network/agent-app/channels'
+
+export function History({ client, lineId }: { client: ChannelsReadClient; lineId: string }) {
+  return <ChannelsProvider client={client}><ChannelConversations lineId={lineId} /></ChannelsProvider>
+}
+```
+
+The host must still scope reads to the authenticated owner and agent. Change
+`client.scope` on owner or agent changes; the existing async resource and provider
+remount discard stale reads. This type is a UI capability contract, not server
+authorization or evidence of provider delivery.

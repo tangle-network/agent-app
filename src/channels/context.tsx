@@ -1,11 +1,11 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import type { ChannelsClient } from './types'
+import type { ChannelsClient, ChannelsReadClient } from './types'
 
-const Context = createContext<{ client: ChannelsClient; pollInterval: number | false } | null>(null)
+const Context = createContext<{ client: ChannelsReadClient; pollInterval: number | false } | null>(null)
 
 /** Mount below authentication. Changing scope remounts all channel state. */
 export function ChannelsProvider({ client, pollInterval = 3000, children }: {
-  client: ChannelsClient
+  client: ChannelsReadClient
   /** Poll after a read settles, never concurrently. false disables polling. */
   pollInterval?: number | false
   children: ReactNode
@@ -16,8 +16,13 @@ export function ChannelsProvider({ client, pollInterval = 3000, children }: {
   return <Context.Provider value={{ client, pollInterval }} key={client.scope}>{children}</Context.Provider>
 }
 
+/** Management hooks keep the existing full-client contract; read views never call this. */
 export function useChannelsClient(): ChannelsClient {
-  return useChannelsContext().client
+  const { client } = useChannelsContext()
+  if (!('setup' in client) || !client.setup || !('fromConnection' in client.lines) || typeof client.lines.fromConnection !== 'function') {
+    throw new Error('Channel setup requires a management client.')
+  }
+  return client as ChannelsClient
 }
 
 export function useChannelsContext() {

@@ -30,8 +30,15 @@ export type ConnectChannelInput =
   | { kind: 'email'; connectionId: string; address: string }
   | { kind: 'order'; orderId: string }
 
+/** Read-only, authenticated conversation access; no setup, purchase, or activation stubs. */
+export interface ChannelsReadClient {
+  /** Changes whenever the authenticated agent or owner changes. Not an auth credential. */
+  scope: string
+  lines: Pick<LinesClient, 'get' | 'threads'> & { list(): Promise<Line[]> }
+}
+
 /**
- * The one authenticated, agent-scoped boundary. Keep this object stable.
+ * The one authenticated, agent-scoped management boundary. Keep this object stable.
  *
  * `lines` delegates to Sandbox SDK client.lines (list MUST be scoped to this
  * agent). `setup` is the host's existing Hub/hosted-agent control plane: it
@@ -45,10 +52,8 @@ export type ConnectChannelInput =
  * The hosted-agent export is server-only. Its existing attachLine operation
  * belongs in setup.activate after proof validation, never in this browser bundle.
  */
-export interface ChannelsClient {
-  /** Changes whenever the authenticated agent or owner changes. Not an auth credential. */
-  scope: string
-  lines: Pick<LinesClient, 'fromConnection' | 'get' | 'threads'> & { list(): Promise<Line[]> }
+export interface ChannelsClient extends ChannelsReadClient {
+  lines: ChannelsReadClient['lines'] & Pick<LinesClient, 'fromConnection'>
   setup: {
     connections(transport: LineTransport, context: ChannelReadContext): Promise<ChannelConnection[]>
     whatsappNumbers(connectionId: string, context: ChannelReadContext): Promise<ChannelNumber[]>
