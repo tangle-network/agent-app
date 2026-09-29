@@ -60,16 +60,11 @@ jobs:
           pnpm run knip
 
   package_release:
-    needs: node_22_compatibility
     if: >-
-      always() &&
+      github.event_name == 'workflow_dispatch' ||
       (
-        github.event_name == 'workflow_dispatch' ||
-        (
-          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-          !contains(github.event.head_commit.message, '[skip release]') &&
-          needs.node_22_compatibility.result == 'success'
-        )
+        github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+        !contains(github.event.head_commit.message, '[skip release]')
       )
     runs-on: ubuntu-latest
     permissions:
