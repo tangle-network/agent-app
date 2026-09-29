@@ -76,6 +76,8 @@ export interface LineSetupProps {
   scopeKey: string
   initialTargetId?: string
   canManage: boolean
+  /** Narrow new attachments without hiding disconnect controls; not server authorization. */
+  canConnect?: boolean
   onNotice?(notice: { kind: 'success' | 'error'; message: string }): void
 }
 

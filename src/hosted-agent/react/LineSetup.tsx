@@ -47,7 +47,7 @@ function matchesLineIdentity(line: LineSetupLine, identity: LineIdentityOption, 
 }
 
 /** Set up an owned identity through a host route backed by sandbox.lines and Hub. */
-export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNotice }: LineSetupProps) {
+export function LineSetup({ client, scopeKey, initialTargetId, canManage, canConnect = canManage, onNotice }: LineSetupProps) {
   const clientRef = useRef(client)
   clientRef.current = client
   const sequence = useRef(0)
@@ -161,7 +161,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   const blockedByExistingLine = Boolean(occupied?.length && !reconnecting)
 
   async function connect() {
-    if (!selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine || busy || loading || refreshFailed) return
+    if (!canManage || !canConnect || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine || busy || loading || refreshFailed) return
     const requestIncarnation = incarnation.current
     setBusy(true)
     setError(null)
@@ -291,7 +291,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
                 </label>}
               </div>
               {reconnectChoice && blockedByExistingLine && <p className="tangle-lines__warning">Enter this line's current provider number ID to reconnect.</p>}
-              <button className="tangle-lines__primary" type="button" disabled={busy || loading || refreshFailed || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine} onClick={() => void connect()}>
+              <button className="tangle-lines__primary" type="button" disabled={!canConnect || busy || loading || refreshFailed || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine} onClick={() => void connect()}>
                 {busy ? (reconnectChoice ? 'Reconnecting…' : 'Connecting…') : `${reconnectChoice ? 'Reconnect' : 'Connect'} ${selected ? TRANSPORT[selected.identity.transport] : 'line'}`}
               </button>
             </>}

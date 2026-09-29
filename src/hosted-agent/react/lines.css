@@ -108,3 +108,8 @@
   .tangle-lines__billing > div { grid-template-columns: 1fr; }
   .tangle-lines__billing dd.tangle-lines__billing-detail { grid-column: 1; }
 }
+
+.tangle-lines__delegation { display: flex; align-items: flex-start; gap: .65rem; font-size: .9rem; line-height: 1.5; }
+.tangle-lines__delegation input { flex: 0 0 auto; margin-top: .25rem; }
+.tangle-lines--application { display: grid; gap: 1rem; margin-bottom: 1.5rem; }
+.tangle-lines--application p { overflow-wrap: anywhere; }
