@@ -27,6 +27,8 @@ import {
   type TangleSsoAccountStore,
   type TangleSsoAuthClient,
   type TangleSsoHandlers,
+  type TangleIdentitySsoAccountStore,
+  type TangleIdentitySsoAuthClient,
   type TangleOidcSsoAccountStore,
   type TangleOidcSsoAuthClient,
 } from '../platform/sso'
@@ -113,6 +115,13 @@ export interface AppAuthOidcSsoConfig extends Omit<AppAuthSsoConfig, 'protocol' 
   createPkcePair: () => Promise<{ verifier: string; challenge: string }>
 }
 
+/** First-party identity login; no Platform API key is issued or stored. */
+export interface AppAuthIdentitySsoConfig extends Omit<AppAuthSsoConfig, 'protocol' | 'client' | 'store'> {
+  protocol: 'identity'
+  client: TangleIdentitySsoAuthClient
+  store: TangleIdentitySsoAccountStore
+}
+
 /** Define the structure for application authentication data including users, sessions, accounts, and verifications */
 export interface AppAuthSchema {
   users: unknown
@@ -161,7 +170,7 @@ export interface AppAuthConfig {
    *  Default 300. */
   sessionCookieCacheSeconds?: number | false
   /** Tangle cross-site SSO (start/callback handlers). */
-  sso?: AppAuthSsoConfig | AppAuthOidcSsoConfig
+  sso?: AppAuthSsoConfig | AppAuthOidcSsoConfig | AppAuthIdentitySsoConfig
   /** Where guards redirect unauthenticated page requests. Default '/login'. */
   loginPath?: string
   /** Merged over the factory's `advanced` block (cookiePrefix stays unless
@@ -375,6 +384,8 @@ export function createAppAuth(config: AppAuthConfig): AppAuth {
     }
     const transport = config.sso.protocol === 'oidc'
       ? { protocol: 'oidc' as const, auth: config.sso.client, store: config.sso.store, createPkcePair: config.sso.createPkcePair }
+      : config.sso.protocol === 'identity'
+        ? { protocol: 'identity' as const, auth: config.sso.client, store: config.sso.store }
       : { protocol: 'legacy' as const, auth: config.sso.client, store: config.sso.store }
     sso = createTangleSsoHandlers({
       ...transport,
