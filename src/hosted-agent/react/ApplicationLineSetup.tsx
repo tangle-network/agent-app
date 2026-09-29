@@ -39,25 +39,25 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
     },
   }), [client, canConnect, address, turnsPerDay])
   return <>
-    {props.canManage && <section className="tangle-lines tangle-lines--application" aria-label="Application access">
+    {props.canManage && <section className="tangle-lines tangle-lines--application" aria-label="Workspace messaging access">
       <header className="tangle-lines__application-heading">
-        <h2>Text your workspace</h2>
-        <p>Continue a conversation from a number or mailbox you own. The agent keeps the same context and saved work.</p>
+        <h2>Workspace messaging</h2>
+        <p>Connect a mailbox or number you own, then choose who can send instructions through it.</p>
       </header>
       {!enabled ? <div className="tangle-lines__notice" role="status">
         <strong>New connections are disabled</strong>
         <p>You can still review and disconnect an existing line below.</p>
       </div> : <div className="tangle-lines__authorization">
         <div className="tangle-lines__authorization-heading">
-          <h3>Authorize a sender</h3>
+          <h3>Sender permissions</h3>
           <p>Only this sender can issue commands through the line you connect.</p>
         </div>
         <div className="tangle-lines__fields">
-          <label>Authorized sender
+          <label>Approved sender
             <input value={operatorAddress} onChange={e => { setAddress(e.target.value); setApproved(null) }}
               autoComplete="off" placeholder="+15550100001 or your Apple ID / email" />
           </label>
-          <label>Maximum messages per day
+          <label>Daily message limit
             <input type="number" min={1} max={10_000} step={1} value={limit}
               onChange={e => { setLimit(e.target.value); setApproved(null) }} />
           </label>

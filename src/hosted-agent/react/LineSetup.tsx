@@ -161,6 +161,8 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
     matchesLineIdentity(occupiedLine, selected.identity, enteredNumber))
   const blockedByExistingLine = Boolean(occupied?.length && !reconnecting)
   const answeringCount = snapshot?.lines.filter(line => line.answering).length ?? 0
+  const canConfigure = Boolean(canManage && showConnectionSetup && snapshot && !loading && !refreshFailed &&
+    snapshot.connections !== null && snapshot.targets.length > 0 && choices.length > 0)
 
   async function connect() {
     if (!canManage || !canConnect || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine || busy || loading || refreshFailed) return
@@ -220,7 +222,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
     }
   }
 
-  return <section className="tangle-lines" aria-label="Agent lines">
+  return <section className="tangle-lines" aria-label="Agent lines" data-application-setup-ready={canConfigure ? 'true' : 'false'}>
     <header className="tangle-lines__heading">
       <div>
         <h2 ref={heading} tabIndex={-1}>Lines</h2>
@@ -231,16 +233,16 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
 
     {error && <div className="tangle-lines__error" role="alert">
       <div><strong>{refreshFailed ? 'Lines are unavailable' : 'Line action failed'}</strong><p>{error}</p></div>
-      {(!snapshot || refreshFailed) && <button type="button" disabled={loading} onClick={retry}>Retry</button>}
+      {(!snapshot || refreshFailed) && <button className="tangle-lines__retry" type="button" aria-label="Retry loading line inventory" disabled={loading} onClick={retry}>Retry</button>}
     </div>}
-    {loading && <p className="tangle-lines__muted" role="status">Loading lines…</p>}
+    {loading && <p className="tangle-lines__loading" role="status">Loading lines…</p>}
 
     {snapshot && <>
       <div className="tangle-lines__list">
         {snapshot.lines.filter(line => line.status !== 'released').length === 0 &&
           <div className="tangle-lines__empty"><strong>No lines connected</strong><p>{canManage && showConnectionSetup
-            ? 'Connect an owned identity below to let this workspace answer messages.'
-            : 'There are no connected lines in this workspace.'}</p></div>}
+            ? 'Connected lines will appear here with their response status.'
+            : 'This workspace cannot answer messages through a line yet.'}</p></div>}
         {snapshot.lines.filter(line => line.status !== 'released').map(line =>
           <div className="tangle-lines__row" key={line.id}>
             <div className="tangle-lines__row-main">
@@ -261,18 +263,27 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
           </div>)}
       </div>
 
-      {canManage && showConnectionSetup && (snapshot.connections === null || choices.length > 0 || allChoices.length === 0) && <div className="tangle-lines__setup">
-        <span className="tangle-lines__overline">New line</span>
-        <h3>Connect an identity you own</h3>
-        <p>Choose an identity already connected in Hub. Billing details appear below.</p>
+      {canManage && showConnectionSetup && !refreshFailed && <div className={canConfigure ? 'tangle-lines__setup' : 'tangle-lines__setup tangle-lines__setup--recovery'}>
+        {canConfigure && <>
+          <span className="tangle-lines__overline">New line</span>
+          <h3>Connect an identity you own</h3>
+          <p>Choose an identity connected in Hub and a conversation. Billing details appear below.</p>
+        </>}
         {snapshot.connections === null ? <div className="tangle-lines__error" role="status">
-          <span>Hub connections could not be read. Check Hub access and try again.</span>
-          <button type="button" disabled={loading} onClick={retry}>Retry</button>
+          <div><strong>Hub connections are unavailable</strong><p>Check Hub access, then try again.</p></div>
+          <button className="tangle-lines__retry" type="button" aria-label="Retry loading Hub connections" disabled={loading} onClick={retry}>Retry</button>
         </div>
-          : availableKinds.length === 0 ? <p className="tangle-lines__empty">
-            Connect an owned handle, number, or mailbox in Hub, then <button type="button" disabled={loading} onClick={retry}>reload</button>.
-          </p>
-            : <>
+          : snapshot.targets.length === 0 ? <div className="tangle-lines__recovery" role="status">
+            <div><strong>No conversation is available</strong><p>Create a conversation for this workspace before connecting a line.</p></div>
+          </div>
+            : allChoices.length === 0 ? <div className="tangle-lines__recovery" role="status">
+              <div><strong>No owned identities are connected</strong><p>Connect a mailbox or number in Hub, then check again.</p></div>
+              <button className="tangle-lines__action-button" type="button" aria-label="Check Hub for connected identities" disabled={loading} onClick={retry}>Check Hub</button>
+            </div>
+              : choices.length === 0 ? <div className="tangle-lines__recovery" role="status">
+                <div><strong>Connected identities are already in use</strong><p>Disconnect a line before using another identity for the same channel.</p></div>
+              </div>
+                : <>
               <div className="tangle-lines__kinds" role="group" aria-label="Identity type">
                 {availableKinds.map(value => <button key={value} type="button" aria-pressed={selectedKind === value} onClick={() => { setKind(value); setChoiceKey(''); setPhoneNumberId('') }}>{IDENTITY[value]}</button>)}
               </div>
