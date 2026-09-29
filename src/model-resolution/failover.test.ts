@@ -30,6 +30,9 @@ const REAL_SUCCESS_PAYLOAD = {
   usage: { inputTokens: 1151, outputTokens: 16 },
 }
 
+const OPENCODE_QUOTA_MESSAGE =
+  'opencode execution failed: No provider served model "claude-fable-5" (provider_quota_exhausted)... (exit code 1)'
+
 describe('isUpstreamUnavailable — classifies the real outage shapes', () => {
   it('detects the resolved (non-thrown) sandbox outage payload', () => {
     expect(isUpstreamUnavailable(REAL_OUTAGE_PAYLOAD)).toBe(true)
@@ -63,6 +66,11 @@ describe('isUpstreamUnavailable — classifies the real outage shapes', () => {
     ).toBe(true)
   })
 
+  it('classifies the exact OpenCode quota message and structured quota code', () => {
+    expect(isUpstreamUnavailable({ message: OPENCODE_QUOTA_MESSAGE })).toBe(true)
+    expect(isUpstreamUnavailable({ error: { code: 'provider_quota_exhausted' } })).toBe(true)
+  })
+
   it('detects a bare HTTP 502 status', () => {
     expect(isUpstreamUnavailable({ status: 502 })).toBe(true)
   })
@@ -70,6 +78,7 @@ describe('isUpstreamUnavailable — classifies the real outage shapes', () => {
   it('does NOT treat a bad request or auth failure as an outage', () => {
     expect(isUpstreamUnavailable({ status: 400, message: 'invalid schema' })).toBe(false)
     expect(isUpstreamUnavailable({ status: 401, message: 'unauthorized' })).toBe(false)
+    expect(isUpstreamUnavailable({ status: 409, message: 'ordinary conflict' })).toBe(false)
   })
 
   it('ignores non-objects', () => {
@@ -110,11 +119,21 @@ describe('runWithModelFailover', () => {
     expect(result.value).toEqual(REAL_SUCCESS_PAYLOAD)
     expect(result.usedFallback).toBe(true)
     expect(result.attempts).toEqual([
-      { model: 'claude-sonnet-4-6', ok: false, reason: REAL_OUTAGE_PAYLOAD.error },
+      {
+        model: 'claude-sonnet-4-6',
+        ok: false,
+        reason: REAL_OUTAGE_PAYLOAD.error,
+        errorCode: 'provider_inference_unavailable',
+      },
       { model: 'gpt-5-mini', ok: true },
     ])
     expect(onFallback).toHaveBeenCalledWith(
-      { model: 'claude-sonnet-4-6', ok: false, reason: REAL_OUTAGE_PAYLOAD.error },
+      {
+        model: 'claude-sonnet-4-6',
+        ok: false,
+        reason: REAL_OUTAGE_PAYLOAD.error,
+        errorCode: 'provider_inference_unavailable',
+      },
       'gpt-5-mini',
     )
   })
@@ -160,6 +179,38 @@ describe('runWithModelFailover', () => {
       runWithModelFailover({ models: ['claude-sonnet-4-6', 'claude-opus-4-8'], run }),
     ).rejects.toBeInstanceOf(ModelFailoverExhaustedError)
     expect(run).toHaveBeenCalledTimes(2)
+  })
+
+  it('preserves a message-only quota code through an exhausted chain', async () => {
+    const error = await runWithModelFailover({
+      models: ['claude-fable-5', 'glm-5.3'],
+      run: async () => ({ success: false, message: OPENCODE_QUOTA_MESSAGE }),
+    }).catch((failure: unknown) => failure)
+
+    expect(error).toBeInstanceOf(ModelFailoverExhaustedError)
+    expect(error).toMatchObject({
+      upstreamCode: 'provider_quota_exhausted',
+      attempts: [
+        { model: 'claude-fable-5', errorCode: 'provider_quota_exhausted' },
+        { model: 'glm-5.3', errorCode: 'provider_quota_exhausted' },
+      ],
+    })
+  })
+
+  it('preserves the structured quota code through an exhausted chain', async () => {
+    const error = await runWithModelFailover({
+      models: ['claude-fable-5', 'glm-5.3'],
+      run: async () => ({ success: false, error: { code: 'provider_quota_exhausted' } }),
+    }).catch((failure: unknown) => failure)
+
+    expect(error).toBeInstanceOf(ModelFailoverExhaustedError)
+    expect(error).toMatchObject({
+      upstreamCode: 'provider_quota_exhausted',
+      attempts: [
+        { model: 'claude-fable-5', errorCode: 'provider_quota_exhausted' },
+        { model: 'glm-5.3', errorCode: 'provider_quota_exhausted' },
+      ],
+    })
   })
 
   it('requires at least one model', async () => {

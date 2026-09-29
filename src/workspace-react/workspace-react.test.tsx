@@ -65,6 +65,55 @@ describe('AgentWorkspaceLayout', () => {
     expect(screen.getByText('History').parentElement?.parentElement?.className).toContain('bg-[var(--accent-surface-strong)]')
   })
 
+  it('adds any number of registered apps and follows live row updates', () => {
+    const apps = {
+      icon: HistoryIcon,
+      items: [
+        { id: 'alpha', name: 'Alpha' },
+        { id: 'beta', name: 'Beta' },
+      ],
+      hrefForApp: (id: string) => '/app/ws_1/apps/' + id,
+    }
+    const activeRoute = {
+      pathname: '/app/ws_1/apps/beta',
+      base: '/app/ws_1',
+      routes: [{ id: 'new', path: '/chat/new' }],
+    }
+    const { rerender } = renderWorkspace({ apps, activeRoute })
+
+    expect(screen.getByRole('link', { name: 'Alpha' }).getAttribute('href')).toBe('/app/ws_1/apps/alpha')
+    expect(screen.getByRole('link', { name: 'Beta' }).className).toContain('bg-[var(--accent-surface-strong)]')
+
+    rerender(
+      <AgentWorkspaceLayout
+        navItems={[{ id: 'new', label: 'New', icon: HistoryIcon, href: '/app/ws_1/chat/new' }]}
+        sessions={config()}
+        apps={{ ...apps, items: [{ id: 'alpha', name: 'Alpha 2' }, { id: 'gamma', name: 'Gamma' }] }}
+        activeRoute={{ ...activeRoute, pathname: '/app/ws_1/apps/gamma' }}
+      >
+        <div>content</div>
+      </AgentWorkspaceLayout>,
+    )
+    expect(screen.queryByRole('link', { name: 'Beta' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Alpha 2' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Gamma' }).className).toContain('bg-[var(--accent-surface-strong)]')
+  })
+
+  it('rejects app hrefs outside the workspace route', () => {
+    expect(() => renderWorkspace({
+      apps: {
+        icon: HistoryIcon,
+        items: [{ id: 'alpha', name: 'Alpha' }],
+        hrefForApp: () => '/another-workspace/apps/alpha',
+      },
+      activeRoute: {
+        pathname: '/app/ws_1/apps/alpha',
+        base: '/app/ws_1',
+        routes: [],
+      },
+    })).toThrow('under the active workspace')
+  })
+
   it('does not invent a History route when the product gives an unrelated URL', () => {
     renderWorkspace({
       sessions: config({ href: '/history' }),

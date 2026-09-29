@@ -53,6 +53,7 @@
 import {
   isUpstreamUnavailable,
   ModelFailoverExhaustedError,
+  readUpstreamUnavailableCode,
   readHttpStatusHint,
   runWithModelFailover,
   type ModelFailoverAttempt,
@@ -213,7 +214,13 @@ export function classifyTerminalFailure(event: unknown): TerminalFailure | null 
     asString(data?.reason) ??
     asString(record.message) ??
     `sandbox stream reported ${type}`
-  const code = asString(data?.errorCode) ?? asString(data?.code)
+  const code =
+    readUpstreamUnavailableCode(data) ??
+    asString(data?.errorCode) ??
+    asString(data?.code) ??
+    readUpstreamUnavailableCode(record) ??
+    asString(record.errorCode) ??
+    asString(record.code)
   return { outage, reason, ...(code ? { code } : {}) }
 }
 

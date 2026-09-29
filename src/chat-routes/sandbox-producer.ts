@@ -42,7 +42,11 @@ import {
   type JsonRecord,
   type StreamEvent,
 } from '../stream/index'
-import { buildModelChain, type ModelFailoverAttempt } from '../model-resolution/failover'
+import {
+  buildModelChain,
+  ModelFailoverExhaustedError,
+  type ModelFailoverAttempt,
+} from '../model-resolution/failover'
 import {
   ModelFailoverTimeoutError,
   resolveEmptyTurnRetries,
@@ -184,6 +188,10 @@ export interface SandboxChatProducerOptions {
    *  outcomes; the promotion mechanics (vault write, key derivation, notice
    *  construction) live in the caller's callback, not here. */
   promoteFilePart?: (raw: JsonRecord) => Promise<FilePartPromotionOutcome>
+  /** Append terminal error explanations to assistant text. Default true.
+   * Set false when the application renders the structured error separately.
+   * Error events, diagnostics, partial answers and tool settlement remain available. */
+  includeErrorText?: boolean
   log?: (message: string, meta?: Record<string, unknown>) => void
 }
 
@@ -329,9 +337,12 @@ function sandboxStreamFailureDiagnostic(error: unknown): {
   const failureNote = diagnosticText
     ? `sandbox-stream: ${message}; ${diagnosticText}`
     : `sandbox-stream: ${message}`
-  const code = error instanceof ModelFailoverTimeoutError
-    ? error.code
-    : 'sandbox.stream_failed'
+  let code = 'sandbox.stream_failed'
+  if (error instanceof ModelFailoverTimeoutError) {
+    code = error.code
+  } else if (error instanceof ModelFailoverExhaustedError) {
+    code = error.upstreamCode ?? code
+  }
   return { userMessage, failureNote, code }
 }
 
@@ -804,10 +815,12 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           const errorContent = fullText.trim()
             ? `The sandbox model stream stopped before a clean completion.\n\nError: ${message}`
             : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`
-          const errorDelta = fullText ? `\n\n---\n${errorContent}` : errorContent
-          fullText += errorDelta
+          if (options.includeErrorText !== false) {
+            const errorDelta = fullText ? `\n\n---\n${errorContent}` : errorContent
+            fullText += errorDelta
+            yield { type: 'text', text: errorDelta }
+          }
           interactionOutcome = 'expired'
-          yield { type: 'text', text: errorDelta }
           yield* emitTerminalizedTools()
           yield toProducerWireEvent(record)
           continue
@@ -826,12 +839,14 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         failureNote: diagnostic.failureNote,
         error: streamErr instanceof Error ? streamErr.message : String(streamErr),
       })
-      const errorDelta = fullText
-        ? `\n\n---\n${diagnostic.userMessage}`
-        : diagnostic.userMessage
-      fullText += errorDelta
+      if (options.includeErrorText !== false) {
+        const errorDelta = fullText
+          ? `\n\n---\n${diagnostic.userMessage}`
+          : diagnostic.userMessage
+        fullText += errorDelta
+        yield { type: 'text', text: errorDelta }
+      }
       interactionOutcome = 'expired'
-      yield { type: 'text', text: errorDelta }
       yield* emitTerminalizedTools()
       yield {
         type: 'error',

@@ -1,6 +1,8 @@
 import { SidebarLayout, type SidebarLayoutNavItem, type SidebarLayoutProps } from '@tangle-network/sandbox-ui/dashboard'
 import type { ReactNode } from 'react'
 
+import type { WorkspaceAppRecord } from '../workspace-apps'
+
 import {
   buildSessionNavItem,
   composeSidebarSessions,
@@ -63,6 +65,18 @@ export interface AgentWorkspaceSessionConfig {
   defaultOpen?: boolean
 }
 
+/**
+ * Registered apps shown as individual workspace destinations.
+ * Products supply authorized rows and their real route; preview URLs never
+ * become navigation hrefs.
+ */
+export interface AgentWorkspaceAppsConfig {
+  icon: WorkspaceIcon
+  items: readonly Pick<WorkspaceAppRecord, 'id' | 'name'>[]
+  hrefForApp: (appId: string) => string
+  prefetch?: RailPrefetch
+}
+
 /** Route data for the shared active-nav resolver. */
 export interface AgentWorkspaceActiveRoute {
   /** Current browser pathname, including the product's workspace base. */
@@ -84,6 +98,8 @@ export interface AgentWorkspaceLayoutProps
   navItems: SidebarLayoutNavItem[]
   /** Omit for a workflow-only shell with no conversational session rail. */
   sessions?: AgentWorkspaceSessionConfig
+  /** Registered app destinations, in the product's persisted order. */
+  apps?: AgentWorkspaceAppsConfig
   /** When supplied, active navigation is resolved by the shared route rules. */
   activeRoute?: AgentWorkspaceActiveRoute
   /** Escape hatch for routers that already resolved the active item. */
@@ -109,6 +125,7 @@ export function AgentWorkspaceLayout({
   children,
   navItems,
   sessions,
+  apps,
   activeRoute,
   activeId,
   ...sidebarProps
@@ -146,9 +163,32 @@ export function AgentWorkspaceLayout({
       })()
     : undefined
 
-  const workspaceNavItems: SidebarLayoutNavItem[] = sessionNav
-    ? [...navItems, sessionNav]
-    : navItems
+  const appNavItems: SidebarLayoutNavItem[] = (apps?.items ?? []).map((app) => {
+    const href = apps!.hrefForApp(app.id)
+    if (!href.startsWith('/') || href.startsWith('//') || /[?#\\]/.test(href)) {
+      throw new Error('Workspace app href must be a local route path')
+    }
+    return {
+      id: 'workspace-app:' + app.id,
+      label: app.name,
+      icon: apps!.icon,
+      href,
+      prefetch: apps!.prefetch,
+    }
+  })
+  const workspaceNavItems: SidebarLayoutNavItem[] = [
+    ...navItems,
+    ...appNavItems,
+    ...(sessionNav ? [sessionNav] : []),
+  ]
+
+  const appRoutes: NavRouteDef[] = activeRoute
+    ? appNavItems.map((item) => {
+        const path = routePathFromHref(item.href!, activeRoute.base)
+        if (!path) throw new Error('Workspace app href must be under the active workspace')
+        return { id: item.id, path }
+      })
+    : []
 
   const historyRoutePath = sessions && activeRoute
     ? routePathFromHref(sessions.href, activeRoute.base)
@@ -157,15 +197,13 @@ export function AgentWorkspaceLayout({
   const resolvedActiveId = activeRoute
     ? resolveActiveNavId({
         ...activeRoute,
-        routes: sessionNav && historyRoutePath
-          ? [
-              ...activeRoute.routes,
-              {
-                id: sessions?.id ?? 'history',
-                path: historyRoutePath,
-              },
-            ]
-          : activeRoute.routes,
+        routes: [
+          ...activeRoute.routes,
+          ...appRoutes,
+          ...(sessionNav && historyRoutePath
+            ? [{ id: sessions?.id ?? 'history', path: historyRoutePath }]
+            : []),
+        ],
       })
     : activeId
 
