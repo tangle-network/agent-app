@@ -1424,7 +1424,7 @@
         {
           "name": "useChannel",
           "kind": "function",
-          "signature": "(lineId: string) => { run: (input: { action: VerificationAction; confirm?: boolean | undefined; }) => Promise<MutationO…",
+          "signature": "(lineId: string) => { state: MutationState<void>; run: (input: { action: VerificationAction; confirm?: boolean | undefi…",
           "doc": null
         },
         {
@@ -1460,19 +1460,19 @@
         {
           "name": "useConnectChannel",
           "kind": "function",
-          "signature": "(onConnected?: ((line: Line) => void) | undefined) => { run: (input: ConnectChannelInput) => Promise<MutationOutcome<Li…",
+          "signature": "(onConnected?: ((line: Line) => void) | undefined) => ConfirmedMutation<ConnectChannelInput, Line>",
           "doc": "Connect only acquires/binds a line."
         },
         {
           "name": "useLinePayment",
           "kind": "function",
-          "signature": "(lineId: string) => { available: boolean; run: (input: { consent: boolean; }) => Promise<MutationOutcome<string>>; stat…",
+          "signature": "(lineId: string) => { available: boolean; state: MutationState<string>; run: (input: { consent: boolean; }) => Promise<…",
           "doc": null
         },
         {
           "name": "useNumberChannel",
           "kind": "function",
-          "signature": "(transport: \"sms\" | \"imessage\") => { run: (input: { action: \"quote\"; } | { action: \"purchase\"; consent: boolean; } | {…",
+          "signature": "(transport: \"sms\" | \"imessage\") => { state: MutationState<void>; run: (input: { action: \"quote\"; } | { action: \"purchas…",
           "doc": "Hub owns prices, terms, idempotency, funding, and cancellation."
         },
         {
@@ -11267,7 +11267,7 @@
         {
           "name": "assessWorkspaceSandboxSnapshot",
           "kind": "function",
-          "signature": "(snapshot: WorkspaceSandboxSnapshot | undefined, sandboxId: string, now?: number) => WorkspaceSandboxSnapshotAssessment",
+          "signature": "<Snapshot extends WorkspaceSandboxSnapshot>(snapshot: Snapshot | undefined, sandboxId: string, now?: number) => Workspa…",
           "doc": "Judge a snapshot against the box being replaced."
         },
         {
@@ -11363,8 +11363,8 @@
         {
           "name": "createWorkspaceSandboxRecoveryManager",
           "kind": "function",
-          "signature": "(store: WorkspaceSandboxRecoveryStore) => WorkspaceSandboxRecoveryManager",
-          "doc": "Bind the recovery bookkeeping to an app's storage."
+          "signature": "<Snapshot extends WorkspaceSandboxSnapshot>(store: WorkspaceSandboxRecoveryStore<Snapshot>) => WorkspaceSandboxRecovery…",
+          "doc": "Bind canonical recovery policy to the application's existing storage."
         },
         {
           "name": "D1PrewarmClaimStoreOptions",
@@ -11561,7 +11561,7 @@
         {
           "name": "isWorkspaceSandboxRecoveryAction",
           "kind": "function",
-          "signature": "(value: unknown) => value is \"confirmation_required\" | \"deletion_declined\" | \"replacement_authorized\" | \"snapshot_repla…",
+          "signature": "(value: unknown) => value is \"replacement_completed\" | \"snapshot_replacement_completed\" | \"missing_replacement_complete…",
           "doc": null
         },
         {
@@ -11573,7 +11573,7 @@
         {
           "name": "isWorkspaceSandboxRecoveryState",
           "kind": "function",
-          "signature": "(value: unknown) => value is WorkspaceSandboxRecoveryState",
+          "signature": "(value: unknown) => value is WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot>",
           "doc": null
         },
         {
@@ -11663,7 +11663,7 @@
         {
           "name": "preferredWorkspaceSandboxRecoveryBoxKey",
           "kind": "function",
-          "signature": "(recovery: WorkspaceSandboxRecoveryState | undefined) => string | undefined",
+          "signature": "(recovery: WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot> | undefined) => string | undefined",
           "doc": "The box key the next provisioning attempt should use, or undefined to keep using the workspace's own key."
         },
         {
@@ -12119,7 +12119,7 @@
         {
           "name": "shouldRestoreWorkspaceSandboxRecovery",
           "kind": "function",
-          "signature": "(recovery: WorkspaceSandboxRecoveryState | undefined) => boolean",
+          "signature": "(recovery: WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot> | undefined) => boolean",
           "doc": "Whether the replacement should be restored from the old box's snapshot."
         },
         {
@@ -12209,7 +12209,7 @@
         {
           "name": "WORKSPACE_SANDBOX_RECOVERY_ACTIONS",
           "kind": "const",
-          "signature": "readonly (\"confirmation_required\" | \"deletion_declined\" | \"replacement_authorized\" | \"snapshot_replacement_authorized\"…",
+          "signature": "readonly (\"replacement_completed\" | \"snapshot_replacement_completed\" | \"missing_replacement_completed\" | \"unrecoverable…",
           "doc": "Every declared action, for exhaustiveness tests in apps and here."
         },
         {
@@ -12275,13 +12275,13 @@
         {
           "name": "workspaceSandboxRecoveryDiagnostic",
           "kind": "function",
-          "signature": "(recovery: WorkspaceSandboxRecoveryState) => Record<string, string | undefined>",
+          "signature": "(recovery: WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot>) => Record<string, string | undefined>",
           "doc": "Flat key/value shape for a log line — no nesting, no secrets."
         },
         {
           "name": "workspaceSandboxRecoveryFromError",
           "kind": "function",
-          "signature": "(error: unknown) => WorkspaceSandboxRecoveryState | undefined",
+          "signature": "(error: unknown) => WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot> | undefined",
           "doc": null
         },
         {
@@ -12293,13 +12293,13 @@
         {
           "name": "workspaceSandboxRecoveryMessage",
           "kind": "function",
-          "signature": "(recovery: WorkspaceSandboxRecoveryState) => string",
+          "signature": "(recovery: WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot>) => string",
           "doc": "What to tell the person waiting."
         },
         {
           "name": "workspaceSandboxRecoveryRecommendedActions",
           "kind": "function",
-          "signature": "(recovery: WorkspaceSandboxRecoveryState) => string[]",
+          "signature": "(recovery: WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot>) => string[]",
           "doc": null
         },
         {
@@ -12318,7 +12318,7 @@
           "name": "WorkspaceSandboxRecoveryStore",
           "kind": "interface",
           "signature": "interface WorkspaceSandboxRecoveryStore",
-          "doc": "Where an app keeps recovery state."
+          "doc": "One current recovery per workspace, stored by the application."
         },
         {
           "name": "WorkspaceSandboxSnapshot",
@@ -21466,7 +21466,7 @@
         {
           "name": "useConfirmedMutation",
           "kind": "function",
-          "signature": "<TInput, TValue>({ mutate, onSucceeded, onFailed, errorMessage, }: UseConfirmedMutationOptions<TInput, TValue>) => Conf…",
+          "signature": "<TInput, TValue>({ mutate, onSucceeded, onFailed, errorMessage, concurrency, }: UseConfirmedMutationOptions<TInput, TVa…",
           "doc": "`idle | pending | succeeded | failed` over a write that must confirm itself."
         },
         {

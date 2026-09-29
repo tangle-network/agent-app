@@ -283,7 +283,7 @@ type LineTransport
 `function`
 
 ```ts
-(lineId: string) => { run: (input: { action: VerificationAction; confirm?: boolean | undefined; }) => Promise<MutationO…
+(lineId: string) => { state: MutationState<void>; run: (input: { action: VerificationAction; confirm?: boolean | undefi…
 ```
 
 ### `useChannelConnections`
@@ -331,7 +331,7 @@ type LineTransport
 `function` — Connect only acquires/binds a line.
 
 ```ts
-(onConnected?: ((line: Line) => void) | undefined) => { run: (input: ConnectChannelInput) => Promise<MutationOutcome<Li…
+(onConnected?: ((line: Line) => void) | undefined) => ConfirmedMutation<ConnectChannelInput, Line>
 ```
 
 ### `useLinePayment`
@@ -339,7 +339,7 @@ type LineTransport
 `function`
 
 ```ts
-(lineId: string) => { available: boolean; run: (input: { consent: boolean; }) => Promise<MutationOutcome<string>>; stat…
+(lineId: string) => { available: boolean; state: MutationState<string>; run: (input: { consent: boolean; }) => Promise<…
 ```
 
 ### `useNumberChannel`
@@ -347,7 +347,7 @@ type LineTransport
 `function` — Hub owns prices, terms, idempotency, funding, and cancellation.
 
 ```ts
-(transport: "sms" | "imessage") => { run: (input: { action: "quote"; } | { action: "purchase"; consent: boolean; } | {…
+(transport: "sms" | "imessage") => { state: MutationState<void>; run: (input: { action: "quote"; } | { action: "purchas…
 ```
 
 ### `useWhatsAppNumbers`
