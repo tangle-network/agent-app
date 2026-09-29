@@ -68,6 +68,9 @@ export function Workspace({ data, pathname, base, activeSessionId }) {
 }
 ```
 
+To show agent-built applications in the rail, pass authorized records through the optional `apps` prop.
+See [workspace apps](./workspace-apps.md) for the publish and preview flow.
+
 Pair the layout with `EntryComposer` from
 `@tangle-network/agent-app/chat-react` on the new-session route and
 `SessionHistoryPanel` from `@tangle-network/agent-app/web-react` on the full

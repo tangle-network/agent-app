@@ -22268,10 +22268,73 @@
       ]
     },
     {
+      "id": "./workspace-apps",
+      "source": "src/workspace-apps/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "confirmWorkspaceAppReady",
+          "kind": "function",
+          "signature": "(app: WorkspaceAppRecord, proof: WorkspaceAppHttpProof) => WorkspaceAppRecord",
+          "doc": "Mark an app ready only after the host fetched its HTML over the trusted preview URL."
+        },
+        {
+          "name": "refreshWorkspaceAppPreview",
+          "kind": "function",
+          "signature": "(app: WorkspaceAppRecord, link: WorkspaceAppPreviewLink, updatedAt?: string) => WorkspaceAppRecord",
+          "doc": "Refresh delivery state without changing which sandbox service this app means."
+        },
+        {
+          "name": "workspaceAppBuilderInstructions",
+          "kind": "function",
+          "signature": "({ publishTool, listTool, }: WorkspaceAppBuilderInstructionsOptions) => string[]",
+          "doc": "Portable instructions for an agent profile that builds workspace apps."
+        },
+        {
+          "name": "WorkspaceAppBuilderInstructionsOptions",
+          "kind": "interface",
+          "signature": "interface WorkspaceAppBuilderInstructionsOptions",
+          "doc": null
+        },
+        {
+          "name": "workspaceAppFromPreviewLink",
+          "kind": "function",
+          "signature": "(identity: WorkspaceAppIdentity, link: WorkspaceAppPreviewLink) => WorkspaceAppRecord",
+          "doc": "Build a durable registration from a preview link created on the box that the authenticated product request resolved."
+        },
+        {
+          "name": "WorkspaceAppHttpProof",
+          "kind": "interface",
+          "signature": "interface WorkspaceAppHttpProof",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceAppIdentity",
+          "kind": "interface",
+          "signature": "interface WorkspaceAppIdentity",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceAppPreviewLink",
+          "kind": "interface",
+          "signature": "interface WorkspaceAppPreviewLink",
+          "doc": "Structural shape returned by the Sandbox SDK previewLinks API."
+        },
+        {
+          "name": "WorkspaceAppRecord",
+          "kind": "interface",
+          "signature": "interface WorkspaceAppRecord",
+          "doc": "A sandbox app registered in one product workspace."
+        }
+      ]
+    },
+    {
       "id": "./workspace-react",
       "source": "src/workspace-react/index.tsx",
       "dependsOn": [
-        "session-shell"
+        "session-shell",
+        "workspace-apps"
       ],
       "error": null,
       "exports": [
@@ -22282,9 +22345,15 @@
           "doc": "Route data for the shared active-nav resolver."
         },
         {
+          "name": "AgentWorkspaceAppsConfig",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceAppsConfig",
+          "doc": "Registered apps shown as individual workspace destinations."
+        },
+        {
           "name": "AgentWorkspaceLayout",
           "kind": "function",
-          "signature": "({ children, navItems, sessions, activeRoute, activeId, ...sidebarProps }: AgentWorkspaceLayoutProps) => Element",
+          "signature": "({ children, navItems, sessions, apps, activeRoute, activeId, ...sidebarProps }: AgentWorkspaceLayoutProps) => Element",
           "doc": "The default agent workspace composition."
         },
         {
