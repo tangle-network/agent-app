@@ -1,0 +1,27 @@
+1
+00:00:00,000 --> 00:00:00,880
+Empty workspace · connection requires sender and consent
+
+2
+00:00:00,880 --> 00:00:01,180
+Sender and daily limit authorized
+
+3
+00:00:01,180 --> 00:00:01,800
+Line saved · answering state shown
+
+4
+00:00:01,800 --> 00:00:02,450
+Reload retained the line and target
+
+5
+00:00:02,450 --> 00:00:02,810
+New grants disabled · existing disconnect remains
+
+6
+00:00:02,810 --> 00:00:03,450
+Keyboard disconnect · empty state restored
+
+7
+00:00:03,450 --> 00:00:03,660
+Reload retained the disconnection
