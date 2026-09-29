@@ -155,7 +155,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('3.0.0', range!)).toBe(false)
   })
 
-  it('supports the published Runtime 0.282 and 0.283 lines', async () => {
+  it('supports the published Runtime 0.282, 0.283, and 0.285 lines', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -171,6 +171,10 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.283.0', range!)).toBe(true)
     expect(satisfiesRange('0.283.999', range!)).toBe(true)
     expect(satisfiesRange('0.284.0', range!)).toBe(false)
+    expect(satisfiesRange('0.284.999', range!)).toBe(false)
+    expect(satisfiesRange('0.285.0', range!)).toBe(true)
+    expect(satisfiesRange('0.285.999', range!)).toBe(true)
+    expect(satisfiesRange('0.286.0', range!)).toBe(false)
   })
 
   it('admits the tested Integrations lines without admitting 0.58', async () => {
@@ -201,8 +205,8 @@ describe('this package audits itself', () => {
   // also installs Runtime or Knowledge needs their peer contracts corrected.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
     ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.1', '0.199.999', '0.200.0', '0.200.1', '0.200.999'], ['0.201.0']],
-    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999', '0.54.0', '0.55.2'], ['0.56.0']],
-    ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0'], ['3.0.0']],
+    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999', '0.54.0', '0.55.2', '0.58.1', '0.58.999'], ['0.56.0', '0.57.0', '0.58.0', '0.59.0']],
+    ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0', '2.14.0'], ['3.0.0']],
   ]
 
   it.each(verifiedWindows)('keeps the %s peer on the verified window', async (name, below, admitted, above) => {
@@ -218,21 +222,25 @@ describe('this package audits itself', () => {
     for (const version of above) expect(satisfiesRange(version, range!)).toBe(false)
   })
 
-  // The generated default installs Runtime. Check the shared peer overlap that
-  // it can install today; Eval-only consumers may use the wider Eval window.
-  it.each(verifiedWindows)('retains a %s window the installed Runtime admits', async (name, _below, admitted) => {
+  // Supported Runtime cohorts have different Interface floors. Check the exact
+  // development cohort against the installed Runtime, not every older option.
+  it.each(verifiedWindows)('installs a %s version the installed Runtime admits', async (name) => {
     const root = join(here, '..', '..')
+    const own = JSON.parse(
+      await readFile(join(root, 'package.json'), 'utf8'),
+    ) as { devDependencies?: Record<string, string>; peerDependencies?: Record<string, string> }
     const runtime = JSON.parse(
       await readFile(join(root, 'node_modules', '@tangle-network', 'agent-runtime', 'package.json'), 'utf8'),
     ) as { version: string; peerDependencies?: Record<string, string> }
-    const range = runtime.peerDependencies?.[name]
+    const installed = own.devDependencies?.[name]
+    const ownRange = own.peerDependencies?.[name]
+    const runtimeRange = runtime.peerDependencies?.[name]
 
-    expect(range, `Runtime ${runtime.version} declares no ${name} peer`).toBeDefined()
-    const sharedAdmitted = name === '@tangle-network/agent-eval'
-      ? admitted.filter((version) => version.startsWith('0.199.'))
-      : admitted
-    expect(sharedAdmitted.length).toBeGreaterThan(0)
-    for (const version of sharedAdmitted) expect(satisfiesRange(version, range!), `${version} vs ${range}`).toBe(true)
+    expect(installed).toBeDefined()
+    expect(ownRange).toBeDefined()
+    expect(runtimeRange, `Runtime ${runtime.version} declares no ${name} peer`).toBeDefined()
+    expect(satisfiesRange(installed!, ownRange!), `${installed} vs ${ownRange}`).toBe(true)
+    expect(satisfiesRange(installed!, runtimeRange!), `${installed} vs ${runtimeRange}`).toBe(true)
   })
 
   // The floors this shell PUBLISHES must be satisfiable by the tree it is
