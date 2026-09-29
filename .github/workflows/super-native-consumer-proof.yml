@@ -36,15 +36,15 @@ jobs:
           JS
           npm install --ignore-scripts --strict-peer-deps --no-audit --no-fund > proof/install.log 2>&1 || { tail -120 proof/install.log; exit 1; }
           npm ls --all --json > proof/dependency-tree.json
+          cp package.json package-lock.json proof/
           node --input-type=module - <<'JS'
           import {writeFileSync} from 'node:fs';
           const [core,kit,interactions]=await Promise.all([import('@tangle-network/sandbox/core'),import('@tangle-network/agent-app/hosted-agent'),import('@tangle-network/agent-app/interactions')]);
           for(const [name,value] of Object.entries({Sandbox:core.Sandbox,lineInstanceKey:core.lineInstanceKey,createTangleAgent:kit.createTangleAgent,buildGeneralAgentProfile:kit.buildGeneralAgentProfile,parseInteractionRequest:interactions.parseInteractionRequest}))if(typeof value!=='function')throw Error('Missing installed export '+name);
-          const client=new core.Sandbox({apiKey:'offline-import-probe-not-a-real-key'});
+          const client=new core.Sandbox({apiKey:'offline-import-probe-not-a-real-key',baseUrl:'https://sandbox.tangle.tools'});
           const methods=Object.getOwnPropertyNames(Object.getPrototypeOf(client.lines));
           writeFileSync('proof/imports.json',JSON.stringify({loaded:true,linesMethods:methods,liveRequestPerformed:false},null,2));
           JS
-          cp package.json package-lock.json proof/
           tar -czf proof/node_modules.tar.gz node_modules
       - uses: actions/upload-artifact@v4
         if: always()
