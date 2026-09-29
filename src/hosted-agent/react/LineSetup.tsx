@@ -159,6 +159,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
   const reconnecting = Boolean(reconnectChoice && selected && occupiedLine &&
     matchesLineIdentity(occupiedLine, selected.identity, enteredNumber))
   const blockedByExistingLine = Boolean(occupied?.length && !reconnecting)
+  const answeringCount = snapshot?.lines.filter(line => line.answering).length ?? 0
 
   async function connect() {
     if (!canManage || !canConnect || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine || busy || loading || refreshFailed) return
@@ -224,7 +225,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
         <h2 ref={heading} tabIndex={-1}>Lines</h2>
         {snapshot && <p>{snapshot.workspaceName} can use one line per transport.</p>}
       </div>
-      {snapshot && <span className="tangle-lines__count">{snapshot.lines.filter(line => line.answering).length} answering</span>}
+      {answeringCount > 1 && <span className="tangle-lines__count">{answeringCount} answering</span>}
     </header>
 
     {error && <div className="tangle-lines__error" role="alert">

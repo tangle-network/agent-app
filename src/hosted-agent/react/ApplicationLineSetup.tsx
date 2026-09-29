@@ -45,7 +45,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
         <p>Continue a conversation from a number or mailbox you own. The agent keeps the same context and saved work.</p>
       </header>
       {!enabled ? <div className="tangle-lines__notice" role="status">
-        <strong>New connections are off</strong>
+        <strong>New connections are disabled</strong>
         <p>You can still review and disconnect an existing line below.</p>
       </div> : <div className="tangle-lines__authorization">
         <div className="tangle-lines__authorization-heading">

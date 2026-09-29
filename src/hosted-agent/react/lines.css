@@ -97,6 +97,7 @@
 .tangle-lines__fields fieldset input { accent-color: var(--tl-accent); margin: 0; }
 .tangle-lines__primary { background: var(--tl-accent); border: 1px solid var(--tl-accent); border-radius: .5rem; color: var(--tl-accent-foreground); font-size: .88rem; font-weight: 600; min-height: 2.55rem; padding: .55rem .85rem; }
 .tangle-lines__primary:hover:not(:disabled) { filter: brightness(.92); }
+.tangle-lines__primary:disabled { background: var(--tl-soft); border-color: var(--tl-border); color: var(--tl-muted); opacity: 1; }
 .tangle-lines__muted { color: var(--tl-muted); font-size: .88rem; padding: 1rem 0; }
 .tangle-lines__empty { color: var(--tl-muted); font-size: .88rem; padding: 1.5rem 1.25rem; }
 .tangle-lines__empty strong { color: var(--tl-text); display: block; font-size: .95rem; margin-bottom: .3rem; }
