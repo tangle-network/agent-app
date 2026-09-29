@@ -1028,6 +1028,54 @@ describe('createSandboxChatProducer', () => {
     expect(producer.finalText()).not.toContain('---')
   })
 
+  it.each(['raw', 'throw'] as const)('keeps partial answers and structured %s errors without diagnostic text', async (source) => {
+    const answer = 'Partial answer. The sandbox agent returned an error before producing a visible answer.\n\nError: quoted example'
+    const partial = [partUpdated({ type: 'text', id: 'partial', text: answer }, answer)]
+    const rawError = { type: 'error', data: { code: 'provider_quota_exhausted', message: 'provider quota exhausted' } }
+    const producer = createSandboxChatProducer({
+      includeErrorText: false,
+      events: source === 'raw'
+        ? feed([...partial, rawError])
+        : throwingFeed(partial, new Error('disconnected')),
+    })
+
+    const events = await drain(producer.stream)
+
+    expect(events.filter((event) => event.type === 'text')).toEqual([{ type: 'text', text: answer }])
+    expect(events.at(-1)).toMatchObject({ type: 'error' })
+    expect(producer.finalText()).toBe(answer)
+    expect(producer.assistantParts?.().filter((part) => part.type === 'text')).toEqual([
+      expect.objectContaining({ text: answer }),
+    ])
+  })
+
+  it('emits the normalized provider quota code after every configured model fails', async () => {
+    const opened: string[] = []
+    const quotaMessage =
+      'opencode execution failed: No provider served model "claude-fable-5" (provider_quota_exhausted)... (exit code 1)'
+    const producer = createSandboxChatProducer({
+      model: 'claude-fable-5',
+      fallbackModels: ['glm-5.3'],
+      openEvents: ({ model }) => {
+        opened.push(model)
+        return feed([{ type: 'error', data: { message: quotaMessage } }])
+      },
+      log: () => {},
+    })
+
+    const events = await drain(producer.stream)
+    const structuredError = events.at(-1) as {
+      type: string
+      data: { code: string }
+    }
+
+    expect(opened).toEqual(['claude-fable-5', 'glm-5.3'])
+    expect(structuredError).toMatchObject({
+      type: 'error',
+      data: { code: 'provider_quota_exhausted' },
+    })
+  })
+
   it('settles a dangling tool live and in persistence when a raw error arrives', async () => {
     const producer = createSandboxChatProducer({
       events: feed([

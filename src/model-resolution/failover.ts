@@ -32,6 +32,7 @@
  */
 export const UPSTREAM_UNAVAILABLE_CODES: readonly string[] = [
   'provider_inference_unavailable',
+  'provider_quota_exhausted',
   'upstream_unavailable',
   'insufficient_quota',
   'model_not_available',
@@ -143,6 +144,27 @@ function readString(source: Record<string, unknown>, key: string): string | unde
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined
 }
 
+/** Read a recognized upstream code, including the terminal message-only shape. */
+export function readUpstreamUnavailableCode(signal: unknown): string | undefined {
+  if (signal === null || typeof signal !== 'object') return undefined
+  const record = signal as Record<string, unknown>
+  const nested = record.error
+  const nestedRecord = nested !== null && typeof nested === 'object' ? (nested as Record<string, unknown>) : undefined
+  const code =
+    readString(record, 'errorCode') ??
+    readString(record, 'code') ??
+    (nestedRecord ? (readString(nestedRecord, 'code') ?? readString(nestedRecord, 'type')) : undefined)
+  if (code && UPSTREAM_UNAVAILABLE_CODES.includes(code)) return code
+
+  const message =
+    readString(record, 'message') ??
+    readString(record, 'error') ??
+    (nestedRecord ? readString(nestedRecord, 'message') : undefined)
+  return message && /\(\s*provider_quota_exhausted\s*\)/i.test(message)
+    ? 'provider_quota_exhausted'
+    : undefined
+}
+
 /**
  * True when `signal` — a thrown error OR a resolved result payload — indicates
  * the model's upstream is unavailable and another model is worth trying.
@@ -161,12 +183,7 @@ export function isUpstreamUnavailable(signal: unknown): boolean {
 
   const nested = record.error
   const nestedRecord = nested !== null && typeof nested === 'object' ? (nested as Record<string, unknown>) : undefined
-
-  const code =
-    readString(record, 'errorCode') ??
-    readString(record, 'code') ??
-    (nestedRecord ? (readString(nestedRecord, 'code') ?? readString(nestedRecord, 'type')) : undefined)
-  if (code && UPSTREAM_UNAVAILABLE_CODES.includes(code)) return true
+  if (readUpstreamUnavailableCode(record)) return true
 
   for (const key of ['status', 'statusCode', 'httpStatus']) {
     const value = record[key]
@@ -206,6 +223,8 @@ export interface ModelFailoverAttempt {
   ok: boolean
   /** Why this model was abandoned. Absent when `ok`. */
   reason?: string
+  /** Recognized upstream code carried by this failed attempt. */
+  errorCode?: string
 }
 
 /** The outcome of a failover run: the value plus the full attempt trail. */
@@ -221,11 +240,14 @@ export interface ModelFailoverResult<T> {
 /** Every model in the chain failed; carries the trail for logging. */
 export class ModelFailoverExhaustedError extends Error {
   readonly attempts: ModelFailoverAttempt[]
+  /** Last recognized upstream code across the exhausted chain, when present. */
+  readonly upstreamCode?: string
   constructor(attempts: ModelFailoverAttempt[]) {
     const trail = attempts.map((a) => `${a.model}: ${a.reason ?? 'failed'}`).join(' | ')
     super(`All ${attempts.length} model(s) failed. ${trail}`)
     this.name = 'ModelFailoverExhaustedError'
     this.attempts = attempts
+    this.upstreamCode = [...attempts].reverse().find((attempt) => attempt.errorCode)?.errorCode
   }
 }
 
@@ -284,7 +306,13 @@ export async function runWithModelFailover<T>(
       result = await input.run(model)
     } catch (error) {
       if (!isUnavailableError(error)) throw error
-      const attempt: ModelFailoverAttempt = { model, ok: false, reason: describe(error) }
+      const errorCode = readUpstreamUnavailableCode(error)
+      const attempt: ModelFailoverAttempt = {
+        model,
+        ok: false,
+        reason: describe(error),
+        ...(errorCode ? { errorCode } : {}),
+      }
       attempts.push(attempt)
       const next = models[index + 1]
       if (next) input.onFallback?.(attempt, next)
@@ -292,7 +320,13 @@ export async function runWithModelFailover<T>(
     }
 
     if (isUnavailableResult(result)) {
-      const attempt: ModelFailoverAttempt = { model, ok: false, reason: describe(result) }
+      const errorCode = readUpstreamUnavailableCode(result)
+      const attempt: ModelFailoverAttempt = {
+        model,
+        ok: false,
+        reason: describe(result),
+        ...(errorCode ? { errorCode } : {}),
+      }
       attempts.push(attempt)
       const next = models[index + 1]
       if (next) input.onFallback?.(attempt, next)
