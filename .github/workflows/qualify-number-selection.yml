@@ -23,9 +23,9 @@ jobs:
         with:
           node-version: '24'
       - uses: pnpm/action-setup@v4
-      - name: Apply the reviewed additive API correction
-        shell: bash
+      - name: Apply reviewed source corrections
         run: |
+          mkdir -p /tmp/hosted-line-proof
           python3 - <<'PY'
           from pathlib import Path
           p=Path('src/hosted-agent/index.ts'); s=p.read_text()
@@ -47,23 +47,21 @@ jobs:
             if s.count(old)!=1: raise SystemExit('Changed preimage: '+old)
             s=s.replace(old,new)
           p.write_text(s)
-          p=Path('CHANGELOG.md');s=p.read_text();heading='## Unreleased'
-          if heading not in s: raise SystemExit('Missing Unreleased changelog heading')
-          s=s.replace(heading, heading+'\n\n### Fixed\n\n- Preserve an explicitly selected provider number when attaching an iMessage line through either hosted-agent API. WhatsApp still requires a number; email rejects one. Existing attachments continue to verify their pinned provider identity. No provider client, automatic migration, or number purchase is added.',1);p.write_text(s)
+          p=Path('CHANGELOG.md');s=p.read_text();heading='# Changelog\n'
+          if not s.startswith(heading): raise SystemExit('Changed changelog format')
+          s=s.replace(heading, heading+'\n## Unreleased\n\n- fix(hosted-agent): preserve an explicitly selected iMessage provider number in both attachment APIs. WhatsApp still requires a number; email rejects one. Existing lines retain exact provider identity.\n',1);p.write_text(s)
           PY
-      - name: Real install, generated docs, typecheck and build
+      - name: Install, generate docs, typecheck and build
         run: |
           set -euo pipefail
-          mkdir -p /tmp/hosted-line-proof
           pnpm install --frozen-lockfile --ignore-scripts=false 2>&1 | tee /tmp/hosted-line-proof/install.log
           pnpm docs:gen 2>&1 | tee /tmp/hosted-line-proof/docs.log
           pnpm typecheck 2>&1 | tee /tmp/hosted-line-proof/typecheck.log
           pnpm build 2>&1 | tee /tmp/hosted-line-proof/build.log
           node --input-type=module -e 'import {createHostedAgent,createTangleAgent} from "./dist/hosted-agent/index.js"; if(typeof createHostedAgent!=="function"||typeof createTangleAgent!=="function")throw Error("missing exports"); console.log("Both built attachment APIs loaded")' | tee /tmp/hosted-line-proof/import.log
-      - name: Commit only reviewed source and generated documentation
+      - name: Commit only reviewed source and generated docs
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           set -euo pipefail
           node --input-type=module - <<'JS'
@@ -81,9 +79,14 @@ jobs:
           GIT_ASKPASS=/tmp/hosted-askpass GIT_TERMINAL_PROMPT=0 git push https://github.com/tangle-network/agent-app.git HEAD:refs/heads/fix/hosted-imessage-number-selection
           rm /tmp/hosted-askpass
           git rev-parse HEAD > /tmp/hosted-line-proof/commit.txt
+      - name: Preserve build sources
+        if: always()
+        run: |
+          mkdir -p /tmp/hosted-line-proof
           git archive HEAD > /tmp/hosted-line-proof/source.tar
-      - name: Resolve and install the published Node consumer cohort
-        shell: bash
+          git diff > /tmp/hosted-line-proof/uncommitted.patch
+      - name: Resolve published Node consumer dependencies
+        if: always()
         run: |
           set -euo pipefail
           mkdir -p /tmp/hosted-consumer
