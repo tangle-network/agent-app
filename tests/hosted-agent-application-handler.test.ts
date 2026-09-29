@@ -43,7 +43,20 @@ describe('application line callback', () => {
       executionId: 'exec_demo', text: 'Saved note',
     })
     expect(bridge.admit).toHaveBeenCalledTimes(1)
-    expect(bridge.authorize).toHaveBeenCalledTimes(2)
+    expect(bridge.authorize).toHaveBeenCalledTimes(3)
+  })
+
+  it.each([403, 503])('refuses admission when authority changes during the missing-result read: %s', async status => {
+    const bridge = options()
+    let readable = true
+    bridge.authorize = async () => {
+      if (!readable) throw new Response('Authority changed', { status })
+    }
+    bridge.read = async () => { readable = false; return { state: 'missing' } }
+    bridge.admit = vi.fn(async () => {})
+    const response = await createApplicationLineHandler(bridge)(callback())
+    expect(response.status).toBe(status)
+    expect(bridge.admit).not.toHaveBeenCalled()
   })
 
   it('never re-admits a native accepted execution when the application record is missing', async () => {

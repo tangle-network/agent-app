@@ -192,3 +192,16 @@ Those are a data-layer decision a product makes once; this is the state contract
 
 Concurrency is handled where it produces the defect: every load and every write carries a sequence guard, so a superseded response (inputs changed, retry pressed, a second save started) can never repaint the current view, and a superseded load's `AbortSignal` is aborted.
 A write's signal is aborted only by a later `run` — never on unmount, because a write the user asked for must not be cancelled by navigating away.
+
+
+## Duplicate user actions
+
+`useConfirmedMutation({ concurrency: 'reject', mutate })` rejects a second
+invocation while the current request is unresolved. It does not abort or resend
+the first request. Channels uses this shared option instead of a second lock.
+The default remains `replace`, preserving existing callers. Neither mode replaces
+server-side idempotency: losing a response does not establish that a write failed.
+
+Read results are bound to their input identity. A dependency change, retry, or
+disable/re-enable cycle cannot render the previous scope's ready or error result
+while the next effect starts. A first-render seed is not reused in a new scope.

@@ -58,8 +58,8 @@ const NO_DEPS: readonly unknown[] = []
  *   empty list;
  * - `empty` is only reachable from a load that actually succeeded;
  * - a superseded load (inputs changed, retry pressed, component unmounted) is
- *   aborted and its late result is dropped by a monotonic sequence guard, so it
- *   cannot repaint a newer view.
+ *   aborted and its late result is discarded; resolutions are bound to their
+ *   input identity, including the render before the next effect runs.
  */
 export function useAsyncResource<T>({
   load,
@@ -69,70 +69,48 @@ export function useAsyncResource<T>({
   isEmpty,
   errorMessage,
 }: UseAsyncResourceOptions<T>): AsyncResourceState<T> {
-  const loadRef = useRef(load)
-  loadRef.current = load
-  const isEmptyRef = useRef(isEmpty ?? defaultIsEmpty)
-  isEmptyRef.current = isEmpty ?? defaultIsEmpty
-  const errorMessageRef = useRef(errorMessage)
-  errorMessageRef.current = errorMessage
-
-  const [resolution, setResolution] = useState<AsyncResolution<T>>(() => {
-    if (initialValue !== undefined) return resolveAsyncValue(initialValue, isEmpty ?? defaultIsEmpty)
-    return enabled ? { status: 'loading' } : { status: 'idle' }
-  })
+  // Include enablement and retries in the identity: stale data must not be
+  // returned during the render before an effect clears the previous request.
   const [reloadKey, setReloadKey] = useState(0)
-
-  const seqRef = useRef(0)
-  // Consumed by the first load attempt: a seeded resource must not throw its
-  // seed away to re-fetch what the server already sent.
-  const seededRef = useRef(initialValue !== undefined)
-  const token = useChangeToken(deps)
+  const token = useChangeToken([enabled, reloadKey, ...deps])
+  const options = useRef({ load, isEmpty, errorMessage })
+  options.current = { load, isEmpty, errorMessage }
+  const [settled, setSettled] = useState<{ token: number; resolution: AsyncResolution<T> }>(() => ({
+    token,
+    resolution: initialValue === undefined
+      ? { status: 'loading' }
+      : resolveAsyncValue(initialValue, isEmpty ?? defaultIsEmpty),
+  }))
+  // A seed belongs only to its first identity. Effect replay does not consume
+  // it, but a dependency change, re-enable, or explicit retry does.
+  const seededToken = useRef(initialValue === undefined ? null : token)
 
   useEffect(() => {
-    if (!enabled) return
-    if (seededRef.current) {
-      seededRef.current = false
-      return
-    }
-
-    const seq = ++seqRef.current
+    if (!enabled || seededToken.current === token) return
     const controller = new AbortController()
-    setResolution({ status: 'loading' })
-
+    const commit = (resolution: AsyncResolution<T>) => {
+      if (!controller.signal.aborted) setSettled({ token, resolution })
+    }
+    commit({ status: 'loading' })
     void (async () => {
       try {
-        const value = await loadRef.current({ signal: controller.signal })
-        if (seq !== seqRef.current || controller.signal.aborted) return
-        setResolution(resolveAsyncValue(value, isEmptyRef.current))
+        const value = await options.current.load({ signal: controller.signal })
+        if (!controller.signal.aborted) commit(resolveAsyncValue(value, options.current.isEmpty ?? defaultIsEmpty))
       } catch (error) {
-        if (seq !== seqRef.current || controller.signal.aborted) return
-        setResolution({
+        if (!controller.signal.aborted) commit({
           status: 'error',
-          message: errorMessageRef.current ? errorMessageRef.current(error) : asyncErrorMessage(error),
+          message: options.current.errorMessage?.(error) ?? asyncErrorMessage(error),
           error,
         })
       }
     })()
-
     return () => controller.abort()
-  }, [token, enabled, reloadKey])
+  }, [token, enabled])
 
-  const retry = useCallback(() => {
-    setReloadKey((key) => key + 1)
-  }, [])
-
-  return useMemo<AsyncResourceState<T>>(() => {
-    switch (resolution.status) {
-      case 'ready':
-        return { status: 'ready', value: resolution.value, retry }
-      case 'empty':
-        return { status: 'empty', value: resolution.value, retry }
-      case 'error':
-        return { status: 'error', message: resolution.message, error: resolution.error, retry }
-      case 'loading':
-        return { status: 'loading', retry }
-      case 'idle':
-        return { status: 'idle', retry }
-    }
-  }, [resolution, retry])
+  const retry = useCallback(() => setReloadKey(key => key + 1), [])
+  return useMemo<AsyncResourceState<T>>(() => ({
+    ...(!enabled ? { status: 'idle' as const }
+      : settled.token === token ? settled.resolution : { status: 'loading' as const }),
+    retry,
+  }), [enabled, settled, token, retry])
 }

@@ -2,6 +2,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { LineSetup } from '../src/hosted-agent/react/LineSetup'
 import { ApplicationLineSetup } from '../src/hosted-agent/react/ApplicationLineSetup'
 import type { ApplicationLineSetupClient, LineSetupSnapshot } from '../src/hosted-agent/react'
 
@@ -52,4 +53,32 @@ describe('application line setup', () => {
     expect(await screen.findByText('No lines connected')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Connect iMessage' })).toBeNull()
   })
+})
+
+
+it('keeps the confirmed attachment after refreshing a replacement into the list', async () => {
+  const user = userEvent.setup()
+  let attachmentId = 'lat_original'
+  const load = vi.fn(async (): Promise<LineSetupSnapshot> => ({
+    workspaceName: 'Workspace', connections: null, targets: [],
+    lines: [{ id: 'ln_demo', attachmentId, connectionId: 'connection', transport: 'imessage',
+      address: '@demo', connect: null, routerAddress: null, providerNumberId: null,
+      status: 'active', answering: true, canDisconnect: true, targetId: 'thread',
+      targetLabel: attachmentId, boxMode: 'shared', lastTurn: { kind: 'none' } }],
+  }))
+  const disconnect = vi.fn(async (_line: string, expected?: string) => {
+    if (expected !== attachmentId) throw new Error('Attachment changed; reload before disconnecting')
+  })
+  render(<LineSetup scopeKey="owner:workspace" canManage client={{ load, disconnect, connect: async () => {} }} />)
+  await user.click(await screen.findByRole('button', { name: 'Disconnect line' }))
+  attachmentId = 'lat_replacement'
+  await user.click(screen.getByRole('button', { name: 'Retry' }))
+  await screen.findByText('lat_replacement · shared box')
+  await user.click(screen.getByRole('button', { name: /^Disconnect$/ }))
+  await waitFor(() => expect(disconnect).toHaveBeenCalledWith('ln_demo', 'lat_original'))
+  expect((await screen.findByRole('alert')).textContent).toContain('Attachment changed')
+  await user.click(screen.getByRole('button', { name: 'Keep line' }))
+  await user.click(screen.getByRole('button', { name: 'Disconnect line' }))
+  await user.click(screen.getByRole('button', { name: /^Disconnect$/ }))
+  await waitFor(() => expect(disconnect).toHaveBeenLastCalledWith('ln_demo', 'lat_replacement'))
 })

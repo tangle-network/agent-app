@@ -71,7 +71,8 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
   const [targetId, setTargetId] = useState(initialTargetId ?? '')
   const [boxMode, setBoxMode] = useState<LineBoxMode>('per-member')
   const [phoneNumberId, setPhoneNumberId] = useState('')
-  const [confirmLineId, setConfirmLineId] = useState<string | null>(null)
+  const [confirmation, setConfirmation] = useState<{ lineId: string; attachmentId: string | undefined } | null>(null)
+  const confirmLineId = confirmation?.lineId ?? null
 
   function stillCurrent(requestIncarnation: number): boolean {
     return requestIncarnation === incarnation.current
@@ -106,7 +107,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
 
   function closeConfirmation(lineId: string) {
     restoreFocusTo.current = lineId
-    setConfirmLineId(null)
+    setConfirmation(null)
   }
 
   useEffect(() => {
@@ -120,7 +121,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
     setTargetId(initialTargetId ?? '')
     setBoxMode('per-member')
     setPhoneNumberId('')
-    setConfirmLineId(null)
+    setConfirmation(null)
     restoreFocusTo.current = null
     void reload(incarnation.current)
     return () => { sequence.current++ }
@@ -194,13 +195,13 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
     }
   }
 
-  async function disconnect(lineId: string) {
-    if (busy || loading || refreshFailed) return
+  async function disconnect() {
+    if (!confirmation || busy || loading || refreshFailed) return
+    const { lineId, attachmentId: expectedAttachmentId } = confirmation
     const requestIncarnation = incarnation.current
     setBusy(true)
     setError(null)
     try {
-      const expectedAttachmentId = snapshot?.lines.find(line => line.id === lineId)?.attachmentId ?? undefined
       await clientRef.current.disconnect(lineId, expectedAttachmentId)
       if (!stillCurrent(requestIncarnation)) return
       const updated = await reload(requestIncarnation)
@@ -253,9 +254,9 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
             {canManage && line.canDisconnect && line.targetId !== null && line.status === 'active' && <div className="tangle-lines__row-actions">
               {confirmLineId === line.id ? <div className="tangle-lines__confirm" role="group" aria-label={`Disconnect ${line.address}?`}>
                 <span>Disconnect this line?</span>
-                <button ref={confirmButton} type="button" className="tangle-lines__danger" disabled={busy || loading || refreshFailed} onClick={() => void disconnect(line.id)}>Disconnect</button>
+                <button ref={confirmButton} type="button" className="tangle-lines__danger" disabled={busy || loading || refreshFailed} onClick={() => void disconnect()}>Disconnect</button>
                 <button type="button" disabled={busy} onClick={() => closeConfirmation(line.id)}>Keep line</button>
-              </div> : <button ref={node => { if (node) disconnectTriggers.current.set(line.id, node); else disconnectTriggers.current.delete(line.id) }} type="button" className="tangle-lines__quiet" disabled={busy || loading || refreshFailed} onClick={() => setConfirmLineId(line.id)}>Disconnect line</button>}
+              </div> : <button ref={node => { if (node) disconnectTriggers.current.set(line.id, node); else disconnectTriggers.current.delete(line.id) }} type="button" className="tangle-lines__quiet" disabled={busy || loading || refreshFailed} onClick={() => setConfirmation({ lineId: line.id, attachmentId: line.attachmentId ?? undefined })}>Disconnect line</button>}
             </div>}
           </div>)}
       </div>

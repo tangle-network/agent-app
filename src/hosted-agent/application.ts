@@ -60,6 +60,8 @@ export function createApplicationLineHandler<T>(options: ApplicationLineOptions<
       if (observed.state === 'missing') {
         if (immutable.acceptedExecutionId !== undefined)
           return failure(503, 'accepted_execution_unavailable')
+        // The read may yield to revocation; check again before admitting work.
+        await options.authorize(target, immutable)
         await options.admit(target, immutable)
         observed = await options.read(target, immutable)
         if (observed.state === 'missing') observed = { state: 'pending', admitted: false }

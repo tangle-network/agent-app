@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef } from 'react'
-import { confirmWrite, rejectWrite, useAsyncResource, useConfirmedMutation } from '../web-react/async'
-import type { AsyncLoadContext, AsyncResourceState, MutationOutcome } from '../web-react/async'
+import { useEffect } from 'react'
+import { confirmWrite, useAsyncResource, useConfirmedMutation } from '../web-react/async'
+import type { AsyncLoadContext, AsyncResourceState } from '../web-react/async'
 import { useChannelsClient, useChannelsContext } from './context'
 import type { ChannelVerification, ConnectChannelInput, Line, LineTransport } from './types'
 
@@ -20,24 +20,17 @@ export function useChannelResource<T>(load: (context: AsyncLoadContext) => Promi
 /** Single-flight on top of the shared confirmed-write primitive. */
 export function useChannelMutation<I, O>(mutate: (input: I, context: AsyncLoadContext) => Promise<O>, onSucceeded?: (value: O) => void) {
   const { client } = useChannelsContext()
-  const lock = useRef<object | null>(null)
   const mutation = useConfirmedMutation<I, O>({
+    concurrency: 'reject',
     mutate: async (input, context) => confirmWrite(await mutate(input, context)),
     onSucceeded,
   })
-  const { reset, run } = mutation
+  const { reset } = mutation
   useEffect(() => {
     reset()
-    return () => { lock.current = null; reset() }
+    return reset
   }, [client, client.scope, reset])
-  const singleRun = useCallback(async (input: I): Promise<MutationOutcome<O>> => {
-    if (lock.current) return rejectWrite('Another channel operation is still in progress.')
-    const token = {}
-    lock.current = token
-    try { return await run(input) }
-    finally { if (lock.current === token) lock.current = null }
-  }, [run])
-  return { ...mutation, run: singleRun }
+  return mutation
 }
 
 export function useChannels() {
