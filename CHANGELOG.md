@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.4
+
+- refactor: consolidate recovery policy and shared async lifecycles (#685)
+
 ## 0.50.3
 
 - refactor(channels): separate read-only conversation capabilities
