@@ -1269,13 +1269,19 @@
           "name": "ChannelsClient",
           "kind": "interface",
           "signature": "interface ChannelsClient",
-          "doc": "The one authenticated, agent-scoped boundary."
+          "doc": "The one authenticated, agent-scoped management boundary."
         },
         {
           "name": "ChannelsProvider",
           "kind": "function",
-          "signature": "({ client, pollInterval, children }: { client: ChannelsClient; pollInterval?: number | false | undefined; children: Rea…",
+          "signature": "({ client, pollInterval, children }: { client: ChannelsReadClient; pollInterval?: number | false | undefined; children:…",
           "doc": "Mount below authentication."
+        },
+        {
+          "name": "ChannelsReadClient",
+          "kind": "interface",
+          "signature": "interface ChannelsReadClient",
+          "doc": "Read-only, authenticated conversation access; no setup, purchase, or activation stubs."
         },
         {
           "name": "ChannelVerification",
@@ -1449,7 +1455,7 @@
           "name": "useChannelsClient",
           "kind": "function",
           "signature": "() => ChannelsClient",
-          "doc": null
+          "doc": "Management hooks keep the existing full-client contract; read views never call this."
         },
         {
           "name": "useConnectChannel",

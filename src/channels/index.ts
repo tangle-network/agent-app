@@ -1,6 +1,6 @@
-/** Browser-safe channel UI. Supply one authenticated ChannelsClient; no server wiring is bundled. */
+/** Browser-safe channel UI. Supply authenticated read or management capabilities; no server wiring is bundled. */
 export type {
-  ChannelsClient, ChannelConnection, ChannelNumber, ChannelReadContext, ChannelVerification,
+  ChannelsClient, ChannelsReadClient, ChannelConnection, ChannelNumber, ChannelReadContext, ChannelVerification,
   ConnectChannelInput, LinePayment, Line, LineAttachment, LineFromConnectionInput, LineMessage,
   LineThread, LineTransport, HubNumberOrder, HubNumberQuote, HubNumberReadiness,
 } from './types'

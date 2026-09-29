@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useChannelsContext } from './context'
+import { useChannelsClient } from './context'
 import { useChannelMutation, useChannelResource } from './hooks'
 import { ChannelState, ChannelFailure, buttonClass, primaryButtonClass, panelClass } from './ui'
 
@@ -12,7 +12,7 @@ export function safeCheckoutUrl(value: string): string {
 }
 
 export function useLinePayment(lineId: string) {
-  const { client } = useChannelsContext()
+  const client = useChannelsClient()
   const resource = useChannelResource(context => {
     if (!client.payment) throw new Error('Payments are unavailable for this line.')
     return client.payment.read(lineId, context)

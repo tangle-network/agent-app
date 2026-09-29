@@ -4,7 +4,7 @@
 
 Source: `src/channels/index.ts`
 
-46 exports.
+47 exports.
 
 ### `ChannelConnect`
 
@@ -72,7 +72,7 @@ interface ChannelReadContext
 
 ### `ChannelsClient`
 
-`interface` — The one authenticated, agent-scoped boundary.
+`interface` — The one authenticated, agent-scoped management boundary.
 
 ```ts
 interface ChannelsClient
@@ -83,7 +83,15 @@ interface ChannelsClient
 `function` — Mount below authentication.
 
 ```ts
-({ client, pollInterval, children }: { client: ChannelsClient; pollInterval?: number | false | undefined; children: Rea…
+({ client, pollInterval, children }: { client: ChannelsReadClient; pollInterval?: number | false | undefined; children:…
+```
+
+### `ChannelsReadClient`
+
+`interface` — Read-only, authenticated conversation access; no setup, purchase, or activation stubs.
+
+```ts
+interface ChannelsReadClient
 ```
 
 ### `ChannelVerification`
@@ -312,7 +320,7 @@ type LineTransport
 
 ### `useChannelsClient`
 
-`function`
+`function` — Management hooks keep the existing full-client contract; read views never call this.
 
 ```ts
 () => ChannelsClient

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { HubNumberOrder, HubNumberQuote } from '@tangle-network/hub-sdk'
-import { useChannelsContext } from './context'
+import { useChannelsClient } from './context'
 import { useChannelMutation, useChannelResource } from './hooks'
 
 export const NUMBER_CHARGE_NOTICE = 'This is a one-time activation charge. Tangle does not bill recurring carrier rental for this number. Your provider’s message rates are separate.'
@@ -23,7 +23,7 @@ export function numberStage(order: HubNumberOrder): string {
 
 /** Hub owns prices, terms, idempotency, funding, and cancellation. */
 export function useNumberChannel(transport: 'sms' | 'imessage') {
-  const { client } = useChannelsContext()
+  const client = useChannelsClient()
   const ordering = client.ordering
   const reference = ordering?.references[transport]
   const [quote, setQuote] = useState<HubNumberQuote | null>(null)
