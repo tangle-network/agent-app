@@ -15314,7 +15314,7 @@
         {
           "name": "messageHasTurnId",
           "kind": "function",
-          "signature": "(message: PersistedChatMessageForTurn, turnId: string) => boolean",
+          "signature": "(message: Pick<TurnIdentityMessage, \"parts\">, turnId: string) => boolean",
           "doc": "Resolve whether a message contains any part with the specified turn ID"
         },
         {
@@ -15369,7 +15369,7 @@
           "name": "PersistedChatMessageForTurn",
           "kind": "interface",
           "signature": "interface PersistedChatMessageForTurn",
-          "doc": "Define the structure of a chat message stored for a specific conversation turn"
+          "doc": "Retained compatibility shape for callers using unstructured message records."
         },
         {
           "name": "pumpBufferedTurn",
@@ -15398,7 +15398,7 @@
         {
           "name": "resolveChatTurn",
           "kind": "function",
-          "signature": "(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; hasRunning…",
+          "signature": "<Message extends TurnIdentityMessage>(input: { existingMessages: readonly Message[]; userContent: string; turnId?: stri…",
           "doc": "Resolve a chat turn by determining message reuse and constructing user message parts"
         },
         {
