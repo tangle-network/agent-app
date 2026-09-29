@@ -76,6 +76,7 @@ export function ComposerRoute() {
             onSend={() => {}}
             placeholder="Message the assistant…"
             controls={pill}
+            mention={{ fetchItems: async () => [] }}
           />
         </Demo>
 
