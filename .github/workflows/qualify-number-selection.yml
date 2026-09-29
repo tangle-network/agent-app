@@ -23,34 +23,34 @@ jobs:
         with:
           node-version: '24'
       - uses: pnpm/action-setup@v4
-      - name: Apply the reviewed selected-line boundary
+      - name: Apply reviewed selected-line changes
         run: |
           mkdir -p /tmp/hosted-line-proof
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('src/hosted-agent/index.ts');s=p.read_text()
-          s="import { resolveHostedLine } from './line-identity'\n"+s
-          edits=[('/** Required when creating a WhatsApp line on a connection with several numbers. */','/** Select a registered iMessage provider number; required for WhatsApp. Omit for an Inkbox identity. */'),("if (transport !== 'whatsapp' && options.phoneNumberId)","if (transport === 'email' && options.phoneNumberId)"),("'phoneNumberId is only valid for WhatsApp lines.'","'Email lines do not accept phoneNumberId.'"),("'The existing line is pinned to another WhatsApp number.'","'The existing line is pinned to another provider number.'")]
-          for old,new in edits:
-            if s.count(old)!=1: raise SystemExit('Changed preimage: '+old)
-            s=s.replace(old,new)
-          old="const line = await sandbox.lines.fromConnection(transport === 'whatsapp'\n        ? { connectionId, transport, phoneNumberId: options.phoneNumberId! }\n        : { connectionId, transport })"
-          if s.count(old)!=1: raise SystemExit('Changed line-creation preimage')
-          s=s.replace(old,"const line = await resolveHostedLine(sandbox, { connectionId, transport, ...(options.phoneNumberId ? { phoneNumberId: options.phoneNumberId } : {}) })")
-          p.write_text(s)
-          p=Path('src/hosted-agent/general.ts');s=p.read_text();s="import { resolveHostedLine } from './line-identity'\n"+s
-          old="{ transport: 'imessage'; voice?: LineVoiceOptions }"
-          if s.count(old)!=1: raise SystemExit('Changed general channel preimage')
-          s=s.replace(old,"{ transport: 'imessage'; phoneNumberId?: string; voice?: LineVoiceOptions }")
-          start=s.index('    const input = channel.transport')
-          end=s.index('\n',s.index('await sdk.lines.fromConnection(input)',start))
-          s=s[:start]+"    const line = await resolveHostedLine(sdk, { connectionId, transport: channel.transport, ...('phoneNumberId' in channel && channel.phoneNumberId ? { phoneNumberId: channel.phoneNumberId } : {}) })"+s[end:]
-          p.write_text(s)
+          for name in ['index.ts','general.ts']:
+            p=Path('src/hosted-agent')/name;s=p.read_text()
+            if "import { resolveHostedLine }" in s: raise SystemExit('Changes already applied; review branch head')
+            s="import { resolveHostedLine } from './line-identity'\n"+s
+            if name=='index.ts':
+              edits=[('/** Required when creating a WhatsApp line on a connection with several numbers. */','/** Select a registered iMessage provider number; required for WhatsApp. Omit for an Inkbox identity. */'),("if (transport !== 'whatsapp' && options.phoneNumberId)","if (transport === 'email' && options.phoneNumberId)"),("'phoneNumberId is only valid for WhatsApp lines.'","'Email lines do not accept phoneNumberId.'"),("'The existing line is pinned to another WhatsApp number.'","'The existing line is pinned to another provider number.'")]
+              for old,new in edits:
+                if s.count(old)!=1: raise SystemExit('Changed preimage: '+old)
+                s=s.replace(old,new)
+              start=s.index('      const line = await sandbox.lines.fromConnection(');end=s.index('\n      return attach(',start)
+              s=s[:start]+"      const line = await resolveHostedLine(sandbox, { connectionId, transport, ...(options.phoneNumberId ? { phoneNumberId: options.phoneNumberId } : {}) })"+s[end:]
+            else:
+              old="{ transport: 'imessage'; voice?: LineVoiceOptions }"
+              if s.count(old)!=1: raise SystemExit('Changed channel preimage')
+              s=s.replace(old,"{ transport: 'imessage'; phoneNumberId?: string; voice?: LineVoiceOptions }")
+              start=s.index('      const input = channel.transport');end=s.index('\n      return attach(',start)
+              s=s[:start]+"      const line = await resolveHostedLine(sandbox, { connectionId, transport: channel.transport, ...('phoneNumberId' in channel && channel.phoneNumberId ? { phoneNumberId: channel.phoneNumberId } : {}) })"+s[end:]
+            p.write_text(s)
           p=Path('CHANGELOG.md');s=p.read_text()
-          if not s.startswith('# Changelog\n'):raise SystemExit('Changed changelog heading')
-          s=s.replace('# Changelog\n','# Changelog\n\n## Unreleased\n\n- fix(hosted-agent): honor an explicitly selected registered iMessage number in both hosted-agent APIs. Resolve exact owned line identity through the published SDK; never fall back to another number. WhatsApp still requires its number and email rejects one. No provider client or number purchase is added.\n',1);p.write_text(s)
+          if not s.startswith('# Changelog\n'): raise SystemExit('Changed changelog heading')
+          s=s.replace('# Changelog\n','# Changelog\n\n## Unreleased\n\n- fix(hosted-agent): honor an explicitly selected registered iMessage number in both hosted-agent APIs. Resolve exact owned line identity through the published SDK; never fall back to another number. WhatsApp requires its number and email rejects one. No provider client or number purchase is added.\n',1);p.write_text(s)
           PY
-      - name: Install, generate docs, typecheck and build
+      - name: Real install, generated docs, typecheck and build
         run: |
           set -euo pipefail
           pnpm install --frozen-lockfile --ignore-scripts=false 2>&1 | tee /tmp/hosted-line-proof/install.log
@@ -58,7 +58,7 @@ jobs:
           pnpm typecheck 2>&1 | tee /tmp/hosted-line-proof/typecheck.log
           pnpm build 2>&1 | tee /tmp/hosted-line-proof/build.log
           node --input-type=module -e 'import {createHostedAgent,createTangleAgent} from "./dist/hosted-agent/index.js"; if(typeof createHostedAgent!=="function"||typeof createTangleAgent!=="function")throw Error("missing exports"); console.log("Both built attachment APIs loaded")' | tee /tmp/hosted-line-proof/import.log
-      - name: Commit the verified source and generated documentation
+      - name: Commit only verified source and generated docs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -67,12 +67,12 @@ jobs:
           import {execFileSync} from 'node:child_process';
           const allowed=new Set(['src/hosted-agent/index.ts','src/hosted-agent/general.ts','CHANGELOG.md','docs/CODEMAP.md','docs/api/hosted-agent.md','docs/codemap.json','docs/llms-full.txt','docs/llms.txt']);
           const paths=execFileSync('git',['diff','--name-only'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
-          if(paths.some(path=>!allowed.has(path)))throw Error('Unexpected changes: '+paths.join(', '));
+          if(paths.some(path=>!allowed.has(path)))throw Error('Unexpected change: '+paths.join(', '));
           JS
           git add src/hosted-agent/index.ts src/hosted-agent/general.ts CHANGELOG.md docs
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'fix(hosted-agent): honor the selected registered iMessage number'
+          git commit -m 'fix(hosted-agent): preserve exact registered iMessage number selection'
           printf '%s\n' '#!/bin/sh' 'case "$1" in *Username*) echo x-access-token;; *) echo "$GH_TOKEN";; esac' > /tmp/hosted-askpass
           chmod 700 /tmp/hosted-askpass
           GIT_ASKPASS=/tmp/hosted-askpass GIT_TERMINAL_PROMPT=0 git push https://github.com/tangle-network/agent-app.git HEAD:refs/heads/fix/hosted-imessage-number-selection
