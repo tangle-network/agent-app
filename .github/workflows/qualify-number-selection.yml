@@ -23,9 +23,24 @@ jobs:
         with:
           node-version: '24'
       - uses: pnpm/action-setup@v4
+      - name: Resolve current SDK for the additive number contract
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hosted-line-proof
+          pnpm add -D -E @tangle-network/sandbox@latest --ignore-scripts 2>&1 | tee /tmp/hosted-line-proof/sdk-install.log
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          const p=JSON.parse(fs.readFileSync('package.json','utf8'));
+          const version=p.devDependencies['@tangle-network/sandbox'];
+          if(!/^0\.\d+\.\d+$/.test(version))throw Error('Review a new SDK major or prerelease before using it');
+          const minor=version.split('.')[1];
+          const range=p.peerDependencies['@tangle-network/sandbox'];
+          if(!range.includes(`^0.${minor}.`))p.peerDependencies['@tangle-network/sandbox']=`${range} || ^${version}`;
+          fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
+          JS
+          pnpm install --lockfile-only --ignore-scripts
       - name: Apply reviewed source corrections
         run: |
-          mkdir -p /tmp/hosted-line-proof
           python3 - <<'PY'
           from pathlib import Path
           p=Path('src/hosted-agent/index.ts'); s=p.read_text()
@@ -49,7 +64,7 @@ jobs:
           p.write_text(s)
           p=Path('CHANGELOG.md');s=p.read_text();heading='# Changelog\n'
           if not s.startswith(heading): raise SystemExit('Changed changelog format')
-          s=s.replace(heading, heading+'\n## Unreleased\n\n- fix(hosted-agent): preserve an explicitly selected iMessage provider number in both attachment APIs. WhatsApp still requires a number; email rejects one. Existing lines retain exact provider identity.\n',1);p.write_text(s)
+          s=s.replace(heading, heading+'\n## Unreleased\n\n- fix(hosted-agent): preserve an explicitly selected iMessage provider number in both attachment APIs. Qualify the current SDK rather than widening its old types. WhatsApp still requires a number; email rejects one.\n',1);p.write_text(s)
           PY
       - name: Install, generate docs, typecheck and build
         run: |
@@ -66,14 +81,14 @@ jobs:
           set -euo pipefail
           node --input-type=module - <<'JS'
           import {execFileSync} from 'node:child_process';
-          const allowed=new Set(['src/hosted-agent/index.ts','src/hosted-agent/general.ts','CHANGELOG.md','docs/CODEMAP.md','docs/api/hosted-agent.md','docs/codemap.json','docs/llms-full.txt','docs/llms.txt']);
+          const allowed=new Set(['src/hosted-agent/index.ts','src/hosted-agent/general.ts','CHANGELOG.md','package.json','pnpm-lock.yaml','docs/CODEMAP.md','docs/api/hosted-agent.md','docs/codemap.json','docs/llms-full.txt','docs/llms.txt']);
           const paths=execFileSync('git',['diff','--name-only'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
           if(paths.some(path=>!allowed.has(path)))throw Error('Unexpected changes: '+paths.join(', '));
           JS
-          git add src/hosted-agent/index.ts src/hosted-agent/general.ts CHANGELOG.md docs
+          git add src/hosted-agent/index.ts src/hosted-agent/general.ts CHANGELOG.md package.json pnpm-lock.yaml docs
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'fix(hosted-agent): retain selected iMessage provider number'
+          git commit -m 'fix(hosted-agent): retain selected iMessage provider number with current SDK'
           printf '%s\n' '#!/bin/sh' 'case "$1" in *Username*) echo x-access-token;; *) echo "$GH_TOKEN";; esac' > /tmp/hosted-askpass
           chmod 700 /tmp/hosted-askpass
           GIT_ASKPASS=/tmp/hosted-askpass GIT_TERMINAL_PROMPT=0 git push https://github.com/tangle-network/agent-app.git HEAD:refs/heads/fix/hosted-imessage-number-selection
@@ -91,10 +106,22 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/hosted-consumer
           cd /tmp/hosted-consumer
-          printf '%s\n' '{"name":"super-agent","version":"9.0.0","private":true,"type":"module","engines":{"node":">=22.16.0"},"dependencies":{"marked":"18.0.14"},"devDependencies":{"@types/node":"26.6.2","typescript":"7.0.2"},"overrides":{"@tangle-network/agent-integrations":{"csv-parse":"7.0.2"}}}' > package.json
-          npm install --ignore-scripts --save-exact --no-audit --no-fund @tangle-network/agent-app@latest @tangle-network/agent-runtime@latest @tangle-network/agent-interface@latest @tangle-network/agent-integrations@latest @tangle-network/tcloud@latest 2>&1 | tee /tmp/hosted-line-proof/consumer-install.log
-          npm install --ignore-scripts --save-exact --save-optional --no-audit --no-fund @tangle-network/hub-sdk@latest @tangle-network/sandbox@latest 2>&1 | tee -a /tmp/hosted-line-proof/consumer-install.log
-          npm install --ignore-scripts --save-exact --save-dev --no-audit --no-fund @tangle-network/agent-eval@latest 2>&1 | tee -a /tmp/hosted-line-proof/consumer-install.log
+          printf '%s\n' '{"name":"super-agent","version":"9.0.0","private":true,"type":"module","engines":{"node":">=22.16.0"},"dependencies":{"marked":"18.0.14"},"devDependencies":{"@types/node":"26.6.2","typescript":"7.0.2"}}' > package.json
+          node --input-type=module - <<'JS' 2>&1 | tee /tmp/hosted-line-proof/consumer-install.log
+          import {execFileSync} from 'node:child_process';
+          import fs from 'node:fs';
+          const npm=(args)=>execFileSync('npm',args,{encoding:'utf8',stdio:['ignore','pipe','inherit']});
+          const app=JSON.parse(npm(['view','@tangle-network/agent-app@latest','--json']));
+          fs.writeFileSync('/tmp/hosted-line-proof/published-agent-app.json',JSON.stringify(app,null,2));
+          const groups={prod:['agent-runtime','agent-interface','agent-integrations','tcloud'],optional:['hub-sdk','sandbox'],dev:['agent-eval']};
+          const pins=Object.fromEntries(Object.values(groups).flat().map(n=>['@tangle-network/'+n,app.peerDependencies['@tangle-network/'+n]??'latest']));
+          const all=[`@tangle-network/agent-app@${app.version}`,...Object.entries(pins).map(([n,r])=>`${n}@${r}`)];
+          console.log(npm(['install','--ignore-scripts','--save-exact','--no-audit','--no-fund',...all]));
+          const p=JSON.parse(fs.readFileSync('package.json','utf8'));
+          for(const [group,names]of Object.entries(groups)){if(group==='prod')continue;const dest=group==='optional'?'optionalDependencies':'devDependencies';p[dest]??={};for(const name of names){const n='@tangle-network/'+name;p[dest][n]=p.dependencies[n];delete p.dependencies[n];}}
+          fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
+          console.log(npm(['install','--package-lock-only','--ignore-scripts','--no-audit','--no-fund']));
+          JS
           npm ls --depth=0 --json > /tmp/hosted-line-proof/consumer-installed.json
           cp package.json package-lock.json /tmp/hosted-line-proof/
           node --input-type=module -e 'const app=await import("@tangle-network/agent-app/hosted-agent");const sdk=await import("@tangle-network/sandbox/core");if(!app.createHostedAgent||!sdk.Sandbox)throw Error("missing native line exports");console.log("Published package imports loaded")' | tee /tmp/hosted-line-proof/consumer-import.log
