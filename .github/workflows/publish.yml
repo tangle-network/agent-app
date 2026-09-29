@@ -404,6 +404,7 @@ jobs:
           git fetch --no-tags origin "$BASE_SHA"
           [[ $(git rev-parse FETCH_HEAD) == "$BASE_SHA" ]]
           git show "$BASE_SHA:.github/scripts/write-release.sh" > "$RUNNER_TEMP/write-release.sh"
+          git show "$BASE_SHA:.github/scripts/next-release-version.mjs" > "$RUNNER_TEMP/next-release-version.mjs"
           [[ $(sha256sum "$RUNNER_TEMP/write-release.sh" | cut -d' ' -f1) == "$CONTROL_SHA" ]]
           chmod 700 "$RUNNER_TEMP/write-release.sh"
           bash "$RUNNER_TEMP/write-release.sh"

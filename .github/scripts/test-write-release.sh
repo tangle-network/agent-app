@@ -232,6 +232,11 @@ git -C "$SEED" commit --quiet --allow-empty -m 'fix(auth)!: require identity dis
 BASE=$(git -C "$SEED" rev-parse HEAD)
 git --git-dir="$ORIGIN" fetch --quiet "$SEED" "$BASE"
 git --git-dir="$ORIGIN" update-ref refs/heads/main "$BASE"
+STAGED_WRITER="$TMP/staged-writer"
+mkdir -p "$STAGED_WRITER"
+cp "$SCRIPT" "$STAGED_WRITER/write-release.sh"
+cp "$ROOT/.github/scripts/next-release-version.mjs" "$STAGED_WRITER/next-release-version.mjs"
+SCRIPT="$STAGED_WRITER/write-release.sh"
 fails 'expected next release 1.3.0' run_release wrong-minor 1.2.6
 run_release minor 1.3.0 >/dev/null
 MINOR_TAG=$(git --git-dir="$ORIGIN" rev-parse refs/tags/v1.3.0)
