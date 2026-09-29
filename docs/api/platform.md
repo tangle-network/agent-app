@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-85 exports.
+86 exports.
 
 ### `AdminGuardOptions`
 
@@ -504,10 +504,18 @@ interface TangleIdentitySsoAccountStore
 
 ### `TangleIdentitySsoAuthClient`
 
-`interface` — First-party login exchanges identity without minting a Platform API key.
+`interface`
 
 ```ts
 interface TangleIdentitySsoAuthClient
+```
+
+### `TangleIdentitySsoExchangeResult`
+
+`interface` — First-party login exchanges identity without minting a Platform API key.
+
+```ts
+interface TangleIdentitySsoExchangeResult
 ```
 
 ### `TangleIdentitySsoHandlerOptions`
