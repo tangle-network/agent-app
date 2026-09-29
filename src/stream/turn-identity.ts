@@ -10,6 +10,9 @@ interface TurnIdentityMessage {
 
 /** Retained compatibility shape for callers using unstructured message records. */
 export interface PersistedChatMessageForTurn extends TurnIdentityMessage {
+  id: string
+  role: TurnIdentityMessage['role']
+  content: string
   parts: Array<Record<string, unknown>> | null
 }
 

@@ -50,52 +50,61 @@ function sanitizeUpstreamMessage(input: unknown): string {
     .replace(/\b(?:sk|pk|tc)[_-][A-Za-z0-9_-]{8,}\b/g, '[redacted-key]')
 }
 
-async function interactionsFetch(
+/** One transport for session controls and interaction answers. Keep the established
+ * error codes per family; authentication, deadlines and decoding cannot drift. */
+async function sidecarFetch(
   connection: SidecarInteractionsConnection,
-  init: { method: 'GET' } | { method: 'POST'; body: Record<string, unknown> },
+  family: 'interactions' | 'session',
+  init: { method: 'GET' | 'POST'; body?: Record<string, unknown> } = { method: 'GET' },
 ): Promise<SidecarInteractionsResult<Record<string, unknown>>> {
-  const doFetch = connection.fetchImpl ?? fetch
-  const url = `${connection.runtimeUrl.replace(/\/$/, '')}/agents/sessions/${encodeURIComponent(connection.sessionId)}/interactions`
+  const session = `/agents/sessions/${encodeURIComponent(connection.sessionId)}`
+  const path = family === 'interactions' ? `${session}/interactions`
+    : init.method === 'POST' ? `${session}/abort` : session
+  const failure = (code: string, message: unknown, status: number): SidecarInteractionsResult<never> => ({
+    succeeded: false, error: { code, message: sanitizeUpstreamMessage(message), status },
+  })
   let response: Response
+  let parsed: unknown
   try {
-    response = await doFetch(url, {
+    response = await (connection.fetchImpl ?? fetch)(`${connection.runtimeUrl.replace(/\/$/, '')}${path}`, {
       method: init.method,
       headers: {
-        ...(connection.authToken ? { Authorization: `Bearer ${connection.authToken}` } : {}),
-        ...(init.method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
+        ...(connection.authToken ? { authorization: `Bearer ${connection.authToken}` } : {}),
+        ...(init.method === 'POST' ? { 'content-type': 'application/json' } : {}),
       },
-      ...(init.method === 'POST' ? { body: JSON.stringify(init.body) } : {}),
+      ...(init.method === 'POST' ? { body: JSON.stringify(init.body ?? {}) } : {}),
+      redirect: 'manual',
+      credentials: 'omit',
       signal: AbortSignal.timeout(connection.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     })
-  } catch (err) {
-    return {
-      succeeded: false,
-      error: { code: 'UPSTREAM_UNREACHABLE', message: sanitizeUpstreamMessage(err), status: 0 },
+    if (response.redirected || response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      await response.body?.cancel().catch(() => undefined)
+      return failure('UPSTREAM_REDIRECT', 'The sidecar request refused a redirect.', response.status)
     }
+    try { parsed = await response.json() } catch { parsed = undefined }
+  } catch (error) {
+    return family === 'interactions'
+      ? failure('UPSTREAM_UNREACHABLE', error, 0)
+      : failure('SIDECAR_UNREACHABLE', error, 502)
   }
-  const raw = await response.text().catch(() => '')
-  let parsed: Record<string, unknown> = {}
-  try {
-    parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
-  } catch {
-    // Non-JSON error bodies (proxy 502 pages) fall through to the status check.
+  const payload = asRecord(parsed)
+  if (!response.ok || payload?.success === false) {
+    const error = asRecord(payload?.error)
+    return failure(
+      typeof error?.code === 'string' && error.code ? error.code
+        : family === 'interactions' ? 'UPSTREAM_ERROR' : 'SIDECAR_SESSION_FAILED',
+      typeof error?.message === 'string' && error.message ? error.message
+        : `sidecar ${family} ${init.method} failed (${response.status})`,
+      response.status,
+    )
   }
-  if (!response.ok) {
-    const upstreamError = (parsed.error ?? {}) as { code?: unknown; message?: unknown }
-    return {
-      succeeded: false,
-      error: {
-        code: typeof upstreamError.code === 'string' && upstreamError.code ? upstreamError.code : 'UPSTREAM_ERROR',
-        message: sanitizeUpstreamMessage(
-          typeof upstreamError.message === 'string' && upstreamError.message
-            ? upstreamError.message
-            : `sidecar interactions ${init.method} failed (${response.status})`,
-        ),
-        status: response.status,
-      },
-    }
-  }
-  return { succeeded: true, value: parsed }
+  if (!payload) return failure('MALFORMED_RESPONSE', 'The sidecar returned no JSON object.', response.status)
+  return { succeeded: true, value: payload }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown> : undefined
 }
 
 /** Outstanding (unanswered) interactions for the session — the sidecar's
@@ -103,7 +112,7 @@ async function interactionsFetch(
 export async function listSessionInteractions(
   connection: SidecarInteractionsConnection,
 ): Promise<SidecarInteractionsResult<InteractionRequestWire[]>> {
-  const result = await interactionsFetch(connection, { method: 'GET' })
+  const result = await sidecarFetch(connection, 'interactions')
   if (!result.succeeded) return result
   const data = result.value.data as { interactions?: unknown } | undefined
   if (!Array.isArray(data?.interactions)) {
@@ -122,7 +131,7 @@ export async function respondToSessionInteraction(
   connection: SidecarInteractionsConnection,
   response: { id: string; outcome: InteractionOutcome; data?: InteractionData },
 ): Promise<SidecarInteractionsResult<void>> {
-  const result = await interactionsFetch(connection, {
+  const result = await sidecarFetch(connection, 'interactions', {
     method: 'POST',
     body: {
       id: response.id,
@@ -182,58 +191,6 @@ export function isTerminalSidecarState(state: {
 
 const TERMINAL_SESSION_STATES = ['completed', 'failed', 'aborted', 'expired', 'idle', 'terminal']
 
-async function sessionFetch(
-  connection: SidecarInteractionsConnection,
-  init: { method: 'GET' | 'POST' } = { method: 'GET' },
-): Promise<SidecarInteractionsResult<Record<string, unknown>>> {
-  const doFetch = connection.fetchImpl ?? fetch
-  const base = `${connection.runtimeUrl.replace(/\/$/, '')}/agents/sessions/${encodeURIComponent(connection.sessionId)}`
-  const url = init.method === 'POST' ? `${base}/abort` : base
-  let response: Response
-  try {
-    response = await doFetch(url, {
-      method: init.method,
-      headers: {
-        ...(connection.authToken ? { authorization: `Bearer ${connection.authToken}` } : {}),
-        ...(init.method === 'POST' ? { 'content-type': 'application/json' } : {}),
-      },
-      ...(init.method === 'POST' ? { body: '{}' } : {}),
-      signal: AbortSignal.timeout(connection.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-    })
-  } catch (err) {
-    return {
-      succeeded: false,
-      error: { code: 'SIDECAR_UNREACHABLE', message: sanitizeUpstreamMessage(err), status: 502 },
-    }
-  }
-  let parsed: Record<string, unknown> = {}
-  try {
-    parsed = (await response.json()) as Record<string, unknown>
-  } catch {
-    parsed = {}
-  }
-  if (!response.ok) {
-    const upstreamError = (parsed.error && typeof parsed.error === 'object'
-      ? parsed.error
-      : {}) as Record<string, unknown>
-    return {
-      succeeded: false,
-      error: {
-        code: typeof upstreamError.code === 'string' && upstreamError.code
-          ? upstreamError.code
-          : 'SIDECAR_SESSION_FAILED',
-        message: sanitizeUpstreamMessage(
-          typeof upstreamError.message === 'string' && upstreamError.message
-            ? upstreamError.message
-            : `sidecar session ${init.method} failed (${response.status})`,
-        ),
-        status: response.status,
-      },
-    }
-  }
-  return { succeeded: true, value: parsed }
-}
-
 /** Read the session payload defensively: newer boxes nest under `data`, and
  *  the execution id appears either on the session or on `activeExecution`. */
 function sessionStateFromPayload(payload: Record<string, unknown>): SidecarSessionState {
@@ -276,7 +233,7 @@ function sessionStateFromPayload(payload: Record<string, unknown>): SidecarSessi
 export async function getSessionState(
   connection: SidecarInteractionsConnection,
 ): Promise<SidecarInteractionsResult<SidecarSessionState>> {
-  const result = await sessionFetch(connection)
+  const result = await sidecarFetch(connection, 'session')
   if (!result.succeeded) return result
   return { succeeded: true, value: sessionStateFromPayload(result.value) }
 }
@@ -292,7 +249,7 @@ export async function getSessionState(
 export async function abortSession(
   connection: SidecarInteractionsConnection,
 ): Promise<SidecarInteractionsResult<SidecarAbortResult>> {
-  const result = await sessionFetch(connection, { method: 'POST' })
+  const result = await sidecarFetch(connection, 'session', { method: 'POST' })
   if (!result.succeeded) {
     if (result.error.status === 404) return { succeeded: true, value: { cancelled: false, reason: 'not-found' } }
     return result
