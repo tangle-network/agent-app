@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.49.38
+
+- feat(auth): support identity-only first-party SSO
+
 ## 0.49.37
 
 - chore(agent-app): align supported UI peers
