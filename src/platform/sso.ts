@@ -343,6 +343,13 @@ export interface TangleOidcSsoAccountStore extends Omit<TangleSsoAccountStore, '
 
 /** Persist only the stable identity link for a first-party app. */
 export interface TangleIdentitySsoAccountStore extends Omit<TangleSsoAccountStore, 'saveTangleLink'> {
+  /** `upsertUserByEmail` may create the local user, but must not publish a new
+   * platform link or update an existing user's verified-email state. The
+   * callback has not yet created a session or prepared its cookie. */
+  upsertUserByEmail: TangleSsoAccountStore['upsertUserByEmail']
+  /** Commit the identity link and any verified-email update atomically. Do not
+   * reject after committing. If the store can partially write before throwing,
+   * `deleteSession` must remove only writes made for this session token. */
   saveTangleLink(input: {
     userId: string
     sessionToken: string
@@ -350,6 +357,9 @@ export interface TangleIdentitySsoAccountStore extends Omit<TangleSsoAccountStor
     email: string
     name: string | null
   }): Promise<void>
+  /** Remove an unpublished session and any link or verification writes that a
+   * rejected `saveTangleLink` made for its exact token. Preserve preexisting
+   * links and other sessions. */
   deleteSession(input: { sessionToken: string }): Promise<void>
 }
 

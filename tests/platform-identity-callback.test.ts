@@ -19,9 +19,11 @@ function harness(overrides: {
   exchange?: () => Promise<unknown>
   setSessionCookie?: () => Promise<readonly string[]>
   saveTangleLink?: TangleIdentitySsoAccountStore['saveTangleLink']
+  deleteSession?: TangleIdentitySsoAccountStore['deleteSession']
 } = {}) {
   const calls: string[] = []
   const sessions = new Set<string>()
+  const links = new Set<string>()
   const auth: TangleIdentitySsoAuthClient = {
     authorizeUrl: ({ state, redirectUri }) => {
       const url = new URL('http://127.0.0.1:4100/cross-site/authorize')
@@ -51,9 +53,11 @@ function harness(overrides: {
     saveTangleLink: async (input) => {
       calls.push('save-link')
       if (overrides.saveTangleLink) await overrides.saveTangleLink(input)
+      else links.add(input.tangleUserId)
     },
     deleteSession: async ({ sessionToken }) => {
       calls.push(`delete-session:${sessionToken}`)
+      if (overrides.deleteSession) await overrides.deleteSession({ sessionToken })
       sessions.delete(sessionToken)
     },
   }
@@ -67,7 +71,7 @@ function harness(overrides: {
     }),
     log: () => {},
   })
-  return { handlers, calls, sessions }
+  return { handlers, calls, sessions, links }
 }
 
 async function callback(handlers: ReturnType<typeof createTangleSsoHandlers>) {
@@ -98,6 +102,7 @@ describe('identity-only SSO callback boundary', () => {
       'create-session', 'mint-cookie', 'save-link',
     ])
     expect(h.sessions.has('local-session')).toBe(true)
+    expect(h.links.has('platform-user')).toBe(true)
   })
 
   it.each([
@@ -129,6 +134,22 @@ describe('identity-only SSO callback boundary', () => {
     const response = await callback(h.handlers)
     expect(response.headers.get('Location')).toBe('/login?error=tangle_session_failed')
     expect(h.calls).toContain('delete-session:local-session')
+    expect(h.sessions.size).toBe(0)
+  })
+
+  it('asks the store to remove a partial identity write for the unpublished session', async () => {
+    const partialLinks = new Map<string, string>()
+    const h = harness({
+      saveTangleLink: async ({ sessionToken, tangleUserId }) => {
+        partialLinks.set(sessionToken, tangleUserId)
+        throw new Error('write acknowledged after link error')
+      },
+      deleteSession: async ({ sessionToken }) => { partialLinks.delete(sessionToken) },
+    })
+    const response = await callback(h.handlers)
+    expect(response.headers.get('Location')).toBe('/login?error=tangle_session_failed')
+    expect(h.calls).toContain('delete-session:local-session')
+    expect(partialLinks.size).toBe(0)
     expect(h.sessions.size).toBe(0)
   })
 })
