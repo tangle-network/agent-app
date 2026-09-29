@@ -186,15 +186,11 @@ export function buildMentionExtension(
     })
 }
 
-/** Matches the composer textarea's own text treatment so the two input modes
- *  render identically (`text-base leading-6`, the same padding). The compound
- *  `focus:outline-none` (never the bare utility, which only ties the
- *  tokens.css `:focus-visible` floor) is required for the same reason as on
- *  that textarea: the composer card this editor mounts into draws the
- *  keyboard indicator through `focus-within:`, so a second outline inside the
- *  card would double the ring. */
+/** Matches the composer textarea's text treatment. The composer card draws
+ *  keyboard feedback through `focus-within:`, so the editor clears its own
+ *  outline and shadow instead of drawing a second ring inside the card. */
 const EDITOR_CLASS =
-  'w-full whitespace-pre-wrap break-words bg-transparent px-1.5 py-1 text-base leading-6 text-foreground focus:outline-none'
+  'w-full whitespace-pre-wrap break-words bg-transparent px-1.5 py-1 text-base leading-6 text-foreground focus:outline-none focus-visible:shadow-none'
 
 /** Trailing debounce on the suggestion fetch so a fast typist doesn't hit the
  * provider once per keystroke. Fixed rather than a prop — 100ms is well under
