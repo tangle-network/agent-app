@@ -93,6 +93,12 @@
           "doc": "Define email configuration for app authentication including client, sender, verification, and warning options"
         },
         {
+          "name": "AppAuthIdentitySsoConfig",
+          "kind": "interface",
+          "signature": "interface AppAuthIdentitySsoConfig",
+          "doc": "First-party identity login; no Platform API key is issued or stored."
+        },
+        {
           "name": "AppAuthInstance",
           "kind": "type",
           "signature": "type AppAuthInstance",
@@ -9036,7 +9042,7 @@
         {
           "name": "createTangleSsoHandlers",
           "kind": "function",
-          "signature": "(opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions) => TangleSsoHandlers",
+          "signature": "(opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions | TangleIdentitySsoHandlerOptions) => TangleSsoHandlers",
           "doc": "Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies"
         },
         {
@@ -9296,6 +9302,24 @@
           "kind": "type",
           "signature": "type TangleHubBearerSource",
           "doc": "Hub bearer provenance mirrors the execution-key source union."
+        },
+        {
+          "name": "TangleIdentitySsoAccountStore",
+          "kind": "interface",
+          "signature": "interface TangleIdentitySsoAccountStore",
+          "doc": "Persist only the stable identity link for a first-party app."
+        },
+        {
+          "name": "TangleIdentitySsoAuthClient",
+          "kind": "interface",
+          "signature": "interface TangleIdentitySsoAuthClient",
+          "doc": "First-party login exchanges identity without minting a Platform API key."
+        },
+        {
+          "name": "TangleIdentitySsoHandlerOptions",
+          "kind": "interface",
+          "signature": "interface TangleIdentitySsoHandlerOptions",
+          "doc": null
         },
         {
           "name": "TangleOidcSsoAccountStore",
