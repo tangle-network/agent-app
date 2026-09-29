@@ -87,6 +87,9 @@ export type MutationState<T> =
   | { readonly status: 'failed'; readonly message: string; readonly error: unknown }
 
 export interface UseConfirmedMutationOptions<TInput, TValue> {
+  /** Default replaces the observed run. `reject` keeps the current request
+   *  and refuses another invocation before any second write can start. */
+  concurrency?: 'replace' | 'reject'
   /**
    * Performs the write and returns a confirmation. Anything else — including a
    * hand-written `{ succeeded: true }` — is treated as a failed write, because
@@ -109,8 +112,8 @@ export interface UseConfirmedMutationOptions<TInput, TValue> {
 export interface ConfirmedMutation<TInput, TValue> {
   readonly state: MutationState<TValue>
   /** Runs the write. Never rejects — the outcome is returned and mirrored into
-   *  `state`. Concurrent runs are last-write-wins; disable the control while
-   *  `state.status === 'pending'`. */
+   *  `state`. Concurrent runs are last-write-wins unless `concurrency: 'reject'`
+   *  is configured. Server-side idempotency is still required. */
   readonly run: (input: TInput) => Promise<MutationOutcome<TValue>>
   /** Back to `idle` (dismisses a "Saved" or error affordance). */
   readonly reset: () => void
@@ -135,55 +138,53 @@ export function useConfirmedMutation<TInput, TValue>({
   onSucceeded,
   onFailed,
   errorMessage,
+  concurrency = 'replace',
 }: UseConfirmedMutationOptions<TInput, TValue>): ConfirmedMutation<TInput, TValue> {
-  const mutateRef = useRef(mutate)
-  mutateRef.current = mutate
-  const onSucceededRef = useRef(onSucceeded)
-  onSucceededRef.current = onSucceeded
-  const onFailedRef = useRef(onFailed)
-  onFailedRef.current = onFailed
-  const errorMessageRef = useRef(errorMessage)
-  errorMessageRef.current = errorMessage
+  const options = useRef({ mutate, onSucceeded, onFailed, errorMessage, concurrency })
+  options.current = { mutate, onSucceeded, onFailed, errorMessage, concurrency }
 
   const [state, setState] = useState<MutationState<TValue>>({ status: 'idle' })
   const seqRef = useRef(0)
-  const inFlightRef = useRef<AbortController | null>(null)
+  const inFlightRef = useRef<{ controller: AbortController; pending: boolean } | null>(null)
 
   const run = useCallback(async (input: TInput): Promise<MutationOutcome<TValue>> => {
-    inFlightRef.current?.abort()
+    if (options.current.concurrency === 'reject' && inFlightRef.current?.pending)
+      return rejectWrite('Another operation is still in progress.')
+    inFlightRef.current?.controller.abort()
     const controller = new AbortController()
-    inFlightRef.current = controller
+    inFlightRef.current = { controller, pending: true }
     const seq = ++seqRef.current
 
     setState({ status: 'pending' })
 
     let outcome: MutationOutcome<TValue>
     try {
-      const returned: unknown = await mutateRef.current(input, { signal: controller.signal })
+      const returned: unknown = await options.current.mutate(input, { signal: controller.signal })
       outcome = isConfirmedWrite<TValue>(returned)
         ? returned
         : asRejection(returned) ?? rejectWrite(UNCONFIRMED_MESSAGE, new Error(UNCONFIRMED_CONTRACT))
     } catch (error) {
-      outcome = rejectWrite(errorMessageRef.current ? errorMessageRef.current(error) : asyncErrorMessage(error), error)
+      outcome = rejectWrite(options.current.errorMessage?.(error) ?? asyncErrorMessage(error), error)
     }
 
     // A superseded run reports its own outcome to its own caller and never
     // repaints the state a newer run owns.
     if (seq !== seqRef.current) return outcome
+    if (inFlightRef.current) inFlightRef.current.pending = false
 
     if (outcome.succeeded) {
       setState({ status: 'succeeded', value: outcome.value })
-      onSucceededRef.current?.(outcome.value)
+      options.current.onSucceeded?.(outcome.value)
     } else {
       setState({ status: 'failed', message: outcome.message, error: outcome.error })
-      onFailedRef.current?.(outcome.message, outcome.error)
+      options.current.onFailed?.(outcome.message, outcome.error)
     }
     return outcome
   }, [])
 
   const reset = useCallback(() => {
     seqRef.current += 1
-    inFlightRef.current?.abort()
+    inFlightRef.current?.controller.abort()
     inFlightRef.current = null
     setState({ status: 'idle' })
   }, [])

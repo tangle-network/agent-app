@@ -275,7 +275,7 @@ interface UseAsyncResourceOptions
 `function` — `idle | pending | succeeded | failed` over a write that must confirm itself.
 
 ```ts
-<TInput, TValue>({ mutate, onSucceeded, onFailed, errorMessage, }: UseConfirmedMutationOptions<TInput, TValue>) => Conf…
+<TInput, TValue>({ mutate, onSucceeded, onFailed, errorMessage, concurrency, }: UseConfirmedMutationOptions<TInput, TVa…
 ```
 
 ### `UseConfirmedMutationOptions`

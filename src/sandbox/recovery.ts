@@ -68,18 +68,18 @@ export type WorkspaceSandboxRecoveryCode = keyof typeof CODES
  * declined to lose.
  */
 const ACTIONS = {
-  confirmation_required: { replacementChosen: false },
-  deletion_declined: { replacementChosen: false },
+  confirmation_required: { replacementChosen: false, canDecide: true },
+  deletion_declined: { replacementChosen: false, canDecide: true },
   replacement_authorized: { replacementChosen: false },
   snapshot_replacement_authorized: { replacementChosen: false },
-  replacement_started: { replacementChosen: true },
+  replacement_started: { replacementChosen: true, completedAs: 'replacement_completed' },
   replacement_completed: { replacementChosen: true },
-  snapshot_replacement_started: { replacementChosen: true },
-  snapshot_restore_failed: { replacementChosen: true },
+  snapshot_replacement_started: { replacementChosen: true, completedAs: 'snapshot_replacement_completed' },
+  snapshot_restore_failed: { replacementChosen: true, completedAs: 'snapshot_replacement_completed' },
   snapshot_replacement_completed: { replacementChosen: true },
-  missing_replacement_started: { replacementChosen: true },
+  missing_replacement_started: { replacementChosen: true, completedAs: 'missing_replacement_completed' },
   missing_replacement_completed: { replacementChosen: true },
-  unrecoverable_replacement_started: { replacementChosen: true },
+  unrecoverable_replacement_started: { replacementChosen: true, completedAs: 'unrecoverable_replacement_completed' },
   unrecoverable_replacement_completed: { replacementChosen: true },
 } as const
 
@@ -95,17 +95,17 @@ export interface WorkspaceSandboxSnapshot {
   [key: string]: unknown
 }
 
-export interface WorkspaceSandboxSnapshotAssessment {
+export interface WorkspaceSandboxSnapshotAssessment<Snapshot extends WorkspaceSandboxSnapshot = WorkspaceSandboxSnapshot> {
   availability: WorkspaceSandboxSnapshotAvailability
   freshness: WorkspaceSandboxSnapshotFreshness
-  snapshot?: WorkspaceSandboxSnapshot
+  snapshot?: Snapshot
 }
 
-export interface WorkspaceSandboxRecoveryState {
+export interface WorkspaceSandboxRecoveryState<Snapshot extends WorkspaceSandboxSnapshot = WorkspaceSandboxSnapshot> {
   code: WorkspaceSandboxRecoveryCode
   sandboxId: string
   detectedAt: string
-  snapshot: WorkspaceSandboxSnapshotAssessment
+  snapshot: WorkspaceSandboxSnapshotAssessment<Snapshot>
   action: WorkspaceSandboxRecoveryAction
   replacementBoxKey?: string
   replacementSandboxId?: string
@@ -179,11 +179,11 @@ export function isWorkspaceSandboxSnapshotRestoreError(error: unknown): boolean 
  * the age bound — a snapshot from a different box restores someone else's
  * filesystem, which is worse than starting empty.
  */
-export function assessWorkspaceSandboxSnapshot(
-  snapshot: WorkspaceSandboxSnapshot | undefined,
+export function assessWorkspaceSandboxSnapshot<Snapshot extends WorkspaceSandboxSnapshot>(
+  snapshot: Snapshot | undefined,
   sandboxId: string,
   now = Date.now(),
-): WorkspaceSandboxSnapshotAssessment {
+): WorkspaceSandboxSnapshotAssessment<Snapshot> {
   if (!snapshot) return { availability: 'missing', freshness: 'unknown' }
 
   const createdAt = Date.parse(snapshot.createdAt)
@@ -320,93 +320,77 @@ export function shouldRestoreWorkspaceSandboxRecovery(
     && recovery.snapshot.availability === 'available'
 }
 
-/**
- * Where an app keeps recovery state. One row per workspace, last write wins —
- * a recovery is a current situation, not a history.
- */
-export interface WorkspaceSandboxRecoveryStore {
-  read: (workspaceId: string) => Promise<WorkspaceSandboxRecoveryState | undefined>
-  write: (workspaceId: string, recovery: WorkspaceSandboxRecoveryState) => Promise<void>
+/** One current recovery per workspace, stored by the application.
+ * Concurrent writers should supply compareAndSet. Legacy write-only stores
+ * remain supported but must serialize decisions and completion themselves. */
+export interface WorkspaceSandboxRecoveryStore<Snapshot extends WorkspaceSandboxSnapshot = WorkspaceSandboxSnapshot> {
+  read: (workspaceId: string) => Promise<WorkspaceSandboxRecoveryState<Snapshot> | undefined>
+  write: (workspaceId: string, recovery: WorkspaceSandboxRecoveryState<Snapshot>) => Promise<void>
+  /** Commit a transition only while the exact recovery read above remains current. */
+  compareAndSet?: (
+    workspaceId: string,
+    expected: WorkspaceSandboxRecoveryState<Snapshot>,
+    recovery: WorkspaceSandboxRecoveryState<Snapshot>,
+  ) => Promise<boolean>
 }
 
-export interface WorkspaceSandboxRecoveryManager {
-  read: (workspaceId: string) => Promise<WorkspaceSandboxRecoveryState | undefined>
-  record: (workspaceId: string, recovery: WorkspaceSandboxRecoveryState) => Promise<void>
-  /** Record an owner's decision. Returns undefined when the stored recovery does
-   *  not name this sandbox — a decision about a box that has already been
-   *  replaced must not resurrect it. */
+export interface WorkspaceSandboxRecoveryManager<Snapshot extends WorkspaceSandboxSnapshot = WorkspaceSandboxSnapshot> {
+  read: WorkspaceSandboxRecoveryStore<Snapshot>['read']
+  record: WorkspaceSandboxRecoveryStore<Snapshot>['write']
+  /** Only a pending/declined recovery for this sandbox accepts a new decision. */
   decide: (args: {
     workspaceId: string
     sandboxId: string
     decision: WorkspaceSandboxRecoveryDecision
     replacementBoxKey?: string
-  }) => Promise<WorkspaceSandboxRecoveryState | undefined>
-  /** Mark a replacement finished and name the box that took over. */
+  }) => Promise<WorkspaceSandboxRecoveryState<Snapshot> | undefined>
+  /** Only a started replacement with a chosen key may be completed. */
   complete: (args: {
     workspaceId: string
     replacementSandboxId: string
-  }) => Promise<WorkspaceSandboxRecoveryState | undefined>
+  }) => Promise<WorkspaceSandboxRecoveryState<Snapshot> | undefined>
 }
 
-/**
- * Bind the recovery bookkeeping to an app's storage.
- *
- * The app owns persistence — a D1 column, a KV key, a Postgres row — and
- * nothing else. Every rule about which action means what stays here, so it
- * cannot drift between apps.
- */
-export function createWorkspaceSandboxRecoveryManager(
-  store: WorkspaceSandboxRecoveryStore,
-): WorkspaceSandboxRecoveryManager {
-  async function record(workspaceId: string, recovery: WorkspaceSandboxRecoveryState) {
-    await store.write(workspaceId, recovery)
+/** Bind canonical recovery policy to the application's existing storage. */
+export function createWorkspaceSandboxRecoveryManager<Snapshot extends WorkspaceSandboxSnapshot>(
+  store: WorkspaceSandboxRecoveryStore<Snapshot>,
+): WorkspaceSandboxRecoveryManager<Snapshot> {
+  type State = WorkspaceSandboxRecoveryState<Snapshot>
+  async function transition(workspaceId: string, expected: State, next: State): Promise<State> {
+    if (store.compareAndSet) {
+      if (!await store.compareAndSet(workspaceId, expected, next))
+        throw new Error('Sandbox recovery changed; reload before retrying its transition')
+    } else {
+      await store.write(workspaceId, next)
+    }
+    return next
   }
 
   return {
-    read: store.read,
-    record,
+    read: workspaceId => store.read(workspaceId),
+    record: (workspaceId, recovery) => store.write(workspaceId, recovery),
     async decide({ workspaceId, sandboxId, decision, replacementBoxKey }) {
       const current = await store.read(workspaceId)
-      if (!current || current.sandboxId !== sandboxId) return undefined
-      const next: WorkspaceSandboxRecoveryState = {
+      if (!current || current.sandboxId !== sandboxId || !('canDecide' in ACTIONS[current.action])) return undefined
+      if (decision === 'replace' && !asNonEmptyString(replacementBoxKey))
+        throw new Error('Sandbox replacement authorization requires a fresh replacement box key')
+      return transition(workspaceId, current, {
         ...current,
         action: decision === 'replace'
-          ? (current.snapshot.availability === 'available'
-              ? 'snapshot_replacement_authorized'
-              : 'replacement_authorized')
+          ? (current.snapshot.availability === 'available' ? 'snapshot_replacement_authorized' : 'replacement_authorized')
           : 'deletion_declined',
         confirmedAt: new Date().toISOString(),
-        ...(decision === 'replace' && replacementBoxKey ? { replacementBoxKey } : {}),
-      }
-      await record(workspaceId, next)
-      return next
+        ...(decision === 'replace' ? { replacementBoxKey } : {}),
+      })
     },
     async complete({ workspaceId, replacementSandboxId }) {
       const current = await store.read(workspaceId)
-      if (!current) return undefined
-      const next: WorkspaceSandboxRecoveryState = {
-        ...current,
-        action: completionFor(current.action),
-        replacementSandboxId,
-      }
-      await record(workspaceId, next)
-      return next
+      if (!current || !asNonEmptyString(current.replacementBoxKey)) return undefined
+      const policy = ACTIONS[current.action]
+      if (!('completedAs' in policy)) return undefined
+      if (!asNonEmptyString(replacementSandboxId)) throw new Error('A replacement sandbox id is required')
+      return transition(workspaceId, current, { ...current, action: policy.completedAs, replacementSandboxId })
     },
-  }
-}
-
-/** The finished form of an in-flight replacement action. */
-function completionFor(action: WorkspaceSandboxRecoveryAction): WorkspaceSandboxRecoveryAction {
-  switch (action) {
-    case 'missing_replacement_started':
-      return 'missing_replacement_completed'
-    case 'unrecoverable_replacement_started':
-      return 'unrecoverable_replacement_completed'
-    case 'snapshot_replacement_started':
-    case 'snapshot_replacement_authorized':
-      return 'snapshot_replacement_completed'
-    default:
-      return 'replacement_completed'
   }
 }
 

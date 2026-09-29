@@ -51,7 +51,7 @@ interface AppToolDescriptor
 `function` — Judge a snapshot against the box being replaced.
 
 ```ts
-(snapshot: WorkspaceSandboxSnapshot | undefined, sandboxId: string, now?: number) => WorkspaceSandboxSnapshotAssessment
+<Snapshot extends WorkspaceSandboxSnapshot>(snapshot: Snapshot | undefined, sandboxId: string, now?: number) => Workspa…
 ```
 
 ### `attachReasoningEffort`
@@ -176,10 +176,10 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `createWorkspaceSandboxRecoveryManager`
 
-`function` — Bind the recovery bookkeeping to an app's storage.
+`function` — Bind canonical recovery policy to the application's existing storage.
 
 ```ts
-(store: WorkspaceSandboxRecoveryStore) => WorkspaceSandboxRecoveryManager
+<Snapshot extends WorkspaceSandboxSnapshot>(store: WorkspaceSandboxRecoveryStore<Snapshot>) => WorkspaceSandboxRecovery…
 ```
 
 ### `D1PrewarmClaimStoreOptions`
@@ -443,7 +443,7 @@ interface InspectablePrewarmClaimStore
 `function`
 
 ```ts
-(value: unknown) => value is "confirmation_required" | "deletion_declined" | "replacement_authorized" | "snapshot_repla…
+(value: unknown) => value is "replacement_completed" | "snapshot_replacement_completed" | "missing_replacement_complete…
 ```
 
 ### `isWorkspaceSandboxRecoveryCode`
@@ -459,7 +459,7 @@ interface InspectablePrewarmClaimStore
 `function`
 
 ```ts
-(value: unknown) => value is WorkspaceSandboxRecoveryState
+(value: unknown) => value is WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot>
 ```
 
 ### `isWorkspaceSandboxSnapshotRestoreError`
@@ -579,7 +579,7 @@ type PeekWorkspaceSandboxOutcome
 `function` — The box key the next provisioning attempt should use, or undefined to keep using the workspace's own key.
 
 ```ts
-(recovery: WorkspaceSandboxRecoveryState | undefined) => string | undefined
+(recovery: WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot> | undefined) => string | undefined
 ```
 
 ### `PREWARM_CLAIM_TABLE_DDL`
@@ -1187,7 +1187,7 @@ interface SecretStore
 `function` — Whether the replacement should be restored from the old box's snapshot.
 
 ```ts
-(recovery: WorkspaceSandboxRecoveryState | undefined) => boolean
+(recovery: WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot> | undefined) => boolean
 ```
 
 ### `splitDeferredProfileFiles`
@@ -1307,7 +1307,7 @@ interface TerminalConnectionBoxLike
 `const` — Every declared action, for exhaustiveness tests in apps and here.
 
 ```ts
-readonly ("confirmation_required" | "deletion_declined" | "replacement_authorized" | "snapshot_replacement_authorized"…
+readonly ("replacement_completed" | "snapshot_replacement_completed" | "missing_replacement_completed" | "unrecoverable…
 ```
 
 ### `WORKSPACE_SANDBOX_RECOVERY_CODES`
@@ -1395,7 +1395,7 @@ type WorkspaceSandboxRecoveryDecision
 `function` — Flat key/value shape for a log line — no nesting, no secrets.
 
 ```ts
-(recovery: WorkspaceSandboxRecoveryState) => Record<string, string | undefined>
+(recovery: WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot>) => Record<string, string | undefined>
 ```
 
 ### `workspaceSandboxRecoveryFromError`
@@ -1403,7 +1403,7 @@ type WorkspaceSandboxRecoveryDecision
 `function`
 
 ```ts
-(error: unknown) => WorkspaceSandboxRecoveryState | undefined
+(error: unknown) => WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot> | undefined
 ```
 
 ### `WorkspaceSandboxRecoveryManager`
@@ -1419,7 +1419,7 @@ interface WorkspaceSandboxRecoveryManager
 `function` — What to tell the person waiting.
 
 ```ts
-(recovery: WorkspaceSandboxRecoveryState) => string
+(recovery: WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot>) => string
 ```
 
 ### `workspaceSandboxRecoveryRecommendedActions`
@@ -1427,7 +1427,7 @@ interface WorkspaceSandboxRecoveryManager
 `function`
 
 ```ts
-(recovery: WorkspaceSandboxRecoveryState) => string[]
+(recovery: WorkspaceSandboxRecoveryState<WorkspaceSandboxSnapshot>) => string[]
 ```
 
 ### `WorkspaceSandboxRecoveryRequiredError`
@@ -1448,7 +1448,7 @@ interface WorkspaceSandboxRecoveryState
 
 ### `WorkspaceSandboxRecoveryStore`
 
-`interface` — Where an app keeps recovery state.
+`interface` — One current recovery per workspace, stored by the application.
 
 ```ts
 interface WorkspaceSandboxRecoveryStore
