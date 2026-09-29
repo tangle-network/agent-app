@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.5
+
+- refactor: bind recovery to provisioning attempts and preserve typed turn history (#687)
+
 ## 0.50.4
 
 - refactor: consolidate recovery policy and shared async lifecycles (#685)
