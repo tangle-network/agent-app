@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_104 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_105 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -109,7 +109,8 @@ _104 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
-| [`./workspace-react`](api/workspace-react.md) | 4 | `session-shell` |
+| [`./workspace-apps`](api/workspace-apps.md) | 9 | — |
+| [`./workspace-react`](api/workspace-react.md) | 5 | `session-shell`, `workspace-apps` |
 
 ---
 
@@ -1039,12 +1040,20 @@ Depends on: `web-react`, `work-product`
 
 [Full API →](api/work-product-react.md)
 
+## `./workspace-apps`
+
+Source: `src/workspace-apps/index.ts` · 9 exports
+
+`confirmWorkspaceAppReady`, `refreshWorkspaceAppPreview`, `workspaceAppBuilderInstructions`, `WorkspaceAppBuilderInstructionsOptions`, `workspaceAppFromPreviewLink`, `WorkspaceAppHttpProof`, `WorkspaceAppIdentity`, `WorkspaceAppPreviewLink`, `WorkspaceAppRecord`
+
+[Full API →](api/workspace-apps.md)
+
 ## `./workspace-react`
 
-Source: `src/workspace-react/index.tsx` · 4 exports
+Source: `src/workspace-react/index.tsx` · 5 exports
 
-Depends on: `session-shell`
+Depends on: `session-shell`, `workspace-apps`
 
-`AgentWorkspaceActiveRoute`, `AgentWorkspaceLayout`, `AgentWorkspaceLayoutProps`, `AgentWorkspaceSessionConfig`
+`AgentWorkspaceActiveRoute`, `AgentWorkspaceAppsConfig`, `AgentWorkspaceLayout`, `AgentWorkspaceLayoutProps`, `AgentWorkspaceSessionConfig`
 
 [Full API →](api/workspace-react.md)

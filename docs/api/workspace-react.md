@@ -4,7 +4,7 @@
 
 Source: `src/workspace-react/index.tsx`
 
-4 exports.
+5 exports.
 
 ### `AgentWorkspaceActiveRoute`
 
@@ -14,12 +14,20 @@ Source: `src/workspace-react/index.tsx`
 interface AgentWorkspaceActiveRoute
 ```
 
+### `AgentWorkspaceAppsConfig`
+
+`interface` — Registered apps shown as individual workspace destinations.
+
+```ts
+interface AgentWorkspaceAppsConfig
+```
+
 ### `AgentWorkspaceLayout`
 
 `function` — The default agent workspace composition.
 
 ```ts
-({ children, navItems, sessions, activeRoute, activeId, ...sidebarProps }: AgentWorkspaceLayoutProps) => Element
+({ children, navItems, sessions, apps, activeRoute, activeId, ...sidebarProps }: AgentWorkspaceLayoutProps) => Element
 ```
 
 ### `AgentWorkspaceLayoutProps`
