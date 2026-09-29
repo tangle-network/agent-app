@@ -1,0 +1,19 @@
+1
+00:00:00,000 --> 00:00:01,280
+2x playback | Storybook fixture | Authorize sender
+
+2
+00:00:01,280 --> 00:00:01,650
+2x playback | Save answering line
+
+3
+00:00:01,650 --> 00:00:02,000
+2x playback | Reload retains saved line
+
+4
+00:00:02,000 --> 00:00:02,650
+2x playback | Disable grants; keyboard disconnect
+
+5
+00:00:02,650 --> 00:00:03,400
+2x playback | Reload retains empty state

@@ -6287,7 +6287,8 @@
       "id": "./hosted-agent",
       "source": "src/hosted-agent/index.ts",
       "dependsOn": [
-        "profile"
+        "profile",
+        "web"
       ],
       "error": null,
       "exports": [
@@ -6450,11 +6451,70 @@
       ]
     },
     {
+      "id": "./hosted-agent/application",
+      "source": "src/hosted-agent/application.ts",
+      "dependsOn": [
+        "profile",
+        "web"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "ApplicationLineObservation",
+          "kind": "type",
+          "signature": "type ApplicationLineObservation",
+          "doc": "Missing is an affirmative storage observation, never an error fallback."
+        },
+        {
+          "name": "ApplicationLineOptions",
+          "kind": "interface",
+          "signature": "interface ApplicationLineOptions",
+          "doc": null
+        },
+        {
+          "name": "attachWorkspaceLine",
+          "kind": "function",
+          "signature": "(input: { box: Pick<SandboxInstance, \"lines\">; lineId: string; ownerAddress: string; application: LineApplication; turn…",
+          "doc": "A line delegates its nominated owner to the application's normal chat path."
+        },
+        {
+          "name": "createApplicationLineHandler",
+          "kind": "function",
+          "signature": "<T>(options: ApplicationLineOptions<T>) => (request: Request) => Promise<Response>",
+          "doc": "One bounded pass from the native Lines worker into the application's existing execution path."
+        }
+      ]
+    },
+    {
       "id": "./hosted-agent/react",
       "source": "src/hosted-agent/react/index.ts",
       "dependsOn": [],
       "error": null,
       "exports": [
+        {
+          "name": "ApplicationLineConnectInput",
+          "kind": "interface",
+          "signature": "interface ApplicationLineConnectInput",
+          "doc": null
+        },
+        {
+          "name": "ApplicationLineSetup",
+          "kind": "function",
+          "signature": "(props: ApplicationLineSetupProps) => Element",
+          "doc": "Nominate a sender explicitly, then use the existing connection and disconnect UI."
+        },
+        {
+          "name": "ApplicationLineSetupClient",
+          "kind": "interface",
+          "signature": "interface ApplicationLineSetupClient",
+          "doc": null
+        },
+        {
+          "name": "ApplicationLineSetupProps",
+          "kind": "interface",
+          "signature": "interface ApplicationLineSetupProps",
+          "doc": null
+        },
         {
           "name": "ConnectableLineTransport",
           "kind": "type",
@@ -6548,7 +6608,7 @@
         {
           "name": "LineSetup",
           "kind": "function",
-          "signature": "({ client, scopeKey, initialTargetId, canManage, onNotice }: LineSetupProps) => Element",
+          "signature": "({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect, showConnectionSetup, onNotice }: LineSetupPro…",
           "doc": "Set up an owned identity through a host route backed by sandbox.lines and Hub."
         },
         {
@@ -18539,7 +18599,7 @@
         {
           "name": "parseJsonObjectBody",
           "kind": "function",
-          "signature": "(request: Request) => Promise<[JsonObject, null] | [null, Response]>",
+          "signature": "(request: Request, options?: { maxBytes?: number | undefined; }) => Promise<[JsonObject, null] | [null, Response]>",
           "doc": "Parse + object-narrow a Request body."
         },
         {

@@ -47,7 +47,7 @@ function matchesLineIdentity(line: LineSetupLine, identity: LineIdentityOption, 
 }
 
 /** Set up an owned identity through a host route backed by sandbox.lines and Hub. */
-export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNotice }: LineSetupProps) {
+export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect = canManage, showConnectionSetup = true, onNotice }: LineSetupProps) {
   const clientRef = useRef(client)
   clientRef.current = client
   const sequence = useRef(0)
@@ -161,7 +161,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
   const blockedByExistingLine = Boolean(occupied?.length && !reconnecting)
 
   async function connect() {
-    if (!selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine || busy || loading || refreshFailed) return
+    if (!canManage || !canConnect || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine || busy || loading || refreshFailed) return
     const requestIncarnation = incarnation.current
     setBusy(true)
     setError(null)
@@ -199,7 +199,8 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
     setBusy(true)
     setError(null)
     try {
-      await clientRef.current.disconnect(lineId)
+      const expectedAttachmentId = snapshot?.lines.find(line => line.id === lineId)?.attachmentId ?? undefined
+      await clientRef.current.disconnect(lineId, expectedAttachmentId)
       if (!stillCurrent(requestIncarnation)) return
       const updated = await reload(requestIncarnation)
       if (!stillCurrent(requestIncarnation)) return
@@ -256,7 +257,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
           </div>)}
       </div>
 
-      {canManage && (snapshot.connections === null || choices.length > 0 || allChoices.length === 0) && <div className="tangle-lines__setup">
+      {canManage && showConnectionSetup && (snapshot.connections === null || choices.length > 0 || allChoices.length === 0) && <div className="tangle-lines__setup">
         <h3>Connect an identity you own</h3>
         <p>Choose an identity already connected in Hub. Billing details appear below.</p>
         {snapshot.connections === null ? <div className="tangle-lines__error" role="status">
@@ -276,9 +277,9 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
                     {kindChoices.map(choice => <option key={choice.key} value={choice.key}>{choice.connection.label} · {choice.identity.label}</option>)}
                   </select>
                 </label>
-                <label>Agent or box
+                <label>{targetLabel ?? 'Agent or box'}
                   <select value={selectedTarget?.id ?? ''} onChange={event => setTargetId(event.target.value)}>
-                    {snapshot.targets.map(target => <option key={target.id} value={target.id}>{target.label} · {target.kind}</option>)}
+                    {snapshot.targets.map(target => <option key={target.id} value={target.id}>{target.label}{targetLabel ? '' : ` · ${target.kind}`}</option>)}
                   </select>
                 </label>
                 {selectedTarget && selectedTarget.modes.length > 1 && <fieldset>
@@ -291,7 +292,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, onNoti
                 </label>}
               </div>
               {reconnectChoice && blockedByExistingLine && <p className="tangle-lines__warning">Enter this line's current provider number ID to reconnect.</p>}
-              <button className="tangle-lines__primary" type="button" disabled={busy || loading || refreshFailed || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine} onClick={() => void connect()}>
+              <button className="tangle-lines__primary" type="button" disabled={!canConnect || busy || loading || refreshFailed || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine} onClick={() => void connect()}>
                 {busy ? (reconnectChoice ? 'Reconnecting…' : 'Connecting…') : `${reconnectChoice ? 'Reconnect' : 'Connect'} ${selected ? TRANSPORT[selected.identity.transport] : 'line'}`}
               </button>
             </>}

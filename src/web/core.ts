@@ -14,10 +14,41 @@ export type JsonObject = Record<string, unknown>
 
 /** Parse + object-narrow a Request body. `[body, null]` on success, `[null,
  *  errorResponse]` on a non-object body (callers `if (err) return err`). */
-export async function parseJsonObjectBody(request: Request): Promise<[JsonObject, null] | [null, Response]> {
+export async function parseJsonObjectBody(
+  request: Request,
+  options: { maxBytes?: number } = {},
+): Promise<[JsonObject, null] | [null, Response]> {
+  const maxBytes = options.maxBytes
+  if (maxBytes !== undefined && (!Number.isSafeInteger(maxBytes) || maxBytes < 1))
+    throw new TypeError('maxBytes must be a positive safe integer')
   let raw: unknown
   try {
-    raw = await request.json()
+    if (maxBytes === undefined) raw = await request.json()
+    else {
+      const length = request.headers.get('content-length')
+      if (length !== null && Number(length) > maxBytes)
+        return [null, Response.json({ error: 'JSON body is too large' }, { status: 413 })]
+      if (!request.body) return [null, Response.json({ error: 'Invalid JSON body' }, { status: 400 })]
+      const reader = request.body.getReader()
+      const chunks: Uint8Array[] = []
+      let size = 0
+      try {
+        for (;;) {
+          const next = await reader.read()
+          if (next.done) break
+          size += next.value.byteLength
+          if (size > maxBytes)
+            return [null, Response.json({ error: 'JSON body is too large' }, { status: 413 })]
+          chunks.push(next.value)
+        }
+      } finally {
+        await reader.cancel().catch(() => undefined)
+      }
+      const bytes = new Uint8Array(size)
+      let offset = 0
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength }
+      raw = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+    }
   } catch {
     return [null, Response.json({ error: 'Invalid JSON body' }, { status: 400 })]
   }

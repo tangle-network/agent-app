@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_103 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_104 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -31,8 +31,9 @@ _103 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
 | [`./harness`](api/harness.md) | 14 | — |
-| [`./hosted-agent`](api/hosted-agent.md) | 26 | `profile` |
-| [`./hosted-agent/react`](api/hosted-agent-react.md) | 20 | — |
+| [`./hosted-agent`](api/hosted-agent.md) | 26 | `profile`, `web` |
+| [`./hosted-agent/application`](api/hosted-agent-application.md) | 4 | `profile`, `web` |
+| [`./hosted-agent/react`](api/hosted-agent-react.md) | 24 | — |
 | [`./hosted-agent/react/styles`](api/hosted-agent-react-styles.md) | 0 | — |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `brand`, `intakes` |
@@ -346,17 +347,27 @@ Source: `src/harness/index.ts` · 14 exports
 
 Source: `src/hosted-agent/index.ts` · 26 exports
 
-Depends on: `profile`
+Depends on: `profile`, `web`
 
 `AgentHomeWorkflow`, `AgentHomeWorkflowOptions`, `agentHomeWorkflows`, `BoxPolicy`, `buildGeneralAgentProfile`, `CONVERSATION_TOOLS_OFF`, `createHostedAgent`, `createTangleAgent`, `DEFAULT_AGENT_HOME`, `DEFAULT_BOX_POLICY`, `DEFAULT_HOME_LIMITS`, `DEFAULT_HOSTED_MODEL`, `defaultHomeFiles`, `GENERAL_AGENT_MODEL`, `GENERAL_AGENT_SYSTEM_PROMPT`, `GeneralAgentMember`, `GeneralAgentProfileOptions`, `HostedAgent`, `HostedAgentAttachment`, `HostedAgentConfig`, `HostedAgentError`, `HostedAgentLineOptions`, `HostedAgentTransport`, `PERSON_KEY_PREFIX`, `TangleAgentOptions`, `withDefaultAgentHome`
 
 [Full API →](api/hosted-agent.md)
 
+## `./hosted-agent/application`
+
+Source: `src/hosted-agent/application.ts` · 4 exports
+
+Depends on: `profile`, `web`
+
+`ApplicationLineObservation`, `ApplicationLineOptions`, `attachWorkspaceLine`, `createApplicationLineHandler`
+
+[Full API →](api/hosted-agent-application.md)
+
 ## `./hosted-agent/react`
 
-Source: `src/hosted-agent/react/index.ts` · 20 exports
+Source: `src/hosted-agent/react/index.ts` · 24 exports
 
-`ConnectableLineTransport`, `LineAnswerTarget`, `LineBilling`, `LineBillingProps`, `LineBillingView`, `LineBoxMode`, `LineConnectInput`, `LineConnectionOption`, `LineIdentityKind`, `LineIdentityOption`, `LineLastTurn`, `LineMemberRole`, `LineMembers`, `LineMembersClient`, `LineMembersProps`, `LineSetup`, `LineSetupClient`, `LineSetupLine`, `LineSetupProps`, `LineSetupSnapshot`
+`ApplicationLineConnectInput`, `ApplicationLineSetup`, `ApplicationLineSetupClient`, `ApplicationLineSetupProps`, `ConnectableLineTransport`, `LineAnswerTarget`, `LineBilling`, `LineBillingProps`, `LineBillingView`, `LineBoxMode`, `LineConnectInput`, `LineConnectionOption`, `LineIdentityKind`, `LineIdentityOption`, `LineLastTurn`, `LineMemberRole`, `LineMembers`, `LineMembersClient`, `LineMembersProps`, `LineSetup`, `LineSetupClient`, `LineSetupLine`, `LineSetupProps`, `LineSetupSnapshot`
 
 [Full API →](api/hosted-agent-react.md)
 
