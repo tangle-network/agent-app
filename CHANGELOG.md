@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.1
+
+- feat(hosted-agent): route workspace messaging through the existing application
+
 ## 0.50.0
 
 - fix(auth)!: release corrected identity contract at 0.50.0
