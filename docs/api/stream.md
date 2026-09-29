@@ -219,7 +219,7 @@ type JsonRecord
 `function` — Resolve whether a message contains any part with the specified turn ID
 
 ```ts
-(message: PersistedChatMessageForTurn, turnId: string) => boolean
+(message: Pick<TurnIdentityMessage, "parts">, turnId: string) => boolean
 ```
 
 ### `MISSING_TOOL_TERMINAL_ERROR`
@@ -288,7 +288,7 @@ type JsonRecord
 
 ### `PersistedChatMessageForTurn`
 
-`interface` — Define the structure of a chat message stored for a specific conversation turn
+`interface` — Retained compatibility shape for callers using unstructured message records.
 
 ```ts
 interface PersistedChatMessageForTurn
@@ -331,7 +331,7 @@ interface ReplayTurnEventsOptions
 `function` — Resolve a chat turn by determining message reuse and constructing user message parts
 
 ```ts
-(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; hasRunning…
+<Message extends TurnIdentityMessage>(input: { existingMessages: readonly Message[]; userContent: string; turnId?: stri…
 ```
 
 ### `ResolvedChatTurn`

@@ -1,18 +1,23 @@
 import type { JsonRecord } from './stream-normalizer'
 
-/** Define the structure of a chat message stored for a specific conversation turn */
-export interface PersistedChatMessageForTurn {
-  id: string
-  role: 'user' | 'assistant' | 'system' | 'tool'
-  content: string
+/** Minimum read-only shape; typed chat parts need no dictionary index signature. */
+interface TurnIdentityMessage {
+  readonly id: string
+  readonly role: 'user' | 'assistant' | 'system' | 'tool'
+  readonly content: string
+  readonly parts: readonly object[] | null
+}
+
+/** Retained compatibility shape for callers using unstructured message records. */
+export interface PersistedChatMessageForTurn extends TurnIdentityMessage {
   parts: Array<Record<string, unknown>> | null
 }
 
 /** Represent a chat turn with resolved user message insertion and prior message context */
-export interface ResolvedChatTurn {
+export interface ResolvedChatTurn<Message extends TurnIdentityMessage = PersistedChatMessageForTurn> {
   turnIndex: number
   shouldInsertUserMessage: boolean
-  priorMessages: PersistedChatMessageForTurn[]
+  priorMessages: Message[]
   userParts: JsonRecord[]
   /** The id of the user row this turn REUSES (retry dedup), when one was
    *  found. Absent on the insert path, where no row exists yet.
@@ -44,9 +49,9 @@ export function buildUserTextParts(text: string, turnId: string | undefined): Js
 }
 
 /** Resolve whether a message contains any part with the specified turn ID */
-export function messageHasTurnId(message: PersistedChatMessageForTurn, turnId: string): boolean {
+export function messageHasTurnId(message: Pick<TurnIdentityMessage, 'parts'>, turnId: string): boolean {
   for (const part of message.parts ?? []) {
-    if (part && typeof part === 'object' && String(part.turnId ?? '') === turnId) {
+    if (part && typeof part === 'object' && 'turnId' in part && String(part.turnId ?? '') === turnId) {
       return true
     }
   }
@@ -54,8 +59,8 @@ export function messageHasTurnId(message: PersistedChatMessageForTurn, turnId: s
 }
 
 /** Resolve a chat turn by determining message reuse and constructing user message parts */
-export function resolveChatTurn(input: {
-  existingMessages: PersistedChatMessageForTurn[]
+export function resolveChatTurn<Message extends TurnIdentityMessage>(input: {
+  existingMessages: readonly Message[]
   userContent: string
   turnId?: string
   /** True when the thread has a turn still RUNNING in the turn-event buffer
@@ -73,7 +78,7 @@ export function resolveChatTurn(input: {
    *  assistant row trailing a SETTLED turn is a completed answer (stop — the
    *  user genuinely repeated a message and deserves a new turn). */
   hasRunningTurn?: boolean
-}): ResolvedChatTurn {
+}): ResolvedChatTurn<Message> {
   const { existingMessages, userContent, turnId } = input
   const reusableIndex = findReusableUserMessageIndex(
     existingMessages,
@@ -86,10 +91,11 @@ export function resolveChatTurn(input: {
     // store the shell does not validate, so an adapter that omits it must
     // surface as "no id" rather than as the string "undefined".
     const reusedId = existingMessages[reusableIndex]?.id
+    const priorMessages = existingMessages.slice(0, reusableIndex)
     return {
-      turnIndex: countUserMessages(existingMessages.slice(0, reusableIndex)),
+      turnIndex: countUserMessages(priorMessages),
       shouldInsertUserMessage: false,
-      priorMessages: existingMessages.slice(0, reusableIndex),
+      priorMessages,
       userParts: buildUserTextParts(userContent, turnId),
       ...(typeof reusedId === 'string' && reusedId ? { reusedUserMessageId: reusedId } : {}),
     }
@@ -98,13 +104,13 @@ export function resolveChatTurn(input: {
   return {
     turnIndex: countUserMessages(existingMessages),
     shouldInsertUserMessage: true,
-    priorMessages: existingMessages,
+    priorMessages: existingMessages.slice(),
     userParts: buildUserTextParts(userContent, turnId),
   }
 }
 
 function findReusableUserMessageIndex(
-  messages: PersistedChatMessageForTurn[],
+  messages: readonly TurnIdentityMessage[],
   userContent: string,
   turnId: string | undefined,
   hasRunningTurn: boolean,
@@ -135,6 +141,8 @@ function findReusableUserMessageIndex(
   return -1
 }
 
-function countUserMessages(messages: PersistedChatMessageForTurn[]): number {
-  return messages.filter((message) => message.role === 'user').length
+function countUserMessages(messages: readonly TurnIdentityMessage[]): number {
+  let count = 0
+  for (const message of messages) if (message.role === 'user') count++
+  return count
 }
