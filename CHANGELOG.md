@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.2
+
+- feat(lines): clarify application setup hierarchy
+- ci(publish): overlap checks and allow registry processing [skip release]
+
 ## 0.50.1
 
 - feat(hosted-agent): route workspace messaging through the existing application
