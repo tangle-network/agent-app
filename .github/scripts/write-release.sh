@@ -23,6 +23,7 @@ if [[ "$ACTION" == 'release' ]]; then
 fi
 
 TAG_REF="refs/tags/v$VERSION"
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 WORK=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/agent-app-release.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
 
@@ -47,6 +48,9 @@ build_expected_release_tree() {
   range=${last_release:+$last_release..}$commit
   # Branch commits can describe discarded work; release notes follow merged changes.
   git log --first-parent --format='%B%x00' "$range" > "$messages_file"
+  local next_version
+  next_version=$(node "$SCRIPT_DIR/next-release-version.mjs" "$root_file" "$commit")
+  [[ "$next_version" == "$VERSION" ]] || die "expected next release $next_version, found $VERSION."
   EXPECTED_VERSION="$VERSION" node - "$root_file" "$create_file" "$changelog_file" "$messages_file" <<'NODE'
 const fs = require('node:fs')
 const [rootFile, createFile, changelogFile, messagesFile] = process.argv.slice(2)
@@ -56,9 +60,6 @@ if (manifests[0].name !== '@tangle-network/agent-app' || manifests[1].name !== '
   throw new Error('unexpected package names')
 }
 if (manifests[0].version !== manifests[1].version) throw new Error('base package versions differ')
-const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(manifests[0].version)
-const next = match && `${match[1]}.${match[2]}.${BigInt(match[3]) + 1n}`
-if (next !== process.env.EXPECTED_VERSION) throw new Error(`expected next patch ${String(next)}, found ${process.env.EXPECTED_VERSION}`)
 for (let index = 0; index < files.length; index += 1) {
   manifests[index].version = process.env.EXPECTED_VERSION
   fs.writeFileSync(files[index], `${JSON.stringify(manifests[index], null, 2)}\n`)
