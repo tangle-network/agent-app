@@ -98,12 +98,17 @@ export interface TangleSsoAuthClient {
 }
 
 /** First-party login exchanges identity without minting a Platform API key. */
+export interface TangleIdentitySsoExchangeResult {
+  kind: 'identity'
+  emailVerified: boolean
+  user: TangleSsoExchangeResult['user']
+  apiKey?: never
+  keyId?: never
+}
+
 export interface TangleIdentitySsoAuthClient {
   authorizeUrl(options: { state: string; redirectUri?: string }): string
-  exchange(code: string, redirectUri: string): Promise<{
-    emailVerified: boolean
-    user: TangleSsoExchangeResult['user']
-  }>
+  exchange(code: string): Promise<TangleIdentitySsoExchangeResult>
 }
 
 /** Token fields the callback persists from the runtime's OIDC exchange. */
@@ -338,6 +343,13 @@ export interface TangleOidcSsoAccountStore extends Omit<TangleSsoAccountStore, '
 
 /** Persist only the stable identity link for a first-party app. */
 export interface TangleIdentitySsoAccountStore extends Omit<TangleSsoAccountStore, 'saveTangleLink'> {
+  /** `upsertUserByEmail` may create the local user, but must not publish a new
+   * platform link or update an existing user's verified-email state. The
+   * callback has not yet created a session or prepared its cookie. */
+  upsertUserByEmail: TangleSsoAccountStore['upsertUserByEmail']
+  /** Commit the identity link and any verified-email update atomically. Do not
+   * reject after committing. If the store can partially write before throwing,
+   * `deleteSession` must remove only writes made for this session token. */
   saveTangleLink(input: {
     userId: string
     sessionToken: string
@@ -345,6 +357,9 @@ export interface TangleIdentitySsoAccountStore extends Omit<TangleSsoAccountStor
     email: string
     name: string | null
   }): Promise<void>
+  /** Remove an unpublished session and any link or verification writes that a
+   * rejected `saveTangleLink` made for its exact token. Preserve preexisting
+   * links and other sessions. */
   deleteSession(input: { sessionToken: string }): Promise<void>
 }
 
@@ -743,7 +758,13 @@ export function createTangleSsoHandlers(
             }
             exchanged = { user: result.user, emailVerified: result.user.emailVerified }
           } else if (opts.protocol === 'identity') {
-            exchanged = await opts.auth.exchange(code, opts.callbackUrl)
+            const identity = await opts.auth.exchange(code)
+            if (identity.kind !== 'identity' || 'apiKey' in identity || 'keyId' in identity
+              || !identity.user || typeof identity.user.id !== 'string' || !identity.user.id.trim()
+              || typeof identity.user.email !== 'string' || !identity.user.email.trim()) {
+              throw new Error('Identity exchange returned an invalid result')
+            }
+            exchanged = identity
           } else {
             legacyExchange = await opts.auth.exchange(code)
             exchanged = legacyExchange
@@ -805,13 +826,14 @@ export function createTangleSsoHandlers(
           return response
         }
         if (opts.protocol === 'identity') {
-          await opts.store.saveTangleLink(link)
-          committed = true
           const headers = new Headers()
           headers.append('Set-Cookie', clearCookieHeader(stateCookieOpts))
           const sessionCookies = await mintSessionCookies({ token, expiresAt, ttlSeconds: sessionTtlSeconds, secure: opts.secureCookies })
           for (const cookie of sessionCookies) headers.append('Set-Cookie', cookie)
-          return redirectResponse(sanitizeRedirectPath(payload.r, defaultRedirectPath), headers)
+          const response = redirectResponse(sanitizeRedirectPath(payload.r, defaultRedirectPath), headers)
+          await opts.store.saveTangleLink(link)
+          committed = true
+          return response
         }
         await opts.store.saveTangleLink({ ...link, apiKey: legacyExchange!.apiKey, planTier: legacyExchange!.plan?.tier ?? null })
         const headers = new Headers()

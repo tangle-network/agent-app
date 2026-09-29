@@ -9313,6 +9313,12 @@
           "name": "TangleIdentitySsoAuthClient",
           "kind": "interface",
           "signature": "interface TangleIdentitySsoAuthClient",
+          "doc": null
+        },
+        {
+          "name": "TangleIdentitySsoExchangeResult",
+          "kind": "interface",
+          "signature": "interface TangleIdentitySsoExchangeResult",
           "doc": "First-party login exchanges identity without minting a Platform API key."
         },
         {
