@@ -67,3 +67,34 @@ type Story = StoryObj<typeof ApplicationLineSetup>
 export const Interactive: Story = { render: () => <StoryFixture enabled /> }
 /** Uses the same saved fixture and keeps the disconnect control available. */
 export const GrantsDisabled: Story = { render: () => <StoryFixture enabled={false} /> }
+
+const attachedLine: LineSetupLine = {
+  id: 'ln_attached', attachmentId: 'lat_attached', connectionId: 'conn_email',
+  transport: 'email', address: 'agent@example.com', connect: null,
+  routerAddress: null, providerNumberId: null, status: 'active',
+  answering: true, canDisconnect: true, targetId: 'thread_research',
+  targetLabel: 'Research conversation', boxMode: 'shared',
+  lastTurn: { kind: 'none' },
+}
+
+function StaticFixture({ state, enabled = true }: { state: 'attached' | 'no-identities' | 'inventory-error'; enabled?: boolean }) {
+  const client = useMemo<ApplicationLineSetupClient>(() => ({
+    async load() {
+      if (state === 'inventory-error') throw new Error('HTTP 503: workspace messaging is unavailable')
+      return state === 'attached' ? { ...initial, lines: [attachedLine] }
+        : { ...initial, connections: [] }
+    },
+    async connect() { throw new Error('This story is read-only') },
+    async disconnect() { throw new Error('This story is read-only') },
+  }), [state])
+  return <ApplicationLineSetup client={client} scopeKey={`storybook:${state}`} canManage enabled={enabled} />
+}
+
+/** An attached line uses the same row as the interactive saved state. */
+export const Attached: Story = { render: () => <StaticFixture state="attached" /> }
+/** No owned Hub identities are available for a new line. */
+export const NoIdentities: Story = { render: () => <StaticFixture state="no-identities" /> }
+/** An inventory failure must remain visible and offer a retry. */
+export const InventoryError: Story = { render: () => <StaticFixture state="inventory-error" /> }
+/** Production can show a disabled grant and a failed inventory together. */
+export const DisabledInventoryError: Story = { render: () => <StaticFixture state="inventory-error" enabled={false} /> }

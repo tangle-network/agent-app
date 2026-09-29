@@ -159,6 +159,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
   const reconnecting = Boolean(reconnectChoice && selected && occupiedLine &&
     matchesLineIdentity(occupiedLine, selected.identity, enteredNumber))
   const blockedByExistingLine = Boolean(occupied?.length && !reconnecting)
+  const answeringCount = snapshot?.lines.filter(line => line.answering).length ?? 0
 
   async function connect() {
     if (!canManage || !canConnect || !selected || !selectedTarget || !selectedMode || (needsNumber && !enteredNumber) || blockedByExistingLine || busy || loading || refreshFailed) return
@@ -224,11 +225,11 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
         <h2 ref={heading} tabIndex={-1}>Lines</h2>
         {snapshot && <p>{snapshot.workspaceName} can use one line per transport.</p>}
       </div>
-      {snapshot && <span className="tangle-lines__count">{snapshot.lines.filter(line => line.answering).length} answering</span>}
+      {answeringCount > 1 && <span className="tangle-lines__count">{answeringCount} answering</span>}
     </header>
 
     {error && <div className="tangle-lines__error" role="alert">
-      <span>{error}</span>
+      <div><strong>{refreshFailed ? 'Lines are unavailable' : 'Line action failed'}</strong><p>{error}</p></div>
       {(!snapshot || refreshFailed) && <button type="button" disabled={loading} onClick={retry}>Retry</button>}
     </div>}
     {loading && <p className="tangle-lines__muted" role="status">Loading lines…</p>}
@@ -236,11 +237,13 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
     {snapshot && <>
       <div className="tangle-lines__list">
         {snapshot.lines.filter(line => line.status !== 'released').length === 0 &&
-          <p className="tangle-lines__empty">No line answers for this workspace yet.</p>}
+          <div className="tangle-lines__empty"><strong>No lines connected</strong><p>{canManage && showConnectionSetup
+            ? 'Connect an owned identity below to let this workspace answer messages.'
+            : 'There are no connected lines in this workspace.'}</p></div>}
         {snapshot.lines.filter(line => line.status !== 'released').map(line =>
           <div className="tangle-lines__row" key={line.id}>
             <div className="tangle-lines__row-main">
-              <span className="tangle-lines__eyebrow">{TRANSPORT[line.transport]} · {line.answering ? 'Answering' : line.targetId === null ? 'Disconnected' : line.status === 'active' ? 'Awaiting member' : line.status}</span>
+              <div className="tangle-lines__row-heading"><span className="tangle-lines__transport">{TRANSPORT[line.transport]}</span><span className={`tangle-lines__status${line.answering ? ' tangle-lines__status--answering' : ''}`}>{line.answering ? 'Answering' : line.targetId === null ? 'Disconnected' : line.status === 'active' ? 'Awaiting member' : line.status}</span></div>
               <strong>{line.routerAddress ?? line.address}</strong>
               {line.connect && line.targetId !== null && <p>To reach this agent, text <code>{line.connect}</code>.</p>}
               <p>{line.targetLabel ?? 'No agent or box assigned'}{line.boxMode && ` · ${line.boxMode === 'per-member' ? 'one box per member' : 'shared box'}`}</p>
@@ -258,6 +261,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
       </div>
 
       {canManage && showConnectionSetup && (snapshot.connections === null || choices.length > 0 || allChoices.length === 0) && <div className="tangle-lines__setup">
+        <span className="tangle-lines__overline">New line</span>
         <h3>Connect an identity you own</h3>
         <p>Choose an identity already connected in Hub. Billing details appear below.</p>
         {snapshot.connections === null ? <div className="tangle-lines__error" role="status">

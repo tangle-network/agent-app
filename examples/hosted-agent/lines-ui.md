@@ -2,6 +2,11 @@
 
 Mount `LineSetup`, `LineMembers`, and `LineBilling` from `@tangle-network/agent-app/hosted-agent/react`.
 Import `@tangle-network/agent-app/hosted-agent/react/styles` once in the app's client entry.
+`ApplicationLineSetup` is exported from the same React subpath and uses the same stylesheet.
+It owns the sender grant, line status, and connection layout, so products do not need to copy its CSS.
+Pass `enabled` from the server-backed grant flag and keep the product route responsible for authenticated reads and writes.
+The stylesheet uses `--md3-surface-container` for panels and `--md3-surface-container-low` for inset areas when the host provides them.
+It falls back to the existing `--line-kit-*` and application tokens in other hosts.
 The components call an authenticated product route; API keys stay on the server.
 This subpath needs `@tangle-network/sandbox` 0.55.2 or newer for its line types and methods.
 

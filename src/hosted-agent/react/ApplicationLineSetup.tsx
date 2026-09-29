@@ -40,9 +40,18 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
   }), [client, canConnect, address, turnsPerDay])
   return <>
     {props.canManage && <section className="tangle-lines tangle-lines--application" aria-label="Application access">
-      <h2>Text your workspace</h2>
-      <p>Use the same agent, conversation and saved work. Only the sender you authorize can issue commands.</p>
-      {!enabled ? <p role="status">New connections are disabled. You can still disconnect an existing line below.</p> : <>
+      <header className="tangle-lines__application-heading">
+        <h2>Text your workspace</h2>
+        <p>Continue a conversation from a number or mailbox you own. The agent keeps the same context and saved work.</p>
+      </header>
+      {!enabled ? <div className="tangle-lines__notice" role="status">
+        <strong>New connections are disabled</strong>
+        <p>You can still review and disconnect an existing line below.</p>
+      </div> : <div className="tangle-lines__authorization">
+        <div className="tangle-lines__authorization-heading">
+          <h3>Authorize a sender</h3>
+          <p>Only this sender can issue commands through the line you connect.</p>
+        </div>
         <div className="tangle-lines__fields">
           <label>Authorized sender
             <input value={operatorAddress} onChange={e => { setAddress(e.target.value); setApproved(null) }}
@@ -58,9 +67,9 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
             onChange={e => setApproved(e.target.checked ? nomination : null)} />
           I authorize this sender to work in the conversation I select below using my application access and compute budget.
         </label>
-        <p>The daily message limit is not a dollar cap. The first inbound message establishes messaging consent.
+        <p className="tangle-lines__fine-print">The daily message limit is not a dollar cap. The first inbound message establishes messaging consent.
           STOP stops replies, not an already accepted task; cancel that task in the application.</p>
-      </>}
+      </div>}
     </section>}
     <LineSetup {...props} targetLabel={props.targetLabel ?? 'Conversation'} client={lineClient} canConnect={canConnect} showConnectionSetup={enabled} />
   </>
