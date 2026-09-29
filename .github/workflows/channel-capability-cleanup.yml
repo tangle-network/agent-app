@@ -1,0 +1,131 @@
+name: Channel capability cleanup proof
+on:
+  push:
+    branches: [audit/channel-capability-cleanup-20260929]
+permissions:
+  contents: write
+concurrency:
+  group: channel-capability-cleanup-proof
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      BASE: 391d90d455fa97e27af9d6461af007492cc4af77
+      FEATURE: refactor/channels-read-capabilities-20260929
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 391d90d455fa97e27af9d6461af007492cc4af77
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Read the hash-pinned source transformation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/proof"
+          gh api repos/$GITHUB_REPOSITORY/git/blobs/d2ee0209066af530f3ec70bbc864b6bbd4b92881 --jq .content | base64 -d | gzip -dc > "$RUNNER_TEMP/prepare.py"
+          echo "ff6cd1abfa4ac5c7f0fd9e1dcdafd5d7246457755fe253c4205d409be6147f62  $RUNNER_TEMP/prepare.py" | sha256sum -c -
+          git checkout -b "$FEATURE" "$BASE"
+      - name: Frozen install and baseline build
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --ignore-scripts=false > "$RUNNER_TEMP/proof/install.log" 2>&1 || { tail -80 "$RUNNER_TEMP/proof/install.log"; exit 1; }
+          pnpm build > "$RUNNER_TEMP/proof/baseline-build.log" 2>&1 || { tail -80 "$RUNNER_TEMP/proof/baseline-build.log"; exit 1; }
+          git diff --exit-code -- package.json pnpm-lock.yaml
+      - name: Measure baseline with matching coverage tooling
+        run: |
+          set -euo pipefail
+          cp package.json "$RUNNER_TEMP/package.json"
+          cp pnpm-lock.yaml "$RUNNER_TEMP/pnpm-lock.yaml"
+          version=$(node -p "require('vitest/package.json').version")
+          pnpm add --ignore-scripts -D "@vitest/coverage-v8@$version" > "$RUNNER_TEMP/proof/coverage-install.log" 2>&1 || { tail -80 "$RUNNER_TEMP/proof/coverage-install.log"; exit 1; }
+          cp "$RUNNER_TEMP/package.json" package.json
+          cp "$RUNNER_TEMP/pnpm-lock.yaml" pnpm-lock.yaml
+          pnpm exec vitest run tests/channels --coverage.enabled=true --coverage.provider=v8 --coverage.include='src/channels/**/*.{ts,tsx}' --coverage.reporter=json --coverage.reporter=json-summary --coverage.reportsDirectory="$RUNNER_TEMP/proof/baseline-coverage" --reporter=json --outputFile="$RUNNER_TEMP/proof/baseline-tests.json" > "$RUNNER_TEMP/proof/baseline-tests.log" 2>&1 || { tail -100 "$RUNNER_TEMP/proof/baseline-tests.log"; exit 1; }
+          cat "$RUNNER_TEMP/proof/baseline-coverage/coverage-summary.json"
+      - name: Tests-first management-capability refusal
+        run: |
+          set -euo pipefail
+          python3 "$RUNNER_TEMP/prepare.py" tests
+          set +e
+          pnpm exec vitest run tests/channels/read-client.test.tsx -t 'refuses management hooks' --reporter=json --outputFile="$RUNNER_TEMP/proof/red.json" > "$RUNNER_TEMP/proof/red.log" 2>&1
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/proof/red.log"
+          test "$status" -ne 0
+          python3 - <<'PY'
+          import json,os,pathlib
+          data=json.loads((pathlib.Path(os.environ['RUNNER_TEMP'])/'proof/red.json').read_text())
+          tests=[a for t in data['testResults'] for a in t['assertionResults'] if a['status']=='failed']
+          assert len(tests)==1 and 'refuses management hooks' in tests[0]['title'], tests
+          assert any('to throw' in m for m in tests[0]['failureMessages']), tests
+          print('RED: the old context exposes a nonexistent management capability.')
+          PY
+      - name: Apply capability split without changing existing test cases
+        run: |
+          set -euo pipefail
+          python3 "$RUNNER_TEMP/prepare.py" apply
+          pnpm docs:gen > "$RUNNER_TEMP/proof/docs.log" 2>&1
+          pnpm typecheck > "$RUNNER_TEMP/proof/typecheck.log" 2>&1 || { cat "$RUNNER_TEMP/proof/typecheck.log"; exit 1; }
+          pnpm build > "$RUNNER_TEMP/proof/build.log" 2>&1 || { tail -80 "$RUNNER_TEMP/proof/build.log"; exit 1; }
+          git diff --check
+          git diff --exit-code -- package.json pnpm-lock.yaml vitest.config.ts
+      - name: Measure candidate under identical coverage scope
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run tests/channels --coverage.enabled=true --coverage.provider=v8 --coverage.include='src/channels/**/*.{ts,tsx}' --coverage.reporter=json --coverage.reporter=json-summary --coverage.reportsDirectory="$RUNNER_TEMP/proof/candidate-coverage" --reporter=json --outputFile="$RUNNER_TEMP/proof/candidate-tests.json" > "$RUNNER_TEMP/proof/candidate-tests.log" 2>&1 || { tail -100 "$RUNNER_TEMP/proof/candidate-tests.log"; exit 1; }
+          python3 - <<'PY'
+          import json,os,pathlib,subprocess
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'proof'
+          def cases(name):
+            d=json.loads((p/f'{name}-tests.json').read_text()); return {a['fullName']:a['status'] for t in d['testResults'] for a in t['assertionResults']}
+          base,candidate=cases('baseline'),cases('candidate')
+          assert all(candidate.get(name)==state=='passed' for name,state in base.items()), (base,candidate)
+          report={'base':os.environ['BASE'],'baselineCases':len(base),'candidateCases':len(candidate),'preservedBaselineCases':len(base),'coverage':{}}
+          for name in ['baseline','candidate']:
+            report['coverage'][name]=json.loads((p/f'{name}-coverage/coverage-summary.json').read_text())
+          report['diffStat']=subprocess.check_output(['git','diff','--stat'],text=True)
+          (p/'comparison.json').write_text(json.dumps(report,indent=2))
+          print(json.dumps(report,indent=2))
+          PY
+      - name: Commit source only and run the maintained exact-head signoff
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/channels tests/channels/read-client.test.tsx docs
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m 'refactor(channels): separate read-only conversation capabilities'
+          git rev-parse HEAD | tee "$RUNNER_TEMP/proof/head.txt"
+          pnpm signoff --source head --json "$RUNNER_TEMP/proof/signoff.json" --keep-going > "$RUNNER_TEMP/proof/signoff.log" 2>&1 || { tail -150 "$RUNNER_TEMP/proof/signoff.log"; exit 1; }
+          tail -60 "$RUNNER_TEMP/proof/signoff.log"
+      - name: Publish the verified feature branch, without promotion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git push origin "HEAD:refs/heads/$FEATURE"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/proof/tree.txt"
+      - name: Retain bounded evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/proof"
+          git status --short > "$RUNNER_TEMP/proof/status.txt"
+          git diff "$BASE" > "$RUNNER_TEMP/proof/candidate.patch"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: channel-capability-cleanup-proof
+          path: ${{ runner.temp }}/proof/
+          retention-days: 7
