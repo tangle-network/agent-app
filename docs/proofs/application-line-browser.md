@@ -37,11 +37,21 @@ The 390 × 844 viewport had no horizontal overflow, and the browser reported no 
 
 ![Empty line state after keyboard disconnect](application-line-disconnected-cohort.png)
 
+The same flow ran again on source `5c4b856c` with an [uncut 6.80-second recording](application-line-flow-original.webm).
+The [3.48-second playback copy](application-line-flow-2x.mp4) runs at 2× speed and labels authorization, save, reload, disabled-grants disconnect, and empty-state reload.
+The [subtitle timing source](application-line-flow-playback.srt) retains those process boundaries.
+I opened the playback in Chromium and checked that the video loaded, played, and displayed the disabled-grants frame.
+
 A locally packed candidate from this source had SHA-256 `cdabdcf865dc30979f7a535795f9b66d2a8aaf38152dea27906ec950c0a7702a`.
 An installed consumer with Sandbox 0.55.2 failed to import `hosted-agent` before the subpath split because `LINE_APPLICATION_REQUEST_MAX_BYTES` was absent.
 After the split, the same installed consumer imported `hosted-agent` successfully.
 The new `hosted-agent/application` entrypoint imported successfully with Sandbox 0.58.1 and the frozen cohort.
 These focused npm consumers used `--legacy-peer-deps` to install only the peers needed for the import check; the source checkout passed a separate strict pnpm install.
+
+The first exact-head signoff at `f20f1e95` found one self-audit test that treated every old Interface option as valid with the installed Runtime 0.285.0.
+The corrected test checks each installed pair and keeps the old and new peer windows explicit.
+Temporarily changing the dev Interface pin to 2.13.0 made that test fail (`2.13.0 vs ^2.14.0`, one of 24 tests).
+Restoring 2.14.0 passed all 24 tests.
 
 Storybook uses session storage and a fixture client.
 These checks do not establish native attachment, provider delivery, or a completed customer task.
