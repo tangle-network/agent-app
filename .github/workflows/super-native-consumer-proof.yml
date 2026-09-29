@@ -1,0 +1,54 @@
+name: Published native consumer proof
+on:
+  push:
+    branches: [chore/super-native-consumer-proof]
+    paths: [.github/workflows/super-native-consumer-proof.yml]
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve and install published compatible dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/native-consumer/proof
+          cd /tmp/native-consumer
+          node --input-type=module - <<'JS'
+          import {execFileSync} from 'node:child_process';
+          import {writeFileSync} from 'node:fs';
+          const view=(spec,field)=>JSON.parse(execFileSync('npm',['view',spec,field,'--json','--registry=https://registry.npmjs.org'],{encoding:'utf8',timeout:120000}));
+          const stable=v=>/^\d+\.\d+\.\d+$/.test(v);
+          const latest=(name,range)=>{const values=view(`${name}@${range}`,'version');const versions=(Array.isArray(values)?values:[values]).filter(stable).sort((a,b)=>{const x=a.split('.').map(Number),y=b.split('.').map(Number);return x[0]-y[0]||x[1]-y[1]||x[2]-y[2];});if(!versions.length)throw Error('No compatible published version of '+name);return versions.at(-1);};
+          const version=latest('@tangle-network/agent-app','latest');
+          const peers=view('@tangle-network/agent-app@'+version,'peerDependencies');
+          const manifest={name:'super-agent',version:'9.0.0',private:true,type:'module',engines:{node:'>=22.16.0'},dependencies:{'@tangle-network/agent-app':version,'marked':'18.0.14'},optionalDependencies:{},devDependencies:{'@types/node':'26.6.2',typescript:'7.0.2'},overrides:{'@tangle-network/agent-integrations':{'csv-parse':'7.0.2'}}};
+          for(const name of ['agent-integrations','agent-interface','agent-runtime'])manifest.dependencies['@tangle-network/'+name]=latest('@tangle-network/'+name,peers['@tangle-network/'+name]);
+          for(const name of ['sandbox','hub-sdk'])manifest.dependencies['@tangle-network/'+name]=latest('@tangle-network/'+name,peers['@tangle-network/'+name]);
+          manifest.devDependencies['@tangle-network/agent-eval']=latest('@tangle-network/agent-eval',peers['@tangle-network/agent-eval']);
+          writeFileSync('package.json',JSON.stringify(manifest,null,2)+'\n');
+          writeFileSync('proof/published-metadata.json',JSON.stringify({resolvedAt:new Date().toISOString(),appVersion:version,peers,manifest},null,2));
+          JS
+          npm install --ignore-scripts --strict-peer-deps --no-audit --no-fund > proof/install.log 2>&1 || { tail -120 proof/install.log; exit 1; }
+          npm ls --all --json > proof/dependency-tree.json
+          node --input-type=module - <<'JS'
+          import {writeFileSync} from 'node:fs';
+          const [core,kit,interactions]=await Promise.all([import('@tangle-network/sandbox/core'),import('@tangle-network/agent-app/hosted-agent'),import('@tangle-network/agent-app/interactions')]);
+          for(const [name,value] of Object.entries({Sandbox:core.Sandbox,lineInstanceKey:core.lineInstanceKey,createTangleAgent:kit.createTangleAgent,buildGeneralAgentProfile:kit.buildGeneralAgentProfile,parseInteractionRequest:interactions.parseInteractionRequest}))if(typeof value!=='function')throw Error('Missing installed export '+name);
+          const client=new core.Sandbox({apiKey:'offline-import-probe-not-a-real-key'});
+          const methods=Object.getOwnPropertyNames(Object.getPrototypeOf(client.lines));
+          writeFileSync('proof/imports.json',JSON.stringify({loaded:true,linesMethods:methods,liveRequestPerformed:false},null,2));
+          JS
+          cp package.json package-lock.json proof/
+          tar -czf proof/node_modules.tar.gz node_modules
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: published-native-consumer
+          path: /tmp/native-consumer/proof/
+          retention-days: 3
