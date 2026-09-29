@@ -348,6 +348,8 @@ export interface WorkspaceSandboxRecoveryManager<Snapshot extends WorkspaceSandb
   complete: (args: {
     workspaceId: string
     replacementSandboxId: string
+    /** The key used by this provisioning attempt, not a freshly read successor. */
+    replacementBoxKey?: string
   }) => Promise<WorkspaceSandboxRecoveryState<Snapshot> | undefined>
 }
 
@@ -383,9 +385,10 @@ export function createWorkspaceSandboxRecoveryManager<Snapshot extends Workspace
         ...(decision === 'replace' ? { replacementBoxKey } : {}),
       })
     },
-    async complete({ workspaceId, replacementSandboxId }) {
+    async complete({ workspaceId, replacementSandboxId, replacementBoxKey }) {
       const current = await store.read(workspaceId)
       if (!current || !asNonEmptyString(current.replacementBoxKey)) return undefined
+      if (replacementBoxKey !== undefined && current.replacementBoxKey !== replacementBoxKey) return undefined
       const policy = ACTIONS[current.action]
       if (!('completedAs' in policy)) return undefined
       if (!asNonEmptyString(replacementSandboxId)) throw new Error('A replacement sandbox id is required')

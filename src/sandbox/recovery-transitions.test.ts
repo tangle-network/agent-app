@@ -81,3 +81,18 @@ describe('recovery transitions', () => {
     expect(next?.action).toBe('snapshot_replacement_authorized')
   })
 })
+
+
+describe('provisioning attempt identity', () => {
+  it.each(['superseded-key', '', '   '])('refuses a result from a different provisioning attempt: %j', async replacementBoxKey => {
+    const { manager, store } = fixture('replacement_started', 'current-key')
+    expect(await manager.complete({ workspaceId: 'w', replacementSandboxId: 'old-result', replacementBoxKey })).toBeUndefined()
+    expect(store.write).not.toHaveBeenCalled()
+    expect((await store.read()).action).toBe('replacement_started')
+  })
+  it('completes the matching attempt and retains its identity', async () => {
+    const { manager } = fixture('replacement_started', 'current-key')
+    expect(await manager.complete({ workspaceId: 'w', replacementSandboxId: 'new-box', replacementBoxKey: 'current-key' }))
+      .toMatchObject({ action: 'replacement_completed', replacementBoxKey: 'current-key', replacementSandboxId: 'new-box' })
+  })
+})
