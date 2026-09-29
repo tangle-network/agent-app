@@ -50,5 +50,6 @@ describe('application line setup', () => {
     await user.click(screen.getByRole('button', { name: /^Disconnect$/ }))
     await waitFor(() => expect(client.disconnect).toHaveBeenCalledTimes(1))
     expect(await screen.findByText('No line answers for this workspace yet.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Connect iMessage' })).toBeNull()
   })
 })

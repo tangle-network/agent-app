@@ -47,7 +47,7 @@ function matchesLineIdentity(line: LineSetupLine, identity: LineIdentityOption, 
 }
 
 /** Set up an owned identity through a host route backed by sandbox.lines and Hub. */
-export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect = canManage, onNotice }: LineSetupProps) {
+export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect = canManage, showConnectionSetup = true, onNotice }: LineSetupProps) {
   const clientRef = useRef(client)
   clientRef.current = client
   const sequence = useRef(0)
@@ -257,7 +257,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
           </div>)}
       </div>
 
-      {canManage && (snapshot.connections === null || choices.length > 0 || allChoices.length === 0) && <div className="tangle-lines__setup">
+      {canManage && showConnectionSetup && (snapshot.connections === null || choices.length > 0 || allChoices.length === 0) && <div className="tangle-lines__setup">
         <h3>Connect an identity you own</h3>
         <p>Choose an identity already connected in Hub. Billing details appear below.</p>
         {snapshot.connections === null ? <div className="tangle-lines__error" role="status">

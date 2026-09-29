@@ -82,6 +82,7 @@ export interface LineSetupProps {
   canManage: boolean
   /** Narrow new attachments without hiding disconnect controls; not server authorization. */
   canConnect?: boolean
+  showConnectionSetup?: boolean
   onNotice?(notice: { kind: 'success' | 'error'; message: string }): void
 }
 

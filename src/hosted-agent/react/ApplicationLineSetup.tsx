@@ -62,6 +62,6 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
           STOP stops replies, not an already accepted task; cancel that task in the application.</p>
       </>}
     </section>}
-    <LineSetup {...props} targetLabel={props.targetLabel ?? 'Conversation'} client={lineClient} canConnect={canConnect} />
+    <LineSetup {...props} targetLabel={props.targetLabel ?? 'Conversation'} client={lineClient} canConnect={canConnect} showConnectionSetup={enabled} />
   </>
 }
