@@ -60,7 +60,7 @@ import '@tangle-network/agent-app/hosted-agent/react/styles'
 />
 ```
 
-The client supplies load/connect/disconnect through normal host authorization. Connect receives the existing target, nominated operatorAddress and turnsPerDay. Changing sender, limit or scope clears confirmation. Disabling new grants leaves disconnection available. The existing LineSetup owns channel selection, loading, errors and disconnect confirmation.
+The client supplies load/connect/disconnect through normal host authorization. Include each line's attachmentId in the snapshot; disconnect receives that viewed identity, which the host passes to the native conditional detach. Never replace it with a newer attachment read at mutation time. Connect receives the existing target, nominated operatorAddress and turnsPerDay. Changing sender, limit or scope clears confirmation. Disabling new grants leaves disconnection available. The existing LineSetup owns channel selection, loading, errors and disconnect confirmation.
 
 A message limit is not a dollar cap. Enforce compute spend at the service paying for work. STOP suppresses replies; it does not cancel an accepted application task. Use the application's explicit cancellation control for that task.
 

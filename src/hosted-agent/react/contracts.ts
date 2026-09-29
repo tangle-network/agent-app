@@ -36,6 +36,8 @@ export type LineLastTurn =
 
 /** The line fields the SDK returns, with the app's target and latest turn joined on. */
 export interface LineSetupLine extends Pick<Line, 'id' | 'connectionId' | 'transport' | 'address' | 'connect' | 'routerAddress' | 'providerNumberId' | 'status'> {
+  /** The attachment shown to the user; hosts can reject a stale disconnect. */
+  attachmentId?: string | null
   /** True only while an active Hub attachment routes messages to an agent or box. */
   answering: boolean
   /** The viewer may disconnect this line. A workspace list can include other agents' lines. */
@@ -67,7 +69,7 @@ export interface LineConnectInput {
 export interface LineSetupClient {
   load(): Promise<LineSetupSnapshot>
   connect(input: LineConnectInput): Promise<void>
-  disconnect(lineId: string): Promise<void>
+  disconnect(lineId: string, expectedAttachmentId?: string): Promise<void>
 }
 
 export interface LineSetupProps {
@@ -75,6 +77,8 @@ export interface LineSetupProps {
   /** Reloads when the host switches workspace or agent. */
   scopeKey: string
   initialTargetId?: string
+  /** Host vocabulary for targets; supplying it omits the generic agent/box suffix. */
+  targetLabel?: string
   canManage: boolean
   /** Narrow new attachments without hiding disconnect controls; not server authorization. */
   canConnect?: boolean

@@ -47,7 +47,7 @@ function matchesLineIdentity(line: LineSetupLine, identity: LineIdentityOption, 
 }
 
 /** Set up an owned identity through a host route backed by sandbox.lines and Hub. */
-export function LineSetup({ client, scopeKey, initialTargetId, canManage, canConnect = canManage, onNotice }: LineSetupProps) {
+export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect = canManage, onNotice }: LineSetupProps) {
   const clientRef = useRef(client)
   clientRef.current = client
   const sequence = useRef(0)
@@ -199,7 +199,8 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, canCon
     setBusy(true)
     setError(null)
     try {
-      await clientRef.current.disconnect(lineId)
+      const expectedAttachmentId = snapshot?.lines.find(line => line.id === lineId)?.attachmentId ?? undefined
+      await clientRef.current.disconnect(lineId, expectedAttachmentId)
       if (!stillCurrent(requestIncarnation)) return
       const updated = await reload(requestIncarnation)
       if (!stillCurrent(requestIncarnation)) return
@@ -276,9 +277,9 @@ export function LineSetup({ client, scopeKey, initialTargetId, canManage, canCon
                     {kindChoices.map(choice => <option key={choice.key} value={choice.key}>{choice.connection.label} · {choice.identity.label}</option>)}
                   </select>
                 </label>
-                <label>Agent or box
+                <label>{targetLabel ?? 'Agent or box'}
                   <select value={selectedTarget?.id ?? ''} onChange={event => setTargetId(event.target.value)}>
-                    {snapshot.targets.map(target => <option key={target.id} value={target.id}>{target.label} · {target.kind}</option>)}
+                    {snapshot.targets.map(target => <option key={target.id} value={target.id}>{target.label}{targetLabel ? '' : ` · ${target.kind}`}</option>)}
                   </select>
                 </label>
                 {selectedTarget && selectedTarget.modes.length > 1 && <fieldset>

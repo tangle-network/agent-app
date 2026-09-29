@@ -32,7 +32,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
   const canConnect = props.canManage && enabled && valid && approved === nomination
   const lineClient = useMemo<LineSetupClient>(() => ({
     load: () => client.load(),
-    disconnect: id => client.disconnect(id),
+    disconnect: (id, expectedAttachmentId) => client.disconnect(id, expectedAttachmentId),
     connect: input => {
       if (!canConnect) throw new Error('Confirm the sender and daily limit before connecting')
       return client.connect({ ...input, operatorAddress: address, turnsPerDay })
@@ -62,6 +62,6 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
           STOP stops replies, not an already accepted task; cancel that task in the application.</p>
       </>}
     </section>}
-    <LineSetup {...props} client={lineClient} canConnect={canConnect} />
+    <LineSetup {...props} targetLabel={props.targetLabel ?? 'Conversation'} client={lineClient} canConnect={canConnect} />
   </>
 }
