@@ -18738,6 +18738,18 @@
           "doc": "A delegation record on the cross-context surface; `missionRef` links a promoted delegation back to the mission/step that spawned it."
         },
         {
+          "name": "AgentProfileEditor",
+          "kind": "function",
+          "signature": "({ value, onChange, disabled, className }: AgentProfileEditorProps) => Element",
+          "doc": "Controlled editor for the canonical profile."
+        },
+        {
+          "name": "AgentProfileEditorProps",
+          "kind": "interface",
+          "signature": "interface AgentProfileEditorProps",
+          "doc": null
+        },
+        {
           "name": "AgentSessionControls",
           "kind": "function",
           "signature": "(props: AgentSessionControlsProps) => Element",
@@ -22288,13 +22300,13 @@
         {
           "name": "workspaceAppBuilderInstructions",
           "kind": "function",
-          "signature": "({ publishTool, listTool, }: WorkspaceAppBuilderInstructionsOptions) => string[]",
+          "signature": "(options: WorkspaceAppBuilderInstructionsOptions) => string[]",
           "doc": "Portable instructions for an agent profile that builds workspace apps."
         },
         {
           "name": "WorkspaceAppBuilderInstructionsOptions",
-          "kind": "interface",
-          "signature": "interface WorkspaceAppBuilderInstructionsOptions",
+          "kind": "type",
+          "signature": "type WorkspaceAppBuilderInstructionsOptions",
           "doc": null
         },
         {

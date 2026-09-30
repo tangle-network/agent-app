@@ -155,12 +155,20 @@ export function refreshWorkspaceAppPreview(
   }
 }
 
-export interface WorkspaceAppBuilderInstructionsOptions {
-  /** Host tool that writes or updates the app registration after creating a preview link. */
-  publishTool: string
-  /** Optional host tool for finding app IDs the builder may update. */
-  listTool?: string
-}
+export type WorkspaceAppBuilderInstructionsOptions =
+  | {
+    /** Host tool that writes the registration after creating a trusted preview. */
+    publishTool: string
+    /** Optional host tool for finding app IDs the builder may update. */
+    listTool?: string
+    manifestPath?: never
+  }
+  | {
+    /** Host-scoped manifest the builder writes after creating runnable projects. */
+    manifestPath: string
+    publishTool?: never
+    listTool?: never
+  }
 
 function toolName(value: string): string {
   if (!/^[A-Za-z][A-Za-z0-9_.-]*$/.test(value)) {
@@ -169,22 +177,47 @@ function toolName(value: string): string {
   return value
 }
 
+function builderManifestPath(value: string): string {
+  if (
+    !/^[A-Za-z0-9._-]+(?:[/][A-Za-z0-9._-]+)*$/.test(value) ||
+    value.split('/').some(segment => segment === '..' || segment === '.')
+  ) {
+    throw new Error('Invalid workspace app manifest path')
+  }
+  return value
+}
+
 /** Portable instructions for an agent profile that builds workspace apps. */
-export function workspaceAppBuilderInstructions({
-  publishTool,
-  listTool,
-}: WorkspaceAppBuilderInstructionsOptions): string[] {
-  const publish = toolName(publishTool)
-  const list = listTool ? toolName(listTool) : undefined
-  return [
+export function workspaceAppBuilderInstructions(
+  options: WorkspaceAppBuilderInstructionsOptions,
+): string[] {
+  const common = [
     'Build a working HTTP application in the current sandbox when the user asks for an app.',
-    ...(list ? ['Use ' + list + ' to inspect the existing apps before creating or updating one.'] : []),
-    'Start its server on 0.0.0.0 using an available, unclaimed port.',
-    'Call ' + publish + ' with the app name, stable app ID when updating, and listening port.',
-    'Use the host tool result as the source of the registered app URL and status; never invent a preview URL.',
     'Keep the same app ID for later revisions of that app.',
     'Treat a preview link as public. Do not embed secrets or private business facts in client code or responses.',
     'Read real business data through authorized product APIs. Do not fabricate records to make the app look complete.',
     'Report the app as available only after the host confirms its preview is ready.',
+  ] as const
+  if (options.manifestPath !== undefined) {
+    const path = builderManifestPath(options.manifestPath)
+    return [
+      common[0],
+      'Inspect the existing app projects and manifest before creating or updating an app.',
+      'Keep each runnable project under apps/<id> relative to the sandbox working directory. Give it a package.json dev script; its HTTP server must listen on 0.0.0.0 and use PORT when supplied.',
+      'Write ' + path + ' as JSON with exactly an apps array of { id, name, projectPath } records; each projectPath is apps/<id>.',
+      'Do not put URLs, credentials, tokens, sandbox IDs, or preview IDs in that manifest.',
+      'The host reads this manifest and owns server launch, port selection, preview creation, registration, and access policy.',
+      ...common.slice(1),
+    ]
+  }
+  const publish = toolName(options.publishTool)
+  const list = options.listTool ? toolName(options.listTool) : undefined
+  return [
+    common[0],
+    ...(list ? ['Use ' + list + ' to inspect the existing apps before creating or updating one.'] : []),
+    'Start its server on 0.0.0.0 using an available, unclaimed port.',
+    'Call ' + publish + ' with the app name, stable app ID when updating, and listening port.',
+    'Use the host tool result as the source of the registered app URL and status; never invent a preview URL.',
+    ...common.slice(1),
   ]
 }

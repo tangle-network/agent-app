@@ -114,6 +114,15 @@ resources/skills, subagents, modes, hooks, and confidentiality policy before
 creating or continuing a session.
 Profile authoring belongs in a settings/profile surface; the composer only
 chooses the active profile for this turn.
+Use AgentProfileEditor from @tangle-network/agent-app/web-react on that
+settings surface.
+Pass the complete AgentProfile as its controlled value and persist on Save.
+Its onChange callback returns a canonical schema-validated profile.
+The product still checks the profile and the caller's authority server-side.
+The editor keeps fields without a dedicated control in Advanced JSON instead of
+discarding them.
+See the rendered editor at docs/assets/profile-editor/complete.png.
+
 
 ```tsx
 import {

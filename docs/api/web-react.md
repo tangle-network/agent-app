@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-427 exports.
+429 exports.
 
 ### `acceptRejectionReason`
 
@@ -60,6 +60,22 @@ interface AgentActivityPanelProps
 
 ```ts
 interface AgentActivityRecord
+```
+
+### `AgentProfileEditor`
+
+`function` — Controlled editor for the canonical profile.
+
+```ts
+({ value, onChange, disabled, className }: AgentProfileEditorProps) => Element
+```
+
+### `AgentProfileEditorProps`
+
+`interface`
+
+```ts
+interface AgentProfileEditorProps
 ```
 
 ### `AgentSessionControls`
