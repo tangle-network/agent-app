@@ -61,7 +61,7 @@ function revision(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 function bounded(value: unknown): value is string {
-  return typeof value === 'string' && new TextEncoder().encode(value).byteLength <= maxBytes
+  return typeof value === 'string' && value.length <= maxBytes && new TextEncoder().encode(value).byteLength <= maxBytes
 }
 function appId(value: string): string {
   if (!idPattern.test(value)) throw new Error('Invalid workspace app ID')
@@ -95,9 +95,14 @@ export function createWorkspaceAppDataHost(options: WorkspaceAppDataHostOptions)
   }
   let closed = false
   let active = 0
+  let messagesLeft = 64
+  let nextWindow = Date.now() + 1000
   const onMessage = (event: MessageEvent<unknown>): void => {
     if (closed || event.source !== frame.contentWindow || event.origin !== previewOrigin ||
       !packet(event.data) || event.data.appId !== app.id) return
+    const now = Date.now()
+    if (now >= nextWindow) { messagesLeft = 64; nextWindow = now + 1000 }
+    if (messagesLeft-- <= 0) return
     const message = event.data
     const reply = (result: Pick<Packet, 'ok' | 'entry' | 'revision' | 'error'>): void => {
       if (closed || event.source !== frame.contentWindow) return

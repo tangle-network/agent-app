@@ -58,3 +58,13 @@ describe('workspace app data host boundary', () => {
     frame.remove()
   })
 })
+
+it('limits message floods from the registered frame', () => {
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(1000)
+  try {
+    const { frame, reply, send } = setup()
+    for (let index = 0; index < 65; index += 1) send({ action: 'ready' })
+    expect(reply).toHaveBeenCalledTimes(64)
+    frame.remove()
+  } finally { clock.mockRestore() }
+})

@@ -139,7 +139,7 @@ It must scope each key to the owner business and stable app ID, enforce a per-ap
 A null expected revision creates a missing key; a numbered revision updates or removes only that version.
 The adapter should throw `WorkspaceAppDataConflict` for a revision mismatch.
 Never put a product credential in the iframe or expose a public storage route for it.
-The bridge caps each UTF-8 value at 64 KiB, keys at 80 characters, and simultaneous requests at 16.
+The bridge caps each UTF-8 value at 64 KiB, keys at 80 characters, simultaneous requests at 16, and messages at 64 per second per mounted frame.
 
 The app preview uses the client with the exact parent origin supplied by the product:
 
