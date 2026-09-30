@@ -204,16 +204,57 @@ describe('workspace runtime environment renewal', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
-  it('renews the retained sandbox after resuming it', async () => {
+  it('supplies renewed runtime credentials to the SDK before resuming a stopped sandbox', async () => {
     const box = fakeBox({ setRuntimeEnv: vi.fn().mockResolvedValue(undefined) })
     listMock.mockResolvedValueOnce([]).mockResolvedValueOnce([box])
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      runtimeEnv: async () => ({ APP_TOKEN: 'after-resume' }),
+    const order: string[] = []
+    const runtimeEnv = vi.fn(async () => {
+      order.push('runtime-env')
+      return { APP_TOKEN: 'after-resume' }
     })
+    box.resume = vi.fn(async () => { order.push('resume') })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { runtimeEnv })
 
     await expect(ensureWorkspaceSandbox(shell, scope)).resolves.toBe(box)
+    expect(runtimeEnv).toHaveBeenCalledOnce()
+    expect(order.slice(0, 2)).toEqual(['runtime-env', 'resume'])
     expect(box.resume).toHaveBeenCalledOnce()
+    expect(box.resume).toHaveBeenCalledWith(expect.objectContaining({
+      env: { APP_TOKEN: 'after-resume' },
+    }))
     expect(box.setRuntimeEnv).toHaveBeenCalledExactlyOnceWith({ APP_TOKEN: 'after-resume' })
+    expect(box.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('does not resume a stopped sandbox when runtime credentials cannot be minted', async () => {
+    const box = fakeBox({ id: 'sandbox-stopped-runtime-env-mint-failure' })
+    listMock.mockResolvedValueOnce([]).mockResolvedValueOnce([box])
+    const runtimeEnv = vi.fn().mockRejectedValue(new Error('Credential issuer unavailable'))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { runtimeEnv })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).rejects.toBeDefined()
+    expect(runtimeEnv).toHaveBeenCalledOnce()
+    expect(box.resume).not.toHaveBeenCalled()
+    expect(box.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('does not start recovery when runtime credentials cannot be minted', async () => {
+    const box = fakeBox({
+      id: 'sandbox-runtime-env-mint-failure',
+      exec: vi.fn()
+        .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'runtime unavailable' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: 'alive', stderr: '' }),
+    })
+    listMock.mockResolvedValue([box])
+    const runtimeEnv = vi.fn().mockRejectedValue(new Error('Credential issuer unavailable'))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { runtimeEnv, livenessProbe: {} })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).rejects.toBeDefined()
+    expect(runtimeEnv).toHaveBeenCalledOnce()
+    expect(box.stop).not.toHaveBeenCalled()
+    expect(box.resume).not.toHaveBeenCalled()
     expect(box.delete).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
   })
@@ -1031,17 +1072,21 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
 
   it('recovers (not deletes) a stopped box that resumes but fails the probe', async () => {
     const del = vi.fn().mockResolvedValue(undefined)
+    const resume = vi.fn().mockResolvedValue(undefined)
     const stopped = fakeBox({
       name: 'box-w1',
       metadata: { harness: 'opencode' },
       delete: del,
+      resume,
       exec: vi.fn().mockRejectedValue(new Error('exec timed out')),
     } as Partial<SandboxInstance>)
     listMock.mockImplementation(({ status }: { status: string }) =>
       status === 'stopped' ? Promise.resolve([stopped]) : Promise.resolve([]),
     )
+    const runtimeEnv = vi.fn().mockResolvedValue({ APP_TOKEN: 'fresh-runtime-token' })
     const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
       livenessProbe: {},
+      runtimeEnv,
     })
 
     const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
@@ -1049,9 +1094,14 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
 
     expect(rejection).toBeInstanceOf(SandboxRecoveryFailedError)
     expect(rejection).toMatchObject({ phase: 'probe', stage: 'resumed' })
-    // Stage-2 resume once, recovery stop→resume once more.
+    // Both SDK resumes receive the authorized app env; the existing workspace stays intact.
+    expect(runtimeEnv).toHaveBeenCalledOnce()
+    expect(resume).toHaveBeenCalledTimes(2)
+    expect(resume.mock.calls).toEqual([
+      [expect.objectContaining({ env: { APP_TOKEN: 'fresh-runtime-token' } })],
+      [expect.objectContaining({ env: { APP_TOKEN: 'fresh-runtime-token' } })],
+    ])
     expect(stopped.stop).toHaveBeenCalledOnce()
-    expect(stopped.resume).toHaveBeenCalledTimes(2)
     expect(del).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
   })

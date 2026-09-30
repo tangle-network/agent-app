@@ -1929,11 +1929,15 @@ function stoppedBoxResumeError(box: SandboxInstance, cause: unknown): unknown {
 async function resumeStoppedBox(
   box: SandboxInstance,
   timeoutMs: number,
+  runtimeEnv: Record<string, string>,
   onProgress?: (event: ProvisionEvent) => void,
 ): Promise<Outcome<SandboxInstance>> {
   try {
     livenessVerifiedAt.delete(box.id)
-    await box.resume({ timeoutMs })
+    await box.resume({
+      timeoutMs,
+      ...(Object.keys(runtimeEnv).length > 0 ? { env: runtimeEnv } : {}),
+    })
     await box.waitFor('running', { timeoutMs, ...(onProgress ? { onProgress } : {}) })
     return ok(box)
   } catch (cause) {
@@ -1958,6 +1962,7 @@ async function recoverUnresponsiveBox(
   stage: SandboxExistingBoxStage,
   name: string,
   resumeTimeout: number,
+  runtimeEnv: Record<string, string>,
   onProgress?: (event: ProvisionEvent) => void,
 ): Promise<SandboxInstance> {
   try {
@@ -1971,7 +1976,7 @@ async function recoverUnresponsiveBox(
       err,
     )
   }
-  const resumed = await resumeStoppedBox(box, resumeTimeout, onProgress)
+  const resumed = await resumeStoppedBox(box, resumeTimeout, runtimeEnv, onProgress)
   if (!resumed.succeeded) {
     throw new SandboxRecoveryFailedError(
       stage,
@@ -2094,6 +2099,7 @@ async function finalizeExistingBox(
   userId: string | undefined,
   harness: Harness,
   scope: SandboxScope,
+  runtimeEnv: Record<string, string>,
 ): Promise<SandboxInstance> {
   await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name)
   const written = await materializeDeferredFilesForExistingBox(
@@ -2110,7 +2116,6 @@ async function finalizeExistingBox(
     throw deferredProfileWriteFailed(stage, name, written.error)
   }
   const finalBox = written.value
-  const runtimeEnv = await resolveWorkspaceRuntimeEnv(shell, scope)
   if (Object.keys(runtimeEnv).length > 0) {
     await finalBox.setRuntimeEnv(runtimeEnv)
   }
@@ -2371,10 +2376,13 @@ async function provisionWorkspaceSandbox(
         throw new Error(`forceNew: sandbox ${name} could not be deleted`, { cause: dropped.error })
       }
     } else if (found.metadata?.harness === harness) {
+      // Resolve app credentials before any restart so a mint failure leaves the
+      // existing sandbox running and intact.
+      const runtimeEnv = await resolveWorkspaceRuntimeEnv(shell, scope)
       try {
         const ready = await refreshRuntimeConnection(client, found)
         if ((await isReusableBox(ready, shell.livenessProbe)).succeeded) {
-          return await finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope)
+          return await finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv)
         }
         // Unresponsive (or never-connectable) box with the RIGHT harness: recover
         // in place — stop→resume preserves the workspace — and fail loud if the
@@ -2387,9 +2395,10 @@ async function provisionWorkspaceSandbox(
           'reused',
           name,
           resumeTimeout,
+          runtimeEnv,
           onProgress,
         )
-        return await finalizeExistingBox(shell, client, recovered, 'reused', name, workspaceId, userId, harness, scope)
+        return await finalizeExistingBox(shell, client, recovered, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv)
       } catch (cause) {
         const error = cause instanceof Error ? cause : new Error(String(cause))
         const recovery = await requestMissingSandboxReplacement(shell, {
@@ -2421,7 +2430,8 @@ async function provisionWorkspaceSandbox(
     const stopped = await listStopped(client, name)
     if (!stopped.succeeded) throw stopped.error
     if (stopped.value) {
-      const resumed = await resumeStoppedBox(stopped.value, resumeTimeout, onProgress)
+      const runtimeEnv = await resolveWorkspaceRuntimeEnv(shell, scope)
+      const resumed = await resumeStoppedBox(stopped.value, resumeTimeout, runtimeEnv, onProgress)
       if (!resumed.succeeded) {
         const recovery = await requestSandboxReplacement(
           shell.recoverStoppedSandbox,
@@ -2434,7 +2444,7 @@ async function provisionWorkspaceSandbox(
         try {
           const box = await refreshRuntimeConnection(client, resumed.value)
           if ((await isReusableBox(box, shell.livenessProbe)).succeeded) {
-            return await finalizeExistingBox(shell, client, box, 'resumed', name, workspaceId, userId, harness, scope)
+            return await finalizeExistingBox(shell, client, box, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv)
           }
           // The box resumed but is unresponsive: one full stop→resume cycle is
           // the state-preserving recovery; still-dead fails loud. Never delete —
@@ -2446,9 +2456,10 @@ async function provisionWorkspaceSandbox(
             'resumed',
             name,
             resumeTimeout,
+            runtimeEnv,
             onProgress,
           )
-          return await finalizeExistingBox(shell, client, recovered, 'resumed', name, workspaceId, userId, harness, scope)
+          return await finalizeExistingBox(shell, client, recovered, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv)
         } catch (cause) {
           const error = cause instanceof Error ? cause : new Error(String(cause))
           const recovery = await requestMissingSandboxReplacement(shell, {
