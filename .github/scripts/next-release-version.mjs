@@ -12,7 +12,12 @@ if (!match) throw new Error(`Invalid base package version: ${version}`)
 
 const subject = execFileSync('git', ['log', '-1', '--format=%s', sourceSha], { encoding: 'utf8' }).trim()
 const breaking = /^[a-z]+(?:\([^)]+\))?!:/.test(subject)
-const next = breaking
-  ? `${match[1]}.${BigInt(match[2]) + 1n}.0`
-  : `${match[1]}.${match[2]}.${BigInt(match[3]) + 1n}`
+let next
+if (breaking) {
+  next = match[1] === '0'
+    ? `0.${BigInt(match[2]) + 1n}.0`
+    : `${BigInt(match[1]) + 1n}.0.0`
+} else {
+  next = `${match[1]}.${match[2]}.${BigInt(match[3]) + 1n}`
+}
 process.stdout.write(next)
