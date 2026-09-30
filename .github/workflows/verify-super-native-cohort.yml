@@ -25,7 +25,7 @@ jobs:
           import {writeFileSync} from 'node:fs';
           import {createRequire} from 'node:module';
           const require=createRequire('/tmp/cohort-solver/package.json'),semver=require('semver'),cache=new Map();
-          const view=(spec,field)=>{const key=spec+' '+field;if(!cache.has(key))cache.set(key,JSON.parse(execFileSync('npm',['view',spec,field,'--json'],{encoding:'utf8'})));return cache.get(key);};
+          const view=(spec,field)=>{const key=spec+' '+field;if(!cache.has(key)){const raw=execFileSync('npm',['view',spec,field,'--json'],{encoding:'utf8'}).trim();cache.set(key,raw?JSON.parse(raw):{});}return cache.get(key);};
           const appVersion='0.50.10',peers=view('@tangle-network/agent-app@'+appVersion,'peerDependencies');
           const names=['agent-runtime','agent-eval','agent-interface','agent-integrations','hub-sdk','sandbox'].map(x=>'@tangle-network/'+x);
           const pins={'@tangle-network/agent-app':appVersion};
