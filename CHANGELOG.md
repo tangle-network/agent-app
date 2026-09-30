@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.9
+
+- fix(model-picker): show current served models first
+
 ## 0.50.8
 
 - fix(sandbox): resolve runtime credentials before workspace resume
