@@ -9,7 +9,7 @@
   "packageManager": "pnpm@11.24.0",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy": "pnpm run peer-check && wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply __PACKAGE_NAME__ --remote",
     "db:migrate:local": "wrangler d1 migrations apply __PACKAGE_NAME__ --local",
     "peer-check": "agent-app-peer-check",

@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
  * `agent-app-peer-check` — fail a consumer's CI when its dependencies are wrong
- * in either of the two ways a version number cannot show.
+ * through installed compatibility, source, and declared-version checks.
  *
  * Runs in the CONSUMER's repo, over the consumer's own tree, because both
- * questions only mean anything against a real install. Add it next to
+ * checks only mean anything against a real install. Add it next to
  * typecheck:
  *
  *     "scripts": { "peer-check": "agent-app-peer-check" }
  *
- * Two gates, one report, one exit code:
+ * Three gates, one report, one exit code:
  *
  *   PEER FLOORS      — is the installed version inside the range the shell
  *                      declares. `pnpm` only WARNS on an unmet peer that is
@@ -20,6 +20,8 @@
  *                      the repo, or a hand-patched `node_modules` all report
  *                      the same version as the real release and ship different
  *                      bytes.
+ *   DECLARED PINS   — do installed exact Tangle versions match the consumer's
+ *                     dependency and development dependency declarations.
  *
  * The source gate runs FIRST and independently: it needs no installed shell, so
  * a repo whose install is broken still gets the answer that explains why.
@@ -29,13 +31,38 @@
  * the escape hatch for a repo that genuinely carries a tarball as test data.
  * Exits 1 on any violation, 0 otherwise.
  */
-import { checkAllPeerFloors, formatPeerFloorReport } from './check'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { checkAllPeerFloors, checkPeerFloors, formatPeerFloorReport } from './check'
 import { checkDependencySources, formatDependencySourceReport } from './dependency-source'
 import { invokedAsScript } from '../signoff/invoked-as-script'
 
 interface CliArgs {
   readonly appDir: string
   readonly exclude: readonly string[]
+}
+
+/** Exact consumer pins choose an artifact; engine peer ranges choose compatibility. */
+function checkDeclaredPins(appDir: string): boolean {
+  const manifest = JSON.parse(readFileSync(join(appDir, 'package.json'), 'utf8')) as {
+    dependencies?: Record<string, string>
+    devDependencies?: Record<string, string>
+  }
+  const pins = Object.fromEntries(
+    Object.entries({ ...manifest.devDependencies, ...manifest.dependencies })
+      .filter(([name, version]) => name.startsWith('@tangle-network/')
+        && /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version)),
+  )
+  const report = checkPeerFloors({ appDir, shellManifest: { peerDependencies: pins } })
+  const installed = report.rows.filter((row) => row.installed !== null)
+  const mismatches = installed.filter((row) => row.installed !== row.range)
+  for (const row of mismatches) {
+    process.stderr.write(`DECLARED PIN VIOLATED: ${row.name} declares ${row.range}, but ${row.installed} is installed. Reinstall from the current frozen lockfile.\n`)
+  }
+  if (mismatches.length === 0) {
+    process.stdout.write(`declared pins: ${installed.length} installed exact Tangle versions matched\n`)
+  }
+  return mismatches.length === 0
 }
 
 export function parsePeerCheckArgs(argv: readonly string[]): CliArgs {
@@ -75,6 +102,13 @@ function main(): void {
     if (reports.some((report) => !report.ok)) failed = true
   } catch (err) {
     process.stderr.write(`agent-app-peer-check (peer floors) failed: ${err instanceof Error ? err.message : String(err)}\n`)
+    failed = true
+  }
+
+  try {
+    if (!checkDeclaredPins(appDir)) failed = true
+  } catch (err) {
+    process.stderr.write(`agent-app-peer-check (declared pins) failed: ${err instanceof Error ? err.message : String(err)}\n`)
     failed = true
   }
 

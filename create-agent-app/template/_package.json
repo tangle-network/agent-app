@@ -9,7 +9,7 @@
   "packageManager": "pnpm@11.24.0",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy": "pnpm run peer-check && wrangler deploy",
     "peer-check": "agent-app-peer-check",
     "signoff": "agent-app-signoff",
     "typecheck": "tsc --noEmit",
