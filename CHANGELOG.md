@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.13
+
+- fix(vault): align tree and document header heights (#696)
+- fix(web-react): recover failed lazy route chunks
+
 ## 0.50.12
 
 - fix(factory): generate apps from the tested engine cohort (#695)
