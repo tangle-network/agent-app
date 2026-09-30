@@ -258,7 +258,7 @@ export function createObjectUploadRoute({
     try {
       await store.put(key, boundedBody, { contentType, contentLength: declaredLength })
       const stored = await store.head(key)
-      if (size > 0 && stored?.size === size && size === declaredLength) {
+      if (bodyComplete && size > 0 && stored?.size === size && size === declaredLength) {
         return Response.json({ key, size, contentType }, { status: 201 })
       }
     } catch {

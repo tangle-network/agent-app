@@ -85,6 +85,24 @@ describe('createObjectUploadRoute', () => {
     expect(store.objects.get(receipt.key)).toEqual(payload)
   })
 
+  it('requires the request stream to finish before exposing a stored key', async () => {
+    const store = memoryStore()
+    store.put = async (key, body) => {
+      const chunk = await (body as ReadableStream<Uint8Array>).getReader().read()
+      if (chunk.value) store.objects.set(key, chunk.value)
+    }
+    const route = createObjectUploadRoute({
+      store,
+      authorize: async () => ({ ok: true, operatorId: 'owner' }),
+    })
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array([1, 2, 3])) },
+    })
+    const response = await route(uploadRequest(body, { 'X-Upload-Length': '3' }))
+    expect(response.status).toBe(503)
+    expect(store.objects.size).toBe(0)
+  })
+
   it('denies before reading a body or writing any object', async () => {
     const store = memoryStore()
     const put = vi.spyOn(store, 'put')
