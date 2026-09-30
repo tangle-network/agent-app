@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.7
+
+- feat(profile): edit complete agent profiles in shared web shell
+
 ## 0.50.6
 
 - fix(chat): recover provider quota failures without duplicate error text (#689)
