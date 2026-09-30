@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -158,26 +158,33 @@ describe('buildCatalog', () => {
     )
   })
 
-  it('recommends a current known family without promoting an unknown family', () => {
-    const current = buildCatalog([
-      {
-        id: 'claude-opus-5',
-        _provider: 'anthropic',
-        routeability: { routeable: true },
-      },
-      {
-        id: 'claude-fable-5-1',
-        _provider: 'anthropic',
-        routeability: { routeable: true },
-      },
-    ])
-
-    expect(current.models.map((model) => model.id)).toEqual([
+  it('keeps an older family searchable without promoting it when its successor cannot route', () => {
+    const candidates: RouterModel[] = [
+      { id: 'claude-opus-5', _provider: 'anthropic', routeability: { routeable: true } },
+      { id: 'claude-opus-5-5', _provider: 'anthropic', routeability: { routeable: false } },
+      { id: 'claude-fable-5-1', _provider: 'anthropic', routeability: { routeable: true } },
+    ]
+    const unavailable = buildCatalog(candidates)
+    expect(unavailable.models.map((model) => model.id)).toEqual([
       'claude-fable-5-1',
       'claude-opus-5',
     ])
-    expect(current.models.find((model) => model.id === 'claude-opus-5')?.featured).toBe(true)
-    expect(current.models[0]?.featured).toBe(false)
+    expect(unavailable.models.every((model) => !model.featured)).toBe(true)
+
+    const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-30T00:00:00Z'))
+    try {
+      const available = buildCatalog([
+        ...candidates.slice(0, 1),
+        { id: 'claude-opus-5-5', _provider: 'anthropic', routeability: { routeable: true } },
+      ])
+      expect(available.models.find((model) => model.id === 'claude-opus-5-5')).toMatchObject({
+        featured: true,
+        releaseDate: '2026-09-22T00:00:00.000Z',
+      })
+      expect(available.models.find((model) => model.id === 'claude-opus-5')?.featured).toBe(false)
+    } finally {
+      now.mockRestore()
+    }
   })
 
   it('groups provider aliases so an old alias cannot precede its successor', () => {
