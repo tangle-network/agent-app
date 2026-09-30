@@ -4,7 +4,7 @@
  * through installed compatibility, source, and declared-version checks.
  *
  * Runs in the CONSUMER's repo, over the consumer's own tree, because both
- * checks only mean anything against a real install. Add it next to
+ * installed checks only mean anything against a real install. Add it next to
  * typecheck:
  *
  *     "scripts": { "peer-check": "agent-app-peer-check" }
