@@ -131,6 +131,7 @@ describe('canonical picker popovers escape their host container', () => {
     // Content is the real menu, not an empty shell that would satisfy the
     // structural assertions on their own.
     expect(within(panel[0]!).getByPlaceholderText('Search models...')).toBeTruthy()
+    fireEvent.click(within(panel[0]!).getByRole('button', { name: 'Browse all models' }))
     expect(within(panel[0]!).getByRole('button', { name: /Gemini 2\.5 Pro/ })).toBeTruthy()
   })
 
@@ -173,6 +174,7 @@ describe('canonical picker popovers escape their host container', () => {
     // would look fixed and still select nothing.
     const { onModelChange } = renderInHost()
     fireEvent.click(screen.getByRole('button', { name: /Claude Opus 4/ }))
+    fireEvent.click(within(openPanels()[0]!).getByRole('button', { name: 'Browse all models' }))
     const row = within(openPanels()[0]!).getByRole('button', { name: /Gemini 2\.5 Pro/ })
     fireEvent.mouseDown(row)
     fireEvent.click(row)
