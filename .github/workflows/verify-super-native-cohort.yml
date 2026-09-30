@@ -24,16 +24,21 @@ jobs:
           import {execFileSync} from 'node:child_process';
           import {writeFileSync} from 'node:fs';
           import {createRequire} from 'node:module';
-          const require=createRequire('/tmp/cohort-solver/package.json'), semver=require('semver');
-          const view=(spec,field)=>JSON.parse(execFileSync('npm',['view',spec,field,'--json'],{encoding:'utf8'}));
-          const appVersion='0.50.10', peers=view('@tangle-network/agent-app@'+appVersion,'peerDependencies');
-          const names=['agent-eval','agent-interface','agent-runtime','agent-integrations','hub-sdk','sandbox'];
+          const require=createRequire('/tmp/cohort-solver/package.json'),semver=require('semver'),cache=new Map();
+          const view=(spec,field)=>{const key=spec+' '+field;if(!cache.has(key))cache.set(key,JSON.parse(execFileSync('npm',['view',spec,field,'--json'],{encoding:'utf8'})));return cache.get(key);};
+          const appVersion='0.50.10',peers=view('@tangle-network/agent-app@'+appVersion,'peerDependencies');
+          const names=['agent-runtime','agent-eval','agent-interface','agent-integrations','hub-sdk','sandbox'].map(x=>'@tangle-network/'+x);
           const pins={'@tangle-network/agent-app':appVersion};
-          for(const short of names){const name='@tangle-network/'+short;
-            const range=short==='sandbox'?'>=0.58.1 <0.59.0':peers[name];
-            const versions=view(name,'versions').filter(v=>!semver.prerelease(v)&&semver.satisfies(v,range));
-            const version=semver.rsort(versions)[0];if(!version)throw Error('No compatible published version for '+name);
-            pins[name]=version;
+          for(let pass=0;pass<12;pass++){
+            let changed=false;
+            for(const name of names){
+              const constraints=[peers[name],...(name.endsWith('/sandbox')?['>=0.58.1 <0.59.0']:[])];
+              for(const [other,v]of Object.entries(pins)){if(other===name)continue;const p=view(other+'@'+v,'peerDependencies');if(p?.[name])constraints.push(p[name]);}
+              const versions=view(name,'versions').filter(v=>!semver.prerelease(v)&&constraints.every(range=>semver.satisfies(v,range)));
+              const version=semver.rsort(versions)[0];if(!version)throw Error('No published intersection for '+name+': '+constraints.join(' AND '));
+              if(pins[name]!==version){pins[name]=version;changed=true;}
+            }
+            if(!changed)break;if(pass===11)throw Error('Dependency selection did not converge');
           }
           const manifest={name:'super-agent',version:'9.0.0',private:true,type:'module',engines:{node:'>=22.16.0'},
             dependencies:{...pins,marked:'18.0.14'},devDependencies:{'@types/node':'26.6.2',typescript:'7.0.2'},
@@ -41,7 +46,7 @@ jobs:
           writeFileSync('package.json',JSON.stringify(manifest,null,2)+'\n');
           writeFileSync('/tmp/cohort-evidence/resolved.json',JSON.stringify({appVersion,peers,pins},null,2)+'\n');
           JS
-          npm install --ignore-scripts --no-audit --no-fund > /tmp/cohort-evidence/install.log 2>&1
+          npm install --ignore-scripts --no-audit --no-fund > /tmp/cohort-evidence/install.log 2>&1 || { cat /tmp/cohort-evidence/install.log; exit 1; }
           npm ls --all --json > /tmp/cohort-evidence/npm-ls.json
           node --input-type=module - <<'JS' > /tmp/cohort-evidence/imports.json
           const modules={
