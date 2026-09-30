@@ -42,8 +42,8 @@ export interface PutObjectOptions {
   /** MIME type recorded with the object (returned by `get`/`head`). Advisory:
    *  the proxied download route always serves `application/octet-stream`. */
   contentType?: string
-  /** Byte length of `body`, when known. Some backends require it for a
-   *  streamed body; the R2 impl passes a known length through when supplied. */
+  /** Byte length of `body`, when known. The R2 adapter wraps a stream in the
+   *  Workers `FixedLengthStream` when this is supplied. */
   contentLength?: number
 }
 
@@ -112,7 +112,13 @@ export function createR2ObjectStore({ bucket }: { bucket: R2LikeBucket }): Objec
   return {
     async put(key, body, opts) {
       const options = opts?.contentType ? { httpMetadata: { contentType: opts.contentType } } : undefined
-      await bucket.put(key, body, options)
+      const fixedLengthStream = (globalThis as typeof globalThis & {
+        FixedLengthStream?: new (length: number) => TransformStream<Uint8Array, Uint8Array>
+      }).FixedLengthStream
+      const value = body instanceof ReadableStream && opts?.contentLength !== undefined && fixedLengthStream
+        ? body.pipeThrough(new fixedLengthStream(opts.contentLength))
+        : body
+      await bucket.put(key, value, options)
     },
     async get(key) {
       const obj = await bucket.get(key)
@@ -131,6 +137,144 @@ export function createR2ObjectStore({ bucket }: { bucket: R2LikeBucket }): Objec
     async delete(key) {
       await bucket.delete(key)
     },
+  }
+}
+
+/** Default ceiling for a single raw-body object upload. Consumers may opt into
+ * a higher ceiling only after proving their deployed request path and store. */
+export const DEFAULT_MAX_OBJECT_UPLOAD_BYTES = 25 * 1024 * 1024
+
+/** The minimum Cloudflare zone request-body ceiling is 100 MB decimal.
+ * Larger route limits cannot work reliably through a Workers ingress. */
+export const MAX_WORKERS_OBJECT_UPLOAD_BYTES = 100_000_000
+
+export type ObjectUploadAuthorization =
+  | { ok: true; operatorId: string; customerId?: string }
+  | { ok: false; response: Response }
+
+export interface CreateObjectUploadRouteOptions {
+  store: ObjectStore
+  /** Resolve identity and upload permission from authenticated server context.
+   * Never return an operator or customer chosen by the request body. */
+  authorize(args: { request: Request }): Promise<ObjectUploadAuthorization>
+  maxBytes?: number
+}
+
+function uploadError(status: number, code: string, message: string): Response {
+  return Response.json({ error: { code, message } }, { status })
+}
+
+/**
+ * Create a PUT handler for one raw file body. The filename is the `filename`
+ * query parameter; the bytes are `request.body`, never multipart form data.
+ * `X-Upload-Length` carries the browser File.size; `Content-Length` works for
+ * non-browser callers. A declared length lets R2 receive a fixed-length stream.
+ * The route checks actual bytes and rejects conflicting declared lengths.
+ * The server supplies owner scope, and a fresh upload id prevents cleanup from
+ * deleting an earlier object. The returned key can be stored in product data;
+ * reads still require a separately signed URL.
+ */
+export function createObjectUploadRoute({
+  store,
+  authorize,
+  maxBytes = DEFAULT_MAX_OBJECT_UPLOAD_BYTES,
+}: CreateObjectUploadRouteOptions): (request: Request) => Promise<Response> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_WORKERS_OBJECT_UPLOAD_BYTES) {
+    throw new Error('object-store: maxBytes must fit the Cloudflare Workers request limit')
+  }
+
+  return async (request) => {
+    if (request.method !== 'PUT') {
+      return new Response('Method not allowed', { status: 405, headers: { Allow: 'PUT' } })
+    }
+
+    let auth: ObjectUploadAuthorization
+    try {
+      auth = await authorize({ request })
+    } catch {
+      return uploadError(503, 'authorization_unavailable', 'Upload authorization unavailable')
+    }
+    if (!auth.ok) return auth.response
+
+    const filename = new URL(request.url).searchParams.get('filename')
+    if (!filename || filename.length > 255 || !request.body) {
+      return uploadError(400, 'invalid_upload', 'A filename and file body are required')
+    }
+
+    const contentType = request.headers.get('Content-Type') || 'application/octet-stream'
+    if (contentType.toLowerCase().startsWith('multipart/form-data')) {
+      return uploadError(415, 'raw_body_required', 'Send one raw file body')
+    }
+
+    const browserLength = request.headers.get('X-Upload-Length')
+    const transportLength = request.headers.get('Content-Length')
+    if (browserLength !== null && transportLength !== null && browserLength !== transportLength) {
+      return uploadError(400, 'invalid_length', 'Conflicting upload lengths')
+    }
+    const lengthHeader = browserLength ?? transportLength
+    if (lengthHeader === null) {
+      return uploadError(411, 'length_required', 'X-Upload-Length is required')
+    }
+    if (!/^[1-9]\d*$/.test(lengthHeader)) {
+      return uploadError(400, 'invalid_length', 'Invalid Content-Length')
+    }
+    const declaredLength = Number(lengthHeader)
+    if (!Number.isSafeInteger(declaredLength)) {
+      return uploadError(400, 'invalid_length', 'Invalid Content-Length')
+    }
+    if (declaredLength > maxBytes) {
+      return uploadError(413, 'upload_too_large', 'File exceeds upload limit')
+    }
+
+    let key: string
+    try {
+      key = objectKey({
+        operatorId: auth.operatorId,
+        customerId: auth.customerId,
+        uploadId: crypto.randomUUID(),
+        filename,
+      })
+    } catch {
+      return uploadError(503, 'invalid_owner_scope', 'Upload owner scope unavailable')
+    }
+
+    let size = 0
+    let exceeded = false
+    let bodyComplete = false
+    const boundedBody = request.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        if (size + chunk.byteLength > maxBytes) {
+          exceeded = true
+          throw new Error('object-store: upload exceeded byte limit')
+        }
+        size += chunk.byteLength
+        controller.enqueue(chunk)
+      },
+      flush() {
+        bodyComplete = true
+      },
+    }))
+
+    try {
+      await store.put(key, boundedBody, { contentType, contentLength: declaredLength })
+      const stored = await store.head(key)
+      if (size > 0 && stored?.size === size && size === declaredLength) {
+        return Response.json({ key, size, contentType }, { status: 201 })
+      }
+    } catch {
+      // A backend may have committed bytes before rejecting the stream.
+    }
+
+    try {
+      await store.delete(key)
+    } catch {
+      return uploadError(503, 'upload_cleanup_failed', 'Upload cleanup failed')
+    }
+    if (exceeded) return uploadError(413, 'upload_too_large', 'File exceeds upload limit')
+    if (size > declaredLength || (bodyComplete && size !== declaredLength)) {
+      return uploadError(400, 'invalid_length', 'Upload length does not match file body')
+    }
+    return uploadError(503, 'upload_storage_failed', 'Upload could not be stored')
   }
 }
 
