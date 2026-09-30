@@ -228,6 +228,20 @@ run_release advanced-no-tag 1.2.6 > "$TMP/advanced.log"
 grep -Fq 'main advanced from tested commit' "$TMP/advanced.log"
 [[ $(wc -l < "$DISPATCH_LOG") -eq 3 ]]
 
+set_seed_version() {
+  SEED_VERSION=$1 node - "$SEED/package.json" "$SEED/create-agent-app/package.json" <<'NODE'
+const fs = require('node:fs')
+for (const file of process.argv.slice(2)) {
+  const manifest = JSON.parse(fs.readFileSync(file, 'utf8'))
+  manifest.version = process.env.SEED_VERSION
+  fs.writeFileSync(file, `${JSON.stringify(manifest)}\n`)
+}
+NODE
+  git -C "$SEED" add package.json create-agent-app/package.json
+  git -C "$SEED" commit --quiet -m "chore(test): set release base to $1"
+}
+
+set_seed_version 0.49.38
 git -C "$SEED" commit --quiet --allow-empty -m 'fix(auth)!: require identity discriminator'
 BASE=$(git -C "$SEED" rev-parse HEAD)
 git --git-dir="$ORIGIN" fetch --quiet "$SEED" "$BASE"
@@ -237,11 +251,23 @@ mkdir -p "$STAGED_WRITER"
 cp "$SCRIPT" "$STAGED_WRITER/write-release.sh"
 cp "$ROOT/.github/scripts/next-release-version.mjs" "$STAGED_WRITER/next-release-version.mjs"
 SCRIPT="$STAGED_WRITER/write-release.sh"
-fails 'expected next release 1.3.0' run_release wrong-minor 1.2.6
-run_release minor 1.3.0 >/dev/null
-MINOR_TAG=$(git --git-dir="$ORIGIN" rev-parse refs/tags/v1.3.0)
+fails 'expected next release 0.50.0' run_release wrong-minor 0.49.39
+run_release minor 0.50.0 >/dev/null
+MINOR_TAG=$(git --git-dir="$ORIGIN" rev-parse refs/tags/v0.50.0)
 [[ $(git --git-dir="$ORIGIN" rev-parse "$MINOR_TAG^") == "$BASE" ]]
-[[ $(git --git-dir="$ORIGIN" show "$MINOR_TAG:package.json" | node -p "JSON.parse(require('fs').readFileSync(0)).version") == 1.3.0 ]]
-run_validate minor-valid 1.3.0 "$MINOR_TAG" >/dev/null
+[[ $(git --git-dir="$ORIGIN" show "$MINOR_TAG:package.json" | node -p "JSON.parse(require('fs').readFileSync(0)).version") == 0.50.0 ]]
+run_validate minor-valid 0.50.0 "$MINOR_TAG" >/dev/null
 
-echo 'write release script: ok (patch and breaking-minor transitions)'
+set_seed_version 1.2.3
+git -C "$SEED" commit --quiet --allow-empty -m 'fix(auth)!: change stable identity contract'
+BASE=$(git -C "$SEED" rev-parse HEAD)
+git --git-dir="$ORIGIN" fetch --quiet "$SEED" "$BASE"
+git --git-dir="$ORIGIN" update-ref refs/heads/main "$BASE"
+fails 'expected next release 2.0.0' run_release wrong-major 1.3.0
+run_release major 2.0.0 >/dev/null
+MAJOR_TAG=$(git --git-dir="$ORIGIN" rev-parse refs/tags/v2.0.0)
+[[ $(git --git-dir="$ORIGIN" rev-parse "$MAJOR_TAG^") == "$BASE" ]]
+[[ $(git --git-dir="$ORIGIN" show "$MAJOR_TAG:package.json" | node -p "JSON.parse(require('fs').readFileSync(0)).version") == 2.0.0 ]]
+run_validate major-valid 2.0.0 "$MAJOR_TAG" >/dev/null
+
+echo 'write release script: ok (patch, pre-1.0 minor, and stable major transitions)'
