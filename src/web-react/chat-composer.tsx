@@ -36,7 +36,6 @@
  */
 
 import {
-  Component,
   lazy,
   Suspense,
   useCallback,
@@ -61,6 +60,7 @@ import { filterCommandPaletteItems, type CommandPaletteItem } from '../session-s
 import { OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, PopoverSurface } from './controls'
 import { formatDictationElapsed, useDictation, type DictationAudio } from './use-dictation'
 import type { ComposerMentionProp } from './use-file-mentions'
+import { LazyLoadBoundary } from './lazy-load-boundary'
 
 /**
  * The TipTap editor is a lazy chunk: only consumers that pass `mention` pull
@@ -71,38 +71,6 @@ import type { ComposerMentionProp } from './use-file-mentions'
  */
 function createLazyMentionEditor() {
   return lazy(() => import('./mention-editor').then((m) => m.loadMentionEditor()))
-}
-
-/**
- * Contains a mention-editor failure without removing the basic input.
- */
-class MentionEditorBoundary extends Component<
-  {
-    fallback: ReactNode
-    children: ReactNode
-  },
-  { failed: boolean }
-> {
-  state = { failed: false }
-
-  static getDerivedStateFromError() {
-    return { failed: true }
-  }
-
-  render() {
-    if (!this.state.failed) return this.props.children
-    return (
-      <>
-        {this.props.fallback}
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-        >
-          Mentions are unavailable. You can still send.
-        </div>
-      </>
-    )
-  }
 }
 
 // ── glyphs (no icon-library dependency) ───────────────────────────────────
@@ -1263,9 +1231,17 @@ export function ChatComposer({
         {mention ? (
           // The basic textarea stays usable through download, initialization,
           // and failure.
-          <MentionEditorBoundary
-            fallback={textareaInput}
-          >
+          <LazyLoadBoundary renderFailure={() => (
+            <>
+              {textareaInput}
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+              >
+                Mentions are unavailable. You can still send.
+              </div>
+            </>
+          )}>
             <Suspense fallback={textareaInput}>
               <MentionEditor
                 value={text}
@@ -1282,7 +1258,7 @@ export function ChatComposer({
                 onPasteFiles={onAttach ? ingestPastedFiles : undefined}
               />
             </Suspense>
-          </MentionEditorBoundary>
+          </LazyLoadBoundary>
         ) : (
           // The card draws the keyboard indicator through `focus-within:`, so
           // the input does not need a second outline.

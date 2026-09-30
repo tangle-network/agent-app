@@ -76,6 +76,24 @@ Pair the layout with `EntryComposer` from
 `SessionHistoryPanel` from `@tangle-network/agent-app/web-react` on the full
 history route.
 
+For a lazy route, place `RouteChunkBoundary` outside its `Suspense` fallback.
+A stale chunk leaves a visible Reload action instead of an empty page.
+The boundary reloads automatically only when `autoReloadOnChunkError` is set.
+Set that prop only when a full page reload cannot discard unsaved work.
+
+```tsx
+import { Suspense, lazy } from 'react'
+import { RouteChunkBoundary } from '@tangle-network/agent-app/web-react'
+
+const AppsRoute = lazy(() => import('./AppsRoute'))
+
+<RouteChunkBoundary>
+  <Suspense fallback={<p>Loading apps…</p>}>
+    <AppsRoute />
+  </Suspense>
+</RouteChunkBoundary>
+```
+
 ## Composer capability contract
 
 `EntryComposer` is capability-driven: a control appears only when the product

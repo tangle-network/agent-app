@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-429 exports.
+431 exports.
 
 ### `acceptRejectionReason`
 
@@ -2756,6 +2756,22 @@ type ReviewQueueState
 
 ```ts
 (record: ProvenanceRecord, policy?: ProvenanceConfidencePolicy, seen?: Set<ProvenanceRecord>) => ProvenanceStanding
+```
+
+### `RouteChunkBoundary`
+
+`function` — Wrap a lazy route and its Suspense fallback to recover after a deploy changes chunk URLs.
+
+```ts
+({ children, autoReloadOnChunkError }: RouteChunkBoundaryProps) => Element
+```
+
+### `RouteChunkBoundaryProps`
+
+`interface`
+
+```ts
+interface RouteChunkBoundaryProps
 ```
 
 ### `RunDrillIn`
