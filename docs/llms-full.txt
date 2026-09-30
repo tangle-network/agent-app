@@ -26908,7 +26908,7 @@ type ReviewQueueState
 
 ### `RouteChunkBoundary`
 
-`function` — Wrap a lazy route and its Suspense fallback to recover after a deploy changes chunk URLs.
+`function` — Wrap a lazy route and its Suspense fallback; recovery requests a fresh document URL.
 
 ```ts
 ({ children, autoReloadOnChunkError }: RouteChunkBoundaryProps) => Element

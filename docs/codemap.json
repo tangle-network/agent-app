@@ -20763,7 +20763,7 @@
           "name": "RouteChunkBoundary",
           "kind": "function",
           "signature": "({ children, autoReloadOnChunkError }: RouteChunkBoundaryProps) => Element",
-          "doc": "Wrap a lazy route and its Suspense fallback to recover after a deploy changes chunk URLs."
+          "doc": "Wrap a lazy route and its Suspense fallback; recovery requests a fresh document URL."
         },
         {
           "name": "RouteChunkBoundaryProps",
