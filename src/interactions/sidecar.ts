@@ -1,9 +1,9 @@
 /**
  * Server-side client for the sandbox sidecar's generic interaction routes
  * (`GET/POST {runtimeUrl}/agents/sessions/{sessionId}/interactions`). The
- * pinned sandbox SDK exposes only the question-specific `session().answer()`
- * convenience; these raw calls are backend-agnostic (question/permission/plan,
- * any harness) and carry explicit outcomes (accepted/declined).
+ * transport supports structural connections and older response shapes across
+ * question/permission/plan interactions. Exact-run cancellation belongs to the
+ * native SDK, not this session-wide compatibility surface.
  *
  * Server-only: the sidecar bearer must never reach browser code. The caller
  * supplies the connection as a structural value (runtime URL + bearer +
@@ -140,6 +140,14 @@ export async function respondToSessionInteraction(
     },
   })
   if (!result.succeeded) return result
+  // An HTTP success is not an acknowledgement that the answer was applied.
+  // Current runtimes return success:true; retain the supported data.ok receipt.
+  if (result.value.success !== true && asRecord(result.value.data)?.ok !== true) {
+    return {
+      succeeded: false,
+      error: { code: 'MALFORMED_RESPONSE', message: 'sidecar answer returned no acknowledgement', status: 200 },
+    }
+  }
   return { succeeded: true, value: undefined }
 }
 
