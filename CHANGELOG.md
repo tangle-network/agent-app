@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.16
+
+- fix(web-react): recover retired route chunks with a fresh document (#703)
+- fix(release): bump stable breaking versions by major [skip release]
+
 ## 0.50.15
 
 - fix(catalog): feature recent served model families
