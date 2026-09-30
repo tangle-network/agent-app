@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.14
+
+- feat(workspace-apps): add scoped durable data bridge
+
 ## 0.50.13
 
 - fix(vault): align tree and document header heights (#696)
