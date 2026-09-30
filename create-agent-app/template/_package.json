@@ -9,7 +9,7 @@
   "packageManager": "pnpm@11.24.0",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy": "pnpm run peer-check && wrangler deploy",
     "peer-check": "agent-app-peer-check",
     "signoff": "agent-app-signoff",
     "typecheck": "tsc --noEmit",
@@ -21,18 +21,18 @@
     "@tangle-network/agent-app": "__AGENT_APP_VERSION__"
   },
   "peerDependencies": {
-    "@tangle-network/agent-eval": ">=0.199.0 <0.200.0",
-    "@tangle-network/agent-integrations": ">=0.54.2 <0.56.0",
-    "@tangle-network/agent-interface": "2.13.0",
-    "@tangle-network/agent-runtime": ">=0.282.2 <0.283.0"
+    "@tangle-network/agent-eval": ">=0.199.0 <0.201.0",
+    "@tangle-network/agent-integrations": ">=0.54.2 <0.58.0 || >=0.59.0 <0.60.0",
+    "@tangle-network/agent-interface": "^2.13.0",
+    "@tangle-network/agent-runtime": ">=0.282.2 <0.284.0 || >=0.285.0 <0.286.0"
   },
   "devDependencies": {
     "@tangle-network/agent-eval": "0.199.1",
-    "@tangle-network/agent-integrations": "0.55.0",
-    "@tangle-network/agent-interface": "2.13.0",
+    "@tangle-network/agent-integrations": "0.57.0",
+    "@tangle-network/agent-interface": "2.14.0",
     "@tangle-network/agent-knowledge": "17.1.10",
-    "@tangle-network/agent-runtime": "0.282.2",
-    "@tangle-network/sandbox": "0.53.0",
+    "@tangle-network/agent-runtime": "0.285.0",
+    "@tangle-network/sandbox": "0.58.1",
     "@types/node": "^22.20.1",
     "typescript": "^7.0.2",
     "viem": "^2.0.0",

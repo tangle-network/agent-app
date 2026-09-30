@@ -13,13 +13,16 @@ package's engine requirement and record the version you will run:
 ```bash
 CREATE_VERSION=$(npm view @tangle-network/create-agent-app@latest version) &&
 npm view "@tangle-network/create-agent-app@$CREATE_VERSION" engines --json &&
-npm view "@tangle-network/agent-app@^$CREATE_VERSION" version peerDependencies --json &&
+npm view "@tangle-network/agent-app@$CREATE_VERSION" version peerDependencies --json &&
 npm create "@tangle-network/agent-app@$CREATE_VERSION" my-agent -- --chat
 ```
 
 Do not continue after a failed registry lookup. The CLI defaults the generated
-`agent-app` dependency to `^<scaffolder-version>`; the generated `package.json`
-records the requested dependencies and `packageManager`. Use that pnpm version.
+`agent-app` dependency to `<scaffolder-version>`; the generated `package.json`
+records the requested dependencies and `packageManager`.
+Use that pnpm version.
+The generated engine pins match the cohort maintained in Agent App's package manifest.
+Upgrade this cohort deliberately and run the product's real flow before deployment.
 Do not force a version override or ignore peer failures to conceal an incomplete
 release.
 

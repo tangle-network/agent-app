@@ -125,7 +125,7 @@ describe('create-agent-app --chat scaffolder', () => {
   it('substitutes tokens across package.json, agent.config.ts, wrangler.toml, and the dev page', () => {
     const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'))
     expect(pkg.name).toBe('demo-chat')
-    expect(pkg.dependencies['@tangle-network/agent-app']).toBe(`^${APP_VERSION}`)
+    expect(pkg.dependencies['@tangle-network/agent-app']).toBe(APP_VERSION)
     const cfg = readFileSync(join(projectDir, 'agent.config.ts'), 'utf8')
     expect(cfg).toContain("name: 'demo-chat'")
     for (const file of ['agent.config.ts', 'wrangler.toml', 'public/index.html', 'prompts/system.md']) {

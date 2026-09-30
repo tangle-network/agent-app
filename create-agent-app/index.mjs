@@ -28,7 +28,7 @@ const TEMPLATES = {
 const COMMON_TEMPLATE = join(HERE, 'template-common')
 
 const { version: packageVersion } = JSON.parse(await readFile(join(HERE, 'package.json'), 'utf8'))
-const AGENT_APP_RANGE = `^${packageVersion}`
+const DEFAULT_AGENT_APP_VERSION = packageVersion
 
 // Template files renamed on materialization. A template cannot itself be named
 // `package.json` / `.gitignore` / `tsconfig.json` without confusing the
@@ -67,7 +67,7 @@ function usage() {
     '                               streaming turns + replay, uploads, agent asks) with',
     '                               its own end-to-end test. Default: the tool-loop skeleton.',
     '  --name <name>                Project name (default: the target dir basename).',
-    '  --agent-app-version <range>  @tangle-network/agent-app version (default: ' + AGENT_APP_RANGE + ').',
+    '  --agent-app-version <range>  @tangle-network/agent-app version (default: ' + DEFAULT_AGENT_APP_VERSION + ').',
     '  --force                      Write into a non-empty directory.',
     '  -h, --help                   Show this help.',
     '',
@@ -143,7 +143,7 @@ async function main() {
   const targetDir = resolve(args._[0] ?? args.name)
   const projectName = args.name ?? targetDir.split(/[\\/]/).pop()
   const packageName = toPackageName(projectName)
-  const agentAppVersion = args.agentAppVersion ?? AGENT_APP_RANGE
+  const agentAppVersion = args.agentAppVersion ?? DEFAULT_AGENT_APP_VERSION
   const templateDir = TEMPLATES[args.template ?? 'default']
 
   if (existsSync(targetDir)) {

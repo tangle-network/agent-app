@@ -210,7 +210,7 @@ function installAndRunScaffolder({
     throw new Error(`${variant} generated project does not pin zod to the mature workspace version`)
   }
   const generatedPackage = JSON.parse(readFileSync(packagePath, 'utf8'))
-  const expectedRange = `^${packedVersion}`
+  const expectedRange = packedVersion
   assertEqual(
     generatedPackage.dependencies?.['@tangle-network/agent-app'],
     expectedRange,
