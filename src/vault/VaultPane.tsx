@@ -779,7 +779,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
           </nav>
           <div className="flex min-h-0 min-w-0 flex-1">
             <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col border-r border-border bg-background @[45rem]/vault:flex @[45rem]/vault:w-[23rem] @[45rem]/vault:min-w-[23rem] @[45rem]/vault:flex-none`}>
-              <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+              <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
                 <div className="min-w-0 flex-1">
                   <input
                     ref={searchRef}
@@ -848,7 +848,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               className={`${showFiles ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden @[45rem]/vault:flex`}
             >
               {selectedFile && (
-                <div className={`flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-1.5 ${pathBarClassName ?? 'bg-card'}`}>
+                <div className={`flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4 ${pathBarClassName ?? 'bg-card'}`}>
                   <span data-vault-path className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{selectedFile.path}</span>
                   <div className="flex shrink-0 items-center gap-1">
                     {canWrite && isMarkdownCapable && (

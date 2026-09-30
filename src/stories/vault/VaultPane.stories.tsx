@@ -54,9 +54,9 @@ export default meta
 export const ExistingDocument: StoryObj<typeof RefreshingVault> = {}
 
 
-function ResponsiveVault({ externalNavigation = false }: { externalNavigation?: boolean }) {
+function ResponsiveVault({ externalNavigation = false, initialWidth }: { externalNavigation?: boolean; initialWidth?: number }) {
   const paneRef = useRef<VaultPaneHandle>(null)
-  const [width, setWidth] = useState(externalNavigation ? 960 : 390)
+  const [width, setWidth] = useState(initialWidth ?? (externalNavigation ? 960 : 390))
   const [path, setPath] = useState<string | null>('brief.md')
   const port = useMemo<VaultDataPort>(() => {
     const documents = new Map([
@@ -153,4 +153,8 @@ export const ExternalFileNavigation: StoryObj<typeof RefreshingVault> = {
       },
     },
   },
+}
+
+export const DesktopHeaders: StoryObj<typeof RefreshingVault> = {
+  render: () => <ResponsiveVault initialWidth={960} />,
 }
