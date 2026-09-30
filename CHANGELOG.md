@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.12
+
+- fix(factory): generate apps from the tested engine cohort (#695)
+
 ## 0.50.11
 
 - fix: unify sidecar transport and preserve writable turn APIs (#690)
