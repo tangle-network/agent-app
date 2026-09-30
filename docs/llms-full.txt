@@ -26906,6 +26906,22 @@ type ReviewQueueState
 (record: ProvenanceRecord, policy?: ProvenanceConfidencePolicy, seen?: Set<ProvenanceRecord>) => ProvenanceStanding
 ```
 
+### `RouteChunkBoundary`
+
+`function` — Wrap a lazy route and its Suspense fallback to recover after a deploy changes chunk URLs.
+
+```ts
+({ children, autoReloadOnChunkError }: RouteChunkBoundaryProps) => Element
+```
+
+### `RouteChunkBoundaryProps`
+
+`interface`
+
+```ts
+interface RouteChunkBoundaryProps
+```
+
 ### `RunDrillIn`
 
 `function` — Readonly side panel showing a retained tool run's transcript — the "drill into what the sandbox actually did" view.
