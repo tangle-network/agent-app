@@ -64,3 +64,23 @@ describe.each(operations)('shared sidecar HTTP transport: $name', operation => {
     expect(await operation.call(connection())).toMatchObject({ succeeded: false, error: { status: 502 } })
   })
 })
+
+
+describe('interaction answer acknowledgement', () => {
+  it.each([{}, { data: {} }, { data: { ok: false } }, { success: 'true' }, { data: { ok: 'true' } }])(
+    'does not turn an unacknowledged successful response into an applied answer: %j', async payload => {
+      body = JSON.stringify(payload)
+      expect(await respondToSessionInteraction(connection(), { id: 'ask-1', outcome: 'declined' }))
+        .toMatchObject({ succeeded: false, error: { code: 'MALFORMED_RESPONSE' } })
+      expect(requests).toHaveLength(1)
+    },
+  )
+  it.each([{ success: true }, { success: true, resolution: 'applied' }, { data: { ok: true } }])(
+    'accepts an explicit current or legacy acknowledgement: %j', async payload => {
+      body = JSON.stringify(payload)
+      expect(await respondToSessionInteraction(connection(), { id: 'ask-1', outcome: 'declined' }))
+        .toEqual({ succeeded: true, value: undefined })
+      expect(requests).toHaveLength(1)
+    },
+  )
+})
