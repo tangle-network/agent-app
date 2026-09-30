@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.10
+
+- fix(web-react): simplify shared agent profile editor (#694)
+
 ## 0.50.9
 
 - fix(model-picker): show current served models first
