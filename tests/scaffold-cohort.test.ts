@@ -61,6 +61,7 @@ describe.each(['template', 'template-chat'])('scaffold release cohort: %s', (tem
       if (!name.startsWith('@tangle-network/')) continue
       const version = installed[name]
       expect(version, `${name}: generated peer has no installed engine`).toBeTruthy()
+      if (!version) throw new Error(`${name}: generated peer has no installed engine`)
       expect(satisfies(version, range), `${name}@${version} violates the generated peer ${range}`).toBe(true)
     }
   })
