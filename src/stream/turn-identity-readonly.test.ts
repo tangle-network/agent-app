@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { messageHasTurnId, resolveChatTurn, type ResolvedChatTurn } from './turn-identity'
+import { messageHasTurnId, resolveChatTurn, type PersistedChatMessageForTurn, type ResolvedChatTurn } from './turn-identity'
 
 interface TypedTextPart { readonly type: 'text'; readonly text: string; readonly turnId?: string }
 interface TypedMessage {
@@ -50,5 +50,16 @@ describe('turn resolution consumes typed readonly stores without record copies',
   it('handles missing identity metadata without fabricating a match', () => {
     expect(messageHasTurnId({ parts: [{ type: 'text', text: 'No turn ID' }] }, 'turn-1')).toBe(false)
     expect(messageHasTurnId({ parts: null }, 'turn-1')).toBe(false)
+  })
+  it('preserves the writable public message fields while accepting readonly input', () => {
+    const message: PersistedChatMessageForTurn = { id: 'draft', role: 'user', content: '', parts: [] }
+    message.id = 'saved'
+    message.role = 'assistant'
+    message.content = 'The saved reply'
+    message.parts = [{ type: 'text', text: message.content }]
+    expect(message).toEqual({ id: 'saved', role: 'assistant', content: 'The saved reply', parts: [{ type: 'text', text: 'The saved reply' }] })
+    const result = resolveChatTurn({ existingMessages: Object.freeze([message]), userContent: 'Next question' })
+    result.priorMessages[0]!.content = 'Updated reply'
+    expect(message.content).toBe('Updated reply')
   })
 })
