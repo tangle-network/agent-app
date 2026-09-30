@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.15
+
+- fix(catalog): feature recent served model families
+
 ## 0.50.14
 
 - feat(workspace-apps): add scoped durable data bridge
