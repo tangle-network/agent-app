@@ -4,7 +4,7 @@
 
 Source: `src/workspace-apps/index.ts`
 
-9 exports.
+17 exports.
 
 ### `confirmWorkspaceAppReady`
 
@@ -12,6 +12,22 @@ Source: `src/workspace-apps/index.ts`
 
 ```ts
 (app: WorkspaceAppRecord, proof: WorkspaceAppHttpProof) => WorkspaceAppRecord
+```
+
+### `createWorkspaceAppDataClient`
+
+`function` — Use inside a registered preview; no product credential crosses the frame.
+
+```ts
+(options: WorkspaceAppDataClientOptions) => WorkspaceAppDataClient
+```
+
+### `createWorkspaceAppDataHost`
+
+`function` — Bind one registered preview to a product-authorized data adapter.
+
+```ts
+(options: WorkspaceAppDataHostOptions) => WorkspaceAppDataHost
 ```
 
 ### `refreshWorkspaceAppPreview`
@@ -36,6 +52,54 @@ Source: `src/workspace-apps/index.ts`
 
 ```ts
 type WorkspaceAppBuilderInstructionsOptions
+```
+
+### `WorkspaceAppDataClient`
+
+`interface`
+
+```ts
+interface WorkspaceAppDataClient
+```
+
+### `WorkspaceAppDataClientOptions`
+
+`interface`
+
+```ts
+interface WorkspaceAppDataClientOptions
+```
+
+### `WorkspaceAppDataConflict`
+
+`class`
+
+```ts
+class WorkspaceAppDataConflict
+```
+
+### `WorkspaceAppDataEntry`
+
+`interface`
+
+```ts
+interface WorkspaceAppDataEntry
+```
+
+### `WorkspaceAppDataHost`
+
+`interface`
+
+```ts
+interface WorkspaceAppDataHost
+```
+
+### `WorkspaceAppDataHostOptions`
+
+`interface`
+
+```ts
+interface WorkspaceAppDataHostOptions
 ```
 
 ### `workspaceAppFromPreviewLink`
