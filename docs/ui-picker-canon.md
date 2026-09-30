@@ -40,17 +40,20 @@ Harness extensions remain reserved for native controls that their provider expli
 ## Current model menu
 
 `ModelPicker` opens with a bounded shortlist from the live Router catalogue.
-The catalogue recommends the newest routeable member of each current family, including GLM 5.3, which served the live probe.
-The Router response checked on 2026-09-29 contained no release dates, so the fallback uses family versions and a conservative generation floor; it does not claim a launch occurred within 120 days.
-If Router supplies an explicit release date, a model older than 120 days does not enter the shortlist.
+The catalogue recommends current families that served live probes: GPT 6.1 Sol, GPT 6 Astra, Gemini 3.7 Flash, and GLM 5.3.
+The Router response checked on 2026-09-30 contained no release dates in 568 entries.
+The catalogue supplements exact IDs with vendor-announced launch dates and applies the 120-day window to them.
+A future model without a verified date uses its family version floor; that fallback does not assert a launch month.
 An explicitly unavailable route never enters the catalogue, even if its name looks newer.
+Opus 5 and Sonnet 5 remain searchable after live quota failures.
+Their 5.5 successors enter the shortlist only when Router marks them routeable.
 
 The search field covers every routeable chat model.
 "Browse all models" opens provider groups for older and specialty models.
 An older selected value remains visible above the shortlist until the user changes it.
-The product's configured default does not change when display order changes.
+A product's configured default does not change when display order changes; without an override, the shared default prefers verified GLM 5.3.
 The menu can recommend up to eight models.
-The 2026-09-29 Router probe served GLM 5.3 but returned a quota error for DeepSeek V4.1 Flash and a server error for Kimi K3.
+The 2026-09-30 Router probe served GLM 5.3 but returned a quota error for DeepSeek V4.1 Flash and an upstream error for Kimi K3.
 Those two remain searchable; they can enter the shortlist after the Router serves them successfully.
 
 ![The short current menu and explicit legacy browse action](./assets/model-picker/freshness-ordering.png)

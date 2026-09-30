@@ -12,10 +12,10 @@
  *   → rank (provider tier, current generation) → recommend (current families)
  *   → default (env override or preferred family)
  *
- * The router is the authority for availability, but its response has no
- * release dates. The shortlist therefore uses the newest routeable entry in
- * each current family, with a conservative generation floor. Other routeable
- * models stay in the catalogue for search and explicit browsing.
+ * The router is the authority for routeability. Its current response has no
+ * release dates, so exact vendor-announced dates supplement it for known
+ * models. Undated newer models use a conservative family floor. Other
+ * routeable models stay available through search and explicit browsing.
  */
 
 export interface RouterModel {
@@ -53,7 +53,7 @@ export interface CatalogModel {
   name: string
   provider: string
   description?: string
-  /** Router-supplied release date when available; never inferred from an id. */
+  /** Router-supplied or vendor-verified release date; never inferred from an id. */
   releaseDate?: string
   contextLength?: number
   pricing?: { prompt?: string; completion?: string }
@@ -125,6 +125,9 @@ const EXCLUDED_ID = /(embedding|tts|transcribe|whisper|audio|realtime|image|lyri
  * mainline model wins.
  */
 const DEFAULT_CANDIDATE_RULES: Array<{ providers: string[]; match: RegExp }> = [
+  { providers: ['zai', 'z-ai'], match: /^glm-5\.3$/ },
+  { providers: ['openai'], match: /^gpt-6\.1-sol$/ },
+  { providers: ['openai'], match: /^gpt-6-astra$/ },
   { providers: ['anthropic'], match: /^claude-sonnet-[\d-]+$/ },
   { providers: ['anthropic'], match: /^claude-opus-[\d-]+$/ },
   { providers: ['anthropic'], match: /^claude-haiku-[\d-]+$/ },
@@ -140,21 +143,20 @@ const DEFAULT_CANDIDATE_RULES: Array<{ providers: string[]; match: RegExp }> = [
 ]
 
 /**
- * Current-family floors are based on the routeable Router catalogue checked
- * 2026-09-29. Router entries do not carry release dates, so these are version
- * checks, not claims about a model's launch month. Never promote an older
- * generation merely because a newer route becomes unavailable; browsing and
- * search retain it. A newer routeable version in a family replaces its peer.
- * DeepSeek V4.1 Flash and Kimi K3 remain searchable but are excluded until
- * a live completion succeeds (2026-09-29 probes: quota 503 and server 500).
+ * Current families are checked against the Router catalogue and live
+ * completions. The 2026-09-30 probes served GPT 6.1 Sol, Astra, Gemini 3.7
+ * Flash, and GLM 5.3. Opus/Sonnet 5 returned quota 503, so only their 5.5
+ * successors may be featured once Router marks them routeable. DeepSeek V4.1
+ * Flash and Kimi K3 remain searchable after quota/upstream failures.
+ * An undated future member uses its family floor, not an invented launch date.
  */
 const RECOMMENDED_FAMILIES: Array<{
   provider: string
   match: RegExp
   minVersion: number[]
 }> = [
-  { provider: 'anthropic', match: /^claude-opus-\d+(?:[-.]\d+)*$/, minVersion: [5] },
-  { provider: 'anthropic', match: /^claude-sonnet-\d+(?:[-.]\d+)*$/, minVersion: [5] },
+  { provider: 'anthropic', match: /^claude-opus-\d+(?:[-.]\d+)*$/, minVersion: [5, 5] },
+  { provider: 'anthropic', match: /^claude-sonnet-\d+(?:[-.]\d+)*$/, minVersion: [5, 5] },
   { provider: 'openai', match: /^gpt-\d+(?:\.\d+)?-sol$/, minVersion: [6] },
   { provider: 'openai', match: /^gpt-\d+(?:\.\d+)?-astra$/, minVersion: [6] },
   { provider: 'google', match: /^gemini-\d+(?:\.\d+)?-flash(?:-preview)?$/, minVersion: [3, 5] },
@@ -162,6 +164,22 @@ const RECOMMENDED_FAMILIES: Array<{
 ]
 
 const RECOMMENDATION_WINDOW_MS = 120 * 24 * 60 * 60 * 1000
+
+/** Exact launch dates from vendor announcements, checked 2026-09-30. */
+const VERIFIED_RELEASE_DATES: Record<string, string> = {
+  // https://www.anthropic.com/claude-opus-5-5
+  'claude-opus-5-5': '2026-09-22',
+  // https://www.anthropic.com/claude-sonnet-5-5
+  'claude-sonnet-5-5': '2026-09-28',
+  // https://developers.openai.com/api/docs/changelog
+  'gpt-6.1-sol': '2026-09-29',
+  // https://openai.com/index/safety-overview-gpt-6-astra/
+  'gpt-6-astra': '2026-09-03',
+  // https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-3-7-flash/
+  'gemini-3.7-flash': '2026-08-13',
+  // https://z.ai/blog/glm-5.3
+  'glm-5.3': '2026-08-14',
+}
 
 function releaseDateFromRouter(model: RouterModel): string | undefined {
   const value = model.release_date ?? model.released_at
@@ -367,7 +385,9 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
     group.sort((a, b) => aliasPenalty(a.id) - aliasPenalty(b.id) || a.id.length - b.id.length)
     const rep = group[0]!
     const mergedParams = new Set<string>(group.flatMap((m) => m.supported_parameters ?? []))
-    const releaseDate = group.map(releaseDateFromRouter).find((date) => date !== undefined)
+    const verifiedDate = VERIFIED_RELEASE_DATES[normalizeModelId(rep.id)]
+    const releaseDate = group.map(releaseDateFromRouter).find((date) => date !== undefined) ??
+      (verifiedDate ? new Date(verifiedDate).toISOString() : undefined)
     reps.push({ model: rep, normId: normalizeModelId(rep.id), mergedParams, releaseDate })
   }
 
