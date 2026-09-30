@@ -80,6 +80,7 @@ describe("AssistantDock", () => {
       await screen.findByPlaceholderText("Search models..."),
     ).toBeTruthy();
 
+    fireEvent.click(screen.getByRole("button", { name: "Browse all models" }));
     fireEvent.click(screen.getByRole("button", { name: /GPT-5/ }));
     await waitFor(() =>
       expect(screen.queryByPlaceholderText("Search models...")).toBeNull(),

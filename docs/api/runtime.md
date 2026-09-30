@@ -200,10 +200,10 @@ interface LoopToolCall
 
 ### `MAX_RECOMMENDED_MODELS`
 
-`const` — A short first screen, not one row for every Router provider.
+`const` — A short, varied first screen.
 
 ```ts
-3
+8
 ```
 
 ### `mergeSurfaceOverlay`
