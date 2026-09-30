@@ -20760,6 +20760,18 @@
           "doc": "The standing a reader should see: this record's own, weakened by every value it was computed from, however deep."
         },
         {
+          "name": "RouteChunkBoundary",
+          "kind": "function",
+          "signature": "({ children, autoReloadOnChunkError }: RouteChunkBoundaryProps) => Element",
+          "doc": "Wrap a lazy route and its Suspense fallback to recover after a deploy changes chunk URLs."
+        },
+        {
+          "name": "RouteChunkBoundaryProps",
+          "kind": "interface",
+          "signature": "interface RouteChunkBoundaryProps",
+          "doc": null
+        },
+        {
           "name": "RunDrillIn",
           "kind": "function",
           "signature": "({ run, onClose }: RunDrillInProps) => Element",
