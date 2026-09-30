@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.11
+
+- fix: unify sidecar transport and preserve writable turn APIs (#690)
+
 ## 0.50.10
 
 - fix(web-react): simplify shared agent profile editor (#694)
