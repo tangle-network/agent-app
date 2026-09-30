@@ -78,7 +78,8 @@ history route.
 
 For a lazy route, place `RouteChunkBoundary` outside its `Suspense` fallback.
 A stale chunk leaves a visible Reload action instead of an empty page.
-The boundary reloads automatically only when `autoReloadOnChunkError` is set.
+Reload requests a fresh document URL so a browser does not reuse the old shell.
+The boundary retries automatically at most once in 60 seconds when `autoReloadOnChunkError` is set.
 Set that prop only when a full page reload cannot discard unsaved work.
 
 ```tsx

@@ -21,6 +21,7 @@ export class LazyLoadBoundary extends Component<LazyLoadBoundaryProps, { failed:
 
 const ROUTE_RELOAD_KEY = 'agent-app:route-chunk-reload-at'
 const ROUTE_RELOAD_WINDOW_MS = 60_000
+const ROUTE_RELOAD_PARAM = '__agent_app_route_reload'
 const CHUNK_LOAD_FAILURE =
   /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed|loading chunk .* failed|failed to load module script/i
 
@@ -32,6 +33,12 @@ function isChunkLoadFailure(error: unknown): boolean {
     (typeof candidate.message === 'string' && CHUNK_LOAD_FAILURE.test(candidate.message))
 }
 
+function loadFreshDocument(): void {
+  const url = new URL(window.location.href)
+  url.searchParams.set(ROUTE_RELOAD_PARAM, Date.now().toString(36))
+  window.location.replace(url.toString())
+}
+
 function RouteLoadFailure({ error, autoReloadOnChunkError }: { error: unknown; autoReloadOnChunkError: boolean }) {
   useEffect(() => {
     if (!autoReloadOnChunkError || !isChunkLoadFailure(error) || typeof window === 'undefined') return
@@ -40,7 +47,7 @@ function RouteLoadFailure({ error, autoReloadOnChunkError }: { error: unknown; a
       const elapsed = Date.now() - lastReload
       if (lastReload > 0 && elapsed >= 0 && elapsed < ROUTE_RELOAD_WINDOW_MS) return
       window.sessionStorage.setItem(ROUTE_RELOAD_KEY, String(Date.now()))
-      window.location.reload()
+      loadFreshDocument()
     } catch {
       // Storage may be disabled. The visible reload action remains available.
     }
@@ -53,7 +60,7 @@ function RouteLoadFailure({ error, autoReloadOnChunkError }: { error: unknown; a
       <button
         type="button"
         className="mt-4 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        onClick={() => window.location.reload()}
+        onClick={loadFreshDocument}
       >
         Reload page
       </button>
@@ -67,8 +74,14 @@ export interface RouteChunkBoundaryProps {
   autoReloadOnChunkError?: boolean
 }
 
-/** Wrap a lazy route and its Suspense fallback to recover after a deploy changes chunk URLs. */
+/** Wrap a lazy route and its Suspense fallback; recovery requests a fresh document URL. */
 export function RouteChunkBoundary({ children, autoReloadOnChunkError = false }: RouteChunkBoundaryProps) {
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has(ROUTE_RELOAD_PARAM)) return
+    url.searchParams.delete(ROUTE_RELOAD_PARAM)
+    window.history.replaceState(window.history.state, '', url)
+  }, [])
   return (
     <LazyLoadBoundary renderFailure={(error) => <RouteLoadFailure error={error} autoReloadOnChunkError={autoReloadOnChunkError} />}>
       {children}
