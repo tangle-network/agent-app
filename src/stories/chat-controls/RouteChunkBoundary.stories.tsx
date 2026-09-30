@@ -17,6 +17,7 @@ export default meta
 type Story = StoryObj<typeof RouteChunkBoundary>
 
 export const LoadFailure: Story = {
+  parameters: { docs: { description: { story: 'A stale route chunk leaves a recovery action that requests the current document.' } } },
   render: () => <RouteChunkBoundary><FailedRoute /></RouteChunkBoundary>,
 }
 
