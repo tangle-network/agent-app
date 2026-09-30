@@ -469,7 +469,8 @@ function formatPrice(p?: string): string | undefined {
   const n = Number(p)
   if (isNaN(n) || n === 0) return undefined
   const perM = n * 1_000_000
-  return perM >= 1 ? `$${perM.toFixed(0)}/M` : `$${perM.toFixed(2)}/M`
+  const amount = Number.isInteger(perM) ? perM.toFixed(0) : perM.toFixed(2)
+  return `$${amount}/M`
 }
 
 function formatContext(len?: number): string | undefined {
@@ -525,8 +526,8 @@ function ModelRow({
 
 /**
  * Searchable model picker pill + popover. A featured model is recommended
- * only when it is also that provider's newest entry. Older featured models
- * stay visible in their provider group instead of jumping above new releases.
+ * when the catalog marks it as a current choice. The first view stays short;
+ * search and the browse action retain every routeable legacy model.
  *
  * This is the CANONICAL ecosystem model picker (see "UI chrome ownership
  * (picker canon)" in AGENTS.md). sandbox-ui's `dashboard/ModelPicker` is
@@ -536,6 +537,7 @@ function ModelRow({
 export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup, variant = 'chip' }: ModelPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [showAll, setShowAll] = useState(false)
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
   const inputRef = useRef<HTMLInputElement>(null)
   const panelId = useId()
@@ -572,35 +574,25 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
   const sections = useMemo(() => {
     const isPriority = priorityGroup ? (m: CatalogModel) => priorityGroup.match(m) : () => false
     const priority = priorityGroup ? sortedModels.filter(isPriority) : []
-    const seenProviders = new Set<string>()
-    const newestIds = new Set<string>()
-    for (const model of sortedModels) {
-      const provider = model.provider.toLowerCase()
-      if (seenProviders.has(provider)) continue
-      seenProviders.add(provider)
-      newestIds.add(model.id)
-    }
-    const recommended = sortedModels
-      .filter((model) => {
-        if (!model.featured || isPriority(model)) return false
-        return newestIds.has(model.id)
-      })
-      .slice(0, MAX_RECOMMENDED_MODELS)
-    const recommendedIds = new Set(recommended.map((model) => model.id))
+    const featured = sortedModels.filter((model) => model.featured && !isPriority(model))
+    const recommended = featured.slice(0, MAX_RECOMMENDED_MODELS)
+    const visibleIds = new Set([...priority, ...recommended].map((model) => model.id))
+    const currentSelection = sortedModels.find((model) => model.id === value && !visibleIds.has(model.id))
     const byProvider: Array<{ provider: string; items: CatalogModel[] }> = []
-    for (const m of sortedModels) {
-      if (recommendedIds.has(m.id) || isPriority(m)) continue
+    for (const model of sortedModels) {
+      if (visibleIds.has(model.id)) continue
       const last = byProvider[byProvider.length - 1]
-      if (last && last.provider === m.provider) last.items.push(m)
-      else byProvider.push({ provider: m.provider, items: [m] })
+      if (last && last.provider === model.provider) last.items.push(model)
+      else byProvider.push({ provider: model.provider, items: [model] })
     }
-    return { priority, recommended, byProvider }
-  }, [sortedModels, priorityGroup])
+    return { priority, recommended, currentSelection, byProvider }
+  }, [sortedModels, priorityGroup, value])
 
   const select = (id: string) => {
     onChange(id)
     setOpen(false)
     setQuery('')
+    setShowAll(false)
   }
 
   return (
@@ -630,7 +622,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
         className={`flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-card-edge bg-popover ${OVERLAY_SHADOW}`}
       >
           <div className="shrink-0 border-b border-border px-3 py-2">
-            <div className="flex items-center gap-2 rounded-lg border border-strong bg-background px-3 py-2">
+            <div className="flex items-center gap-2 rounded-lg border border-strong bg-background px-3 py-2 focus-within:ring-2 focus-within:ring-ring">
               <SearchGlyph className="h-3.5 w-3.5 text-muted-foreground" />
               <input
                 ref={inputRef}
@@ -638,13 +630,14 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search models..."
-                className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground"
+                aria-label="Search all models"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               />
             </div>
           </div>
           {/* `min-h-0` is what lets the list absorb the surface's computed
               max-height on a short viewport instead of overflowing the panel. */}
-          <div className="max-h-[400px] min-h-0 overflow-y-auto p-1 pb-2">
+          <div className="max-h-[520px] min-h-0 overflow-y-auto p-1 pb-2">
             {loading && <div className="px-3 py-4 text-center text-sm text-muted-foreground">Loading models...</div>}
             {!loading && filtered && (
               <>
@@ -669,6 +662,12 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
                     ))}
                   </>
                 )}
+                {sections.currentSelection && !showAll && (
+                  <>
+                    <SectionHeader>Selected model</SectionHeader>
+                    <ModelRow model={sections.currentSelection} selected onSelect={() => select(sections.currentSelection!.id)} renderProviderBadge={renderProviderBadge} />
+                  </>
+                )}
                 {sections.recommended.length > 0 && (
                   <>
                     <SectionHeader>{recommendedLabel}</SectionHeader>
@@ -677,7 +676,20 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
                     ))}
                   </>
                 )}
-                {sections.byProvider.map((g) => (
+                {sections.recommended.length === 0 && sections.priority.length === 0 && !sections.currentSelection && (
+                  <div className="px-3 py-3 text-sm text-muted-foreground">Search or browse all models</div>
+                )}
+                {sections.byProvider.length > 0 && (
+                  <button
+                    type="button"
+                    aria-expanded={showAll}
+                    onClick={() => setShowAll(!showAll)}
+                    className={`mt-2 w-full rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground ${POPOVER_OPTION_FOCUS}`}
+                  >
+                    {showAll ? 'Hide older models' : 'Browse all models'}
+                  </button>
+                )}
+                {showAll && sections.byProvider.map((g) => (
                   <div key={g.provider}>
                     <SectionHeader>{g.provider}</SectionHeader>
                     {g.items.map((m) => (

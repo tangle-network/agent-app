@@ -37,15 +37,23 @@ Explicit effort selections travel in `AgentProfile.model.reasoningEffort`.
 `attachReasoningEffort` preserves other model hints and leaves Auto or omitted selections unchanged.
 Harness extensions remain reserved for native controls that their provider explicitly handles.
 
-## Freshness ordering
+## Current model menu
 
-`ModelPicker` sorts the live catalog by provider and release generation before it renders any section.
-The newest stable release appears before older models, even when a caller sends stale order or stale `featured` flags.
-The Recommended section contains at most three current provider leaders.
-Every other routeable chat model remains available in its provider group and through search.
+`ModelPicker` opens with a bounded shortlist from the live Router catalogue.
+The catalogue recommends the newest routeable member of each current family, including DeepSeek, GLM, and Kimi choices when Router lists them as routeable.
+The Router response checked on 2026-09-29 contained no release dates, so the fallback uses family versions and a conservative generation floor; it does not claim a launch occurred within 120 days.
+If Router supplies an explicit release date, a model older than 120 days does not enter the shortlist.
+An explicitly unavailable route never enters the catalogue, even if its name looks newer.
+
+The search field covers every routeable chat model.
+"Browse all models" opens provider groups for older and specialty models.
+An older selected value remains visible above the shortlist until the user changes it.
 The product's configured default does not change when display order changes.
+The menu can recommend up to eight models, with distinct choices from the current Anthropic, OpenAI, Google, DeepSeek, Z.ai, and Moonshot families.
 
-![Current models appear before stale models](./assets/model-picker/freshness-ordering.png)
+![The short current menu and explicit legacy browse action](./assets/model-picker/freshness-ordering.png)
+
+![The same picker at mobile width](./assets/model-picker/freshness-ordering-mobile.png)
 
 ## Migration: sandbox-ui → agent-app canon
 

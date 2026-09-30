@@ -71,41 +71,44 @@ describe('ModelPicker', () => {
     expect(screen.queryByText('No models available')).toBeNull()
   })
 
-  it('shows current models before stale models even when the caller sends stale order', () => {
+  it('keeps current choices first when the caller sends stale order', () => {
     render(<ModelPicker
       value="gpt-4.1-mini"
       onChange={() => {}}
       models={[
         model('gpt-4.1-mini'),
         model('gpt-5.5'),
-        model('gpt-5.6-luna'),
+        model('gpt-5.6-luna', { featured: true }),
       ]}
     />)
     openPicker()
+    expect(screen.queryByText('gpt-5.5')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Browse all models' }))
     const rows = screen.getAllByRole('button').filter(
       (button) => !button.hasAttribute('aria-expanded') && button.textContent?.startsWith('gpt-'),
     )
     expect(rows.map((row) => row.textContent)).toEqual(['gpt-5.6-luna', 'gpt-5.5', 'gpt-4.1-mini'])
   })
 
-  it('does not promote an old featured model above a newer release', () => {
+  it('keeps a selected older model visible while hiding other legacy rows', () => {
     render(<ModelPicker
       value="gpt-4.1-mini"
       onChange={() => {}}
       models={[
-        model('gpt-4.1-mini', { featured: true }),
-        model('gpt-5.6-luna'),
+        model('gpt-4.1-mini'),
+        model('gpt-5.6-luna', { featured: true }),
+        model('gpt-3.5'),
       ]}
     />)
     openPicker()
-    expect(screen.queryByText('Recommended')).toBeNull()
-    const rows = screen.getAllByRole('button').filter(
-      (button) => !button.hasAttribute('aria-expanded') && button.textContent?.startsWith('gpt-'),
-    )
-    expect(rows.map((row) => row.textContent)).toEqual(['gpt-5.6-luna', 'gpt-4.1-mini'])
+    expect(screen.getByText('Selected model')).toBeTruthy()
+    expect(screen.getByText('Recommended')).toBeTruthy()
+    expect(screen.queryByText('gpt-3.5')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Browse all models' }))
+    expect(screen.getByText('gpt-3.5')).toBeTruthy()
   })
 
-  it('limits recommendations without hiding the remaining providers', () => {
+  it('shows current choices across more than three providers', () => {
     const providers = ['anthropic', 'openai', 'google', 'xai', 'deepseek']
     render(<ModelPicker
       value="claude-fable-5-1"
@@ -124,9 +127,9 @@ describe('ModelPicker', () => {
       recommendedCount += 1
       sibling = sibling.nextElementSibling
     }
-    expect(recommendedCount).toBe(3)
-    expect(screen.getByText('xai')).toBeTruthy()
-    expect(screen.getByText('deepseek')).toBeTruthy()
+    expect(recommendedCount).toBe(5)
+    expect(screen.getByText('xai/model-3')).toBeTruthy()
+    expect(screen.getByText('deepseek/model-4')).toBeTruthy()
   })
 })
 
