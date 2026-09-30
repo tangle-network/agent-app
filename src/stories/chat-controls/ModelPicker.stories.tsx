@@ -65,7 +65,7 @@ const currentModels = buildCatalog([
   { id: 'claude-opus-4-7', _provider: 'anthropic', routeability: { status: 'routeable' } },
 ]).models
 
-/** Current choices open first; an older selected model stays visible. */
+/** Served current choices open first; search and browse retain older routes. */
 export const FreshnessOrdering: Story = {
   name: 'Current Router menu',
   decorators: [withPopoverHeadroom],

@@ -145,6 +145,8 @@ const DEFAULT_CANDIDATE_RULES: Array<{ providers: string[]; match: RegExp }> = [
  * checks, not claims about a model's launch month. Never promote an older
  * generation merely because a newer route becomes unavailable; browsing and
  * search retain it. A newer routeable version in a family replaces its peer.
+ * DeepSeek V4.1 Flash and Kimi K3 remain searchable but are excluded until
+ * a live completion succeeds (2026-09-29 probes: quota 503 and server 500).
  */
 const RECOMMENDED_FAMILIES: Array<{
   provider: string
@@ -156,9 +158,7 @@ const RECOMMENDED_FAMILIES: Array<{
   { provider: 'openai', match: /^gpt-\d+(?:\.\d+)?-sol$/, minVersion: [6] },
   { provider: 'openai', match: /^gpt-\d+(?:\.\d+)?-astra$/, minVersion: [6] },
   { provider: 'google', match: /^gemini-\d+(?:\.\d+)?-flash(?:-preview)?$/, minVersion: [3, 5] },
-  { provider: 'deepseek', match: /^deepseek-v\d+(?:\.\d+)*(?:-flash)?$/, minVersion: [4, 1] },
   { provider: 'zai', match: /^glm-\d+(?:\.\d+)?$/, minVersion: [5, 3] },
-  { provider: 'moonshot', match: /^kimi-k\d+(?:\.\d+)?$/, minVersion: [3] },
 ]
 
 const RECOMMENDATION_WINDOW_MS = 120 * 24 * 60 * 60 * 1000
