@@ -109,7 +109,7 @@ _105 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
-| [`./workspace-apps`](api/workspace-apps.md) | 9 | — |
+| [`./workspace-apps`](api/workspace-apps.md) | 17 | — |
 | [`./workspace-react`](api/workspace-react.md) | 5 | `session-shell`, `workspace-apps` |
 
 ---
@@ -1042,9 +1042,9 @@ Depends on: `web-react`, `work-product`
 
 ## `./workspace-apps`
 
-Source: `src/workspace-apps/index.ts` · 9 exports
+Source: `src/workspace-apps/index.ts` · 17 exports
 
-`confirmWorkspaceAppReady`, `refreshWorkspaceAppPreview`, `workspaceAppBuilderInstructions`, `WorkspaceAppBuilderInstructionsOptions`, `workspaceAppFromPreviewLink`, `WorkspaceAppHttpProof`, `WorkspaceAppIdentity`, `WorkspaceAppPreviewLink`, `WorkspaceAppRecord`
+`confirmWorkspaceAppReady`, `createWorkspaceAppDataClient`, `createWorkspaceAppDataHost`, `refreshWorkspaceAppPreview`, `workspaceAppBuilderInstructions`, `WorkspaceAppBuilderInstructionsOptions`, `WorkspaceAppDataClient`, `WorkspaceAppDataClientOptions`, `WorkspaceAppDataConflict`, `WorkspaceAppDataEntry`, `WorkspaceAppDataHost`, `WorkspaceAppDataHostOptions`, `workspaceAppFromPreviewLink`, `WorkspaceAppHttpProof`, `WorkspaceAppIdentity`, `WorkspaceAppPreviewLink`, `WorkspaceAppRecord`
 
 [Full API →](api/workspace-apps.md)
 

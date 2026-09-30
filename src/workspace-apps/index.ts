@@ -221,3 +221,16 @@ export function workspaceAppBuilderInstructions(
     ...common.slice(1),
   ]
 }
+
+export {
+  WorkspaceAppDataConflict,
+  createWorkspaceAppDataClient,
+  createWorkspaceAppDataHost,
+} from './data-bridge'
+export type {
+  WorkspaceAppDataClient,
+  WorkspaceAppDataClientOptions,
+  WorkspaceAppDataEntry,
+  WorkspaceAppDataHost,
+  WorkspaceAppDataHostOptions,
+} from './data-bridge'

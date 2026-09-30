@@ -22292,6 +22292,18 @@
           "doc": "Mark an app ready only after the host fetched its HTML over the trusted preview URL."
         },
         {
+          "name": "createWorkspaceAppDataClient",
+          "kind": "function",
+          "signature": "(options: WorkspaceAppDataClientOptions) => WorkspaceAppDataClient",
+          "doc": "Use inside a registered preview; no product credential crosses the frame."
+        },
+        {
+          "name": "createWorkspaceAppDataHost",
+          "kind": "function",
+          "signature": "(options: WorkspaceAppDataHostOptions) => WorkspaceAppDataHost",
+          "doc": "Bind one registered preview to a product-authorized data adapter."
+        },
+        {
           "name": "refreshWorkspaceAppPreview",
           "kind": "function",
           "signature": "(app: WorkspaceAppRecord, link: WorkspaceAppPreviewLink, updatedAt?: string) => WorkspaceAppRecord",
@@ -22307,6 +22319,42 @@
           "name": "WorkspaceAppBuilderInstructionsOptions",
           "kind": "type",
           "signature": "type WorkspaceAppBuilderInstructionsOptions",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceAppDataClient",
+          "kind": "interface",
+          "signature": "interface WorkspaceAppDataClient",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceAppDataClientOptions",
+          "kind": "interface",
+          "signature": "interface WorkspaceAppDataClientOptions",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceAppDataConflict",
+          "kind": "class",
+          "signature": "class WorkspaceAppDataConflict",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceAppDataEntry",
+          "kind": "interface",
+          "signature": "interface WorkspaceAppDataEntry",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceAppDataHost",
+          "kind": "interface",
+          "signature": "interface WorkspaceAppDataHost",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceAppDataHostOptions",
+          "kind": "interface",
+          "signature": "interface WorkspaceAppDataHostOptions",
           "doc": null
         },
         {
