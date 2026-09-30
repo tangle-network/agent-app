@@ -140,16 +140,12 @@ describe('buildCatalog', () => {
     expect(ids).toContain('claude-opus-4-6')
   })
 
-  it('recommends a bounded current-model shortlist and keeps current generations first', () => {
+  it('retains older generations for search without recommending them', () => {
     const featured = catalog.models.filter((m) => m.featured).map((m) => m.id)
-    expect(featured[0]).toBe('claude-opus-4-7') // beats 4-6 and dated 4-5
-    expect(featured).toContain('gpt-5.1') // beats gpt-5
-    expect(featured).not.toContain('gpt-5.1-codex') // specialty suffix not featured
-    expect(featured).toContain('gemini-3.1-pro-preview') // 3.1 beats 2.5
-    expect(featured).not.toContain('grok-4.3')
-    expect(featured).not.toContain('glm-5.1')
-    expect(featured).not.toContain('claude-sonnet-4-6')
-    expect(featured.length).toBeLessThanOrEqual(3)
+    expect(featured).toEqual([])
+    expect(ids).toContain('claude-opus-4-7')
+    expect(ids).toContain('gpt-5.1')
+    expect(ids).toContain('gemini-3.1-pro-preview')
   })
 
   it('keeps the product default independent from display freshness', () => {
@@ -162,7 +158,7 @@ describe('buildCatalog', () => {
     )
   })
 
-  it('recommends a new versioned family without a family rule', () => {
+  it('recommends a current known family without promoting an unknown family', () => {
     const current = buildCatalog([
       {
         id: 'claude-opus-5',
@@ -180,7 +176,8 @@ describe('buildCatalog', () => {
       'claude-fable-5-1',
       'claude-opus-5',
     ])
-    expect(current.models[0]?.featured).toBe(true)
+    expect(current.models.find((model) => model.id === 'claude-opus-5')?.featured).toBe(true)
+    expect(current.models[0]?.featured).toBe(false)
   })
 
   it('groups provider aliases so an old alias cannot precede its successor', () => {
@@ -210,8 +207,8 @@ describe('buildCatalog', () => {
     ])
 
     expect(current.models.map(({ id, provider, featured }) => ({ id, provider, featured }))).toEqual([
-      { id: 'grok-4.6', provider: 'xai', featured: true },
-      { id: 'mistral-medium-2604', provider: 'mistral', featured: true },
+      { id: 'grok-4.6', provider: 'xai', featured: false },
+      { id: 'mistral-medium-2604', provider: 'mistral', featured: false },
     ])
   })
 
@@ -226,7 +223,7 @@ describe('buildCatalog', () => {
       routeability: { routeable: true },
     })))
 
-    expect(current.models.filter((model) => model.featured)).toHaveLength(3)
+    expect(current.models.filter((model) => model.featured)).toHaveLength(0)
     expect(current.models).toHaveLength(providers.length)
   })
 

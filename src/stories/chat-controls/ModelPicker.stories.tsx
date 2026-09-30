@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useState } from 'react'
 
-import { ModelPicker, type CatalogModel } from '../../web-react'
+import { ModelPicker } from '../../web-react'
+import { buildCatalog } from '../../runtime/model-catalog'
 import { AutoClick, catalogModels, DEFAULT_MODEL_ID, withPopoverHeadroom } from './fixtures'
 
 /**
@@ -49,26 +50,29 @@ export const Open: Story = {
   },
 }
 
-const currentModels: CatalogModel[] = [
-  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: false },
-  { id: 'gpt-4.1-mini', name: 'GPT 4.1 Mini', provider: 'openai', supportsTools: true, supportsReasoning: false, featured: false },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google', supportsTools: true, supportsReasoning: true, featured: false },
-  { id: 'claude-opus-5', name: 'Claude Opus 5', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
-  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', supportsTools: true, supportsReasoning: true, featured: true },
-  { id: 'gpt-5.6-luna', name: 'GPT 5.6 Luna', provider: 'openai', supportsTools: true, supportsReasoning: true, featured: true },
-  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
-  { id: 'claude-fable-5', name: 'Claude Fable 5', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
-  { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
-]
+// Routeable entries sampled from the authenticated Router catalogue on 2026-09-29.
+// The unavailable Opus/Sonnet 5.5 routes are intentionally absent.
+const currentModels = buildCatalog([
+  { id: 'claude-opus-5', name: 'Claude Opus 5', pricing: { prompt: '0.000005' }, _provider: 'anthropic', routeability: { status: 'routeable' } },
+  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', pricing: { prompt: '0.000002' }, _provider: 'anthropic', routeability: { status: 'routeable' } },
+  { id: 'gpt-6.1-sol', name: 'gpt-6.1-sol', pricing: { prompt: '0.000002' }, _provider: 'openai', routeability: { status: 'routeable' } },
+  { id: 'gpt-6-astra', name: 'gpt-6-astra', pricing: { prompt: '0.00001' }, _provider: 'openai', routeability: { status: 'routeable' } },
+  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', pricing: { prompt: '0.00000075' }, _provider: 'google', routeability: { status: 'routeable' } },
+  { id: 'deepseek/deepseek-v4.1-flash', name: 'DeepSeek: DeepSeek V4.1 Flash', pricing: { prompt: '0.0000003' }, _provider: 'deepseek', routeability: { status: 'routeable' } },
+  { id: 'glm-5.3', name: 'glm-5.3', pricing: { prompt: '0.0000014' }, _provider: 'z-ai', routeability: { status: 'routeable' } },
+  { id: 'kimi-k3', name: 'kimi-k3', pricing: { prompt: '0.000003' }, _provider: 'moonshot', routeability: { status: 'routeable' } },
+  { id: 'gpt-5.4', _provider: 'openai', routeability: { status: 'routeable' } },
+  { id: 'claude-opus-4-7', _provider: 'anthropic', routeability: { status: 'routeable' } },
+]).models
 
-/** Current launches render first; old models remain available lower down. */
+/** Served current choices open first; search and browse retain older routes. */
 export const FreshnessOrdering: Story = {
-  name: 'Current launch ordering',
+  name: 'Current Router menu',
   decorators: [withPopoverHeadroom],
   render: () => (
     <AutoClick>
       <ModelPicker
-        value="claude-fable-5-1"
+        value="gpt-5.4"
         onChange={() => {}}
         models={currentModels}
       />

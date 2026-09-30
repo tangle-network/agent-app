@@ -9,20 +9,21 @@
  * duplicate canonical ones. This module turns that into a product catalogue:
  *
  *   filter (chat-capable, routeable) → dedupe (snapshot/prefix/:free aliases)
- *   → rank (provider tier, current generation) → recommend (bounded shortlist)
+ *   → rank (provider tier, current generation) → recommend (current families)
  *   → default (env override or preferred family)
  *
- * Freshness is automatic: everything is derived from the live router response,
- * so new models surface as soon as the router lists them. The only static
- * knowledge here is slow-moving: provider display order and family name
- * patterns (e.g. "claude-sonnet-*", "gpt-N"). A new release and a new family
- * both reach the first row from their versioned id with no catalogue edit.
+ * The router is the authority for availability, but its response has no
+ * release dates. The shortlist therefore uses the newest routeable entry in
+ * each current family, with a conservative generation floor. Other routeable
+ * models stay in the catalogue for search and explicit browsing.
  */
 
 export interface RouterModel {
   id: string
   name?: string
   description?: string
+  release_date?: string
+  released_at?: string
   _provider?: string
   provider?: string
   pricing?: { prompt?: string | null; completion?: string | null }
@@ -52,6 +53,8 @@ export interface CatalogModel {
   name: string
   provider: string
   description?: string
+  /** Router-supplied release date when available; never inferred from an id. */
+  releaseDate?: string
   contextLength?: number
   pricing?: { prompt?: string; completion?: string }
   supportsTools: boolean
@@ -109,8 +112,8 @@ function providerForModel(model: RouterModel): string {
   return 'unknown'
 }
 
-/** A short first screen, not one row for every Router provider. */
-export const MAX_RECOMMENDED_MODELS = 3
+/** A short, varied first screen. All other routeable entries remain searchable. */
+export const MAX_RECOMMENDED_MODELS = 8
 
 /** Non-chat endpoints that pollute the router list (matched on normalized id). */
 const EXCLUDED_ID = /(embedding|tts|transcribe|whisper|audio|realtime|image|lyria|sora|dall-e|moderation|content-safety|search-preview|search-api|deep-research|:batch$)/
@@ -136,9 +139,40 @@ const DEFAULT_CANDIDATE_RULES: Array<{ providers: string[]; match: RegExp }> = [
   { providers: ['mistral'], match: /^mistral-(large|medium)-?[\d.-]*$/ },
 ]
 
+/**
+ * Current-family floors are based on the routeable Router catalogue checked
+ * 2026-09-29. Router entries do not carry release dates, so these are version
+ * checks, not claims about a model's launch month. Never promote an older
+ * generation merely because a newer route becomes unavailable; browsing and
+ * search retain it. A newer routeable version in a family replaces its peer.
+ * DeepSeek V4.1 Flash and Kimi K3 remain searchable but are excluded until
+ * a live completion succeeds (2026-09-29 probes: quota 503 and server 500).
+ */
+const RECOMMENDED_FAMILIES: Array<{
+  provider: string
+  match: RegExp
+  minVersion: number[]
+}> = [
+  { provider: 'anthropic', match: /^claude-opus-\d+(?:[-.]\d+)*$/, minVersion: [5] },
+  { provider: 'anthropic', match: /^claude-sonnet-\d+(?:[-.]\d+)*$/, minVersion: [5] },
+  { provider: 'openai', match: /^gpt-\d+(?:\.\d+)?-sol$/, minVersion: [6] },
+  { provider: 'openai', match: /^gpt-\d+(?:\.\d+)?-astra$/, minVersion: [6] },
+  { provider: 'google', match: /^gemini-\d+(?:\.\d+)?-flash(?:-preview)?$/, minVersion: [3, 5] },
+  { provider: 'zai', match: /^glm-\d+(?:\.\d+)?$/, minVersion: [5, 3] },
+]
+
+const RECOMMENDATION_WINDOW_MS = 120 * 24 * 60 * 60 * 1000
+
+function releaseDateFromRouter(model: RouterModel): string | undefined {
+  const value = model.release_date ?? model.released_at
+  if (!value || !/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(value)) return undefined
+  const time = Date.parse(value)
+  return Number.isFinite(time) ? new Date(time).toISOString() : undefined
+}
+
 /** Families known to support tool calls even when router metadata omits it
  *  (dated snapshots often lack the supported_parameters of their parent). */
-const TOOL_CAPABLE_FAMILY = /^(claude|gpt-[45]|gpt-oss|o[134]|gemini|grok|deepseek|glm|kimi|mistral|ministral|magistral|command|nemotron|llama)/
+const TOOL_CAPABLE_FAMILY = /^(claude|gpt-\d|gpt-oss|o[134]|gemini|grok|deepseek|glm|kimi|mistral|ministral|magistral|command|nemotron|llama)/
 
 /** Strip provider prefix, :free suffix, and trailing date stamps. */
 export function normalizeModelId(id: string): string {
@@ -328,12 +362,13 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
     else groups.set(key, [m])
   }
 
-  const reps: Array<{ model: RouterModel; normId: string; mergedParams: Set<string> }> = []
+  const reps: Array<{ model: RouterModel; normId: string; mergedParams: Set<string>; releaseDate?: string }> = []
   for (const group of groups.values()) {
     group.sort((a, b) => aliasPenalty(a.id) - aliasPenalty(b.id) || a.id.length - b.id.length)
     const rep = group[0]!
     const mergedParams = new Set<string>(group.flatMap((m) => m.supported_parameters ?? []))
-    reps.push({ model: rep, normId: normalizeModelId(rep.id), mergedParams })
+    const releaseDate = group.map(releaseDateFromRouter).find((date) => date !== undefined)
+    reps.push({ model: rep, normId: normalizeModelId(rep.id), mergedParams, releaseDate })
   }
 
   // Resolve the default independently from menu recommendations.
@@ -363,6 +398,7 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
       name: m.name ?? m.id,
       provider,
       description: m.description ? m.description.slice(0, 160) : undefined,
+      releaseDate: r.releaseDate,
       contextLength: m.context_length,
       pricing:
         m.pricing?.prompt || m.pricing?.completion
@@ -382,13 +418,15 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
     .map(toCatalogModel)
   const sorted = sortModelsByFreshness(reps.map(toCatalogModel))
   const recommendedIds = new Set<string>()
-  const seenProviders = new Set<string>()
-  for (const model of sorted) {
-    const provider = normalizeProvider(model.provider)
-    if (providerRank(provider) >= PROVIDER_TIER.length) continue
-    if (seenProviders.has(provider)) continue
-    seenProviders.add(provider)
-    recommendedIds.add(model.id)
+  const recentSince = Date.now() - RECOMMENDATION_WINDOW_MS
+  for (const family of RECOMMENDED_FAMILIES) {
+    const current = sorted.find((model) =>
+      normalizeProvider(model.provider) === family.provider &&
+      family.match.test(normalizeModelId(model.id)) &&
+      compareVersions(releaseVersion(model.id), family.minVersion) >= 0 &&
+      (model.releaseDate === undefined || Date.parse(model.releaseDate) >= recentSince),
+    )
+    if (current) recommendedIds.add(current.id)
     if (recommendedIds.size >= MAX_RECOMMENDED_MODELS) break
   }
   const models = sorted.map((model) =>
