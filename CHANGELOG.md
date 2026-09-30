@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.8
+
+- fix(sandbox): resolve runtime credentials before workspace resume
+
 ## 0.50.7
 
 - feat(profile): edit complete agent profiles in shared web shell
