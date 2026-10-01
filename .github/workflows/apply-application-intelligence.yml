@@ -1,0 +1,79 @@
+name: Apply shared application intelligence source
+on:
+  push:
+    branches: [verify/app-intelligence-environment-20261001]
+    paths: [.github/workflows/apply-application-intelligence.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPECTED_BASE: abe93e0ef1ea1d0f0521d4505347625d4559b2dc
+      TARGET_BRANCH: feat/application-intelligence
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: delivery
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: abe93e0ef1ea1d0f0521d4505347625d4559b2dc
+          path: source
+          persist-credentials: false
+      - name: Verify and apply the exact source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat delivery/.verification/application-intelligence.patch.gz.b64 delivery/.verification/application-intelligence.part{1,2,3} | tr -d '\n\r' | base64 -d | gzip -d > "$RUNNER_TEMP/source.patch"
+          echo 'ec0ee8b10b387c53d49c18eaefc9fc1cabeb57943ca47c32fad579ea6f5bea7f  '"$RUNNER_TEMP/source.patch" | sha256sum -c -
+          cd source
+          test "$(git rev-parse HEAD)" = "$EXPECTED_BASE"
+          git apply --check "$RUNNER_TEMP/source.patch"
+          git apply "$RUNNER_TEMP/source.patch"
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+        with:
+          package_json_file: source/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: source/.nvmrc
+          cache: pnpm
+          cache-dependency-path: source/pnpm-lock.yaml
+      - name: Qualify shared source and regenerate documentation
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/qualification"
+          pnpm install --frozen-lockfile --ignore-scripts=false 2>&1 | tee "$RUNNER_TEMP/qualification/install.log"
+          pnpm docs:gen 2>&1 | tee "$RUNNER_TEMP/qualification/docs.log"
+          pnpm typecheck 2>&1 | tee "$RUNNER_TEMP/qualification/typecheck.log"
+          pnpm build 2>&1 | tee "$RUNNER_TEMP/qualification/build.log"
+          pnpm exec vitest run tests/application-intelligence.test.ts tests/runtime-certified-delivery-integration.test.ts src/runtime/certified-delivery.test.ts 2>&1 | tee "$RUNNER_TEMP/qualification/focused-tests.log"
+          git diff --check
+      - name: Commit only qualified source to the unchanged feature branch
+        working-directory: source
+        env:
+          PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          AUTH=$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $AUTH"
+          test "$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)" = "$EXPECTED_BASE"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/runtime/application-intelligence.ts src/runtime/index.ts src/runtime/certified-delivery.ts src/chat-routes/intelligence.ts src/chat-routes/index.ts tests/application-intelligence.test.ts create-agent-app/template-chat/src/chat.ts create-agent-app/template-chat/src/env.ts docs
+          git commit -m 'feat(intelligence): share application observation and opt-in guidance'
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          git rev-parse HEAD > "$RUNNER_TEMP/qualification/commit.txt"
+          git archive --format=tar.gz HEAD > "$RUNNER_TEMP/qualification/source.tar.gz"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: application-intelligence-source-qualification
+          path: ${{ runner.temp }}/qualification/
+          retention-days: 7
