@@ -22450,7 +22450,7 @@
           "name": "AgentWorkspaceAppsConfig",
           "kind": "interface",
           "signature": "interface AgentWorkspaceAppsConfig",
-          "doc": "Registered apps shown as individual workspace destinations."
+          "doc": "Registered apps shown under one expandable workspace destination."
         },
         {
           "name": "AgentWorkspaceLayout",
