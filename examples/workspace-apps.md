@@ -68,7 +68,9 @@ A normal status refresh must use the same sandbox, preview ID, and port.
 The host stores ownership, source session, and visibility alongside the shared record.
 Private access should be the default until the product grants broader workspace access.
 
-The [rendered rail](../docs/assets/workspace-apps/rail-with-four-apps.png) shows four registered apps after a live update.
+The [rendered rail](../docs/assets/workspace-apps/rail-apps-grouped.png) groups authorized app routes under Apps and keeps History separate.
+The Apps row opens when its active child is selected and can be expanded or collapsed with the keyboard or pointer.
+The [mobile drawer](../docs/assets/workspace-apps/rail-apps-grouped-mobile.png) uses the same destinations.
 
 The page example uses `@tangle-network/sandbox-ui` 0.115.0 or later for `EmbeddedAppView`.
 The workspace rail consumes authorized records in the order returned by the store.
