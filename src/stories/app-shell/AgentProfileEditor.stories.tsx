@@ -91,6 +91,6 @@ export const ReferenceOnly: Story = { args: { value: referenceResources, ...refe
 export const ExistingResourcesToRepair: Story = {
   args: { value: { resources: {
     files: [{ path: 'docs/old-guide.md', resource: { kind: 'github', repository: 'example/agent-guides', path: 'old-guide.md', ref: 'main' }, executable: true }],
-    skills: [{ kind: 'github', repository: 'example/agent-guides', path: 'skills/booking/SKILL.md', ref: 'main' }],
+    skills: [{ kind: 'github', repository: 'example/agent-guides', path: 'skills/booking/SKILL.md', ref: fixedCommit, name: 'booking-guide ' }],
   }, mcp: { local: { command: 'local-mcp' }, insecure: { transport: 'http', url: 'http://example.com/mcp' } } }, ...referenceConstraints },
 }

@@ -115,25 +115,26 @@ function normalizedFilePathPrefix(prefix?: string): string | undefined {
   return folder ? folder + '/' : undefined
 }
 
-function resourceError(draft: ResourceDraft, requireGitHubCommitSha = false): string | null {
-  if (draft.kind === 'inline') return draft.name.trim() ? null : 'Enter a name for the inline file.'
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(draft.repository.trim())) return 'Enter a GitHub repository as owner/repo.'
-  if (!draft.path.trim()) return 'Enter a path within the GitHub repository.'
+function resourceError(draft: ResourceDraft, requireGitHubCommitSha = false, stored = false): string | null {
+  const checked = stored ? draft : resourceDraft(resourceRef(draft))
+  if (checked.kind === 'inline') return checked.name.trim() ? null : 'Enter a name for the inline file.'
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(checked.repository)) return 'Enter a GitHub repository as owner/repo.'
+  if (!checked.path) return 'Enter a path within the GitHub repository.'
   if (requireGitHubCommitSha) {
-    if (draft.repository.trim().length > 200 || draft.repository.trim().split('/').some(segment => segment === '.' || segment === '..')) {
+    if (checked.repository.length > 200 || checked.repository.split('/').some(segment => segment === '.' || segment === '..')) {
       return 'Enter a GitHub repository as owner/repo.'
     }
-    if (!/^[0-9a-f]{40}$/i.test(draft.ref.trim())) return 'Enter a 40-character GitHub commit SHA.'
-    if (!validRelativePath(draft.path.trim()) || /[?#%]/.test(draft.path.trim())) return 'Enter a relative repository path without traversal or URL characters.'
-    if (draft.name && (!draft.name.trim() || draft.name.length > 160 || /[\u0000-\u001f\u007f]/.test(draft.name))) {
+    if (!/^[0-9a-f]{40}$/i.test(checked.ref)) return 'Enter a 40-character GitHub commit SHA.'
+    if (!validRelativePath(checked.path) || /[?#%]/.test(checked.path)) return 'Enter a relative repository path without traversal or URL characters.'
+    if (checked.name && (!checked.name.trim() || checked.name.length > 160 || /[\u0000-\u001f\u007f]/.test(checked.name))) {
       return 'Enter a short file name without control characters.'
     }
   }
   return null
 }
 
-function skillNameError(draft: ResourceDraft, refs: readonly AgentProfileResourceRef[], index?: number): string | null {
-  const name = draft.name.trim()
+function skillNameError(draft: ResourceDraft, refs: readonly AgentProfileResourceRef[], index?: number, stored = false): string | null {
+  const name = stored ? draft.name : draft.name.trim()
   if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) {
     return 'Enter a lowercase skill name of up to 64 letters, numbers, dots, dashes, or underscores.'
   }
@@ -187,15 +188,15 @@ function fileMount(draft: FileDraft): AgentProfileFileMount {
 }
 
 function fileIssues(draft: FileDraft, filePathPrefix: string | undefined, allowExecutableFiles: boolean,
-  requireGitHubCommitSha: boolean): string[] {
+  requireGitHubCommitSha: boolean, stored = false): string[] {
   const issues: string[] = []
-  const path = draft.path.trim()
+  const path = stored ? draft.path : draft.path.trim()
   if (!path) issues.push('Enter a workspace path for the file.')
   else if (filePathPrefix && (!path.startsWith(filePathPrefix) || !validRelativePath(path))) {
     issues.push('Enter a relative workspace path under ' + filePathPrefix + ' without traversal.')
   }
   if (!allowExecutableFiles && draft.executable) issues.push('Executable resource files are not allowed.')
-  const resourceIssue = resourceError(draft.resource, requireGitHubCommitSha)
+  const resourceIssue = resourceError(draft.resource, requireGitHubCommitSha, stored)
   if (resourceIssue) issues.push(resourceIssue)
   return issues
 }
@@ -242,10 +243,10 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
   const toolFiles = value.resources?.tools ?? []
   const instructions = value.resources?.instructions
   const constrainedEntryCount = workspaceFilePrefix || !allowExecutableFiles || requireGitHubCommitSha || requireUniqueSkillNames
-    ? (value.resources?.files ?? []).filter(mount => fileIssues(fileDraft(mount), workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha).length > 0).length +
-      skills.filter((ref, index) => resourceIssue('skills', resourceDraft(ref), skills, index)).length +
-      toolFiles.filter((ref, index) => requireGitHubCommitSha && resourceIssue('tools', resourceDraft(ref), toolFiles, index)).length +
-      Number(Boolean(requireGitHubCommitSha && instructions && typeof instructions === 'object' && resourceError(resourceDraft(instructions), true)))
+    ? (value.resources?.files ?? []).filter(mount => fileIssues(fileDraft(mount), workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha, true).length > 0).length +
+      skills.filter((ref, index) => resourceIssue('skills', resourceDraft(ref), skills, index, true)).length +
+      toolFiles.filter((ref, index) => requireGitHubCommitSha && resourceIssue('tools', resourceDraft(ref), toolFiles, index, true)).length +
+      Number(Boolean(requireGitHubCommitSha && instructions && typeof instructions === 'object' && resourceError(resourceDraft(instructions), true, true)))
     : 0
   const invalidMcpCount = publicHttpsMcpOnly
     ? Object.values(value.mcp ?? {}).filter(server => publicHttpsMcpError(server)).length : 0
@@ -264,12 +265,12 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     return emit({ ...value, resources: { ...value.resources, [key]: refs } })
   }
   function resourceIssue(key: 'skills' | 'tools', draft: ResourceDraft,
-    refs: readonly AgentProfileResourceRef[], index?: number): string | null {
+    refs: readonly AgentProfileResourceRef[], index?: number, stored = false): string | null {
     if (key === 'skills' && requireUniqueSkillNames) {
-      const issue = skillNameError(draft, refs, index)
+      const issue = skillNameError(draft, refs, index, stored)
       if (issue) return issue
     }
-    return resourceError(draft, requireGitHubCommitSha)
+    return resourceError(draft, requireGitHubCommitSha, stored)
   }
   function addResource(key: 'skills' | 'tools') {
     const draft = resourceDrafts[key]
@@ -319,7 +320,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     return <Disclosure title={title} description={description} detail={refs.length ? refs.length + ' configured' : 'Optional'}>
       {refs.length === 0 && <p className="text-sm text-muted-foreground">None configured.</p>}
       <ul className="space-y-2">{refs.map((ref, index) => {
-        const issue = resourceIssue(key, resourceDraft(ref), refs, index)
+        const issue = resourceIssue(key, resourceDraft(ref), refs, index, true)
         return <li key={index} className="space-y-3 rounded-lg border border-border p-3 text-sm" aria-label={title + ' ' + (index + 1)}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0"><span className="block break-words font-medium text-foreground">{ref.name || (ref.kind === 'github' ? ref.path : 'Inline resource')}</span>
@@ -485,7 +486,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     {allowsResource('files') && <Disclosure title="Resource files" description="Configure files for the agent workspace. The runtime determines whether it can place them." detail={(value.resources?.files ?? []).length + ' configured'}>
       {(value.resources?.files ?? []).length === 0 && <p className="text-sm text-muted-foreground">No resource files configured.</p>}
       <ul className="space-y-2">{(value.resources?.files ?? []).map((mount, index) => {
-        const issues = fileIssues(fileDraft(mount), workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha)
+        const issues = fileIssues(fileDraft(mount), workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha, true)
         return <li key={index} className="space-y-3 rounded-lg border border-border p-3 text-sm" aria-label={'Resource file ' + (index + 1)}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0"><span className="block break-words font-medium text-foreground">{mount.path}</span>
