@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.17
+
+- feat(object-store): stream authenticated raw uploads
+
 ## 0.50.16
 
 - fix(web-react): recover retired route chunks with a fresh document (#703)
