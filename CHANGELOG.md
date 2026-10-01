@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.22
+
+- chore(peers): admit Sandbox 0.59 and require UI schema
+
 ## 0.50.21
 
 - feat(vault): resolve external opens after display
