@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.23
+
+- chore(peers): admit Runtime 0.289 consumer cohort
+
 ## 0.50.22
 
 - chore(peers): admit Sandbox 0.59 and require UI schema
