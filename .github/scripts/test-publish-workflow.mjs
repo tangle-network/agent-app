@@ -78,6 +78,14 @@ const node22Job = job('node_22_compatibility')
 const writeJob = job('write_release')
 const agentPublishJob = job('publish_agent_app')
 const createPublishJob = job('publish_create_agent_app')
+check(
+  createPublishJob.includes('needs: [package_release, publish_agent_app]'),
+  'create-agent-app publication can precede Agent App publication',
+)
+check(
+  createPublishJob.includes("needs.publish_agent_app.result == 'success'"),
+  'create-agent-app publication does not require Agent App publication success',
+)
 const safetyIssueJob = job('safety_net_issue')
 const safetyClearJob = job('safety_net_clear')
 check(jobs.size === 7, 'publish workflow must contain exactly seven jobs')
