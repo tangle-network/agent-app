@@ -11,6 +11,9 @@ The components call an authenticated product route; API keys stay on the server.
 This subpath needs `@tangle-network/sandbox` 0.55.2 or newer for its line types and methods.
 
 `LineSetupClient.load()` returns every line in the current workspace, owned Hub connections with their available identities, and the agents or boxes that can answer.
+Return only targets the viewer may attach; one available identity or target displays as a value, while several remain selectable.
+The identity display names the transport, because one Inkbox account can offer Email and iMessage with the same label.
+The host still enforces the selected connection, transport, and target during `connect()`.
 Set `answering` from an active SDK line attachment, not from `line.status` alone.
 Set `lastTurn` to `latest`, `none`, or `unavailable` so a failed history read never looks like an empty conversation.
 Set `canDisconnect` only for lines this viewer may detach.

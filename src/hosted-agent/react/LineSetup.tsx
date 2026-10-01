@@ -54,6 +54,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
   const incarnation = useRef(0)
   const confirmButton = useRef<HTMLButtonElement>(null)
   const heading = useRef<HTMLHeadingElement>(null)
+  const setupHeading = useRef<HTMLHeadingElement>(null)
   const disconnectTriggers = useRef(new Map<string, HTMLButtonElement>())
   const restoreFocusTo = useRef<string | null>(null)
   useBrowserLayoutEffect(() => {
@@ -137,7 +138,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
     restoreFocusTo.current = null
     const trigger = disconnectTriggers.current.get(lineId)
     if (trigger && !trigger.disabled) trigger.focus()
-    else heading.current?.focus()
+    else (heading.current ?? setupHeading.current)?.focus()
   }, [confirmLineId, snapshot, refreshFailed])
 
   const allChoices = snapshot ? choicesFor(snapshot) : []
@@ -150,6 +151,12 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
   const selectedKind = availableKinds.includes(kind) ? kind : availableKinds[0]
   const kindChoices = choices.filter(choice => choice.identity.kind === selectedKind)
   const selected = kindChoices.find(choice => choice.key === choiceKey) ?? kindChoices[0]
+  const visibleLines = snapshot?.lines.filter(line => line.status !== 'released') ?? []
+  const showSetup = Boolean(snapshot && canManage && showConnectionSetup &&
+    (snapshot.connections === null || choices.length > 0 || allChoices.length === 0))
+  const showExisting = snapshot ? visibleLines.length > 0 || !showSetup : !(canManage && showConnectionSetup)
+  const hasSeveralChoices = availableKinds.length > 1 || kindChoices.length > 1 || (snapshot?.targets.length ?? 0) > 1
+  const SetupHeading = showExisting ? 'h3' : 'h2'
   const selectedTarget = snapshot?.targets.find(target => target.id === targetId)
   const selectedMode = selectedTarget?.modes.includes(boxMode) ? boxMode : selectedTarget?.modes[0]
   const enteredNumber = selected?.identity.phoneNumberId ?? phoneNumberId.trim()
@@ -226,13 +233,13 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
   }
 
   return <section className="tangle-lines" aria-label="Agent lines">
-    <header className="tangle-lines__heading">
+    {showExisting && <header className="tangle-lines__heading">
       <div>
         <h2 ref={heading} tabIndex={-1}>Lines</h2>
         {snapshot && <p>{snapshot.workspaceName} can use one line per transport.</p>}
       </div>
       {answeringCount > 1 && <span className="tangle-lines__count">{answeringCount} answering</span>}
-    </header>
+    </header>}
 
     {error && <div className="tangle-lines__error" role="alert">
       <div><strong>{refreshFailed ? 'Lines are unavailable' : 'Line action failed'}</strong><p>{error}</p></div>
@@ -241,12 +248,12 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
     {loading && <p className="tangle-lines__muted" role="status">Loading lines…</p>}
 
     {snapshot && <>
-      <div className="tangle-lines__list">
-        {snapshot.lines.filter(line => line.status !== 'released').length === 0 &&
+      {showExisting && <div className="tangle-lines__list">
+        {visibleLines.length === 0 &&
           <div className="tangle-lines__empty"><strong>No lines connected</strong><p>{canManage && showConnectionSetup
             ? 'Connect an owned identity below to let this workspace answer messages.'
             : 'There are no connected lines in this workspace.'}</p></div>}
-        {snapshot.lines.filter(line => line.status !== 'released').map(line =>
+        {visibleLines.map(line =>
           <div className="tangle-lines__row" key={line.id}>
             <div className="tangle-lines__row-main">
               <div className="tangle-lines__row-heading"><span className="tangle-lines__transport">{TRANSPORT[line.transport]}</span><span className={`tangle-lines__status${line.answering ? ' tangle-lines__status--answering' : ''}`}>{line.answering ? 'Answering' : line.targetId === null ? 'Disconnected' : line.status === 'active' ? 'Awaiting member' : line.status}</span></div>
@@ -264,12 +271,11 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
               </div> : <button ref={node => { if (node) disconnectTriggers.current.set(line.id, node); else disconnectTriggers.current.delete(line.id) }} type="button" className="tangle-lines__quiet" disabled={busy || loading || refreshFailed} onClick={() => setConfirmation({ lineId: line.id, attachmentId: line.attachmentId ?? undefined })}>Disconnect line</button>}
             </div>}
           </div>)}
-      </div>
+      </div>}
 
-      {canManage && showConnectionSetup && (snapshot.connections === null || choices.length > 0 || allChoices.length === 0) && <div className="tangle-lines__setup">
-        <span className="tangle-lines__overline">New line</span>
-        <h3>Connect an identity you own</h3>
-        <p>{setupDescription ?? 'Choose an identity already connected in Hub. Billing details appear below.'}</p>
+      {showSetup && <div className={`tangle-lines__setup${showExisting ? '' : ' tangle-lines__setup--first'}`}>
+        <SetupHeading ref={setupHeading} tabIndex={-1}>Connect a line</SetupHeading>
+        {hasSeveralChoices && setupDescription && <p>{setupDescription}</p>}
         {snapshot.connections === null ? <div className="tangle-lines__error" role="status">
           <span>Hub connections could not be read. Check Hub access and try again.</span>
           <button type="button" disabled={loading} onClick={retry}>Retry</button>
@@ -278,20 +284,27 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
             {emptyConnectionsMessage ?? 'Connect an owned handle, number, or mailbox in Hub, then'} <button type="button" disabled={loading} onClick={retry}>reload</button>.
           </p>
             : <>
-              <div className="tangle-lines__kinds" role="group" aria-label="Identity type">
+              {availableKinds.length > 1 && <div className="tangle-lines__kinds" role="group" aria-label="Identity type">
                 {availableKinds.map(value => <button key={value} type="button" aria-pressed={selectedKind === value} onClick={() => { setKind(value); setChoiceKey(''); setPhoneNumberId('') }}>{IDENTITY[value]}</button>)}
-              </div>
+              </div>}
               <div className="tangle-lines__fields">
-                <label>Owned connection
+                {kindChoices.length > 1 ? <label>Line
                   <select value={selected?.key ?? ''} onChange={event => { setChoiceKey(event.target.value); setPhoneNumberId('') }}>
-                    {kindChoices.map(choice => <option key={choice.key} value={choice.key}>{choice.connection.label} · {choice.identity.label}</option>)}
+                    {kindChoices.map(choice => <option key={choice.key} value={choice.key}>{choice.identity.label} · {TRANSPORT[choice.identity.transport]} via {choice.connection.label}</option>)}
                   </select>
-                </label>
-                <label>{targetLabel ?? 'Agent or box'}
+                </label> : selected && <div className="tangle-lines__fixed-choice">
+                  <span>Line</span>
+                  <strong>{selected.identity.label}</strong>
+                  <small>{TRANSPORT[selected.identity.transport]} via {selected.connection.label}</small>
+                </div>}
+                {snapshot.targets.length > 1 ? <label>{targetLabel ?? 'Agent or box'}
                   <select value={selectedTarget?.id ?? ''} onChange={event => setTargetId(event.target.value)}>
                     {snapshot.targets.map(target => <option key={target.id} value={target.id}>{target.label}{targetLabel ? '' : ` · ${target.kind}`}</option>)}
                   </select>
-                </label>
+                </label> : selectedTarget && <div className="tangle-lines__fixed-choice">
+                  <span>{targetLabel ?? 'Agent or box'}</span>
+                  <strong>{selectedTarget.label}{targetLabel ? '' : ` · ${selectedTarget.kind}`}</strong>
+                </div>}
                 {selectedTarget && selectedTarget.modes.length > 1 && <fieldset>
                   <legend>Conversation space</legend>
                   <label><input type="radio" name={`line-box-mode-${scopeKey}`} value="per-member" checked={selectedMode === 'per-member'} disabled={!selectedTarget?.modes.includes('per-member')} onChange={() => setBoxMode('per-member')} /> One box per member</label>
