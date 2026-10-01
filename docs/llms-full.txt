@@ -10844,6 +10844,22 @@ Source: `src/object-store/index.ts` · depends on `crypto`
 (s: string) => string
 ```
 
+### `createObjectUploadRoute`
+
+`function` — Create a PUT handler for one raw file body.
+
+```ts
+({ store, authorize, maxBytes, }: CreateObjectUploadRouteOptions) => (request: Request) => Promise<Response>
+```
+
+### `CreateObjectUploadRouteOptions`
+
+`interface`
+
+```ts
+interface CreateObjectUploadRouteOptions
+```
+
 ### `createProxiedArtifactRoute`
 
 `function` — Build a download handler that verifies a signed request and STREAMS the object back with a conservative, non-executable content type.
@@ -10858,6 +10874,22 @@ Source: `src/object-store/index.ts` · depends on `crypto`
 
 ```ts
 ({ bucket }: { bucket: R2LikeBucket; }) => ObjectStore
+```
+
+### `DEFAULT_MAX_OBJECT_UPLOAD_BYTES`
+
+`const` — Default ceiling for a single raw-body object upload.
+
+```ts
+number
+```
+
+### `MAX_WORKERS_OBJECT_UPLOAD_BYTES`
+
+`const` — The minimum Cloudflare zone request-body ceiling is 100 MB decimal.
+
+```ts
+100000000
 ```
 
 ### `ObjectBody`
@@ -10890,6 +10922,14 @@ interface ObjectKeyParts
 
 ```ts
 interface ObjectStore
+```
+
+### `ObjectUploadAuthorization`
+
+`type`
+
+```ts
+type ObjectUploadAuthorization
 ```
 
 ### `PutObjectOptions`

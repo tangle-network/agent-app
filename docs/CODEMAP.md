@@ -48,7 +48,7 @@ _105 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./legibility/cli`](api/legibility-cli.md) | 0 | `signoff` |
 | [`./missions`](api/missions.md) | 65 | — |
 | [`./model-resolution`](api/model-resolution.md) | 24 | — |
-| [`./object-store`](api/object-store.md) | 15 | `crypto` |
+| [`./object-store`](api/object-store.md) | 20 | `crypto` |
 | [`./openui`](api/openui.md) | 35 | — |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
 | [`./peer-floors/check`](api/peer-floors-check.md) | 23 | `signoff` |
@@ -492,11 +492,11 @@ Source: `src/model-resolution/index.ts` · 24 exports
 
 ## `./object-store`
 
-Source: `src/object-store/index.ts` · 15 exports
+Source: `src/object-store/index.ts` · 20 exports
 
 Depends on: `crypto`
 
-`assertSafeKeySegment`, `createProxiedArtifactRoute`, `createR2ObjectStore`, `ObjectBody`, `objectKey`, `ObjectKeyParts`, `ObjectStore`, `PutObjectOptions`, `R2LikeBucket`, `R2LikeObjectBody`, `R2LikeObjectHead`, `signObjectUrl`, `SignObjectUrlArgs`, `verifyObjectUrl`, `VerifyObjectUrlResult`
+`assertSafeKeySegment`, `createObjectUploadRoute`, `CreateObjectUploadRouteOptions`, `createProxiedArtifactRoute`, `createR2ObjectStore`, `DEFAULT_MAX_OBJECT_UPLOAD_BYTES`, `MAX_WORKERS_OBJECT_UPLOAD_BYTES`, `ObjectBody`, `objectKey`, `ObjectKeyParts`, `ObjectStore`, `ObjectUploadAuthorization`, `PutObjectOptions`, `R2LikeBucket`, `R2LikeObjectBody`, `R2LikeObjectHead`, `signObjectUrl`, `SignObjectUrlArgs`, `verifyObjectUrl`, `VerifyObjectUrlResult`
 
 [Full API →](api/object-store.md)
 

@@ -8388,6 +8388,18 @@
           "doc": "Assert a single object-key path SEGMENT (an operator id, customer id, or upload id) is safe to interpolate into a key, and return it."
         },
         {
+          "name": "createObjectUploadRoute",
+          "kind": "function",
+          "signature": "({ store, authorize, maxBytes, }: CreateObjectUploadRouteOptions) => (request: Request) => Promise<Response>",
+          "doc": "Create a PUT handler for one raw file body."
+        },
+        {
+          "name": "CreateObjectUploadRouteOptions",
+          "kind": "interface",
+          "signature": "interface CreateObjectUploadRouteOptions",
+          "doc": null
+        },
+        {
           "name": "createProxiedArtifactRoute",
           "kind": "function",
           "signature": "({ store, secret, }: { store: ObjectStore; secret: string; }) => (request: Request) => Promise<Response>",
@@ -8398,6 +8410,18 @@
           "kind": "function",
           "signature": "({ bucket }: { bucket: R2LikeBucket; }) => ObjectStore",
           "doc": "Map the {@link ObjectStore} port onto an R2 bucket 1:1."
+        },
+        {
+          "name": "DEFAULT_MAX_OBJECT_UPLOAD_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Default ceiling for a single raw-body object upload."
+        },
+        {
+          "name": "MAX_WORKERS_OBJECT_UPLOAD_BYTES",
+          "kind": "const",
+          "signature": "100000000",
+          "doc": "The minimum Cloudflare zone request-body ceiling is 100 MB decimal."
         },
         {
           "name": "ObjectBody",
@@ -8422,6 +8446,12 @@
           "kind": "interface",
           "signature": "interface ObjectStore",
           "doc": "Portable object-store port."
+        },
+        {
+          "name": "ObjectUploadAuthorization",
+          "kind": "type",
+          "signature": "type ObjectUploadAuthorization",
+          "doc": null
         },
         {
           "name": "PutObjectOptions",
