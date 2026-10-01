@@ -6478,16 +6478,46 @@
           "doc": null
         },
         {
+          "name": "ApplicationOwnerLines",
+          "kind": "interface",
+          "signature": "interface ApplicationOwnerLines",
+          "doc": null
+        },
+        {
+          "name": "ApplicationSenderVerification",
+          "kind": "interface",
+          "signature": "interface ApplicationSenderVerification",
+          "doc": "Browser-safe status from the owner server."
+        },
+        {
+          "name": "ApplicationSenderVerificationStart",
+          "kind": "interface",
+          "signature": "interface ApplicationSenderVerificationStart",
+          "doc": "Public TEST data."
+        },
+        {
           "name": "attachWorkspaceLine",
           "kind": "function",
-          "signature": "(input: { box: Pick<SandboxInstance, \"lines\">; lineId: string; ownerAddress: string; application: LineApplication; turn…",
-          "doc": "A line delegates its nominated owner to the application's normal chat path."
+          "signature": "(input: { box: Pick<SandboxInstance, \"lines\">; ownerLines: ApplicationOwnerLines; lineId: string; senderVerificationId:…",
+          "doc": "Attach a proved handset to the application's normal chat path."
         },
         {
           "name": "createApplicationLineHandler",
           "kind": "function",
           "signature": "<T>(options: ApplicationLineOptions<T>) => (request: Request) => Promise<Response>",
           "doc": "One bounded pass from the native Lines worker into the application's existing execution path."
+        },
+        {
+          "name": "OwnerApplicationSenderVerification",
+          "kind": "interface",
+          "signature": "interface OwnerApplicationSenderVerification",
+          "doc": "The owner-key SDK read includes the confirmed sender for the attach helper."
+        },
+        {
+          "name": "publicApplicationSenderVerification",
+          "kind": "function",
+          "signature": "(result: OwnerApplicationSenderVerification) => ApplicationSenderVerification",
+          "doc": "Use at the host response boundary so approvedSender cannot enter page state."
         }
       ]
     },
@@ -6507,7 +6537,7 @@
           "name": "ApplicationLineSetup",
           "kind": "function",
           "signature": "(props: ApplicationLineSetupProps) => Element",
-          "doc": "Nominate a sender explicitly, then use the existing connection and disconnect UI."
+          "doc": "Verify an owned handset before connecting its iMessage line to an application."
         },
         {
           "name": "ApplicationLineSetupClient",
@@ -6520,6 +6550,18 @@
           "kind": "interface",
           "signature": "interface ApplicationLineSetupProps",
           "doc": null
+        },
+        {
+          "name": "ApplicationSenderVerification",
+          "kind": "interface",
+          "signature": "interface ApplicationSenderVerification",
+          "doc": "Browser-safe status from the owner server."
+        },
+        {
+          "name": "ApplicationSenderVerificationStart",
+          "kind": "interface",
+          "signature": "interface ApplicationSenderVerificationStart",
+          "doc": "Public TEST data."
         },
         {
           "name": "ConnectableLineTransport",
@@ -6614,7 +6656,7 @@
         {
           "name": "LineSetup",
           "kind": "function",
-          "signature": "({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect, showConnectionSetup, onNotice }: LineSetupPro…",
+          "signature": "({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect, showConnectionSetup, connectPrerequisite, set…",
           "doc": "Set up an owned identity through a host route backed by sandbox.lines and Hub."
         },
         {

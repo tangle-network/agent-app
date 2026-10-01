@@ -8402,12 +8402,36 @@ type ApplicationLineObservation
 interface ApplicationLineOptions
 ```
 
-### `attachWorkspaceLine`
+### `ApplicationOwnerLines`
 
-`function` — A line delegates its nominated owner to the application's normal chat path.
+`interface`
 
 ```ts
-(input: { box: Pick<SandboxInstance, "lines">; lineId: string; ownerAddress: string; application: LineApplication; turn…
+interface ApplicationOwnerLines
+```
+
+### `ApplicationSenderVerification`
+
+`interface` — Browser-safe status from the owner server.
+
+```ts
+interface ApplicationSenderVerification
+```
+
+### `ApplicationSenderVerificationStart`
+
+`interface` — Public TEST data.
+
+```ts
+interface ApplicationSenderVerificationStart
+```
+
+### `attachWorkspaceLine`
+
+`function` — Attach a proved handset to the application's normal chat path.
+
+```ts
+(input: { box: Pick<SandboxInstance, "lines">; ownerLines: ApplicationOwnerLines; lineId: string; senderVerificationId:…
 ```
 
 ### `createApplicationLineHandler`
@@ -8416,6 +8440,22 @@ interface ApplicationLineOptions
 
 ```ts
 <T>(options: ApplicationLineOptions<T>) => (request: Request) => Promise<Response>
+```
+
+### `OwnerApplicationSenderVerification`
+
+`interface` — The owner-key SDK read includes the confirmed sender for the attach helper.
+
+```ts
+interface OwnerApplicationSenderVerification
+```
+
+### `publicApplicationSenderVerification`
+
+`function` — Use at the host response boundary so approvedSender cannot enter page state.
+
+```ts
+(result: OwnerApplicationSenderVerification) => ApplicationSenderVerification
 ```
 
 
@@ -8433,7 +8473,7 @@ interface ApplicationLineConnectInput
 
 ### `ApplicationLineSetup`
 
-`function` — Nominate a sender explicitly, then use the existing connection and disconnect UI.
+`function` — Verify an owned handset before connecting its iMessage line to an application.
 
 ```ts
 (props: ApplicationLineSetupProps) => Element
@@ -8453,6 +8493,22 @@ interface ApplicationLineSetupClient
 
 ```ts
 interface ApplicationLineSetupProps
+```
+
+### `ApplicationSenderVerification`
+
+`interface` — Browser-safe status from the owner server.
+
+```ts
+interface ApplicationSenderVerification
+```
+
+### `ApplicationSenderVerificationStart`
+
+`interface` — Public TEST data.
+
+```ts
+interface ApplicationSenderVerificationStart
 ```
 
 ### `ConnectableLineTransport`
@@ -8580,7 +8636,7 @@ interface LineMembersProps
 `function` — Set up an owned identity through a host route backed by sandbox.lines and Hub.
 
 ```ts
-({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect, showConnectionSetup, onNotice }: LineSetupPro…
+({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect, showConnectionSetup, connectPrerequisite, set…
 ```
 
 ### `LineSetupClient`

@@ -1,76 +1,211 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { ApplicationSenderVerification, ApplicationSenderVerificationStart } from '../application-verification'
 import { LineSetup } from './LineSetup'
 import type { LineConnectInput, LineSetupClient, LineSetupProps } from './contracts'
 
+export type { ApplicationSenderVerification, ApplicationSenderVerificationStart } from '../application-verification'
+
 export interface ApplicationLineConnectInput extends LineConnectInput {
-  operatorAddress: string
+  senderVerificationId: string
   turnsPerDay: number
 }
+
 export interface ApplicationLineSetupClient extends Omit<LineSetupClient, 'connect'> {
+  /** Host creates or finds the selected owned line, then starts TEST with its owner key. */
+  startSenderVerification(input: LineConnectInput): Promise<ApplicationSenderVerificationStart>
+  /** Host returns only public fields. approvedSender never reaches the browser. */
+  getSenderVerification(lineId: string, testId: string): Promise<ApplicationSenderVerification>
+  /** Host rechecks owner authority and consumes the proof during attach. */
   connect(input: ApplicationLineConnectInput): Promise<void>
 }
-export interface ApplicationLineSetupProps extends Omit<LineSetupProps, 'client' | 'canConnect'> {
+
+export interface ApplicationLineSetupProps extends Omit<LineSetupProps, 'client' | 'canConnect' | 'connectPrerequisite'> {
   client: ApplicationLineSetupClient
   /** Disable new grants without preventing disconnection of an existing line. */
   enabled: boolean
 }
 
-/** Nominate a sender explicitly, then use the existing connection and disconnect UI. */
+function verificationError(cause: unknown): string {
+  return cause instanceof Error ? cause.message : 'The phone test could not be checked. Try again.'
+}
+
+function draftKey(input: LineConnectInput): string {
+  return JSON.stringify(input)
+}
+
+function expiry(value: string): number {
+  const time = new Date(value).getTime()
+  return Number.isFinite(time) ? time : 0
+}
+
+/** Verify an owned handset before connecting its iMessage line to an application. */
 export function ApplicationLineSetup(props: ApplicationLineSetupProps) {
   return <ApplicationLineSetupScope key={props.scopeKey} {...props} />
 }
 
 function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLineSetupProps) {
-  const [operatorAddress, setAddress] = useState('')
   const [limit, setLimit] = useState('20')
-  const [approved, setApproved] = useState<string | null>(null)
-  const address = operatorAddress.trim()
+  const [session, setSession] = useState<{
+    draftKey: string
+    start: ApplicationSenderVerificationStart
+    status: ApplicationSenderVerification
+  } | null>(null)
+  const [pending, setPending] = useState<{ kind: 'start' | 'check'; draftKey: string } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [now, setNow] = useState(() => Date.now())
   const turnsPerDay = Number(limit)
-  const nomination = JSON.stringify({ address, turnsPerDay })
-  const valid = address.length <= 320 && (/^\+[1-9]\d{6,14}$/.test(address) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))
-    && Number.isSafeInteger(turnsPerDay) && turnsPerDay >= 1 && turnsPerDay <= 10_000
-  const canConnect = props.canManage && enabled && valid && approved === nomination
+  const validLimit = Number.isSafeInteger(turnsPerDay) && turnsPerDay >= 1 && turnsPerDay <= 10_000
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1_000)
+    return () => clearInterval(timer)
+  }, [])
+
+  function activeFor(input: LineConnectInput) {
+    return session?.draftKey === draftKey(input) ? session : null
+  }
+
+  function verifiedFor(input: LineConnectInput, time: number): boolean {
+    const active = activeFor(input)
+    return Boolean(active && active.status.state === 'verified'
+      && active.status.proof.signedInboundTestAt && active.status.proof.providerReplyAcknowledgedAt
+      && active.status.proof.signedInboundConfirmAt && expiry(active.status.expiresAt) > time)
+  }
+
+  async function start(input: LineConnectInput) {
+    const key = draftKey(input)
+    if (!enabled || !props.canManage || !validLimit || pending || input.transport !== 'imessage') return
+    setPending({ kind: 'start', draftKey: key })
+    setError(null)
+    try {
+      const result = await client.startSenderVerification(input)
+      if (!result.lineId || !result.testId || !result.testText || result.state !== 'awaiting_test'
+        || expiry(result.expiresAt) <= Date.now()) throw new Error('The phone test could not be started. Try again.')
+      setSession({
+        draftKey: key,
+        start: result,
+        status: {
+          lineId: result.lineId, testId: result.testId, state: result.state, expiresAt: result.expiresAt,
+          proof: { signedInboundTestAt: null, providerReplyAcknowledgedAt: null, signedInboundConfirmAt: null },
+        },
+      })
+      setNow(Date.now())
+    } catch (cause) {
+      setError(verificationError(cause))
+    } finally {
+      setPending(null)
+    }
+  }
+
+  async function check(active: NonNullable<typeof session>) {
+    if (pending) return
+    setPending({ kind: 'check', draftKey: active.draftKey })
+    setError(null)
+    try {
+      const result = await client.getSenderVerification(active.start.lineId, active.start.testId)
+      if (result.lineId !== active.start.lineId || result.testId !== active.start.testId)
+        throw new Error('The phone test changed. Start a new test.')
+      // Copy only public fields even if a host accidentally returns an SDK owner read.
+      const status: ApplicationSenderVerification = {
+        lineId: result.lineId, testId: result.testId, state: result.state, expiresAt: result.expiresAt,
+        proof: {
+          signedInboundTestAt: result.proof.signedInboundTestAt,
+          providerReplyAcknowledgedAt: result.proof.providerReplyAcknowledgedAt,
+          signedInboundConfirmAt: result.proof.signedInboundConfirmAt,
+        },
+      }
+      setSession(current => current?.start.testId === active.start.testId ? { ...current, status } : current)
+      setNow(Date.now())
+    } catch (cause) {
+      setError(verificationError(cause))
+    } finally {
+      setPending(null)
+    }
+  }
+
   const lineClient = useMemo<LineSetupClient>(() => ({
-    load: () => client.load(),
-    disconnect: (id, expectedAttachmentId) => client.disconnect(id, expectedAttachmentId),
-    connect: input => {
-      if (!canConnect) throw new Error('Confirm the sender and daily limit before connecting')
-      return client.connect({ ...input, operatorAddress: address, turnsPerDay })
+    async load() {
+      const snapshot = await client.load()
+      return {
+        ...snapshot,
+        connections: snapshot.connections?.map(connection => ({
+          ...connection,
+          identities: connection.providerId === 'inkbox'
+            ? connection.identities.filter(identity => identity.transport === 'imessage') : [],
+        })).filter(connection => connection.identities.length > 0) ?? null,
+      }
     },
-  }), [client, canConnect, address, turnsPerDay])
+    disconnect: (id, expectedAttachmentId) => client.disconnect(id, expectedAttachmentId),
+    async connect(input) {
+      const active = activeFor(input)
+      if (!enabled || !props.canManage || !validLimit || !verifiedFor(input, Date.now()) || !active)
+        throw new Error('Verify the selected phone before connecting this line')
+      await client.connect({ ...input, senderVerificationId: active.start.testId, turnsPerDay })
+      setSession(null)
+    },
+  }), [client, enabled, props.canManage, session, turnsPerDay, validLimit])
+
+  function prerequisite(input: LineConnectInput) {
+    const key = draftKey(input)
+    const active = activeFor(input)
+    const expired = Boolean(active && expiry(active.status.expiresAt) <= now)
+    const verified = verifiedFor(input, now)
+    const inProgress = active && !expired && ['awaiting_test', 'sending', 'challenge_sent'].includes(active.status.state)
+    const busy = pending?.draftKey === key
+    const canStart = enabled && props.canManage && validLimit && !pending && input.transport === 'imessage'
+    const canCheck = inProgress && !pending
+
+    return {
+      ready: validLimit && verified,
+      content: <div className="tangle-lines__verification" aria-label="Phone verification">
+        <h4>Verify your phone</h4>
+        <p>Use the phone that will send commands to this line. Connection opens after that phone is verified.</p>
+        {!validLimit && <p className="tangle-lines__warning">Enter a daily message limit from 1 to 10,000 first.</p>}
+        {(!active || expired || ['consumed', 'cancelled', 'superseded', 'failed', 'expired'].includes(active.status.state))
+          ? <>
+            {active && <p role="status">This phone test can no longer connect the line. Start a new test.</p>}
+            <button type="button" className="tangle-lines__secondary" disabled={!canStart}
+              onClick={() => void start(input)}>{busy && pending?.kind === 'start' ? 'Starting test…' : 'Start phone test'}</button>
+          </> : <>
+            <p>Text this exact message to the selected line from your phone:</p>
+            <code className="tangle-lines__test-text">{active.start.testText}</code>
+            <p>Follow the private reply on your phone. No confirmation code is entered here.</p>
+            <p className="tangle-lines__verification-expiry">Test expires at {new Date(active.status.expiresAt).toLocaleTimeString()}.</p>
+            {verified ? <p className="tangle-lines__verified" role="status">Phone verified. You can connect this line.</p>
+              : <div className="tangle-lines__verification-actions">
+                <span role="status">{active.status.state === 'challenge_sent'
+                  ? 'Confirmation sent. Reply from the same phone, then check again.'
+                  : active.status.state === 'sending' ? 'Sending confirmation…' : 'Waiting for your test message.'}</span>
+                <button type="button" className="tangle-lines__secondary" disabled={!canCheck}
+                  onClick={() => void check(active)}>{busy && pending?.kind === 'check' ? 'Checking…' : 'Check verification'}</button>
+              </div>}
+          </>}
+        {error && <p className="tangle-lines__verification-error" role="alert">{error}</p>}
+      </div>,
+    }
+  }
+
   return <>
     {props.canManage && <section className="tangle-lines tangle-lines--application" aria-label="Application access">
       <header className="tangle-lines__application-heading">
         <h2>Text your workspace</h2>
-        <p>Continue a conversation from a number or mailbox you own. The agent keeps the same context and saved work.</p>
+        <p>Connect an owned Inkbox iMessage line to a conversation. Verify your phone before it can use application access and compute.</p>
       </header>
       {!enabled ? <div className="tangle-lines__notice" role="status">
         <strong>New connections are disabled</strong>
         <p>You can still review and disconnect an existing line below.</p>
       </div> : <div className="tangle-lines__authorization">
-        <div className="tangle-lines__authorization-heading">
-          <h3>Authorize a sender</h3>
-          <p>Only this sender can issue commands through the line you connect.</p>
-        </div>
-        <div className="tangle-lines__fields">
-          <label>Authorized sender
-            <input value={operatorAddress} onChange={e => { setAddress(e.target.value); setApproved(null) }}
-              autoComplete="off" placeholder="+15550100001 or your Apple ID / email" />
-          </label>
-          <label>Maximum messages per day
-            <input type="number" min={1} max={10_000} step={1} value={limit}
-              onChange={e => { setLimit(e.target.value); setApproved(null) }} />
-          </label>
-        </div>
-        <label className="tangle-lines__delegation">
-          <input type="checkbox" checked={approved === nomination} disabled={!valid}
-            onChange={e => setApproved(e.target.checked ? nomination : null)} />
-          I authorize this sender to work in the conversation I select below using my application access and compute budget.
+        <label className="tangle-lines__limit">Maximum messages per day
+          <input type="number" min={1} max={10_000} step={1} value={limit}
+            onChange={event => setLimit(event.target.value)} />
         </label>
-        <p className="tangle-lines__fine-print">The daily message limit is not a dollar cap. The first inbound message establishes messaging consent.
-          STOP stops replies, not an already accepted task; cancel that task in the application.</p>
+        <p className="tangle-lines__fine-print">The message limit is not a dollar cap. STOP stops replies, not an already accepted task; cancel that task in the application.</p>
       </div>}
     </section>}
-    <LineSetup {...props} targetLabel={props.targetLabel ?? 'Conversation'} client={lineClient} canConnect={canConnect} showConnectionSetup={enabled} />
+    <LineSetup {...props} targetLabel={props.targetLabel ?? 'Conversation'} client={lineClient}
+      canConnect={props.canManage && enabled} showConnectionSetup={enabled}
+      connectPrerequisite={prerequisite}
+      setupDescription="Choose an owned Inkbox iMessage line and the conversation it will answer."
+      emptyConnectionsMessage="Add an owned Inkbox iMessage handle in Hub, then" />
   </>
 }

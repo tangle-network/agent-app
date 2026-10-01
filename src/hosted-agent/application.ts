@@ -9,6 +9,9 @@ import {
 } from '@tangle-network/sandbox/core'
 
 export { attachWorkspaceLine } from './workspace-line'
+export { publicApplicationSenderVerification } from './application-verification'
+export type { ApplicationOwnerLines } from './workspace-line'
+export type { ApplicationSenderVerification, ApplicationSenderVerificationStart, OwnerApplicationSenderVerification } from './application-verification'
 
 /** Missing is an affirmative storage observation, never an error fallback. */
 export type ApplicationLineObservation = LineApplicationState | { state: 'missing' }

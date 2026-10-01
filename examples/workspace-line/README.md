@@ -28,21 +28,44 @@ Hub retains the returned execution ID. Thereafter `acceptedExecutionId` pins rec
 
 `pending` with `admitted: false` is not completion; another conversation turn may hold the existing lock. A pending human decision should produce a permission-checked pointer to the application's normal decision UI, not implicit approval by text.
 
-## Attach an existing workspace
+## Verify the handset and attach an existing workspace
+
+The owner server creates or finds the selected owned Inkbox iMessage line.
+It calls `ownerLines.startSenderVerification(lineId)` with the owner API key.
+Only the returned TEST text, test ID, state and expiry go to the browser.
+The owner texts TEST to the line and follows the private confirmation reply on the handset.
+The private confirmation and `approvedSender` stay off the browser.
+For status responses, the server calls `ownerLines.getSenderVerification(lineId, testId)` with that same key and projects the public fields with `publicApplicationSenderVerification`.
+The Platform accepts only a verified, unexpired, one-use proof during attach.
 
 ```ts
-import { attachWorkspaceLine } from '@tangle-network/agent-app/hosted-agent/application'
+import {
+  attachWorkspaceLine,
+  publicApplicationSenderVerification,
+} from '@tangle-network/agent-app/hosted-agent/application'
 
+const status = await ownerLines.getSenderVerification(ownedLine.id, testId)
+return Response.json(publicApplicationSenderVerification(status))
+```
+
+After the public status reports `verified`, the authenticated owner route calls:
+
+```ts
 await attachWorkspaceLine({
   box: authorizedPreparedWorkspace,
+  ownerLines,
   lineId: ownedLine.id,
-  ownerAddress: explicitlyDelegatedSender,
+  senderVerificationId: testId,
   turnsPerDay: 20,
   application: { url: trustedCallbackUrl, binding: immutableBinding, secret: callbackSecret },
 })
 ```
 
-Values come from an authenticated owner operation. The helper calls `box.lines.attach` with one declared owner, own-context act authority and unknown senders rejected. It adds no persona, model, namespace, payer override or second sandbox. The first inbound message establishes messaging consent; the host separately verifies the owner's explicit delegation of that sender.
+The helper reads `approvedSender` from the owner SDK, then passes that member and `senderVerificationId` to `box.lines.attach`.
+The owner read, box attach and TEST start must use the same owner API key.
+The Platform checks the proof, sender, key and attachment together; a stale or reused test cannot attach.
+The helper keeps one declared owner, own-context act authority and unknown senders rejected.
+It adds no persona, model, namespace, payer override or second sandbox.
 
 The application mode refuses native voice, public/shared members, instance creation and native backend/allowance overrides. Those paths must not bypass application admission or billing. Public buyers require restricted or isolated execution, never the private owner's workspace.
 
@@ -60,13 +83,25 @@ import '@tangle-network/agent-app/hosted-agent/react/styles'
 />
 ```
 
-The client supplies load/connect/disconnect through normal host authorization. Include each line's attachmentId in the snapshot; disconnect receives that viewed identity, which the host passes to the native conditional detach. Never replace it with a newer attachment read at mutation time. Connect receives the existing target, nominated operatorAddress and turnsPerDay. Changing sender, limit or scope clears confirmation. Disabling new grants leaves disconnection available. The existing LineSetup owns channel selection, loading, errors and disconnect confirmation.
+The browser client supplies `load`, `startSenderVerification`, `getSenderVerification`, `connect` and `disconnect` through authenticated host routes.
+The active setup offers only owned Inkbox iMessage identities.
+`startSenderVerification` receives the selected connection and target; the host creates or finds that owned line before starting TEST.
+`getSenderVerification` returns only the public projection shown above.
+`connect` receives the selected target, `senderVerificationId` and daily message limit; it does not receive a sender address.
+The host rechecks owner authority and calls the attach helper with the same owner key.
+Changing the selected line prevents the previous test from connecting the new selection.
+Include each line's `attachmentId` in the snapshot.
+Disconnect receives that viewed identity, which the host passes to the native conditional detach.
+Never replace it with a newer attachment read at mutation time.
+Disabling new grants leaves disconnection available.
+The existing `LineSetup` owns loading, selection, errors and disconnect confirmation.
 
 A message limit is not a dollar cap. Enforce compute spend at the service paying for work. STOP suppresses replies; it does not cancel an accepted application task. Use the application's explicit cancellation control for that task.
 
 ## Release and proof
 
-The `hosted-agent/application` server entrypoint requires Sandbox 0.58.1 or later in the 0.58 series.
+The `hosted-agent/application` sender-proof helper requires a Sandbox SDK release containing agent-dev-container #8614.
+Sandbox 0.58.8 does not provide its verification methods or attach token type.
 The existing `hosted-agent` entrypoint remains importable with older Sandbox versions in the package's peer range.
 This addition depends on the native application-backed Lines SDK and server change in agent-dev-container #8499.
 Pin published SDK, Runtime and Agent App archives before consumer lock generation.

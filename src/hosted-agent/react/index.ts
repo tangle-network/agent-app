@@ -9,4 +9,4 @@ export { LineSetup } from './LineSetup'
 export { LineMembers } from './LineMembers'
 export { LineBilling } from './LineBilling'
 
-export { ApplicationLineSetup, type ApplicationLineSetupProps, type ApplicationLineSetupClient, type ApplicationLineConnectInput } from './ApplicationLineSetup'
+export { ApplicationLineSetup, type ApplicationLineSetupProps, type ApplicationLineSetupClient, type ApplicationLineConnectInput, type ApplicationSenderVerificationStart, type ApplicationSenderVerification } from './ApplicationLineSetup'
