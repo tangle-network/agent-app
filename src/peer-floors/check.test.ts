@@ -197,6 +197,22 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.9.0', range!)).toBe(false)
   })
 
+  it('admits the Hub SDK line used by Hospitality without claiming 0.23', async () => {
+    const root = join(here, '..', '..')
+    const own = JSON.parse(
+      await readFile(join(root, 'package.json'), 'utf8'),
+    ) as { peerDependencies?: Record<string, string> }
+    const range = own.peerDependencies?.['@tangle-network/hub-sdk']
+
+    expect(range).toBeDefined()
+    expect(satisfiesRange('0.19.3', range!)).toBe(true)
+    expect(satisfiesRange('0.21.0', range!)).toBe(true)
+    expect(satisfiesRange('0.22.0', range!)).toBe(false)
+    expect(satisfiesRange('0.22.1', range!)).toBe(true)
+    expect(satisfiesRange('0.22.999', range!)).toBe(true)
+    expect(satisfiesRange('0.23.0', range!)).toBe(false)
+  })
+
   it('admits the tested Integrations lines without admitting 0.58', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
