@@ -26,16 +26,21 @@ import {
 
 /** Reviewer verdict wire body for the POST endpoint. */
 export type WorkProductVerdictBody =
-  | { ok: true; id: string; verdict: 'approve'; note?: string }
-  | { ok: true; id: string; verdict: 'request_changes'; note: string }
+  | { ok: true; id: string; version?: number; verdict: 'approve'; note?: string }
+  | { ok: true; id: string; version?: number; verdict: 'request_changes'; note: string }
   | { ok: false; error: string }
 
-/** Validate the verdict POST body: `{ id, verdict, note? }`; a
+/** Validate the verdict POST body: `{ id, version?, verdict, note? }`; a
  *  `request_changes` verdict REQUIRES a non-empty note — the note IS the
  *  correction turn the agent works from. */
 export function validateWorkProductVerdictBody(body: Record<string, unknown>): WorkProductVerdictBody {
   const id = typeof body.id === 'string' && body.id.trim() ? body.id.trim() : null
   if (!id) return { ok: false, error: 'Missing work product id' }
+  const version = body.version
+  if (version !== undefined && (typeof version !== 'number' || !Number.isSafeInteger(version) || version < 1)) {
+    return { ok: false, error: 'Invalid work product version: expected a positive safe integer' }
+  }
+  const ref = { id, ...(version === undefined ? {} : { version }) }
   const verdict = body.verdict
   if (verdict !== 'approve' && verdict !== 'request_changes') {
     return { ok: false, error: 'Invalid verdict: expected approve or request_changes' }
@@ -44,9 +49,9 @@ export function validateWorkProductVerdictBody(body: Record<string, unknown>): W
   if (note === null) return { ok: false, error: 'Invalid note: expected a string' }
   if (verdict === 'request_changes') {
     if (!note) return { ok: false, error: 'request_changes requires a note — it becomes the correction instruction in chat' }
-    return { ok: true, id, verdict, note }
+    return { ok: true, ...ref, verdict, note }
   }
-  return note ? { ok: true, id, verdict, note } : { ok: true, id, verdict }
+  return note ? { ok: true, ...ref, verdict, note } : { ok: true, ...ref, verdict }
 }
 
 /** The product seam's verdict for one request: authenticated reviewer +
@@ -95,7 +100,7 @@ export interface WorkProductRoutes {
   list: (request: Request) => Promise<Response>
   /** GET — one record by id (404 when absent or outside the workspace). */
   detail: (request: Request, id: string) => Promise<Response>
-  /** POST `{ id, verdict, note? }` — the reviewer verdict: CAS transition +
+  /** POST `{ id, version?, verdict, note? }` — the reviewer verdict: CAS transition +
    *  history entry + product seams. 409 when the record is no longer ready. */
   verdict: (request: Request) => Promise<Response>
 }
@@ -152,6 +157,7 @@ export function createWorkProductRoutes(options: WorkProductRoutesOptions): Work
     const outcome = await service.applyVerdict(validation.id, {
       verdict: validation.verdict,
       reviewedBy: auth.reviewedBy,
+      expectedVersion: validation.version ?? existing.version,
       ...(validation.note === undefined ? {} : { note: validation.note }),
     })
     if (!outcome.succeeded) {
