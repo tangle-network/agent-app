@@ -24330,6 +24330,22 @@ interface AgentProfileEditorProps
 type AgentProfileResourceKind
 ```
 
+### `AgentProfileViewer`
+
+`function` — Read-only view of configured profile data.
+
+```ts
+({ profile, className, defaultExpanded }: AgentProfileViewerProps) => Element
+```
+
+### `AgentProfileViewerProps`
+
+`interface`
+
+```ts
+interface AgentProfileViewerProps
+```
+
 ### `AgentSessionControls`
 
 `function`

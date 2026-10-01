@@ -588,3 +588,14 @@ The honest reading of that table: **the gate closes Pattern 6's island case and 
 The honest reading of the structural table above it: **three of six patterns carry a guarantee below the review layer, every one of the three has a named hole, and Patterns 2, 5 and 6 have nothing but the rubric and the gate.**
 So the rubric is not a backstop to the types — on half the patterns it is the only enforcement there is, and on the other half it covers the hole.
 Each "still not structural" cell is a real piece of work, not a caveat: closing one moves a rule from *reviewed* to *impossible to get wrong*, which is the only direction this document is trying to travel.
+
+
+## Agent profile — view and edit
+
+`AgentProfileViewer` from `/web-react` presents configured profile data without disabled forms.
+Use `AgentProfileEditor` only when the user chooses to edit a draft.
+The viewer shows model hints, instructions, tool policy, MCP aliases, and declared resources.
+It does not claim that a resource loaded or a model served a request.
+MCP URLs, headers, environment values, and connection identifiers stay private.
+Set `defaultExpanded={false}` when embedding the viewer in a narrow Copilot panel.
+Keep execution receipts separate from configured profile data.
