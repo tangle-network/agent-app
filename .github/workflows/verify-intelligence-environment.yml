@@ -32,9 +32,20 @@ jobs:
           cp "$(command -v node)" /tmp/app-intelligence-environment/node
           tar -czf /tmp/app-intelligence-environment/dependencies.tar.gz node_modules
           sha256sum pnpm-lock.yaml > /tmp/app-intelligence-environment/lockfile.sha256
+          sha256sum /tmp/app-intelligence-environment/dependencies.tar.gz > /tmp/app-intelligence-environment/dependencies.sha256
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: app-intelligence-frozen-environment
-          path: /tmp/app-intelligence-environment/
+          name: app-intelligence-dependencies
+          path: /tmp/app-intelligence-environment/dependencies.tar.gz
           compression-level: 0
+          retention-days: 3
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: app-intelligence-source-tools
+          path: |
+            /tmp/app-intelligence-environment/source.tar.gz
+            /tmp/app-intelligence-environment/node
+            /tmp/app-intelligence-environment/*.txt
+            /tmp/app-intelligence-environment/*.sha256
+          compression-level: 6
           retention-days: 3
