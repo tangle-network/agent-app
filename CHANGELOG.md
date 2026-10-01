@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.25
+
+- fix(web-react): use semantic inverse chat colors
+
 ## 0.50.24
 
 - fix(web-react): make profile resources editable and scoped (#714)
