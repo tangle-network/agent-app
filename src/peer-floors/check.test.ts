@@ -207,6 +207,20 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.117.0', range!)).toBe(false)
   })
 
+  it('requires the UI release that exports openui-schema', async () => {
+    const root = join(here, '..', '..')
+    const own = JSON.parse(
+      await readFile(join(root, 'package.json'), 'utf8'),
+    ) as { peerDependencies?: Record<string, string> }
+    const range = own.peerDependencies?.['@tangle-network/ui']
+
+    expect(range).toBeDefined()
+    expect(satisfiesRange('11.11.2', range!)).toBe(false)
+    expect(satisfiesRange('11.11.3', range!)).toBe(true)
+    expect(satisfiesRange('11.11.5', range!)).toBe(true)
+    expect(satisfiesRange('12.0.0', range!)).toBe(false)
+  })
+
   // Each window starts at the floor this application code ran on, admits the
   // newer minor tested in an installed consumer, and claims nothing past it.
   // The Runtime refuses Sandbox
