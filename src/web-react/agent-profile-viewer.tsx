@@ -54,9 +54,9 @@ function ResourceRow({ label, resource, path }: {
 
 function PromptDetail({ label, note, value }: { label: string; note?: string; value: string }) {
   return (
-    <details className="group min-w-0">
+    <details className="group/prompt min-w-0">
       <summary className="flex min-w-0 cursor-pointer list-none items-start gap-2 rounded-md py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-        <span aria-hidden="true" className="mt-1 shrink-0 text-muted-foreground transition-transform group-open:rotate-90">›</span>
+        <span aria-hidden="true" className="mt-1 shrink-0 text-muted-foreground transition-transform group-open/prompt:rotate-90">›</span>
         <span className="min-w-0 flex-1">
           <span className="font-medium text-foreground">{label}</span>
           {note && <span className="ml-2 text-xs text-muted-foreground">{note}</span>}
@@ -153,9 +153,9 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
         <p className="mt-4 border-t border-border pt-3 text-sm text-muted-foreground">No profile details are configured.</p>
       )}
 
-      {hasConfiguration && <details open={defaultExpanded} className="group mt-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+      {hasConfiguration && <details open={defaultExpanded} className="group/config mt-4 rounded-xl border border-border bg-card p-4 shadow-sm">
         <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-          <span aria-hidden="true" className="text-muted-foreground transition-transform group-open:rotate-90">›</span>
+          <span aria-hidden="true" className="text-muted-foreground transition-transform group-open/config:rotate-90">›</span>
           <span className="font-medium text-foreground">Profile configuration</span>
           <span className="text-xs text-muted-foreground">
             {[hasBehavior && 'Instructions', (tools.length || permissions.length) > 0 && 'Tools', mcp.length > 0 && 'MCP', (resources.length || profile.resources?.failOnError) && 'Resources', profile.connections?.length && 'Connections', profile.subagents && Object.keys(profile.subagents).length > 0 && 'Subagents', profile.hooks && Object.keys(profile.hooks).length > 0 && 'Hooks', profile.modes && Object.keys(profile.modes).length > 0 && 'Modes'].filter(Boolean).join(' · ')}
