@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.19
+
+- fix(spend): prefer sandbox group key for attribution (#706)
+
 ## 0.50.18
 
 - feat(workspace): group app destinations in sidebar
