@@ -93,6 +93,20 @@ Discovery: **What does the real surface look like?**
       backend behavior, upload route, and file index are real.
       Keep navigation taxonomy, session URLs, domain context, and transcript
       cards in the product.
+- [ ] Let the transcript fill the main column from its top edge.
+      Do not add a title row, prompt strip, or repeated session heading.
+      Keep session titles in History and the browser document title.
+      Float optional navigation, sharing, and thread actions above the transcript.
+      Render each control only when its real callback exists.
+      Allow pointer events through empty overlay space.
+      Inset transcript content where controls could cover the first message.
+      Derive execution status from runtime events instead of adding a readiness badge.
+- [ ] Use `IntegrationsPanel` and `useIntegrations` from
+      `@tangle-network/sandbox-ui/integrations` for the integration catalog.
+      Supply authorized data and real connect and disconnect callbacks.
+      Reuse `ProviderIcon` for product-specific connection rows.
+      Keep workspace bindings and access checks in the product.
+      Do not duplicate the catalog layout or provider logo resolution.
 - [ ] Keep the wire contract: `chatTurnRequestInit` from web-react serializes
       exactly what `createChatTurnRoutes` parses.
 
