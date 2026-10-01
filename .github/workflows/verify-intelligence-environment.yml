@@ -1,0 +1,40 @@
+name: Shared intelligence verification environment
+on:
+  push:
+    branches: [verify/app-intelligence-environment-20261001]
+    paths: [.github/workflows/verify-intelligence-environment.yml]
+permissions:
+  contents: read
+jobs:
+  environment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: abe93e0ef1ea1d0f0521d4505347625d4559b2dc
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install the unmodified locked dependency graph
+        run: pnpm install --frozen-lockfile --ignore-scripts=false
+      - name: Retain source, installed tools and dependency identities
+        run: |
+          set -eu
+          mkdir -p /tmp/app-intelligence-environment
+          git rev-parse HEAD > /tmp/app-intelligence-environment/commit.txt
+          node --version > /tmp/app-intelligence-environment/node-version.txt
+          pnpm --version > /tmp/app-intelligence-environment/pnpm-version.txt
+          git archive --format=tar.gz HEAD > /tmp/app-intelligence-environment/source.tar.gz
+          cp "$(command -v node)" /tmp/app-intelligence-environment/node
+          tar -czf /tmp/app-intelligence-environment/dependencies.tar.gz node_modules
+          sha256sum pnpm-lock.yaml > /tmp/app-intelligence-environment/lockfile.sha256
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: app-intelligence-frozen-environment
+          path: /tmp/app-intelligence-environment/
+          compression-level: 0
+          retention-days: 3
