@@ -99,6 +99,7 @@ Discovery: **What does the real surface look like?**
       Float optional navigation, sharing, and thread actions above the transcript.
       Render each control only when its real callback exists.
       Allow pointer events through empty overlay space.
+      Inset transcript content where controls could cover the first message.
       Derive execution status from runtime events instead of adding a readiness badge.
 - [ ] Use `IntegrationsPanel` and `useIntegrations` from
       `@tangle-network/sandbox-ui/integrations` for the integration catalog.

@@ -177,6 +177,7 @@ Keep session titles in History and the browser document title.
 Place optional navigation, sharing, and thread actions in a floating overlay.
 Show each action only when its real callback exists.
 Keep the overlay outside document flow and allow pointer events through its empty area.
+Inset transcript content where floating controls could cover the first message.
 Do not add placeholder actions or a fabricated connection indicator.
 Show execution status from observed runtime events inside the conversation.
 
