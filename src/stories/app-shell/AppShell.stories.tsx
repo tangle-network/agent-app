@@ -127,6 +127,46 @@ export const Default: Story = {
   render: (args) => <ShellScene args={args} messages={chatThread} />,
 }
 
+function FloatingActionsScene({ args }: { args: AppShellProps }) {
+  const [panel, setPanel] = useState<'share' | 'actions' | null>(null)
+  return (
+    <div className="relative">
+      <ShellScene
+        args={{
+          ...args,
+          onShare: () => setPanel('share'),
+          onOpenThreadMenu: () => setPanel('actions'),
+        }}
+        messages={chatThread}
+      />
+      {panel && (
+        <div
+          role="dialog"
+          aria-label={panel === 'share' ? 'Share conversation' : 'Conversation actions'}
+          className="absolute right-3 top-14 z-20 rounded-xl border border-border bg-card p-4 shadow-lg"
+        >
+          <p className="mb-3 text-sm font-medium text-foreground">
+            {panel === 'share' ? 'Share conversation' : 'Conversation actions'}
+          </p>
+          <button
+            type="button"
+            onClick={() => setPanel(null)}
+            className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Close
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Optional actions open stateful fixture panels without reserving a header. */
+export const FloatingActions: Story = {
+  name: 'Optional floating actions',
+  render: (args) => <FloatingActionsScene args={args} />,
+}
+
 /** A turn in flight: partial assistant text with a live tool call, streaming
  *  cursor on the last message, and the composer's Stop button. */
 export const Streaming: Story = {

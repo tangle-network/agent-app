@@ -1,0 +1,83 @@
+{
+  "executionTarget": "drew-gtr-pro; rendered Storybook; headless /usr/bin/google-chrome",
+  "cases": [
+    {
+      "callbacks": false,
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "transcriptTop": 0,
+      "firstMessageControlClearance": null,
+      "shareKeyboardOpensPanel": false,
+      "menuPointerOpensPanel": false,
+      "mobileKeyboardNavigation": false,
+      "errors": []
+    },
+    {
+      "callbacks": false,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "transcriptTop": 0,
+      "firstMessageControlClearance": null,
+      "shareKeyboardOpensPanel": false,
+      "menuPointerOpensPanel": false,
+      "mobileKeyboardNavigation": false,
+      "errors": []
+    },
+    {
+      "callbacks": false,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "transcriptTop": 0,
+      "firstMessageControlClearance": null,
+      "shareKeyboardOpensPanel": false,
+      "menuPointerOpensPanel": false,
+      "mobileKeyboardNavigation": true,
+      "errors": []
+    },
+    {
+      "callbacks": true,
+      "viewport": {
+        "width": 1024,
+        "height": 800
+      },
+      "transcriptTop": 0,
+      "firstMessageControlClearance": 48,
+      "shareKeyboardOpensPanel": true,
+      "menuPointerOpensPanel": true,
+      "mobileKeyboardNavigation": false,
+      "errors": []
+    },
+    {
+      "callbacks": true,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "transcriptTop": 0,
+      "firstMessageControlClearance": 48,
+      "shareKeyboardOpensPanel": true,
+      "menuPointerOpensPanel": true,
+      "mobileKeyboardNavigation": false,
+      "errors": []
+    },
+    {
+      "callbacks": true,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "transcriptTop": 0,
+      "firstMessageControlClearance": 48,
+      "shareKeyboardOpensPanel": true,
+      "menuPointerOpensPanel": true,
+      "mobileKeyboardNavigation": true,
+      "errors": []
+    }
+  ]
+}

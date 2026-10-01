@@ -429,7 +429,7 @@ export function AppShell({
           onShare={onShare}
           onOpenThreadMenu={onOpenThreadMenu}
         />
-        <main className="min-h-0 flex-1 overflow-y-auto pt-12 md:pt-0">{children}</main>
+        <main className={`min-h-0 flex-1 overflow-y-auto pt-12 ${onShare || onOpenThreadMenu ? '' : 'md:pt-0'}`}>{children}</main>
         {composer && (
           <div className="shrink-0 px-3 pb-3 pt-2 sm:px-4">
             <div className="mx-auto max-w-3xl">{composer}</div>
