@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.21
+
+- feat(vault): resolve external opens after display
+
 ## 0.50.20
 
 - fix(peers): admit Sandbox UI 0.116 line
