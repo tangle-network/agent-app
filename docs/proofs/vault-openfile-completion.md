@@ -14,7 +14,9 @@ Chromium reported zero page errors.
 At 390 px, keyboard Enter opened `artifact.md` and reported success after its content appeared.
 The document width stayed 390 px, with no horizontal overflow or page errors.
 
-The focused Vault test suite passed 53/53 after the seven new completion cases first failed against the old `void` handle.
+The focused Vault test suite passed 55/55 after seven new completion cases first failed against the old `void` handle.
+A later regression case also failed against the first Promise implementation: its dirty dialog stayed actionable after timeout.
+The corrected suite covers that dialog and a late read response after timeout.
 Typecheck, docs freshness, package build, and Storybook build passed.
 
 ![Dirty navigation confirmation](vault-openfile-dirty-prompt.png)

@@ -642,6 +642,52 @@ describe('VaultPaneHandle.openFile completion', () => {
     }
   })
 
+  it('removes a timed-out dirty request so a late confirmation cannot navigate', async () => {
+    const { paneRef, port } = mount()
+    await openFile('a.md')
+    fireEvent.click(screen.getByLabelText('Edit as source'))
+    await typeSource('unsaved A')
+    vi.useFakeTimers()
+    try {
+      let opened!: Promise<boolean>
+      act(() => { opened = paneRef.current!.openFile('b.md') })
+      expect(screen.getByRole('dialog', { name: 'Discard unsaved changes?' })).toBeTruthy()
+      await act(async () => { await vi.advanceTimersByTimeAsync(30_000) })
+
+      expect(await opened).toBe(false)
+      expect(screen.queryByRole('dialog', { name: 'Discard unsaved changes?' })).toBeNull()
+      expect(document.querySelector('[data-vault-path]')?.textContent).toBe('a.md')
+      expect((screen.getByLabelText('Source editor') as HTMLTextAreaElement).value).toBe('unsaved A')
+      expect(port.readFile).not.toHaveBeenCalledWith('b.md')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('ignores a late read after timeout and returns to the previous file', async () => {
+    let finishRead!: (file: VaultFile) => void
+    const readFile = vi.fn((path: string) => path === 'b.md'
+      ? new Promise<VaultFile>((resolve) => { finishRead = resolve })
+      : Promise.resolve({ path, content: 'body A' }))
+    const { paneRef } = mount({ port: fakePort({ readFile }) })
+    await openFile('a.md')
+    vi.useFakeTimers()
+    try {
+      let opened!: Promise<boolean>
+      act(() => { opened = paneRef.current!.openFile('b.md') })
+      expect(readFile).toHaveBeenCalledWith('b.md')
+      await act(async () => { await vi.advanceTimersByTimeAsync(30_000) })
+      expect(await opened).toBe(false)
+      expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md')
+
+      await act(async () => finishRead({ path: 'b.md', content: 'late B' }))
+      expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md')
+      expect(screen.getByTestId('artifact').textContent).toBe('body A')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps the dirty editor when opening the already displayed file', async () => {
     const { paneRef, port } = mount()
     await openFile('a.md')
