@@ -21,18 +21,18 @@
     "@tangle-network/agent-app": "__AGENT_APP_VERSION__"
   },
   "peerDependencies": {
-    "@tangle-network/agent-eval": ">=0.199.0 <0.201.0",
-    "@tangle-network/agent-integrations": ">=0.54.2 <0.58.0 || >=0.59.0 <0.60.0",
-    "@tangle-network/agent-interface": "^2.13.0",
-    "@tangle-network/agent-runtime": ">=0.282.2 <0.284.0 || >=0.285.0 <0.286.0"
+    "@tangle-network/agent-eval": ">=0.201.0 <0.204.0",
+    "@tangle-network/agent-integrations": ">=0.59.0 <0.60.0",
+    "@tangle-network/agent-interface": "^2.15.0",
+    "@tangle-network/agent-runtime": ">=0.289.1 <0.290.0"
   },
   "devDependencies": {
-    "@tangle-network/agent-eval": "0.199.1",
-    "@tangle-network/agent-integrations": "0.57.0",
-    "@tangle-network/agent-interface": "2.14.0",
-    "@tangle-network/agent-knowledge": "17.1.10",
-    "@tangle-network/agent-runtime": "0.285.0",
-    "@tangle-network/sandbox": "0.58.1",
+    "@tangle-network/agent-eval": "0.203.0",
+    "@tangle-network/agent-integrations": "0.59.0",
+    "@tangle-network/agent-interface": "2.15.0",
+    "@tangle-network/agent-knowledge": "18.0.0",
+    "@tangle-network/agent-runtime": "0.289.1",
+    "@tangle-network/sandbox": "0.59.0",
     "@types/node": "^22.20.1",
     "typescript": "^7.0.2",
     "viem": "^2.0.0",
