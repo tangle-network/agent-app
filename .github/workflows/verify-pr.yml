@@ -42,6 +42,8 @@ jobs:
       - run: pnpm run typecheck > "$VERIFICATION_DIR/typecheck.log" 2>&1 || { cat "$VERIFICATION_DIR/typecheck.log"; exit 1; }
       - run: pnpm run test:gates > "$VERIFICATION_DIR/gates.log" 2>&1 || { tail -80 "$VERIFICATION_DIR/gates.log"; exit 1; }
       - run: pnpm run build > "$VERIFICATION_DIR/build.log" 2>&1 || { tail -80 "$VERIFICATION_DIR/build.log"; exit 1; }
+      - name: Work-product review over HTTP and SQLite
+        run: node scripts/prove-work-product-review.mjs > "$VERIFICATION_DIR/work-product-review.json" 2>&1 || { cat "$VERIFICATION_DIR/work-product-review.json"; exit 1; }
       - name: Test all source
         run: pnpm exec vitest run --reporter=json --outputFile="$VERIFICATION_DIR/tests.json" > "$VERIFICATION_DIR/tests.log" 2>&1 || { tail -100 "$VERIFICATION_DIR/tests.log"; exit 1; }
       - run: pnpm run test:generated > "$VERIFICATION_DIR/generated.log" 2>&1 || { tail -100 "$VERIFICATION_DIR/generated.log"; exit 1; }

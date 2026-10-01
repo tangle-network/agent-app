@@ -488,7 +488,7 @@ interface TrustItem
 
 ### `validateWorkProductVerdictBody`
 
-`function` — Validate the verdict POST body: `{ id, verdict, note?
+`function` — Validate the verdict POST body: `{ id, version?, verdict, note?
 
 ```ts
 (body: Record<string, unknown>) => WorkProductVerdictBody

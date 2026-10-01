@@ -22162,7 +22162,7 @@
           "name": "validateWorkProductVerdictBody",
           "kind": "function",
           "signature": "(body: Record<string, unknown>) => WorkProductVerdictBody",
-          "doc": "Validate the verdict POST body: `{ id, verdict, note?"
+          "doc": "Validate the verdict POST body: `{ id, version?, verdict, note?"
         },
         {
           "name": "valuesInText",
