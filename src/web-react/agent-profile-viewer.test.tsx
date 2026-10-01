@@ -92,6 +92,7 @@ describe('AgentProfileViewer configuration visibility', () => {
       modes: { careful: { tools: { write: false } } },
     }} />)
     expect(html).toContain('Lifecycle hooks')
+    expect(html).not.toContain('Subagents')
     expect(html).toContain('beforeTurn')
     expect(html).not.toContain('private command')
     expect(html).toContain('Modes')

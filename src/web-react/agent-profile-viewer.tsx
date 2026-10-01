@@ -261,8 +261,7 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
           </ProfileSection>
         )}
 
-        {Boolean(profile.subagents && Object.keys(profile.subagents).length ||
-    profile.hooks && Object.keys(profile.hooks).length || profile.modes && Object.keys(profile.modes).length) && (
+        {Boolean(profile.subagents && Object.keys(profile.subagents).length) && (
           <ProfileSection title="Subagents">
             <ul className="divide-y divide-border/70">
               {Object.entries(profile.subagents ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([name, subagent]) => (
