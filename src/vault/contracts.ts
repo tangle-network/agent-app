@@ -200,7 +200,7 @@ export interface VaultPaneProps {
   canWrite?: boolean
   /** Controlled selection. Pair with `onSelectedPathChange`. */
   selectedPath?: string | null
-  /** Notified whenever the selected path changes (including clear → null). */
+  /** Notified when selection changes (including clear → null). A controlled host may return false to reject the request. */
   onSelectedPathChange?: (path: string | null) => void
   /** Optional observer for structured data-port failures. VaultPane still owns
    *  the visible error state and retry behavior when this is omitted. */

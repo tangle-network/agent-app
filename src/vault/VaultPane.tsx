@@ -45,17 +45,14 @@ const IDENTITY_CODEC: VaultMarkdownCodec = {
   serialize: (parts) => (typeof parts === 'string' ? parts : String(parts ?? '')),
 }
 
-type PendingNav = { type: 'open'; path: string; request?: PendingOpen } | { type: 'close' } | null
+type PendingNav = { path: string; request?: PendingOpen } | null
 type PendingOpen = {
   path: string
   fromPath: string | null
   resolve: (opened: boolean) => void
   loaded: boolean
   selected: boolean
-  timeout?: ReturnType<typeof setTimeout>
 }
-
-const OPEN_FILE_TIMEOUT_MS = 30_000
 
 interface TreeRefreshContext {
   operation: Extract<VaultOperation, 'list' | 'create' | 'delete'>
@@ -390,7 +387,6 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const dirtyRef = useRef(isDirty)
   dirtyRef.current = isDirty
   const treeRequestRef = useRef(0)
-  const readEpochRef = useRef(0)
   const savedContentRef = useRef('')
   const loadedPathRef = useRef<string | null>(null)
   const onOperationErrorRef = useRef(onOperationError)
@@ -402,9 +398,8 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     const pending = pendingOpenRef.current
     if (!pending) return
     pendingOpenRef.current = null
-    if (pending.timeout) clearTimeout(pending.timeout)
     if (!opened && clearNavigation) {
-      setPendingNav((current) => current?.type === 'open' && current.request === pending ? null : current)
+      setPendingNav((current) => current?.request === pending ? null : current)
     }
     pending.resolve(opened)
   }, [])
@@ -461,8 +456,13 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
 
   const commitPath = useCallback(
     (next: string | null) => {
-      if (!controlled) setInternalPath(next)
+      if (controlled) {
+        const decision: unknown = onSelectedPathChange?.(next)
+        return decision !== false
+      }
+      setInternalPath(next)
       onSelectedPathChange?.(next)
+      return true
     },
     [controlled, onSelectedPathChange],
   )
@@ -536,7 +536,6 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
 
   useEffect(() => {
     if (!selectedPath) {
-      finishPendingOpen(false)
       setSelectedFile(null)
       setFileLoading(false)
       setReadError(null)
@@ -554,7 +553,6 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
       return
     }
     let cancelled = false
-    const readEpoch = readEpochRef.current
     const path = resolvedSelectedPath
     if (path !== selectedPath) commitPath(path)
     setFileLoading(true)
@@ -563,24 +561,24 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
       try {
         const file = await port.readFile(path)
         if (file.path !== path) throw new Error(`Vault returned ${file.path} for ${path}`)
-        if (!cancelled && readEpoch === readEpochRef.current && !dirtyRef.current) {
+        if (!cancelled && !dirtyRef.current) {
           const pending = pendingOpenRef.current
           if (pending?.path === path) pending.loaded = true
           setSelectedFile(file)
-        } else if (!cancelled && readEpoch === readEpochRef.current && pendingOpenRef.current?.path === path) {
+        } else if (!cancelled && pendingOpenRef.current?.path === path) {
           finishPendingOpen(false)
         }
       } catch (err) {
         // Surface read failures instead of making them indistinguishable from
         // the intentionally empty "no file selected" state.
-        if (!cancelled && readEpoch === readEpochRef.current) {
+        if (!cancelled) {
           if (pendingOpenRef.current?.path === path) finishPendingOpen(false)
           const failure = reportFailure('read', 'operation', err, 'Failed to read file', path)
           setSelectedFile((current) => current?.path === path ? current : null)
           setReadError(failure.message)
         }
       } finally {
-        if (!cancelled && readEpoch === readEpochRef.current) setFileLoading(false)
+        if (!cancelled) setFileLoading(false)
       }
     })()
     return () => {
@@ -627,14 +625,14 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   }, [selectedPath, selectedFile, displayReadyPath, sourceDraft, fileLoading, finishPendingOpen])
 
   const guardedOpen = useCallback((rawPath: string, resolve?: (opened: boolean) => void) => {
-    finishPendingOpen(false)
-    setPendingNav(null)
     const target = resolveTreePath(rawPath, treePaths)
     if (!rawPath.trim() || target?.type === 'directory') {
       resolve?.(false)
       return
     }
     const path = target?.path ?? rawPath
+    finishPendingOpen(false)
+    setPendingNav(null)
     if (path === selectedPath && selectedFile?.path === path && displayReadyPath === path) {
       showDocument()
       resolve?.(true)
@@ -648,16 +646,6 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
         loaded: false,
         selected: path === selectedPath,
       }
-      pending.timeout = setTimeout(() => {
-        if (pendingOpenRef.current !== pending) return
-        if (pending.selected) {
-          readEpochRef.current += 1
-          setFileLoading(false)
-          setReadError('Opening this file timed out')
-          if (pending.fromPath !== pending.path) commitPath(pending.fromPath)
-        }
-        finishPendingOpen(false)
-      }, OPEN_FILE_TIMEOUT_MS)
       pendingOpenRef.current = pending
     }
     if (path === selectedPath) {
@@ -666,11 +654,11 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
       return
     }
     if (isDirty) {
-      setPendingNav({ type: 'open', path, request: resolve ? pendingOpenRef.current ?? undefined : undefined })
+      setPendingNav({ path, request: resolve ? pendingOpenRef.current ?? undefined : undefined })
       return
     }
     showDocument()
-    commitPath(path)
+    if (commitPath(path) === false) finishPendingOpen(false)
   }, [finishPendingOpen, treePaths, selectedPath, selectedFile, displayReadyPath, fileLoading, showDocument, readError, isDirty, commitPath])
 
   useImperativeHandle(ref, () => ({
@@ -681,10 +669,8 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   // it and a new file lands inside it. Clicking it again clears that — the same
   // row is the way back out, so the gesture is reversible where it was made.
   const toggleFolder = useCallback((path: string) => {
-    finishPendingOpen(false)
-    setPendingNav(null)
     setFolderPath((current) => (current === path ? null : path))
-  }, [finishPendingOpen])
+  }, [])
 
   // Some tree models keep their original selection callback while resetting
   // paths internally. Keep the callable stable, but have it execute the latest
@@ -701,31 +687,17 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   }
   const handleTreeSelect = useCallback((path: string) => selectFileRef.current(path), [])
 
-  const guardedClose = useCallback(() => {
-    finishPendingOpen(false)
-    if (isDirty) {
-      setPendingNav({ type: 'close' })
-      return
-    }
-    commitPath(null)
-    setSelectedFile(null)
-  }, [isDirty, commitPath, finishPendingOpen])
-
   const confirmDiscard = useCallback(() => {
     const nav = pendingNav
     setPendingNav(null)
     if (!nav) return
-    if (nav.type === 'open') {
-      if (nav.request && pendingOpenRef.current !== nav.request) return
-      setIsDirty(false)
-      showDocument()
-      commitPath(nav.path)
-    } else {
-      setIsDirty(false)
+    if (nav.request && pendingOpenRef.current !== nav.request) return
+    if (!commitPath(nav.path)) {
       finishPendingOpen(false)
-      commitPath(null)
-      setSelectedFile(null)
+      return
     }
+    setIsDirty(false)
+    showDocument()
   }, [pendingNav, commitPath, showDocument, finishPendingOpen])
 
   const showRichMode = useCallback(() => {

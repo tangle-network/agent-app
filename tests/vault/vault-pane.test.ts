@@ -10,7 +10,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createElement, createRef, useState } from 'react'
+import { createElement, createRef, useEffect, useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { VaultPane } from '../../src/vault/VaultPane'
@@ -495,6 +495,38 @@ describe('VaultPane — dirty-guard state machine', () => {
 })
 
 describe('VaultPaneHandle.openFile completion', () => {
+  it('keeps a first-render request pending until its file is displayed', async () => {
+    let finishRead!: (file: VaultFile) => void
+    let opened!: Promise<boolean>
+    let settled: boolean | null = null
+    const paneRef = createRef<VaultPaneHandle>()
+    const readFile = vi.fn(() => new Promise<VaultFile>((resolve) => { finishRead = resolve }))
+
+    function OpeningTree(props: VaultTreeRenderProps) {
+      useEffect(() => {
+        opened = paneRef.current!.openFile('b.md')
+        void opened.then((result) => { settled = result })
+      }, [])
+      return renderTree(props)
+    }
+
+    render(createElement(VaultPane, {
+      port: fakePort({ readFile }),
+      renderTree: (props) => createElement(OpeningTree, props),
+      renderArtifact,
+      codec: fmCodec,
+      ref: paneRef,
+    }))
+    await screen.findByTestId('tree-b.md')
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith('b.md'))
+    await act(async () => {})
+    expect(settled).toBeNull()
+
+    await act(async () => finishRead({ path: 'b.md', content: 'loaded B' }))
+    expect(await opened).toBe(true)
+    expect(screen.getByTestId('artifact').textContent).toBe('loaded B')
+  })
+
   it('waits for the requested file to be displayed before resolving true', async () => {
     let finishRead!: (file: VaultFile) => void
     const readFile = vi.fn((path: string) => new Promise<VaultFile>((resolve) => {
@@ -582,6 +614,23 @@ describe('VaultPaneHandle.openFile completion', () => {
     expect(screen.getByTestId('artifact').textContent).toBe('current B')
   })
 
+  it('does not cancel a valid read when another request names a directory', async () => {
+    let finishRead!: (file: VaultFile) => void
+    const readFile = vi.fn(() => new Promise<VaultFile>((resolve) => { finishRead = resolve }))
+    const { paneRef } = mount({ port: fakePort({ readFile }) })
+    await screen.findByTestId('tree-folder')
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('b.md') })
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith('b.md'))
+    expect(await paneRef.current!.openFile('folder')).toBe(false)
+    expect(await Promise.race([opened, Promise.resolve('pending')])).toBe('pending')
+
+    await act(async () => finishRead({ path: 'b.md', content: 'loaded B' }))
+    expect(await opened).toBe(true)
+    expect(screen.getByTestId('artifact').textContent).toBe('loaded B')
+  })
+
   it('settles pending work false when unmounted or replaced by a tree click', async () => {
     const readFile = vi.fn((path: string) => new Promise<VaultFile>(() => { void path }))
     const first = mount({ port: fakePort({ readFile }) })
@@ -626,23 +675,35 @@ describe('VaultPaneHandle.openFile completion', () => {
     expect(await opened).toBe(false)
   })
 
-  it('settles false when a controlled parent does not accept the requested path', async () => {
-    const onSelectedPathChange = vi.fn()
+  it('settles false when a controlled parent explicitly rejects the requested path', async () => {
+    const onSelectedPathChange = vi.fn(() => false as const)
     const { paneRef } = mount({ selectedPath: null, onSelectedPathChange })
     await screen.findByTestId('tree-a.md')
-    vi.useFakeTimers()
-    try {
-      let opened!: Promise<boolean>
-      act(() => { opened = paneRef.current!.openFile('a.md') })
-      expect(onSelectedPathChange).toHaveBeenCalledWith('a.md')
-      await act(async () => { await vi.advanceTimersByTimeAsync(30_000) })
-      expect(await opened).toBe(false)
-    } finally {
-      vi.useRealTimers()
-    }
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('a.md') })
+    expect(onSelectedPathChange).toHaveBeenCalledWith('a.md')
+    expect(await Promise.race([opened, Promise.resolve('pending')])).toBe(false)
   })
 
-  it('removes a timed-out dirty request so a late confirmation cannot navigate', async () => {
+  it('preserves dirty edits when a controlled parent rejects the confirmed path', async () => {
+    const onSelectedPathChange = vi.fn(() => false as const)
+    const { paneRef } = mount({ selectedPath: 'a.md', onSelectedPathChange })
+    await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md'))
+    fireEvent.click(screen.getByLabelText('Edit as source'))
+    await typeSource('unsaved A')
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('b.md') })
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }))
+
+    expect(onSelectedPathChange).toHaveBeenCalledWith('b.md')
+    expect(await Promise.race([opened, Promise.resolve('pending')])).toBe(false)
+    expect((screen.getByLabelText('Source editor') as HTMLTextAreaElement).value).toBe('unsaved A')
+    expect(screen.getByText('Unsaved changes')).toBeTruthy()
+    expect(currentPath()).toBe('a.md')
+  })
+
+  it('keeps a dirty confirmation actionable while the user decides', async () => {
     const { paneRef, port } = mount()
     await openFile('a.md')
     fireEvent.click(screen.getByLabelText('Edit as source'))
@@ -654,17 +715,19 @@ describe('VaultPaneHandle.openFile completion', () => {
       expect(screen.getByRole('dialog', { name: 'Discard unsaved changes?' })).toBeTruthy()
       await act(async () => { await vi.advanceTimersByTimeAsync(30_000) })
 
-      expect(await opened).toBe(false)
-      expect(screen.queryByRole('dialog', { name: 'Discard unsaved changes?' })).toBeNull()
+      expect(screen.getByRole('dialog', { name: 'Discard unsaved changes?' })).toBeTruthy()
+      expect(await Promise.race([opened, Promise.resolve('pending')])).toBe('pending')
       expect(document.querySelector('[data-vault-path]')?.textContent).toBe('a.md')
       expect((screen.getByLabelText('Source editor') as HTMLTextAreaElement).value).toBe('unsaved A')
       expect(port.readFile).not.toHaveBeenCalledWith('b.md')
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      expect(await opened).toBe(false)
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('ignores a late read after timeout and returns to the previous file', async () => {
+  it('lets the data port finish a read after a long wait', async () => {
     let finishRead!: (file: VaultFile) => void
     const readFile = vi.fn((path: string) => path === 'b.md'
       ? new Promise<VaultFile>((resolve) => { finishRead = resolve })
@@ -677,12 +740,12 @@ describe('VaultPaneHandle.openFile completion', () => {
       act(() => { opened = paneRef.current!.openFile('b.md') })
       expect(readFile).toHaveBeenCalledWith('b.md')
       await act(async () => { await vi.advanceTimersByTimeAsync(30_000) })
-      expect(await opened).toBe(false)
-      expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md')
+      expect(await Promise.race([opened, Promise.resolve('pending')])).toBe('pending')
 
       await act(async () => finishRead({ path: 'b.md', content: 'late B' }))
-      expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md')
-      expect(screen.getByTestId('artifact').textContent).toBe('body A')
+      expect(await opened).toBe(true)
+      expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('b.md')
+      expect(screen.getByTestId('artifact').textContent).toBe('late B')
     } finally {
       vi.useRealTimers()
     }
