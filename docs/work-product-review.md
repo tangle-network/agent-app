@@ -33,7 +33,8 @@ Product hooks run only after a successful transition. A version conflict runs ne
 On the repository's configured Node runtime with `node:sqlite` support and installed dependencies:
 
 ```sh
-pnpm exec tsx scripts/prove-work-product-review.mjs
+pnpm build
+node scripts/prove-work-product-review.mjs
 ```
 
 The proof creates a temporary SQLite database, opens two connections and serves the actual review routes over loopback HTTP. Another service instance performs actual request-changes/reopen/resubmit transitions while selected reads are paused. It checks stale browser versions, in-flight review and submission races, route-to-service fencing, malformed versions, competing reviewers, and normal approval/supersession behavior. Temporary resources are removed in `finally`.

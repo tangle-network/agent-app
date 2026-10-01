@@ -6,8 +6,7 @@ import { createServer } from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { createWorkProductService } from '../src/work-product/service.ts'
-import { createWorkProductRoutes } from '../src/work-product/route.ts'
+import { createWorkProductService, createWorkProductRoutes } from '../dist/work-product/index.js'
 
 const baseline = process.argv.includes('--baseline')
 const directory = await mkdtemp(path.join(os.tmpdir(), 'work-product-review-'))
