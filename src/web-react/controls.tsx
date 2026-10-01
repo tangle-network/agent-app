@@ -462,6 +462,8 @@ export interface ModelPickerProps {
   }
   /** Trigger treatment — see {@link PickerVariant}. Default `chip`. */
   variant?: PickerVariant
+  /** Optional accessible trigger content for a picker docked beside an editable model field. */
+  triggerContent?: ReactNode
 }
 
 function formatPrice(p?: string): string | undefined {
@@ -534,7 +536,7 @@ function ModelRow({
  * legacy — deprecated, frozen, removed at sandbox-ui's next major; new code
  * belongs here.
  */
-export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup, variant = 'chip' }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup, variant = 'chip', triggerContent }: ModelPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
@@ -609,8 +611,10 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
             : 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent'
         }
       >
-        {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
-        <span className="max-w-[160px] truncate">{selected?.name ?? value}</span>
+        {triggerContent ?? <>
+          {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
+          <span className="max-w-[160px] truncate">{selected?.name ?? value}</span>
+        </>}
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
 
