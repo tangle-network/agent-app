@@ -18770,13 +18770,19 @@
         {
           "name": "AgentProfileEditor",
           "kind": "function",
-          "signature": "({ value, onChange, disabled, className }: AgentProfileEditorProps) => Element",
+          "signature": "({ value, onChange, disabled, className, allowedResourceKinds }: AgentProfileEditorProps) => Element",
           "doc": "Controlled editor for the canonical profile."
         },
         {
           "name": "AgentProfileEditorProps",
           "kind": "interface",
           "signature": "interface AgentProfileEditorProps",
+          "doc": null
+        },
+        {
+          "name": "AgentProfileResourceKind",
+          "kind": "type",
+          "signature": "type AgentProfileResourceKind",
           "doc": null
         },
         {

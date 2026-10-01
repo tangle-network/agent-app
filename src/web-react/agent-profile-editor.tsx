@@ -1,13 +1,27 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
-import type { AgentProfile, AgentProfileMcpServer, AgentProfileResourceRef } from '@tangle-network/agent-interface/profile'
+import type { AgentProfile, AgentProfileFileMount, AgentProfileMcpServer, AgentProfileResourceRef } from '@tangle-network/agent-interface/profile'
 import { agentProfileSchema } from '@tangle-network/agent-interface/profile-schema'
 import { Button, Input, Textarea, Switch, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@tangle-network/sandbox-ui/primitives'
+
+export type AgentProfileResourceKind = 'files' | 'skills' | 'tools' | 'agents' | 'commands' | 'instructions'
 
 export interface AgentProfileEditorProps {
   value: AgentProfile
   onChange: (value: AgentProfile) => void
   disabled?: boolean
   className?: string
+  /** Hide unsupported resource controls. Existing entries remain in the profile and are flagged for review. */
+  allowedResourceKinds?: readonly AgentProfileResourceKind[]
+}
+
+const RESOURCE_KIND_LABELS: Record<AgentProfileResourceKind, string> = {
+  files: 'Resource files', skills: 'Skills', tools: 'Tool files',
+  agents: 'Agent files', commands: 'Command files', instructions: 'Resource instructions',
+}
+
+function configuredResourceCount(profile: AgentProfile, kind: AgentProfileResourceKind): number {
+  const resource = profile.resources?.[kind]
+  return Array.isArray(resource) ? resource.length : resource ? 1 : 0
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -44,8 +58,88 @@ function issueMessage(error: { issues: readonly { path: PropertyKey[]; message: 
   return issue ? (issue.path.map(String).join('.') || 'Profile') + ': ' + issue.message : 'Invalid profile'
 }
 
+interface ResourceDraft {
+  kind: 'github' | 'inline'
+  repository: string
+  path: string
+  ref: string
+  name: string
+  content: string
+}
+
+interface FileDraft {
+  path: string
+  resource: ResourceDraft
+  executable: boolean
+}
+
+function emptyResourceDraft(): ResourceDraft {
+  return { kind: 'github', repository: '', path: '', ref: '', name: '', content: '' }
+}
+
+function resourceDraft(ref: AgentProfileResourceRef): ResourceDraft {
+  return ref.kind === 'github'
+    ? { ...emptyResourceDraft(), kind: 'github', repository: ref.repository ?? '', path: ref.path, ref: ref.ref ?? '', name: ref.name ?? '' }
+    : { ...emptyResourceDraft(), kind: 'inline', name: ref.name, content: ref.content }
+}
+
+function resourceRef(draft: ResourceDraft): AgentProfileResourceRef {
+  return draft.kind === 'inline'
+    ? { kind: 'inline', name: draft.name.trim(), content: draft.content }
+    : {
+      kind: 'github', repository: draft.repository.trim(), path: draft.path.trim(),
+      ...(draft.ref.trim() ? { ref: draft.ref.trim() } : {}),
+      ...(draft.name.trim() ? { name: draft.name.trim() } : {}),
+    }
+}
+
+function resourceError(draft: ResourceDraft): string | null {
+  if (draft.kind === 'inline') return draft.name.trim() ? null : 'Enter a name for the inline file.'
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(draft.repository.trim())) return 'Enter a GitHub repository as owner/repo.'
+  if (!draft.path.trim()) return 'Enter a path within the GitHub repository.'
+  return null
+}
+
+function ResourceFields({ draft, onChange, disabled, pathPlaceholder }: {
+  draft: ResourceDraft
+  onChange: (draft: ResourceDraft) => void
+  disabled: boolean
+  pathPlaceholder: string
+}) {
+  function change(field: keyof ResourceDraft, text: string) { onChange({ ...draft, [field]: text }) }
+  return <div className="grid gap-3 sm:grid-cols-2">
+    <Field label="Source"><Select disabled={disabled} value={draft.kind} onValueChange={kind => change('kind', kind)}>
+      <SelectTrigger aria-label="Source"><SelectValue /></SelectTrigger><SelectContent>
+        <SelectItem value="github">GitHub file</SelectItem><SelectItem value="inline">Inline content</SelectItem>
+      </SelectContent></Select></Field>
+    {draft.kind === 'github' ? <>
+      <Field label="Repository" hint="GitHub owner/repo"><Input disabled={disabled} value={draft.repository}
+        onChange={event => change('repository', event.target.value)} placeholder="owner/repo" /></Field>
+      <Field label="Repository path" hint="Relative to the repository root"><Input disabled={disabled} value={draft.path}
+        onChange={event => change('path', event.target.value)} placeholder={pathPlaceholder} /></Field>
+      <Field label="Ref" hint="Defaults to the main branch"><Input disabled={disabled} value={draft.ref}
+        onChange={event => change('ref', event.target.value)} placeholder="main" /></Field>
+      <Field label="Name" hint="Defaults to the source filename"><Input disabled={disabled} value={draft.name}
+        onChange={event => change('name', event.target.value)} /></Field>
+    </> : <>
+      <Field label="File name"><Input disabled={disabled} value={draft.name}
+        onChange={event => change('name', event.target.value)} placeholder="guide.md" /></Field>
+      <div className="sm:col-span-2"><Field label="Content"><Textarea className="min-h-32 font-mono text-sm" disabled={disabled}
+        value={draft.content} onChange={event => change('content', event.target.value)} /></Field></div>
+    </>}
+  </div>
+}
+
+function fileDraft(mount: AgentProfileFileMount): FileDraft {
+  return { path: mount.path, resource: resourceDraft(mount.resource), executable: mount.executable ?? false }
+}
+
+function fileMount(draft: FileDraft): AgentProfileFileMount {
+  return { path: draft.path.trim(), resource: resourceRef(draft.resource), ...(draft.executable ? { executable: true } : {}) }
+}
+
 /** Controlled editor for the canonical profile. The product owns save and execution authority. */
-export function AgentProfileEditor({ value, onChange, disabled = false, className }: AgentProfileEditorProps) {
+export function AgentProfileEditor({ value, onChange, disabled = false, className, allowedResourceKinds }: AgentProfileEditorProps) {
   const id = useId()
   const [error, setError] = useState<string | null>(null)
   const [newTool, setNewTool] = useState('')
@@ -53,11 +147,18 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
   const [mcpName, setMcpName] = useState('')
   const [mcpKind, setMcpKind] = useState<'http' | 'sse' | 'stdio'>('http')
   const [mcpTarget, setMcpTarget] = useState('')
-  const [resourceDrafts, setResourceDrafts] = useState<Record<string, { kind: 'github' | 'inline'; path: string; name: string; content: string }>>({})
+  const [resourceDrafts, setResourceDrafts] = useState<Record<'skills' | 'tools', ResourceDraft>>({ skills: emptyResourceDraft(), tools: emptyResourceDraft() })
+  const [resourceEdit, setResourceEdit] = useState<{ key: 'skills' | 'tools'; index: number; draft: ResourceDraft } | null>(null)
+  const [newFile, setNewFile] = useState<FileDraft>({ path: '', resource: { ...emptyResourceDraft(), kind: 'inline' }, executable: false })
+  const [addingFile, setAddingFile] = useState(false)
+  const [fileEdit, setFileEdit] = useState<{ index: number; draft: FileDraft } | null>(null)
   const [json, setJson] = useState(() => JSON.stringify(value, null, 2))
   const [jsonDirty, setJsonDirty] = useState(false)
   useEffect(() => { if (!jsonDirty) setJson(JSON.stringify(value, null, 2)) }, [value, jsonDirty])
   const editingDisabled = disabled || jsonDirty
+  const allowsResource = (kind: AgentProfileResourceKind) => !allowedResourceKinds || allowedResourceKinds.includes(kind)
+  const unsupportedResources = (Object.keys(RESOURCE_KIND_LABELS) as AgentProfileResourceKind[])
+    .filter(kind => !allowsResource(kind) && configuredResourceCount(value, kind) > 0)
 
   function emit(next: AgentProfile) {
     if (jsonDirty) { setError('Apply or discard JSON edits first.'); return false }
@@ -73,48 +174,76 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     return emit({ ...value, resources: { ...value.resources, [key]: refs } })
   }
   function addResource(key: 'skills' | 'tools') {
-    const draft = resourceDrafts[key] ?? { kind: 'github', path: '', name: '', content: '' }
-    const ref: AgentProfileResourceRef = draft.kind === 'github'
-      ? { kind: 'github', path: draft.path.trim(), ...(draft.name.trim() ? { name: draft.name.trim() } : {}) }
-      : { kind: 'inline', name: draft.name.trim(), content: draft.content }
-    if (draft.kind === 'github' && !draft.path.trim() || draft.kind === 'inline' && !draft.name.trim()) {
-      setError(draft.kind === 'github' ? 'Enter a resource path.' : 'Enter a resource name.')
-      return
+    const draft = resourceDrafts[key]
+    const issue = resourceError(draft)
+    if (issue) { setError(issue); return }
+    if (!resources(key, [...(value.resources?.[key] ?? []), resourceRef(draft)])) return
+    setResourceDrafts(current => ({ ...current, [key]: emptyResourceDraft() }))
+  }
+  function applyResourceEdit() {
+    if (!resourceEdit) return
+    const issue = resourceError(resourceEdit.draft)
+    if (issue) { setError(issue); return }
+    const { key, index, draft } = resourceEdit
+    const refs = value.resources?.[key] ?? []
+    if (!refs[index]) { setError('This resource changed. Reopen it to edit.'); setResourceEdit(null); return }
+    if (resources(key, refs.map((ref, item) => item === index ? resourceRef(draft) : ref))) setResourceEdit(null)
+  }
+  function saveFile(draft: FileDraft, index?: number) {
+    const path = draft.path.trim()
+    if (!path) { setError('Enter a workspace path for the file.'); return false }
+    const issue = resourceError(draft.resource)
+    if (issue) { setError(issue); return false }
+    const files = value.resources?.files ?? []
+    if (files.some((file, item) => file.path === path && item !== index)) {
+      setError('A resource file already uses that workspace path.')
+      return false
     }
-    if (!resources(key, [...(value.resources?.[key] ?? []), ref])) return
-    setResourceDrafts(current => ({ ...current, [key]: { ...draft, path: '', name: '', content: '' } }))
+    const next = index === undefined ? [...files, fileMount(draft)] : files.map((file, item) => item === index ? fileMount(draft) : file)
+    return emit({ ...value, resources: { ...value.resources, files: next } })
+  }
+  function fileFields(draft: FileDraft, onChange: (draft: FileDraft) => void) {
+    return <div className="space-y-3">
+      <Field label="Workspace path" hint="Relative to the agent workspace"><Input disabled={editingDisabled} value={draft.path}
+        onChange={event => onChange({ ...draft, path: event.target.value })} placeholder="docs/guide.md" /></Field>
+      <ResourceFields draft={draft.resource} disabled={editingDisabled} pathPlaceholder="docs/guide.md"
+        onChange={resource => onChange({ ...draft, resource })} />
+      <label className="flex items-center gap-2 text-sm text-foreground"><Switch disabled={editingDisabled} checked={draft.executable}
+        onCheckedChange={executable => onChange({ ...draft, executable })} />Executable file</label>
+    </div>
   }
   function resourceSection(key: 'skills' | 'tools', title: string, description: string) {
     const refs = value.resources?.[key] ?? []
-    const draft = resourceDrafts[key] ?? { kind: 'github', path: '', name: '', content: '' }
-    function change(field: keyof typeof draft, text: string) {
-      setResourceDrafts(current => ({ ...current, [key]: { ...draft, [field]: text } }))
-    }
-    return <Disclosure title={title} description={description} detail={refs.length ? refs.length + ' added' : 'Optional'}>
-      {refs.length === 0 && <p className="text-sm text-muted-foreground">None added.</p>}
+    const draft = resourceDrafts[key]
+    return <Disclosure title={title} description={description} detail={refs.length ? refs.length + ' configured' : 'Optional'}>
+      {refs.length === 0 && <p className="text-sm text-muted-foreground">None configured.</p>}
       <ul className="space-y-2">{refs.map((ref, index) =>
-        <li key={index} className="flex items-start justify-between gap-3 rounded-lg border border-border p-3 text-sm">
-          <div className="min-w-0"><span className="font-medium">{ref.name || (ref.kind === 'github' ? ref.path : 'Inline resource')}</span>
-            <span className="ml-2 text-xs text-muted-foreground">{ref.kind === 'github' ? 'GitHub · ' + ref.path : 'Inline'}</span>
-            {ref.kind === 'github' && ref.repository && <span className="block text-xs text-muted-foreground">{ref.repository}</span>}
+        <li key={index} className="space-y-3 rounded-lg border border-border p-3 text-sm" aria-label={title + ' ' + (index + 1)}>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0"><span className="block break-words font-medium text-foreground">{ref.name || (ref.kind === 'github' ? ref.path : 'Inline resource')}</span>
+              <span className={'block break-words text-xs ' + (ref.kind === 'github' && !ref.repository ? 'text-destructive' : 'text-muted-foreground')}>{ref.kind === 'github'
+                ? (ref.repository ? ref.repository + ' / ' : 'Repository required · ') + ref.path + (ref.ref ? ' @ ' + ref.ref : '')
+                : 'Inline content'}</span></div>
+            <div className="flex shrink-0 gap-1">
+              <Button type="button" variant="ghost" disabled={editingDisabled} aria-label={'Edit ' + title.toLowerCase() + ' ' + (index + 1)}
+                onClick={() => setResourceEdit({ key, index, draft: resourceDraft(ref) })}>Edit</Button>
+              <Button type="button" variant="ghost" className="text-destructive" disabled={editingDisabled} aria-label={'Remove ' + title.toLowerCase() + ' ' + (index + 1)}
+                onClick={() => { if (resources(key, refs.filter((_, item) => item !== index))) setResourceEdit(null) }}>Remove</Button>
+            </div>
           </div>
-          <Button type="button" variant="ghost" className="text-destructive" disabled={editingDisabled} aria-label={'Remove ' + title.toLowerCase() + ' ' + (index + 1)}
-            onClick={() => resources(key, refs.filter((_, item) => item !== index))}>Remove</Button>
+          {resourceEdit?.key === key && resourceEdit.index === index && <div className="space-y-3 border-t border-border pt-3">
+            <ResourceFields draft={resourceEdit.draft} disabled={editingDisabled} pathPlaceholder={key === 'skills' ? 'research/SKILL.md' : 'tools/search.ts'}
+              onChange={next => setResourceEdit({ key, index, draft: next })} />
+            <div className="flex gap-2"><Button type="button" variant="outline" disabled={editingDisabled} onClick={applyResourceEdit}>Apply changes</Button>
+              <Button type="button" variant="ghost" onClick={() => setResourceEdit(null)}>Cancel</Button></div>
+          </div>}
         </li>)}</ul>
-      <div className="grid gap-3 rounded-lg border border-dashed border-border p-3 sm:grid-cols-[10rem_1fr]">
-        <Field label="Source"><Select disabled={editingDisabled} value={draft.kind} onValueChange={kind => change('kind', kind)}>
-          <SelectTrigger aria-label="Source"><SelectValue /></SelectTrigger><SelectContent>
-            <SelectItem value="github">GitHub path</SelectItem><SelectItem value="inline">Inline content</SelectItem>
-          </SelectContent></Select></Field>
-        <Field label={draft.kind === 'github' ? 'Path' : 'Name'}><Input disabled={editingDisabled}
-          value={draft.kind === 'github' ? draft.path : draft.name}
-          onChange={event => change(draft.kind === 'github' ? 'path' : 'name', event.target.value)}
-          placeholder={draft.kind === 'github' ? 'skills/research/SKILL.md' : 'Research skill'} /></Field>
-        {draft.kind === 'inline' && <div className="sm:col-span-2"><Field label="Content"><Textarea className="min-h-28" disabled={editingDisabled} value={draft.content}
-          onChange={event => change('content', event.target.value)} /></Field></div>}
-        <div className="sm:col-span-2"><Button type="button" variant="outline" disabled={editingDisabled} onClick={() => addResource(key)}>Add {key === 'skills' ? 'skill' : 'tool file'}</Button></div>
+      <div className="space-y-3 rounded-lg border border-dashed border-border p-3">
+        <ResourceFields draft={draft} disabled={editingDisabled} pathPlaceholder={key === 'skills' ? 'research/SKILL.md' : 'tools/search.ts'}
+          onChange={next => setResourceDrafts(current => ({ ...current, [key]: next }))} />
+        <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => addResource(key)}>Add {key === 'skills' ? 'skill' : 'tool file'}</Button>
       </div>
-      <p className="text-xs text-muted-foreground">Repository, ref, and other options are available in Advanced JSON.</p>
+      <p className="text-xs text-muted-foreground">GitHub files are fetched when the profile runs. Saving does not verify their contents or availability.</p>
     </Disclosure>
   }
   function addMcp() {
@@ -138,6 +267,10 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
   return <div className={'space-y-5 ' + (className ?? '')} aria-label="Agent profile editor">
     {error && <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
     {jsonDirty && <p role="status" className="rounded-lg border border-border bg-muted p-3 text-sm text-foreground">Apply or discard edits in Advanced JSON before using the other fields.</p>}
+    {unsupportedResources.length > 0 && <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground">
+      This profile contains resources this product does not support: {unsupportedResources.map(kind => RESOURCE_KIND_LABELS[kind] + ' (' + configuredResourceCount(value, kind) + ')').join(', ')}.
+      They remain in the profile. Review or remove them in Advanced JSON before saving.
+    </p>}
     <Section title="Profile" description="Name the agent and set its instructions.">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Name"><Input disabled={editingDisabled} value={value.name ?? ''} onChange={event => emit({ ...value, name: event.target.value })} /></Field>
@@ -203,10 +336,10 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
         <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => { const name = newTool.trim(); if (!name || name in (value.tools ?? {})) { setError('Enter a unique tool name.'); return } if (emit({ ...value, tools: { ...value.tools, [name]: true } })) setNewTool('') }}>Add tool</Button></div>
       <p className="text-xs text-muted-foreground">Nested permission rules remain in Advanced JSON.</p>
     </Disclosure>
-    {resourceSection('skills', 'Skills', 'Add skill packages from a repository or inline content.')}
-    {resourceSection('tools', 'Tool files', 'Provide files that a supported harness can discover as tools.')}
-    <Disclosure title="MCP servers" description="Connect remote or local servers. Use secret references for credentials." detail={Object.keys(value.mcp ?? {}).length + ' connected'}>
-      {Object.keys(value.mcp ?? {}).length === 0 && <p className="text-sm text-muted-foreground">No servers added.</p>}
+    {allowsResource('skills') && resourceSection('skills', 'Skills', 'Add skill packages from a repository or inline content.')}
+    {allowsResource('tools') && resourceSection('tools', 'Tool files', 'Provide files that a supported harness can discover as tools.')}
+    <Disclosure title="MCP servers" description="Configure remote or local servers. Use secret references for credentials." detail={Object.keys(value.mcp ?? {}).length + ' configured'}>
+      {Object.keys(value.mcp ?? {}).length === 0 && <p className="text-sm text-muted-foreground">No servers configured.</p>}
       <ul className="space-y-2">{Object.entries(value.mcp ?? {}).map(([name, server]) =>
         <li key={name} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
           <div className="min-w-0"><span className="font-medium">{name}</span>
@@ -227,15 +360,37 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
       </div>
       <p className="text-xs text-muted-foreground">Arguments, headers, environment, and secret references remain in Advanced JSON.</p>
     </Disclosure>
-    <Disclosure title="Resource files" description="Mount files in the agent workspace. Edit paths and content in Advanced JSON." detail={(value.resources?.files ?? []).length + ' mounted'}>
-      {(value.resources?.files ?? []).length === 0 && <p className="text-sm text-muted-foreground">No files mounted.</p>}
+    {allowsResource('files') && <Disclosure title="Resource files" description="Configure files for the agent workspace. The runtime determines whether it can place them." detail={(value.resources?.files ?? []).length + ' configured'}>
+      {(value.resources?.files ?? []).length === 0 && <p className="text-sm text-muted-foreground">No resource files configured.</p>}
       <ul className="space-y-2">{(value.resources?.files ?? []).map((mount, index) =>
-        <li key={index} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
-          <span className="truncate">{mount.path} <span className="text-muted-foreground">← {mount.resource.kind === 'github' ? mount.resource.path : mount.resource.name}</span></span>
-          <Button type="button" variant="ghost" className="text-destructive" disabled={editingDisabled} onClick={() => emit({ ...value, resources: { ...value.resources, files: (value.resources?.files ?? []).filter((_, i) => i !== index) } })}>Remove</Button>
+        <li key={index} className="space-y-3 rounded-lg border border-border p-3 text-sm" aria-label={'Resource file ' + (index + 1)}>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0"><span className="block break-words font-medium text-foreground">{mount.path}</span>
+              <span className={'block break-words text-xs ' + (mount.resource.kind === 'github' && !mount.resource.repository ? 'text-destructive' : 'text-muted-foreground')}>{mount.resource.kind === 'github'
+                ? (mount.resource.repository ? mount.resource.repository + ' / ' : 'Repository required · ') + mount.resource.path + (mount.resource.ref ? ' @ ' + mount.resource.ref : '')
+                : 'Inline · ' + mount.resource.name}{mount.executable ? ' · executable' : ''}</span></div>
+            <div className="flex shrink-0 gap-1">
+              <Button type="button" variant="ghost" disabled={editingDisabled} aria-label={'Edit resource file ' + (index + 1)}
+                onClick={() => setFileEdit({ index, draft: fileDraft(mount) })}>Edit</Button>
+              <Button type="button" variant="ghost" className="text-destructive" disabled={editingDisabled} aria-label={'Remove resource file ' + (index + 1)}
+                onClick={() => { if (emit({ ...value, resources: { ...value.resources, files: (value.resources?.files ?? []).filter((_, item) => item !== index) } })) setFileEdit(null) }}>Remove</Button>
+            </div>
+          </div>
+          {mount.resource.kind === 'inline' && fileEdit?.index !== index && <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-2 text-xs text-muted-foreground">{mount.resource.content || '(Empty file)'}</pre>}
+          {fileEdit?.index === index && <div className="space-y-3 border-t border-border pt-3">
+            {fileFields(fileEdit.draft, draft => setFileEdit({ index, draft }))}
+            <div className="flex gap-2"><Button type="button" variant="outline" disabled={editingDisabled}
+              onClick={() => { if (saveFile(fileEdit.draft, index)) setFileEdit(null) }}>Apply changes</Button>
+              <Button type="button" variant="ghost" onClick={() => setFileEdit(null)}>Cancel</Button></div>
+          </div>}
         </li>)}</ul>
-      <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => emit({ ...value, resources: { ...value.resources, files: [...(value.resources?.files ?? []), { path: 'new-file.md', resource: { kind: 'inline', name: 'New file', content: '' } }] } })}>Add file</Button>
-    </Disclosure>
+      {addingFile ? <div className="space-y-3 rounded-lg border border-dashed border-border p-3">
+        {fileFields(newFile, setNewFile)}
+        <div className="flex gap-2"><Button type="button" variant="outline" disabled={editingDisabled}
+          onClick={() => { if (saveFile(newFile)) { setNewFile({ path: '', resource: { ...emptyResourceDraft(), kind: 'inline' }, executable: false }); setAddingFile(false) } }}>Add file</Button>
+          <Button type="button" variant="ghost" onClick={() => setAddingFile(false)}>Cancel</Button></div>
+      </div> : <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => setAddingFile(true)}>Add file</Button>}
+    </Disclosure>}
     <Disclosure title="Advanced JSON" description="Edit the full canonical profile, including hooks, modes, connections, and extensions.">
       <label htmlFor={id + '-json'} className="sr-only">Full profile JSON</label>
       <Textarea id={id + '-json'} className="min-h-72 font-mono text-xs" spellCheck={false} disabled={disabled} value={json} onChange={event => { setJson(event.target.value); setJsonDirty(true) }} />
