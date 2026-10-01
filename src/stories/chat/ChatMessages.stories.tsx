@@ -245,7 +245,7 @@ export const MessageSizeComparison: Story = {
 
 /** The full 16-message thread from Long History under the opt-in quiet chrome:
  *  no role labels, a hover-revealed meta lane (copy + demoted model/cost), and
- *  neutral symmetric user bubbles. Hover a row to see the lane. */
+ *  inverse user bubbles. Hover a row to see the lane. */
 export const QuietLongHistory: Story = {
   name: 'Quiet · Long History',
   args: {
@@ -290,18 +290,17 @@ export const QuietProposalAwaitingApproval: Story = {
 }
 
 /**
- * The redesign's comparison surface: the same six-turn thread at equal width,
- * current labeled chrome next to the opt-in quiet chrome. Hover rows in the
- * right column to reveal the meta lane; the left column never changes.
+ * The same six-turn thread at equal width in labeled and quiet chrome.
+ * Hover rows in the right column to reveal its meta lane.
  */
 export const BeforeAfter: Story = {
-  name: 'Before / After (current: labeled · new: quiet)',
+  name: 'Labeled / Quiet',
   render: () => (
     <div className="flex items-start gap-6">
       {(['labeled', 'quiet'] as const).map((chrome) => (
         <section key={chrome} className="w-[560px] shrink-0 rounded-lg border border-border bg-background">
           <p className="border-b border-border px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {chrome === 'labeled' ? 'current: labeled' : 'new: quiet'}
+            {chrome}
           </p>
           <ChatMessages
             messages={densityThread}
