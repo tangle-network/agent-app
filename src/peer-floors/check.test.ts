@@ -229,6 +229,19 @@ describe('this package audits itself', () => {
     }
   })
 
+  it('admits the Knowledge line compatible with Eval 0.203', async () => {
+    const root = join(here, '..', '..')
+    const own = JSON.parse(
+      await readFile(join(root, 'package.json'), 'utf8'),
+    ) as { peerDependencies?: Record<string, string> }
+    const range = own.peerDependencies?.['@tangle-network/agent-knowledge']
+
+    expect(range).toBeDefined()
+    expect(satisfiesRange('17.1.10', range!)).toBe(true)
+    expect(satisfiesRange('18.0.0', range!)).toBe(true)
+    expect(satisfiesRange('19.0.0', range!)).toBe(false)
+  })
+
   it('admits the shared header Sandbox UI line without claiming the next minor', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
