@@ -440,11 +440,12 @@ jobs:
           bash publish-packages.sh publish agent-app agent-app.tgz
 
   publish_create_agent_app:
-    needs: package_release
+    needs: [package_release, publish_agent_app]
     if: >-
       always() &&
       needs.package_release.result == 'success' &&
-      needs.package_release.outputs.mode == 'tag'
+      needs.package_release.outputs.mode == 'tag' &&
+      needs.publish_agent_app.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: read
