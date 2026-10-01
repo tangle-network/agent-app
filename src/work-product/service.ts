@@ -88,6 +88,8 @@ export interface WorkProductVerdictInput {
   verdict: 'approve' | 'request_changes'
   reviewedBy: string
   note?: string
+  /** The revision the reviewer saw; omitted only by legacy callers. */
+  expectedVersion?: number
 }
 
 /** Guarded mutation surface over the work-product store */
@@ -244,18 +246,15 @@ export function createWorkProductService(options: WorkProductServiceOptions): Wo
     })
   }
 
-  // Guarded status transition: load → validate the edge → CAS guarded on the
-  // {status, version} read → audit event. The loser of a racing transition
-  // gets a conflict instead of silently violating the machine.
+  // Commit against the same snapshot that supplied the patch and history.
+  // A second read must not authorize an old patch against a newer revision.
   async function transition(
-    id: string,
+    record: WorkProductRecord,
     to: WorkProductStatus,
     patch: Omit<WorkProductPatch, 'status'> = {},
     eventMeta: Record<string, unknown> = {},
   ): Promise<WorkProductOutcome<WorkProductRecord>> {
-    const record = await store.load(id)
-    if (!record) return rejected(`Work product ${id} not found`)
-    const from = record.status
+    const { id, status: from } = record
     if (isWorkProductTerminal(from)) {
       return rejected(`Work product ${id} is terminal (${from}); cannot transition to ${to}`)
     }
@@ -388,10 +387,10 @@ export function createWorkProductService(options: WorkProductServiceOptions): Wo
     const record = merged.value
     const blocking = unresolvedBlockingExceptions(record.exceptions).length
     if (record.status === 'draft' && blocking > 0) {
-      return transition(id, 'blocked', {}, { blocking })
+      return transition(record, 'blocked', {}, { blocking })
     }
     if (record.status === 'blocked' && blocking === 0) {
-      return transition(id, 'draft', {}, { blocking })
+      return transition(record, 'draft', {}, { blocking })
     }
     return merged
   }
@@ -429,7 +428,7 @@ export function createWorkProductService(options: WorkProductServiceOptions): Wo
       at: now(),
     }
     return transition(
-      id,
+      record,
       'ready',
       {
         artifact: input.artifact,
@@ -442,33 +441,38 @@ export function createWorkProductService(options: WorkProductServiceOptions): Wo
   }
 
   const applyVerdict: WorkProductService['applyVerdict'] = async (id, input) => {
+    const { verdict, reviewedBy, note, expectedVersion } = input
+    if (expectedVersion !== undefined && (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1)) {
+      return rejected('Expected review version must be a positive safe integer')
+    }
     const record = await store.load(id)
     if (!record) return rejected(`Work product ${id} not found`)
+    if (expectedVersion !== undefined && expectedVersion !== record.version) return lostRace(id)
     if (record.status !== 'ready') {
       return rejected(`Work product ${id} is ${record.status}; a verdict applies only to ready`)
     }
-    const to: WorkProductStatus = input.verdict === 'approve' ? 'approved' : 'changes_requested'
+    const to: WorkProductStatus = verdict === 'approve' ? 'approved' : 'changes_requested'
     const entry: WorkProductVersionEntry = {
       version: record.version,
       status: to,
       provenance: record.provenance,
       ...(record.artifact?.path === undefined ? {} : { artifactPath: record.artifact.path }),
-      reviewedBy: input.reviewedBy,
-      ...(input.note === undefined ? {} : { reviewNote: input.note }),
+      reviewedBy,
+      ...(note === undefined ? {} : { reviewNote: note }),
       at: now(),
     }
     const outcome = await transition(
-      id,
+      record,
       to,
       { history: [...record.history, entry] },
-      { verdict: input.verdict, reviewedBy: input.reviewedBy },
+      { verdict, reviewedBy },
     )
     if (!outcome.succeeded || to !== 'approved') return outcome
     // Exactly one approved version per scope: supersede prior approved rows.
     const priorApproved = await store.listByWorkspace(record.workspaceId, { status: ['approved'] })
     for (const prior of priorApproved) {
       if (prior.id === id || prior.scopeKey !== record.scopeKey) continue
-      await transition(prior.id, 'superseded', {}, { supersededBy: id })
+      await transition(prior, 'superseded', {}, { supersededBy: id })
     }
     return outcome
   }
@@ -486,7 +490,10 @@ export function createWorkProductService(options: WorkProductServiceOptions): Wo
     recordChecks,
     submit,
     applyVerdict,
-    supersede: (id) => transition(id, 'superseded'),
+    supersede: async (id) => {
+      const record = await store.load(id)
+      return record ? transition(record, 'superseded') : rejected(`Work product ${id} not found`)
+    },
   }
 }
 
