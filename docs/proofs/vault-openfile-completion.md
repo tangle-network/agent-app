@@ -19,8 +19,10 @@ The dialog remained visible with the unsaved `dirty note` behind it.
 Clicking Discard then displayed the new artifact and reported success.
 At 390 px the document and viewport were both 390 px, with zero page errors.
 
-The focused Vault test suite passed 58/58 after seven completion cases first failed against the old `void` handle.
+The focused Vault test suite passed 60/60 after seven completion cases first failed against the old `void` handle.
 Against the first Promise implementation, six changed checks failed: an initial effect canceled a request before its read completed; controlled rejection remained pending; a dirty prompt disappeared after 30 seconds; a slow read was canceled after 30 seconds; an invalid request canceled a valid read; and rejection after dirty confirmation discarded the draft.
+Two further checks failed against the first corrected head: after initial tree listing failed, an explicit path and an already selected explicit path never reached `readFile`.
+The corrected pane asks the data port to read an explicit external path while the tree error remains visible.
 The corrected pane has no UI deadline for human confirmation or data-port reads.
 The data port owns read timeouts and reports failures through its existing error path.
 Controlled hosts may explicitly reject a selection by returning `false` from `onSelectedPathChange`.

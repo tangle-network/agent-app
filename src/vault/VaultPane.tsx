@@ -542,7 +542,9 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
       loadedPathRef.current = null
       return
     }
-    if (treeLoading || !treeLoaded || isDirty || saving) return
+    // An external path can be read after listing fails; the data port still validates access.
+    const explicitOpenAfterTreeError = !!treeError && pendingOpenRef.current?.path === selectedPath
+    if (treeLoading || (!treeLoaded && !explicitOpenAfterTreeError) || isDirty || saving) return
     if (!resolvedSelectedPath) {
       finishPendingOpen(false)
       commitPath(null)
@@ -584,7 +586,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     return () => {
       cancelled = true
     }
-  }, [port, selectedPath, resolvedSelectedPath, treeLoading, treeLoaded, isDirty, saving, reloadNonce, commitPath, reportFailure, finishPendingOpen])
+  }, [port, selectedPath, resolvedSelectedPath, treeLoading, treeLoaded, treeError, isDirty, saving, reloadNonce, commitPath, reportFailure, finishPendingOpen])
 
   useEffect(() => {
     if (!selectedFile) {
@@ -650,7 +652,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     }
     if (path === selectedPath) {
       showDocument()
-      if (readError && !fileLoading) setReloadNonce((nonce) => nonce + 1)
+      if (!fileLoading && (readError || (treeError && !treeLoaded))) setReloadNonce((nonce) => nonce + 1)
       return
     }
     if (isDirty) {
@@ -659,7 +661,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     }
     showDocument()
     if (commitPath(path) === false) finishPendingOpen(false)
-  }, [finishPendingOpen, treePaths, selectedPath, selectedFile, displayReadyPath, fileLoading, showDocument, readError, isDirty, commitPath])
+  }, [finishPendingOpen, treePaths, selectedPath, selectedFile, displayReadyPath, fileLoading, showDocument, readError, treeError, treeLoaded, isDirty, commitPath])
 
   useImperativeHandle(ref, () => ({
     openFile: (path) => new Promise<boolean>((resolve) => guardedOpen(path, resolve)),

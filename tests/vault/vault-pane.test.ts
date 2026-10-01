@@ -495,6 +495,39 @@ describe('VaultPane — dirty-guard state machine', () => {
 })
 
 describe('VaultPaneHandle.openFile completion', () => {
+  it('reads an explicit path when the initial tree listing fails', async () => {
+    const listTree = vi.fn().mockRejectedValue(new Error('list unavailable'))
+    const readFile = vi.fn(async (path: string): Promise<VaultFile> => ({ path, content: 'direct content' }))
+    const { paneRef } = mount({ port: fakePort({ listTree, readFile }) })
+    await screen.findByText("Couldn't load the Vault")
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('unlisted.md') })
+
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith('unlisted.md'))
+    expect(await opened).toBe(true)
+    expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('unlisted.md')
+    expect(screen.getByTestId('artifact').textContent).toBe('direct content')
+  })
+
+  it('retries an explicit selected path after the initial tree listing fails', async () => {
+    const listTree = vi.fn().mockRejectedValue(new Error('list unavailable'))
+    const readFile = vi.fn(async (path: string): Promise<VaultFile> => ({ path, content: 'direct content' }))
+    const { paneRef } = mount({
+      port: fakePort({ listTree, readFile }),
+      selectedPath: 'unlisted.md',
+      onSelectedPathChange: vi.fn(),
+    })
+    await screen.findByText("Couldn't load the Vault")
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('unlisted.md') })
+
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith('unlisted.md'))
+    expect(await opened).toBe(true)
+    expect(screen.getByTestId('artifact').textContent).toBe('direct content')
+  })
+
   it('keeps a first-render request pending until its file is displayed', async () => {
     let finishRead!: (file: VaultFile) => void
     let opened!: Promise<boolean>
