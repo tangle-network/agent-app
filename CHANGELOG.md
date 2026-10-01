@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.18
+
+- feat(workspace): group app destinations in sidebar
+
 ## 0.50.17
 
 - feat(object-store): stream authenticated raw uploads
