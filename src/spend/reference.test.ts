@@ -80,12 +80,35 @@ describe('parseSandboxGroupKey', () => {
 })
 
 describe('settlementSandboxId', () => {
-  it('prefers the reference id, which is the field the platform dedups on', () => {
-    expect(settlementSandboxId(row({ groupKey: 'sandbox:sb_stale' }))).toBe('sb_abc')
+  it('uses the canonical group key when the interval reference names a session-qualified resource', () => {
+    expect(
+      settlementSandboxId(
+        row({
+          referenceId:
+            'sandbox:compute:sandbox-939adc5e2c82:6b13e6b0-4d41-44ee-82aa-a780b0439562:1790888695332',
+          groupKey: 'sandbox:sandbox-939adc5e2c82',
+        }),
+      ),
+    ).toBe('sandbox-939adc5e2c82')
   })
 
-  it('falls back to the group key when the reference carries no interval', () => {
+  it('prefers the canonical group key over a conflicting reference id', () => {
+    expect(settlementSandboxId(row({ groupKey: 'sandbox:sb_stale' }))).toBe('sb_stale')
+  })
+
+  it('uses the group key when the reference carries no interval', () => {
     expect(settlementSandboxId(row({ referenceId: null }))).toBe('sb_abc')
+  })
+
+  it('falls back to reference-only identities when the group key is missing', () => {
+    expect(
+      settlementSandboxId(
+        row({
+          referenceId: 'sandbox:stop:sb_legacy:1753900000000',
+          groupKey: null,
+        }),
+      ),
+    ).toBe('sb_legacy')
   })
 
   it('is null for a row that names no sandbox at all', () => {
