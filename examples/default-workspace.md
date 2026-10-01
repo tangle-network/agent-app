@@ -3,8 +3,32 @@
 Chat-first products should start with the shared workspace composition instead
 of creating a product-local sidebar.
 
+## Generated starter
+
+The maintained `create-agent-app --chat` template now assembles this layout in
+React. See [the scaffold walkthrough](../create-agent-app/README.md) and
+[packed consumer proof](../create-agent-app/proof/README.md). Check the selected
+published version: source in this checkout does not prove that a registry
+release already includes the template.
+
+The starter imports `AgentWorkspaceLayout`, `SessionHistoryPanel`, `ChatMessages`,
+and `ChatComposer` through public package paths. It builds standalone browser
+assets with the public Tailwind preset and both maintained stylesheets, scanning
+installed package distributions rather than repository source. It uses real
+same-origin auth, History navigation, and `/?threadId=...` links.
+
+The starter's existing upload API returns inline/sandbox parts. It therefore
+uses `ChatComposer.onSendParts`, not `EntryComposer.uploadUrl`, whose upload
+contract is for store-backed attachments. Do not change server/storage behavior
+to make a UI example fit. Capability controls without real server data remain
+absent. No new primitive family or transcript header is required.
+
+## Reference composition
+
 The browser reference is [desktop](../docs/assets/default-workspace/desktop.png)
 and [mobile](../docs/assets/default-workspace/mobile.png).
+These are the existing reference composition, not screenshots from a generated
+consumer run. The packed proof captures its own desktop and mobile evidence.
 
 `AgentWorkspaceLayout` owns the repeated visual and session behavior:
 
@@ -58,8 +82,7 @@ export function Workspace({ data, pathname, base, activeSessionId }) {
       logo={data.logo}
       logoHref={base}
       user={data.user}
-      {/* The standard rail is hidden below `lg`; override when mobile navigation
-          is a deliberate part of the product shell. */}
+      onLogout={data.signOut}
       hideBelow="lg"
     >
       {data.children}
@@ -72,7 +95,7 @@ To show agent-built applications in the rail, pass authorized records through th
 See [workspace apps](./workspace-apps.md) for the publish and preview flow.
 
 Pair the layout with `EntryComposer` from
-`@tangle-network/agent-app/chat-react` on the new-session route and
+`@tangle-network/agent-app/web-react` on the new-session route and
 `SessionHistoryPanel` from `@tangle-network/agent-app/web-react` on the full
 history route.
 
@@ -147,7 +170,7 @@ See the rendered editor at docs/assets/profile-editor/complete.png.
 import {
   EntryComposer,
   type ComposerPlanModeSelection,
-} from '@tangle-network/agent-app/chat-react'
+} from '@tangle-network/agent-app/web-react'
 
 <EntryComposer
   heading="What do you want to work on?"
@@ -168,7 +191,7 @@ import {
 />
 ```
 
-Use `ChatMessages` and the shared `AgentComposer` for an existing session,
+Use `ChatMessages` and the shared `ChatComposer` for an existing session,
 keeping domain cards and context in the product.
 
 The transcript fills the main column from its top edge.

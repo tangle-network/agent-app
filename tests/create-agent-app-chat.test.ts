@@ -63,10 +63,10 @@ function linkDeps(projectDir: string) {
     .flatMap((deps) => Object.keys(deps ?? {}))
     .filter((name) => name !== '@tangle-network/agent-app')
 
-  // Wrangler is a declared devDependency the tests never execute; linking the
-  // whole CLI tree buys nothing. Everything else the template declares must be
-  // linkable from this repo — a declared dep the repo cannot provide is drift.
-  const skip = new Set(['wrangler'])
+  // This offline lane runs TypeScript and the server suite, not bundlers.
+  // The fresh packed-install gate installs and executes ALL of these tools,
+  // builds real browser assets, then boots the Worker and Chromium.
+  const skip = new Set(['wrangler', 'vite', '@vitejs/plugin-react'])
   for (const name of new Set(declared)) {
     if (skip.has(name)) continue
     link(join(nm, name), join(REPO, 'node_modules', name))
@@ -90,7 +90,7 @@ describe('create-agent-app --chat scaffolder', () => {
     linkDeps(projectDir)
   })
 
-  it('emits the chat vertical: config, composer, sandbox lane, migration, dev page, its own e2e test', () => {
+  it('emits the chat vertical, React workspace, standalone build, and its own e2e test', () => {
     const expected = [
       'agent.config.ts',
       'prompts/system.md',
@@ -103,7 +103,17 @@ describe('create-agent-app --chat scaffolder', () => {
       'src/db/schema.ts',
       'migrations/0001_init.sql',
       'migrations/0002_agent_gateway.sql',
-      'public/index.html',
+      'web/index.html',
+      'web/main.tsx',
+      'web/App.tsx',
+      'web/Conversation.tsx',
+      'web/api.ts',
+      'web/uploads.ts',
+      'web/styles.css',
+      'web/tsconfig.json',
+      'web/env.d.ts',
+      'vite.config.mjs',
+      'tailwind.config.mjs',
       'tests/chat-turn.e2e.test.ts',
       'tests/sandbox-fence.test.ts',
       'package.json',
@@ -120,20 +130,23 @@ describe('create-agent-app --chat scaffolder', () => {
     for (const f of expected) {
       expect(existsSync(join(projectDir, f)), `missing ${f}`).toBe(true)
     }
+    expect(existsSync(join(projectDir, 'public/index.html'))).toBe(false)
   })
 
-  it('substitutes tokens across package.json, agent.config.ts, wrangler.toml, and the dev page', () => {
+  it('substitutes tokens across package.json, agent.config.ts, wrangler.toml, and the browser entry', () => {
     const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'))
     expect(pkg.name).toBe('demo-chat')
     expect(pkg.dependencies['@tangle-network/agent-app']).toBe(APP_VERSION)
     const cfg = readFileSync(join(projectDir, 'agent.config.ts'), 'utf8')
     expect(cfg).toContain("name: 'demo-chat'")
-    for (const file of ['agent.config.ts', 'wrangler.toml', 'public/index.html', 'prompts/system.md']) {
+    for (const file of ['agent.config.ts', 'wrangler.toml', 'web/index.html', 'prompts/system.md']) {
       expect(readFileSync(join(projectDir, file), 'utf8'), `unsubstituted token in ${file}`).not.toMatch(/__[A-Z_]+__/)
     }
     expect(JSON.stringify(pkg)).not.toMatch(/__[A-Z_]+__/)
     const wrangler = readFileSync(join(projectDir, 'wrangler.toml'), 'utf8')
     expect(wrangler).toContain('migrations_dir = "migrations"')
+    expect(wrangler).toContain('directory = "dist/client"')
+    expect(wrangler).toContain('run_worker_first = ["/api/*", "/v1/*"]')
   })
 
   it('template engine pins satisfy agent-app peerDependencies (drift gate)', () => {
@@ -150,9 +163,10 @@ describe('create-agent-app --chat scaffolder', () => {
       ...gen.peerDependencies,
       ...gen.dependencies,
     }
-    // agent-gateway is a sibling app-shell package used by the generated app.
-    // It is not an engine peer of the agent-app library.
-    const directShellDependencies = new Set(['@tangle-network/agent-gateway'])
+    // agent-gateway is the sibling gateway; brand is sandbox-ui's required
+    // peer. Neither is an agent-app engine peer. The packed gate checks the
+    // complete installed peer graph, including sandbox-ui's brand contract.
+    const directShellDependencies = new Set(['@tangle-network/agent-gateway', '@tangle-network/brand'])
     for (const [name, range] of Object.entries(declaredEngines)) {
       if (
         !name.startsWith('@tangle-network/')
@@ -176,6 +190,10 @@ describe('create-agent-app --chat scaffolder', () => {
       'better-auth',
       'drizzle-orm',
       'viem',
+      '@tangle-network/sandbox-ui',
+      '@tangle-network/ui',
+      'react',
+      'react-dom',
     ]) {
       expect(gen.dependencies[name], `missing runtime dependency ${name}`).toBeTruthy()
     }
@@ -199,13 +217,15 @@ describe('create-agent-app --chat scaffolder', () => {
     expect(sandboxSource.match(/ensureWorkspaceSandbox\(/g) ?? []).toHaveLength(1)
   })
 
-  it('the generated app typechecks against the real agent-app dist types', () => {
+  it('the generated Worker and browser typecheck against the real agent-app dist types', () => {
     const tsc = join(projectDir, 'node_modules', 'typescript', 'bin', 'tsc')
     try {
-      execFileSync('node', [tsc, '--noEmit', '--project', join(projectDir, 'tsconfig.json')], {
-        cwd: projectDir,
-        stdio: 'pipe',
-      })
+      for (const config of ['tsconfig.json', 'web/tsconfig.json']) {
+        execFileSync('node', [tsc, '--noEmit', '--project', join(projectDir, config)], {
+          cwd: projectDir,
+          stdio: 'pipe',
+        })
+      }
     } catch (err: unknown) {
       const e = err as { stdout?: Buffer; stderr?: Buffer }
       const output = (e.stdout?.toString() ?? '') + (e.stderr?.toString() ?? '')
@@ -222,8 +242,7 @@ describe('create-agent-app --chat scaffolder', () => {
   // a scaffold can never EMIT the defect in the first place.
   it('the generated app references no undefined design token (invisible-UI class)', async () => {
     const { checkThemeContract } = (await import('../src/theme-contract/index')) as typeof import('../src/theme-contract/index')
-    const srcDir = join(projectDir, 'src')
-    const result = checkThemeContract({ srcDirs: [srcDir] })
+    const result = checkThemeContract({ srcDirs: [join(projectDir, 'src'), join(projectDir, 'web')] })
     expect(
       result.missing,
       `the --chat scaffold emits references to design tokens that are not defined in tokens.css, ` +

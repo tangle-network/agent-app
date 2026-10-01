@@ -3,7 +3,7 @@
 Scaffold a Tangle agent product on
 [`@tangle-network/agent-app`](https://github.com/tangle-network/agent-app).
 Use **`--chat` for the browser sign-in and chat walkthrough below**. Without it,
-the CLI generates the tool-loop skeleton, not the assembled chat variant.
+the CLI generates the unchanged tool-loop skeleton, not the assembled chat variant.
 
 ## Choose a published version
 
@@ -19,29 +19,36 @@ npm create "@tangle-network/agent-app@$CREATE_VERSION" my-agent -- --chat
 
 Do not continue after a failed registry lookup. The CLI defaults the generated
 `agent-app` dependency to `<scaffolder-version>`; the generated `package.json`
-records the requested dependencies and `packageManager`.
-Use that pnpm version.
-The generated engine pins match the cohort maintained in Agent App's package manifest.
-Upgrade this cohort deliberately and run the product's real flow before deployment.
-Do not force a version override or ignore peer failures to conceal an incomplete
-release.
+records the requested dependencies and `packageManager`. Use that pnpm version.
+The engine and UI pins match the maintained Agent App cohort. Upgrade this
+cohort deliberately and run the product's real flow before deployment. Do not
+force an override or ignore peer failures to conceal an incomplete release.
 
-An npm dist-tag is not `main`. This walkthrough describes the maintained chat
-template; compare it with the files in your generated project. A feature found
-only in this repository is not evidence that your selected npm package ships it.
+An npm dist-tag is not `main`. This walkthrough describes the maintained source
+template; compare it with the files in your generated project. In particular,
+check for `web/` and the Vite build configuration. A source-only React template
+change does not prove that the selected registry package already ships it.
 
 ## What is generated
 
-The chat variant supplies a Cloudflare Worker, D1 migrations, session-authenticated
-chat routes, sandbox-backed turns, and `public/index.html`: a small **development
-chat page** with email/password sign-in, a thread list, a composer, and uploads.
-It does not generate the React workspace shown in
-[`examples/default-workspace.md`](../examples/default-workspace.md).
-That example is a product-UI integration guide, not a screenshot of the scaffold.
+The chat variant supplies a standalone React workspace, a Cloudflare Worker,
+D1 migrations, session-authenticated routes, and sandbox-backed turns.
+`web/App.tsx` composes the existing `AgentWorkspaceLayout`, real email/password
+session auth, New thread navigation, and the shared full History panel.
+`web/Conversation.tsx` composes the shared composer, messages, and interaction
+cards with the existing chat, upload, and replay routes. There is no second
+primitive family or product-local sidebar.
+
+Vite builds browser JS and standalone CSS into `dist/client`. The CSS imports
+public Agent App and sandbox-ui styles and the public Tailwind preset, scanning
+installed package distributions. Wrangler's custom build serves the same
+compiled assets in development and deployment. Worker and browser typechecking
+use separate configurations; no server config is bundled into the browser.
 
 The generated `README.md`, `AGENTS.md`, and `CUSTOMIZE.md` remain the customization
-trail. Installing dependencies or passing the template's injected-producer tests
-is not proof of a real login, model turn, or durable file.
+trail. A build or an injected-producer test does not prove a hosted login, a live
+model turn, or durable artifact bytes. The source-level default workspace guide
+is at [`examples/default-workspace.md`](../examples/default-workspace.md).
 
 ## Configure and start the chat variant
 
@@ -52,78 +59,84 @@ cp .dev.vars.example .dev.vars
 ```
 
 Keep `.dev.vars` out of version control. Replace its auth-secret placeholder with
-a fresh secret (for example, generate one with `openssl rand -base64 32`), and fill
-`TANGLE_API_KEY`, `SANDBOX_API_KEY`, and `SANDBOX_GATEWAY_URL` with development
-credentials. These are server-side Router and Sandbox credentials, not the
-password you will use to sign in to the generated app. Missing sandbox
-credentials do not select a demo agent: real turns fail.
+a fresh secret (for example, `openssl rand -base64 32`) and fill the development
+`TANGLE_API_KEY`, `SANDBOX_API_KEY`, and `SANDBOX_GATEWAY_URL` credentials.
+These are server-side Router and Sandbox credentials, not your app password.
+Missing sandbox credentials do not select a demo agent: real turns fail.
 
-In `agent.config.ts`, replace `model.default: 'REPLACE_WITH_MODEL'` with a model
-your Router key can use, compatible with the selected harness (`opencode` is the
-template default). Review `model.fallbacks` as well; `MODEL_NAME` in `.dev.vars`
-can override the default. Customize the persona in `prompts/system.md`.
+Replace `model.default: 'REPLACE_WITH_MODEL'` in `agent.config.ts` with a model
+your Router key can use, compatible with the selected harness (`opencode` by
+default). Review fallbacks and the optional `MODEL_NAME` environment override.
+Customize `prompts/system.md` and the product title in `web/index.html`.
 
 Set the `DB` binding's `database_id` in `wrangler.toml` to a **development** D1
-database ID; `CUSTOMIZE.md` contains the database-creation instructions. Keep its
-`database_name` consistent with the generated migration scripts. Keep
-`BETTER_AUTH_URL` at `http://localhost:8787` when using that local origin; change
-both together when using another origin. R2 is not required for the chat turn,
-and uncommenting its binding alone does not add artifact storage or downloads.
+ID. Keep `database_name` consistent with the migration scripts. Keep
+`BETTER_AUTH_URL` equal to the actual Worker origin, normally
+`http://localhost:8787`. Do not introduce a second Vite origin for cookie auth.
+R2 is not required for a chat turn and does not itself provide downloads.
 
 ```bash
 pnpm db:migrate:local
-pnpm typecheck
+pnpm build
+pnpm test
 pnpm dev
 ```
 
-The migration command above is local. Neither `pnpm deploy` nor the remote
-`pnpm db:migrate` command is part of this local walkthrough. The chat template
-uses `wrangler dev`; it does not define a separate `build` script.
+Wrangler compiles the frontend before starting and rebuilds it when the browser
+sources change; refresh after a rebuild. `pnpm build` checks both type boundaries
+and builds browser assets. `pnpm exec wrangler deploy --dry-run` checks the Worker
+bundle without deployment. Neither `pnpm deploy` nor remote `pnpm db:migrate` is
+part of this local walkthrough. APIs retain their JSON responses and are not
+covered by an HTML fallback.
 
 ## Sign in and run a normal turn
 
-Open `http://localhost:8787`. In the sign-in dialog, choose **No account? Sign up**
-and create a development account with an email and a password of at least eight
-characters. Use **Sign in** for an account already in this app's D1 database;
-this is not a Tangle CLI login or a provider OAuth flow.
+Open the Worker origin. Choose **No account? Sign up**, then create a development
+account with an email and a password of at least eight characters. An existing
+account signs in against the same D1 database. This is not a Tangle CLI login or
+provider OAuth flow.
 
-Choose **New thread** and send a normal message such as “What can you help me
-with?” This invokes the real Sandbox and model and can incur usage charges.
-Wait for completion, check for an error, and reload the same thread. Look for the
-persisted assistant text and model/token metadata, not just a successful HTTP
-connection or a locally rendered user message. A second message in that thread
-uses the thread ID as the agent session ID.
+Choose **New thread** and send a normal message. This invokes the real Sandbox
+and model and can incur usage charges. Wait for completion, check for errors,
+and reload the saved `?threadId=...` URL. Inspect persisted assistant text and
+model/token metadata, not only a successful HTTP connection or optimistic user
+message. A second message uses the same thread ID as the agent session ID.
 
-Save the resulting URL containing `?threadId=...`. The dev page can reload the
-completed transcript; it is not the shared React reconnect/replay client. Do not
-use closing the tab mid-turn as a substitute for this completed-turn check.
+History is `/?view=history`; its search and sorting cover the existing API's
+pages, not only the capped rail. Native links retain normal browser navigation.
+The shared stream client resumes a dropped stream; reopening a running thread
+uses existing replay handles and durable rows without appending the same text
+twice. Verify that live behavior separately on the target environment.
+
+The existing upload endpoint returns inline or sandbox `parts`. The template
+uses `ChatComposer.onSendParts` rather than pretending those responses are the
+store-backed attachments expected by `EntryComposer.uploadUrl`. Model, effort,
+profile, plan-mode, and unsupported thread-action controls stay hidden until
+real catalogs and handlers exist.
 
 ## Restart and artifact limits
 
-For a file-producing turn, ask the agent to save a small text file at
-`/home/agent/artifacts/quickstart.txt` with a distinctive value you can compare
-later. A claim in the assistant's answer is not proof that the file exists.
-In the maintained chat template, opening `/api/files` in the same signed-in
-browser lists metadata under `/home/agent/artifacts`. Check that your generated
-`src/worker.ts` actually mounts this route before relying on it.
+After a completed turn, stop only local `pnpm dev`, then restart it from the same
+project. Preserve `.wrangler/state`, the D1 configuration, auth secret, and app
+identity. Reopen the saved URL and sign in if needed. This checks a local Worker
+restart, not sandbox suspension, deletion, or host-loss recovery.
 
-After the turn completes, stop **only the local `pnpm dev` process**, then run
-`pnpm dev` again from the same project directory. Preserve the local Wrangler
-state (`.wrangler/state`), database configuration, auth secret, and app identity.
-Reopen the saved thread URL and sign in to the same app account if needed. Check
-the transcript and artifact index again. This exercises a local Worker restart,
-not sandbox suspension, deletion, or host-loss recovery.
+For an artifact-producing turn, ask for a distinctive small file under
+`/home/agent/artifacts`. Check `/api/files` in the signed-in browser; an assistant
+claim alone is not proof. The index returns metadata or `warming`, and does not
+provision, resume, or read files. **Attachment labels are not downloads.** An
+authorized product file reader must compare actual contents before and after
+restart to prove saved bytes reopened. Do not claim that proof from this scaffold.
 
-**The stock dev page does not reopen artifact contents.** Its file/image parts
-are labels, not download links. `/api/files` is a metadata index, not a file-read
-endpoint; it returns `warming` when no ready sandbox exists and does not provision
-or resume one. Uploading a file and replaying a transcript are also not proof of
-saved artifact bytes. Completing a saved-artifact-reopened check requires a
-product-owned, authorized file reader/storage integration and a comparison of
-the actual contents before and after restart. Do not describe that check as
-passed from this scaffold alone.
+## Fresh packed consumer proof
 
-For product assembly after this local walkthrough, see
-[`examples/chat-app.md`](../examples/chat-app.md) and the shared workspace example
-above. The product supplies its UI and artifact access; those examples do not
-turn source-only behavior into a published scaffold feature.
+From a candidate Agent App checkout, run its maintained `pnpm test:generated`
+gate. It installs the packed generator, generates fresh headless and chat apps,
+installs the candidate Agent App tarball, runs typechecks/tests, and builds the
+frontend and Worker. Its Chromium/Worker/D1 lane checks real signup, History,
+thread navigation/reload, sign-out, and the same thread after a fresh process
+and login, with zero model turns. See [proof instructions](./proof/README.md).
+
+The existing generated server suite covers message/part persistence and replay
+with an explicitly fake producer. Hosted deployment, live model execution,
+live mid-turn reconnect, and saved artifact bytes remain separate proofs.

@@ -3,10 +3,17 @@ main = "src/worker.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
-# The dev chat page. Assets are served before the worker; /api/* falls
-# through to src/worker.ts.
+# Compile the same browser assets for dev and deploy. Only web sources trigger
+# a frontend rebuild; Worker source keeps Wrangler's ordinary watch behavior.
+[build]
+command = "pnpm run build:web"
+watch_dir = ["web", "vite.config.mjs", "tailwind.config.mjs"]
+
+# Same-origin cookie auth. Query-based thread URLs need no SPA fallback.
+# Never let an asset or HTML fallback swallow an API/gateway request.
 [assets]
-directory = "public"
+directory = "dist/client"
+run_worker_first = ["/api/*", "/v1/*"]
 
 # D1 holds everything durable: auth, threads/messages, the turn buffer.
 # Setup: `wrangler d1 create __PACKAGE_NAME__`, paste the database_id, then
