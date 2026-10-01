@@ -56,16 +56,17 @@ export function parseSandboxGroupKey(groupKey: string | null | undefined): strin
 /**
  * The sandbox a settlement row is attributable to.
  *
- * The reference id wins over the group key because it is the field the platform
- * dedups on, so it is the one guaranteed present and correct on a compute
- * settlement; the group key is the fallback for rows written before a producer
- * stamped a reference, and for kinds whose reference names something else (a GPU
- * lease id, not a box).
+ * The platform's group key names the sandbox being billed and remains stable
+ * across its settlement intervals. A reference identifies an interval and may
+ * include a session id in its resource id, so use it only when the group key is
+ * absent. Legacy reference-only rows remain attributable.
  */
 export function settlementSandboxId(row: SettlementRow): string | null {
+  const groupKeySandboxId = parseSandboxGroupKey(row.groupKey)
+  if (groupKeySandboxId) return groupKeySandboxId
+
   const reference = parseSettlementReference(row.referenceId)
-  if (reference && reference.intervalStartMs !== null) return reference.resourceId
-  return parseSandboxGroupKey(row.groupKey) ?? (reference ? reference.resourceId : null)
+  return reference ? reference.resourceId : null
 }
 
 /** True when a row is a charge (the ledger stores charges as negative amounts). */
