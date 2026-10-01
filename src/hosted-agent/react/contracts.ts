@@ -1,4 +1,5 @@
 import type { Line, LineFromConnectionInput, LineMember, LineMemberPatch, LineMemberSpec } from '@tangle-network/sandbox'
+import type { ReactNode } from 'react'
 
 export type ConnectableLineTransport = LineFromConnectionInput['transport']
 export type LineBoxMode = 'per-member' | 'shared'
@@ -83,6 +84,11 @@ export interface LineSetupProps {
   /** Narrow new attachments without hiding disconnect controls; not server authorization. */
   canConnect?: boolean
   showConnectionSetup?: boolean
+  /** Product-specific step beside the selected line, before attach. The ready
+   * flag gates the button and is checked again when the user clicks it. */
+  connectPrerequisite?(input: LineConnectInput): { content: ReactNode; ready: boolean }
+  setupDescription?: string
+  emptyConnectionsMessage?: string
   onNotice?(notice: { kind: 'success' | 'error'; message: string }): void
 }
 

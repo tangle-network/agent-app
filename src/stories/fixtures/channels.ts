@@ -12,7 +12,7 @@ export function channelLine(overrides: Partial<Line> = {}): Line {
 
 export function channelAttachment(): LineAttachment {
   return {
-    id: 'att_demo', lineId: 'ln_demo', sandboxId: 'box_demo', mode: 'personal', payer: 'owner', unknownSenders: 'reject',
+    id: 'att_demo', lineId: 'ln_demo', runAsKeyId: 'key_demo', sandboxId: 'box_demo', mode: 'personal', payer: 'owner', unknownSenders: 'reject',
     roles: { owner: { context: 'own', tools: 'chat' } }, respond: { kind: 'agent', acknowledgement: true },
     limits: { turnsPerMemberPerDay: 20, noticesPerSenderPerDay: 2, noticesPerLinePerDay: 20 },
     status: 'active', clientReference: 'agent:demo', createdAt: '2026-09-24T12:00:00Z', updatedAt: '2026-09-24T12:00:00Z',

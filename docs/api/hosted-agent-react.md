@@ -4,7 +4,7 @@
 
 Source: `src/hosted-agent/react/index.ts`
 
-24 exports.
+26 exports.
 
 ### `ApplicationLineConnectInput`
 
@@ -16,7 +16,7 @@ interface ApplicationLineConnectInput
 
 ### `ApplicationLineSetup`
 
-`function` — Nominate a sender explicitly, then use the existing connection and disconnect UI.
+`function` — Verify an owned handset before connecting its iMessage line to an application.
 
 ```ts
 (props: ApplicationLineSetupProps) => Element
@@ -36,6 +36,22 @@ interface ApplicationLineSetupClient
 
 ```ts
 interface ApplicationLineSetupProps
+```
+
+### `ApplicationSenderVerification`
+
+`interface` — Browser-safe status from the owner server.
+
+```ts
+interface ApplicationSenderVerification
+```
+
+### `ApplicationSenderVerificationStart`
+
+`interface` — Public TEST data.
+
+```ts
+interface ApplicationSenderVerificationStart
 ```
 
 ### `ConnectableLineTransport`
@@ -163,7 +179,7 @@ interface LineMembersProps
 `function` — Set up an owned identity through a host route backed by sandbox.lines and Hub.
 
 ```ts
-({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect, showConnectionSetup, onNotice }: LineSetupPro…
+({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect, showConnectionSetup, connectPrerequisite, set…
 ```
 
 ### `LineSetupClient`

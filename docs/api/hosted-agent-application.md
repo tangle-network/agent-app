@@ -4,7 +4,7 @@
 
 Source: `src/hosted-agent/application.ts`
 
-4 exports.
+9 exports.
 
 ### `ApplicationLineObservation`
 
@@ -22,12 +22,36 @@ type ApplicationLineObservation
 interface ApplicationLineOptions
 ```
 
-### `attachWorkspaceLine`
+### `ApplicationOwnerLines`
 
-`function` — A line delegates its nominated owner to the application's normal chat path.
+`interface`
 
 ```ts
-(input: { box: Pick<SandboxInstance, "lines">; lineId: string; ownerAddress: string; application: LineApplication; turn…
+interface ApplicationOwnerLines
+```
+
+### `ApplicationSenderVerification`
+
+`interface` — Browser-safe status from the owner server.
+
+```ts
+interface ApplicationSenderVerification
+```
+
+### `ApplicationSenderVerificationStart`
+
+`interface` — Public TEST data.
+
+```ts
+interface ApplicationSenderVerificationStart
+```
+
+### `attachWorkspaceLine`
+
+`function` — Attach a proved handset to the application's normal chat path.
+
+```ts
+(input: { box: Pick<SandboxInstance, "lines">; ownerLines: ApplicationOwnerLines; lineId: string; senderVerificationId:…
 ```
 
 ### `createApplicationLineHandler`
@@ -36,4 +60,20 @@ interface ApplicationLineOptions
 
 ```ts
 <T>(options: ApplicationLineOptions<T>) => (request: Request) => Promise<Response>
+```
+
+### `OwnerApplicationSenderVerification`
+
+`interface` — The owner-key SDK read includes the confirmed sender for the attach helper.
+
+```ts
+interface OwnerApplicationSenderVerification
+```
+
+### `publicApplicationSenderVerification`
+
+`function` — Use at the host response boundary so approvedSender cannot enter page state.
+
+```ts
+(result: OwnerApplicationSenderVerification) => ApplicationSenderVerification
 ```
