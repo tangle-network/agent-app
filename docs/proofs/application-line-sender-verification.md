@@ -24,7 +24,14 @@ Both states stayed within the 1280 px viewport without horizontal overflow.
 
 ![Status error at desktop width](application-line-verification-error-desktop.png)
 
-The browser reported no page exceptions or failed application requests.
+The consumed-proof story verified a phone, rejected Connect after another session used its proof, then refreshed status.
+It kept Connect disabled and offered a new test at 1280 px and 390 px without horizontal overflow.
+The browser reported no page exceptions, console errors, or failed requests in either viewport.
+
+![Consumed proof recovery at desktop width](application-line-verification-consumed-desktop.png)
+
+![Consumed proof recovery at mobile width](application-line-verification-consumed-mobile.png)
+
 Storybook's development server returned 404 for `/favicon.ico`; this did not affect the component.
 These checks prove the rendered fixture flow and browser-session persistence.
 Native attachment, provider delivery, and a real handset require separate served proof.

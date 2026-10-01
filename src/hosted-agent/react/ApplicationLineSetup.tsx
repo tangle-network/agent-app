@@ -52,6 +52,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
   } | null>(null)
   const [pending, setPending] = useState<{ kind: 'start' | 'check'; draftKey: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [needsStatusRefresh, setNeedsStatusRefresh] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const turnsPerDay = Number(limit)
   const validLimit = Number.isSafeInteger(turnsPerDay) && turnsPerDay >= 1 && turnsPerDay <= 10_000
@@ -67,7 +68,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
 
   function verifiedFor(input: LineConnectInput, time: number): boolean {
     const active = activeFor(input)
-    return Boolean(active && active.status.state === 'verified'
+    return Boolean(active && !needsStatusRefresh && !pending && active.status.state === 'verified'
       && active.status.proof.signedInboundTestAt && active.status.proof.providerReplyAcknowledgedAt
       && active.status.proof.signedInboundConfirmAt && expiry(active.status.expiresAt) > time)
   }
@@ -77,6 +78,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
     if (!enabled || !props.canManage || !validLimit || pending || input.transport !== 'imessage') return
     setPending({ kind: 'start', draftKey: key })
     setError(null)
+    setNeedsStatusRefresh(true)
     try {
       const result = await client.startSenderVerification(input)
       if (!result.lineId || !result.testId || !result.testText || result.state !== 'awaiting_test'
@@ -101,6 +103,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
     if (pending) return
     setPending({ kind: 'check', draftKey: active.draftKey })
     setError(null)
+    setNeedsStatusRefresh(true)
     try {
       const result = await client.getSenderVerification(active.start.lineId, active.start.testId)
       if (result.lineId !== active.start.lineId || result.testId !== active.start.testId)
@@ -115,6 +118,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
         },
       }
       setSession(current => current?.start.testId === active.start.testId ? { ...current, status } : current)
+      setNeedsStatusRefresh(false)
       setNow(Date.now())
     } catch (cause) {
       setError(verificationError(cause))
@@ -140,10 +144,15 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
       const active = activeFor(input)
       if (!enabled || !props.canManage || !validLimit || !verifiedFor(input, Date.now()) || !active)
         throw new Error('Verify the selected phone before connecting this line')
-      await client.connect({ ...input, senderVerificationId: active.start.testId, turnsPerDay })
-      setSession(null)
+      try {
+        await client.connect({ ...input, senderVerificationId: active.start.testId, turnsPerDay })
+        setSession(null)
+      } catch (cause) {
+        setNeedsStatusRefresh(true)
+        throw cause
+      }
     },
-  }), [client, enabled, props.canManage, session, turnsPerDay, validLimit])
+  }), [client, enabled, props.canManage, session, turnsPerDay, validLimit, needsStatusRefresh, pending])
 
   function prerequisite(input: LineConnectInput) {
     const key = draftKey(input)
@@ -153,7 +162,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
     const inProgress = active && !expired && ['awaiting_test', 'sending', 'challenge_sent'].includes(active.status.state)
     const busy = pending?.draftKey === key
     const canStart = enabled && props.canManage && validLimit && !pending && input.transport === 'imessage'
-    const canCheck = inProgress && !pending
+    const canCheck = Boolean((inProgress || active?.status.state === 'verified') && !pending)
 
     return {
       ready: validLimit && verified,
@@ -171,14 +180,16 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
             <code className="tangle-lines__test-text">{active.start.testText}</code>
             <p>Follow the private reply on your phone. No confirmation code is entered here.</p>
             <p className="tangle-lines__verification-expiry">Test expires at {new Date(active.status.expiresAt).toLocaleTimeString()}.</p>
-            {verified ? <p className="tangle-lines__verified" role="status">Phone verified. You can connect this line.</p>
-              : <div className="tangle-lines__verification-actions">
-                <span role="status">{active.status.state === 'challenge_sent'
+            {verified && <p className="tangle-lines__verified" role="status">Phone verified. You can connect this line.</p>}
+            <div className="tangle-lines__verification-actions">
+              {!verified && <span role="status">{active.status.state === 'verified'
+                ? 'Check verification again before connecting.'
+                : active.status.state === 'challenge_sent'
                   ? 'Confirmation sent. Reply from the same phone, then check again.'
-                  : active.status.state === 'sending' ? 'Sending confirmation…' : 'Waiting for your test message.'}</span>
-                <button type="button" className="tangle-lines__secondary" disabled={!canCheck}
-                  onClick={() => void check(active)}>{busy && pending?.kind === 'check' ? 'Checking…' : 'Check verification'}</button>
-              </div>}
+                  : active.status.state === 'sending' ? 'Sending confirmation…' : 'Waiting for your test message.'}</span>}
+              <button type="button" className="tangle-lines__secondary" disabled={!canCheck}
+                onClick={() => void check(active)}>{busy && pending?.kind === 'check' ? 'Checking…' : 'Check verification'}</button>
+            </div>
           </>}
         {error && <p className="tangle-lines__verification-error" role="alert">{error}</p>}
       </div>,

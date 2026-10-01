@@ -46,7 +46,7 @@ function status(state: ApplicationSenderVerification['state']): ApplicationSende
   }
 }
 
-type Mode = 'interactive' | 'waiting' | 'verified' | 'expired' | 'error' | 'attached' | 'no-identities' | 'inventory-error'
+type Mode = 'interactive' | 'waiting' | 'verified' | 'stale-proof' | 'expired' | 'error' | 'attached' | 'no-identities' | 'inventory-error'
 
 function createClient(mode: Mode): ApplicationLineSetupClient {
   let checks = 0
@@ -69,6 +69,7 @@ function createClient(mode: Mode): ApplicationLineSetupClient {
       if (mode === 'error') throw new Error('Verification is unavailable. Try again.')
       if (mode === 'expired') return status('expired')
       if (mode === 'verified') return status('verified')
+      if (mode === 'stale-proof') return status(checks > 1 ? 'consumed' : 'verified')
       return status(checks > 1 ? 'verified' : 'challenge_sent')
     },
     async connect(input) {
@@ -76,6 +77,7 @@ function createClient(mode: Mode): ApplicationLineSetupClient {
         || input.transport !== 'imessage' || input.boxMode !== 'shared'
         || input.senderVerificationId !== 'lsv_story')
         throw new Error('This fixture accepts only its verified line and conversation')
+      if (mode === 'stale-proof') throw new Error('Phone proof was used in another session')
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(attachedLine))
     },
     async disconnect(lineId, attachmentId) {
@@ -117,6 +119,19 @@ export const VerifiedPhone: Story = {
     const canvas = within(canvasElement)
     await userEvent.click(await canvas.findByRole('button', { name: 'Start phone test' }))
     await userEvent.click(await canvas.findByRole('button', { name: 'Check verification' }))
+  },
+}
+
+export const ConsumedPhoneProof: Story = {
+  render: () => <StoryFixture mode="stale-proof" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: 'Start phone test' }))
+    await userEvent.click(await canvas.findByRole('button', { name: 'Check verification' }))
+    await userEvent.click(await canvas.findByRole('button', { name: 'Connect iMessage' }))
+    await canvas.findByText('Check verification again before connecting.')
+    await userEvent.click(await canvas.findByRole('button', { name: 'Check verification' }))
+    await canvas.findByText('This phone test can no longer connect the line. Start a new test.')
   },
 }
 

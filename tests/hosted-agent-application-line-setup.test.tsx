@@ -157,6 +157,52 @@ describe('application line setup', () => {
     await user.click(connect)
     expect(client.connect).not.toHaveBeenCalled()
   })
+
+  it('recovers when another tab consumes a verified proof and a refresh fails', async () => {
+    const user = userEvent.setup()
+    let remoteState: ApplicationSenderVerification['state'] = 'verified'
+    let refreshFails = false
+    const client: ApplicationLineSetupClient = {
+      load: async () => ({
+        workspaceName: 'Research', lines: [],
+        targets: [{ id: 'thread_demo', label: 'Research conversation', kind: 'box', modes: ['shared'] }],
+        connections: [{ id: 'conn_demo', label: 'Owned Inkbox', providerId: 'inkbox',
+          identities: [{ kind: 'handle', transport: 'imessage', label: '@research' }] }],
+      }),
+      startSenderVerification: vi.fn(async () => ({
+        lineId, testId, state: 'awaiting_test' as const, testText: 'TEST ABC123', expiresAt: expiresAt(),
+      })),
+      getSenderVerification: vi.fn(async () => {
+        if (refreshFails) throw new Error('Status unavailable')
+        return verification(remoteState)
+      }),
+      connect: vi.fn(async () => { throw new Error('Proof consumed by another tab') }),
+      disconnect: vi.fn(async () => {}),
+    }
+    render(<ApplicationLineSetup client={client} scopeKey="owner:workspace" canManage enabled />)
+    const connect = await screen.findByRole('button', { name: 'Connect iMessage' }) as HTMLButtonElement
+    await user.click(screen.getByRole('button', { name: 'Start phone test' }))
+    await user.click(await screen.findByRole('button', { name: 'Check verification' }))
+    expect(await screen.findByText('Phone verified. You can connect this line.')).toBeTruthy()
+    expect(connect.disabled).toBe(false)
+
+    remoteState = 'consumed'
+    await user.click(connect)
+    expect((await screen.findByRole('alert')).textContent).toContain('Proof consumed by another tab')
+    await waitFor(() => expect(connect.disabled).toBe(true))
+    expect(screen.getByText('Check verification again before connecting.')).toBeTruthy()
+    refreshFails = true
+    await user.click(screen.getByRole('button', { name: 'Check verification' }))
+    expect((await screen.findByText('Status unavailable')).textContent).toContain('Status unavailable')
+    expect(connect.disabled).toBe(true)
+
+    refreshFails = false
+    await user.click(screen.getByRole('button', { name: 'Check verification' }))
+    expect(await screen.findByText('This phone test can no longer connect the line. Start a new test.')).toBeTruthy()
+    expect(connect.disabled).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Start phone test' }))
+    await waitFor(() => expect(client.startSenderVerification).toHaveBeenCalledTimes(2))
+  })
 })
 
 it('keeps the confirmed attachment after refreshing a replacement into the list', async () => {
