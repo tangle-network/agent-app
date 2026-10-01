@@ -20,12 +20,18 @@ Reason 1 needs new node types, which belong to the renderer's package.
 | Thing | Repo | Path |
 | --- | --- | --- |
 | Node union + renderer | `tangle-network/brand` | `packages/ui/src/openui/openui-artifact-renderer.tsx`, published as `@tangle-network/ui@11.x` subpath `./openui` |
+| Model JSON Schema + validator | `tangle-network/brand` | `packages/ui/src/openui/schema.ts`, published as `@tangle-network/ui/openui-schema` |
 | Verbatim re-export | `tangle-network/sandbox-ui` | `src/openui/index.ts` → `@tangle-network/sandbox-ui/openui` |
 | Host contract | `tangle-network/agent-app` | `src/openui/` → `@tangle-network/agent-app/openui` |
 | The `onAction` handler | `tangle-network/agent-app` | `src/openui-react/` → `@tangle-network/agent-app/openui-react` |
 
 The node union has ONE owner and it is not this package.
 `@tangle-network/agent-app/openui` declares only the narrowest structural port it needs — a node is `{ type: string }`, a form field is `{ id, kind, min?, max?, … }` — so a renderer node satisfies it by assignment and neither package imports the other.
+
+The `render_ui` tool advertises the renderer-owned JSON Schema and rejects unsupported nodes before calling a product handler.
+The default Cloudflare handler runs the same check before a direct vault write.
+Products with their own direct handler should call `validateOpenUIJsonNode` before persistence.
+The validator reports the path of an unsupported nested node so the agent can correct the call.
 
 ## The seam that costs no model turn
 

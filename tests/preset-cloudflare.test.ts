@@ -125,13 +125,24 @@ describe('createPresetToolHandlers', () => {
 
   it('render_ui persists a vault artifact + knowledge row and returns the exact content', async () => {
     const handlers = createPresetToolHandlers({ db: env.db, vault: kv })
-    const schema = { kind: 'board', columns: ['new', 'won'] }
+    const schema = { type: 'card', title: 'Lead Board', children: [{ type: 'stat', label: 'Won', value: '1' }] }
     const r = await handlers.renderUi({ title: 'Lead Board', schema }, ctx)
     expect(r.path).toBe('ui/t1/lead-board.json')
     expect(r.content).toBe(JSON.stringify(schema))
     expect(kv.store.get(r.path)).toBe(JSON.stringify(schema))
     const krow = env.raw.prepare(`SELECT * FROM knowledge WHERE path = ?`).get(r.path) as Record<string, unknown>
     expect(krow).toMatchObject({ workspace_id: 'ws1', kind: 'ui', label: 'Lead Board' })
+  })
+
+  it('rejects an unsupported view before the direct preset handler writes the vault or knowledge row', async () => {
+    const handlers = createPresetToolHandlers({ db: env.db, vault: kv })
+    await expect(handlers.renderUi({
+      title: 'Lost View',
+      schema: { type: 'card', children: [{ type: 'section', children: [{ type: 'text', text: 'lost' }] }] },
+    }, ctx)).rejects.toMatchObject({ code: 'invalid_schema', message: expect.stringContaining('$.children[0]') })
+    expect(kv.store.has('ui/t1/lost-view.json')).toBe(false)
+    const row = env.raw.prepare(`SELECT count(*) AS n FROM knowledge WHERE path = ?`).get('ui/t1/lost-view.json') as { n: number }
+    expect(row.n).toBe(0)
   })
 
   it('add_citation persists a citation artifact + knowledge row', async () => {
