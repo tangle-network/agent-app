@@ -214,12 +214,14 @@ describe('this package audits itself', () => {
   // that `hosted-agent` keeps each person's box on, 0.51 adds lines, 0.52
   // runs each line member in their own named instance, 0.53 adds email lines,
   // and 0.55 adds the global line detach the hosted-agent kit uses.
+  // Sandbox 0.59 is admitted for this shell's optional /sandbox adapter;
+  // Runtime declares its own Sandbox window for consumers that install both.
   // Published Runtime 0.283.0 and Knowledge 17.1.10 still require Eval 0.199.x.
   // Eval 0.200.x is valid for the optional Eval-only subpaths; a consumer that
   // also installs Runtime or Knowledge needs their peer contracts corrected.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
     ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.1', '0.199.999', '0.200.0', '0.200.1', '0.200.999'], ['0.201.0']],
-    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999', '0.54.0', '0.55.2', '0.58.1', '0.58.999'], ['0.56.0', '0.57.0', '0.58.0', '0.59.0']],
+    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999', '0.54.0', '0.55.2', '0.58.1', '0.58.999', '0.59.0', '0.59.999'], ['0.56.0', '0.57.0', '0.58.0', '0.60.0']],
     ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0', '2.14.0'], ['3.0.0']],
   ]
 
