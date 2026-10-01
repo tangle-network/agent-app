@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.20
+
+- fix(peers): admit Sandbox UI 0.116 line
+- fix(tools): validate generated OpenUI before persistence (#707)
+
 ## 0.50.19
 
 - fix(spend): prefer sandbox group key for attribution (#706)
