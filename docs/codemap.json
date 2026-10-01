@@ -20180,7 +20180,7 @@
         {
           "name": "ModelPicker",
           "kind": "function",
-          "signature": "({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant }: ModelPickerProps)…",
+          "signature": "({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant, triggerContent }: M…",
           "doc": "Searchable model picker pill + popover."
         },
         {
