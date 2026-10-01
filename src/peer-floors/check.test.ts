@@ -155,7 +155,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('3.0.0', range!)).toBe(false)
   })
 
-  it('supports the published Runtime 0.282, 0.283, and 0.285 lines', async () => {
+  it('supports the verified Runtime 0.282, 0.283, 0.285, and 0.289 lines', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -175,6 +175,26 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.285.0', range!)).toBe(true)
     expect(satisfiesRange('0.285.999', range!)).toBe(true)
     expect(satisfiesRange('0.286.0', range!)).toBe(false)
+    expect(satisfiesRange('0.289.0', range!)).toBe(false)
+    expect(satisfiesRange('0.289.1', range!)).toBe(true)
+    expect(satisfiesRange('0.289.999', range!)).toBe(true)
+    expect(satisfiesRange('0.290.0', range!)).toBe(false)
+  })
+
+  it('admits the tcloud line used by the Sandbox 0.59 consumer', async () => {
+    const root = join(here, '..', '..')
+    const own = JSON.parse(
+      await readFile(join(root, 'package.json'), 'utf8'),
+    ) as { peerDependencies?: Record<string, string> }
+    const range = own.peerDependencies?.['@tangle-network/tcloud']
+
+    expect(range).toBeDefined()
+    expect(satisfiesRange('0.5.2', range!)).toBe(true)
+    expect(satisfiesRange('0.6.0', range!)).toBe(false)
+    expect(satisfiesRange('0.8.0', range!)).toBe(false)
+    expect(satisfiesRange('0.8.1', range!)).toBe(true)
+    expect(satisfiesRange('0.8.999', range!)).toBe(true)
+    expect(satisfiesRange('0.9.0', range!)).toBe(false)
   })
 
   it('admits the tested Integrations lines without admitting 0.58', async () => {
@@ -230,13 +250,12 @@ describe('this package audits itself', () => {
   // and 0.55 adds the global line detach the hosted-agent kit uses.
   // Sandbox 0.59 is admitted for this shell's optional /sandbox adapter;
   // Runtime declares its own Sandbox window for consumers that install both.
-  // Published Runtime 0.283.0 and Knowledge 17.1.10 still require Eval 0.199.x.
-  // Eval 0.200.x is valid for the optional Eval-only subpaths; a consumer that
-  // also installs Runtime or Knowledge needs their peer contracts corrected.
+  // The Runtime 0.289.1 line requires Eval 0.201–0.203; older Runtime and
+  // Knowledge lines retain their own peer contracts in combined consumers.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
-    ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.1', '0.199.999', '0.200.0', '0.200.1', '0.200.999'], ['0.201.0']],
+    ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.1', '0.199.999', '0.200.0', '0.200.1', '0.200.999', '0.201.0', '0.202.0', '0.203.0', '0.203.999'], ['0.204.0']],
     ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999', '0.54.0', '0.55.2', '0.58.1', '0.58.999', '0.59.0', '0.59.999'], ['0.56.0', '0.57.0', '0.58.0', '0.60.0']],
-    ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0', '2.14.0'], ['3.0.0']],
+    ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0', '2.14.0', '2.15.0'], ['3.0.0']],
   ]
 
   it.each(verifiedWindows)('keeps the %s peer on the verified window', async (name, below, admitted, above) => {
