@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import type { AgentProfile } from '@tangle-network/agent-interface/profile'
-import { AgentProfileEditor, type AgentProfileResourceKind } from '../../web-react/agent-profile-editor'
+import { AgentProfileEditor, type AgentProfileEditorProps } from '../../web-react/agent-profile-editor'
 
 const example: AgentProfile = {
   name: 'Research assistant',
@@ -25,12 +25,15 @@ const example: AgentProfile = {
   hooks: { beforeTurn: [{ command: 'check-policy' }] },
 }
 
-function Preview({ initial, allowedResourceKinds }: { initial: AgentProfile; allowedResourceKinds?: readonly AgentProfileResourceKind[] }) {
+type ResourceConstraints = Pick<AgentProfileEditorProps, 'allowedResourceKinds' | 'filePathPrefix' |
+  'allowExecutableFiles' | 'requireGitHubCommitSha' | 'requireUniqueSkillNames' | 'showToolsAndPermissions'>
+
+function Preview({ initial, ...constraints }: { initial: AgentProfile } & ResourceConstraints) {
   const [profile, setProfile] = useState(initial)
   return <main className="min-h-screen bg-background p-4 text-foreground sm:p-8">
     <div className="mx-auto max-w-3xl space-y-5">
       <header><h1 className="text-2xl font-semibold">Agent profile</h1><p className="mt-1 text-sm text-muted-foreground">Edit a local profile draft.</p></header>
-      <AgentProfileEditor value={profile} onChange={setProfile} allowedResourceKinds={allowedResourceKinds} />
+      <AgentProfileEditor value={profile} onChange={setProfile} {...constraints} />
       <details className="rounded-xl border border-border bg-card p-4"><summary className="cursor-pointer text-sm font-medium">Current profile data</summary>
         <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(profile, null, 2)}</pre></details>
     </div>
@@ -42,7 +45,10 @@ const meta: Meta<typeof AgentProfileEditor> = {
   component: AgentProfileEditor,
   parameters: { layout: 'fullscreen' },
   args: { value: example, onChange: () => {} },
-  render: args => <Preview initial={args.value} allowedResourceKinds={args.allowedResourceKinds} />,
+  render: args => <Preview initial={args.value} allowedResourceKinds={args.allowedResourceKinds}
+    filePathPrefix={args.filePathPrefix} allowExecutableFiles={args.allowExecutableFiles}
+    requireGitHubCommitSha={args.requireGitHubCommitSha} requireUniqueSkillNames={args.requireUniqueSkillNames}
+    showToolsAndPermissions={args.showToolsAndPermissions} />,
 }
 export default meta
 type Story = StoryObj<typeof AgentProfileEditor>
@@ -53,4 +59,35 @@ export const RepositoryNeeded: Story = {
 }
 export const LimitedResources: Story = {
   args: { value: example, allowedResourceKinds: ['files', 'skills', 'instructions'] },
+}
+
+const fixedCommit = '0123456789abcdef0123456789abcdef01234567'
+const referenceResources: AgentProfile = {
+  name: 'Reference assistant',
+  tools: { read: false, skill: true },
+  permissions: { read: 'deny', skill: 'allow' },
+  resources: {
+    files: [
+      { path: 'reference/arrival.md', resource: { kind: 'inline', name: 'arrival.md', content: '# Arrivals\nConfirm the booking reference.' } },
+      { path: 'reference/terms.md', resource: { kind: 'github', repository: 'example/agent-guides', path: 'terms.md', ref: fixedCommit } },
+    ],
+    skills: [{ kind: 'inline', name: 'booking-guide', content: 'Use the declared reference files when answering booking questions.' }],
+  },
+}
+
+const referenceConstraints = {
+  allowedResourceKinds: ['files', 'skills', 'instructions'],
+  filePathPrefix: 'reference/',
+  allowExecutableFiles: false,
+  requireGitHubCommitSha: true,
+  requireUniqueSkillNames: true,
+  showToolsAndPermissions: false,
+} as const
+
+export const ReferenceOnly: Story = { args: { value: referenceResources, ...referenceConstraints } }
+export const ExistingResourcesToRepair: Story = {
+  args: { value: { resources: {
+    files: [{ path: 'docs/old-guide.md', resource: { kind: 'github', repository: 'example/agent-guides', path: 'old-guide.md', ref: 'main' }, executable: true }],
+    skills: [{ kind: 'github', repository: 'example/agent-guides', path: 'skills/booking/SKILL.md', ref: 'main' }],
+  } }, ...referenceConstraints },
 }
