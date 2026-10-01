@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.27
+
+- feat(hosted-agent): require phone proof for application lines
+
 ## 0.50.26
 
 - fix(web-react): scope profile editor to product policy (#716)
