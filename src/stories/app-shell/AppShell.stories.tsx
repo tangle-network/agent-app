@@ -183,7 +183,7 @@ export const QuietTranscript: Story = {
 }
 
 /** The approval gate, end to end: the queued proposal card gets Approve /
- *  Reject buttons, the header shows the pending count, and the active sidebar
+ *  Reject buttons, the sidebar shows the pending count, and the active sidebar
  *  session carries the amber awaiting-approval dot. */
 export const ProposalPending: Story = {
   name: 'Proposal pending',

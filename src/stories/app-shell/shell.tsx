@@ -360,10 +360,9 @@ export interface AppShellProps {
 }
 
 /**
- * The production agent-app layout: sidebar (fixed on desktop, drawer below
- * `md`), scrolling thread, pinned composer, and optional floating actions. Presentational only —
- * all behavior arrives via props, so stories drive it with fixtures and
- * console.log callbacks.
+ * Reference composition: sidebar, scrolling transcript, pinned composer, and
+ * optional floating actions. The mobile navigation opens a sidebar drawer.
+ * Products supply their own action callbacks and observed session state.
  */
 export function AppShell({
   sections,
