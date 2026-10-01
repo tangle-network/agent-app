@@ -193,6 +193,20 @@ describe('this package audits itself', () => {
     }
   })
 
+  it('admits the shared header Sandbox UI line without claiming the next minor', async () => {
+    const root = join(here, '..', '..')
+    const own = JSON.parse(
+      await readFile(join(root, 'package.json'), 'utf8'),
+    ) as { peerDependencies?: Record<string, string> }
+    const range = own.peerDependencies?.['@tangle-network/sandbox-ui']
+
+    expect(range).toBeDefined()
+    expect(satisfiesRange('0.113.2', range!)).toBe(false)
+    expect(satisfiesRange('0.115.0', range!)).toBe(true)
+    expect(satisfiesRange('0.116.1', range!)).toBe(true)
+    expect(satisfiesRange('0.117.0', range!)).toBe(false)
+  })
+
   // Each window starts at the floor this application code ran on, admits the
   // newer minor tested in an installed consumer, and claims nothing past it.
   // The Runtime refuses Sandbox
