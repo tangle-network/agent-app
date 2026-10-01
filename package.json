@@ -575,7 +575,7 @@
     "@tangle-network/brand": "1.8.2",
     "@tangle-network/hub-sdk": "0.21.0",
     "@tangle-network/sandbox": "0.58.1",
-    "@tangle-network/sandbox-ui": "0.115.0",
+    "@tangle-network/sandbox-ui": "0.116.1",
     "@tangle-network/ui": "11.11.3",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.3",
