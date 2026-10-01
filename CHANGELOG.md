@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.28
+
+- fix(work-product): bind review and history to the original revision (#710)
+
 ## 0.50.27
 
 - feat(hosted-agent): require phone proof for application lines
