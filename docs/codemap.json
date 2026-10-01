@@ -1012,7 +1012,7 @@
         {
           "name": "TangleKnot",
           "kind": "function",
-          "signature": "({ size, className, }: { size?: number | undefined; className?: string | undefined; }) => Element",
+          "signature": "({ size, className }: { size?: number | undefined; className?: string | undefined; }) => Element",
           "doc": null
         }
       ]

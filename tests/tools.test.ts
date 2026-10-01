@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { agentProfileSchema } from '@tangle-network/agent-interface'
+import { OPENUI_NODE_JSON_SCHEMA } from '@tangle-network/ui/openui-schema'
 import {
   ToolInputError,
   buildAppToolOpenAITools,
@@ -73,6 +74,19 @@ describe('buildAppToolOpenAITools', () => {
     expect(tools[3]!.function.description).toContain('grounding reference')
     const followup = tools[1]!.function.parameters as { properties: { priority: { enum: string[] } } }
     expect(followup.properties.priority.enum).toEqual(['low', 'medium', 'high'])
+  })
+
+  it('advertises the exact renderer-owned JSON Schema for render_ui', () => {
+    const tools = buildAppToolOpenAITools(taxonomy)
+    const render = tools.find((tool) => tool.function.name === 'render_ui')!
+    expect(render.function.parameters.$defs).toEqual(OPENUI_NODE_JSON_SCHEMA.$defs)
+    expect((render.function.parameters as { properties: { schema: unknown } }).properties.schema).toEqual({ $ref: '#/$defs/node' })
+    const defs = render.function.parameters.$defs as Record<string, unknown>
+    for (const [, name] of JSON.stringify(render.function.parameters).matchAll(/"\$ref":"#\/\$defs\/([^"]+)"/g)) {
+      if (name === undefined) throw new Error('OpenUI schema reference has no definition name')
+      expect(defs).toHaveProperty(name)
+    }
+    expect(JSON.stringify(render.function.parameters)).not.toContain('"section"')
   })
 
   it('lets a product retune model-facing prose + priority vocabulary without forking', () => {
@@ -203,6 +217,20 @@ describe('createAppToolRuntimeExecutor', () => {
 
     const bad = await exec({ toolName: 'render_ui', args: { title: 'View', schema: 'not-an-object' } })
     expect(bad).toMatchObject({ ok: false, code: 'invalid_schema' })
+  })
+
+  it('rejects unsupported nested view nodes before the product handler or produced event', async () => {
+    const { handlers, calls } = fakeHandlers()
+    const produced: AppToolProducedEvent[] = []
+    const exec = createAppToolRuntimeExecutor({ handlers, taxonomy, ctx, onProduced: (event) => produced.push(event) })
+    const out = await exec({
+      toolName: 'render_ui',
+      args: { title: 'View', schema: { type: 'card', children: [{ type: 'section', children: [{ type: 'text', text: 'lost' }] }] } },
+    })
+
+    expect(out).toMatchObject({ ok: false, code: 'invalid_schema', message: expect.stringContaining('$.children[0]') })
+    expect(calls.renderUi).toHaveLength(0)
+    expect(produced).toEqual([])
   })
 
   it('rejects an unknown tool name', async () => {
