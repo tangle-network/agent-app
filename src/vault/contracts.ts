@@ -107,8 +107,10 @@ export interface VaultPaneHandle {
   /**
    * Request a file, confirming unsaved edits before changing selection.
    * The path need not appear in the current tree; the data port validates and reads it.
+   * Resolves true after that file is loaded and displayed. Returns false when
+   * navigation is cancelled, fails, is superseded, or the pane unmounts.
    */
-  openFile: (path: string) => void
+  openFile: (path: string) => Promise<boolean>
 }
 
 /** Props the pane passes to the product's tree renderer (e.g. RichFileTree). */
