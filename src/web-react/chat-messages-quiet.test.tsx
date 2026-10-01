@@ -21,9 +21,12 @@ const thread: ChatUiMessage[] = [
 
 describe('ChatMessages quiet chrome', () => {
   it('renders no role labels in quiet mode', () => {
-    const { queryByText } = render(<ChatMessages messages={thread} chrome="quiet" />)
+    const { queryByText, getByText } = render(<ChatMessages messages={thread} chrome="quiet" />)
     expect(queryByText('User')).toBeNull()
     expect(queryByText('Agent')).toBeNull()
+    expect(getByText('Render the launch poster.').parentElement?.className).toContain('bg-[hsl(var(--foreground))]')
+    expect(getByText('Render the launch poster.').parentElement?.className).toContain('text-[hsl(var(--background))]')
+    expect(getByText('Poster rendered and queued for review.').parentElement?.className).toContain('text-[hsl(var(--foreground))]')
   })
 
   it('renders one hover-revealed meta lane per row, carrying the demoted meta', () => {
@@ -64,8 +67,8 @@ describe('ChatMessages quiet chrome', () => {
     expect(writeText).toHaveBeenLastCalledWith('Poster rendered and queued for review.')
   })
 
-  it('keeps the labeled chrome byte-identical by default (labels on, no lane)', () => {
-    const { getByText, queryByTestId, queryByLabelText, container } = render(
+  it('keeps labels and actions in labeled chrome with inverse user text', () => {
+    const { getByText, queryByTestId, queryByLabelText } = render(
       <ChatMessages messages={thread} />,
     )
     expect(getByText('User')).toBeTruthy()
@@ -75,8 +78,12 @@ describe('ChatMessages quiet chrome', () => {
     // No quiet-only affordances leak into the default.
     expect(queryByTestId('message-meta-lane')).toBeNull()
     expect(queryByLabelText('Copy message')).toBeNull()
-    // The user bubble stays primary-tinted and asymmetric.
-    expect(container.innerHTML).toContain('bg-primary/10')
-    expect(container.innerHTML).toContain('rounded-tr-md')
+    const userBubble = getByText('Render the launch poster.').parentElement
+    expect(userBubble?.className).toContain('bg-[hsl(var(--foreground))]')
+    expect(userBubble?.className).toContain('text-[hsl(var(--background))]')
+    expect(userBubble?.className).toContain('rounded-tr-md')
+    const assistantCopy = getByText('Poster rendered and queued for review.').parentElement
+    expect(assistantCopy?.className).toContain('bg-transparent')
+    expect(assistantCopy?.className).toContain('text-[hsl(var(--foreground))]')
   })
 })
