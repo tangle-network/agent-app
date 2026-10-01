@@ -12,6 +12,18 @@ export interface AgentProfileEditorProps {
   className?: string
   /** Hide unsupported resource controls. Existing entries remain in the profile and are flagged for review. */
   allowedResourceKinds?: readonly AgentProfileResourceKind[]
+  /** Require resource file workspace paths under this relative folder, for example `reference/`. */
+  filePathPrefix?: string
+  /** Disable new executable resource files while retaining existing values for review. Defaults to true. */
+  allowExecutableFiles?: boolean
+  /** Require a 40-character commit SHA for GitHub resource refs. Defaults to false. */
+  requireGitHubCommitSha?: boolean
+  /** Require unique skill names matching `[a-z0-9][a-z0-9._-]{0,63}`. Defaults to false. */
+  requireUniqueSkillNames?: boolean
+  /** Hide the generic tool and permission controls without removing stored values. Defaults to true. */
+  showToolsAndPermissions?: boolean
+  /** Offer only public HTTPS MCP endpoints while retaining existing servers for review. Defaults to false. */
+  publicHttpsMcpOnly?: boolean
 }
 
 const RESOURCE_KIND_LABELS: Record<AgentProfileResourceKind, string> = {
@@ -93,18 +105,50 @@ function resourceRef(draft: ResourceDraft): AgentProfileResourceRef {
     }
 }
 
-function resourceError(draft: ResourceDraft): string | null {
-  if (draft.kind === 'inline') return draft.name.trim() ? null : 'Enter a name for the inline file.'
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(draft.repository.trim())) return 'Enter a GitHub repository as owner/repo.'
-  if (!draft.path.trim()) return 'Enter a path within the GitHub repository.'
+function validRelativePath(path: string): boolean {
+  return path.length <= 240 && !path.startsWith('/') && !path.includes('\\') &&
+    !/[\u0000-\u001f\u007f]/.test(path) && path.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..')
+}
+
+function normalizedFilePathPrefix(prefix?: string): string | undefined {
+  const folder = prefix?.trim().replace(/\/+$/, '')
+  return folder ? folder + '/' : undefined
+}
+
+function resourceError(draft: ResourceDraft, requireGitHubCommitSha = false, stored = false): string | null {
+  const checked = stored ? draft : resourceDraft(resourceRef(draft))
+  if (checked.kind === 'inline') return checked.name.trim() ? null : 'Enter a name for the inline file.'
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(checked.repository)) return 'Enter a GitHub repository as owner/repo.'
+  if (!checked.path) return 'Enter a path within the GitHub repository.'
+  if (requireGitHubCommitSha) {
+    if (checked.repository.length > 200 || checked.repository.split('/').some(segment => segment === '.' || segment === '..')) {
+      return 'Enter a GitHub repository as owner/repo.'
+    }
+    if (!/^[0-9a-f]{40}$/i.test(checked.ref)) return 'Enter a 40-character GitHub commit SHA.'
+    if (!validRelativePath(checked.path) || /[?#%]/.test(checked.path)) return 'Enter a relative repository path without traversal or URL characters.'
+    if (checked.name && (!checked.name.trim() || checked.name.length > 160 || /[\u0000-\u001f\u007f]/.test(checked.name))) {
+      return 'Enter a short file name without control characters.'
+    }
+  }
   return null
 }
 
-function ResourceFields({ draft, onChange, disabled, pathPlaceholder }: {
+function skillNameError(draft: ResourceDraft, refs: readonly AgentProfileResourceRef[], index?: number, stored = false): string | null {
+  const name = stored ? draft.name : draft.name.trim()
+  if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) {
+    return 'Enter a lowercase skill name of up to 64 letters, numbers, dots, dashes, or underscores.'
+  }
+  if (refs.some((ref, item) => item !== index && ref.name === name)) return 'A skill with that name already exists.'
+  return null
+}
+
+function ResourceFields({ draft, onChange, disabled, pathPlaceholder, requireGitHubCommitSha, requireSkillName }: {
   draft: ResourceDraft
   onChange: (draft: ResourceDraft) => void
   disabled: boolean
   pathPlaceholder: string
+  requireGitHubCommitSha: boolean
+  requireSkillName?: boolean
 }) {
   function change(field: keyof ResourceDraft, text: string) { onChange({ ...draft, [field]: text }) }
   return <div className="grid gap-3 sm:grid-cols-2">
@@ -117,13 +161,18 @@ function ResourceFields({ draft, onChange, disabled, pathPlaceholder }: {
         onChange={event => change('repository', event.target.value)} placeholder="owner/repo" /></Field>
       <Field label="Repository path" hint="Relative to the repository root"><Input disabled={disabled} value={draft.path}
         onChange={event => change('path', event.target.value)} placeholder={pathPlaceholder} /></Field>
-      <Field label="Ref" hint="Defaults to the main branch"><Input disabled={disabled} value={draft.ref}
-        onChange={event => change('ref', event.target.value)} placeholder="main" /></Field>
-      <Field label="Name" hint="Defaults to the source filename"><Input disabled={disabled} value={draft.name}
-        onChange={event => change('name', event.target.value)} /></Field>
+      <Field label={requireGitHubCommitSha ? 'Commit SHA' : 'Ref'} hint={requireGitHubCommitSha ? 'Use the full 40-character SHA of a fixed commit.' : 'Defaults to the main branch'}>
+        <Input disabled={disabled} value={draft.ref} onChange={event => change('ref', event.target.value)}
+          placeholder={requireGitHubCommitSha ? '40-character commit SHA' : 'main'} /></Field>
+      <Field label={requireSkillName ? 'Skill name' : 'Name'}
+        hint={requireSkillName ? 'Unique lowercase name, up to 64 letters, numbers, dots, dashes, or underscores.' : 'Defaults to the source filename'}>
+        <Input disabled={disabled} value={draft.name} onChange={event => change('name', event.target.value)}
+          placeholder={requireSkillName ? 'research' : undefined} /></Field>
     </> : <>
-      <Field label="File name"><Input disabled={disabled} value={draft.name}
-        onChange={event => change('name', event.target.value)} placeholder="guide.md" /></Field>
+      <Field label={requireSkillName ? 'Skill name' : 'File name'}
+        hint={requireSkillName ? 'Unique lowercase name, up to 64 letters, numbers, dots, dashes, or underscores.' : undefined}>
+        <Input disabled={disabled} value={draft.name} onChange={event => change('name', event.target.value)}
+          placeholder={requireSkillName ? 'research' : 'guide.md'} /></Field>
       <div className="sm:col-span-2"><Field label="Content"><Textarea className="min-h-32 font-mono text-sm" disabled={disabled}
         value={draft.content} onChange={event => change('content', event.target.value)} /></Field></div>
     </>}
@@ -138,18 +187,49 @@ function fileMount(draft: FileDraft): AgentProfileFileMount {
   return { path: draft.path.trim(), resource: resourceRef(draft.resource), ...(draft.executable ? { executable: true } : {}) }
 }
 
+function fileIssues(draft: FileDraft, filePathPrefix: string | undefined, allowExecutableFiles: boolean,
+  requireGitHubCommitSha: boolean, stored = false): string[] {
+  const issues: string[] = []
+  const path = stored ? draft.path : draft.path.trim()
+  if (!path) issues.push('Enter a workspace path for the file.')
+  else if (filePathPrefix && (!path.startsWith(filePathPrefix) || !validRelativePath(path))) {
+    issues.push('Enter a relative workspace path under ' + filePathPrefix + ' without traversal.')
+  }
+  if (!allowExecutableFiles && draft.executable) issues.push('Executable resource files are not allowed.')
+  const resourceIssue = resourceError(draft.resource, requireGitHubCommitSha, stored)
+  if (resourceIssue) issues.push(resourceIssue)
+  return issues
+}
+
+function publicHttpsMcpError(server: AgentProfileMcpServer): string | null {
+  if (server.enabled === false) return null
+  if (!('url' in server) || !server.url) return 'Use a public HTTPS MCP endpoint.'
+  try {
+    const url = new URL(server.url)
+    if (url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash &&
+      url.hostname.includes('.') && !/^\d+\.\d+\.\d+\.\d+$/.test(url.hostname) && !url.hostname.includes(':') &&
+      !url.hostname.endsWith('.local') && !url.hostname.endsWith('.internal')) return null
+  } catch { /* Invalid URLs are rejected below. */ }
+  return 'Use a public HTTPS MCP endpoint without credentials, query, fragment, or local address.'
+}
+
 /** Controlled editor for the canonical profile. The product owns save and execution authority. */
-export function AgentProfileEditor({ value, onChange, disabled = false, className, allowedResourceKinds }: AgentProfileEditorProps) {
+export function AgentProfileEditor({ value, onChange, disabled = false, className, allowedResourceKinds,
+  filePathPrefix, allowExecutableFiles = true, requireGitHubCommitSha = false, requireUniqueSkillNames = false,
+  showToolsAndPermissions = true, publicHttpsMcpOnly = false }: AgentProfileEditorProps) {
   const id = useId()
+  const workspaceFilePrefix = normalizedFilePathPrefix(filePathPrefix)
   const [error, setError] = useState<string | null>(null)
   const [newTool, setNewTool] = useState('')
   const [showAllTools, setShowAllTools] = useState(false)
   const [mcpName, setMcpName] = useState('')
   const [mcpKind, setMcpKind] = useState<'http' | 'sse' | 'stdio'>('http')
+  const selectedMcpKind = publicHttpsMcpOnly && mcpKind === 'stdio' ? 'http' : mcpKind
   const [mcpTarget, setMcpTarget] = useState('')
   const [resourceDrafts, setResourceDrafts] = useState<Record<'skills' | 'tools', ResourceDraft>>({ skills: emptyResourceDraft(), tools: emptyResourceDraft() })
   const [resourceEdit, setResourceEdit] = useState<{ key: 'skills' | 'tools'; index: number; draft: ResourceDraft } | null>(null)
-  const [newFile, setNewFile] = useState<FileDraft>({ path: '', resource: { ...emptyResourceDraft(), kind: 'inline' }, executable: false })
+  const [newFile, setNewFile] = useState<FileDraft>(() => ({ path: normalizedFilePathPrefix(filePathPrefix) ?? '',
+    resource: { ...emptyResourceDraft(), kind: 'inline' }, executable: false }))
   const [addingFile, setAddingFile] = useState(false)
   const [fileEdit, setFileEdit] = useState<{ index: number; draft: FileDraft } | null>(null)
   const [json, setJson] = useState(() => JSON.stringify(value, null, 2))
@@ -159,6 +239,17 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
   const allowsResource = (kind: AgentProfileResourceKind) => !allowedResourceKinds || allowedResourceKinds.includes(kind)
   const unsupportedResources = (Object.keys(RESOURCE_KIND_LABELS) as AgentProfileResourceKind[])
     .filter(kind => !allowsResource(kind) && configuredResourceCount(value, kind) > 0)
+  const skills = value.resources?.skills ?? []
+  const toolFiles = value.resources?.tools ?? []
+  const instructions = value.resources?.instructions
+  const constrainedEntryCount = workspaceFilePrefix || !allowExecutableFiles || requireGitHubCommitSha || requireUniqueSkillNames
+    ? (value.resources?.files ?? []).filter(mount => fileIssues(fileDraft(mount), workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha, true).length > 0).length +
+      skills.filter((ref, index) => resourceIssue('skills', resourceDraft(ref), skills, index, true)).length +
+      toolFiles.filter((ref, index) => requireGitHubCommitSha && resourceIssue('tools', resourceDraft(ref), toolFiles, index, true)).length +
+      Number(Boolean(requireGitHubCommitSha && instructions && typeof instructions === 'object' && resourceError(resourceDraft(instructions), true, true)))
+    : 0
+  const invalidMcpCount = publicHttpsMcpOnly
+    ? Object.values(value.mcp ?? {}).filter(server => publicHttpsMcpError(server)).length : 0
 
   function emit(next: AgentProfile) {
     if (jsonDirty) { setError('Apply or discard JSON edits first.'); return false }
@@ -173,26 +264,34 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
   function resources(key: 'skills' | 'tools', refs: AgentProfileResourceRef[]) {
     return emit({ ...value, resources: { ...value.resources, [key]: refs } })
   }
+  function resourceIssue(key: 'skills' | 'tools', draft: ResourceDraft,
+    refs: readonly AgentProfileResourceRef[], index?: number, stored = false): string | null {
+    if (key === 'skills' && requireUniqueSkillNames) {
+      const issue = skillNameError(draft, refs, index, stored)
+      if (issue) return issue
+    }
+    return resourceError(draft, requireGitHubCommitSha, stored)
+  }
   function addResource(key: 'skills' | 'tools') {
     const draft = resourceDrafts[key]
-    const issue = resourceError(draft)
+    const refs = value.resources?.[key] ?? []
+    const issue = resourceIssue(key, draft, refs)
     if (issue) { setError(issue); return }
-    if (!resources(key, [...(value.resources?.[key] ?? []), resourceRef(draft)])) return
+    if (!resources(key, [...refs, resourceRef(draft)])) return
     setResourceDrafts(current => ({ ...current, [key]: emptyResourceDraft() }))
   }
   function applyResourceEdit() {
     if (!resourceEdit) return
-    const issue = resourceError(resourceEdit.draft)
-    if (issue) { setError(issue); return }
     const { key, index, draft } = resourceEdit
     const refs = value.resources?.[key] ?? []
     if (!refs[index]) { setError('This resource changed. Reopen it to edit.'); setResourceEdit(null); return }
+    const issue = resourceIssue(key, draft, refs, index)
+    if (issue) { setError(issue); return }
     if (resources(key, refs.map((ref, item) => item === index ? resourceRef(draft) : ref))) setResourceEdit(null)
   }
   function saveFile(draft: FileDraft, index?: number) {
     const path = draft.path.trim()
-    if (!path) { setError('Enter a workspace path for the file.'); return false }
-    const issue = resourceError(draft.resource)
+    const issue = fileIssues(draft, workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha)[0]
     if (issue) { setError(issue); return false }
     const files = value.resources?.files ?? []
     if (files.some((file, item) => file.path === path && item !== index)) {
@@ -204,12 +303,15 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
   }
   function fileFields(draft: FileDraft, onChange: (draft: FileDraft) => void) {
     return <div className="space-y-3">
-      <Field label="Workspace path" hint="Relative to the agent workspace"><Input disabled={editingDisabled} value={draft.path}
-        onChange={event => onChange({ ...draft, path: event.target.value })} placeholder="docs/guide.md" /></Field>
-      <ResourceFields draft={draft.resource} disabled={editingDisabled} pathPlaceholder="docs/guide.md"
+      <Field label="Workspace path" hint={workspaceFilePrefix ? 'Place this file under ' + workspaceFilePrefix : 'Relative to the agent workspace'}>
+        <Input disabled={editingDisabled} value={draft.path} onChange={event => onChange({ ...draft, path: event.target.value })}
+          placeholder={workspaceFilePrefix ? workspaceFilePrefix + 'guide.md' : 'docs/guide.md'} /></Field>
+      <ResourceFields draft={draft.resource} disabled={editingDisabled} pathPlaceholder="docs/guide.md" requireGitHubCommitSha={requireGitHubCommitSha}
         onChange={resource => onChange({ ...draft, resource })} />
-      <label className="flex items-center gap-2 text-sm text-foreground"><Switch disabled={editingDisabled} checked={draft.executable}
-        onCheckedChange={executable => onChange({ ...draft, executable })} />Executable file</label>
+      {allowExecutableFiles || draft.executable ? <label className="flex items-center gap-2 text-sm text-foreground">
+        <Switch disabled={editingDisabled || (!allowExecutableFiles && !draft.executable)} checked={draft.executable}
+          onCheckedChange={executable => { if (allowExecutableFiles || !executable) onChange({ ...draft, executable }) }} />Executable file</label>
+        : <p className="text-xs text-muted-foreground">Executable files are unavailable for this profile.</p>}
     </div>
   }
   function resourceSection(key: 'skills' | 'tools', title: string, description: string) {
@@ -217,8 +319,9 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     const draft = resourceDrafts[key]
     return <Disclosure title={title} description={description} detail={refs.length ? refs.length + ' configured' : 'Optional'}>
       {refs.length === 0 && <p className="text-sm text-muted-foreground">None configured.</p>}
-      <ul className="space-y-2">{refs.map((ref, index) =>
-        <li key={index} className="space-y-3 rounded-lg border border-border p-3 text-sm" aria-label={title + ' ' + (index + 1)}>
+      <ul className="space-y-2">{refs.map((ref, index) => {
+        const issue = resourceIssue(key, resourceDraft(ref), refs, index, true)
+        return <li key={index} className="space-y-3 rounded-lg border border-border p-3 text-sm" aria-label={title + ' ' + (index + 1)}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0"><span className="block break-words font-medium text-foreground">{ref.name || (ref.kind === 'github' ? ref.path : 'Inline resource')}</span>
               <span className={'block break-words text-xs ' + (ref.kind === 'github' && !ref.repository ? 'text-destructive' : 'text-muted-foreground')}>{ref.kind === 'github'
@@ -231,15 +334,19 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
                 onClick={() => { if (resources(key, refs.filter((_, item) => item !== index))) setResourceEdit(null) }}>Remove</Button>
             </div>
           </div>
+          {(requireGitHubCommitSha || (key === 'skills' && requireUniqueSkillNames)) && issue &&
+            <p className="text-xs text-destructive">{issue} Edit this resource before saving.</p>}
           {resourceEdit?.key === key && resourceEdit.index === index && <div className="space-y-3 border-t border-border pt-3">
-            <ResourceFields draft={resourceEdit.draft} disabled={editingDisabled} pathPlaceholder={key === 'skills' ? 'research/SKILL.md' : 'tools/search.ts'}
+            <ResourceFields draft={resourceEdit.draft} disabled={editingDisabled} requireGitHubCommitSha={requireGitHubCommitSha}
+              requireSkillName={key === 'skills' && requireUniqueSkillNames} pathPlaceholder={key === 'skills' ? 'research/SKILL.md' : 'tools/search.ts'}
               onChange={next => setResourceEdit({ key, index, draft: next })} />
             <div className="flex gap-2"><Button type="button" variant="outline" disabled={editingDisabled} onClick={applyResourceEdit}>Apply changes</Button>
               <Button type="button" variant="ghost" onClick={() => setResourceEdit(null)}>Cancel</Button></div>
           </div>}
-        </li>)}</ul>
+        </li>})}</ul>
       <div className="space-y-3 rounded-lg border border-dashed border-border p-3">
-        <ResourceFields draft={draft} disabled={editingDisabled} pathPlaceholder={key === 'skills' ? 'research/SKILL.md' : 'tools/search.ts'}
+        <ResourceFields draft={draft} disabled={editingDisabled} requireGitHubCommitSha={requireGitHubCommitSha}
+          requireSkillName={key === 'skills' && requireUniqueSkillNames} pathPlaceholder={key === 'skills' ? 'research/SKILL.md' : 'tools/search.ts'}
           onChange={next => setResourceDrafts(current => ({ ...current, [key]: next }))} />
         <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => addResource(key)}>Add {key === 'skills' ? 'skill' : 'tool file'}</Button>
       </div>
@@ -251,7 +358,11 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     const target = mcpTarget.trim()
     if (!name || !target) { setError('Enter a server name and URL or command.'); return }
     if (name in (value.mcp ?? {})) { setError('A server with that name already exists.'); return }
-    const server: AgentProfileMcpServer = mcpKind === 'stdio' ? { command: target } : { transport: mcpKind, url: target }
+    const server: AgentProfileMcpServer = selectedMcpKind === 'stdio' ? { command: target } : { transport: selectedMcpKind, url: target }
+    if (publicHttpsMcpOnly) {
+      const issue = publicHttpsMcpError(server)
+      if (issue) { setError(issue); return }
+    }
     if (emit({ ...value, mcp: { ...value.mcp, [name]: server } })) { setMcpName(''); setMcpTarget('') }
   }
   function applyJson() {
@@ -270,6 +381,14 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     {unsupportedResources.length > 0 && <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground">
       This profile contains resources this product does not support: {unsupportedResources.map(kind => RESOURCE_KIND_LABELS[kind] + ' (' + configuredResourceCount(value, kind) + ')').join(', ')}.
       They remain in the profile. Review or remove them in Advanced JSON before saving.
+    </p>}
+    {constrainedEntryCount > 0 && <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground">
+      {constrainedEntryCount} configured resource {constrainedEntryCount === 1 ? 'entry needs' : 'entries need'} repair before this product can save the profile.
+      Review the resource sections or Advanced JSON. Existing values remain unchanged until you edit them.
+    </p>}
+    {invalidMcpCount > 0 && <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground">
+      {invalidMcpCount} configured MCP {invalidMcpCount === 1 ? 'server needs' : 'servers need'} a public HTTPS endpoint before this product can save the profile.
+      Review MCP servers or Advanced JSON. Existing values remain unchanged until you edit them.
     </p>}
     <Section title="Profile" description="Name the agent and set its instructions.">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -313,7 +432,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
         </div>
       </details>
     </Section>
-    <Disclosure title="Tools and permissions" description="Choose which tools are available and when each needs approval." detail={Object.keys(value.tools ?? {}).length + ' configured'}>
+    {showToolsAndPermissions && <Disclosure title="Tools and permissions" description="Choose which tools are available and when each needs approval." detail={Object.keys(value.tools ?? {}).length + ' configured'}>
       {Object.keys(value.tools ?? {}).length === 0 && <p className="text-sm text-muted-foreground">No tool rules added.</p>}
       <div className="space-y-2">{Object.entries(value.tools ?? {}).slice(0, showAllTools ? undefined : 4).map(([name, enabled]) =>
         <div key={name} className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3 text-sm">
@@ -335,35 +454,40 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
       <div className="flex gap-2"><Input aria-label="New tool name" disabled={editingDisabled} value={newTool} onChange={event => setNewTool(event.target.value)} placeholder="Tool name" />
         <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => { const name = newTool.trim(); if (!name || name in (value.tools ?? {})) { setError('Enter a unique tool name.'); return } if (emit({ ...value, tools: { ...value.tools, [name]: true } })) setNewTool('') }}>Add tool</Button></div>
       <p className="text-xs text-muted-foreground">Nested permission rules remain in Advanced JSON.</p>
-    </Disclosure>
+    </Disclosure>}
     {allowsResource('skills') && resourceSection('skills', 'Skills', 'Add skill packages from a repository or inline content.')}
     {allowsResource('tools') && resourceSection('tools', 'Tool files', 'Provide files that a supported harness can discover as tools.')}
-    <Disclosure title="MCP servers" description="Configure remote or local servers. Use secret references for credentials." detail={Object.keys(value.mcp ?? {}).length + ' configured'}>
+    <Disclosure title="MCP servers" description={publicHttpsMcpOnly
+      ? 'Configure public HTTPS servers. Use secret references for credentials.'
+      : 'Configure remote or local servers. Use secret references for credentials.'} detail={Object.keys(value.mcp ?? {}).length + ' configured'}>
       {Object.keys(value.mcp ?? {}).length === 0 && <p className="text-sm text-muted-foreground">No servers configured.</p>}
       <ul className="space-y-2">{Object.entries(value.mcp ?? {}).map(([name, server]) =>
         <li key={name} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
           <div className="min-w-0"><span className="font-medium">{name}</span>
             <span className="ml-2 text-xs text-muted-foreground">{server.enabled === false ? 'Disabled' : 'command' in server ? 'Local' : 'Remote'}</span>
             {server.enabled !== false && <p className="truncate text-xs text-muted-foreground">{'command' in server ? server.command : server.url}</p>}
+            {publicHttpsMcpOnly && publicHttpsMcpError(server) && <p className="text-xs text-destructive">
+              {publicHttpsMcpError(server)} Remove this server or edit it in Advanced JSON before saving.</p>}
           </div>
           <Button type="button" variant="ghost" className="text-destructive" disabled={editingDisabled} onClick={() => { const mcp = { ...value.mcp }; delete mcp[name]; emit({ ...value, mcp }) }}>Remove</Button>
         </li>)}</ul>
       <div className="grid gap-3 rounded-lg border border-dashed border-border p-3 sm:grid-cols-[1fr_10rem]">
         <Field label="Server name"><Input disabled={editingDisabled} value={mcpName} onChange={event => setMcpName(event.target.value)} placeholder="search" /></Field>
-        <Field label="Transport"><Select disabled={editingDisabled} value={mcpKind} onValueChange={kind => setMcpKind(kind as typeof mcpKind)}>
+        <Field label="Transport"><Select disabled={editingDisabled} value={selectedMcpKind} onValueChange={kind => setMcpKind(kind as typeof mcpKind)}>
           <SelectTrigger aria-label="Transport"><SelectValue /></SelectTrigger><SelectContent>
             <SelectItem value="http">HTTP</SelectItem><SelectItem value="sse">SSE</SelectItem>
-            <SelectItem value="stdio">Local command</SelectItem>
+            {!publicHttpsMcpOnly && <SelectItem value="stdio">Local command</SelectItem>}
           </SelectContent></Select></Field>
-        <div className="sm:col-span-2"><Field label={mcpKind === 'stdio' ? 'Command' : 'URL'}><Input disabled={editingDisabled} value={mcpTarget} onChange={event => setMcpTarget(event.target.value)} placeholder={mcpKind === 'stdio' ? 'mcp-server' : 'https://example.com/mcp'} /></Field></div>
+        <div className="sm:col-span-2"><Field label={selectedMcpKind === 'stdio' ? 'Command' : 'URL'}><Input disabled={editingDisabled} value={mcpTarget} onChange={event => setMcpTarget(event.target.value)} placeholder={selectedMcpKind === 'stdio' ? 'mcp-server' : 'https://example.com/mcp'} /></Field></div>
         <div className="sm:col-span-2"><Button type="button" variant="outline" disabled={editingDisabled} onClick={addMcp}>Add server</Button></div>
       </div>
       <p className="text-xs text-muted-foreground">Arguments, headers, environment, and secret references remain in Advanced JSON.</p>
     </Disclosure>
     {allowsResource('files') && <Disclosure title="Resource files" description="Configure files for the agent workspace. The runtime determines whether it can place them." detail={(value.resources?.files ?? []).length + ' configured'}>
       {(value.resources?.files ?? []).length === 0 && <p className="text-sm text-muted-foreground">No resource files configured.</p>}
-      <ul className="space-y-2">{(value.resources?.files ?? []).map((mount, index) =>
-        <li key={index} className="space-y-3 rounded-lg border border-border p-3 text-sm" aria-label={'Resource file ' + (index + 1)}>
+      <ul className="space-y-2">{(value.resources?.files ?? []).map((mount, index) => {
+        const issues = fileIssues(fileDraft(mount), workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha, true)
+        return <li key={index} className="space-y-3 rounded-lg border border-border p-3 text-sm" aria-label={'Resource file ' + (index + 1)}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0"><span className="block break-words font-medium text-foreground">{mount.path}</span>
               <span className={'block break-words text-xs ' + (mount.resource.kind === 'github' && !mount.resource.repository ? 'text-destructive' : 'text-muted-foreground')}>{mount.resource.kind === 'github'
@@ -376,6 +500,9 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
                 onClick={() => { if (emit({ ...value, resources: { ...value.resources, files: (value.resources?.files ?? []).filter((_, item) => item !== index) } })) setFileEdit(null) }}>Remove</Button>
             </div>
           </div>
+          {issues.length > 0 && <div className="space-y-1 text-xs text-destructive">
+            {issues.map(issue => <p key={issue}>{issue} Edit this file before saving.</p>)}
+          </div>}
           {mount.resource.kind === 'inline' && fileEdit?.index !== index && <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-2 text-xs text-muted-foreground">{mount.resource.content || '(Empty file)'}</pre>}
           {fileEdit?.index === index && <div className="space-y-3 border-t border-border pt-3">
             {fileFields(fileEdit.draft, draft => setFileEdit({ index, draft }))}
@@ -383,11 +510,11 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
               onClick={() => { if (saveFile(fileEdit.draft, index)) setFileEdit(null) }}>Apply changes</Button>
               <Button type="button" variant="ghost" onClick={() => setFileEdit(null)}>Cancel</Button></div>
           </div>}
-        </li>)}</ul>
+        </li>})}</ul>
       {addingFile ? <div className="space-y-3 rounded-lg border border-dashed border-border p-3">
         {fileFields(newFile, setNewFile)}
         <div className="flex gap-2"><Button type="button" variant="outline" disabled={editingDisabled}
-          onClick={() => { if (saveFile(newFile)) { setNewFile({ path: '', resource: { ...emptyResourceDraft(), kind: 'inline' }, executable: false }); setAddingFile(false) } }}>Add file</Button>
+          onClick={() => { if (saveFile(newFile)) { setNewFile({ path: workspaceFilePrefix ?? '', resource: { ...emptyResourceDraft(), kind: 'inline' }, executable: false }); setAddingFile(false) } }}>Add file</Button>
           <Button type="button" variant="ghost" onClick={() => setAddingFile(false)}>Cancel</Button></div>
       </div> : <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => setAddingFile(true)}>Add file</Button>}
     </Disclosure>}
