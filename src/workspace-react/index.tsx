@@ -66,7 +66,7 @@ export interface AgentWorkspaceSessionConfig {
 }
 
 /**
- * Registered apps shown as individual workspace destinations.
+ * Registered apps shown under one expandable workspace destination.
  * Products supply authorized rows and their real route; preview URLs never
  * become navigation hrefs.
  */
@@ -94,11 +94,11 @@ export interface AgentWorkspaceActiveRoute {
 export interface AgentWorkspaceLayoutProps
   extends Omit<SidebarLayoutProps, 'activeId' | 'children' | 'navItems' | 'hideBelow' | 'railLabels'> {
   children: ReactNode
-  /** Product-owned destinations. The shared History row is appended after them. */
+  /** Product-owned destinations. Shared Apps and History rows follow them. */
   navItems: SidebarLayoutNavItem[]
   /** Omit for a workflow-only shell with no conversational session rail. */
   sessions?: AgentWorkspaceSessionConfig
-  /** Registered app destinations, in the product's persisted order. */
+  /** Authorized app destinations, in the product's persisted order. */
   apps?: AgentWorkspaceAppsConfig
   /** When supplied, active navigation is resolved by the shared route rules. */
   activeRoute?: AgentWorkspaceActiveRoute
@@ -115,8 +115,8 @@ export interface AgentWorkspaceLayoutProps
  *
  * Products own their navigation taxonomy, routes, and session storage. This
  * component owns the repeated assembly: the standard visual layout, the
- * expandable History row, capped session composition, unread state, and active
- * route resolution. The full History route and the empty-state composer stay
+ * expandable Apps and History rows, capped session composition, unread state,
+ * and active route resolution. The full History route and the empty-state composer stay
  * separate because their data and domain copy belong to the product; pair this
  * with `SessionHistoryPanel` and `EntryComposer` for the complete chat-first
  * structure.
@@ -176,12 +176,6 @@ export function AgentWorkspaceLayout({
       prefetch: apps!.prefetch,
     }
   })
-  const workspaceNavItems: SidebarLayoutNavItem[] = [
-    ...navItems,
-    ...appNavItems,
-    ...(sessionNav ? [sessionNav] : []),
-  ]
-
   const appRoutes: NavRouteDef[] = activeRoute
     ? appNavItems.map((item) => {
         const path = routePathFromHref(item.href!, activeRoute.base)
@@ -207,6 +201,32 @@ export function AgentWorkspaceLayout({
       })
     : activeId
 
+  const activeAppId = appNavItems.some((item) => item.id === resolvedActiveId)
+    ? resolvedActiveId
+    : undefined
+  const appGroup: SidebarLayoutNavItem | undefined = apps && appNavItems.length > 0
+    ? {
+        id: 'workspace-apps',
+        label: 'Apps',
+        icon: apps.icon,
+        expandable: true,
+        defaultOpen: activeAppId !== undefined,
+        subItems: appNavItems.map(({ id, label, icon, href, prefetch }) => ({
+          id,
+          label,
+          icon,
+          href: href!,
+          prefetch,
+        })),
+        subActiveIds: activeAppId ? [activeAppId] : undefined,
+      }
+    : undefined
+  const workspaceNavItems: SidebarLayoutNavItem[] = [
+    ...navItems,
+    ...(appGroup ? [appGroup] : []),
+    ...(sessionNav ? [sessionNav] : []),
+  ]
+
   const layoutProps = {
     hideBelow: 'lg' as const,
     railLabels: true,
@@ -217,7 +237,7 @@ export function AgentWorkspaceLayout({
     <SidebarLayout
       {...layoutProps}
       navItems={workspaceNavItems}
-      activeId={resolvedActiveId}
+      activeId={activeAppId ? appGroup?.id : resolvedActiveId}
     >
       {children}
     </SidebarLayout>

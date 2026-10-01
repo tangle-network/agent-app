@@ -1,4 +1,5 @@
 import { OPENUI_INTERACTIVE_AUTHORING_GUIDE } from '../openui/authoring'
+import { OPENUI_NODE_JSON_SCHEMA, OPENUI_NODE_TYPES } from '@tangle-network/ui/openui-schema'
 import type { AppToolTaxonomy, BuildAppToolsOptions } from './types'
 
 /** The four canonical app-tool names. Stable identifiers the model calls in
@@ -86,13 +87,14 @@ export function buildAppToolOpenAITools(
         name: 'render_ui',
         description:
           (d?.render_ui ??
-            'Show a generated view live in the workspace. Validates the OpenUI JSON and persists the artifact. Executes immediately.') +
+            `Show a generated view live in the workspace. Validates the OpenUI JSON and persists the artifact. Use only these nodes: ${OPENUI_NODE_TYPES.join(', ')}. Stack, grid, and card may contain nested children. Executes immediately.`) +
           (opts?.interactiveUi ? `\n\n${OPENUI_INTERACTIVE_AUTHORING_GUIDE}` : ''),
         parameters: {
           type: 'object',
+          $defs: OPENUI_NODE_JSON_SCHEMA.$defs,
           properties: {
             title: { type: 'string' },
-            schema: { type: 'object', description: 'The OpenUI JSON object.' },
+            schema: { $ref: '#/$defs/node' },
           },
           required: ['title', 'schema'],
         },

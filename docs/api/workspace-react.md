@@ -16,7 +16,7 @@ interface AgentWorkspaceActiveRoute
 
 ### `AgentWorkspaceAppsConfig`
 
-`interface` — Registered apps shown as individual workspace destinations.
+`interface` — Registered apps shown under one expandable workspace destination.
 
 ```ts
 interface AgentWorkspaceAppsConfig

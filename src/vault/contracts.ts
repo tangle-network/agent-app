@@ -107,8 +107,10 @@ export interface VaultPaneHandle {
   /**
    * Request a file, confirming unsaved edits before changing selection.
    * The path need not appear in the current tree; the data port validates and reads it.
+   * Resolves true after that file is loaded and displayed. Returns false when
+   * navigation is cancelled, fails, is superseded, or the pane unmounts.
    */
-  openFile: (path: string) => void
+  openFile: (path: string) => Promise<boolean>
 }
 
 /** Props the pane passes to the product's tree renderer (e.g. RichFileTree). */
@@ -198,7 +200,7 @@ export interface VaultPaneProps {
   canWrite?: boolean
   /** Controlled selection. Pair with `onSelectedPathChange`. */
   selectedPath?: string | null
-  /** Notified whenever the selected path changes (including clear → null). */
+  /** Notified when selection changes (including clear → null). A controlled host may return false to reject the request. */
   onSelectedPathChange?: (path: string | null) => void
   /** Optional observer for structured data-port failures. VaultPane still owns
    *  the visible error state and retry behavior when this is omitted. */

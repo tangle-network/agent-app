@@ -10,13 +10,14 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createElement } from 'react'
+import { createElement, createRef, useEffect, useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { VaultPane } from '../../src/vault/VaultPane'
 import type {
   VaultDataPort,
   VaultFile,
+  VaultPaneHandle,
   VaultMarkdownCodec,
   VaultTreeNode,
   VaultTreeRenderProps,
@@ -100,6 +101,7 @@ function renderArtifact(props: VaultArtifactRenderProps) {
 
 function mount(extra: Partial<Parameters<typeof VaultPane>[0]> = {}) {
   const port = (extra.port as VaultDataPort) ?? fakePort()
+  const paneRef = createRef<VaultPaneHandle>()
   const utils = render(
     createElement(VaultPane, {
       port,
@@ -107,9 +109,10 @@ function mount(extra: Partial<Parameters<typeof VaultPane>[0]> = {}) {
       renderArtifact,
       codec: fmCodec,
       ...extra,
+      ref: paneRef,
     }),
   )
-  return { port, ...utils }
+  return { port, paneRef, ...utils }
 }
 
 async function openFile(path: string) {
@@ -488,6 +491,309 @@ describe('VaultPane — dirty-guard state machine', () => {
     await openFile('b.md')
     expect(screen.queryByRole('dialog', { name: 'Discard unsaved changes?' })).toBeNull()
     expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('b.md')
+  })
+})
+
+describe('VaultPaneHandle.openFile completion', () => {
+  it('reads an explicit path when the initial tree listing fails', async () => {
+    const listTree = vi.fn().mockRejectedValue(new Error('list unavailable'))
+    const readFile = vi.fn(async (path: string): Promise<VaultFile> => ({ path, content: 'direct content' }))
+    const { paneRef } = mount({ port: fakePort({ listTree, readFile }) })
+    await screen.findByText("Couldn't load the Vault")
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('unlisted.md') })
+
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith('unlisted.md'))
+    expect(await opened).toBe(true)
+    expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('unlisted.md')
+    expect(screen.getByTestId('artifact').textContent).toBe('direct content')
+  })
+
+  it('retries an explicit selected path after the initial tree listing fails', async () => {
+    const listTree = vi.fn().mockRejectedValue(new Error('list unavailable'))
+    const readFile = vi.fn(async (path: string): Promise<VaultFile> => ({ path, content: 'direct content' }))
+    const { paneRef } = mount({
+      port: fakePort({ listTree, readFile }),
+      selectedPath: 'unlisted.md',
+      onSelectedPathChange: vi.fn(),
+    })
+    await screen.findByText("Couldn't load the Vault")
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('unlisted.md') })
+
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith('unlisted.md'))
+    expect(await opened).toBe(true)
+    expect(screen.getByTestId('artifact').textContent).toBe('direct content')
+  })
+
+  it('keeps a first-render request pending until its file is displayed', async () => {
+    let finishRead!: (file: VaultFile) => void
+    let opened!: Promise<boolean>
+    let settled: boolean | null = null
+    const paneRef = createRef<VaultPaneHandle>()
+    const readFile = vi.fn(() => new Promise<VaultFile>((resolve) => { finishRead = resolve }))
+
+    function OpeningTree(props: VaultTreeRenderProps) {
+      useEffect(() => {
+        opened = paneRef.current!.openFile('b.md')
+        void opened.then((result) => { settled = result })
+      }, [])
+      return renderTree(props)
+    }
+
+    render(createElement(VaultPane, {
+      port: fakePort({ readFile }),
+      renderTree: (props) => createElement(OpeningTree, props),
+      renderArtifact,
+      codec: fmCodec,
+      ref: paneRef,
+    }))
+    await screen.findByTestId('tree-b.md')
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith('b.md'))
+    await act(async () => {})
+    expect(settled).toBeNull()
+
+    await act(async () => finishRead({ path: 'b.md', content: 'loaded B' }))
+    expect(await opened).toBe(true)
+    expect(screen.getByTestId('artifact').textContent).toBe('loaded B')
+  })
+
+  it('waits for the requested file to be displayed before resolving true', async () => {
+    let finishRead!: (file: VaultFile) => void
+    const readFile = vi.fn((path: string) => new Promise<VaultFile>((resolve) => {
+      expect(path).toBe('b.md')
+      finishRead = resolve
+    }))
+    const { paneRef } = mount({ port: fakePort({ readFile }) })
+    await screen.findByTestId('tree-b.md')
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('b.md') })
+    let settled = false
+    void opened.then(() => { settled = true })
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith('b.md'))
+    expect(settled).toBe(false)
+    await act(async () => finishRead({ path: 'b.md', content: 'loaded B' }))
+
+    expect(await opened).toBe(true)
+    expect(screen.getByTestId('artifact').textContent).toBe('loaded B')
+  })
+
+  it('returns false on dirty-navigation cancel and preserves the editor', async () => {
+    const { paneRef, port } = mount()
+    await openFile('a.md')
+    fireEvent.click(screen.getByLabelText('Edit as source'))
+    await typeSource('unsaved A')
+    const reads = vi.mocked(port.readFile).mock.calls.length
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('b.md') })
+    expect(screen.getByRole('dialog', { name: 'Discard unsaved changes?' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(await opened).toBe(false)
+    expect(vi.mocked(port.readFile)).toHaveBeenCalledTimes(reads)
+    expect((screen.getByLabelText('Source editor') as HTMLTextAreaElement).value).toBe('unsaved A')
+  })
+
+  it('returns true after dirty confirmation loads the new file', async () => {
+    const { paneRef } = mount()
+    await openFile('a.md')
+    fireEvent.click(screen.getByLabelText('Edit as source'))
+    await typeSource('unsaved A')
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('b.md') })
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }))
+
+    expect(await opened).toBe(true)
+    expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('b.md')
+    expect(screen.getByTestId('artifact').textContent).toContain('body B')
+  })
+
+  it('returns false on an invalid directory or failed read', async () => {
+    const readFile = vi.fn(async (path: string): Promise<VaultFile> => {
+      throw new Error(`missing ${path}`)
+    })
+    const { paneRef } = mount({ port: fakePort({ readFile }) })
+    await screen.findByTestId('tree-folder')
+
+    expect(await paneRef.current!.openFile('folder')).toBe(false)
+    expect(readFile).not.toHaveBeenCalled()
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('missing.md') })
+    expect(await opened).toBe(false)
+    expect(await screen.findByText('missing missing.md')).toBeTruthy()
+  })
+
+  it('settles a superseded request false and ignores its late read', async () => {
+    const finishes = new Map<string, (file: VaultFile) => void>()
+    const readFile = vi.fn((path: string) => new Promise<VaultFile>((resolve) => { finishes.set(path, resolve) }))
+    const { paneRef } = mount({ port: fakePort({ readFile }) })
+    await screen.findByTestId('tree-a.md')
+
+    let first!: Promise<boolean>
+    act(() => { first = paneRef.current!.openFile('a.md') })
+    await waitFor(() => expect(finishes.has('a.md')).toBe(true))
+    let second!: Promise<boolean>
+    act(() => { second = paneRef.current!.openFile('b.md') })
+    expect(await first).toBe(false)
+    await waitFor(() => expect(finishes.has('b.md')).toBe(true))
+    await act(async () => finishes.get('b.md')!({ path: 'b.md', content: 'current B' }))
+    expect(await second).toBe(true)
+    await act(async () => finishes.get('a.md')!({ path: 'a.md', content: 'late A' }))
+    expect(screen.getByTestId('artifact').textContent).toBe('current B')
+  })
+
+  it('does not cancel a valid read when another request names a directory', async () => {
+    let finishRead!: (file: VaultFile) => void
+    const readFile = vi.fn(() => new Promise<VaultFile>((resolve) => { finishRead = resolve }))
+    const { paneRef } = mount({ port: fakePort({ readFile }) })
+    await screen.findByTestId('tree-folder')
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('b.md') })
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith('b.md'))
+    expect(await paneRef.current!.openFile('folder')).toBe(false)
+    expect(await Promise.race([opened, Promise.resolve('pending')])).toBe('pending')
+
+    await act(async () => finishRead({ path: 'b.md', content: 'loaded B' }))
+    expect(await opened).toBe(true)
+    expect(screen.getByTestId('artifact').textContent).toBe('loaded B')
+  })
+
+  it('settles pending work false when unmounted or replaced by a tree click', async () => {
+    const readFile = vi.fn((path: string) => new Promise<VaultFile>(() => { void path }))
+    const first = mount({ port: fakePort({ readFile }) })
+    await screen.findByTestId('tree-a.md')
+    let opened!: Promise<boolean>
+    act(() => { opened = first.paneRef.current!.openFile('a.md') })
+    await waitFor(() => expect(readFile).toHaveBeenCalledWith('a.md'))
+    first.unmount()
+    expect(await opened).toBe(false)
+
+    const second = mount({ port: fakePort({ readFile }) })
+    await screen.findByTestId('tree-a.md')
+    act(() => { opened = second.paneRef.current!.openFile('a.md') })
+    fireEvent.click(screen.getByTestId('tree-b.md'))
+    expect(await opened).toBe(false)
+  })
+
+  it('settles false when a controlled parent closes the selected file during a read', async () => {
+    const paneRef = createRef<VaultPaneHandle>()
+    const port = fakePort({ readFile: vi.fn(() => new Promise<VaultFile>(() => {})) })
+    let selectPath!: (path: string | null) => void
+    function ControlledPane() {
+      const [path, setPath] = useState<string | null>(null)
+      selectPath = setPath
+      return createElement(VaultPane, {
+        ref: paneRef,
+        port,
+        renderTree,
+        renderArtifact,
+        codec: fmCodec,
+        selectedPath: path,
+        onSelectedPathChange: setPath,
+      })
+    }
+    render(createElement(ControlledPane))
+    await screen.findByTestId('tree-a.md')
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('a.md') })
+    await waitFor(() => expect(port.readFile).toHaveBeenCalledWith('a.md'))
+    act(() => selectPath(null))
+    expect(await opened).toBe(false)
+  })
+
+  it('settles false when a controlled parent explicitly rejects the requested path', async () => {
+    const onSelectedPathChange = vi.fn(() => false as const)
+    const { paneRef } = mount({ selectedPath: null, onSelectedPathChange })
+    await screen.findByTestId('tree-a.md')
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('a.md') })
+    expect(onSelectedPathChange).toHaveBeenCalledWith('a.md')
+    expect(await Promise.race([opened, Promise.resolve('pending')])).toBe(false)
+  })
+
+  it('preserves dirty edits when a controlled parent rejects the confirmed path', async () => {
+    const onSelectedPathChange = vi.fn(() => false as const)
+    const { paneRef } = mount({ selectedPath: 'a.md', onSelectedPathChange })
+    await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md'))
+    fireEvent.click(screen.getByLabelText('Edit as source'))
+    await typeSource('unsaved A')
+
+    let opened!: Promise<boolean>
+    act(() => { opened = paneRef.current!.openFile('b.md') })
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }))
+
+    expect(onSelectedPathChange).toHaveBeenCalledWith('b.md')
+    expect(await Promise.race([opened, Promise.resolve('pending')])).toBe(false)
+    expect((screen.getByLabelText('Source editor') as HTMLTextAreaElement).value).toBe('unsaved A')
+    expect(screen.getByText('Unsaved changes')).toBeTruthy()
+    expect(currentPath()).toBe('a.md')
+  })
+
+  it('keeps a dirty confirmation actionable while the user decides', async () => {
+    const { paneRef, port } = mount()
+    await openFile('a.md')
+    fireEvent.click(screen.getByLabelText('Edit as source'))
+    await typeSource('unsaved A')
+    vi.useFakeTimers()
+    try {
+      let opened!: Promise<boolean>
+      act(() => { opened = paneRef.current!.openFile('b.md') })
+      expect(screen.getByRole('dialog', { name: 'Discard unsaved changes?' })).toBeTruthy()
+      await act(async () => { await vi.advanceTimersByTimeAsync(30_000) })
+
+      expect(screen.getByRole('dialog', { name: 'Discard unsaved changes?' })).toBeTruthy()
+      expect(await Promise.race([opened, Promise.resolve('pending')])).toBe('pending')
+      expect(document.querySelector('[data-vault-path]')?.textContent).toBe('a.md')
+      expect((screen.getByLabelText('Source editor') as HTMLTextAreaElement).value).toBe('unsaved A')
+      expect(port.readFile).not.toHaveBeenCalledWith('b.md')
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      expect(await opened).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('lets the data port finish a read after a long wait', async () => {
+    let finishRead!: (file: VaultFile) => void
+    const readFile = vi.fn((path: string) => path === 'b.md'
+      ? new Promise<VaultFile>((resolve) => { finishRead = resolve })
+      : Promise.resolve({ path, content: 'body A' }))
+    const { paneRef } = mount({ port: fakePort({ readFile }) })
+    await openFile('a.md')
+    vi.useFakeTimers()
+    try {
+      let opened!: Promise<boolean>
+      act(() => { opened = paneRef.current!.openFile('b.md') })
+      expect(readFile).toHaveBeenCalledWith('b.md')
+      await act(async () => { await vi.advanceTimersByTimeAsync(30_000) })
+      expect(await Promise.race([opened, Promise.resolve('pending')])).toBe('pending')
+
+      await act(async () => finishRead({ path: 'b.md', content: 'late B' }))
+      expect(await opened).toBe(true)
+      expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('b.md')
+      expect(screen.getByTestId('artifact').textContent).toBe('late B')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the dirty editor when opening the already displayed file', async () => {
+    const { paneRef, port } = mount()
+    await openFile('a.md')
+    fireEvent.click(screen.getByLabelText('Edit as source'))
+    await typeSource('unsaved A')
+    const reads = vi.mocked(port.readFile).mock.calls.length
+
+    expect(await paneRef.current!.openFile('a.md')).toBe(true)
+    expect(vi.mocked(port.readFile)).toHaveBeenCalledTimes(reads)
+    expect((screen.getByLabelText('Source editor') as HTMLTextAreaElement).value).toBe('unsaved A')
   })
 })
 

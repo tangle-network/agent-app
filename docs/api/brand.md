@@ -43,5 +43,5 @@ interface LogoProps
 `function`
 
 ```ts
-({ size, className, }: { size?: number | undefined; className?: string | undefined; }) => Element
+({ size, className }: { size?: number | undefined; className?: string | undefined; }) => Element
 ```

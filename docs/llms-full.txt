@@ -1310,7 +1310,7 @@ interface LogoProps
 `function`
 
 ```ts
-({ size, className, }: { size?: number | undefined; className?: string | undefined; }) => Element
+({ size, className }: { size?: number | undefined; className?: string | undefined; }) => Element
 ```
 
 
@@ -24311,7 +24311,7 @@ interface AgentActivityRecord
 `function` — Controlled editor for the canonical profile.
 
 ```ts
-({ value, onChange, disabled, className }: AgentProfileEditorProps) => Element
+({ value, onChange, disabled, className, allowedResourceKinds }: AgentProfileEditorProps) => Element
 ```
 
 ### `AgentProfileEditorProps`
@@ -24320,6 +24320,14 @@ interface AgentActivityRecord
 
 ```ts
 interface AgentProfileEditorProps
+```
+
+### `AgentProfileResourceKind`
+
+`type`
+
+```ts
+type AgentProfileResourceKind
 ```
 
 ### `AgentSessionControls`
@@ -29127,7 +29135,7 @@ interface AgentWorkspaceActiveRoute
 
 ### `AgentWorkspaceAppsConfig`
 
-`interface` — Registered apps shown as individual workspace destinations.
+`interface` — Registered apps shown under one expandable workspace destination.
 
 ```ts
 interface AgentWorkspaceAppsConfig

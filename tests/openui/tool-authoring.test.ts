@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildAppToolOpenAITools } from '../../src/tools/index'
+import { OPENUI_NODE_TYPES } from '@tangle-network/ui/openui-schema'
 import { OPENUI_INPUT_KINDS, OPENUI_INTERACTIVE_AUTHORING_GUIDE } from '../../src/openui/index'
 
 const TAXONOMY = { proposalTypes: ['outreach'], regulatedTypes: [] } as const
@@ -15,7 +16,7 @@ describe('interactive-UI authoring guide', () => {
   it('leaves the shipped tool description byte-identical when not asked for', () => {
     const description = renderUiDescription(buildAppToolOpenAITools(TAXONOMY))
     expect(description).toBe(
-      'Show a generated view live in the workspace. Validates the OpenUI JSON and persists the artifact. Executes immediately.',
+      `Show a generated view live in the workspace. Validates the OpenUI JSON and persists the artifact. Use only these nodes: ${OPENUI_NODE_TYPES.join(', ')}. Stack, grid, and card may contain nested children. Executes immediately.`,
     )
   })
 

@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.50.25
+
+- fix(web-react): use semantic inverse chat colors
+
+## 0.50.24
+
+- fix(web-react): make profile resources editable and scoped (#714)
+
+## 0.50.23
+
+- chore(peers): admit Runtime 0.289 consumer cohort
+
+## 0.50.22
+
+- chore(peers): admit Sandbox 0.59 and require UI schema
+
+## 0.50.21
+
+- feat(vault): resolve external opens after display
+
+## 0.50.20
+
+- fix(peers): admit Sandbox UI 0.116 line
+- fix(tools): validate generated OpenUI before persistence (#707)
+
+## 0.50.19
+
+- fix(spend): prefer sandbox group key for attribution (#706)
+
+## 0.50.18
+
+- feat(workspace): group app destinations in sidebar
+
 ## 0.50.17
 
 - feat(object-store): stream authenticated raw uploads

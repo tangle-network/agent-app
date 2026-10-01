@@ -1529,6 +1529,9 @@ export function ChatMessages({
     messageSize === 'large'
       ? 'agent-app-message-copy text-[17px] leading-[1.6]'
       : 'agent-app-message-copy text-base leading-[1.6]'
+  // Resolve role colors at the message, so nested host themes can override
+  // the raw tokens without also redefining Tailwind's root color aliases.
+  const assistantMessageClassName = `${messageClassName} bg-transparent text-[hsl(var(--foreground))]`
   // Stabilize the fallback renderer's identity so it doesn't change every
   // render — otherwise the memoized `AssistantMessage` (and its per-frame body
   // memo) would invalidate on every parent render when no `renderMarkdown` is
@@ -1563,11 +1566,7 @@ export function ChatMessages({
                 </p>
               )}
               <div
-                className={
-                  quiet
-                    ? `rounded-2xl bg-[color-mix(in_srgb,hsl(var(--secondary))_65%,hsl(var(--background)))] px-4 py-2.5 ${messageClassName}`
-                    : `rounded-2xl rounded-tr-md bg-primary/10 px-4 py-2.5 ${messageClassName}`
-                }
+                className={`rounded-2xl bg-[hsl(var(--foreground))] px-4 py-2.5 text-[hsl(var(--background))] ${quiet ? '' : 'rounded-tr-md '}${messageClassName}`}
               >
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
@@ -1602,7 +1601,7 @@ export function ChatMessages({
             durableCards={durableCards}
             resolveAttachmentUrl={resolveAttachmentUrl}
             workProductCards={workProductCards}
-            messageClassName={messageClassName}
+            messageClassName={assistantMessageClassName}
             chrome={chrome}
           />
         ),
