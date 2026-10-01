@@ -105,11 +105,6 @@ export const streamingAssistantMessage: ChatUiMessage = {
  */
 export const chatThread: ChatUiMessage[] = [
   {
-    id: 'm1',
-    role: 'system',
-    content: 'Workspace: launch-poster. Approvals required for: asset_publish.',
-  },
-  {
     id: 'm2',
     role: 'user',
     content: 'Render the launch poster and queue it for review.',

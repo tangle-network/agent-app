@@ -134,7 +134,7 @@ export const Streaming: Story = {
     sections: withSessionStatus(shellSections, 'launch-poster', 'running'),
   },
   render: (args) => (
-    <ShellScene args={args} messages={[...chatThread.slice(0, 11), streamingAssistantMessage]} streaming />
+    <ShellScene args={args} messages={[...chatThread.slice(0, 10), streamingAssistantMessage]} streaming />
   ),
 }
 
@@ -194,7 +194,7 @@ export const ProposalPending: Story = {
   render: (args) => (
     <ShellScene
       args={args}
-      messages={[...chatThread.slice(0, 2), proposalAwaitingApprovalMessage]}
+      messages={[...chatThread.slice(0, 1), proposalAwaitingApprovalMessage]}
       approval={{
         onApprove: (proposalId, toolCallId) => console.log('approve', proposalId, toolCallId),
         onReject: (proposalId, toolCallId) => console.log('reject', proposalId, toolCallId),
