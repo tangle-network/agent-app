@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.24
+
+- fix(web-react): make profile resources editable and scoped (#714)
+
 ## 0.50.23
 
 - chore(peers): admit Runtime 0.289 consumer cohort
