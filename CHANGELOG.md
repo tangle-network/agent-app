@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.29
+
+- fix(hosted-agent): simplify single-choice line setup
+- fix(release): sequence CLI publication after Agent App [skip release] (#717)
+
 ## 0.50.28
 
 - fix(work-product): bind review and history to the original revision (#710)
