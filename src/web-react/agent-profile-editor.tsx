@@ -22,6 +22,8 @@ export interface AgentProfileEditorProps {
   requireUniqueSkillNames?: boolean
   /** Hide the generic tool and permission controls without removing stored values. Defaults to true. */
   showToolsAndPermissions?: boolean
+  /** Offer only public HTTPS MCP endpoints while retaining existing servers for review. Defaults to false. */
+  publicHttpsMcpOnly?: boolean
 }
 
 const RESOURCE_KIND_LABELS: Record<AgentProfileResourceKind, string> = {
@@ -198,10 +200,22 @@ function fileIssues(draft: FileDraft, filePathPrefix: string | undefined, allowE
   return issues
 }
 
+function publicHttpsMcpError(server: AgentProfileMcpServer): string | null {
+  if (server.enabled === false) return null
+  if (!('url' in server) || !server.url) return 'Use a public HTTPS MCP endpoint.'
+  try {
+    const url = new URL(server.url)
+    if (url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash &&
+      url.hostname.includes('.') && !/^\d+\.\d+\.\d+\.\d+$/.test(url.hostname) && !url.hostname.includes(':') &&
+      !url.hostname.endsWith('.local') && !url.hostname.endsWith('.internal')) return null
+  } catch { /* Invalid URLs are rejected below. */ }
+  return 'Use a public HTTPS MCP endpoint without credentials, query, fragment, or local address.'
+}
+
 /** Controlled editor for the canonical profile. The product owns save and execution authority. */
 export function AgentProfileEditor({ value, onChange, disabled = false, className, allowedResourceKinds,
   filePathPrefix, allowExecutableFiles = true, requireGitHubCommitSha = false, requireUniqueSkillNames = false,
-  showToolsAndPermissions = true }: AgentProfileEditorProps) {
+  showToolsAndPermissions = true, publicHttpsMcpOnly = false }: AgentProfileEditorProps) {
   const id = useId()
   const workspaceFilePrefix = normalizedFilePathPrefix(filePathPrefix)
   const [error, setError] = useState<string | null>(null)
@@ -209,6 +223,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
   const [showAllTools, setShowAllTools] = useState(false)
   const [mcpName, setMcpName] = useState('')
   const [mcpKind, setMcpKind] = useState<'http' | 'sse' | 'stdio'>('http')
+  const selectedMcpKind = publicHttpsMcpOnly && mcpKind === 'stdio' ? 'http' : mcpKind
   const [mcpTarget, setMcpTarget] = useState('')
   const [resourceDrafts, setResourceDrafts] = useState<Record<'skills' | 'tools', ResourceDraft>>({ skills: emptyResourceDraft(), tools: emptyResourceDraft() })
   const [resourceEdit, setResourceEdit] = useState<{ key: 'skills' | 'tools'; index: number; draft: ResourceDraft } | null>(null)
@@ -232,6 +247,8 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
       toolFiles.filter((ref, index) => requireGitHubCommitSha && resourceIssue('tools', resourceDraft(ref), toolFiles, index)).length +
       Number(Boolean(requireGitHubCommitSha && instructions && typeof instructions === 'object' && resourceError(resourceDraft(instructions), true)))
     : 0
+  const invalidMcpCount = publicHttpsMcpOnly
+    ? Object.values(value.mcp ?? {}).filter(server => publicHttpsMcpError(server)).length : 0
 
   function emit(next: AgentProfile) {
     if (jsonDirty) { setError('Apply or discard JSON edits first.'); return false }
@@ -340,7 +357,11 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     const target = mcpTarget.trim()
     if (!name || !target) { setError('Enter a server name and URL or command.'); return }
     if (name in (value.mcp ?? {})) { setError('A server with that name already exists.'); return }
-    const server: AgentProfileMcpServer = mcpKind === 'stdio' ? { command: target } : { transport: mcpKind, url: target }
+    const server: AgentProfileMcpServer = selectedMcpKind === 'stdio' ? { command: target } : { transport: selectedMcpKind, url: target }
+    if (publicHttpsMcpOnly) {
+      const issue = publicHttpsMcpError(server)
+      if (issue) { setError(issue); return }
+    }
     if (emit({ ...value, mcp: { ...value.mcp, [name]: server } })) { setMcpName(''); setMcpTarget('') }
   }
   function applyJson() {
@@ -363,6 +384,10 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     {constrainedEntryCount > 0 && <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground">
       {constrainedEntryCount} configured resource {constrainedEntryCount === 1 ? 'entry needs' : 'entries need'} repair before this product can save the profile.
       Review the resource sections or Advanced JSON. Existing values remain unchanged until you edit them.
+    </p>}
+    {invalidMcpCount > 0 && <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground">
+      {invalidMcpCount} configured MCP {invalidMcpCount === 1 ? 'server needs' : 'servers need'} a public HTTPS endpoint before this product can save the profile.
+      Review MCP servers or Advanced JSON. Existing values remain unchanged until you edit them.
     </p>}
     <Section title="Profile" description="Name the agent and set its instructions.">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -431,24 +456,28 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     </Disclosure>}
     {allowsResource('skills') && resourceSection('skills', 'Skills', 'Add skill packages from a repository or inline content.')}
     {allowsResource('tools') && resourceSection('tools', 'Tool files', 'Provide files that a supported harness can discover as tools.')}
-    <Disclosure title="MCP servers" description="Configure remote or local servers. Use secret references for credentials." detail={Object.keys(value.mcp ?? {}).length + ' configured'}>
+    <Disclosure title="MCP servers" description={publicHttpsMcpOnly
+      ? 'Configure public HTTPS servers. Use secret references for credentials.'
+      : 'Configure remote or local servers. Use secret references for credentials.'} detail={Object.keys(value.mcp ?? {}).length + ' configured'}>
       {Object.keys(value.mcp ?? {}).length === 0 && <p className="text-sm text-muted-foreground">No servers configured.</p>}
       <ul className="space-y-2">{Object.entries(value.mcp ?? {}).map(([name, server]) =>
         <li key={name} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
           <div className="min-w-0"><span className="font-medium">{name}</span>
             <span className="ml-2 text-xs text-muted-foreground">{server.enabled === false ? 'Disabled' : 'command' in server ? 'Local' : 'Remote'}</span>
             {server.enabled !== false && <p className="truncate text-xs text-muted-foreground">{'command' in server ? server.command : server.url}</p>}
+            {publicHttpsMcpOnly && publicHttpsMcpError(server) && <p className="text-xs text-destructive">
+              {publicHttpsMcpError(server)} Remove this server or edit it in Advanced JSON before saving.</p>}
           </div>
           <Button type="button" variant="ghost" className="text-destructive" disabled={editingDisabled} onClick={() => { const mcp = { ...value.mcp }; delete mcp[name]; emit({ ...value, mcp }) }}>Remove</Button>
         </li>)}</ul>
       <div className="grid gap-3 rounded-lg border border-dashed border-border p-3 sm:grid-cols-[1fr_10rem]">
         <Field label="Server name"><Input disabled={editingDisabled} value={mcpName} onChange={event => setMcpName(event.target.value)} placeholder="search" /></Field>
-        <Field label="Transport"><Select disabled={editingDisabled} value={mcpKind} onValueChange={kind => setMcpKind(kind as typeof mcpKind)}>
+        <Field label="Transport"><Select disabled={editingDisabled} value={selectedMcpKind} onValueChange={kind => setMcpKind(kind as typeof mcpKind)}>
           <SelectTrigger aria-label="Transport"><SelectValue /></SelectTrigger><SelectContent>
             <SelectItem value="http">HTTP</SelectItem><SelectItem value="sse">SSE</SelectItem>
-            <SelectItem value="stdio">Local command</SelectItem>
+            {!publicHttpsMcpOnly && <SelectItem value="stdio">Local command</SelectItem>}
           </SelectContent></Select></Field>
-        <div className="sm:col-span-2"><Field label={mcpKind === 'stdio' ? 'Command' : 'URL'}><Input disabled={editingDisabled} value={mcpTarget} onChange={event => setMcpTarget(event.target.value)} placeholder={mcpKind === 'stdio' ? 'mcp-server' : 'https://example.com/mcp'} /></Field></div>
+        <div className="sm:col-span-2"><Field label={selectedMcpKind === 'stdio' ? 'Command' : 'URL'}><Input disabled={editingDisabled} value={mcpTarget} onChange={event => setMcpTarget(event.target.value)} placeholder={selectedMcpKind === 'stdio' ? 'mcp-server' : 'https://example.com/mcp'} /></Field></div>
         <div className="sm:col-span-2"><Button type="button" variant="outline" disabled={editingDisabled} onClick={addMcp}>Add server</Button></div>
       </div>
       <p className="text-xs text-muted-foreground">Arguments, headers, environment, and secret references remain in Advanced JSON.</p>

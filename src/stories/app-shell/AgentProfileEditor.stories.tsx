@@ -26,7 +26,8 @@ const example: AgentProfile = {
 }
 
 type ResourceConstraints = Pick<AgentProfileEditorProps, 'allowedResourceKinds' | 'filePathPrefix' |
-  'allowExecutableFiles' | 'requireGitHubCommitSha' | 'requireUniqueSkillNames' | 'showToolsAndPermissions'>
+  'allowExecutableFiles' | 'requireGitHubCommitSha' | 'requireUniqueSkillNames' | 'showToolsAndPermissions' |
+  'publicHttpsMcpOnly'>
 
 function Preview({ initial, ...constraints }: { initial: AgentProfile } & ResourceConstraints) {
   const [profile, setProfile] = useState(initial)
@@ -48,7 +49,7 @@ const meta: Meta<typeof AgentProfileEditor> = {
   render: args => <Preview initial={args.value} allowedResourceKinds={args.allowedResourceKinds}
     filePathPrefix={args.filePathPrefix} allowExecutableFiles={args.allowExecutableFiles}
     requireGitHubCommitSha={args.requireGitHubCommitSha} requireUniqueSkillNames={args.requireUniqueSkillNames}
-    showToolsAndPermissions={args.showToolsAndPermissions} />,
+    showToolsAndPermissions={args.showToolsAndPermissions} publicHttpsMcpOnly={args.publicHttpsMcpOnly} />,
 }
 export default meta
 type Story = StoryObj<typeof AgentProfileEditor>
@@ -66,6 +67,7 @@ const referenceResources: AgentProfile = {
   name: 'Reference assistant',
   tools: { read: false, skill: true },
   permissions: { read: 'deny', skill: 'allow' },
+  mcp: { catalog: { transport: 'http', url: 'https://catalog.example.com/mcp' } },
   resources: {
     files: [
       { path: 'reference/arrival.md', resource: { kind: 'inline', name: 'arrival.md', content: '# Arrivals\nConfirm the booking reference.' } },
@@ -82,6 +84,7 @@ const referenceConstraints = {
   requireGitHubCommitSha: true,
   requireUniqueSkillNames: true,
   showToolsAndPermissions: false,
+  publicHttpsMcpOnly: true,
 } as const
 
 export const ReferenceOnly: Story = { args: { value: referenceResources, ...referenceConstraints } }
@@ -89,5 +92,5 @@ export const ExistingResourcesToRepair: Story = {
   args: { value: { resources: {
     files: [{ path: 'docs/old-guide.md', resource: { kind: 'github', repository: 'example/agent-guides', path: 'old-guide.md', ref: 'main' }, executable: true }],
     skills: [{ kind: 'github', repository: 'example/agent-guides', path: 'skills/booking/SKILL.md', ref: 'main' }],
-  } }, ...referenceConstraints },
+  }, mcp: { local: { command: 'local-mcp' }, insecure: { transport: 'http', url: 'http://example.com/mcp' } } }, ...referenceConstraints },
 }
