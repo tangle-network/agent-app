@@ -46,6 +46,7 @@ describe('application line sender proof', () => {
     ['expired', { expiresAt: new Date(Date.now() - 1_000).toISOString() }],
     ['no CONFIRM', { proof: { ...verified().proof, signedInboundConfirmAt: null } }],
     ['no approved sender', { approvedSender: undefined }],
+    ['non-phone approved sender', { approvedSender: 'owner@example.com' }],
   ])('refuses %s before any attach', async (_name, patch) => {
     const result = { ...verified(), ...patch } as OwnerApplicationSenderVerification
     const { attach, box, ownerLines } = clients(result)

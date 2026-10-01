@@ -29,8 +29,8 @@ export async function attachWorkspaceLine(input: {
   }
   const address = verification.approvedSender?.trim() ?? ''
   const turnsPerDay = input.turnsPerDay ?? 20
-  if (!/^\+[1-9]\d{6,14}$/.test(address) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
-    throw new TypeError('The verified sender must be an E.164 number or email/Apple ID')
+  if (!/^\+[1-9]\d{6,14}$/.test(address)) {
+    throw new TypeError('The verified sender must be an E.164 phone number')
   }
   if (!Number.isSafeInteger(turnsPerDay) || turnsPerDay < 1 || turnsPerDay > 10_000) {
     throw new TypeError('A daily turn limit between 1 and 10000 is required')
@@ -47,7 +47,7 @@ export async function attachWorkspaceLine(input: {
     number: input.lineId,
     senderVerificationId: input.senderVerificationId,
     mode: 'personal',
-    members: [{ address: address.includes('@') ? address.toLowerCase() : address, role: 'owner' }],
+    members: [{ address, role: 'owner' }],
     unknownSenders: 'reject',
     roles: { owner: { context: 'own', tools: 'act' } },
     respond: { kind: 'agent', application: { ...input.application } },
