@@ -104,3 +104,44 @@ export const InteractiveLight: Story = {
   globals: { agentTheme: 'agent-light' },
   render: () => <InteractiveSetup />,
 }
+
+const severalChoices: LineSetupSnapshot = {
+  ...setupEmpty,
+  connections: [
+    { id: 'conn_inkbox', label: 'Research Inkbox', providerId: 'inkbox',
+      identities: [{ kind: 'handle', transport: 'imessage', label: '@research' }] },
+    { id: 'conn_support', label: 'Support Inkbox', providerId: 'inkbox',
+      identities: [{ kind: 'handle', transport: 'imessage', label: '@support' }] },
+  ],
+  targets: [
+    { id: 'agent_guide', label: 'Guide', kind: 'agent', modes: ['per-member'] },
+    { id: 'agent_support', label: 'Support', kind: 'agent', modes: ['per-member'] },
+  ],
+}
+
+export const MultipleChoices: Story = {
+  globals: { agentTheme: 'agent-light' },
+  render: () => <SetupFixture snapshot={severalChoices} scopeKey="storybook-multiple-choices" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.selectOptions(await canvas.findByRole('combobox', { name: 'Line' }), 'conn_support:0')
+    await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Agent or box' }), 'agent_support')
+  },
+}
+
+export const SameAccountDifferentChannels: Story = {
+  globals: { agentTheme: 'agent-dark' },
+  render: () => <SetupFixture snapshot={{
+    ...setupEmpty,
+    connections: [{
+      id: 'conn_inkbox', label: 'Owned Inkbox', providerId: 'inkbox',
+      identities: [
+        { kind: 'handle', transport: 'imessage', label: '@research' },
+        { kind: 'email', transport: 'email', label: '@research' },
+      ],
+    }],
+  }} scopeKey="storybook-same-account-channels" />,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole('button', { name: 'Email line' }))
+  },
+}
