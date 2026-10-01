@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.26
+
+- fix(web-react): scope profile editor to product policy (#716)
+
 ## 0.50.25
 
 - fix(web-react): use semantic inverse chat colors

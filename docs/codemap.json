@@ -18812,7 +18812,7 @@
         {
           "name": "AgentProfileEditor",
           "kind": "function",
-          "signature": "({ value, onChange, disabled, className, allowedResourceKinds }: AgentProfileEditorProps) => Element",
+          "signature": "({ value, onChange, disabled, className, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGitHubCommi…",
           "doc": "Controlled editor for the canonical profile."
         },
         {

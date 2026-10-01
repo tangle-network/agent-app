@@ -24311,7 +24311,7 @@ interface AgentActivityRecord
 `function` — Controlled editor for the canonical profile.
 
 ```ts
-({ value, onChange, disabled, className, allowedResourceKinds }: AgentProfileEditorProps) => Element
+({ value, onChange, disabled, className, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGitHubCommi…
 ```
 
 ### `AgentProfileEditorProps`
