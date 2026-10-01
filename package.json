@@ -634,14 +634,14 @@
   "peerDependencies": {
     "@firecrawl/pdf-inspector-wasm": ">=0.1.3",
     "@huggingface/transformers": ">=3",
-    "@tangle-network/agent-eval": ">=0.199.0 <0.201.0",
+    "@tangle-network/agent-eval": ">=0.199.0 <0.204.0",
     "@tangle-network/agent-integrations": ">=0.54.2 <0.58.0 || >=0.59.0 <0.60.0",
     "@tangle-network/agent-interface": "^2.13.0",
     "@tangle-network/agent-knowledge": "^17.1.2",
     "@tangle-network/agent-profile-materialize": ">=0.20.1 <0.21.0",
-    "@tangle-network/agent-runtime": ">=0.282.2 <0.284.0 || >=0.285.0 <0.286.0",
+    "@tangle-network/agent-runtime": ">=0.282.2 <0.284.0 || >=0.285.0 <0.286.0 || >=0.289.1 <0.290.0",
     "@tangle-network/brand": ">=1.6.0",
-    "@tangle-network/hub-sdk": ">=0.19.3 <0.21.0 || >=0.21.0 <0.22.0",
+    "@tangle-network/hub-sdk": ">=0.19.3 <0.21.0 || >=0.21.0 <0.22.0 || >=0.22.1 <0.23.0",
     "@tangle-network/sandbox": ">=0.45.0 <0.48.0 || ^0.49.0 || ^0.50.0 || ^0.51.0 || ^0.52.0 || ^0.53.0 || ^0.54.0 || ^0.55.0 || >=0.58.1 <0.60.0",
     "@tangle-network/sandbox-ui": ">=0.113.3 <0.117.0",
     "@tangle-network/ui": ">=11.11.3 <12.0.0",
@@ -664,7 +664,7 @@
     "resend": ">=6",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@tangle-network/browser-agent-driver": "^0.36.1",
-    "@tangle-network/tcloud": "^0.5.2",
+    "@tangle-network/tcloud": "^0.5.2 || >=0.8.1 <0.9.0",
     "playwright": "^1.63.0"
   },
   "peerDependenciesMeta": {
