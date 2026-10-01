@@ -58,6 +58,7 @@ function ResponsiveVault({ externalNavigation = false, initialWidth }: { externa
   const paneRef = useRef<VaultPaneHandle>(null)
   const [width, setWidth] = useState(initialWidth ?? (externalNavigation ? 960 : 390))
   const [path, setPath] = useState<string | null>('brief.md')
+  const [navigationResult, setNavigationResult] = useState('')
   const port = useMemo<VaultDataPort>(() => {
     const documents = new Map([
       ['brief.md', content],
@@ -80,7 +81,8 @@ function ResponsiveVault({ externalNavigation = false, initialWidth }: { externa
   async function openNewArtifact() {
     const nextPath = await port.createFile('artifact.md')
     await port.writeFile(nextPath, '# Fresh artifact\n\nThis file was created after the tree was loaded.')
-    paneRef.current?.openFile(nextPath)
+    const opened = await paneRef.current?.openFile(nextPath)
+    setNavigationResult(opened ? `Opened ${nextPath}` : `Could not open ${nextPath}`)
   }
   return (
     <div className="flex h-[700px] max-w-full flex-col gap-3 p-3" style={{ width }}>
@@ -89,9 +91,14 @@ function ResponsiveVault({ externalNavigation = false, initialWidth }: { externa
           <button type="button" className="rounded border border-border px-3 py-2" onClick={() => void openNewArtifact()}>
             Open new artifact
           </button>
-          <button type="button" className="rounded border border-border px-3 py-2" onClick={() => paneRef.current?.openFile('missing.md')}>
+          <button type="button" className="rounded border border-border px-3 py-2" onClick={() => {
+            void paneRef.current?.openFile('missing.md').then((opened) => {
+              setNavigationResult(opened ? 'Opened missing.md' : 'Could not open missing.md')
+            })
+          }}>
             Open missing file
           </button>
+          <span role="status" className="self-center text-sm" aria-live="polite">{navigationResult}</span>
         </div>
       )}
       <label className="flex items-center gap-3 text-sm">
@@ -149,7 +156,7 @@ export const ExternalFileNavigation: StoryObj<typeof RefreshingVault> = {
   parameters: {
     docs: {
       description: {
-        story: 'An in-memory component fixture. External navigation confirms a dirty draft, reads a newly created file without refreshing the tree, and shows missing-file errors. This does not prove backend persistence.',
+        story: 'An in-memory component fixture. External navigation reports completion after a new file appears, reports failed reads, and asks before discarding a dirty draft. This does not prove backend persistence.',
       },
     },
   },
