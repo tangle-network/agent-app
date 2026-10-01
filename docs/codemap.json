@@ -2009,6 +2009,12 @@
           "doc": "The official Sandbox methods needed for completed-turn recovery."
         },
         {
+          "name": "createApplicationIntelligenceLifecycle",
+          "kind": "function",
+          "signature": "<TContext>(intelligence: Pick<ApplicationIntelligence, \"recordObservation\">) => ChatTurnLifecycle<TContext>",
+          "doc": "Adapt the existing terminal hooks, including gated turns, without observing a second stream."
+        },
+        {
           "name": "createAssistantDraftWriter",
           "kind": "function",
           "signature": "(options: AssistantDraftWriterOptions) => AssistantDraftWriter",
@@ -10832,6 +10838,24 @@
           "doc": "The variance-erased form a registry accepts (`build` is contravariant in `TCtx`, so every concrete definition is assignable to this)."
         },
         {
+          "name": "ApplicationIntelligence",
+          "kind": "interface",
+          "signature": "interface ApplicationIntelligence",
+          "doc": "Shared app entry points; Runtime/Eval/Intelligence still own search, evidence and activation."
+        },
+        {
+          "name": "ApplicationIntelligenceOptions",
+          "kind": "interface",
+          "signature": "interface ApplicationIntelligenceOptions",
+          "doc": "One adapter per authorization scope."
+        },
+        {
+          "name": "ApplicationRunExport",
+          "kind": "interface",
+          "signature": "interface ApplicationRunExport",
+          "doc": null
+        },
+        {
           "name": "AppToolLoopOptions",
           "kind": "interface",
           "signature": "interface AppToolLoopOptions",
@@ -10866,6 +10890,12 @@
           "kind": "type",
           "signature": "type CertifiedDeliveryConfig",
           "doc": "Pull coordinates, refresh cadence and timeout owned by the shared source."
+        },
+        {
+          "name": "createApplicationIntelligence",
+          "kind": "function",
+          "signature": "(options: ApplicationIntelligenceOptions) => ApplicationIntelligence",
+          "doc": null
         },
         {
           "name": "createCertifiedDelivery",
@@ -10992,6 +11022,12 @@
           "kind": "function",
           "signature": "(id: string) => string",
           "doc": "Strip provider prefix, :free suffix, and trailing date stamps."
+        },
+        {
+          "name": "ObservedApplicationProducer",
+          "kind": "interface",
+          "signature": "interface ObservedApplicationProducer",
+          "doc": null
         },
         {
           "name": "OpenAICompatServedModel",

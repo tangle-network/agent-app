@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-210 exports.
+211 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -604,6 +604,14 @@ interface ChatTurnUsage
 
 ```ts
 type CompletedSandboxTurnSource
+```
+
+### `createApplicationIntelligenceLifecycle`
+
+`function` — Adapt the existing terminal hooks, including gated turns, without observing a second stream.
+
+```ts
+<TContext>(intelligence: Pick<ApplicationIntelligence, "recordObservation">) => ChatTurnLifecycle<TContext>
 ```
 
 ### `createAssistantDraftWriter`

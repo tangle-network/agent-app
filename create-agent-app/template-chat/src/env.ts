@@ -7,6 +7,12 @@
  */
 
 export interface AppEnv {
+  /** Explicit metadata-only observation opt-in. Never authorizes improvement spend or activation. */
+  INTELLIGENCE_OBSERVE_ENABLED?: string
+  /** Dedicated export credential; no fallback to the inference key. */
+  TANGLE_INTELLIGENCE_API_KEY?: string
+  TANGLE_INTELLIGENCE_URL?: string
+
   /** D1 database — run `migrations/` against it before first boot. */
   DB: D1Database
 

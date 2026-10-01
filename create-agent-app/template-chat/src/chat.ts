@@ -23,9 +23,11 @@
  */
 
 import { config } from '../agent.config'
+import { createApplicationIntelligence } from '@tangle-network/agent-app/runtime'
 import { createAppAuth, type AppAuth } from '@tangle-network/agent-app/app-auth'
 import {
   createChatTurnRoutes,
+  createApplicationIntelligenceLifecycle,
   createUploadRoute,
   type ChatTurnAuthorization,
   type ChatTurnProduceArgs,
@@ -130,8 +132,20 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
     return { ok: true, tenantId: user.id, userId: user.id, context: undefined }
   }
 
+  // Server opt-in: metadata only; the Router key is never an export credential.
+  const intelligence = env.INTELLIGENCE_OBSERVE_ENABLED === 'true'
+    ? createApplicationIntelligence({ config: () => ({
+      project: appSlug, apiKey: env.TANGLE_INTELLIGENCE_API_KEY?.trim() ?? '',
+      baseUrl: env.TANGLE_INTELLIGENCE_URL, effort: 'off', payloadAttributes: 'metadata',
+    }), warn: message => console.warn(message) })
+    : undefined
+
   const routes = createChatTurnRoutes<void>({
     projectId: appSlug,
+    ...(intelligence ? {
+      lifecycle: createApplicationIntelligenceLifecycle(intelligence),
+      traceFlush: () => intelligence.flush(),
+    } : {}),
     authorize,
     store,
     turnStore: overrides.turnStore ?? createD1TurnEventStore(env.DB),

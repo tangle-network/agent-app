@@ -2586,6 +2586,14 @@ interface ChatTurnUsage
 type CompletedSandboxTurnSource
 ```
 
+### `createApplicationIntelligenceLifecycle`
+
+`function` — Adapt the existing terminal hooks, including gated turns, without observing a second stream.
+
+```ts
+<TContext>(intelligence: Pick<ApplicationIntelligence, "recordObservation">) => ChatTurnLifecycle<TContext>
+```
+
 ### `createAssistantDraftWriter`
 
 `function` — Build the coalescing draft writer for one turn.
@@ -13961,6 +13969,30 @@ Source: `src/runtime/index.ts` · depends on `tools`
 type AnySurfaceKind
 ```
 
+### `ApplicationIntelligence`
+
+`interface` — Shared app entry points; Runtime/Eval/Intelligence still own search, evidence and activation.
+
+```ts
+interface ApplicationIntelligence
+```
+
+### `ApplicationIntelligenceOptions`
+
+`interface` — One adapter per authorization scope.
+
+```ts
+interface ApplicationIntelligenceOptions
+```
+
+### `ApplicationRunExport`
+
+`interface`
+
+```ts
+interface ApplicationRunExport
+```
+
 ### `AppToolLoopOptions`
 
 `interface`
@@ -14007,6 +14039,14 @@ interface CertifiedDelivery
 
 ```ts
 type CertifiedDeliveryConfig
+```
+
+### `createApplicationIntelligence`
+
+`function`
+
+```ts
+(options: ApplicationIntelligenceOptions) => ApplicationIntelligence
 ```
 
 ### `createCertifiedDelivery`
@@ -14175,6 +14215,14 @@ interface ModelCatalog
 
 ```ts
 (id: string) => string
+```
+
+### `ObservedApplicationProducer`
+
+`interface`
+
+```ts
+interface ObservedApplicationProducer
 ```
 
 ### `OpenAICompatServedModel`

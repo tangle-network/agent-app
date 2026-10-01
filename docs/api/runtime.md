@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-71 exports.
+76 exports.
 
 ### `AnySurfaceKind`
 
@@ -12,6 +12,30 @@ Source: `src/runtime/index.ts`
 
 ```ts
 type AnySurfaceKind
+```
+
+### `ApplicationIntelligence`
+
+`interface` — Shared app entry points; Runtime/Eval/Intelligence still own search, evidence and activation.
+
+```ts
+interface ApplicationIntelligence
+```
+
+### `ApplicationIntelligenceOptions`
+
+`interface` — One adapter per authorization scope.
+
+```ts
+interface ApplicationIntelligenceOptions
+```
+
+### `ApplicationRunExport`
+
+`interface`
+
+```ts
+interface ApplicationRunExport
 ```
 
 ### `AppToolLoopOptions`
@@ -60,6 +84,14 @@ interface CertifiedDelivery
 
 ```ts
 type CertifiedDeliveryConfig
+```
+
+### `createApplicationIntelligence`
+
+`function`
+
+```ts
+(options: ApplicationIntelligenceOptions) => ApplicationIntelligence
 ```
 
 ### `createCertifiedDelivery`
@@ -228,6 +260,14 @@ interface ModelCatalog
 
 ```ts
 (id: string) => string
+```
+
+### `ObservedApplicationProducer`
+
+`interface`
+
+```ts
+interface ObservedApplicationProducer
 ```
 
 ### `OpenAICompatServedModel`

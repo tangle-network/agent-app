@@ -17,3 +17,5 @@ export * from './surface-profile'
 export * from './loop'
 
 export * from './protected-model'
+
+export * from './application-intelligence'

@@ -20,6 +20,8 @@ export type CertifiedDeliveryConfig = CertifiedPromptSourceOptions
 
 /** Adapt certified prompt guidance without granting execution authority. */
 export interface CertifiedDelivery {
+  /** Compose plain prompt guidance through the same cached source as composeProfile. */
+  composePrompt(base: string): Promise<string>
   /** Refresh on the source's cadence and compose the current prompt guidance.
    * Other resolved profile fields pass through unchanged. */
   composeProfile(base: ResolvedAgentProfile): Promise<ResolvedAgentProfile>
@@ -33,6 +35,7 @@ export interface CertifiedDelivery {
 export function createCertifiedDelivery(config: CertifiedDeliveryConfig): CertifiedDelivery {
   const source = createCertifiedPromptSource(config)
   return {
+    composePrompt: base => source.compose(base),
     async composeProfile(base) {
       return { ...base, systemPrompt: await source.compose(base.systemPrompt) }
     },
