@@ -38,16 +38,12 @@ const meta: Meta<typeof AppShell> = {
     activeSessionId: 'launch-poster',
     pendingApprovals: 0,
     user: { name: 'Drew Stone', email: 'drew@tangle.tools' },
-    headerTitle: 'Launch poster review',
-    headerSubtitle: 'Workspace · launch-poster · sandbox connected',
     onNewChat: () => console.log('new-chat'),
     onSelectSession: (id) => console.log('select-session', id),
     onToggleCollapse: () => console.log('toggle-collapse'),
     onOpenApprovals: () => console.log('open-approvals'),
     onOpenSettings: () => console.log('open-settings'),
     onOpenAccount: () => console.log('open-account'),
-    onShare: () => console.log('share-thread'),
-    onOpenThreadMenu: () => console.log('thread-menu'),
   },
 }
 
@@ -146,7 +142,7 @@ export const Streaming: Story = {
  *  to the branded `ChatEmptyState` with three concrete doors. */
 export const EmptyState: Story = {
   name: 'Empty state',
-  args: { activeSessionId: null, headerTitle: 'New chat', headerSubtitle: 'No workspace selected' },
+  args: { activeSessionId: null },
   render: (args) => (
     <ShellScene
       args={args}

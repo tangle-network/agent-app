@@ -171,6 +171,24 @@ import {
 Use `ChatMessages` and the shared `AgentComposer` for an existing session,
 keeping domain cards and context in the product.
 
+The transcript fills the main column from its top edge.
+Do not reserve a title row, prompt strip, or repeated session heading above it.
+Keep session titles in History and the browser document title.
+Place optional navigation, sharing, and thread actions in a floating overlay.
+Show each action only when its real callback exists.
+Keep the overlay outside document flow and allow pointer events through its empty area.
+Do not add placeholder actions or a fabricated connection indicator.
+Show execution status from observed runtime events inside the conversation.
+
+## Integration settings
+
+Use `IntegrationsPanel` and `useIntegrations` from `@tangle-network/sandbox-ui/integrations` for the integration catalog.
+The shared panel owns provider logos, search, sorting, connection controls, and disconnect confirmation.
+Products supply authorized catalog data, connections, and real connect and disconnect callbacks.
+Use the shared `ProviderIcon` for product-specific connection rows.
+Keep workspace ownership, access checks, and connection bindings in the product.
+Do not copy the catalog grid or logo resolution into an agent app.
+
 Do not add a second History panel for a chat-first product.
 
 Workflow-first and queue-first products may omit `sessions` when a persistent

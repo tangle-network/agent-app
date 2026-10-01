@@ -4,7 +4,7 @@
  * from package primitives (`ChatMessages`, `ChatComposer`, `../../brand`) plus
  * its own sidebar. These are the story-local building blocks for that
  * composition: a session sidebar (recency sections, active item, status
- * affordances, new-chat button), a thread header, and the `AppShell` layout
+ * affordances, new-chat button), floating thread controls, and the `AppShell` layout
  * that wires them together with a mobile drawer below `md`.
  *
  * Everything is Tailwind over the shared tokens (`bg-card`, `border-border`,
@@ -297,53 +297,41 @@ export function AppSidebar(props: AppSidebarProps) {
   )
 }
 
-// ── thread header ─────────────────────────────────────────────────────────────
+// ── floating thread controls ──────────────────────────────────────────────────
 
-interface ShellHeaderProps {
-  title: string
-  subtitle?: string
-  pendingApprovals?: number
-  /** Hamburger — only visible below `md`, where the sidebar is a drawer. */
-  onOpenMobileNav?: () => void
+interface ShellControlsProps {
+  onOpenMobileNav: () => void
   onShare?: () => void
   onOpenThreadMenu?: () => void
 }
 
-function ShellHeader({
-  title,
-  subtitle,
-  pendingApprovals = 0,
-  onOpenMobileNav,
-  onShare,
-  onOpenThreadMenu,
-}: ShellHeaderProps) {
+function ShellControls({ onOpenMobileNav, onShare, onOpenThreadMenu }: ShellControlsProps) {
+  const floatingButtonClass = `${iconButtonClass} pointer-events-auto border border-border bg-background/95 shadow-sm`
   return (
-    <header className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-border bg-card px-2 py-1.5 sm:px-3">
-      <button type="button" onClick={onOpenMobileNav} aria-label="Open navigation" className={`${iconButtonClass} md:hidden`}>
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-3">
+      <button
+        type="button"
+        onClick={onOpenMobileNav}
+        aria-label="Open navigation"
+        className={`${floatingButtonClass} md:hidden`}
+      >
         <PanelLeft className="h-4 w-4" />
       </button>
-      <div className="min-w-0 flex-1 px-1">
-        <p className="truncate text-sm font-semibold leading-5 text-foreground">{title}</p>
-        {subtitle && (
-          <p className="flex items-center gap-1.5 truncate text-xs leading-4 text-muted-foreground">
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-label="Sandbox connected" />
-            {subtitle}
-          </p>
-        )}
-      </div>
-      {pendingApprovals > 0 && (
-        <span className="hidden shrink-0 items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning sm:inline-flex">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          {pendingApprovals} awaiting approval
-        </span>
+      {(onShare || onOpenThreadMenu) && (
+        <div className="ml-auto flex gap-1.5">
+          {onShare && (
+            <button type="button" onClick={onShare} aria-label="Share chat" className={floatingButtonClass}>
+              <Share2 className="h-4 w-4" />
+            </button>
+          )}
+          {onOpenThreadMenu && (
+            <button type="button" onClick={onOpenThreadMenu} aria-label="Chat actions" className={floatingButtonClass}>
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       )}
-      <button type="button" onClick={onShare} aria-label="Share chat" className={iconButtonClass}>
-        <Share2 className="h-4 w-4" />
-      </button>
-      <button type="button" onClick={onOpenThreadMenu} aria-label="Chat actions" className={iconButtonClass}>
-        <MoreHorizontal className="h-4 w-4" />
-      </button>
-    </header>
+    </div>
   )
 }
 
@@ -356,8 +344,6 @@ export interface AppShellProps {
   sidebarDensity?: 'comfortable' | 'compact'
   pendingApprovals?: number
   user?: ShellUser | null
-  headerTitle: string
-  headerSubtitle?: string
   onNewChat?: () => void
   onSelectSession?: (id: string) => void
   onToggleCollapse?: () => void
@@ -375,7 +361,7 @@ export interface AppShellProps {
 
 /**
  * The production agent-app layout: sidebar (fixed on desktop, drawer below
- * `md`), header row, scrolling thread, pinned composer. Presentational only —
+ * `md`), scrolling thread, pinned composer, and optional floating actions. Presentational only —
  * all behavior arrives via props, so stories drive it with fixtures and
  * console.log callbacks.
  */
@@ -386,8 +372,6 @@ export function AppShell({
   sidebarDensity = 'comfortable',
   pendingApprovals = 0,
   user,
-  headerTitle,
-  headerSubtitle,
   onNewChat,
   onSelectSession,
   onToggleCollapse,
@@ -440,11 +424,8 @@ export function AppShell({
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <ShellHeader
-          title={headerTitle}
-          subtitle={headerSubtitle}
-          pendingApprovals={pendingApprovals}
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        <ShellControls
           onOpenMobileNav={() => setMobileNavOpen(true)}
           onShare={onShare}
           onOpenThreadMenu={onOpenThreadMenu}
