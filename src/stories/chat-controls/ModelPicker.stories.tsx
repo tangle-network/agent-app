@@ -149,3 +149,16 @@ export const AllStates: Story = {
     </div>
   ),
 }
+
+
+export const EditableField: Story = {
+  render: () => {
+    const [model, setModel] = useState(DEFAULT_MODEL_ID)
+    return <div className="flex w-[340px] max-w-[calc(100vw-32px)] items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+      <input aria-label="Model ID" className="min-w-0 flex-1 bg-transparent text-sm" value={model}
+        onChange={event => setModel(event.target.value)} />
+      <ModelPicker value={model} onChange={setModel} models={catalogModels} variant="quiet"
+        triggerContent={<span>Search</span>} />
+    </div>
+  },
+}

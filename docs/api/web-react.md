@@ -1891,7 +1891,7 @@ interface MissionActivityLaneProps
 `function` — Searchable model picker pill + popover.
 
 ```ts
-({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant }: ModelPickerProps)…
+({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant, triggerContent }: M…
 ```
 
 ### `ModelPickerProps`
