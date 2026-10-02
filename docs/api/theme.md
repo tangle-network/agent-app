@@ -8,7 +8,7 @@ Source: `src/theme/index.ts`
 
 ### `AgentAppTheme`
 
-`interface` — Typed mirror of tokens.css for runtime/JS theming.
+`interface`
 
 ```ts
 interface AgentAppTheme
@@ -24,7 +24,7 @@ interface CanvasRenderPalette
 
 ### `darkTheme`
 
-`const` — Define a dark color scheme for the Agent app interface with specific background and foreground hues
+`const` — Canonical Brand dark values projected for legacy JS and bitmap callers.
 
 ```ts
 AgentAppTheme

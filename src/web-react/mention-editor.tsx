@@ -106,6 +106,14 @@ export interface MentionEditorProps {
   /** Registers a focus callback the composer wires to Cmd/Ctrl+L; called with
    *  `null` on unmount so the composer never focuses a destroyed editor. */
   registerFocus?: (focus: (() => void) | null) => void
+  /** Handles the shared skill slash menu before Enter would submit a turn. */
+  onComposerKeyDown?: (event: globalThis.KeyboardEvent) => boolean
+  /** Lets the composer hide its slash menu while @ suggestions own the keys. */
+  onMentionMenuOpenChange?: (open: boolean) => void
+  /** Accessible listbox state for the shared slash picker. `@` suggestions
+   * take priority when both inputs have candidate state. */
+  slashListId?: string
+  slashActiveId?: string
   /**
    * Clipboard files pulled off a paste. Returns true when consumed so the
    * editor suppresses its default text paste — the same funnel the textarea
@@ -241,6 +249,10 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
     mention,
     fallback,
     registerFocus,
+    onComposerKeyDown,
+    onMentionMenuOpenChange,
+    slashListId,
+    slashActiveId,
     onPasteFiles,
   }: MentionEditorProps) {
     const trigger = mention.trigger ?? '@'
@@ -287,6 +299,10 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
     onMentionsChangeRef.current = mention.onMentionsChange
     const onPasteFilesRef = useRef(onPasteFiles)
     onPasteFilesRef.current = onPasteFiles
+    const onComposerKeyDownRef = useRef(onComposerKeyDown)
+    onComposerKeyDownRef.current = onComposerKeyDown
+    const onMentionMenuOpenChangeRef = useRef(onMentionMenuOpenChange)
+    onMentionMenuOpenChangeRef.current = onMentionMenuOpenChange
     const fetchItemsRef = useRef(mention.fetchItems)
     fetchItemsRef.current = mention.fetchItems
 
@@ -306,6 +322,14 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
             'aria-haspopup': 'listbox',
           },
           handleKeyDown: (_view, event) => {
+            // IME Enter commits the candidate. An open @ suggestion owns its
+            // arrow and selection keys before the slash picker may see them.
+            if (
+              !event.isComposing &&
+              event.keyCode !== 229 &&
+              !openRef.current &&
+              onComposerKeyDownRef.current?.(event)
+            ) return true
             if (event.key !== 'Enter' || event.shiftKey) return false
             // Composition (IME) commits via Enter — never send mid-composition.
             if (event.isComposing || event.keyCode === 229) return false
@@ -366,6 +390,7 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
             render: () => ({
               onStart: (props: SuggestionProps) => {
                 openRef.current = true
+                onMentionMenuOpenChangeRef.current?.(true)
                 commandRef.current = props.command
                 setOpen(true)
                 setQuery(props.query)
@@ -383,6 +408,7 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
               },
               onExit: () => {
                 openRef.current = false
+                onMentionMenuOpenChangeRef.current?.(false)
                 commandRef.current = null
                 setOpen(false)
                 setItems([])
@@ -471,13 +497,15 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
     useEffect(() => {
       if (!editor) return
       const dom = editor.view.dom
-      dom.setAttribute('aria-expanded', open ? 'true' : 'false')
+      dom.setAttribute('aria-expanded', open || Boolean(slashListId) ? 'true' : 'false')
       if (open) dom.setAttribute('aria-controls', listboxId)
+      else if (slashListId) dom.setAttribute('aria-controls', slashListId)
       else dom.removeAttribute('aria-controls')
       const hasRows = open && !loading && !errored && items.length > 0
       if (hasRows) dom.setAttribute('aria-activedescendant', `${listboxId}-opt-${activeIndex}`)
+      else if (slashListId && slashActiveId) dom.setAttribute('aria-activedescendant', slashActiveId)
       else dom.removeAttribute('aria-activedescendant')
-    }, [editor, open, loading, errored, items.length, activeIndex, listboxId])
+    }, [editor, open, loading, errored, items.length, activeIndex, listboxId, slashListId, slashActiveId])
 
     useEffect(() => {
       if (!editor || !registerFocus) return

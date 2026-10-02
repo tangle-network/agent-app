@@ -1,0 +1,90 @@
+[
+  {
+    "surface": "canvas",
+    "theme": "agent-light",
+    "canvas": {
+      "x": 276,
+      "y": 108,
+      "width": 844,
+      "height": 777
+    },
+    "initialZoom": "63%",
+    "pointerZoom": "73%",
+    "keyboardZoom": "63%",
+    "width": 1440,
+    "errors": [],
+    "screenshot": "canvas-agent-light-interactive.png"
+  },
+  {
+    "surface": "canvas",
+    "theme": "agent-dark",
+    "canvas": {
+      "x": 276,
+      "y": 108,
+      "width": 844,
+      "height": 777
+    },
+    "initialZoom": "63%",
+    "pointerZoom": "73%",
+    "keyboardZoom": "63%",
+    "width": 1440,
+    "errors": [],
+    "screenshot": "canvas-agent-dark-interactive.png"
+  },
+  {
+    "surface": "chat",
+    "theme": "agent-light",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "detailsExpanded": true,
+    "keyboardFocus": "solid",
+    "rejected": true,
+    "width": 1440,
+    "errors": [],
+    "screenshot": "chat-agent-light-1440-details.png"
+  },
+  {
+    "surface": "chat",
+    "theme": "agent-dark",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "detailsExpanded": true,
+    "keyboardFocus": "solid",
+    "rejected": true,
+    "width": 1440,
+    "errors": [],
+    "screenshot": "chat-agent-dark-1440-details.png"
+  },
+  {
+    "surface": "chat",
+    "theme": "agent-light",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "detailsExpanded": true,
+    "keyboardFocus": "solid",
+    "rejected": true,
+    "width": 390,
+    "errors": [],
+    "screenshot": "chat-agent-light-390-details.png"
+  },
+  {
+    "surface": "chat",
+    "theme": "agent-dark",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "detailsExpanded": true,
+    "keyboardFocus": "solid",
+    "rejected": true,
+    "width": 390,
+    "errors": [],
+    "screenshot": "chat-agent-dark-390-details.png"
+  }
+]

@@ -2745,6 +2745,14 @@ class ChatTurnInputError
 interface ChatTurnInputPatch
 ```
 
+### `ChatTurnIntelligenceOptions`
+
+`interface` — Host-resolved metadata only.
+
+```ts
+interface ChatTurnIntelligenceOptions
+```
+
 ### `ChatTurnLifecycle`
 
 `interface` — Deterministic run telemetry: `onTurnStart` fires before the producer runs; exactly one of `onTurnComplete` / `onTurnError` fires after the turn settles, always after `onTurnStart`.
@@ -3449,6 +3457,14 @@ interface NativeCompletionTurnReceipt
 (prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]
 ```
 
+### `observeChatTurnStream`
+
+`function` — Observe the source iterator without an execution loop, relay, queue or eager pull.
+
+```ts
+<TEvent>(source: AsyncGenerator<TEvent, void, unknown>, options: ChatTurnIntelligenceOptions) => AsyncGenerator<TEvent,…
+```
+
 ### `observeNativeCompletion`
 
 `function` — Observe only the turns admitted under `executionId`.
@@ -3535,6 +3551,14 @@ type OpenModelStream
 
 ```ts
 (raw: unknown) => FileMention[]
+```
+
+### `produceChatTurnWithIntelligence`
+
+`function` — Adapter for product producer factories.
+
+```ts
+(options: ChatTurnIntelligenceOptions & { produce: () => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>; }) =>…
 ```
 
 ### `ProducerErrorEvent`
@@ -22507,7 +22531,7 @@ Source: `src/theme/index.ts`
 
 ### `AgentAppTheme`
 
-`interface` — Typed mirror of tokens.css for runtime/JS theming.
+`interface`
 
 ```ts
 interface AgentAppTheme
@@ -22523,7 +22547,7 @@ interface CanvasRenderPalette
 
 ### `darkTheme`
 
-`const` — Define a dark color scheme for the Agent app interface with specific background and foreground hues
+`const` — Canonical Brand dark values projected for legacy JS and bitmap callers.
 
 ```ts
 AgentAppTheme
@@ -22603,7 +22627,7 @@ Source: `src/theme/tailwind-preset.ts`
 
 ### `default`
 
-`const` — Define a preset configuration for dark mode and extended theme colors with foreground variants
+`const`
 
 ```ts
 { darkMode: [string, string]; theme: { extend: { colors: { background: string; foreground: string; border: string; inpu…
@@ -25364,6 +25388,14 @@ interface ComposerSendRejected
 
 ```ts
 type ComposerSendResult
+```
+
+### `ComposerSkillOption`
+
+`interface` — A skill the host has made eligible for this turn.
+
+```ts
+interface ComposerSkillOption
 ```
 
 ### `consumeChatStream`

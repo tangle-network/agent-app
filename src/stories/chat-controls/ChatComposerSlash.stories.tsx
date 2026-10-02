@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useState } from 'react'
 
-import { ChatComposer, type SlashCommand } from '../../web-react'
+import { ChatComposer, type ComposerSkillOption, type SlashCommand } from '../../web-react'
 import { withPopoverHeadroom } from './fixtures'
 
 /**
- * The composer's `/` commands. The menu opens only while the whole draft is
- * one leading slash token, so the deterministic states below just seed
+ * The composer's general `/` commands. Their menu opens only while the whole
+ * draft is one leading slash token, so the deterministic states below seed
  * `initialValue`: `/` shows every command, `/mo` shows the ranking filtered,
  * and the interactive story runs picks into a readout (the GIF is recorded
  * from that one). The menu anchors to the textarea and opens UPWARD through
@@ -94,4 +94,38 @@ export const NoMatch: Story = {
       placeholder="Message the agent…"
     />
   ),
+}
+
+const DEMO_SKILLS: ComposerSkillOption[] = [
+  { id: 'draft-plan', name: 'Draft plan', description: 'Outline the next steps' },
+  { id: 'review-code', name: 'Review code', description: 'Inspect a change and report findings' },
+]
+
+/** `/skill` selection and `@` file mentions share the same rich input. The
+ *  selected chip is host state; choose or remove it, then type an @ mention. */
+export const SkillsWithFileMentions: Story = {
+  name: 'Skills with file mentions',
+  parameters: { layout: 'fullscreen' },
+  render: () => {
+    const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null)
+    const [last, setLast] = useState('No turn sent yet')
+    return (
+      <div className="w-full space-y-3">
+        <ChatComposer
+          onSend={(message) => setLast(`Sent ${selectedSkillId ?? 'no skill'}: ${message || '(skill only)'}`)}
+          placeholder="Type /skill to choose, or @ to attach a file…"
+          mention={{
+            fetchItems: async () => [
+              { id: 'src/app.tsx', label: 'app.tsx', detail: 'src/app.tsx', kind: 'file' },
+              { id: 'docs/plan.md', label: 'plan.md', detail: 'docs/plan.md', kind: 'file' },
+            ],
+          }}
+          eligibleSkills={DEMO_SKILLS}
+          selectedSkillId={selectedSkillId}
+          onSelectedSkillChange={(skill) => setSelectedSkillId(skill?.id ?? null)}
+        />
+        <p className="px-1 text-sm text-muted-foreground" data-testid="skill-send-result">{last}</p>
+      </div>
+    )
+  },
 }

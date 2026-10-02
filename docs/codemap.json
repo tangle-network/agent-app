@@ -2145,6 +2145,12 @@
           "doc": "Patch a `beforeTurn` hook returns to augment the producer's input."
         },
         {
+          "name": "ChatTurnIntelligenceOptions",
+          "kind": "interface",
+          "signature": "interface ChatTurnIntelligenceOptions",
+          "doc": "Host-resolved metadata only."
+        },
+        {
           "name": "ChatTurnLifecycle",
           "kind": "interface",
           "signature": "interface ChatTurnLifecycle",
@@ -2673,6 +2679,12 @@
           "doc": "Convert the browser-safe chat attachment contract into the current sandbox prompt contract."
         },
         {
+          "name": "observeChatTurnStream",
+          "kind": "function",
+          "signature": "<TEvent>(source: AsyncGenerator<TEvent, void, unknown>, options: ChatTurnIntelligenceOptions) => AsyncGenerator<TEvent,…",
+          "doc": "Observe the source iterator without an execution loop, relay, queue or eager pull."
+        },
+        {
           "name": "observeNativeCompletion",
           "kind": "function",
           "signature": "(options: NativeCompletionObservationOptions) => Promise<NativeCompletionObservation>",
@@ -2737,6 +2749,12 @@
           "kind": "function",
           "signature": "(raw: unknown) => FileMention[]",
           "doc": "Validates the untyped `mentions` array off the wire, mirroring {@link parseChatTurnParts}: the typed list, or `ChatTurnInputError` (400) naming the offending entry."
+        },
+        {
+          "name": "produceChatTurnWithIntelligence",
+          "kind": "function",
+          "signature": "(options: ChatTurnIntelligenceOptions & { produce: () => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>; }) =>…",
+          "doc": "Adapter for product producer factories."
         },
         {
           "name": "ProducerErrorEvent",
@@ -17407,7 +17425,7 @@
           "name": "AgentAppTheme",
           "kind": "interface",
           "signature": "interface AgentAppTheme",
-          "doc": "Typed mirror of tokens.css for runtime/JS theming."
+          "doc": null
         },
         {
           "name": "CanvasRenderPalette",
@@ -17419,7 +17437,7 @@
           "name": "darkTheme",
           "kind": "const",
           "signature": "AgentAppTheme",
-          "doc": "Define a dark color scheme for the Agent app interface with specific background and foreground hues"
+          "doc": "Canonical Brand dark values projected for legacy JS and bitmap callers."
         },
         {
           "name": "lightTheme",
@@ -17496,7 +17514,7 @@
           "name": "default",
           "kind": "const",
           "signature": "{ darkMode: [string, string]; theme: { extend: { colors: { background: string; foreground: string; border: string; inpu…",
-          "doc": "Define a preset configuration for dark mode and extended theme colors with foreground variants"
+          "doc": null
         }
       ]
     },
@@ -19627,6 +19645,12 @@
           "kind": "type",
           "signature": "type ComposerSendResult",
           "doc": null
+        },
+        {
+          "name": "ComposerSkillOption",
+          "kind": "interface",
+          "signature": "interface ComposerSkillOption",
+          "doc": "A skill the host has made eligible for this turn."
         },
         {
           "name": "consumeChatStream",

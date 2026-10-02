@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.51.11
+
+- feat: select eligible skills in shared composer (#757)
+
+## 0.51.10
+
+- fix: expose platform SSO declarations to NodeNext (#756)
+
+## 0.51.9
+
+- fix: admit Hub SDK 0.23 cohort (#755)
+
+## 0.51.8
+
+- feat(chat-routes): one shared observation contract for agent applications (#754)
+
+## 0.51.7
+
+- feat(theme): finish pursuit8 canonical Brand migration
+
 ## 0.51.6
 
 - feat(create-agent-app)!: make the shared workspace the default starter

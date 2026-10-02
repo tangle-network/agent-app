@@ -122,9 +122,9 @@ export default defineConfig({
   // the whole of `src` in ~1 GB, and `dist/<entry>.d.ts` still answers every
   // `types` path in `exports`.
   //
-  // Emitted relative specifiers carry no file extension, so a consumer must
-  // resolve types with `moduleResolution: bundler`. Both scaffold templates and
-  // every product consuming this package already do.
+  // tsc preserves authored relative specifiers in declarations. Public barrels
+  // used by NodeNext consumers need explicit `.js` specifiers; other modules
+  // still have extensionless paths that require bundler resolution.
   dts: false,
   sourcemap: true,
   clean: true,
@@ -135,5 +135,5 @@ export default defineConfig({
   external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tiptap/core', '@tiptap/extension-mention', '@tiptap/react', '@tiptap/starter-kit', '@tiptap/suggestion', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-profile-materialize', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers', '@tangle-network/sandbox-ui', '@tangle-network/sandbox-ui/*', '@tangle-network/ui', '@tangle-network/ui/*', 'lucide-react', 'react-router', '@radix-ui/react-dialog', 'resend', 'better-auth', 'better-auth/*', 'pdf-lib', '@firecrawl/pdf-inspector-wasm'],
   // tokens.css is shipped raw (the ./styles subpath); copy it next to the
   // built theme entries so `import '@tangle-network/agent-app/styles'` resolves.
-  onSuccess: 'cp src/theme/tokens.css dist/theme/tokens.css && cp src/studio-react/studio.css dist/studio-react/studio.css && cp src/hosted-agent/react/lines.css dist/hosted-agent/react/lines.css',
+  onSuccess: 'node src/theme/build.mjs --dist && cp src/studio-react/studio.css dist/studio-react/studio.css && cp src/hosted-agent/react/lines.css dist/hosted-agent/react/lines.css',
 })

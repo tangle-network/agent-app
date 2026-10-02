@@ -5,6 +5,6 @@
  *   import preset from '@tangle-network/agent-app/tailwind-preset'  // shadcn name → var map
  *   import { darkTheme, themeToCssVars } from '@tangle-network/agent-app/theme'  // JS/runtime
  *
- * The CSS file is the canonical source; this module is the typed JS mirror.
+ * Brand is the canonical source; this module exposes the generated compatibility mirror.
  */
 export * from './theme'

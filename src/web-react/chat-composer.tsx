@@ -282,8 +282,17 @@ export interface SlashCommand {
   run: () => void
 }
 
+/** A skill the host has made eligible for this turn. The id is the value the
+ * host validates and sends; the name and description are display metadata. */
+export interface ComposerSkillOption {
+  id: string
+  name: string
+  description: string
+}
+
 export interface ChatComposerProps {
-  /** Send the trimmed, non-empty message. Attached files travel separately via
+  /** Send the trimmed message, or an empty message when a skill is selected.
+   *  Attached files travel separately via
    *  `onAttach` + `pendingFiles` (the host consumes and clears them on send).
    *  Optional when `onSendParts` is wired.
    *
@@ -409,9 +418,8 @@ export interface ChatComposerProps {
    * react, starter-kit, suggestion) are OPTIONAL peers — a consumer installs
    * them to use this prop.
    *
-   * The rich input owns its own keyboard surface, so `slashCommands` is
-   * disabled while `mention` is set rather than left half-armed with a menu
-   * no key can reach; no shipped surface combines the two. Seed and
+   * General `slashCommands` remain disabled while `mention` is set; the
+   * skill picker has explicit keyboard handling in both input modes. Seed and
    * failed-send drafts still apply in mention mode, but caret placement (a
    * textarea affordance) degrades to content-only.
    */
@@ -420,6 +428,14 @@ export interface ChatComposerProps {
    *  Omit (or pass []) and `/` types as ordinary text. Inert while `mention`
    *  is set — see {@link mention}. */
   slashCommands?: SlashCommand[]
+  /** Skills available in the current authenticated workspace and harness.
+   * The host resolves eligibility; this list only drives selection UI. */
+  eligibleSkills?: ReadonlyArray<ComposerSkillOption>
+  /** The host-owned skill selected for the next turn. */
+  selectedSkillId?: string | null
+  /** Picking or removing a skill reports its typed id and display metadata.
+   * The host persists selection through queued turns and rejected sends. */
+  onSelectedSkillChange?: (skill: ComposerSkillOption | null) => void
   /** Dictation is opt-in: pass `onDictate` and the action row gains a mic
    *  button (browsers without `MediaRecorder`/`getUserMedia` render none).
    *  Click starts the capture; the button flips to a stop control with the
@@ -528,6 +544,9 @@ export function ChatComposer({
   trailing,
   mention,
   slashCommands,
+  eligibleSkills = [],
+  selectedSkillId,
+  onSelectedSkillChange,
   onDictate,
   onDictateError,
 
@@ -697,7 +716,7 @@ export function ChatComposer({
   const sendableFiles = canSubmitAttachmentsOnly
     ? pendingFiles
     : pendingFiles.filter((f) => f.status === 'ready')
-  const hasSendable = text.trim().length > 0 || sendableFiles.length > 0
+  const hasSendable = text.trim().length > 0 || sendableFiles.length > 0 || Boolean(selectedSkillId)
   // Streaming blocks a send unless the host queues turns. The button still
   // shows Stop while streaming, so `canSubmitWhileBusy` opens Enter, not a
   // second visible control.
@@ -764,13 +783,13 @@ export function ChatComposer({
     if (sendBlockedByStream || disabled) return
     const readyFiles = pendingFiles.filter((f) => f.status === 'ready')
     const sendable = canSubmitAttachmentsOnly ? pendingFiles : readyFiles
-    if (!trimmed && sendable.length === 0) return
+    if (!trimmed && sendable.length === 0 && !selectedSkillId) return
     // `canSubmitAttachmentsOnly` keeps the control live while a file is staged,
     // but a turn carrying no text and no file the host can deliver must not go
     // out: it would arrive empty and the attachment would be lost. Refuse it
     // here and say why, rather than dispatching and trusting every host to
     // re-derive the same check.
-    if (!trimmed && readyFiles.length === 0) {
+    if (!trimmed && readyFiles.length === 0 && pendingFiles.length > 0) {
       const message =
         attachmentsNotReadyMessage ??
         (pendingFiles.some((f) => f.status === 'error')
@@ -800,6 +819,7 @@ export function ChatComposer({
     attachmentsNotReadyMessage,
     onSendParts,
     pendingFiles,
+    selectedSkillId,
     setText,
     dispatchSend,
   ])
@@ -816,35 +836,52 @@ export function ChatComposer({
   }, [failedSend, sendBlockedByStream, disabled, dispatchSend])
 
   // ── '/' commands ─────────────────────────────────────────────────────────
-  // The menu exists only while the WHOLE draft is one leading slash token
-  // (`/`, `/mod`). The first space ends it — arguments are ordinary text. Esc
+  // General commands exist only while the WHOLE draft is one leading slash
+  // token (`/`, `/mod`); `/skill <query>` also searches eligible skills. Esc
   // or an outside click dismisses for the CURRENT token only, so continued
   // typing reopens the menu instead of leaving it permanently suppressed.
   const slashPanelRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const slashListId = useId()
+  const [mentionSuggestionOpen, setMentionSuggestionOpen] = useState(false)
   const [slashActive, setSlashActive] = useState(0)
   const [slashDismissedFor, setSlashDismissedFor] = useState<string | null>(null)
-  // `mention` disables the slash menu outright: its keydown/anchor wiring is
-  // the textarea's, so a token match in the rich path would arm a menu no key
-  // or click can reach. See the `mention` prop doc.
-  const slashToken =
-    !mention && slashCommands && slashCommands.length > 0 ? /^\/(\S*)$/.exec(text)?.[1] : undefined
-  const slashOpen = slashToken !== undefined && text !== slashDismissedFor
+  // General commands retain their textarea-only contract. Eligible skills
+  // deliberately share the menu in both input modes; the rich input forwards
+  // its keyboard events below. `/skill <query>` filters only skills.
+  const hasSkills = Boolean(onSelectedSkillChange && eligibleSkills.length > 0)
+  const commandToken = !mention && slashCommands?.length ? /^\/(\S*)$/.exec(text)?.[1] : undefined
+  const skillToken = hasSkills ? /^\/(\S*)$/.exec(text)?.[1] : undefined
+  const skillInvocation = hasSkills ? /^\/skill(?:\s+(.*))?$/i.exec(text) : null
+  const skillQuery = skillInvocation ? (skillInvocation[1] ?? '') : undefined
+  const slashToken = skillQuery ?? skillToken ?? commandToken
+  const slashOpen = slashToken !== undefined && text !== slashDismissedFor && !mentionSuggestionOpen
   const slashItems = useMemo<CommandPaletteItem[]>(
-    () =>
-      (slashCommands ?? []).map((command) => ({
-        id: command.name,
+    () => [
+      ...(!mention ? slashCommands ?? [] : []).map((command) => ({
+        id: `command:${command.name}`,
         group: 'Commands',
         label: `/${command.name}`,
         description: command.description,
         keywords: [command.name, command.description],
       })),
-    [slashCommands],
+      ...(onSelectedSkillChange ? eligibleSkills : []).map((skill) => ({
+        id: `skill:${skill.id}`,
+        group: 'Skills',
+        label: `/skill ${skill.name}`,
+        description: skill.description,
+        keywords: [skill.id, skill.name, skill.description],
+      })),
+    ],
+    [slashCommands, mention, eligibleSkills, onSelectedSkillChange],
   )
   const slashFiltered = useMemo(
-    () => (slashToken === undefined ? [] : filterCommandPaletteItems(slashItems, slashToken)),
-    [slashItems, slashToken],
+    () => {
+      if (slashToken === undefined) return []
+      const items = skillQuery !== undefined ? slashItems.filter((item) => item.group === 'Skills') : slashItems
+      return filterCommandPaletteItems(items, slashToken)
+    },
+    [slashItems, slashToken, skillQuery],
   )
   const slashActiveIndex = slashFiltered.length === 0 ? 0 : Math.min(slashActive, slashFiltered.length - 1)
 
@@ -872,47 +909,56 @@ export function ChatComposer({
   }, [slashOpen])
 
   const pickSlash = useCallback(
-    (name: string) => {
-      const command = slashCommands?.find((c) => c.name === name)
-      // The draft IS the slash token (the menu only opens while it is), so the
-      // pick consumes it: clear the box, then run.
+    (id: string) => {
+      // A pick consumes the current slash invocation: clear the box, then
+      // report a typed skill or run the host's general command.
       setText('')
       setSlashDismissedFor(null)
-      command?.run()
+      if (id.startsWith('skill:')) {
+        const skill = eligibleSkills.find((item) => item.id === id.slice('skill:'.length))
+        if (skill) onSelectedSkillChange?.(skill)
+      } else if (id.startsWith('command:')) {
+        slashCommands?.find((command) => command.name === id.slice('command:'.length))?.run()
+      }
     },
-    [slashCommands, setText],
+    [slashCommands, eligibleSkills, onSelectedSkillChange, setText],
   )
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Respect IME composition — Enter commits the candidate, it doesn't send.
-    if (e.nativeEvent.isComposing) return
+  const handleSlashKeyDown = (e: Pick<globalThis.KeyboardEvent, 'key' | 'shiftKey' | 'preventDefault'>): boolean => {
     if (slashOpen) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
         if (slashFiltered.length > 0) setSlashActive((slashActiveIndex + 1) % slashFiltered.length)
-        return
+        return true
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault()
         if (slashFiltered.length > 0)
           setSlashActive((slashActiveIndex - 1 + slashFiltered.length) % slashFiltered.length)
-        return
+        return true
       }
       if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
         const item = slashFiltered[slashActiveIndex]
         if (item) {
           e.preventDefault()
           pickSlash(item.id)
-          return
+          return true
         }
         // No command matched — fall through and let Enter send the raw text.
       }
       if (e.key === 'Escape') {
         e.preventDefault()
         setSlashDismissedFor(text)
-        return
+        return true
       }
     }
+    return false
+  }
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Respect IME composition — Enter commits the candidate, it doesn't send.
+    if (e.nativeEvent.isComposing) return
+    if (handleSlashKeyDown(e)) return
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       send()
@@ -1131,6 +1177,24 @@ export function ChatComposer({
         </div>
       )}
 
+      {selectedSkillId && (
+        <div aria-label="Selected skill" className="mb-2 flex min-w-0 flex-wrap gap-1.5">
+          <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary">
+            <span className="min-w-0 truncate">Skill: {eligibleSkills.find((skill) => skill.id === selectedSkillId)?.name ?? selectedSkillId}</span>
+            {onSelectedSkillChange && (
+              <button
+                type="button"
+                aria-label="Remove selected skill"
+                onClick={() => onSelectedSkillChange(null)}
+                className="shrink-0 rounded p-0.5 text-primary/70 transition hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <CloseGlyph className="h-3 w-3" />
+              </button>
+            )}
+          </span>
+        </div>
+      )}
+
       {contextItems.length > 0 && (
         <div aria-label="Message context" className="mb-2 flex min-w-0 flex-wrap gap-1.5">
           {contextItems.map((item) => (
@@ -1255,6 +1319,10 @@ export function ChatComposer({
                 mention={mention}
                 fallback={textareaInput}
                 registerFocus={registerRichFocus}
+                onComposerKeyDown={handleSlashKeyDown}
+                onMentionMenuOpenChange={setMentionSuggestionOpen}
+                slashListId={slashOpen ? slashListId : undefined}
+                slashActiveId={slashFiltered[slashActiveIndex] ? `${slashListId}-${slashActiveIndex}` : undefined}
                 onPasteFiles={onAttach ? ingestPastedFiles : undefined}
               />
             </Suspense>
@@ -1424,18 +1492,20 @@ export function ChatComposer({
       {/* The slash menu ports through PopoverSurface like every canonical
           popover: the composer docks inside horizontally scrolling rails, and
           an in-place panel there is a panel the host clips away. It anchors
-          to the textarea and opens above. Focus never leaves the input —
+          to the current input card and opens above. Focus never leaves the input —
           rows are mousedown-swallowed so a click can't blur it. */}
       <PopoverSurface
         open={slashOpen}
         id={slashListId}
         role="listbox"
-        triggerRef={textareaRef}
+        triggerRef={mention ? cardRef : textareaRef}
         panelRef={slashPanelRef}
         className={`w-80 overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
       >
         {slashFiltered.length === 0 && (
-          <div className="px-3 py-4 text-center text-sm text-muted-foreground">No matching commands</div>
+          <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+            {skillQuery !== undefined ? 'No matching skills' : hasSkills ? 'No matching commands or skills' : 'No matching commands'}
+          </div>
         )}
         {slashFiltered.map((item, index) => (
           <button

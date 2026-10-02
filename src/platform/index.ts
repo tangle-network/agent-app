@@ -4,8 +4,8 @@
  * and persistence are structural seams; this module owns the protocol.
  */
 
-export * from './sso'
-export * from './hub-settings'
-export * from './billing'
-export * from './guards'
-export * from './api-key-auth'
+export * from './sso.js'
+export * from './hub-settings.js'
+export * from './billing.js'
+export * from './guards.js'
+export * from './api-key-auth.js'

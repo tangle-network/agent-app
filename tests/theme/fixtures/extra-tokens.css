@@ -5,3 +5,7 @@
   --popover: 0 0% 100%;
   --nonexistent-token: 12 34% 56%;
 }
+
+:root {
+  --md3-surface-container-high: hsl(var(--popover));
+}
