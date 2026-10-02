@@ -1,8 +1,9 @@
 {
   "private": true,
+  "packageManager": "pnpm@11.24.0",
   "type": "module",
   "dependencies": {
-    "@tangle-network/agent-app": "file:../candidate-ce5fe7.tgz",
+    "@tangle-network/agent-app": "file:../candidate-0e1518.tgz",
     "@tangle-network/sandbox-ui": "0.116.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
