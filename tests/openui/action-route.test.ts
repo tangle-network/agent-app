@@ -290,3 +290,34 @@ describe('describeOpenUIAction', () => {
     )
   })
 })
+
+describe('createOpenUIActionRoute body cap (#748)', () => {
+  it('refuses a body over the cap with 413 OPENUI_BODY_TOO_LARGE before parsing', async () => {
+    const handle = vi.fn()
+    const r = route({ recalculate: handle }, { maxBodyBytes: 64 })
+    // content-length precheck path: declare more than the cap
+    const request = new Request('https://app.example/api/openui/action', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': '1024' },
+      body: JSON.stringify({ actionId: 'recalculate' }),
+    })
+    const response = await r.handle(request)
+    expect(response.status).toBe(413)
+    expect(await response.json()).toMatchObject({ ok: false, code: 'OPENUI_BODY_TOO_LARGE' })
+    expect(handle).not.toHaveBeenCalled()
+  })
+
+  it('refuses a streamed body that crosses the cap even when content-length is absent', async () => {
+    const handle = vi.fn()
+    const r = route({ recalculate: handle }, { maxBodyBytes: 32 })
+    const response = await r.handle(post({ actionId: 'recalculate', values: { pad: 'x'.repeat(128) } }))
+    expect(response.status).toBe(413)
+    expect(handle).not.toHaveBeenCalled()
+  })
+
+  it('accepts a normal body unchanged', async () => {
+    const r = route({ recalculate: () => ({ ok: true }) })
+    const response = await r.handle(post({ actionId: 'recalculate' }))
+    expect(response.status).toBe(200)
+  })
+})

@@ -642,3 +642,24 @@ describe('mapInteractionRespondFailure', () => {
     expect(statuses).toEqual([410, 503, 503, 503, 501, 503])
   })
 })
+
+describe('createInteractionAnswerRoute body cap (#748)', () => {
+  it('refuses a body over the cap with 413 before resolving the connection', async () => {
+    const resolveConnection = vi.fn()
+    const answerRoute = createInteractionAnswerRoute({
+      resolveConnection,
+      maxBodyBytes: 32,
+      logger: { warn: () => {}, error: () => {} },
+    })
+    const response = await answerRoute.answer(
+      new Request('https://app.example/api/interactions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: 'ir_1', outcome: 'accepted', pad: 'x'.repeat(128) }),
+      }),
+    )
+    expect(response.status).toBe(413)
+    expect(await response.json()).toEqual({ error: 'JSON body is too large' })
+    expect(resolveConnection).not.toHaveBeenCalled()
+  })
+})
