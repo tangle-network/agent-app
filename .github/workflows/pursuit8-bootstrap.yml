@@ -1,0 +1,33 @@
+name: Pursuit8 branch bootstrap
+on:
+  pull_request:
+    types: [opened, synchronize]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'build/pursuit8-canonical-brand-tokens'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+      - name: Prepare only the authorized theme migration
+        run: |
+          node tests/theme/bootstrap-migration.mjs
+          pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
+          pnpm install --frozen-lockfile --ignore-scripts
+          node src/theme/build.mjs --write
+          node src/theme/build.mjs --check
+      - name: Retain generated source and scoped dependency changes on this branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json pnpm-lock.yaml tsup.config.ts src/theme/theme.ts src/theme/index.ts src/theme/brand.generated.ts src/theme/compat.generated.css src/theme-contract/index.ts tests/theme/contract.test.ts tests/theme/focus-floor.test.ts tests/theme/fixtures/extra-tokens.css
+          git commit -m "build(theme): consume Brand 1.10 and generate compatibility outputs"
+          git push origin HEAD:build/pursuit8-canonical-brand-tokens
