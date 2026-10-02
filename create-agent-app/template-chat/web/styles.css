@@ -1,0 +1,17 @@
+@import 'tailwindcss';
+@import '@tangle-network/sandbox-ui/styles';
+@import '@tangle-network/agent-app/styles';
+@config '../tailwind.config.mjs';
+
+/* Standalone consumer: scan installed public JS, never a monorepo src alias. */
+@source '../node_modules/@tangle-network/agent-app/dist';
+@source '../node_modules/@tangle-network/sandbox-ui/dist';
+@source '../node_modules/@tangle-network/ui/dist';
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+html, body, #root { min-height: 100%; }

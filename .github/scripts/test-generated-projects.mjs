@@ -21,6 +21,7 @@ const COMMAND_TIMEOUT_MS = 10 * 60 * 1000
 const PACK_TIMEOUT_MS = 2 * 60 * 1000
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const createAgentAppDir = join(repo, 'create-agent-app')
+const workspaceProof = fileURLToPath(new URL('../../create-agent-app/proof/workspace-browser.mjs', import.meta.url))
 const require = createRequire(import.meta.url)
 const npmPackagePath = require.resolve('npm/package.json')
 const npmCli = join(dirname(npmPackagePath), 'bin', 'npm-cli.js')
@@ -236,12 +237,24 @@ function installAndRunScaffolder({
   run('pnpm', ['install', '--strict-peer-dependencies', '--store-dir', storeDir], { cwd: project, env })
   assertGeneratedPeerFloors(project, env)
   run('pnpm', ['typecheck'], { cwd: project, env })
+  if (variant === 'chat') run('pnpm', ['build'], { cwd: project, env })
   run('pnpm', ['test'], { cwd: project, env })
   run(
     'pnpm',
     ['exec', 'wrangler', 'deploy', '--dry-run', '--outdir', '.wrangler-dry-run'],
     { cwd: project, env },
   )
+  if (variant === 'chat') {
+    const html = readFileSync(join(project, 'dist/client/index.html'), 'utf8')
+    if (html.includes('/main.tsx') || !/assets\/[^"']+\.js/.test(html) || !/assets\/[^"']+\.css/.test(html)) {
+      throw new Error('Chat build did not emit compiled JavaScript and standalone CSS')
+    }
+    // Playwright is the repository's proof driver, not a dependency available
+    // to the fresh generated browser build. The child shares the scrubbed HOME.
+    run('pnpm', ['exec', 'playwright', 'install', 'chromium'], { env })
+    const evidence = process.env.VERIFICATION_DIR ?? join(scratch, 'evidence')
+    run(process.execPath, [workspaceProof, project, evidence], { env })
+  }
   assertEqual(
     readFileSync(workspacePath, 'utf8'),
     workspaceBeforeInstall,
@@ -309,6 +322,12 @@ function main(scratch) {
     'dist/runtime/index.d.ts',
     'dist/studio-react/styles.d.ts',
     'dist/theme/styles.d.ts',
+    'dist/theme/tokens.css',
+    'dist/theme/tailwind-preset.js',
+    'dist/workspace-react/index.js',
+    'dist/workspace-react/index.d.ts',
+    'dist/web-react/index.js',
+    'dist/web-react/index.d.ts',
   ])
   const createFiles = assertPaths(createAgentAppPack, [
     'index.mjs',
@@ -327,7 +346,19 @@ function main(scratch) {
     'template-chat/src/gateway.ts',
     'template-chat/src/worker.ts',
     'template-chat/tests/chat-turn.e2e.test.ts',
+    'template-chat/web/index.html',
+    'template-chat/web/main.tsx',
+    'template-chat/web/App.tsx',
+    'template-chat/web/Conversation.tsx',
+    'template-chat/web/api.ts',
+    'template-chat/web/uploads.ts',
+    'template-chat/web/styles.css',
+    'template-chat/web/tsconfig.json',
+    'template-chat/web/env.d.ts',
+    'template-chat/vite.config.mjs',
+    'template-chat/tailwind.config.mjs',
   ])
+  if (createFiles.has('template-chat/public/index.html')) throw new Error('Scaffolder still ships the replaced diagnostic page')
   if ((createFiles.get('index.mjs').mode & 0o111) === 0) {
     throw new Error('create-agent-app tarball bin is not executable')
   }
@@ -338,6 +369,7 @@ function main(scratch) {
     `Packed ${agentAppPack.name}@${agentAppPack.version} (${agentAppPack.entryCount} files) and ` +
       `${createAgentAppPack.name}@${createAgentAppPack.version} (${createAgentAppPack.entryCount} files).\n`,
   )
+  process.stdout.write(`${JSON.stringify({ agentAppIntegrity: agentAppPack.integrity, scaffolderIntegrity: createAgentAppPack.integrity })}\n`)
 
   for (const variant of ['default', 'chat']) {
     installAndRunScaffolder({
