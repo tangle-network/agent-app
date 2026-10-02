@@ -6,11 +6,14 @@ type NativeAttachment = Parameters<Sandbox['lines']['attach']>[0]
 export type HostedAgentAttachment = Partial<Omit<NativeAttachment, 'number' | 'mode' | 'respond'>>
 export type HostedAgentTransport = 'imessage' | 'whatsapp' | 'email'
 
+/** Hosted line setup. For Resend email, set address to a mailbox on the owned connection. */
 export interface HostedAgentLineOptions {
   transport?: HostedAgentTransport
   mode?: 'personal' | 'shared'
   /** Required when creating a WhatsApp line on a connection with several numbers. */
   phoneNumberId?: string
+  /** Email mailbox on the owned connection. Required for Resend; Inkbox discovers its mailbox. */
+  address?: string
   voice?: LineVoiceOptions
 }
 
@@ -121,6 +124,10 @@ export function createHostedAgent(config: HostedAgentConfig) {
       throw new HostedAgentError('phone_number_required', 'WhatsApp lines require phoneNumberId.')
     if (transport !== 'whatsapp' && options.phoneNumberId)
       throw new HostedAgentError('phone_number_not_allowed', 'phoneNumberId is only valid for WhatsApp lines.')
+    if (options.address !== undefined && transport !== 'email')
+      throw new HostedAgentError('email_address_not_allowed', 'address is only valid for email lines.')
+    if (options.address !== undefined && !EMAIL.test(options.address))
+      throw new HostedAgentError('email_address_invalid', 'address must be an email mailbox on the owned connection.')
     if (options.voice && transport !== 'imessage')
       throw new HostedAgentError('voice_transport_unsupported', 'Voice is supported only on iMessage lines.')
     if (transport === 'email' && config.attachment?.unknownSenders && config.attachment.unknownSenders !== 'reject')
@@ -134,7 +141,11 @@ export function createHostedAgent(config: HostedAgentConfig) {
       throw new HostedAgentError('line_transport_mismatch', 'The existing line uses another transport.')
     if (options.phoneNumberId && line.providerNumberId !== options.phoneNumberId)
       throw new HostedAgentError('line_number_mismatch', 'The existing line is pinned to another WhatsApp number.')
+    if (options.address && line.address.toLowerCase() !== options.address.toLowerCase())
+      throw new HostedAgentError('line_address_mismatch', 'The existing line uses another email mailbox.')
     const retained = line.attachment?.status === 'active' ? line.attachment : undefined
+    if (transport === 'email' && retained && retained.unknownSenders !== 'reject')
+      throw new HostedAgentError('line_policy_migration_required', 'Email lines require declared-member admission. Migrate this line in Hub while preserving its members and instance namespace; setup has left it unchanged.')
     if (retained?.unknownSenders === 'onboard')
       throw new HostedAgentError('line_policy_migration_required', 'This line uses onboard admission. Manage it through Hub; the hosted-agent kit will not replace its policy.')
     const mode = options.mode ?? retained?.mode ?? 'shared'
@@ -181,7 +192,9 @@ export function createHostedAgent(config: HostedAgentConfig) {
       // with an existing WhatsApp line created by an earlier kit.
       const line = await sandbox.lines.fromConnection(transport === 'whatsapp'
         ? { connectionId, transport, phoneNumberId: options.phoneNumberId! }
-        : { connectionId, transport })
+        : transport === 'email'
+          ? { connectionId, transport, ...(options.address ? { address: options.address } : {}) }
+          : { connectionId, transport })
       return attach(line, options)
     },
     /**

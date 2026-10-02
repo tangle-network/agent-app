@@ -75,6 +75,27 @@ Each person keeps their box and its `memory.md`; their thread starts over.
 curl -X DELETE https://sandbox.tangle.tools/v1/lines/<line id>/attachment -H "authorization: Bearer $TANGLE_API_KEY"
 ```
 
+## Connect an email mailbox
+
+Pass `transport: "email"` and an email `OWNER_ADDRESS` for the recipient who will use the assistant.
+For Resend, also pass the assistant's `address` on a verified domain belonging to the connected account.
+Inkbox discovers its mailbox, so `address` can be omitted.
+
+```sh
+curl -X POST https://<worker>/setup -H "authorization: Bearer $SETUP_SECRET" \
+  -H 'content-type: application/json' \
+  -d '{"connectionId":"hubconn_resend_...","transport":"email","address":"assistant@example.com"}'
+```
+
+Email admits only declared members, including on shared lines.
+Hub confirms the recipient's mailbox before running a turn.
+Repeating setup with the same mailbox preserves the attachment and its admission policy.
+For `assistant.mjs`, set `TRANSPORT=email` and `EMAIL_ADDRESS` to the assistant's Resend address.
+
+Legacy email attachments with guest or onboard admission return `409 line_policy_migration_required`.
+Setup leaves their route, members, and instance namespace unchanged.
+The Hub operator must migrate to declared-member admission while retaining those records before repeating setup.
+
 ## Connect voice (ph0ny)
 
 1. Create a ph0ny agent for the line's calls.

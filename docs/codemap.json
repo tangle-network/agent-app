@@ -6690,7 +6690,7 @@
           "name": "HostedAgentLineOptions",
           "kind": "interface",
           "signature": "interface HostedAgentLineOptions",
-          "doc": null
+          "doc": "Hosted line setup."
         },
         {
           "name": "HostedAgentTransport",

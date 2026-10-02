@@ -91,6 +91,13 @@ describe('hosted agent on Hub lines', () => {
     expect(platform.fromConnection).toHaveBeenCalledWith({ connectionId: 'hubconn_linq', transport: 'whatsapp', phoneNumberId: 'pn_1' })
   })
 
+  it('keeps email mailbox discovery available for Inkbox connections', async () => {
+    await createHostedAgent({ apiKey: 'local-test-key', owner: 'owner@example.com', profile: {} })
+      .attachLine('hubconn_inkbox', { transport: 'email' })
+    expect(platform.fromConnection).toHaveBeenCalledWith({ connectionId: 'hubconn_inkbox', transport: 'email' })
+    expect(platform.attach.mock.calls[0]![0]).toMatchObject({ mode: 'shared', unknownSenders: 'reject' })
+  })
+
   it('refuses a request Hub would refuse before creating or attaching a line', async () => {
     const voice = { ph0nyConnectionId: 'hubconn_phony_1', ph0nyAgentId: 'agent_1' }
     await expect(braid().attachLine('hubconn_linq', { transport: 'whatsapp', phoneNumberId: 'pn_1', voice })).rejects.toThrow(/iMessage/)
