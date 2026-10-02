@@ -1,0 +1,16 @@
+0e1518c57bf91c9eb0bc9d3892f5188f02d3cb2dc15d903adf64daad2cf52b44  /tmp/agent-app1583-proof/candidate-0e1518.tgz
+(node:3950631) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+  "consumer": "packed agent-app 0.50.30 candidate",
+  "target": "Chromium 1440x900 and 390x844",
+  "selected": "hotel-b",
+  "decision": "ask",
+  "policyWrite": true,
+  "policyReread": true,
+  "reloadSelection": true,
+  "apiKeyConnection": true,
+  "horizontalOverflow": false,
+  "browserErrors": 0,
+  "media": "/tmp/agent-app1583-proof/media"
+}
