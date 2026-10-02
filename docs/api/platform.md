@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-96 exports.
+82 exports.
 
 ### `AdminGuardOptions`
 
@@ -110,17 +110,9 @@ interface BillableBalanceState
 (auth: BetterAuthSessionCookieSource, options?: BetterAuthSessionCookieMinterOptions) => (args: TangleSsoSessionCookieA…
 ```
 
-### `createHubProxyRoutes`
-
-`function` — Resolve hub proxy routes with authentication and error handling based on the given context
-
-```ts
-(ctx: HubProxyContext) => HubProxyRoutes
-```
-
 ### `createHubSettingsRoutes`
 
-`function` — Build a finite Hub settings server boundary; existing Hub proxy routes are unaffected.
+`function` — Build the finite, application-authorized Hub settings server boundary.
 
 ```ts
 (ctx: HubSettingsContext) => HubSettingsRoutes
@@ -206,38 +198,6 @@ Record<TanglePlanTier, TangleTierPolicy>
 type GuardResolution
 ```
 
-### `HubClientLike`
-
-`interface` — Structural subset of the platform hub wire client — extra methods are fine.
-
-```ts
-interface HubClientLike
-```
-
-### `HubProxyContext`
-
-`interface` — Define methods to require user ID, get bearer token, and create a hub client bound to the bearer
-
-```ts
-interface HubProxyContext
-```
-
-### `HubProxyRouteArgs`
-
-`interface` — Define arguments for configuring a proxy route with request and optional parameters
-
-```ts
-interface HubProxyRouteArgs
-```
-
-### `HubProxyRoutes`
-
-`interface` — Define routes for hub proxy handling catalog, connections, healthchecks, and authorization actions
-
-```ts
-interface HubProxyRoutes
-```
-
 ### `HubSettingsApiKeyMetadata`
 
 `type` — Non-secret API-key setup shapes supported by the Hub SDK.
@@ -318,14 +278,6 @@ interface HubSettingsRoutes
 (error: unknown) => error is PlatformBillingHttpError
 ```
 
-### `isPlatformHubErrorLike`
-
-`function` — Structural detection of the platform hub wire error (name + numeric status).
-
-```ts
-(error: unknown) => error is Error & { status: number; code?: string | undefined; }
-```
-
 ### `isProductEntitled`
 
 `function` — Honor platform access policy; older endpoints provide only seat authority.
@@ -340,14 +292,6 @@ interface HubSettingsRoutes
 
 ```ts
 (opts?: SeatBillingFlagOptions) => boolean
-```
-
-### `isTangleBearerMissingError`
-
-`function` — Structural guard (name + userId shape) — robust when the error class is constructed in a different module instance than the one checking it.
-
-```ts
-(error: unknown) => error is TangleBearerMissingError
 ```
 
 ### `normalizeTanglePlanTier`
@@ -470,52 +414,12 @@ interface ProductSeatOfferPeriod
 interface RequestApiKey
 ```
 
-### `ResolvedTangleHubBearer`
-
-`interface` — Represent a resolved bearer token with its associated TangleHub bearer source
-
-```ts
-interface ResolvedTangleHubBearer
-```
-
 ### `resolveTangleSsoAccount`
 
 `function` — Resolve a platform exchange against all local rows found by stable platform identity and normalized email.
 
 ```ts
 (input: TangleSsoAccountResolutionInput) => TangleSsoAccountResolution
-```
-
-### `resolveUserTangleHubBearer`
-
-`function` — Resolve the Tangle bearer used by the integration hub proxy.
-
-```ts
-(opts: ResolveUserTangleHubBearerOptions) => Promise<ResolvedTangleHubBearer>
-```
-
-### `resolveUserTangleHubBearerForUser`
-
-`function` — Resolve the TangleHub bearer token for a specified user based on provided options
-
-```ts
-<UserId = string>(opts: ResolveUserTangleHubBearerForUserOptions<UserId>) => Promise<ResolvedTangleHubBearer>
-```
-
-### `ResolveUserTangleHubBearerForUserOptions`
-
-`interface` — Resolve options for retrieving a TangleHub bearer token for a specified user
-
-```ts
-interface ResolveUserTangleHubBearerForUserOptions
-```
-
-### `ResolveUserTangleHubBearerOptions`
-
-`interface` — Resolve options required to obtain a user's TangleHub bearer token including environment and API key retrieval
-
-```ts
-interface ResolveUserTangleHubBearerOptions
 ```
 
 ### `SeatBillingFlagOptions`
@@ -556,22 +460,6 @@ type SeatStatus
 
 ```ts
 interface SsoStateConfig
-```
-
-### `TangleBearerMissingError`
-
-`class` — Represent missing Tangle platform link error for a specified user ID
-
-```ts
-class TangleBearerMissingError
-```
-
-### `TangleHubBearerSource`
-
-`type` — Hub bearer provenance mirrors the execution-key source union.
-
-```ts
-type TangleHubBearerSource
 ```
 
 ### `TangleIdentitySsoAccountStore`

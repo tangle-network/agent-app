@@ -5,7 +5,6 @@
  */
 
 export * from './sso'
-export * from './hub'
 export * from './hub-settings'
 export * from './billing'
 export * from './guards'

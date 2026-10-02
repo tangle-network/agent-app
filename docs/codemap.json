@@ -9401,16 +9401,10 @@
           "doc": "Canonical `setSessionCookie` wiring for better-auth apps: mint the session Set-Cookie exactly as better-auth's own login flows do — name + attributes from `auth.$context.authCookies.sessionToken` (be…"
         },
         {
-          "name": "createHubProxyRoutes",
-          "kind": "function",
-          "signature": "(ctx: HubProxyContext) => HubProxyRoutes",
-          "doc": "Resolve hub proxy routes with authentication and error handling based on the given context"
-        },
-        {
           "name": "createHubSettingsRoutes",
           "kind": "function",
           "signature": "(ctx: HubSettingsContext) => HubSettingsRoutes",
-          "doc": "Build a finite Hub settings server boundary; existing Hub proxy routes are unaffected."
+          "doc": "Build the finite, application-authorized Hub settings server boundary."
         },
         {
           "name": "createPlatformBillingHttp",
@@ -9473,30 +9467,6 @@
           "doc": "Resolve a value or an HTTP response indicating failure in a guarded operation"
         },
         {
-          "name": "HubClientLike",
-          "kind": "interface",
-          "signature": "interface HubClientLike",
-          "doc": "Structural subset of the platform hub wire client — extra methods are fine."
-        },
-        {
-          "name": "HubProxyContext",
-          "kind": "interface",
-          "signature": "interface HubProxyContext",
-          "doc": "Define methods to require user ID, get bearer token, and create a hub client bound to the bearer"
-        },
-        {
-          "name": "HubProxyRouteArgs",
-          "kind": "interface",
-          "signature": "interface HubProxyRouteArgs",
-          "doc": "Define arguments for configuring a proxy route with request and optional parameters"
-        },
-        {
-          "name": "HubProxyRoutes",
-          "kind": "interface",
-          "signature": "interface HubProxyRoutes",
-          "doc": "Define routes for hub proxy handling catalog, connections, healthchecks, and authorization actions"
-        },
-        {
           "name": "HubSettingsApiKeyMetadata",
           "kind": "type",
           "signature": "type HubSettingsApiKeyMetadata",
@@ -9557,12 +9527,6 @@
           "doc": "Structural guard (name + numeric status) — robust across module instances."
         },
         {
-          "name": "isPlatformHubErrorLike",
-          "kind": "function",
-          "signature": "(error: unknown) => error is Error & { status: number; code?: string | undefined; }",
-          "doc": "Structural detection of the platform hub wire error (name + numeric status)."
-        },
-        {
           "name": "isProductEntitled",
           "kind": "function",
           "signature": "(ent: ProductEntitlement) => boolean",
@@ -9573,12 +9537,6 @@
           "kind": "function",
           "signature": "(opts?: SeatBillingFlagOptions) => boolean",
           "doc": "An explicit flag controls seat billing in every environment."
-        },
-        {
-          "name": "isTangleBearerMissingError",
-          "kind": "function",
-          "signature": "(error: unknown) => error is TangleBearerMissingError",
-          "doc": "Structural guard (name + userId shape) — robust when the error class is constructed in a different module instance than the one checking it."
         },
         {
           "name": "normalizeTanglePlanTier",
@@ -9671,40 +9629,10 @@
           "doc": "Verified key fields required to enter a product's private API routes."
         },
         {
-          "name": "ResolvedTangleHubBearer",
-          "kind": "interface",
-          "signature": "interface ResolvedTangleHubBearer",
-          "doc": "Represent a resolved bearer token with its associated TangleHub bearer source"
-        },
-        {
           "name": "resolveTangleSsoAccount",
           "kind": "function",
           "signature": "(input: TangleSsoAccountResolutionInput) => TangleSsoAccountResolution",
           "doc": "Resolve a platform exchange against all local rows found by stable platform identity and normalized email."
-        },
-        {
-          "name": "resolveUserTangleHubBearer",
-          "kind": "function",
-          "signature": "(opts: ResolveUserTangleHubBearerOptions) => Promise<ResolvedTangleHubBearer>",
-          "doc": "Resolve the Tangle bearer used by the integration hub proxy."
-        },
-        {
-          "name": "resolveUserTangleHubBearerForUser",
-          "kind": "function",
-          "signature": "<UserId = string>(opts: ResolveUserTangleHubBearerForUserOptions<UserId>) => Promise<ResolvedTangleHubBearer>",
-          "doc": "Resolve the TangleHub bearer token for a specified user based on provided options"
-        },
-        {
-          "name": "ResolveUserTangleHubBearerForUserOptions",
-          "kind": "interface",
-          "signature": "interface ResolveUserTangleHubBearerForUserOptions",
-          "doc": "Resolve options for retrieving a TangleHub bearer token for a specified user"
-        },
-        {
-          "name": "ResolveUserTangleHubBearerOptions",
-          "kind": "interface",
-          "signature": "interface ResolveUserTangleHubBearerOptions",
-          "doc": "Resolve options required to obtain a user's TangleHub bearer token including environment and API key retrieval"
         },
         {
           "name": "SeatBillingFlagOptions",
@@ -9735,18 +9663,6 @@
           "kind": "interface",
           "signature": "interface SsoStateConfig",
           "doc": "Define configuration options for managing SSO state including secret, lifetime, and clock injection"
-        },
-        {
-          "name": "TangleBearerMissingError",
-          "kind": "class",
-          "signature": "class TangleBearerMissingError",
-          "doc": "Represent missing Tangle platform link error for a specified user ID"
-        },
-        {
-          "name": "TangleHubBearerSource",
-          "kind": "type",
-          "signature": "type TangleHubBearerSource",
-          "doc": "Hub bearer provenance mirrors the execution-key source union."
         },
         {
           "name": "TangleIdentitySsoAccountStore",

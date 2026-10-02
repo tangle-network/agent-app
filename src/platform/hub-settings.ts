@@ -263,7 +263,7 @@ async function prepare(request: Request, basePath: string): Promise<Prepared | R
   return invalid()
 }
 
-/** Build a finite Hub settings server boundary; existing Hub proxy routes are unaffected. */
+/** Build the finite, application-authorized Hub settings server boundary. */
 export function createHubSettingsRoutes(ctx: HubSettingsContext): HubSettingsRoutes {
   if (typeof ctx.authorize !== 'function' || typeof ctx.resolveClient !== 'function') {
     throw new TypeError('Hub settings requires authorize and resolveClient callbacks')
