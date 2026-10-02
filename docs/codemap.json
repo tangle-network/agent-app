@@ -2145,6 +2145,12 @@
           "doc": "Patch a `beforeTurn` hook returns to augment the producer's input."
         },
         {
+          "name": "ChatTurnIntelligenceOptions",
+          "kind": "interface",
+          "signature": "interface ChatTurnIntelligenceOptions",
+          "doc": "Host-resolved metadata only."
+        },
+        {
           "name": "ChatTurnLifecycle",
           "kind": "interface",
           "signature": "interface ChatTurnLifecycle",
@@ -2673,6 +2679,12 @@
           "doc": "Convert the browser-safe chat attachment contract into the current sandbox prompt contract."
         },
         {
+          "name": "observeChatTurnStream",
+          "kind": "function",
+          "signature": "<TEvent>(source: AsyncGenerator<TEvent, void, unknown>, options: ChatTurnIntelligenceOptions) => AsyncGenerator<TEvent,…",
+          "doc": "Observe the source iterator without an execution loop, relay, queue or eager pull."
+        },
+        {
           "name": "observeNativeCompletion",
           "kind": "function",
           "signature": "(options: NativeCompletionObservationOptions) => Promise<NativeCompletionObservation>",
@@ -2737,6 +2749,12 @@
           "kind": "function",
           "signature": "(raw: unknown) => FileMention[]",
           "doc": "Validates the untyped `mentions` array off the wire, mirroring {@link parseChatTurnParts}: the typed list, or `ChatTurnInputError` (400) naming the offending entry."
+        },
+        {
+          "name": "produceChatTurnWithIntelligence",
+          "kind": "function",
+          "signature": "(options: ChatTurnIntelligenceOptions & { produce: () => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>; }) =>…",
+          "doc": "Adapter for product producer factories."
         },
         {
           "name": "ProducerErrorEvent",
