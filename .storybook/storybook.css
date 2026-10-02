@@ -1,5 +1,5 @@
-@import 'tailwindcss';
 @import '@tangle-network/sandbox-ui/styles';
+@import 'tailwindcss';
 @config '../tailwind.config.cjs';
 
 /*

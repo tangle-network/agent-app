@@ -47,7 +47,8 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs'
-import { relative } from 'node:path'
+import { createRequire } from 'node:module'
+import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walkSources } from '../legibility/walk-sources'
 
@@ -130,15 +131,30 @@ function buildUtilityRe(suffix: string): RegExp {
  */
 function definedVars(cssFiles: string[]): Set<string> {
   const defs = new Set<string>()
-  for (const file of cssFiles) {
+  const visited = new Set<string>()
+  const visit = (file: string): void => {
+    if (visited.has(file)) return
+    visited.add(file)
     let css: string
     try {
       css = readFileSync(file, 'utf8')
     } catch {
-      continue
+      return
     }
     for (const m of css.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gim)) if (m[1]) defs.add(m[1])
+    // Source tokens.css imports the published Brand sheet and its checked
+    // projection. The packed public sheet has already inlined both. Follow
+    // local imports here so the source and installed consumer see the same
+    // definitions without making Brand a runtime dependency of the package.
+    for (const m of css.matchAll(/@import\s+['"]([^'"]+)['"]/g)) {
+      if (!m[1]) continue
+      const imported = m[1].startsWith('.')
+        ? resolve(dirname(file), m[1])
+        : createRequire(file).resolve(m[1])
+      visit(imported)
+    }
   }
+  for (const file of cssFiles) visit(file)
   return defs
 }
 

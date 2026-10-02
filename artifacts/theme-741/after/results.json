@@ -1,0 +1,162 @@
+[
+  {
+    "revision": "ff0c7a8b",
+    "label": "canvas",
+    "theme": "agent-light",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "url": "http://127.0.0.1:6107/iframe.html?id=design-canvas-designcanvaseditor--editor-with-document&viewMode=story&globals=agentTheme:agent-light",
+    "screenshot": "canvas-agent-light-1440.png",
+    "state": {
+      "theme": "light",
+      "darkClass": false,
+      "width": 1440,
+      "contentWidth": 1440,
+      "background": "rgb(234, 234, 234)",
+      "text": "Elements\nT\nHeading\n\u00b6\nBody text\nRectangle\nEllipse\nVIEW\nPAGE SIZE\nInstagram \u2014 Square\nW\n\u00d7\nH\nBG\nExport\n0\n100\n200\n300\n400\n500\n600\n700\n800\n900\n1k\n0\n100\n200\n300\n400\n500\n600\n700\n800\n900\n1k"
+    },
+    "errors": []
+  },
+  {
+    "revision": "ff0c7a8b",
+    "label": "canvas",
+    "theme": "agent-light",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "url": "http://127.0.0.1:6107/iframe.html?id=design-canvas-designcanvaseditor--editor-with-document&viewMode=story&globals=agentTheme:agent-light",
+    "screenshot": "canvas-agent-light-390.png",
+    "state": {
+      "theme": "light",
+      "darkClass": false,
+      "width": 390,
+      "contentWidth": 390,
+      "background": "rgb(234, 234, 234)",
+      "text": "PAGE SIZE\nInstagram \u2014 Square\nW\n\u00d7\nH\nBG\nExport\n\nBest edited on a larger screen\n\nOpen this on a tablet or desktop to edit and export.\n\nPAGES\nSquare\nAdd page\n100%"
+    },
+    "errors": []
+  },
+  {
+    "revision": "ff0c7a8b",
+    "label": "canvas",
+    "theme": "agent-dark",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "url": "http://127.0.0.1:6107/iframe.html?id=design-canvas-designcanvaseditor--editor-with-document&viewMode=story&globals=agentTheme:agent-dark",
+    "screenshot": "canvas-agent-dark-1440.png",
+    "state": {
+      "theme": "dark",
+      "darkClass": true,
+      "width": 1440,
+      "contentWidth": 1440,
+      "background": "rgb(22, 22, 22)",
+      "text": "Elements\nT\nHeading\n\u00b6\nBody text\nRectangle\nEllipse\nVIEW\nPAGE SIZE\nInstagram \u2014 Square\nW\n\u00d7\nH\nBG\nExport\n0\n100\n200\n300\n400\n500\n600\n700\n800\n900\n1k\n0\n100\n200\n300\n400\n500\n600\n700\n800\n900\n1k"
+    },
+    "errors": []
+  },
+  {
+    "revision": "ff0c7a8b",
+    "label": "canvas",
+    "theme": "agent-dark",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "url": "http://127.0.0.1:6107/iframe.html?id=design-canvas-designcanvaseditor--editor-with-document&viewMode=story&globals=agentTheme:agent-dark",
+    "screenshot": "canvas-agent-dark-390.png",
+    "state": {
+      "theme": "dark",
+      "darkClass": true,
+      "width": 390,
+      "contentWidth": 390,
+      "background": "rgb(22, 22, 22)",
+      "text": "PAGE SIZE\nInstagram \u2014 Square\nW\n\u00d7\nH\nBG\nExport\n\nBest edited on a larger screen\n\nOpen this on a tablet or desktop to edit and export.\n\nPAGES\nSquare\nAdd page\n100%"
+    },
+    "errors": []
+  },
+  {
+    "revision": "ff0c7a8b",
+    "label": "chat",
+    "theme": "agent-light",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "url": "http://127.0.0.1:6107/iframe.html?id=chat-chatmessages--proposal-awaiting-approval&viewMode=story&globals=agentTheme:agent-light",
+    "screenshot": "chat-agent-light-1440.png",
+    "state": {
+      "theme": "light",
+      "darkClass": false,
+      "width": 1440,
+      "contentWidth": 1440,
+      "background": "rgb(234, 234, 234)",
+      "text": "USER\n\nRender the poster and queue it for review.\n\nAGENT\nanthropic/claude-opus-4\n81 tok/s\n$0.05\n\nThe poster is rendered and I submitted the publish proposal. It needs your approval "
+    },
+    "errors": []
+  },
+  {
+    "revision": "ff0c7a8b",
+    "label": "chat",
+    "theme": "agent-light",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "url": "http://127.0.0.1:6107/iframe.html?id=chat-chatmessages--proposal-awaiting-approval&viewMode=story&globals=agentTheme:agent-light",
+    "screenshot": "chat-agent-light-390.png",
+    "state": {
+      "theme": "light",
+      "darkClass": false,
+      "width": 390,
+      "contentWidth": 390,
+      "background": "rgb(234, 234, 234)",
+      "text": "USER\n\nRender the poster and queue it for review.\n\nAGENT\nanthropic/claude-opus-4\n81 tok/s\n$0.05\n\nThe poster is rendered and I submitted the publish proposal. It needs your approval "
+    },
+    "errors": []
+  },
+  {
+    "revision": "ff0c7a8b",
+    "label": "chat",
+    "theme": "agent-dark",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "url": "http://127.0.0.1:6107/iframe.html?id=chat-chatmessages--proposal-awaiting-approval&viewMode=story&globals=agentTheme:agent-dark",
+    "screenshot": "chat-agent-dark-1440.png",
+    "state": {
+      "theme": "dark",
+      "darkClass": true,
+      "width": 1440,
+      "contentWidth": 1440,
+      "background": "rgb(22, 22, 22)",
+      "text": "USER\n\nRender the poster and queue it for review.\n\nAGENT\nanthropic/claude-opus-4\n81 tok/s\n$0.05\n\nThe poster is rendered and I submitted the publish proposal. It needs your approval "
+    },
+    "errors": []
+  },
+  {
+    "revision": "ff0c7a8b",
+    "label": "chat",
+    "theme": "agent-dark",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "url": "http://127.0.0.1:6107/iframe.html?id=chat-chatmessages--proposal-awaiting-approval&viewMode=story&globals=agentTheme:agent-dark",
+    "screenshot": "chat-agent-dark-390.png",
+    "state": {
+      "theme": "dark",
+      "darkClass": true,
+      "width": 390,
+      "contentWidth": 390,
+      "background": "rgb(22, 22, 22)",
+      "text": "USER\n\nRender the poster and queue it for review.\n\nAGENT\nanthropic/claude-opus-4\n81 tok/s\n$0.05\n\nThe poster is rendered and I submitted the publish proposal. It needs your approval "
+    },
+    "errors": []
+  }
+]

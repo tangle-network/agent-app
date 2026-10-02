@@ -29,9 +29,9 @@ describe('checkThemeContract', () => {
 
   it('flags an undefined dangerous Tailwind utility and names the class', () => {
     const { missing } = checkThemeContract({ srcDirs: [srcDir], tokensCss })
-    // bg-surface-container-high → --popover, which the fixture tokens.css omits.
+    // bg-surface-container-high → the MD3 high tier, omitted by this fixture.
     const miss = missing.find((m) => m.varName === '--md3-surface-container-high')
-    expect(miss, 'should report --popover behind bg-surface-container-high').toBeDefined()
+    expect(miss, 'should report the MD3 high tier behind bg-surface-container-high').toBeDefined()
     expect(miss!.referencedIn).toContain('BadUtilityComponent.tsx')
     expect(miss!.referencedIn).toContain('via bg-surface-container-high')
   })

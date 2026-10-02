@@ -33,6 +33,20 @@ const agentAppPreset = {
         'surface-container-high': 'var(--md3-surface-container-high)',
         'surface-container-highest': 'var(--md3-surface-container-highest)',
       },
+      // A field's well and edge are separate Brand roles. Keep border-input
+      // on --input while bg-input paints the full-color recessed well.
+      backgroundColor: {
+        input: 'color-mix(in oklch, var(--bg-input) calc(<alpha-value> * 100%), transparent)',
+      },
+      // Approval cards use a light tint; their label needs Brand's stronger
+      // warning ink. The solid warning chip keeps its own foreground pairing.
+      textColor: {
+        warning: {
+          DEFAULT: 'hsl(var(--warning-strong))',
+          foreground: 'hsl(var(--warning-foreground))',
+          strong: 'hsl(var(--warning-strong))',
+        },
+      },
       boxShadow: { raised: 'var(--shadow-raised)', overlay: 'var(--shadow-overlay)' },
       borderColor: {
         border: tier('--border-soft'),

@@ -1,0 +1,24 @@
+[
+  {
+    "theme": "agent-light",
+    "box": {
+      "x": 276,
+      "y": 108,
+      "width": 844,
+      "height": 777
+    },
+    "errors": [],
+    "overlay": "same effective sm:block/hidden order as fixed Storybook preview"
+  },
+  {
+    "theme": "agent-dark",
+    "box": {
+      "x": 276,
+      "y": 108,
+      "width": 844,
+      "height": 777
+    },
+    "errors": [],
+    "overlay": "same effective sm:block/hidden order as fixed Storybook preview"
+  }
+]
