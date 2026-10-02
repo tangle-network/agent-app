@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.11
+
+- feat: select eligible skills in shared composer (#757)
+
 ## 0.51.10
 
 - fix: expose platform SSO declarations to NodeNext (#756)
