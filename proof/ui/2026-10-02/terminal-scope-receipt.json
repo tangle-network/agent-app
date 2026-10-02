@@ -1,0 +1,15 @@
+{
+  "target": "actual useSandboxTerminalConnection source in jsdom on GTR",
+  "sourcePath": "src/web-react/sandbox-terminal.ts",
+  "baselineRevision": "83292590",
+  "red": {
+    "priorImplementation": "4 failures, 9 passes",
+    "cases": "workspace, endpoint, and connection-ID changes retained prior tokens; a pending connection retained loading status"
+  },
+  "green": {
+    "tests": "13 passes",
+    "typecheck": "PASS",
+    "actions": "explicitly connect first scope; change scope; observe idle/null URL/token; advance beyond old refresh; observe zero new requests; explicitly connect new scope; observe same-scope automatic refresh; reject late prior-scope response"
+  },
+  "limits": "Hook-level connection API responses are controlled fixtures. This does not prove a live shell connection."
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react'
 
 /** Define the connection details and status for a sandbox terminal session */
 export interface SandboxTerminalConnection {
@@ -50,6 +50,8 @@ export interface SandboxTerminalConnectionResponse {
  */
 export interface UseSandboxTerminalConnectionOptions {
   workspaceId: string
+  /** Connect each scope by default; false requires an explicit connect after mount or scope changes. */
+  autoConnect?: boolean
   connectionUrl?: string | ((workspaceId: string) => string)
   connectionId?: string
   fetcher?: typeof fetch
@@ -95,7 +97,6 @@ const EMPTY_CONNECTION: SandboxTerminalConnection = {
  * `runtimeUrl` as `apiUrl`, and `token` as its token prop.
  */
 export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionOptions): UseSandboxTerminalConnectionResult {
-  const [conn, setConn] = useState<SandboxTerminalConnection>(EMPTY_CONNECTION)
   const mountedRef = useRef(false)
   const generationRef = useRef(0)
   const fetcher = opts.fetcher ?? fetch
@@ -114,10 +115,23 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
     return `${base}${separator}connectionId=${encodeURIComponent(opts.connectionId)}`
   }, [opts.connectionUrl, opts.workspaceId, opts.connectionId])
 
+  const scopeKey = JSON.stringify([opts.workspaceId, connectionUrl()])
+  const scopeRef = useRef(scopeKey)
+  const [connectionState, setConnectionState] = useState(() => ({ scopeKey, connection: EMPTY_CONNECTION }))
+  const conn = connectionState.scopeKey === scopeKey ? connectionState.connection : EMPTY_CONNECTION
+  const setConn = useCallback((value: SetStateAction<SandboxTerminalConnection>) => {
+    setConnectionState((current) => ({
+      scopeKey,
+      connection: typeof value === 'function'
+        ? value(current.scopeKey === scopeKey ? current.connection : EMPTY_CONNECTION)
+        : value,
+    }))
+  }, [scopeKey])
+
   const connect = useCallback(async () => {
     const generation = generationRef.current + 1
     generationRef.current = generation
-    const isCurrent = () => mountedRef.current && generationRef.current === generation
+    const isCurrent = () => mountedRef.current && generationRef.current === generation && scopeRef.current === scopeKey
     const setCurrentConn: typeof setConn = (value) => {
       if (!isCurrent()) return
       setConn(value)
@@ -197,7 +211,7 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
         return
       }
     }
-  }, [connectionUrl, fetcher, pollIntervalMs, pollTimeoutMs])
+  }, [connectionUrl, fetcher, pollIntervalMs, pollTimeoutMs, scopeKey, setConn])
 
   useEffect(() => {
     mountedRef.current = true
@@ -208,8 +222,16 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
   }, [])
 
   useEffect(() => {
-    void connect()
-  }, [connect])
+    // A token and in-flight provisioning belong to one workspace/connection scope.
+    scopeRef.current = scopeKey
+    generationRef.current += 1
+    setConn(EMPTY_CONNECTION)
+    return () => { generationRef.current += 1 }
+  }, [scopeKey, setConn])
+
+  useEffect(() => {
+    if (opts.autoConnect !== false) void connect()
+  }, [connect, opts.autoConnect])
 
   useEffect(() => {
     if (!conn.runtimeUrl || !conn.token || !conn.expiresAt) return
@@ -230,7 +252,7 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
       void connect()
     }, Math.max(1_000, refreshAt))
     return () => window.clearTimeout(timer)
-  }, [conn.runtimeUrl, conn.token, conn.expiresAt, connect, refreshSkewMs])
+  }, [conn.runtimeUrl, conn.token, conn.expiresAt, connect, refreshSkewMs, setConn])
 
   return { ...conn, connect }
 }

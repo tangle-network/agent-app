@@ -4,7 +4,7 @@
 
 Source: `src/workspace-react/index.tsx`
 
-5 exports.
+9 exports.
 
 ### `AgentWorkspaceActiveRoute`
 
@@ -20,6 +20,38 @@ interface AgentWorkspaceActiveRoute
 
 ```ts
 interface AgentWorkspaceAppsConfig
+```
+
+### `AgentWorkspaceCompanion`
+
+`function` — Product-owned tools beside a conversation; omitted tools have no tabs or effects.
+
+```ts
+ForwardRefExoticComponent<AgentWorkspaceCompanionProps & RefAttributes<AgentWorkspaceCompanionHandle>>
+```
+
+### `AgentWorkspaceCompanionHandle`
+
+`interface`
+
+```ts
+interface AgentWorkspaceCompanionHandle
+```
+
+### `AgentWorkspaceCompanionProps`
+
+`interface`
+
+```ts
+interface AgentWorkspaceCompanionProps
+```
+
+### `AgentWorkspaceCompanionTab`
+
+`interface`
+
+```ts
+interface AgentWorkspaceCompanionTab
 ```
 
 ### `AgentWorkspaceLayout`
