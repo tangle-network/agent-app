@@ -1,0 +1,31 @@
+{
+  "runtime": "v22.16.0",
+  "command": "node --experimental-strip-types --test tests/integrations-react/chatgpt-state.node.mjs",
+  "sourceSha256": "c504840ac4253d3be52d395539f6c885ea7f86de9f144043a0c2121350c39243",
+  "testsSha256": "244b6b1621f97371c045fd760675d576641ea9da5ea51b52758a45c8aa5f6485",
+  "mutations": [
+    {
+      "mutation": "identity",
+      "exitCode": 1,
+      "summary": ["# pass 15", "# fail 4"]
+    },
+    {
+      "mutation": "endpoint",
+      "exitCode": 1,
+      "summary": ["# pass 17", "# fail 2"]
+    },
+    {
+      "mutation": "registered-is-not-connected",
+      "exitCode": 1,
+      "summary": ["# pass 17", "# fail 2"]
+    }
+  ],
+  "restored": {
+    "passed": 19,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "limits": [
+    "Source projection only; not React/Vitest, package installation, typecheck, browser, or hosted proof."
+  ]
+}
