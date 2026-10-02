@@ -1,0 +1,78 @@
+name: Default workspace exact consumer proof
+on:
+  push:
+    branches: [feat/default-workspace-starter-20261002]
+permissions:
+  contents: write
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+      - name: Final candidate and baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/feat/default-workspace-starter-20261002
+          git fetch --no-tags --depth=1 origin 2aaba0adc32c07ae7ce87e38bc5c09ccfc696ac9
+          git cat-file -e 2aaba0adc32c07ae7ce87e38bc5c09ccfc696ac9:create-agent-app/index.mjs
+          git rm .github/workflows/starter-recheck.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: finalize default workspace candidate for consumer proof'
+          git push origin HEAD:refs/heads/feat/default-workspace-starter-20261002
+          mkdir -p receipts
+          git rev-parse HEAD > receipts/checked-head.txt
+          pnpm install --frozen-lockfile 2>&1 | tee receipts/install.log
+      - name: Red and green defaults
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=create-agent-app/index.mjs
+          trap 'git checkout HEAD -- "$file"' EXIT
+          git show 2aaba0adc32c07ae7ce87e38bc5c09ccfc696ac9:$file > "$RUNNER_TEMP/starter-baseline.mjs"
+          cp "$RUNNER_TEMP/starter-baseline.mjs" "$file"
+          set +e
+          pnpm exec vitest run tests/scaffold-defaults.test.ts -t 'defaults to the maintained workspace' > receipts/red.log 2>&1
+          result=$?
+          set -e
+          git checkout HEAD -- "$file"
+          test "$result" -eq 1
+          grep -q 'defaults to the maintained workspace' receipts/red.log
+          pnpm exec vitest run tests/scaffold-defaults.test.ts tests/scaffold-cohort.test.ts 2>&1 | tee receipts/green.log
+          pnpm typecheck 2>&1 | tee receipts/typecheck.log
+          pnpm build 2>&1 | tee receipts/build.log
+      - name: External installed starters and real local browser
+        shell: bash
+        env:
+          VERIFICATION_DIR: ${{ github.workspace }}/receipts/browser
+        run: |
+          set -euo pipefail
+          pnpm exec playwright install-deps chromium
+          pnpm test:generated 2>&1 | tee receipts/generated.log
+          git diff --exit-code
+      - name: Retain exact source and observations
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p receipts
+          git rev-parse HEAD > receipts/observed-head.txt
+          git status --short > receipts/worktree.txt
+          git archive --format=tar.gz HEAD > receipts/source.tar.gz
+          cd create-agent-app
+          npm pack --ignore-scripts --pack-destination ../receipts > ../receipts/pack.log 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: default-workspace-starter-proof
+          path: receipts/
+          retention-days: 3
