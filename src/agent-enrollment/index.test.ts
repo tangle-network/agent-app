@@ -246,18 +246,21 @@ describe('createAgentEnrollment', () => {
 
   it('rejects a store that tries to change the committed target in place', async () => {
     const f = fixture()
+    let retained: AgentEnrollmentTarget | null = null
     const enrollment = createAgentEnrollment({
       authorize: async () => {}, client: () => f.client as never,
       store: {
         claimIfAbsent: async claim => claim,
-        get: async () => null,
+        get: async () => retained,
         insertIfAbsent: async target => {
-          target.profileVersion = 'unclaimed-profile'
-          return target
+          try { target.profileVersion = 'unclaimed-profile' } catch { /* Store rejects an immutable write. */ }
+          retained ??= target
+          return retained
         },
       },
     })
-    await expect(enrollment.enroll('owner', f.request)).rejects.toThrow()
+    await expect(enrollment.enroll('owner', f.request)).resolves.toMatchObject({ profileVersion: 'v1' })
+    expect(retained).toMatchObject({ profileVersion: 'v1' })
   })
 
   it('retains the first target when concurrent callers race for one enrollment id', async () => {

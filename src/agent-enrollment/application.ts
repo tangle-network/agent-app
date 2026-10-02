@@ -34,9 +34,12 @@ export interface EnrolledApplicationLineOptions<Principal> {
   /** Re-read live app, customer, consent and member grant for the selected app. */
   lookup(principal: Principal, binding: string, subjectId: string, appId: string): Promise<LiveSharedEnrollmentMember | null>
   enrollment: { resolve(principal: Principal, enrollmentId: string): Promise<ResolvedAgentEnrollment> }
-  /** Read and admit through the application's existing durable task and output store. */
-  read(resolved: ResolvedAgentEnrollment, input: Readonly<LineApplicationRequest>): Promise<ApplicationLineObservation>
-  admit(resolved: ResolvedAgentEnrollment, input: Readonly<LineApplicationRequest>): Promise<void>
+  /** Read through the application's existing durable output store using the pinned grant. */
+  read(resolved: ResolvedAgentEnrollment, input: Readonly<LineApplicationRequest>,
+    member: Readonly<LiveSharedEnrollmentMember>): Promise<ApplicationLineObservation>
+  /** Atomically compare the pinned grant revision at the durable task write before paid work. */
+  admit(resolved: ResolvedAgentEnrollment, input: Readonly<LineApplicationRequest>,
+    member: Readonly<LiveSharedEnrollmentMember>): Promise<void>
 }
 
 function forbidden(): Response {
@@ -114,7 +117,7 @@ export function createEnrolledApplicationLineHandler<Principal>(options: Enrolle
     const current = await options.lookup(authenticated.principal, authenticated.binding, subject, appId)
     if (!current || !sameMember(current, member)) throw forbidden()
     authenticated.pinned ??= Object.freeze({ member, target })
-    return { ...resolved, target }
+    return { resolved: { ...resolved, target }, member: authenticated.pinned.member }
   }
 
   return createApplicationLineHandler({
@@ -124,7 +127,13 @@ export function createEnrolledApplicationLineHandler<Principal>(options: Enrolle
       return { binding: target.binding, target: { ...target, selectedAppId: undefined, pinned: undefined } }
     },
     authorize: async (target, input) => { await resolve(target, input) },
-    read: async (target, input) => options.read(await resolve(target, input), input),
-    admit: async (target, input) => options.admit(await resolve(target, input), input),
+    read: async (target, input) => {
+      const { resolved, member } = await resolve(target, input)
+      return options.read(resolved, input, member)
+    },
+    admit: async (target, input) => {
+      const { resolved, member } = await resolve(target, input)
+      return options.admit(resolved, input, member)
+    },
   })
 }

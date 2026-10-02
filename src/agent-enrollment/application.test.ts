@@ -152,4 +152,32 @@ describe('shared enrolled application line', () => {
     const response = await handler(callback('@builder hello', 'msg_mutated_member'))
     expect(response.status).toBe(403)
   })
+
+  it('passes the pinned grant to an admission that checks the live revision at its write', async () => {
+    let liveRevision = 'revision-1'
+    let admitted = 0
+    let suppliedRevision: string | undefined
+    const handler = createEnrolledApplicationLineHandler({
+      authenticate: async () => ({ principal: 'owner', binding }),
+      selectApp: async () => 'builder',
+      lookup: async () => ({ ...member('builder'), grantRevision: liveRevision }),
+      enrollment: { resolve: async () => ({
+        target: { ...member('builder') }, box: {}, session: {},
+      }) as never },
+      read: async () => ({ state: 'missing' }),
+      admit: async (...args: unknown[]) => {
+        const pinned = args[2] as LiveSharedEnrollmentMember | undefined
+        suppliedRevision = pinned?.grantRevision
+        liveRevision = 'revision-2'
+        if (pinned?.grantRevision !== liveRevision) {
+          throw Response.json({ error: { code: 'grant_changed' } }, { status: 403 })
+        }
+        admitted++
+      },
+    })
+    const response = await handler(callback('@builder hello', 'msg_revoke_before_admit'))
+    expect(response.status).toBe(403)
+    expect(suppliedRevision).toBe('revision-1')
+    expect(admitted).toBe(0)
+  })
 })
