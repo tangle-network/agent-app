@@ -1,0 +1,22 @@
+{
+  "private": true,
+  "packageManager": "pnpm@11.24.0",
+  "type": "module",
+  "dependencies": {
+    "@tangle-network/agent-app": "file:../candidate-1a9fb04.tgz",
+    "@tangle-network/hub-sdk": "0.22.1",
+    "@tangle-network/sandbox-ui": "0.116.9",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "@tangle-network/agent-interface": "2.15.0",
+    "@tangle-network/brand": "1.9.1",
+    "@tangle-network/ui": "11.12.0"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vite": "7.3.1",
+    "playwright": "1.63.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5"
+  }
+}

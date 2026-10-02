@@ -288,7 +288,7 @@ function OperationErrorAlert({
   return (
     <div
       role="alert"
-      className="flex shrink-0 items-center justify-between gap-3 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+      className="flex shrink-0 items-center justify-between gap-3 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-[var(--surface-danger-text)]"
     >
       <span className="min-w-0 flex-1">{message}</span>
       <div className="flex shrink-0 items-center gap-3">
@@ -994,7 +994,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                         aria-label="Delete this file"
                         title="Delete file"
                         onClick={() => { setDeleteError(null); setDeleteOpen(true) }}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--surface-danger-text)] transition-colors hover:bg-destructive/10"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -1076,7 +1076,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               aria-label="New file path"
               className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
             />
-            {createError && <p role="alert" className="text-xs text-destructive">{createError.message}</p>}
+            {createError && <p role="alert" className="text-xs text-[var(--surface-danger-text)]">{createError.message}</p>}
           </div>
         </ConfirmDialog>
 
@@ -1090,7 +1090,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
           onConfirm={() => void handleDelete()}
           onCancel={() => { setDeleteOpen(false); setDeleteError(null) }}
         >
-          {deleteError && <p role="alert" className="text-xs text-destructive">{deleteError.message}</p>}
+          {deleteError && <p role="alert" className="text-xs text-[var(--surface-danger-text)]">{deleteError.message}</p>}
         </ConfirmDialog>
 
         <ConfirmDialog

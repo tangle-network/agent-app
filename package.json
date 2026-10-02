@@ -213,6 +213,11 @@
       "import": "./dist/integrations/index.js",
       "default": "./dist/integrations/index.js"
     },
+    "./integrations-react": {
+      "types": "./dist/integrations-react/index.d.ts",
+      "import": "./dist/integrations-react/index.js",
+      "default": "./dist/integrations-react/index.js"
+    },
     "./channels": {
       "types": "./dist/channels/index.d.ts",
       "import": "./dist/channels/index.js",
@@ -227,6 +232,11 @@
       "types": "./dist/agent-enrollment/index.d.ts",
       "import": "./dist/agent-enrollment/index.js",
       "default": "./dist/agent-enrollment/index.js"
+    },
+    "./agent-enrollment/drizzle": {
+      "types": "./dist/agent-enrollment/drizzle.d.ts",
+      "import": "./dist/agent-enrollment/drizzle.js",
+      "default": "./dist/agent-enrollment/drizzle.js"
     },
     "./hosted-agent/application": {
       "types": "./dist/hosted-agent/application.d.ts",

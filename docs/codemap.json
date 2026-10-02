@@ -93,6 +93,46 @@
       ]
     },
     {
+      "id": "./agent-enrollment/drizzle",
+      "source": "src/agent-enrollment/drizzle.ts",
+      "dependsOn": [
+        "hosted-agent"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "AgentEnrollmentClaimTable",
+          "kind": "type",
+          "signature": "type AgentEnrollmentClaimTable",
+          "doc": "The claim and its write-once native target share one enrollment row."
+        },
+        {
+          "name": "AgentEnrollmentDatabase",
+          "kind": "type",
+          "signature": "type AgentEnrollmentDatabase",
+          "doc": null
+        },
+        {
+          "name": "AgentInstanceClaimTable",
+          "kind": "type",
+          "signature": "type AgentInstanceClaimTable",
+          "doc": "Required Drizzle column properties; SQL column names remain product-owned."
+        },
+        {
+          "name": "createDrizzleAgentEnrollmentStore",
+          "kind": "function",
+          "signature": "(options: CreateDrizzleAgentEnrollmentStoreOptions) => AgentEnrollmentStore",
+          "doc": "Create an owner-scoped Drizzle D1 store; SQL `enrollment_id` must be explicitly `NOT NULL`."
+        },
+        {
+          "name": "CreateDrizzleAgentEnrollmentStoreOptions",
+          "kind": "interface",
+          "signature": "interface CreateDrizzleAgentEnrollmentStoreOptions",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./alerting",
       "source": "src/alerting/index.ts",
       "dependsOn": [],
@@ -7221,6 +7261,125 @@
           "kind": "function",
           "signature": "(toolName: string) => ParsedIntegrationAction | undefined",
           "doc": "Resolve an MCP tool name (the opaque `int_…` catalog name the agent calls) into the dotted hub action path."
+        }
+      ]
+    },
+    {
+      "id": "./integrations-react",
+      "source": "src/integrations-react/index.ts",
+      "dependsOn": [
+        "platform",
+        "web-react"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "createHubIntegrationsClient",
+          "kind": "function",
+          "signature": "(request: HubSettingsRequestFn, basePath?: string) => HubIntegrationsClient",
+          "doc": "Finite browser transport for the server-owned `createHubSettingsRoutes` API."
+        },
+        {
+          "name": "HUB_CONNECT_CHANNEL",
+          "kind": "const",
+          "signature": "\"tangle:hub-connect\"",
+          "doc": null
+        },
+        {
+          "name": "HUB_CONNECT_FAILED_MESSAGE_TYPE",
+          "kind": "const",
+          "signature": "\"tangle:hub-connect-failed\"",
+          "doc": null
+        },
+        {
+          "name": "HUB_CONNECTED_MESSAGE_TYPE",
+          "kind": "const",
+          "signature": "\"tangle:hub-connected\"",
+          "doc": null
+        },
+        {
+          "name": "HubConnectCallbackPage",
+          "kind": "function",
+          "signature": "({ returnHref }: HubConnectCallbackPageProps) => Element",
+          "doc": "The callback only signals completion; the opener verifies fresh Hub state."
+        },
+        {
+          "name": "HubConnectCallbackPageProps",
+          "kind": "interface",
+          "signature": "interface HubConnectCallbackPageProps",
+          "doc": null
+        },
+        {
+          "name": "HubIntegrationCapabilities",
+          "kind": "type",
+          "signature": "type HubIntegrationCapabilities",
+          "doc": "Display hints only."
+        },
+        {
+          "name": "HubIntegrationCapability",
+          "kind": "type",
+          "signature": "type HubIntegrationCapability",
+          "doc": null
+        },
+        {
+          "name": "HubIntegrationsClient",
+          "kind": "interface",
+          "signature": "interface HubIntegrationsClient",
+          "doc": null
+        },
+        {
+          "name": "HubIntegrationsIdentity",
+          "kind": "interface",
+          "signature": "interface HubIntegrationsIdentity",
+          "doc": "The host must bind each request to this server-verified identity."
+        },
+        {
+          "name": "HubIntegrationsPanel",
+          "kind": "function",
+          "signature": "(props: HubIntegrationsPanelProps) => Element",
+          "doc": "Embeddable settings surface."
+        },
+        {
+          "name": "HubIntegrationsPanelProps",
+          "kind": "interface",
+          "signature": "interface HubIntegrationsPanelProps",
+          "doc": null
+        },
+        {
+          "name": "HubSettingsRequest",
+          "kind": "interface",
+          "signature": "interface HubSettingsRequest",
+          "doc": null
+        },
+        {
+          "name": "HubSettingsRequestFn",
+          "kind": "type",
+          "signature": "type HubSettingsRequestFn",
+          "doc": "The host supplies its authenticated fetch, CSRF protection and expected identity check."
+        },
+        {
+          "name": "HubWriteReceipt",
+          "kind": "interface",
+          "signature": "interface HubWriteReceipt",
+          "doc": null
+        },
+        {
+          "name": "POPUP_TIMEOUT_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": null
+        },
+        {
+          "name": "useHubIntegrations",
+          "kind": "function",
+          "signature": "({ identity, client, can, callbackPath, onUnsupportedConnect }: UseHubIntegrationsOptions) => { providers: AsyncResourc…",
+          "doc": "Identity-bound Hub settings controller; connection state is always server-read."
+        },
+        {
+          "name": "UseHubIntegrationsOptions",
+          "kind": "interface",
+          "signature": "interface UseHubIntegrationsOptions",
+          "doc": null
         }
       ]
     },
