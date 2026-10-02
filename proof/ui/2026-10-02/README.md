@@ -35,13 +35,15 @@ The embedded 480-pixel fixture uses a desktop viewport.
 The capture checks each narrow model trigger stays inside its composer.
 It also checks the settings occupy a separate row.
 
-## Companion engineering artifact
+## Published layout artifact
 
-The companion captures use sandbox-ui’s source-built `0.117.0` prerelease artifact.
-Its source revision is `e7f604fdf632deb41fcae0aefb019c8b3a4db06b`.
-Its SHA-256 is `cca53b9cd44846836d71b4800b39604807bc288220ba06197ede2c166d172c3a`.
-This artifact includes the maintained retention and floating-expander seams.
-It does not prove registry publication or the final dependency floor.
+The final captures replay App revision `97ef1cab` with published sandbox-ui `0.117.0`.
+Its release merge is `0c74ba79`.
+The downloaded npm tarball SHA-256 is `db1e46e0118ded843e7d44dfe88b000209c0d39441226bc83f48f43381a35826`.
+Its SHA-512 matches npm’s declared integrity.
+The runtime and declarations contain the retention and floating-expander seams.
+App’s dependency floor now requires this published layout line.
+These captures prove the compiled fixture interactions; they do not prove App publication or hosted product behavior.
 
 The file tree opens two fixture documents through actual accessible tree items.
 The viewer displays the selected document.

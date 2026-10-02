@@ -8,5 +8,13 @@
       "backend": "Storybook catalog/picker fixtures only; no generation or upload backend",
       "video": "studio-interaction-original.webm"
     }
-  ]
+  ],
+  "appSourceRevision": "97ef1cab",
+  "layoutArtifact": {
+    "version": "0.117.0",
+    "registryPublicationProved": true,
+    "sourceRevision": "0c74ba79",
+    "tarballSha256": "db1e46e0118ded843e7d44dfe88b000209c0d39441226bc83f48f43381a35826",
+    "integrity": "sha512-2zVfGsIgpiTeTq+ZBv4DKIu3gSjAornU4s5WKVkhiCARy+A+N0P4hN4DuNgRfKOLOeR9sS3qe09LfktyKaC/aA=="
+  }
 }
