@@ -188,6 +188,7 @@ export interface PopoverSurfaceProps {
   className?: string
   role?: string
   id?: string
+  'aria-label'?: string
   /** Make the panel at least as wide as its trigger. A portaled panel has no
    *  `w-full` to inherit — the trigger is no longer its offset parent — so a
    *  menu that used to stretch to a full-width trigger declares it here. */
@@ -222,6 +223,7 @@ export function PopoverSurface({
   className,
   role,
   id,
+  'aria-label': ariaLabel,
   matchTriggerWidth,
   children,
 }: PopoverSurfaceProps) {
@@ -276,7 +278,8 @@ export function PopoverSurface({
       return
     }
     place()
-  }, [open, place])
+  // Search, retry and catalogue updates can change height while already open.
+  }, [open, place, children])
 
   useEffect(() => {
     if (!open) return
@@ -301,6 +304,7 @@ export function PopoverSurface({
       ref={panelRef}
       id={id}
       role={role}
+      aria-label={ariaLabel}
       style={style}
       {...{ [POPOVER_SURFACE_ATTR]: path }}
       className={`z-[1000] ${className ?? ''}`}
@@ -442,13 +446,26 @@ export function usePending(): { pending: boolean; run: (action: () => void | Pro
 // ── ModelPicker ───────────────────────────────────────────────────────────
 
 export interface ModelPickerProps {
+  /** Controlled, opaque saved id. Never replaced merely because the catalogue omits it. */
   value: string
   onChange: (id: string) => void
   /** Catalogue models — from `GET`ing the app's catalogue route (see
    *  `runtime/model-catalog`), plus any product-specific entries appended. */
   models: CatalogModel[]
+  /** Host-owned request state. Loading takes precedence over error and results. */
   loading?: boolean
-  /** Render a provider logo/badge; default is a generic sparkle. */
+  /** Host-safe failure message. null/undefined means no failure; even '' is an error. */
+  error?: string | null
+  /** Ask the host to retry. The host owns fetching, loading, errors and cancellation. */
+  onRetry?: () => void
+  /** Disable the trigger and close an open picker; does not change the saved value. */
+  disabled?: boolean
+  /** Associations belong to the trigger button, not its surrounding div. */
+  id?: string
+  'aria-label'?: string
+  'aria-labelledby'?: string
+  'aria-describedby'?: string
+  /** Render a provider logo/badge; default is ProviderLogo. */
   renderProviderBadge?: (provider: string) => ReactNode
   /** Section label for `featured` models. */
   recommendedLabel?: string
@@ -507,21 +524,26 @@ function ModelRow({
     <button
       type="button"
       onClick={onSelect}
+      aria-pressed={selected}
+      title={`${model.name} (${model.id})`}
       className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
         selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
       }`}
     >
-      {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={16} />}
-      <span className="truncate">{model.name}</span>
-      {!model.supportsTools && (
-        <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-          no tools
-        </span>
-      )}
-      <span className="ml-auto flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-        {ctx && <span>{ctx}</span>}
-        {price && <span>{price}</span>}
+      <span className="shrink-0" aria-hidden>
+        {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={16} />}
       </span>
+      <span className="min-w-0 flex-1">
+        <span className="block break-words [overflow-wrap:anywhere]">{model.name}</span>
+        {(ctx || price || !model.supportsTools) && (
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-muted-foreground">
+            {!model.supportsTools && <span className="rounded bg-secondary px-1.5 py-0.5">no tools</span>}
+            {ctx && <span>{ctx}</span>}
+            {price && <span>{price}</span>}
+          </span>
+        )}
+      </span>
+      {selected && <CheckGlyph className="h-3.5 w-3.5 shrink-0 text-primary" />}
     </button>
   )
 }
@@ -531,36 +553,85 @@ function ModelRow({
  * when the catalog marks it as a current choice. The first view stays short;
  * search and the browse action retain every routeable legacy model.
  *
- * This is the CANONICAL ecosystem model picker (see "UI chrome ownership
- * (picker canon)" in AGENTS.md). sandbox-ui's `dashboard/ModelPicker` is
- * legacy — deprecated, frozen, removed at sandbox-ui's next major; new code
- * belongs here.
+ * This is the CANONICAL ecosystem model picker (see docs/ui-picker-canon.md).
+ * Catalogue requests, retry outcomes and persisted selections belong to the host.
+ * The non-modal dialog uses native buttons, not a partial combobox/listbox:
+ * Tab and Enter/Space work normally; arrow keys also move through its controls.
  */
-export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup, variant = 'chip', triggerContent }: ModelPickerProps) {
+export function ModelPicker({
+  value, onChange, models, loading = false, error, onRetry, disabled = false,
+  id, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy,
+  renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup,
+  variant = 'chip', triggerContent,
+}: ModelPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
-  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
+  const changeOpen = useCallback((next: boolean) => {
+    setOpen(next && !disabled)
+    if (!next) {
+      setQuery('')
+      setShowAll(false)
+    }
+  }, [disabled])
+  const expanded = open && !disabled
+  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(expanded, changeOpen)
   const inputRef = useRef<HTMLInputElement>(null)
   const panelId = useId()
+  const valueId = useId()
+  const unavailable = error != null
   const sortedModels = useMemo(() => sortModelsByFreshness(models), [models])
 
   useEffect(() => {
-    if (!open) return
+    if (disabled) changeOpen(false)
+  }, [disabled, changeOpen])
 
-    // PopoverSurface is portaled and its placement effect can commit a second
-    // render after the panel mounts. Focus once after that commit so the
-    // browser keeps the search field active instead of restoring focus to the
-    // trigger button. Guard the browser-only scheduler for SSR and test hosts.
+  useEffect(() => {
+    if (!expanded) return
+    // The portal's placement may commit a second render. Focus after that too.
     const focus = () => inputRef.current?.focus()
     focus()
     if (typeof requestAnimationFrame !== 'function') return
     const frame = requestAnimationFrame(focus)
     return () => cancelAnimationFrame(frame)
-  }, [open])
+  }, [expanded])
+
+  useEffect(() => {
+    const panel = panelRef.current
+    if (!expanded || !panel) return
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
+      const input = inputRef.current
+      if (!input || !panel) return
+      const controls: HTMLElement[] = [input, ...panel.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]
+      const index = controls.indexOf(document.activeElement as HTMLElement)
+      if (index < 0) return
+      if (event.key === 'Tab') {
+        // Portals are last in DOM order. Exit beside the trigger, not at the
+        // top of the page; Shift+Tab from search returns to the trigger itself.
+        if ((event.shiftKey && index === 0) || (!event.shiftKey && index === controls.length - 1)) {
+          changeOpen(false)
+          triggerRef.current?.focus()
+          if (event.shiftKey) event.preventDefault()
+        }
+        return
+      }
+      let next: number
+      if (event.key === 'ArrowDown') next = (index + 1) % controls.length
+      else if (event.key === 'ArrowUp') next = (index - 1 + controls.length) % controls.length
+      else if (event.key === 'Home' && index > 0) next = 1
+      else if (event.key === 'End' && index > 0) next = controls.length - 1
+      else return // Home/End in search remain text-editing keys.
+      event.preventDefault()
+      controls[next]?.focus()
+    }
+    panel.addEventListener('keydown', onKeyDown)
+    return () => panel.removeEventListener('keydown', onKeyDown)
+  }, [expanded, changeOpen, panelRef, triggerRef])
 
   const selected = sortedModels.find((m) => m.id === value)
-
+  const selectedLabel = selected?.name ?? value
+  const describeValue = triggerContent != null || Boolean(id || ariaLabel || ariaLabelledBy)
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return null
@@ -590,120 +661,142 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
     return { priority, recommended, currentSelection, byProvider }
   }, [sortedModels, priorityGroup, value])
 
-  const select = (id: string) => {
-    onChange(id)
-    setOpen(false)
-    setQuery('')
-    setShowAll(false)
+  const select = (modelId: string) => {
+    if (disabled || loading || unavailable) return
+    changeOpen(false)
+    triggerRef.current?.focus()
+    onChange(modelId)
   }
+  const row = (model: CatalogModel) => (
+    <ModelRow key={model.id} model={model} selected={model.id === value} onSelect={() => select(model.id)} renderProviderBadge={renderProviderBadge} />
+  )
 
   return (
-    <div ref={containerRef} className="relative inline-flex">
+    <div ref={containerRef} className="relative inline-flex min-w-0 max-w-full">
       <button
         type="button"
         {...triggerProps}
-        aria-controls={open ? panelId : undefined}
-        onClick={() => setOpen(!open)}
-        data-state={open ? 'open' : 'closed'}
-        className={
+        id={id}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={[ariaDescribedBy, describeValue && value ? valueId : undefined].filter(Boolean).join(' ') || undefined}
+        aria-haspopup="dialog"
+        aria-controls={expanded ? panelId : undefined}
+        onClick={() => changeOpen(!expanded)}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault()
+            changeOpen(true)
+          }
+        }}
+        title={selectedLabel || 'Select model'}
+        data-state={expanded ? 'open' : 'closed'}
+        className={`${
           variant === 'quiet'
-            ? quietPickerTriggerClass()
-            : 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent'
-        }
+            ? quietPickerTriggerClass({ interactive: !disabled })
+            : `inline-flex min-h-[36px] items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition ${disabled ? '' : 'hover:bg-accent'}`
+        } max-w-full disabled:cursor-not-allowed disabled:opacity-50`}
       >
         {triggerContent ?? <>
-          {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
-          <span className="max-w-[160px] truncate">{selected?.name ?? value}</span>
+          <span className="shrink-0" aria-hidden>
+            {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
+          </span>
+          <span className="max-w-[160px] truncate">{selectedLabel || 'Select model'}</span>
         </>}
-        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
+      {describeValue && value && <span id={valueId} className="sr-only">Selected model: {selectedLabel}</span>}
 
       <PopoverSurface
-        open={open}
+        open={expanded}
         id={panelId}
+        role="dialog"
+        aria-label="Choose a model"
         triggerRef={triggerRef}
         panelRef={panelRef}
-        className={`flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-card-edge bg-popover ${OVERLAY_SHADOW}`}
+        className={`flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-card-edge bg-popover text-foreground ${OVERLAY_SHADOW}`}
       >
-          <div className="shrink-0 border-b border-border px-3 py-2">
-            <div className="flex items-center gap-2 rounded-lg border border-strong bg-background px-3 py-2 focus-within:ring-2 focus-within:ring-ring">
-              <SearchGlyph className="h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search models..."
-                aria-label="Search all models"
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              />
+        <div className="shrink-0 border-b border-border px-3 py-2">
+          <div className="flex items-center gap-2 rounded-lg border border-strong bg-background px-3 py-2 focus-within:ring-2 focus-within:ring-ring">
+            <SearchGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search models..."
+              aria-label="Search all models"
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+        </div>
+        {/* min-h-0 lets results absorb the surface's viewport height limit. */}
+        <div className="max-h-[520px] min-h-0 overflow-y-auto p-1 pb-2">
+          {value && !selected && (
+            <div className="mx-2 mb-1 mt-2 rounded-lg bg-secondary px-3 py-2 text-sm">
+              <p className="text-xs font-medium text-muted-foreground">Saved model</p>
+              <p className="break-words [overflow-wrap:anywhere]">{value}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {loading || unavailable ? 'Your saved selection is unchanged.' : 'Not in this catalogue. Your saved selection is unchanged.'}
+              </p>
             </div>
-          </div>
-          {/* `min-h-0` is what lets the list absorb the surface's computed
-              max-height on a short viewport instead of overflowing the panel. */}
-          <div className="max-h-[520px] min-h-0 overflow-y-auto p-1 pb-2">
-            {loading && <div className="px-3 py-4 text-center text-sm text-muted-foreground">Loading models...</div>}
-            {!loading && filtered && (
-              <>
-                {filtered.length === 0 && (
-                  <div className="px-3 py-4 text-center text-sm text-muted-foreground">No models match your search</div>
-                )}
-                {filtered.map((m) => (
-                  <ModelRow key={m.id} model={m} selected={m.id === value} onSelect={() => select(m.id)} renderProviderBadge={renderProviderBadge} />
-                ))}
-              </>
-            )}
-            {!loading && !filtered && models.length === 0 && (
-              <div className="px-3 py-4 text-center text-sm text-muted-foreground">No models available</div>
-            )}
-            {!loading && !filtered && models.length > 0 && (
-              <>
-                {priorityGroup && sections.priority.length > 0 && (
-                  <>
-                    <SectionHeader>{priorityGroup.label}</SectionHeader>
-                    {sections.priority.map((m) => (
-                      <ModelRow key={m.id} model={m} selected={m.id === value} onSelect={() => select(m.id)} renderProviderBadge={renderProviderBadge} />
-                    ))}
-                  </>
-                )}
-                {sections.currentSelection && !showAll && (
-                  <>
-                    <SectionHeader>Selected model</SectionHeader>
-                    <ModelRow model={sections.currentSelection} selected onSelect={() => select(sections.currentSelection!.id)} renderProviderBadge={renderProviderBadge} />
-                  </>
-                )}
-                {sections.recommended.length > 0 && (
-                  <>
-                    <SectionHeader>{recommendedLabel}</SectionHeader>
-                    {sections.recommended.map((m) => (
-                      <ModelRow key={m.id} model={m} selected={m.id === value} onSelect={() => select(m.id)} renderProviderBadge={renderProviderBadge} />
-                    ))}
-                  </>
-                )}
-                {sections.recommended.length === 0 && sections.priority.length === 0 && !sections.currentSelection && (
-                  <div className="px-3 py-3 text-sm text-muted-foreground">Search or browse all models</div>
-                )}
-                {sections.byProvider.length > 0 && (
-                  <button
-                    type="button"
-                    aria-expanded={showAll}
-                    onClick={() => setShowAll(!showAll)}
-                    className={`mt-2 w-full rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground ${POPOVER_OPTION_FOCUS}`}
-                  >
-                    {showAll ? 'Hide older models' : 'Browse all models'}
-                  </button>
-                )}
-                {showAll && sections.byProvider.map((g) => (
-                  <div key={g.provider}>
-                    <SectionHeader>{g.provider}</SectionHeader>
-                    {g.items.map((m) => (
-                      <ModelRow key={m.id} model={m} selected={m.id === value} onSelect={() => select(m.id)} renderProviderBadge={renderProviderBadge} />
-                    ))}
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
+          )}
+          {loading ? (
+            <div role="status" className="px-3 py-4 text-center text-sm text-muted-foreground">Loading models...</div>
+          ) : unavailable ? (
+            <div className="px-3 py-4 text-sm">
+              <div role="alert">
+                <p className="font-medium">Model catalogue unavailable</p>
+                <p className="mt-1 break-words text-muted-foreground [overflow-wrap:anywhere]">{error || 'The catalogue could not be loaded.'}</p>
+              </div>
+              {onRetry && <button type="button" className={`mt-3 rounded-md border border-border bg-card px-3 py-2 font-medium hover:bg-accent ${POPOVER_OPTION_FOCUS}`}
+                onClick={() => {
+                  // Retry may remove this button synchronously. Keep focus on
+                  // the stable search input while the host updates its state.
+                  inputRef.current?.focus()
+                  onRetry()
+                }}>Retry</button>}
+            </div>
+          ) : models.length === 0 ? (
+            <div role="status" className="px-3 py-4 text-center text-sm text-muted-foreground">No models available</div>
+          ) : filtered ? (
+            <>
+              {filtered.length === 0 && <div role="status" className="px-3 py-4 text-center text-sm text-muted-foreground">No models match your search</div>}
+              {filtered.map(row)}
+            </>
+          ) : (
+            <>
+              {priorityGroup && sections.priority.length > 0 && <>
+                <SectionHeader>{priorityGroup.label}</SectionHeader>
+                {sections.priority.map(row)}
+              </>}
+              {sections.currentSelection && !showAll && <>
+                <SectionHeader>Selected model</SectionHeader>
+                {row(sections.currentSelection)}
+              </>}
+              {sections.recommended.length > 0 && <>
+                <SectionHeader>{recommendedLabel}</SectionHeader>
+                {sections.recommended.map(row)}
+              </>}
+              {sections.recommended.length === 0 && sections.priority.length === 0 && !sections.currentSelection && (
+                <div className="px-3 py-3 text-sm text-muted-foreground">Search or browse all models</div>
+              )}
+              {sections.byProvider.length > 0 && <button
+                type="button"
+                aria-expanded={showAll}
+                onClick={() => setShowAll(!showAll)}
+                className={`mt-2 w-full rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground ${POPOVER_OPTION_FOCUS}`}
+              >{showAll ? 'Hide older models' : 'Browse all models'}</button>}
+              {showAll && sections.byProvider.map((group) => (
+                <div key={group.provider}>
+                  <SectionHeader>{group.provider}</SectionHeader>
+                  {group.items.map(row)}
+                </div>
+              ))}
+            </>
+          )}
+        </div>
       </PopoverSurface>
     </div>
   )
@@ -930,7 +1023,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
           {selected ? selected.label : '—'}
         </span>
         {/* Quiet inherits the trigger's tone, so the meter is muted at rest
-            and lifts with the label on hover. */}
+            and lifts with the label on hover instead of staying at full foreground. */}
         {selected && isDeclared(selected.id) && (
           <EffortMeter
             fill={effortMeterFill(selected.id, levels)}
