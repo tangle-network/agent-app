@@ -145,7 +145,10 @@ describe('createAgentEnrollment', () => {
         profileVersion: options.profile.version, box: f.box,
         sessionId: () => 'thread-1-v1' } as never
     })
-    const client = { ...f.client, instances: { ...f.client.instances, ensure } }
+    const client = { ...f.client, instances: { ...f.client.instances, ensure,
+      get: vi.fn(async () => ({ key: f.request.instance.key, generation: 1,
+        sandboxId: 'sandbox-1', profileVersion: liveProfileVersion })),
+    } }
     const enrollment = createAgentEnrollment({
       authorize: async () => {}, client: () => client as never,
       store: {
@@ -162,7 +165,7 @@ describe('createAgentEnrollment', () => {
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
     expect(results.filter(result => result.status === 'rejected')).toHaveLength(1)
     expect(ensure).toHaveBeenCalledTimes(1)
-    expect(liveProfileVersion).toBe('v1')
+    expect(liveProfileVersion).toBe(claimed?.profileVersion)
   })
 
   it('accepts an identical retry when nested configuration keys use another insertion order', async () => {
