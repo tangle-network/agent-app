@@ -67,7 +67,7 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 `function` — General agents use the SDK's line attachment route.
 
 ```ts
-(options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: LineVoiceOptions | undefined) => Promis…
+(options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: any) => Promise<Line>; attachLine(conne…
 ```
 
 ### `DEFAULT_AGENT_HOME`

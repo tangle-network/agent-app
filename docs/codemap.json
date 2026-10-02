@@ -1274,7 +1274,7 @@
         {
           "name": "TangleKnot",
           "kind": "function",
-          "signature": "({ size, className }: { size?: number | undefined; className?: string | undefined; }) => Element",
+          "signature": "({ size, className, }: { size?: number | undefined; className?: string | undefined; }) => Element",
           "doc": null
         }
       ]
@@ -1601,26 +1601,26 @@
         },
         {
           "name": "Line",
-          "kind": "interface",
-          "signature": "interface Line",
+          "kind": "value",
+          "signature": "Line",
           "doc": null
         },
         {
           "name": "LineAttachment",
-          "kind": "interface",
-          "signature": "interface LineAttachment",
+          "kind": "value",
+          "signature": "LineAttachment",
           "doc": null
         },
         {
           "name": "LineFromConnectionInput",
-          "kind": "type",
-          "signature": "type LineFromConnectionInput",
-          "doc": "Input to `client.lines.fromConnection()`."
+          "kind": "value",
+          "signature": "LineFromConnectionInput",
+          "doc": null
         },
         {
           "name": "LineMessage",
-          "kind": "interface",
-          "signature": "interface LineMessage",
+          "kind": "value",
+          "signature": "LineMessage",
           "doc": null
         },
         {
@@ -1637,15 +1637,15 @@
         },
         {
           "name": "LineThread",
-          "kind": "interface",
-          "signature": "interface LineThread",
+          "kind": "value",
+          "signature": "LineThread",
           "doc": null
         },
         {
           "name": "LineTransport",
-          "kind": "type",
-          "signature": "type LineTransport",
-          "doc": "The transport a line carries."
+          "kind": "value",
+          "signature": "LineTransport",
+          "doc": null
         },
         {
           "name": "NUMBER_CHARGE_NOTICE",
@@ -1698,19 +1698,19 @@
         {
           "name": "useChannelConversation",
           "kind": "function",
-          "signature": "(lineId: string, threadId: string) => AsyncResourceState<LineMessage[]>",
+          "signature": "(lineId: string, threadId: string) => AsyncResourceState<unknown[]>",
           "doc": null
         },
         {
           "name": "useChannelConversations",
           "kind": "function",
-          "signature": "(lineId: string) => AsyncResourceState<LineThread[]>",
+          "signature": "(lineId: string) => AsyncResourceState<any>",
           "doc": null
         },
         {
           "name": "useChannels",
           "kind": "function",
-          "signature": "() => AsyncResourceState<Line[]>",
+          "signature": "() => AsyncResourceState<unknown>",
           "doc": null
         },
         {
@@ -3345,7 +3345,7 @@
         {
           "name": "createChatStore",
           "kind": "function",
-          "signature": "<TTables extends ChatTables>(db: ChatDatabase, tables: TTables) => ChatStore<TTables[\"threads\"][\"$inferSelect\"], TTable…",
+          "signature": "<TTables extends ChatTables>(db: any, tables: TTables) => ChatStore<TTables[\"threads\"][\"$inferSelect\"], TTables[\"messag…",
           "doc": "Create a chat store managing threads and messages based on the provided database and tables"
         },
         {
@@ -4498,8 +4498,8 @@
         },
         {
           "name": "DesignCanvasChromeLazy",
-          "kind": "function",
-          "signature": "LazyExoticComponent<({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange…",
+          "kind": "const",
+          "signature": "any",
           "doc": "Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail."
         },
         {
@@ -4516,8 +4516,8 @@
         },
         {
           "name": "DesignCanvasLazy",
-          "kind": "function",
-          "signature": "LazyExoticComponent<(props: DesignCanvasProps) => Element>",
+          "kind": "const",
+          "signature": "any",
           "doc": "Batteries-included editor: chrome + workspace on one shared stack."
         },
         {
@@ -4570,8 +4570,8 @@
         },
         {
           "name": "ElementNode",
-          "kind": "function",
-          "signature": "MemoExoticComponent<(props: ElementNodeProps) => Element | null>",
+          "kind": "const",
+          "signature": "any",
           "doc": "Memoized so a `stack.notify()` (fired ~120/s during a pan/marquee) that re-renders WorkspaceView does NOT re-render every element."
         },
         {
@@ -4684,8 +4684,8 @@
         },
         {
           "name": "IconButton",
-          "kind": "function",
-          "signature": "ForwardRefExoticComponent<IconButtonProps & RefAttributes<HTMLButtonElement>>",
+          "kind": "const",
+          "signature": "any",
           "doc": null
         },
         {
@@ -5572,8 +5572,8 @@
       "exports": [
         {
           "name": "DesignCanvasChromeLazy",
-          "kind": "function",
-          "signature": "LazyExoticComponent<({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange…",
+          "kind": "const",
+          "signature": "any",
           "doc": "Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail."
         },
         {
@@ -5584,8 +5584,8 @@
         },
         {
           "name": "DesignCanvasLazy",
-          "kind": "function",
-          "signature": "LazyExoticComponent<(props: DesignCanvasProps) => Element>",
+          "kind": "const",
+          "signature": "any",
           "doc": "Batteries-included editor: chrome + workspace on one shared stack."
         },
         {
@@ -5608,7 +5608,7 @@
         {
           "name": "createDesignCanvasTables",
           "kind": "function",
-          "signature": "(opts: CreateDesignCanvasTablesOptions) => { designDocuments: SQLiteTableWithColumns<{ name: \"design_document\"; schema:…",
+          "signature": "(opts: CreateDesignCanvasTablesOptions) => { designDocuments: any; designDecisions: any; designExports: any; }",
           "doc": "Build SQLite tables for design documents with workspace and user references"
         },
         {
@@ -6001,7 +6001,7 @@
           "name": "extractProducedState",
           "kind": "function",
           "signature": "(events: readonly RuntimeEventLike[]) => ProducedState",
-          "doc": "Normalize an emission-ordered stream into its latest observed produced state."
+          "doc": "Normalize a run's runtime event stream into `ProducedState`."
         },
         {
           "name": "GateFn",
@@ -6623,7 +6623,7 @@
         {
           "name": "createTangleAgent",
           "kind": "function",
-          "signature": "(options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: LineVoiceOptions | undefined) => Promis…",
+          "signature": "(options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: any) => Promise<Line>; attachLine(conne…",
           "doc": "General agents use the SDK's line attachment route."
         },
         {
@@ -7212,8 +7212,8 @@
       "exports": [
         {
           "name": "IntakeInterviewLazy",
-          "kind": "function",
-          "signature": "LazyExoticComponent<({ view: initialView, onAnswer, onComplete, onDone, onNotice, }: IntakeInterviewProps) => Element>",
+          "kind": "const",
+          "signature": "any",
           "doc": "Load IntakeInterview component lazily to optimize initial application rendering"
         },
         {
@@ -10965,7 +10965,7 @@
         {
           "name": "createRecordTable",
           "kind": "function",
-          "signature": "{ <TExtra extends RecordExtraColumns>(options: CreateRecordTableOptions & { extraColumns: TExtra; }): RecordTableWithEx…",
+          "signature": "{ <TExtra extends RecordExtraColumns>(options: CreateRecordTableOptions & { extraColumns: TExtra; }): any; (options: Cr…",
           "doc": "Build one record-entry table wired to the product's tables."
         },
         {
@@ -11055,7 +11055,7 @@
         {
           "name": "resolveAtomicStrategy",
           "kind": "function",
-          "signature": "(db: RecordDatabase) => RecordAtomicStrategy",
+          "signature": "(db: any) => RecordAtomicStrategy",
           "doc": "Pick the driver's atomic primitive."
         },
         {
@@ -11067,7 +11067,7 @@
         {
           "name": "toFoldable",
           "kind": "function",
-          "signature": "(row: { path: string; id: string; createdAt: number; seq: number; dimension: string; period: number; conflict: boolean;…",
+          "signature": "(row: any) => FoldableRecordEntry",
           "doc": "Project a stored row onto the slice the pure fold reads."
         },
         {
@@ -13883,8 +13883,8 @@
         },
         {
           "name": "SequenceTimelineEditorLazy",
-          "kind": "function",
-          "signature": "LazyExoticComponent<(props: TimelineEditorProps) => Element>",
+          "kind": "const",
+          "signature": "any",
           "doc": null
         },
         {
@@ -14195,7 +14195,7 @@
         {
           "name": "createSequenceTables",
           "kind": "function",
-          "signature": "(opts: CreateSequenceTablesOptions) => { sequences: SQLiteTableWithColumns<{ name: \"sequence\"; schema: undefined; colum…",
+          "signature": "(opts: CreateSequenceTablesOptions) => { sequences: any; sequenceTracks: any; sequenceClips: any; sequenceDecisions: an…",
           "doc": "Build SQLite sequence tables with defined columns and relationships based on provided options"
         },
         {
@@ -16482,7 +16482,7 @@
         {
           "name": "MediaViewerModal",
           "kind": "function",
-          "signature": "({ generation, onClose, actions, onRequestDelete, onSaved, }: MediaViewerModalProps) => Element | null",
+          "signature": "({ generation, onClose, actions, onRequestDelete, onSaved, }: MediaViewerModalProps) => any",
           "doc": null
         },
         {
@@ -16548,7 +16548,7 @@
         {
           "name": "StudioConfirmDialog",
           "kind": "function",
-          "signature": "({ open, count, onConfirm, onCancel, }: StudioConfirmDialogProps) => Element | null",
+          "signature": "({ open, count, onConfirm, onCancel, }: StudioConfirmDialogProps) => any",
           "doc": null
         },
         {
@@ -16572,7 +16572,7 @@
         {
           "name": "StudioHistoryScreen",
           "kind": "function",
-          "signature": "({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => Element",
+          "signature": "({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => JSX.Element",
           "doc": null
         },
         {
@@ -16602,7 +16602,7 @@
         {
           "name": "StudioPlaybackProvider",
           "kind": "function",
-          "signature": "(props: { children: ReactNode; createAudioElement?: (() => StudioAudioElementLike) | undefined; }) => Element",
+          "signature": "(props: { children: ReactNode; createAudioElement?: (() => StudioAudioElementLike) | undefined; }) => JSX.Element",
           "doc": null
         },
         {
@@ -16614,7 +16614,7 @@
         {
           "name": "StudioToastProvider",
           "kind": "function",
-          "signature": "({ children }: { children: ReactNode; }) => Element",
+          "signature": "({ children }: { children: ReactNode; }) => JSX.Element",
           "doc": null
         },
         {
@@ -16674,7 +16674,7 @@
         {
           "name": "VaultPathPopover",
           "kind": "function",
-          "signature": "({ open, triggerRef, panelRef, generations, onSubmit, onCancel, pending, }: VaultPathPopoverProps) => Element | null",
+          "signature": "({ open, triggerRef, panelRef, generations, onSubmit, onCancel, pending, }: VaultPathPopoverProps) => any",
           "doc": null
         },
         {
@@ -17047,8 +17047,8 @@
       "exports": [
         {
           "name": "InvitationsPanelLazy",
-          "kind": "function",
-          "signature": "LazyExoticComponent<({ invitations, currentRole, onInvite, onResend, onRevoke, onCopy, onNotice, }: InvitationsPanelPro…",
+          "kind": "const",
+          "signature": "any",
           "doc": "Load InvitationsPanel component lazily to optimize initial rendering performance"
         },
         {
@@ -17059,8 +17059,8 @@
         },
         {
           "name": "InviteAcceptPageLazy",
-          "kind": "function",
-          "signature": "LazyExoticComponent<({ details, onAccept, onNavigate, onResendVerification }: InviteAcceptPageProps) => Element>",
+          "kind": "const",
+          "signature": "any",
           "doc": "Load InviteAcceptPage component lazily for optimized code splitting and performance"
         },
         {
@@ -17071,8 +17071,8 @@
         },
         {
           "name": "MembersPanelLazy",
-          "kind": "function",
-          "signature": "LazyExoticComponent<({ members, currentRole, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPane…",
+          "kind": "const",
+          "signature": "any",
           "doc": "Load MembersPanel component lazily to optimize initial rendering performance"
         },
         {
@@ -17122,7 +17122,7 @@
         {
           "name": "createTeamTables",
           "kind": "function",
-          "signature": "(opts: CreateTeamTablesOptions) => { organizations: SQLiteTableWithColumns<{ name: \"organization\"; schema: undefined; c…",
+          "signature": "(opts: CreateTeamTablesOptions) => { organizations: any; organizationMembers: any; workspaceMembers: any; }",
           "doc": "Build SQLite tables for organizations and related team structures using provided options"
         },
         {
@@ -17140,7 +17140,7 @@
         {
           "name": "createWorkspaceInvitationTable",
           "kind": "function",
-          "signature": "(opts: CreateWorkspaceInvitationTableOptions) => { workspaceInvitations: SQLiteTableWithColumns<{ name: \"workspace_invi…",
+          "signature": "(opts: CreateWorkspaceInvitationTableOptions) => { workspaceInvitations: any; }",
           "doc": "Build a workspace invitation table with defined columns and foreign key constraints"
         },
         {
@@ -18341,6 +18341,7 @@
       "source": "src/turn-stream/index.ts",
       "dependsOn": [
         "chat-routes",
+        "crypto",
         "stream"
       ],
       "error": null,
@@ -18348,7 +18349,7 @@
         {
           "name": "acquireDurableTurnLock",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, input: AcquireDurableTurnLockInput) => Promise<TurnLockAcquireResult>",
+          "signature": "(namespace: TurnStreamNamespaceLike, input: AcquireDurableTurnLockInput, auth?: TurnStreamAuth | undefined) => Promise<…",
           "doc": "Acquire a durable turn lock in the specified namespace with given input parameters"
         },
         {
@@ -18370,33 +18371,21 @@
           "doc": "A responding marker older than this is treated as stale, so a dropped `end` broadcast can't leave a permanently-stuck \"responding\" dot."
         },
         {
-          "name": "appendSegmentEvent",
-          "kind": "function",
-          "signature": "(store: SegmentStore, executionId: string, incoming: TurnStreamEvent, maxEvents?: number) => TurnStreamEvent",
-          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — append a per-turn event to its execution's segment, assigning a monotonic `seq`."
-        },
-        {
           "name": "broadcastThreadCreated",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, workspaceId: string, thread: { threadId: string; title: string; }) => Promise<void>",
+          "signature": "(namespace: TurnStreamNamespaceLike, workspaceId: string, thread: { threadId: string; title: string; }, auth?: TurnStre…",
           "doc": "Per-workspace marker that a new thread was created, so an already-open history list prepends it without a reload."
-        },
-        {
-          "name": "broadcastTurnStreamEvent",
-          "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; executionId: string; event: { type…",
-          "doc": "DEPRECATED for sandbox-backed interactive turns (drive on the session-message lane + `SessionGatewayClient` instead) — fan a turn event out to the per-thread channel."
         },
         {
           "name": "broadcastWorkspaceActivity",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, workspaceId: string, threadId: string, phase: \"start\" | \"end\") => Promise<void>",
+          "signature": "(namespace: TurnStreamNamespaceLike, workspaceId: string, threadId: string, phase: \"start\" | \"end\", auth?: TurnStreamAu…",
           "doc": "Coarse per-workspace marker that a thread's turn started / ended — drives a sidebar \"agent responding\" indicator subscribed once per workspace."
         },
         {
           "name": "createDurableObjectTurnEventStore",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike) => TurnEventStore",
+          "signature": "(namespace: TurnStreamNamespaceLike, auth?: TurnStreamAuth | undefined) => TurnEventStore",
           "doc": "A {@link TurnEventStore} backed by {@link TurnStreamDO } storage — the production implementation of `createChatTurnRoutes`' `turnStore` seam for apps that don't run D1 for turn events (or want replay…"
         },
         {
@@ -18414,14 +18403,8 @@
         {
           "name": "createMemoryTurnStreamHarness",
           "kind": "function",
-          "signature": "(createInstance?: (state: TurnStreamDOState) => TurnStreamDO, _options?: TurnStreamDOOptions) => MemoryTurnStreamHarness",
-          "doc": "Build the harness."
-        },
-        {
-          "name": "createSegmentStore",
-          "kind": "function",
-          "signature": "() => SegmentStore",
-          "doc": "DEPRECATED (interactive sandbox-turn rebroadcast; the SDK's session gateway replaces it) — create a SegmentStore with initialized segments and no active execution ID."
+          "signature": "(createInstance?: (state: TurnStreamDOState, authSecret: string) => TurnStreamDO, options?: TurnStreamDOOptions & { aut…",
+          "doc": null
         },
         {
           "name": "createTurnLock",
@@ -18433,7 +18416,7 @@
           "name": "createTurnStreamUpgradeHandler",
           "kind": "function",
           "signature": "(options: CreateTurnStreamUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>",
-          "doc": "The worker-entry WebSocket forwarder."
+          "doc": "The worker-entry WebSocket forwarder — WORKSPACE channel only (the per-thread variant went with the deprecated rebroadcast lane; a thread's live turn replay is the sandbox session gateway's job)."
         },
         {
           "name": "CreateTurnStreamUpgradeHandlerOptions",
@@ -18454,22 +18437,16 @@
           "doc": "The interrupted/stale release fence."
         },
         {
-          "name": "isTerminalRunEvent",
-          "kind": "function",
-          "signature": "(type: string) => boolean",
-          "doc": "Terminal run markers: they close a turn segment and auto-release the channel's chat-turn lock for the segment's execution."
-        },
-        {
           "name": "MAX_RECENT_CREATED",
           "kind": "const",
           "signature": "50",
           "doc": "Recent `thread.created` markers kept for late-connecting sidebars."
         },
         {
-          "name": "MAX_SEGMENT_EVENTS",
+          "name": "MEMORY_TURN_STREAM_AUTH_SECRET",
           "kind": "const",
-          "signature": "2000",
-          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — per-turn replay window."
+          "signature": "\"test-turn-stream-harness-secret-0123456789ab\"",
+          "doc": "Default harness secret — long enough to satisfy the DO's minimum, fixed so tests are deterministic."
         },
         {
           "name": "MemoryTurnStreamChannel",
@@ -18490,10 +18467,16 @@
           "doc": "A test-side viewer socket: records frames sent by the DO and lets the test drive the `sync` handshake."
         },
         {
+          "name": "mintTurnStreamToken",
+          "kind": "function",
+          "signature": "(channelName: string, secret: string, now?: () => number, ttlMs?: number) => Promise<string>",
+          "doc": "`v1.<exp-ms-36>.<hmac-hex>` — the expiry is inside the signed payload so it cannot be extended by editing the token."
+        },
+        {
           "name": "pruneStaleThreads",
           "kind": "function",
           "signature": "(active: Map<string, number>, now: number, ttlMs: number) => string[]",
-          "doc": "Remove responding entries (threadId → startedAt) older than `ttlMs`, so a dropped `end` broadcast can't leave a permanently-stuck dot."
+          "doc": null
         },
         {
           "name": "reconcileStaleDurableTurnLock",
@@ -18510,13 +18493,13 @@
         {
           "name": "releaseDurableTurnLock",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput) => Promise<{ released: boolean; deferred?: boolean |…",
+          "signature": "(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput, auth?: TurnStreamAuth | undefined) => Promise<...>",
           "doc": "Release a durable turn lock and indicate if the release was successful or deferred"
         },
         {
           "name": "releaseInterruptedDurableTurnLock",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput) => Promise<boolean>",
+          "signature": "(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput, auth?: TurnStreamAuth | undefined)…",
           "doc": "Fenced out-of-band release — the DO refuses a successor lock (started after `interruptedAt`) and a turnId mismatch."
         },
         {
@@ -18526,22 +18509,10 @@
           "doc": "Define input parameters to release an interrupted durable turn lock in a workspace or thread"
         },
         {
-          "name": "replayActiveSegment",
-          "kind": "function",
-          "signature": "(store: SegmentStore, afterSeq: number) => TurnStreamEvent[]",
-          "doc": "DEPRECATED (interactive turn-rebroadcast buffer; the SDK replays losslessly on both lanes) — events of the active, non-terminal turn with `seq > afterSeq`, i.e."
-        },
-        {
           "name": "scopeIndexChannelKey",
           "kind": "function",
           "signature": "(scopeId: string) => string",
           "doc": "Generate a unique channel key string based on the provided scope identifier."
-        },
-        {
-          "name": "SegmentStore",
-          "kind": "interface",
-          "signature": "interface SegmentStore",
-          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — define a store managing segments and tracking the active execution identifier."
         },
         {
           "name": "threadChannelKey",
@@ -18566,6 +18537,18 @@
           "kind": "const",
           "signature": "{ readonly lock: \"chatTurnLock\"; readonly activeThreads: \"activeThreads\"; readonly turnStatus: \"turnStatus\"; readonly t…",
           "doc": "Storage keys inside a DO instance."
+        },
+        {
+          "name": "TURN_STREAM_TOKEN_HEADER",
+          "kind": "const",
+          "signature": "\"x-turn-stream-token\"",
+          "doc": "Request header the adapters attach (and the DO accepts)."
+        },
+        {
+          "name": "TURN_STREAM_TOKEN_TTL_MS",
+          "kind": "const",
+          "signature": "60000",
+          "doc": "Default capability lifetime."
         },
         {
           "name": "turnEventStorageKey",
@@ -18628,22 +18611,22 @@
           "doc": "Verdict shape of the vertical's `turnLock.acquire`."
         },
         {
-          "name": "TurnSegment",
-          "kind": "interface",
-          "signature": "interface TurnSegment",
-          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — represent a segment of a turn containing events, sequence limit, and terminal status."
-        },
-        {
           "name": "turnStorageChannelKey",
           "kind": "function",
           "signature": "(turnId: string) => string",
           "doc": "Generate a storage channel key string for a given turn identifier."
         },
         {
+          "name": "TurnStreamAuth",
+          "kind": "interface",
+          "signature": "interface TurnStreamAuth",
+          "doc": "The HMAC secret shared between this worker and its `TurnStreamDO` binding."
+        },
+        {
           "name": "TurnStreamDO",
           "kind": "class",
           "signature": "class TurnStreamDO",
-          "doc": "Manage per-turn segments and track active threads with durable event storage"
+          "doc": "Durable turn-event storage, workspace signals, and the single-flight turn lock, on one channel-bound Durable Object."
         },
         {
           "name": "TurnStreamDOOptions",
@@ -18692,6 +18675,12 @@
           "kind": "type",
           "signature": "type TurnStreamUpgradeAuthorization",
           "doc": "Represent success or failure of a TURN stream upgrade authorization with optional response data"
+        },
+        {
+          "name": "verifyTurnStreamToken",
+          "kind": "function",
+          "signature": "(channelName: string, token: string, secret: string, now?: () => number) => Promise<boolean>",
+          "doc": "Verify a token for `channelName`: constant-time MAC compare with the exact channel name embedded in the signed payload, plus freshness."
         },
         {
           "name": "workspaceChannelKey",
@@ -18781,8 +18770,8 @@
         },
         {
           "name": "VaultPane",
-          "kind": "function",
-          "signature": "ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>",
+          "kind": "const",
+          "signature": "any",
           "doc": "Browse and edit files in the available pane width."
         },
         {
@@ -18831,8 +18820,8 @@
         },
         {
           "name": "VaultPaneLazy",
-          "kind": "function",
-          "signature": "LazyExoticComponent<ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>>",
+          "kind": "const",
+          "signature": "any",
           "doc": "Resolve VaultPane component lazily to optimize loading and improve performance"
         },
         {
@@ -20711,7 +20700,7 @@
         {
           "name": "PopoverSurface",
           "kind": "function",
-          "signature": "({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…",
+          "signature": "({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => any",
           "doc": "The floating panel every canonical picker opens."
         },
         {
@@ -21377,7 +21366,7 @@
         {
           "name": "Sparkline",
           "kind": "function",
-          "signature": "({ values, label, format, width, height, emptyLabel, unavailableLabel, className, }: SparklineProps) => ReactElement<un…",
+          "signature": "({ values, label, format, width, height, emptyLabel, unavailableLabel, className, }: SparklineProps) => ReactElement",
           "doc": "The series glyph."
         },
         {
@@ -21623,7 +21612,7 @@
         {
           "name": "usePopover",
           "kind": "function",
-          "signature": "(open: boolean, setOpen: (open: boolean) => void) => { containerRef: RefObject<HTMLDivElement | null>; triggerRef: RefO…",
+          "signature": "(open: boolean, setOpen: (open: boolean) => void) => { containerRef: any; triggerRef: any; panelRef: any; triggerProps:…",
           "doc": "Keyboard + pointer model for a trigger-and-popover pair, dependency-free."
         },
         {
@@ -21925,7 +21914,7 @@
         {
           "name": "MutationStatus",
           "kind": "function",
-          "signature": "<T>({ state, labels, className }: MutationStatusProps<T>) => ReactElement<unknown, string | JSXElementConstructor<any>>…",
+          "signature": "<T>({ state, labels, className }: MutationStatusProps<T>) => any",
           "doc": "The write's own status line."
         },
         {
@@ -22913,8 +22902,8 @@
         },
         {
           "name": "AgentWorkspaceCompanion",
-          "kind": "function",
-          "signature": "ForwardRefExoticComponent<AgentWorkspaceCompanionProps & RefAttributes<AgentWorkspaceCompanionHandle>>",
+          "kind": "const",
+          "signature": "any",
           "doc": "Product-owned tools beside a conversation; omitted tools have no tabs or effects."
         },
         {

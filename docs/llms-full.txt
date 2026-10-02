@@ -1637,7 +1637,7 @@ interface LogoProps
 `function`
 
 ```ts
-({ size, className }: { size?: number | undefined; className?: string | undefined; }) => Element
+({ size, className, }: { size?: number | undefined; className?: string | undefined; }) => Element
 ```
 
 
@@ -2049,34 +2049,34 @@ interface HubNumberReadiness
 
 ### `Line`
 
-`interface`
+`value`
 
 ```ts
-interface Line
+Line
 ```
 
 ### `LineAttachment`
 
-`interface`
+`value`
 
 ```ts
-interface LineAttachment
+LineAttachment
 ```
 
 ### `LineFromConnectionInput`
 
-`type` — Input to `client.lines.fromConnection()`.
+`value`
 
 ```ts
-type LineFromConnectionInput
+LineFromConnectionInput
 ```
 
 ### `LineMessage`
 
-`interface`
+`value`
 
 ```ts
-interface LineMessage
+LineMessage
 ```
 
 ### `LinePayment`
@@ -2097,18 +2097,18 @@ interface LinePayment
 
 ### `LineThread`
 
-`interface`
+`value`
 
 ```ts
-interface LineThread
+LineThread
 ```
 
 ### `LineTransport`
 
-`type` — The transport a line carries.
+`value`
 
 ```ts
-type LineTransport
+LineTransport
 ```
 
 ### `NUMBER_CHARGE_NOTICE`
@@ -2180,7 +2180,7 @@ type LineTransport
 `function`
 
 ```ts
-(lineId: string, threadId: string) => AsyncResourceState<LineMessage[]>
+(lineId: string, threadId: string) => AsyncResourceState<unknown[]>
 ```
 
 ### `useChannelConversations`
@@ -2188,7 +2188,7 @@ type LineTransport
 `function`
 
 ```ts
-(lineId: string) => AsyncResourceState<LineThread[]>
+(lineId: string) => AsyncResourceState<any>
 ```
 
 ### `useChannels`
@@ -2196,7 +2196,7 @@ type LineTransport
 `function`
 
 ```ts
-() => AsyncResourceState<Line[]>
+() => AsyncResourceState<unknown>
 ```
 
 ### `useChannelsClient`
@@ -4331,7 +4331,7 @@ type ChatWorkProductPart
 `function` — Create a chat store managing threads and messages based on the provided database and tables
 
 ```ts
-<TTables extends ChatTables>(db: ChatDatabase, tables: TTables) => ChatStore<TTables["threads"]["$inferSelect"], TTable…
+<TTables extends ChatTables>(db: any, tables: TTables) => ChatStore<TTables["threads"]["$inferSelect"], TTables["messag…
 ```
 
 ### `createChatTables`
@@ -5828,10 +5828,10 @@ interface DeletePageInput
 
 ### `DesignCanvasChromeLazy`
 
-`function` — Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail.
+`const` — Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail.
 
 ```ts
-LazyExoticComponent<({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange…
+any
 ```
 
 ### `DesignCanvasEditor`
@@ -5852,10 +5852,10 @@ interface DesignCanvasFullProps
 
 ### `DesignCanvasLazy`
 
-`function` — Batteries-included editor: chrome + workspace on one shared stack.
+`const` — Batteries-included editor: chrome + workspace on one shared stack.
 
 ```ts
-LazyExoticComponent<(props: DesignCanvasProps) => Element>
+any
 ```
 
 ### `DesignCanvasMode`
@@ -5924,10 +5924,10 @@ interface EditorSceneState
 
 ### `ElementNode`
 
-`function` — Memoized so a `stack.notify()` (fired ~120/s during a pan/marquee) that re-renders WorkspaceView does NOT re-render every element.
+`const` — Memoized so a `stack.notify()` (fired ~120/s during a pan/marquee) that re-renders WorkspaceView does NOT re-render every element.
 
 ```ts
-MemoExoticComponent<(props: ElementNodeProps) => Element | null>
+any
 ```
 
 ### `ElementNodeProps`
@@ -6076,10 +6076,10 @@ interface GroupElementsInput
 
 ### `IconButton`
 
-`function`
+`const`
 
 ```ts
-ForwardRefExoticComponent<IconButtonProps & RefAttributes<HTMLButtonElement>>
+any
 ```
 
 ### `IconButtonProps`
@@ -7238,10 +7238,10 @@ Source: `src/design-canvas-react/lazy.tsx` · depends on `brand`, `design-canvas
 
 ### `DesignCanvasChromeLazy`
 
-`function` — Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail.
+`const` — Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail.
 
 ```ts
-LazyExoticComponent<({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange…
+any
 ```
 
 ### `DesignCanvasFullProps`
@@ -7254,10 +7254,10 @@ interface DesignCanvasFullProps
 
 ### `DesignCanvasLazy`
 
-`function` — Batteries-included editor: chrome + workspace on one shared stack.
+`const` — Batteries-included editor: chrome + workspace on one shared stack.
 
 ```ts
-LazyExoticComponent<(props: DesignCanvasProps) => Element>
+any
 ```
 
 ### `DesignCanvasProps`
@@ -7278,7 +7278,7 @@ Source: `src/design-canvas/drizzle.ts` · depends on `tools`, `web`
 `function` — Build SQLite tables for design documents with workspace and user references
 
 ```ts
-(opts: CreateDesignCanvasTablesOptions) => { designDocuments: SQLiteTableWithColumns<{ name: "design_document"; schema:…
+(opts: CreateDesignCanvasTablesOptions) => { designDocuments: any; designDecisions: any; designExports: any; }
 ```
 
 ### `CreateDesignCanvasTablesOptions`
@@ -7778,7 +7778,7 @@ interface CorrectnessChecker
 
 ### `extractProducedState`
 
-`function` — Normalize an emission-ordered stream into its latest observed produced state.
+`function` — Normalize a run's runtime event stream into `ProducedState`.
 
 ```ts
 (events: readonly RuntimeEventLike[]) => ProducedState
@@ -8585,7 +8585,7 @@ readonly ["bash", "glob", "grep", "task", "todowrite", "webfetch", "skill"]
 `function` — General agents use the SDK's line attachment route.
 
 ```ts
-(options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: LineVoiceOptions | undefined) => Promis…
+(options: TangleAgentOptions) => { attachExistingLine: (lineId: string, voice?: any) => Promise<Line>; attachLine(conne…
 ```
 
 ### `DEFAULT_AGENT_HOME`
@@ -9325,10 +9325,10 @@ Source: `src/intakes-react/lazy.tsx` · depends on `brand`, `intakes`
 
 ### `IntakeInterviewLazy`
 
-`function` — Load IntakeInterview component lazily to optimize initial application rendering
+`const` — Load IntakeInterview component lazily to optimize initial application rendering
 
 ```ts
-LazyExoticComponent<({ view: initialView, onAnswer, onComplete, onDone, onNotice, }: IntakeInterviewProps) => Element>
+any
 ```
 
 ### `IntakeInterviewProps`
@@ -14131,7 +14131,7 @@ interface CreateRecordStoreOptions
 `function` — Build one record-entry table wired to the product's tables.
 
 ```ts
-{ <TExtra extends RecordExtraColumns>(options: CreateRecordTableOptions & { extraColumns: TExtra; }): RecordTableWithEx…
+{ <TExtra extends RecordExtraColumns>(options: CreateRecordTableOptions & { extraColumns: TExtra; }): any; (options: Cr…
 ```
 
 ### `CreateRecordTableOptions`
@@ -14251,7 +14251,7 @@ type RecordTableWithExtras
 `function` — Pick the driver's atomic primitive.
 
 ```ts
-(db: RecordDatabase) => RecordAtomicStrategy
+(db: any) => RecordAtomicStrategy
 ```
 
 ### `ReviewRecordEntryInput`
@@ -14267,7 +14267,7 @@ interface ReviewRecordEntryInput
 `function` — Project a stored row onto the slice the pure fold reads.
 
 ```ts
-(row: { path: string; id: string; createdAt: number; seq: number; dimension: string; period: number; conflict: boolean;…
+(row: any) => FoldableRecordEntry
 ```
 
 ### `WriteRecordEntryInput`
@@ -17966,10 +17966,10 @@ number
 
 ### `SequenceTimelineEditorLazy`
 
-`function`
+`const`
 
 ```ts
-LazyExoticComponent<(props: TimelineEditorProps) => Element>
+any
 ```
 
 ### `setClipTextCommand`
@@ -18374,7 +18374,7 @@ interface CreateDrizzleSequenceStoreOptions
 `function` — Build SQLite sequence tables with defined columns and relationships based on provided options
 
 ```ts
-(opts: CreateSequenceTablesOptions) => { sequences: SQLiteTableWithColumns<{ name: "sequence"; schema: undefined; colum…
+(opts: CreateSequenceTablesOptions) => { sequences: any; sequenceTracks: any; sequenceClips: any; sequenceDecisions: an…
 ```
 
 ### `CreateSequenceTablesOptions`
@@ -21337,7 +21337,7 @@ interface MediaTypeSegment
 `function`
 
 ```ts
-({ generation, onClose, actions, onRequestDelete, onSaved, }: MediaViewerModalProps) => Element | null
+({ generation, onClose, actions, onRequestDelete, onSaved, }: MediaViewerModalProps) => any
 ```
 
 ### `MediaViewerModalProps`
@@ -21425,7 +21425,7 @@ interface StudioComposerProps
 `function`
 
 ```ts
-({ open, count, onConfirm, onCancel, }: StudioConfirmDialogProps) => Element | null
+({ open, count, onConfirm, onCancel, }: StudioConfirmDialogProps) => any
 ```
 
 ### `StudioConfirmDialogProps`
@@ -21457,7 +21457,7 @@ interface StudioGenerationScreenProps
 `function`
 
 ```ts
-({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => Element
+({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => JSX.Element
 ```
 
 ### `StudioHistoryScreenProps`
@@ -21497,7 +21497,7 @@ interface StudioPlayback
 `function`
 
 ```ts
-(props: { children: ReactNode; createAudioElement?: (() => StudioAudioElementLike) | undefined; }) => Element
+(props: { children: ReactNode; createAudioElement?: (() => StudioAudioElementLike) | undefined; }) => JSX.Element
 ```
 
 ### `StudioToastInput`
@@ -21513,7 +21513,7 @@ interface StudioToastInput
 `function`
 
 ```ts
-({ children }: { children: ReactNode; }) => Element
+({ children }: { children: ReactNode; }) => JSX.Element
 ```
 
 ### `useBatchNavigation`
@@ -21593,7 +21593,7 @@ interface UseGenerationHistoryOptions
 `function`
 
 ```ts
-({ open, triggerRef, panelRef, generations, onSubmit, onCancel, pending, }: VaultPathPopoverProps) => Element | null
+({ open, triggerRef, panelRef, generations, onSubmit, onCancel, pending, }: VaultPathPopoverProps) => any
 ```
 
 ### `VaultPathPopoverProps`
@@ -22058,10 +22058,10 @@ Source: `src/teams-react/lazy.tsx` · depends on `brand`, `teams`
 
 ### `InvitationsPanelLazy`
 
-`function` — Load InvitationsPanel component lazily to optimize initial rendering performance
+`const` — Load InvitationsPanel component lazily to optimize initial rendering performance
 
 ```ts
-LazyExoticComponent<({ invitations, currentRole, onInvite, onResend, onRevoke, onCopy, onNotice, }: InvitationsPanelPro…
+any
 ```
 
 ### `InvitationsPanelProps`
@@ -22074,10 +22074,10 @@ interface InvitationsPanelProps
 
 ### `InviteAcceptPageLazy`
 
-`function` — Load InviteAcceptPage component lazily for optimized code splitting and performance
+`const` — Load InviteAcceptPage component lazily for optimized code splitting and performance
 
 ```ts
-LazyExoticComponent<({ details, onAccept, onNavigate, onResendVerification }: InviteAcceptPageProps) => Element>
+any
 ```
 
 ### `InviteAcceptPageProps`
@@ -22090,10 +22090,10 @@ interface InviteAcceptPageProps
 
 ### `MembersPanelLazy`
 
-`function` — Load MembersPanel component lazily to optimize initial rendering performance
+`const` — Load MembersPanel component lazily to optimize initial rendering performance
 
 ```ts
-LazyExoticComponent<({ members, currentRole, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPane…
+any
 ```
 
 ### `MembersPanelProps`
@@ -22154,7 +22154,7 @@ interface CreatePersonalOrganizationOptions
 `function` — Build SQLite tables for organizations and related team structures using provided options
 
 ```ts
-(opts: CreateTeamTablesOptions) => { organizations: SQLiteTableWithColumns<{ name: "organization"; schema: undefined; c…
+(opts: CreateTeamTablesOptions) => { organizations: any; organizationMembers: any; workspaceMembers: any; }
 ```
 
 ### `CreateTeamTablesOptions`
@@ -22178,7 +22178,7 @@ interface CreateTeamTablesOptions
 `function` — Build a workspace invitation table with defined columns and foreign key constraints
 
 ```ts
-(opts: CreateWorkspaceInvitationTableOptions) => { workspaceInvitations: SQLiteTableWithColumns<{ name: "workspace_invi…
+(opts: CreateWorkspaceInvitationTableOptions) => { workspaceInvitations: any; }
 ```
 
 ### `CreateWorkspaceInvitationTableOptions`
@@ -23699,14 +23699,14 @@ interface UnansweredThread
 
 ## `./turn-stream`
 
-Source: `src/turn-stream/index.ts` · depends on `chat-routes`, `stream`
+Source: `src/turn-stream/index.ts` · depends on `chat-routes`, `crypto`, `stream`
 
 ### `acquireDurableTurnLock`
 
 `function` — Acquire a durable turn lock in the specified namespace with given input parameters
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: AcquireDurableTurnLockInput) => Promise<TurnLockAcquireResult>
+(namespace: TurnStreamNamespaceLike, input: AcquireDurableTurnLockInput, auth?: TurnStreamAuth | undefined) => Promise<…
 ```
 
 ### `AcquireDurableTurnLockInput`
@@ -23733,28 +23733,12 @@ interface AcquireDurableTurnLockInput
 number
 ```
 
-### `appendSegmentEvent`
-
-`function` — DEPRECATED (interactive turn-rebroadcast buffer) — append a per-turn event to its execution's segment, assigning a monotonic `seq`.
-
-```ts
-(store: SegmentStore, executionId: string, incoming: TurnStreamEvent, maxEvents?: number) => TurnStreamEvent
-```
-
 ### `broadcastThreadCreated`
 
 `function` — Per-workspace marker that a new thread was created, so an already-open history list prepends it without a reload.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, workspaceId: string, thread: { threadId: string; title: string; }) => Promise<void>
-```
-
-### `broadcastTurnStreamEvent`
-
-`function` — DEPRECATED for sandbox-backed interactive turns (drive on the session-message lane + `SessionGatewayClient` instead) — fan a turn event out to the per-thread channel.
-
-```ts
-(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; executionId: string; event: { type…
+(namespace: TurnStreamNamespaceLike, workspaceId: string, thread: { threadId: string; title: string; }, auth?: TurnStre…
 ```
 
 ### `broadcastWorkspaceActivity`
@@ -23762,7 +23746,7 @@ number
 `function` — Coarse per-workspace marker that a thread's turn started / ended — drives a sidebar "agent responding" indicator subscribed once per workspace.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, workspaceId: string, threadId: string, phase: "start" | "end") => Promise<void>
+(namespace: TurnStreamNamespaceLike, workspaceId: string, threadId: string, phase: "start" | "end", auth?: TurnStreamAu…
 ```
 
 ### `createDurableObjectTurnEventStore`
@@ -23770,7 +23754,7 @@ number
 `function` — A {@link TurnEventStore} backed by {@link TurnStreamDO } storage — the production implementation of `createChatTurnRoutes`' `turnStore` seam for apps that don't run D1 for turn events (or want replay…
 
 ```ts
-(namespace: TurnStreamNamespaceLike) => TurnEventStore
+(namespace: TurnStreamNamespaceLike, auth?: TurnStreamAuth | undefined) => TurnEventStore
 ```
 
 ### `createDurableTurnLock`
@@ -23791,18 +23775,10 @@ interface CreateDurableTurnLockOptions
 
 ### `createMemoryTurnStreamHarness`
 
-`function` — Build the harness.
+`function`
 
 ```ts
-(createInstance?: (state: TurnStreamDOState) => TurnStreamDO, _options?: TurnStreamDOOptions) => MemoryTurnStreamHarness
-```
-
-### `createSegmentStore`
-
-`function` — DEPRECATED (interactive sandbox-turn rebroadcast; the SDK's session gateway replaces it) — create a SegmentStore with initialized segments and no active execution ID.
-
-```ts
-() => SegmentStore
+(createInstance?: (state: TurnStreamDOState, authSecret: string) => TurnStreamDO, options?: TurnStreamDOOptions & { aut…
 ```
 
 ### `createTurnLock`
@@ -23815,7 +23791,7 @@ interface CreateDurableTurnLockOptions
 
 ### `createTurnStreamUpgradeHandler`
 
-`function` — The worker-entry WebSocket forwarder.
+`function` — The worker-entry WebSocket forwarder — WORKSPACE channel only (the per-thread variant went with the deprecated rebroadcast lane; a thread's live turn replay is the sandbox session gateway's job).
 
 ```ts
 (options: CreateTurnStreamUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>
@@ -23845,14 +23821,6 @@ interface DurableTurnLock
 (active: DurableTurnLock, input: { threadId: string; interruptedAt: number; turnId?: string | undefined; }) => boolean
 ```
 
-### `isTerminalRunEvent`
-
-`function` — Terminal run markers: they close a turn segment and auto-release the channel's chat-turn lock for the segment's execution.
-
-```ts
-(type: string) => boolean
-```
-
 ### `MAX_RECENT_CREATED`
 
 `const` — Recent `thread.created` markers kept for late-connecting sidebars.
@@ -23861,12 +23829,12 @@ interface DurableTurnLock
 50
 ```
 
-### `MAX_SEGMENT_EVENTS`
+### `MEMORY_TURN_STREAM_AUTH_SECRET`
 
-`const` — DEPRECATED (interactive turn-rebroadcast buffer) — per-turn replay window.
+`const` — Default harness secret — long enough to satisfy the DO's minimum, fixed so tests are deterministic.
 
 ```ts
-2000
+"test-turn-stream-harness-secret-0123456789ab"
 ```
 
 ### `MemoryTurnStreamChannel`
@@ -23893,9 +23861,17 @@ interface MemoryTurnStreamHarness
 interface MemoryTurnStreamSocket
 ```
 
+### `mintTurnStreamToken`
+
+`function` — `v1.<exp-ms-36>.<hmac-hex>` — the expiry is inside the signed payload so it cannot be extended by editing the token.
+
+```ts
+(channelName: string, secret: string, now?: () => number, ttlMs?: number) => Promise<string>
+```
+
 ### `pruneStaleThreads`
 
-`function` — Remove responding entries (threadId → startedAt) older than `ttlMs`, so a dropped `end` broadcast can't leave a permanently-stuck dot.
+`function`
 
 ```ts
 (active: Map<string, number>, now: number, ttlMs: number) => string[]
@@ -23922,7 +23898,7 @@ interface ReconcileStaleDurableTurnLockOptions
 `function` — Release a durable turn lock and indicate if the release was successful or deferred
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput) => Promise<{ released: boolean; deferred?: boolean |…
+(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput, auth?: TurnStreamAuth | undefined) => Promise<...>
 ```
 
 ### `releaseInterruptedDurableTurnLock`
@@ -23930,7 +23906,7 @@ interface ReconcileStaleDurableTurnLockOptions
 `function` — Fenced out-of-band release — the DO refuses a successor lock (started after `interruptedAt`) and a turnId mismatch.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput) => Promise<boolean>
+(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput, auth?: TurnStreamAuth | undefined)…
 ```
 
 ### `ReleaseInterruptedDurableTurnLockInput`
@@ -23941,28 +23917,12 @@ interface ReconcileStaleDurableTurnLockOptions
 interface ReleaseInterruptedDurableTurnLockInput
 ```
 
-### `replayActiveSegment`
-
-`function` — DEPRECATED (interactive turn-rebroadcast buffer; the SDK replays losslessly on both lanes) — events of the active, non-terminal turn with `seq > afterSeq`, i.e.
-
-```ts
-(store: SegmentStore, afterSeq: number) => TurnStreamEvent[]
-```
-
 ### `scopeIndexChannelKey`
 
 `function` — Generate a unique channel key string based on the provided scope identifier.
 
 ```ts
 (scopeId: string) => string
-```
-
-### `SegmentStore`
-
-`interface` — DEPRECATED (interactive turn-rebroadcast buffer) — define a store managing segments and tracking the active execution identifier.
-
-```ts
-interface SegmentStore
 ```
 
 ### `threadChannelKey`
@@ -23995,6 +23955,22 @@ number
 
 ```ts
 { readonly lock: "chatTurnLock"; readonly activeThreads: "activeThreads"; readonly turnStatus: "turnStatus"; readonly t…
+```
+
+### `TURN_STREAM_TOKEN_HEADER`
+
+`const` — Request header the adapters attach (and the DO accepts).
+
+```ts
+"x-turn-stream-token"
+```
+
+### `TURN_STREAM_TOKEN_TTL_MS`
+
+`const` — Default capability lifetime.
+
+```ts
+60000
 ```
 
 ### `turnEventStorageKey`
@@ -24077,14 +24053,6 @@ interface TurnLockSeamArgs
 type TurnLockSeamResult
 ```
 
-### `TurnSegment`
-
-`interface` — DEPRECATED (interactive turn-rebroadcast buffer) — represent a segment of a turn containing events, sequence limit, and terminal status.
-
-```ts
-interface TurnSegment
-```
-
 ### `turnStorageChannelKey`
 
 `function` — Generate a storage channel key string for a given turn identifier.
@@ -24093,9 +24061,17 @@ interface TurnSegment
 (turnId: string) => string
 ```
 
+### `TurnStreamAuth`
+
+`interface` — The HMAC secret shared between this worker and its `TurnStreamDO` binding.
+
+```ts
+interface TurnStreamAuth
+```
+
 ### `TurnStreamDO`
 
-`class` — Manage per-turn segments and track active threads with durable event storage
+`class` — Durable turn-event storage, workspace signals, and the single-flight turn lock, on one channel-bound Durable Object.
 
 ```ts
 class TurnStreamDO
@@ -24163,6 +24139,14 @@ interface TurnStreamStubLike
 
 ```ts
 type TurnStreamUpgradeAuthorization
+```
+
+### `verifyTurnStreamToken`
+
+`function` — Verify a token for `channelName`: constant-time MAC compare with the exact channel name embedded in the signed payload, plus freshness.
+
+```ts
+(channelName: string, token: string, secret: string, now?: () => number) => Promise<boolean>
 ```
 
 ### `workspaceChannelKey`
@@ -24276,10 +24260,10 @@ type VaultOperationPhase
 
 ### `VaultPane`
 
-`function` — Browse and edit files in the available pane width.
+`const` — Browse and edit files in the available pane width.
 
 ```ts
-ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>
+any
 ```
 
 ### `VaultPaneHandle`
@@ -24337,10 +24321,10 @@ interface VaultPaneHandle
 
 ### `VaultPaneLazy`
 
-`function` — Resolve VaultPane component lazily to optimize loading and improve performance
+`const` — Resolve VaultPane component lazily to optimize loading and improve performance
 
 ```ts
-LazyExoticComponent<ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>>
+any
 ```
 
 ### `VaultPaneProps`
@@ -26811,7 +26795,7 @@ type PickerVariant
 `function` — The floating panel every canonical picker opens.
 
 ```ts
-({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…
+({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => any
 ```
 
 ### `PopoverSurfaceProps`
@@ -27699,7 +27683,7 @@ interface SmoothRevealOptions
 `function` — The series glyph.
 
 ```ts
-({ values, label, format, width, height, emptyLabel, unavailableLabel, className, }: SparklineProps) => ReactElement<un…
+({ values, label, format, width, height, emptyLabel, unavailableLabel, className, }: SparklineProps) => ReactElement
 ```
 
 ### `SparklineDirection`
@@ -28027,7 +28011,7 @@ interface UseInfiniteScrollOptions
 `function` — Keyboard + pointer model for a trigger-and-popover pair, dependency-free.
 
 ```ts
-(open: boolean, setOpen: (open: boolean) => void) => { containerRef: RefObject<HTMLDivElement | null>; triggerRef: RefO…
+(open: boolean, setOpen: (open: boolean) => void) => { containerRef: any; triggerRef: any; panelRef: any; triggerProps:…
 ```
 
 ### `useSandboxTerminalConnection`
@@ -28424,7 +28408,7 @@ type MutationState
 `function` — The write's own status line.
 
 ```ts
-<T>({ state, labels, className }: MutationStatusProps<T>) => ReactElement<unknown, string | JSXElementConstructor<any>>…
+<T>({ state, labels, className }: MutationStatusProps<T>) => any
 ```
 
 ### `MutationStatusLabels`
@@ -29659,10 +29643,10 @@ interface AgentWorkspaceAppsConfig
 
 ### `AgentWorkspaceCompanion`
 
-`function` — Product-owned tools beside a conversation; omitted tools have no tabs or effects.
+`const` — Product-owned tools beside a conversation; omitted tools have no tabs or effects.
 
 ```ts
-ForwardRefExoticComponent<AgentWorkspaceCompanionProps & RefAttributes<AgentWorkspaceCompanionHandle>>
+any
 ```
 
 ### `AgentWorkspaceCompanionHandle`

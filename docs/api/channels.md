@@ -168,34 +168,34 @@ interface HubNumberReadiness
 
 ### `Line`
 
-`interface`
+`value`
 
 ```ts
-interface Line
+Line
 ```
 
 ### `LineAttachment`
 
-`interface`
+`value`
 
 ```ts
-interface LineAttachment
+LineAttachment
 ```
 
 ### `LineFromConnectionInput`
 
-`type` — Input to `client.lines.fromConnection()`.
+`value`
 
 ```ts
-type LineFromConnectionInput
+LineFromConnectionInput
 ```
 
 ### `LineMessage`
 
-`interface`
+`value`
 
 ```ts
-interface LineMessage
+LineMessage
 ```
 
 ### `LinePayment`
@@ -216,18 +216,18 @@ interface LinePayment
 
 ### `LineThread`
 
-`interface`
+`value`
 
 ```ts
-interface LineThread
+LineThread
 ```
 
 ### `LineTransport`
 
-`type` — The transport a line carries.
+`value`
 
 ```ts
-type LineTransport
+LineTransport
 ```
 
 ### `NUMBER_CHARGE_NOTICE`
@@ -299,7 +299,7 @@ type LineTransport
 `function`
 
 ```ts
-(lineId: string, threadId: string) => AsyncResourceState<LineMessage[]>
+(lineId: string, threadId: string) => AsyncResourceState<unknown[]>
 ```
 
 ### `useChannelConversations`
@@ -307,7 +307,7 @@ type LineTransport
 `function`
 
 ```ts
-(lineId: string) => AsyncResourceState<LineThread[]>
+(lineId: string) => AsyncResourceState<any>
 ```
 
 ### `useChannels`
@@ -315,7 +315,7 @@ type LineTransport
 `function`
 
 ```ts
-() => AsyncResourceState<Line[]>
+() => AsyncResourceState<unknown>
 ```
 
 ### `useChannelsClient`

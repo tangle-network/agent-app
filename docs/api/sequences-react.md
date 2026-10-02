@@ -488,10 +488,10 @@ number
 
 ### `SequenceTimelineEditorLazy`
 
-`function`
+`const`
 
 ```ts
-LazyExoticComponent<(props: TimelineEditorProps) => Element>
+any
 ```
 
 ### `setClipTextCommand`

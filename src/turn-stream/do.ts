@@ -4,11 +4,9 @@
  * decides which endpoints a given instance ever sees:
  *
  * - **thread channel** (`${workspaceId}:${threadId}`) — the thread-scope lock
- *   (KEPT), plus the live turn rebroadcast: WebSocket fanout and per-turn
- *   segments with `sync`/`afterSeq` reconnect replay. That rebroadcast is
- *   `@deprecated` for sandbox-backed interactive turns — the sandbox session
- *   gateway already does it, browser-direct, when the turn is driven on the
- *   message lane (`./core`'s header has the production measurement).
+ *   only. (The deprecated per-turn rebroadcast that also lived here was
+ *   REMOVED in 0.52.0 — the sandbox session gateway owns interactive-turn
+ *   replay; `./core`'s header has the production measurement.)
  * - **workspace channel** (`${workspaceId}`) — coarse sidebar signals
  *   (`thread.activity` responding set, durable across eviction;
  *   `thread.created` recent list) and the workspace-scope lock. KEPT: the
@@ -49,20 +47,17 @@ import { DEFAULT_RUNNING_TURN_LEASE_MS } from '../stream/turn-buffer'
 import {
   ACTIVITY_TTL_MS,
   MAX_RECENT_CREATED,
-  MAX_SEGMENT_EVENTS,
   TURN_LOCK_TTL_MS,
   TURN_STREAM_PATHS,
   TURN_STREAM_STORAGE_KEYS,
+  TURN_STREAM_TOKEN_HEADER,
   activeTurnLock,
-  appendSegmentEvent,
-  createSegmentStore,
   createTurnLock,
   interruptedReleaseApplies,
-  isTerminalRunEvent,
   pruneStaleThreads,
-  replayActiveSegment,
   turnEventStorageKey,
   turnLockMatchesRelease,
+  verifyTurnStreamToken,
   type DurableTurnLock,
   type TurnLockAcquireResult,
   type TurnLockScope,
@@ -95,6 +90,11 @@ export interface TurnStreamDOState {
   storage: TurnStreamStorage
   acceptWebSocket(ws: TurnStreamSocket): void
   getWebSockets(): TurnStreamSocket[]
+  /** The instance's named identity — Cloudflare's `DurableObjectState.id`
+   *  satisfies this structurally (`state.id.name` for `idFromName` bindings).
+   *  Capability tokens are bound to this name, so it must be present for the
+   *  DO to serve any request. */
+  id?: { name?: string | null }
 }
 
 interface SocketMeta {
@@ -142,22 +142,29 @@ const MAX_SCOPE_TURNS = 100
 export interface TurnStreamDOOptions {
   /** Override {@link TURN_LOCK_TTL_MS}. */
   lockTtlMs?: number
-  /** Override {@link MAX_SEGMENT_EVENTS}. */
-  maxSegmentEvents?: number
   /** Override {@link ACTIVITY_TTL_MS}. */
   activityTtlMs?: number
   /** How long an unrenewed running turn remains discoverable. */
   runningTurnLeaseMs?: number
+  /**
+   * HMAC secret for the channel-bound capability tokens every request must
+   * carry (issue #746). When omitted, the DO reads `TURN_STREAM_AUTH_SECRET`
+   * from its `env`. Fail-closed: absent or shorter than 32 chars, every
+   * request answers 500 with the fix in the message — there is deliberately
+   * no unauthenticated mode.
+   */
+  authSecret?: string
 }
 
-/** Manage per-turn segments and track active threads with durable event storage */
+/** Durable turn-event storage, workspace signals, and the single-flight turn
+ *  lock, on one channel-bound Durable Object. Every request — including
+ *  subclass product routes — passes the capability-token gate in
+ *  {@link TurnStreamDO.fetch} (issue #746). */
 export class TurnStreamDO {
   protected readonly state: TurnStreamDOState
   protected readonly env: unknown
   protected readonly options: TurnStreamDOOptions
 
-  // Thread channel: per-turn segments; only the active one is replayed.
-  private segments = createSegmentStore()
   // Workspace channel: recent thread.created markers (in-memory, best-effort)
   // + durable responding set (threadId → startedAt) that survives eviction.
   private recentCreated: TurnStreamEvent[] = []
@@ -169,8 +176,50 @@ export class TurnStreamDO {
     this.options = options
   }
 
+  /** The token-verification secret: explicit option first, then the
+   *  `TURN_STREAM_AUTH_SECRET` env binding. Protected so a product subclass
+   *  with its own secret store overrides ONE method instead of copying the
+   *  resolution. */
+  protected resolveAuthSecret(): string | undefined {
+    const explicit = this.options.authSecret
+    if (explicit) return explicit
+    const fromEnv = (this.env as { TURN_STREAM_AUTH_SECRET?: unknown } | undefined)?.TURN_STREAM_AUTH_SECRET
+    return typeof fromEnv === 'string' && fromEnv ? fromEnv : undefined
+  }
+
+  /**
+   * The single authentication gate for EVERYTHING this DO serves — base
+   * endpoints, the WebSocket upgrade, and subclass product routes (they are
+   * dispatched from {@link fetch} after this check). A request must present a
+   * capability token minted for THIS instance's channel name: cross-channel
+   * replay is impossible, an unauthenticated forward gets 401, and a missing
+   * secret fails closed with a 500 that names the fix (issue #746).
+   */
+  private async authorizeRequest(request: Request, url: URL): Promise<Response | null> {
+    const name = this.state.id?.name
+    if (typeof name !== 'string' || !name) {
+      return Response.json(
+        { error: 'turn-stream DO has no channel name; bind with idFromName so capability tokens can be bound to it' },
+        { status: 500 },
+      )
+    }
+    const secret = this.resolveAuthSecret()
+    if (!secret || secret.length < 32) {
+      return Response.json(
+        { error: 'turn-stream DO requires authSecret (option or TURN_STREAM_AUTH_SECRET, >= 32 chars); refusing unauthenticated mode' },
+        { status: 500 },
+      )
+    }
+    const token = request.headers.get(TURN_STREAM_TOKEN_HEADER) ?? url.searchParams.get('token') ?? ''
+    if (await verifyTurnStreamToken(name, token, secret)) return null
+    return Response.json({ error: 'invalid or missing turn-stream capability token' }, { status: 401 })
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
+
+    const unauthorized = await this.authorizeRequest(request, url)
+    if (unauthorized) return unauthorized
 
     if (request.headers.get('Upgrade') === 'websocket') {
       return this.handleWebSocketUpgrade(request, url)
@@ -288,8 +337,12 @@ export class TurnStreamDO {
       return
     }
 
-    if (meta.scope === 'workspace') {
-      // Current responding state as synthetic `start` markers.
+    {
+      // Current responding state as synthetic `start` markers, then recently
+      // created threads for late joiners. (The thread-scope branch that used
+      // to replay the deprecated per-turn segment buffer is gone with it —
+      // every socket this base serves is a workspace-signal socket.)
+      void afterSeq
       const active = await this.loadActiveThreads()
       const removed = pruneStaleThreads(active, Date.now(), this.options.activityTtlMs ?? ACTIVITY_TTL_MS)
       if (removed.length > 0) await this.persistActiveThreads(active)
@@ -300,13 +353,7 @@ export class TurnStreamDO {
           timestamp: startedAt,
         })
       }
-      // Recently-created threads for late joiners.
       for (const event of this.recentCreated) this.trySend(ws, event)
-    } else {
-      // The active, non-terminal turn segment from the cursor.
-      for (const event of replayActiveSegment(this.segments, afterSeq)) {
-        this.trySend(ws, event)
-      }
     }
     for (const event of await this.productSyncEvents(meta.scope, { sessionId: meta.sessionId })) {
       this.trySend(ws, event)
@@ -335,13 +382,12 @@ export class TurnStreamDO {
     }
   }
 
-  // ── broadcast (live fanout + segments + activity) ─────────────────────────
+  // ── broadcast (live fanout + activity) ─────────────────────────────────────
 
   private async handleBroadcast(request: Request): Promise<Response> {
     const incoming = (await request.json()) as TurnStreamEvent
     const data = (incoming.data ?? {}) as Record<string, unknown>
     const sessionId = typeof data.sessionId === 'string' ? data.sessionId : undefined
-    let outgoing: TurnStreamEvent = incoming
 
     if (incoming.type === 'thread.activity') {
       const threadId = typeof data.threadId === 'string' ? data.threadId : undefined
@@ -356,34 +402,18 @@ export class TurnStreamDO {
       if (this.recentCreated.length > MAX_RECENT_CREATED) {
         this.recentCreated = this.recentCreated.slice(-MAX_RECENT_CREATED)
       }
-    } else if (typeof data.executionId === 'string') {
-      // Deprecated lane: per-turn rebroadcast. A product on the sandbox
-      // message lane stops sending these and the tab reads the gateway
-      // instead; the lock's cooperative release and the stale-lock
-      // reconciler then own release (this terminal auto-release is a
-      // convenience, not the only path out of a wedge).
-      outgoing = appendSegmentEvent(
-        this.segments,
-        data.executionId,
-        incoming,
-        this.options.maxSegmentEvents ?? MAX_SEGMENT_EVENTS,
-      )
-      // A finished turn frees the channel's single-flight lock without waiting
-      // for the worker's cooperative release — unless a product task defers it.
-      if (isTerminalRunEvent(incoming.type)) {
-        if (await this.shouldDeferLockRelease(data.executionId)) {
-          await this.deferLockRelease({ executionId: data.executionId })
-        } else {
-          await this.releaseActiveLock({ executionId: data.executionId })
-        }
-      }
     }
+    // (The per-turn rebroadcast lane that used to live here — segment
+    // buffering + terminal-event lock auto-release — was REMOVED with the
+    // deprecated segment store. Lock release is owned by the cooperative
+    // release and the stale-lock reconciler, which are the paths that
+    // actually free a wedged lane.)
 
     // Fan out to live sockets for this session. Enumerate accepted sockets so
     // fan-out is correct after WebSocket hibernation (no in-memory socket map).
     // Only `synced` sockets receive live frames; an un-synced socket is still
     // mid-handshake and will pick this event up in its `sync` replay snapshot.
-    const message = JSON.stringify(outgoing)
+    const message = JSON.stringify(incoming)
     for (const ws of this.state.getWebSockets()) {
       const meta = ws.deserializeAttachment() as SocketMeta | null
       if (!meta?.synced) continue

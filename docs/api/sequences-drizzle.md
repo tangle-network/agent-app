@@ -27,7 +27,7 @@ interface CreateDrizzleSequenceStoreOptions
 `function` — Build SQLite sequence tables with defined columns and relationships based on provided options
 
 ```ts
-(opts: CreateSequenceTablesOptions) => { sequences: SQLiteTableWithColumns<{ name: "sequence"; schema: undefined; colum…
+(opts: CreateSequenceTablesOptions) => { sequences: any; sequenceTracks: any; sequenceClips: any; sequenceDecisions: an…
 ```
 
 ### `CreateSequenceTablesOptions`

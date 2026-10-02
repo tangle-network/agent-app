@@ -88,7 +88,7 @@ interface CorrectnessChecker
 
 ### `extractProducedState`
 
-`function` — Normalize an emission-ordered stream into its latest observed produced state.
+`function` — Normalize a run's runtime event stream into `ProducedState`.
 
 ```ts
 (events: readonly RuntimeEventLike[]) => ProducedState

@@ -24,10 +24,10 @@ interface AgentWorkspaceAppsConfig
 
 ### `AgentWorkspaceCompanion`
 
-`function` — Product-owned tools beside a conversation; omitted tools have no tabs or effects.
+`const` — Product-owned tools beside a conversation; omitted tools have no tabs or effects.
 
 ```ts
-ForwardRefExoticComponent<AgentWorkspaceCompanionProps & RefAttributes<AgentWorkspaceCompanionHandle>>
+any
 ```
 
 ### `AgentWorkspaceCompanionHandle`

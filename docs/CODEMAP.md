@@ -102,7 +102,7 @@ _109 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./tools`](api/tools.md) | 66 | `crypto`, `eval`, `openui` |
 | [`./trace`](api/trace.md) | 33 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting` |
-| [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `stream` |
+| [`./turn-stream`](api/turn-stream.md) | 57 | `chat-routes`, `crypto`, `stream` |
 | [`./vault`](api/vault.md) | 18 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
@@ -984,11 +984,11 @@ Depends on: `alerting`
 
 ## `./turn-stream`
 
-Source: `src/turn-stream/index.ts` · 59 exports
+Source: `src/turn-stream/index.ts` · 57 exports
 
-Depends on: `chat-routes`, `stream`
+Depends on: `chat-routes`, `crypto`, `stream`
 
-`acquireDurableTurnLock`, `AcquireDurableTurnLockInput`, `activeTurnLock`, `ACTIVITY_TTL_MS`, `appendSegmentEvent`, `broadcastThreadCreated`, `broadcastTurnStreamEvent`, `broadcastWorkspaceActivity`, `createDurableObjectTurnEventStore`, `createDurableTurnLock`, `CreateDurableTurnLockOptions`, `createMemoryTurnStreamHarness`, `createSegmentStore`, `createTurnLock`, `createTurnStreamUpgradeHandler`, `CreateTurnStreamUpgradeHandlerOptions`, `DurableTurnLock`, `interruptedReleaseApplies`, `isTerminalRunEvent`, `MAX_RECENT_CREATED`, `MAX_SEGMENT_EVENTS`, `MemoryTurnStreamChannel`, `MemoryTurnStreamHarness`, `MemoryTurnStreamSocket`, `pruneStaleThreads`, `reconcileStaleDurableTurnLock`, `ReconcileStaleDurableTurnLockOptions`, `releaseDurableTurnLock`, `releaseInterruptedDurableTurnLock`, `ReleaseInterruptedDurableTurnLockInput`, `replayActiveSegment`, `scopeIndexChannelKey`, `SegmentStore`, `threadChannelKey`, `TURN_LOCK_TTL_MS`, `TURN_STREAM_PATHS`, `TURN_STREAM_STORAGE_KEYS`, `turnEventStorageKey`, `TurnLockAcquireInput`, `TurnLockAcquireResult`, `turnLockChannelKey`, `TurnLockInterruptedReleaseInput`, `turnLockMatchesRelease`, `TurnLockReleaseInput`, `TurnLockScope`, `TurnLockSeamArgs`, `TurnLockSeamResult`, `TurnSegment`, `turnStorageChannelKey`, `TurnStreamDO`, `TurnStreamDOOptions`, `TurnStreamDOState`, `TurnStreamEvent`, `TurnStreamNamespaceLike`, `TurnStreamSocket`, `TurnStreamStorage`, `TurnStreamStubLike`, `TurnStreamUpgradeAuthorization`, `workspaceChannelKey`
+`acquireDurableTurnLock`, `AcquireDurableTurnLockInput`, `activeTurnLock`, `ACTIVITY_TTL_MS`, `broadcastThreadCreated`, `broadcastWorkspaceActivity`, `createDurableObjectTurnEventStore`, `createDurableTurnLock`, `CreateDurableTurnLockOptions`, `createMemoryTurnStreamHarness`, `createTurnLock`, `createTurnStreamUpgradeHandler`, `CreateTurnStreamUpgradeHandlerOptions`, `DurableTurnLock`, `interruptedReleaseApplies`, `MAX_RECENT_CREATED`, `MEMORY_TURN_STREAM_AUTH_SECRET`, `MemoryTurnStreamChannel`, `MemoryTurnStreamHarness`, `MemoryTurnStreamSocket`, `mintTurnStreamToken`, `pruneStaleThreads`, `reconcileStaleDurableTurnLock`, `ReconcileStaleDurableTurnLockOptions`, `releaseDurableTurnLock`, `releaseInterruptedDurableTurnLock`, `ReleaseInterruptedDurableTurnLockInput`, `scopeIndexChannelKey`, `threadChannelKey`, `TURN_LOCK_TTL_MS`, `TURN_STREAM_PATHS`, `TURN_STREAM_STORAGE_KEYS`, `TURN_STREAM_TOKEN_HEADER`, `TURN_STREAM_TOKEN_TTL_MS`, `turnEventStorageKey`, `TurnLockAcquireInput`, `TurnLockAcquireResult`, `turnLockChannelKey`, `TurnLockInterruptedReleaseInput`, `turnLockMatchesRelease`, `TurnLockReleaseInput`, `TurnLockScope`, `TurnLockSeamArgs`, `TurnLockSeamResult`, `turnStorageChannelKey`, `TurnStreamAuth`, `TurnStreamDO`, `TurnStreamDOOptions`, `TurnStreamDOState`, `TurnStreamEvent`, `TurnStreamNamespaceLike`, `TurnStreamSocket`, `TurnStreamStorage`, `TurnStreamStubLike`, `TurnStreamUpgradeAuthorization`, `verifyTurnStreamToken`, `workspaceChannelKey`
 
 [Full API →](api/turn-stream.md)
 

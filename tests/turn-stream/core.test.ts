@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  ACTIVITY_TTL_MS,
   activeTurnLock,
-  appendSegmentEvent,
-  createSegmentStore,
   createTurnLock,
   interruptedReleaseApplies,
   pruneStaleThreads,
-  replayActiveSegment,
   scopeIndexChannelKey,
   threadChannelKey,
   turnEventStorageKey,
@@ -24,41 +22,10 @@ function event(type: string, data: unknown = {}): TurnStreamEvent {
 }
 
 describe('segment store', () => {
-  it('stamps a monotonic seq per execution and replays only after the cursor', () => {
-    const store = createSegmentStore()
-    appendSegmentEvent(store, 'exec-1', event('session.run.started'))
-    appendSegmentEvent(store, 'exec-1', event('text', { text: 'a' }))
-    const third = appendSegmentEvent(store, 'exec-1', event('text', { text: 'b' }))
-    expect(third.seq).toBe(3)
-
-    const replayed = replayActiveSegment(store, 1)
-    expect(replayed.map((e) => e.seq)).toEqual([2, 3])
-  })
-
-  it('a new turn evicts prior segments so a resumer replays only the active turn', () => {
-    const store = createSegmentStore()
-    appendSegmentEvent(store, 'exec-1', event('session.run.started'))
-    appendSegmentEvent(store, 'exec-1', event('text'))
-    appendSegmentEvent(store, 'exec-2', event('session.run.started'))
-    expect(store.segments.has('exec-1')).toBe(false)
-    expect(store.activeExecutionId).toBe('exec-2')
-  })
-
-  it('a terminal run event closes the segment: replay returns nothing', () => {
-    const store = createSegmentStore()
-    appendSegmentEvent(store, 'exec-1', event('session.run.started'))
-    appendSegmentEvent(store, 'exec-1', event('session.run.completed'))
-    expect(replayActiveSegment(store, 0)).toEqual([])
-  })
-
-  it('caps buffered events per segment, dropping the earliest', () => {
-    const store = createSegmentStore()
-    for (let i = 0; i < 5; i++) appendSegmentEvent(store, 'exec-1', event('text', { i }), 3)
-    const replayed = replayActiveSegment(store, 0)
-    expect(replayed).toHaveLength(3)
-    expect(replayed[0]!.seq).toBe(3)
-  })
-
+  
+  
+  
+  
   it('pruneStaleThreads removes only entries past the ttl', () => {
     const active = new Map([
       ['t1', 1000],

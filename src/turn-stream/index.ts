@@ -47,17 +47,18 @@
  *     by SDK contract. Autonomous stream/dispatch work a browser must tail
  *     still needs the durable rows.
  *
- * DEPRECATED — duplicates the SDK:
+ * REMOVED (0.52.0) — duplicated the SDK:
  *   • the interactive per-turn REBROADCAST/replay on the thread channel
- *     (`broadcastTurnStreamEvent` + the segment functions in `./core`).
- *     Sandbox products: drive on the message lane and attach the tab with
- *     `box.mintScopedToken({ scope: 'session' })` + `SessionGatewayClient`;
- *     resume a worker-side read with
- *     `box.streamPrompt('', { executionId, lastEventId })`, which replays
- *     strictly after the cursor without re-dispatching.
+ *     (`broadcastTurnStreamEvent` + the segment functions in `./core`) is
+ *     gone. Every product drives interactive turns on the session message
+ *     lane; a worker-side read resumes with
+ *     `box.streamPrompt('', { executionId, lastEventId })`.
  *
- * Nothing is removed: these are published exports and unknown consumers may
- * hold them. Removal is a major-version change.
+ * AUTH (issue #746): the DO now serves NOTHING without a channel-bound HMAC
+ * capability token. Workers mint via the adapters' `auth`
+ * (`env.TURN_STREAM_AUTH_SECRET`) and the upgrade forwarder's `authSecret`;
+ * the DO resolves the same secret from its env or options and FAILS CLOSED
+ * without it. There is no unauthenticated mode.
  */
 
 export * from './core'

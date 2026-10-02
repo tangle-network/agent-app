@@ -115,7 +115,7 @@ interface MediaTypeSegment
 `function`
 
 ```ts
-({ generation, onClose, actions, onRequestDelete, onSaved, }: MediaViewerModalProps) => Element | null
+({ generation, onClose, actions, onRequestDelete, onSaved, }: MediaViewerModalProps) => any
 ```
 
 ### `MediaViewerModalProps`
@@ -203,7 +203,7 @@ interface StudioComposerProps
 `function`
 
 ```ts
-({ open, count, onConfirm, onCancel, }: StudioConfirmDialogProps) => Element | null
+({ open, count, onConfirm, onCancel, }: StudioConfirmDialogProps) => any
 ```
 
 ### `StudioConfirmDialogProps`
@@ -235,7 +235,7 @@ interface StudioGenerationScreenProps
 `function`
 
 ```ts
-({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => Element
+({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => JSX.Element
 ```
 
 ### `StudioHistoryScreenProps`
@@ -275,7 +275,7 @@ interface StudioPlayback
 `function`
 
 ```ts
-(props: { children: ReactNode; createAudioElement?: (() => StudioAudioElementLike) | undefined; }) => Element
+(props: { children: ReactNode; createAudioElement?: (() => StudioAudioElementLike) | undefined; }) => JSX.Element
 ```
 
 ### `StudioToastInput`
@@ -291,7 +291,7 @@ interface StudioToastInput
 `function`
 
 ```ts
-({ children }: { children: ReactNode; }) => Element
+({ children }: { children: ReactNode; }) => JSX.Element
 ```
 
 ### `useBatchNavigation`
@@ -371,7 +371,7 @@ interface UseGenerationHistoryOptions
 `function`
 
 ```ts
-({ open, triggerRef, panelRef, generations, onSubmit, onCancel, pending, }: VaultPathPopoverProps) => Element | null
+({ open, triggerRef, panelRef, generations, onSubmit, onCancel, pending, }: VaultPathPopoverProps) => any
 ```
 
 ### `VaultPathPopoverProps`

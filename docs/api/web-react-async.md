@@ -203,7 +203,7 @@ type MutationState
 `function` — The write's own status line.
 
 ```ts
-<T>({ state, labels, className }: MutationStatusProps<T>) => ReactElement<unknown, string | JSXElementConstructor<any>>…
+<T>({ state, labels, className }: MutationStatusProps<T>) => any
 ```
 
 ### `MutationStatusLabels`

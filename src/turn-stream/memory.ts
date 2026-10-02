@@ -4,6 +4,13 @@
  * state. The adapters and the DO run their production code paths — only the
  * Cloudflare runtime (isolation, hibernation, real sockets) is simulated.
  *
+ * The harness runs the DO in its PRODUCTION auth mode: instances carry their
+ * channel name and a capability-token secret (a fixed default, overridable),
+ * so tests exercise the real gate — an adapter call without `auth` fails
+ * exactly like a misconfigured worker would. Test-side viewer sockets attach
+ * through `channel().connect()` (inside the DO, post-upgrade), which is the
+ * one hop that legitimately skips the HTTP gate.
+ *
  * For vitest composition tests and keyless local dev (the same role
  * `createMemoryTurnEventStore` plays for the D1 store). Not for production:
  * state is per-process and evaporates on restart.
@@ -65,10 +72,18 @@ interface MemoryInstance {
  * Build the harness. `createInstance` lets a product test run its own
  * `TurnStreamDO` subclass through the same wiring.
  */
+/** Default harness secret — long enough to satisfy the DO's minimum, fixed so
+ *  tests are deterministic. Products testing their own subclass pass their
+ *  own via `options.authSecret`. */
+export const MEMORY_TURN_STREAM_AUTH_SECRET = 'test-turn-stream-harness-secret-0123456789ab'
+
 export function createMemoryTurnStreamHarness(
-  createInstance: (state: TurnStreamDOState) => TurnStreamDO = (state) => new TurnStreamDO(state),
-  _options: TurnStreamDOOptions = {},
+  createInstance: (state: TurnStreamDOState, authSecret: string) => TurnStreamDO = (state, secret) =>
+    new TurnStreamDO(state, undefined, { authSecret: secret }),
+  options: TurnStreamDOOptions & { authSecret?: string } = {},
 ): MemoryTurnStreamHarness {
+  const authSecret = options.authSecret ?? MEMORY_TURN_STREAM_AUTH_SECRET
+  const createInst = (state: TurnStreamDOState) => createInstance(state, authSecret)
   const instances = new Map<string, MemoryInstance>()
 
   function ensure(name: string): MemoryInstance {
@@ -79,12 +94,14 @@ export function createMemoryTurnStreamHarness(
         storage: createMemoryStorage(),
         acceptWebSocket: (ws) => sockets.push(ws as MemoryTurnStreamSocket),
         getWebSockets: () => sockets.filter((ws) => !ws.closed),
+        id: { name },
       }
-      entry = { instance: createInstance(state), sockets }
+      entry = { instance: createInst(state), sockets }
       instances.set(name, entry)
     }
     return entry
   }
+
 
   const namespace: TurnStreamNamespaceLike = {
     idFromName: (name) => name,

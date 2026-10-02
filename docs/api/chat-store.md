@@ -315,7 +315,7 @@ type ChatWorkProductPart
 `function` — Create a chat store managing threads and messages based on the provided database and tables
 
 ```ts
-<TTables extends ChatTables>(db: ChatDatabase, tables: TTables) => ChatStore<TTables["threads"]["$inferSelect"], TTable…
+<TTables extends ChatTables>(db: any, tables: TTables) => ChatStore<TTables["threads"]["$inferSelect"], TTables["messag…
 ```
 
 ### `createChatTables`

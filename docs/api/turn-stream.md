@@ -4,14 +4,14 @@
 
 Source: `src/turn-stream/index.ts`
 
-59 exports.
+57 exports.
 
 ### `acquireDurableTurnLock`
 
 `function` — Acquire a durable turn lock in the specified namespace with given input parameters
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: AcquireDurableTurnLockInput) => Promise<TurnLockAcquireResult>
+(namespace: TurnStreamNamespaceLike, input: AcquireDurableTurnLockInput, auth?: TurnStreamAuth | undefined) => Promise<…
 ```
 
 ### `AcquireDurableTurnLockInput`
@@ -38,28 +38,12 @@ interface AcquireDurableTurnLockInput
 number
 ```
 
-### `appendSegmentEvent`
-
-`function` — DEPRECATED (interactive turn-rebroadcast buffer) — append a per-turn event to its execution's segment, assigning a monotonic `seq`.
-
-```ts
-(store: SegmentStore, executionId: string, incoming: TurnStreamEvent, maxEvents?: number) => TurnStreamEvent
-```
-
 ### `broadcastThreadCreated`
 
 `function` — Per-workspace marker that a new thread was created, so an already-open history list prepends it without a reload.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, workspaceId: string, thread: { threadId: string; title: string; }) => Promise<void>
-```
-
-### `broadcastTurnStreamEvent`
-
-`function` — DEPRECATED for sandbox-backed interactive turns (drive on the session-message lane + `SessionGatewayClient` instead) — fan a turn event out to the per-thread channel.
-
-```ts
-(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; executionId: string; event: { type…
+(namespace: TurnStreamNamespaceLike, workspaceId: string, thread: { threadId: string; title: string; }, auth?: TurnStre…
 ```
 
 ### `broadcastWorkspaceActivity`
@@ -67,7 +51,7 @@ number
 `function` — Coarse per-workspace marker that a thread's turn started / ended — drives a sidebar "agent responding" indicator subscribed once per workspace.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, workspaceId: string, threadId: string, phase: "start" | "end") => Promise<void>
+(namespace: TurnStreamNamespaceLike, workspaceId: string, threadId: string, phase: "start" | "end", auth?: TurnStreamAu…
 ```
 
 ### `createDurableObjectTurnEventStore`
@@ -75,7 +59,7 @@ number
 `function` — A {@link TurnEventStore} backed by {@link TurnStreamDO } storage — the production implementation of `createChatTurnRoutes`' `turnStore` seam for apps that don't run D1 for turn events (or want replay…
 
 ```ts
-(namespace: TurnStreamNamespaceLike) => TurnEventStore
+(namespace: TurnStreamNamespaceLike, auth?: TurnStreamAuth | undefined) => TurnEventStore
 ```
 
 ### `createDurableTurnLock`
@@ -96,18 +80,10 @@ interface CreateDurableTurnLockOptions
 
 ### `createMemoryTurnStreamHarness`
 
-`function` — Build the harness.
+`function`
 
 ```ts
-(createInstance?: (state: TurnStreamDOState) => TurnStreamDO, _options?: TurnStreamDOOptions) => MemoryTurnStreamHarness
-```
-
-### `createSegmentStore`
-
-`function` — DEPRECATED (interactive sandbox-turn rebroadcast; the SDK's session gateway replaces it) — create a SegmentStore with initialized segments and no active execution ID.
-
-```ts
-() => SegmentStore
+(createInstance?: (state: TurnStreamDOState, authSecret: string) => TurnStreamDO, options?: TurnStreamDOOptions & { aut…
 ```
 
 ### `createTurnLock`
@@ -120,7 +96,7 @@ interface CreateDurableTurnLockOptions
 
 ### `createTurnStreamUpgradeHandler`
 
-`function` — The worker-entry WebSocket forwarder.
+`function` — The worker-entry WebSocket forwarder — WORKSPACE channel only (the per-thread variant went with the deprecated rebroadcast lane; a thread's live turn replay is the sandbox session gateway's job).
 
 ```ts
 (options: CreateTurnStreamUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>
@@ -150,14 +126,6 @@ interface DurableTurnLock
 (active: DurableTurnLock, input: { threadId: string; interruptedAt: number; turnId?: string | undefined; }) => boolean
 ```
 
-### `isTerminalRunEvent`
-
-`function` — Terminal run markers: they close a turn segment and auto-release the channel's chat-turn lock for the segment's execution.
-
-```ts
-(type: string) => boolean
-```
-
 ### `MAX_RECENT_CREATED`
 
 `const` — Recent `thread.created` markers kept for late-connecting sidebars.
@@ -166,12 +134,12 @@ interface DurableTurnLock
 50
 ```
 
-### `MAX_SEGMENT_EVENTS`
+### `MEMORY_TURN_STREAM_AUTH_SECRET`
 
-`const` — DEPRECATED (interactive turn-rebroadcast buffer) — per-turn replay window.
+`const` — Default harness secret — long enough to satisfy the DO's minimum, fixed so tests are deterministic.
 
 ```ts
-2000
+"test-turn-stream-harness-secret-0123456789ab"
 ```
 
 ### `MemoryTurnStreamChannel`
@@ -198,9 +166,17 @@ interface MemoryTurnStreamHarness
 interface MemoryTurnStreamSocket
 ```
 
+### `mintTurnStreamToken`
+
+`function` — `v1.<exp-ms-36>.<hmac-hex>` — the expiry is inside the signed payload so it cannot be extended by editing the token.
+
+```ts
+(channelName: string, secret: string, now?: () => number, ttlMs?: number) => Promise<string>
+```
+
 ### `pruneStaleThreads`
 
-`function` — Remove responding entries (threadId → startedAt) older than `ttlMs`, so a dropped `end` broadcast can't leave a permanently-stuck dot.
+`function`
 
 ```ts
 (active: Map<string, number>, now: number, ttlMs: number) => string[]
@@ -227,7 +203,7 @@ interface ReconcileStaleDurableTurnLockOptions
 `function` — Release a durable turn lock and indicate if the release was successful or deferred
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput) => Promise<{ released: boolean; deferred?: boolean |…
+(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput, auth?: TurnStreamAuth | undefined) => Promise<...>
 ```
 
 ### `releaseInterruptedDurableTurnLock`
@@ -235,7 +211,7 @@ interface ReconcileStaleDurableTurnLockOptions
 `function` — Fenced out-of-band release — the DO refuses a successor lock (started after `interruptedAt`) and a turnId mismatch.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput) => Promise<boolean>
+(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput, auth?: TurnStreamAuth | undefined)…
 ```
 
 ### `ReleaseInterruptedDurableTurnLockInput`
@@ -246,28 +222,12 @@ interface ReconcileStaleDurableTurnLockOptions
 interface ReleaseInterruptedDurableTurnLockInput
 ```
 
-### `replayActiveSegment`
-
-`function` — DEPRECATED (interactive turn-rebroadcast buffer; the SDK replays losslessly on both lanes) — events of the active, non-terminal turn with `seq > afterSeq`, i.e.
-
-```ts
-(store: SegmentStore, afterSeq: number) => TurnStreamEvent[]
-```
-
 ### `scopeIndexChannelKey`
 
 `function` — Generate a unique channel key string based on the provided scope identifier.
 
 ```ts
 (scopeId: string) => string
-```
-
-### `SegmentStore`
-
-`interface` — DEPRECATED (interactive turn-rebroadcast buffer) — define a store managing segments and tracking the active execution identifier.
-
-```ts
-interface SegmentStore
 ```
 
 ### `threadChannelKey`
@@ -300,6 +260,22 @@ number
 
 ```ts
 { readonly lock: "chatTurnLock"; readonly activeThreads: "activeThreads"; readonly turnStatus: "turnStatus"; readonly t…
+```
+
+### `TURN_STREAM_TOKEN_HEADER`
+
+`const` — Request header the adapters attach (and the DO accepts).
+
+```ts
+"x-turn-stream-token"
+```
+
+### `TURN_STREAM_TOKEN_TTL_MS`
+
+`const` — Default capability lifetime.
+
+```ts
+60000
 ```
 
 ### `turnEventStorageKey`
@@ -382,14 +358,6 @@ interface TurnLockSeamArgs
 type TurnLockSeamResult
 ```
 
-### `TurnSegment`
-
-`interface` — DEPRECATED (interactive turn-rebroadcast buffer) — represent a segment of a turn containing events, sequence limit, and terminal status.
-
-```ts
-interface TurnSegment
-```
-
 ### `turnStorageChannelKey`
 
 `function` — Generate a storage channel key string for a given turn identifier.
@@ -398,9 +366,17 @@ interface TurnSegment
 (turnId: string) => string
 ```
 
+### `TurnStreamAuth`
+
+`interface` — The HMAC secret shared between this worker and its `TurnStreamDO` binding.
+
+```ts
+interface TurnStreamAuth
+```
+
 ### `TurnStreamDO`
 
-`class` — Manage per-turn segments and track active threads with durable event storage
+`class` — Durable turn-event storage, workspace signals, and the single-flight turn lock, on one channel-bound Durable Object.
 
 ```ts
 class TurnStreamDO
@@ -468,6 +444,14 @@ interface TurnStreamStubLike
 
 ```ts
 type TurnStreamUpgradeAuthorization
+```
+
+### `verifyTurnStreamToken`
+
+`function` — Verify a token for `channelName`: constant-time MAC compare with the exact channel name embedded in the signed payload, plus freshness.
+
+```ts
+(channelName: string, token: string, secret: string, now?: () => number) => Promise<boolean>
 ```
 
 ### `workspaceChannelKey`

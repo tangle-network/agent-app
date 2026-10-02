@@ -16,10 +16,10 @@ interface VaultPaneHandle
 
 ### `VaultPaneLazy`
 
-`function` — Resolve VaultPane component lazily to optimize loading and improve performance
+`const` — Resolve VaultPane component lazily to optimize loading and improve performance
 
 ```ts
-LazyExoticComponent<ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>>
+any
 ```
 
 ### `VaultPaneProps`

@@ -104,10 +104,10 @@ type VaultOperationPhase
 
 ### `VaultPane`
 
-`function` — Browse and edit files in the available pane width.
+`const` — Browse and edit files in the available pane width.
 
 ```ts
-ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>
+any
 ```
 
 ### `VaultPaneHandle`

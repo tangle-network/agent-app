@@ -33,18 +33,16 @@
  *
  * Consequences for this module, and they cut both ways:
  *
- * 1. INTERACTIVE sandbox turns should be driven on the message lane and
- *    tailed by the browser through `box.mintScopedToken({ scope: 'session' })`
- *    + `SessionGatewayClient`. Re-broadcasting those same events through the
- *    per-turn SEGMENT buffer below duplicates the SDK and adds a worker hop.
- *    That half is `@deprecated` (see the tags on {@link createSegmentStore},
- *    {@link appendSegmentEvent}, {@link replayActiveSegment} and
- *    `broadcastTurnStreamEvent` in `./adapters`).
+ * 1. INTERACTIVE sandbox turns are driven on the message lane and tailed
+ *    by the browser through `box.mintScopedToken({ scope: 'session' })` +
+ *    `SessionGatewayClient`. The former per-turn SEGMENT rebroadcast lane
+ *    that duplicated this was REMOVED (0.52.0) after every product had
+ *    moved off it — do not rebuild it.
  * 2. Detached turns driven through `dispatchPrompt({ detach: true })` or
- *    `streamPrompt` remain on the run/stream lane and need a buffer when a
- *    browser must tail them. Sandbox 0.37 `driveTurn` is different: it uses
- *    the session message lane and the gateway can observe it. The buffer
- *    remains the path for stream/dispatch runs and has no SDK replacement.
+ *    `streamPrompt` remain on the run/stream lane and keep the durable
+ *    turn-event rows (`turn:` channels) when a browser must tail them.
+ *    Sandbox 0.37 `driveTurn` is different: it uses the session message
+ *    lane and the gateway can observe it by SDK contract.
  * 3. The LOCK and the per-workspace SIGNALS have no gateway equivalent at
  *    all (the gateway is per-session and read-only). They stay canonical.
  *
@@ -55,27 +53,87 @@
  * 0 lost, 0 duplicated, 0 out-of-order, ids 1..517 contiguous.
  */
 
+import { constantTimeEqual } from '../crypto/web-token'
+
+async function hmacSha256Hex(secret: string, value: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)))
+  return Array.from(sig, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 // ── events ──────────────────────────────────────────────────────────────────
 
-/** One event on a turn-stream channel. `seq` is monotonic within a turn
- *  segment and assigned by {@link appendSegmentEvent} on arrival at the DO. */
+/** One event on a turn-stream channel. Workspace-signal events
+ *  (`thread.created`, `thread.activity`, product events) carry no `seq` —
+ *  ordering is delivery order on the DO's single-threaded event loop. */
 export interface TurnStreamEvent {
   type: string
   data?: unknown
   timestamp: number
-  seq?: number
+  seq?: never
 }
 
-/** Terminal run markers: they close a turn segment and auto-release the
- *  channel's chat-turn lock for the segment's execution.
- *
- *  KEPT (not deprecated with the segment buffer): the lock auto-release
- *  reads it. A product that stops broadcasting turn events to the thread
- *  channel loses only that auto-release — the cooperative release on settle
- *  (`createDurableTurnLock().release`) and `reconcileStaleDurableTurnLock`
- *  both still fire, which is what actually frees a wedged lane. */
-export function isTerminalRunEvent(type: string): boolean {
-  return type === 'session.run.completed' || type === 'session.run.failed'
+// ── channel-bound capability tokens (issue #746) ─────────────────────────────
+//
+// The DO's endpoints are not publicly routed, but "safe because nothing
+// forwards to it" is convention, not enforcement: one accidental
+// `stub.fetch(publicRequest)` and every channel's lock, turn events, and
+// signals are cross-tenant writable. Every request the DO serves must now
+// carry a short-lived HMAC capability token minted for THIS DO's channel
+// name — a valid token for one channel is refused by every other, and a
+// token without the secret cannot exist. Worker code mints with the same
+// secret via the adapters (`authSecret`) and the WS upgrade forwarder;
+// nothing else needs to know the format.
+
+/** Default capability lifetime. Tokens are minted per worker request and
+ *  verified immediately; a WS token gates only the upgrade handshake — an
+ *  accepted socket lives until it closes. */
+export const TURN_STREAM_TOKEN_TTL_MS = 60_000
+
+/** Request header the adapters attach (and the DO accepts). The WS upgrade
+ *  additionally accepts `?token=` because browsers cannot set headers on a
+ *  WebSocket handshake. */
+export const TURN_STREAM_TOKEN_HEADER = 'x-turn-stream-token'
+
+/** `v1.<exp-ms-36>.<hmac-hex>` — the expiry is inside the signed payload so
+ *  it cannot be extended by editing the token. */
+export async function mintTurnStreamToken(
+  channelName: string,
+  secret: string,
+  now: () => number = Date.now,
+  ttlMs: number = TURN_STREAM_TOKEN_TTL_MS,
+): Promise<string> {
+  if (!secret || secret.length < 32) throw new Error('turn-stream token secret must be at least 32 characters')
+  const expiresAt = now() + ttlMs
+  const payload = `v1.${channelName}.${expiresAt.toString(36)}`
+  return `${payload}.${await hmacSha256Hex(secret, payload)}`
+}
+
+/** Verify a token for `channelName`: constant-time MAC compare with the
+ *  exact channel name embedded in the signed payload, plus freshness. A
+ *  token minted for any other channel — or a tampered expiry — is false. */
+export async function verifyTurnStreamToken(
+  channelName: string,
+  token: string,
+  secret: string,
+  now: () => number = Date.now,
+): Promise<boolean> {
+  if (!secret || secret.length < 32) return false
+  const parts = token.split('.')
+  if (parts.length !== 4 || parts[0] !== 'v1') return false
+  const [, name, expires36, mac] = parts as [string, string, string, string]
+  if (name !== channelName) return false
+  if (!/^[0-9a-z]+$/.test(expires36)) return false
+  const expiresAt = parseInt(expires36, 36)
+  if (!Number.isFinite(expiresAt) || expiresAt <= now()) return false
+  const expected = await hmacSha256Hex(secret, `v1.${channelName}.${expires36}`)
+  return constantTimeEqual(mac, expected)
 }
 
 // ── channel keys ────────────────────────────────────────────────────────────
@@ -136,36 +194,21 @@ export function scopeIndexChannelKey(scopeId: string): string {
   return `scope:${scopeId}`
 }
 
-// ── segment store (reconnect replay over a live socket) ─────────────────────
+// ── segment store ───────────────────────────────────────────────────────────
+//
+// REMOVED (0.52.0): the deprecated interactive-turn rebroadcast buffer
+// (`createSegmentStore` / `appendSegmentEvent` / `replayActiveSegment` /
+// `MAX_SEGMENT_EVENTS` / `broadcastTurnStreamEvent`). Every product drives
+// interactive turns on the sandbox session-message lane, where the SDK's
+// own gateway replays losslessly; detached runs keep the durable `turn:`
+// rows. Rebuilding per-turn in-DO segments would duplicate the SDK and
+// re-open the client-declared-sessionId fanout this removal closed.
 
-/** DEPRECATED (interactive turn-rebroadcast buffer) — represent a segment of a turn containing events, sequence limit, and terminal status.
- *
- *  @deprecated Part of the interactive turn-rebroadcast buffer — see the
- *  two-lane rule in this file's header. Removal is a major-version change. */
-export interface TurnSegment {
-  events: TurnStreamEvent[]
-  maxSeq: number
-  terminal: boolean
-}
-
-/** DEPRECATED (interactive turn-rebroadcast buffer) — define a store managing segments and tracking the active execution identifier.
- *
- *  @deprecated Part of the interactive turn-rebroadcast buffer — see the
- *  two-lane rule in this file's header. Removal is a major-version change. */
-export interface SegmentStore {
-  segments: Map<string, TurnSegment>
-  activeExecutionId: string | null
-}
-
-/** DEPRECATED (interactive turn-rebroadcast buffer) — per-turn replay window. Generous enough for normal turns; a turn that
- *  exceeds it loses its earliest deltas from replay (a late resumer
- *  self-heals via the final `result` event + loader revalidation).
- *
- *  @deprecated Sizes the interactive turn-rebroadcast buffer only. The
- *  stream/dispatch detached lanes' durable rows (`turnEvent:` storage) are
- *  uncapped and are not affected. */
-export const MAX_SEGMENT_EVENTS = 2000
-
+/**
+ * Remove responding entries (threadId → startedAt) older than `ttlMs`, so a
+ * dropped `end` broadcast can't leave a permanently-stuck dot. Mutates
+ * `active` and returns the removed thread ids.
+ */
 /** Recent `thread.created` markers kept for late-connecting sidebars.
  *
  *  KEPT: a workspace-level signal, not a turn rebroadcast. */
@@ -175,87 +218,7 @@ export const MAX_RECENT_CREATED = 50
  *  `end` broadcast can't leave a permanently-stuck "responding" dot. */
 export const ACTIVITY_TTL_MS = 15 * 60 * 1000
 
-/** DEPRECATED (interactive sandbox-turn rebroadcast; the SDK's session gateway replaces it) — create a SegmentStore with initialized segments and no active execution ID.
- *
- *  @deprecated Backs the interactive sandbox-turn rebroadcast, which the
- *  sandbox SDK already does better (measured: run/stream → 0 frames at the
- *  gateway, message lane → 297/297; see the two-lane rule in this file's
- *  header). Sandbox turns: drive on `box.session(id).sendMessage()` and let
- *  the browser attach with `box.mintScopedToken({ scope: 'session' })` +
- *  `SessionGatewayClient`. Sandbox-FREE turns: `/stream`'s
- *  `replayTurnEvents` (`GET /chat/stream/:turnId`) already follows a running
- *  turn from a cursor. Stream/dispatch detached turns keep the durable
- *  turn-event rows —
- *  they are a different, non-deprecated lane. Removal is a major-version
- *  change; nothing is deleted here. */
-export function createSegmentStore(): SegmentStore {
-  return { segments: new Map(), activeExecutionId: null }
-}
 
-/**
- * DEPRECATED (interactive turn-rebroadcast buffer) — append a per-turn event to
- * its execution's segment, assigning a monotonic
- * `seq`. A `session.run.started` (or the first-seen event for an execution)
- * opens a fresh segment, makes it active, and drops prior turns' buffers so a
- * resumer only ever replays the current turn. A terminal run event marks the
- * segment terminal. Returns the seq-stamped event to broadcast.
- *
- * @deprecated The interactive rebroadcast half — {@link createSegmentStore}
- * names the replacement per lane; this file's header holds the measurement.
- */
-export function appendSegmentEvent(
-  store: SegmentStore,
-  executionId: string,
-  incoming: TurnStreamEvent,
-  maxEvents = MAX_SEGMENT_EVENTS,
-): TurnStreamEvent {
-  let segment = store.segments.get(executionId)
-  if (incoming.type === 'session.run.started' || !segment) {
-    if (!segment) {
-      segment = { events: [], maxSeq: 0, terminal: false }
-      store.segments.set(executionId, segment)
-    }
-    store.activeExecutionId = executionId
-    for (const id of store.segments.keys()) {
-      if (id !== executionId) store.segments.delete(id)
-    }
-  }
-  const seq = ++segment.maxSeq
-  const stamped: TurnStreamEvent = { ...incoming, seq }
-  segment.events.push(stamped)
-  if (segment.events.length > maxEvents) {
-    segment.events = segment.events.slice(-maxEvents)
-  }
-  if (isTerminalRunEvent(incoming.type)) {
-    segment.terminal = true
-  }
-  return stamped
-}
-
-/**
- * DEPRECATED (interactive turn-rebroadcast buffer; the SDK replays losslessly on
- * both lanes) — events of the active, non-terminal turn with `seq > afterSeq`,
- * i.e. what a
- * (re)connecting client replays before going live. A terminal (finished) turn
- * replays nothing: the client falls back to the loader's persisted row.
- *
- * @deprecated The interactive rebroadcast half — {@link createSegmentStore}
- * names the replacement per lane. The SDK's own reconnect replay is
- * `SessionGatewayClient` + `lastEventId` (browser) or
- * `box.streamPrompt('', { executionId, lastEventId })` (worker); both were
- * measured lossless.
- */
-export function replayActiveSegment(store: SegmentStore, afterSeq: number): TurnStreamEvent[] {
-  const segment = store.activeExecutionId ? store.segments.get(store.activeExecutionId) : undefined
-  if (!segment || segment.terminal) return []
-  return segment.events.filter((event) => (event.seq ?? 0) > afterSeq)
-}
-
-/**
- * Remove responding entries (threadId → startedAt) older than `ttlMs`, so a
- * dropped `end` broadcast can't leave a permanently-stuck dot. Mutates
- * `active` and returns the removed thread ids.
- */
 export function pruneStaleThreads(active: Map<string, number>, now: number, ttlMs: number): string[] {
   const removed: string[] = []
   for (const [threadId, startedAt] of active) {
