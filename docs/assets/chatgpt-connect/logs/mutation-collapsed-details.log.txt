@@ -1,0 +1,40 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/drew/code/_wt/agent-app-chatgpt-connect-20261002[39m
+
+ [31m❯[39m src/chatgpt-react/connect.test.tsx [2m([22m[2m8 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m7 skipped[39m[2m)[22m[32m 26[2mms[22m[39m
+     [2m[90m↓[39m[22m opens supported setup with the exact endpoint, without inferring connected state
+[31m     [31m×[31m keeps native identifiers in collapsed connection details[39m[32m 25[2mms[22m[39m
+     [2m[90m↓[39m[22m uses an explicitly supplied ChatGPT URL and never derives one from the ID
+     [2m[90m↓[39m[22m falls back to supported setup for an invalid registered destination
+     [2m[90m↓[39m[22m renders host-confirmed state and delegates checks without granting or connecting anything
+     [2m[90m↓[39m[22m drops setup and clipboard feedback when enrollment changes
+     [2m[90m↓[39m[22m supports manual copy when clipboard access is unavailable
+     [2m[90m↓[39m[22m does not expose an invalid endpoint containing credentials
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[33m7 skipped[39m[90m (8)[39m
+[2m   Start at [22m 14:59:30
+[2m   Duration [22m 852ms[2m (transform 41ms, setup 64ms, import 372ms, tests 26ms, environment 310ms)[22m
+
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/chatgpt-react/connect.test.tsx[2m > [22mChatGPT connection surface[2m > [22mkeeps native identifiers in collapsed connection details
+[31m[1mAssertionError[22m: expected true to be false // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- false[39m
+[31m+ true[39m
+
+[36m [2m❯[22m src/chatgpt-react/connect.test.tsx:[2m29:43[22m[39m
+    [90m 27|[39m     [35mconst[39m summary [33m=[39m screen[33m.[39m[34mgetByText[39m([32m'Connection details'[39m)
+    [90m 28|[39m     [35mconst[39m details [33m=[39m summary[33m.[39m[34mclosest[39m([32m'details'[39m)
+    [90m 29|[39m     [34mexpect[39m(details[33m?.[39m[34mhasAttribute[39m([32m'open'[39m))[33m.[39m[34mtoBe[39m([35mfalse[39m)
+    [90m   |[39m                                           [31m^[39m
+    [90m 30|[39m     [35mawait[39m user[33m.[39m[34mclick[39m(summary)
+    [90m 31|[39m     [34mexpect[39m(details[33m?.[39m[34mhasAttribute[39m([32m'open'[39m))[33m.[39m[34mtoBe[39m([35mtrue[39m)
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+

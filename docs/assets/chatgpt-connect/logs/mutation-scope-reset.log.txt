@@ -1,0 +1,45 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/drew/code/_wt/agent-app-chatgpt-connect-20261002[39m
+
+ [31m❯[39m src/chatgpt-react/connect.test.tsx [2m([22m[2m8 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m7 skipped[39m[2m)[22m[32m 110[2mms[22m[39m
+     [2m[90m↓[39m[22m opens supported setup with the exact endpoint, without inferring connected state
+     [2m[90m↓[39m[22m keeps native identifiers in collapsed connection details
+     [2m[90m↓[39m[22m uses an explicitly supplied ChatGPT URL and never derives one from the ID
+     [2m[90m↓[39m[22m falls back to supported setup for an invalid registered destination
+     [2m[90m↓[39m[22m renders host-confirmed state and delegates checks without granting or connecting anything
+[31m     [31m×[31m drops setup and clipboard feedback when enrollment changes[39m[32m 109[2mms[22m[39m
+     [2m[90m↓[39m[22m supports manual copy when clipboard access is unavailable
+     [2m[90m↓[39m[22m does not expose an invalid endpoint containing credentials
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[33m7 skipped[39m[90m (8)[39m
+[2m   Start at [22m 14:59:25
+[2m   Duration [22m 999ms[2m (transform 44ms, setup 58ms, import 353ms, tests 110ms, environment 311ms)[22m
+
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/chatgpt-react/connect.test.tsx[2m > [22mChatGPT connection surface[2m > [22mdrops setup and clipboard feedback when enrollment changes
+[31m[1mAssertionError[22m: expected <input id="_r_0_-url" …(3)></input> to be null[39m
+
+[32m- Expected:[39m
+null
+
+[31m+ Received:[39m
+<input
+  class="flex w-full rounded-lg border bg-card px-4 py-2 text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 file:border-0 file:bg-transparent file:font-medium file:text-sm border-border transition-[border-color,box-shadow] duration-150 ease-out hover:border-[var(--border-strong)] focus:outline-hidden focus:border-[var(--focus-border)] focus:ring-3 focus:ring-[var(--focus-halo)] h-11"
+  id="_r_0_-url"
+  readonly=""
+  value="https://creative.example.com/api/agents/mcp"
+/>
+
+[36m [2m❯[22m src/chatgpt-react/connect.test.tsx:[2m76:48[22m[39m
+    [90m 74|[39m     [34mexpect[39m(screen[33m.[39m[34mgetByText[39m([32m'MCP URL copied'[39m))[33m.[39m[34mtoBeTruthy[39m()
+    [90m 75|[39m     [34mrerender[39m([33m<[39m[33mChatGPTConnect[39m [33m{[39m[33m...[39mcreativeExample[33m}[39m [33m/[39m[33m>[39m)
+    [90m 76|[39m     [34mexpect[39m(screen[33m.[39m[34mqueryByLabelText[39m([32m'MCP URL'[39m))[33m.[39m[34mtoBeNull[39m()
+    [90m   |[39m                                                [31m^[39m
+    [90m 77|[39m     [34mexpect[39m(screen[33m.[39m[34mqueryByText[39m([32m'MCP URL copied'[39m))[33m.[39m[34mtoBeNull[39m()
+    [90m 78|[39m     await user.click(screen.getByRole('button', { name: 'Connect to Ch…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+

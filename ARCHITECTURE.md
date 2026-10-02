@@ -76,6 +76,7 @@ harness/missions/runtime/trace *(chat shell + observability; `react`)* ·
 `sequences-react` → sequences *(`react`; lazy `@huggingface/transformers` for
 transcription)* · `studio-react` → studio *(`react`, `lucide-react`,
 `react-router`)* · `intakes-react` · `teams-react` ·
+`chatgpt-react` *(ChatGPT setup over public kit metadata and host-owned connection state; enrollment identity is type-only)* ·
 `hosted-agent/react` *(line setup, members, and billing over authenticated host callbacks)* ·
 `openui-react` → openui *(`react` only — the renderer stays the product's own
 import, so this forces no UI peer)* ·
@@ -101,6 +102,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | An agent people text or call, each person in their own isolated sandbox | `hosted-agent` — `createHostedAgent`: `attachLine` gives a Hub line one box per person (Hub routes, counts and replies to texts); ph0ny `voiceHook`/`voiceAsk` answer calls from the same box and thread. Peer: `sandbox`. Reference Worker: [`examples/hosted-agent`](./examples/hosted-agent) |
 | A page to connect owned lines and manage members | `hosted-agent/react` — `LineSetup`, `LineMembers`, and `LineBilling` over authenticated callbacks backed by `sandbox.lines` and Hub. Import `hosted-agent/react/styles` for its CSS. The host supplies workspace-scoped lines and verified payer facts. |
 | One private agent across phone, web and ChatGPT | `agent-enrollment` — `createAgentEnrollment` records the exact SDK instance, filesystem and workspace-retained session. `createEnrolledApplicationLineHandler` binds a signed shared Line subject and selected authorized app to that target. The host supplies live grants, owner-scoped Sandbox access and an atomic target store. Hub owns phone routing. |
+| A shared Connect to ChatGPT action | `chatgpt-react` — `ChatGPTConnect` consumes public kit metadata, an existing `AgentEnrollmentIdentity`, and host-owned connection state. It opens a supplied registered connection or presents supported setup. No OAuth/enrollment side effects. See [installed examples](examples/chatgpt-connect/README.md). |
 | A ChatGPT OAuth resource for a hosted agent | `app-oauth` — compose Better Auth's provider and resource client with host tables, a canonical issuer/resource, one live consent, and current client/session/user checks. A separate resource host can use one uncached authority snapshot after JWS verification; the verified claims include any host grant generation needed by that lookup. The host binds the verified subject to its own enrollment authority. This optional subpath requires `better-auth` and `@better-auth/oauth-provider` 1.7.2 or newer. |
 | Per-workspace key mint/rotate/budget | `billing` |
 | Resumable chat turns (buffer/replay/coalesce) | `stream` — see [`examples/resumable-turns.md`](./examples/resumable-turns.md) |

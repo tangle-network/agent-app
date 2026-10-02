@@ -3501,6 +3501,55 @@
       ]
     },
     {
+      "id": "./chatgpt-react",
+      "source": "src/chatgpt-react/index.tsx",
+      "dependsOn": [
+        "agent-enrollment"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "ChatGPTAppMetadata",
+          "kind": "interface",
+          "signature": "interface ChatGPTAppMetadata",
+          "doc": "The public display fields from chatgpt-agents-kit's AgentAppDescription."
+        },
+        {
+          "name": "ChatGPTConnect",
+          "kind": "function",
+          "signature": "(props: ChatGPTConnectProps) => Element",
+          "doc": "Browser-only presentation: no enrollment, OAuth, connection discovery or local persistence."
+        },
+        {
+          "name": "ChatGPTConnectionState",
+          "kind": "type",
+          "signature": "type ChatGPTConnectionState",
+          "doc": "Only the host can confirm connection state for its current authenticated user."
+        },
+        {
+          "name": "ChatGPTConnectProps",
+          "kind": "interface",
+          "signature": "interface ChatGPTConnectProps",
+          "doc": null
+        },
+        {
+          "name": "ChatGPTRegisteredConnection",
+          "kind": "interface",
+          "signature": "interface ChatGPTRegisteredConnection",
+          "doc": "Supplied by the host from a real registered ChatGPT connection."
+        }
+      ]
+    },
+    {
+      "id": "./chatgpt-react/styles",
+      "source": "src/chatgpt-react/styles.ts",
+      "dependsOn": [
+        "agent-enrollment"
+      ],
+      "error": null,
+      "exports": []
+    },
+    {
       "id": "./config",
       "source": "src/config/index.ts",
       "dependsOn": [

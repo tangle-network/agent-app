@@ -3,6 +3,7 @@ import '../src/theme/tokens.css'
 import './storybook.css'
 import '../src/studio-react/studio.css'
 import '../src/hosted-agent/react/lines.css'
+import '../src/chatgpt-react/styles.css'
 
 interface AgentTheme {
   /**
