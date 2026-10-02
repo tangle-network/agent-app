@@ -4,7 +4,7 @@
 
 Source: `src/agent-enrollment/index.ts`
 
-13 exports.
+15 exports.
 
 ### `AgentEnrollmentClaim`
 
@@ -102,10 +102,26 @@ class EnrollmentTargetError
 interface LiveSharedEnrollmentMember
 ```
 
+### `ObservedSharedLineApplicationRequest`
+
+`interface` — Signed Hub fields required for every shared Line observation.
+
+```ts
+interface ObservedSharedLineApplicationRequest
+```
+
 ### `ResolvedAgentEnrollment`
 
 `interface`
 
 ```ts
 interface ResolvedAgentEnrollment
+```
+
+### `SignedSharedLineApplicationRequest`
+
+`interface` — Lease fields required before a shared Line can admit new work.
+
+```ts
+interface SignedSharedLineApplicationRequest
 ```

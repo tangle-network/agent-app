@@ -1,7 +1,7 @@
 import type { EnsureInstanceOptions, Sandbox, SandboxInstance } from '@tangle-network/sandbox/core'
 
 export { createEnrolledApplicationLineHandler } from './application'
-export type { AuthenticatedSharedLinePrincipal, LiveSharedEnrollmentMember, EnrolledApplicationLineOptions } from './application'
+export type { AuthenticatedSharedLinePrincipal, LiveSharedEnrollmentMember, EnrolledApplicationLineOptions, ObservedSharedLineApplicationRequest, SignedSharedLineApplicationRequest } from './application'
 
 /** An application's durable pointer to one private agent's native SDK session. */
 export interface AgentEnrollmentTarget {

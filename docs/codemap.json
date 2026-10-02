@@ -85,10 +85,22 @@
           "doc": "Current host-owned app, customer and member grant for one Hub subject."
         },
         {
+          "name": "ObservedSharedLineApplicationRequest",
+          "kind": "interface",
+          "signature": "interface ObservedSharedLineApplicationRequest",
+          "doc": "Signed Hub fields required for every shared Line observation."
+        },
+        {
           "name": "ResolvedAgentEnrollment",
           "kind": "interface",
           "signature": "interface ResolvedAgentEnrollment",
           "doc": null
+        },
+        {
+          "name": "SignedSharedLineApplicationRequest",
+          "kind": "interface",
+          "signature": "interface SignedSharedLineApplicationRequest",
+          "doc": "Lease fields required before a shared Line can admit new work."
         }
       ]
     },

@@ -104,12 +104,28 @@ class EnrollmentTargetError
 interface LiveSharedEnrollmentMember
 ```
 
+### `ObservedSharedLineApplicationRequest`
+
+`interface` — Signed Hub fields required for every shared Line observation.
+
+```ts
+interface ObservedSharedLineApplicationRequest
+```
+
 ### `ResolvedAgentEnrollment`
 
 `interface`
 
 ```ts
 interface ResolvedAgentEnrollment
+```
+
+### `SignedSharedLineApplicationRequest`
+
+`interface` — Lease fields required before a shared Line can admit new work.
+
+```ts
+interface SignedSharedLineApplicationRequest
 ```
 
 
