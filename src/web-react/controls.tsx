@@ -193,6 +193,8 @@ export interface PopoverSurfaceProps {
    *  `w-full` to inherit — the trigger is no longer its offset parent — so a
    *  menu that used to stretch to a full-width trigger declares it here. */
   matchTriggerWidth?: boolean
+  /** Opt in to remeasurement when asynchronous or filtered content changes. */
+  contentKey?: unknown
   children: ReactNode
 }
 
@@ -225,6 +227,7 @@ export function PopoverSurface({
   id,
   'aria-label': ariaLabel,
   matchTriggerWidth,
+  contentKey,
   children,
 }: PopoverSurfaceProps) {
   const surfaceId = useId()
@@ -278,8 +281,7 @@ export function PopoverSurface({
       return
     }
     place()
-  // Search, retry and catalogue updates can change height while already open.
-  }, [open, place, children])
+  }, [open, place, contentKey])
 
   useEffect(() => {
     if (!open) return
@@ -581,6 +583,8 @@ export function ModelPicker({
   const valueId = useId()
   const unavailable = error != null
   const sortedModels = useMemo(() => sortModelsByFreshness(models), [models])
+  const contentKey = useMemo(() => ({ query, showAll, loading, error, models, value, priorityGroup }),
+    [query, showAll, loading, error, models, value, priorityGroup])
 
   useEffect(() => {
     if (disabled) changeOpen(false)
@@ -713,6 +717,7 @@ export function ModelPicker({
         id={panelId}
         role="dialog"
         aria-label="Choose a model"
+        contentKey={contentKey}
         triggerRef={triggerRef}
         panelRef={panelRef}
         className={`flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-card-edge bg-popover text-foreground ${OVERLAY_SHADOW}`}
