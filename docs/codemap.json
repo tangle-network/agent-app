@@ -16535,7 +16535,7 @@
         {
           "name": "hasOrganizationRole",
           "kind": "function",
-          "signature": "(actual: \"admin\" | \"owner\" | \"member\" | \"billing\", minimum: \"admin\" | \"owner\" | \"member\" | \"billing\") => boolean",
+          "signature": "(actual: \"member\" | \"admin\" | \"owner\" | \"billing\", minimum: \"member\" | \"admin\" | \"owner\" | \"billing\") => boolean",
           "doc": "True when `actual` is at least `minimum` on the organization ladder."
         },
         {
@@ -16619,7 +16619,7 @@
         {
           "name": "ORGANIZATION_ROLE_RANK",
           "kind": "const",
-          "signature": "Record<\"admin\" | \"owner\" | \"member\" | \"billing\", number>",
+          "signature": "Record<\"member\" | \"admin\" | \"owner\" | \"billing\", number>",
           "doc": "Map organization roles to their hierarchical rank for permission and access control purposes"
         },
         {
