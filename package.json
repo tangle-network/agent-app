@@ -223,6 +223,11 @@
       "import": "./dist/hosted-agent/index.js",
       "default": "./dist/hosted-agent/index.js"
     },
+    "./agent-enrollment": {
+      "types": "./dist/agent-enrollment/index.d.ts",
+      "import": "./dist/agent-enrollment/index.js",
+      "default": "./dist/agent-enrollment/index.js"
+    },
     "./hosted-agent/application": {
       "types": "./dist/hosted-agent/application.d.ts",
       "import": "./dist/hosted-agent/application.js",

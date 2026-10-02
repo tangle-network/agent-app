@@ -2,10 +2,11 @@
 
 # agent-app code map
 
-_105 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_106 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
+| [`./agent-enrollment`](api/agent-enrollment.md) | 12 | `hosted-agent` |
 | [`./alerting`](api/alerting.md) | 8 | — |
 | [`./app-auth`](api/app-auth.md) | 13 | `platform` |
 | [`./assets`](api/assets.md) | 44 | — |
@@ -113,6 +114,16 @@ _105 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./workspace-react`](api/workspace-react.md) | 5 | `session-shell`, `workspace-apps` |
 
 ---
+
+## `./agent-enrollment`
+
+Source: `src/agent-enrollment/index.ts` · 12 exports
+
+Depends on: `hosted-agent`
+
+`AgentEnrollmentIdentity`, `AgentEnrollmentOptions`, `AgentEnrollmentRequest`, `AgentEnrollmentStore`, `AgentEnrollmentTarget`, `AuthenticatedSharedLinePrincipal`, `createAgentEnrollment`, `createEnrolledApplicationLineHandler`, `EnrolledApplicationLineOptions`, `EnrollmentTargetError`, `LiveSharedEnrollmentMember`, `ResolvedAgentEnrollment`
+
+[Full API →](api/agent-enrollment.md)
 
 ## `./alerting`
 

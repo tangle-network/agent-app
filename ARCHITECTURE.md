@@ -59,7 +59,7 @@ agent→app side channel; `defineAppTool` registers product tools here)* ·
 *(bridge + re-exports agent-eval)* · `sandbox` → crypto/harness/runtime/tools
 *(per-turn streaming)* · `trace` → missions *(flow observability)* · `config` →
 knowledge/runtime · `knowledge-loop` → config · `profile` → skills · `run` →
-harness · `platform` → billing/runtime/web · `hosted-agent` *(a person's text or call answered from their own isolated box; peer `sandbox`)* · `hosted-agent/application` *(native application callback and workspace attachment; Sandbox 0.58.1 or later)* · `preset-cloudflare` →
+harness · `platform` → billing/runtime/web · `hosted-agent` *(a person's text or call answered from their own isolated box; peer `sandbox`)* · `hosted-agent/application` *(native application callback and workspace attachment; Sandbox 0.58.1 or later)* · `agent-enrollment` *(authenticated durable target for one private agent's SDK session; verified with Sandbox 0.58.4 and 0.59.0)* · `preset-cloudflare` →
 billing/crypto/knowledge/tools/web · `turn-stream` → stream/chat-routes
 *(shared DO-backed turn replay/broadcast/lock; structural Cloudflare, server-only)*.
 
@@ -100,6 +100,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | Integration-hub `/exec` calls | `integrations` |
 | An agent people text or call, each person in their own isolated sandbox | `hosted-agent` — `createHostedAgent`: `attachLine` gives a Hub line one box per person (Hub routes, counts and replies to texts); ph0ny `voiceHook`/`voiceAsk` answer calls from the same box and thread. Peer: `sandbox`. Reference Worker: [`examples/hosted-agent`](./examples/hosted-agent) |
 | A page to connect owned lines and manage members | `hosted-agent/react` — `LineSetup`, `LineMembers`, and `LineBilling` over authenticated callbacks backed by `sandbox.lines` and Hub. Import `hosted-agent/react/styles` for its CSS. The host supplies workspace-scoped lines and verified payer facts. |
+| One private agent across phone, web and ChatGPT | `agent-enrollment` — `createAgentEnrollment` records the exact SDK instance, filesystem and workspace-retained session. `createEnrolledApplicationLineHandler` binds a signed shared Line subject and selected authorized app to that target. The host supplies live grants, owner-scoped Sandbox access and an atomic target store. Hub owns phone routing. |
 | Per-workspace key mint/rotate/budget | `billing` |
 | Resumable chat turns (buffer/replay/coalesce) | `stream` — see [`examples/resumable-turns.md`](./examples/resumable-turns.md) |
 | The whole assembled chat turn route (auth → persist → stream → interactions) | `chat-routes` — `createChatTurnRoutes` (peer `agent-runtime`). Product seams — all STABLE, graduated in #227 once each had two independent consumers (`turnLock` · `contextGate` · `beforeTurn` · `onRawEvent` · `lifecycle` · `heartbeat`, plus the `authorize` result's `insertUserMessage`); kept FLAT top-level for back-compat — plus `transformFinalText` (pre-persist redaction over the final-text scalar AND every persisted TEXT part) and `onTurnComplete(failed, failureReason)` run-failure surfacing |

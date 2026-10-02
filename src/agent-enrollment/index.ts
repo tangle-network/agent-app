@@ -1,0 +1,137 @@
+import type { EnsureInstanceOptions, Sandbox, SandboxInstance } from '@tangle-network/sandbox/core'
+
+export { createEnrolledApplicationLineHandler } from './application'
+export type { AuthenticatedSharedLinePrincipal, LiveSharedEnrollmentMember, EnrolledApplicationLineOptions } from './application'
+
+/** An application's durable pointer to one private agent's native SDK session. */
+export interface AgentEnrollmentTarget {
+  enrollmentId: string
+  agentId: string
+  workspaceId: string
+  threadId: string
+  instanceKey: string
+  generation: number
+  profileVersion: string
+  sandboxId: string
+  filesystemIncarnationId: string
+  sessionId: string
+}
+
+export type AgentEnrollmentIdentity = Pick<AgentEnrollmentTarget, 'enrollmentId' | 'agentId' | 'workspaceId' | 'threadId'>
+
+export interface AgentEnrollmentRequest extends AgentEnrollmentIdentity {
+  /** The host derives this from the authorized agent and its saved profile. */
+  instance: Pick<EnsureInstanceOptions, 'key' | 'create'> & { profile: NonNullable<EnsureInstanceOptions['profile']> }
+}
+
+export interface AgentEnrollmentStore {
+  get(enrollmentId: string): Promise<AgentEnrollmentTarget | null>
+  /** Atomically return the winning row. Never overwrite an existing target. */
+  insertIfAbsent(target: AgentEnrollmentTarget): Promise<AgentEnrollmentTarget>
+}
+
+export interface AgentEnrollmentOptions<Principal> {
+  /** Check the live agent, workspace, thread and owner grant on every call. */
+  authorize(principal: Principal, identity: AgentEnrollmentIdentity, operation: 'enroll' | 'resolve'): Promise<void>
+  /** Return the caller's owner-scoped SDK client. Never use a global service key. */
+  client(principal: Principal): Pick<Sandbox, 'instances' | 'get'> | Promise<Pick<Sandbox, 'instances' | 'get'>>
+  store: AgentEnrollmentStore
+}
+
+export class EnrollmentTargetError extends Error {
+  constructor(readonly code: 'invalid_request' | 'missing' | 'conflict' | 'target_changed' | 'session_missing') {
+    super(code)
+    this.name = 'EnrollmentTargetError'
+  }
+}
+
+export interface ResolvedAgentEnrollment {
+  target: AgentEnrollmentTarget
+  box: SandboxInstance
+  session: ReturnType<SandboxInstance['session']>
+}
+
+function valid(value: string): boolean {
+  return value.trim().length > 0
+}
+
+function sameIdentity(left: AgentEnrollmentIdentity, right: AgentEnrollmentIdentity): boolean {
+  return left.enrollmentId === right.enrollmentId && left.agentId === right.agentId
+    && left.workspaceId === right.workspaceId && left.threadId === right.threadId
+}
+
+function sameTarget(left: AgentEnrollmentTarget, right: AgentEnrollmentTarget): boolean {
+  return sameIdentity(left, right) && left.instanceKey === right.instanceKey
+    && left.generation === right.generation && left.profileVersion === right.profileVersion
+    && left.sandboxId === right.sandboxId && left.filesystemIncarnationId === right.filesystemIncarnationId
+    && left.sessionId === right.sessionId
+}
+
+/** Share one authenticated target between an app's phone, web and ChatGPT adapters. */
+export function createAgentEnrollment<Principal>(options: AgentEnrollmentOptions<Principal>) {
+  async function resolve(principal: Principal, enrollmentId: string): Promise<ResolvedAgentEnrollment> {
+    if (!valid(enrollmentId)) throw new EnrollmentTargetError('invalid_request')
+    const target = await options.store.get(enrollmentId)
+    if (!target) throw new EnrollmentTargetError('missing')
+    await options.authorize(principal, target, 'resolve')
+    const client = await options.client(principal)
+    const record = await client.instances.get(target.instanceKey)
+    if (!record || record.key !== target.instanceKey || record.generation !== target.generation
+      || record.profileVersion !== target.profileVersion || record.sandboxId !== target.sandboxId) {
+      throw new EnrollmentTargetError('target_changed')
+    }
+    const box = await client.get(target.sandboxId)
+    if (!box || box.id !== target.sandboxId || box.filesystemIncarnationReadiness !== 'ready'
+      || box.filesystemIncarnationId !== target.filesystemIncarnationId) {
+      throw new EnrollmentTargetError('target_changed')
+    }
+    const session = box.session(target.sessionId)
+    const status = await session.status()
+    if (!status || status.id !== target.sessionId) throw new EnrollmentTargetError('session_missing')
+    // Each external observation can yield; deny if the host revoked the grant meanwhile.
+    await options.authorize(principal, target, 'resolve')
+    return { target, box, session }
+  }
+
+  async function enroll(principal: Principal, request: AgentEnrollmentRequest): Promise<AgentEnrollmentTarget> {
+    if (![request.enrollmentId, request.agentId, request.workspaceId, request.threadId,
+      request.instance.key, request.instance.profile.version].every(valid)) {
+      throw new EnrollmentTargetError('invalid_request')
+    }
+    await options.authorize(principal, request, 'enroll')
+    const existing = await options.store.get(request.enrollmentId)
+    if (existing) {
+      if (!sameIdentity(existing, request) || existing.instanceKey !== request.instance.key
+        || existing.profileVersion !== request.instance.profile.version) throw new EnrollmentTargetError('conflict')
+      return (await resolve(principal, request.enrollmentId)).target
+    }
+    const client = await options.client(principal)
+    const instance = await client.instances.ensure(request.instance)
+    const box = instance.box
+    if (instance.key !== request.instance.key || instance.profileVersion !== request.instance.profile.version
+      || !Number.isSafeInteger(instance.generation) || instance.generation < 1
+      || instance.sandboxId !== box.id || box.filesystemIncarnationReadiness !== 'ready'
+      || !box.filesystemIncarnationId) throw new EnrollmentTargetError('target_changed')
+    const sessionId = instance.sessionId(request.threadId)
+    if (!valid(sessionId)) throw new EnrollmentTargetError('target_changed')
+    // Provisioning can await a revoked grant. Check again before creating a session.
+    await options.authorize(principal, request, 'enroll')
+    const created = await box.createSession({ sessionId, retention: 'workspace', backend: request.instance.profile.backend })
+    if (created.info.id !== sessionId) throw new EnrollmentTargetError('target_changed')
+    const target: AgentEnrollmentTarget = {
+      enrollmentId: request.enrollmentId, agentId: request.agentId, workspaceId: request.workspaceId,
+      threadId: request.threadId, instanceKey: instance.key, generation: instance.generation,
+      profileVersion: instance.profileVersion, sandboxId: instance.sandboxId,
+      filesystemIncarnationId: box.filesystemIncarnationId, sessionId,
+    }
+    const record = await client.instances.get(target.instanceKey)
+    if (!record || record.generation !== target.generation || record.sandboxId !== target.sandboxId
+      || record.profileVersion !== target.profileVersion) throw new EnrollmentTargetError('target_changed')
+    await options.authorize(principal, request, 'enroll')
+    const saved = await options.store.insertIfAbsent(target)
+    if (!sameTarget(saved, target)) throw new EnrollmentTargetError('conflict')
+    return (await resolve(principal, request.enrollmentId)).target
+  }
+
+  return { enroll, resolve }
+}

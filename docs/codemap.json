@@ -5,6 +5,88 @@
   "slug": "tangle-network/agent-app",
   "entries": [
     {
+      "id": "./agent-enrollment",
+      "source": "src/agent-enrollment/index.ts",
+      "dependsOn": [
+        "hosted-agent"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "AgentEnrollmentIdentity",
+          "kind": "type",
+          "signature": "type AgentEnrollmentIdentity",
+          "doc": null
+        },
+        {
+          "name": "AgentEnrollmentOptions",
+          "kind": "interface",
+          "signature": "interface AgentEnrollmentOptions",
+          "doc": null
+        },
+        {
+          "name": "AgentEnrollmentRequest",
+          "kind": "interface",
+          "signature": "interface AgentEnrollmentRequest",
+          "doc": null
+        },
+        {
+          "name": "AgentEnrollmentStore",
+          "kind": "interface",
+          "signature": "interface AgentEnrollmentStore",
+          "doc": null
+        },
+        {
+          "name": "AgentEnrollmentTarget",
+          "kind": "interface",
+          "signature": "interface AgentEnrollmentTarget",
+          "doc": "An application's durable pointer to one private agent's native SDK session."
+        },
+        {
+          "name": "AuthenticatedSharedLinePrincipal",
+          "kind": "interface",
+          "signature": "interface AuthenticatedSharedLinePrincipal",
+          "doc": "The host verifies Hub's signed callback before the SDK parses its body."
+        },
+        {
+          "name": "createAgentEnrollment",
+          "kind": "function",
+          "signature": "<Principal>(options: AgentEnrollmentOptions<Principal>) => { enroll: (principal: Principal, request: AgentEnrollmentReq…",
+          "doc": "Share one authenticated target between an app's phone, web and ChatGPT adapters."
+        },
+        {
+          "name": "createEnrolledApplicationLineHandler",
+          "kind": "function",
+          "signature": "<Principal>(options: EnrolledApplicationLineOptions<Principal>) => (request: Request) => Promise<Response>",
+          "doc": "Bind a signed shared Line member to the same native target used by web and ChatGPT."
+        },
+        {
+          "name": "EnrolledApplicationLineOptions",
+          "kind": "interface",
+          "signature": "interface EnrolledApplicationLineOptions",
+          "doc": null
+        },
+        {
+          "name": "EnrollmentTargetError",
+          "kind": "class",
+          "signature": "class EnrollmentTargetError",
+          "doc": null
+        },
+        {
+          "name": "LiveSharedEnrollmentMember",
+          "kind": "interface",
+          "signature": "interface LiveSharedEnrollmentMember",
+          "doc": "Current host-owned app, customer and member grant for one Hub subject."
+        },
+        {
+          "name": "ResolvedAgentEnrollment",
+          "kind": "interface",
+          "signature": "interface ResolvedAgentEnrollment",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./alerting",
       "source": "src/alerting/index.ts",
       "dependsOn": [],
