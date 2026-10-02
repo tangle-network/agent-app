@@ -1,0 +1,35 @@
+{
+  "lightTokens": {
+    "background": "rgb(247, 247, 247)",
+    "color": "rgb(45, 45, 45)",
+    "buttonBackground": "rgb(99, 102, 241)"
+  },
+  "darkTokens": {
+    "background": "rgb(36, 36, 36)",
+    "color": "rgb(230, 230, 230)",
+    "buttonBackground": "rgb(124, 108, 246)"
+  },
+  "mobileButtons": [
+    {
+      "label": "Get a dedicated number",
+      "x": 47,
+      "y": 209,
+      "width": 295,
+      "height": 40
+    },
+    {
+      "label": "Keep sharing",
+      "x": 47,
+      "y": 256,
+      "width": 295,
+      "height": 40
+    }
+  ],
+  "uniqueAppCount": 3,
+  "videoPath": "/tmp/shared-line-app-notice-proof/page@73c471ddf19d3119b04d0864bb99c64b.webm",
+  "screenshots": [
+    "/tmp/shared-line-app-notice-proof/light-desktop.png",
+    "/tmp/shared-line-app-notice-proof/light-mobile.png",
+    "/tmp/shared-line-app-notice-proof/dark-desktop.png"
+  ]
+}

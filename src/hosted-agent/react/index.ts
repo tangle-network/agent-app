@@ -10,3 +10,4 @@ export { LineMembers } from './LineMembers'
 export { LineBilling } from './LineBilling'
 
 export { ApplicationLineSetup, type ApplicationLineSetupProps, type ApplicationLineSetupClient, type ApplicationLineConnectInput, type ApplicationSenderVerificationStart, type ApplicationSenderVerification } from './ApplicationLineSetup'
+export { SharedLineAppNotice, type SharedLineApp, type SharedLineAppNoticeProps } from './SharedLineAppNotice'

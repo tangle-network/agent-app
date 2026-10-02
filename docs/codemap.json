@@ -6810,6 +6810,24 @@
           "kind": "interface",
           "signature": "interface LineSetupSnapshot",
           "doc": null
+        },
+        {
+          "name": "SharedLineApp",
+          "kind": "interface",
+          "signature": "interface SharedLineApp",
+          "doc": null
+        },
+        {
+          "name": "SharedLineAppNotice",
+          "kind": "function",
+          "signature": "({ apps, open, onKeepSharing, onRequestDedicatedNumber, }: SharedLineAppNoticeProps) => Element | null",
+          "doc": "A quiet, dismissible notice for apps that the host verified share a phone thread."
+        },
+        {
+          "name": "SharedLineAppNoticeProps",
+          "kind": "interface",
+          "signature": "interface SharedLineAppNoticeProps",
+          "doc": null
         }
       ]
     },
