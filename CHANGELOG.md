@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.1
+
+- fix(peer): admit signed Sandbox callback cohort
+
 ## 0.51.0
 
 - refactor(platform)!: retire the legacy Hub proxy (#735)
