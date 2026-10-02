@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.5
+
+- fix(platform): accept empty Workerd Hub settings streams (#744)
+
 ## 0.51.4
 
 - chore(ci): remove automatic PR checks and duplicate suites (#742)
