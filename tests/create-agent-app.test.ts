@@ -76,7 +76,7 @@ describe('create-agent-app scaffolder', () => {
     }
     const tmp = mkdtempSync(join(tmpdir(), 'create-agent-app-'))
     projectDir = join(tmp, 'demo-agent')
-    execFileSync('node', [CLI, projectDir, '--name', 'demo-agent'], { stdio: 'pipe' })
+    execFileSync('node', [CLI, projectDir, '--name', 'demo-agent', '--headless'], { stdio: 'pipe' })
     linkDeps(projectDir)
   })
 
