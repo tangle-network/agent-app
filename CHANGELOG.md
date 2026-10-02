@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.51.15
+
+- fix(deps): admit Hub SDK 0.24 (#760)
+
+## 0.51.14
+
+- fix(composer): keep skill suggestions compact and scrollable (#759)
+
+## 0.51.13
+
+- fix(sso): apply startup hardening to every protocol, not just oidc/identity (#753)
+- fix(openui, interactions): bound route body parsing with parseJsonObjectBody (#751)
+- fix(crypto): charset-validate decodeHexKey input before decoding (#750)
+
 ## 0.51.12
 
 - fix(hosted-agent): complete email mailbox setup and migration errors (#752)

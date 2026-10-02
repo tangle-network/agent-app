@@ -646,18 +646,23 @@ export function createTangleSsoHandlers(
   if (!opts.callbackUrl) throw new Error('TangleSsoHandlerOptions.callbackUrl is required')
   if (!opts.stateCookieName) throw new Error('TangleSsoHandlerOptions.stateCookieName is required')
   const callbackUrl = new URL(opts.callbackUrl)
-  if (opts.protocol === 'oidc' || opts.protocol === 'identity') {
-    if (opts.stateSecret.length < 32) throw new Error('SSO stateSecret must contain at least 32 characters')
-    if (callbackUrl.username || callbackUrl.password || callbackUrl.hash || callbackUrl.search) {
-      throw new Error('SSO callbackUrl must be fixed and have no credentials, query, or fragment')
-    }
-    const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(callbackUrl.hostname)
-    if (callbackUrl.protocol !== 'https:' && !(callbackUrl.protocol === 'http:' && loopback)) {
-      throw new Error('SSO requires HTTPS except on loopback')
-    }
-    if (callbackUrl.protocol === 'https:' && !opts.secureCookies) {
-      throw new Error('SSO HTTPS callbacks require Secure cookies')
-    }
+  // Startup hardening applies to EVERY protocol. The checks were previously
+  // gated on 'oidc' | 'identity', which left 'legacy' (the default when
+  // `protocol` is omitted — the configuration every product shipped before
+  // the typed variants existed) accepting a short stateSecret, a non-HTTPS
+  // callback, credentials/query/fragment in the callback URL, and https with
+  // non-Secure cookies (issue #749). The same configuration rules protect
+  // every flow; only the runtime origin checks remain protocol-specific.
+  if (opts.stateSecret.length < 32) throw new Error('SSO stateSecret must contain at least 32 characters')
+  if (callbackUrl.username || callbackUrl.password || callbackUrl.hash || callbackUrl.search) {
+    throw new Error('SSO callbackUrl must be fixed and have no credentials, query, or fragment')
+  }
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(callbackUrl.hostname)
+  if (callbackUrl.protocol !== 'https:' && !(callbackUrl.protocol === 'http:' && loopback)) {
+    throw new Error('SSO requires HTTPS except on loopback')
+  }
+  if (callbackUrl.protocol === 'https:' && !opts.secureCookies) {
+    throw new Error('SSO HTTPS callbacks require Secure cookies')
   }
   const sessionCookieName = opts.sessionCookieName ?? DEFAULT_SESSION_COOKIE
   let mintSessionCookies: (args: TangleSsoSessionCookieArgs) => Promise<readonly string[]>

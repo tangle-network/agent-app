@@ -82,8 +82,8 @@ importers:
         specifier: ^0.36.1
         version: 0.36.1(@ai-sdk/anthropic@3.0.122(zod@4.4.3))(@ai-sdk/google@3.0.127(zod@4.4.3))(@anthropic-ai/sdk@0.93.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(playwright@1.63.0)(ws@8.21.3)(zod@4.4.3)
       '@tangle-network/hub-sdk':
-        specifier: 0.23.0
-        version: 0.23.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@opentelemetry/api@1.9.1)(@opentelemetry/semantic-conventions@1.43.0)
+        specifier: 0.24.0
+        version: 0.24.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@opentelemetry/api@1.9.1)(@opentelemetry/semantic-conventions@1.43.0)
       '@tangle-network/sandbox':
         specifier: 0.59.0
         version: 0.59.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
@@ -2500,8 +2500,8 @@ packages:
       '@ai-sdk/google': ^3.0.33
       playwright: ^1.40.0
 
-  '@tangle-network/hub-sdk@0.23.0':
-    resolution: {integrity: sha512-6oKiX4Y5Ffk222LknuaLSRXq+XUXbbzZ8sQNxNxUWlwosbFLY3suGquX9OrmghymxO+m2j4ZoCrTYQZhIU90Sg==}
+  '@tangle-network/hub-sdk@0.24.0':
+    resolution: {integrity: sha512-hBJmYi/8H+lWBvif2LaPCqbHSKmMX1hqIue/hPfpQ53EFQKJT4cFqK/so/3OndyaZ7iP8/K3TE9sZSPecJg7mA==}
 
   '@tangle-network/sandbox-ui@0.117.0':
     resolution: {integrity: sha512-2zVfGsIgpiTeTq+ZBv4DKIu3gSjAornU4s5WKVkhiCARy+A+N0P4hN4DuNgRfKOLOeR9sS3qe09LfktyKaC/aA==}
@@ -2575,8 +2575,8 @@ packages:
       viem:
         optional: true
 
-  '@tangle-network/sdk-telemetry@0.1.21':
-    resolution: {integrity: sha512-y7TNqvSweSR726gNP0B6SgOcNx9uMStk+X8F891rDsxxnhKo2715jWQTR8L747LOc+ktRJOSK7lqoYd7JIe+hQ==}
+  '@tangle-network/sdk-telemetry@0.1.22':
+    resolution: {integrity: sha512-Wcnbu26uT/k664n7AkEFechMhS/S0c9yPvCcTD5Ql896geRWKA4JeufRUJVdWAv0SfcAsEwl8qiNZ8wbP6m9Gg==}
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0'
       '@opentelemetry/exporter-trace-otlp-http': '>=0.50.0'
@@ -8046,9 +8046,9 @@ snapshots:
       - ws
       - zod
 
-  '@tangle-network/hub-sdk@0.23.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@opentelemetry/api@1.9.1)(@opentelemetry/semantic-conventions@1.43.0)':
+  '@tangle-network/hub-sdk@0.24.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@opentelemetry/api@1.9.1)(@opentelemetry/semantic-conventions@1.43.0)':
     dependencies:
-      '@tangle-network/sdk-telemetry': 0.1.21(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@opentelemetry/api@1.9.1)(@opentelemetry/semantic-conventions@1.43.0)
+      '@tangle-network/sdk-telemetry': 0.1.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@opentelemetry/api@1.9.1)(@opentelemetry/semantic-conventions@1.43.0)
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
       - '@opentelemetry/api'
@@ -8125,7 +8125,7 @@ snapshots:
       openai: 6.49.0(ws@8.21.3)(zod@4.4.3)
       viem: 2.57.1(typescript@7.0.2)(zod@4.6.5)
 
-  '@tangle-network/sdk-telemetry@0.1.21(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@opentelemetry/api@1.9.1)(@opentelemetry/semantic-conventions@1.43.0)':
+  '@tangle-network/sdk-telemetry@0.1.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@opentelemetry/api@1.9.1)(@opentelemetry/semantic-conventions@1.43.0)':
     dependencies:
       '@tangle-network/agent-core': 0.9.5(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
     optionalDependencies:

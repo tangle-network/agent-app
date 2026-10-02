@@ -37,6 +37,7 @@ import {
   type SidecarInteractionsConnection,
   type SidecarInteractionsError,
 } from './sidecar'
+import { parseJsonObjectBody } from '../web/core'
 
 // A client resolves an ask by answering (`accepted`) or refusing (`declined`).
 // Withdrawal (`cancelled`) is an agent/broker outcome delivered via the
@@ -77,6 +78,12 @@ export function validateInteractionAnswerBody(body: Record<string, unknown>): In
   }
   return { ok: true, id, outcome, data }
 }
+
+/** How big the POST body may be before the route refuses to parse it. An
+ *  answer carries an interaction id, an outcome, and field values — 64 KiB is
+ *  generous; refusing larger bodies before parsing bounds per-request memory
+ *  (issue #748). */
+const DEFAULT_MAX_BODY_BYTES = 64 * 1024
 
 /** Provide logging methods for warnings and errors in interaction routes */
 export type InteractionRouteLogger = Pick<Console, 'warn' | 'error'>
@@ -190,6 +197,8 @@ export interface InteractionAnswerRouteOptions {
   /** Additive crash-recoverable settlement. When configured, POST requires an
    * `attemptKey`; accepted values are finalized only after sidecar ack. */
   durable?: DurableInteractionRoutePersistence
+  /** Request-body byte cap before parsing. Default 64 KiB. */
+  maxBodyBytes?: number
   logger?: InteractionRouteLogger
 }
 
@@ -225,9 +234,16 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
   }
 
   async function answer(request: Request): Promise<Response> {
-    const body = await request.json().catch(() => null) as Record<string, unknown> | null
-    if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
+    // Bounded body parse (streaming cap, content-length precheck, 413) — the
+    // same primitive every other route boundary in the package uses.
+    const [body, bodyError] = await parseJsonObjectBody(request, { maxBytes: options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES })
+    if (bodyError) {
+      return Response.json(
+        bodyError.status === 413
+          ? { error: 'JSON body is too large' }
+          : { error: 'Invalid JSON body' },
+        { status: bodyError.status },
+      )
     }
     const validation = validateInteractionAnswerBody(body)
     if (!validation.ok) return Response.json({ error: validation.error }, { status: 400 })

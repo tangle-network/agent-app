@@ -16,7 +16,13 @@ const ALGORITHM = 'AES-GCM'
 /** Validate + decode a 64-char hex key to 32 bytes. Throws on the wrong shape so
  *  a misconfigured key fails loud, never silently weakens encryption. */
 export function decodeHexKey(keyHex: string): Uint8Array {
-  if (keyHex.length !== 64) throw new Error('encryption key must be a 64-char hex string (32 bytes)')
+  // Charset-validated BEFORE decoding: `parseInt('zz', 16)` is NaN, and a NaN
+  // assignment to a Uint8Array silently stores 0 — a 64-char non-hex string
+  // would otherwise produce an all-zero key instead of throwing, contradicting
+  // the fail-loud contract above (found in redteam review, issue #747).
+  if (!/^[0-9a-fA-F]{64}$/.test(keyHex)) {
+    throw new Error('encryption key must be a 64-char hex string (32 bytes)')
+  }
   const bytes = new Uint8Array(32)
   for (let i = 0; i < 64; i += 2) bytes[i / 2] = parseInt(keyHex.substring(i, i + 2), 16)
   return bytes
