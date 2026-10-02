@@ -100,19 +100,21 @@ export function createEnrolledApplicationLineHandler<Principal>(options: Enrolle
     const appId = await options.selectApp(authenticated, input)
     if (!appId || (authenticated.selectedAppId && authenticated.selectedAppId !== appId)) throw forbidden()
     authenticated.selectedAppId = appId
-    const member = await options.lookup(authenticated.principal, authenticated.binding, subject, appId)
-    if (!member || member.appId !== appId || !matches(input, member)
+    const observedMember = await options.lookup(authenticated.principal, authenticated.binding, subject, appId)
+    if (!observedMember) throw forbidden()
+    // A host cache may return the same mutable object on both lookups.
+    const member = Object.freeze({ ...observedMember })
+    if (member.appId !== appId || !matches(input, member)
       || (authenticated.pinned && !sameMember(authenticated.pinned.member, member))) throw forbidden()
     const resolved = await options.enrollment.resolve(authenticated.principal, member.enrollmentId)
-    if (!matchesTarget(member, resolved.target)
-      || (authenticated.pinned && !sameTarget(authenticated.pinned.target, resolved.target))) throw forbidden()
+    const target = Object.freeze({ ...resolved.target })
+    if (!matchesTarget(member, target)
+      || (authenticated.pinned && !sameTarget(authenticated.pinned.target, target))) throw forbidden()
     // SDK observations yield. A revoked or remapped member must not start or read a turn.
     const current = await options.lookup(authenticated.principal, authenticated.binding, subject, appId)
     if (!current || !sameMember(current, member)) throw forbidden()
-    authenticated.pinned ??= Object.freeze({
-      member: Object.freeze({ ...member }), target: Object.freeze({ ...resolved.target }),
-    })
-    return resolved
+    authenticated.pinned ??= Object.freeze({ member, target })
+    return { ...resolved, target }
   }
 
   return createApplicationLineHandler({

@@ -89,7 +89,10 @@ function sameClaim(left: AgentEnrollmentClaim, right: AgentEnrollmentClaim): boo
 async function configurationDigest(request: AgentEnrollmentRequest): Promise<string> {
   let serialized: string | undefined
   try {
-    serialized = JSON.stringify({ profile: request.instance.profile, create: request.instance.create })
+    serialized = JSON.stringify({ profile: request.instance.profile, create: request.instance.create },
+      (_key, value: unknown) => value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0))
+        : value)
   } catch {
     throw new EnrollmentTargetError('invalid_request')
   }
@@ -98,12 +101,25 @@ async function configurationDigest(request: AgentEnrollmentRequest): Promise<str
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
+function snapshotRequest(request: AgentEnrollmentRequest): AgentEnrollmentRequest {
+  try {
+    return {
+      enrollmentId: request.enrollmentId, agentId: request.agentId,
+      workspaceId: request.workspaceId, threadId: request.threadId,
+      instance: structuredClone(request.instance),
+    }
+  } catch {
+    throw new EnrollmentTargetError('invalid_request')
+  }
+}
+
 /** Share one authenticated target between an app's phone, web and ChatGPT adapters. */
 export function createAgentEnrollment<Principal>(options: AgentEnrollmentOptions<Principal>) {
   async function resolve(principal: Principal, enrollmentId: string): Promise<ResolvedAgentEnrollment> {
     if (!valid(enrollmentId)) throw new EnrollmentTargetError('invalid_request')
-    const target = await options.store.get(enrollmentId)
-    if (!target) throw new EnrollmentTargetError('missing')
+    const stored = await options.store.get(enrollmentId)
+    if (!stored) throw new EnrollmentTargetError('missing')
+    const target = Object.freeze({ ...stored })
     await options.authorize(principal, target, 'resolve')
     const client = await options.client(principal)
     const record = await client.instances.get(target.instanceKey)
@@ -125,53 +141,57 @@ export function createAgentEnrollment<Principal>(options: AgentEnrollmentOptions
   }
 
   async function enroll(principal: Principal, request: AgentEnrollmentRequest): Promise<AgentEnrollmentTarget> {
-    if (![request.enrollmentId, request.agentId, request.workspaceId, request.threadId,
-      request.instance.key, request.instance.profile.version].every(valid)) {
+    const snapshot = snapshotRequest(request)
+    if (![snapshot.enrollmentId, snapshot.agentId, snapshot.workspaceId, snapshot.threadId,
+      snapshot.instance.key, snapshot.instance.profile.version].every(valid)) {
       throw new EnrollmentTargetError('invalid_request')
     }
-    await options.authorize(principal, request, 'enroll')
-    const claim: AgentEnrollmentClaim = {
-      enrollmentId: request.enrollmentId, agentId: request.agentId,
-      workspaceId: request.workspaceId, threadId: request.threadId,
-      instanceKey: request.instance.key, profileVersion: request.instance.profile.version,
-      configurationDigest: await configurationDigest(request),
-    }
+    const identity: AgentEnrollmentIdentity = Object.freeze({
+      enrollmentId: snapshot.enrollmentId, agentId: snapshot.agentId,
+      workspaceId: snapshot.workspaceId, threadId: snapshot.threadId,
+    })
+    await options.authorize(principal, identity, 'enroll')
+    const claim: AgentEnrollmentClaim = Object.freeze({
+      ...identity,
+      instanceKey: snapshot.instance.key, profileVersion: snapshot.instance.profile.version,
+      configurationDigest: await configurationDigest(snapshot),
+    })
     const winner = await options.store.claimIfAbsent(claim)
     if (!sameClaim(winner, claim)) throw new EnrollmentTargetError('conflict')
-    const existing = await options.store.get(request.enrollmentId)
+    const existing = await options.store.get(snapshot.enrollmentId)
     if (existing) {
       if (!sameClaim(existing, claim)) throw new EnrollmentTargetError('conflict')
-      return (await resolve(principal, request.enrollmentId)).target
+      return (await resolve(principal, snapshot.enrollmentId)).target
     }
     const client = await options.client(principal)
     // Store and client lookups can yield after the first grant check.
-    await options.authorize(principal, request, 'enroll')
-    const instance = await client.instances.ensure(request.instance)
+    await options.authorize(principal, identity, 'enroll')
+    const instance = await client.instances.ensure(structuredClone(snapshot.instance))
     const box = instance.box
-    if (instance.key !== request.instance.key || instance.profileVersion !== request.instance.profile.version
+    if (instance.key !== claim.instanceKey || instance.profileVersion !== claim.profileVersion
       || !Number.isSafeInteger(instance.generation) || instance.generation < 1
       || instance.sandboxId !== box.id || box.filesystemIncarnationReadiness !== 'ready'
       || !box.filesystemIncarnationId) throw new EnrollmentTargetError('target_changed')
-    const sessionId = instance.sessionId(request.threadId)
+    const sessionId = instance.sessionId(claim.threadId)
     if (!valid(sessionId)) throw new EnrollmentTargetError('target_changed')
     // Provisioning can await a revoked grant. Check again before creating a session.
-    await options.authorize(principal, request, 'enroll')
-    const created = await box.createSession({ sessionId, retention: 'workspace', backend: request.instance.profile.backend })
+    await options.authorize(principal, identity, 'enroll')
+    const created = await box.createSession({ sessionId, retention: 'workspace', backend: snapshot.instance.profile.backend })
     if (created.info.id !== sessionId) throw new EnrollmentTargetError('target_changed')
-    const target: AgentEnrollmentTarget = {
-      enrollmentId: request.enrollmentId, agentId: request.agentId, workspaceId: request.workspaceId,
-      threadId: request.threadId, instanceKey: instance.key,
+    const target: AgentEnrollmentTarget = Object.freeze({
+      enrollmentId: claim.enrollmentId, agentId: claim.agentId, workspaceId: claim.workspaceId,
+      threadId: claim.threadId, instanceKey: instance.key,
       configurationDigest: claim.configurationDigest, generation: instance.generation,
       profileVersion: instance.profileVersion, sandboxId: instance.sandboxId,
       filesystemIncarnationId: box.filesystemIncarnationId, sessionId,
-    }
+    })
     const record = await client.instances.get(target.instanceKey)
     if (!record || record.generation !== target.generation || record.sandboxId !== target.sandboxId
       || record.profileVersion !== target.profileVersion) throw new EnrollmentTargetError('target_changed')
-    await options.authorize(principal, request, 'enroll')
+    await options.authorize(principal, identity, 'enroll')
     const saved = await options.store.insertIfAbsent(target)
     if (!sameTarget(saved, target)) throw new EnrollmentTargetError('conflict')
-    return (await resolve(principal, request.enrollmentId)).target
+    return (await resolve(principal, claim.enrollmentId)).target
   }
 
   return { enroll, resolve }

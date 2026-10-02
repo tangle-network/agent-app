@@ -135,4 +135,21 @@ describe('shared enrolled application line', () => {
     const response = await handler(callback('@builder hello', 'msg_generation'))
     expect(response.status).toBe(403)
   })
+
+  it('denies a grant revision mutated on the same cached member object during resolution', async () => {
+    const cached = member('builder')
+    const handler = createEnrolledApplicationLineHandler({
+      authenticate: async () => ({ principal: 'owner', binding }),
+      selectApp: async () => 'builder',
+      lookup: async () => cached,
+      enrollment: { resolve: async () => {
+        cached.grantRevision = 'revision-2'
+        return { target: { ...cached }, box: {}, session: {} } as never
+      } },
+      read: async () => ({ state: 'completed', executionId: 'old-execution', text: 'old private output' }),
+      admit: async () => { throw new Error('revoked grant must not admit') },
+    })
+    const response = await handler(callback('@builder hello', 'msg_mutated_member'))
+    expect(response.status).toBe(403)
+  })
 })

@@ -165,6 +165,101 @@ describe('createAgentEnrollment', () => {
     expect(liveProfileVersion).toBe('v1')
   })
 
+  it('accepts an identical retry when nested configuration keys use another insertion order', async () => {
+    const f = fixture()
+    const first = { ...f.request, instance: { ...f.request.instance,
+      profile: { version: 'v1', backend: { type: 'opencode', settings: { b: 2, a: 1 } } } as never,
+      create: { region: 'us', metadata: { b: '2', a: '1' } } as never,
+    } }
+    const reordered = { ...f.request, instance: { ...f.request.instance,
+      profile: { backend: { settings: { a: 1, b: 2 }, type: 'opencode' }, version: 'v1' } as never,
+      create: { metadata: { a: '1', b: '2' }, region: 'us' } as never,
+    } }
+    await f.enrollment.enroll('owner', first)
+    await expect(f.enrollment.enroll('owner', reordered)).resolves.toMatchObject(identity)
+    expect(f.client.instances.ensure).toHaveBeenCalledTimes(1)
+  })
+
+  it('provisions the snapshotted configuration if the caller mutates its request during a store await', async () => {
+    const f = fixture()
+    const request = { ...f.request, instance: { ...f.request.instance,
+      profile: { ...f.request.instance.profile } } }
+    let stored: AgentEnrollmentTarget | null = null
+    const enrollment = createAgentEnrollment({
+      authorize: async () => {}, client: () => f.client as never,
+      store: {
+        claimIfAbsent: async claim => {
+          request.instance.key = 'agent:unclaimed'
+          request.instance.profile.backend = { type: 'opencode', changed: true } as never
+          return claim
+        },
+        get: async () => stored,
+        insertIfAbsent: async target => { stored ??= target; return stored },
+      },
+    })
+    await expect(enrollment.enroll('owner', request)).resolves.toMatchObject(identity)
+    expect(f.client.instances.ensure).toHaveBeenCalledWith(expect.objectContaining({
+      key: 'agent:agent-1', profile: { version: 'v1', backend: { type: 'opencode' } },
+    }))
+  })
+
+  it('keeps provisioning config private from host authorization callbacks', async () => {
+    const f = fixture()
+    let retained: AgentEnrollmentTarget | null = null
+    let checks = 0
+    const enrollment = createAgentEnrollment({
+      authorize: async (_principal, identity) => {
+        checks++
+        if (checks === 2 && 'instance' in identity) {
+          (identity as typeof f.request).instance.profile.backend = { type: 'opencode', changed: true } as never
+        }
+      },
+      client: () => f.client as never,
+      store: {
+        claimIfAbsent: async claim => claim,
+        get: async () => retained,
+        insertIfAbsent: async target => { retained ??= target; return retained },
+      },
+    })
+    await enrollment.enroll('owner', f.request)
+    expect(f.box.createSession).toHaveBeenCalledWith({
+      sessionId: 'thread-1-v1', retention: 'workspace', backend: { type: 'opencode' },
+    })
+  })
+
+  it('never calls ensure if a store attempts to mutate the reserved claim', async () => {
+    const f = fixture()
+    const enrollment = createAgentEnrollment({
+      authorize: async () => {}, client: () => f.client as never,
+      store: {
+        claimIfAbsent: async claim => {
+          claim.instanceKey = 'agent:unclaimed'
+          return claim
+        },
+        get: async () => null,
+        insertIfAbsent: async target => target,
+      },
+    })
+    await expect(enrollment.enroll('owner', f.request)).rejects.toThrow()
+    expect(f.client.instances.ensure).not.toHaveBeenCalled()
+  })
+
+  it('rejects a store that tries to change the committed target in place', async () => {
+    const f = fixture()
+    const enrollment = createAgentEnrollment({
+      authorize: async () => {}, client: () => f.client as never,
+      store: {
+        claimIfAbsent: async claim => claim,
+        get: async () => null,
+        insertIfAbsent: async target => {
+          target.profileVersion = 'unclaimed-profile'
+          return target
+        },
+      },
+    })
+    await expect(enrollment.enroll('owner', f.request)).rejects.toThrow()
+  })
+
   it('retains the first target when concurrent callers race for one enrollment id', async () => {
     const f = fixture()
     let stored: AgentEnrollmentTarget | null = null
