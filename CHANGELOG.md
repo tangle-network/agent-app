@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.9
+
+- fix: admit Hub SDK 0.23 cohort (#755)
+
 ## 0.51.8
 
 - feat(chat-routes): one shared observation contract for agent applications (#754)
