@@ -27,7 +27,7 @@ interface CreateRecordStoreOptions
 `function` — Build one record-entry table wired to the product's tables.
 
 ```ts
-{ <TExtra extends RecordExtraColumns>(options: CreateRecordTableOptions & { extraColumns: TExtra; }): any; (options: Cr…
+{ <TExtra extends RecordExtraColumns>(options: CreateRecordTableOptions & { extraColumns: TExtra; }): RecordTableWithEx…
 ```
 
 ### `CreateRecordTableOptions`
@@ -147,7 +147,7 @@ type RecordTableWithExtras
 `function` — Pick the driver's atomic primitive.
 
 ```ts
-(db: any) => RecordAtomicStrategy
+(db: RecordDatabase) => RecordAtomicStrategy
 ```
 
 ### `ReviewRecordEntryInput`
@@ -163,7 +163,7 @@ interface ReviewRecordEntryInput
 `function` — Project a stored row onto the slice the pure fold reads.
 
 ```ts
-(row: any) => FoldableRecordEntry
+(row: { path: string; id: string; createdAt: number; seq: number; dimension: string; period: number; conflict: boolean;…
 ```
 
 ### `WriteRecordEntryInput`

@@ -1,71 +1,11 @@
 /**
- * `/turn-stream` core — the pure, substrate-free half of the shared durable
- * turn replay/broadcast/lock channel (issue #221).
- *
- * Extracted from the reference consumer's hand-rolled Durable Object
- * (gtm-agent `SessionStreamDO` + `session-broadcast.ts`): the per-turn
- * segment store that backs reconnect replay over a live socket, the
- * single-flight chat-turn lock record and its release fences, and the wire
- * contract (channel keys, endpoint paths, request/response bodies) shared by
- * the DO transport shell (`./do`) and the worker-side adapters
- * (`./adapters`). Everything here is plain data + functions — no
- * `cloudflare:workers`, no storage, no sockets — so the semantics are
- * unit-testable in Node and the DO stays a thin shell.
- *
- * ── The two-lane rule (measured, not assumed) ────────────────────────────
- *
- * A 4-arm A/B on production (sandbox.tangle.tools, SDK 0.12.0, one box, one
- * gateway client per arm) established which sandbox lane a browser can see:
- *
- *   | turn driver                          | raw turn events | seen at gateway |
- *   | ------------------------------------ | --------------- | --------------- |
- *   | `box.streamPrompt()` (run/stream)    | 71 / 527 / 408  | 0 / 0 / 0       |
- *   | `box.session(id).sendMessage()`      | 297             | 297             |
- *   | `box.driveTurn()` (Sandbox 0.37+)    | —               | SDK contract    |
- *
- * `POST /agents/run/stream` publishes nothing to the sidecar session event
- * bus, so a `SessionGatewayClient` attached to that session receives zero
- * turn events — three different session-id strategies all got 0, the id was
- * not the variable. `POST /agents/sessions/{id}/messages` publishes to the
- * bus and the gateway delivered every frame, byte-matching the sidecar tail.
- * Sandbox 0.37 admits `driveTurn` through the session message lane, so the
- * gateway can observe it. That is an SDK contract, not a new production count.
- *
- * Consequences for this module, and they cut both ways:
- *
- * 1. INTERACTIVE sandbox turns are driven on the message lane and tailed
- *    by the browser through `box.mintScopedToken({ scope: 'session' })` +
- *    `SessionGatewayClient`. The former per-turn SEGMENT rebroadcast lane
- *    that duplicated this was REMOVED (0.52.0) after every product had
- *    moved off it — do not rebuild it.
- * 2. Detached turns driven through `dispatchPrompt({ detach: true })` or
- *    `streamPrompt` remain on the run/stream lane and keep the durable
- *    turn-event rows (`turn:` channels) when a browser must tail them.
- *    Sandbox 0.37 `driveTurn` is different: it uses the session message
- *    lane and the gateway can observe it by SDK contract.
- * 3. The LOCK and the per-workspace SIGNALS have no gateway equivalent at
- *    all (the gateway is per-session and read-only). They stay canonical.
- *
- * Server-side resume of a run/stream turn is also already solved by the SDK
- * and needs nothing here: `box.streamPrompt('', { executionId, lastEventId })`
- * replays strictly after the cursor without re-dispatching — measured across
- * a SIGKILL mid-run and a fresh process resuming from the cursor alone:
- * 0 lost, 0 duplicated, 0 out-of-order, ids 1..517 contiguous.
+ * Channel tokens, lock records, workspace signals, and durable event keys.
+ * Interactive turn replay belongs to the sandbox session gateway.
+ * Detached stream/dispatch turns retain durable rows and a running-turn index.
+ * This core uses WebCrypto and plain data without a Cloudflare runtime import.
  */
 
-import { constantTimeEqual } from '../crypto/web-token'
-
-async function hmacSha256Hex(secret: string, value: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)))
-  return Array.from(sig, (b) => b.toString(16).padStart(2, '0')).join('')
-}
+import { base64UrlEncodeText, constantTimeEqual, hmacSha256Base64Url } from '../crypto/web-token'
 
 // ── events ──────────────────────────────────────────────────────────────────
 
@@ -96,12 +36,11 @@ export interface TurnStreamEvent {
  *  accepted socket lives until it closes. */
 export const TURN_STREAM_TOKEN_TTL_MS = 60_000
 
-/** Request header the adapters attach (and the DO accepts). The WS upgrade
- *  additionally accepts `?token=` because browsers cannot set headers on a
- *  WebSocket handshake. */
+/** Request header the adapters attach (and the DO accepts). The worker also
+ *  attaches it when forwarding an authorized browser WebSocket handshake. */
 export const TURN_STREAM_TOKEN_HEADER = 'x-turn-stream-token'
 
-/** `v1.<exp-ms-36>.<hmac-hex>` — the expiry is inside the signed payload so
+/** `v1.<base64url-channel>.<exp-ms-36>.<base64url-mac>` — the expiry is inside the signed payload so
  *  it cannot be extended by editing the token. */
 export async function mintTurnStreamToken(
   channelName: string,
@@ -111,8 +50,8 @@ export async function mintTurnStreamToken(
 ): Promise<string> {
   if (!secret || secret.length < 32) throw new Error('turn-stream token secret must be at least 32 characters')
   const expiresAt = now() + ttlMs
-  const payload = `v1.${channelName}.${expiresAt.toString(36)}`
-  return `${payload}.${await hmacSha256Hex(secret, payload)}`
+  const payload = `v1.${base64UrlEncodeText(channelName)}.${expiresAt.toString(36)}`
+  return `${payload}.${await hmacSha256Base64Url(payload, secret)}`
 }
 
 /** Verify a token for `channelName`: constant-time MAC compare with the
@@ -128,19 +67,18 @@ export async function verifyTurnStreamToken(
   const parts = token.split('.')
   if (parts.length !== 4 || parts[0] !== 'v1') return false
   const [, name, expires36, mac] = parts as [string, string, string, string]
-  if (name !== channelName) return false
+  if (name !== base64UrlEncodeText(channelName)) return false
   if (!/^[0-9a-z]+$/.test(expires36)) return false
   const expiresAt = parseInt(expires36, 36)
-  if (!Number.isFinite(expiresAt) || expiresAt <= now()) return false
-  const expected = await hmacSha256Hex(secret, `v1.${channelName}.${expires36}`)
+  if (!Number.isSafeInteger(expiresAt) || expiresAt <= now()) return false
+  const expected = await hmacSha256Base64Url(`v1.${name}.${expires36}`, secret)
   return constantTimeEqual(mac, expected)
 }
 
 // ── channel keys ────────────────────────────────────────────────────────────
 //
-// One DO instance per channel key. Three families:
-//   thread     `${workspaceId}:${threadId}` — live turn fanout + segments +
-//              the thread-scope lock.
+// One DO instance per channel key. Four families:
+//   thread     `${workspaceId}:${threadId}` — thread-scope lock.
 //   workspace  `${workspaceId}`             — sidebar activity + thread.created
 //              + the workspace-scope lock.
 //   turn       `turn:${turnId}`             — durable turn-event rows + status
@@ -151,20 +89,12 @@ export async function verifyTurnStreamToken(
 /** Define the scope level for acquiring a turn lock within thread or workspace contexts */
 export type TurnLockScope = 'thread' | 'workspace'
 
-/** Generate a unique string key combining workspace and thread identifiers.
- *
- *  KEPT: thread-scope LOCKS are keyed on it (see {@link turnLockChannelKey}).
- *  Only its second use — addressing a live-viewer socket for interactive
- *  sandbox-turn rebroadcast — is superseded by the session gateway. */
+/** Channel for a thread-scoped lock. */
 export function threadChannelKey(workspaceId: string, threadId: string): string {
   return `${workspaceId}:${threadId}`
 }
 
-/** Generate a unique channel key based on the given workspace identifier.
- *
- *  KEPT and canonical: the per-workspace signal channel (`thread.created`,
- *  `thread.activity`) plus workspace-scope locks. The session gateway is
- *  per-SESSION and read-only, so it cannot carry either. */
+/** Channel for workspace signals and the workspace-scoped lock. */
 export function workspaceChannelKey(workspaceId: string): string {
   return workspaceId
 }
@@ -177,48 +107,24 @@ export function turnLockChannelKey(workspaceId: string, threadId: string, scope:
   return scope === 'workspace' ? workspaceChannelKey(workspaceId) : threadChannelKey(workspaceId, threadId)
 }
 
-/** Generate a storage channel key string for a given turn identifier.
- *
- *  KEPT and canonical: durable turn-event rows for stream/dispatch detached
- *  runs live on this instance. Those run/stream paths do not reach the
- *  session gateway, so this is how a browser tails one. */
+/** Channel for the optional Durable Object turn-event backend. */
 export function turnStorageChannelKey(turnId: string): string {
   return `turn:${turnId}`
 }
 
-/** Generate a unique channel key string based on the provided scope identifier.
- *
- *  KEPT and canonical: backs `TurnEventStore.listRunning`, which is how a
- *  reloaded client rediscovers an in-flight DETACHED turn. */
+/** Running-turn index for the optional Durable Object turn-event backend. */
 export function scopeIndexChannelKey(scopeId: string): string {
   return `scope:${scopeId}`
 }
 
-// ── segment store ───────────────────────────────────────────────────────────
-//
-// REMOVED (0.52.0): the deprecated interactive-turn rebroadcast buffer
-// (`createSegmentStore` / `appendSegmentEvent` / `replayActiveSegment` /
-// `MAX_SEGMENT_EVENTS` / `broadcastTurnStreamEvent`). Every product drives
-// interactive turns on the sandbox session-message lane, where the SDK's
-// own gateway replays losslessly; detached runs keep the durable `turn:`
-// rows. Rebuilding per-turn in-DO segments would duplicate the SDK and
-// re-open the client-declared-sessionId fanout this removal closed.
-
-/**
- * Remove responding entries (threadId → startedAt) older than `ttlMs`, so a
- * dropped `end` broadcast can't leave a permanently-stuck dot. Mutates
- * `active` and returns the removed thread ids.
- */
-/** Recent `thread.created` markers kept for late-connecting sidebars.
- *
- *  KEPT: a workspace-level signal, not a turn rebroadcast. */
+/** Recent thread-created markers kept for late-connecting sidebars. */
 export const MAX_RECENT_CREATED = 50
 
 /** A responding marker older than this is treated as stale, so a dropped
  *  `end` broadcast can't leave a permanently-stuck "responding" dot. */
 export const ACTIVITY_TTL_MS = 15 * 60 * 1000
 
-
+/** Remove responding markers older than ttlMs; return their thread IDs. */
 export function pruneStaleThreads(active: Map<string, number>, now: number, ttlMs: number): string[] {
   const removed: string[] = []
   for (const [threadId, startedAt] of active) {
@@ -232,15 +138,8 @@ export function pruneStaleThreads(active: Map<string, number>, now: number, ttlM
 
 // ── chat-turn lock record + fences ──────────────────────────────────────────
 
-/** Default lifetime of an unreleased lock. Long enough that a legitimately
- *  slow sandbox turn never loses its guard mid-run; the way OUT of a wedge is
- *  never the TTL but `reconcileStaleTurnLock` (in `/chat-routes`), which
- *  probes the execution's actual state.
- *
- *  Everything from here down is the LOCK, and it is fully KEPT. The sandbox
- *  SDK ships no single-flight primitive — the session gateway is a read-only
- *  fanout — so moving a product to the message lane changes nothing about
- *  who is allowed to start a turn. */
+/** Fallback lifetime for an unreleased lock. Use stale-lock reconciliation to
+ *  recover earlier when execution state proves that its holder stopped. */
 export const TURN_LOCK_TTL_MS = 30 * 60 * 1000
 
 /** The stored single-flight lock. Field-compatible with the reference
@@ -320,11 +219,7 @@ export function createTurnLock(input: TurnLockAcquireInput, now: number, ttlMs =
   }
 }
 
-/** A cooperative release must present the lock's own identity — both the
- *  execution and the lockId minted at acquire — so a retry of a PREVIOUS turn
- *  can never release the current one. `lockId` is optional only for the DO's
- *  internal terminal-event auto-release, which knows the execution but not
- *  the caller-held lockId. */
+/** A cooperative release matches the execution and, when supplied, lock ID. */
 export function turnLockMatchesRelease(
   active: DurableTurnLock,
   input: { executionId: string; lockId?: string },

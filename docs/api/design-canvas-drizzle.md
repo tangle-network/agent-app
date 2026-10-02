@@ -11,7 +11,7 @@ Source: `src/design-canvas/drizzle.ts`
 `function` — Build SQLite tables for design documents with workspace and user references
 
 ```ts
-(opts: CreateDesignCanvasTablesOptions) => { designDocuments: any; designDecisions: any; designExports: any; }
+(opts: CreateDesignCanvasTablesOptions) => { designDocuments: SQLiteTableWithColumns<{ name: "design_document"; schema:…
 ```
 
 ### `CreateDesignCanvasTablesOptions`

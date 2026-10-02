@@ -8,10 +8,10 @@ Source: `src/design-canvas-react/lazy.tsx`
 
 ### `DesignCanvasChromeLazy`
 
-`const` — Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail.
+`function` — Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail.
 
 ```ts
-any
+LazyExoticComponent<({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange…
 ```
 
 ### `DesignCanvasFullProps`
@@ -24,10 +24,10 @@ interface DesignCanvasFullProps
 
 ### `DesignCanvasLazy`
 
-`const` — Batteries-included editor: chrome + workspace on one shared stack.
+`function` — Batteries-included editor: chrome + workspace on one shared stack.
 
 ```ts
-any
+LazyExoticComponent<(props: DesignCanvasProps) => Element>
 ```
 
 ### `DesignCanvasProps`

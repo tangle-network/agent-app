@@ -51,7 +51,7 @@ interface CreatePersonalOrganizationOptions
 `function` — Build SQLite tables for organizations and related team structures using provided options
 
 ```ts
-(opts: CreateTeamTablesOptions) => { organizations: any; organizationMembers: any; workspaceMembers: any; }
+(opts: CreateTeamTablesOptions) => { organizations: SQLiteTableWithColumns<{ name: "organization"; schema: undefined; c…
 ```
 
 ### `CreateTeamTablesOptions`
@@ -75,7 +75,7 @@ interface CreateTeamTablesOptions
 `function` — Build a workspace invitation table with defined columns and foreign key constraints
 
 ```ts
-(opts: CreateWorkspaceInvitationTableOptions) => { workspaceInvitations: any; }
+(opts: CreateWorkspaceInvitationTableOptions) => { workspaceInvitations: SQLiteTableWithColumns<{ name: "workspace_invi…
 ```
 
 ### `CreateWorkspaceInvitationTableOptions`

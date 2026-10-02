@@ -102,7 +102,7 @@ describe('capability-token gate (issue #746)', () => {
       new Request(`https://turn-stream.internal${TURN_STREAM_PATHS.turnStatusGet}`, { method: 'POST', body: '{}' }),
     )
     expect(response.status).toBe(500)
-    expect(await response.json()).toMatchObject(/TURN_STREAM_AUTH_SECRET/)
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining('TURN_STREAM_AUTH_SECRET') })
   })
 
   it('fails closed with 500 when the DO has no channel name', async () => {
@@ -128,7 +128,7 @@ describe('capability-token gate (issue #746)', () => {
     expect(response.status).toBe(500)
   })
 
-  it('a valid token is accepted via header and via ?token= (WS upgrade path)', async () => {
+  it('accepts an internal header and refuses credentials passed in the URL', async () => {
     const h = harness()
     const name = 'ws-1:th-1'
     const stub = h.namespace.get(h.namespace.idFromName(name))
@@ -142,7 +142,7 @@ describe('capability-token gate (issue #746)', () => {
       `https://turn-stream.internal${TURN_STREAM_PATHS.turnStatusGet}?token=${encodeURIComponent(await mintTurnStreamToken(name, AUTH.secret))}`,
       { method: 'POST', body: '{}' },
     )
-    expect(viaQuery.status).toBe(200)
+    expect(viaQuery.status).toBe(401)
   })
 
   it('the gate also covers subclass product endpoints (single choke point)', async () => {
@@ -166,6 +166,11 @@ describe('capability-token gate (issue #746)', () => {
       body: '{}',
     })
     expect(await authenticated.json()).toEqual({ pong: true })
+  })
+
+  it.each(['customer.example:thread.2', 'workspace/équipe:東京'])('round-trips the exact channel name %s', async (name) => {
+    const token = await mintTurnStreamToken(name, AUTH.secret)
+    expect(await verifyTurnStreamToken(name, token, AUTH.secret)).toBe(true)
   })
 
   it('verifyTurnStreamToken: mint/verify round-trip rejects secret under 32 chars', async () => {

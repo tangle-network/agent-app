@@ -8,10 +8,10 @@ Source: `src/teams-react/lazy.tsx`
 
 ### `InvitationsPanelLazy`
 
-`const` — Load InvitationsPanel component lazily to optimize initial rendering performance
+`function` — Load InvitationsPanel component lazily to optimize initial rendering performance
 
 ```ts
-any
+LazyExoticComponent<({ invitations, currentRole, onInvite, onResend, onRevoke, onCopy, onNotice, }: InvitationsPanelPro…
 ```
 
 ### `InvitationsPanelProps`
@@ -24,10 +24,10 @@ interface InvitationsPanelProps
 
 ### `InviteAcceptPageLazy`
 
-`const` — Load InviteAcceptPage component lazily for optimized code splitting and performance
+`function` — Load InviteAcceptPage component lazily for optimized code splitting and performance
 
 ```ts
-any
+LazyExoticComponent<({ details, onAccept, onNavigate, onResendVerification }: InviteAcceptPageProps) => Element>
 ```
 
 ### `InviteAcceptPageProps`
@@ -40,10 +40,10 @@ interface InviteAcceptPageProps
 
 ### `MembersPanelLazy`
 
-`const` — Load MembersPanel component lazily to optimize initial rendering performance
+`function` — Load MembersPanel component lazily to optimize initial rendering performance
 
 ```ts
-any
+LazyExoticComponent<({ members, currentRole, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPane…
 ```
 
 ### `MembersPanelProps`

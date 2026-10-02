@@ -11,7 +11,7 @@ Source: `src/turn-stream/index.ts`
 `function` — Acquire a durable turn lock in the specified namespace with given input parameters
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: AcquireDurableTurnLockInput, auth?: TurnStreamAuth | undefined) => Promise<…
+(namespace: TurnStreamNamespaceLike, input: AcquireDurableTurnLockInput, auth: TurnStreamAuth) => Promise<...>
 ```
 
 ### `AcquireDurableTurnLockInput`
@@ -43,7 +43,7 @@ number
 `function` — Per-workspace marker that a new thread was created, so an already-open history list prepends it without a reload.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, workspaceId: string, thread: { threadId: string; title: string; }, auth?: TurnStre…
+(namespace: TurnStreamNamespaceLike, workspaceId: string, thread: { threadId: string; title: string; }, auth: TurnStrea…
 ```
 
 ### `broadcastWorkspaceActivity`
@@ -51,15 +51,15 @@ number
 `function` — Coarse per-workspace marker that a thread's turn started / ended — drives a sidebar "agent responding" indicator subscribed once per workspace.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, workspaceId: string, threadId: string, phase: "start" | "end", auth?: TurnStreamAu…
+(namespace: TurnStreamNamespaceLike, workspaceId: string, threadId: string, phase: "start" | "end", auth: TurnStreamAut…
 ```
 
 ### `createDurableObjectTurnEventStore`
 
-`function` — A {@link TurnEventStore} backed by {@link TurnStreamDO } storage — the production implementation of `createChatTurnRoutes`' `turnStore` seam for apps that don't run D1 for turn events (or want replay…
+`function` — Optional Durable Object backend for {@link TurnEventStore}.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, auth?: TurnStreamAuth | undefined) => TurnEventStore
+(namespace: TurnStreamNamespaceLike, auth: TurnStreamAuth) => TurnEventStore
 ```
 
 ### `createDurableTurnLock`
@@ -128,7 +128,7 @@ interface DurableTurnLock
 
 ### `MAX_RECENT_CREATED`
 
-`const` — Recent `thread.created` markers kept for late-connecting sidebars.
+`const` — Recent thread-created markers kept for late-connecting sidebars.
 
 ```ts
 50
@@ -168,7 +168,7 @@ interface MemoryTurnStreamSocket
 
 ### `mintTurnStreamToken`
 
-`function` — `v1.<exp-ms-36>.<hmac-hex>` — the expiry is inside the signed payload so it cannot be extended by editing the token.
+`function` — `v1.<base64url-channel>.<exp-ms-36>.<base64url-mac>` — the expiry is inside the signed payload so it cannot be extended by editing the token.
 
 ```ts
 (channelName: string, secret: string, now?: () => number, ttlMs?: number) => Promise<string>
@@ -176,7 +176,7 @@ interface MemoryTurnStreamSocket
 
 ### `pruneStaleThreads`
 
-`function`
+`function` — Remove responding markers older than ttlMs; return their thread IDs.
 
 ```ts
 (active: Map<string, number>, now: number, ttlMs: number) => string[]
@@ -203,7 +203,7 @@ interface ReconcileStaleDurableTurnLockOptions
 `function` — Release a durable turn lock and indicate if the release was successful or deferred
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput, auth?: TurnStreamAuth | undefined) => Promise<...>
+(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput, auth: TurnStreamAuth) => Promise<{ released: boolean;…
 ```
 
 ### `releaseInterruptedDurableTurnLock`
@@ -211,7 +211,7 @@ interface ReconcileStaleDurableTurnLockOptions
 `function` — Fenced out-of-band release — the DO refuses a successor lock (started after `interruptedAt`) and a turnId mismatch.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput, auth?: TurnStreamAuth | undefined)…
+(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput, auth: TurnStreamAuth) => Promise<..…
 ```
 
 ### `ReleaseInterruptedDurableTurnLockInput`
@@ -224,7 +224,7 @@ interface ReleaseInterruptedDurableTurnLockInput
 
 ### `scopeIndexChannelKey`
 
-`function` — Generate a unique channel key string based on the provided scope identifier.
+`function` — Running-turn index for the optional Durable Object turn-event backend.
 
 ```ts
 (scopeId: string) => string
@@ -232,7 +232,7 @@ interface ReleaseInterruptedDurableTurnLockInput
 
 ### `threadChannelKey`
 
-`function` — Generate a unique string key combining workspace and thread identifiers.
+`function` — Channel for a thread-scoped lock.
 
 ```ts
 (workspaceId: string, threadId: string) => string
@@ -240,7 +240,7 @@ interface ReleaseInterruptedDurableTurnLockInput
 
 ### `TURN_LOCK_TTL_MS`
 
-`const` — Default lifetime of an unreleased lock.
+`const` — Fallback lifetime for an unreleased lock.
 
 ```ts
 number
@@ -320,7 +320,7 @@ interface TurnLockInterruptedReleaseInput
 
 ### `turnLockMatchesRelease`
 
-`function` — A cooperative release must present the lock's own identity — both the execution and the lockId minted at acquire — so a retry of a PREVIOUS turn can never release the current one.
+`function` — A cooperative release matches the execution and, when supplied, lock ID.
 
 ```ts
 (active: DurableTurnLock, input: { executionId: string; lockId?: string | undefined; }) => boolean
@@ -360,7 +360,7 @@ type TurnLockSeamResult
 
 ### `turnStorageChannelKey`
 
-`function` — Generate a storage channel key string for a given turn identifier.
+`function` — Channel for the optional Durable Object turn-event backend.
 
 ```ts
 (turnId: string) => string
@@ -456,7 +456,7 @@ type TurnStreamUpgradeAuthorization
 
 ### `workspaceChannelKey`
 
-`function` — Generate a unique channel key based on the given workspace identifier.
+`function` — Channel for workspace signals and the workspace-scoped lock.
 
 ```ts
 (workspaceId: string) => string

@@ -272,10 +272,10 @@ interface DeletePageInput
 
 ### `DesignCanvasChromeLazy`
 
-`const` — Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail.
+`function` — Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail.
 
 ```ts
-any
+LazyExoticComponent<({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange…
 ```
 
 ### `DesignCanvasEditor`
@@ -296,10 +296,10 @@ interface DesignCanvasFullProps
 
 ### `DesignCanvasLazy`
 
-`const` — Batteries-included editor: chrome + workspace on one shared stack.
+`function` — Batteries-included editor: chrome + workspace on one shared stack.
 
 ```ts
-any
+LazyExoticComponent<(props: DesignCanvasProps) => Element>
 ```
 
 ### `DesignCanvasMode`
@@ -368,10 +368,10 @@ interface EditorSceneState
 
 ### `ElementNode`
 
-`const` — Memoized so a `stack.notify()` (fired ~120/s during a pan/marquee) that re-renders WorkspaceView does NOT re-render every element.
+`function` — Memoized so a `stack.notify()` (fired ~120/s during a pan/marquee) that re-renders WorkspaceView does NOT re-render every element.
 
 ```ts
-any
+MemoExoticComponent<(props: ElementNodeProps) => Element | null>
 ```
 
 ### `ElementNodeProps`
@@ -520,10 +520,10 @@ interface GroupElementsInput
 
 ### `IconButton`
 
-`const`
+`function`
 
 ```ts
-any
+ForwardRefExoticComponent<IconButtonProps & RefAttributes<HTMLButtonElement>>
 ```
 
 ### `IconButtonProps`

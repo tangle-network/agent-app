@@ -2075,7 +2075,7 @@ type PickerVariant
 `function` — The floating panel every canonical picker opens.
 
 ```ts
-({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => any
+({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…
 ```
 
 ### `PopoverSurfaceProps`
@@ -2963,7 +2963,7 @@ interface SmoothRevealOptions
 `function` — The series glyph.
 
 ```ts
-({ values, label, format, width, height, emptyLabel, unavailableLabel, className, }: SparklineProps) => ReactElement
+({ values, label, format, width, height, emptyLabel, unavailableLabel, className, }: SparklineProps) => ReactElement<un…
 ```
 
 ### `SparklineDirection`
@@ -3291,7 +3291,7 @@ interface UseInfiniteScrollOptions
 `function` — Keyboard + pointer model for a trigger-and-popover pair, dependency-free.
 
 ```ts
-(open: boolean, setOpen: (open: boolean) => void) => { containerRef: any; triggerRef: any; panelRef: any; triggerProps:…
+(open: boolean, setOpen: (open: boolean) => void) => { containerRef: RefObject<HTMLDivElement | null>; triggerRef: RefO…
 ```
 
 ### `useSandboxTerminalConnection`

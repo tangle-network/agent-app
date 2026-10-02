@@ -14,18 +14,9 @@ import {
   turnStorageChannelKey,
   TURN_LOCK_TTL_MS,
   type DurableTurnLock,
-  type TurnStreamEvent,
 } from '../../src/turn-stream/core'
 
-function event(type: string, data: unknown = {}): TurnStreamEvent {
-  return { type, data, timestamp: 1 }
-}
-
-describe('segment store', () => {
-  
-  
-  
-  
+describe('workspace activity', () => {
   it('pruneStaleThreads removes only entries past the ttl', () => {
     const active = new Map([
       ['t1', 1000],

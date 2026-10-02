@@ -8,10 +8,10 @@ Source: `src/intakes-react/lazy.tsx`
 
 ### `IntakeInterviewLazy`
 
-`const` — Load IntakeInterview component lazily to optimize initial application rendering
+`function` — Load IntakeInterview component lazily to optimize initial application rendering
 
 ```ts
-any
+LazyExoticComponent<({ view: initialView, onAnswer, onComplete, onDone, onNotice, }: IntakeInterviewProps) => Element>
 ```
 
 ### `IntakeInterviewProps`

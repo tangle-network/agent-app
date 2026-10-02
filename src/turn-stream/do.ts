@@ -1,45 +1,12 @@
 /**
- * `TurnStreamDO` — the shared Durable Object transport shell over the pure
- * core (`./core`). One class serves every channel family; the instance NAME
- * decides which endpoints a given instance ever sees:
+ * Durable Object transport for thread/workspace locks, workspace signals,
+ * detached turn-event rows, and running-turn discovery.
+ * Cloudflare's named object identity binds every request's capability token.
+ * Worker and DO code share TURN_STREAM_AUTH_SECRET; absent configuration fails closed.
  *
- * - **thread channel** (`${workspaceId}:${threadId}`) — the thread-scope lock
- *   only. (The deprecated per-turn rebroadcast that also lived here was
- *   REMOVED in 0.52.0 — the sandbox session gateway owns interactive-turn
- *   replay; `./core`'s header has the production measurement.)
- * - **workspace channel** (`${workspaceId}`) — coarse sidebar signals
- *   (`thread.activity` responding set, durable across eviction;
- *   `thread.created` recent list) and the workspace-scope lock. KEPT: the
- *   gateway is per-session and read-only, so it carries neither.
- * - **turn storage** (`turn:${turnId}`) — the durable `TurnEventStore` rows +
- *   status for one buffered turn (replay survives DO eviction — this is what
- *   graduates the vertical's `turnStore` from no-op). KEPT and load-bearing:
- *   a stream/dispatch DETACHED run does not reach the gateway on the
- *   measured path, so this is how a browser tails that autonomous work.
- * - **scope index** (`scope:${scopeId}`) — the running-turn index backing
- *   `TurnEventStore.listRunning` reconnect discovery. KEPT.
- *
- * The class is a PLAIN class over a structural {@link TurnStreamDOState} —
- * no `cloudflare:workers` import, so this package stays substrate-free and
- * the DO is unit-testable in Node. Cloudflare's `DurableObjectState`
- * satisfies the interface; a product binds it in wrangler by re-exporting:
- *
- *   // worker entry
- *   export { TurnStreamDO } from '@tangle-network/agent-app/turn-stream'
- *
- * Fan-out enumerates `state.getWebSockets()` (never an in-memory socket map)
- * and reads per-socket metadata from the serialized attachment, so it is
- * correct across WebSocket hibernation.
- *
- * Product extension (how the reference consumer keeps its Vault machinery
- * while deleting its fork): subclass and override
- * {@link TurnStreamDO.handleProductRequest} (extra POST endpoints),
- * {@link TurnStreamDO.shouldDeferLockRelease} /
- * {@link TurnStreamDO.completeDeferredLockRelease} (park a lock release
- * behind a product-owned post-turn task), and
- * {@link TurnStreamDO.productSyncEvents} (extra state replayed to a
- * late-connecting socket). Product storage keys must avoid
- * {@link TURN_STREAM_STORAGE_KEYS}.
+ * Sockets use hibernation attachments; products may add authenticated endpoints,
+ * defer lock release during persistence, and contribute workspace sync events.
+ * Product storage keys must avoid TURN_STREAM_STORAGE_KEYS.
  */
 
 import { DEFAULT_RUNNING_TURN_LEASE_MS } from '../stream/turn-buffer'
@@ -195,7 +162,7 @@ export class TurnStreamDO {
    * replay is impossible, an unauthenticated forward gets 401, and a missing
    * secret fails closed with a 500 that names the fix (issue #746).
    */
-  private async authorizeRequest(request: Request, url: URL): Promise<Response | null> {
+  private async authorizeRequest(request: Request): Promise<Response | null> {
     const name = this.state.id?.name
     if (typeof name !== 'string' || !name) {
       return Response.json(
@@ -210,7 +177,7 @@ export class TurnStreamDO {
         { status: 500 },
       )
     }
-    const token = request.headers.get(TURN_STREAM_TOKEN_HEADER) ?? url.searchParams.get('token') ?? ''
+    const token = request.headers.get(TURN_STREAM_TOKEN_HEADER) ?? ''
     if (await verifyTurnStreamToken(name, token, secret)) return null
     return Response.json({ error: 'invalid or missing turn-stream capability token' }, { status: 401 })
   }
@@ -218,10 +185,10 @@ export class TurnStreamDO {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
 
-    const unauthorized = await this.authorizeRequest(request, url)
+    const unauthorized = await this.authorizeRequest(request)
     if (unauthorized) return unauthorized
 
-    if (request.headers.get('Upgrade') === 'websocket') {
+    if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       return this.handleWebSocketUpgrade(request, url)
     }
 
@@ -266,8 +233,7 @@ export class TurnStreamDO {
     return null
   }
 
-  /** Consulted before any lock release (cooperative, interrupted, or the
-   *  terminal-event auto-release). Return `true` while a product-owned
+  /** Consulted before any lock release (cooperative or interrupted). Return `true` while a product-owned
    *  post-turn task for `executionId` must keep the scope serialized (e.g.
    *  file persistence still reading the box) — the release is then parked as
    *  `releasePending` on the lock and completed via
@@ -328,21 +294,15 @@ export class TurnStreamDO {
   async webSocketMessage(ws: TurnStreamSocket, message: string | ArrayBuffer): Promise<void> {
     const meta = ws.deserializeAttachment() as SocketMeta | null
     if (!meta || meta.synced) return
-    let afterSeq = 0
     try {
-      const parsed = JSON.parse(typeof message === 'string' ? message : '') as { type?: string; afterSeq?: number }
+      const parsed = JSON.parse(typeof message === 'string' ? message : '') as { type?: string }
       if (parsed.type !== 'sync') return
-      afterSeq = typeof parsed.afterSeq === 'number' ? parsed.afterSeq : 0
     } catch {
       return
     }
 
     {
-      // Current responding state as synthetic `start` markers, then recently
-      // created threads for late joiners. (The thread-scope branch that used
-      // to replay the deprecated per-turn segment buffer is gone with it —
-      // every socket this base serves is a workspace-signal socket.)
-      void afterSeq
+      // Replay the current responding state and recent thread-created markers.
       const active = await this.loadActiveThreads()
       const removed = pruneStaleThreads(active, Date.now(), this.options.activityTtlMs ?? ACTIVITY_TTL_MS)
       if (removed.length > 0) await this.persistActiveThreads(active)
