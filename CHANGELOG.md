@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.33
+
+- feat(lines): explain shared phone conversations (#737)
+- feat(app-oauth): share hosted OAuth resource authority
+- fix(enrollment): bind shared line admission to signed lease
+- feat(workspace): add reusable companion and responsive studio (#730)
+
 ## 0.50.32
 
 - docs: refresh generated module counts
