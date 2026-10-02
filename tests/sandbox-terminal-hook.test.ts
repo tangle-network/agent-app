@@ -318,3 +318,60 @@ it('leaves a manual terminal idle until connect and then refreshes its scoped to
     vi.useRealTimers()
   }
 })
+
+describe('manual terminal connection scope', () => {
+  it.each([
+    { label: 'workspace', change: { workspaceId: 'second' } },
+    { label: 'connection ID', change: { connectionId: 'second-tab' } },
+    { label: 'endpoint', change: { connectionUrl: '/second/connection' } },
+  ])('clears the prior $label scope and requires another explicit Connect', async ({ change }) => {
+    vi.useFakeTimers()
+    const fetcher = vi.fn(async (url: RequestInfo | URL) => Response.json({
+      runtimeUrl: `${String(url)}/runtime`, token: String(url),
+      expiresAt: new Date(Date.now() + 1_200).toISOString(),
+    }))
+    const initial: { workspaceId: string; connectionId: string; connectionUrl?: string } = { workspaceId: 'first', connectionId: 'first-tab' }
+    const { result, rerender, unmount } = renderHook((scope: typeof initial) => useSandboxTerminalConnection({
+      ...scope, autoConnect: false, fetcher, tokenRefreshSkewMs: 200,
+    }), { initialProps: initial })
+    try {
+      await act(async () => { await result.current.connect() })
+      expect(result.current.token).toBeTruthy()
+      rerender({ ...initial, ...change })
+      expect(result.current).toMatchObject({ token: null, runtimeUrl: null, status: 'idle', loading: false })
+      await act(async () => { await vi.advanceTimersByTimeAsync(5_000) })
+      expect(fetcher).toHaveBeenCalledTimes(1)
+      await act(async () => { await result.current.connect() })
+      expect(fetcher).toHaveBeenCalledTimes(2)
+      expect(result.current.token).toBe(String(fetcher.mock.calls[1]?.[0]))
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+      expect(fetcher).toHaveBeenCalledTimes(3)
+      expect(fetcher.mock.calls[2]?.[0]).toBe(fetcher.mock.calls[1]?.[0])
+    } finally { unmount(); vi.useRealTimers() }
+  })
+
+  it('rejects a late prior-scope response after explicitly connecting the new workspace', async () => {
+    let resolveFirst: ((response: Response) => void) | undefined
+    const pending = new Promise<Response>((resolve) => { resolveFirst = resolve })
+    const fetcher = vi.fn()
+      .mockReturnValueOnce(pending)
+      .mockResolvedValueOnce(Response.json({ runtimeUrl: '/second/runtime', token: 'second-token', expiresAt: new Date(Date.now() + 60_000).toISOString() }))
+    const { result, rerender, unmount } = renderHook(({ workspaceId }) => useSandboxTerminalConnection({ workspaceId, autoConnect: false, fetcher }), { initialProps: { workspaceId: 'first' } })
+    let firstConnect: Promise<void> | undefined
+    try {
+      await act(async () => { firstConnect = result.current.connect(); await Promise.resolve() })
+      rerender({ workspaceId: 'second' })
+      expect(result.current).toMatchObject({ token: null, status: 'idle', loading: false })
+      await act(async () => { await result.current.connect() })
+      expect(result.current.token).toBe('second-token')
+      if (!resolveFirst || !firstConnect) throw new Error('Prior connection was not started')
+      const resolve = resolveFirst
+      await act(async () => {
+        resolve(Response.json({ runtimeUrl: '/first/runtime', token: 'first-token', expiresAt: new Date(Date.now() + 60_000).toISOString() }))
+        await firstConnect
+      })
+      expect(result.current).toMatchObject({ token: 'second-token', runtimeUrl: '/second/runtime' })
+      expect(fetcher).toHaveBeenCalledTimes(2)
+    } finally { unmount() }
+  })
+})

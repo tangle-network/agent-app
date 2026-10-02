@@ -35,6 +35,9 @@ Set `autoConnect: false` on `useSandboxTerminalConnection` for an optional compa
 Opening its tab then mounts the interface without provisioning a sandbox.
 Use the returned `connect` function for the user's Connect action.
 A successful explicit connection retains automatic scoped-token refresh.
+Changing the workspace, connection endpoint, or connection ID clears the old connection and cancels its refresh.
+Prior in-flight responses cannot replace the new scope.
+A manual scope stays idle until another explicit Connect action.
 Standalone terminals keep their default automatic connection behavior.
 
 The shared theme stylesheet sets native `color-scheme` from the selected app theme.
