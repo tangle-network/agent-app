@@ -19647,6 +19647,12 @@
           "doc": null
         },
         {
+          "name": "ComposerSkillOption",
+          "kind": "interface",
+          "signature": "interface ComposerSkillOption",
+          "doc": "A skill the host has made eligible for this turn."
+        },
+        {
           "name": "consumeChatStream",
           "kind": "function",
           "signature": "(body: ReadableStream<Uint8Array<ArrayBufferLike>>, cb: ChatStreamCallbacks) => Promise<ConsumeChatStreamResult>",

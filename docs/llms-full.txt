@@ -25390,6 +25390,14 @@ interface ComposerSendRejected
 type ComposerSendResult
 ```
 
+### `ComposerSkillOption`
+
+`interface` — A skill the host has made eligible for this turn.
+
+```ts
+interface ComposerSkillOption
+```
+
 ### `consumeChatStream`
 
 `function` — Drain one NDJSON body into the callbacks.

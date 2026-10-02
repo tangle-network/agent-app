@@ -439,6 +439,88 @@ describe('ChatComposer — mention path', () => {
     expect(screen.queryByText('/model')).toBeNull()
     expect(screen.queryByRole('listbox')).toBeNull()
   })
+
+  it('offers an eligible skill by slash token in mention mode and emits its exact id', async () => {
+    const user = userEvent.setup()
+    const onSelectedSkillChange = vi.fn()
+    const skill = { id: 'draft-plan', name: 'Draft plan', description: 'Outline the next steps' }
+    const { editor } = await renderMentionComposer({
+      eligibleSkills: [skill],
+      onSelectedSkillChange,
+    })
+
+    editor.focus()
+    await user.type(editor, '/')
+    const option = await screen.findByRole('option', { name: /draft plan/i })
+    expect(editor.getAttribute('aria-controls')).toBe(option.closest('[role="listbox"]')?.id)
+    await user.click(option)
+
+    expect(onSelectedSkillChange).toHaveBeenCalledExactlyOnceWith(skill)
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(editor.textContent).toBe('')
+  })
+
+  it('keeps file mentions available after a keyboard skill pick', async () => {
+    const user = userEvent.setup()
+    const selected = vi.fn()
+    const mentions = vi.fn()
+    const { editor, onSend } = await renderMentionComposer({
+      eligibleSkills: [{ id: 'draft-plan', name: 'Draft plan', description: 'Outline steps' }],
+      onSelectedSkillChange: selected,
+      mention: mentionProp({ onMentionsChange: mentions }),
+    })
+
+    editor.focus()
+    await user.type(editor, '/')
+    await screen.findByRole('option', { name: /draft plan/i })
+    fireEvent.keyDown(editor, { key: 'Enter' })
+    expect(selected).toHaveBeenCalledWith({ id: 'draft-plan', name: 'Draft plan', description: 'Outline steps' })
+    expect(onSend).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(editor)
+
+    await user.type(editor, '@app')
+    const file = await screen.findByText('app.tsx')
+    await user.click(file)
+    expect(mentions).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'src/app.tsx', label: 'app.tsx', kind: 'file' }),
+    ])
+  })
+
+  it('gives @ file suggestions priority over an open /skill menu', async () => {
+    const user = userEvent.setup()
+    const { editor } = await renderMentionComposer({
+      value: '/skill ',
+      eligibleSkills: [{ id: 'draft-plan', name: 'Draft plan', description: 'Outline steps' }],
+      onSelectedSkillChange: vi.fn(),
+    })
+    await screen.findByRole('option', { name: /draft plan/i })
+
+    editor.focus()
+    await user.type(editor, '@')
+    await screen.findByRole('option', { name: /app.tsx/i })
+    expect(screen.queryByRole('option', { name: /draft plan/i })).toBeNull()
+  })
+
+  it('sends a selected skill with an empty draft and lets the host remove it', async () => {
+    const onSend = vi.fn()
+    const onSelectedSkillChange = vi.fn()
+    const skill = { id: 'draft-plan', name: 'Draft plan', description: 'Outline steps' }
+    render(
+      <ChatComposer
+        onSend={onSend}
+        mention={mentionProp()}
+        eligibleSkills={[skill]}
+        selectedSkillId={skill.id}
+        onSelectedSkillChange={onSelectedSkillChange}
+      />,
+    )
+
+    expect(screen.getByText('Skill: Draft plan')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(onSend).toHaveBeenCalledExactlyOnceWith('')
+    fireEvent.click(screen.getByRole('button', { name: 'Remove selected skill' }))
+    expect(onSelectedSkillChange).toHaveBeenCalledExactlyOnceWith(null)
+  })
 })
 
 describe('mention node', () => {

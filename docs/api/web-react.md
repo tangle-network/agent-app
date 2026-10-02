@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-434 exports.
+435 exports.
 
 ### `acceptRejectionReason`
 
@@ -652,6 +652,14 @@ interface ComposerSendRejected
 
 ```ts
 type ComposerSendResult
+```
+
+### `ComposerSkillOption`
+
+`interface` — A skill the host has made eligible for this turn.
+
+```ts
+interface ComposerSkillOption
 ```
 
 ### `consumeChatStream`
