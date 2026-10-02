@@ -55,7 +55,7 @@ const server = createServer((req, res) => {
 })
 const port = Number(process.env.CONNECT_PORT ?? 4401)
 server.listen(port, '127.0.0.1', () => {
-  const receipt = { url: `http://127.0.0.1:${port}`, scratch, archive, archiveSha256: createHash('sha256').update(readFileSync(archive)).digest('hex'),
+  const receipt = { sourceCommit: run('git', ['rev-parse', 'HEAD'], root).trim(), url: `http://127.0.0.1:${port}`, scratch, archive, archiveSha256: createHash('sha256').update(readFileSync(archive)).digest('hex'),
     installedAppVersion: JSON.parse(readFileSync(join(scratch, 'node_modules/@tangle-network/agent-app/package.json'))).version,
     kitVersion: '0.1.0', browserInputs: Object.keys(bundle.inputs), serverModulesInBrowser: forbidden,
     proofScope: 'Two installed app configurations with kit metadata and native enrollment identity fixtures. No live ChatGPT connection or hosted installation.' }
