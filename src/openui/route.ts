@@ -31,6 +31,7 @@ import {
   type OpenUIFormSpec,
   type OpenUIFormValues,
 } from './values'
+import { parseJsonObjectBody } from '../web/core'
 
 /** Logging surface the route uses; `console` by default. */
 export type OpenUIActionLogger = Pick<Console, 'warn' | 'error'>
@@ -81,6 +82,12 @@ export type OpenUIActionHandler<TContext, TNode extends OpenUINode = OpenUINode>
   args: OpenUIActionHandlerArgs<TContext>,
 ) => OpenUIActionResult<TNode> | Promise<OpenUIActionResult<TNode>>
 
+/** How big the POST body may be before the route refuses to parse it. A
+ *  click carries action ids and form values — 64 KiB covers generous forms with
+ *  headroom; anything larger is abuse or a mistake, and refusing it before
+ *  parsing bounds per-request memory (issue #748). */
+const DEFAULT_MAX_BODY_BYTES = 64 * 1024
+
 /** How the route is wired. Note what is absent: nothing here can reach a model. */
 export interface OpenUIActionRouteOptions<TContext, TNode extends OpenUINode = OpenUINode> {
   /**
@@ -109,6 +116,8 @@ export interface OpenUIActionRouteOptions<TContext, TNode extends OpenUINode = O
     context: TContext
     note: string
   }) => void | Promise<void>
+  /** Request-body byte cap before parsing. Default 64 KiB. */
+  maxBodyBytes?: number
   logger?: OpenUIActionLogger
 }
 
@@ -151,9 +160,13 @@ export function createOpenUIActionRoute<TContext, TNode extends OpenUINode = Ope
   async function handle(request: Request): Promise<Response> {
     if (request.method !== 'POST') return failure('OPENUI_METHOD_NOT_ALLOWED', 'Method not allowed', 405)
 
-    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
-    if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return failure('OPENUI_BODY_INVALID', 'Invalid JSON body', 400)
+    // Bounded body parse (streaming cap, content-length precheck, 413) — the
+    // same primitive every other route boundary in the package uses.
+    const [body, bodyError] = await parseJsonObjectBody(request, { maxBytes: options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES })
+    if (bodyError) {
+      return bodyError.status === 413
+        ? failure('OPENUI_BODY_TOO_LARGE', 'JSON body is too large', 413)
+        : failure('OPENUI_BODY_INVALID', 'Invalid JSON body', 400)
     }
 
     const parsed = validateOpenUIActionBody(body)
