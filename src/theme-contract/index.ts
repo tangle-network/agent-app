@@ -100,9 +100,9 @@ export interface ThemeContractResult {
  * suspenders rather than load-bearing.
  */
 const DANGEROUS_UTILITIES: ReadonlyArray<{ suffix: string; varName: string }> = [
-  { suffix: 'surface-container-highest', varName: '--secondary' },
-  { suffix: 'surface-container-high', varName: '--popover' },
-  { suffix: 'surface-container', varName: '--card' },
+  { suffix: 'surface-container-highest', varName: '--md3-surface-container-highest' },
+  { suffix: 'surface-container-high', varName: '--md3-surface-container-high' },
+  { suffix: 'surface-container', varName: '--md3-surface-container' },
   { suffix: 'card-foreground', varName: '--card-foreground' },
   { suffix: 'popover-foreground', varName: '--popover-foreground' },
   { suffix: 'card', varName: '--card' },
