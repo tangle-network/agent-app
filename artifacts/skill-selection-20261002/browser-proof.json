@@ -1,0 +1,32 @@
+[
+  {
+    "width": 1440,
+    "menuVisible": true,
+    "menuBox": {
+      "x": 16,
+      "y": 266,
+      "width": 320,
+      "height": 90
+    },
+    "mention": "@app.tsx ",
+    "selected": 1,
+    "result": "Sent draft-plan: @src/app.tsx",
+    "errors": [],
+    "horizontalOverflow": false
+  },
+  {
+    "width": 390,
+    "menuVisible": true,
+    "menuBox": {
+      "x": 16,
+      "y": 266,
+      "width": 320,
+      "height": 90
+    },
+    "mention": "@app.tsx ",
+    "selected": 1,
+    "result": "Sent draft-plan: @src/app.tsx",
+    "errors": [],
+    "horizontalOverflow": false
+  }
+]
