@@ -293,3 +293,28 @@ describe('tabTerminalConnectionId', () => {
     }
   })
 })
+
+it('leaves a manual terminal idle until connect and then refreshes its scoped token', async () => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
+  const fetcher = vi.fn()
+    .mockImplementationOnce(async () => Response.json({ runtimeUrl: '/runtime/one', token: 'token-1', expiresAt: new Date(Date.now() + 1_200).toISOString() }))
+    .mockResolvedValueOnce(Response.json({ runtimeUrl: '/runtime/two', token: 'token-2', expiresAt: new Date(Date.now() + 60_000).toISOString() }))
+  const { result, unmount } = renderHook(() => useSandboxTerminalConnection({ workspaceId: 'manual', autoConnect: false, fetcher, tokenRefreshSkewMs: 200 }))
+  try {
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000) })
+    expect(fetcher).not.toHaveBeenCalled()
+    expect(result.current.status).toBe('idle')
+    expect(result.current.loading).toBe(false)
+    await act(async () => { await result.current.connect() })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(fetcher).toHaveBeenCalledWith('/api/workspaces/manual/sandbox/connection')
+    expect(result.current.token).toBe('token-1')
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(result.current.token).toBe('token-2')
+  } finally {
+    unmount()
+    vi.useRealTimers()
+  }
+})

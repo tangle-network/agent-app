@@ -50,6 +50,8 @@ export interface SandboxTerminalConnectionResponse {
  */
 export interface UseSandboxTerminalConnectionOptions {
   workspaceId: string
+  /** Connect on mount by default; false leaves provisioning to an explicit connect call. */
+  autoConnect?: boolean
   connectionUrl?: string | ((workspaceId: string) => string)
   connectionId?: string
   fetcher?: typeof fetch
@@ -208,8 +210,8 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
   }, [])
 
   useEffect(() => {
-    void connect()
-  }, [connect])
+    if (opts.autoConnect !== false) void connect()
+  }, [connect, opts.autoConnect])
 
   useEffect(() => {
     if (!conn.runtimeUrl || !conn.token || !conn.expiresAt) return

@@ -8,7 +8,7 @@
  * request until the provider rejects it.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import type {
   GenerationType,
@@ -100,7 +100,7 @@ async function submit(prompt: string) {
 }
 
 async function attachReference(url = 'https://example.com/ref.png') {
-  fireEvent.click(screen.getByRole('button', { name: 'Reference image' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Add reference image' }))
   fireEvent.change(await screen.findByLabelText('Reference image URL'), { target: { value: url } })
   fireEvent.click(screen.getByRole('button', { name: 'Attach' }))
 }
@@ -289,7 +289,7 @@ describe('StudioComposer — the pills are the model’s own parameters', () => 
     expect(pill('Resolution')).not.toBeNull()
     expect(pill('Aspect')).not.toBeNull()
     expect(screen.getByRole('button', { name: 'Audio on' })).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'Reference image' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Add reference image' })).not.toBeNull()
 
     // kling v2-master publishes `resolution`, `audio` and `mode` as
     // `supported: false` — three controls that must disappear, not grey out.
@@ -299,7 +299,7 @@ describe('StudioComposer — the pills are the model’s own parameters', () => 
     expect(pill('Resolution')).toBeNull()
     expect(pill('Mode')).toBeNull()
     expect(screen.queryByRole('button', { name: /^Audio (on|off)$/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Reference image' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add reference image' })).toBeNull()
 
     // ltx-video publishes nothing at all: the model pill and no other control.
     await chooseModel('ltx-video')
@@ -413,7 +413,7 @@ describe('StudioComposer — the reference image swaps the model', () => {
     expect(posted[0]).not.toHaveProperty('referenceImageUrl')
 
     await chooseModel(SEEDANCE)
-    expect(screen.getByRole('button', { name: 'Reference image' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Add reference image' })).not.toBeNull()
     expect(screen.queryByRole('button', { name: 'Remove reference image' })).toBeNull()
   })
 })
@@ -556,7 +556,7 @@ describe('StudioComposer — model availability', () => {
     expect((limitedRow as HTMLButtonElement).disabled).toBe(false)
   })
 
-  it('replaces an unavailable Audio lane prompt with one compact derived message and recovers', async () => {
+  it('keeps the unavailable Audio draft editable, blocks submission, and recovers', async () => {
     const first = catalog({
       image: [model('gpt-image-2', 'image')],
       speech: [model('dead-speech', 'speech', { status: 'unavailable' })],
@@ -565,18 +565,23 @@ describe('StudioComposer — model availability', () => {
       image: [model('gpt-image-2', 'image')],
       speech: [model('live-speech', 'speech')],
     }, { image: 'gpt-image-2', speech: 'live-speech' })
-    const { onGenerated, rerender } = mountWith((workspaceId) => workspaceId === 'ws-2' ? second : first)
+    const { posted, onGenerated, rerender } = mountWith((workspaceId) => workspaceId === 'ws-2' ? second : first)
     await screen.findByRole('button', { name: 'Model: gpt-image-2' })
     fireEvent.click(screen.getByRole('button', { name: 'Audio' }))
 
-    const laneWarning = await screen.findByText('Audio models are temporarily unavailable')
-    expect(laneWarning.parentElement?.className).toContain('min-h-[calc(70.6875px+0.625rem)]')
-    expect(screen.queryByLabelText('Prompt')).toBeNull()
+    const laneWarning = await screen.findByText('Audio models are unavailable')
+    expect(laneWarning.closest('[role=status]')).toBeTruthy()
+    const draft = screen.getByLabelText('Prompt')
+    fireEvent.change(draft, { target: { value: 'A draft while audio is unavailable' } })
+    expect((draft as HTMLTextAreaElement).value).toBe('A draft while audio is unavailable')
+    fireEvent.keyDown(draft, { key: 'Enter' })
+    expect(posted).toHaveLength(0)
+    expect(onGenerated).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Generate' }).hasAttribute('disabled')).toBe(true)
 
     rerender(<StudioComposer workspaceId="ws-2" onGenerated={onGenerated} />)
     await screen.findByRole('button', { name: 'Model: live-speech' })
-    expect(screen.queryByText('Audio models are temporarily unavailable')).toBeNull()
+    expect(screen.queryByText('Audio models are unavailable')).toBeNull()
     expect(screen.getByLabelText('Prompt')).not.toBeNull()
   })
 
@@ -589,7 +594,8 @@ describe('StudioComposer — model availability', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Audio' }))
 
     await screen.findByText('No audio models are available')
-    expect(screen.queryByLabelText('Prompt')).toBeNull()
+    expect(screen.getByLabelText('Prompt')).toBeTruthy()
+    expect(screen.getByPlaceholderText('Write the words to speak…')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Generate' }).hasAttribute('disabled')).toBe(true)
   })
 })
@@ -768,4 +774,100 @@ describe('StudioComposer — submitting', () => {
       }
     }
   })
+})
+
+
+describe('StudioComposer — catalog states', () => {
+  it('shows loading status without an empty model menu while a catalog request is pending', async () => {
+    let resolve: ((response: Response) => void) | undefined
+    const fetchMock = vi.fn(() => new Promise<Response>((done) => { resolve = done }))
+    vi.stubGlobal('fetch', fetchMock)
+    const onGenerated = vi.fn()
+    render(<StudioComposer workspaceId="ws-1" onGenerated={onGenerated} />)
+    expect(screen.getByText('Loading media models…')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Model:/ })).toBeNull()
+    expect(screen.queryByText('No models are available for this media type.')).toBeNull()
+    fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: 'Draft during loading' } })
+    fireEvent.keyDown(screen.getByLabelText('Prompt'), { key: 'Enter' })
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(onGenerated).not.toHaveBeenCalled()
+    await act(async () => { resolve?.(new Response(JSON.stringify(catalog({ image: [model('gpt-image-2', 'image')] })))) })
+    expect(await screen.findByRole('button', { name: 'Model: gpt-image-2' })).toBeTruthy()
+  })
+
+  it('retries a failed catalog once, keeps the draft, and recovers a usable model', async () => {
+    let resolve: ((response: Response) => void) | undefined
+    const fetchMock = vi.fn().mockRejectedValueOnce(new Error('Network failure'))
+      .mockImplementationOnce(() => new Promise<Response>((done) => { resolve = done }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<StudioComposer workspaceId="ws-1" onGenerated={vi.fn()} />)
+    const retry = await screen.findByRole('button', { name: 'Retry models' })
+    expect(screen.getAllByText('Could not load media models')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: /^Model:/ })).toBeNull()
+    const prompt = screen.getByLabelText('Prompt')
+    fireEvent.change(prompt, { target: { value: 'Keep this draft' } })
+    act(() => { fireEvent.click(retry); fireEvent.click(retry) })
+    expect(screen.getByText('Loading media models…')).toBeTruthy()
+    fireEvent.keyDown(prompt, { key: 'Enter' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    await act(async () => { resolve?.(new Response(JSON.stringify(catalog({ image: [model('gpt-image-2', 'image')] })))) })
+    expect(await screen.findByRole('button', { name: 'Model: gpt-image-2' })).toBeTruthy()
+    expect((prompt as HTMLTextAreaElement).value).toBe('Keep this draft')
+    expect(screen.queryByText('Could not load media models')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Generate' }).hasAttribute('disabled')).toBe(false)
+  })
+
+  it('offers refresh for a successful empty lane and never posts a generation', async () => {
+    const { posted } = mountWith(catalog({}))
+    await screen.findByText('No image models are available')
+    expect(screen.queryByRole('button', { name: /^Model:/ })).toBeNull()
+    fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: 'Empty catalog draft' } })
+    fireEvent.keyDown(screen.getByLabelText('Prompt'), { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh models' }))
+    await screen.findByRole('button', { name: 'Refresh models' })
+    expect(posted).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Generate' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  it('aborts a replaced workspace request and ignores its late result', async () => {
+    const requests: Array<{ signal?: AbortSignal; resolve: (response: Response) => void }> = []
+    vi.stubGlobal('fetch', vi.fn((_input: unknown, init?: RequestInit) => new Promise<Response>((resolve) => {
+      requests.push({ signal: init?.signal ?? undefined, resolve })
+    })))
+    const view = render(<StudioComposer workspaceId="ws-1" onGenerated={vi.fn()} />)
+    view.rerender(<StudioComposer workspaceId="ws-2" onGenerated={vi.fn()} />)
+    const [first, second] = requests
+    if (!first || !second) throw new Error('Both workspace catalog requests must start')
+    expect(first.signal?.aborted).toBe(true)
+    await act(async () => { second.resolve(new Response(JSON.stringify(catalog({ image: [model('openai/gpt-image-2', 'image')] })))) })
+    await screen.findByRole('button', { name: 'Model: openai/gpt-image-2' })
+    await act(async () => { first.resolve(new Response(JSON.stringify(catalog({ image: [model('gpt-image-2', 'image')] })))) })
+    expect(screen.getByRole('button', { name: 'Model: openai/gpt-image-2' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Model: gpt-image-2' })).toBeNull()
+  })
+
+  it.each([
+    { defaults: {}, models: {} },
+    { ...catalog({}), models: { ...EMPTY_LANES, image: [{ id: 'gpt-image-2', name: 'Bad status', type: 'image', status: ['available'] }] } },
+    { ...catalog({}), models: { ...EMPTY_LANES, image: [{ id: '  ', name: 'Blank id', type: 'image', status: 'available' }] } },
+    { ...catalog({}), models: { ...EMPTY_LANES, image: [{ id: 'broken', name: 'Broken', type: 'image', status: 'unknown' }] } },
+  ])('rejects a malformed successful body and recovers through retry', async (invalid) => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(invalid)))
+      .mockResolvedValueOnce(new Response(JSON.stringify(catalog({ image: [model('gpt-image-2', 'image')] }))))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<StudioComposer workspaceId="ws-1" onGenerated={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry models' }))
+    expect(await screen.findByRole('button', { name: 'Model: gpt-image-2' })).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+it('explains provider-key eligibility without implying a refresh will enable generation', async () => {
+  mountWith(catalog({ image: [model('gpt-image-2', 'image', { status: 'unavailable', reason: 'Connect your provider key to generate images.' })] }))
+  await screen.findByText('Connect your provider key to generate images.')
+  expect(screen.getByRole('textbox', { name: 'Prompt' })).not.toBeNull()
+  expect(screen.getByRole('button', { name: /^Generate$/ })).toHaveProperty('disabled', true)
+  expect(screen.queryByRole('button', { name: 'Refresh models' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Retry models' })).toBeNull()
 })

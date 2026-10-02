@@ -1,0 +1,87 @@
+{
+  "phase": "before",
+  "origin": "http://127.0.0.1:6178",
+  "target": "compiled source Storybook; fixture account with no credentials",
+  "records": [
+    {
+      "story": "studio-studiohomescreen--empty",
+      "name": "home-empty-desktop-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6178/iframe.html?id=studio-studiohomescreen--empty&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--empty-catalog",
+      "name": "catalog-empty-desktop-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6178/iframe.html?id=studio-studiocomposer--empty-catalog&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiohomescreen--empty",
+      "name": "home-empty-desktop-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6178/iframe.html?id=studio-studiohomescreen--empty&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--empty-catalog",
+      "name": "catalog-empty-desktop-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6178/iframe.html?id=studio-studiocomposer--empty-catalog&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiohomescreen--empty",
+      "name": "home-empty-phone-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6178/iframe.html?id=studio-studiohomescreen--empty&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--empty-catalog",
+      "name": "catalog-empty-phone-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6178/iframe.html?id=studio-studiocomposer--empty-catalog&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiohomescreen--empty",
+      "name": "home-empty-phone-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6178/iframe.html?id=studio-studiohomescreen--empty&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--empty-catalog",
+      "name": "catalog-empty-phone-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6178/iframe.html?id=studio-studiocomposer--empty-catalog&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ]
+}

@@ -90,17 +90,20 @@ describe('StudioHomeScreen', () => {
 
   it('opens history from the card-surface button', () => {
     const onOpenHistory = vi.fn()
-    mount({ onOpenHistory })
+    mount({ onOpenHistory, generations: [generation('history-row')] })
 
     fireEvent.click(screen.getByRole('button', { name: 'View history' }))
     expect(onOpenHistory).toHaveBeenCalledOnce()
   })
 
-  it('renders both empty-state copy lines when there is no media', () => {
+  it('keeps creation controls and omits the entire recent library when there is no media', () => {
     mount()
 
-    expect(screen.getByText('Nothing generated yet.')).toBeTruthy()
-    expect(screen.getByText('Whatever you make lands here first — it only reaches the vault when you save it.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'What do you want to create?' })).toBeTruthy()
+    expect(screen.getByLabelText('Prompt')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Recent media' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'View history' })).toBeNull()
+    expect(document.querySelector('.studio-home-recent')).toBeNull()
   })
 
   it('opens a tile in the media viewer', () => {
@@ -146,6 +149,10 @@ describe('StudioHomeScreen', () => {
     expect(screen.getByText('Deleted 1 item')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy()
     expect(remove).not.toHaveBeenCalled()
+    expect(screen.queryByRole('heading', { name: 'Recent media' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByRole('button', { name: 'Prompt delete-row — open' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'View history' })).toBeTruthy()
   })
 })
 

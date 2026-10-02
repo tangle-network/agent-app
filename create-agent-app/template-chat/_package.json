@@ -35,7 +35,9 @@
     "@tangle-network/ui": "11.12.0",
     "lucide-react": "^1.35.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "@nanostores/react": "1.1.0",
+    "nanostores": "1.5.4"
   },
   "peerDependencies": {
     "@tangle-network/agent-eval": ">=0.201.0 <0.204.0",

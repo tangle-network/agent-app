@@ -12,7 +12,7 @@ import {
 const meta: Meta<typeof StudioHomeScreen> = {
   title: 'Studio/StudioHomeScreen',
   // A full-viewport screen: the global `centered` layout shrink-wraps it to
-  // content width, which misrepresents the 820px column + full-bleed grid.
+  // content width, which misrepresents the shared composer and recent-media column.
   parameters: { layout: 'fullscreen' },
   component: StudioHomeScreen,
   decorators: [

@@ -1,0 +1,12 @@
+{
+  "phase": "interaction",
+  "origin": "http://127.0.0.1:6177",
+  "target": "compiled source Storybook; fixture account with no credentials",
+  "records": [
+    {
+      "flow": "empty catalog refresh preserves draft and prevents generation; reference picker fixture attaches/removes; audio mode changes prompt",
+      "backend": "Storybook catalog/picker fixtures only; no generation or upload backend",
+      "video": "studio-interaction-original.webm"
+    }
+  ]
+}

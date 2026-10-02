@@ -105,39 +105,34 @@ export function StudioHomeScreen({
         />
       </div>
 
-      <section className="studio-home-recent pb-[72px]">
-        <div className="mb-3 mt-[34px] flex items-center justify-between gap-3 px-6 max-[900px]:px-4">
-          <h2 className="text-[13px] font-normal tracking-[0.02em] text-muted-foreground">Recent media</h2>
-          <button
-            type="button"
-            onClick={onOpenHistory}
-            className="h-[30px] whitespace-nowrap rounded-md px-1 text-[13px] font-medium text-primary transition hover:text-primary/80"
-          >
-            View history
-          </button>
-        </div>
+      {visible.length > 0 && (
+        <section className="studio-home-recent mx-auto w-full max-w-[868px] px-6 pb-[72px] max-[900px]:px-4">
+          <div className="mb-3 mt-[34px] flex items-center justify-between gap-3">
+            <h2 className="text-[14px] font-medium text-foreground">Recent media</h2>
+            <button
+              type="button"
+              onClick={onOpenHistory}
+              className="h-8 whitespace-nowrap rounded-md px-1 text-[14px] font-medium text-foreground underline underline-offset-4 hover:decoration-foreground"
+            >
+              View history
+            </button>
+          </div>
 
-        <div className="studio-grid studio-grid-library">
-          {visible.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center py-16 text-center">
-              <p className="text-[14px] text-foreground">Nothing generated yet.</p>
-              <p className="max-w-[380px] text-[13px] text-muted-foreground">
-                Whatever you make lands here first — it only reaches the vault when you save it.
-              </p>
-            </div>
-          ) : visible.slice(0, recentLimit).map((generation) => (
-            <MediaTile
-              key={generation.id}
-              generation={generation}
-              context="home"
-              onOpen={setViewer}
-              actions={actions}
-              onRequestDelete={requestDelete}
-              onSaved={onSaved}
-            />
-          ))}
-        </div>
-      </section>
+          <div className="studio-grid studio-grid-library">
+            {visible.slice(0, recentLimit).map((generation) => (
+              <MediaTile
+                key={generation.id}
+                generation={generation}
+                context="home"
+                onOpen={setViewer}
+                actions={actions}
+                onRequestDelete={requestDelete}
+                onSaved={onSaved}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       <MediaViewerModal
         generation={renderedViewer}
