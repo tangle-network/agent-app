@@ -27,7 +27,7 @@ That request must preserve the server's approval and denial decisions.
 
 `createHubSettingsRoutes` is a separate server boundary, exported from
 `@tangle-network/agent-app/platform`. It uses the existing methods of
-`@tangle-network/hub-sdk` (exercised with pinned 0.23.0 and oldest admitted 0.19.3), not a
+`@tangle-network/hub-sdk` (exercised with pinned 0.24.0 and oldest admitted 0.19.3), not a
 second HTTP client. The SDK seam is structural, so existing platform imports do
 not acquire a new required Hub SDK runtime or declaration dependency. This is the
 only Hub account-settings server boundary. The superseded Hub proxy and its
