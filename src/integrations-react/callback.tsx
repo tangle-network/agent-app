@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { HUB_CONNECTED_MESSAGE_TYPE, HUB_CONNECT_CHANNEL, HUB_CONNECT_FAILED_MESSAGE_TYPE } from './popup'
+import { HUB_CONNECTED_MESSAGE_TYPE, HUB_CONNECT_CHANNEL, HUB_CONNECT_FAILED_MESSAGE_TYPE, localAppUrl } from './popup'
 
 export interface HubConnectCallbackPageProps {
   /** Local settings destination owned by the consuming app. */
@@ -29,7 +29,8 @@ export function HubConnectCallbackPage({ returnHref }: HubConnectCallbackPagePro
     return () => window.clearTimeout(timer)
   }, [])
 
-  const localReturn = returnHref.startsWith('/') && !returnHref.startsWith('//') ? returnHref : '/'
+  const destination = localAppUrl(returnHref)
+  const localReturn = destination ? `${destination.pathname}${destination.search}${destination.hash}` : '/'
   return <main aria-live="polite" style={{ maxWidth: 560, margin: '20vh auto', padding: 24, textAlign: 'center' }}>
     {phase === 'checking' ? <p>Checking your connection…</p> : phase === 'returned'
       ? <p>Return to the app to check your connection. You can close this window.</p>

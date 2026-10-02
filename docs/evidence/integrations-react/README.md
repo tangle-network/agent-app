@@ -12,19 +12,19 @@ All media uses local fixture data; it contains no customer account or credential
 | Account detail | [After](./after/detail-desktop.png) | [After](./after/detail-phone.png) |
 
 The [permission write](./after/policy-desktop.png), [second-account dialog](./after/connect-dialog-desktop.png), [added account](./after/added-account-desktop.png), and [light theme detail](./after/detail-light-desktop.png) show additional states.
-The [uncut Chromium video](./after/interaction-uncut.webm) is 9.04 seconds at 1440 × 900.
+The [uncut Chromium video](./after/interaction-uncut.webm) is 11.04 seconds at 1440 × 900.
 It shows selecting Hotel B, setting `cloudbeds.rooms.update` to Ask, rereading stored policy, reloading the selected account, and adding and selecting Hotel C.
 The video was inspected frame by frame after capture.
 
 ## Execution receipt
 
 - Source base: Agent App `origin/main` `e44cc163` (#726); candidate branch `feat/integrations-react-controller-20261002`.
-- Local packed candidate: `@tangle-network/agent-app@0.50.30` tarball SHA-256 `0e1518c57bf91c9eb0bc9d3892f5188f02d3cb2dc15d903adf64daad2cf52b44`.
+- Local packed candidate: `@tangle-network/agent-app@0.50.30` tarball SHA-256 `1a9fb04b456e8d96afde633197d4ce4008124d19bf3ade22c00e616818e8f74d`.
   This version label is the source package value; the candidate is **not** the public 0.50.30 npm tarball.
-- Exact installed view package: `@tangle-network/sandbox-ui@0.116.9`, with UI 11.12.0, Brand 1.9.1, Agent Interface 2.15.0, React and React DOM 19.2.8.
-- Fresh PNPM 11.24.0 `install --strict-peer-dependencies --ignore-scripts`: exit 0 after resolving 421 packages; lockfile policy verification also passed.
+- Exact installed view package: `@tangle-network/sandbox-ui@0.116.9`, with Hub SDK 0.22.1, UI 11.12.0, Brand 1.9.1, Agent Interface 2.15.0, React and React DOM 19.2.8.
+- PNPM 11.24.0 `install --strict-peer-dependencies --ignore-scripts` resolved 426 packages; a frozen strict reinstall exited 0 and PNPM reported that the lockfile passed supply-chain policies.
   PNPM recorded the exact direct Brand, Sandbox UI, and UI releases in the fixture's `minimumReleaseAgeExclude` list.
-- Consumer `tsc --noEmit` and production Vite build: exit 0; the browser bundle was 428.65 kB before gzip.
+- Consumer `tsc --noEmit` with `skipLibCheck: false` and production Vite build: exit 0; the browser bundle was 428.80 kB before gzip.
 - Packed entry import graph: two Agent App JavaScript files; external runtime imports were React, React JSX, Sandbox UI integrations, and UI primitives.
   It had no Node builtin, Hub SDK, or agent-integrations runtime import.
 - Chromium result: policy PUT and at least two authorized-policy-read calls; Hotel B and its stored override survived fixture reload; Hotel C was added and selected; zero page errors and zero horizontal overflow at both viewports.
@@ -35,7 +35,7 @@ The video was inspected frame by frame after capture.
 
 The [fixture source](./fixture/) records the browser entry and the Playwright flow.
 `package.fixture.json` records the temporary local tarball install; copy it as `package.json` in a scratch consumer with that tarball beside it.
-Pack the source revision and name the tarball `candidate-0e1518.tgz` in the scratch parent after checking its SHA-256 above.
+Pack the source revision and name the tarball `candidate-1a9fb04.tgz` in the scratch parent after checking its SHA-256 above.
 Use the adjacent `pnpm-workspace.yaml` to reproduce PNPM's exact direct-package age exclusions.
 The host normally generates the UI primitive's `text-destructive-foreground` utility through its Tailwind scan.
 The minimal Vite fixture includes that single utility in `preview.css` for the light theme capture.

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { HubClient, type HubConnection, type HubPolicy, type HubProvider, type HubTool } from '@tangle-network/hub-sdk'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createHubSettingsRoutes } from '../platform'
 import { HubConnectCallbackPage } from './callback'
@@ -336,6 +337,27 @@ describe('OAuth completion fencing', () => {
     render(<HubConnectCallbackPage returnHref="/settings" />)
     await waitFor(() => expect(sent).toEqual([{ type: HUB_CONNECTED_MESSAGE_TYPE, provider: 'github', nonce: 'opaque', context: 'flow' }]))
     expect(screen.getByRole('link', { name: 'Return to integrations' }).getAttribute('href')).toBe('/settings')
+  })
+
+  it.each(['/\\example.test/return', '//example.test/return'])('keeps an external-looking return path local: %s', returnHref => {
+    render(<HubConnectCallbackPage returnHref={returnHref} />)
+    expect(screen.getByRole('link', { name: 'Return to integrations' }).getAttribute('href')).toBe('/')
+  })
+
+  it('keeps the local return link when server rendering has no window', () => {
+    vi.stubGlobal('window', undefined)
+    const markup = renderToStaticMarkup(<HubConnectCallbackPage returnHref="/settings?tab=integrations" />)
+    expect(markup).toContain('href="/settings?tab=integrations"')
+  })
+
+  it.each(['/\\example.test/callback', '//example.test/callback'])('rejects an external-looking callback before opening a popup: %s', async callbackPath => {
+    const open = vi.spyOn(window, 'open')
+    const startOAuth = vi.fn()
+    const client = { startOAuth } as unknown as HubIntegrationsClient
+    await expect(connectWithPopup({ client, identity, providerId: 'github', before: [], callbackPath,
+      signal: new AbortController().signal, isCurrent: () => true })).rejects.toThrow('Callback path must be local.')
+    expect(open).not.toHaveBeenCalled()
+    expect(startOAuth).not.toHaveBeenCalled()
   })
 
   it('returns a blocked state before requesting an OAuth redirect', async () => {

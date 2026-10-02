@@ -11,6 +11,15 @@ const POPUP_FEATURES = 'popup=yes,width=520,height=680'
 
 export type PopupConnectResult = 'connected' | 'blocked' | 'cancelled' | 'unverified' | 'unavailable'
 
+export function localAppUrl(path: string): URL | null {
+  if (!path.startsWith('/') || path.startsWith('//')) return null
+  try {
+    const origin = typeof window === 'undefined' ? 'https://local.invalid' : window.location.origin
+    const url = new URL(path, origin)
+    return url.origin === origin && !url.username && !url.password ? url : null
+  } catch { return null }
+}
+
 function updatedConnection(providerId: string, before: readonly HubConnection[], after: readonly HubConnection[]): boolean {
   const previous = new Map(before.filter(connection => connection.providerId === providerId).map(connection => [connection.id, connection]))
   return after.some(connection => {
@@ -103,14 +112,14 @@ export async function connectWithPopup(input: {
   signal: AbortSignal
   isCurrent: () => boolean
 }): Promise<PopupConnectResult> {
-  if (!input.callbackPath.startsWith('/') || input.callbackPath.startsWith('//')) throw new TypeError('Callback path must be local.')
+  const callback = localAppUrl(input.callbackPath)
+  if (!callback) throw new TypeError('Callback path must be local.')
   const popup = window.open('', '_blank', POPUP_FEATURES)
   if (!popup) return 'blocked'
   // Keep the parent handle for navigation while removing the provider page's opener.
   try { popup.opener = null } catch { /* Some browsers make this read-only. */ }
   const nonce = crypto.randomUUID()
   const contextToken = crypto.randomUUID()
-  const callback = new URL(input.callbackPath, window.location.origin)
   callback.searchParams.set('provider', input.providerId)
   callback.searchParams.set('nonce', nonce)
   callback.searchParams.set('context', contextToken)

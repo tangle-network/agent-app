@@ -2,6 +2,8 @@
 
 `./integrations-react` composes the finite server routes from `./platform` with the controlled views in `@tangle-network/sandbox-ui/integrations`.
 Install the published Sandbox UI `0.116.9` or later in its current `0.116.x` line when using this subpath.
+Install a supported `@tangle-network/hub-sdk` peer too; this subpath's public types use Hub SDK response types.
+The Hub SDK remains on the server at runtime and does not enter the browser bundle.
 The other Agent App subpaths retain their existing Sandbox UI peer window.
 
 Mount `createHubSettingsRoutes` at `/api/hub/settings` on the app server.
