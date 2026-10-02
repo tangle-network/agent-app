@@ -8,9 +8,6 @@ import configs from './config.json'
 
 const params = new URLSearchParams(location.search)
 const app = params.get('app') === 'creative' ? configs.creative : configs.gtm
-const theme = params.get('theme') === 'dark' ? 'dark' : 'light'
-document.documentElement.dataset.theme = theme
-document.documentElement.classList.toggle('dark', theme === 'dark')
 const states: Record<string, ChatGPTConnectionState> = {
   setup: { status: 'not-connected' }, checking: { status: 'checking' }, connected: { status: 'connected' },
   error: { status: 'error', message: 'The connection could not be checked. Try again.' },
