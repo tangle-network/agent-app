@@ -22507,7 +22507,7 @@ Source: `src/theme/index.ts`
 
 ### `AgentAppTheme`
 
-`interface` — Typed mirror of tokens.css for runtime/JS theming.
+`interface`
 
 ```ts
 interface AgentAppTheme
@@ -22523,7 +22523,7 @@ interface CanvasRenderPalette
 
 ### `darkTheme`
 
-`const` — Define a dark color scheme for the Agent app interface with specific background and foreground hues
+`const` — Canonical Brand dark values projected for legacy JS and bitmap callers.
 
 ```ts
 AgentAppTheme
@@ -22603,7 +22603,7 @@ Source: `src/theme/tailwind-preset.ts`
 
 ### `default`
 
-`const` — Define a preset configuration for dark mode and extended theme colors with foreground variants
+`const`
 
 ```ts
 { darkMode: [string, string]; theme: { extend: { colors: { background: string; foreground: string; border: string; inpu…

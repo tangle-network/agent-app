@@ -24,6 +24,7 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
+import postcss from 'postcss'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const srcRoot = join(repoRoot, 'src')
@@ -91,7 +92,11 @@ describe('keyboard focus floor', () => {
     expect(floor).toMatch(/outline:\s*var\(--focus-ring-width\)\s+solid\s+var\(--focus-ring-color\)/)
     expect(floor).toMatch(/outline-offset:\s*var\(--focus-ring-offset\)/)
 
-    const root = blockBody(tokensCss, /(^|\n)\s*:root\s*\{/)
+    const roots: string[] = []
+    postcss.parse(tokensCss).walkRules((rule) => {
+      if (rule.selectors.includes(':where(:root)')) roots.push(rule.toString())
+    })
+    const root = roots.join('\n')
     for (const token of ['--focus-ring-width', '--focus-ring-offset', '--focus-ring-color']) {
       expect(root, `${token} must be defined in :root`).toContain(`${token}:`)
     }

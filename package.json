@@ -25,7 +25,9 @@
   },
   "license": "MIT",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/**/*.css"
+  ],
   "files": [
     "dist",
     "bin",
@@ -562,12 +564,13 @@
     }
   },
   "scripts": {
-    "build": "tsup && tsc -p tsconfig.build.json",
+    "build": "node src/theme/build.mjs --check && tsup && tsc -p tsconfig.build.json",
     "dev": "tsup --watch",
     "dev:types": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "prepare": "pnpm run build",
     "test": "vitest run",
     "test:generated": "node .github/scripts/test-generated-projects.mjs",
+    "test:theme:packed": "node tests/theme/packed-styles-consumer.mjs",
     "test:gates": "vitest run src/sandbox/index.test.ts src/profile/index.test.ts tests/chat-stream.test.ts tests/browser-safe-subpaths.test.ts tests/test-quality.test.ts tests/knip-entries-fresh.test.ts tests/web-react/popover-escapes-host.test.tsx tests/web-react/popover-canon-source.test.ts tests/studio/layer-order.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -593,7 +596,7 @@
     "@tangle-network/agent-knowledge": "18.0.0",
     "@tangle-network/agent-profile-materialize": "0.20.1",
     "@tangle-network/agent-runtime": "0.289.1",
-    "@tangle-network/brand": "1.9.1",
+    "@tangle-network/brand": "1.10.0",
     "@tangle-network/hub-sdk": "0.22.1",
     "@tangle-network/sandbox": "0.59.0",
     "@tangle-network/sandbox-ui": "0.117.0",

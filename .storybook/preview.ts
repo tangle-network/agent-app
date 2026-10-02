@@ -3,9 +3,6 @@ import '../src/theme/tokens.css'
 import './storybook.css'
 import '../src/studio-react/studio.css'
 import '../src/hosted-agent/react/lines.css'
-// AFTER tokens.css on purpose: brand-themes.css ties `:root`/`.dark` in
-// specificity and must win by source order (see the note inside that file).
-import './brand-themes.css'
 
 interface AgentTheme {
   /**
@@ -31,7 +28,7 @@ interface AgentTheme {
 const AGENT_DARK: AgentTheme = { dataTheme: 'dark', dark: true, title: 'Agent Dark (current)' }
 
 /**
- * The toolbar vocabulary: every brand named theme (brand's named-themes.css)
+ * The toolbar vocabulary: every named scope in Brand's light-default sheet
  * plus agent-app's own two, dark group first — the toolbar item list below is
  * derived from this map, so a theme cannot drift out of one but not the
  * other. `dark` drives the `.dark` class: arena and intelligence ARE dark
@@ -65,9 +62,9 @@ const LEGACY_THEME_VALUES: Record<string, string> = {
 
 /**
  * Applies the Storybook toolbar theme to the document the way a product shell
- * would: `data-theme` on `document.documentElement` (which is also :root, so
- * the brand named scopes and the alias bridge in brand-themes.css resolve on
- * the same element), plus the `.dark` class for dark themes (see AGENT_THEMES).
+ * would: `data-theme` on `document.documentElement` (also :root, so Brand's
+ * named scope and Agent App's aliases resolve on the same element), plus the
+ * `.dark` class for dark themes (see AGENT_THEMES).
  */
 const withAgentTheme: Decorator = (Story, context) => {
   const raw = String(context.globals.agentTheme ?? 'agent-dark')

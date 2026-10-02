@@ -17407,7 +17407,7 @@
           "name": "AgentAppTheme",
           "kind": "interface",
           "signature": "interface AgentAppTheme",
-          "doc": "Typed mirror of tokens.css for runtime/JS theming."
+          "doc": null
         },
         {
           "name": "CanvasRenderPalette",
@@ -17419,7 +17419,7 @@
           "name": "darkTheme",
           "kind": "const",
           "signature": "AgentAppTheme",
-          "doc": "Define a dark color scheme for the Agent app interface with specific background and foreground hues"
+          "doc": "Canonical Brand dark values projected for legacy JS and bitmap callers."
         },
         {
           "name": "lightTheme",
@@ -17496,7 +17496,7 @@
           "name": "default",
           "kind": "const",
           "signature": "{ darkMode: [string, string]; theme: { extend: { colors: { background: string; foreground: string; border: string; inpu…",
-          "doc": "Define a preset configuration for dark mode and extended theme colors with foreground variants"
+          "doc": null
         }
       ]
     },
