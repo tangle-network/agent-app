@@ -1502,29 +1502,31 @@ export function ChatComposer({
         panelRef={slashPanelRef}
         className={`w-80 overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
       >
-        {slashFiltered.length === 0 && (
-          <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-            {skillQuery !== undefined ? 'No matching skills' : hasSkills ? 'No matching commands or skills' : 'No matching commands'}
-          </div>
-        )}
-        {slashFiltered.map((item, index) => (
-          <button
-            key={item.id}
-            type="button"
-            role="option"
-            aria-selected={index === slashActiveIndex}
-            id={`${slashListId}-${index}`}
-            onMouseDown={(e) => e.preventDefault()}
-            onMouseMove={() => setSlashActive(index)}
-            onClick={() => pickSlash(item.id)}
-            className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
-              index === slashActiveIndex ? 'bg-accent' : 'hover:bg-accent'
-            }`}
-          >
-            <span className="shrink-0 font-medium text-foreground">{item.label}</span>
-            <span className="truncate text-xs text-muted-foreground">{item.description}</span>
-          </button>
-        ))}
+        <div className="max-h-80 overflow-y-auto overscroll-contain">
+          {slashFiltered.length === 0 && (
+            <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+              {skillQuery !== undefined ? 'No matching skills' : hasSkills ? 'No matching commands or skills' : 'No matching commands'}
+            </div>
+          )}
+          {slashFiltered.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              role="option"
+              aria-selected={index === slashActiveIndex}
+              id={`${slashListId}-${index}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseMove={() => setSlashActive(index)}
+              onClick={() => pickSlash(item.id)}
+              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
+                index === slashActiveIndex ? 'bg-accent' : 'hover:bg-accent'
+              }`}
+            >
+              <span className="shrink-0 font-medium text-foreground">{item.label}</span>
+              <span className="truncate text-xs text-muted-foreground">{item.description}</span>
+            </button>
+          ))}
+        </div>
       </PopoverSurface>
 
       {focusShortcut && (
