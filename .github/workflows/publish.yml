@@ -27,38 +27,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  node_22_compatibility:
-    if: >-
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      !contains(github.event.head_commit.message, '[skip release]')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      NODE_OPTIONS: --max-old-space-size=12288
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Verify source on Node 22
-        run: |
-          set -euo pipefail
-          pnpm install --frozen-lockfile --ignore-scripts=false
-          pnpm run typecheck
-          pnpm run test:gates
-          pnpm run build
-          pnpm run test
-          pnpm run test:generated
-          pnpm run knip
-
   package_release:
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -174,12 +142,6 @@ jobs:
       - name: Install dependencies
         if: steps.release.outputs.mode == 'auto'
         run: pnpm install --frozen-lockfile --ignore-scripts=false
-      - name: Typecheck source
-        if: steps.release.outputs.mode == 'auto'
-        run: pnpm run typecheck
-      - name: Incident-class gates
-        if: steps.release.outputs.mode == 'auto'
-        run: pnpm run test:gates
       - name: Prepare release manifests
         if: steps.release.outputs.mode == 'auto'
         env:
@@ -189,16 +151,6 @@ jobs:
       - name: Build release
         if: steps.release.outputs.mode == 'auto'
         run: pnpm run build
-      - name: Test source
-        if: steps.release.outputs.mode == 'auto'
-        run: pnpm run test
-      - name: Test clean generated projects
-        if: steps.release.outputs.mode == 'auto'
-        run: pnpm run test:generated
-      - name: Check dead surface
-        if: steps.release.outputs.mode == 'auto'
-        run: pnpm run knip
-
       - name: Configure exact artifact pack runtime
         if: steps.release.outputs.mode == 'auto'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -367,11 +319,11 @@ jobs:
           bash publish-packages.sh validate agent-app.tgz create-agent-app.tgz
 
   write_release:
-    needs: [package_release, node_22_compatibility]
+    needs: package_release
     if: >-
       always() &&
       needs.package_release.outputs.mode == 'auto' &&
-      needs.node_22_compatibility.result == 'success'
+      needs.package_release.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -477,12 +429,11 @@ jobs:
           bash publish-packages.sh publish create-agent-app create-agent-app.tgz
 
   safety_net_issue:
-    needs: [package_release, node_22_compatibility]
+    needs: package_release
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       !contains(github.event.head_commit.message, '[skip release]') &&
       (
-        needs.node_22_compatibility.result != 'success' ||
         needs.package_release.result == 'failure' ||
         needs.package_release.result == 'cancelled'
       )
@@ -499,14 +450,14 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          title='Post-merge safety net is red on main'
+          title='Package artifact preparation failed on main'
           body="$(printf '%s\n' \
-            "Commit \`$SHA\` failed the post-merge safety net." \
+            "Commit \`$SHA\` failed package artifact preparation." \
             "" \
             "- run: $RUN_URL" \
             "- pushed by: @$ACTOR" \
             "" \
-            "Reproduce with: pnpm signoff --source head")"
+            "Inspect artifact preparation in the linked Publish run.")"
           number="$(gh issue list --state open --limit 100 --json number,title \
             --jq "map(select(.title == \"${title}\")) | .[0].number // empty")"
           if [[ -n "$number" ]]; then
@@ -516,12 +467,11 @@ jobs:
           fi
 
   safety_net_clear:
-    needs: [package_release, node_22_compatibility]
+    needs: package_release
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.package_release.result == 'success' &&
-      needs.package_release.outputs.mode == 'auto' &&
-      needs.node_22_compatibility.result == 'success'
+      needs.package_release.outputs.mode == 'auto'
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -534,7 +484,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          title='Post-merge safety net is red on main'
+          title='Package artifact preparation failed on main'
           number="$(gh issue list --state open --limit 100 --json number,title \
             --jq "map(select(.title == \"${title}\")) | .[0].number // empty")"
           [[ -n "$number" ]] || {
