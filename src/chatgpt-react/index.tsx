@@ -38,10 +38,10 @@ export interface ChatGPTConnectProps {
 const pluginsUrl = 'https://chatgpt.com/plugins'
 const guideUrl = 'https://developers.openai.com/plugins/deploy/connect-chatgpt'
 
-function publicUrl(value: string): URL | undefined {
+function httpsUrl(value: string): URL | undefined {
   try {
     const url = new URL(value)
-    if (url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash) return url
+    if (url.protocol === 'https:' && !url.username && !url.password) return url
   } catch { /* Configuration errors render a recoverable setup message below. */ }
   return undefined
 }
@@ -59,8 +59,9 @@ function ConnectSurface({ app, endpoint, enrollment, registeredConnection, state
   const id = useId()
   const [showSetup, setShowSetup] = useState(false)
   const [copyNotice, setCopyNotice] = useState('')
-  const resource = publicUrl(endpoint)
-  const registeredUrl = registeredConnection?.id.trim() ? publicUrl(registeredConnection.url) : undefined
+  const resourceUrl = httpsUrl(endpoint)
+  const resource = resourceUrl && !resourceUrl.search && !resourceUrl.hash
+  const registeredUrl = registeredConnection?.id.trim() ? httpsUrl(registeredConnection.url) : undefined
   const connectionUrl = registeredUrl?.hostname === 'chatgpt.com' && !registeredUrl.port ? registeredUrl.href : undefined
   const checking = state.status === 'checking'
   const connected = state.status === 'connected'

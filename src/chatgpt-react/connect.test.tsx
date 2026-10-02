@@ -22,9 +22,9 @@ describe('ChatGPT connection surface', () => {
   })
 
   it('uses an explicitly supplied ChatGPT URL and never derives one from the ID', () => {
-    render(<ChatGPTConnect {...gtmExample} registeredConnection={{ id: 'test-record-id', url: 'https://chatgpt.com/plugins' }} />)
+    render(<ChatGPTConnect {...gtmExample} registeredConnection={{ id: 'test-record-id', url: 'https://chatgpt.com/plugins?test=fixture#location' }} />)
     const action = screen.getByRole('link', { name: 'Connect to ChatGPT (opens a new tab)' })
-    expect(action.getAttribute('href')).toBe('https://chatgpt.com/plugins')
+    expect(action.getAttribute('href')).toBe('https://chatgpt.com/plugins?test=fixture#location')
     expect(action.getAttribute('rel')).toBe('noopener noreferrer')
     expect(screen.queryByText('Connected to ChatGPT')).toBeNull()
   })
