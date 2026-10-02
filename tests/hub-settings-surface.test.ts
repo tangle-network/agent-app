@@ -26,7 +26,7 @@ describe('Hub settings has one public server boundary', () => {
     expect(existsSync(fileURLToPath(new URL('../src/platform/hub.ts', import.meta.url)))).toBe(false)
     const barrel = readFileSync(new URL('../src/platform/index.ts', import.meta.url), 'utf8')
     expect(barrel).not.toMatch(/from ['"]\.\/hub['"]/)
-    expect(barrel).toContain("export * from './hub-settings'")
+    expect(barrel).toContain("export * from './hub-settings.js'")
   })
 
   it.each([

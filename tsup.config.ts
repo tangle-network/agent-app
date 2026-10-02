@@ -122,9 +122,9 @@ export default defineConfig({
   // the whole of `src` in ~1 GB, and `dist/<entry>.d.ts` still answers every
   // `types` path in `exports`.
   //
-  // Emitted relative specifiers carry no file extension, so a consumer must
-  // resolve types with `moduleResolution: bundler`. Both scaffold templates and
-  // every product consuming this package already do.
+  // tsc preserves authored relative specifiers in declarations. Public barrels
+  // used by NodeNext consumers need explicit `.js` specifiers; other modules
+  // still have extensionless paths that require bundler resolution.
   dts: false,
   sourcemap: true,
   clean: true,
