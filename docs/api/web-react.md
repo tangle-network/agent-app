@@ -219,7 +219,7 @@ type AttachmentFileResult
 `function` — The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`.
 
 ```ts
-(mentions: readonly Pick<FileMention, "name" | "path">[]) => string
+(mentions: readonly Pick<FileMention, "path" | "name">[]) => string
 ```
 
 ### `cancelChatInteraction`

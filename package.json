@@ -73,6 +73,11 @@
       "import": "./dist/app-auth/index.js",
       "default": "./dist/app-auth/index.js"
     },
+    "./app-oauth": {
+      "types": "./dist/app-oauth/index.d.ts",
+      "import": "./dist/app-oauth/index.js",
+      "default": "./dist/app-oauth/index.js"
+    },
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.js",
@@ -573,6 +578,7 @@
     "build-storybook": "storybook build"
   },
   "devDependencies": {
+    "@better-auth/oauth-provider": "1.7.2",
     "@cloudflare/workers-types": "5.20260828.1",
     "@firecrawl/pdf-inspector-wasm": "^1.17.0",
     "@hocuspocus/provider": "^4.6.0",
@@ -649,6 +655,7 @@
     "nanostores": "1.5.4"
   },
   "peerDependencies": {
+    "@better-auth/oauth-provider": ">=1.7.2",
     "@firecrawl/pdf-inspector-wasm": ">=0.1.3",
     "@huggingface/transformers": ">=3",
     "@tangle-network/agent-eval": ">=0.199.0 <0.204.0",
@@ -687,6 +694,9 @@
     "nanostores": ">=0.11.3 <2.0.0"
   },
   "peerDependenciesMeta": {
+    "@better-auth/oauth-provider": {
+      "optional": true
+    },
     "@firecrawl/pdf-inspector-wasm": {
       "optional": true
     },

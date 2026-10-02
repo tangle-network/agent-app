@@ -289,6 +289,128 @@
       ]
     },
     {
+      "id": "./app-oauth",
+      "source": "src/app-oauth/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "activeAppOAuthConsent",
+          "kind": "function",
+          "signature": "(config: AppOAuthIssuerConfig, clientId: string, userId: string, scopes: readonly string[]) => Promise<AppOAuthConsent…",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthAuthority",
+          "kind": "interface",
+          "signature": "interface AppOAuthAuthority",
+          "doc": "Each callback reads current host authority."
+        },
+        {
+          "name": "AppOAuthAuthoritySnapshot",
+          "kind": "interface",
+          "signature": "interface AppOAuthAuthoritySnapshot",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthAuthoritySnapshotInput",
+          "kind": "interface",
+          "signature": "interface AppOAuthAuthoritySnapshotInput",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthConfig",
+          "kind": "interface",
+          "signature": "interface AppOAuthConfig",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthConsent",
+          "kind": "interface",
+          "signature": "interface AppOAuthConsent",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthConsentAuthority",
+          "kind": "interface",
+          "signature": "interface AppOAuthConsentAuthority",
+          "doc": "The issuer reads current consent before minting a token."
+        },
+        {
+          "name": "AppOAuthIssuerConfig",
+          "kind": "type",
+          "signature": "type AppOAuthIssuerConfig",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthJwksFetch",
+          "kind": "type",
+          "signature": "type AppOAuthJwksFetch",
+          "doc": null
+        },
+        {
+          "name": "appOAuthMetadataResponse",
+          "kind": "function",
+          "signature": "(request: Request, handler: (request: Request) => Promise<Response>) => Promise<Response>",
+          "doc": "Strip unsupported DPoP advertisement from Better Auth's issuer metadata."
+        },
+        {
+          "name": "AppOAuthPrincipal",
+          "kind": "interface",
+          "signature": "interface AppOAuthPrincipal",
+          "doc": null
+        },
+        {
+          "name": "appOAuthProtectedResourceMetadata",
+          "kind": "function",
+          "signature": "(config: AppOAuthConfig, auth?: ResourceClientAuth | undefined) => Promise<Record<string, unknown>>",
+          "doc": "RFC 9728 metadata for an issuer-hosted or separate protected resource."
+        },
+        {
+          "name": "AppOAuthRefreshStore",
+          "kind": "interface",
+          "signature": "interface AppOAuthRefreshStore",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthRefreshToken",
+          "kind": "interface",
+          "signature": "interface AppOAuthRefreshToken",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthResourceConfig",
+          "kind": "type",
+          "signature": "type AppOAuthResourceConfig",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthSnapshotAuthority",
+          "kind": "interface",
+          "signature": "interface AppOAuthSnapshotAuthority",
+          "doc": "Read one uncached, current authority view after JWS verification."
+        },
+        {
+          "name": "appOAuthTokenResponse",
+          "kind": "function",
+          "signature": "(request: Request, config: AppOAuthConfig & { authority: AppOAuthConsentAuthority; } & { handler(request: Request): Pro…",
+          "doc": "Bind refresh rows to the current consent before their secret leaves the host."
+        },
+        {
+          "name": "createAppOAuthProvider",
+          "kind": "function",
+          "signature": "(config: AppOAuthConfig & { authority: AppOAuthConsentAuthority; } & { loginPage: string; consentPage: string; humanUse…",
+          "doc": "Compose the maintained Better Auth provider with one host's live authority."
+        },
+        {
+          "name": "createAppOAuthResourceVerifier",
+          "kind": "function",
+          "signature": "(config: AppOAuthConfig & { authority: AppOAuthAuthority | AppOAuthSnapshotAuthority; } & { jwksFetch: () => Promise<JS…",
+          "doc": "Verify bearer tokens and current host grants before any private tool is listed."
+        }
+      ]
+    },
+    {
       "id": "./assets",
       "source": "src/assets/index.ts",
       "dependsOn": [],
@@ -1917,7 +2039,7 @@
         {
           "name": "buildMentionPromptBlock",
           "kind": "function",
-          "signature": "(mentions: readonly Pick<FileMention, \"name\" | \"path\">[]) => string",
+          "signature": "(mentions: readonly Pick<FileMention, \"path\" | \"name\">[]) => string",
           "doc": "The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`."
         },
         {
@@ -3007,7 +3129,7 @@
         {
           "name": "buildAttachmentPromptBlock",
           "kind": "function",
-          "signature": "(atts: readonly Pick<ChatAttachmentPart, \"name\" | \"path\">[], header?: string) => string",
+          "signature": "(atts: readonly Pick<ChatAttachmentPart, \"path\" | \"name\">[], header?: string) => string",
           "doc": "The agent-facing pointer block appended to the dispatched prompt — never persisted in `message.content`."
         },
         {
@@ -19245,7 +19367,7 @@
         {
           "name": "buildMentionPromptBlock",
           "kind": "function",
-          "signature": "(mentions: readonly Pick<FileMention, \"name\" | \"path\">[]) => string",
+          "signature": "(mentions: readonly Pick<FileMention, \"path\" | \"name\">[]) => string",
           "doc": "The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`."
         },
         {
