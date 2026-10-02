@@ -51,7 +51,7 @@ interface AppendMessageInput
 `function` — The agent-facing pointer block appended to the dispatched prompt — never persisted in `message.content`.
 
 ```ts
-(atts: readonly Pick<ChatAttachmentPart, "name" | "path">[], header?: string) => string
+(atts: readonly Pick<ChatAttachmentPart, "path" | "name">[], header?: string) => string
 ```
 
 ### `BULK_DELETE_MAX_THREADS`
