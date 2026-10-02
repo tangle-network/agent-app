@@ -20584,7 +20584,7 @@
         {
           "name": "ModelPicker",
           "kind": "function",
-          "signature": "({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant, triggerContent }: M…",
+          "signature": "({ value, onChange, models, loading, error, onRetry, disabled, id, \"aria-label\": ariaLabel, \"aria-labelledby\": ariaLabe…",
           "doc": "Searchable model picker pill + popover."
         },
         {
@@ -20704,7 +20704,7 @@
         {
           "name": "PopoverSurface",
           "kind": "function",
-          "signature": "({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…",
+          "signature": "({ open, triggerRef, panelRef, className, role, id, \"aria-label\": ariaLabel, matchTriggerWidth, contentKey, children, }…",
           "doc": "The floating panel every canonical picker opens."
         },
         {

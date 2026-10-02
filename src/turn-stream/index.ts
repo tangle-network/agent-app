@@ -5,7 +5,7 @@
  * Every DO request independently verifies a short-lived token for its own named channel.
  *
  * Interactive turn replay belongs to the sandbox session gateway.
- * Detached stream/dispatch turns use durable event rows and the running-turn index.
+ * The optional turn-event backend is independent of lock and signal coordination.
  * Products own sandbox probes, membership checks, and deferred persistence tasks.
  * See docs/turn-stream-migration.md for the 0.52.0 consumer migration.
  */

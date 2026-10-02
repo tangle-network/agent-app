@@ -1,7 +1,7 @@
 /**
  * Channel tokens, lock records, workspace signals, and durable event keys.
  * Interactive turn replay belongs to the sandbox session gateway.
- * Detached stream/dispatch turns retain durable rows and a running-turn index.
+ * An optional turn-event backend stores durable rows and a running-turn index.
  * This core uses WebCrypto and plain data without a Cloudflare runtime import.
  */
 
