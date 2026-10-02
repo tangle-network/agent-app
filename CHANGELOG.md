@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.8
+
+- feat(chat-routes): one shared observation contract for agent applications (#754)
+
 ## 0.51.7
 
 - feat(theme): finish pursuit8 canonical Brand migration
