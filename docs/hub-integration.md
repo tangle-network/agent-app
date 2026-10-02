@@ -29,7 +29,9 @@ That request must preserve the server's approval and denial decisions.
 `@tangle-network/agent-app/platform`. It uses the existing methods of
 `@tangle-network/hub-sdk` (exercised with pinned 0.22.1 and oldest admitted 0.19.3), not a
 second HTTP client. The SDK seam is structural, so existing platform imports do
-not acquire a new required Hub SDK runtime or declaration dependency. `createHubProxyRoutes` and its existing convenience API are unchanged.
+not acquire a new required Hub SDK runtime or declaration dependency. This is the
+only Hub account-settings server boundary. The superseded Hub proxy and its
+bearer helpers have been removed; there is no compatibility adapter.
 Do not mount an unrestricted `/v1/*` proxy to implement a settings screen.
 
 The factory returns `{ handle(request): Promise<Response> }`. Its application-owned
@@ -87,7 +89,9 @@ The callback must be safe to call twice with the same immutable intent.
 Return `{ authorized: true, principal: { userId, sessionId, workspaceId } }` only
 after those checks. A generic user ID, cached earlier grant, OAuth success, or
 brokered execution permission is insufficient. Return a denial `Response` or
-throw the host's auth `Response`; neither performs client resolution or Hub calls.
+throw the host's auth `Response`. An initial denial performs no client resolution
+or Hub calls; a denial on the second check performs no Hub calls, but credential
+resolution has already occurred.
 The router itself is not the application's session, CSRF, membership or consent store.
 
 `resolveClient(principal)` receives only that server-derived principal, not browser
@@ -156,13 +160,63 @@ other status-less or invalid-status SDK failures to 502. Error messages/details 
 not reflected because they may contain credentials. Auth responses/throws remain
 host-owned; unrelated exceptions are not disguised as successful SDK responses.
 
+### Migrating from the removed proxy
+
+This is a **breaking API removal**. `createHubProxyRoutes`, `HubClientLike`,
+`HubProxyContext`, `HubProxyRouteArgs`, and `HubProxyRoutes` are no longer exported.
+The `resolveUserTangleHubBearer` / `resolveUserTangleHubBearerForUser` helpers,
+their option/result/provenance types, `TangleBearerMissingError`,
+`isTangleBearerMissingError`, and `isPlatformHubErrorLike` are also removed.
+Do not rename an import or adapt `requireUserId` into an unconditional grant.
+No hidden implementation, deprecated alias, environment-key fallback, or
+`PlatformHubError` translation remains in the settings path.
+
+Use the two authorization-aware callbacks above and mount `settings.handle`.
+Change the browser caller and server route together:
+
+| Removed convenience route | Finite replacement | Response/caller change |
+| --- | --- | --- |
+| `catalog` | `GET /providers` | Consume the SDK provider result, not a `{ catalog }` wrapper. |
+| `connections` | `GET /connections` | Consume the SDK connection result, not a second app-side wrapper. |
+| `authStart` | `POST /connections/:provider/start` | Use a provider path and same-origin `returnUrl`; consume SDK `redirectUrl` and `state`, not `authorizationUrl`. |
+| `connectionDelete` | `DELETE /connections/:connectionId` | Authorize the exact owned connection in the current workspace context. |
+| `healthchecks` | `POST /connections/:connectionId/health` | Choose and authorize one connection; there is no all-connections healthcheck route. |
+
+For OAuth, resolve the old provider/connector selection through the actual Hub
+provider catalog. Do not guess that their identifiers are interchangeable.
+`providerId`, `connectorId`, browser identity fields, CLI mode, and
+`requestedScopes` are not accepted setup fields here. The current finite route
+supports `connectionParameters`; it does not silently drop unsupported options.
+There are no `/catalog`, `/auth/start`, or `/healthchecks` aliases, including
+when the host configures a different `basePath`.
+
+Replace the old bearer helpers with an application-owned lookup of the current
+caller's linked account credential. Missing linkage must be denied explicitly
+by that lookup or by `authorize`; it is not permission to use an environment,
+workspace owner's, administrator's, or brokered-execution credential. Handle
+`HubSdkError` status/code through the settings boundary, not the removed
+`PlatformHubError` guard. Keep execution under the separate `/integrations`
+contract; this removal does not grant execution tokens account-management power.
+
+The repository search during this cleanup found product imports in
+`gtm-agent/src/lib/.server/hub-routes.ts`,
+`creative-agent/src/lib/.server/hub-routes.ts`,
+`legal-agent/src/lib/.server/hub-routes.ts`, and
+`relationships-agent/src/integrations.ts`. Those are separate repositories, not
+migrated by this Agent App PR. Before upgrading them, migrate their route mounts,
+UI response shapes, session/role/ownership checks and linked-credential lookups,
+then test through each product's real authenticated entrypoint. The same check
+applies to consumers of the removed bearer helpers, not only proxy callers.
+A passing library test is not proof that those products are migrated. Coordinate
+a breaking release; do not publish this removal as a compatible patch upgrade.
+
 ### Settings verification
 
 Use the repository's Vitest runner and the existing package build/export gates:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm exec vitest run tests/hub-settings-routes.test.ts tests/platform.test.ts
+pnpm exec vitest run tests/hub-settings-routes.test.ts tests/hub-settings-surface.test.ts tests/platform.test.ts
 pnpm typecheck
 pnpm build
 pnpm docs:gen
