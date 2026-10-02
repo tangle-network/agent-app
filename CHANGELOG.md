@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.7
+
+- feat(theme): finish pursuit8 canonical Brand migration
+
 ## 0.51.6
 
 - feat(create-agent-app)!: make the shared workspace the default starter
