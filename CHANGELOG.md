@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.3
+
+- fix(channels): distinguish iMessage connection from direct texting (#739)
+
 ## 0.51.2
 
 - docs(agents): own delivery with focused checks (#740)
