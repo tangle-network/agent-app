@@ -36,6 +36,7 @@ function member(appId: string): LiveSharedEnrollmentMember {
   return {
     binding, subjectId, appId, lineId: base.lineId, attachmentId: base.attachmentId,
     memberId: base.memberId, ownerUserId: base.ownerUserId, senderAddress: base.sender.address,
+    grantRevision: 'revision-1',
     enrollmentId: `enrollment-${appId}`, agentId: `agent-${appId}`,
     workspaceId: `workspace-${appId}`, threadId: `thread-${appId}`,
   }
@@ -90,5 +91,93 @@ describe('shared enrolled application line', () => {
     const response = await f.handler(callback('@builder hello', 'msg_builder'))
     expect(response.status).toBe(403)
     expect(f.admitted).toEqual([])
+  })
+
+  it('does not return output read from the old target after a same-app member remap', async () => {
+    let enrollmentId = 'enrollment-builder'
+    let revision = 'revision-1'
+    const handler = createEnrolledApplicationLineHandler({
+      authenticate: async () => ({ principal: 'owner', binding }),
+      selectApp: async () => 'builder',
+      lookup: async () => ({ ...member('builder'), enrollmentId, grantRevision: revision }),
+      enrollment: { resolve: async (_principal, id) => ({
+        target: { ...member('builder'), enrollmentId: id }, box: {}, session: {},
+      }) as never },
+      read: async () => {
+        enrollmentId = 'enrollment-replacement'
+        revision = 'revision-2'
+        return { state: 'completed', executionId: 'old-execution', text: 'old private output' }
+      },
+      admit: async () => { throw new Error('completed output must not be admitted') },
+    })
+    const response = await handler(callback('@builder hello', 'msg_remap'))
+    expect(response.status).toBe(403)
+  })
+
+  it('does not return output after the pinned SDK target generation changes', async () => {
+    let generation = 1
+    const handler = createEnrolledApplicationLineHandler({
+      authenticate: async () => ({ principal: 'owner', binding }),
+      selectApp: async () => 'builder',
+      lookup: async () => member('builder'),
+      enrollment: { resolve: async () => ({
+        target: { ...member('builder'), instanceKey: 'agent:builder', configurationDigest: 'digest',
+          profileVersion: 'v1', generation, sandboxId: 'sandbox-1',
+          filesystemIncarnationId: 'incarnation-1', sessionId: 'session-1' },
+        box: {}, session: {},
+      }) as never },
+      read: async () => {
+        generation = 2
+        return { state: 'completed', executionId: 'old-execution', text: 'old private output' }
+      },
+      admit: async () => { throw new Error('completed output must not be admitted') },
+    })
+    const response = await handler(callback('@builder hello', 'msg_generation'))
+    expect(response.status).toBe(403)
+  })
+
+  it('denies a grant revision mutated on the same cached member object during resolution', async () => {
+    const cached = member('builder')
+    const handler = createEnrolledApplicationLineHandler({
+      authenticate: async () => ({ principal: 'owner', binding }),
+      selectApp: async () => 'builder',
+      lookup: async () => cached,
+      enrollment: { resolve: async () => {
+        cached.grantRevision = 'revision-2'
+        return { target: { ...cached }, box: {}, session: {} } as never
+      } },
+      read: async () => ({ state: 'completed', executionId: 'old-execution', text: 'old private output' }),
+      admit: async () => { throw new Error('revoked grant must not admit') },
+    })
+    const response = await handler(callback('@builder hello', 'msg_mutated_member'))
+    expect(response.status).toBe(403)
+  })
+
+  it('passes the pinned grant to an admission that checks the live revision at its write', async () => {
+    let liveRevision = 'revision-1'
+    let admitted = 0
+    let suppliedRevision: string | undefined
+    const handler = createEnrolledApplicationLineHandler({
+      authenticate: async () => ({ principal: 'owner', binding }),
+      selectApp: async () => 'builder',
+      lookup: async () => ({ ...member('builder'), grantRevision: liveRevision }),
+      enrollment: { resolve: async () => ({
+        target: { ...member('builder') }, box: {}, session: {},
+      }) as never },
+      read: async () => ({ state: 'missing' }),
+      admit: async (...args: unknown[]) => {
+        const pinned = args[2] as LiveSharedEnrollmentMember | undefined
+        suppliedRevision = pinned?.grantRevision
+        liveRevision = 'revision-2'
+        if (pinned?.grantRevision !== liveRevision) {
+          throw Response.json({ error: { code: 'grant_changed' } }, { status: 403 })
+        }
+        admitted++
+      },
+    })
+    const response = await handler(callback('@builder hello', 'msg_revoke_before_admit'))
+    expect(response.status).toBe(403)
+    expect(suppliedRevision).toBe('revision-1')
+    expect(admitted).toBe(0)
   })
 })

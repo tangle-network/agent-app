@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createAgentEnrollment, EnrollmentTargetError, type AgentEnrollmentTarget } from './index'
+import { createAgentEnrollment, EnrollmentTargetError, type AgentEnrollmentClaim, type AgentEnrollmentTarget } from './index'
 
 const identity = {
   enrollmentId: 'enrollment-1', agentId: 'agent-1', workspaceId: 'workspace-1', threadId: 'thread-1',
@@ -7,6 +7,7 @@ const identity = {
 
 function fixture() {
   let retained: AgentEnrollmentTarget | null = null
+  let claimed: AgentEnrollmentClaim | null = null
   let generation = 1
   let sandboxId = 'sandbox-1'
   let incarnation = 'incarnation-1'
@@ -37,6 +38,7 @@ function fixture() {
     client: () => client as never,
     store: {
       get: async () => retained,
+      claimIfAbsent: async (claim) => { claimed ??= claim; return claimed },
       insertIfAbsent: async (target) => { retained ??= target; return retained },
     },
   })
@@ -103,14 +105,173 @@ describe('createAgentEnrollment', () => {
     expect(f.stored()).toBeNull()
   })
 
-  it('retains the first target when concurrent callers race for one enrollment id', async () => {
+  it('does not call ensure when authority is revoked while obtaining the SDK client', async () => {
+    const f = fixture()
+    let authorized = true
+    const enrollment = createAgentEnrollment({
+      authorize: async () => { if (!authorized) throw new Error('denied') },
+      client: async () => { authorized = false; return f.client as never },
+      store: { get: async () => null, claimIfAbsent: async claim => claim,
+        insertIfAbsent: async target => target },
+    })
+    await expect(enrollment.enroll('owner', f.request)).rejects.toThrow('denied')
+    expect(f.client.instances.ensure).not.toHaveBeenCalled()
+  })
+
+  it('does not call ensure when authority is revoked while reading the target store', async () => {
+    const f = fixture()
+    let authorized = true
+    const enrollment = createAgentEnrollment({
+      authorize: async () => { if (!authorized) throw new Error('denied') },
+      client: () => f.client as never,
+      store: {
+        claimIfAbsent: async claim => claim,
+        get: async () => { authorized = false; return null },
+        insertIfAbsent: async target => target,
+      },
+    })
+    await expect(enrollment.enroll('owner', f.request)).rejects.toThrow('denied')
+    expect(f.client.instances.ensure).not.toHaveBeenCalled()
+  })
+
+  it('does not let a losing profile request mutate the winning instance', async () => {
     const f = fixture()
     let stored: AgentEnrollmentTarget | null = null
-    let reads = 0
+    let claimed: AgentEnrollmentClaim | null = null
+    let liveProfileVersion = 'v1'
+    const ensure = vi.fn(async (options: typeof f.request.instance) => {
+      liveProfileVersion = options.profile.version
+      return { key: options.key, generation: 1, sandboxId: 'sandbox-1',
+        profileVersion: options.profile.version, box: f.box,
+        sessionId: () => 'thread-1-v1' } as never
+    })
+    const client = { ...f.client, instances: { ...f.client.instances, ensure } }
+    const enrollment = createAgentEnrollment({
+      authorize: async () => {}, client: () => client as never,
+      store: {
+        get: async () => stored,
+        claimIfAbsent: async claim => { claimed ??= claim; return claimed },
+        insertIfAbsent: async target => { stored ??= target; return stored },
+      },
+    })
+    const results = await Promise.allSettled([
+      enrollment.enroll('owner', f.request),
+      enrollment.enroll('owner', { ...f.request, instance: { ...f.request.instance,
+        profile: { ...f.request.instance.profile, version: 'v2' } } }),
+    ])
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1)
+    expect(ensure).toHaveBeenCalledTimes(1)
+    expect(liveProfileVersion).toBe('v1')
+  })
+
+  it('accepts an identical retry when nested configuration keys use another insertion order', async () => {
+    const f = fixture()
+    const first = { ...f.request, instance: { ...f.request.instance,
+      profile: { version: 'v1', backend: { type: 'opencode', settings: { b: 2, a: 1 } } } as never,
+      create: { region: 'us', metadata: { b: '2', a: '1' } } as never,
+    } }
+    const reordered = { ...f.request, instance: { ...f.request.instance,
+      profile: { backend: { settings: { a: 1, b: 2 }, type: 'opencode' }, version: 'v1' } as never,
+      create: { metadata: { a: '1', b: '2' }, region: 'us' } as never,
+    } }
+    await f.enrollment.enroll('owner', first)
+    await expect(f.enrollment.enroll('owner', reordered)).resolves.toMatchObject(identity)
+    expect(f.client.instances.ensure).toHaveBeenCalledTimes(1)
+  })
+
+  it('provisions the snapshotted configuration if the caller mutates its request during a store await', async () => {
+    const f = fixture()
+    const request = { ...f.request, instance: { ...f.request.instance,
+      profile: { ...f.request.instance.profile } } }
+    let stored: AgentEnrollmentTarget | null = null
     const enrollment = createAgentEnrollment({
       authorize: async () => {}, client: () => f.client as never,
       store: {
-        get: async () => ++reads <= 2 ? null : stored,
+        claimIfAbsent: async claim => {
+          request.instance.key = 'agent:unclaimed'
+          request.instance.profile.backend = { type: 'opencode', changed: true } as never
+          return claim
+        },
+        get: async () => stored,
+        insertIfAbsent: async target => { stored ??= target; return stored },
+      },
+    })
+    await expect(enrollment.enroll('owner', request)).resolves.toMatchObject(identity)
+    expect(f.client.instances.ensure).toHaveBeenCalledWith(expect.objectContaining({
+      key: 'agent:agent-1', profile: { version: 'v1', backend: { type: 'opencode' } },
+    }))
+  })
+
+  it('keeps provisioning config private from host authorization callbacks', async () => {
+    const f = fixture()
+    let retained: AgentEnrollmentTarget | null = null
+    let checks = 0
+    const enrollment = createAgentEnrollment({
+      authorize: async (_principal, identity) => {
+        checks++
+        if (checks === 2 && 'instance' in identity) {
+          (identity as typeof f.request).instance.profile.backend = { type: 'opencode', changed: true } as never
+        }
+      },
+      client: () => f.client as never,
+      store: {
+        claimIfAbsent: async claim => claim,
+        get: async () => retained,
+        insertIfAbsent: async target => { retained ??= target; return retained },
+      },
+    })
+    await enrollment.enroll('owner', f.request)
+    expect(f.box.createSession).toHaveBeenCalledWith({
+      sessionId: 'thread-1-v1', retention: 'workspace', backend: { type: 'opencode' },
+    })
+  })
+
+  it('never calls ensure if a store attempts to mutate the reserved claim', async () => {
+    const f = fixture()
+    const enrollment = createAgentEnrollment({
+      authorize: async () => {}, client: () => f.client as never,
+      store: {
+        claimIfAbsent: async claim => {
+          claim.instanceKey = 'agent:unclaimed'
+          return claim
+        },
+        get: async () => null,
+        insertIfAbsent: async target => target,
+      },
+    })
+    await expect(enrollment.enroll('owner', f.request)).rejects.toThrow()
+    expect(f.client.instances.ensure).not.toHaveBeenCalled()
+  })
+
+  it('rejects a store that tries to change the committed target in place', async () => {
+    const f = fixture()
+    let retained: AgentEnrollmentTarget | null = null
+    const enrollment = createAgentEnrollment({
+      authorize: async () => {}, client: () => f.client as never,
+      store: {
+        claimIfAbsent: async claim => claim,
+        get: async () => retained,
+        insertIfAbsent: async target => {
+          try { target.profileVersion = 'unclaimed-profile' } catch { /* Store rejects an immutable write. */ }
+          retained ??= target
+          return retained
+        },
+      },
+    })
+    await expect(enrollment.enroll('owner', f.request)).resolves.toMatchObject({ profileVersion: 'v1' })
+    expect(retained).toMatchObject({ profileVersion: 'v1' })
+  })
+
+  it('retains the first target when concurrent callers race for one enrollment id', async () => {
+    const f = fixture()
+    let stored: AgentEnrollmentTarget | null = null
+    let claimed: AgentEnrollmentClaim | null = null
+    const enrollment = createAgentEnrollment({
+      authorize: async () => {}, client: () => f.client as never,
+      store: {
+        get: async () => stored,
+        claimIfAbsent: async claim => { claimed ??= claim; return claimed },
         insertIfAbsent: async target => { stored ??= target; return stored },
       },
     })

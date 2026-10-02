@@ -13,6 +13,12 @@
       "error": null,
       "exports": [
         {
+          "name": "AgentEnrollmentClaim",
+          "kind": "type",
+          "signature": "type AgentEnrollmentClaim",
+          "doc": "Immutable reservation made before any SDK provisioning can change an instance."
+        },
+        {
           "name": "AgentEnrollmentIdentity",
           "kind": "type",
           "signature": "type AgentEnrollmentIdentity",
