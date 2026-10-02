@@ -16,7 +16,7 @@ interface ApplicationLineConnectInput
 
 ### `ApplicationLineSetup`
 
-`function` — Verify an owned handset before connecting its iMessage line to an application.
+`function` — Verify an owned handset before connecting its supported line to an application.
 
 ```ts
 (props: ApplicationLineSetupProps) => Element

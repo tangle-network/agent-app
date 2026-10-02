@@ -38,7 +38,16 @@ function expiry(value: string): number {
   return Number.isFinite(time) ? time : 0
 }
 
-/** Verify an owned handset before connecting its iMessage line to an application. */
+function supportsSenderVerification(providerId: string, transport: LineConnectInput['transport']): boolean {
+  return (providerId === 'inkbox' && transport === 'imessage')
+    || (providerId === 'linq-whatsapp' && transport === 'whatsapp')
+}
+
+function hasTestIdentity(input: LineConnectInput): boolean {
+  return input.transport === 'imessage' || (input.transport === 'whatsapp' && Boolean(input.phoneNumberId))
+}
+
+/** Verify an owned handset before connecting its supported line to an application. */
 export function ApplicationLineSetup(props: ApplicationLineSetupProps) {
   return <ApplicationLineSetupScope key={props.scopeKey} {...props} />
 }
@@ -75,7 +84,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
 
   async function start(input: LineConnectInput) {
     const key = draftKey(input)
-    if (!enabled || !props.canManage || !validLimit || pending || input.transport !== 'imessage') return
+    if (!enabled || !props.canManage || !validLimit || pending || !hasTestIdentity(input)) return
     setPending({ kind: 'start', draftKey: key })
     setError(null)
     setNeedsStatusRefresh(true)
@@ -134,8 +143,8 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
         ...snapshot,
         connections: snapshot.connections?.map(connection => ({
           ...connection,
-          identities: connection.providerId === 'inkbox'
-            ? connection.identities.filter(identity => identity.transport === 'imessage') : [],
+          identities: connection.identities.filter(identity =>
+            supportsSenderVerification(connection.providerId, identity.transport)),
         })).filter(connection => connection.identities.length > 0) ?? null,
       }
     },
@@ -161,7 +170,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
     const verified = verifiedFor(input, now)
     const inProgress = active && !expired && ['awaiting_test', 'sending', 'challenge_sent'].includes(active.status.state)
     const busy = pending?.draftKey === key
-    const canStart = enabled && props.canManage && validLimit && !pending && input.transport === 'imessage'
+    const canStart = enabled && props.canManage && validLimit && !pending && hasTestIdentity(input)
     const canCheck = Boolean((inProgress || active?.status.state === 'verified') && !pending)
 
     return {
@@ -200,7 +209,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
     {props.canManage && <section className="tangle-lines tangle-lines--application" aria-label="Application access">
       <header className="tangle-lines__application-heading">
         <h2>Text your workspace</h2>
-        <p>Connect an owned Inkbox iMessage line to a conversation. Verify your phone before it can use application access and compute.</p>
+        <p>Connect an owned iMessage or WhatsApp line to a conversation. Verify your phone before it can use application access and compute.</p>
       </header>
       {!enabled ? <div className="tangle-lines__notice" role="status">
         <strong>New connections are disabled</strong>
@@ -216,7 +225,7 @@ function ApplicationLineSetupScope({ client, enabled, ...props }: ApplicationLin
     <LineSetup {...props} targetLabel={props.targetLabel ?? 'Conversation'} client={lineClient}
       canConnect={props.canManage && enabled} showConnectionSetup={enabled}
       connectPrerequisite={prerequisite}
-      setupDescription="Choose an owned Inkbox iMessage line and the conversation it will answer."
-      emptyConnectionsMessage="Add an owned Inkbox iMessage handle in Hub, then" />
+      setupDescription="Choose an owned iMessage or WhatsApp line and the conversation it will answer."
+      emptyConnectionsMessage="Add an owned Inkbox iMessage handle or Linq WhatsApp number in Hub, then" />
   </>
 }
