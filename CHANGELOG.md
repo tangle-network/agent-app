@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.32
+
+- docs: refresh generated module counts
+- feat(enrollment): add owner-scoped Drizzle store
+- feat(integrations-react): add identity-bound Hub settings controller
+- fix(vault): use readable danger text for failures
+
 ## 0.50.31
 
 - docs(api): refresh generated role signatures
