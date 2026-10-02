@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import { userEvent, within } from 'storybook/test'
+import { expect, userEvent, within } from 'storybook/test'
 import { useMemo } from 'react'
 import { ApplicationLineSetup } from '../../hosted-agent/react'
 import type { ApplicationLineSetupClient, ApplicationSenderVerification, LineSetupLine, LineSetupSnapshot } from '../../hosted-agent/react'
@@ -46,7 +46,7 @@ function status(state: ApplicationSenderVerification['state']): ApplicationSende
   }
 }
 
-type Mode = 'interactive' | 'waiting' | 'verified' | 'stale-proof' | 'expired' | 'error' | 'attached' | 'no-identities' | 'inventory-error'
+type Mode = 'interactive' | 'waiting' | 'verified' | 'stale-proof' | 'expired' | 'error' | 'attached' | 'dedicated' | 'no-identities' | 'inventory-error'
 
 function createClient(mode: Mode): ApplicationLineSetupClient {
   let checks = 0
@@ -55,6 +55,8 @@ function createClient(mode: Mode): ApplicationLineSetupClient {
       if (mode === 'inventory-error') throw new Error('HTTP 503: workspace messaging is unavailable')
       if (mode === 'no-identities') return { ...initial, connections: [] }
       if (mode === 'attached') return { ...initial, lines: [attachedLine] }
+      if (mode === 'dedicated') return { ...initial, lines: [{ ...attachedLine,
+        address: '+15550100003', connect: null, routerAddress: null }] }
       const line = mode === 'interactive' ? storedLine() : null
       return { ...initial, lines: line ? [line] : [] }
     },
@@ -153,7 +155,24 @@ export const VerificationError: Story = {
   },
 }
 
-export const Attached: Story = { render: () => <StoryFixture mode="attached" /> }
+export const Attached: Story = {
+  render: () => <StoryFixture mode="attached" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const connect = await canvas.findByRole('link', { name: 'Connect iMessage' })
+    await expect(connect.getAttribute('href')).toBe('sms:+15550100002?body=connect%20%40research')
+    await expect(canvas.queryByRole('link', { name: 'Text it now' })).toBeNull()
+  },
+}
+export const DedicatedNumber: Story = {
+  render: () => <StoryFixture mode="dedicated" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const message = await canvas.findByRole('link', { name: 'Text it now' })
+    await expect(message.getAttribute('href')).toBe('sms:+15550100003?body=Hello')
+    await expect(canvas.queryByRole('link', { name: 'Connect iMessage' })).toBeNull()
+  },
+}
 export const GrantsDisabled: Story = { render: () => <StoryFixture mode="attached" enabled={false} /> }
 export const NoIdentities: Story = { render: () => <StoryFixture mode="no-identities" /> }
 export const InventoryError: Story = { render: () => <StoryFixture mode="inventory-error" /> }
