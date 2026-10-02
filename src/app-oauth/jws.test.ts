@@ -45,5 +45,6 @@ describe('app OAuth signed resource token', () => {
     expect(await verify(request(`${token().slice(0, -2)}xx`))).toBeNull()
     expect(await verify(request(token({ consent_id: 'old-consent' })))).toBeNull()
     expect(await verify(request(token({ exp: Math.floor(Date.now() / 1000) - 1 })))).toBeNull()
+    expect(await verify(request(token({ exp: undefined })))).toBeNull()
   })
 })

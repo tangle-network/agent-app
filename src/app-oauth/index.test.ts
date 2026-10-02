@@ -140,4 +140,14 @@ describe('app OAuth host boundary', () => {
       humanUserEligible: async () => true })
     expect(plugin.id).toBe('oauth-provider')
   })
+
+  it('refuses consent claim names owned or stripped by the OAuth provider', () => {
+    const { config } = setup()
+    for (const consentClaim of ['iss', 'sub', 'aud', 'exp', 'iat', 'jti', 'client_id', 'scope',
+      'auth_time', 'acr', 'amr', 'cnf', 'sid', 'nbf', 'azp']) {
+      expect(() => createAppOAuthProvider({ ...config, consentClaim,
+        loginPage: '/login', consentPage: '/consent', humanUserEligible: async () => true,
+      })).toThrow('invalid issuer, resource, scopes or consent claim')
+    }
+  })
 })

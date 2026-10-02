@@ -6,6 +6,9 @@ import { verifyJwsAccessToken } from 'better-auth/oauth2'
 
 const ASYMMETRIC_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512', 'PS256', 'PS384', 'PS512', 'RS256', 'RS384', 'RS512']
 const OPERATIONAL_ERROR = Symbol('appOAuthOperational')
+// Better Auth 1.7.2 strips these AS-owned access-token claims at issuance.
+const RESERVED_CONSENT_CLAIMS = new Set(['iss', 'sub', 'aud', 'exp', 'iat', 'jti', 'client_id', 'scope',
+  'auth_time', 'acr', 'amr', 'cnf', 'sid', 'nbf', 'azp'])
 const STANDARD_SCOPES = ['openid', 'profile', 'email', 'offline_access']
 
 export interface AppOAuthConsent {
@@ -54,7 +57,7 @@ function validate(config: AppOAuthConfig): void {
   const issuer = new URL(config.issuer)
   const resource = new URL(config.resource)
   if (!config.issuer || !config.resource || !/^[a-z][a-z0-9_]*$/.test(config.consentClaim)
-    || ['sub', 'iss', 'aud', 'exp', 'sid', 'scope', 'client_id', 'cnf'].includes(config.consentClaim)
+    || RESERVED_CONSENT_CLAIMS.has(config.consentClaim)
     || !config.scopes.length
     || !config.scopes.includes(config.defaultClientScope)
     || issuer.hash || issuer.search || resource.hash || resource.search
@@ -220,7 +223,8 @@ export function createAppOAuthResourceVerifier(config: AppOAuthConfig & {
             throw error
           }
         },
-        verifyOptions: { issuer: config.issuer, audience: config.resource, algorithms: ASYMMETRIC_ALGORITHMS },
+        verifyOptions: { issuer: config.issuer, audience: config.resource,
+          algorithms: ASYMMETRIC_ALGORITHMS, requiredClaims: ['exp'] },
       })
     } catch (error) {
       if (typeof error === 'object' && error !== null && (error as Record<PropertyKey, unknown>)[OPERATIONAL_ERROR]) throw error
