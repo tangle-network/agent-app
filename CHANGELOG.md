@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.15
+
+- fix(deps): admit Hub SDK 0.24 (#760)
+
 ## 0.51.14
 
 - fix(composer): keep skill suggestions compact and scrollable (#759)
