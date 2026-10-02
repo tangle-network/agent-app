@@ -1,6 +1,6 @@
 # __PROJECT_NAME__
 
-A React chat workspace scaffolded with `create-agent-app --chat`, built on
+A React chat workspace scaffolded with `create-agent-app`, built on
 `@tangle-network/agent-app` and its public UI packages. The maintained
 `AgentWorkspaceLayout` owns the rail and History. `ChatComposer`, `ChatMessages`,
 and the interaction cards supply the conversation surface.
@@ -36,8 +36,10 @@ pnpm build
 pnpm test
 ```
 
-Read `AGENTS.md` and follow `CUSTOMIZE.md`. Set up the development D1 binding
-and `.dev.vars`, then:
+The scaffolder creates ignored `.dev.vars` with a fresh local session secret;
+it never prints the value or overwrites an existing file. Fill the scoped
+Router/Sandbox credentials, choose an authorized model in `agent.config.ts`,
+and configure the development D1 binding described in `CUSTOMIZE.md`. Then:
 
 ```bash
 pnpm db:migrate:local
