@@ -99,6 +99,17 @@ export const NoMatch: Story = {
 const DEMO_SKILLS: ComposerSkillOption[] = [
   { id: 'draft-plan', name: 'Draft plan', description: 'Outline the next steps' },
   { id: 'review-code', name: 'Review code', description: 'Inspect a change and report findings' },
+  ...[
+    'Research audience', 'Review positioning', 'Find prospects', 'Qualify leads',
+    'Draft outreach', 'Plan follow-ups', 'Prepare discovery', 'Write a brief',
+    'Review pipeline', 'Summarize calls', 'Plan a launch', 'Draft a proposal',
+    'Review pricing', 'Analyze feedback', 'Prepare a demo', 'Review onboarding',
+    'Draft a case study', 'Plan a webinar', 'Review retention', 'Analyze win loss',
+    'Research competitors', 'Prepare handoff', 'Review forecast', 'Draft a sequence',
+    'Plan expansion', 'Review referrals', 'Prepare negotiation', 'Audit content',
+    'Review channels', 'Plan an experiment', 'Review results', 'Update playbook',
+    'Summarize learning', 'Choose next action',
+  ].map((name) => ({ id: name.toLowerCase().replaceAll(' ', '-'), name, description: 'Use workspace context' })),
 ]
 
 /** `/skill` selection and `@` file mentions share the same rich input. The
@@ -110,7 +121,7 @@ export const SkillsWithFileMentions: Story = {
     const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null)
     const [last, setLast] = useState('No turn sent yet')
     return (
-      <div className="w-full space-y-3">
+      <div className="flex min-h-[calc(100dvh-2rem)] w-full flex-col justify-end gap-3">
         <ChatComposer
           onSend={(message) => setLast(`Sent ${selectedSkillId ?? 'no skill'}: ${message || '(skill only)'}`)}
           placeholder="Type /skill to choose, or @ to attach a file…"
