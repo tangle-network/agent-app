@@ -4,22 +4,38 @@
 
 Source: `src/app-oauth/index.ts`
 
-13 exports.
+19 exports.
 
 ### `activeAppOAuthConsent`
 
-`function` — Require exactly one current consent; malformed grants cannot widen authority.
+`function`
 
 ```ts
-(config: AppOAuthConfig, clientId: string, userId: string, scopes: readonly string[]) => Promise<AppOAuthConsent | null>
+(config: AppOAuthIssuerConfig, clientId: string, userId: string, scopes: readonly string[]) => Promise<AppOAuthConsent…
 ```
 
 ### `AppOAuthAuthority`
 
-`interface` — Every callback reads current host authority.
+`interface` — Each callback reads current host authority.
 
 ```ts
 interface AppOAuthAuthority
+```
+
+### `AppOAuthAuthoritySnapshot`
+
+`interface`
+
+```ts
+interface AppOAuthAuthoritySnapshot
+```
+
+### `AppOAuthAuthoritySnapshotInput`
+
+`interface`
+
+```ts
+interface AppOAuthAuthoritySnapshotInput
 ```
 
 ### `AppOAuthConfig`
@@ -36,6 +52,22 @@ interface AppOAuthConfig
 
 ```ts
 interface AppOAuthConsent
+```
+
+### `AppOAuthConsentAuthority`
+
+`interface` — The issuer reads current consent before minting a token.
+
+```ts
+interface AppOAuthConsentAuthority
+```
+
+### `AppOAuthIssuerConfig`
+
+`type`
+
+```ts
+type AppOAuthIssuerConfig
 ```
 
 ### `AppOAuthJwksFetch`
@@ -86,12 +118,28 @@ interface AppOAuthRefreshStore
 interface AppOAuthRefreshToken
 ```
 
+### `AppOAuthResourceConfig`
+
+`type`
+
+```ts
+type AppOAuthResourceConfig
+```
+
+### `AppOAuthSnapshotAuthority`
+
+`interface` — Read one uncached, current authority view after JWS verification.
+
+```ts
+interface AppOAuthSnapshotAuthority
+```
+
 ### `appOAuthTokenResponse`
 
 `function` — Bind refresh rows to the current consent before their secret leaves the host.
 
 ```ts
-(request: Request, config: AppOAuthConfig & { handler(request: Request): Promise<Response>; refreshStore: AppOAuthRefre…
+(request: Request, config: AppOAuthConfig & { authority: AppOAuthConsentAuthority; } & { handler(request: Request): Pro…
 ```
 
 ### `createAppOAuthProvider`
@@ -99,7 +147,7 @@ interface AppOAuthRefreshToken
 `function` — Compose the maintained Better Auth provider with one host's live authority.
 
 ```ts
-(config: AppOAuthConfig & { loginPage: string; consentPage: string; humanUserEligible(userId: string): Promise<boolean>…
+(config: AppOAuthConfig & { authority: AppOAuthConsentAuthority; } & { loginPage: string; consentPage: string; humanUse…
 ```
 
 ### `createAppOAuthResourceVerifier`
@@ -107,5 +155,5 @@ interface AppOAuthRefreshToken
 `function` — Verify bearer tokens and current host grants before any private tool is listed.
 
 ```ts
-(config: AppOAuthConfig & { jwksFetch: () => Promise<JSONWebKeySet | undefined>; }) => (request: Request) => Promise<Ap…
+(config: AppOAuthConfig & { authority: AppOAuthAuthority | AppOAuthSnapshotAuthority; } & { jwksFetch: () => Promise<JS…
 ```

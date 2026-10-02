@@ -26,7 +26,7 @@ function setup() {
     sessionActive: vi.fn(async () => true),
     userActive: vi.fn(async () => true),
   }
-  const config: AppOAuthConfig = {
+  const config: AppOAuthConfig & { authority: AppOAuthAuthority } = {
     issuer, resource, authority, scopes: ['operator:read', 'operator:run'],
     defaultClientScope: 'operator:read', consentClaim: 'gtm_consent_id',
   }

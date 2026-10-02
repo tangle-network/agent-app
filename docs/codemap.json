@@ -285,14 +285,26 @@
         {
           "name": "activeAppOAuthConsent",
           "kind": "function",
-          "signature": "(config: AppOAuthConfig, clientId: string, userId: string, scopes: readonly string[]) => Promise<AppOAuthConsent | null>",
-          "doc": "Require exactly one current consent; malformed grants cannot widen authority."
+          "signature": "(config: AppOAuthIssuerConfig, clientId: string, userId: string, scopes: readonly string[]) => Promise<AppOAuthConsent…",
+          "doc": null
         },
         {
           "name": "AppOAuthAuthority",
           "kind": "interface",
           "signature": "interface AppOAuthAuthority",
-          "doc": "Every callback reads current host authority."
+          "doc": "Each callback reads current host authority."
+        },
+        {
+          "name": "AppOAuthAuthoritySnapshot",
+          "kind": "interface",
+          "signature": "interface AppOAuthAuthoritySnapshot",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthAuthoritySnapshotInput",
+          "kind": "interface",
+          "signature": "interface AppOAuthAuthoritySnapshotInput",
+          "doc": null
         },
         {
           "name": "AppOAuthConfig",
@@ -304,6 +316,18 @@
           "name": "AppOAuthConsent",
           "kind": "interface",
           "signature": "interface AppOAuthConsent",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthConsentAuthority",
+          "kind": "interface",
+          "signature": "interface AppOAuthConsentAuthority",
+          "doc": "The issuer reads current consent before minting a token."
+        },
+        {
+          "name": "AppOAuthIssuerConfig",
+          "kind": "type",
+          "signature": "type AppOAuthIssuerConfig",
           "doc": null
         },
         {
@@ -343,21 +367,33 @@
           "doc": null
         },
         {
+          "name": "AppOAuthResourceConfig",
+          "kind": "type",
+          "signature": "type AppOAuthResourceConfig",
+          "doc": null
+        },
+        {
+          "name": "AppOAuthSnapshotAuthority",
+          "kind": "interface",
+          "signature": "interface AppOAuthSnapshotAuthority",
+          "doc": "Read one uncached, current authority view after JWS verification."
+        },
+        {
           "name": "appOAuthTokenResponse",
           "kind": "function",
-          "signature": "(request: Request, config: AppOAuthConfig & { handler(request: Request): Promise<Response>; refreshStore: AppOAuthRefre…",
+          "signature": "(request: Request, config: AppOAuthConfig & { authority: AppOAuthConsentAuthority; } & { handler(request: Request): Pro…",
           "doc": "Bind refresh rows to the current consent before their secret leaves the host."
         },
         {
           "name": "createAppOAuthProvider",
           "kind": "function",
-          "signature": "(config: AppOAuthConfig & { loginPage: string; consentPage: string; humanUserEligible(userId: string): Promise<boolean>…",
+          "signature": "(config: AppOAuthConfig & { authority: AppOAuthConsentAuthority; } & { loginPage: string; consentPage: string; humanUse…",
           "doc": "Compose the maintained Better Auth provider with one host's live authority."
         },
         {
           "name": "createAppOAuthResourceVerifier",
           "kind": "function",
-          "signature": "(config: AppOAuthConfig & { jwksFetch: () => Promise<JSONWebKeySet | undefined>; }) => (request: Request) => Promise<Ap…",
+          "signature": "(config: AppOAuthConfig & { authority: AppOAuthAuthority | AppOAuthSnapshotAuthority; } & { jwksFetch: () => Promise<JS…",
           "doc": "Verify bearer tokens and current host grants before any private tool is listed."
         }
       ]

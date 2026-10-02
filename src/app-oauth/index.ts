@@ -18,14 +18,44 @@ export interface AppOAuthConsent {
   resources: string | readonly string[] | null
 }
 
-/** Every callback reads current host authority. A lookup outage must throw. */
-export interface AppOAuthAuthority {
+/** The issuer reads current consent before minting a token. A lookup outage must throw. */
+export interface AppOAuthConsentAuthority {
   findConsents(clientId: string, userId: string): Promise<readonly AppOAuthConsent[]>
+}
+
+/** Each callback reads current host authority. A lookup outage must throw. */
+export interface AppOAuthAuthority extends AppOAuthConsentAuthority {
   clientActive(clientId: string): Promise<boolean>
   resourceActive(resource: string): Promise<boolean>
   clientResourceLinked(clientId: string, resource: string): Promise<boolean>
   sessionActive(sessionId: string, userId: string): Promise<boolean>
   userActive(userId: string): Promise<boolean>
+}
+
+export interface AppOAuthAuthoritySnapshotInput {
+  clientId: string
+  userId: string
+  sessionId: string
+  consentId: string
+  resource: string
+  scopes: readonly string[]
+  /** Claims from a verified JWS. The host can forward its own grant generation. */
+  claims: Readonly<Record<string, unknown>>
+}
+
+export interface AppOAuthAuthoritySnapshot {
+  active: boolean
+  clientActive: boolean
+  resourceActive: boolean
+  clientResourceLinked: boolean
+  consents: readonly AppOAuthConsent[]
+  sessionActive: boolean
+  userActive: boolean
+}
+
+/** Read one uncached, current authority view after JWS verification. */
+export interface AppOAuthSnapshotAuthority {
+  readSnapshot(input: AppOAuthAuthoritySnapshotInput): Promise<AppOAuthAuthoritySnapshot>
 }
 
 export interface AppOAuthConfig {
@@ -37,9 +67,13 @@ export interface AppOAuthConfig {
   scopes: readonly string[]
   /** Scope granted to a dynamically registered client by default. */
   defaultClientScope: string
-  /** Stable claim name bound to the current consent generation. */
+  /** Claim containing the current consent row ID. */
   consentClaim: string
-  authority: AppOAuthAuthority
+}
+
+export type AppOAuthIssuerConfig = AppOAuthConfig & { authority: AppOAuthConsentAuthority }
+export type AppOAuthResourceConfig = AppOAuthConfig & {
+  authority: AppOAuthAuthority | AppOAuthSnapshotAuthority
 }
 
 export type AppOAuthJwksFetch = Extract<Parameters<typeof verifyJwsAccessToken>[1]['jwksFetch'], (...args: never[]) => unknown>
@@ -70,9 +104,9 @@ function validate(config: AppOAuthConfig): void {
 }
 
 /** Require exactly one current consent; malformed grants cannot widen authority. */
-export async function activeAppOAuthConsent(config: AppOAuthConfig, clientId: string, userId: string,
-  scopes: readonly string[]): Promise<AppOAuthConsent | null> {
-  const rows = await config.authority.findConsents(clientId, userId)
+function consentFromRows(config: AppOAuthConfig, rows: readonly AppOAuthConsent[],
+  scopes: readonly string[]): AppOAuthConsent | null {
+  if (!Array.isArray(rows)) return null
   if (rows.length !== 1) return null
   const consent = rows[0]
   if (!consent?.id) return null
@@ -82,12 +116,17 @@ export async function activeAppOAuthConsent(config: AppOAuthConfig, clientId: st
   return scopes.every(scope => granted.includes(scope)) ? consent : null
 }
 
+export async function activeAppOAuthConsent(config: AppOAuthIssuerConfig, clientId: string, userId: string,
+  scopes: readonly string[]): Promise<AppOAuthConsent | null> {
+  return consentFromRows(config, await config.authority.findConsents(clientId, userId), scopes)
+}
+
 function invalidGrant(description: string): never {
   throw new APIError('BAD_REQUEST', { error: 'invalid_grant', error_description: description })
 }
 
 /** Compose the maintained Better Auth provider with one host's live authority. */
-export function createAppOAuthProvider(config: AppOAuthConfig & {
+export function createAppOAuthProvider(config: AppOAuthIssuerConfig & {
   loginPage: string
   consentPage: string
   /** The host must reject deleted, disabled or unverified users at token mint. */
@@ -163,7 +202,7 @@ function rejectedTokenResponse(): Response {
 }
 
 /** Bind refresh rows to the current consent before their secret leaves the host. */
-export async function appOAuthTokenResponse(request: Request, config: AppOAuthConfig & {
+export async function appOAuthTokenResponse(request: Request, config: AppOAuthIssuerConfig & {
   handler(request: Request): Promise<Response>
   refreshStore: AppOAuthRefreshStore
 }): Promise<Response> {
@@ -198,7 +237,7 @@ export interface AppOAuthPrincipal {
 }
 
 /** Verify bearer tokens and current host grants before any private tool is listed. */
-export function createAppOAuthResourceVerifier(config: AppOAuthConfig & {
+export function createAppOAuthResourceVerifier(config: AppOAuthResourceConfig & {
   jwksFetch: AppOAuthJwksFetch
 }) {
   validate(config)
@@ -233,16 +272,27 @@ export function createAppOAuthResourceVerifier(config: AppOAuthConfig & {
     if (!claims || typeof claims.sub !== 'string' || !claims.sub || claims.cnf !== undefined
       || typeof claims.client_id !== 'string' || !claims.client_id
       || typeof claims.sid !== 'string' || !claims.sid) return null
+    const consentId = claims[config.consentClaim]
+    if (typeof consentId !== 'string' || !consentId) return null
     const clientId = claims.client_id
     const userId = claims.sub
-    if (!await config.authority.clientActive(clientId)
-      || !await config.authority.resourceActive(config.resource)
-      || !await config.authority.clientResourceLinked(clientId, config.resource)) return null
     const tokenScopes = typeof claims.scope === 'string' ? claims.scope.split(' ').filter(Boolean) : []
-    const consent = await activeAppOAuthConsent(config, clientId, userId, tokenScopes)
-    if (!consent || claims[config.consentClaim] !== consent.id) return null
-    if (!await config.authority.sessionActive(claims.sid, userId)
-      || !await config.authority.userActive(userId)) return null
+    const authority = config.authority
+    if ('readSnapshot' in authority) {
+      const snapshot = await authority.readSnapshot({ clientId, userId, sessionId: claims.sid,
+        consentId, resource: config.resource, scopes: tokenScopes, claims: { ...claims } })
+      if (!snapshot?.active || !snapshot.clientActive || !snapshot.resourceActive
+        || !snapshot.clientResourceLinked || !snapshot.sessionActive || !snapshot.userActive
+        || consentFromRows(config, snapshot.consents, tokenScopes)?.id !== consentId) return null
+    } else {
+      if (!await authority.clientActive(clientId)
+        || !await authority.resourceActive(config.resource)
+        || !await authority.clientResourceLinked(clientId, config.resource)) return null
+      const consent = await activeAppOAuthConsent({ ...config, authority }, clientId, userId, tokenScopes)
+      if (!consent || consent.id !== consentId) return null
+      if (!await authority.sessionActive(claims.sid, userId)
+        || !await authority.userActive(userId)) return null
+    }
     return { userId, clientId, scopes: tokenScopes.filter(scope => config.scopes.includes(scope)) }
   }
 }

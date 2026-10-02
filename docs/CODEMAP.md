@@ -10,7 +10,7 @@ _109 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./agent-enrollment/drizzle`](api/agent-enrollment-drizzle.md) | 5 | `hosted-agent` |
 | [`./alerting`](api/alerting.md) | 8 | — |
 | [`./app-auth`](api/app-auth.md) | 13 | `platform` |
-| [`./app-oauth`](api/app-oauth.md) | 13 | — |
+| [`./app-oauth`](api/app-oauth.md) | 19 | — |
 | [`./assets`](api/assets.md) | 44 | — |
 | [`./assistant`](api/assistant.md) | 56 | `runtime`, `web-react` |
 | [`./billing`](api/billing.md) | 34 | — |
@@ -158,9 +158,9 @@ Depends on: `platform`
 
 ## `./app-oauth`
 
-Source: `src/app-oauth/index.ts` · 13 exports
+Source: `src/app-oauth/index.ts` · 19 exports
 
-`activeAppOAuthConsent`, `AppOAuthAuthority`, `AppOAuthConfig`, `AppOAuthConsent`, `AppOAuthJwksFetch`, `appOAuthMetadataResponse`, `AppOAuthPrincipal`, `appOAuthProtectedResourceMetadata`, `AppOAuthRefreshStore`, `AppOAuthRefreshToken`, `appOAuthTokenResponse`, `createAppOAuthProvider`, `createAppOAuthResourceVerifier`
+`activeAppOAuthConsent`, `AppOAuthAuthority`, `AppOAuthAuthoritySnapshot`, `AppOAuthAuthoritySnapshotInput`, `AppOAuthConfig`, `AppOAuthConsent`, `AppOAuthConsentAuthority`, `AppOAuthIssuerConfig`, `AppOAuthJwksFetch`, `appOAuthMetadataResponse`, `AppOAuthPrincipal`, `appOAuthProtectedResourceMetadata`, `AppOAuthRefreshStore`, `AppOAuthRefreshToken`, `AppOAuthResourceConfig`, `AppOAuthSnapshotAuthority`, `appOAuthTokenResponse`, `createAppOAuthProvider`, `createAppOAuthResourceVerifier`
 
 [Full API →](api/app-oauth.md)
 
