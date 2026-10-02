@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.0
+
+- feat(turn-stream)!: channel-bound capability tokens; remove the deprecated rebroadcast lane
+
 ## 0.51.16
 
 - fix(web-react): dependable shared model picker recovery and keyboard focus
