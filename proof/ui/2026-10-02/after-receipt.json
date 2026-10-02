@@ -1,0 +1,395 @@
+{
+  "phase": "after",
+  "origin": "http://127.0.0.1:6177",
+  "target": "compiled source Storybook; fixture account with no credentials",
+  "records": [
+    {
+      "story": "studio-studiohomescreen--empty",
+      "name": "home-empty-desktop-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiohomescreen--empty&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--empty-catalog",
+      "name": "catalog-empty-desktop-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--empty-catalog&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--narrow",
+      "name": "narrow-embedded-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--narrow&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiohomescreen--populated",
+      "name": "home-populated-desktop-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiohomescreen--populated&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--image-lane",
+      "name": "image-desktop-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--image-lane&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--video-lane",
+      "name": "video-desktop-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--video-lane&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--audio-lane",
+      "name": "audio-desktop-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--audio-lane&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--catalog-loading",
+      "name": "loading-desktop-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--catalog-loading&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--catalog-unavailable",
+      "name": "error-desktop-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--catalog-unavailable&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--provider-key-required",
+      "name": "provider-key-desktop-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--provider-key-required&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiohomescreen--empty",
+      "name": "home-empty-desktop-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiohomescreen--empty&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--empty-catalog",
+      "name": "catalog-empty-desktop-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--empty-catalog&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--narrow",
+      "name": "narrow-embedded-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--narrow&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiohomescreen--populated",
+      "name": "home-populated-desktop-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiohomescreen--populated&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--image-lane",
+      "name": "image-desktop-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--image-lane&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--video-lane",
+      "name": "video-desktop-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--video-lane&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--audio-lane",
+      "name": "audio-desktop-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--audio-lane&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--catalog-loading",
+      "name": "loading-desktop-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--catalog-loading&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--catalog-unavailable",
+      "name": "error-desktop-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--catalog-unavailable&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiocomposer--provider-key-required",
+      "name": "provider-key-desktop-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--provider-key-required&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "story": "studio-studiohomescreen--empty",
+      "name": "home-empty-phone-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiohomescreen--empty&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--empty-catalog",
+      "name": "catalog-empty-phone-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--empty-catalog&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiohomescreen--populated",
+      "name": "home-populated-phone-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiohomescreen--populated&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--image-lane",
+      "name": "image-phone-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--image-lane&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--video-lane",
+      "name": "video-phone-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--video-lane&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--audio-lane",
+      "name": "audio-phone-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--audio-lane&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--catalog-loading",
+      "name": "loading-phone-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--catalog-loading&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--catalog-unavailable",
+      "name": "error-phone-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--catalog-unavailable&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--provider-key-required",
+      "name": "provider-key-phone-agent-dark",
+      "theme": "agent-dark",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--provider-key-required&viewMode=story&globals=agentTheme%3Aagent-dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiohomescreen--empty",
+      "name": "home-empty-phone-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiohomescreen--empty&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--empty-catalog",
+      "name": "catalog-empty-phone-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--empty-catalog&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiohomescreen--populated",
+      "name": "home-populated-phone-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiohomescreen--populated&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--image-lane",
+      "name": "image-phone-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--image-lane&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--video-lane",
+      "name": "video-phone-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--video-lane&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--audio-lane",
+      "name": "audio-phone-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--audio-lane&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--catalog-loading",
+      "name": "loading-phone-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--catalog-loading&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--catalog-unavailable",
+      "name": "error-phone-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--catalog-unavailable&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "story": "studio-studiocomposer--provider-key-required",
+      "name": "provider-key-phone-agent-light",
+      "theme": "agent-light",
+      "url": "http://127.0.0.1:6177/iframe.html?id=studio-studiocomposer--provider-key-required&viewMode=story&globals=agentTheme%3Aagent-light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ],
+  "appSourceRevision": "97ef1cab",
+  "layoutArtifact": {
+    "version": "0.117.0",
+    "registryPublicationProved": true,
+    "sourceRevision": "0c74ba79",
+    "tarballSha256": "db1e46e0118ded843e7d44dfe88b000209c0d39441226bc83f48f43381a35826",
+    "integrity": "sha512-2zVfGsIgpiTeTq+ZBv4DKIu3gSjAornU4s5WKVkhiCARy+A+N0P4hN4DuNgRfKOLOeR9sS3qe09LfktyKaC/aA=="
+  }
+}

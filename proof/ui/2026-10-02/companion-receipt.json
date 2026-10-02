@@ -1,0 +1,48 @@
+{
+  "origin": "http://127.0.0.1:6177",
+  "target": "compiled source Storybook on GTR",
+  "records": [
+    {
+      "theme": "agent-dark",
+      "osColorScheme": "dark",
+      "actions": "open tools; open actual file tree row; view document; type terminal fixture; switch tabs; close/reopen; desktop→phone→desktop; reload and reopen",
+      "outcome": "terminal fixture input retained across tab/pane/viewport transitions; selected tab restored after reload",
+      "backend": "local documents and terminal textarea fixture; no shell connection or file upload"
+    },
+    {
+      "theme": "agent-light",
+      "osColorScheme": "light",
+      "actions": "open tools; open actual file tree row; view document; type terminal fixture; switch tabs; close/reopen; desktop→phone→desktop; reload and reopen",
+      "outcome": "terminal fixture input retained across tab/pane/viewport transitions; selected tab restored after reload",
+      "backend": "local documents and terminal textarea fixture; no shell connection or file upload"
+    },
+    {
+      "theme": "agent-dark",
+      "osColorScheme": "light",
+      "observedScheme": {
+        "root": "dark",
+        "host": "dark",
+        "background": "rgb(20, 20, 21)"
+      },
+      "outcome": "File tree follows app selection independently of operating-system preference"
+    },
+    {
+      "theme": "agent-light",
+      "osColorScheme": "dark",
+      "observedScheme": {
+        "root": "light",
+        "host": "light",
+        "background": "rgb(248, 248, 248)"
+      },
+      "outcome": "File tree follows app selection independently of operating-system preference"
+    }
+  ],
+  "appSourceRevision": "97ef1cab",
+  "layoutArtifact": {
+    "version": "0.117.0",
+    "registryPublicationProved": true,
+    "sourceRevision": "0c74ba79",
+    "tarballSha256": "db1e46e0118ded843e7d44dfe88b000209c0d39441226bc83f48f43381a35826",
+    "integrity": "sha512-2zVfGsIgpiTeTq+ZBv4DKIu3gSjAornU4s5WKVkhiCARy+A+N0P4hN4DuNgRfKOLOeR9sS3qe09LfktyKaC/aA=="
+  }
+}

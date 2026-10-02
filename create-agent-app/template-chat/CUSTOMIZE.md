@@ -62,6 +62,10 @@ Discovery: **What product behavior belongs beside the maintained workspace?**
   Titles belong in History and the document title.
   The shared shell owns the mobile header, navigation drawer, and account menu.
   Do not add a second mobile bar or header inset.
+- [ ] Configure `workspaceTools` in `web/workspace-tools.ts` when the product has authorized tool APIs.
+  The shared companion supplies tabs, the expander, and remembered selection.
+  Keep the list empty until file viewing, terminal connection, or preview is supported.
+  The default conversation uses the full available space.
 - [ ] Keep `settingsHref={null}` until the product provides Settings.
   Then pass its real route or `onSettingsClick` callback.
 - [ ] Keep `ChatComposer`, `ChatMessages`, `streamChatTurn`, and the shared interaction cards. Their current callbacks target the existing routes.
