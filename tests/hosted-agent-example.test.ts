@@ -4,7 +4,7 @@ import { HostedAgentError } from '../src/hosted-agent'
 
 const kit = vi.hoisted(() => ({ attachLine: vi.fn(), createHostedAgent: vi.fn() }))
 vi.mock('@tangle-network/agent-app/hosted-agent', async () => {
-  const source = await import('../src/hosted-agent')
+  const source = await vi.importActual<typeof import('../src/hosted-agent')>('../src/hosted-agent')
   return { HostedAgentError: source.HostedAgentError, createHostedAgent: kit.createHostedAgent }
 })
 const env = { TANGLE_API_KEY: 'local-test-key', OWNER_ADDRESS: 'owner@example.com', SETUP_SECRET: 'local-test-setup' }
