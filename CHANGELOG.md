@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.16
+
+- fix(web-react): dependable shared model picker recovery and keyboard focus
+
 ## 0.51.15
 
 - fix(deps): admit Hub SDK 0.24 (#760)
