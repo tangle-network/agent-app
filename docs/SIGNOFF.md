@@ -1,7 +1,8 @@
 # Sign-off — the merge gate for agent-app
 
 **The merge gate is `pnpm signoff`, run locally. CI is not the merge gate.**
-A merge whose commit has no valid sign-off proof is a defect, in the same sense a merge with a failing test is a defect — regardless of who merged it or how urgent it was.
+Executable, dependency, build, export, and generated-template changes require valid sign-off proof for the commit that lands.
+Instruction-only changes require diff and local-link checks; hooks and enforced branch protections still apply.
 
 This repo also *ships* the gate (`/signoff`, the `agent-app-signoff` bin). The doctrine, the measured comparison against CI, and the calibration against the two failures it replaced are in [`local-signoff.md`](./local-signoff.md); this file is how to use it here.
 

@@ -86,9 +86,16 @@ Exercise the real composed engine path and verify an applicable reference consum
 ## Merge and release
 
 Read [SIGNOFF.md](docs/SIGNOFF.md) before preparing a merge.
-Run `pnpm signoff --source head` against the commit that will land and attach its proof to the PR.
+For executable, dependency, build, export, or generated-template changes, run `pnpm signoff --source head` and attach its proof.
+For instruction-only changes, verify the diff and local links; preserve hooks and configured branch protections.
 A working-tree result does not prove all required files were committed.
 Do not tune `signoff.config.mjs` to hide a failure.
 Keep its source checks aligned with `.github/workflows/publish.yml` when changing either.
 A local pass does not prove publishing or production behavior; check those results when claiming a release.
 Use the configured Git identity and omit co-authorship or AI-attribution trailers.
+
+Choose checks for the changed surface and reuse passing checks while their inputs remain unchanged.
+Honor explicit hosted-CI waivers while preserving hooks and enforced branch protections.
+Fix change-caused failures; record unrelated or infrastructure failures as owned follow-ups.
+Own authorized push, PR, conflict resolution, review, merge, and release.
+When the task includes application adoption, finish the dependency update and verify the served consumer.
