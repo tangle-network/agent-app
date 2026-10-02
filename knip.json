@@ -41,6 +41,7 @@
     "src/hosted-agent/react/index.ts",
     "src/hosted-agent/react/styles.ts",
     "src/integrations/index.ts",
+    "src/integrations-react/index.ts",
     "src/interactions/index.ts",
     "src/knowledge-loop/index.ts",
     "src/knowledge/index.ts",

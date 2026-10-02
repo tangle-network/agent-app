@@ -188,6 +188,10 @@ as missing, not as authorization or provider success.
 
 ## Verify a consumer
 
+For an in-app connection and permission settings UI, use the `./integrations-react` controller with the finite `./platform` server routes.
+See [the in-app Hub settings example](../examples/hub-integrations-react.md) for the identity-bound host request and local OAuth callback.
+The settings controller never runs an integration action or grants a workspace connection.
+
 Build the candidate and install its tarball in an isolated consumer with its declared peers.
 Use `pnpm pack --pack-destination .gtr-private` to retain the candidate artifact.
 Record the source revision, tarball hash, consumer lockfile, and installed SDK version.

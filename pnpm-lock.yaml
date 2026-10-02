@@ -82,8 +82,8 @@ importers:
         specifier: 0.59.0
         version: 0.59.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       '@tangle-network/sandbox-ui':
-        specifier: 0.116.8
-        version: 0.116.8(f2259ba323a02cb04afa3ba77e34f5a9)
+        specifier: 0.116.9
+        version: 0.116.9(f2259ba323a02cb04afa3ba77e34f5a9)
       '@tangle-network/tcloud':
         specifier: 0.8.1
         version: 0.8.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(typescript@7.0.2)(zod@4.4.3)
@@ -2478,8 +2478,8 @@ packages:
   '@tangle-network/hub-sdk@0.22.1':
     resolution: {integrity: sha512-nqvZHkQf0rbs4HRZ76wQ05pXapHr8L2k4z/fSzDKtT6Gru1a5ulkfRAyljtBxp5giocWH4OPOJuja/QEX8QZdg==}
 
-  '@tangle-network/sandbox-ui@0.116.8':
-    resolution: {integrity: sha512-rm2htV1lSe+FArPQWyohXK+f21TX7HT9+nzBT3NEpiqapNkUYtS0ERiHXOp3TfyaD9d5umrCJKLi1sj/9w/AtA==}
+  '@tangle-network/sandbox-ui@0.116.9':
+    resolution: {integrity: sha512-rEfR4tn9bsNEgVH7bdZXEr6+Z9ha3MuG0M1TUM6ZFqKFjZKRnCLdzvGzlKruwoT1U/mFTLonZ9FFE3SJWPTnFQ==}
     peerDependencies:
       '@hocuspocus/provider': '>=2.15.0 <5.0.0'
       '@nanostores/react': '>=0.8.4 <2.0.0'
@@ -8007,7 +8007,7 @@ snapshots:
       - '@opentelemetry/semantic-conventions'
       - langfuse-node
 
-  '@tangle-network/sandbox-ui@0.116.8(f2259ba323a02cb04afa3ba77e34f5a9)':
+  '@tangle-network/sandbox-ui@0.116.9(f2259ba323a02cb04afa3ba77e34f5a9)':
     dependencies:
       '@lobehub/icons-static-svg': 1.95.1
       '@pierre/diffs': 1.5.1(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
