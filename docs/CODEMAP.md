@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_107 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_108 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -113,7 +113,7 @@ _107 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
 | [`./workspace-apps`](api/workspace-apps.md) | 17 | — |
-| [`./workspace-react`](api/workspace-react.md) | 5 | `session-shell`, `workspace-apps` |
+| [`./workspace-react`](api/workspace-react.md) | 9 | `session-shell`, `workspace-apps` |
 
 ---
 
@@ -1083,10 +1083,10 @@ Source: `src/workspace-apps/index.ts` · 17 exports
 
 ## `./workspace-react`
 
-Source: `src/workspace-react/index.tsx` · 5 exports
+Source: `src/workspace-react/index.tsx` · 9 exports
 
 Depends on: `session-shell`, `workspace-apps`
 
-`AgentWorkspaceActiveRoute`, `AgentWorkspaceAppsConfig`, `AgentWorkspaceLayout`, `AgentWorkspaceLayoutProps`, `AgentWorkspaceSessionConfig`
+`AgentWorkspaceActiveRoute`, `AgentWorkspaceAppsConfig`, `AgentWorkspaceCompanion`, `AgentWorkspaceCompanionHandle`, `AgentWorkspaceCompanionProps`, `AgentWorkspaceCompanionTab`, `AgentWorkspaceLayout`, `AgentWorkspaceLayoutProps`, `AgentWorkspaceSessionConfig`
 
 [Full API →](api/workspace-react.md)
