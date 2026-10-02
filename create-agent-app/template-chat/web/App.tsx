@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { CirclePlus, History } from 'lucide-react'
-import { AgentWorkspaceLayout } from '@tangle-network/agent-app/workspace-react'
+import { AgentWorkspaceCompanion, AgentWorkspaceLayout } from '@tangle-network/agent-app/workspace-react'
 import { SessionHistoryPanel, useSessionHistory, type FetchSessionPage } from '@tangle-network/agent-app/web-react'
 import type { SessionSort } from '@tangle-network/agent-app/session-shell'
 import { Conversation } from './Conversation'
+import { workspaceTools } from './workspace-tools'
 import { historyHref, json, listThreads, post, threadHref, type Session, type Thread } from './api'
 
 const productName = document.title
@@ -85,7 +86,7 @@ function Workspace({ session }: { session: Session }) {
     contentClassName="h-dvh min-h-0 overflow-hidden" defaultRailCollapsed={false}>
     {error && <div role="alert" className="p-4 text-sm text-destructive">{error} <button className="underline" onClick={() => location.reload()}>Reload</button></div>}
     {showHistory ? loaded ? <HistoryPage threads={threads} /> : <p role="status" className="p-6">Loading History…</p>
-      : <Conversation initialThreadId={initialThreadId} onThread={setActiveId} onChanged={refreshThreads} />}
+      : <AgentWorkspaceCompanion tabs={workspaceTools} persistenceKey={`workspace:${session.user.id}:tools`}><Conversation initialThreadId={initialThreadId} onThread={setActiveId} onChanged={refreshThreads} /></AgentWorkspaceCompanion>}
   </AgentWorkspaceLayout>
 }
 

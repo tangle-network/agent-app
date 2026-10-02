@@ -96,6 +96,7 @@ const IMAGE_LANE_DOWN_CATALOG: MediaModelCatalogResponse = {
 }
 
 let servedCatalog = CATALOG
+let servedState: 'ready' | 'loading' | 'error' = 'ready'
 let stubInstalled = false
 
 /** Installed once, and only for the two studio endpoints — every other request
@@ -110,7 +111,11 @@ function installFetchStub() {
   })
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input)
-    if (url.startsWith('/api/media-models')) return Promise.resolve(json(servedCatalog))
+    if (url.startsWith('/api/media-models')) {
+      if (servedState === 'error') return Promise.resolve(json({ error: 'Catalog fixture unavailable' }, 503))
+      if (servedState === 'loading') return new Promise<Response>(() => {})
+      return Promise.resolve(json(servedCatalog))
+    }
     if (url.startsWith('/api/generate')) {
       return Promise.resolve(json({ error: 'Storybook has no generation backend.' }, 501))
     }
@@ -121,9 +126,10 @@ function installFetchStub() {
 function withCatalog(catalog: MediaModelCatalogResponse, width = 'w-full max-w-[820px]') {
   return function CatalogDecorator(Story: () => ReactNode) {
     servedCatalog = catalog
+    servedState = 'ready'
     installFetchStub()
     return (
-      <div className={`${width} max-w-full p-4`}>
+      <div className={`mx-auto ${width} p-4`}>
         <Story />
       </div>
     )
@@ -176,6 +182,7 @@ function PickUnavailableModel({ children }: { children: ReactNode }) {
 
 const meta: Meta<typeof StudioComposer> = {
   title: 'Studio/StudioComposer',
+  parameters: { layout: 'fullscreen' },
   component: StudioComposer,
   decorators: [withCatalog(CATALOG)],
   args: {
@@ -236,14 +243,13 @@ export const ModelUnavailable: Story = {
 }
 
 /** Every curated image model is unavailable, so the prompt becomes the compact
- *  amber lane-down line and Generate stays disabled. */
+ *  unavailable lane status and Generate stays disabled. */
 export const LaneDown: Story = {
   name: 'Lane down',
   decorators: [withCatalog(IMAGE_LANE_DOWN_CATALOG)],
 }
 
-/** An empty lane uses the compact amber "No image models are available" line;
- *  the model pill reads "Select a model" and Generate stays disabled. */
+/** Empty lanes expose Refresh models and keep the prompt editable without an empty picker. */
 export const EmptyCatalog: Story = {
   name: 'Empty catalog',
   decorators: [withCatalog(EMPTY_CATALOG)],
@@ -254,7 +260,7 @@ export const EmptyCatalog: Story = {
  *  them, with the edge fade showing how much is off-screen. */
 export const Narrow: Story = {
   name: 'Narrow (480px)',
-  decorators: [withCatalog(CATALOG, 'w-[480px]')],
+  decorators: [withCatalog(CATALOG, 'w-[480px] max-w-full')],
   render: (args) => (
     <OnLane lane="Video">
       <StudioComposer {...args} />
@@ -271,4 +277,39 @@ export const WithNotice: Story = {
       <StudioComposer {...args} className="w-full" />
     </div>
   ),
+}
+
+/** Uses the host picker port with an explicit Storybook reference fixture; no upload occurs. */
+export const ReferencePicker: Story = {
+  name: 'Reference picker fixture',
+  args: { pickReferenceImage: async () => 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=640' },
+  render: (args) => <OnLane lane="Video"><StudioComposer {...args} /></OnLane>,
+}
+export const ReferencePickerCancelled: Story = {
+  name: 'Reference picker cancellation',
+  args: { pickReferenceImage: async () => null },
+  render: (args) => <OnLane lane="Video"><StudioComposer {...args} /></OnLane>,
+}
+
+function withCatalogState(state: 'loading' | 'error') {
+  return function CatalogStateDecorator(Story: () => ReactNode) {
+    servedState = state
+    installFetchStub()
+    return <div className="mx-auto w-full max-w-[820px] p-4"><Story /></div>
+  }
+}
+export const CatalogLoading: Story = {
+  name: 'Catalog loading',
+  decorators: [withCatalogState('loading')],
+}
+export const CatalogUnavailable: Story = {
+  name: 'Catalog request failed',
+  decorators: [withCatalogState('error')],
+}
+
+/** Models are present but require the caller's provider key; refreshing cannot grant eligibility. */
+export const ProviderKeyRequired: Story = {
+  name: 'Provider key required',
+  render: (args) => <OnLane lane="Image"><StudioComposer {...args} /></OnLane>,
+  decorators: [withCatalog({ ...CATALOG, models: { ...CATALOG.models, image: [model('gpt-image-2', 'image', 'openai', 'GPT Image 2', { status: 'unavailable', reason: 'Connect your provider key to generate images.' })] } })],
 }

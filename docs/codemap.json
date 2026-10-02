@@ -22906,6 +22906,30 @@
           "doc": "Registered apps shown under one expandable workspace destination."
         },
         {
+          "name": "AgentWorkspaceCompanion",
+          "kind": "function",
+          "signature": "ForwardRefExoticComponent<AgentWorkspaceCompanionProps & RefAttributes<AgentWorkspaceCompanionHandle>>",
+          "doc": "Product-owned tools beside a conversation; omitted tools have no tabs or effects."
+        },
+        {
+          "name": "AgentWorkspaceCompanionHandle",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceCompanionHandle",
+          "doc": null
+        },
+        {
+          "name": "AgentWorkspaceCompanionProps",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceCompanionProps",
+          "doc": null
+        },
+        {
+          "name": "AgentWorkspaceCompanionTab",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceCompanionTab",
+          "doc": null
+        },
+        {
           "name": "AgentWorkspaceLayout",
           "kind": "function",
           "signature": "({ children, navItems, sessions, apps, activeRoute, activeId, ...sidebarProps }: AgentWorkspaceLayoutProps) => Element",

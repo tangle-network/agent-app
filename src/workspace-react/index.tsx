@@ -243,3 +243,5 @@ export function AgentWorkspaceLayout({
     </SidebarLayout>
   )
 }
+
+export { AgentWorkspaceCompanion, type AgentWorkspaceCompanionHandle, type AgentWorkspaceCompanionProps, type AgentWorkspaceCompanionTab } from './companion'

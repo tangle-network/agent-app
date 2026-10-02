@@ -12,7 +12,7 @@
  * an invented one and not a disabled one.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   AudioLines,
   ArrowUp,
@@ -31,6 +31,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import {
+  GENERATION_TYPES,
   type Generation,
   type MediaModelCatalogResponse,
   type MediaModelOption,
@@ -172,6 +173,26 @@ export interface StudioComposerProps {
   className?: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isMediaCatalog(value: unknown): value is MediaModelCatalogResponse {
+  if (!isRecord(value) || !isRecord(value.defaults) || !isRecord(value.models)) return false
+  const { defaults, models } = value
+  return GENERATION_TYPES.every((type) => {
+    const rows = models[type]
+    return typeof defaults[type] === 'string' && Array.isArray(rows) && rows.every((row: unknown) => (
+      isRecord(row) && typeof row.id === 'string' && Boolean(row.id.trim()) && typeof row.name === 'string'
+      && row.type === type && typeof row.status === 'string'
+      && ['available', 'limited', 'unavailable'].includes(row.status)
+      && (row.provider === undefined || typeof row.provider === 'string')
+      && (row.reason === undefined || typeof row.reason === 'string')
+      && (row.options === undefined || isRecord(row.options))
+    ))
+  })
+}
+
 /**
  * The composer card. The host owns its width (the card fills its container) and
  * the heading above it; this owns the prompt, the controls, and the POST.
@@ -184,9 +205,12 @@ export function StudioComposer({
   sendTone = 'contrast',
   className,
 }: StudioComposerProps) {
+  const laneWarningId = useId()
   const [type, setType] = useState<ComposerType>('image')
   const [prompt, setPrompt] = useState('')
   const [catalog, setCatalog] = useState<MediaModelCatalogResponse | null>(null)
+  const [catalogRequest, setCatalogRequest] = useState(0)
+  const catalogPendingRef = useRef(false)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [selectedModels, setSelectedModels] = useState<Partial<Record<ComposerType, string>>>({})
@@ -223,13 +247,16 @@ export function StudioComposer({
   useEffect(() => {
     if (!workspaceId) return
     let cancelled = false
+    const controller = new AbortController()
+    catalogPendingRef.current = true
+    setCatalog(null)
     setCatalogLoading(true)
     setCatalogError(null)
 
-    fetch(`/api/media-models?workspaceId=${encodeURIComponent(workspaceId)}`)
+    fetch(`/api/media-models?workspaceId=${encodeURIComponent(workspaceId)}`, { signal: controller.signal })
       .then(async (res) => {
-        const data = await res.json() as MediaModelCatalogResponse
-        if (!res.ok) throw new Error(data.error ?? 'Could not load media models')
+        const data: unknown = await res.json()
+        if (!res.ok || !isMediaCatalog(data)) throw new Error('Could not load media models')
         return data
       })
       .then((data) => {
@@ -244,13 +271,17 @@ export function StudioComposer({
         setCatalogError('Could not load media models')
       })
       .finally(() => {
-        if (!cancelled) setCatalogLoading(false)
+        if (!cancelled) {
+          catalogPendingRef.current = false
+          setCatalogLoading(false)
+        }
       })
 
     return () => {
       cancelled = true
+      controller.abort()
     }
-  }, [workspaceId])
+  }, [workspaceId, catalogRequest])
 
   const laneModels = useMemo(() => catalog?.models[type] ?? [], [catalog, type])
   const curatedModels = useMemo(() => curateComposerModels(type, laneModels), [laneModels, type])
@@ -349,25 +380,26 @@ export function StudioComposer({
     persistedOptionsRef.current = optionsByModel
   }, [catalog, hydratedWorkspaceId, modelId, optionValues, options, selectedModels, type, workspaceId])
 
+  const catalogReady = Boolean(catalog) && !catalogLoading && !catalogError
   const laneDown = Boolean(catalog) && !catalogLoading && !catalogError && laneUnavailable(curatedModels)
 
   const values = optionValues[type]
   // Every parameter belongs to the MODEL. A dead lane has none, so the pills it
   // would have filled are dropped rather than left standing on a default no
   // model is offering.
-  const params = laneDown ? [] : visibleParams(type, options)
+  const params = catalogReady && !laneDown ? visibleParams(type, options) : []
   const audioMeta = type === 'video' ? options?.audio : undefined
-  const audioSupported = !laneDown && Boolean(audioMeta) && audioMeta?.supported !== false
+  const audioSupported = catalogReady && !laneDown && Boolean(audioMeta) && audioMeta?.supported !== false
   // A model the catalog does not list is normally "not ready" — except for a
   // verified image-to-video sibling, which the composer selected itself by
   // attaching a reference image and must be able to send even when the catalog
   // never listed it.
   const unlistedSibling = !modelOption && Boolean(textToVideoSibling(modelId))
-  const referenceSupported = !laneDown
+  const referenceSupported = catalogReady && !laneDown
     && type === 'video'
     && Boolean(imageToVideoSibling(modelId) ?? textToVideoSibling(modelId))
 
-  const modelReady = (Boolean(modelOption) || unlistedSibling)
+  const modelReady = catalogReady && (Boolean(modelOption) || unlistedSibling)
     && modelOption?.status !== 'unavailable'
     && !catalogLoading
     && !catalogError
@@ -485,45 +517,66 @@ export function StudioComposer({
     }
   }
 
-  const notice = catalogError ?? error
+  const notice = error
   const laneLabel = SEGMENTS.find((segment) => segment.type === type)!.label
   // An empty curated lane can reflect catalog or curation policy, not an outage.
-  const laneDownMessage = curatedModels.length > 0
-    ? `${laneLabel} models are temporarily unavailable`
-    : `No ${laneLabel.toLowerCase()} models are available`
+  const blockedReasons = [...new Set(curatedModels.map((model) => model.reason?.trim()).filter(Boolean))]
+  const sharedBlockReason = curatedModels.every((model) => Boolean(model.reason?.trim())) && blockedReasons.length === 1
+    ? blockedReasons[0]
+    : undefined
+  const laneDownMessage = curatedModels.length === 0
+    ? `No ${laneLabel.toLowerCase()} models are available`
+    : sharedBlockReason ?? `${laneLabel} models are unavailable`
+  const loadingModels = Boolean(workspaceId) && (catalogLoading || (!catalog && !catalogError))
+  const modelStatus = loadingModels ? 'Loading media models…' : catalogError ?? (laneDown ? laneDownMessage : null)
+  const showModelMenu = catalogReady && curatedModels.length > 0
+  const canReloadModels = Boolean(workspaceId) && !loadingModels && Boolean(catalogError || (catalogReady && curatedModels.length === 0))
+
+  function reloadModels() {
+    if (!workspaceId || catalogLoading || catalogPendingRef.current) return
+    catalogPendingRef.current = true
+    setCatalogLoading(true)
+    setCatalogRequest((current) => current + 1)
+  }
 
   return (
     <section
       data-variant={variant}
-      className={`studio-composer-card rounded-2xl border border-border bg-surface-container-high p-2.5 shadow-sm transition focus-within:border-primary/60 ${className ?? ''}`}
+      className={`studio-composer-card @container/studio-composer rounded-2xl border border-border bg-surface-container-high p-2.5 shadow-sm transition focus-within:border-primary/60 ${className ?? ''}`}
     >
-      {laneDown ? (
-        // Match rows={3} at 14.5px/1.625 plus the textarea's vertical padding.
-        <p className="flex min-h-[calc(70.6875px+0.625rem)] items-center gap-2 px-1.5 pb-3 pt-1.5 text-[13px] font-medium text-warning">
-          <TriangleAlert aria-hidden className="h-4 w-4 shrink-0" strokeWidth={2} />
-          <span>{laneDownMessage}</span>
-        </p>
-      ) : (
-        <textarea
-          value={prompt}
-          onChange={(event) => setPrompt(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' || event.shiftKey) return
-            event.preventDefault()
-            void generate()
-          }}
-          rows={3}
-          aria-label="Prompt"
-          placeholder="Describe what you want to generate…"
-          className="block min-h-[66px] w-full resize-none border-0 bg-transparent px-1.5 pb-1 pt-1.5 text-[14.5px] leading-relaxed outline-none placeholder:text-muted-foreground"
-        />
+      <textarea
+        value={prompt}
+        onChange={(event) => setPrompt(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || event.shiftKey) return
+          event.preventDefault()
+          void generate()
+        }}
+        rows={3}
+        aria-label="Prompt"
+        aria-describedby={modelStatus ? laneWarningId : undefined}
+        placeholder={type === 'speech' ? 'Write the words to speak…' : `Describe the ${type} you want to create…`}
+        className="block min-h-[66px] w-full resize-none border-0 bg-transparent px-1.5 pb-1 pt-1.5 text-[14.5px] leading-relaxed outline-none placeholder:text-muted-foreground"
+      />
+      {modelStatus && (
+        <div id={laneWarningId} role="status" className="flex flex-wrap items-center gap-2 px-1.5 pb-3 pt-1.5 text-[14px] text-muted-foreground">
+          <span className="flex min-w-0 max-w-full items-start gap-2">
+            {!loadingModels && <TriangleAlert aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={2} />}
+            <span className="min-w-0">{modelStatus}</span>
+          </span>
+          {canReloadModels && (
+            <button type="button" onClick={reloadModels} className="rounded-md px-1 font-medium text-foreground underline underline-offset-4 hover:decoration-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+              {catalogError ? 'Retry models' : 'Refresh models'}
+            </button>
+          )}
+        </div>
       )}
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 @[640px]/studio-composer:flex-nowrap">
         <MediaTypeSegments value={type} segments={SEGMENTS} onChange={setType} />
 
         <ComposerBand bandRef={bandRef} resetKey={type}>
-          <ModelPill
+          {showModelMenu && <ModelPill
             models={curatedModels}
             // A dead lane has no sendable model, so nothing in the menu is marked
             // chosen either — the resolved default is a placeholder, not a pick.
@@ -535,7 +588,7 @@ export function StudioComposer({
             unavailable={laneDown || modelOption?.status === 'unavailable'}
             onSelect={chooseModel}
             bandRef={bandRef}
-          />
+          />}
 
           {params.map((param) => (
             <div key={`${type}-${param}`} className="studio-pill-in flex-none">
@@ -600,7 +653,7 @@ export function StudioComposer({
       </div>
 
       {notice && (
-        <p className="px-1.5 pt-1.5 text-[12px] text-destructive">
+        <p className="px-1.5 pt-1.5 text-[14px] text-destructive">
           {notice}
         </p>
       )}

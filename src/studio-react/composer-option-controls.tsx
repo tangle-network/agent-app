@@ -36,7 +36,7 @@ import { ProviderLogo } from '../web-react/provider-logo'
 import { type MediaModelOption, type ModelOptionValue, validateCustomImageSize } from '../studio'
 
 /** The resting pill: one row height, never wraps, shrink-proof in the band. */
-const PILL = 'inline-flex h-7 flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-2.5 text-[12.5px] font-medium text-foreground transition hover:bg-accent'
+const PILL = 'inline-flex h-7 flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-2.5 text-[14px] font-medium text-foreground transition hover:bg-accent'
 /**
  * Optically centers a pill label. Flex `items-center` centers the LINE BOX, but
  * where the glyphs sit inside it is font-metric-determined — with an
@@ -46,10 +46,10 @@ const PILL = 'inline-flex h-7 flex-none items-center gap-1.5 whitespace-nowrap r
  */
 const PILL_LABEL = '[text-box:trim-both_cap_alphabetic]'
 const MENU_PANEL = `flex min-w-[184px] flex-col overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground ${OVERLAY_SHADOW}`
-const MENU_HEADER = 'px-2.5 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground'
+const MENU_HEADER = 'px-2.5 pb-1 pt-1.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-muted-foreground'
 
 function menuRowClass(selected: boolean): string {
-  return `flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[13px] transition ${POPOVER_OPTION_FOCUS} ${
+  return `flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[14px] transition ${POPOVER_OPTION_FOCUS} ${
     selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
   }`
 }
@@ -96,7 +96,7 @@ export function MediaTypeSegments<T extends string>({
             aria-label={label}
             title={label}
             onClick={() => onChange(type)}
-            className={`inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full text-[12.5px] transition ${
+            className={`inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full text-[14px] transition ${
               active
                 ? 'bg-card px-2.5 font-medium text-foreground shadow-sm'
                 : 'px-2 text-muted-foreground hover:text-foreground'
@@ -169,7 +169,7 @@ export function ComposerBand({
       ref={bandRef}
       data-overflow="none"
       onScroll={sync}
-      className="studio-band flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto"
+      className="studio-band order-3 flex w-full min-w-0 flex-auto flex-nowrap items-center gap-2 overflow-x-auto empty:hidden @[640px]/studio-composer:order-none @[640px]/studio-composer:w-auto @[640px]/studio-composer:flex-1"
     >
       {children}
     </div>
@@ -276,7 +276,7 @@ export function MenuPill<T extends string>({
         aria-label={label}
         onClick={() => setOpen(!open)}
         className={`${trigger === 'text'
-          ? 'inline-flex h-7 flex-none items-center gap-1 whitespace-nowrap rounded-full px-2 text-[12.5px] font-medium text-primary transition hover:bg-accent'
+          ? 'inline-flex h-7 flex-none items-center gap-1 whitespace-nowrap rounded-full px-2 text-[14px] font-medium text-primary transition hover:bg-accent'
           : PILL} ${className ?? ''}`}
       >
         {Icon && <Icon aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />}
@@ -424,7 +424,7 @@ export function CustomSizeForm({
   const [width, setWidth] = useState(parsed?.[1] ?? '')
   const [height, setHeight] = useState(parsed?.[2] ?? '')
   const [error, setError] = useState<string | null>(null)
-  const fieldClass = 'h-8 w-[74px] rounded-md border border-input bg-background px-2 text-[13px] tabular-nums'
+  const fieldClass = 'h-8 w-[74px] rounded-md border border-input bg-background px-2 text-[14px] tabular-nums'
 
   function apply() {
     const verdict = validateCustomImageSize(Number(width), Number(height))
@@ -461,20 +461,20 @@ export function CustomSizeForm({
         />
       </div>
       {error
-        ? <p className="text-[12px] text-destructive">{error}</p>
-        : <p className="text-[12px] text-muted-foreground">Multiples of 16, long edge up to 3840, ratio between 1:3 and 3:1.</p>}
+        ? <p className="text-[14px] text-destructive">{error}</p>
+        : <p className="text-[14px] text-muted-foreground">Multiples of 16, long edge up to 3840, ratio between 1:3 and 3:1.</p>}
       <div className="flex items-center justify-end gap-1.5">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md px-2.5 py-1 text-[12.5px] font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
+          className="rounded-md px-2.5 py-1 text-[14px] font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={apply}
-          className="rounded-md bg-primary px-2.5 py-1 text-[12.5px] font-medium text-primary-foreground transition hover:opacity-90"
+          className="rounded-md bg-primary px-2.5 py-1 text-[14px] font-medium text-primary-foreground transition hover:opacity-90"
         >
           Apply
         </button>
@@ -539,7 +539,7 @@ export function ReferencePill({
     return (
       <div className={`${PILL} border-primary bg-primary/10 pr-1.5 text-primary hover:bg-primary/10`}>
         <img src={url} alt="" className="h-[18px] w-[18px] shrink-0 rounded-[5px] object-cover" />
-        <span className={PILL_LABEL}>Reference</span>
+        <span className={PILL_LABEL}>Reference image</span>
         <button
           type="button"
           aria-label="Remove reference image"
@@ -573,7 +573,8 @@ export function ReferencePill({
         // popover — claiming `aria-haspopup` there announces a menu that never
         // appears.
         {...(pick ? {} : { 'aria-haspopup': true as const, 'aria-expanded': open, 'aria-controls': open ? panelId : undefined })}
-        title="Reference image"
+        title="Add reference image"
+        aria-label="Add reference image"
         onClick={() => {
           if (!pick) {
             setOpen(!open)
@@ -586,7 +587,7 @@ export function ReferencePill({
         className={PILL}
       >
         <ImagePlus className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-        <span className={PILL_LABEL}>Reference image</span>
+        <span className={PILL_LABEL}>Add image</span>
       </button>
 
       {!pick && (
@@ -608,21 +609,21 @@ export function ReferencePill({
                 setDraft(event.target.value)
                 setError(null)
               }}
-              className="h-8 w-full rounded-md border border-input bg-background px-2 text-[13px]"
+              className="h-8 w-full rounded-md border border-input bg-background px-2 text-[14px]"
             />
-            {error && <p className="text-[12px] text-destructive">{error}</p>}
+            {error && <p className="text-[14px] text-destructive">{error}</p>}
             <div className="flex items-center justify-end gap-1.5">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md px-2.5 py-1 text-[12.5px] font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                className="rounded-md px-2.5 py-1 text-[14px] font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={attach}
-                className="rounded-md bg-primary px-2.5 py-1 text-[12.5px] font-medium text-primary-foreground transition hover:opacity-90"
+                className="rounded-md bg-primary px-2.5 py-1 text-[14px] font-medium text-primary-foreground transition hover:opacity-90"
               >
                 Attach
               </button>
@@ -695,7 +696,7 @@ export function ModelPill({
       >
         <div className={MENU_HEADER}>Model</div>
         {models.length === 0 && (
-          <p className="px-2.5 py-2 text-[13px] text-muted-foreground">No models are available for this media type.</p>
+          <p className="px-2.5 py-2 text-[14px] text-muted-foreground">No models are available for this media type.</p>
         )}
         {models.map((model) => (
           <button
@@ -719,11 +720,11 @@ export function ModelPill({
             </span>
             {model.status === 'unavailable' ? (
               <>
-                <span className="ml-auto shrink-0 text-[11px] text-warning">Unavailable</span>
+                <span className="ml-auto shrink-0 text-[14px] text-warning">Unavailable</span>
                 <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />
               </>
             ) : model.status === 'limited' && (
-              <span className="ml-auto shrink-0 text-[11px] capitalize text-muted-foreground">{model.status}</span>
+              <span className="ml-auto shrink-0 text-[14px] capitalize text-muted-foreground">{model.status}</span>
             )}
             {model.id === value && (
               <CheckGlyph className={`${model.status === 'available' ? 'ml-auto ' : ''}h-3.5 w-3.5 shrink-0 text-primary`} />

@@ -22,6 +22,7 @@
  */
 
 :root {
+  color-scheme: light;
   /* ── The neutral ramp ────────────────────────────────────────────────────
      ONE ladder, both themes: light reads it from the top down, dark from the
      bottom up. A stop's name is its oklch lightness × 100, rounded to the
@@ -349,7 +350,7 @@
  * Every interactive element is keyboard-visible by DEFAULT, so a component has
  * to opt out on purpose rather than by omission. Before this rule an element
  * that declared no focus style fell back to the browser's own ring — measured
- * `rgb(16, 16, 16)` in BOTH themes, because nothing here sets `color-scheme`,
+ * `rgb(16, 16, 16)` in BOTH themes, before these theme scopes set native `color-scheme`,
  * which is 1.03:1 against the dark canvas backdrop `rgb(19, 19, 21)`. Visible in
  * light, effectively absent in dark, on 30 of the 176 focusable elements the
  * playground audit reaches.
@@ -396,6 +397,7 @@
 
 [data-theme='dark'],
 .dark {
+  color-scheme: dark;
   /* The ramp is NOT redefined here — both themes read the same `--neutral-*`
      ladder and only differ in which stop each role picks.
      `--warning-foreground` (dark text on a solid gold chip) is theme-invariant

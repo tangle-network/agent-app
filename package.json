@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.50.31",
+  "version": "0.50.32",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -596,7 +596,7 @@
     "@tangle-network/brand": "1.9.1",
     "@tangle-network/hub-sdk": "0.22.1",
     "@tangle-network/sandbox": "0.59.0",
-    "@tangle-network/sandbox-ui": "0.116.9",
+    "@tangle-network/sandbox-ui": "0.117.0",
     "@tangle-network/ui": "11.12.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.3",
@@ -650,7 +650,9 @@
     "playwright": "^1.63.0",
     "@ai-sdk/google": "^3.0.33",
     "@ai-sdk/anthropic": "^3.0.49",
-    "@anthropic-ai/sdk": "^0.93.0"
+    "@anthropic-ai/sdk": "^0.93.0",
+    "@nanostores/react": "1.1.0",
+    "nanostores": "1.5.4"
   },
   "peerDependencies": {
     "@better-auth/oauth-provider": ">=1.7.2",
@@ -665,7 +667,7 @@
     "@tangle-network/brand": ">=1.6.0",
     "@tangle-network/hub-sdk": ">=0.19.3 <0.21.0 || >=0.21.0 <0.22.0 || >=0.22.1 <0.23.0",
     "@tangle-network/sandbox": ">=0.45.0 <0.48.0 || ^0.49.0 || ^0.50.0 || ^0.51.0 || ^0.52.0 || ^0.53.0 || ^0.54.0 || ^0.55.0 || >=0.58.1 <0.60.0",
-    "@tangle-network/sandbox-ui": ">=0.113.3 <0.117.0",
+    "@tangle-network/sandbox-ui": ">=0.117.0 <0.118.0",
     "@tangle-network/ui": ">=11.11.3 <12.0.0",
     "@tiptap/core": ">=3.28.0 <4.0.0",
     "@tiptap/extension-mention": ">=3.28.0 <4.0.0",
@@ -687,7 +689,9 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@tangle-network/browser-agent-driver": "^0.36.1",
     "@tangle-network/tcloud": "^0.5.2 || >=0.8.1 <0.9.0",
-    "playwright": "^1.63.0"
+    "playwright": "^1.63.0",
+    "@nanostores/react": ">=0.8.4 <2.0.0",
+    "nanostores": ">=0.11.3 <2.0.0"
   },
   "peerDependenciesMeta": {
     "@better-auth/oauth-provider": {
@@ -784,6 +788,12 @@
       "optional": true
     },
     "playwright": {
+      "optional": true
+    },
+    "@nanostores/react": {
+      "optional": true
+    },
+    "nanostores": {
       "optional": true
     }
   },
