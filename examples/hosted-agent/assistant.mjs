@@ -33,6 +33,7 @@ export async function installAssistant() {
   return agent.attachLine(required('CONNECTION_ID'), {
     transport,
     mode: 'personal',
+    ...(transport === 'email' && process.env.EMAIL_ADDRESS ? { address: process.env.EMAIL_ADDRESS } : {}),
     ...(transport === 'whatsapp' ? { phoneNumberId: required('PHONE_NUMBER_ID') } : {}),
   })
 }

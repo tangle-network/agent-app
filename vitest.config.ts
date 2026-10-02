@@ -1,7 +1,13 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
+    // The example imports the published subpath. Resolve it to this checkout's
+    // source when its Worker is exercised inside the repository test suite.
+    alias: {
+      '@tangle-network/agent-app/hosted-agent': fileURLToPath(new URL('./src/hosted-agent/index.ts', import.meta.url)),
+    },
     // The framework's own tests live in `tests/**` and co-located `src/**`.
     // EXCLUDE `create-agent-app/template*/**`: those are scaffolder templates
     // whose tests run inside a GENERATED project, not here (they import the

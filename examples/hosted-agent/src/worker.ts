@@ -47,12 +47,14 @@ async function setup(request: Request, env: Env): Promise<Response> {
   if ((body.transport !== undefined && !['imessage', 'email', 'whatsapp'].includes(String(body.transport))) ||
       (body.mode !== undefined && !['personal', 'shared'].includes(String(body.mode))) ||
       (body.phoneNumberId !== undefined && (typeof body.phoneNumberId !== 'string' || !body.phoneNumberId.trim() || body.phoneNumberId.length > 256)) ||
+      (body.address !== undefined && (typeof body.address !== 'string' || !body.address.trim() || body.address.length > 320)) ||
       (body.voice !== undefined && (!record(body.voice) || typeof body.voice.ph0nyConnectionId !== 'string' || typeof body.voice.ph0nyAgentId !== 'string')))
     return Response.json({ error: 'invalid_line_options' }, { status: 400 })
   const options: HostedAgentLineOptions = {
     transport: body.transport as HostedAgentLineOptions['transport'],
     mode: body.mode as HostedAgentLineOptions['mode'],
     phoneNumberId: body.phoneNumberId as string | undefined,
+    address: body.address as string | undefined,
     voice: body.voice as HostedAgentLineOptions['voice'],
   }
   try {
@@ -60,7 +62,9 @@ async function setup(request: Request, env: Env): Promise<Response> {
     return Response.json(await agent.attachLine(body.connectionId, options))
   } catch (error) {
     if (error instanceof HostedAgentError)
-      return Response.json({ error: error.code, message: error.message }, { status: 400 })
+      return Response.json({ error: error.code, message: error.message }, {
+        status: error.code === 'line_policy_migration_required' ? 409 : 400,
+      })
     if (record(error) && error.status === 409)
       return Response.json({
         error: 'line_setup_conflict',

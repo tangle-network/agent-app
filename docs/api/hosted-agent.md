@@ -176,7 +176,7 @@ class HostedAgentError
 
 ### `HostedAgentLineOptions`
 
-`interface`
+`interface` — Hosted line setup.
 
 ```ts
 interface HostedAgentLineOptions
