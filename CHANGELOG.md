@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.14
+
+- fix(composer): keep skill suggestions compact and scrollable (#759)
+
 ## 0.51.13
 
 - fix(sso): apply startup hardening to every protocol, not just oidc/identity (#753)
