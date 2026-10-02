@@ -1,0 +1,234 @@
+name: Hub settings PR 735 verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  retire-proxy:
+    if: >-
+      github.repository == 'tangle-network/agent-app' &&
+      github.event.pull_request.number == 735 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'feat/authorized-hub-settings-routes'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+      PROOF: ${{ runner.temp }}/hub-settings-pr735
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install the configured repository environment
+        run: |
+          mkdir -p "$PROOF"
+          node --version > "$PROOF/node.txt"
+          pnpm --version > "$PROOF/pnpm.txt"
+          pnpm install --frozen-lockfile --ignore-scripts=false > "$PROOF/install.log" 2>&1 || { tail -80 "$PROOF/install.log"; exit 1; }
+      - name: Calibrate removal regressions on the retained proxy
+        run: |
+          set +e
+          pnpm exec vitest run tests/hub-settings-surface.test.ts --reporter=json --outputFile="$PROOF/red.json" > "$PROOF/red.log" 2>&1
+          result=$?
+          set -e
+          test "$result" -eq 1
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import { readFileSync } from 'node:fs'
+          const report = JSON.parse(readFileSync(`${process.env.PROOF}/red.json`, 'utf8'))
+          assert.equal(report.numFailedTests, 7)
+          assert.equal(report.numPassedTests, 9)
+          console.log('Red calibration: 7 removal regressions failed; 9 modern-boundary checks passed.')
+          NODE
+      - name: Apply the reviewed removal only
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import { createHash } from 'node:crypto'
+          import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
+          const read = (path) => readFileSync(path, 'utf8')
+          const write = (path, text) => writeFileSync(path, text)
+          const replaceOnce = (text, before, after) => {
+            assert.equal(text.split(before).length, 2, `Expected one occurrence of ${before}`)
+            return text.replace(before, after)
+          }
+          const expectBlob = (path, expected) => {
+            const content = readFileSync(path)
+            const actual = createHash('sha1').update(`blob ${content.length}\0`).update(content).digest('hex')
+            assert.equal(actual, expected, `${path} changed since the inspected base`)
+          }
+          expectBlob('src/platform/hub.ts', 'a9e4d3c44791b993472e23ae2494a517c598022d')
+          expectBlob('tests/platform.test.ts', '6224b50fb21b5968c516e944d44e65807527e99c')
+          unlinkSync('src/platform/hub.ts')
+          write('src/platform/index.ts', replaceOnce(read('src/platform/index.ts'), "export * from './hub'\n", ''))
+          write('src/platform/hub-settings.ts', replaceOnce(read('src/platform/hub-settings.ts'),
+            '/** Build a finite Hub settings server boundary; existing Hub proxy routes are unaffected. */',
+            '/** Build the finite, application-authorized Hub settings server boundary. */'))
+          let tests = read('tests/platform.test.ts')
+          const start = tests.indexOf('// ── Hub proxy routes ')
+          const end = tests.indexOf('// ── Platform billing HTTP + tier state ')
+          assert.ok(start > 0 && end > start)
+          const removed = tests.slice(start, end)
+          assert.equal((removed.match(/\bit\(/g) ?? []).length, 20, 'Only the 20 superseded Hub tests may be removed')
+          tests = tests.slice(0, start) + tests.slice(end)
+          for (const name of ['createHubProxyRoutes', 'isTangleBearerMissingError', 'resolveUserTangleHubBearer', 'resolveUserTangleHubBearerForUser', 'TangleBearerMissingError', 'type HubClientLike', 'type HubProxyContext']) {
+            tests = replaceOnce(tests, `  ${name},\n`, '')
+          }
+          write('tests/platform.test.ts', tests)
+          let docs = read('docs/hub-integration.md')
+          docs = replaceOnce(docs,
+            'not acquire a new required Hub SDK runtime or declaration dependency. `createHubProxyRoutes` and its existing convenience API are unchanged.',
+            'not acquire a new required Hub SDK runtime or declaration dependency. This is the\nonly Hub account-settings server boundary. The superseded Hub proxy and its\nbearer helpers have been removed; there is no compatibility adapter.')
+          docs = replaceOnce(docs,
+            'throw the host\'s auth `Response`; neither performs client resolution or Hub calls.',
+            'throw the host\'s auth `Response`. An initial denial performs no client resolution\nor Hub calls; a denial on the second check performs no Hub calls, but credential\nresolution has already occurred.')
+          const migration = `### Migrating from the removed proxy
+
+          This is a **breaking API removal**. \`createHubProxyRoutes\`, \`HubClientLike\`,
+          \`HubProxyContext\`, \`HubProxyRouteArgs\`, and \`HubProxyRoutes\` are no longer exported.
+          The \`resolveUserTangleHubBearer\` / \`resolveUserTangleHubBearerForUser\` helpers,
+          their option/result/provenance types, \`TangleBearerMissingError\`,
+          \`isTangleBearerMissingError\`, and \`isPlatformHubErrorLike\` are also removed.
+          Do not rename an import or adapt \`requireUserId\` into an unconditional grant.
+          No hidden implementation, deprecated alias, environment-key fallback, or
+          \`PlatformHubError\` translation remains in the settings path.
+
+          Use the two authorization-aware callbacks above and mount \`settings.handle\`.
+          Change the browser caller and server route together:
+
+          | Removed convenience route | Finite replacement | Response/caller change |
+          | --- | --- | --- |
+          | \`catalog\` | \`GET /providers\` | Consume the SDK provider result, not a \`{ catalog }\` wrapper. |
+          | \`connections\` | \`GET /connections\` | Consume the SDK connection result, not a second app-side wrapper. |
+          | \`authStart\` | \`POST /connections/:provider/start\` | Use a provider path and same-origin \`returnUrl\`; consume SDK \`redirectUrl\` and \`state\`, not \`authorizationUrl\`. |
+          | \`connectionDelete\` | \`DELETE /connections/:connectionId\` | Authorize the exact owned connection in the current workspace context. |
+          | \`healthchecks\` | \`POST /connections/:connectionId/health\` | Choose and authorize one connection; there is no all-connections healthcheck route. |
+
+          For OAuth, resolve the old provider/connector selection through the actual Hub
+          provider catalog. Do not guess that their identifiers are interchangeable.
+          \`providerId\`, \`connectorId\`, browser identity fields, CLI mode, and
+          \`requestedScopes\` are not accepted setup fields here. The current finite route
+          supports \`connectionParameters\`; it does not silently drop unsupported options.
+          There are no \`/catalog\`, \`/auth/start\`, or \`/healthchecks\` aliases, including
+          when the host configures a different \`basePath\`.
+
+          Replace the old bearer helpers with an application-owned lookup of the current
+          caller's linked account credential. Missing linkage must be denied explicitly
+          by that lookup or by \`authorize\`; it is not permission to use an environment,
+          workspace owner's, administrator's, or brokered-execution credential. Handle
+          \`HubSdkError\` status/code through the settings boundary, not the removed
+          \`PlatformHubError\` guard. Keep execution under the separate \`/integrations\`
+          contract; this removal does not grant execution tokens account-management power.
+
+          The repository search during this cleanup found product imports in
+          \`gtm-agent/src/lib/.server/hub-routes.ts\`,
+          \`creative-agent/src/lib/.server/hub-routes.ts\`,
+          \`legal-agent/src/lib/.server/hub-routes.ts\`, and
+          \`relationships-agent/src/integrations.ts\`. Those are separate repositories, not
+          migrated by this Agent App PR. Before upgrading them, migrate their route mounts,
+          UI response shapes, session/role/ownership checks and linked-credential lookups,
+          then test through each product's real authenticated entrypoint. The same check
+          applies to consumers of the removed bearer helpers, not only proxy callers.
+          A passing library test is not proof that those products are migrated. Coordinate
+          a breaking release; do not publish this removal as a compatible patch upgrade.
+
+          `
+          docs = replaceOnce(docs, '### Settings verification\n', migration + '### Settings verification\n')
+          docs = replaceOnce(docs,
+            'pnpm exec vitest run tests/hub-settings-routes.test.ts tests/platform.test.ts',
+            'pnpm exec vitest run tests/hub-settings-routes.test.ts tests/hub-settings-surface.test.ts tests/platform.test.ts')
+          write('docs/hub-integration.md', docs)
+          write('.changeset/remove-legacy-hub-proxy.md', `---
+          "@tangle-network/agent-app": major
+          ---
+
+          Remove the superseded Hub proxy and its bearer-resolution API. The platform
+          subpath now exposes only createHubSettingsRoutes for account settings, with no
+          legacy route aliases, user-ID-only authorization adapter, environment credential
+          fallback, or PlatformHubError translation. Keep the existing finite Hub SDK
+          operations, exact per-operation authorization, caller/session/workspace binding,
+          and status/code handling.
+
+          This removes createHubProxyRoutes, HubClientLike, HubProxyContext, HubProxyRouteArgs,
+          HubProxyRoutes, resolveUserTangleHubBearer, resolveUserTangleHubBearerForUser,
+          ResolveUserTangleHubBearerOptions, ResolveUserTangleHubBearerForUserOptions,
+          ResolvedTangleHubBearer, TangleHubBearerSource, TangleBearerMissingError,
+          isTangleBearerMissingError, and isPlatformHubErrorLike. Migrate product callbacks,
+          route mounts and response consumers as documented in docs/hub-integration.md
+          before upgrading; a generic user ID or brokered execution token cannot stand in
+          for settings authorization. Coordinate a breaking release, not a patch.
+          `)
+          console.log('Removed obsolete Hub source, seven imports and twenty obsolete tests; preserved the finite SDK route suite and all non-Hub platform tests.')
+          NODE
+      - name: Generate canonical documentation
+        run: pnpm docs:gen > "$PROOF/docs.log" 2>&1 || { cat "$PROOF/docs.log"; exit 1; }
+      - name: Remove this one-shot helper and commit the exact source
+        id: commit
+        run: |
+          rm .github/workflows/hub-settings-pr735.yml
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import { execFileSync } from 'node:child_process'
+          const allowed = new Set([
+            '.github/workflows/hub-settings-pr735.yml', '.changeset/remove-legacy-hub-proxy.md',
+            'src/platform/hub.ts', 'src/platform/index.ts', 'src/platform/hub-settings.ts',
+            'tests/platform.test.ts', 'docs/hub-integration.md', 'docs/CODEMAP.md',
+            'docs/api/platform.md', 'docs/codemap.json', 'docs/llms.txt', 'docs/llms-full.txt',
+          ])
+          const changed = execFileSync('git', ['diff', '--name-only'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean)
+          const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean)
+          for (const path of [...changed, ...untracked]) assert.ok(allowed.has(path), `Unexpected change: ${path}`)
+          execFileSync('git', ['add', '--', ...allowed])
+          NODE
+          git diff --cached --check
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'refactor(platform)!: remove the superseded Hub proxy'
+          git rev-parse HEAD > "$PROOF/commit.txt"
+          git rev-parse HEAD^{tree} > "$PROOF/tree.txt"
+          git show --stat --oneline HEAD > "$PROOF/changes.txt"
+          git archive --format=tar.gz HEAD > "$PROOF/source.tar.gz"
+          test -z "$(git status --porcelain)"
+      - name: Publish only the unchanged PR branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          header="AUTHORIZATION: basic $auth"
+          branch=feat/authorized-hub-settings-routes
+          current=$(git -c credential.helper= -c "http.https://github.com/.extraheader=$header" ls-remote origin "refs/heads/$branch" | cut -f1)
+          test "$current" = "$EXPECTED_HEAD"
+          git -c credential.helper= -c "http.https://github.com/.extraheader=$header" push origin "HEAD:refs/heads/$branch"
+      - name: Run the real Hub and platform tests on the committed head
+        id: focused
+        continue-on-error: true
+        run: pnpm exec vitest run tests/hub-settings-surface.test.ts tests/hub-settings-routes.test.ts tests/platform.test.ts --reporter=json --outputFile="$PROOF/green.json" > "$PROOF/green.log" 2>&1 || { tail -100 "$PROOF/green.log"; exit 1; }
+      - name: Exact-head repository signoff
+        id: signoff
+        continue-on-error: true
+        run: pnpm signoff --source head --json "$PROOF/signoff.json" > "$PROOF/signoff.log" 2>&1 || { tail -100 "$PROOF/signoff.log"; exit 1; }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: hub-settings-pr735-proof
+          path: ${{ env.PROOF }}/
+          retention-days: 7
+      - name: Do not report failed verification as success
+        if: always()
+        env:
+          FOCUSED: ${{ steps.focused.outcome }}
+          SIGNOFF: ${{ steps.signoff.outcome }}
+        run: test "$FOCUSED" = success && test "$SIGNOFF" = success
