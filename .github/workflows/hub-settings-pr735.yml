@@ -20,7 +20,7 @@ jobs:
       contents: write
     env:
       NODE_OPTIONS: --max-old-space-size=12288
-      PROOF: ${{ runner.temp }}/hub-settings-pr735
+      PROOF: /tmp/hub-settings-pr735-${{ github.run_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -175,15 +175,14 @@ jobs:
           NODE
       - name: Generate canonical documentation
         run: pnpm docs:gen > "$PROOF/docs.log" 2>&1 || { cat "$PROOF/docs.log"; exit 1; }
-      - name: Remove this one-shot helper and commit the exact source
+      - name: Commit only the reviewed source and generated documentation
         id: commit
         run: |
-          rm .github/workflows/hub-settings-pr735.yml
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict'
           import { execFileSync } from 'node:child_process'
           const allowed = new Set([
-            '.github/workflows/hub-settings-pr735.yml', '.changeset/remove-legacy-hub-proxy.md',
+            '.changeset/remove-legacy-hub-proxy.md',
             'src/platform/hub.ts', 'src/platform/index.ts', 'src/platform/hub-settings.ts',
             'tests/platform.test.ts', 'docs/hub-integration.md', 'docs/CODEMAP.md',
             'docs/api/platform.md', 'docs/codemap.json', 'docs/llms.txt', 'docs/llms-full.txt',
@@ -212,6 +211,32 @@ jobs:
           current=$(git -c credential.helper= -c "http.https://github.com/.extraheader=$header" ls-remote origin "refs/heads/$branch" | cut -f1)
           test "$current" = "$EXPECTED_HEAD"
           git -c credential.helper= -c "http.https://github.com/.extraheader=$header" push origin "HEAD:refs/heads/$branch"
+      - name: Await connector removal of this helper and bind proof to that exact head
+        run: |
+          generated=$(git rev-parse HEAD)
+          branch=feat/authorized-hub-settings-routes
+          removed=false
+          for attempt in $(seq 1 60); do
+            git fetch --no-tags origin "refs/heads/$branch"
+            candidate=$(git rev-parse FETCH_HEAD)
+            if test "$candidate" != "$generated"; then
+              git merge-base --is-ancestor "$generated" "$candidate"
+              expected=$(printf 'D\t.github/workflows/hub-settings-pr735.yml')
+              actual=$(git diff --name-status "$generated" "$candidate")
+              test "$actual" = "$expected"
+              git checkout --detach "$candidate"
+              removed=true
+              break
+            fi
+            sleep 10
+          done
+          test "$removed" = true
+          test ! -e .github/workflows/hub-settings-pr735.yml
+          git rev-parse HEAD > "$PROOF/commit.txt"
+          git rev-parse HEAD^{tree} > "$PROOF/tree.txt"
+          git archive --format=tar.gz HEAD > "$PROOF/source.tar.gz"
+          git diff --check
+          test -z "$(git status --porcelain)"
       - name: Run the real Hub and platform tests on the committed head
         id: focused
         continue-on-error: true
