@@ -137,7 +137,7 @@ describe('createAgentEnrollment', () => {
   it('does not let a losing profile request mutate the winning instance', async () => {
     const f = fixture()
     let stored: AgentEnrollmentTarget | null = null
-    let claimed: AgentEnrollmentClaim | null = null
+    const claims: AgentEnrollmentClaim[] = []
     let liveProfileVersion = 'v1'
     const ensure = vi.fn(async (options: typeof f.request.instance) => {
       liveProfileVersion = options.profile.version
@@ -153,7 +153,7 @@ describe('createAgentEnrollment', () => {
       authorize: async () => {}, client: () => client as never,
       store: {
         get: async () => stored,
-        claimIfAbsent: async claim => { claimed ??= claim; return claimed },
+        claimIfAbsent: async claim => { if (claims.length === 0) claims.push(claim); return claims[0]! },
         insertIfAbsent: async target => { stored ??= target; return stored },
       },
     })
@@ -165,7 +165,7 @@ describe('createAgentEnrollment', () => {
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
     expect(results.filter(result => result.status === 'rejected')).toHaveLength(1)
     expect(ensure).toHaveBeenCalledTimes(1)
-    expect(liveProfileVersion).toBe(claimed?.profileVersion)
+    expect(liveProfileVersion).toBe(claims[0]?.profileVersion)
   })
 
   it('accepts an identical retry when nested configuration keys use another insertion order', async () => {
