@@ -92,6 +92,12 @@ a successful send call, and `Line.status === 'active'` do not prove both
 communication directions. Activation must recheck proof and ownership before
 attaching with sandbox.lines; UI checks are defense in depth, not authorization.
 
+`ApplicationLineSetup` offers TEST for owned `inkbox`/`imessage` handles and
+`linq-whatsapp`/`whatsapp` numbers. The host supplies the authenticated connection
+inventory and starts verification for the selected connection, transport, and
+provider number ID. It must recheck ownership and consume the matching proof
+when attaching; the browser's filtered choices do not authorize either action.
+
 The UI represents configuring, waiting, received, sending, uncertain, sent,
 verified, revoked, expired, and needs-review states. An uncertain send offers a
 status check, not a second send. Reset and number cancellation require explicit
