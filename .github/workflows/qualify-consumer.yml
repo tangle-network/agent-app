@@ -23,6 +23,7 @@ jobs:
       FEATURE_BRANCH: ${{ inputs.feature_branch }}
       MANIFESTS: ${{ inputs.manifests }}
       APP_VERSION: 0.51.8
+      SANDBOX_UI_VERSION: 0.117.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -33,32 +34,44 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - name: Verify immutable source and the actual published package
+      - name: Verify immutable source and actual published packages
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/consumer-proof"
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           test "$(git ls-remote origin "refs/heads/$FEATURE_BRANCH" | cut -f1)" = "$SOURCE_SHA"
-          pnpm view "@tangle-network/agent-app@$APP_VERSION" version dist.integrity --json > "$RUNNER_TEMP/consumer-proof/registry.json"
+          pnpm view "@tangle-network/agent-app@$APP_VERSION" version dist.integrity peerDependencies --json > "$RUNNER_TEMP/consumer-proof/registry.json"
+          pnpm view "@tangle-network/sandbox-ui@$SANDBOX_UI_VERSION" version dist.integrity --json > "$RUNNER_TEMP/consumer-proof/ui-registry.json"
           git rev-parse HEAD > "$RUNNER_TEMP/consumer-proof/baseline.txt"
-      - name: Adopt the published release through the native package manager
+      - name: Adopt published releases and reconcile existing declarations
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json,os,pathlib,subprocess
-          changed=[]
+          versions={'@tangle-network/agent-app':os.environ['APP_VERSION'],'@tangle-network/sandbox-ui':os.environ['SANDBOX_UI_VERSION']}
+          changed=[]; importers=[]
           for name in json.loads(os.environ['MANIFESTS']):
             p=pathlib.Path(name)
             assert not p.is_absolute() and '..' not in p.parts and p.name=='package.json'
             subprocess.run(['git','ls-files','--error-unmatch',str(p)],check=True,stdout=subprocess.DEVNULL)
-            data=json.loads(p.read_text()); found=False
+            original=p.read_text(); data=json.loads(original); has_app=False
             for field in ['dependencies','devDependencies','peerDependencies']:
-              if '@tangle-network/agent-app' in data.get(field,{}):
-                data[field]['@tangle-network/agent-app']=os.environ['APP_VERSION']; found=True
-            if found:
-              p.write_text(json.dumps(data,indent=2)+'\n'); changed.append(str(p))
-          assert changed,'No declared Agent App consumer in the allowed manifests'
-          pathlib.Path(os.environ['RUNNER_TEMP'],'consumer-proof','manifests.json').write_text(json.dumps(changed))
+              for package,version in versions.items():
+                if package in data.get(field,{}):
+                  data[field][package]=version
+                  has_app=has_app or package=='@tangle-network/agent-app'
+            for package,version in versions.items():
+              if package in data.get('pnpm',{}).get('overrides',{}):
+                data['pnpm']['overrides'][package]=version
+              if package in data.get('resolutions',{}): data['resolutions'][package]=version
+            if has_app: importers.append(str(p))
+            updated=json.dumps(data,indent=2)+'\n'
+            if json.loads(original)!=data:
+              p.write_text(updated);changed.append(str(p))
+          assert importers,'No declared Agent App consumer in the allowed manifests'
+          root=pathlib.Path(os.environ['RUNNER_TEMP'],'consumer-proof')
+          (root/'manifests.json').write_text(json.dumps(changed))
+          (root/'importers.json').write_text(json.dumps(importers))
           PY
           pnpm install --no-frozen-lockfile --ignore-scripts=false > "$RUNNER_TEMP/consumer-proof/install.log" 2>&1 || { tail -120 "$RUNNER_TEMP/consumer-proof/install.log"; exit 1; }
           python3 - <<'PY'
@@ -68,23 +81,26 @@ jobs:
           subprocess.run(['git','add','--',*paths,*locks],check=True)
           PY
           if ! git diff --cached --quiet; then
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'chore(deps): adopt published Agent App 0.51.8'
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'chore(deps): install published shared observer with its compatible UI peer'
             git push origin "HEAD:refs/heads/$FEATURE_BRANCH"
           fi
           git rev-parse HEAD > "$RUNNER_TEMP/consumer-proof/commit.txt"
           git diff --binary > "$RUNNER_TEMP/consumer-proof/unstaged.patch"
           git archive HEAD | gzip > "$RUNNER_TEMP/consumer-proof/source.tar.gz"
-      - name: Verify the installed export in every admitted consumer
+      - name: Verify actual installed versions and exports
         run: |
-          python3 - <<'PY'
+          python3 - <<'PY' > "$RUNNER_TEMP/consumer-proof/exports.log" 2>&1
           import json,os,pathlib,subprocess
-          paths=json.loads(pathlib.Path(os.environ['RUNNER_TEMP'],'consumer-proof','manifests.json').read_text())
-          script='const m=await import("@tangle-network/agent-app/chat-routes"); if(typeof m.produceChatTurnWithIntelligence!=="function" || typeof m.observeChatTurnStream!=="function") throw Error("Published shared observer is missing")'
+          paths=json.loads(pathlib.Path(os.environ['RUNNER_TEMP'],'consumer-proof','importers.json').read_text())
+          script='import {readFileSync} from "node:fs"; import {dirname,join} from "node:path"; import {fileURLToPath} from "node:url"; const entry=import.meta.resolve("@tangle-network/agent-app/chat-routes"); const pkg=JSON.parse(readFileSync(join(dirname(fileURLToPath(entry)),"../../package.json"))); if(pkg.version!==process.env.APP_VERSION)throw Error(`Resolved ${pkg.version}, expected ${process.env.APP_VERSION}`); const m=await import(entry); if(typeof m.produceChatTurnWithIntelligence!=="function" || typeof m.observeChatTurnStream!=="function") throw Error("Published shared observer is missing");console.log(JSON.stringify({cwd:process.cwd(),version:pkg.version,entry}))'
           for p in paths:
             subprocess.run(['node','--input-type=module','-e',script],cwd=pathlib.Path(p).parent,check=True)
           PY
-      - name: Execute the repository's unchanged committed-source signoff
-        run: pnpm signoff --source head --keep-going --json "$RUNNER_TEMP/consumer-proof/signoff.json" > "$RUNNER_TEMP/consumer-proof/signoff.log" 2>&1 || { tail -120 "$RUNNER_TEMP/consumer-proof/signoff.log"; exit 1; }
+      - name: Execute unchanged committed-source signoff
+        if: ${{ !cancelled() && hashFiles('pnpm-lock.yaml') != '' }}
+        run: |
+          test -f "$RUNNER_TEMP/consumer-proof/commit.txt"
+          pnpm signoff --source head --keep-going --json "$RUNNER_TEMP/consumer-proof/signoff.json" > "$RUNNER_TEMP/consumer-proof/signoff.log" 2>&1 || { tail -120 "$RUNNER_TEMP/consumer-proof/signoff.log"; exit 1; }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
