@@ -15,7 +15,7 @@ import {
   type TangleSsoLocalAccount,
 } from '../src/platform/index'
 
-const SECRET = 'test-secret'
+const SECRET = 'legacy-sso-test-state-secret-32-bytes'
 // Distinct from SECRET on purpose: the session cookie signs with the auth
 // framework's secret, never the state secret.
 const AUTH_SECRET = 'test-auth-secret'
@@ -200,7 +200,7 @@ function fakeHarness(overrides: {
     sessionCookieSecret: AUTH_SECRET,
     callbackUrl: 'https://my.app/auth/tangle/callback',
     stateCookieName: 'app_tangle_state',
-    secureCookies: false,
+    secureCookies: true,
     log: (...args) => logs.push(args),
   })
   return { handlers, calls, saved, logs }
@@ -226,11 +226,24 @@ describe('createTangleSsoHandlers — start', () => {
     expect(header).toContain('HttpOnly')
     expect(header).toContain('SameSite=Lax')
     expect(header).toContain('Max-Age=600')
-    expect(header).not.toContain('Secure')
+    // The harness is a compliant https config (secureCookies: true), so the
+    // state cookie carries Secure; the loopback-http counter-case lives in
+    // the next test.
+    expect(header).toContain('Secure')
   })
 
-  it('adds Secure when secureCookies is set', async () => {
-    const { handlers } = fakeHarness()
+  it('adds Secure when secureCookies is set (and a loopback http config stays non-Secure)', async () => {
+    const loopback = createTangleSsoHandlers({
+      auth: { authorizeUrl: () => 'https://id.example/a', exchange: async () => ({ apiKey: '', emailVerified: true, user: { id: '', email: '' } }) },
+      store: {} as TangleSsoAccountStore,
+      stateSecret: SECRET,
+      sessionCookieSecret: AUTH_SECRET,
+      callbackUrl: 'http://localhost:5173/cb',
+      stateCookieName: 'app_tangle_state',
+      secureCookies: false,
+    })
+    const loopbackRes = await loopback.start(new Request('http://localhost:5173/auth/tangle/start'))
+    expect(loopbackRes.headers.getSetCookie()[0]).not.toContain('Secure')
     const secure = createTangleSsoHandlers({
       auth: { authorizeUrl: () => 'https://id.example/a', exchange: async () => ({ apiKey: '', emailVerified: true, user: { id: '', email: '' } }) },
       store: {} as TangleSsoAccountStore,
@@ -242,7 +255,6 @@ describe('createTangleSsoHandlers — start', () => {
     })
     const res = await secure.start(new Request('https://my.app/auth/tangle/start'))
     expect(res.headers.getSetCookie()[0]).toContain('Secure')
-    void handlers
   })
 
 })
@@ -393,7 +405,7 @@ describe('createTangleSsoHandlers — callback', () => {
       sessionCookieSecret: AUTH_SECRET,
       callbackUrl: 'https://my.app/cb',
       stateCookieName: 'app_tangle_state',
-      secureCookies: false,
+      secureCookies: true,
       now: () => t,
     })
     const startRes = await handlers.start(new Request('https://my.app/auth/tangle/start'))
@@ -859,5 +871,61 @@ describe('guardResolution', () => {
     const session = { user: { id: 'u1' } }
     expect(await guardResolution(async () => session)).toEqual({ ok: true, value: session })
     await expect(guardResolution(async () => { throw new Error('db down') })).rejects.toThrow('db down')
+  })
+})
+
+describe('createTangleSsoHandlers — startup hardening applies to every protocol (#749)', () => {
+  const base = {
+    auth: { authorizeUrl: () => 'https://id.example/a', exchange: async () => ({ apiKey: '', emailVerified: true, user: { id: '', email: '' } }) },
+    store: {} as TangleSsoAccountStore,
+    sessionCookieSecret: AUTH_SECRET,
+    stateCookieName: 'app_tangle_state',
+    secureCookies: true,
+  }
+
+  it('legacy (the default) rejects a short stateSecret', () => {
+    expect(() => createTangleSsoHandlers({
+      ...base,
+      protocol: 'legacy',
+      stateSecret: 'short',
+      callbackUrl: 'https://my.app/cb',
+    })).toThrow(/at least 32 characters/)
+  })
+
+  it('legacy rejects a non-HTTPS, non-loopback callbackUrl', () => {
+    expect(() => createTangleSsoHandlers({
+      ...base,
+      protocol: 'legacy',
+      stateSecret: SECRET,
+      callbackUrl: 'http://my.app/cb',
+    })).toThrow(/HTTPS except on loopback/)
+  })
+
+  it('legacy rejects credentials/query/fragment in the callbackUrl', () => {
+    expect(() => createTangleSsoHandlers({
+      ...base,
+      protocol: 'legacy',
+      stateSecret: SECRET,
+      callbackUrl: 'https://user:pw@my.app/cb?x=1#f',
+    })).toThrow(/no credentials, query, or fragment/)
+  })
+
+  it('legacy rejects an https callback without Secure cookies', () => {
+    expect(() => createTangleSsoHandlers({
+      ...base,
+      protocol: 'legacy',
+      stateSecret: SECRET,
+      callbackUrl: 'https://my.app/cb',
+      secureCookies: false,
+    })).toThrow(/HTTPS callbacks require Secure cookies/)
+  })
+
+  it('legacy accepts the compliant production shape (https + Secure + real secret)', () => {
+    expect(() => createTangleSsoHandlers({
+      ...base,
+      protocol: 'legacy',
+      stateSecret: SECRET,
+      callbackUrl: 'https://my.app/auth/tangle/callback',
+    })).not.toThrow()
   })
 })
