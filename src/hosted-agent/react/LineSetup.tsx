@@ -16,6 +16,17 @@ const IDENTITY: Record<LineIdentityKind, string> = {
 
 type Choice = { key: string; connection: LineConnectionOption; identity: LineIdentityOption }
 
+function LineMessageAction({ line }: { line: LineSetupLine }) {
+  if (line.transport !== 'imessage' || line.targetId === null || line.status !== 'active') return null
+  if (!!line.connect !== !!line.routerAddress) return null
+  const shared = !!line.connect && !!line.routerAddress
+  const number = shared ? line.routerAddress : line.address
+  if (!number || !/^\+[1-9]\d{7,14}$/.test(number)) return null
+  return <a className="tangle-lines__primary tangle-lines__message-action" href={`sms:${number}?body=${encodeURIComponent(shared ? line.connect ?? '' : 'Hello')}`}>
+    {shared ? 'Connect iMessage' : 'Text it now'}
+  </a>
+}
+
 function message(error: unknown): string {
   return error instanceof Error ? error.message : 'The line request failed. Try again.'
 }
@@ -257,8 +268,9 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
           <div className="tangle-lines__row" key={line.id}>
             <div className="tangle-lines__row-main">
               <div className="tangle-lines__row-heading"><span className="tangle-lines__transport">{TRANSPORT[line.transport]}</span><span className={`tangle-lines__status${line.answering ? ' tangle-lines__status--answering' : ''}`}>{line.answering ? 'Answering' : line.targetId === null ? 'Disconnected' : line.status === 'active' ? 'Awaiting member' : line.status}</span></div>
-              <strong>{line.routerAddress ?? line.address}</strong>
-              {line.connect && line.targetId !== null && <p>To reach this agent, text <code>{line.connect}</code>.</p>}
+              <strong>{line.address}</strong>
+              {line.transport === 'imessage' && line.connect && line.routerAddress && line.targetId !== null && <p>Send <code>{line.connect}</code> to {line.routerAddress}. Then message the number Inkbox sends you.</p>}
+              <LineMessageAction line={line} />
               <p>{line.targetLabel ?? 'No agent or box assigned'}{line.boxMode && ` · ${line.boxMode === 'per-member' ? 'one box per member' : 'shared box'}`}</p>
               {line.lastTurn.kind === 'latest' ? <p>Last turn: {line.lastTurn.status} · {dateTime(line.lastTurn.at)}</p>
                 : <p>{line.lastTurn.kind === 'none' ? 'No turns yet.' : 'Turn history unavailable.'}</p>}

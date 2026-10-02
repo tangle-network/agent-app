@@ -9,6 +9,7 @@ const labels: Record<LineTransport, string> = { imessage: 'iMessage', whatsapp: 
 
 /** User-facing deep links, not provider API calls. Invalid addresses render as text only. */
 export function channelMessageLink(line: Line, instruction: string): string | null {
+  if (line.transport === 'imessage' && !!line.connect !== !!line.routerAddress) return null
   if (line.transport === 'email') {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(line.address)) return null
     return `mailto:${encodeURIComponent(line.address)}?subject=Channel%20test&body=${encodeURIComponent(instruction)}`
@@ -43,6 +44,7 @@ export function ChannelVerificationPanel({ lineId, className = '' }: { lineId: s
       const expired = test ? verificationExpired(test) : false
       const active = line.status === 'active' && line.attachment?.status === 'active'
       const link = test ? channelMessageLink(line, test.instruction) : null
+      const sharedIMessage = line.transport === 'imessage' && !!line.connect && !!line.routerAddress
       return <>
         <p className="break-all font-medium">{labels[line.transport]} · {line.address}</p>
         {line.status !== 'active' ? <p role="alert">This line is {line.status}. Check the line’s status before testing or activating it.</p>
@@ -62,9 +64,9 @@ export function ChannelVerificationPanel({ lineId, className = '' }: { lineId: s
             <button type="button" className={primaryButtonClass} disabled={busy} onClick={() => act('resume')}>Check setup</button></>
           : test.status === 'waiting' ? <>
             {line.connect && line.routerAddress && <><p>First, send this to {line.routerAddress}. The router replies with your agent’s number.</p><CopyLine text={line.connect} /></>}
-            <p>{line.transport === 'email' ? `From another email address, send this line to ${line.address}.` : line.connect ? 'Then send this in the conversation the router opens:' : `From your phone, send this to ${line.address}:`}</p>
+            <p>{line.transport === 'email' ? `From another email address, send this line to ${line.address}.` : line.connect ? 'Then send this to the number Inkbox sends you:' : `From your phone, send this to ${line.address}:`}</p>
             <CopyLine text={test.instruction} />
-            {link && <a className={primaryButtonClass} href={link} target={line.transport === 'whatsapp' ? '_blank' : undefined} rel="noopener noreferrer">Open {line.transport === 'email' ? 'Email' : line.transport === 'whatsapp' ? 'WhatsApp' : 'Messages'}</a>}
+            {link && <a className={primaryButtonClass} href={link} target={line.transport === 'whatsapp' ? '_blank' : undefined} rel="noopener noreferrer">{sharedIMessage ? 'Connect iMessage' : line.transport === 'email' ? 'Open Email' : line.transport === 'whatsapp' ? 'Open WhatsApp' : 'Text it now'}</a>}
           </> : test.status === 'received' ? <><p role="status">Your test message arrived.</p><button type="button" className={primaryButtonClass} disabled={busy} onClick={() => act('send')}>Send test reply</button></>
           : test.status === 'sending' ? <p role="status">The test reply is being sent. Do not send another.</p>
           : test.status === 'uncertain' ? <><p role="alert">The reply result is uncertain. Check its status instead of sending another.</p><button type="button" className={primaryButtonClass} disabled={busy} onClick={() => act('resume')}>Check reply status</button></>
