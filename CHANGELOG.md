@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.12
+
+- fix(hosted-agent): complete email mailbox setup and migration errors (#752)
+
 ## 0.51.11
 
 - feat: select eligible skills in shared composer (#757)
