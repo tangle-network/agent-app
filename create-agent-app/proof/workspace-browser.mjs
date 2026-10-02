@@ -120,6 +120,15 @@ try {
   browser = await chromium.launch({ headless: true })
   let { context, page } = await pageInNewContext()
   await signIn(page, true)
+  await page.getByRole('heading', { name: 'What can we work on?', exact: true }).waitFor()
+  const entryDesktop = await assertStyled(page)
+  await page.screenshot({ path: join(evidence, 'workspace-entry-desktop.png'), fullPage: true })
+  const initialViewport = page.viewportSize()
+  assert.ok(initialViewport)
+  await page.setViewportSize({ width: 390, height: 844 })
+  const entryMobile = await assertStyled(page)
+  await page.screenshot({ path: join(evidence, 'workspace-entry-mobile.png'), fullPage: true })
+  await page.setViewportSize(initialViewport)
   const response = await page.request.post(`${origin}/api/threads`, { data: { firstMessage: 'Saved workspace proof' } })
   assert.equal(response.status(), 200)
   const { thread } = await response.json()
@@ -138,11 +147,22 @@ try {
   assert.equal(saved.status(), 200)
   assert.equal((await saved.json()).thread.id, thread.id)
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByRole('navigation', { name: 'Mobile workspace' }).getByRole('link', { name: 'History' }).click()
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
+  const drawer = page.getByRole('dialog', { name: 'Navigation', exact: true })
+  await drawer.getByRole('link', { name: 'New thread', exact: true }).waitFor()
+  await drawer.evaluate(async (element) => {
+    await Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished))
+  })
+  await page.screenshot({ path: join(evidence, 'workspace-mobile-navigation.png'), fullPage: true })
+  await drawer.getByRole('link', { name: 'History', exact: true }).click()
   await page.getByRole('heading', { name: 'History', exact: true }).waitFor()
   const mobile = await assertStyled(page)
   await page.screenshot({ path: join(evidence, 'workspace-mobile.png'), fullPage: true })
-  await page.getByRole('navigation', { name: 'Mobile workspace' }).getByRole('button', { name: 'Sign out' }).click()
+  await page.getByRole('button', { name: 'User menu', exact: true }).click()
+  await page.getByRole('menu').waitFor()
+  assert.equal(await page.getByRole('menuitem', { name: /Settings$/ }).count(), 0, 'Apps without settings must omit the destination')
+  await page.screenshot({ path: join(evidence, 'workspace-mobile-account.png'), fullPage: true })
+  await page.getByRole('menuitem', { name: /Sign Out$/ }).click()
   await page.getByRole('heading', { name: 'Sign in', exact: true }).waitFor()
   assert.equal((await page.request.get(`${origin}/api/threads`)).status(), 401)
   await context.close()
@@ -161,8 +181,8 @@ try {
   const result = {
     node: process.version,
     package: pkg.name,
-    checks: ['real signup', 'real cookie session', 'HTTP thread create', 'History navigation', 'thread URL reload', 'mobile navigation', 'real signout', 'fresh Worker process and browser login reopen the same D1 thread'],
-    desktop, mobile, modelTurnRequests: turnRequests,
+    checks: ['real signup', 'real cookie session', 'HTTP thread create', 'History navigation', 'thread URL reload', 'shared mobile drawer navigation', 'shared profile menu signout', 'fresh Worker process and browser login reopen the same D1 thread'],
+    entryDesktop, entryMobile, desktop, mobile, modelTurnRequests: turnRequests,
     unrun: ['hosted deployment', 'live model/sandbox turn', 'live mid-turn disconnect'],
     messagePersistence: 'Covered separately by the generated app e2e suite with its explicitly fake sandbox producer, not by this no-model browser proof.',
   }

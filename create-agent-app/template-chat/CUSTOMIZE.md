@@ -58,7 +58,12 @@ Discovery: **What product behavior belongs beside the maintained workspace?**
 
 - [ ] Keep `AgentWorkspaceLayout` and the existing full `SessionHistoryPanel`. Do not add a second History surface or a local sidebar.
 - [ ] Keep native thread links and real session/auth callbacks in `web/App.tsx`. The server remains authoritative after a reload.
-- [ ] Keep the transcript full-space, with no repeated title row. Titles belong in History and the document title. Mobile navigation floats above the content with matching content inset.
+- [ ] Keep the transcript full-space, with no repeated title row.
+  Titles belong in History and the document title.
+  The shared shell owns the mobile header, navigation drawer, and account menu.
+  Do not add a second mobile bar or header inset.
+- [ ] Keep `settingsHref={null}` until the product provides Settings.
+  Then pass its real route or `onSettingsClick` callback.
 - [ ] Keep `ChatComposer`, `ChatMessages`, `streamChatTurn`, and the shared interaction cards. Their current callbacks target the existing routes.
 - [ ] Keep the inline/sandbox upload adapter in `web/uploads.ts`. `ChatComposer.onSendParts` matches `/api/chat/upload`; `EntryComposer.uploadUrl` and `useComposerAttachments` expect stored attachment descriptors instead. Do not silently reinterpret those responses or change storage behavior to make a different UI fit.
 - [ ] Add uploads, mentions, integrations, profiles, thread mutations, or plan controls only through real supported product contracts. No empty catalogs, placeholder URLs, or no-op callbacks.

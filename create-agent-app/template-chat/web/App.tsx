@@ -51,7 +51,7 @@ function HistoryPage({ threads }: { threads: Thread[] }) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SessionSort>('newest')
   const history = useSessionHistory({ fetchPage: fetchHistory, q: query.trim(), sort, initialPage: { items: threads, nextCursor: null } })
-  return <div className="h-full min-h-0 pt-14 lg:pt-0"><SessionHistoryPanel history={history} hasAnySessions={threads.length > 0}
+  return <div className="h-full min-h-0"><SessionHistoryPanel history={history} hasAnySessions={threads.length > 0}
     query={query} onQueryChange={setQuery} sort={sort} onSortChange={setSort}
     hrefForSession={threadHref} newSessionHref="/" emptyTitle="No conversations yet" /></div>
 }
@@ -81,13 +81,10 @@ function Workspace({ session }: { session: Session }) {
       totalCount: threads.length, activeSessionId: activeId }}
     activeId={showHistory ? 'history' : activeId ? undefined : 'new'}
     logo={<span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground" title={productName}>{productName.slice(0, 1)}</span>}
-    logoHref="/" user={session.user} onLogout={() => void logout()}
+    logoHref="/" user={session.user} settingsHref={null} onLogout={() => void logout()}
     contentClassName="h-dvh min-h-0 overflow-hidden" defaultRailCollapsed={false}>
-    <nav aria-label="Mobile workspace" className="fixed right-3 top-3 z-40 flex gap-3 rounded-lg border border-border bg-background p-2 text-sm lg:hidden">
-      <a href="/">New thread</a><a href={historyHref}>History</a><button onClick={() => void logout()}>Sign out</button>
-    </nav>
     {error && <div role="alert" className="p-4 text-sm text-destructive">{error} <button className="underline" onClick={() => location.reload()}>Reload</button></div>}
-    {showHistory ? loaded ? <HistoryPage threads={threads} /> : <p role="status" className="p-6 pt-16">Loading History…</p>
+    {showHistory ? loaded ? <HistoryPage threads={threads} /> : <p role="status" className="p-6">Loading History…</p>
       : <Conversation initialThreadId={initialThreadId} onThread={setActiveId} onChanged={refreshThreads} />}
   </AgentWorkspaceLayout>
 }

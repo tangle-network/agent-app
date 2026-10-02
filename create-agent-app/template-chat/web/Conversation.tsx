@@ -180,7 +180,7 @@ export function Conversation({ initialThreadId, onThread, onChanged }: {
   const empty = !threadId && messages.length === 0
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {!empty && <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-16 lg:pt-4" aria-label="Conversation">
+      {!empty && <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4" aria-label="Conversation">
         <div className="mx-auto w-full max-w-[820px]">
           <>{opening && <p role="status" className="text-sm text-muted-foreground">Loading conversation…</p>}</>
           <ChatMessages messages={messages} loading={busy && asks.pending.length === 0} error={error} renderExtras={(message) => {

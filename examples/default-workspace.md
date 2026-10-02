@@ -43,9 +43,9 @@ The product still owns its navigation taxonomy, route URLs, session queries,
 authentication, and domain content.
 
 The fixed rail is hidden below `lg` so it cannot cover a mobile composer.
-Products that need mobile navigation should add their compact header or menu
-around the shared content; that surface needs the product's brand and route
-context.
+The shared shell supplies the mobile header, navigation drawer, and account menu.
+Pass product branding and routes through its existing props.
+Do not add another mobile navigation bar or a second header inset.
 
 ```tsx
 import { CirclePlus, FolderOpen, History } from 'lucide-react'

@@ -26,13 +26,13 @@ The gate then invokes `workspace-browser.mjs` against that generated project.
 The proof starts the real Worker on loopback and applies the real migrations to
 an isolated local D1 directory. Chromium signs up through the rendered form,
 creates a thread through the authenticated HTTP route, opens it through History,
-reloads its exact URL, uses mobile navigation, signs out, and checks unauthenticated
-access. A fresh Worker process and browser context must reopen the same thread
-after a real sign-in. API/gateway 404s must remain JSON, not SPA documents.
+reloads its exact URL and uses the shared mobile navigation drawer and account menu.
+It signs out and checks unauthenticated access.
+A fresh Worker process and browser context must reopen the same thread after a real sign-in. API/gateway 404s must remain JSON, not SPA documents.
 
 The driver rejects external browser requests, records page errors, and requires
-zero `POST /api/chat` requests. It writes `workspace-proof.json`,
-`workspace-desktop.png`, and `workspace-mobile.png` under `VERIFICATION_DIR`.
+zero `POST /api/chat` requests.
+It writes `workspace-proof.json` and desktop, mobile, drawer, and account screenshots under `VERIFICATION_DIR`.
 The existing Verify PR workflow also captures the exact commit, source archive,
 and generated-gate log. Temporary passwords/auth secrets never enter committed
 evidence, and proof-owned processes and local state are removed on exit.
@@ -42,13 +42,3 @@ Message/part persistence and replay are separately exercised by the generated
 `tests/chat-turn.e2e.test.ts` using its explicitly fake sandbox event producer.
 No result from either lane proves hosted deployment, live Sandbox/model access,
 actual model quality, saved artifact bytes, or a live mid-turn disconnect.
-
-## Authoring-environment status
-
-The implementation environment could run Node syntax/transpilation checks and
-execute the URL/transcript projection. It could not clone or install packages:
-GitHub DNS resolution failed, and the pinned pnpm/npm toolchain and package
-payload were not installed locally. Consequently fresh packed build, Chromium,
-and local D1 execution must be read from the candidate's actual CI results;
-they are not claimed as passed by this source document. Hosted/model proofs
-were not run.
