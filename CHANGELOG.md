@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.50.31
+
+- docs(api): refresh generated role signatures
+- fix(enrollment): reserve and pin shared agent targets (#725)
+- feat(enrollment): share authorized agent session across channels (#724)
+- feat(platform): add finite authorized Hub settings routes (#723)
+- feat(create-agent-app): ship the maintained React workspace template (#722)
+
 ## 0.50.30
 
 - feat(profile): add reusable read-only profile viewer (#721)
