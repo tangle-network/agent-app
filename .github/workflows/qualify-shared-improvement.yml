@@ -1,0 +1,59 @@
+name: Qualify shared improvement source
+on:
+  push:
+    branches: [verify/shared-agent-improvement-20261002]
+permissions:
+  contents: read
+concurrency:
+  group: qualify-shared-improvement
+  cancel-in-progress: false
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      SOURCE_SHA: 938cabe97aab8afa435496fda01d8cac0022bb3f
+      NODE_OPTIONS: --max-old-space-size=12288
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Record source
+        run: |
+          mkdir -p "$RUNNER_TEMP/shared-proof"
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git rev-parse HEAD > "$RUNNER_TEMP/shared-proof/commit.txt"
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts=false > "$RUNNER_TEMP/shared-proof/install.log" 2>&1 || { tail -80 "$RUNNER_TEMP/shared-proof/install.log"; exit 1; }
+      - name: Generate and retain canonical documentation
+        run: |
+          pnpm docs:gen > "$RUNNER_TEMP/shared-proof/docs.log" 2>&1
+          git diff --binary -- docs > "$RUNNER_TEMP/shared-proof/generated-docs.patch"
+          tar -czf "$RUNNER_TEMP/shared-proof/generated-docs.tar.gz" docs
+      - name: Typecheck
+        run: pnpm typecheck > "$RUNNER_TEMP/shared-proof/typecheck.log" 2>&1 || { cat "$RUNNER_TEMP/shared-proof/typecheck.log"; exit 1; }
+      - name: Build public exports
+        run: pnpm build > "$RUNNER_TEMP/shared-proof/build.log" 2>&1 || { tail -100 "$RUNNER_TEMP/shared-proof/build.log"; exit 1; }
+      - name: Prove public observation entrypoint
+        run: node scripts/prove-chat-intelligence.mjs > "$RUNNER_TEMP/shared-proof/observer.json"
+      - name: Full source gates
+        run: pnpm test:gates > "$RUNNER_TEMP/shared-proof/gates.log" 2>&1 || { tail -100 "$RUNNER_TEMP/shared-proof/gates.log"; exit 1; }
+      - name: Full tests
+        run: pnpm exec vitest run --reporter=json --outputFile="$RUNNER_TEMP/shared-proof/tests.json" > "$RUNNER_TEMP/shared-proof/tests.log" 2>&1 || { tail -100 "$RUNNER_TEMP/shared-proof/tests.log"; exit 1; }
+      - name: Generated consumer and dead-code checks
+        run: |
+          pnpm test:generated > "$RUNNER_TEMP/shared-proof/generated.log" 2>&1
+          pnpm knip > "$RUNNER_TEMP/shared-proof/knip.log" 2>&1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: shared-improvement-qualification
+          path: ${{ runner.temp }}/shared-proof/
+          retention-days: 7
