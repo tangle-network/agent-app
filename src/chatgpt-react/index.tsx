@@ -86,15 +86,11 @@ function ConnectSurface({ app, endpoint, enrollment, registeredConnection, state
       <span className="tangle-chatgpt__badge">ChatGPT</span>
     </div>
     <p className="tangle-chatgpt__description">{app.description}</p>
-    <dl className="tangle-chatgpt__identity">
-      <div><dt>Agent</dt><dd>{enrollment.agentId}</dd></div>
-      <div><dt>Workspace</dt><dd>{enrollment.workspaceId}</dd></div>
-    </dl>
     <p role={state.status === 'error' ? 'alert' : 'status'} aria-busy={checking} className="tangle-chatgpt__status">{status}</p>
     <div className="tangle-chatgpt__actions">
       {connectionUrl || connected ? <Button asChild className="tangle-chatgpt__primary">
         <a href={connectionUrl ?? pluginsUrl} target="_blank" rel="noopener noreferrer">
-          {connected ? 'Open in ChatGPT' : 'Connect to ChatGPT'}{' '}<span className="tangle-chatgpt__sr-only">(opens a new tab)</span>
+          {connected ? (connectionUrl ? 'Open in ChatGPT' : 'Open ChatGPT plugins') : 'Connect to ChatGPT'}{' '}<span className="tangle-chatgpt__sr-only">(opens a new tab)</span>
         </a>
       </Button> : <Button type="button" className="tangle-chatgpt__primary" disabled={checking || !resource}
         aria-expanded={showSetup} aria-controls={`${id}-setup`} onClick={() => setShowSetup(!showSetup)}>
@@ -103,6 +99,13 @@ function ConnectSurface({ app, endpoint, enrollment, registeredConnection, state
       {onCheck && <Button type="button" variant="outline" className="tangle-chatgpt__secondary" disabled={checking}
         onClick={onCheck}>{checking ? 'Checking…' : 'Check connection'}</Button>}
     </div>
+    <details className="tangle-chatgpt__details">
+      <summary>Connection details</summary>
+      <dl className="tangle-chatgpt__identity">
+        <div><dt>Agent</dt><dd>{enrollment.agentId}</dd></div>
+        <div><dt>Workspace</dt><dd>{enrollment.workspaceId}</dd></div>
+      </dl>
+    </details>
     {!resource && <p role="alert">A public HTTPS MCP URL without credentials, query parameters or a fragment is required. Contact your app administrator.</p>}
     {resource && (connectionUrl || connected) && <button type="button" className="tangle-chatgpt__text-action"
       aria-expanded={showSetup} aria-controls={`${id}-setup`} onClick={() => setShowSetup(!showSetup)}>Connection setup</button>}

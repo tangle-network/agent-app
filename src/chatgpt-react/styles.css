@@ -9,7 +9,7 @@
 .tangle-chatgpt .tangle-chatgpt__description { margin-top: 1rem; color: hsl(var(--muted-foreground)); }
 .tangle-chatgpt__identity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0; padding: 1rem 0; border-block: 1px solid hsl(var(--border)); }
 .tangle-chatgpt__identity dd { margin: .25rem 0 0; overflow-wrap: anywhere; font-size: .875rem; }
-.tangle-chatgpt .tangle-chatgpt__status { margin-bottom: .75rem; font-weight: 550; }
+.tangle-chatgpt .tangle-chatgpt__status { margin: 1.25rem 0 .75rem; font-weight: 550; }
 .tangle-chatgpt__actions, .tangle-chatgpt__endpoint { display: flex; flex-wrap: wrap; gap: .625rem; align-items: center; }
 .tangle-chatgpt :is(button, input) { font: inherit; }
 .tangle-chatgpt :is(.tangle-chatgpt__primary, .tangle-chatgpt__secondary) { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: .625rem 1rem; border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius, .75rem) - 2px); font-weight: 600; font-size: .875rem; text-decoration: none; cursor: pointer; }
@@ -28,3 +28,7 @@
 .tangle-chatgpt__copy-notice:empty { display: none; }
 .tangle-chatgpt__sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 420px) { .tangle-chatgpt__actions > * { width: 100%; } .tangle-chatgpt__identity { grid-template-columns: 1fr; gap: .75rem; } }
+.tangle-chatgpt__details { margin-top: .75rem; }
+.tangle-chatgpt__details summary { min-height: 2.75rem; padding: .75rem 0; cursor: pointer; font-size: .8125rem; color: hsl(var(--muted-foreground)); }
+.tangle-chatgpt__details summary:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+.tangle-chatgpt__details .tangle-chatgpt__identity { margin: 0 0 1rem; }

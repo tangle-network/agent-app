@@ -24,8 +24,8 @@ import '@tangle-network/agent-app/chatgpt-react/styles'
 - `app` accepts the `name`, `displayName`, and `description` from the kit's
   `AgentAppDescription` or `defineAgentAppMetadata` result. Pass the same public
   metadata used by the endpoint; the browser does not import the server kit.
-- `enrollment` is the existing `AgentEnrollmentIdentity`. The UI displays its
-  agent and workspace IDs. It never creates an enrollment, changes native
+- `enrollment` is the existing `AgentEnrollmentIdentity`. The UI retains its
+  agent and workspace IDs in collapsed Connection details. It never creates an enrollment, changes native
   sessions, selects a workspace, or adds a grant.
 - `registeredConnection` is optional `{ id, url }` from a real registration.
   Supply the exact verified HTTPS `chatgpt.com` destination. The UI does not

@@ -29,6 +29,13 @@ try {
     assert.ok(parseFloat(outline) >= 2, outline)
     await page.keyboard.press('Enter')
     assert.equal(await primary.getAttribute('aria-expanded'), 'true')
+    const details = page.getByText('Connection details', { exact: true })
+    await details.press('Enter')
+    assert.equal(await details.evaluate(node => node.parentElement.open), true)
+    assert.equal(await page.getByRole('definition').count(), 2)
+    if (app === 'gtm' && theme === 'dark' && width === 1440) await page.screenshot({ path: `${output}/connection-details.png`, fullPage: true })
+    await details.press('Enter')
+    assert.equal(await details.evaluate(node => node.parentElement.open), false)
     const expected = `https://${app}.example.com/api/agents/mcp`
     assert.equal(await page.getByLabel('MCP URL').inputValue(), expected)
     await page.getByRole('button', { name: 'Copy URL' }).click()
@@ -73,5 +80,5 @@ try {
   writeFileSync(`${output}/browser-proof.json`, JSON.stringify({ base, checkedAt: new Date().toISOString(),
     scope: 'Installed public exports, kit-generated display metadata, controlled host enrollment/state fixtures. No live ChatGPT connection or installation claim.',
     results, stateRecovery: true, registeredLink: 'Fixture ID with exact supplied official Plugins URL; no synthetic install URL.', originalVideos: 2 }, null, 2))
-  console.log(JSON.stringify({ passed: results.length, screenshots: 14, axeViolations: 0, originalVideos: 2 }))
+  console.log(JSON.stringify({ passed: results.length, screenshots: 15, axeViolations: 0, originalVideos: 2 }))
 } finally { await browser.close() }

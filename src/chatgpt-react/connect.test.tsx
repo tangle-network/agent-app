@@ -21,12 +21,26 @@ describe('ChatGPT connection surface', () => {
     expect(screen.queryByText('Connected to ChatGPT')).toBeNull()
   })
 
+  it('keeps native identifiers in collapsed connection details', async () => {
+    const user = userEvent.setup()
+    render(<ChatGPTConnect {...gtmExample} />)
+    const summary = screen.getByText('Connection details')
+    const details = summary.closest('details')
+    expect(details?.hasAttribute('open')).toBe(false)
+    await user.click(summary)
+    expect(details?.hasAttribute('open')).toBe(true)
+    expect(details?.textContent).toContain(gtmExample.enrollment.agentId)
+    expect(details?.textContent).toContain(gtmExample.enrollment.workspaceId)
+  })
+
   it('uses an explicitly supplied ChatGPT URL and never derives one from the ID', () => {
-    render(<ChatGPTConnect {...gtmExample} registeredConnection={{ id: 'test-record-id', url: 'https://chatgpt.com/plugins?test=fixture#location' }} />)
+    const { rerender } = render(<ChatGPTConnect {...gtmExample} registeredConnection={{ id: 'test-record-id', url: 'https://chatgpt.com/plugins?test=fixture#location' }} />)
     const action = screen.getByRole('link', { name: 'Connect to ChatGPT (opens a new tab)' })
     expect(action.getAttribute('href')).toBe('https://chatgpt.com/plugins?test=fixture#location')
     expect(action.getAttribute('rel')).toBe('noopener noreferrer')
     expect(screen.queryByText('Connected to ChatGPT')).toBeNull()
+    rerender(<ChatGPTConnect {...gtmExample} state={{ status: 'connected' }} registeredConnection={{ id: 'test-record-id', url: 'https://chatgpt.com/plugins?test=fixture#location' }} />)
+    expect(screen.getByRole('link', { name: 'Open in ChatGPT (opens a new tab)' }).getAttribute('href')).toBe('https://chatgpt.com/plugins?test=fixture#location')
   })
 
   it('falls back to supported setup for an invalid registered destination', async () => {
@@ -49,7 +63,7 @@ describe('ChatGPT connection surface', () => {
     expect(screen.getByRole('button', { name: 'Checking…' }).hasAttribute('disabled')).toBe(true)
     rerender(<ChatGPTConnect {...gtmExample} state={{ status: 'connected' }} />)
     expect(screen.getByRole('status').textContent).toBe('Connected to ChatGPT')
-    expect(screen.getByRole('link', { name: 'Open in ChatGPT (opens a new tab)' }).getAttribute('href')).toBe('https://chatgpt.com/plugins')
+    expect(screen.getByRole('link', { name: 'Open ChatGPT plugins (opens a new tab)' }).getAttribute('href')).toBe('https://chatgpt.com/plugins')
   })
 
   it('drops setup and clipboard feedback when enrollment changes', async () => {
