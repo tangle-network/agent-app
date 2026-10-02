@@ -2,12 +2,16 @@
   "lightTokens": {
     "background": "rgb(247, 247, 247)",
     "color": "rgb(45, 45, 45)",
-    "buttonBackground": "rgb(99, 102, 241)"
+    "buttonBackground": "rgb(76, 63, 198)",
+    "buttonForeground": "rgb(255, 255, 255)",
+    "buttonContrast": 7.410685248443441
   },
   "darkTokens": {
     "background": "rgb(36, 36, 36)",
     "color": "rgb(230, 230, 230)",
-    "buttonBackground": "rgb(124, 108, 246)"
+    "buttonBackground": "rgb(76, 63, 198)",
+    "buttonForeground": "rgb(255, 255, 255)",
+    "buttonContrast": 7.410685248443441
   },
   "mobileButtons": [
     {
@@ -26,7 +30,7 @@
     }
   ],
   "uniqueAppCount": 3,
-  "videoPath": "/tmp/shared-line-app-notice-proof/page@73c471ddf19d3119b04d0864bb99c64b.webm",
+  "videoPath": "/tmp/shared-line-app-notice-proof/page@467b44159af28ccf8220406a26fd46ee.webm",
   "screenshots": [
     "/tmp/shared-line-app-notice-proof/light-desktop.png",
     "/tmp/shared-line-app-notice-proof/light-mobile.png",

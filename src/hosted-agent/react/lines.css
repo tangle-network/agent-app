@@ -3,8 +3,8 @@
   --tl-muted: var(--line-kit-muted, var(--text-secondary, var(--fg-muted, #64748b)));
   --tl-border: var(--line-kit-border, var(--border-default, var(--line-subtle, #dbe1e7)));
   --tl-surface: var(--line-kit-surface, var(--bg-input, #fff));
-  --tl-accent: var(--line-kit-accent, var(--brand-primary, #2856a1));
-  --tl-accent-foreground: var(--line-kit-accent-foreground, #fff);
+  --tl-accent: var(--line-kit-accent, hsl(var(--primary, 217 60% 39%)));
+  --tl-accent-foreground: var(--line-kit-accent-foreground, hsl(var(--primary-foreground, 0 0% 100%)));
   --tl-success: var(--line-kit-success, var(--success-11, hsl(var(--success, 160 84% 26%))));
   --tl-warning: var(--line-kit-warning, var(--warning-11, hsl(var(--warning-strong, 41 96% 27%))));
   --tl-danger: var(--line-kit-danger, var(--text-danger, #a62f3b));
