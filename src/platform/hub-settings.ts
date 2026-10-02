@@ -219,7 +219,23 @@ async function prepare(request: Request, basePath: string): Promise<Prepared | R
   const isActions = route.kind === 'actions'
   query(url, isPolicyRead ? ['connectionId'] : isActions ? ['query', 'limit'] : [])
   const hasJson = route.kind === 'oauth' || route.kind === 'api-key' || (route.kind === 'policies' && !isPolicyRead)
-  if (!hasJson && request.body !== null) invalid()
+  if (!hasJson && request.body !== null) {
+    // Workers may expose an empty body stream for a bodyless POST.
+    const reader = request.body.getReader()
+    let emptyChunks = 0
+    try {
+      for (;;) {
+        const chunk = await reader.read()
+        if (chunk.done) break
+        if (chunk.value.byteLength > 0) invalid()
+        // Limit empty chunks before authorization; bodyless requests reach EOF.
+        if (++emptyChunks > 16) invalid()
+      }
+    } finally {
+      await reader.cancel().catch(() => undefined)
+      reader.releaseLock()
+    }
+  }
 
   if (route.kind === 'providers') return { intent: { operation: 'providers.list', target: 'caller-account' }, call: (hub) => hub.connections.providers() }
   if (route.kind === 'connections') return { intent: { operation: 'connections.list', target: 'caller-account' }, call: (hub) => hub.connections.list() }
