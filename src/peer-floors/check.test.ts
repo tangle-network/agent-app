@@ -242,7 +242,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('19.0.0', range!)).toBe(false)
   })
 
-  it('admits the shared header Sandbox UI line without claiming the next minor', async () => {
+  it('requires the shared companion layout seams without claiming the next minor', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -250,10 +250,10 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/sandbox-ui']
 
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.113.2', range!)).toBe(false)
-    expect(satisfiesRange('0.115.0', range!)).toBe(true)
-    expect(satisfiesRange('0.116.1', range!)).toBe(true)
-    expect(satisfiesRange('0.117.0', range!)).toBe(false)
+    expect(satisfiesRange('0.116.9', range!)).toBe(false)
+    expect(satisfiesRange('0.117.0', range!)).toBe(true)
+    expect(satisfiesRange('0.117.1', range!)).toBe(true)
+    expect(satisfiesRange('0.118.0', range!)).toBe(false)
   })
 
   it('requires the UI release that exports openui-schema', async () => {
