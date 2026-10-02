@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.51.4
+
+- chore(ci): remove automatic PR checks and duplicate suites (#742)
+- feat(lines): offer owned Linq WhatsApp application TEST
+
 ## 0.51.3
 
 - fix(channels): distinguish iMessage connection from direct texting (#739)
