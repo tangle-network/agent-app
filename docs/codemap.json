@@ -6799,7 +6799,7 @@
           "name": "ApplicationLineSetup",
           "kind": "function",
           "signature": "(props: ApplicationLineSetupProps) => Element",
-          "doc": "Verify an owned handset before connecting its iMessage line to an application."
+          "doc": "Verify an owned handset before connecting its supported line to an application."
         },
         {
           "name": "ApplicationLineSetupClient",
