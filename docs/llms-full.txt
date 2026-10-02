@@ -11826,6 +11826,14 @@ interface BillableBalanceState
 (ctx: HubProxyContext) => HubProxyRoutes
 ```
 
+### `createHubSettingsRoutes`
+
+`function` — Build a finite Hub settings server boundary; existing Hub proxy routes are unaffected.
+
+```ts
+(ctx: HubSettingsContext) => HubSettingsRoutes
+```
+
 ### `createPlatformBillingHttp`
 
 `function` — Create a PlatformBillingHttp instance configured with given options and default behaviors
@@ -11936,6 +11944,78 @@ interface HubProxyRouteArgs
 
 ```ts
 interface HubProxyRoutes
+```
+
+### `HubSettingsApiKeyMetadata`
+
+`type` — Non-secret API-key setup shapes supported by the Hub SDK.
+
+```ts
+type HubSettingsApiKeyMetadata
+```
+
+### `HubSettingsClient`
+
+`interface` — Structural subset of the existing SDK, with no execution methods.
+
+```ts
+interface HubSettingsClient
+```
+
+### `HubSettingsClientBinding`
+
+`interface`
+
+```ts
+interface HubSettingsClientBinding
+```
+
+### `HubSettingsContext`
+
+`interface`
+
+```ts
+interface HubSettingsContext
+```
+
+### `HubSettingsGrant`
+
+`interface`
+
+```ts
+interface HubSettingsGrant
+```
+
+### `HubSettingsOAuthInput`
+
+`interface` — Browser OAuth setup, excluding CLI mode and identity/credential overrides.
+
+```ts
+interface HubSettingsOAuthInput
+```
+
+### `HubSettingsOperation`
+
+`type` — Validated, exact intent.
+
+```ts
+type HubSettingsOperation
+```
+
+### `HubSettingsPrincipal`
+
+`interface` — Server-derived application identity, not fields read from browser input.
+
+```ts
+interface HubSettingsPrincipal
+```
+
+### `HubSettingsRoutes`
+
+`interface`
+
+```ts
+interface HubSettingsRoutes
 ```
 
 ### `isPlatformBillingHttpError`
