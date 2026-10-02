@@ -18828,6 +18828,18 @@
           "doc": null
         },
         {
+          "name": "AgentProfileViewer",
+          "kind": "function",
+          "signature": "({ profile, className, defaultExpanded }: AgentProfileViewerProps) => Element",
+          "doc": "Read-only view of configured profile data."
+        },
+        {
+          "name": "AgentProfileViewerProps",
+          "kind": "interface",
+          "signature": "interface AgentProfileViewerProps",
+          "doc": null
+        },
+        {
           "name": "AgentSessionControls",
           "kind": "function",
           "signature": "(props: AgentSessionControlsProps) => Element",
@@ -20180,7 +20192,7 @@
         {
           "name": "ModelPicker",
           "kind": "function",
-          "signature": "({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant }: ModelPickerProps)…",
+          "signature": "({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant, triggerContent }: M…",
           "doc": "Searchable model picker pill + popover."
         },
         {

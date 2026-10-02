@@ -60,6 +60,10 @@ Those two remain searchable; they can enter the shortlist after the Router serve
 
 ![The same picker at mobile width](./assets/model-picker/freshness-ordering-mobile.png)
 
+An editable model field can dock the canonical picker with `variant="quiet"` and `triggerContent={<span>Search</span>}`.
+The supplied content names the trigger; the picker retains its dropdown indicator, search, selection, and focus behavior.
+Omitting this slot preserves the selected-model label and provider icon.
+
 ## Migration: sandbox-ui → agent-app canon
 
 ### `ModelPicker` (sandbox-ui `dashboard/ModelPicker` → `agent-app/web-react` `ModelPicker`)

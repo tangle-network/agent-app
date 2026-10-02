@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-432 exports.
+434 exports.
 
 ### `acceptRejectionReason`
 
@@ -84,6 +84,22 @@ interface AgentProfileEditorProps
 
 ```ts
 type AgentProfileResourceKind
+```
+
+### `AgentProfileViewer`
+
+`function` — Read-only view of configured profile data.
+
+```ts
+({ profile, className, defaultExpanded }: AgentProfileViewerProps) => Element
+```
+
+### `AgentProfileViewerProps`
+
+`interface`
+
+```ts
+interface AgentProfileViewerProps
 ```
 
 ### `AgentSessionControls`
@@ -1891,7 +1907,7 @@ interface MissionActivityLaneProps
 `function` — Searchable model picker pill + popover.
 
 ```ts
-({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant }: ModelPickerProps)…
+({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant, triggerContent }: M…
 ```
 
 ### `ModelPickerProps`

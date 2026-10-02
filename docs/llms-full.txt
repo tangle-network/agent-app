@@ -24330,6 +24330,22 @@ interface AgentProfileEditorProps
 type AgentProfileResourceKind
 ```
 
+### `AgentProfileViewer`
+
+`function` — Read-only view of configured profile data.
+
+```ts
+({ profile, className, defaultExpanded }: AgentProfileViewerProps) => Element
+```
+
+### `AgentProfileViewerProps`
+
+`interface`
+
+```ts
+interface AgentProfileViewerProps
+```
+
 ### `AgentSessionControls`
 
 `function`
@@ -26135,7 +26151,7 @@ interface MissionActivityLaneProps
 `function` — Searchable model picker pill + popover.
 
 ```ts
-({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant }: ModelPickerProps)…
+({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant, triggerContent }: M…
 ```
 
 ### `ModelPickerProps`
