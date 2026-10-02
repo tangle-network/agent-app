@@ -1,7 +1,8 @@
-# Copy to .dev.vars for local development (never commit .dev.vars).
+# The scaffolder creates private .dev.vars with a fresh local session secret.
+# This example remains a recovery template; never commit .dev.vars.
 # Production: `wrangler secret put <NAME>` for each secret.
 
-# better-auth HMAC secret — generate one: openssl rand -base64 32
+# The scaffolder replaces this placeholder only in the new local .dev.vars.
 BETTER_AUTH_SECRET=REPLACE_WITH_RANDOM_SECRET
 
 # Tangle Router key the harness bills model calls against.

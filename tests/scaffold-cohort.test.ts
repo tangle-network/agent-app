@@ -17,7 +17,7 @@ const readManifest = (path: string): PackageManifest =>
   JSON.parse(readFileSync(resolve(repo, path), 'utf8'))
 const app = readManifest('package.json')
 
-describe.each([{ flags: [] }, { flags: ['--chat'] }])('scaffold version selection: $flags', ({ flags }) => {
+describe.each([{ flags: [] }, { flags: ['--chat'] }, { flags: ['--headless'] }])('scaffold version selection: $flags', ({ flags }) => {
   it('pins the released App cohort and preserves an explicit version override', () => {
     const scratch = mkdtempSync(join(tmpdir(), 'scaffold-version-'))
     try {
