@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.0
+
+- refactor(platform)!: retire the legacy Hub proxy (#735)
+
 ## 0.50.33
 
 - feat(lines): explain shared phone conversations (#737)
