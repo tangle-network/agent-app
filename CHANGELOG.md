@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.1
+
+- feat(chatgpt-react): share Connect to ChatGPT setup across apps
+
 ## 0.52.0
 
 - feat(turn-stream)!: channel-bound capability tokens; remove the deprecated rebroadcast lane
