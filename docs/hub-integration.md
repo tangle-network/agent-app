@@ -27,7 +27,7 @@ That request must preserve the server's approval and denial decisions.
 
 `createHubSettingsRoutes` is a separate server boundary, exported from
 `@tangle-network/agent-app/platform`. It uses the existing methods of
-`@tangle-network/hub-sdk` (verified against the repository's pinned 0.22.1), not a
+`@tangle-network/hub-sdk` (exercised with pinned 0.22.1 and oldest admitted 0.19.3), not a
 second HTTP client. The SDK seam is structural, so existing platform imports do
 not acquire a new required Hub SDK runtime or declaration dependency. `createHubProxyRoutes` and its existing convenience API are unchanged.
 Do not mount an unrestricted `/v1/*` proxy to implement a settings screen.
@@ -40,7 +40,7 @@ trailing slash. The complete allowlist, relative to that mount, is:
 | --- | --- | --- | --- |
 | GET | `/providers` | None | `connections.providers()` |
 | GET | `/connections` | None | `connections.list()` |
-| POST | `/connections/:provider/start` | `{ returnUrl, connectionParameters?, requestedScopes? }` | `connections.start(provider, input)` |
+| POST | `/connections/:provider/start` | `{ returnUrl, connectionParameters? }` | `connections.start(provider, input)` |
 | POST | `/connections/:provider/connect-key` | `{ apiKey, metadata? }` | `connections.connectApiKey(provider, apiKey, metadata)` |
 | DELETE | `/connections/:connectionId` | None | `connections.revoke(connectionId)` |
 | POST | `/connections/:connectionId/health` | None | `connections.health(connectionId)` |
@@ -64,9 +64,10 @@ digit. Action paths are 2+ dot-separated letter/digit/underscore/hyphen segments
 up to 256 characters. The SDK and Hub still own provider-specific validation.
 OAuth `returnUrl` is required and must be an absolute, credential-free HTTP(S) URL
 on the request origin. `connectionParameters` are bounded non-secret string
-values; identity/credential override keys are rejected. `requestedScopes` retains
-the SDK's own provider/scope restrictions; this boundary does not expand them or
-expose CLI OAuth mode. API-key metadata supports the SDK's property/currency and
+values; identity/credential override keys are rejected.
+`requestedScopes` is rejected because admitted Hub SDK 0.19.3 silently omits it from the OAuth request.
+This boundary does not expose CLI OAuth mode.
+API-key metadata supports the SDK's property/currency and
 listing ID/PMS shapes, not arbitrary identity or credential dictionaries.
 
 ### The application must authorize account management
@@ -80,6 +81,9 @@ request, credentials, OAuth parameters, or upstream response bodies.
 
 The host must check its current session, mutation CSRF protection, current
 workspace membership/role, and authority over the exact connection/action.
+The router calls `authorize` again after credential resolution and immediately before the SDK operation.
+The second grant must name the same principal, so a revoked or changed session makes no Hub call.
+The callback must be safe to call twice with the same immutable intent.
 Return `{ authorized: true, principal: { userId, sessionId, workspaceId } }` only
 after those checks. A generic user ID, cached earlier grant, OAuth success, or
 brokered execution permission is insufficient. Return a denial `Response` or

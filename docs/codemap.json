@@ -9160,6 +9160,12 @@
           "doc": "Resolve hub proxy routes with authentication and error handling based on the given context"
         },
         {
+          "name": "createHubSettingsRoutes",
+          "kind": "function",
+          "signature": "(ctx: HubSettingsContext) => HubSettingsRoutes",
+          "doc": "Build a finite Hub settings server boundary; existing Hub proxy routes are unaffected."
+        },
+        {
           "name": "createPlatformBillingHttp",
           "kind": "function",
           "signature": "(opts: PlatformBillingHttpOptions) => PlatformBillingHttp",
@@ -9242,6 +9248,60 @@
           "kind": "interface",
           "signature": "interface HubProxyRoutes",
           "doc": "Define routes for hub proxy handling catalog, connections, healthchecks, and authorization actions"
+        },
+        {
+          "name": "HubSettingsApiKeyMetadata",
+          "kind": "type",
+          "signature": "type HubSettingsApiKeyMetadata",
+          "doc": "Non-secret API-key setup shapes supported by the Hub SDK."
+        },
+        {
+          "name": "HubSettingsClient",
+          "kind": "interface",
+          "signature": "interface HubSettingsClient",
+          "doc": "Structural subset of the existing SDK, with no execution methods."
+        },
+        {
+          "name": "HubSettingsClientBinding",
+          "kind": "interface",
+          "signature": "interface HubSettingsClientBinding",
+          "doc": null
+        },
+        {
+          "name": "HubSettingsContext",
+          "kind": "interface",
+          "signature": "interface HubSettingsContext",
+          "doc": null
+        },
+        {
+          "name": "HubSettingsGrant",
+          "kind": "interface",
+          "signature": "interface HubSettingsGrant",
+          "doc": null
+        },
+        {
+          "name": "HubSettingsOAuthInput",
+          "kind": "interface",
+          "signature": "interface HubSettingsOAuthInput",
+          "doc": "Browser OAuth setup, excluding CLI mode and identity/credential overrides."
+        },
+        {
+          "name": "HubSettingsOperation",
+          "kind": "type",
+          "signature": "type HubSettingsOperation",
+          "doc": "Validated, exact intent."
+        },
+        {
+          "name": "HubSettingsPrincipal",
+          "kind": "interface",
+          "signature": "interface HubSettingsPrincipal",
+          "doc": "Server-derived application identity, not fields read from browser input."
+        },
+        {
+          "name": "HubSettingsRoutes",
+          "kind": "interface",
+          "signature": "interface HubSettingsRoutes",
+          "doc": null
         },
         {
           "name": "isPlatformBillingHttpError",

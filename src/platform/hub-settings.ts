@@ -10,7 +10,6 @@ export type HubSettingsApiKeyMetadata =
 export interface HubSettingsOAuthInput {
   returnUrl: string
   connectionParameters?: Record<string, string>
-  requestedScopes?: readonly string[]
 }
 
 type PolicyDecision = 'allow' | 'ask' | 'deny'
@@ -141,7 +140,7 @@ function metadata(value: unknown): HubSettingsApiKeyMetadata {
 }
 
 function oauthInput(body: Record<string, unknown>, url: URL): HubSettingsOAuthInput {
-  onlyKeys(body, ['returnUrl', 'connectionParameters', 'requestedScopes'])
+  onlyKeys(body, ['returnUrl', 'connectionParameters'])
   const returnUrl = text(body.returnUrl, 2048)
   let destination: URL
   try { destination = new URL(returnUrl) } catch { invalid() }
@@ -157,11 +156,6 @@ function oauthInput(body: Record<string, unknown>, url: URL): HubSettingsOAuthIn
       return [key, text(value, 1024)]
     }))
   }
-  if (body.requestedScopes !== undefined) {
-    if (!Array.isArray(body.requestedScopes) || body.requestedScopes.length === 0 || body.requestedScopes.length > 50) invalid()
-    input.requestedScopes = body.requestedScopes.map((scope) => text(scope))
-    if (new Set(input.requestedScopes).size !== input.requestedScopes.length) invalid()
-  }
   return input
 }
 
@@ -172,7 +166,7 @@ function query(url: URL, allowed: readonly string[]): void {
 }
 
 async function body(request: Request): Promise<Record<string, unknown>> {
-  if (request.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
+  if ((request.headers.get('content-type')?.split(';')[0] ?? '').trim().toLowerCase() !== 'application/json') {
     throw json({ error: 'Expected application/json', code: 'HUB_INVALID_INPUT' }, 415)
   }
   const [value, error] = await parseJsonObjectBody(request, { maxBytes: 64 * 1024 })
@@ -296,6 +290,13 @@ export function createHubSettingsRoutes(ctx: HubSettingsContext): HubSettingsRou
       if (bound?.credentialSource !== 'caller-account' || !isPrincipal(bound.principal) ||
         bound.principal.userId !== principal.userId || bound.principal.sessionId !== principal.sessionId || bound.principal.workspaceId !== principal.workspaceId) {
         return json({ error: 'Hub settings caller binding mismatch', code: 'HUB_FORBIDDEN' }, 403)
+      }
+      // Client resolution can outlive a session or role grant. Recheck before the Hub effect.
+      const renewed = await ctx.authorize(request, prepared.intent)
+      if (renewed instanceof Response) return renewed
+      if (renewed?.authorized !== true || !isPrincipal(renewed.principal) ||
+        renewed.principal.userId !== principal.userId || renewed.principal.sessionId !== principal.sessionId || renewed.principal.workspaceId !== principal.workspaceId) {
+        return json({ error: 'Hub settings authorization required', code: 'HUB_FORBIDDEN' }, 403)
       }
       return json(await prepared.call(bound.client))
     } catch (error) {

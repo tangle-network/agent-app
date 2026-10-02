@@ -45,10 +45,10 @@ const cases: Array<{
   { path: '/connections', method: 'GET', intent: { operation: 'connections.list', target: 'caller-account' }, upstreamPath: '/v1/hub/connections', upstreamMethod: 'GET' },
   {
     path: '/connections/github/start', method: 'POST', data: OAUTH,
-    input: { returnUrl: 'https://app.example/settings', requestedScopes: OAUTH.scopes },
-    intent: { operation: 'oauth.start', provider: 'github', input: { returnUrl: 'https://app.example/settings', requestedScopes: OAUTH.scopes } },
+    input: { returnUrl: 'https://app.example/settings' },
+    intent: { operation: 'oauth.start', provider: 'github', input: { returnUrl: 'https://app.example/settings' } },
     upstreamPath: '/v1/hub/connections/github/start', upstreamMethod: 'POST',
-    upstreamBody: { returnUrl: 'https://app.example/settings', requestedScopes: OAUTH.scopes },
+    upstreamBody: { returnUrl: 'https://app.example/settings' },
   },
   {
     path: '/connections/cloudbeds/connect-key', method: 'POST',
@@ -85,10 +85,13 @@ describe('createHubSettingsRoutes: finite SDK settings boundary', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual(item.data ?? DATA)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
-    expect(f.authorize).toHaveBeenCalledExactlyOnceWith(req, item.intent)
+    expect(f.authorize).toHaveBeenCalledTimes(2)
+    expect(f.authorize).toHaveBeenNthCalledWith(1, req, item.intent)
+    expect(f.authorize).toHaveBeenNthCalledWith(2, req, item.intent)
     expect(f.resolveClient).toHaveBeenCalledExactlyOnceWith(PRINCIPAL)
     expect(f.authorize.mock.invocationCallOrder[0]).toBeLessThan(f.resolveClient.mock.invocationCallOrder[0]!)
-    expect(f.resolveClient.mock.invocationCallOrder[0]).toBeLessThan(f.upstream.mock.invocationCallOrder[0]!)
+    expect(f.resolveClient.mock.invocationCallOrder[0]).toBeLessThan(f.authorize.mock.invocationCallOrder[1]!)
+    expect(f.authorize.mock.invocationCallOrder[1]).toBeLessThan(f.upstream.mock.invocationCallOrder[0]!)
     expect(f.upstream).toHaveBeenCalledTimes(1)
     const [url, init] = f.upstream.mock.calls[0]!
     expect(url).toBe(`https://hub.example${item.upstreamPath}`)
@@ -189,6 +192,7 @@ describe('method/path and input allowlists', () => {
     ['/providers/github/actions?provider=other', 'GET'], ['/providers/github/actions?limit=201', 'GET'],
     ['/providers/github/actions?limit=0', 'GET'], ['/providers/github/actions?limit=1e2', 'GET'],
     ['/providers/github/actions?limit=5&limit=6', 'GET'],
+    ['/providers/github/actions?query=issues%7F', 'GET'],
     ['/connections/c-1/health', 'POST', { userId: 'other' }],
     ['/connections/c-1', 'DELETE', { connectionId: 'c-2' }],
     ['/connections/github/start', 'POST', null], ['/connections/github/start', 'POST', []],
@@ -199,8 +203,8 @@ describe('method/path and input allowlists', () => {
     ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', connectionParameters: { workspaceId: 'other' } }],
     ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', connectionParameters: { api_key: 'credential' } }],
     ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', connectionParameters: { tenant: { nested: true } } }],
-    ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', requestedScopes: [42] }],
-    ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', requestedScopes: ['repo', 'repo'] }],
+    ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings\u007f' }],
+    ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', requestedScopes: ['read:user', 'repo', 'read:org'] }],
     ['/connections/cloudbeds/connect-key', 'POST', { apiKey: 'key', metadata: { propertyId: 'p', userId: 'other' } }],
     ['/connections/pricelabs/connect-key', 'POST', { apiKey: 'key', metadata: { listings: [{ id: 'i', pms: 'p', ownerId: 'other' }] } }],
     ['/connections/pricelabs/connect-key', 'POST', { apiKey: 'key', metadata: { listings: [] } }],
@@ -268,9 +272,33 @@ describe('application authority and caller-bound credentials', () => {
     expect((await f.routes.handle(request('/connections'))).status).toBe(200)
     f.authorize.mockResolvedValue(Response.json({ code: 'SESSION_REVOKED' }, { status: 401 }))
     expect((await f.routes.handle(request('/connections'))).status).toBe(401)
-    expect(f.authorize).toHaveBeenCalledTimes(2)
+    expect(f.authorize).toHaveBeenCalledTimes(3)
     expect(f.resolveClient).toHaveBeenCalledTimes(1)
     expect(f.upstream).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses a grant revoked while resolving the caller credential', async () => {
+    const f = fixture()
+    const req = request('/connections/connection-1', 'DELETE')
+    f.resolveClient.mockImplementation(async (principal) => {
+      f.authorize.mockResolvedValue(Response.json({ code: 'SESSION_REVOKED' }, { status: 401 }))
+      return { principal, credentialSource: 'caller-account', client: f.client }
+    })
+    const response = await f.routes.handle(req)
+    expect(response.status).toBe(401)
+    expect(f.authorize).toHaveBeenCalledTimes(2)
+    expect(f.authorize.mock.calls[0]?.[1]).toBe(f.authorize.mock.calls[1]?.[1])
+    expect(f.upstream).not.toHaveBeenCalled()
+  })
+
+  it('refuses a different principal granted during credential resolution', async () => {
+    const f = fixture()
+    f.resolveClient.mockImplementation(async (principal) => {
+      f.authorize.mockResolvedValue({ authorized: true, principal: { ...PRINCIPAL, workspaceId: 'other-workspace' } })
+      return { principal, credentialSource: 'caller-account', client: f.client }
+    })
+    expect((await f.routes.handle(request('/connections/connection-1/health', 'POST'))).status).toBe(403)
+    expect(f.upstream).not.toHaveBeenCalled()
   })
 
   it.each(['userId', 'sessionId', 'workspaceId'] as const)('rejects a resolved %s mismatch before calling the SDK', async (field) => {
@@ -297,7 +325,8 @@ describe('application authority and caller-bound credentials', () => {
 
   it('requires the authorization callback at construction time', () => {
     const f = fixture()
-    expect(() => createHubSettingsRoutes({ resolveClient: f.resolveClient } as HubSettingsContext)).toThrow('authorize')
+    // @ts-expect-error Exercise the runtime guard for an invalid JavaScript caller.
+    expect(() => createHubSettingsRoutes({ resolveClient: f.resolveClient })).toThrow('authorize')
   })
 
   it('keeps browser headers and identity out of the SDK transport and resolver', async () => {
@@ -365,14 +394,6 @@ describe('upstream error contract', () => {
     const response = await f.routes.handle(request('/providers'))
     expect(response.status).toBe(502)
     expect((await response.json()).code).toBe('HUB_HTTP_502')
-  })
-
-  it('preserves SDK validation errors that occur before any HTTP call', async () => {
-    const f = fixture()
-    const response = await f.routes.handle(request('/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', requestedScopes: ['repo'] }))
-    expect(response.status).toBe(400)
-    expect((await response.json()).code).toBe('HUB_INVALID_INPUT')
-    expect(f.upstream).not.toHaveBeenCalled()
   })
 
   it('accepts structurally equivalent SDK errors from a duplicated module', async () => {
