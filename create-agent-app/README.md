@@ -2,8 +2,9 @@
 
 Scaffold a Tangle agent product on
 [`@tangle-network/agent-app`](https://github.com/tangle-network/agent-app).
-Use **`--chat` for the browser sign-in and chat walkthrough below**. Without it,
-the CLI generates the unchanged tool-loop skeleton, not the assembled chat variant.
+The default is the full shared browser workspace: sign-in, chat, History, uploads
+and replay. Use `--headless` for the unchanged tool-loop skeleton; `--chat` remains
+an explicit alias for the default.
 
 ## Choose a published version
 
@@ -14,7 +15,7 @@ package's engine requirement and record the version you will run:
 CREATE_VERSION=$(npm view @tangle-network/create-agent-app@latest version) &&
 npm view "@tangle-network/create-agent-app@$CREATE_VERSION" engines --json &&
 npm view "@tangle-network/agent-app@$CREATE_VERSION" version peerDependencies --json &&
-npm create "@tangle-network/agent-app@$CREATE_VERSION" my-agent -- --chat
+npm create "@tangle-network/agent-app@$CREATE_VERSION" my-agent
 ```
 
 Do not continue after a failed registry lookup. The CLI defaults the generated
@@ -55,12 +56,12 @@ is at [`examples/default-workspace.md`](../examples/default-workspace.md).
 ```bash
 cd my-agent
 pnpm install
-cp .dev.vars.example .dev.vars
 ```
 
-Keep `.dev.vars` out of version control. Replace its auth-secret placeholder with
-a fresh secret (for example, `openssl rand -base64 32`) and fill the development
-`TANGLE_API_KEY`, `SANDBOX_API_KEY`, and `SANDBOX_GATEWAY_URL` credentials.
+The scaffolder creates ignored `.dev.vars` with a fresh random local auth secret
+(mode 0600 on POSIX). It does not print the secret or rotate an existing file,
+even with `--force`. Fill the development `TANGLE_API_KEY`, `SANDBOX_API_KEY`,
+and `SANDBOX_GATEWAY_URL` credentials.
 These are server-side Router and Sandbox credentials, not your app password.
 Missing sandbox credentials do not select a demo agent: real turns fail.
 

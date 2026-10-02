@@ -2,7 +2,7 @@
 // create-agent-app — scaffold a new Tangle agent product on @tangle-network/agent-app.
 //
 // Dependency-light by design: Node built-ins only. The CLI copies one template
-// tree verbatim (`template/` by default, `template-chat/` with `--chat`),
+// tree verbatim (`template-chat/` by default, `template/` with `--headless`),
 // substitutes a small set of `__TOKEN__` placeholders, and renames
 // files whose template name would otherwise interfere with tooling (a template's
 // own `package.json` must not be read by the scaffolder's package manager; a
@@ -14,15 +14,16 @@
 
 import { cp, mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-// Template variants: the default tool-loop skeleton, and `--chat` — the
+// Template variants: the explicit headless tool-loop skeleton, and the default
 // assembled multimodal chat vertical (auth + chat-store + chat-routes +
 // sandbox producer + uploads + replay) from `examples/chat-app.md`.
 const TEMPLATES = {
-  default: join(HERE, 'template'),
+  headless: join(HERE, 'template'),
   chat: join(HERE, 'template-chat'),
 }
 const COMMON_TEMPLATE = join(HERE, 'template-common')
@@ -46,7 +47,11 @@ function parseArgs(argv) {
     const a = argv[i]
     if (a === '--name') args.name = argv[++i]
     else if (a === '--agent-app-version') args.agentAppVersion = argv[++i]
-    else if (a === '--chat') args.template = 'chat'
+    else if (a === '--chat' || a === '--headless') {
+      const template = a === '--headless' ? 'headless' : 'chat'
+      if (args.template && args.template !== template) throw new Error('--chat and --headless cannot be combined')
+      args.template = template
+    }
     else if (a === '--force') args.force = true
     else if (a === '-h' || a === '--help') args.help = true
     else if (!a.startsWith('-')) args._.push(a)
@@ -62,10 +67,8 @@ function usage() {
     'Scaffolds a new Tangle agent product on @tangle-network/agent-app.',
     '',
     'Options:',
-    '  --chat                       Scaffold the multimodal chat variant instead: the',
-    '                               assembled chat vertical (auth, thread/message store,',
-    '                               streaming turns + replay, uploads, agent asks) with',
-    '                               its own end-to-end test. Default: the tool-loop skeleton.',
+    '  --chat                       Full shared chat workspace (the default).',
+    '  --headless                   Tool-loop skeleton without the browser workspace.',
     '  --name <name>                Project name (default: the target dir basename).',
     '  --agent-app-version <range>  @tangle-network/agent-app version (default: ' + DEFAULT_AGENT_APP_VERSION + ').',
     '  --force                      Write into a non-empty directory.',
@@ -133,6 +136,20 @@ async function materializeTemplate(templateDir, targetDir, tokens) {
   }
 }
 
+// Initialize only this new app's local session secret. Never copy account
+// credentials, print the value, or rotate an existing development session.
+async function initializeLocalAuth(targetDir) {
+  const example = await readFile(join(targetDir, '.dev.vars.example'), 'utf8')
+  const placeholder = 'BETTER_AUTH_SECRET=REPLACE_WITH_RANDOM_SECRET'
+  if (!example.includes(placeholder)) throw new Error('Chat template is missing its local auth-secret placeholder')
+  const local = example.replace(placeholder, `BETTER_AUTH_SECRET=${randomBytes(32).toString('base64url')}`)
+  try {
+    await writeFile(join(targetDir, '.dev.vars'), local, { flag: 'wx', mode: 0o600 })
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   if (args.help || (args._.length === 0 && !args.name)) {
@@ -144,7 +161,8 @@ async function main() {
   const projectName = args.name ?? targetDir.split(/[\\/]/).pop()
   const packageName = toPackageName(projectName)
   const agentAppVersion = args.agentAppVersion ?? DEFAULT_AGENT_APP_VERSION
-  const templateDir = TEMPLATES[args.template ?? 'default']
+  const variant = args.template ?? 'chat'
+  const templateDir = TEMPLATES[variant]
 
   if (existsSync(targetDir)) {
     const entries = await readdir(targetDir).catch(() => [])
@@ -166,6 +184,7 @@ async function main() {
 
   await materializeTemplate(COMMON_TEMPLATE, targetDir, tokens)
   await materializeTemplate(templateDir, targetDir, tokens)
+  if (variant === 'chat') await initializeLocalAuth(targetDir)
 
   process.stdout.write(
     [
@@ -174,7 +193,11 @@ async function main() {
       'Next:',
       `  cd ${targetDir}`,
       '  pnpm install',
-      '  pnpm typecheck && pnpm test',
+      ...(variant === 'chat' ? [
+        '  # Fill scoped Router/Sandbox access in .dev.vars and choose a model in agent.config.ts.',
+        '  pnpm db:migrate:local',
+        '  pnpm dev',
+      ] : ['  pnpm typecheck && pnpm test']),
       '',
       'Then walk CUSTOMIZE.md (the fill-checklist) and AGENTS.md (the behavior contract).',
       '',

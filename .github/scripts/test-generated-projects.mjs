@@ -194,7 +194,8 @@ function installAndRunScaffolder({
   }
 
   const cliArgs = [project, '--name', `generated-${variant}`]
-  if (variant === 'chat') cliArgs.push('--chat')
+  // Exercise the public no-flag workspace default; headless is explicit.
+  if (variant === 'headless') cliArgs.push('--headless')
   run(installedCli, cliArgs, { cwd: runner, env, timeout: PACK_TIMEOUT_MS })
 
   const packagePath = join(project, 'package.json')
@@ -371,7 +372,7 @@ function main(scratch) {
   )
   process.stdout.write(`${JSON.stringify({ agentAppIntegrity: agentAppPack.integrity, scaffolderIntegrity: createAgentAppPack.integrity })}\n`)
 
-  for (const variant of ['default', 'chat']) {
+  for (const variant of ['headless', 'chat']) {
     installAndRunScaffolder({
       env,
       packedAgentApp,
