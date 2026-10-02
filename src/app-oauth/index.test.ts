@@ -3,6 +3,7 @@ import { verifyJwsAccessToken } from 'better-auth/oauth2'
 import {
   activeAppOAuthConsent,
   appOAuthMetadataResponse,
+  appOAuthProtectedResourceMetadata,
   appOAuthTokenResponse,
   createAppOAuthProvider,
   createAppOAuthResourceVerifier,
@@ -122,6 +123,15 @@ describe('app OAuth host boundary', () => {
     const metadata = await appOAuthMetadataResponse(new Request(`${issuer}/.well-known/oauth-authorization-server`),
       async () => Response.json({ issuer, dpop_signing_alg_values_supported: ['ES256'] }))
     expect(await metadata.json()).toEqual({ issuer })
+  })
+
+  it('publishes protected resource metadata without the issuer auth instance', async () => {
+    const { config } = setup()
+    expect(await appOAuthProtectedResourceMetadata(config)).toEqual({
+      resource,
+      authorization_servers: [issuer],
+      scopes_supported: ['operator:read', 'operator:run', 'offline_access'],
+    })
   })
 
   it('keeps the provider human-only, authorization-code/refresh-only and read-default', () => {
