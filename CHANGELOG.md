@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.30
+
+- feat(profile): add reusable read-only profile viewer (#721)
+- fix(model-picker): support compact search triggers in editable fields (#720)
+- fix(workspace): default to full-space chat examples [skip release] (#719)
+
 ## 0.50.29
 
 - fix(hosted-agent): simplify single-choice line setup
