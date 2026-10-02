@@ -3,8 +3,10 @@
  * DO-backed adapters plugged into the REAL `createChatTurnRoutes` assembly.
  *
  *   1. Reconnect-replay — a turn buffered through the DO turnStore is
- *      replayable from a cursor after the client drops, and a live WS viewer
- *      on the thread channel receives the fanout.
+ *      replayable from a cursor after the client drops, and the running-turn
+ *      index reports it until it settles. (Live per-turn WS fanout moved to
+ *      the sandbox session gateway; the workspace-signal channel is covered
+ *      in do.test.ts.)
  *   2. Stale-lock recovery — a dead holder's lock 409s a second turn; the
  *      reconcile pass (unreachable sandbox past grace) force-releases with
  *      the successor fence, and the retried acquire wins.
@@ -18,12 +20,12 @@ import {
   type ChatTurnRouteProducer,
 } from '../../src/chat-routes/index'
 import {
-  broadcastTurnStreamEvent,
+  MEMORY_TURN_STREAM_AUTH_SECRET,
   createDurableObjectTurnEventStore,
   createDurableTurnLock,
   createMemoryTurnStreamHarness,
+  mintTurnStreamToken,
   reconcileStaleDurableTurnLock,
-  threadChannelKey,
 } from '../../src/turn-stream/index'
 import type { ChatMessagePart } from '../../src/chat-store/parts'
 
@@ -74,7 +76,7 @@ function producerOf(events: Array<{ type: string; data?: Record<string, unknown>
 }
 
 describe('turn-stream × createChatTurnRoutes', () => {
-  it('reconnect-replay: DO turnStore buffers the turn, replay serves the tail, WS viewer gets live fanout', async () => {
+  it('reconnect-replay: DO turnStore buffers the turn, replay serves the tail from a cursor', async () => {
     const harness = createMemoryTurnStreamHarness()
     const { store } = memoryMessageStore()
     const pending: Promise<unknown>[] = []
@@ -83,7 +85,7 @@ describe('turn-stream × createChatTurnRoutes', () => {
       projectId: 'test-app',
       authorize: async () => ({ ok: true, tenantId: WS, userId: 'u-1', context: undefined }),
       store,
-      turnStore: createDurableObjectTurnEventStore(harness.namespace),
+      turnStore: createDurableObjectTurnEventStore(harness.namespace, { secret: MEMORY_TURN_STREAM_AUTH_SECRET }),
       produce: ({ executionId }) =>
         producerOf(
           [
@@ -94,23 +96,8 @@ describe('turn-stream × createChatTurnRoutes', () => {
           ],
           'hello world',
         ),
-      // The product's broadcast wiring — same contract the reference consumer
-      // runs in its onEvent.
-      onEvent: async (event, _context) => {
-        await broadcastTurnStreamEvent(harness.namespace, {
-          workspaceId: WS,
-          threadId: THREAD,
-          executionId: 'exec-under-test',
-          event,
-        })
-      },
       replay: { pollMs: 5, timeoutMs: 2000 },
     })
-
-    // A viewer connected mid-turn (before the turn starts here — equivalent).
-    const viewer = await harness
-      .channel(threadChannelKey(WS, THREAD))
-      .connect({ sessionId: THREAD, scope: 'thread' })
 
     const response = await routes.turn(turnRequest({ threadId: THREAD, content: 'hi' }), {
       waitUntil: (p) => void pending.push(p),
@@ -120,15 +107,6 @@ describe('turn-stream × createChatTurnRoutes', () => {
     const turnMarker = lines[0] as { type: string; turnId: string }
     expect(turnMarker.type).toBe('turn')
     await Promise.all(pending)
-
-    // Live fanout reached the WS viewer (seq-stamped, in order). The engine
-    // frames the producer's run markers with its own lifecycle envelope, so
-    // started/completed appear once from each — assert order + content, not
-    // exact multiplicity.
-    const viewerTypes = viewer.frames.map((f) => (JSON.parse(f) as { type: string }).type)
-    expect(viewerTypes[0]).toBe('session.run.started')
-    expect(viewerTypes.filter((t) => t === 'text')).toHaveLength(2)
-    expect(viewerTypes[viewerTypes.length - 1]).toBe('session.run.completed')
 
     // The dropped client replays the buffered tail from its cursor.
     const replay = await routes.replay(
@@ -159,10 +137,12 @@ describe('turn-stream × createChatTurnRoutes', () => {
 
     const turnLock = createDurableTurnLock({
       namespace: harness.namespace,
+      auth: { secret: MEMORY_TURN_STREAM_AUTH_SECRET },
       scopeOf: () => 'workspace',
       reconcile: async (args, active) =>
         reconcileStaleDurableTurnLock({
           namespace: harness.namespace,
+          auth: { secret: MEMORY_TURN_STREAM_AUTH_SECRET },
           workspaceId: args.identity.tenantId,
           threadId: active.threadId,
           active,
@@ -176,7 +156,7 @@ describe('turn-stream × createChatTurnRoutes', () => {
       projectId: 'test-app',
       authorize: async () => ({ ok: true, tenantId: WS, userId: 'u-1', context: undefined }),
       store,
-      turnStore: createDurableObjectTurnEventStore(harness.namespace),
+      turnStore: createDurableObjectTurnEventStore(harness.namespace, { secret: MEMORY_TURN_STREAM_AUTH_SECRET }),
       turnLock,
       produce: () => producerOf([{ type: 'text', data: { text: 'ok' } }], 'ok'),
     })
@@ -187,7 +167,10 @@ describe('turn-stream × createChatTurnRoutes', () => {
     const doChannel = harness.namespace.get(harness.namespace.idFromName(WS))
     await doChannel.fetch('https://turn-stream.internal/chat-turn-lock/acquire', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-turn-stream-token': await mintTurnStreamToken(WS, MEMORY_TURN_STREAM_AUTH_SECRET),
+      },
       body: JSON.stringify({
         workspaceId: WS,
         threadId: THREAD,
@@ -251,8 +234,12 @@ describe('turn-stream × createChatTurnRoutes', () => {
       projectId: 'test-app',
       authorize: async () => ({ ok: true, tenantId: WS, userId: 'u-1', context: undefined }),
       store,
-      turnStore: createDurableObjectTurnEventStore(harness.namespace),
-      turnLock: createDurableTurnLock({ namespace: harness.namespace, scopeOf: () => 'thread' }),
+      turnStore: createDurableObjectTurnEventStore(harness.namespace, { secret: MEMORY_TURN_STREAM_AUTH_SECRET }),
+      turnLock: createDurableTurnLock({
+        namespace: harness.namespace,
+        auth: { secret: MEMORY_TURN_STREAM_AUTH_SECRET },
+        scopeOf: () => 'thread',
+      }),
       produce: () => ({
         stream: (async function* () {
           yield { type: 'text', data: { text: 'streaming' } }

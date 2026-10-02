@@ -45,7 +45,7 @@ _109 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./intakes/drizzle`](api/intakes-drizzle.md) | 18 | — |
 | [`./integrations`](api/integrations.md) | 10 | — |
 | [`./integrations-react`](api/integrations-react.md) | 18 | `platform`, `web-react` |
-| [`./interactions`](api/interactions.md) | 64 | — |
+| [`./interactions`](api/interactions.md) | 64 | `web` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
@@ -53,7 +53,7 @@ _109 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./missions`](api/missions.md) | 65 | — |
 | [`./model-resolution`](api/model-resolution.md) | 24 | — |
 | [`./object-store`](api/object-store.md) | 20 | `crypto` |
-| [`./openui`](api/openui.md) | 35 | — |
+| [`./openui`](api/openui.md) | 35 | `web` |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
 | [`./peer-floors/check`](api/peer-floors-check.md) | 23 | `signoff` |
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 1 | `signoff` |
@@ -102,7 +102,7 @@ _109 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./tools`](api/tools.md) | 66 | `crypto`, `eval`, `openui` |
 | [`./trace`](api/trace.md) | 33 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting` |
-| [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `stream` |
+| [`./turn-stream`](api/turn-stream.md) | 57 | `chat-routes`, `crypto`, `stream` |
 | [`./vault`](api/vault.md) | 18 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
@@ -476,6 +476,8 @@ Depends on: `platform`, `web-react`
 
 Source: `src/interactions/index.ts` · 64 exports
 
+Depends on: `web`
+
 `abortSession`, `BeforeInteractionAnswerArgs`, `cancelStatusFor`, `canTransitionInteractionStatus`, `ChatFreeTextField`, `ChatInteraction`, `ChatInteractionField`, `ChatInteractionStatus`, `ChatSelectField`, `composerAnswerData`, `composerAnswerDeliveries`, `ComposerAnswerDelivery`, `createInteractionAnswerRoute`, `dedupeQuestionInteractionsByContent`, `DurableInteractionRouteArgs`, `DurableInteractionRoutePersistence`, `fieldAcceptsFreeText`, `getSessionState`, `INTERACTION_CANCEL_EVENT`, `INTERACTION_EVENT`, `INTERACTION_RESOLVED_EVENT`, `InteractionAnswerBodyValidation`, `InteractionAnswerRoute`, `InteractionAnswerRouteOptions`, `InteractionAnswers`, `InteractionAnswerValue`, `InteractionCancelData`, `InteractionClientOutcome`, `InteractionConnectionResolution`, `InteractionData`, `interactionFromWireRequest`, `InteractionOutcome`, `interactionPartKey`, `InteractionPersistedPart`, `InteractionRequest`, `InteractionRequestWire`, `InteractionRouteLogger`, `interactionToPersistedPart`, `isRenderableInteractionKind`, `isSafeInteractionFieldKey`, `isTerminalInteractionStatus`, `isTerminalSidecarState`, `listSessionInteractions`, `mapInteractionRespondFailure`, `NoticeKind`, `noticePart`, `noticePartKey`, `NoticePersistedPart`, `parseInteractionAnswers`, `ParseInteractionAnswersResult`, `parseInteractionCancel`, `parseInteractionRequest`, `ParseInteractionResult`, `persistedPartToInteraction`, `questionInteractionContentSignature`, `ResolveInteractionConnectionArgs`, `respondToSessionInteraction`, `SidecarAbortResult`, `SidecarInteractionsConnection`, `SidecarInteractionsError`, `SidecarInteractionsResult`, `SidecarSessionState`, `stampInteractionAnswers`, `validateInteractionAnswerBody`
 
 [Full API →](api/interactions.md)
@@ -545,6 +547,8 @@ Depends on: `crypto`
 ## `./openui`
 
 Source: `src/openui/index.ts` · 35 exports
+
+Depends on: `web`
 
 `createOpenUIActionRoute`, `describeOpenUIAction`, `hasOpenUISegment`, `isOpenUIFieldKind`, `isSafeOpenUIActionId`, `isSafeOpenUIFieldId`, `OPENUI_INPUT_KINDS`, `OPENUI_INTERACTIVE_AUTHORING_GUIDE`, `OpenUIActionBodyErrorCode`, `OpenUIActionBodyValidation`, `OpenUIActionHandler`, `OpenUIActionHandlerArgs`, `OpenUIActionLogger`, `OpenUIActionResolution`, `OpenUIActionResult`, `OpenUIActionRoute`, `OpenUIActionRouteOptions`, `OpenUIActionSubmission`, `OpenUIArtifact`, `OpenUIArtifactError`, `OpenUIArtifactResult`, `OpenUIFieldIssue`, `OpenUIFieldIssueCode`, `OpenUIFieldKind`, `OpenUIFieldSpec`, `OpenUIFormSpec`, `OpenUIFormValidation`, `OpenUIFormValues`, `OpenUINode`, `OpenUISegment`, `OpenUIValue`, `parseOpenUIArtifact`, `parseOpenUISegments`, `validateOpenUIActionBody`, `validateOpenUIFormValues`
 
@@ -984,11 +988,11 @@ Depends on: `alerting`
 
 ## `./turn-stream`
 
-Source: `src/turn-stream/index.ts` · 59 exports
+Source: `src/turn-stream/index.ts` · 57 exports
 
-Depends on: `chat-routes`, `stream`
+Depends on: `chat-routes`, `crypto`, `stream`
 
-`acquireDurableTurnLock`, `AcquireDurableTurnLockInput`, `activeTurnLock`, `ACTIVITY_TTL_MS`, `appendSegmentEvent`, `broadcastThreadCreated`, `broadcastTurnStreamEvent`, `broadcastWorkspaceActivity`, `createDurableObjectTurnEventStore`, `createDurableTurnLock`, `CreateDurableTurnLockOptions`, `createMemoryTurnStreamHarness`, `createSegmentStore`, `createTurnLock`, `createTurnStreamUpgradeHandler`, `CreateTurnStreamUpgradeHandlerOptions`, `DurableTurnLock`, `interruptedReleaseApplies`, `isTerminalRunEvent`, `MAX_RECENT_CREATED`, `MAX_SEGMENT_EVENTS`, `MemoryTurnStreamChannel`, `MemoryTurnStreamHarness`, `MemoryTurnStreamSocket`, `pruneStaleThreads`, `reconcileStaleDurableTurnLock`, `ReconcileStaleDurableTurnLockOptions`, `releaseDurableTurnLock`, `releaseInterruptedDurableTurnLock`, `ReleaseInterruptedDurableTurnLockInput`, `replayActiveSegment`, `scopeIndexChannelKey`, `SegmentStore`, `threadChannelKey`, `TURN_LOCK_TTL_MS`, `TURN_STREAM_PATHS`, `TURN_STREAM_STORAGE_KEYS`, `turnEventStorageKey`, `TurnLockAcquireInput`, `TurnLockAcquireResult`, `turnLockChannelKey`, `TurnLockInterruptedReleaseInput`, `turnLockMatchesRelease`, `TurnLockReleaseInput`, `TurnLockScope`, `TurnLockSeamArgs`, `TurnLockSeamResult`, `TurnSegment`, `turnStorageChannelKey`, `TurnStreamDO`, `TurnStreamDOOptions`, `TurnStreamDOState`, `TurnStreamEvent`, `TurnStreamNamespaceLike`, `TurnStreamSocket`, `TurnStreamStorage`, `TurnStreamStubLike`, `TurnStreamUpgradeAuthorization`, `workspaceChannelKey`
+`acquireDurableTurnLock`, `AcquireDurableTurnLockInput`, `activeTurnLock`, `ACTIVITY_TTL_MS`, `broadcastThreadCreated`, `broadcastWorkspaceActivity`, `createDurableObjectTurnEventStore`, `createDurableTurnLock`, `CreateDurableTurnLockOptions`, `createMemoryTurnStreamHarness`, `createTurnLock`, `createTurnStreamUpgradeHandler`, `CreateTurnStreamUpgradeHandlerOptions`, `DurableTurnLock`, `interruptedReleaseApplies`, `MAX_RECENT_CREATED`, `MEMORY_TURN_STREAM_AUTH_SECRET`, `MemoryTurnStreamChannel`, `MemoryTurnStreamHarness`, `MemoryTurnStreamSocket`, `mintTurnStreamToken`, `pruneStaleThreads`, `reconcileStaleDurableTurnLock`, `ReconcileStaleDurableTurnLockOptions`, `releaseDurableTurnLock`, `releaseInterruptedDurableTurnLock`, `ReleaseInterruptedDurableTurnLockInput`, `scopeIndexChannelKey`, `threadChannelKey`, `TURN_LOCK_TTL_MS`, `TURN_STREAM_PATHS`, `TURN_STREAM_STORAGE_KEYS`, `TURN_STREAM_TOKEN_HEADER`, `TURN_STREAM_TOKEN_TTL_MS`, `turnEventStorageKey`, `TurnLockAcquireInput`, `TurnLockAcquireResult`, `turnLockChannelKey`, `TurnLockInterruptedReleaseInput`, `turnLockMatchesRelease`, `TurnLockReleaseInput`, `TurnLockScope`, `TurnLockSeamArgs`, `TurnLockSeamResult`, `turnStorageChannelKey`, `TurnStreamAuth`, `TurnStreamDO`, `TurnStreamDOOptions`, `TurnStreamDOState`, `TurnStreamEvent`, `TurnStreamNamespaceLike`, `TurnStreamSocket`, `TurnStreamStorage`, `TurnStreamStubLike`, `TurnStreamUpgradeAuthorization`, `verifyTurnStreamToken`, `workspaceChannelKey`
 
 [Full API →](api/turn-stream.md)
 

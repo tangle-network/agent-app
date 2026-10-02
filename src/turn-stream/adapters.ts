@@ -1,40 +1,17 @@
 /**
- * Worker-side adapters over {@link TurnStreamDO}: the concrete implementations
- * of the chat vertical's `turnStore` and `turnLock` seams, the WebSocket
- * upgrade forwarder, the best-effort broadcast helpers, and an in-process
- * memory harness for tests and keyless local dev.
- *
- * Everything takes the namespace STRUCTURALLY ({@link TurnStreamNamespaceLike}
- * — Cloudflare's `DurableObjectNamespace` satisfies it), so nothing here
- * imports Cloudflare types and the same adapters run against the memory
- * harness in vitest.
- *
- * Live fanout is deliberately NOT a side effect of the turn-event store: the
- * store is keyed by turnId/scopeId while viewer sockets live on the
- * `${workspaceId}:${threadId}` channel, and only the product's per-turn
- * context knows both. Products wire the workspace signal helpers into
- * `createChatTurnRoutes`' `onEvent`.
- *
- * Which adapters are still the right answer (see `./core`'s header for the
- * production measurement behind this split):
- *
- * | adapter                              | status                            |
- * | ------------------------------------ | --------------------------------- |
- * | {@link createDurableTurnLock}        | KEPT — no SDK equivalent          |
- * | {@link reconcileStaleDurableTurnLock}| KEPT — no SDK equivalent          |
- * | {@link createDurableObjectTurnEventStore} | KEPT — the DETACHED lane     |
- * | {@link broadcastWorkspaceActivity}   | KEPT — workspace signal           |
- * | {@link broadcastThreadCreated}       | KEPT — workspace signal           |
- * | {@link createTurnStreamUpgradeHandler} | KEPT for the workspace channel  |
- * | {@link broadcastTurnStreamEvent}     | `@deprecated` for sandbox turns   |
+ * Worker adapters for durable turn storage, single-flight locks, and workspace signals.
+ * Namespace interfaces remain structural so Cloudflare bindings and the memory harness
+ * run the same authenticated request path.
+ * Products provide workspace authorization and their binding's TURN_STREAM_AUTH_SECRET.
  */
 
 import { reconcileStaleTurnLock, type ReconcileStaleTurnLockOptions } from '../chat-routes/stale-turn-lock'
 import type { TurnEventStore, TurnStatus } from '../stream/turn-buffer'
 import {
   TURN_STREAM_PATHS,
+  TURN_STREAM_TOKEN_HEADER,
+  mintTurnStreamToken,
   scopeIndexChannelKey,
-  threadChannelKey,
   turnLockChannelKey,
   turnStorageChannelKey,
   workspaceChannelKey,
@@ -60,16 +37,28 @@ export interface TurnStreamNamespaceLike {
 
 const INTERNAL_ORIGIN = 'https://turn-stream.internal'
 
+/** The HMAC secret shared between this worker and its `TurnStreamDO` binding.
+ *  Every adapter call mints a channel-bound capability token from it; the DO
+ *  refuses requests without one (issue #746). Products pass the same value
+ *  the DO resolves — `env.TURN_STREAM_AUTH_SECRET`. */
+export interface TurnStreamAuth {
+  secret: string
+}
+
 async function postJson<T>(
   namespace: TurnStreamNamespaceLike,
   channelKey: string,
   path: string,
   body: unknown,
+  auth: TurnStreamAuth,
 ): Promise<{ status: number; body: T }> {
   const stub = namespace.get(namespace.idFromName(channelKey))
   const response = await stub.fetch(`${INTERNAL_ORIGIN}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      [TURN_STREAM_TOKEN_HEADER]: await mintTurnStreamToken(channelKey, auth.secret),
+    },
     body: JSON.stringify(body),
   })
   return { status: response.status, body: (await response.json()) as T }
@@ -80,8 +69,9 @@ async function postJsonOk<T>(
   channelKey: string,
   path: string,
   body: unknown,
+  auth: TurnStreamAuth,
 ): Promise<T> {
-  const result = await postJson<T>(namespace, channelKey, path, body)
+  const result = await postJson<T>(namespace, channelKey, path, body, auth)
   if (result.status !== 200) {
     throw new Error(`turn-stream ${path} failed with status ${result.status}`)
   }
@@ -91,27 +81,19 @@ async function postJsonOk<T>(
 // ── TurnEventStore adapter (the real turnStore) ─────────────────────────────
 
 /**
- * A {@link TurnEventStore} backed by {@link TurnStreamDO} storage — the
- * production implementation of `createChatTurnRoutes`' `turnStore` seam for
- * apps that don't run D1 for turn events (or want replay co-located with the
- * live channel). Each buffered turn lives on its own `turn:<turnId>` DO
- * instance; `listRunning` reconnect discovery rides a per-scope index
- * instance. Drops in wherever `createD1TurnEventStore(env.DB)` would.
- *
- * KEPT and load-bearing for AUTONOMOUS work. A detached run driven through
- * `dispatchPrompt({ detach: true })` or `streamPrompt` executes on the sandbox
- * run/stream lane, which publishes nothing to the session event bus on the
- * measured path (0 of 71 / 0 of 527 / 0 of 408 across three session-id
- * strategies). Sandbox 0.37 `driveTurn` uses the session message lane and is
- * gateway-visible by SDK contract. A browser tailing a stream/dispatch run
- * needs these durable rows plus `runDetachedTurn` (`/chat-routes`). Nothing
- * here is deprecated.
+ * Optional Durable Object backend for {@link TurnEventStore}.
+ * Each turn has its own named instance; a per-scope index tracks running turns.
+ * Products choose this adapter or the D1 backend independently of their lock
+ * and workspace-signal transport.
  */
-export function createDurableObjectTurnEventStore(namespace: TurnStreamNamespaceLike): TurnEventStore {
+export function createDurableObjectTurnEventStore(
+  namespace: TurnStreamNamespaceLike,
+  auth: TurnStreamAuth,
+): TurnEventStore {
   return {
     async append(turnId, events) {
       if (!events.length) return
-      await postJsonOk(namespace, turnStorageChannelKey(turnId), TURN_STREAM_PATHS.turnEventsAppend, { events })
+      await postJsonOk(namespace, turnStorageChannelKey(turnId), TURN_STREAM_PATHS.turnEventsAppend, { events }, auth)
     },
     async read(turnId, fromSeq) {
       const body = await postJsonOk<{ events: Array<{ seq: number; event: string }> }>(
@@ -119,16 +101,17 @@ export function createDurableObjectTurnEventStore(namespace: TurnStreamNamespace
         turnStorageChannelKey(turnId),
         TURN_STREAM_PATHS.turnEventsRead,
         { fromSeq },
+        auth,
       )
       return body.events
     },
     async setStatus(turnId, status, scopeId) {
-      await postJsonOk(namespace, turnStorageChannelKey(turnId), TURN_STREAM_PATHS.turnStatusSet, { status })
+      await postJsonOk(namespace, turnStorageChannelKey(turnId), TURN_STREAM_PATHS.turnStatusSet, { status }, auth)
       if (scopeId) {
         await postJsonOk(namespace, scopeIndexChannelKey(scopeId), TURN_STREAM_PATHS.scopeStatusSet, {
           turnId,
           status,
-        })
+        }, auth)
       }
     },
     async getStatus(turnId) {
@@ -137,6 +120,7 @@ export function createDurableObjectTurnEventStore(namespace: TurnStreamNamespace
         turnStorageChannelKey(turnId),
         TURN_STREAM_PATHS.turnStatusGet,
         {},
+        auth,
       )
       return body.status
     },
@@ -146,6 +130,7 @@ export function createDurableObjectTurnEventStore(namespace: TurnStreamNamespace
         scopeIndexChannelKey(scopeId),
         TURN_STREAM_PATHS.scopeRunningList,
         {},
+        auth,
       )
       return body.running
     },
@@ -169,13 +154,14 @@ export interface AcquireDurableTurnLockInput {
 export async function acquireDurableTurnLock(
   namespace: TurnStreamNamespaceLike,
   input: AcquireDurableTurnLockInput,
+  auth: TurnStreamAuth,
 ): Promise<TurnLockAcquireResult> {
   const lockId = input.lockId ?? crypto.randomUUID()
   const key = turnLockChannelKey(input.workspaceId, input.threadId, input.scope)
   const result = await postJson<TurnLockAcquireResult>(namespace, key, TURN_STREAM_PATHS.lockAcquire, {
     ...input,
     lockId,
-  })
+  }, auth)
   if (result.status !== 200 && result.status !== 409) {
     throw new Error(`turn-stream lock acquire failed with status ${result.status}`)
   }
@@ -186,9 +172,10 @@ export async function acquireDurableTurnLock(
 export async function releaseDurableTurnLock(
   namespace: TurnStreamNamespaceLike,
   input: TurnLockReleaseInput,
+  auth: TurnStreamAuth,
 ): Promise<{ released: boolean; deferred?: boolean }> {
   const key = turnLockChannelKey(input.workspaceId, input.threadId, input.scope)
-  return postJsonOk(namespace, key, TURN_STREAM_PATHS.lockRelease, input)
+  return postJsonOk(namespace, key, TURN_STREAM_PATHS.lockRelease, input, auth)
 }
 
 /** Define input parameters to release an interrupted durable turn lock in a workspace or thread */
@@ -208,6 +195,7 @@ export interface ReleaseInterruptedDurableTurnLockInput {
 export async function releaseInterruptedDurableTurnLock(
   namespace: TurnStreamNamespaceLike,
   input: ReleaseInterruptedDurableTurnLockInput,
+  auth: TurnStreamAuth,
 ): Promise<boolean> {
   const scopes: readonly TurnLockScope[] = input.scope ? [input.scope] : ['workspace', 'thread']
   for (const scope of scopes) {
@@ -216,7 +204,7 @@ export async function releaseInterruptedDurableTurnLock(
       threadId: input.threadId,
       interruptedAt: input.interruptedAt,
       ...(input.turnId ? { turnId: input.turnId } : {}),
-    })
+    }, auth)
     if (result.released) return true
   }
   return false
@@ -231,6 +219,7 @@ export interface ReconcileStaleDurableTurnLockOptions
     'probeSandbox' | 'probeSession' | 'graceMs' | 'terminalGraceMs' | 'context' | 'log' | 'now'
   > {
   namespace: TurnStreamNamespaceLike
+  auth: TurnStreamAuth
   workspaceId: string
   threadId: string
   /** The lock the acquire attempt was refused on. */
@@ -247,7 +236,7 @@ export interface ReconcileStaleDurableTurnLockOptions
 export async function reconcileStaleDurableTurnLock(
   options: ReconcileStaleDurableTurnLockOptions,
 ): Promise<{ released: boolean; diagnostics: Record<string, unknown> }> {
-  const { namespace, workspaceId, threadId, active, ...policy } = options
+  const { namespace, auth, workspaceId, threadId, active, ...policy } = options
   return reconcileStaleTurnLock({
     ...policy,
     lockStartedAt: active.startedAt,
@@ -258,7 +247,7 @@ export async function reconcileStaleDurableTurnLock(
         scope: active.scope,
         interruptedAt: fence.observedAt,
         ...(active.turnId ? { turnId: active.turnId } : {}),
-      }),
+      }, auth),
   })
 }
 
@@ -282,6 +271,9 @@ export type TurnLockSeamResult =
 /** Define options for creating a durable turn lock with customizable scope and identification methods */
 export interface CreateDurableTurnLockOptions<TContext> {
   namespace: TurnStreamNamespaceLike
+  /** Capability tokens for the DO; pass the worker's
+   *  `env.TURN_STREAM_AUTH_SECRET`. The DO validates every request. */
+  auth: TurnStreamAuth
   /** Which lane serializes this turn: `'workspace'` (shared sandbox — one
    *  turn per workspace) or `'thread'` (router lane — one turn per thread). */
   scopeOf(args: TurnLockSeamArgs<TContext>): TurnLockScope
@@ -356,13 +348,13 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
         ...(turnId ? { turnId } : {}),
       }
 
-      let acquired = await acquireDurableTurnLock(options.namespace, input)
+      let acquired = await acquireDurableTurnLock(options.namespace, input, options.auth)
       let diagnostics: Record<string, unknown> | undefined
       if (!acquired.acquired && options.reconcile) {
         const reconciled = await options.reconcile(args, acquired.active)
         diagnostics = reconciled.diagnostics
         if (reconciled.released) {
-          acquired = await acquireDurableTurnLock(options.namespace, input)
+          acquired = await acquireDurableTurnLock(options.namespace, input, options.auth)
         }
       }
       if (!acquired.acquired) {
@@ -382,70 +374,12 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
     },
     async release(handle) {
       if (!handle) return
-      await releaseDurableTurnLock(options.namespace, handle as TurnLockReleaseInput)
+      await releaseDurableTurnLock(options.namespace, handle as TurnLockReleaseInput, options.auth)
     },
   }
 }
 
 // ── broadcast helpers (products wire these into onEvent) ────────────────────
-
-/**
- * DEPRECATED for sandbox-backed interactive turns (drive on the session-message
- * lane + `SessionGatewayClient` instead) — fan a turn event out to the
- * per-thread channel. `executionId` groups events
- * into a per-turn segment with a monotonic seq, so a reconnecting client
- * replays only the active turn and resumes from a cursor. Callers MUST await
- * (the DO assigns seq on arrival — emission order matters); failures are
- * swallowed (fanout is best-effort and never breaks chat delivery).
- *
- * @deprecated For a SANDBOX-backed interactive turn this re-broadcasts events
- * the sandbox platform already fans out, at the cost of a worker hop. Drive
- * the turn on the session-MESSAGE lane instead —
- * `box.createSession({ sessionId, backend })` then
- * `box.session(id).sendMessage({ parts: [{ type: 'text', text }] })` — and let
- * the tab attach with `box.mintScopedToken({ scope: 'session', sessionId,
- * runtimeSessionId })` + `SessionGatewayClient`
- * (`@tangle-network/sandbox/session-gateway`). Measured on production
- * (4 arms, SDK 0.12.0): turns driven with `box.streamPrompt()` delivered
- * 0 of 71 / 0 of 527 / 0 of 408 turn events to a gateway client, because
- * `POST /agents/run/stream` publishes nothing to the session event bus;
- * the message lane delivered 297 of 297.
- *
- * Two things this deprecation does NOT cover, both still supported:
- * stream/dispatch DETACHED runs (keep `runDetachedTurn` over the durable
- * turn-event rows) and the per-workspace signals
- * ({@link broadcastWorkspaceActivity} / {@link broadcastThreadCreated}).
- * A SANDBOX-FREE copilot that wants a second viewer should use `/stream`'s
- * `replayTurnEvents` (`GET /chat/stream/:turnId`), which follows a running
- * turn from a cursor without a second broadcast fabric.
- *
- * Kept for back-compat; removal is a major-version change.
- */
-export async function broadcastTurnStreamEvent(
-  namespace: TurnStreamNamespaceLike,
-  input: {
-    workspaceId: string
-    threadId: string
-    executionId: string
-    event: { type: string; data?: Record<string, unknown> }
-  },
-): Promise<void> {
-  try {
-    await postJson(namespace, threadChannelKey(input.workspaceId, input.threadId), TURN_STREAM_PATHS.broadcast, {
-      type: input.event.type,
-      timestamp: Date.now(),
-      data: {
-        ...(input.event.data ?? {}),
-        workspaceId: input.workspaceId,
-        threadId: input.threadId,
-        sessionId: input.threadId,
-        executionId: input.executionId,
-      },
-    } satisfies TurnStreamEvent)
-  } catch {
-    // Best-effort.
-  }
-}
 
 /** Coarse per-workspace marker that a thread's turn started / ended — drives
  *  a sidebar "agent responding" indicator subscribed once per workspace. */
@@ -454,13 +388,14 @@ export async function broadcastWorkspaceActivity(
   workspaceId: string,
   threadId: string,
   phase: 'start' | 'end',
+  auth: TurnStreamAuth,
 ): Promise<void> {
   try {
     await postJson(namespace, workspaceChannelKey(workspaceId), TURN_STREAM_PATHS.broadcast, {
       type: 'thread.activity',
       timestamp: Date.now(),
       data: { threadId, phase, workspaceId, sessionId: workspaceId },
-    } satisfies TurnStreamEvent)
+    } satisfies TurnStreamEvent, auth)
   } catch {
     // Best-effort: the indicator is non-critical UI.
   }
@@ -472,13 +407,14 @@ export async function broadcastThreadCreated(
   namespace: TurnStreamNamespaceLike,
   workspaceId: string,
   thread: { threadId: string; title: string },
+  auth: TurnStreamAuth,
 ): Promise<void> {
   try {
     await postJson(namespace, workspaceChannelKey(workspaceId), TURN_STREAM_PATHS.broadcast, {
       type: 'thread.created',
       timestamp: Date.now(),
       data: { threadId: thread.threadId, title: thread.title, workspaceId, sessionId: workspaceId },
-    } satisfies TurnStreamEvent)
+    } satisfies TurnStreamEvent, auth)
   } catch {
     // Best-effort: the loader reconciles on the next revalidation.
   }
@@ -492,57 +428,65 @@ export type TurnStreamUpgradeAuthorization = { ok: true } | { ok: false; respons
 /** Define options for creating a TURN stream upgrade handler including namespace, path, and authorization logic */
 export interface CreateTurnStreamUpgradeHandlerOptions {
   namespace: TurnStreamNamespaceLike
+  /** HMAC secret shared with the DO binding (`env.TURN_STREAM_AUTH_SECRET`).
+   *  After the product `authorize` passes, the handler mints a channel-bound
+   *  capability token and the DO verifies it — the browser never holds it. */
+  authSecret: string
   /** The worker route serving the stream. Default `/api/session-stream`. */
   path?: string
   /** Viewer access check (session cookie → workspace membership). */
   authorize(
     request: Request,
-    target: { workspaceId: string; threadId: string | null },
+    target: { workspaceId: string },
   ): Promise<TurnStreamUpgradeAuthorization>
 }
 
 /**
- * The worker-entry WebSocket forwarder. Call BEFORE the app router (a router
- * loader cannot return a 101); returns `null` for requests that are not a
- * WebSocket upgrade on the configured path.
+ * The worker-entry WebSocket forwarder — WORKSPACE channel only (the
+ * per-thread variant went with the deprecated rebroadcast lane; a thread's
+ * live turn replay is the sandbox session gateway's job). Call BEFORE the
+ * app router (a router loader cannot return a 101); returns `null` for
+ * requests that are not a WebSocket upgrade on the configured path.
  *
- *   GET {path}?workspaceId=...            → workspace channel (sidebar)
- *   GET {path}?workspaceId=...&threadId=… → thread channel (turn resume)
+ *   GET {path}?workspaceId=... → workspace channel (sidebar signals)
  *
- * After the 101, the client sends `{type:'sync', afterSeq}` and receives the
- * replay-then-live stream (see {@link TurnStreamDO.webSocketMessage}).
+ * After the 101, the client sends `{type:'sync'}` and receives the
+ * current-activity + recent-threads snapshot, then live signals.
  *
- * NOT deprecated — the workspace variant (no `threadId`) is the canonical
- * transport for the per-workspace signals, which the session gateway cannot
- * carry (it is per-session and read-only). The THREAD variant is the
- * deprecated half: for a sandbox-backed interactive turn the tab should
- * attach to the session gateway directly instead of to this socket. See
- * {@link broadcastTurnStreamEvent} for the measurement and the replacement
- * wiring.
+ * Security: the product's `authorize` decides whether THIS caller may see the
+ * workspace's signals; the channel-bound token this handler then mints is
+ * what the DO itself verifies — two independent gates, and the browser never
+ * learns the token (it rides the forwarded upgrade request only).
  */
 export function createTurnStreamUpgradeHandler(
   options: CreateTurnStreamUpgradeHandlerOptions,
 ): (request: Request) => Promise<Response | null> {
   const path = options.path ?? '/api/session-stream'
+  if (!options.authSecret || options.authSecret.length < 32) {
+    throw new Error('createTurnStreamUpgradeHandler requires authSecret (>= 32 chars) — the DO fails closed without tokens')
+  }
   return async (request) => {
     const url = new URL(request.url)
-    if (url.pathname !== path || request.headers.get('Upgrade') !== 'websocket') return null
+    if (url.pathname !== path || request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return null
 
+    if (url.searchParams.has('threadId')) {
+      return new Response('Thread replay uses the sandbox session gateway or chat replay route', { status: 400 })
+    }
     const workspaceId = url.searchParams.get('workspaceId')
-    const threadId = url.searchParams.get('threadId')
     if (!workspaceId) return new Response('Missing workspaceId', { status: 400 })
 
-    const auth = await options.authorize(request, { workspaceId, threadId })
+    const auth = await options.authorize(request, { workspaceId })
     if (!auth.ok) return auth.response
 
-    // threadId present → per-thread turn channel; absent → workspace channel.
-    const key = threadId ? threadChannelKey(workspaceId, threadId) : workspaceChannelKey(workspaceId)
-    const sessionId = threadId ?? workspaceId
+    const key = workspaceChannelKey(workspaceId)
     const stub = options.namespace.get(options.namespace.idFromName(key))
 
     const forwardUrl = new URL(request.url)
-    forwardUrl.searchParams.set('sessionId', sessionId)
-    forwardUrl.searchParams.set('scope', threadId ? 'thread' : 'workspace')
-    return stub.fetch(new Request(forwardUrl, request))
+    forwardUrl.searchParams.set('sessionId', workspaceId)
+    forwardUrl.searchParams.set('scope', 'workspace')
+    forwardUrl.searchParams.delete('token')
+    const headers = new Headers(request.headers)
+    headers.set(TURN_STREAM_TOKEN_HEADER, await mintTurnStreamToken(key, options.authSecret))
+    return stub.fetch(new Request(new Request(forwardUrl, request), { headers }))
   }
 }

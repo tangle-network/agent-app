@@ -1915,7 +1915,7 @@ interface MissionActivityLaneProps
 `function` — Searchable model picker pill + popover.
 
 ```ts
-({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant, triggerContent }: M…
+({ value, onChange, models, loading, error, onRetry, disabled, id, "aria-label": ariaLabel, "aria-labelledby": ariaLabe…
 ```
 
 ### `ModelPickerProps`
@@ -2075,7 +2075,7 @@ type PickerVariant
 `function` — The floating panel every canonical picker opens.
 
 ```ts
-({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…
+({ open, triggerRef, panelRef, className, role, id, "aria-label": ariaLabel, matchTriggerWidth, contentKey, children, }…
 ```
 
 ### `PopoverSurfaceProps`

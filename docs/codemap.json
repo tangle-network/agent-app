@@ -7556,7 +7556,9 @@
     {
       "id": "./interactions",
       "source": "src/interactions/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "web"
+      ],
       "error": null,
       "exports": [
         {
@@ -8965,7 +8967,9 @@
     {
       "id": "./openui",
       "source": "src/openui/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "web"
+      ],
       "error": null,
       "exports": [
         {
@@ -18341,6 +18345,7 @@
       "source": "src/turn-stream/index.ts",
       "dependsOn": [
         "chat-routes",
+        "crypto",
         "stream"
       ],
       "error": null,
@@ -18348,7 +18353,7 @@
         {
           "name": "acquireDurableTurnLock",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, input: AcquireDurableTurnLockInput) => Promise<TurnLockAcquireResult>",
+          "signature": "(namespace: TurnStreamNamespaceLike, input: AcquireDurableTurnLockInput, auth: TurnStreamAuth) => Promise<...>",
           "doc": "Acquire a durable turn lock in the specified namespace with given input parameters"
         },
         {
@@ -18370,34 +18375,22 @@
           "doc": "A responding marker older than this is treated as stale, so a dropped `end` broadcast can't leave a permanently-stuck \"responding\" dot."
         },
         {
-          "name": "appendSegmentEvent",
-          "kind": "function",
-          "signature": "(store: SegmentStore, executionId: string, incoming: TurnStreamEvent, maxEvents?: number) => TurnStreamEvent",
-          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — append a per-turn event to its execution's segment, assigning a monotonic `seq`."
-        },
-        {
           "name": "broadcastThreadCreated",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, workspaceId: string, thread: { threadId: string; title: string; }) => Promise<void>",
+          "signature": "(namespace: TurnStreamNamespaceLike, workspaceId: string, thread: { threadId: string; title: string; }, auth: TurnStrea…",
           "doc": "Per-workspace marker that a new thread was created, so an already-open history list prepends it without a reload."
-        },
-        {
-          "name": "broadcastTurnStreamEvent",
-          "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; executionId: string; event: { type…",
-          "doc": "DEPRECATED for sandbox-backed interactive turns (drive on the session-message lane + `SessionGatewayClient` instead) — fan a turn event out to the per-thread channel."
         },
         {
           "name": "broadcastWorkspaceActivity",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, workspaceId: string, threadId: string, phase: \"start\" | \"end\") => Promise<void>",
+          "signature": "(namespace: TurnStreamNamespaceLike, workspaceId: string, threadId: string, phase: \"start\" | \"end\", auth: TurnStreamAut…",
           "doc": "Coarse per-workspace marker that a thread's turn started / ended — drives a sidebar \"agent responding\" indicator subscribed once per workspace."
         },
         {
           "name": "createDurableObjectTurnEventStore",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike) => TurnEventStore",
-          "doc": "A {@link TurnEventStore} backed by {@link TurnStreamDO } storage — the production implementation of `createChatTurnRoutes`' `turnStore` seam for apps that don't run D1 for turn events (or want replay…"
+          "signature": "(namespace: TurnStreamNamespaceLike, auth: TurnStreamAuth) => TurnEventStore",
+          "doc": "Optional Durable Object backend for {@link TurnEventStore}."
         },
         {
           "name": "createDurableTurnLock",
@@ -18414,14 +18407,8 @@
         {
           "name": "createMemoryTurnStreamHarness",
           "kind": "function",
-          "signature": "(createInstance?: (state: TurnStreamDOState) => TurnStreamDO, _options?: TurnStreamDOOptions) => MemoryTurnStreamHarness",
-          "doc": "Build the harness."
-        },
-        {
-          "name": "createSegmentStore",
-          "kind": "function",
-          "signature": "() => SegmentStore",
-          "doc": "DEPRECATED (interactive sandbox-turn rebroadcast; the SDK's session gateway replaces it) — create a SegmentStore with initialized segments and no active execution ID."
+          "signature": "(createInstance?: (state: TurnStreamDOState, authSecret: string) => TurnStreamDO, options?: TurnStreamDOOptions & { aut…",
+          "doc": null
         },
         {
           "name": "createTurnLock",
@@ -18433,7 +18420,7 @@
           "name": "createTurnStreamUpgradeHandler",
           "kind": "function",
           "signature": "(options: CreateTurnStreamUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>",
-          "doc": "The worker-entry WebSocket forwarder."
+          "doc": "The worker-entry WebSocket forwarder — WORKSPACE channel only (the per-thread variant went with the deprecated rebroadcast lane; a thread's live turn replay is the sandbox session gateway's job)."
         },
         {
           "name": "CreateTurnStreamUpgradeHandlerOptions",
@@ -18454,22 +18441,16 @@
           "doc": "The interrupted/stale release fence."
         },
         {
-          "name": "isTerminalRunEvent",
-          "kind": "function",
-          "signature": "(type: string) => boolean",
-          "doc": "Terminal run markers: they close a turn segment and auto-release the channel's chat-turn lock for the segment's execution."
-        },
-        {
           "name": "MAX_RECENT_CREATED",
           "kind": "const",
           "signature": "50",
-          "doc": "Recent `thread.created` markers kept for late-connecting sidebars."
+          "doc": "Recent thread-created markers kept for late-connecting sidebars."
         },
         {
-          "name": "MAX_SEGMENT_EVENTS",
+          "name": "MEMORY_TURN_STREAM_AUTH_SECRET",
           "kind": "const",
-          "signature": "2000",
-          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — per-turn replay window."
+          "signature": "\"test-turn-stream-harness-secret-0123456789ab\"",
+          "doc": "Default harness secret — long enough to satisfy the DO's minimum, fixed so tests are deterministic."
         },
         {
           "name": "MemoryTurnStreamChannel",
@@ -18490,10 +18471,16 @@
           "doc": "A test-side viewer socket: records frames sent by the DO and lets the test drive the `sync` handshake."
         },
         {
+          "name": "mintTurnStreamToken",
+          "kind": "function",
+          "signature": "(channelName: string, secret: string, now?: () => number, ttlMs?: number) => Promise<string>",
+          "doc": "`v1.<base64url-channel>.<exp-ms-36>.<base64url-mac>` — the expiry is inside the signed payload so it cannot be extended by editing the token."
+        },
+        {
           "name": "pruneStaleThreads",
           "kind": "function",
           "signature": "(active: Map<string, number>, now: number, ttlMs: number) => string[]",
-          "doc": "Remove responding entries (threadId → startedAt) older than `ttlMs`, so a dropped `end` broadcast can't leave a permanently-stuck dot."
+          "doc": "Remove responding markers older than ttlMs; return their thread IDs."
         },
         {
           "name": "reconcileStaleDurableTurnLock",
@@ -18510,13 +18497,13 @@
         {
           "name": "releaseDurableTurnLock",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput) => Promise<{ released: boolean; deferred?: boolean |…",
+          "signature": "(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput, auth: TurnStreamAuth) => Promise<{ released: boolean;…",
           "doc": "Release a durable turn lock and indicate if the release was successful or deferred"
         },
         {
           "name": "releaseInterruptedDurableTurnLock",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput) => Promise<boolean>",
+          "signature": "(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput, auth: TurnStreamAuth) => Promise<..…",
           "doc": "Fenced out-of-band release — the DO refuses a successor lock (started after `interruptedAt`) and a turnId mismatch."
         },
         {
@@ -18526,34 +18513,22 @@
           "doc": "Define input parameters to release an interrupted durable turn lock in a workspace or thread"
         },
         {
-          "name": "replayActiveSegment",
-          "kind": "function",
-          "signature": "(store: SegmentStore, afterSeq: number) => TurnStreamEvent[]",
-          "doc": "DEPRECATED (interactive turn-rebroadcast buffer; the SDK replays losslessly on both lanes) — events of the active, non-terminal turn with `seq > afterSeq`, i.e."
-        },
-        {
           "name": "scopeIndexChannelKey",
           "kind": "function",
           "signature": "(scopeId: string) => string",
-          "doc": "Generate a unique channel key string based on the provided scope identifier."
-        },
-        {
-          "name": "SegmentStore",
-          "kind": "interface",
-          "signature": "interface SegmentStore",
-          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — define a store managing segments and tracking the active execution identifier."
+          "doc": "Running-turn index for the optional Durable Object turn-event backend."
         },
         {
           "name": "threadChannelKey",
           "kind": "function",
           "signature": "(workspaceId: string, threadId: string) => string",
-          "doc": "Generate a unique string key combining workspace and thread identifiers."
+          "doc": "Channel for a thread-scoped lock."
         },
         {
           "name": "TURN_LOCK_TTL_MS",
           "kind": "const",
           "signature": "number",
-          "doc": "Default lifetime of an unreleased lock."
+          "doc": "Fallback lifetime for an unreleased lock."
         },
         {
           "name": "TURN_STREAM_PATHS",
@@ -18566,6 +18541,18 @@
           "kind": "const",
           "signature": "{ readonly lock: \"chatTurnLock\"; readonly activeThreads: \"activeThreads\"; readonly turnStatus: \"turnStatus\"; readonly t…",
           "doc": "Storage keys inside a DO instance."
+        },
+        {
+          "name": "TURN_STREAM_TOKEN_HEADER",
+          "kind": "const",
+          "signature": "\"x-turn-stream-token\"",
+          "doc": "Request header the adapters attach (and the DO accepts)."
+        },
+        {
+          "name": "TURN_STREAM_TOKEN_TTL_MS",
+          "kind": "const",
+          "signature": "60000",
+          "doc": "Default capability lifetime."
         },
         {
           "name": "turnEventStorageKey",
@@ -18601,7 +18588,7 @@
           "name": "turnLockMatchesRelease",
           "kind": "function",
           "signature": "(active: DurableTurnLock, input: { executionId: string; lockId?: string | undefined; }) => boolean",
-          "doc": "A cooperative release must present the lock's own identity — both the execution and the lockId minted at acquire — so a retry of a PREVIOUS turn can never release the current one."
+          "doc": "A cooperative release matches the execution and, when supplied, lock ID."
         },
         {
           "name": "TurnLockReleaseInput",
@@ -18628,22 +18615,22 @@
           "doc": "Verdict shape of the vertical's `turnLock.acquire`."
         },
         {
-          "name": "TurnSegment",
-          "kind": "interface",
-          "signature": "interface TurnSegment",
-          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — represent a segment of a turn containing events, sequence limit, and terminal status."
-        },
-        {
           "name": "turnStorageChannelKey",
           "kind": "function",
           "signature": "(turnId: string) => string",
-          "doc": "Generate a storage channel key string for a given turn identifier."
+          "doc": "Channel for the optional Durable Object turn-event backend."
+        },
+        {
+          "name": "TurnStreamAuth",
+          "kind": "interface",
+          "signature": "interface TurnStreamAuth",
+          "doc": "The HMAC secret shared between this worker and its `TurnStreamDO` binding."
         },
         {
           "name": "TurnStreamDO",
           "kind": "class",
           "signature": "class TurnStreamDO",
-          "doc": "Manage per-turn segments and track active threads with durable event storage"
+          "doc": "Durable turn-event storage, workspace signals, and the single-flight turn lock, on one channel-bound Durable Object."
         },
         {
           "name": "TurnStreamDOOptions",
@@ -18694,10 +18681,16 @@
           "doc": "Represent success or failure of a TURN stream upgrade authorization with optional response data"
         },
         {
+          "name": "verifyTurnStreamToken",
+          "kind": "function",
+          "signature": "(channelName: string, token: string, secret: string, now?: () => number) => Promise<boolean>",
+          "doc": "Verify a token for `channelName`: constant-time MAC compare with the exact channel name embedded in the signed payload, plus freshness."
+        },
+        {
           "name": "workspaceChannelKey",
           "kind": "function",
           "signature": "(workspaceId: string) => string",
-          "doc": "Generate a unique channel key based on the given workspace identifier."
+          "doc": "Channel for workspace signals and the workspace-scoped lock."
         }
       ]
     },
@@ -20591,7 +20584,7 @@
         {
           "name": "ModelPicker",
           "kind": "function",
-          "signature": "({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant, triggerContent }: M…",
+          "signature": "({ value, onChange, models, loading, error, onRetry, disabled, id, \"aria-label\": ariaLabel, \"aria-labelledby\": ariaLabe…",
           "doc": "Searchable model picker pill + popover."
         },
         {
@@ -20711,7 +20704,7 @@
         {
           "name": "PopoverSurface",
           "kind": "function",
-          "signature": "({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…",
+          "signature": "({ open, triggerRef, panelRef, className, role, id, \"aria-label\": ariaLabel, matchTriggerWidth, contentKey, children, }…",
           "doc": "The floating panel every canonical picker opens."
         },
         {

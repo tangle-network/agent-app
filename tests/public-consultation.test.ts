@@ -4,7 +4,7 @@ import { searchKnowledge, type KnowledgeIndex, type KnowledgePage } from '@tangl
 import { createKnowledgePublication, createPublicConsultation, type ConsultationConsumer, type ConsultationExecution, type PublicConsultationOptions } from '../src/public-consultation/index'
 import { createMcpToolHandler } from '../src/tools/mcp-rpc'
 import { createMemoryTurnEventStore } from '../src/stream/index'
-import { createDurableTurnLock, createMemoryTurnStreamHarness } from '../src/turn-stream/index'
+import { createDurableTurnLock, createMemoryTurnStreamHarness, MEMORY_TURN_STREAM_AUTH_SECRET } from '../src/turn-stream/index'
 import type { ChatTurnMessageStore } from '../src/chat-routes/turn-routes'
 
 const PRIVATE = 'SYNTHETIC_PRIVATE_CLIENT_SETTLEMENT_9182'
@@ -43,7 +43,7 @@ function fixture(beforeProduce?: () => Promise<void>, conflictingParent = false,
     store, turnStore: createMemoryTurnEventStore(), ensureConversation: async identity => ({
       workspaceId: conflictingParent ? 'owner-workspace' : identity.workspaceId, threadId: identity.threadId,
     }),
-    turnLock: createDurableTurnLock({ namespace: createMemoryTurnStreamHarness().namespace, scopeOf: () => 'thread' }),
+    turnLock: createDurableTurnLock({ namespace: createMemoryTurnStreamHarness().namespace, auth: { secret: MEMORY_TURN_STREAM_AUTH_SECRET }, scopeOf: () => 'thread' }),
     prepareExecution: prepareExecution ?? (async () => ({ status: 'prepared', produce: async input => {
       executions.push(input)
       await beforeProduce?.()
