@@ -36,6 +36,7 @@ function member(appId: string): LiveSharedEnrollmentMember {
   return {
     binding, subjectId, appId, lineId: base.lineId, attachmentId: base.attachmentId,
     memberId: base.memberId, ownerUserId: base.ownerUserId, senderAddress: base.sender.address,
+    grantRevision: 'revision-1',
     enrollmentId: `enrollment-${appId}`, agentId: `agent-${appId}`,
     workspaceId: `workspace-${appId}`, threadId: `thread-${appId}`,
   }
@@ -90,5 +91,48 @@ describe('shared enrolled application line', () => {
     const response = await f.handler(callback('@builder hello', 'msg_builder'))
     expect(response.status).toBe(403)
     expect(f.admitted).toEqual([])
+  })
+
+  it('does not return output read from the old target after a same-app member remap', async () => {
+    let enrollmentId = 'enrollment-builder'
+    let revision = 'revision-1'
+    const handler = createEnrolledApplicationLineHandler({
+      authenticate: async () => ({ principal: 'owner', binding }),
+      selectApp: async () => 'builder',
+      lookup: async () => ({ ...member('builder'), enrollmentId, grantRevision: revision }),
+      enrollment: { resolve: async (_principal, id) => ({
+        target: { ...member('builder'), enrollmentId: id }, box: {}, session: {},
+      }) as never },
+      read: async () => {
+        enrollmentId = 'enrollment-replacement'
+        revision = 'revision-2'
+        return { state: 'completed', executionId: 'old-execution', text: 'old private output' }
+      },
+      admit: async () => { throw new Error('completed output must not be admitted') },
+    })
+    const response = await handler(callback('@builder hello', 'msg_remap'))
+    expect(response.status).toBe(403)
+  })
+
+  it('does not return output after the pinned SDK target generation changes', async () => {
+    let generation = 1
+    const handler = createEnrolledApplicationLineHandler({
+      authenticate: async () => ({ principal: 'owner', binding }),
+      selectApp: async () => 'builder',
+      lookup: async () => member('builder'),
+      enrollment: { resolve: async () => ({
+        target: { ...member('builder'), instanceKey: 'agent:builder', configurationDigest: 'digest',
+          profileVersion: 'v1', generation, sandboxId: 'sandbox-1',
+          filesystemIncarnationId: 'incarnation-1', sessionId: 'session-1' },
+        box: {}, session: {},
+      }) as never },
+      read: async () => {
+        generation = 2
+        return { state: 'completed', executionId: 'old-execution', text: 'old private output' }
+      },
+      admit: async () => { throw new Error('completed output must not be admitted') },
+    })
+    const response = await handler(callback('@builder hello', 'msg_generation'))
+    expect(response.status).toBe(403)
   })
 })

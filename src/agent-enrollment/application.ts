@@ -16,6 +16,8 @@ export interface LiveSharedEnrollmentMember {
   lineId: string
   attachmentId: string
   memberId: string
+  /** Changes on every grant, consent, or target remap, including revoke and regrant. */
+  grantRevision: string
   ownerUserId: string
   senderAddress: string
   enrollmentId: string
@@ -48,7 +50,8 @@ function subjectId(input: Readonly<LineApplicationRequest>): string | null {
 }
 
 function matches(input: Readonly<LineApplicationRequest>, member: LiveSharedEnrollmentMember): boolean {
-  return !!member.enrollmentId && member.binding === input.binding && member.subjectId === subjectId(input)
+  return !!member.enrollmentId && !!member.grantRevision
+    && member.binding === input.binding && member.subjectId === subjectId(input)
     && member.lineId === input.lineId && member.attachmentId === input.attachmentId
     && member.memberId === input.memberId && member.ownerUserId === input.ownerUserId
     && member.senderAddress === input.sender.address
@@ -56,7 +59,8 @@ function matches(input: Readonly<LineApplicationRequest>, member: LiveSharedEnro
 
 function sameMember(left: LiveSharedEnrollmentMember, right: LiveSharedEnrollmentMember): boolean {
   return left.binding === right.binding && left.subjectId === right.subjectId
-    && left.appId === right.appId && left.enrollmentId === right.enrollmentId && left.agentId === right.agentId
+    && left.appId === right.appId && left.grantRevision === right.grantRevision
+    && left.enrollmentId === right.enrollmentId && left.agentId === right.agentId
     && left.workspaceId === right.workspaceId && left.threadId === right.threadId
     && left.lineId === right.lineId && left.attachmentId === right.attachmentId
     && left.memberId === right.memberId && left.ownerUserId === right.ownerUserId
@@ -68,9 +72,28 @@ function matchesTarget(member: LiveSharedEnrollmentMember, target: AgentEnrollme
     && member.workspaceId === target.workspaceId && member.threadId === target.threadId
 }
 
+function sameTarget(left: AgentEnrollmentTarget, right: AgentEnrollmentTarget): boolean {
+  return left.enrollmentId === right.enrollmentId && left.agentId === right.agentId
+    && left.workspaceId === right.workspaceId && left.threadId === right.threadId
+    && left.instanceKey === right.instanceKey && left.configurationDigest === right.configurationDigest
+    && left.profileVersion === right.profileVersion && left.generation === right.generation
+    && left.sandboxId === right.sandboxId && left.filesystemIncarnationId === right.filesystemIncarnationId
+    && left.sessionId === right.sessionId
+}
+
+interface PinnedResolution {
+  member: Readonly<LiveSharedEnrollmentMember>
+  target: Readonly<AgentEnrollmentTarget>
+}
+
+interface AuthenticatedContext<Principal> extends AuthenticatedSharedLinePrincipal<Principal> {
+  selectedAppId?: string
+  pinned?: PinnedResolution
+}
+
 /** Bind a signed shared Line member to the same native target used by web and ChatGPT. */
 export function createEnrolledApplicationLineHandler<Principal>(options: EnrolledApplicationLineOptions<Principal>) {
-  async function resolve(authenticated: AuthenticatedSharedLinePrincipal<Principal> & { selectedAppId?: string },
+  async function resolve(authenticated: AuthenticatedContext<Principal>,
     input: Readonly<LineApplicationRequest>) {
     const subject = subjectId(input)
     if (!subject) throw forbidden()
@@ -78,12 +101,17 @@ export function createEnrolledApplicationLineHandler<Principal>(options: Enrolle
     if (!appId || (authenticated.selectedAppId && authenticated.selectedAppId !== appId)) throw forbidden()
     authenticated.selectedAppId = appId
     const member = await options.lookup(authenticated.principal, authenticated.binding, subject, appId)
-    if (!member || member.appId !== appId || !matches(input, member)) throw forbidden()
+    if (!member || member.appId !== appId || !matches(input, member)
+      || (authenticated.pinned && !sameMember(authenticated.pinned.member, member))) throw forbidden()
     const resolved = await options.enrollment.resolve(authenticated.principal, member.enrollmentId)
-    if (!matchesTarget(member, resolved.target)) throw forbidden()
+    if (!matchesTarget(member, resolved.target)
+      || (authenticated.pinned && !sameTarget(authenticated.pinned.target, resolved.target))) throw forbidden()
     // SDK observations yield. A revoked or remapped member must not start or read a turn.
     const current = await options.lookup(authenticated.principal, authenticated.binding, subject, appId)
     if (!current || !sameMember(current, member)) throw forbidden()
+    authenticated.pinned ??= Object.freeze({
+      member: Object.freeze({ ...member }), target: Object.freeze({ ...resolved.target }),
+    })
     return resolved
   }
 
@@ -91,7 +119,7 @@ export function createEnrolledApplicationLineHandler<Principal>(options: Enrolle
     authenticate: async request => {
       const target = await options.authenticate(request)
       if (!target.binding) throw forbidden()
-      return { binding: target.binding, target: { ...target, selectedAppId: undefined } }
+      return { binding: target.binding, target: { ...target, selectedAppId: undefined, pinned: undefined } }
     },
     authorize: async (target, input) => { await resolve(target, input) },
     read: async (target, input) => options.read(await resolve(target, input), input),

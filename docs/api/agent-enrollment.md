@@ -4,7 +4,15 @@
 
 Source: `src/agent-enrollment/index.ts`
 
-12 exports.
+13 exports.
+
+### `AgentEnrollmentClaim`
+
+`type` — Immutable reservation made before any SDK provisioning can change an instance.
+
+```ts
+type AgentEnrollmentClaim
+```
 
 ### `AgentEnrollmentIdentity`
 
