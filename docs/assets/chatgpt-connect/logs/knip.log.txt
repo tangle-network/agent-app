@@ -1,0 +1,25 @@
+$ knip
+Configuration hints (123)
+.worktrees/**                                knip.json  Remove from ignore                                           
+create-agent-app/template/**                 knip.json  Remove from ignore                                           
+create-agent-app/template-chat/**            knip.json  Remove from ignore                                           
+playground/**                                knip.json  Remove from ignore                                           
+@tangle-network/agent-gateway                knip.json  Remove from ignoreDependencies                               
+@tangle-network/agent-profile-materialize    knip.json  Remove from ignoreDependencies                               
+@xterm/addon-fit                             knip.json  Remove from ignoreDependencies                               
+@xterm/addon-web-links                       knip.json  Remove from ignoreDependencies                               
+@xterm/addon-webgl                           knip.json  Remove from ignoreDependencies                               
+@xterm/xterm                                 knip.json  Remove from ignoreDependencies                               
+tsc                                          knip.json  Remove from ignoreBinaries                                   
+src/app-auth/index.ts                        knip.json  Remove redundant entry pattern                               
+src/app-oauth/index.ts                       knip.json  Remove redundant entry pattern                               
+src/assets/index.ts                          knip.json  Remove redundant entry pattern                               
+src/assistant/index.ts                       knip.json  Remove redundant entry pattern                               
+src/billing/index.ts                         knip.json  Remove redundant entry pattern                               
+src/brand-extraction/index.ts                knip.json  Remove redundant entry pattern                               
+src/brand/index.tsx                          knip.json  Remove redundant entry pattern                               
+src/catalog/index.ts                         knip.json  Remove redundant entry pattern                               
+src/channels/index.ts                        knip.json  Remove redundant entry pattern                               
+src/agent-enrollment/index.ts                knip.json  Remove redundant entry pattern                               
+...101 more similar hints                                                                                            
+.css                                         knip.json  Compiled extension excluded by project (imports not followed)

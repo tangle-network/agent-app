@@ -1,0 +1,220 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/drew/code/_wt/agent-app-chatgpt-connect-20261002[39m
+
+ [31m❯[39m src/chatgpt-react/connect.test.tsx [2m([22m[2m8 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m7 skipped[39m[2m)[22m[32m 121[2mms[22m[39m
+     [2m[90m↓[39m[22m opens supported setup with the exact endpoint, without inferring connected state
+     [2m[90m↓[39m[22m keeps native identifiers in collapsed connection details
+     [2m[90m↓[39m[22m uses an explicitly supplied ChatGPT URL and never derives one from the ID
+     [2m[90m↓[39m[22m falls back to supported setup for an invalid registered destination
+[31m     [31m×[31m renders host-confirmed state and delegates checks without granting or connecting anything[39m[32m 120[2mms[22m[39m
+     [2m[90m↓[39m[22m drops setup and clipboard feedback when enrollment changes
+     [2m[90m↓[39m[22m supports manual copy when clipboard access is unavailable
+     [2m[90m↓[39m[22m does not expose an invalid endpoint containing credentials
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[33m7 skipped[39m[90m (8)[39m
+[2m   Start at [22m 14:59:32
+[2m   Duration [22m 924ms[2m (transform 43ms, setup 57ms, import 352ms, tests 121ms, environment 310ms)[22m
+
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/chatgpt-react/connect.test.tsx[2m > [22mChatGPT connection surface[2m > [22mrenders host-confirmed state and delegates checks without granting or connecting anything
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an accessible element with the role "link" and name "Open ChatGPT plugins (opens a new tab)"
+
+Here are the accessible roles:
+
+  region:
+
+  Name "Your agent, in ChatGPT":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"_r_0_-heading"[39m
+    [33mclass[39m=[32m"tangle-chatgpt "[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "Your agent, in ChatGPT":
+  [36m<h2[39m
+    [33mid[39m=[32m"_r_0_-heading"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"tangle-chatgpt__description"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  status:
+
+  Name "":
+  [36m<p[39m
+    [33maria-busy[39m=[32m"false"[39m
+    [33mclass[39m=[32m"tangle-chatgpt__status"[39m
+    [33mrole[39m=[32m"status"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  link:
+
+  Name "Open in ChatGPT (opens a new tab)":
+  [36m<a[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium text-sm transition-all focus-visible:outline-1 focus-visible:outline-[var(--focus-border)] focus-visible:ring-4 focus-visible:ring-[var(--focus-halo)] focus-visible:outline-offset-0 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.97] duration-[var(--transition-fast)] h-[var(--control-height)] px-4 py-2 tangle-chatgpt__primary"[39m
+    [33mhref[39m=[32m"https://chatgpt.com/plugins"[39m
+    [33mrel[39m=[32m"noopener noreferrer"[39m
+    [33mtarget[39m=[32m"_blank"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  group:
+
+  Name "":
+  [36m<details[39m
+    [33mclass[39m=[32m"tangle-chatgpt__details"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  term:
+
+  Name "":
+  [36m<dt />[39m
+
+  Name "":
+  [36m<dt />[39m
+
+  --------------------------------------------------
+  definition:
+
+  Name "":
+  [36m<dd />[39m
+
+  Name "":
+  [36m<dd />[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Connection setup":
+  [36m<button[39m
+    [33maria-controls[39m=[32m"_r_0_-setup"[39m
+    [33maria-expanded[39m=[32m"false"[39m
+    [33mclass[39m=[32m"tangle-chatgpt__text-action"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<section[39m
+      [33maria-labelledby[39m=[32m"_r_0_-heading"[39m
+      [33mclass[39m=[32m"tangle-chatgpt "[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"tangle-chatgpt__heading"[39m
+      [36m>[39m
+        [36m<div>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"tangle-chatgpt__eyebrow"[39m
+          [36m>[39m
+            [0mGTM workspace[0m
+          [36m</span>[39m
+          [36m<h2[39m
+            [33mid[39m=[32m"_r_0_-heading"[39m
+          [36m>[39m
+            [0mYour agent, in ChatGPT[0m
+          [36m</h2>[39m
+        [36m</div>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"tangle-chatgpt__badge"[39m
+        [36m>[39m
+          [0mChatGPT[0m
+        [36m</span>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"tangle-chatgpt__description"[39m
+      [36m>[39m
+        [0mWork on account research and campaign tasks with your existing agent.[0m
+      [36m</p>[39m
+      [36m<p[39m
+        [33maria-busy[39m=[32m"false"[39m
+        [33mclass[39m=[32m"tangle-chatgpt__status"[39m
+        [33mrole[39m=[32m"status"[39m
+      [36m>[39m
+        [0mConnected to ChatGPT[0m
+      [36m</p>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"tangle-chatgpt__actions"[39m
+      [36m>[39m
+        [36m<a[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium text-sm transition-all focus-visible:outline-1 focus-visible:outline-[var(--focus-border)] focus-visible:ring-4 focus-visible:ring-[var(--focus-halo)] focus-visible:outline-offset-0 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.97] duration-[var(--transition-fast)] h-[var(--control-height)] px-4 py-2 tangle-chatgpt__primary"[39m
+          [33mhref[39m=[32m"https://chatgpt.com/plugins"[39m
+          [33mrel[39m=[32m"noopener noreferrer"[39m
+          [33mtarget[39m=[32m"_blank"[39m
+        [36m>[39m
+          [0mOpen in ChatGPT[0m
+          [0m [0m
+          [36m<span[39m
+            [33mclass[39m=[32m"tangle-chatgpt__sr-only"[39m
+          [36m>[39m
+            [0m(opens a new tab)[0m
+          [36m</span>[39m
+        [36m</a>[39m
+      [36m</div>[39m
+      [36m<details[39m
+        [33mclass[39m=[32m"tangle-chatgpt__details"[39m
+      [36m>[39m
+        [36m<summary>[39m
+          [0mConnection details[0m
+        [36m</summary>[39m
+        [36m<dl[39m
+          [33mclass[39m=[32m"tangle-chatgpt__identity"[39m
+        [36m>[39m
+          [36m<div>[39m
+            [36m<dt>[39m
+              [0mAgent[0m
+            [36m</dt>[39m
+            [36m<dd>[39m
+              [0mresearch-agent[0m
+            [36m</dd>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<dt>[39m
+              [0mWorkspace[0m
+            [36m</dt>[39m
+            [36m<dd>[39m
+              [0mgtm-workspace[0m
+            [36m</dd>[39m
+          [36m</div>[39m
+        [36m</dl>[39m
+      [36m</details>[39m
+      [36m<button[39m
+        [33maria-controls[39m=[32m"_r_0_-setup"[39m
+        [33maria-expanded[39m=[32m"false"[39m
+        [33mclass[39m=[32m"tangle-chatgpt__text-action"[39m
+        [33mtype[39m=[32m"button"[39m
+      [36m>[39m
+        [0mConnection setup[0m
+      [36m</button>[39m
+    [36m</section>[39m
+  [36m</div>[39m
+[36m</body>[39m
+[90m [2m❯[22m Object.getElementError node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m src/chatgpt-react/connect.test.tsx:[2m66:19[22m[39m
+    [90m 64|[39m     rerender(<ChatGPTConnect {...gtmExample} state={{ status: 'connect…
+    [90m 65|[39m     expect(screen.getByRole('status').textContent).toBe('Connected to …
+    [90m 66|[39m     expect(screen.getByRole('link', { name: 'Open ChatGPT plugins (ope…
+    [90m   |[39m                   [31m^[39m
+    [90m 67|[39m   })
+    [90m 68|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
