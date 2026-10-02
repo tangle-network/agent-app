@@ -38,6 +38,7 @@ export default defineConfig({
     'integrations/index': 'src/integrations/index.ts',
     'channels/index': 'src/channels/index.ts',
     'agent-enrollment/index': 'src/agent-enrollment/index.ts',
+    'agent-enrollment/drizzle': 'src/agent-enrollment/drizzle.ts',
     'hosted-agent/index': 'src/hosted-agent/index.ts',
     'hosted-agent/application': 'src/hosted-agent/application.ts',
     'hosted-agent/react/index': 'src/hosted-agent/react/index.ts',

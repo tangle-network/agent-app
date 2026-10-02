@@ -15,6 +15,7 @@
     "src/catalog/index.ts",
     "src/channels/index.ts",
     "src/agent-enrollment/index.ts",
+    "src/agent-enrollment/drizzle.ts",
     "src/chat-react/index.tsx",
     "src/chat-routes/index.ts",
     "src/chat-store/index.ts",

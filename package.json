@@ -228,6 +228,11 @@
       "import": "./dist/agent-enrollment/index.js",
       "default": "./dist/agent-enrollment/index.js"
     },
+    "./agent-enrollment/drizzle": {
+      "types": "./dist/agent-enrollment/drizzle.d.ts",
+      "import": "./dist/agent-enrollment/drizzle.js",
+      "default": "./dist/agent-enrollment/drizzle.js"
+    },
     "./hosted-agent/application": {
       "types": "./dist/hosted-agent/application.d.ts",
       "import": "./dist/hosted-agent/application.js",
