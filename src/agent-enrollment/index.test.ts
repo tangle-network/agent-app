@@ -102,4 +102,34 @@ describe('createAgentEnrollment', () => {
     expect(f.box.createSession).not.toHaveBeenCalled()
     expect(f.stored()).toBeNull()
   })
+
+  it('retains the first target when concurrent callers race for one enrollment id', async () => {
+    const f = fixture()
+    let stored: AgentEnrollmentTarget | null = null
+    let reads = 0
+    const enrollment = createAgentEnrollment({
+      authorize: async () => {}, client: () => f.client as never,
+      store: {
+        get: async () => ++reads <= 2 ? null : stored,
+        insertIfAbsent: async target => { stored ??= target; return stored },
+      },
+    })
+    const results = await Promise.allSettled([
+      enrollment.enroll('owner', f.request),
+      enrollment.enroll('owner', { ...f.request, agentId: 'other-agent' }),
+    ])
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1)
+    expect(stored).toMatchObject({ agentId: results[0].status === 'fulfilled' ? f.request.agentId : 'other-agent' })
+  })
+
+  it('denies a result when authority is revoked while SDK session status is read', async () => {
+    const f = fixture()
+    await f.enrollment.enroll('owner', f.request)
+    f.session.status.mockImplementationOnce(async () => {
+      f.revoke()
+      return { id: 'thread-1-v1', status: 'idle' }
+    })
+    await expect(f.enrollment.resolve('owner', identity.enrollmentId)).rejects.toThrow('denied')
+  })
 })
