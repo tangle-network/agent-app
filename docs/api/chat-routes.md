@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-210 exports.
+213 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -436,6 +436,14 @@ class ChatTurnInputError
 
 ```ts
 interface ChatTurnInputPatch
+```
+
+### `ChatTurnIntelligenceOptions`
+
+`interface` — Host-resolved metadata only.
+
+```ts
+interface ChatTurnIntelligenceOptions
 ```
 
 ### `ChatTurnLifecycle`
@@ -1142,6 +1150,14 @@ interface NativeCompletionTurnReceipt
 (prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]
 ```
 
+### `observeChatTurnStream`
+
+`function` — Observe the source iterator without an execution loop, relay, queue or eager pull.
+
+```ts
+<TEvent>(source: AsyncGenerator<TEvent, void, unknown>, options: ChatTurnIntelligenceOptions) => AsyncGenerator<TEvent,…
+```
+
 ### `observeNativeCompletion`
 
 `function` — Observe only the turns admitted under `executionId`.
@@ -1228,6 +1244,14 @@ type OpenModelStream
 
 ```ts
 (raw: unknown) => FileMention[]
+```
+
+### `produceChatTurnWithIntelligence`
+
+`function` — Adapter for product producer factories.
+
+```ts
+(options: ChatTurnIntelligenceOptions & { produce: () => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>; }) =>…
 ```
 
 ### `ProducerErrorEvent`
