@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.2
+
+- docs(agents): own delivery with focused checks (#740)
+
 ## 0.51.1
 
 - fix(peer): admit signed Sandbox callback cohort
