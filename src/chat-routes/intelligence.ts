@@ -12,6 +12,8 @@ export interface ChatTurnIntelligenceOptions {
   traceId?: string
   /** Requested model. This is not a receipt for the model that served. */
   model?: string
+  /** Existing transport cancellation evidence; grants no new abort authority. */
+  signal?: AbortSignal
   /** Receives no exception text, which may contain private customer material. */
   onObservationError?: () => void
 }
@@ -25,7 +27,7 @@ export function observeChatTurnStream<TEvent>(
   source: AsyncGenerator<TEvent, void, unknown>,
   options: ChatTurnIntelligenceOptions,
 ): AsyncGenerator<TEvent, void, unknown> {
-  const { client, sessionId, userId, workspaceId, runId, traceId, model, onObservationError } = options
+  const { client, sessionId, userId, workspaceId, runId, traceId, model, signal, onObservationError } = options
   let state: 'idle' | 'running' | 'terminal' = 'idle'
   let startedAt = 0
   let interrupted = false
@@ -35,6 +37,7 @@ export function observeChatTurnStream<TEvent>(
     if (state !== 'running') return observation ?? Promise.resolve()
     state = 'terminal'
     const completedAt = Date.now()
+    const observedTermination = signal?.aborted ? 'interrupted' : termination
     observation = Promise.resolve().then(async () => {
       await client().traceRun({
         ...(runId !== undefined ? { runId } : {}),
@@ -45,7 +48,7 @@ export function observeChatTurnStream<TEvent>(
           ...(userId !== undefined ? { 'tangle.userId': userId } : {}),
           ...(workspaceId !== undefined ? { 'tangle.workspaceId': workspaceId } : {}),
           'tangle.observation.kind': 'stream-lifecycle',
-          'tangle.stream.termination': termination,
+          'tangle.stream.termination': observedTermination,
           'tangle.started_at_ms': startedAt,
           'tangle.completed_at_ms': completedAt,
           'tangle.duration_ms': Math.max(0, completedAt - startedAt),
