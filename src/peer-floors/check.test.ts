@@ -201,7 +201,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.9.0', range!)).toBe(false)
   })
 
-  it('admits the Hub SDK line used by Hospitality without claiming 0.23', async () => {
+  it('admits the tested Hub SDK 0.23 line without claiming 0.24', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -214,7 +214,9 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.22.0', range!)).toBe(false)
     expect(satisfiesRange('0.22.1', range!)).toBe(true)
     expect(satisfiesRange('0.22.999', range!)).toBe(true)
-    expect(satisfiesRange('0.23.0', range!)).toBe(false)
+    expect(satisfiesRange('0.23.0', range!)).toBe(true)
+    expect(satisfiesRange('0.23.999', range!)).toBe(true)
+    expect(satisfiesRange('0.24.0', range!)).toBe(false)
   })
 
   it('admits the tested Integrations lines without admitting 0.58', async () => {
