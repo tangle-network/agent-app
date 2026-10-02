@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.6
+
+- feat(create-agent-app)!: make the shared workspace the default starter
+
 ## 0.51.5
 
 - fix(platform): accept empty Workerd Hub settings streams (#744)
