@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_107 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_108 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
