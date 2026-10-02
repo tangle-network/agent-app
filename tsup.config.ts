@@ -36,6 +36,8 @@ export default defineConfig({
     'turn-stream/index': 'src/turn-stream/index.ts',
     'turn-health/index': 'src/turn-health/index.ts',
     'integrations/index': 'src/integrations/index.ts',
+    'chatgpt-react/index': 'src/chatgpt-react/index.tsx',
+    'chatgpt-react/styles': 'src/chatgpt-react/styles.ts',
     'integrations-react/index': 'src/integrations-react/index.ts',
     'channels/index': 'src/channels/index.ts',
     'agent-enrollment/index': 'src/agent-enrollment/index.ts',
@@ -135,5 +137,5 @@ export default defineConfig({
   external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tiptap/core', '@tiptap/extension-mention', '@tiptap/react', '@tiptap/starter-kit', '@tiptap/suggestion', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-profile-materialize', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers', '@tangle-network/sandbox-ui', '@tangle-network/sandbox-ui/*', '@tangle-network/ui', '@tangle-network/ui/*', 'lucide-react', 'react-router', '@radix-ui/react-dialog', 'resend', 'better-auth', 'better-auth/*', 'pdf-lib', '@firecrawl/pdf-inspector-wasm'],
   // tokens.css is shipped raw (the ./styles subpath); copy it next to the
   // built theme entries so `import '@tangle-network/agent-app/styles'` resolves.
-  onSuccess: 'node src/theme/build.mjs --dist && cp src/studio-react/studio.css dist/studio-react/studio.css && cp src/hosted-agent/react/lines.css dist/hosted-agent/react/lines.css',
+  onSuccess: 'node src/theme/build.mjs --dist && cp src/studio-react/studio.css dist/studio-react/studio.css && cp src/hosted-agent/react/lines.css dist/hosted-agent/react/lines.css && cp src/chatgpt-react/styles.css dist/chatgpt-react/styles.css',
 })

@@ -561,6 +561,15 @@
       "types": "./dist/public-consultation/index.d.ts",
       "import": "./dist/public-consultation/index.js",
       "default": "./dist/public-consultation/index.js"
+    },
+    "./chatgpt-react": {
+      "types": "./dist/chatgpt-react/index.d.ts",
+      "import": "./dist/chatgpt-react/index.js",
+      "default": "./dist/chatgpt-react/index.js"
+    },
+    "./chatgpt-react/styles": {
+      "types": "./dist/chatgpt-react/styles.d.ts",
+      "default": "./dist/chatgpt-react/styles.css"
     }
   },
   "scripts": {

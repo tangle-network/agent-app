@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_109 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_111 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -21,6 +21,8 @@ _109 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./chat-react`](api/chat-react.md) | 5 | `web-react` |
 | [`./chat-routes`](api/chat-routes.md) | 213 | `chat-store`, `interactions`, `model-resolution`, `plans`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `web` |
 | [`./chat-store`](api/chat-store.md) | 64 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
+| [`./chatgpt-react`](api/chatgpt-react.md) | 5 | `agent-enrollment` |
+| [`./chatgpt-react/styles`](api/chatgpt-react-styles.md) | 0 | `agent-enrollment` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
 | [`./crypto`](api/crypto.md) | 10 | `billing` |
 | [`./design-canvas`](api/design-canvas.md) | 103 | `tools`, `web` |
@@ -45,7 +47,7 @@ _109 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./intakes/drizzle`](api/intakes-drizzle.md) | 18 | — |
 | [`./integrations`](api/integrations.md) | 10 | — |
 | [`./integrations-react`](api/integrations-react.md) | 18 | `platform`, `web-react` |
-| [`./interactions`](api/interactions.md) | 64 | — |
+| [`./interactions`](api/interactions.md) | 64 | `web` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
@@ -53,7 +55,7 @@ _109 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./missions`](api/missions.md) | 65 | — |
 | [`./model-resolution`](api/model-resolution.md) | 24 | — |
 | [`./object-store`](api/object-store.md) | 20 | `crypto` |
-| [`./openui`](api/openui.md) | 35 | — |
+| [`./openui`](api/openui.md) | 35 | `web` |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
 | [`./peer-floors/check`](api/peer-floors-check.md) | 23 | `signoff` |
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 1 | `signoff` |
@@ -255,6 +257,24 @@ Depends on: `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-reac
 `AppendMessageInput`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `buildAttachmentPromptBlock`, `BULK_DELETE_MAX_THREADS`, `BulkDeleteThreadsByUpdatedAtInput`, `BulkDeleteThreadsInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatDatabase`, `ChatExtraIndexes`, `ChatFilePart`, `ChatImagePart`, `ChatInteractionPart`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessagePart`, `ChatMessageRow`, `ChatNoticePart`, `ChatParentTable`, `ChatPartTime`, `ChatPlanPart`, `ChatReasoningPart`, `ChatStepFinishPart`, `ChatStepStartPart`, `ChatStore`, `ChatStoreInputError`, `ChatSubtaskPart`, `ChatTables`, `ChatTextPart`, `ChatThreadRow`, `ChatToolPart`, `ChatToolState`, `ChatToolStatus`, `ChatUsageTokens`, `ChatWorkProductPart`, `createChatStore`, `createChatTables`, `CreateChatTablesOptions`, `CreateThreadInput`, `DEFAULT_ATTACHMENT_PROMPT_HEADER`, `historyContentWithAttachments`, `isChatAttachmentPart`, `isChatInteractionPart`, `isChatMentionPart`, `isChatPlanPart`, `isChatStepFinishPart`, `isChatTextPart`, `isChatToolPart`, `isChatWorkProductPart`, `ListMessagesOptions`, `ListThreadsInput`, `ListThreadsResult`, `mentionInputToPart`, `mentionPartsFromMessageParts`, `NewChatMessageRow`, `NewChatThreadRow`, `StorableHarnessPartKind`, `threadTitleFromMessage`, `toChatMessageParts`, `UpdateMessageInput`, `WorkspaceAccessCheck`
 
 [Full API →](api/chat-store.md)
+
+## `./chatgpt-react`
+
+Source: `src/chatgpt-react/index.tsx` · 5 exports
+
+Depends on: `agent-enrollment`
+
+`ChatGPTAppMetadata`, `ChatGPTConnect`, `ChatGPTConnectionState`, `ChatGPTConnectProps`, `ChatGPTRegisteredConnection`
+
+[Full API →](api/chatgpt-react.md)
+
+## `./chatgpt-react/styles`
+
+Source: `src/chatgpt-react/styles.ts` · 0 exports
+
+Depends on: `agent-enrollment`
+
+_No public exports._
 
 ## `./config`
 
@@ -476,6 +496,8 @@ Depends on: `platform`, `web-react`
 
 Source: `src/interactions/index.ts` · 64 exports
 
+Depends on: `web`
+
 `abortSession`, `BeforeInteractionAnswerArgs`, `cancelStatusFor`, `canTransitionInteractionStatus`, `ChatFreeTextField`, `ChatInteraction`, `ChatInteractionField`, `ChatInteractionStatus`, `ChatSelectField`, `composerAnswerData`, `composerAnswerDeliveries`, `ComposerAnswerDelivery`, `createInteractionAnswerRoute`, `dedupeQuestionInteractionsByContent`, `DurableInteractionRouteArgs`, `DurableInteractionRoutePersistence`, `fieldAcceptsFreeText`, `getSessionState`, `INTERACTION_CANCEL_EVENT`, `INTERACTION_EVENT`, `INTERACTION_RESOLVED_EVENT`, `InteractionAnswerBodyValidation`, `InteractionAnswerRoute`, `InteractionAnswerRouteOptions`, `InteractionAnswers`, `InteractionAnswerValue`, `InteractionCancelData`, `InteractionClientOutcome`, `InteractionConnectionResolution`, `InteractionData`, `interactionFromWireRequest`, `InteractionOutcome`, `interactionPartKey`, `InteractionPersistedPart`, `InteractionRequest`, `InteractionRequestWire`, `InteractionRouteLogger`, `interactionToPersistedPart`, `isRenderableInteractionKind`, `isSafeInteractionFieldKey`, `isTerminalInteractionStatus`, `isTerminalSidecarState`, `listSessionInteractions`, `mapInteractionRespondFailure`, `NoticeKind`, `noticePart`, `noticePartKey`, `NoticePersistedPart`, `parseInteractionAnswers`, `ParseInteractionAnswersResult`, `parseInteractionCancel`, `parseInteractionRequest`, `ParseInteractionResult`, `persistedPartToInteraction`, `questionInteractionContentSignature`, `ResolveInteractionConnectionArgs`, `respondToSessionInteraction`, `SidecarAbortResult`, `SidecarInteractionsConnection`, `SidecarInteractionsError`, `SidecarInteractionsResult`, `SidecarSessionState`, `stampInteractionAnswers`, `validateInteractionAnswerBody`
 
 [Full API →](api/interactions.md)
@@ -545,6 +567,8 @@ Depends on: `crypto`
 ## `./openui`
 
 Source: `src/openui/index.ts` · 35 exports
+
+Depends on: `web`
 
 `createOpenUIActionRoute`, `describeOpenUIAction`, `hasOpenUISegment`, `isOpenUIFieldKind`, `isSafeOpenUIActionId`, `isSafeOpenUIFieldId`, `OPENUI_INPUT_KINDS`, `OPENUI_INTERACTIVE_AUTHORING_GUIDE`, `OpenUIActionBodyErrorCode`, `OpenUIActionBodyValidation`, `OpenUIActionHandler`, `OpenUIActionHandlerArgs`, `OpenUIActionLogger`, `OpenUIActionResolution`, `OpenUIActionResult`, `OpenUIActionRoute`, `OpenUIActionRouteOptions`, `OpenUIActionSubmission`, `OpenUIArtifact`, `OpenUIArtifactError`, `OpenUIArtifactResult`, `OpenUIFieldIssue`, `OpenUIFieldIssueCode`, `OpenUIFieldKind`, `OpenUIFieldSpec`, `OpenUIFormSpec`, `OpenUIFormValidation`, `OpenUIFormValues`, `OpenUINode`, `OpenUISegment`, `OpenUIValue`, `parseOpenUIArtifact`, `parseOpenUISegments`, `validateOpenUIActionBody`, `validateOpenUIFormValues`
 
