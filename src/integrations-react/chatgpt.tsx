@@ -15,17 +15,18 @@ export function ConnectToChatGPT(props: ConnectToChatGPTProps) {
   const view = chatGPTView(props)
   const failed = view.status === 'error' || view.status === 'unavailable'
   const registered = view.status === 'registered' || view.status === 'connected'
-  const scope = JSON.stringify([props.endpoint, props.enrollment, view.status])
+  const scope = JSON.stringify([props.endpoint, props.enrollment?.enrollmentId, props.enrollment?.agentId,
+    props.enrollment?.workspaceId, props.enrollment?.threadId, view.status])
   const external = { target: '_blank', rel: 'noopener noreferrer', referrerPolicy: 'no-referrer' } as const
 
   return <section
-    aria-labelledby={`${id}-title`}
+    aria-labelledby={`${id}-app ${id}-title`}
     aria-busy={view.status === 'checking' || undefined}
     data-chatgpt-state={view.status}
     className={cn('min-w-0 rounded-xl border border-border bg-card p-5 text-foreground sm:p-6', props.className)}
   >
     <header className="min-w-0">
-      <p className="mb-1 text-sm text-muted-foreground [overflow-wrap:anywhere]">{props.app?.name}</p>
+      <p id={`${id}-app`} className="mb-1 text-sm text-muted-foreground [overflow-wrap:anywhere]">{props.app?.name}</p>
       <h2 id={`${id}-title`} className="text-xl font-semibold tracking-tight">Connect to ChatGPT</h2>
     </header>
     <div className="mt-4 space-y-2" role={failed ? 'alert' : 'status'} aria-atomic="true">
