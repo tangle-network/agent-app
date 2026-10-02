@@ -22,7 +22,7 @@ function LineMessageAction({ line }: { line: LineSetupLine }) {
   const shared = !!line.connect && !!line.routerAddress
   const number = shared ? line.routerAddress : line.address
   if (!number || !/^\+[1-9]\d{7,14}$/.test(number)) return null
-  return <a className="tangle-lines__quiet" href={`sms:${number}?body=${encodeURIComponent(shared ? line.connect ?? '' : 'Hello')}`}>
+  return <a className="tangle-lines__primary tangle-lines__message-action" href={`sms:${number}?body=${encodeURIComponent(shared ? line.connect ?? '' : 'Hello')}`}>
     {shared ? 'Connect iMessage' : 'Text it now'}
   </a>
 }
