@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.51.5
+
+- fix(platform): accept empty Workerd Hub settings streams (#744)
+
+## 0.51.4
+
+- chore(ci): remove automatic PR checks and duplicate suites (#742)
+- feat(lines): offer owned Linq WhatsApp application TEST
+
+## 0.51.3
+
+- fix(channels): distinguish iMessage connection from direct texting (#739)
+
 ## 0.51.2
 
 - docs(agents): own delivery with focused checks (#740)

@@ -24,7 +24,6 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
       - run: pnpm build-storybook
       - name: Read the shared catalog attestor at an immutable revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

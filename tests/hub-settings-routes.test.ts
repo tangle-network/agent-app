@@ -157,6 +157,55 @@ describe('createHubSettingsRoutes: finite SDK settings boundary', () => {
 
 describe('method/path and input allowlists', () => {
   it.each([
+    ['/connections/c-1/health', 'POST'],
+    ['/connections/c-1', 'DELETE'],
+  ])('accepts an empty request stream for bodyless %s %s', async (path, method) => {
+    const f = fixture()
+    const req = new Request(`${BASE}${path}`, { method, body: '', headers: { 'Content-Length': '0' } })
+    expect(req.body).not.toBeNull()
+    expect((await f.routes.handle(req)).status).toBe(200)
+    expect(f.authorize).toHaveBeenCalledTimes(2)
+    expect(f.upstream).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects a nonempty stream on a bodyless route before authorization', async () => {
+    const f = fixture()
+    const req = new Request(`${BASE}/connections/c-1/health`, { method: 'POST', body: 'x', headers: { 'Content-Length': '0' } })
+    expect((await f.routes.handle(req)).status).toBe(400)
+    expect(f.authorize).not.toHaveBeenCalled()
+    expect(f.upstream).not.toHaveBeenCalled()
+  })
+
+  it('rejects bytes after an empty stream chunk before authorization', async () => {
+    const f = fixture()
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array())
+        controller.enqueue(new Uint8Array([120]))
+        controller.close()
+      },
+    })
+    const req = new Request(`${BASE}/connections/c-1/health`, { method: 'POST', body: stream, duplex: 'half' } as RequestInit & { duplex: 'half' })
+    expect((await f.routes.handle(req)).status).toBe(400)
+    expect(f.authorize).not.toHaveBeenCalled()
+    expect(f.upstream).not.toHaveBeenCalled()
+  })
+
+  it('bounds empty stream chunks before authorization', async () => {
+    const f = fixture()
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let index = 0; index < 17; index++) controller.enqueue(new Uint8Array())
+        controller.close()
+      },
+    })
+    const req = new Request(`${BASE}/connections/c-1/health`, { method: 'POST', body: stream, duplex: 'half' } as RequestInit & { duplex: 'half' })
+    expect((await f.routes.handle(req)).status).toBe(400)
+    expect(f.authorize).not.toHaveBeenCalled()
+    expect(f.upstream).not.toHaveBeenCalled()
+  })
+
+  it.each([
     '/exec', '/tokens', '/tokens/mint', '/apps', '/apps/app-1/grants', '/policies/allow-writes',
     '/policies/revert-writes', '/tools/search', '/tools/describe', '/workflows', '/v1/hub/exec',
     '/providers/', '/Providers', '/connections/c-1/health/extra', '/connections/c-1/start/extra',

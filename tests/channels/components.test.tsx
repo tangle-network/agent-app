@@ -17,8 +17,21 @@ describe('rendered channel surfaces', () => {
     mount(<ChannelVerificationPanel lineId="ln_demo" />, fake => { fake.state.test = channelTest() })
     expect(await screen.findByText('connect @helper')).toBeTruthy()
     expect(screen.getByText('TEST example-only')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Open Messages' }).getAttribute('href')).toBe('sms:+15550100001?body=connect%20%40helper')
+    expect(screen.getByText('Then send this to the number Inkbox sends you:')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Text it now' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Connect iMessage' }).getAttribute('href')).toBe('sms:+15550100001?body=connect%20%40helper')
     expect(screen.queryByRole('button', { name: 'Turn on messaging' })).toBeNull()
+  })
+
+  it('opens a dedicated iMessage line directly with the verification message', async () => {
+    mount(<ChannelVerificationPanel lineId="ln_demo" />, fake => {
+      fake.state.test = channelTest()
+      fake.state.line = channelLine({ address: '+15550100003', connect: null, routerAddress: null })
+    })
+    expect((await screen.findByRole('link', { name: 'Text it now' })).getAttribute('href'))
+      .toBe('sms:+15550100003?body=TEST%20example-only')
+    expect(screen.queryByRole('link', { name: 'Connect iMessage' })).toBeNull()
+    expect(screen.queryByText('Then send this to the number Inkbox sends you:')).toBeNull()
   })
 
   it('requires a second explicit click to stop verification', async () => {
@@ -134,7 +147,9 @@ describe('rendered channel surfaces', () => {
 
   it('validates public message and checkout links', () => {
     expect(channelMessageLink(channelLine({ transport: 'email', address: 'a@example.com', connect: null, routerAddress: null }), 'TEST x')).toBe('mailto:a%40example.com?subject=Channel%20test&body=TEST%20x')
-    expect(channelMessageLink(channelLine({ address: 'javascript:alert(1)', routerAddress: null }), 'x')).toBeNull()
+    expect(channelMessageLink(channelLine({ address: 'javascript:alert(1)', connect: null, routerAddress: null }), 'x')).toBeNull()
+    expect(channelMessageLink(channelLine({ connect: null }), 'TEST x')).toBeNull()
+    expect(channelMessageLink(channelLine({ routerAddress: null }), 'TEST x')).toBeNull()
     expect(() => safeCheckoutUrl('https://user:password@example.com')).toThrow()
     expect(() => safeCheckoutUrl('//example.com/evil')).toThrow()
     expect(() => safeCheckoutUrl('/\\example.com')).toThrow()

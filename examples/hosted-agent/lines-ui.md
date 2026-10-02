@@ -38,7 +38,13 @@ The server uses the published clients:
 
 The currently published Sandbox SDK supports iMessage, WhatsApp, and email in `fromConnection()`.
 Offer a transport only when the owned connection and deployed Hub can serve it.
-An Inkbox handle line returns `routerAddress` and `connect`; show both so a member knows to text `connect @handle`.
+An Inkbox handle line returns `routerAddress` and `connect`.
+Show its handle as the identity and label its action **Connect iMessage**.
+The router connects the member and replies with the number for their conversation.
+Tell the member to send their next message to that assigned number.
+Do not label `routerAddress` as the agent’s direct number or use it for a normal test message.
+A dedicated line can offer **Text it now** using its actual `address`.
+Never infer the assigned agent number from the provider’s `remote_number`; that field identifies the person.
 A dedicated number uses its existing owned connection.
 This UI does not order or buy a number.
 

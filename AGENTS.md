@@ -91,7 +91,7 @@ When the user authorizes scoped delivery, run relevant checks and report omitted
 For instruction-only changes, verify the diff and local links; preserve hooks and configured branch protections.
 A working-tree result does not prove all required files were committed.
 Do not tune `signoff.config.mjs` to hide a failure.
-Keep its source checks aligned with `.github/workflows/publish.yml` when changing either.
+Keep local verification available; the publish workflow owns artifact preparation and release identity.
 A local pass does not prove publishing or production behavior; check those results when claiming a release.
 Use the configured Git identity and omit co-authorship or AI-attribution trailers.
 

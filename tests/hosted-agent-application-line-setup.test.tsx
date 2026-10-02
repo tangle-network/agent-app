@@ -22,6 +22,55 @@ function verification(state: ApplicationSenderVerification['state']): Applicatio
 }
 
 describe('application line setup', () => {
+  it('verifies and attaches only an owned Linq WhatsApp number from a mixed inventory', async () => {
+    const user = userEvent.setup()
+    const client: ApplicationLineSetupClient = {
+      load: async () => ({
+        workspaceName: 'Research', lines: [],
+        targets: [{ id: 'thread_demo', label: 'Research conversation', kind: 'box', modes: ['shared'] }],
+        connections: [
+          { id: 'conn_linq', label: 'Owned Linq', providerId: 'linq-whatsapp', identities: [
+            { kind: 'number', transport: 'whatsapp', label: '+1 555 0100', requiresPhoneNumberId: true },
+            { kind: 'handle', transport: 'imessage', label: '@wrong-provider' },
+          ] },
+          { id: 'conn_other', label: 'Other provider', providerId: 'other-whatsapp', identities: [
+            { kind: 'number', transport: 'whatsapp', label: '+1 555 0199', phoneNumberId: 'pn_other' },
+          ] },
+        ],
+      }),
+      startSenderVerification: vi.fn(async () => ({
+        lineId, testId, state: 'awaiting_test' as const, testText: 'TEST WHATSAPP', expiresAt: expiresAt(),
+      })),
+      getSenderVerification: vi.fn(async () => verification('verified')),
+      connect: vi.fn(async () => {}),
+      disconnect: vi.fn(async () => {}),
+    }
+    render(<ApplicationLineSetup client={client} scopeKey="owner:workspace" canManage enabled />)
+
+    const connect = await screen.findByRole('button', { name: 'Connect WhatsApp' }) as HTMLButtonElement
+    expect(screen.getByText('+1 555 0100')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Inkbox handle' })).toBeNull()
+    expect(screen.queryByText('+1 555 0199')).toBeNull()
+    expect(connect.disabled).toBe(true)
+    const start = screen.getByRole('button', { name: 'Start phone test' }) as HTMLButtonElement
+    expect(start.disabled).toBe(true)
+    await user.type(screen.getByRole('textbox', { name: 'Existing provider number ID' }), 'pn_owned')
+    expect(start.disabled).toBe(false)
+    await user.click(start)
+    await waitFor(() => expect(client.startSenderVerification).toHaveBeenCalledWith({
+      connectionId: 'conn_linq', transport: 'whatsapp', phoneNumberId: 'pn_owned',
+      targetId: 'thread_demo', boxMode: 'shared',
+    }))
+    await user.click(await screen.findByRole('button', { name: 'Check verification' }))
+    expect(await screen.findByText('Phone verified. You can connect this line.')).toBeTruthy()
+    expect(connect.disabled).toBe(false)
+    await user.click(connect)
+    await waitFor(() => expect(client.connect).toHaveBeenCalledWith({
+      connectionId: 'conn_linq', transport: 'whatsapp', phoneNumberId: 'pn_owned',
+      targetId: 'thread_demo', boxMode: 'shared', senderVerificationId: testId, turnsPerDay: 20,
+    }))
+  })
+
   it('requires a signed phone proof before attach, then saves, reopens and disconnects', async () => {
     const user = userEvent.setup()
     let lines: LineSetupSnapshot['lines'] = []

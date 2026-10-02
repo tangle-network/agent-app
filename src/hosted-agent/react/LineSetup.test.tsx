@@ -25,6 +25,48 @@ function setup(snapshot: LineSetupSnapshot) {
 }
 
 describe('LineSetup choice display', () => {
+  it('labels the shared entry point as a connection, never the agent direct number', async () => {
+    setup({ ...singleChoice, lines: [{
+      id: 'ln_shared', connectionId: 'conn_inkbox', transport: 'imessage', address: '@research',
+      connect: 'connect @research', routerAddress: '+15550100002', providerNumberId: null,
+      status: 'active', answering: true, canDisconnect: true, targetId: 'thread_research',
+      targetLabel: 'Research conversation', boxMode: 'shared', lastTurn: { kind: 'none' },
+    }] })
+    const action = await screen.findByRole('link', { name: 'Connect iMessage' })
+    expect(action.getAttribute('href')).toBe('sms:+15550100002?body=connect%20%40research')
+    expect(screen.getByText('@research').tagName).toBe('STRONG')
+    expect(screen.getByText(/Then message the number Inkbox sends you/)).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Text it now' })).toBeNull()
+  })
+
+  it('messages a dedicated number directly without sending a shared connect command', async () => {
+    setup({ ...singleChoice, lines: [{
+      id: 'ln_direct', connectionId: 'conn_inkbox', transport: 'imessage', address: '+15550100003',
+      connect: null, routerAddress: null, providerNumberId: null,
+      status: 'active', answering: true, canDisconnect: true, targetId: 'thread_research',
+      targetLabel: 'Research conversation', boxMode: 'shared', lastTurn: { kind: 'none' },
+    }] })
+    expect((await screen.findByRole('link', { name: 'Text it now' })).getAttribute('href'))
+      .toBe('sms:+15550100003?body=Hello')
+    expect(screen.queryByRole('link', { name: 'Connect iMessage' })).toBeNull()
+    expect(screen.queryByText(/Then message the number Inkbox sends you/)).toBeNull()
+  })
+
+  it.each([
+    { connect: null, routerAddress: '+15550100002' },
+    { connect: 'connect @research', routerAddress: null },
+  ])('does not offer messaging from incomplete shared metadata: %j', async partial => {
+    setup({ ...singleChoice, lines: [{
+      id: 'ln_partial', connectionId: 'conn_inkbox', transport: 'imessage', address: '+15550100003',
+      ...partial, providerNumberId: null, status: 'active', answering: true,
+      canDisconnect: true, targetId: 'thread_research', targetLabel: 'Research conversation',
+      boxMode: 'shared', lastTurn: { kind: 'none' },
+    }] })
+    await screen.findByText('Research conversation · shared box')
+    expect(screen.queryByRole('link', { name: 'Connect iMessage' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Text it now' })).toBeNull()
+  })
+
   it('shows the only identity and target as facts while keeping connect available', async () => {
     const connect = setup(singleChoice)
     const button = await screen.findByRole('button', { name: 'Connect iMessage' })

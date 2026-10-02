@@ -32,7 +32,7 @@ Attach the proof — the report block, or the one-line `signoff PASS <sha> …` 
 
 ## What a green run proves
 
-The same source checks `.github/workflows/publish.yml` runs, in a clean `git worktree` with a `--frozen-lockfile` install into a pristine store:
+Local source checks run in a clean `git worktree` with a `--frozen-lockfile` install into a pristine store:
 
 | step | command |
 |---|---|
@@ -84,13 +84,9 @@ The gate holds no secrets, so every credentialed step is simply absent from the 
 - **The store cache is a speed lever, not a correctness one.** Correctness comes from `--frozen-lockfile` into a fresh `node_modules`; the cache only decides whether the bytes are already on disk.
 - **"Cold" is store-cold, not network-cold in the CI sense.** On a slower connection the cold column grows and the warm column does not.
 
-## What the post-merge workflow does
+## What the release workflow does
 
-`.github/workflows/publish.yml` runs the source checks on Node 24.18.0 and repeats them on a clean Node 22 runner before release work.
-A failure updates the rolling *Post-merge safety net is red on main* issue.
-A passing run builds and uploads the exact release tarballs.
-The release tag starts a second, short path that verifies and publishes those same bytes.
-It does not install dependencies, rebuild, or repeat the source checks.
-
-The source check list and `signoff.config.mjs` must stay identical.
-**Adding a check to one without the other makes the sign-off proof weaker than it reads.**
+The Publish workflow builds and retains exact release tarballs.
+The release tag starts publication, which verifies artifact identity and publishes those same bytes.
+It does not rebuild or repeat local source verification.
+Local sign-off remains available independently; hosted PR suites and the duplicate compatibility suite are retired.
