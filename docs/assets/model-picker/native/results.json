@@ -1,0 +1,20 @@
+{
+  "checks": [
+    "recovery preserves value, focus, and viewport geometry",
+    "portal Tab exits beside trigger and Escape restores focus",
+    "AgentSessionControls inline",
+    "AgentSessionControls compact",
+    "AgentSessionControls inline-harness-locked",
+    "AgentSessionControls compact-harness-locked",
+    "long names 1440 light",
+    "long names 1440 dark",
+    "long names 1280 light",
+    "long names 1280 dark",
+    "long names 390 light",
+    "long names 390 dark",
+    "long names 320 light",
+    "long names 320 dark",
+    "disabled triggers do not open"
+  ],
+  "errors": []
+}
