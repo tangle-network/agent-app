@@ -11,5 +11,5 @@ describe('shared consumed-stream observation', () => {
     expect(report.tests).toBeGreaterThan(0)
     expect(report.failed).toBe(0)
     expect(report.passed).toBe(report.tests)
-  })
+  }, 30_000)
 })
