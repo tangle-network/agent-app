@@ -106,7 +106,10 @@ function targetFromRow(row: EnrollmentRow): AgentEnrollmentTarget | null {
   }
 }
 
-/** Create an owner-scoped store backed by the caller's existing Drizzle D1. */
+/**
+ * Create an owner-scoped Drizzle D1 store; SQL `enrollment_id` must be explicitly `NOT NULL`.
+ * A config mismatch inserts NULL to roll back the entire claim batch.
+ */
 export function createDrizzleAgentEnrollmentStore(
   options: CreateDrizzleAgentEnrollmentStoreOptions,
 ): AgentEnrollmentStore {

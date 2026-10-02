@@ -93,6 +93,46 @@
       ]
     },
     {
+      "id": "./agent-enrollment/drizzle",
+      "source": "src/agent-enrollment/drizzle.ts",
+      "dependsOn": [
+        "hosted-agent"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "AgentEnrollmentClaimTable",
+          "kind": "type",
+          "signature": "type AgentEnrollmentClaimTable",
+          "doc": "The claim and its write-once native target share one enrollment row."
+        },
+        {
+          "name": "AgentEnrollmentDatabase",
+          "kind": "type",
+          "signature": "type AgentEnrollmentDatabase",
+          "doc": null
+        },
+        {
+          "name": "AgentInstanceClaimTable",
+          "kind": "type",
+          "signature": "type AgentInstanceClaimTable",
+          "doc": "Required Drizzle column properties; SQL column names remain product-owned."
+        },
+        {
+          "name": "createDrizzleAgentEnrollmentStore",
+          "kind": "function",
+          "signature": "(options: CreateDrizzleAgentEnrollmentStoreOptions) => AgentEnrollmentStore",
+          "doc": "Create an owner-scoped Drizzle D1 store; SQL `enrollment_id` must be explicitly `NOT NULL`."
+        },
+        {
+          "name": "CreateDrizzleAgentEnrollmentStoreOptions",
+          "kind": "interface",
+          "signature": "interface CreateDrizzleAgentEnrollmentStoreOptions",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./alerting",
       "source": "src/alerting/index.ts",
       "dependsOn": [],
