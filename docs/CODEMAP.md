@@ -36,7 +36,7 @@ _109 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./harness`](api/harness.md) | 14 | — |
 | [`./hosted-agent`](api/hosted-agent.md) | 26 | `profile`, `web` |
 | [`./hosted-agent/application`](api/hosted-agent-application.md) | 9 | `profile`, `web` |
-| [`./hosted-agent/react`](api/hosted-agent-react.md) | 26 | — |
+| [`./hosted-agent/react`](api/hosted-agent-react.md) | 29 | — |
 | [`./hosted-agent/react/styles`](api/hosted-agent-react-styles.md) | 0 | — |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `brand`, `intakes` |
@@ -398,9 +398,9 @@ Depends on: `profile`, `web`
 
 ## `./hosted-agent/react`
 
-Source: `src/hosted-agent/react/index.ts` · 26 exports
+Source: `src/hosted-agent/react/index.ts` · 29 exports
 
-`ApplicationLineConnectInput`, `ApplicationLineSetup`, `ApplicationLineSetupClient`, `ApplicationLineSetupProps`, `ApplicationSenderVerification`, `ApplicationSenderVerificationStart`, `ConnectableLineTransport`, `LineAnswerTarget`, `LineBilling`, `LineBillingProps`, `LineBillingView`, `LineBoxMode`, `LineConnectInput`, `LineConnectionOption`, `LineIdentityKind`, `LineIdentityOption`, `LineLastTurn`, `LineMemberRole`, `LineMembers`, `LineMembersClient`, `LineMembersProps`, `LineSetup`, `LineSetupClient`, `LineSetupLine`, `LineSetupProps`, `LineSetupSnapshot`
+`ApplicationLineConnectInput`, `ApplicationLineSetup`, `ApplicationLineSetupClient`, `ApplicationLineSetupProps`, `ApplicationSenderVerification`, `ApplicationSenderVerificationStart`, `ConnectableLineTransport`, `LineAnswerTarget`, `LineBilling`, `LineBillingProps`, `LineBillingView`, `LineBoxMode`, `LineConnectInput`, `LineConnectionOption`, `LineIdentityKind`, `LineIdentityOption`, `LineLastTurn`, `LineMemberRole`, `LineMembers`, `LineMembersClient`, `LineMembersProps`, `LineSetup`, `LineSetupClient`, `LineSetupLine`, `LineSetupProps`, `LineSetupSnapshot`, `SharedLineApp`, `SharedLineAppNotice`, `SharedLineAppNoticeProps`
 
 [Full API →](api/hosted-agent-react.md)
 

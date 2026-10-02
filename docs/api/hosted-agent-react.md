@@ -4,7 +4,7 @@
 
 Source: `src/hosted-agent/react/index.ts`
 
-26 exports.
+29 exports.
 
 ### `ApplicationLineConnectInput`
 
@@ -212,4 +212,28 @@ interface LineSetupProps
 
 ```ts
 interface LineSetupSnapshot
+```
+
+### `SharedLineApp`
+
+`interface`
+
+```ts
+interface SharedLineApp
+```
+
+### `SharedLineAppNotice`
+
+`function` — A quiet, dismissible notice for apps that the host verified share a phone thread.
+
+```ts
+({ apps, open, onKeepSharing, onRequestDedicatedNumber, }: SharedLineAppNoticeProps) => Element | null
+```
+
+### `SharedLineAppNoticeProps`
+
+`interface`
+
+```ts
+interface SharedLineAppNoticeProps
 ```
