@@ -1,0 +1,22 @@
+1a9fb04b456e8d96afde633197d4ce4008124d19bf3ade22c00e616818e8f74d  /tmp/agent-app1583-proof/candidate-1a9fb04.tgz
+$ pnpm@11.24.0 install --frozen-lockfile --strict-peer-dependencies --ignore-scripts
+exit 0; ✓ Lockfile passes supply-chain policies (verified 8s ago)
+$ tsc --noEmit (tsconfig skipLibCheck: false)
+exit 0
+$ vite build
+exit 0; dist/assets/index-DtabkKlg.js   428.80 kB │ gzip: 133.89 kB
+$ node proof.mjs
+exit 0
+{
+  "consumer": "packed agent-app 0.50.30 candidate",
+  "target": "Chromium 1440x900 and 390x844",
+  "selected": "hotel-b",
+  "decision": "ask",
+  "policyWrite": true,
+  "policyReread": true,
+  "reloadSelection": true,
+  "apiKeyConnection": true,
+  "horizontalOverflow": false,
+  "browserErrors": 0,
+  "media": "/tmp/agent-app1583-proof/media"
+}

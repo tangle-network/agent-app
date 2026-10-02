@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_106 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_107 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -42,6 +42,7 @@ _106 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./intakes/api`](api/intakes-api.md) | 3 | — |
 | [`./intakes/drizzle`](api/intakes-drizzle.md) | 18 | — |
 | [`./integrations`](api/integrations.md) | 10 | — |
+| [`./integrations-react`](api/integrations-react.md) | 18 | `platform`, `web-react` |
 | [`./interactions`](api/interactions.md) | 64 | — |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
@@ -440,6 +441,16 @@ Source: `src/integrations/index.ts` · 10 exports
 `HubExecClient`, `HubExecClientOptions`, `HubExecErrorCode`, `HubExecResult`, `HubInvokeDeps`, `HubInvokeInput`, `HubInvokeOutcome`, `invokeIntegrationHub`, `ParsedIntegrationAction`, `resolveIntegrationAction`
 
 [Full API →](api/integrations.md)
+
+## `./integrations-react`
+
+Source: `src/integrations-react/index.ts` · 18 exports
+
+Depends on: `platform`, `web-react`
+
+`createHubIntegrationsClient`, `HUB_CONNECT_CHANNEL`, `HUB_CONNECT_FAILED_MESSAGE_TYPE`, `HUB_CONNECTED_MESSAGE_TYPE`, `HubConnectCallbackPage`, `HubConnectCallbackPageProps`, `HubIntegrationCapabilities`, `HubIntegrationCapability`, `HubIntegrationsClient`, `HubIntegrationsIdentity`, `HubIntegrationsPanel`, `HubIntegrationsPanelProps`, `HubSettingsRequest`, `HubSettingsRequestFn`, `HubWriteReceipt`, `POPUP_TIMEOUT_MS`, `useHubIntegrations`, `UseHubIntegrationsOptions`
+
+[Full API →](api/integrations-react.md)
 
 ## `./interactions`
 

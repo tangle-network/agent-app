@@ -36,6 +36,7 @@ export default defineConfig({
     'turn-stream/index': 'src/turn-stream/index.ts',
     'turn-health/index': 'src/turn-health/index.ts',
     'integrations/index': 'src/integrations/index.ts',
+    'integrations-react/index': 'src/integrations-react/index.ts',
     'channels/index': 'src/channels/index.ts',
     'agent-enrollment/index': 'src/agent-enrollment/index.ts',
     'hosted-agent/index': 'src/hosted-agent/index.ts',
