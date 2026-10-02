@@ -7,6 +7,7 @@ _107 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | Entry | Exports | Depends on |
 |---|---|---|
 | [`./agent-enrollment`](api/agent-enrollment.md) | 13 | `hosted-agent` |
+| [`./agent-enrollment/drizzle`](api/agent-enrollment-drizzle.md) | 5 | `hosted-agent` |
 | [`./alerting`](api/alerting.md) | 8 | — |
 | [`./app-auth`](api/app-auth.md) | 13 | `platform` |
 | [`./assets`](api/assets.md) | 44 | — |
@@ -125,6 +126,16 @@ Depends on: `hosted-agent`
 `AgentEnrollmentClaim`, `AgentEnrollmentIdentity`, `AgentEnrollmentOptions`, `AgentEnrollmentRequest`, `AgentEnrollmentStore`, `AgentEnrollmentTarget`, `AuthenticatedSharedLinePrincipal`, `createAgentEnrollment`, `createEnrolledApplicationLineHandler`, `EnrolledApplicationLineOptions`, `EnrollmentTargetError`, `LiveSharedEnrollmentMember`, `ResolvedAgentEnrollment`
 
 [Full API →](api/agent-enrollment.md)
+
+## `./agent-enrollment/drizzle`
+
+Source: `src/agent-enrollment/drizzle.ts` · 5 exports
+
+Depends on: `hosted-agent`
+
+`AgentEnrollmentClaimTable`, `AgentEnrollmentDatabase`, `AgentInstanceClaimTable`, `createDrizzleAgentEnrollmentStore`, `CreateDrizzleAgentEnrollmentStoreOptions`
+
+[Full API →](api/agent-enrollment-drizzle.md)
 
 ## `./alerting`
 
