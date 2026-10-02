@@ -1,0 +1,25 @@
+{
+  "sourceBase": "4b9d4b87e20c87a437cc4f4732f897b0e925c4b1",
+  "artifactSource": "eb0fc29843aea96e9d82c8cfb4913d11c32cce8c",
+  "prHead": "68d6455c9e160e0c181d352872305f0d21b6d546",
+  "artifactId": 11252542035,
+  "afterControlsSHA256": "2a24fe4811b1aa84231284f7e83529b91e43f90a2b336fe6961860f70d02d585",
+  "environment": "Chromium via Python Playwright; actual PR #761 CI-built Storybook artifact, including its controls, installed AgentSessionControls composition, React 19.2.8 and theme CSS. ESM packaged offline as CommonJS without changing component logic. Not a full product/backend run.",
+  "checks": [
+    { "name": "after: Enter selects exactly once and restores focus", "passed": true },
+    { "name": "after: arrow navigation, Escape, Shift+Tab and forward Tab exit", "passed": true },
+    { "name": "after: distinct catalogue states, retry, retained query/value and pointer choice", "passed": true },
+    { "name": "after: native disabled and disable while open", "passed": true },
+    { "name": "after: compact Search associations and native Space selection", "passed": true },
+    { "name": "after: async growth and search shrink remain anchored above trigger", "passed": true },
+    { "name": "after: desktop light full names, viewport bounds, failure screenshot", "passed": true },
+    { "name": "after: installed compact quiet locked-harness composition desktop light", "passed": true },
+    { "name": "after: desktop dark full names, viewport bounds, failure screenshot", "passed": true },
+    { "name": "after: installed compact quiet locked-harness composition desktop dark", "passed": true },
+    { "name": "after: phone light full names, viewport bounds, failure screenshot", "passed": true },
+    { "name": "after: installed compact quiet locked-harness composition phone light", "passed": true },
+    { "name": "after: phone dark full names, viewport bounds, failure screenshot", "passed": true },
+    { "name": "after: installed compact quiet locked-harness composition phone dark", "passed": true }
+  ],
+  "consoleErrors": []
+}
