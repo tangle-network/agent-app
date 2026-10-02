@@ -2,11 +2,11 @@
 
 # agent-app code map
 
-_107 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_108 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
-| [`./agent-enrollment`](api/agent-enrollment.md) | 13 | `hosted-agent` |
+| [`./agent-enrollment`](api/agent-enrollment.md) | 15 | `hosted-agent` |
 | [`./agent-enrollment/drizzle`](api/agent-enrollment-drizzle.md) | 5 | `hosted-agent` |
 | [`./alerting`](api/alerting.md) | 8 | — |
 | [`./app-auth`](api/app-auth.md) | 13 | `platform` |
@@ -119,11 +119,11 @@ _107 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 ## `./agent-enrollment`
 
-Source: `src/agent-enrollment/index.ts` · 13 exports
+Source: `src/agent-enrollment/index.ts` · 15 exports
 
 Depends on: `hosted-agent`
 
-`AgentEnrollmentClaim`, `AgentEnrollmentIdentity`, `AgentEnrollmentOptions`, `AgentEnrollmentRequest`, `AgentEnrollmentStore`, `AgentEnrollmentTarget`, `AuthenticatedSharedLinePrincipal`, `createAgentEnrollment`, `createEnrolledApplicationLineHandler`, `EnrolledApplicationLineOptions`, `EnrollmentTargetError`, `LiveSharedEnrollmentMember`, `ResolvedAgentEnrollment`
+`AgentEnrollmentClaim`, `AgentEnrollmentIdentity`, `AgentEnrollmentOptions`, `AgentEnrollmentRequest`, `AgentEnrollmentStore`, `AgentEnrollmentTarget`, `AuthenticatedSharedLinePrincipal`, `createAgentEnrollment`, `createEnrolledApplicationLineHandler`, `EnrolledApplicationLineOptions`, `EnrollmentTargetError`, `LiveSharedEnrollmentMember`, `ObservedSharedLineApplicationRequest`, `ResolvedAgentEnrollment`, `SignedSharedLineApplicationRequest`
 
 [Full API →](api/agent-enrollment.md)
 

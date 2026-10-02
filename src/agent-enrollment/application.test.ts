@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { LineApplicationRequest } from '@tangle-network/sandbox/core'
 import { createEnrolledApplicationLineHandler, type LiveSharedEnrollmentMember } from './application'
 
-// Sandbox 0.59.0 drops subjectId. ADC's signed callback parser adds it before release.
+// The published parser drops these signed callback fields until ADC releases them.
 vi.mock('@tangle-network/sandbox/core', async importOriginal => {
   const actual = await importOriginal<typeof import('@tangle-network/sandbox/core')>()
   return {
@@ -10,12 +10,16 @@ vi.mock('@tangle-network/sandbox/core', async importOriginal => {
     parseLineApplicationRequest: (value: unknown) => ({
       ...actual.parseLineApplicationRequest(value),
       subjectId: (value as { subjectId?: unknown }).subjectId,
+      memberRevision: (value as { memberRevision?: unknown }).memberRevision,
+      dispatchFence: (value as { dispatchFence?: unknown }).dispatchFence,
+      dispatchDeadline: (value as { dispatchDeadline?: unknown }).dispatchDeadline,
     }),
   }
 })
 
 const binding = 'global-agent-app'
 const subjectId = 'customer-subject'
+const memberRevision = '2026-10-02T00:00:00.000Z'
 const base: LineApplicationRequest = {
   version: 1, binding, messageId: 'msg_builder', lineId: 'ln_shared',
   attachmentId: 'lat_shared', memberId: 'mem_customer', lineThreadId: 'thread_customer',
@@ -23,8 +27,10 @@ const base: LineApplicationRequest = {
   transport: 'imessage', receivedAt: '2026-10-02T00:00:00Z', text: '@builder hello',
 }
 
-function callback(text: string, messageId: string) {
-  const body = { ...base, subjectId, messageId, text }
+function callback(text: string, messageId: string, overrides: Record<string, unknown> = {}) {
+  const body = { ...base, subjectId, memberRevision,
+    dispatchFence: 'lease-1', dispatchDeadline: new Date(Date.now() + 30_000).toISOString(),
+    messageId, text, ...overrides }
   return new Request('https://app.example.com/shared-line', {
     method: 'POST', headers: { 'content-type': 'application/json',
       'idempotency-key': `line-application:${messageId}` },
@@ -36,7 +42,7 @@ function member(appId: string): LiveSharedEnrollmentMember {
   return {
     binding, subjectId, appId, lineId: base.lineId, attachmentId: base.attachmentId,
     memberId: base.memberId, ownerUserId: base.ownerUserId, senderAddress: base.sender.address,
-    grantRevision: 'revision-1',
+    grantRevision: 'revision-1', memberRevision,
     enrollmentId: `enrollment-${appId}`, agentId: `agent-${appId}`,
     workspaceId: `workspace-${appId}`, threadId: `thread-${appId}`,
   }
@@ -47,7 +53,7 @@ function fixture(allowed = new Set(['builder', 'other'])) {
   const resolved: string[] = []
   let grant = true
   const handler = createEnrolledApplicationLineHandler({
-    authenticate: async () => ({ principal: 'owner', binding }),
+    authenticate: async () => ({ principal: 'owner', binding, callbackCredentialId: 'credential-v1' }),
     selectApp: async (_auth, input) => input.text.split(' ')[0]?.slice(1) ?? '',
     lookup: async (_principal, inputBinding, inputSubject, appId) => grant && allowed.has(appId)
       && inputBinding === binding && inputSubject === subjectId ? member(appId) : null,
@@ -65,6 +71,77 @@ function fixture(allowed = new Set(['builder', 'other'])) {
 }
 
 describe('shared enrolled application line', () => {
+  it('denies a callback without a verified binding credential identity', async () => {
+    let lookedUp = false
+    const handler = createEnrolledApplicationLineHandler({
+      authenticate: async () => ({ principal: 'owner', binding, callbackCredentialId: '' }),
+      selectApp: async () => 'builder',
+      lookup: async () => { lookedUp = true; return member('builder') },
+      enrollment: { resolve: async () => { throw new Error('unverified callback') } },
+      read: async () => ({ state: 'missing' }),
+      admit: async () => { throw new Error('unverified callback') },
+    })
+    const response = await handler(callback('@builder hello', 'msg_no_credential'))
+    expect(response.status).toBe(403)
+    expect(lookedUp).toBe(false)
+  })
+
+  it('denies a stale signed Hub member revision before target resolution', async () => {
+    const f = fixture()
+    const response = await f.handler(callback('@builder hello', 'msg_stale_member',
+      { memberRevision: '2026-10-01T00:00:00.000Z' }))
+    expect(response.status).toBe(403)
+    expect(f.resolved).toEqual([])
+    expect(f.admitted).toEqual([])
+  })
+
+  it('denies expired, distant, and missing dispatch leases before admission', async () => {
+    for (const [name, lease] of [
+      ['expired', { dispatchDeadline: new Date(Date.now() - 1).toISOString() }],
+      ['distant', { dispatchDeadline: new Date(Date.now() + 61_000).toISOString() }],
+      ['malformed', { dispatchDeadline: 'not-a-deadline' }],
+      ['missing', { dispatchFence: undefined }],
+    ] as const) {
+      const f = fixture()
+      const response = await f.handler(callback('@builder hello', `msg_${name}`, lease))
+      expect(response.status).toBe(403)
+      expect(f.admitted).toEqual([])
+    }
+  })
+
+  it('rechecks the dispatch deadline after an awaited output read', async () => {
+    let admitted = false
+    let deadline = Date.now() + 30_000
+    const handler = createEnrolledApplicationLineHandler({
+      authenticate: async () => ({ principal: 'owner', binding, callbackCredentialId: 'credential-v1' }),
+      selectApp: async () => 'builder',
+      lookup: async () => member('builder'),
+      enrollment: { resolve: async () => ({ target: { ...member('builder') }, box: {}, session: {} }) as never },
+      read: async () => { vi.spyOn(Date, 'now').mockReturnValue(deadline + 1); return { state: 'missing' } },
+      admit: async () => { admitted = true },
+    })
+    try {
+      const response = await handler(callback('@builder hello', 'msg_expires_during_read',
+        { dispatchDeadline: new Date(deadline).toISOString() }))
+      expect(response.status).toBe(403)
+      expect(admitted).toBe(false)
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('observes an accepted execution after its dispatch lease is gone', async () => {
+    const f = fixture()
+    const first = await f.handler(callback('@builder hello', 'msg_accepted'))
+    expect(first.status).toBe(200)
+    const observed = await f.handler(callback('@builder hello', 'msg_accepted', {
+      acceptedExecutionId: 'exec_done', dispatchFence: undefined, dispatchDeadline: undefined,
+    }))
+    expect(observed.status).toBe(200)
+    expect((await observed.json()).text).toBe('agent-builder')
+    expect(f.admitted).toEqual(['enrollment-builder'])
+  })
+
   it('routes two allowed apps on one signed endpoint to distinct retained targets', async () => {
     const f = fixture()
     const builder = await f.handler(callback('@builder hello', 'msg_builder'))
@@ -97,7 +174,7 @@ describe('shared enrolled application line', () => {
     let enrollmentId = 'enrollment-builder'
     let revision = 'revision-1'
     const handler = createEnrolledApplicationLineHandler({
-      authenticate: async () => ({ principal: 'owner', binding }),
+      authenticate: async () => ({ principal: 'owner', binding, callbackCredentialId: 'credential-v1' }),
       selectApp: async () => 'builder',
       lookup: async () => ({ ...member('builder'), enrollmentId, grantRevision: revision }),
       enrollment: { resolve: async (_principal, id) => ({
@@ -117,7 +194,7 @@ describe('shared enrolled application line', () => {
   it('does not return output after the pinned SDK target generation changes', async () => {
     let generation = 1
     const handler = createEnrolledApplicationLineHandler({
-      authenticate: async () => ({ principal: 'owner', binding }),
+      authenticate: async () => ({ principal: 'owner', binding, callbackCredentialId: 'credential-v1' }),
       selectApp: async () => 'builder',
       lookup: async () => member('builder'),
       enrollment: { resolve: async () => ({
@@ -139,7 +216,7 @@ describe('shared enrolled application line', () => {
   it('denies a grant revision mutated on the same cached member object during resolution', async () => {
     const cached = member('builder')
     const handler = createEnrolledApplicationLineHandler({
-      authenticate: async () => ({ principal: 'owner', binding }),
+      authenticate: async () => ({ principal: 'owner', binding, callbackCredentialId: 'credential-v1' }),
       selectApp: async () => 'builder',
       lookup: async () => cached,
       enrollment: { resolve: async () => {
@@ -157,8 +234,9 @@ describe('shared enrolled application line', () => {
     let liveRevision = 'revision-1'
     let admitted = 0
     let suppliedRevision: string | undefined
+    let suppliedCredentialId: string | undefined
     const handler = createEnrolledApplicationLineHandler({
-      authenticate: async () => ({ principal: 'owner', binding }),
+      authenticate: async () => ({ principal: 'owner', binding, callbackCredentialId: 'credential-v1' }),
       selectApp: async () => 'builder',
       lookup: async () => ({ ...member('builder'), grantRevision: liveRevision }),
       enrollment: { resolve: async () => ({
@@ -167,7 +245,9 @@ describe('shared enrolled application line', () => {
       read: async () => ({ state: 'missing' }),
       admit: async (...args: unknown[]) => {
         const pinned = args[2] as LiveSharedEnrollmentMember | undefined
+        const authenticated = args[3] as { callbackCredentialId?: string } | undefined
         suppliedRevision = pinned?.grantRevision
+        suppliedCredentialId = authenticated?.callbackCredentialId
         liveRevision = 'revision-2'
         if (pinned?.grantRevision !== liveRevision) {
           throw Response.json({ error: { code: 'grant_changed' } }, { status: 403 })
@@ -178,6 +258,7 @@ describe('shared enrolled application line', () => {
     const response = await handler(callback('@builder hello', 'msg_revoke_before_admit'))
     expect(response.status).toBe(403)
     expect(suppliedRevision).toBe('revision-1')
+    expect(suppliedCredentialId).toBe('credential-v1')
     expect(admitted).toBe(0)
   })
 })
