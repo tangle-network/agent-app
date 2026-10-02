@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.10
+
+- fix: expose platform SSO declarations to NodeNext (#756)
+
 ## 0.51.9
 
 - fix: admit Hub SDK 0.23 cohort (#755)
