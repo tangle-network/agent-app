@@ -59,7 +59,7 @@ type AssignableWorkspaceRole
 `function` — True when `actual` is at least `minimum` on the organization ladder.
 
 ```ts
-(actual: "admin" | "owner" | "member" | "billing", minimum: "admin" | "owner" | "member" | "billing") => boolean
+(actual: "member" | "admin" | "owner" | "billing", minimum: "member" | "admin" | "owner" | "billing") => boolean
 ```
 
 ### `hasWorkspaceRole`
@@ -171,7 +171,7 @@ interface InviteValidationResult
 `const` — Map organization roles to their hierarchical rank for permission and access control purposes
 
 ```ts
-Record<"admin" | "owner" | "member" | "billing", number>
+Record<"member" | "admin" | "owner" | "billing", number>
 ```
 
 ### `ORGANIZATION_ROLES`
