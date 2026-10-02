@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { LineApplicationRequest } from '@tangle-network/sandbox/core'
 import { createEnrolledApplicationLineHandler, type LiveSharedEnrollmentMember } from './application'
 
-// The published parser drops these signed callback fields until ADC releases them.
+// The development cohort pins Sandbox 0.59, whose parser drops these signed callback fields.
 vi.mock('@tangle-network/sandbox/core', async importOriginal => {
   const actual = await importOriginal<typeof import('@tangle-network/sandbox/core')>()
   return {
