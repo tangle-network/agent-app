@@ -86,7 +86,8 @@ Exercise the real composed engine path and verify an applicable reference consum
 ## Merge and release
 
 Read [SIGNOFF.md](docs/SIGNOFF.md) before preparing a merge.
-For executable, dependency, build, export, or generated-template changes, run `pnpm signoff --source head` and attach its proof.
+For substantial runtime, dependency, build, export, or generated-template changes, default to `pnpm signoff --source head` and attach proof.
+When the user authorizes scoped delivery, run relevant checks and report omitted sign-off coverage; preserve hooks and enforced protections.
 For instruction-only changes, verify the diff and local links; preserve hooks and configured branch protections.
 A working-tree result does not prove all required files were committed.
 Do not tune `signoff.config.mjs` to hide a failure.
