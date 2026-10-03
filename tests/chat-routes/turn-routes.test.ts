@@ -428,6 +428,37 @@ describe('createChatTurnRoutes — turn', () => {
     expect(produce.mock.calls.map((call) => call[0]!.userMessageId)).toEqual([userRows[0]!.id, userRows[0]!.id])
   })
 
+  it('separates deliberate retry attempts while transport retries reuse the message and execution', async () => {
+    const produce = vi.fn((_args: ChatTurnProduceArgs<unknown>) => fakeProducer([{ type: 'text', text: 'ok' }], 'ok'))
+    const { routes, rows, ctx, pending } = makeRoutes({ produce })
+    const body = { threadId: 't-1', content: 'same question', turnId: 'turn-abc', mentions: [{ path: 'brief.md', name: 'brief.md' }] }
+    for (const retryAttemptId of [undefined, 'retry-1', 'retry-1', 'retry-2']) {
+      const response = await routes.turn(turnRequest({ ...body, retryAttemptId }), ctx)
+      expect(response.status).toBe(200)
+      await readLines(response.body!)
+      await Promise.all(pending.splice(0))
+    }
+    const attempts = produce.mock.calls.map(([args]) => args)
+    const ids = attempts.map(args => args.executionId)
+    expect(ids[0]).toBe('test-app:t-1:0')
+    expect(ids[1]).not.toBe(ids[0])
+    expect(ids[2]).toBe(ids[1])
+    expect(ids[3]).not.toBe(ids[1])
+    const userRows = rows.filter(row => row.role === 'user')
+    expect(userRows).toHaveLength(1)
+    expect(attempts.map(args => args.userMessageId)).toEqual(Array(4).fill(userRows[0]!.id))
+    expect(userRows[0]!.parts).toContainEqual(expect.objectContaining({ type: 'mention', path: 'brief.md' }))
+  })
+
+  it.each(['', 'bad/attempt', 'x'.repeat(65), 7])('rejects invalid retry attempt %j before producing', async (retryAttemptId) => {
+    const produce = vi.fn(() => fakeProducer([], ''))
+    const { routes, rows, ctx } = makeRoutes({ produce })
+    const response = await routes.turn(turnRequest({ threadId: 't-1', content: 'hello', turnId: 'turn-abc', retryAttemptId }), ctx)
+    expect(response.status).toBe(400)
+    expect(produce).not.toHaveBeenCalled()
+    expect(rows).toHaveLength(0)
+  })
+
   it('authorize insertUserMessage:false suppresses the user-row insert but still runs the turn', async () => {
     const produce = vi.fn((_args: ChatTurnProduceArgs<unknown>) => fakeProducer([{ type: 'text', text: 'ack' }], 'ack'))
     const { routes, rows, ctx, pending } = makeRoutes({

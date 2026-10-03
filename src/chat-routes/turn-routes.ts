@@ -653,6 +653,10 @@ function validateTurnBody(body: Record<string, unknown>, maxInlinePartBytes: num
   } catch (err) {
     throw new ChatTurnInputError(err instanceof Error ? err.message : 'Invalid turnId')
   }
+  const retryAttemptId = body.retryAttemptId
+  if (retryAttemptId !== undefined && (
+    typeof retryAttemptId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(retryAttemptId) || !turnId
+  )) throw new ChatTurnInputError('retryAttemptId requires turnId and 1–64 letters, digits, underscores, or hyphens')
   return {
     // The VALIDATED, deduped mention list replaces the raw one on the payload,
     // so every downstream seam (`authorize`, `contextGate`, `beforeTurn`,
@@ -823,11 +827,17 @@ export function createChatTurnRoutes<TContext = void>(
       userId,
       turnIndex: chatTurn.turnIndex,
     }
-    const executionId = deriveExecutionId({
+    const turnExecutionId = deriveExecutionId({
       projectId: options.projectId,
       sessionId: payload.threadId,
       turnIndex: chatTurn.turnIndex,
     })
+    // Message identity preserves the original inputs; an explicit retry starts
+    // another native execution with its own immutable completion receipt.
+    const executionId = payload.retryAttemptId
+      ? `${turnExecutionId}:retry:${payload.retryAttemptId}`
+      : turnExecutionId
+    if (executionId.length > 256) return errorResponse(new ChatTurnInputError('Retry execution id exceeds 256 bytes'))
     const turnStreamId = crypto.randomUUID()
 
     const prompt: string | ChatTurnPartInput[] =
