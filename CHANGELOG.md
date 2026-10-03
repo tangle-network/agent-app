@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.4
+
+- fix(chat): separate deliberate retry execution attempts
+
 ## 0.52.3
 
 - fix(chatgpt-react): compact the shared connection card
