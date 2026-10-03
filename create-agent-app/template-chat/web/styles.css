@@ -1,6 +1,9 @@
-@import 'tailwindcss';
+/* Shared compiled styles load before this app's utilities so its responsive and container variants win the cascade. */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
 @import '@tangle-network/sandbox-ui/styles';
 @import '@tangle-network/agent-app/styles';
+@import 'tailwindcss/utilities.css' layer(utilities);
 @config '../tailwind.config.mjs';
 
 /* Standalone consumer: scan installed public JS, never a monorepo src alias. */

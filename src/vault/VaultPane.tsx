@@ -25,7 +25,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from 'react'
-import { Download, Folder, Trash2 } from 'lucide-react'
+import { Download, Folder, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from './ConfirmDialog'
 import type {
   VaultEditorMode,
@@ -72,10 +72,10 @@ function operationMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
-function treeFailureMessage(failure: VaultOperationFailure): string {
+function treeFailureMessage(failure: VaultOperationFailure, label: string): string {
   if (failure.phase !== 'post-mutation-refresh') return failure.message
   const completed = failure.operation === 'create' ? 'created' : 'deleted'
-  return `The file was ${completed}, but the Vault couldn't refresh. ${failure.message}`
+  return `The file was ${completed}, but ${label} couldn't refresh. ${failure.message}`
 }
 
 interface TreePaths {
@@ -159,7 +159,7 @@ function filterNodes(nodes: VaultTreeNode[], q: string): VaultTreeNode[] {
   return out
 }
 
-class EditorErrorBoundary extends Component<{ children: ReactNode; onReset?: () => void }, { error: unknown }> {
+class EditorErrorBoundary extends Component<{ children: ReactNode; label: string; onReset?: () => void }, { error: unknown }> {
   state: { error: unknown } = { error: null }
   static getDerivedStateFromError(error: unknown) {
     return { error }
@@ -173,10 +173,10 @@ class EditorErrorBoundary extends Component<{ children: ReactNode; onReset?: () 
         ? this.state.error.message
         : typeof this.state.error === 'string'
           ? this.state.error
-          : 'Something went wrong loading the vault'
+          : `Something went wrong loading ${this.props.label}`
       return (
         <div className="flex h-full flex-1 flex-col items-center justify-center p-8 text-center">
-          <h3 className="mb-1 text-sm font-medium text-foreground">Vault failed to load</h3>
+          <h3 className="mb-1 text-sm font-medium text-foreground">{this.props.label} failed to load</h3>
           <p className="mb-4 max-w-xs text-xs text-muted-foreground">{String(msg)}</p>
           <button
             type="button"
@@ -256,11 +256,11 @@ function ReadErrorState({ message, onRetry }: { message: string; onRetry: () => 
   )
 }
 
-function TreeErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+function TreeErrorState({ label, message, onRetry }: { label: string; message: string; onRetry: () => void }) {
   return (
     <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
       <div>
-        <h3 className="text-sm font-medium text-foreground">Couldn't load the Vault</h3>
+        <h3 className="text-sm font-medium text-foreground">Couldn't load {label}</h3>
         <p className="mt-1 max-w-xs text-xs text-muted-foreground">{message}</p>
       </div>
       <button
@@ -325,7 +325,13 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     headerActions,
     onDownloadFile,
     pathBarClassName,
+    label = 'Vault',
+    emptyState,
+    fileActions,
   } = props
+  const noun = label.toLowerCase()
+  const canCreate = canWrite && (props.canCreate ?? true)
+  const canDelete = canWrite && (props.canDelete ?? true)
 
   const activeCodec = codec ?? IDENTITY_CODEC
   const controlled = controlledPath !== undefined
@@ -439,8 +445,8 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   )
   const activeFolder = activeFolderNode?.path ?? null
   const treeRoot = useMemo<VaultTreeNode>(
-    () => ({ name: 'Vault', path: '', type: 'directory', children: tree }),
-    [tree],
+    () => ({ name: label, path: '', type: 'directory', children: tree }),
+    [tree, label],
   )
   // With no query the whole vault stays on screen: the tree renderer owns
   // expansion (both sandbox-ui trees keep it internal), so re-rooting on a
@@ -505,7 +511,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
         context.operation,
         context.phase,
         error,
-        'Failed to load the Vault',
+        `Failed to load ${label}`,
         context.path,
       )
       setTreeError({ failure, context })
@@ -513,7 +519,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     } finally {
       if (request === treeRequestRef.current) setTreeLoading(false)
     }
-  }, [port, reportFailure])
+  }, [port, reportFailure, label])
 
   useEffect(() => {
     setTree([])
@@ -802,14 +808,14 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   if (!treeLoaded && (treeLoading || !treeError)) {
     treeContent = <TreeSkeleton />
   } else if (!treeLoaded && treeError) {
-    treeContent = <TreeErrorState message={treeFailureMessage(treeError.failure)} onRetry={() => void retryTree()} />
+    treeContent = <TreeErrorState label={label} message={treeFailureMessage(treeError.failure, label)} onRetry={() => void retryTree()} />
   } else {
     treeContent = (
       <>
         {treeError && (
           <OperationErrorAlert
-            message={treeFailureMessage(treeError.failure)}
-            retryLabel="Retry vault refresh"
+            message={treeFailureMessage(treeError.failure, label)}
+            retryLabel={`Retry ${noun} refresh`}
             onRetry={() => void retryTree()}
             onDismiss={() => setTreeError(null)}
           />
@@ -824,10 +830,10 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   }
 
   return (
-    <EditorErrorBoundary onReset={() => { commitPath(null); setSelectedFile(null) }}>
+    <EditorErrorBoundary label={label} onReset={() => { commitPath(null); setSelectedFile(null) }}>
       <div className={`flex min-h-0 min-w-0 flex-1 overflow-hidden ${className ?? ''}`}>
         <div className="@container/vault flex min-w-0 flex-1 flex-col">
-          <nav aria-label="Vault navigation" className="flex shrink-0 items-center gap-1 border-b border-border p-2 @[45rem]/vault:hidden">
+          <nav aria-label={`${label} navigation`} className="flex shrink-0 items-center gap-1 border-b border-border p-2 @[45rem]/vault:hidden">
             <button
               type="button"
               aria-pressed={showFiles}
@@ -866,7 +872,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={activeFolder ? `Search ${activeFolder}…` : 'Search…'}
-                    aria-label="Search vault"
+                    aria-label={`Search ${noun}`}
                     className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
@@ -874,20 +880,22 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                   {headerActions}
                   <button
                     type="button"
-                    aria-label="Refresh vault"
+                    aria-label={`Refresh ${noun}`}
+                    title="Refresh"
                     onClick={() => void refresh()}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
-                    ↻
+                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
                   </button>
-                  {canWrite && (
+                  {canCreate && (
                     <button
                       type="button"
-                      aria-label={activeFolder ? `New vault file in ${activeFolder}` : 'New vault file'}
+                      title="New file"
+                      aria-label={activeFolder ? `New ${noun} file in ${activeFolder}` : `New ${noun} file`}
                       onClick={() => { setCreateError(null); setNewPath(activeFolder ? `${activeFolder}/` : ''); setCreateOpen(true) }}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
                     >
-                      +
+                      <Plus className="h-4 w-4" aria-hidden="true" />
                     </button>
                   )}
                 </div>
@@ -922,7 +930,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
             <div
               ref={documentRef}
               role="region"
-              aria-label="Vault document"
+              aria-label={`${label} document`}
               tabIndex={-1}
               className={`${showFiles ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden @[45rem]/vault:flex`}
             >
@@ -977,6 +985,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                         {dockToggleCfg.label}
                       </button>
                     )}
+                    {fileActions?.(selectedFile)}
                     {onDownloadFile && (
                       <button
                         type="button"
@@ -988,7 +997,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                         <Download className="h-4 w-4" />
                       </button>
                     )}
-                    {canWrite && (
+                    {canDelete && (
                       <button
                         type="button"
                         aria-label="Delete this file"
@@ -1043,7 +1052,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                     onRichChange,
                     onSave: () => void saveCurrent(),
                   })
-                ) : null}
+                ) : (emptyState ?? null)}
               </div>
             </div>
           </div>
@@ -1057,8 +1066,8 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
 
         <ConfirmDialog
           open={createOpen}
-          title="Create vault file"
-          description={activeFolder ? `Add a new document to ${activeFolder}.` : 'Add a new document to this vault.'}
+          title={`Create ${noun} file`}
+          description={activeFolder ? `Add a new document to ${activeFolder}.` : `Add a new document to ${label}.`}
           confirmLabel={creating ? 'Creating…' : 'Create'}
           // A prefilled folder is a path with no file name yet, so emptiness is
           // not the test — `folder/` would otherwise be sent to the port as a
@@ -1083,7 +1092,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
         <ConfirmDialog
           open={deleteOpen}
           title="Delete file?"
-          description={`This permanently removes ${selectedFile?.path ?? 'this file'} from the vault.`}
+          description={`This permanently removes ${selectedFile?.path ?? 'this file'} from ${label}.`}
           confirmLabel={deleting ? 'Deleting…' : 'Delete file'}
           confirmDisabled={deleting}
           destructive
