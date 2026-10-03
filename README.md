@@ -132,7 +132,7 @@ Three decisions cover most of the surface.
 
 **1. How does the turn run?** Pick the transport by who's watching, not by feature.
 
-Each primitive is written `package → symbol`; three packages ship similarly-named turn functions, and AGENTS.md has the full [primitive table and the `runLoop` name-collision note](./AGENTS.md#turn-execution-primitives--which-one-when).
+Each primitive is written `package → symbol`; check its owning package before choosing among similarly named turn functions.
 
 | Your turn | Use | Why |
 |---|---|---|
