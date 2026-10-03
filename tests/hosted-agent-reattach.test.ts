@@ -71,6 +71,14 @@ describe('hosted email setup through the Sandbox SDK', () => {
     expect(hub.requests.every(request => request.method !== 'DELETE')).toBe(true)
   })
 
+  it('forwards the host-selected member instance namespace through the SDK', async () => {
+    const hub = emailHub()
+    const instance = { keyPrefix: 'product-mail:', create: { name: 'customer-home' } }
+    const agent = createHostedAgent({ client: hub.client, owner: OWNER, profile: {}, attachment: { instance } })
+    await agent.attachLine('hubconn_resend', { transport: 'email', address: MAILBOX })
+    expect(hub.requests.find(request => request.method === 'PUT')?.body?.instance).toEqual(instance)
+  })
+
   it.each(['guest', 'onboard'])('surfaces migration for legacy email %s admission before changing its attachment', async unknownSenders => {
     const backend = { profile: { name: 'Legacy Mail' } }
     const legacy = {

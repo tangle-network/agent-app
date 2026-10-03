@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.6
+
+- chore(deps): qualify Runtime 0.293 shared-core cohort (#767)
+
 ## 0.52.5
 
 - feat(workspace): share companion tool defaults and session navigation (#766)
