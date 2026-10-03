@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.15
+
+- docs(ui): lead with shared operational page composition (#778)
+
 ## 0.52.14
 
 - fix(deps): qualify sandbox-ui 0.121
