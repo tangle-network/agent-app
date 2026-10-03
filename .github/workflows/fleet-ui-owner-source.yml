@@ -1,0 +1,27 @@
+name: Fleet UI owner source
+on:
+  push:
+    branches: [verify/fleet-ui-parity-20261003]
+    paths: [.github/workflows/fleet-ui-owner-source.yml]
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Archive committed source
+        run: |
+          mkdir -p "$RUNNER_TEMP/ui-source"
+          git rev-parse HEAD > "$RUNNER_TEMP/ui-source/commit.txt"
+          git archive HEAD | gzip > "$RUNNER_TEMP/ui-source/source.tar.gz"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: fleet-ui-source
+          path: ${{ runner.temp }}/ui-source
+          retention-days: 3
+          if-no-files-found: error
