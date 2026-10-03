@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.5
+
+- feat(workspace): share companion tool defaults and session navigation (#766)
+
 ## 0.52.4
 
 - fix(chat): separate deliberate retry execution attempts
