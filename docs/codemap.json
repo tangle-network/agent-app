@@ -3504,7 +3504,8 @@
       "id": "./chatgpt-react",
       "source": "src/chatgpt-react/index.tsx",
       "dependsOn": [
-        "agent-enrollment"
+        "agent-enrollment",
+        "web-react"
       ],
       "error": null,
       "exports": [
@@ -3544,7 +3545,8 @@
       "id": "./chatgpt-react/styles",
       "source": "src/chatgpt-react/styles.ts",
       "dependsOn": [
-        "agent-enrollment"
+        "agent-enrollment",
+        "web-react"
       ],
       "error": null,
       "exports": []
@@ -18948,6 +18950,12 @@
       "error": null,
       "exports": [
         {
+          "name": "acquisitionFromRequest",
+          "kind": "function",
+          "signature": "(request: Request, now?: number, ignoredReferrerOrigins?: readonly string[]) => FirstTouchAcquisition | null",
+          "doc": "Capture only campaign fields and an external origin, never URL queries or referrer paths."
+        },
+        {
           "name": "addSecurityHeaders",
           "kind": "function",
           "signature": "(response: Response, opts?: SecurityHeaderOptions) => Response",
@@ -19012,6 +19020,18 @@
           "kind": "function",
           "signature": "(request: Request) => RequestContext",
           "doc": "Extract request context for audit trails."
+        },
+        {
+          "name": "FirstTouchAcquisition",
+          "kind": "interface",
+          "signature": "interface FirstTouchAcquisition",
+          "doc": "Untrusted acquisition hints."
+        },
+        {
+          "name": "firstTouchAcquisitionCookie",
+          "kind": "function",
+          "signature": "(request: Request, cookieName: string, now?: number, ignoredReferrerOrigins?: readonly string[]) => string | null",
+          "doc": "Host-only HttpOnly cookie survives a top-level sign-in round trip."
         },
         {
           "name": "FREE_ROUTE_BUDGETS",
@@ -19132,6 +19152,12 @@
           "kind": "function",
           "signature": "(cookieHeader: string | null, name: string) => string | null",
           "doc": "Read + decode one cookie from a Cookie request header; null when absent."
+        },
+        {
+          "name": "readFirstTouchAcquisition",
+          "kind": "function",
+          "signature": "(request: Request, cookieName: string, now?: number) => FirstTouchAcquisition | null",
+          "doc": "Reject expired, future, malformed, and oversized hints without affecting authentication."
         },
         {
           "name": "RequestContext",
@@ -22966,6 +22992,12 @@
           "doc": null
         },
         {
+          "name": "AgentWorkspaceCompanionNavigation",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceCompanionNavigation",
+          "doc": null
+        },
+        {
           "name": "AgentWorkspaceCompanionProps",
           "kind": "interface",
           "signature": "interface AgentWorkspaceCompanionProps",
@@ -22976,6 +23008,18 @@
           "kind": "interface",
           "signature": "interface AgentWorkspaceCompanionTab",
           "doc": null
+        },
+        {
+          "name": "AgentWorkspaceCompanionTool",
+          "kind": "type",
+          "signature": "type AgentWorkspaceCompanionTool",
+          "doc": null
+        },
+        {
+          "name": "AgentWorkspaceCompanionTools",
+          "kind": "type",
+          "signature": "type AgentWorkspaceCompanionTools",
+          "doc": "Supply only tools the product can actually serve."
         },
         {
           "name": "AgentWorkspaceLayout",
@@ -22994,6 +23038,12 @@
           "kind": "interface",
           "signature": "interface AgentWorkspaceSessionConfig",
           "doc": "The session data and product-owned URLs needed by the default workspace."
+        },
+        {
+          "name": "createAgentWorkspaceCompanionTabs",
+          "kind": "function",
+          "signature": "(tools: Partial<Record<AgentWorkspaceCompanionTool, (state: { active: boolean; }) => ReactNode>>) => AgentWorkspaceComp…",
+          "doc": "Canonical order, labels, icons and lazy retention for companion tools."
         }
       ]
     }

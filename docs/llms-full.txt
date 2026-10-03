@@ -4537,7 +4537,7 @@ type WorkspaceAccessCheck
 
 ## `./chatgpt-react`
 
-Source: `src/chatgpt-react/index.tsx` · depends on `agent-enrollment`
+Source: `src/chatgpt-react/index.tsx` · depends on `agent-enrollment`, `web-react`
 
 ### `ChatGPTAppMetadata`
 
@@ -4582,7 +4582,7 @@ interface ChatGPTRegisteredConnection
 
 ## `./chatgpt-react/styles`
 
-Source: `src/chatgpt-react/styles.ts` · depends on `agent-enrollment`
+Source: `src/chatgpt-react/styles.ts` · depends on `agent-enrollment`, `web-react`
 
 _No public exports._
 
@@ -24460,6 +24460,14 @@ interface VaultDeletionPolicy
 
 Source: `src/web/index.ts`
 
+### `acquisitionFromRequest`
+
+`function` — Capture only campaign fields and an external origin, never URL queries or referrer paths.
+
+```ts
+(request: Request, now?: number, ignoredReferrerOrigins?: readonly string[]) => FirstTouchAcquisition | null
+```
+
 ### `addSecurityHeaders`
 
 `function` — Set standard security headers on a response (HSTS, nosniff, frame-options, referrer-policy, XSS) + optional product disclaimer/retention.
@@ -24546,6 +24554,22 @@ interface CookieOptions
 
 ```ts
 (request: Request) => RequestContext
+```
+
+### `FirstTouchAcquisition`
+
+`interface` — Untrusted acquisition hints.
+
+```ts
+interface FirstTouchAcquisition
+```
+
+### `firstTouchAcquisitionCookie`
+
+`function` — Host-only HttpOnly cookie survives a top-level sign-in round trip.
+
+```ts
+(request: Request, cookieName: string, now?: number, ignoredReferrerOrigins?: readonly string[]) => string | null
 ```
 
 ### `FREE_ROUTE_BUDGETS`
@@ -24706,6 +24730,14 @@ interface RateLimitResult
 
 ```ts
 (cookieHeader: string | null, name: string) => string | null
+```
+
+### `readFirstTouchAcquisition`
+
+`function` — Reject expired, future, malformed, and oversized hints without affecting authentication.
+
+```ts
+(request: Request, cookieName: string, now?: number) => FirstTouchAcquisition | null
 ```
 
 ### `RequestContext`
@@ -29708,6 +29740,14 @@ ForwardRefExoticComponent<AgentWorkspaceCompanionProps & RefAttributes<AgentWork
 interface AgentWorkspaceCompanionHandle
 ```
 
+### `AgentWorkspaceCompanionNavigation`
+
+`interface`
+
+```ts
+interface AgentWorkspaceCompanionNavigation
+```
+
 ### `AgentWorkspaceCompanionProps`
 
 `interface`
@@ -29722,6 +29762,22 @@ interface AgentWorkspaceCompanionProps
 
 ```ts
 interface AgentWorkspaceCompanionTab
+```
+
+### `AgentWorkspaceCompanionTool`
+
+`type`
+
+```ts
+type AgentWorkspaceCompanionTool
+```
+
+### `AgentWorkspaceCompanionTools`
+
+`type` — Supply only tools the product can actually serve.
+
+```ts
+type AgentWorkspaceCompanionTools
 ```
 
 ### `AgentWorkspaceLayout`
@@ -29746,4 +29802,12 @@ interface AgentWorkspaceLayoutProps
 
 ```ts
 interface AgentWorkspaceSessionConfig
+```
+
+### `createAgentWorkspaceCompanionTabs`
+
+`function` — Canonical order, labels, icons and lazy retention for companion tools.
+
+```ts
+(tools: Partial<Record<AgentWorkspaceCompanionTool, (state: { active: boolean; }) => ReactNode>>) => AgentWorkspaceComp…
 ```

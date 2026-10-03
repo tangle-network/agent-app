@@ -4,7 +4,15 @@
 
 Source: `src/web/index.ts`
 
-39 exports.
+43 exports.
+
+### `acquisitionFromRequest`
+
+`function` — Capture only campaign fields and an external origin, never URL queries or referrer paths.
+
+```ts
+(request: Request, now?: number, ignoredReferrerOrigins?: readonly string[]) => FirstTouchAcquisition | null
+```
 
 ### `addSecurityHeaders`
 
@@ -92,6 +100,22 @@ interface CookieOptions
 
 ```ts
 (request: Request) => RequestContext
+```
+
+### `FirstTouchAcquisition`
+
+`interface` — Untrusted acquisition hints.
+
+```ts
+interface FirstTouchAcquisition
+```
+
+### `firstTouchAcquisitionCookie`
+
+`function` — Host-only HttpOnly cookie survives a top-level sign-in round trip.
+
+```ts
+(request: Request, cookieName: string, now?: number, ignoredReferrerOrigins?: readonly string[]) => string | null
 ```
 
 ### `FREE_ROUTE_BUDGETS`
@@ -252,6 +276,14 @@ interface RateLimitResult
 
 ```ts
 (cookieHeader: string | null, name: string) => string | null
+```
+
+### `readFirstTouchAcquisition`
+
+`function` — Reject expired, future, malformed, and oversized hints without affecting authentication.
+
+```ts
+(request: Request, cookieName: string, now?: number) => FirstTouchAcquisition | null
 ```
 
 ### `RequestContext`
