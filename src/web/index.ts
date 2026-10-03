@@ -2,3 +2,4 @@
 export * from './core'
 export * from './message-groups'
 export * from './api-key-fetch'
+export * from './acquisition'
