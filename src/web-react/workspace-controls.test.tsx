@@ -56,7 +56,7 @@ describe('shared workspace switcher', () => {
   it('preserves the selected ID when available items change', () => {
     const change = vi.fn()
     const { rerender } = render(<WorkspaceSwitcher items={items} value="a" onChange={change} />)
-    rerender(<WorkspaceSwitcher items={[items[1]]} value="a" onChange={change} />)
+    rerender(<WorkspaceSwitcher items={[items[1]!]} value="a" onChange={change} />)
     expect(change).not.toHaveBeenCalled()
     expect(screen.getByRole('button').getAttribute('aria-label')).toContain('Select workspace')
   })
@@ -117,7 +117,7 @@ describe('shared agent settings', () => {
     expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(true)
   })
   it('closes the nested model picker before its parent settings', () => {
-    render(<AgentSettingsPopover><ModelPicker models={models} value={models[0].id} onChange={vi.fn()} /></AgentSettingsPopover>)
+    render(<AgentSettingsPopover><ModelPicker models={models} value={models[0]!.id} onChange={vi.fn()} /></AgentSettingsPopover>)
     fireEvent.click(screen.getByRole('button', { name: 'Agent settings' }))
     const settings = screen.getByRole('dialog', { name: 'Agent settings' })
     const model = within(settings).getByRole('button')
@@ -131,7 +131,7 @@ describe('shared agent settings', () => {
   })
   it('grouped controls retain the complete provided effort ladder and pinned harness', () => {
     const onHarnessChange = vi.fn()
-    render(<AgentSessionControls models={models} model={models[0].id} onModelChange={vi.fn()} harness="opencode" onHarnessChange={onHarnessChange}
+    render(<AgentSessionControls models={models} model={models[0]!.id} onModelChange={vi.fn()} harness="opencode" onHarnessChange={onHarnessChange}
       effort="max" onEffortChange={vi.fn()} effortLevels={[{ id: 'max', label: 'Maximum' }]}
       layout="grouped" harnessLockReason="This conversation is pinned" profileControl={<button type="button">Domain profile</button>} />)
     fireEvent.click(screen.getByRole('button', { name: 'Agent settings' }))
@@ -144,7 +144,7 @@ describe('shared agent settings', () => {
     expect(onHarnessChange).not.toHaveBeenCalled()
   })
   it('omits unsupported harness and reasoning controls', () => {
-    render(<AgentSessionControls models={[{ ...models[0], supportsReasoning: false }]} model={models[0].id} onModelChange={vi.fn()} harness="opencode" onHarnessChange={vi.fn()} effort="auto" onEffortChange={vi.fn()} layout="grouped" showHarness={false} />)
+    render(<AgentSessionControls models={[{ ...models[0]!, supportsReasoning: false }]} model={models[0]!.id} onModelChange={vi.fn()} harness="opencode" onHarnessChange={vi.fn()} effort="auto" onEffortChange={vi.fn()} layout="grouped" showHarness={false} />)
     fireEvent.click(screen.getByRole('button'))
     expect(screen.queryByText('Thinking')).toBeNull()
     expect(screen.queryByText('Agent backend')).toBeNull()

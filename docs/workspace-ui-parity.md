@@ -35,3 +35,7 @@ Source imports alone do not establish visual parity. Preserve each application's
 review/approval behavior and auth/billing calls; a UI migration grants no new
 execution authority. New exports require normal release and package-manager
 adoption before a consumer is ready to merge.
+
+AgentProfileChoices supplies selection-only inline rows inside agent settings.
+It reuses the profile picker's catalog contract; full authoring remains with the
+existing profile editor. Locked conversations offer only the host new-chat action.
