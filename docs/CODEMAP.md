@@ -21,8 +21,8 @@ _111 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./chat-react`](api/chat-react.md) | 5 | `web-react` |
 | [`./chat-routes`](api/chat-routes.md) | 213 | `chat-store`, `interactions`, `model-resolution`, `plans`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `web` |
 | [`./chat-store`](api/chat-store.md) | 64 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
-| [`./chatgpt-react`](api/chatgpt-react.md) | 5 | `agent-enrollment` |
-| [`./chatgpt-react/styles`](api/chatgpt-react-styles.md) | 0 | `agent-enrollment` |
+| [`./chatgpt-react`](api/chatgpt-react.md) | 5 | `agent-enrollment`, `web-react` |
+| [`./chatgpt-react/styles`](api/chatgpt-react-styles.md) | 0 | `agent-enrollment`, `web-react` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
 | [`./crypto`](api/crypto.md) | 10 | `billing` |
 | [`./design-canvas`](api/design-canvas.md) | 103 | `tools`, `web` |
@@ -108,7 +108,7 @@ _111 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./vault`](api/vault.md) | 18 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
-| [`./web`](api/web.md) | 39 | — |
+| [`./web`](api/web.md) | 43 | — |
 | [`./web-react`](api/web-react.md) | 435 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/async`](api/web-react-async.md) | 35 | — |
 | [`./web-react/session-gateway`](api/web-react-session-gateway.md) | 22 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
@@ -116,7 +116,7 @@ _111 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
 | [`./workspace-apps`](api/workspace-apps.md) | 17 | — |
-| [`./workspace-react`](api/workspace-react.md) | 9 | `session-shell`, `workspace-apps` |
+| [`./workspace-react`](api/workspace-react.md) | 13 | `session-shell`, `workspace-apps` |
 
 ---
 
@@ -262,7 +262,7 @@ Depends on: `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-reac
 
 Source: `src/chatgpt-react/index.tsx` · 5 exports
 
-Depends on: `agent-enrollment`
+Depends on: `agent-enrollment`, `web-react`
 
 `ChatGPTAppMetadata`, `ChatGPTConnect`, `ChatGPTConnectionState`, `ChatGPTConnectProps`, `ChatGPTRegisteredConnection`
 
@@ -272,7 +272,7 @@ Depends on: `agent-enrollment`
 
 Source: `src/chatgpt-react/styles.ts` · 0 exports
 
-Depends on: `agent-enrollment`
+Depends on: `agent-enrollment`, `web-react`
 
 _No public exports._
 
@@ -1042,9 +1042,9 @@ Source: `src/vault/server.ts` · 8 exports
 
 ## `./web`
 
-Source: `src/web/index.ts` · 39 exports
+Source: `src/web/index.ts` · 43 exports
 
-`addSecurityHeaders`, `ApiKeyFetch`, `ApiKeyFetchOptions`, `assertMediaUrl`, `checkFreeRouteLimit`, `checkRateLimit`, `clearCookieHeader`, `ConversationGroupItem`, `CookieOptions`, `createApiKeyFetch`, `extractRequestContext`, `FREE_ROUTE_BUDGETS`, `FreeRouteAllowance`, `FreeRouteClass`, `FreeRouteDenialReason`, `FreeRouteDimension`, `FreeRouteIdentity`, `FreeRouteLimitError`, `FreeRouteLimitInput`, `FreeRouteLimitOutcome`, `freeRouteLimitResponse`, `FreeRouteLimitResponseOptions`, `groupConversationMessages`, `GroupedConversationItem`, `isWorkspaceFileExportable`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitBudget`, `RateLimitResult`, `readCookieValue`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `STANDARD_SECURITY_HEADERS`, `withFreeRouteLimit`, `WithFreeRouteLimitOptions`, `WORKSPACE_BUDGET_MULTIPLIER`
+`acquisitionFromRequest`, `addSecurityHeaders`, `ApiKeyFetch`, `ApiKeyFetchOptions`, `assertMediaUrl`, `checkFreeRouteLimit`, `checkRateLimit`, `clearCookieHeader`, `ConversationGroupItem`, `CookieOptions`, `createApiKeyFetch`, `extractRequestContext`, `FirstTouchAcquisition`, `firstTouchAcquisitionCookie`, `FREE_ROUTE_BUDGETS`, `FreeRouteAllowance`, `FreeRouteClass`, `FreeRouteDenialReason`, `FreeRouteDimension`, `FreeRouteIdentity`, `FreeRouteLimitError`, `FreeRouteLimitInput`, `FreeRouteLimitOutcome`, `freeRouteLimitResponse`, `FreeRouteLimitResponseOptions`, `groupConversationMessages`, `GroupedConversationItem`, `isWorkspaceFileExportable`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitBudget`, `RateLimitResult`, `readCookieValue`, `readFirstTouchAcquisition`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `STANDARD_SECURITY_HEADERS`, `withFreeRouteLimit`, `WithFreeRouteLimitOptions`, `WORKSPACE_BUDGET_MULTIPLIER`
 
 [Full API →](api/web.md)
 
@@ -1116,10 +1116,10 @@ Source: `src/workspace-apps/index.ts` · 17 exports
 
 ## `./workspace-react`
 
-Source: `src/workspace-react/index.tsx` · 9 exports
+Source: `src/workspace-react/index.tsx` · 13 exports
 
 Depends on: `session-shell`, `workspace-apps`
 
-`AgentWorkspaceActiveRoute`, `AgentWorkspaceAppsConfig`, `AgentWorkspaceCompanion`, `AgentWorkspaceCompanionHandle`, `AgentWorkspaceCompanionProps`, `AgentWorkspaceCompanionTab`, `AgentWorkspaceLayout`, `AgentWorkspaceLayoutProps`, `AgentWorkspaceSessionConfig`
+`AgentWorkspaceActiveRoute`, `AgentWorkspaceAppsConfig`, `AgentWorkspaceCompanion`, `AgentWorkspaceCompanionHandle`, `AgentWorkspaceCompanionNavigation`, `AgentWorkspaceCompanionProps`, `AgentWorkspaceCompanionTab`, `AgentWorkspaceCompanionTool`, `AgentWorkspaceCompanionTools`, `AgentWorkspaceLayout`, `AgentWorkspaceLayoutProps`, `AgentWorkspaceSessionConfig`, `createAgentWorkspaceCompanionTabs`
 
 [Full API →](api/workspace-react.md)

@@ -4,7 +4,7 @@
 
 Source: `src/workspace-react/index.tsx`
 
-9 exports.
+13 exports.
 
 ### `AgentWorkspaceActiveRoute`
 
@@ -38,6 +38,14 @@ ForwardRefExoticComponent<AgentWorkspaceCompanionProps & RefAttributes<AgentWork
 interface AgentWorkspaceCompanionHandle
 ```
 
+### `AgentWorkspaceCompanionNavigation`
+
+`interface`
+
+```ts
+interface AgentWorkspaceCompanionNavigation
+```
+
 ### `AgentWorkspaceCompanionProps`
 
 `interface`
@@ -52,6 +60,22 @@ interface AgentWorkspaceCompanionProps
 
 ```ts
 interface AgentWorkspaceCompanionTab
+```
+
+### `AgentWorkspaceCompanionTool`
+
+`type`
+
+```ts
+type AgentWorkspaceCompanionTool
+```
+
+### `AgentWorkspaceCompanionTools`
+
+`type` — Supply only tools the product can actually serve.
+
+```ts
+type AgentWorkspaceCompanionTools
 ```
 
 ### `AgentWorkspaceLayout`
@@ -76,4 +100,12 @@ interface AgentWorkspaceLayoutProps
 
 ```ts
 interface AgentWorkspaceSessionConfig
+```
+
+### `createAgentWorkspaceCompanionTabs`
+
+`function` — Canonical order, labels, icons and lazy retention for companion tools.
+
+```ts
+(tools: Partial<Record<AgentWorkspaceCompanionTool, (state: { active: boolean; }) => ReactNode>>) => AgentWorkspaceComp…
 ```
