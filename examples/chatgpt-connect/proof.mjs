@@ -18,8 +18,9 @@ try {
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
     await page.goto(`${base}/?app=${app}&theme=${theme}`)
-    await page.getByRole('heading', { name: 'Your agent, in ChatGPT' }).waitFor()
+    await page.getByRole('heading', { name: 'ChatGPT', exact: true }).waitFor()
     assert.equal(await page.getByRole('status').textContent(), 'Ready to connect')
+    const closedCardHeight = await page.locator('.tangle-chatgpt').evaluate(node => node.getBoundingClientRect().height)
     if (video) await page.screenshot({ path: `${output}/${label}-initial.png`, fullPage: true })
     await page.keyboard.press('Tab')
     const primary = page.getByRole('button', { name: 'Connect to ChatGPT', exact: true })
@@ -53,7 +54,7 @@ try {
     await page.getByText('Ready to connect', { exact: true }).waitFor()
     assert.equal(await page.locator('[data-checks]').textContent(), '1')
     assert.deepEqual(errors, [])
-    results.push({ app, theme, width, keyboard: true, clipboard: true, hostCallback: true, violations, errors, ...dimensions })
+    results.push({ app, theme, width, closedCardHeight, keyboard: true, clipboard: true, hostCallback: true, violations, errors, ...dimensions })
     const recording = page.video()
     await context.close()
     if (video) copyFileSync(await recording.path(), `${output}/${label}-original.webm`)
@@ -62,7 +63,7 @@ try {
   const page = await context.newPage()
   for (const state of ['checking', 'connected', 'error']) {
     await page.goto(`${base}/?app=creative&theme=dark&state=${state}`)
-    await page.getByRole('heading', { name: 'Your agent, in ChatGPT' }).waitFor()
+    await page.getByRole('heading', { name: 'ChatGPT', exact: true }).waitFor()
     await page.screenshot({ path: `${output}/creative-${state}.png`, fullPage: true })
     if (state === 'connected') assert.equal(await page.getByText('Connected to ChatGPT', { exact: true }).count(), 1)
     if (state === 'error') {

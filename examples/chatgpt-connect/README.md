@@ -4,7 +4,9 @@
 `@tangle-network/chatgpt-agents-kit` over their native enrollment. It provides one
 primary action, supported setup instructions, endpoint copying, and controlled
 connection states. The module uses Tangle UI Button/Input and the app's Brand
-light/dark tokens. It does not make network requests or retain credentials.
+light/dark tokens, the shared provider logo, and StatusPill. The compact row
+keeps setup and native IDs behind explicit controls and adapts to its embedding
+container. It does not make network requests or retain credentials.
 
 ```tsx
 import { ChatGPTConnect } from '@tangle-network/agent-app/chatgpt-react'
