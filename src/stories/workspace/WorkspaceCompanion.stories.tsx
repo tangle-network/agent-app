@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useMemo, useState } from 'react'
-import { RichFileTree } from '@tangle-network/ui/files'
+import { WorkspaceFilesPane } from '@tangle-network/sandbox-ui/workspace'
 import { AgentWorkspaceCompanion, type AgentWorkspaceCompanionTools } from '../../workspace-react'
 
 const documents: Record<string, string> = {
@@ -9,12 +9,20 @@ const documents: Record<string, string> = {
 }
 function FilesPane() {
   const [selected, setSelected] = useState<string>()
-  return selected ? (
-    <div className="flex h-full flex-col">
-      <button className="border-b border-border p-3 text-left text-sm" onClick={() => setSelected(undefined)}>Files</button>
-      <article className="overflow-auto p-4 text-sm leading-7"><h2 className="mb-4 font-medium">{selected.split('/').at(-1)}</h2><p className="whitespace-pre-wrap">{documents[selected]}</p></article>
-    </div>
-  ) : <RichFileTree style={{ colorScheme: 'inherit' }} paths={Object.keys(documents)} selectedPath={selected} onSelect={setSelected} />
+  return (
+    <WorkspaceFilesPane
+      paths={Object.keys(documents)}
+      selectedPath={selected}
+      onSelect={(path) => {
+        if (Object.hasOwn(documents, path)) setSelected(path)
+      }}
+      onBack={() => setSelected(undefined)}
+      preview={selected ? {
+        path: selected,
+        content: <article className="p-4 text-sm leading-7"><p className="whitespace-pre-wrap">{documents[selected]}</p></article>,
+      } : undefined}
+    />
+  )
 }
 function TerminalPane() {
   const [text, setText] = useState('')

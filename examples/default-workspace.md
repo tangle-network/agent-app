@@ -221,6 +221,12 @@ thread rail would obscure their primary job.
 
 ## Files and companion tools
 
+Use `WorkspaceFilesPane` from `@tangle-network/sandbox-ui/workspace` for the Files slot.
+It owns the compact tree, preview header, Back navigation, and focus return.
+Supply authorized paths or a file tree, selection callbacks, and the selected file's rendered content.
+This component requires sandbox-ui 0.120 or later; storage, permissions, loading, and error states remain product-owned.
+
+
 Use `AgentWorkspaceCompanion` for tools beside the conversation.
 The `tools` prop supplies the default order, names, icons, and panel lifecycle.
 Files comes first; omitted capabilities have no tab and never mount.
