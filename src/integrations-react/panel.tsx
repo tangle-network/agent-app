@@ -1,9 +1,10 @@
-import type { HubApiKeyConnectionMetadata, HubProvider } from '@tangle-network/hub-sdk'
+import type { HubApiKeyConnectionMetadata, HubConnection, HubProvider } from '@tangle-network/hub-sdk'
 import {
   ApiKeyConnectDialog,
   IntegrationConnectionDetail,
   IntegrationsCatalog,
   OAuthConnectionParameterDialog,
+  type IntegrationDisplayAction,
   type IntegrationSort,
 } from '@tangle-network/sandbox-ui/integrations'
 import { Button } from '@tangle-network/ui/primitives'
@@ -21,6 +22,9 @@ export interface HubIntegrationsPanelProps {
   className?: string
   onRequestIntegration?: (prefill: string) => void
   onUnsupportedConnect?: (provider: HubProvider) => void
+  /** Host-owned context and actions; the host authorizes and confirms their effects. */
+  getConnectionContext?: (connection: HubConnection) => string | undefined
+  getConnectionActions?: (connection: HubConnection) => readonly IntegrationDisplayAction[]
   /** Host-owned, transient fields for providers that require API-key metadata. */
   renderApiKeyMetadata?: (input: {
     provider: HubProvider
@@ -48,6 +52,7 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('')
   const [sort, setSort] = useState<IntegrationSort>('featured')
+  const [catalogSelection, setCatalogSelection] = useState<{ scope: string; ids: Record<string, string | null> }>({ scope, ids: {} })
   const [keyInput, setKeyInput] = useState({ scope, value: '' })
   const apiKey = keyInput.scope === scope ? keyInput.value : ''
   const setApiKey = (value: string) => setKeyInput({ scope, value })
@@ -65,7 +70,23 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
   const mutationError = hub.writeState.status === 'failed' ? hub.writeState.message : null
   const writeMessage = hub.writeState.status === 'succeeded' ? hub.writeState.value.message : null
   const writeWarning = hub.writeState.status === 'succeeded' && hub.writeState.value.reconciliation === 'refresh-failed'
-  const selectedRow = hub.rows.find(row => row.providerId === hub.provider?.providerId)
+  const rows = hub.rows.map(row => {
+    const selectedId = catalogSelection.scope === scope ? catalogSelection.ids[row.providerId] : null
+    return {
+      ...row,
+      selectedConnectionId: row.connections.some(connection => connection.id === selectedId) ? selectedId ?? null : null,
+      connections: row.connections.map(connection => {
+        const source = hub.connections.status === 'ready'
+          ? hub.connections.value.find(item => item.id === connection.id) : undefined
+        return source ? {
+          ...connection,
+          detail: props.getConnectionContext?.(source) ?? connection.detail,
+          actions: props.getConnectionActions?.(source),
+        } : connection
+      }),
+    }
+  })
+  const selectedRow = rows.find(row => row.providerId === hub.provider?.providerId)
   const detailError = hub.detail.status === 'error' ? hub.detail.message
     : hub.detail.status === 'ready' && hub.detail.value.truncated
       ? `Showing at most ${hub.detail.value.tools.length} actions. The provider catalog may be incomplete.` : null
@@ -116,14 +137,17 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
       />
     </> : <IntegrationsCatalog
       title={props.title ?? 'Integrations'}
-      rows={hub.rows}
+      rows={rows}
       query={query}
       onQueryChange={setQuery}
       categoryFilter={category}
       onCategoryFilterChange={setCategory}
       sort={sort}
       onSortChange={setSort}
-      onSelectConnection={(providerId, connectionId) => hub.selectConnection(providerId, connectionId)}
+      onSelectConnection={(providerId, connectionId) => setCatalogSelection(current => ({
+        scope,
+        ids: { ...(current.scope === scope ? current.ids : {}), [providerId]: connectionId },
+      }))}
       onConnect={row => { const provider = hub.providers.status === 'ready' ? hub.providers.value.find(item => item.providerId === row.providerId) : null; if (provider) hub.beginConnect(provider) }}
       onManage={(connection, row) => hub.selectConnection(row.providerId, connection.id)}
       onDisconnect={connection => { void hub.revoke(connection.id) }}
