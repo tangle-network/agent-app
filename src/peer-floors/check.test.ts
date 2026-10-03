@@ -233,10 +233,10 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-integrations']
 
     expect(range).toBeDefined()
-    for (const version of ['0.54.1', '0.58.0', '0.58.999', '0.60.0']) {
+    for (const version of ['0.54.1', '0.58.0', '0.58.999', '0.61.0']) {
       expect(satisfiesRange(version, range!)).toBe(false)
     }
-    for (const version of ['0.54.2', '0.57.0', '0.59.0', '0.59.999']) {
+    for (const version of ['0.54.2', '0.57.0', '0.59.0', '0.59.999', '0.60.0', '0.60.999']) {
       expect(satisfiesRange(version, range!)).toBe(true)
     }
   })
