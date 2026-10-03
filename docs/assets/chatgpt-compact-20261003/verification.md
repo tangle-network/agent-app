@@ -33,3 +33,8 @@ Raw browser artifacts remain at `beelink1-wsl:/tmp/chatgpt-compact-20261003`.
 These are installed package fixtures, not a hosted ChatGPT connection or served Builder acceptance.
 Root coordinates the App publication; the Builder enrollment owner handles the consumer pin and plain-language description.
 Rollback uses the prior package pin.
+
+Recovery merged base `e2caa96b` (Vault controls and release metadata) without a source conflict.
+The [refreshed Beelink gate](recovered-gate.json) passed frozen install, typecheck, eight component tests, and 36 browser-safe export tests.
+The card and example sources remain byte-identical to `eaaf9e49`, so the installed browser evidence is retained.
+An independent reviewer inspected the complete JSX/CSS diff, unchanged state paths, and desktop/mobile screenshots with no findings.
