@@ -1,0 +1,136 @@
+name: Fleet UI complete qualification
+on:
+  push:
+    branches: [verify/fleet-ui-parity-20261003]
+    paths: [.github/workflows/fleet-ui-qualified.yml]
+permissions:
+  contents: write
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/shared-workspace-ui-parity-20261003
+          fetch-depth: 0
+      - name: Complete exports and strict fixture types
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ui-proof"
+          test "$(git rev-parse HEAD)" = 4f2fb5b73f61dd9f647dc7ea913ce14b64f62862
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          p=Path('src/web-react/workspace-controls.test.tsx')
+          t=re.sub(r'models\[0\](?!!)', 'models[0]!', p.read_text())
+          p.write_text(re.sub(r'items\[1\](?!!)', 'items[1]!', t))
+          p=Path('src/stories/workspace/WorkspaceControls.stories.tsx')
+          t=re.sub(r'catalogModels\[0\](?!!)', 'catalogModels[0]!', p.read_text())
+          t=t.replace('className="w-full rounded-lg p-2 text-left text-sm">New workspace', 'onClick={() => setResult("Local fixture: create workspace requested")} className="w-full rounded-lg p-2 text-left text-sm">New workspace')
+          t=t.replace('AgentSessionControls, EntryComposer, WorkspaceSwitcher', 'AgentProfileChoices, AgentSessionControls, EntryComposer, WorkspaceSwitcher')
+          t=t.replace("  const [result, setResult] = useState('')", "  const [result, setResult] = useState('')\n  const [profile, setProfile] = useState('general')")
+          t=t.replace('settingsSummary: `${domain} agent`', 'settingsSummary: `${domain} agent`, profileControl: <AgentProfileChoices value={profile} profiles={[{ id: \'general\', name: \'General\' }, { id: \'review\', name: \'Review\' }]} onChange={setProfile} />')
+          p.write_text(t)
+          p=Path('src/web-react/index.tsx'); p.write_text(p.read_text()+"\nexport * from './agent-profile-choices'\n")
+          p=Path('docs/workspace-ui-parity.md'); p.write_text(p.read_text()+"\nAgentProfileChoices supplies selection-only inline rows inside agent settings.\nIt reuses the profile picker's catalog contract; full authoring remains with the\nexisting profile editor. Locked conversations offer only the host new-chat action.\n")
+          PY
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/web-react src/stories/workspace docs/workspace-ui-parity.md
+          git commit -m "feat(workspace): export inline profile choices and complete controlled fixtures"
+          git push origin HEAD:refs/heads/feat/shared-workspace-ui-parity-20261003
+          git rev-parse HEAD > "$RUNNER_TEMP/ui-proof/source-head.txt"
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Frozen install
+        id: install
+        run: pnpm install --frozen-lockfile --ignore-scripts=false 2>&1 | tee "$RUNNER_TEMP/ui-proof/install.log"
+      - name: Focused interactions and types
+        id: focused
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run src/web-react/workspace-controls.test.tsx src/web-react/agent-profile-choices.test.tsx src/web-react/entry-composer.test.tsx src/web-react/agent-session-controls.test.tsx tests/web-react/popover-escapes-host.test.tsx tests/web-react/popover-canon-source.test.ts tests/web-react/model-picker-state.test.tsx tests/browser-safe-subpaths.test.ts 2>&1 | tee "$RUNNER_TEMP/ui-proof/focused.log"
+          pnpm typecheck 2>&1 | tee "$RUNNER_TEMP/ui-proof/typecheck.log"
+          pnpm docs:gen 2>&1 | tee "$RUNNER_TEMP/ui-proof/docs.log"
+          if ! git diff --quiet -- docs; then
+            git add docs
+            git commit -m "docs(api): generate shared workspace UI contracts"
+            git push origin HEAD:refs/heads/feat/shared-workspace-ui-parity-20261003
+          fi
+          git rev-parse HEAD > "$RUNNER_TEMP/ui-proof/source-head.txt"
+      - name: Exact source signoff
+        if: steps.focused.outcome == 'success'
+        run: pnpm signoff --source head --keep-going --json "$RUNNER_TEMP/ui-proof/signoff.json" 2>&1 | tee "$RUNNER_TEMP/ui-proof/signoff.log"
+      - name: Build interaction catalog and candidate package
+        id: catalog
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          set -euo pipefail
+          pnpm build-storybook --quiet 2>&1 | tee "$RUNNER_TEMP/ui-proof/storybook.log"
+          pnpm build 2>&1 | tee "$RUNNER_TEMP/ui-proof/build.log"
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/ui-proof" > "$RUNNER_TEMP/ui-proof/pack.log"
+      - name: Browser interaction proof
+        if: always() && steps.catalog.outcome == 'success'
+        run: |
+          set -euo pipefail
+          pnpm exec playwright install --with-deps chromium
+          python -m http.server 6010 --directory storybook-static > "$RUNNER_TEMP/ui-proof/server.log" 2>&1 &
+          cat > .ui-browser-proof.mjs <<'JS'
+          import { chromium } from 'playwright';
+          import { mkdir, writeFile } from 'node:fs/promises';
+          const root=process.env.RUNNER_TEMP+'/ui-proof';
+          await mkdir(root+'/screens',{recursive:true});
+          const browser=await chromium.launch(); const checks=[];
+          try {
+            for (const size of [{name:'desktop',width:1440,height:900},{name:'phone',width:390,height:720},{name:'short',width:568,height:320}]) {
+              const page=await browser.newPage({viewport:{width:size.width,height:size.height}});
+              const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+              for (const theme of ['light','dark']) {
+                await page.goto('http://127.0.0.1:6010/iframe.html?id=workspace-shared-controls--research&viewMode=story&globals=theme:'+theme);
+                const trigger=page.getByRole('button',{name:'Agent settings',exact:true}).first();
+                await trigger.waitFor();
+                await page.screenshot({path:`${root}/screens/${size.name}-${theme}.png`,fullPage:true});
+                await trigger.click();
+                const dialog=page.getByRole('dialog',{name:'Agent settings',exact:true}); await dialog.waitFor();
+                const bounds=await dialog.boundingBox();
+                if(!bounds || bounds.x < -1 || bounds.x+bounds.width > size.width+1 || bounds.y < -1 || bounds.y+bounds.height > size.height+1) throw Error('Settings outside viewport '+size.name+JSON.stringify(bounds));
+                await page.screenshot({path:`${root}/screens/${size.name}-${theme}-settings.png`,fullPage:true});
+                await page.getByRole('radio',{name:'Review',exact:true}).check();
+                if(!await dialog.isVisible()) throw Error('Profile selection closed its owner');
+                await page.keyboard.press('Escape'); await dialog.waitFor({state:'detached'});
+                if(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1)) throw Error('Horizontal overflow '+size.name);
+                checks.push(`${size.name}/${theme}: profile choice, settings bounds, Escape, no overflow`);
+              }
+              const switcher=page.getByRole('button',{name:/Switch workspace:/}).filter({visible:true}).first(); await switcher.click();
+              await page.getByRole('textbox',{name:'Search workspaces'}).fill('not-found');
+              await page.getByRole('status').filter({hasText:'No matches'}).waitFor();
+              await page.keyboard.press('Escape');
+              checks.push(size.name+': workspace search and dismissal');
+              if(errors.length) throw Error(errors.join('\n')); await page.close();
+            }
+            await writeFile(root+'/browser.json',JSON.stringify({ok:true,checks},null,2));
+          } catch(error) {await writeFile(root+'/browser.json',JSON.stringify({ok:false,checks,error:String(error)},null,2));throw error;}
+          finally {await browser.close();}
+          JS
+          node .ui-browser-proof.mjs
+      - name: Retain immutable candidate source
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/ui-proof"
+          git rev-parse HEAD > "$RUNNER_TEMP/ui-proof/source-head.txt"
+          git archive HEAD | gzip > "$RUNNER_TEMP/ui-proof/source.tar.gz"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: fleet-ui-complete-proof
+          path: ${{ runner.temp }}/ui-proof
+          retention-days: 5
+          if-no-files-found: error
