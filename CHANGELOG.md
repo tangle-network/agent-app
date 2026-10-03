@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.9
+
+- feat(web): preserve bounded first-touch acquisition across sign-in
+
 ## 0.52.8
 
 - fix(peers): qualify retained Eval 0.204 app contracts (#769)
