@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.8
+
+- fix(peers): qualify retained Eval 0.204 app contracts (#769)
+
 ## 0.52.7
 
 - fix(workspace): qualify shared files pane dependency cohort (#768)
