@@ -214,7 +214,11 @@ Failures retain their SDK cause for the redacted diagnostic serializer and prese
 ```bash
 pnpm install
 pnpm typecheck && pnpm test && pnpm build
+pnpm test:eval-compat # retained Eval 0.204 application contracts
 ```
+
+The compatibility suite reruns the Eval, campaign, profile, knowledge, and catalog seams against published Eval 0.204.0.
+A package identity assertion prevents the latest development peer from silently supplying that proof.
 
 Build is [tsup](https://tsup.egoist.dev) for the ESM output plus `tsc` for the `.d.ts`, tests are [vitest](https://vitest.dev). A change keeps the suite green and follows the layering rule above — anything engine-general is contributed down to the substrate, not duplicated here. See [AGENTS.md](./AGENTS.md) for the full contributor contract.
 
