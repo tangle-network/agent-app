@@ -40,7 +40,8 @@ export function createRouterProtectedModelPort(options: RouterProtectedModelPort
     let response: Response
     try {
       response = await fetch(`${CONTROL_ORIGIN}/${operation}`, {
-        method: 'POST', redirect: 'error', signal,
+        // Workerd supports manual redirects; non-2xx responses below still fail closed.
+        method: 'POST', redirect: 'manual', signal,
         headers: {
           Authorization: `Bearer ${options.apiKey}`,
           'Content-Type': 'application/json', 'X-Tangle-Client': options.clientName ?? 'agent-app',

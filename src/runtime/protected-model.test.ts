@@ -49,8 +49,20 @@ describe('Router protected model transport', () => {
     for (const [url, init] of fetchMock.mock.calls) {
       expect(url).toMatch(/^https:\/\/router\.tangle\.tools\/v1\/candidate-model-grants\/(resolve|reserve|activate)$/)
       expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer parent-secret-must-stay-server-side')
-      expect(init?.redirect).toBe('error')
+      expect(init?.redirect).toBe('manual')
     }
+  })
+
+  it('rejects a control-plane redirect without forwarding the parent credential', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, {
+      status: 302, headers: { location: 'https://untrusted.invalid/resolve' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const grant = grantOptions()
+    await expect(grant.port.resolve(grant.resolve)).rejects.toThrow('HTTP 302')
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\/router\.tangle\.tools\//),
+      expect.objectContaining({ redirect: 'manual' }))
   })
 
   it.each([
