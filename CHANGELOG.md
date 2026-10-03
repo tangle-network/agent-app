@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.14
+
+- fix(deps): qualify sandbox-ui 0.121
+
 ## 0.52.13
 
 - fix(integrations): expose workspace actions on account cards (#774)
