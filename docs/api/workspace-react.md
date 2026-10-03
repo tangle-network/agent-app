@@ -4,7 +4,7 @@
 
 Source: `src/workspace-react/index.tsx`
 
-13 exports.
+16 exports.
 
 ### `AgentWorkspaceActiveRoute`
 
@@ -108,4 +108,28 @@ interface AgentWorkspaceSessionConfig
 
 ```ts
 (tools: Partial<Record<AgentWorkspaceCompanionTool, (state: { active: boolean; }) => ReactNode>>) => AgentWorkspaceComp…
+```
+
+### `WorkspaceSwitcher`
+
+`function` — Searchable workspace/client/project selection, shared across all workspace shells.
+
+```ts
+({ items, value, onChange, label, placeholder, searchLabel, emptyLabel, collapsed, variant, footer, open: controlledOpe…
+```
+
+### `WorkspaceSwitcherItem`
+
+`interface`
+
+```ts
+interface WorkspaceSwitcherItem
+```
+
+### `WorkspaceSwitcherProps`
+
+`interface`
+
+```ts
+interface WorkspaceSwitcherProps
 ```

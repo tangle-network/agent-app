@@ -19271,6 +19271,18 @@
           "doc": "A delegation record on the cross-context surface; `missionRef` links a promoted delegation back to the mission/step that spawned it."
         },
         {
+          "name": "AgentProfileChoices",
+          "kind": "function",
+          "signature": "({ value, profiles, onChange, disabled, locked, lockReason, onNewChat, label }: AgentProfileChoicesProps) => Element",
+          "doc": "Selection-only profile rows for an existing settings surface, with no nested portal or authoring policy."
+        },
+        {
+          "name": "AgentProfileChoicesProps",
+          "kind": "interface",
+          "signature": "interface AgentProfileChoicesProps",
+          "doc": null
+        },
+        {
           "name": "AgentProfileEditor",
           "kind": "function",
           "signature": "({ value, onChange, disabled, className, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGitHubCommi…",
@@ -19310,6 +19322,18 @@
           "name": "AgentSessionControlsProps",
           "kind": "interface",
           "signature": "interface AgentSessionControlsProps",
+          "doc": null
+        },
+        {
+          "name": "AgentSettingsPopover",
+          "kind": "function",
+          "signature": "({ label, summary, children, open: controlledOpen, onOpenChange, disabled, className, panelClassName, }: AgentSettingsP…",
+          "doc": "One settings surface for entry, docked and embedded composers."
+        },
+        {
+          "name": "AgentSettingsPopoverProps",
+          "kind": "interface",
+          "signature": "interface AgentSettingsPopoverProps",
           "doc": null
         },
         {
@@ -21837,6 +21861,24 @@
           "kind": "function",
           "signature": "(status: WorkProductStatus) => string",
           "doc": "Human label for a work-product status."
+        },
+        {
+          "name": "WorkspaceSwitcher",
+          "kind": "function",
+          "signature": "({ items, value, onChange, label, placeholder, searchLabel, emptyLabel, collapsed, variant, footer, open: controlledOpe…",
+          "doc": "Searchable workspace/client/project selection, shared across all workspace shells."
+        },
+        {
+          "name": "WorkspaceSwitcherItem",
+          "kind": "interface",
+          "signature": "interface WorkspaceSwitcherItem",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSwitcherProps",
+          "kind": "interface",
+          "signature": "interface WorkspaceSwitcherProps",
+          "doc": null
         }
       ]
     },
@@ -22963,6 +23005,7 @@
       "source": "src/workspace-react/index.tsx",
       "dependsOn": [
         "session-shell",
+        "web-react",
         "workspace-apps"
       ],
       "error": null,
@@ -23044,6 +23087,24 @@
           "kind": "function",
           "signature": "(tools: Partial<Record<AgentWorkspaceCompanionTool, (state: { active: boolean; }) => ReactNode>>) => AgentWorkspaceComp…",
           "doc": "Canonical order, labels, icons and lazy retention for companion tools."
+        },
+        {
+          "name": "WorkspaceSwitcher",
+          "kind": "function",
+          "signature": "({ items, value, onChange, label, placeholder, searchLabel, emptyLabel, collapsed, variant, footer, open: controlledOpe…",
+          "doc": "Searchable workspace/client/project selection, shared across all workspace shells."
+        },
+        {
+          "name": "WorkspaceSwitcherItem",
+          "kind": "interface",
+          "signature": "interface WorkspaceSwitcherItem",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSwitcherProps",
+          "kind": "interface",
+          "signature": "interface WorkspaceSwitcherProps",
+          "doc": null
         }
       ]
     }
