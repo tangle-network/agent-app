@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@tangle-network/sandbox-ui/primitives'
 import { WorkspaceLayout } from '@tangle-network/sandbox-ui/workspace'
+import { FlaskConical, FolderOpen, GitCompare, Monitor, Terminal } from 'lucide-react'
 
 export interface AgentWorkspaceCompanionTab {
   id: string
@@ -11,13 +12,51 @@ export interface AgentWorkspaceCompanionTab {
   renderContent: (state: { active: boolean }) => ReactNode
 }
 
+export type AgentWorkspaceCompanionTool = 'files' | 'agent' | 'terminal' | 'changes' | 'preview'
+
+/** Supply only tools the product can actually serve. Content remains product-owned. */
+export type AgentWorkspaceCompanionTools = Partial<Record<AgentWorkspaceCompanionTool, AgentWorkspaceCompanionTab['renderContent']>>
+
+const companionTools = [
+  { id: 'files', label: 'Files', Icon: FolderOpen },
+  { id: 'agent', label: 'Agent', Icon: FlaskConical },
+  { id: 'terminal', label: 'Terminal', Icon: Terminal },
+  { id: 'changes', label: 'Changes', Icon: GitCompare },
+  { id: 'preview', label: 'Preview', Icon: Monitor },
+] as const
+
+/** Canonical order, labels, icons and lazy retention for companion tools. */
+export function createAgentWorkspaceCompanionTabs(tools: AgentWorkspaceCompanionTools): AgentWorkspaceCompanionTab[] {
+  return companionTools.flatMap(({ id, label, Icon }) => {
+    const renderContent = tools[id]
+    return renderContent ? [{ id, label, icon: <Icon className="h-3.5 w-3.5" aria-hidden />, keepMounted: true, renderContent }] : []
+  })
+}
+
+export interface AgentWorkspaceCompanionNavigation {
+  content: ReactNode
+  header?: ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  label?: string
+  defaultWidth?: number
+  minWidth?: number
+  maxWidth?: number
+  collapsedControl?: ReactNode
+}
+
 export interface AgentWorkspaceCompanionHandle {
   openTab: (tabId: string) => boolean
 }
 
 export interface AgentWorkspaceCompanionProps {
   children: ReactNode
-  tabs: readonly AgentWorkspaceCompanionTab[]
+  /** Use tools for shared defaults; tabs overrides them for product-specific navigation. */
+  tabs?: readonly AgentWorkspaceCompanionTab[]
+  tools?: AgentWorkspaceCompanionTools
+  /** Optional session navigation, composed in the same responsive layout. */
+  navigation?: AgentWorkspaceCompanionNavigation
+  keyboardShortcuts?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
   defaultOpen?: boolean
@@ -34,7 +73,10 @@ export interface AgentWorkspaceCompanionProps {
 /** Product-owned tools beside a conversation; omitted tools have no tabs or effects. */
 export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle, AgentWorkspaceCompanionProps>(function AgentWorkspaceCompanion({
   children,
-  tabs,
+  tabs: customTabs,
+  tools,
+  navigation,
+  keyboardShortcuts,
   open: controlledOpen,
   onOpenChange,
   defaultOpen = false,
@@ -46,6 +88,7 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
   defaultWidth = 420,
   className,
 }, ref) {
+  const tabs = customTabs ?? createAgentWorkspaceCompanionTabs(tools ?? {})
   const [uncontrolledOpen, setOpen] = useState(defaultOpen)
   const open = controlledOpen ?? uncontrolledOpen
   const [selection, setSelection] = useState({ key: persistenceKey, id: defaultActiveTabId })
@@ -126,7 +169,7 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
     },
   }), [selectTab, changeOpen])
 
-  if (tabs.length === 0) return <>{children}</>
+  if (tabs.length === 0 && !navigation) return <>{children}</>
 
   return (
     <Tabs key={persistenceKey} value={active} onValueChange={selectTab} className={`flex h-full min-h-0 min-w-0 flex-1 flex-col ${className ?? ''}`}>
@@ -135,6 +178,17 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
         collapsedControlsPlacement="overlay"
         keepRightMounted
         center={children}
+        left={navigation?.content}
+        leftContentClassName="py-0"
+        leftHeader={navigation && (navigation.header !== undefined ? navigation.header : <span className="text-sm font-medium">{navigation.label ?? 'Chats'}</span>)}
+        leftOpen={navigation?.open}
+        onLeftOpenChange={navigation?.onOpenChange}
+        leftLabel={navigation?.label ?? 'Chats'}
+        defaultLeftWidth={navigation?.defaultWidth ?? 260}
+        minLeftWidth={navigation?.minWidth ?? 200}
+        maxLeftWidth={navigation?.maxWidth ?? 400}
+        leftCollapsedControl={navigation?.collapsedControl}
+        keyboardShortcuts={keyboardShortcuts}
         rightOpen={open}
         onRightOpenChange={changeOpen}
         rightLabel={label}
@@ -142,7 +196,7 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
         persistenceKey={persistenceKey}
         minRightWidth={280}
         rightContentClassName="flex flex-col overflow-hidden"
-        rightHeader={(
+        rightHeader={tabs.length > 0 ? (
           <TabsList aria-label={label} className="h-9 max-w-full justify-start overflow-x-auto bg-transparent p-0">
             {tabs.map((tab) => (
               <TabsTrigger key={tab.id} value={tab.id} className="gap-1.5 px-2.5 text-sm">
@@ -150,8 +204,8 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
               </TabsTrigger>
             ))}
           </TabsList>
-        )}
-        right={tabs.map((tab) => {
+        ) : undefined}
+        right={tabs.length > 0 ? tabs.map((tab) => {
           const isActive = tab.id === active
           const retained = tab.keepMounted && visited.has(tab.id)
           if (!(open && isActive) && !retained) return null
@@ -166,7 +220,7 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
               {tab.renderContent({ active: open && isActive })}
             </TabsContent>
           )
-        })}
+        }) : undefined}
       />
     </Tabs>
   )
