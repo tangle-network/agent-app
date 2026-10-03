@@ -1614,3 +1614,6 @@ export function ChatMessages({
 }
 
 export * from './api-access-panel'
+
+export * from './agent-settings-popover'
+export * from './workspace-switcher'

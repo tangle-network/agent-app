@@ -152,10 +152,10 @@ export function EntryComposer({
     <div
       className={
         className ??
-        'relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-background px-5'
+        'relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto bg-background px-5 py-8'
       }
     >
-      <div className="w-full" style={{ maxWidth }}>
+      <div className="my-auto w-full shrink-0" style={{ maxWidth }}>
         {heading ? (
           <h2 className="mb-4 text-center text-[1.75rem] font-medium tracking-tight text-foreground">
             {heading}
