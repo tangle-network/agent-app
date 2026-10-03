@@ -188,6 +188,8 @@ export interface ChatTurnRequestPayload {
   harness?: string
   /** Client-generated idempotency key for the logical turn (retry-safe). */
   turnId?: string
+  /** New token for a deliberate retry; reuse it for transport retries of that attempt. */
+  retryAttemptId?: string
   [key: string]: unknown
 }
 

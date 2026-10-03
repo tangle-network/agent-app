@@ -24,6 +24,9 @@ Who owns each hop:
 | Durable plan projection | `/plans` codec + `/chat-routes` `withDurableChatProjection` (structural) |
 | Composer, stream consumption, cards | `/web-react` |
 
+A deliberate retry keeps the original `turnId` and supplies a new `retryAttemptId`.
+Transport retries reuse both identifiers, preserving the user message while each deliberate attempt gets separate execution and completion records.
+
 ## Schema (Drizzle + shared migration constants)
 
 ```ts
