@@ -217,3 +217,35 @@ Do not add a second History panel for a chat-first product.
 
 Workflow-first and queue-first products may omit `sessions` when a persistent
 thread rail would obscure their primary job.
+
+
+## Files and companion tools
+
+Use `AgentWorkspaceCompanion` for tools beside the conversation.
+The `tools` prop supplies the default order, names, icons, and panel lifecycle.
+Files comes first; omitted capabilities have no tab and never mount.
+Visited tools remain mounted through tab switches, pane closure, and responsive changes.
+Use the supplied `active` flag to pause background work without losing local state.
+A terminal should connect only through the product's explicit connection policy.
+
+```tsx
+import { AgentWorkspaceCompanion } from '@tangle-network/agent-app/workspace-react'
+
+<AgentWorkspaceCompanion
+  persistenceKey={`workspace:${workspaceId}`}
+  tools={{
+    files: () => <WorkspaceFiles />,
+    agent: () => <AgentSettings />,
+    terminal: canUseTerminal
+      ? ({ active }) => <WorkspaceTerminal active={active} />
+      : undefined,
+  }}
+>
+  <Conversation />
+</AgentWorkspaceCompanion>
+```
+
+`createAgentWorkspaceCompanionTabs(tools)` exposes the same defaults when custom tabs are necessary.
+Use `navigation` for an optional session rail within the same responsive layout.
+Products retain data loading, permissions, file previews, agent settings, and terminal connection policy.
+Do not nest another workspace layout to add the rail.

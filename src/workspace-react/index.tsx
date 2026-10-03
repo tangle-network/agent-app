@@ -244,4 +244,4 @@ export function AgentWorkspaceLayout({
   )
 }
 
-export { AgentWorkspaceCompanion, type AgentWorkspaceCompanionHandle, type AgentWorkspaceCompanionProps, type AgentWorkspaceCompanionTab } from './companion'
+export { AgentWorkspaceCompanion, createAgentWorkspaceCompanionTabs, type AgentWorkspaceCompanionHandle, type AgentWorkspaceCompanionProps, type AgentWorkspaceCompanionTab, type AgentWorkspaceCompanionTool, type AgentWorkspaceCompanionTools, type AgentWorkspaceCompanionNavigation } from './companion'

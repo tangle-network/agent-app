@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRef, StrictMode, useEffect, useState } from 'react'
-import { AgentWorkspaceCompanion, type AgentWorkspaceCompanionHandle, type AgentWorkspaceCompanionTab } from '../src/workspace-react/companion'
+import { AgentWorkspaceCompanion, createAgentWorkspaceCompanionTabs, type AgentWorkspaceCompanionHandle, type AgentWorkspaceCompanionTab } from '../src/workspace-react/companion'
 import { WorkspaceLayout } from '@tangle-network/sandbox-ui/workspace'
 
 let desktop = true
@@ -189,4 +189,69 @@ it('restores a valid saved tab before reconciling a stale controlled initial tab
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Terminal' }).getAttribute('aria-selected')).toBe('true'))
   expect(changed).toHaveBeenCalledTimes(1)
   expect(changed).toHaveBeenCalledWith('terminal')
+})
+
+
+describe('shared companion defaults', () => {
+  it('starts in Files, orders supported tools and retains visited terminal state', async () => {
+    const user = userEvent.setup()
+    render(<AgentWorkspaceCompanion defaultOpen tools={{
+      preview: () => <p>Preview content</p>,
+      terminal: () => <Terminal />,
+      files: () => <p>Workspace files</p>,
+    }}><p>Chat</p></AgentWorkspaceCompanion>)
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Files', 'Terminal', 'Preview'])
+    expect(screen.getByRole('tab', { name: 'Files' }).getAttribute('aria-selected')).toBe('true')
+    expect(mounts).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('tab', { name: 'Terminal' }))
+    const input = screen.getByRole('textbox', { name: 'Terminal input' })
+    await user.type(input, 'keep my terminal')
+    await user.click(screen.getByRole('tab', { name: 'Files' }))
+    await user.click(screen.getByRole('tab', { name: 'Terminal' }))
+    expect(screen.getByRole('textbox', { name: 'Terminal input' })).toBe(input)
+    expect(input.getAttribute('value')).toBe('keep my terminal')
+    expect(unmounts).not.toHaveBeenCalled()
+  })
+
+  it('exposes the same preset to custom tab compositions', () => {
+    const renderAgent = vi.fn(() => <p>Agent settings</p>)
+    const preset = createAgentWorkspaceCompanionTabs({ agent: renderAgent, files: () => <p>Files</p> })
+    expect(renderAgent).not.toHaveBeenCalled()
+    render(<AgentWorkspaceCompanion tabs={[...preset, { id: 'custom', label: 'Reports', renderContent: () => <p>Report</p> }]} defaultOpen><p>Chat</p></AgentWorkspaceCompanion>)
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Files', 'Agent', 'Reports'])
+    expect(renderAgent).not.toHaveBeenCalled()
+  })
+
+  it('keeps session navigation functional when no companion tools are available', async () => {
+    const user = userEvent.setup()
+    function NavigationOnly() {
+      const [open, setOpen] = useState(true)
+      return <AgentWorkspaceCompanion tools={{}} navigation={{ content: <nav aria-label="Session history">Saved conversation</nav>, open, onOpenChange: setOpen }} keyboardShortcuts><p>Conversation</p></AgentWorkspaceCompanion>
+    }
+    render(<NavigationOnly />)
+    expect(screen.getByRole('navigation', { name: 'Session history' })).toBeTruthy()
+    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open right panel' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Collapse left panel' }))
+    expect(screen.queryByRole('navigation')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Open left panel' }))
+    expect(screen.getByRole('navigation', { name: 'Session history' })).toBeTruthy()
+    await user.keyboard('{Control>}b{/Control}')
+    expect(screen.queryByRole('navigation')).toBeNull()
+  })
+
+  it('shows one mobile drawer with both session navigation and companion tools', async () => {
+    const user = userEvent.setup()
+    render(<AgentWorkspaceCompanion defaultOpen navigation={{ content: <nav aria-label="Session history">Saved conversation</nav> }} tools={{ files: () => <p>Browse workspace</p> }}><p>Conversation</p></AgentWorkspaceCompanion>)
+    resize(false)
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByRole('dialog').textContent).toContain('Browse workspace')
+    await user.keyboard('{Escape}')
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByRole('dialog').textContent).toContain('Saved conversation')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByText('Conversation')).toBeTruthy()
+  })
+
 })
