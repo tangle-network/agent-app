@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.7
+
+- fix(workspace): qualify shared files pane dependency cohort (#768)
+
 ## 0.52.6
 
 - chore(deps): qualify Runtime 0.293 shared-core cohort (#767)
