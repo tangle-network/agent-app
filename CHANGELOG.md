@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.13
+
+- fix(integrations): expose workspace actions on account cards (#774)
+
 ## 0.52.12
 
 - fix(runtime): reject redirects compatibly with workerd (#773)
