@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.2
+
+- feat(vault): let hosts name the collection and control file actions
+
 ## 0.52.1
 
 - feat(chatgpt-react): share Connect to ChatGPT setup across apps

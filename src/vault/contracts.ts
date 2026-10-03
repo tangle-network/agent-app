@@ -198,6 +198,12 @@ export interface VaultPaneProps {
    * are hidden and the pane is read-only. Defaults to true.
    */
   canWrite?: boolean
+  /** Show the New file control. Defaults to `canWrite`; set false for a source
+   *  that can edit existing files but cannot create them. */
+  canCreate?: boolean
+  /** Show the delete control. Defaults to `canWrite`; set false for a source
+   *  that can edit existing files but cannot delete them. */
+  canDelete?: boolean
   /** Controlled selection. Pair with `onSelectedPathChange`. */
   selectedPath?: string | null
   /** Notified when selection changes (including clear → null). A controlled host may return false to reject the request. */
@@ -207,5 +213,14 @@ export interface VaultPaneProps {
   onOperationError?: (failure: VaultOperationFailure) => void
   /** Optional rich/source codec. Defaults to identity passthrough. */
   codec?: VaultMarkdownCodec
+  /** User-facing name of this file collection, such as 'Knowledge' or 'Files'.
+   *  Used in error headings, dialogs and accessible names. Defaults to 'Vault'. */
+  label?: string
+  /** Product controls for the open file, rendered in its path row before the
+   *  download and delete actions (for example an Edit toggle). */
+  fileActions?: (file: VaultFile) => ReactNode
+  /** Rendered in the document pane while no file is selected. Defaults to an
+   *  empty pane, which suits hosts that float other UI over that area. */
+  emptyState?: ReactNode
   className?: string
 }

@@ -188,7 +188,7 @@ describe('VaultPane — load + selection', () => {
     const port = fakePort({ listTree })
     mount({ port, selectedPath: 'a.md', onSelectedPathChange, onOperationError })
 
-    await waitFor(() => expect(screen.getByText("Couldn't load the Vault")).toBeTruthy())
+    await waitFor(() => expect(screen.getByText("Couldn't load Vault")).toBeTruthy())
     expect(screen.getByText('list exploded')).toBeTruthy()
     expect(screen.queryByTestId('tree')).toBeNull()
     expect(onSelectedPathChange).not.toHaveBeenCalled()
@@ -499,7 +499,7 @@ describe('VaultPaneHandle.openFile completion', () => {
     const listTree = vi.fn().mockRejectedValue(new Error('list unavailable'))
     const readFile = vi.fn(async (path: string): Promise<VaultFile> => ({ path, content: 'direct content' }))
     const { paneRef } = mount({ port: fakePort({ listTree, readFile }) })
-    await screen.findByText("Couldn't load the Vault")
+    await screen.findByText("Couldn't load Vault")
 
     let opened!: Promise<boolean>
     act(() => { opened = paneRef.current!.openFile('unlisted.md') })
@@ -518,7 +518,7 @@ describe('VaultPaneHandle.openFile completion', () => {
       selectedPath: 'unlisted.md',
       onSelectedPathChange: vi.fn(),
     })
-    await screen.findByText("Couldn't load the Vault")
+    await screen.findByText("Couldn't load Vault")
 
     let opened!: Promise<boolean>
     act(() => { opened = paneRef.current!.openFile('unlisted.md') })
@@ -942,7 +942,7 @@ describe('VaultPane — create / delete call the port', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
 
-    await waitFor(() => expect(screen.getByText(/The file was created, but the Vault couldn't refresh/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/The file was created, but Vault couldn't refresh/)).toBeTruthy())
     expect(screen.queryByRole('dialog', { name: 'Create vault file' })).toBeNull()
     expect(createFile).toHaveBeenCalledTimes(1)
     expect(onOperationError).toHaveBeenCalledTimes(1)
@@ -977,7 +977,7 @@ describe('VaultPane — create / delete call the port', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete file' }))
 
-    await waitFor(() => expect(screen.getByText(/The file was deleted, but the Vault couldn't refresh/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/The file was deleted, but Vault couldn't refresh/)).toBeTruthy())
     expect(screen.queryByTestId('artifact')).toBeNull()
     expect(deleteFile).toHaveBeenCalledTimes(1)
     expect(onOperationError).toHaveBeenCalledTimes(1)
