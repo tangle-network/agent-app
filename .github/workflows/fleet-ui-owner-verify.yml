@@ -1,0 +1,68 @@
+name: Fleet UI owner qualification
+on:
+  push:
+    branches: [verify/fleet-ui-parity-20261003]
+    paths: [.github/workflows/fleet-ui-owner-verify.yml]
+permissions:
+  contents: write
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Assemble source on isolated feature branch
+        run: |
+          set -euo pipefail
+          cp .github/verification/assemble-ui.py "$RUNNER_TEMP/assemble-ui.py"
+          git switch --track origin/feat/shared-workspace-ui-parity-20261003
+          test "$(git rev-parse HEAD)" = 4f9fef08d3e2e2c5beffd86a7ff248ee06f7888d
+          python "$RUNNER_TEMP/assemble-ui.py"
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/web-react src/workspace-react .changeset/shared-workspace-controls.md
+          git commit -m "feat(workspace): group agent controls and share shell selectors"
+          git push origin HEAD:refs/heads/feat/shared-workspace-ui-parity-20261003
+          mkdir -p "$RUNNER_TEMP/ui-proof"
+          git rev-parse HEAD > "$RUNNER_TEMP/ui-proof/source-head.txt"
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Frozen install
+        run: pnpm install --frozen-lockfile --ignore-scripts=false 2>&1 | tee "$RUNNER_TEMP/ui-proof/install.log"
+      - name: Focused interaction and existing composer checks
+        run: pnpm exec vitest run src/web-react/workspace-controls.test.tsx src/web-react/entry-composer.test.tsx src/web-react/agent-session-controls.test.tsx tests/web-react/popover-escapes-host.test.tsx tests/web-react/popover-canon-source.test.ts tests/web-react/model-picker-state.test.tsx tests/browser-safe-subpaths.test.ts 2>&1 | tee "$RUNNER_TEMP/ui-proof/focused.log"
+      - name: Types and generated docs
+        run: |
+          set -euo pipefail
+          pnpm typecheck 2>&1 | tee "$RUNNER_TEMP/ui-proof/typecheck.log"
+          pnpm docs:gen 2>&1 | tee "$RUNNER_TEMP/ui-proof/docs.log"
+          if ! git diff --quiet -- docs; then
+            git add docs
+            git commit -m "docs(api): generate shared workspace UI contracts"
+            git push origin HEAD:refs/heads/feat/shared-workspace-ui-parity-20261003
+          fi
+          git rev-parse HEAD > "$RUNNER_TEMP/ui-proof/source-head.txt"
+      - name: Exact source signoff
+        run: pnpm signoff --source head --keep-going --json "$RUNNER_TEMP/ui-proof/signoff.json" 2>&1 | tee "$RUNNER_TEMP/ui-proof/signoff.log"
+      - name: Build interaction catalog
+        if: always()
+        run: pnpm build-storybook --quiet 2>&1 | tee "$RUNNER_TEMP/ui-proof/storybook.log"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: fleet-ui-owner-proof
+          path: ${{ runner.temp }}/ui-proof
+          retention-days: 5
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: fleet-ui-catalog
+          path: storybook-static
+          retention-days: 5
