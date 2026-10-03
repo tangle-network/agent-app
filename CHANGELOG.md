@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.10
+
+- docs(api): index shared workspace defaults
+
 ## 0.52.9
 
 - feat(web): preserve bounded first-touch acquisition across sign-in
