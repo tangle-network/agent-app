@@ -3,6 +3,9 @@
 This project composes the shared chat application shell from `@tangle-network/agent-app`.
 Read [CUSTOMIZE.md](CUSTOMIZE.md) for required configuration and deployment setup.
 
+For UI changes, read the canonical [product surfaces guide](https://github.com/tangle-network/agent-app/blob/main/docs/product-surfaces.md).
+Reports, dashboards, admin pages, and record lists start with its [operational-page compositions](https://github.com/tangle-network/agent-app/blob/main/docs/product-surfaces.md#operational-pages).
+
 ## DATA vs CODE
 
 - `agent.config.ts` contains identity, prompt, model, backend, and renderable interaction choices as plain values.

@@ -52,6 +52,10 @@ All of these except `agent-eval`, `agent-integrations`, and `agent-interface` ar
 
 Modules that import no engine package (`/tools`, `/web`, `/crypto`, `/redact`, `/stream`, `/billing`, `/tangle` — the last two take their client as a structural contract) need no peers.
 
+For reports, dashboards, admin pages, and record lists, start with the shared
+[operational-page compositions](https://github.com/tangle-network/agent-app/blob/main/docs/product-surfaces.md#operational-pages).
+For the conversational UI, start with the [default workspace](./examples/default-workspace.md).
+
 ## Quick start
 
 A product supplies its **taxonomy** (which proposal types exist, which are approval-gated) and its **handlers** (the real DB/vault writes), then wires the tool side channel to whichever surface it runs on.

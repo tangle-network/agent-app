@@ -1,35 +1,46 @@
-# Product surfaces — purpose, intent, and naming
+# Product surfaces
 
-**Two parts.** *Part I* (below) names what each surface is **for** — purpose,
-goal, first impression, and the labels that carry them. *[Part
-II](#part-ii--patterns)* is the **patterns**: the canonical answers to the six
-questions all four verticals answered separately and badly, each stated as a
-rule with an anatomy and a rejected example. The per-diff review lens over both
-is [`legibility-rubric.md`](./legibility-rubric.md).
+Choose the shared composition for the user's task before styling a route.
+For reports, dashboards, admin pages, and record lists, start with
+[Operational pages](#operational-pages). For conversations, start with the
+[default workspace](../examples/default-workspace.md). Editor-specific guidance
+follows below; [Part II](#part-ii--patterns) covers state, provenance, motion,
+density, and reachability. Use the [legibility rubric](./legibility-rubric.md)
+against the rendered product.
 
-> This is the **product-clarity layer** for agent-app's React surfaces. The
-> framework ships strong *mechanism* (a11y scored 10/10 in the browser audit,
-> tokens mirror Tangle Quiet, the chat shell is genuinely well-built). What the
-> audit found thin everywhere — product-clarity 2–4/10 across Chat, Canvas, and
-> Timeline — is **framing**: a first-time user can't tell what a surface is for,
-> which action matters, or what happens next. Mechanism is not the gap; meaning
-> is.
->
-> This doc fixes that at the source: for every surface it states the purpose,
-> the user's actual goal, the first impression we want to manufacture, what
-> makes it *feel* intuitive, and names that evoke understanding instead of
-> describing widgets. It is the brief a designer or a consuming product reads
-> before they wire a surface in — and the contract the playground demo should
-> grow into.
+## Operational pages
+
+Compose the page inside the product's existing navigation and route. Start with
+`@tangle-network/ui/primitives`, checking the installed package's exports and
+props before implementation:
+
+| Page region | Shared composition and first read |
+| --- | --- |
+| Page frame and title | `PageShell` and `PageHeader`: [page example](https://github.com/tangle-network/brand/blob/main/packages/ui/src/primitives/page-shell.stories.tsx). `PageShell` supplies width, gutters, and spacing; the product owns landmarks and navigation. |
+| Search, filters, and view actions | `Toolbar` with `search`, `filters`, and `actions` slots; `FilterField` labels each filter: [source](https://github.com/tangle-network/brand/blob/main/packages/ui/src/primitives/toolbar.tsx). |
+| Related summary values | `MetricStrip` with `Metric`: [responsive examples](https://github.com/tangle-network/brand/blob/main/packages/ui/src/primitives/metric-strip.stories.tsx). Keep values, units, and scope readable together. |
+| Comparable records | `Table` and its header, row, and cell components: [source](https://github.com/tangle-network/brand/blob/main/packages/ui/src/primitives/table.tsx). Choose the columns the user needs to compare and keep overflow within the table. |
+| A focused decision or edit | `Dialog` and its content, title, description, and action components: [source](https://github.com/tangle-network/brand/blob/main/packages/ui/src/primitives/dialog.tsx). |
+
+Use shared `Button`, `Input`, and `Select` inside those compositions. Choose the
+page structure as well as its individual controls. Product code supplies data,
+labels, actions, and state; extend an owning component when a required behavior
+cannot be expressed through its props. A canvas or other workbench can use the
+available width instead of the bounded `PageShell`.
+
+For a product example, read Platform's
+[DashboardStats](https://github.com/tangle-network/agent-dev-container/blob/main/products/platform/web/src/client/components/dashboard/DashboardStats.tsx)
+for related metrics and a loading state matching their layout. Follow the
+[empty-state pattern](#pattern-1--empty-state) for first use, filtered results,
+and failed loads. Check the actual page at desktop and phone widths with long
+values and those states; component selection alone does not prove the result.
 
 ## The one principle behind every naming call here
 
 **A name should answer "what is this for," not "what is this."** "Timeline" names
 a widget; "Storyboard" names a goal. "Chat" names a textbox; "Agent run" names
-what the user is actually doing. The audit's recurring critical finding — *equal
-visual weight, no hierarchy, unclear intent* — is a naming and framing failure
-before it is a CSS one. You cannot style your way out of a screen that hasn't
-decided what it is.
+what the user is actually doing. Choose the user's task and primary action
+before tuning visual hierarchy.
 
 Three tests every label must pass:
 
@@ -62,27 +73,23 @@ assistant text interleaved with tool chips, a proposal card that blocks on
 approval, a stream-dropped error with retry. agent-app owns it once so products
 don't fork it five times.
 
-**The user's goal.** Not "send a message." The goal is *"get the agent to do the
-thing, and stay in control of the irreversible parts."* The approval card is the
-product, not a decoration on the chat.
+**The user's goal.** Ask for work, understand the response, and make decisions
+when the task needs them. Keep the conversation primary, with tool activity
+and pending approvals visible in context.
 
-**First impression we want.** "This agent is working, I can see exactly what it's
-doing, and nothing scary happens without my say-so." The transcript should read
-like a *worklog*, not a messaging app — assistant reasoning visibly distinct from
-tool calls, and the one proposal awaiting approval should be the most visually
-prominent thing on screen the moment it appears.
+**First impression we want.** "I can ask for what I need and see what happens
+next." Use the [default workspace](../examples/default-workspace.md) for the
+conversation. Give a pending decision clear prominence when it needs the
+user's attention; keep routine activity secondary.
 
 **What makes it feel intuitive.**
-- The approval card must out-weigh everything around it. Today (audit, chat
-  finding #1, *critical*) **Approve and Reject carry equal weight** — the single
-  highest-leverage fix on this surface. Approve is the affirmative path: filled,
-  brand-colored, primary. Reject is quiet/outline. A person should never have to
-  read both labels twice to know which is the safe default.
-- A proposal must say *what it will do* before you approve it (finding #2): a
+- Give the pending decision visual priority. Distinguish the affirmative action
+  from rejection, while preserving the user's ability to decline.
+- A proposal must say *what it will do* before you approve it: a
   one-line preview ("Publish **Launch poster** to X and LinkedIn") and the cost
   or reach if known. Approving a black box is the fastest way to lose trust.
 - Tool chips, proposals, follow-ups, and alerts are **different kinds of thing**
-  and must look different (finding #3/#4) — a command is past tense ("ran
+  and must look different — a command is past tense ("ran
   `render`"), a proposal is a pending decision, a follow-up is a scheduled
   intent. Same card shape for all four is why the surface "feels like
   scaffolding."
@@ -90,7 +97,7 @@ prominent thing on screen the moment it appears.
 **Naming that evokes understanding.**
 | Today | Proposed | Why |
 |---|---|---|
-| nav: "Chat" | **"Agent"** or **"Workspace"** | The user isn't chatting, they're running an agent. "Chat" undersells it to a help-desk widget. |
+| nav: "Chat" | Keep the product's familiar name | Rename only when evidence from the user flow or user research supports the change. |
 | "Proposal · asset_publish: Launch poster" | **"Approve: publish "Launch poster"?"** | Lead with the decision and the verb, not the internal tool taxonomy (`asset_publish`). |
 | "Follow-up · Post launch poster" | **"Scheduled: post launch poster"** | "Follow-up" is ambiguous (a task? a reminder? done?). "Scheduled" states it's pending and time-based. |
 | "Effort: Medium" | **"Thinking: Standard / Extended"** | "Effort" is our word for reasoning budget; users understand "how hard should it think." |
@@ -116,26 +123,18 @@ publish"* — adjust, arrange, export at the right size with bleed. The canvas i
 where the human adds the last 10% of taste the agent can't.
 
 **First impression we want.** "I know how to start, and the tools are where I'd
-expect them." Today the canvas opens **blank with no entry point** (audit, canvas
-finding *critical*): no sample content, no "drop a shape / pick a template /
-ask the agent" prompt. A blank professional canvas reads as "broken or empty,"
-not "ready." The empty state is the most important screen and right now it
-doesn't exist.
+expect them." The empty state offers a clear entry point: choose a template,
+add an element, or ask the agent.
 
 **What makes it feel intuitive.**
 - An **empty state with three doors**: pick a template, add an element, or ask
   the agent — so the first move is obvious whether you think in tools or in
   prompts.
-- **Toolbar hierarchy.** 14 buttons at identical weight (finding, *major*) means
-  the user can't tell creation (Add page) from view toggles (rulers, grid, snap,
-  bleed). Creation actions get primary weight; view toggles collapse to
-  icon-only or a single "View" menu. This is the audit's #1 ROI fix on canvas.
-- The pages strip needs a **"Pages" label and a divider** (finding) — right now
-  it floats at the bottom with no name, so a user unfamiliar with design tools
-  doesn't recognize it as page management.
-- On touch, pan/marquee/transform must own the gesture — fixed in this release
-  (`touch-action:none` on the canvas host); before it, the browser's scroll
-  fought every drag and the editor was unusable on a tablet.
+- **Toolbar hierarchy.** Give creation actions primary weight and group view
+  toggles (rulers, grid, snap, bleed) in a "View" menu.
+- Name the pages strip **"Pages"** so it is recognizable as page management.
+- On touch, pan/marquee/transform must own the gesture; verify that browser
+  scrolling does not compete with editing.
 
 **Naming that evokes understanding.**
 | Today | Proposed | Why |
@@ -164,23 +163,15 @@ editable, human-correctable output target for video/audio agents.
 trim clips, confirm captions land on the right frames.
 
 **First impression we want.** "This is a video editor and I can see the timing."
-Today it scored the lowest (4/10) and its *critical* finding is the killer: **no
-visible ruler, track lanes, or time grid** in the demo state — "a timeline editor
-without time markers is like a ruler with no numbers." The very thing that makes
-it a *timeline* must be the first thing you see.
+The ruler, track lanes, and time grid make timing visible before playback.
 
 **What makes it feel intuitive.**
 - **Time must be legible at rest**: ruler with timecodes, distinct labeled lanes
   (Video / Captions), a visible playhead. This is the identity of the surface.
-- **Transport vs. edit hierarchy** (finding, *critical*): Play/pause is one kind
-  of action; Split/Trim/Add-caption is another. 14 equal-weight buttons hide the
-  one verb (Play) every user looks for first. Group transport, separate edit
-  tools, demote destructive ones.
-- The **zoom control needs a readout** (finding) — "am I at 50% or 200%?" A
-  slider with no number is a guess.
-- On touch, clip drag / trim / scrub now own the gesture (`touch-action:none` on
-  clips, ruler, and lanes — this release); before, dragging a clip scrolled the
-  page instead.
+- **Transport vs. edit hierarchy:** group Play/pause separately from
+  Split/Trim/Add-caption and distinguish destructive actions.
+- Give the **zoom control a readout** so the current scale is visible.
+- On touch, verify that clip drag, trim, and scrub own their gestures.
 
 **Naming that evokes understanding.**
 | Today | Proposed | Why |
@@ -200,8 +191,7 @@ it a *timeline* must be the first thing you see.
 - **First impression we want:** "I can see which model is active and switch it in
   one tap." It's well-built (popover, search, ARIA) — the gap is naming: "Effort"
   is internal. Use **"Thinking: Standard / Extended"** and show the active
-  model's name, not just a logo. Popover overflow on small phones is fixed this
-  release (`max-w` clamp).
+  model's name, not just a logo. Verify that the popover fits on a phone.
 
 ### Agent activity / Mission lane (`MissionActivityLane`, `AgentActivityPanel`, `mission-activity`)
 - **Purpose / goal:** make a long, multi-step autonomous run *legible* — what step
@@ -216,7 +206,8 @@ it a *timeline* must be the first thing you see.
 - **Purpose / goal:** compose a generation request (image/video/audio) against
   one model, with only the parameters that model actually publishes — and then
   live with what came back. Three screens over one library: **home** (the
-  centred composer above a full-bleed "Recent media" grid), the **generation
+  composer and recent media share a bounded content width; the recent section
+  appears only when media exists, as in [StudioHomeScreen](../src/studio-react/studio-home-screen.tsx)), the **generation
   page** for one prompt (its batch, shimmer skeletons at the chosen aspect while
   it runs, and the composer docked at the bottom so the next take is one edit
   away), and **history** (server-side search, media-type filter, select mode
@@ -273,19 +264,6 @@ it a *timeline* must be the first thing you see.
   component shipped that chrome once and was removed after an org-wide
   zero-importer audit (#340) — it mirrors the 0.44.0 root-barrel removal
   precedent, so don't re-add it as a shared component.
-
----
-
-## How this maps to the audit scores
-
-The browser audit (claude-code provider, SaaS rubric) scored Canvas 6, Timeline
-4, Chat 4 — and in all three, `accessibility` was 10/10 while `product-clarity`
-was the floor (4, 2, 3). That spread is the whole story: **the mechanism is
-sound; the meaning is missing.** Every fix above targets product-clarity,
-hierarchy, and naming — the cheapest points to win and the ones a token bump or a
-CSS pass can't buy. Ship the empty states, the action hierarchy, and the names,
-and these surfaces move from "looks like scaffolding" to "feels designed,"
-without touching the engine underneath.
 
 ---
 
