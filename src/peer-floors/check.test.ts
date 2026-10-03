@@ -155,7 +155,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('3.0.0', range!)).toBe(false)
   })
 
-  it('supports the verified Runtime 0.282, 0.283, 0.285, 0.289, and 0.291 lines', async () => {
+  it('supports the verified Runtime 0.282, 0.283, 0.285, 0.289, 0.291, and 0.293 lines', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -183,6 +183,9 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.291.0', range!)).toBe(true)
     expect(satisfiesRange('0.291.999', range!)).toBe(true)
     expect(satisfiesRange('0.292.0', range!)).toBe(false)
+    expect(satisfiesRange('0.293.0', range!)).toBe(true)
+    expect(satisfiesRange('0.293.999', range!)).toBe(true)
+    expect(satisfiesRange('0.294.0', range!)).toBe(false)
   })
 
   it('admits the tcloud line used by the Sandbox 0.59 consumer', async () => {
@@ -238,7 +241,7 @@ describe('this package audits itself', () => {
     }
   })
 
-  it('admits the Knowledge line compatible with Eval 0.203', async () => {
+  it('admits the Knowledge lines compatible with Eval 0.203 and 0.205', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -249,6 +252,9 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('17.1.10', range!)).toBe(true)
     expect(satisfiesRange('18.0.0', range!)).toBe(true)
     expect(satisfiesRange('19.0.0', range!)).toBe(false)
+    expect(satisfiesRange('19.0.1', range!)).toBe(true)
+    expect(satisfiesRange('19.999.0', range!)).toBe(true)
+    expect(satisfiesRange('20.0.0', range!)).toBe(false)
   })
 
   it('requires the shared companion layout seams without claiming the next minor', async () => {
@@ -292,10 +298,12 @@ describe('this package audits itself', () => {
   // Runtime declares its own Sandbox window for consumers that install both.
   // The Runtime 0.289.1 line requires Eval 0.201–0.203; older Runtime and
   // Knowledge lines retain their own peer contracts in combined consumers.
+  // Runtime 0.293 with Knowledge 19.0.1 is qualified against Eval 0.205.1;
+  // other minor windows remain unqualified.
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
-    ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.1', '0.199.999', '0.200.0', '0.200.1', '0.200.999', '0.201.0', '0.202.0', '0.203.0', '0.203.999'], ['0.204.0']],
+    ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.1', '0.199.999', '0.200.0', '0.200.1', '0.200.999', '0.201.0', '0.202.0', '0.203.0', '0.203.999', '0.205.1', '0.205.999'], ['0.204.0', '0.205.0', '0.206.0']],
     ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999', '0.54.0', '0.55.2', '0.58.1', '0.58.999', '0.59.0', '0.59.999', '0.60.3', '0.60.999'], ['0.56.0', '0.57.0', '0.58.0', '0.60.0', '0.60.1', '0.60.2', '0.61.0']],
-    ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0', '2.14.0', '2.15.0'], ['3.0.0']],
+    ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0', '2.14.0', '2.15.0', '2.16.0', '2.17.0'], ['3.0.0']],
   ]
 
   it.each(verifiedWindows)('keeps the %s peer on the verified window', async (name, below, admitted, above) => {
