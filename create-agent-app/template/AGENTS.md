@@ -4,6 +4,9 @@ This project supplies domain configuration and application wiring around `@tangl
 Read [CUSTOMIZE.md](CUSTOMIZE.md) for the customization checklist.
 For knowledge ingestion or proposal checks, read [KNOWLEDGE.md](KNOWLEDGE.md).
 
+For UI changes, read the canonical [product surfaces guide](https://github.com/tangle-network/agent-app/blob/main/docs/product-surfaces.md).
+Reports, dashboards, admin pages, and record lists start with its [operational-page compositions](https://github.com/tangle-network/agent-app/blob/main/docs/product-surfaces.md#operational-pages).
+
 ## DATA vs CODE
 
 - `agent.config.ts` contains identity, taxonomy, sources, integrations, UI, and model configuration as plain values.

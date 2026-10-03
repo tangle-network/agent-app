@@ -52,6 +52,10 @@ All of these except `agent-eval`, `agent-integrations`, and `agent-interface` ar
 
 Modules that import no engine package (`/tools`, `/web`, `/crypto`, `/redact`, `/stream`, `/billing`, `/tangle` — the last two take their client as a structural contract) need no peers.
 
+For reports, dashboards, admin pages, and record lists, start with the shared
+[operational-page compositions](https://github.com/tangle-network/agent-app/blob/main/docs/product-surfaces.md#operational-pages).
+For the conversational UI, start with the [default workspace](./examples/default-workspace.md).
+
 ## Quick start
 
 A product supplies its **taxonomy** (which proposal types exist, which are approval-gated) and its **handlers** (the real DB/vault writes), then wires the tool side channel to whichever surface it runs on.
@@ -128,7 +132,7 @@ Three decisions cover most of the surface.
 
 **1. How does the turn run?** Pick the transport by who's watching, not by feature.
 
-Each primitive is written `package → symbol`; three packages ship similarly-named turn functions, and AGENTS.md has the full [primitive table and the `runLoop` name-collision note](./AGENTS.md#turn-execution-primitives--which-one-when).
+Each primitive is written `package → symbol`; check its owning package before choosing among similarly named turn functions.
 
 | Your turn | Use | Why |
 |---|---|---|
