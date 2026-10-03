@@ -1,8 +1,8 @@
 # In-app Hub settings
 
 `./integrations-react` composes the finite server routes from `./platform` with the controlled views in `@tangle-network/sandbox-ui/integrations`.
-Install the published Sandbox UI `0.116.9` or later in its current `0.116.x` line when using this subpath.
-Install a supported `@tangle-network/hub-sdk` peer too; this subpath's public types use Hub SDK response types.
+Install supported Sandbox UI and Hub SDK peers from this package's declared peer ranges.
+This subpath's public types use Hub SDK response types.
 The Hub SDK remains on the server at runtime and does not enter the browser bundle.
 The other Agent App subpaths retain their existing Sandbox UI peer window.
 
@@ -52,6 +52,9 @@ function ConnectCallback() {
 The app derives `identity` and `can` from its signed-in state.
 The host may render additional API-key metadata fields through `renderApiKeyMetadata`.
 Custom signup flows use `onUnsupportedConnect`; the panel does not redirect to Platform management.
+Use `getConnectionContext` and `getConnectionActions` for host-owned workspace access on each account's existing card.
+The host authorizes those actions and updates their context only after its server confirms the change.
+Selecting an account stays on its card; Manage opens its connection settings.
 
 OAuth opens a popup during the user gesture.
 The callback broadcasts an opaque provider, nonce, and context signal.

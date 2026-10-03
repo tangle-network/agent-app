@@ -143,12 +143,41 @@ describe('integrations-react through the finite Hub settings server', () => {
     const f = fixture()
     render(<HubIntegrationsPanel identity={identity} client={f.client} can={allow} callbackPath="/integrations/callback" />)
     expect(await screen.findByText('Cloudbeds')).toBeTruthy()
-    expect(screen.getByRole('option', { name: /Hotel A/ })).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Account for Cloudbeds'), { target: { value: 'conn_1' } })
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Account for Cloudbeds' }), { key: 'Enter' })
+    fireEvent.click(await screen.findByRole('option', { name: /Hotel A/ }))
+    expect(window.location.search).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: 'Manage' }))
     await waitFor(() => expect(window.location.search).toBe('?integration=cloudbeds&connection=conn_1'))
     expect(await screen.findByText('Update a room')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Connect another account' }))
     expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+
+  it('keeps host actions on the selected account and clears selection when workspace identity changes', async () => {
+    const f = fixture()
+    f.setConnections([connection, { ...connection, id: 'conn_2', accountDisplay: 'Hotel B' }])
+    const useAccount = vi.fn()
+    const getConnectionActions = (account: HubConnection) => [{
+      id: 'use', label: 'Use in this workspace', onSelect: () => useAccount(account.id),
+    }]
+    const props = { client: f.client, can: allow, callbackPath: '/integrations/callback', getConnectionActions,
+      getConnectionContext: (account: HubConnection) => account.id === 'conn_1' ? 'In this workspace' : 'Available to this workspace' }
+    const view = render(<HubIntegrationsPanel {...props} identity={identity} />)
+    await screen.findByRole('combobox', { name: 'Account for Cloudbeds' })
+    expect(useAccount).not.toHaveBeenCalled()
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Account for Cloudbeds' }), { key: 'Enter' })
+    fireEvent.click(await screen.findByRole('option', { name: /Hotel A/ }))
+    expect(screen.getByText('In this workspace')).toBeTruthy()
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Account for Cloudbeds' }), { key: 'Enter' })
+    fireEvent.click(await screen.findByRole('option', { name: /Hotel B/ }))
+    expect(screen.queryByText('In this workspace')).toBeNull()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'More actions for Cloudbeds' }), { key: 'Enter' })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Use in this workspace' }))
+    expect(useAccount).toHaveBeenCalledExactlyOnceWith('conn_2')
+    expect(window.location.search).toBe('')
+    view.rerender(<HubIntegrationsPanel {...props} identity={other} />)
+    expect(screen.queryByText('Available to this workspace')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'More actions for Cloudbeds' })).toBeNull()
   })
 
   it.each(['custom', 'none'] as const)('reaches an explicit host connector for a %s provider', async authKind => {
