@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.12
+
+- fix(runtime): reject redirects compatibly with workerd (#773)
+
 ## 0.52.11
 
 - fix(peers): admit verified Integrations 0.60 line (#772)
