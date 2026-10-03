@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.3
+
+- fix(chatgpt-react): compact the shared connection card
+
 ## 0.52.2
 
 - feat(vault): let hosts name the collection and control file actions
