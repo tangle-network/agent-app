@@ -1,0 +1,106 @@
+{
+  "base": "http://127.0.0.1:4401",
+  "checkedAt": "2026-10-03T00:40:55.871Z",
+  "scope": "Installed public exports, kit-generated display metadata, controlled host enrollment/state fixtures. No live ChatGPT connection or installation claim.",
+  "results": [
+    {
+      "app": "gtm",
+      "theme": "light",
+      "width": 1440,
+      "keyboard": true,
+      "clipboard": true,
+      "hostCallback": true,
+      "violations": [],
+      "errors": [],
+      "scrollWidth": 1440,
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "app": "gtm",
+      "theme": "light",
+      "width": 390,
+      "keyboard": true,
+      "clipboard": true,
+      "hostCallback": true,
+      "violations": [],
+      "errors": [],
+      "scrollWidth": 390,
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "app": "gtm",
+      "theme": "dark",
+      "width": 1440,
+      "keyboard": true,
+      "clipboard": true,
+      "hostCallback": true,
+      "violations": [],
+      "errors": [],
+      "scrollWidth": 1440,
+      "background": "rgb(48, 48, 48)"
+    },
+    {
+      "app": "gtm",
+      "theme": "dark",
+      "width": 390,
+      "keyboard": true,
+      "clipboard": true,
+      "hostCallback": true,
+      "violations": [],
+      "errors": [],
+      "scrollWidth": 390,
+      "background": "rgb(48, 48, 48)"
+    },
+    {
+      "app": "creative",
+      "theme": "light",
+      "width": 1440,
+      "keyboard": true,
+      "clipboard": true,
+      "hostCallback": true,
+      "violations": [],
+      "errors": [],
+      "scrollWidth": 1440,
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "app": "creative",
+      "theme": "light",
+      "width": 390,
+      "keyboard": true,
+      "clipboard": true,
+      "hostCallback": true,
+      "violations": [],
+      "errors": [],
+      "scrollWidth": 390,
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "app": "creative",
+      "theme": "dark",
+      "width": 1440,
+      "keyboard": true,
+      "clipboard": true,
+      "hostCallback": true,
+      "violations": [],
+      "errors": [],
+      "scrollWidth": 1440,
+      "background": "rgb(48, 48, 48)"
+    },
+    {
+      "app": "creative",
+      "theme": "dark",
+      "width": 390,
+      "keyboard": true,
+      "clipboard": true,
+      "hostCallback": true,
+      "violations": [],
+      "errors": [],
+      "scrollWidth": 390,
+      "background": "rgb(48, 48, 48)"
+    }
+  ],
+  "stateRecovery": true,
+  "registeredLink": "Fixture ID with exact supplied official Plugins URL; no synthetic install URL.",
+  "originalVideos": 2
+}

@@ -1,0 +1,39 @@
+{
+  "sourceCommit": "eaaf9e495a606ec3f83e3f2c2a15d74815c00963",
+  "base": "5e34b3faf8917c75a6ca29fc0020a0014362e6b1",
+  "utc": "2026-10-03T00:48:10.704278+00:00",
+  "host": "beelink1-wsl",
+  "checks": {
+    "baseMerge": "Already up to date",
+    "frozenInstall": 0,
+    "typecheck": 0,
+    "affectedTests": {
+      "exit": 0,
+      "passed": 44
+    },
+    "installedBrowser": {
+      "exit": 0,
+      "configurations": 8,
+      "axeViolations": 0,
+      "runtimeErrors": 0
+    }
+  },
+  "sourceSha256": {
+    "src/chatgpt-react/index.tsx": "3db6cf4dd05678d2cc60edbe7f0e75e6a546768e76eaee47898dccd4316717c7",
+    "src/chatgpt-react/styles.css": "6e878dae11203415ac07f04f68b4bed43dcb4bbccd6eae8d9273473433431304",
+    "src/chatgpt-react/connect.stories.tsx": "bd6f950e35aa1a3b7ac99e68dcab7e3cd11a46b6300fea421c6cb5a8ddb6f399",
+    "examples/chatgpt-connect/proof.mjs": "63bc9656e17362f4e5423563fadcec0ad32fd8086c97e85cded06ebb2ad22164"
+  },
+  "baseline": {
+    "sourceCommit": "ca46454c0c6d3406f79c23cb1652ca5e96fb88c9",
+    "sameCardSourceAsBase": true,
+    "url": "http://127.0.0.1:4401"
+  },
+  "after": {
+    "url": "http://127.0.0.1:4412",
+    "packedWorkingTreeMatchesSourceCommit": true,
+    "scope": "Local candidate tarball installed in isolated GTM/Creative fixtures; unchanged package version is not a published release."
+  },
+  "rawArtifacts": "beelink1-wsl:/tmp/chatgpt-compact-20261003",
+  "limits": "No hosted ChatGPT or served Builder claim. Root coordinates publication and picker_delivery owns Builder pin/metadata adoption. Layout changed; setup interactions remain unchanged."
+}
