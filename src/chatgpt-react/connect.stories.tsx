@@ -16,3 +16,8 @@ export const Checking: Story = { args: { state: { status: 'checking' } } }
 export const Connected: Story = { args: { state: { status: 'connected' } } }
 export const Error: Story = { args: { state: { status: 'error', message: 'Connection could not be checked. Try again.' }, onCheck: () => {} } }
 export const MissingEndpoint: Story = { args: { endpoint: '' } }
+
+/** Container queries keep the same card usable in a narrow settings column. */
+export const Narrow: Story = {
+  decorators: [(Story) => <div style={{ width: 320, maxWidth: '100%' }}><Story /></div>],
+}

@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
-import { Button, Input } from '@tangle-network/ui/primitives'
+import { Button, Input, StatusPill } from '@tangle-network/ui/primitives'
+import { ProviderLogo } from '../web-react/provider-logo'
 import type { AgentEnrollmentIdentity } from '../agent-enrollment/index'
 
 /** The public display fields from chatgpt-agents-kit's AgentAppDescription. */
@@ -78,26 +79,28 @@ function ConnectSurface({ app, endpoint, enrollment, registeredConnection, state
   }
 
   return <section className={`tangle-chatgpt ${className ?? ''}`} aria-labelledby={`${id}-heading`}>
-    <div className="tangle-chatgpt__heading">
-      <div>
-        <span className="tangle-chatgpt__eyebrow">{app.displayName}</span>
-        <h2 id={`${id}-heading`}>Your agent, in ChatGPT</h2>
+    <div className="tangle-chatgpt__row">
+      <div className="tangle-chatgpt__logo" aria-hidden="true"><ProviderLogo provider="openai" size={24} /></div>
+      <div className="tangle-chatgpt__content">
+        <div className="tangle-chatgpt__heading">
+          <h2 id={`${id}-heading`}>ChatGPT</h2>
+          <StatusPill bare tone={connected ? 'success' : state.status === 'error' ? 'danger' : checking ? 'running' : 'neutral'}
+            role={state.status === 'error' ? 'alert' : 'status'} aria-busy={checking} className="tangle-chatgpt__status">{status}</StatusPill>
+        </div>
+        <p className="tangle-chatgpt__description">{app.description}</p>
       </div>
-      <span className="tangle-chatgpt__badge">ChatGPT</span>
-    </div>
-    <p className="tangle-chatgpt__description">{app.description}</p>
-    <p role={state.status === 'error' ? 'alert' : 'status'} aria-busy={checking} className="tangle-chatgpt__status">{status}</p>
-    <div className="tangle-chatgpt__actions">
-      {connectionUrl || connected ? <Button asChild className="tangle-chatgpt__primary">
-        <a href={connectionUrl ?? pluginsUrl} target="_blank" rel="noopener noreferrer">
-          {connected ? (connectionUrl ? 'Open in ChatGPT' : 'Open ChatGPT plugins') : 'Connect to ChatGPT'}{' '}<span className="tangle-chatgpt__sr-only">(opens a new tab)</span>
-        </a>
-      </Button> : <Button type="button" className="tangle-chatgpt__primary" disabled={checking || !resource}
-        aria-expanded={showSetup} aria-controls={`${id}-setup`} onClick={() => setShowSetup(!showSetup)}>
-        Connect to ChatGPT
-      </Button>}
-      {onCheck && <Button type="button" variant="outline" className="tangle-chatgpt__secondary" disabled={checking}
-        onClick={onCheck}>{checking ? 'Checking…' : 'Check connection'}</Button>}
+      <div className="tangle-chatgpt__actions">
+        {connectionUrl || connected ? <Button asChild className="tangle-chatgpt__primary">
+          <a href={connectionUrl ?? pluginsUrl} target="_blank" rel="noopener noreferrer">
+            {connected ? (connectionUrl ? 'Open in ChatGPT' : 'Open ChatGPT plugins') : 'Connect to ChatGPT'}{' '}<span className="tangle-chatgpt__sr-only">(opens a new tab)</span>
+          </a>
+        </Button> : <Button type="button" className="tangle-chatgpt__primary" disabled={checking || !resource}
+          aria-expanded={showSetup} aria-controls={`${id}-setup`} onClick={() => setShowSetup(!showSetup)}>
+          Connect to ChatGPT
+        </Button>}
+        {onCheck && <Button type="button" variant="outline" className="tangle-chatgpt__secondary" disabled={checking}
+          onClick={onCheck}>{checking ? 'Checking…' : 'Check connection'}</Button>}
+      </div>
     </div>
     <details className="tangle-chatgpt__details">
       <summary>Connection details</summary>
