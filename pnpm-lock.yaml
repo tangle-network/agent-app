@@ -153,6 +153,9 @@ importers:
       '@xyflow/react':
         specifier: ^12.11.5
         version: 12.11.5(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      agent-eval-0204:
+        specifier: npm:@tangle-network/agent-eval@0.204.0
+        version: '@tangle-network/agent-eval@0.204.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))'
       autoprefixer:
         specifier: ^10.5.4
         version: 10.5.4(postcss@8.5.26)
@@ -2434,6 +2437,11 @@ packages:
   '@tangle-network/agent-docs@0.2.1':
     resolution: {integrity: sha512-3VtBnTLYk/C6pnaNMzcxIXJhwcCoWIHW8/GSpwVkD/XoGNyq1QYMoeOXkSZJhx8uygDYx8pzTMFcAo1D2D1kIg==}
     engines: {node: '>=20'}
+    hasBin: true
+
+  '@tangle-network/agent-eval@0.204.0':
+    resolution: {integrity: sha512-jI5moWlQ68f9WKHo7cfPgplgjLnWtWD0bO/73ZivU3MLZk+S2+ASfMa/ROj6XX3WLYPUd8w1upmqbPMZ77hSZA==}
+    engines: {node: '>=20.19.0'}
     hasBin: true
 
   '@tangle-network/agent-eval@0.205.1':
@@ -7909,7 +7917,7 @@ snapshots:
 
   '@tangle-network/agent-core@0.10.2(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))':
     dependencies:
-      '@tangle-network/agent-interface': 2.15.0
+      '@tangle-network/agent-interface': 2.17.0
       '@tangle-network/agent-trace-contract': 2.0.0
       zod: 4.6.5
     optionalDependencies:
@@ -7925,6 +7933,21 @@ snapshots:
   '@tangle-network/agent-docs@0.2.1':
     dependencies:
       '@typescript/typescript6': 6.0.2
+
+  '@tangle-network/agent-eval@0.204.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))':
+    dependencies:
+      '@asteasolutions/zod-to-openapi': 9.1.0(zod@4.6.5)
+      '@hono/node-server': 2.1.1(hono@4.13.11)
+      '@tangle-network/agent-core': 0.10.2(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
+      '@tangle-network/agent-interface': 2.17.0
+      '@tangle-network/agent-trace-contract': 2.0.0
+      hono: 4.13.11
+      linear-sum-assignment: 1.0.9
+      re2js: 2.8.6
+      smol-toml: 1.9.0
+      zod: 4.6.5
+    transitivePeerDependencies:
+      - '@modelcontextprotocol/sdk'
 
   '@tangle-network/agent-eval@0.205.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))':
     dependencies:
