@@ -155,17 +155,17 @@ export const members: LineMember[] = [
   {
     id: 'mem_owner', lineId: 'ln_email', attachmentId: 'att_1',
     address: 'owner@example.com', role: 'owner', label: 'Owner', source: 'declared',
-    status: 'active', createdAt: '2026-09-28T03:00:00Z',
+    status: 'active', createdAt: '2026-09-28T03:00:00Z', updatedAt: '2026-09-28T03:00:00Z',
   },
   {
     id: 'mem_invited', lineId: 'ln_email', attachmentId: 'att_1',
     address: 'teammate@example.com', role: 'member', label: 'Teammate', source: 'declared',
-    status: 'invited', createdAt: '2026-09-28T03:30:00Z',
+    status: 'invited', createdAt: '2026-09-28T03:30:00Z', updatedAt: '2026-09-28T03:30:00Z',
   },
   {
     id: 'mem_stopped', lineId: 'ln_email', attachmentId: 'att_1',
     address: 'paused@example.com', role: 'chat-only', label: 'Paused member', source: 'declared',
-    status: 'stopped', createdAt: '2026-09-28T03:45:00Z',
+    status: 'stopped', createdAt: '2026-09-28T03:45:00Z', updatedAt: '2026-09-28T03:45:00Z',
   },
 ]
 
@@ -175,10 +175,11 @@ export function createMembersClient(initial: LineMember[]): LineMembersClient {
   return {
     async list() { return structuredClone(rows) },
     async add(lineId, input) {
+      const now = new Date().toISOString()
       rows.push({
         id: `mem_added_${nextId++}`, lineId, attachmentId: 'att_1',
         address: input.address, role: input.role, label: input.label ?? null,
-        source: 'declared', status: 'invited', createdAt: new Date().toISOString(),
+        source: 'declared', status: 'invited', createdAt: now, updatedAt: now,
       })
     },
     async update(_lineId, memberId, patch) {
@@ -186,11 +187,13 @@ export function createMembersClient(initial: LineMember[]): LineMembersClient {
       if (!row) throw new Error('Member not found.')
       if (patch.role !== undefined) row.role = patch.role
       if (patch.label !== undefined) row.label = patch.label
+      row.updatedAt = new Date().toISOString()
     },
     async remove(_lineId, memberId) {
       const row = rows.find(item => item.id === memberId)
       if (!row) throw new Error('Member not found.')
       row.status = 'removed'
+      row.updatedAt = new Date().toISOString()
     },
   }
 }

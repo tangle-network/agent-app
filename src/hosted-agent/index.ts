@@ -3,7 +3,7 @@ import { type Line, type LineInstanceCreate, Sandbox } from '@tangle-network/san
 
 /** Native Hub options. The kit does not keep a second membership or execution store. */
 type NativeAttachment = Parameters<Sandbox['lines']['attach']>[0]
-export type HostedAgentAttachment = Partial<Omit<NativeAttachment, 'number' | 'mode' | 'respond'>>
+export type HostedAgentAttachment = Partial<Omit<NativeAttachment, 'number' | 'mode' | 'respond'> & Pick<NonNullable<Line['attachment']>, 'instance'>>
 export type HostedAgentTransport = 'imessage' | 'whatsapp' | 'email'
 
 /** Hosted line setup. For Resend email, set address to a mailbox on the owned connection. */
