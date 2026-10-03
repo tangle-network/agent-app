@@ -12,7 +12,7 @@ describe('first-touch acquisition', () => {
     const header = firstTouchAcquisitionCookie(landing(), name, now)!
     expect(header).toContain('HttpOnly; SameSite=Lax; Max-Age=2592000; Secure')
     expect(header).not.toContain('Domain=')
-    const returned = new Request('https://app.example/app?utm_campaign=second', { headers: { cookie: header.split(';')[0] } })
+    const returned = new Request('https://app.example/app?utm_campaign=second', { headers: { cookie: header.split(';')[0]! } })
     expect(firstTouchAcquisitionCookie(returned, name, now + 1000)).toBeNull()
     expect(readFirstTouchAcquisition(returned, name, now + 1000)).toEqual({
       parameters: { utm_campaign: 'launch', utm_source: 'search', gclid: 'click-123' },
