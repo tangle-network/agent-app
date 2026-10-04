@@ -257,7 +257,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('20.0.0', range!)).toBe(false)
   })
 
-  it('requires the shared companion layout seams without claiming the next minor', async () => {
+  it('admits qualified Sandbox UI releases without claiming the next minor', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -269,6 +269,9 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.117.0', range!)).toBe(true)
     expect(satisfiesRange('0.117.1', range!)).toBe(true)
     expect(satisfiesRange('0.118.0', range!)).toBe(false)
+    expect(satisfiesRange('0.122.0', range!)).toBe(true)
+    expect(satisfiesRange('0.122.2', range!)).toBe(true)
+    expect(satisfiesRange('0.123.0', range!)).toBe(false)
   })
 
   it('requires the UI release that exports openui-schema', async () => {
