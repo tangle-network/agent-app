@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.2
+
+- fix: align enrollment lease tests and scaffold engine cohort (#784)
+
 ## 0.53.1
 
 - feat(assistant): derive page context from the title and let hosts layer the toggle (#783)
