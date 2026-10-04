@@ -38,6 +38,11 @@ export {
   type AssistantPanelLayout,
 } from "./launcher";
 export {
+  useDocumentPageContext,
+  pageLabelFromTitle,
+  type DocumentPageContextOptions,
+} from "./page-context";
+export {
   AssistantPanelToggle,
   type AssistantPanelToggleProps,
   ASSISTANT_PANEL_ID,
