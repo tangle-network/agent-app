@@ -19283,6 +19283,48 @@
           "doc": null
         },
         {
+          "name": "AgentProfileRegistryError",
+          "kind": "class",
+          "signature": "class AgentProfileRegistryError",
+          "doc": null
+        },
+        {
+          "name": "AgentProfileRegistryFailure",
+          "kind": "type",
+          "signature": "type AgentProfileRegistryFailure",
+          "doc": "Registry search failures the editor renders distinctly."
+        },
+        {
+          "name": "AgentProfileRegistryMcpResult",
+          "kind": "interface",
+          "signature": "interface AgentProfileRegistryMcpResult",
+          "doc": null
+        },
+        {
+          "name": "AgentProfileRegistryMcpServer",
+          "kind": "interface",
+          "signature": "interface AgentProfileRegistryMcpServer",
+          "doc": "An MCP server offered by the official MCP Registry or a custom registry."
+        },
+        {
+          "name": "AgentProfileRegistryPort",
+          "kind": "interface",
+          "signature": "interface AgentProfileRegistryPort",
+          "doc": "Host-supplied registry search."
+        },
+        {
+          "name": "AgentProfileRegistrySkill",
+          "kind": "interface",
+          "signature": "interface AgentProfileRegistrySkill",
+          "doc": "A skill offered by a maintained catalog."
+        },
+        {
+          "name": "AgentProfileRegistrySkillsResult",
+          "kind": "interface",
+          "signature": "interface AgentProfileRegistrySkillsResult",
+          "doc": null
+        },
+        {
           "name": "AgentProfileResourceKind",
           "kind": "type",
           "signature": "type AgentProfileResourceKind",
@@ -19467,6 +19509,18 @@
           "kind": "type",
           "signature": "type ChatFreeTextField",
           "doc": "A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it."
+        },
+        {
+          "name": "ChatFundingFailure",
+          "kind": "interface",
+          "signature": "interface ChatFundingFailure",
+          "doc": null
+        },
+        {
+          "name": "ChatFundingRecovery",
+          "kind": "interface",
+          "signature": "interface ChatFundingRecovery",
+          "doc": "Presentation only."
         },
         {
           "name": "ChatInteraction",
@@ -20205,6 +20259,12 @@
           "kind": "function",
           "signature": "(msg: ChatMessageMetrics) => string | null",
           "doc": "\"38 tok/s\" from completion tokens over first-token→end duration; null when unknown."
+        },
+        {
+          "name": "getChatFundingRecovery",
+          "kind": "function",
+          "signature": "(failure: string | ChatFundingFailure | null | undefined) => ChatFundingRecovery | null",
+          "doc": "Recognize a paid-access refusal across HTTP and SDK-wrapped chat failures."
         },
         {
           "name": "HarnessGlyph",

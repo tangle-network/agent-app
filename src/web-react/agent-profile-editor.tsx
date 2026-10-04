@@ -2,6 +2,8 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import type { AgentProfile, AgentProfileFileMount, AgentProfileMcpServer, AgentProfileResourceRef } from '@tangle-network/agent-interface/profile'
 import { agentProfileSchema } from '@tangle-network/agent-interface/profile-schema'
 import { Button, Input, Textarea, Switch, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@tangle-network/sandbox-ui/primitives'
+import type { AgentProfileRegistryPort } from './agent-profile-registry'
+import { AgentProfileRegistryMcpSearch, AgentProfileRegistrySkillSearch } from './agent-profile-registry-search'
 
 export type AgentProfileResourceKind = 'files' | 'skills' | 'tools' | 'agents' | 'commands' | 'instructions'
 
@@ -24,6 +26,8 @@ export interface AgentProfileEditorProps {
   showToolsAndPermissions?: boolean
   /** Offer only public HTTPS MCP endpoints while retaining existing servers for review. Defaults to false. */
   publicHttpsMcpOnly?: boolean
+  /** Host-supplied registry discovery (agent-app#776). Omit to hide catalog search entirely. */
+  registry?: AgentProfileRegistryPort
 }
 
 const RESOURCE_KIND_LABELS: Record<AgentProfileResourceKind, string> = {
@@ -216,7 +220,7 @@ function publicHttpsMcpError(server: AgentProfileMcpServer): string | null {
 /** Controlled editor for the canonical profile. The product owns save and execution authority. */
 export function AgentProfileEditor({ value, onChange, disabled = false, className, allowedResourceKinds,
   filePathPrefix, allowExecutableFiles = true, requireGitHubCommitSha = false, requireUniqueSkillNames = false,
-  showToolsAndPermissions = true, publicHttpsMcpOnly = false }: AgentProfileEditorProps) {
+  showToolsAndPermissions = true, publicHttpsMcpOnly = false, registry }: AgentProfileEditorProps) {
   const id = useId()
   const workspaceFilePrefix = normalizedFilePathPrefix(filePathPrefix)
   const [error, setError] = useState<string | null>(null)
@@ -344,6 +348,10 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
               <Button type="button" variant="ghost" onClick={() => setResourceEdit(null)}>Cancel</Button></div>
           </div>}
         </li>})}</ul>
+      {key === 'skills' && registry && <AgentProfileRegistrySkillSearch registry={registry} disabled={editingDisabled}
+        existing={refs}
+        validate={ref => resourceIssue('skills', resourceDraft(ref), refs)}
+        onAdd={ref => resources('skills', [...(value.resources?.skills ?? []), ref])} />}
       <div className="space-y-3 rounded-lg border border-dashed border-border p-3">
         <ResourceFields draft={draft} disabled={editingDisabled} requireGitHubCommitSha={requireGitHubCommitSha}
           requireSkillName={key === 'skills' && requireUniqueSkillNames} pathPlaceholder={key === 'skills' ? 'research/SKILL.md' : 'tools/search.ts'}
@@ -481,6 +489,14 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
         <div className="sm:col-span-2"><Field label={selectedMcpKind === 'stdio' ? 'Command' : 'URL'}><Input disabled={editingDisabled} value={mcpTarget} onChange={event => setMcpTarget(event.target.value)} placeholder={selectedMcpKind === 'stdio' ? 'mcp-server' : 'https://example.com/mcp'} /></Field></div>
         <div className="sm:col-span-2"><Button type="button" variant="outline" disabled={editingDisabled} onClick={addMcp}>Add server</Button></div>
       </div>
+      {registry && <AgentProfileRegistryMcpSearch registry={registry} disabled={editingDisabled}
+        existingNames={Object.keys(value.mcp ?? {})}
+        validate={(name, server) => {
+          if (!name.trim()) return 'The registry returned a server without a usable name.'
+          if (name in (value.mcp ?? {})) return 'A server with that name already exists.'
+          return publicHttpsMcpOnly ? publicHttpsMcpError(server) : null
+        }}
+        onAdd={(name, server) => emit({ ...value, mcp: { ...value.mcp, [name]: server } })} />}
       <p className="text-xs text-muted-foreground">Arguments, headers, environment, and secret references remain in Advanced JSON.</p>
     </Disclosure>
     {allowsResource('files') && <Disclosure title="Resource files" description="Configure files for the agent workspace. The runtime determines whether it can place them." detail={(value.resources?.files ?? []).length + ' configured'}>
