@@ -45,7 +45,8 @@ export interface AssistantDockProps {
   /** Render the panel toggle at the viewport's top right while the panel is
    *  closed. Pass false when the host places `AssistantPanelToggle` in its own
    *  header. Hosts can tune the floating position with the
-   *  `--assistant-toggle-top` and `--assistant-toggle-right` CSS variables. */
+   *  `--assistant-toggle-top` and `--assistant-toggle-right` CSS variables,
+   *  and lift it above a fixed top bar with `--assistant-toggle-z`. */
   floatingToggle?: boolean;
   /** Host navigation for error CTAs and connect targets. */
   navigate?: (path: string) => void;
@@ -215,10 +216,11 @@ export function AssistantDock({
     return floatingToggle ? (
       <AssistantPanelToggle
         buttonRef={toggleRef}
-        className="fixed z-30"
+        className="fixed"
         style={{
           top: "var(--assistant-toggle-top, 0.75rem)",
           right: "var(--assistant-toggle-right, 0.75rem)",
+          zIndex: "var(--assistant-toggle-z, 30)",
         }}
       />
     ) : null;
