@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.18
+
+- feat(profile): discover skills and MCP servers in the shared profile editor (#781)
+
 ## 0.52.17
 
 - fix(web-react): share billing recovery for chat funding failures (#780)
