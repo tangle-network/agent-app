@@ -944,6 +944,12 @@
           "doc": "Define data structure representing a delta event with associated text content"
         },
         {
+          "name": "DocumentPageContextOptions",
+          "kind": "interface",
+          "signature": "interface DocumentPageContextOptions",
+          "doc": "Pass module-level `titleSuffix`, `ignoreTitles` and `ids` so the context keeps its identity between renders."
+        },
+        {
           "name": "DoneEventData",
           "kind": "interface",
           "signature": "interface DoneEventData",
@@ -954,6 +960,12 @@
           "kind": "interface",
           "signature": "interface ErrorEventData",
           "doc": "Describe error event data including code and message fields"
+        },
+        {
+          "name": "pageLabelFromTitle",
+          "kind": "function",
+          "signature": "(title: string, titleSuffix?: RegExp | undefined, ignoreTitles?: readonly string[]) => string | null",
+          "doc": "`title` minus the product suffix, or null when nothing page-specific is left."
         },
         {
           "name": "PendingProposal",
@@ -1068,6 +1080,12 @@
           "kind": "function",
           "signature": "(userId: string | null) => AssistantThreads",
           "doc": "Resolve and manage assistant threads state for a given user including pending deletions and refresh logic"
+        },
+        {
+          "name": "useDocumentPageContext",
+          "kind": "function",
+          "signature": "({ path, titleSuffix, ignoreTitles, ids, }: DocumentPageContextOptions) => AssistantPageContext | null",
+          "doc": null
         }
       ]
     },
