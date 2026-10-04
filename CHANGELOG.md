@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.0
+
+- feat(assistant)!: dock the assistant as a right panel on the main chat primitives (#782)
+
 ## 0.52.18
 
 - feat(profile): discover skills and MCP servers in the shared profile editor (#781)
