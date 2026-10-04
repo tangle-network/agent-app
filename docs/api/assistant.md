@@ -4,7 +4,7 @@
 
 Source: `src/assistant/index.ts`
 
-63 exports.
+66 exports.
 
 ### `ASSISTANT_PANEL_ID`
 
@@ -342,6 +342,14 @@ interface ConnectRequirementResult
 interface DeltaEventData
 ```
 
+### `DocumentPageContextOptions`
+
+`interface` — Pass module-level `titleSuffix`, `ignoreTitles` and `ids` so the context keeps its identity between renders.
+
+```ts
+interface DocumentPageContextOptions
+```
+
 ### `DoneEventData`
 
 `interface` — Describe the data emitted when a process turn completes including status and optional flags
@@ -356,6 +364,14 @@ interface DoneEventData
 
 ```ts
 interface ErrorEventData
+```
+
+### `pageLabelFromTitle`
+
+`function` — `title` minus the product suffix, or null when nothing page-specific is left.
+
+```ts
+(title: string, titleSuffix?: RegExp | undefined, ignoreTitles?: readonly string[]) => string | null
 ```
 
 ### `PendingProposal`
@@ -508,4 +524,12 @@ interface UseAssistantChatOptions
 
 ```ts
 (userId: string | null) => AssistantThreads
+```
+
+### `useDocumentPageContext`
+
+`function`
+
+```ts
+({ path, titleSuffix, ignoreTitles, ids, }: DocumentPageContextOptions) => AssistantPageContext | null
 ```
