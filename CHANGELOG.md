@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.17
+
+- fix(web-react): share billing recovery for chat funding failures (#780)
+
 ## 0.52.16
 
 - fix(deps): qualify sandbox-ui 0.122
