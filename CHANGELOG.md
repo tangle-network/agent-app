@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.1
+
+- feat(assistant): derive page context from the title and let hosts layer the toggle (#783)
+
 ## 0.53.0
 
 - feat(assistant)!: dock the assistant as a right panel on the main chat primitives (#782)
