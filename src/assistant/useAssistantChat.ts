@@ -18,6 +18,7 @@ import {
 } from "./reducer";
 import type {
   AssistantDeliveryMode,
+  AssistantPageContext,
   ChatMessage,
   ConfirmedResult,
   ConnectionRequirement,
@@ -58,6 +59,11 @@ export interface UseAssistantChatOptions {
   onConnectRequirement?: (
     requirement: ConnectionRequirement,
   ) => Promise<ConnectRequirementResult>;
+  /**
+   * The page the user has open. Read when a turn starts, so the model sees the
+   * page the panel header names at the moment of sending.
+   */
+  context?: AssistantPageContext | null;
 }
 
 const EMPTY_IDS: ReadonlySet<string> = new Set();
@@ -179,6 +185,8 @@ export function useAssistantChat(
   onWorkflowMutationRef.current = options?.onWorkflowMutation;
   const onConnectRequirementRef = useRef(options?.onConnectRequirement);
   onConnectRequirementRef.current = options?.onConnectRequirement;
+  const contextRef = useRef(options?.context ?? null);
+  contextRef.current = options?.context ?? null;
 
   // Proposal ids whose confirmation request is in flight. The ref is the
   // synchronous guard against a double-click issuing a duplicate execute; the
@@ -249,6 +257,7 @@ export function useAssistantChat(
             model,
             threadId,
             turnKey: uuid(),
+            ...(contextRef.current ? { context: contextRef.current } : {}),
           },
           (event) => {
             // Drop events from a stream that has been superseded (new turn,

@@ -15,7 +15,7 @@ import {
 } from './fixtures'
 
 /**
- * The chat panel the dock's drawer hosts. Stories drive it with a controlled
+ * The chat panel the dock hosts. Stories drive it with a controlled
  * `AssistantChat` handle (the same fake the panel's tests use), so each story
  * is one exact conversation state — no streaming waits. The model picker and
  * history view read the stub client's fixtures.
@@ -36,7 +36,7 @@ const meta: Meta<typeof AssistantPanel> = {
 export default meta
 type Story = StoryObj<typeof AssistantPanel>
 
-/** The drawer-sized frame the panel is designed for (default dock width 448px,
+/** The panel-sized frame the panel is designed for (default dock width 480px,
  *  trimmed to sit comfortably in the canvas). */
 function Frame({ children }: { children: ReactNode }) {
   return (

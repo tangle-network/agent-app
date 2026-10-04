@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
 import {
   afterEach,
   beforeEach,
@@ -11,6 +10,7 @@ import {
 } from "vitest";
 import {
   AssistantPanel,
+  type AssistantPanelProps,
   nextModelSelection,
   toPickerModels,
 } from "./AssistantPanel";
@@ -22,7 +22,7 @@ import {
 } from "./client";
 import { AssistantClientProvider } from "./client-context";
 import { type AssistantState, initialAssistantState } from "./reducer";
-import type { AssistantTranscriptView, PendingProposal } from "./types";
+import type { PendingProposal } from "./types";
 import type { AssistantChat } from "./useAssistantChat";
 
 const client = createAssistantClient({ baseUrl: "/api/v1/assistant" });
@@ -56,32 +56,23 @@ function makeChat(over: Partial<AssistantState> = {}): AssistantChat {
 
 function renderPanel(
   chat: AssistantChat,
-  renderTranscript?: (view: AssistantTranscriptView) => ReactNode,
+  extra: Partial<AssistantPanelProps> = {},
 ) {
   return render(
     <AssistantClientProvider client={client}>
-      <AssistantPanel
-        chat={chat}
-        userId="u1"
-        onClose={() => {}}
-        renderTranscript={renderTranscript}
-      />
+      <AssistantPanel chat={chat} userId="u1" onClose={() => {}} {...extra} />
     </AssistantClientProvider>,
   );
 }
 
-describe("AssistantPanel transcript seam", () => {
-  it("renders the built-in transcript (branded empty state) when no renderTranscript is supplied", () => {
+describe("AssistantPanel transcript", () => {
+  it("shows the first-run starters on a fresh thread", () => {
     renderPanel(makeChat());
-    expect(
-      screen.getByText(/Ask the assistant to do something/i),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/pause for approval before anything changes/i),
-    ).toBeTruthy();
+    expect(screen.getByText("What should the assistant do?")).toBeTruthy();
+    expect(screen.getByText(/Changes wait for your approval/)).toBeTruthy();
   });
 
-  it("seeds the composer from an empty-state door", () => {
+  it("seeds the composer from a starter", () => {
     renderPanel(makeChat());
     const input = screen.getByLabelText("Message input") as HTMLTextAreaElement;
     expect(input.value).toBe("");
@@ -91,43 +82,15 @@ describe("AssistantPanel transcript seam", () => {
     expect(input.value).toBe("Create a workflow that ");
   });
 
-  it("hands the host renderTranscript the live view and a bound renderProposal that renders the ProposalCard", () => {
-    let captured: AssistantTranscriptView | null = null;
-    const chat = makeChat({
-      status: "awaiting_confirm",
-      model: "anthropic/claude",
-      messages: [{ id: "a", role: "assistant", text: "I'll create that." }],
-      pendingProposals: [proposal],
-    });
-
-    renderPanel(chat, (view) => {
-      captured = view;
-      return (
-        <div data-testid="host-transcript">
-          {view.pendingProposals.map((p) => (
-            <div key={p.callId}>{view.renderProposal(p)}</div>
-          ))}
-        </div>
-      );
-    });
-
-    // The host renderer ran instead of the built-in timeline.
-    expect(screen.getByTestId("host-transcript")).toBeTruthy();
-    expect(screen.queryByText(/Ask the assistant to do something/i)).toBeNull();
-
-    // The view carries the panel-derived surface the contract promises.
-    expect(captured).not.toBeNull();
-    const view = captured as unknown as AssistantTranscriptView;
-    expect(view.isStreaming).toBe(false);
-    expect(view.isThinking).toBe(false);
-    expect(view.model).toBe("anthropic/claude");
-    expect(view.messages).toHaveLength(1);
-    expect(view.pendingProposals).toHaveLength(1);
-    expect(view.pendingProposals[0]!.callId).toBe("c1");
-
-    // The bound renderProposal renders the panel's own ProposalCard, with the
-    // confirm/cancel controls wired — so a host can't accidentally hide a
-    // pending mutating action.
+  it("renders a pending proposal with its confirm and cancel controls", () => {
+    renderPanel(
+      makeChat({
+        status: "awaiting_confirm",
+        messages: [{ id: "a", role: "assistant", text: "I'll create that." }],
+        pendingProposals: [proposal],
+      }),
+    );
+    expect(screen.getByText("I'll create that.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
   });
@@ -151,13 +114,7 @@ describe("AssistantPanel transcript seam", () => {
     });
     chat.canConnectRequirement = true;
 
-    renderPanel(chat, (view) => (
-      <div>
-        {view.pendingProposals.map((p) => (
-          <div key={p.callId}>{view.renderProposal(p)}</div>
-        ))}
-      </div>
-    ));
+    renderPanel(chat);
 
     fireEvent.click(screen.getByRole("button", { name: /Connect/ }));
     expect(chat.connectRequirement).toHaveBeenCalledWith(
@@ -187,19 +144,10 @@ describe("AssistantPanel transcript seam", () => {
       status: "awaiting_confirm",
       pendingProposals: [proposalWithReq],
     });
-    // canConnectRequirement stays false (the makeChat default).
 
-    renderPanel(chat, (view) => (
-      <div>
-        {view.pendingProposals.map((p) => (
-          <div key={p.callId}>{view.renderProposal(p)}</div>
-        ))}
-      </div>
-    ));
+    renderPanel(chat);
 
     fireEvent.click(screen.getByRole("button", { name: /Connect/ }));
-    // The panel passed no onConnect, so the card keeps its navigate/open fallback
-    // and never calls the host connect handler.
     expect(chat.connectRequirement).not.toHaveBeenCalled();
     expect(openSpy).toHaveBeenCalledWith(
       "https://example.com/connect/slack",
@@ -208,75 +156,41 @@ describe("AssistantPanel transcript seam", () => {
     );
     openSpy.mockRestore();
   });
-
-  it("reflects a live streaming turn in the view's isStreaming/isThinking flags", () => {
-    let captured: AssistantTranscriptView | null = null;
-    // A turn that has started but emitted no answer text yet reads as thinking.
-    const chat = makeChat({
-      status: "streaming",
-      streamingId: "a",
-      messages: [{ id: "a", role: "assistant", text: "" }],
-    });
-
-    renderPanel(chat, (view) => {
-      captured = view;
-      return <div data-testid="host-transcript" />;
-    });
-
-    const view = captured as unknown as AssistantTranscriptView;
-    expect(view.isStreaming).toBe(true);
-    expect(view.isThinking).toBe(true);
-  });
 });
 
-describe("AssistantPanel composer running indicator", () => {
-  it("shows a running indicator while a turn is streaming", () => {
-    const { container } = renderPanel(
-      makeChat({ status: "streaming", streamingId: "a" }),
-      () => <div data-testid="host-transcript" />,
-    );
+describe("AssistantPanel page context", () => {
+  const context = {
+    label: "nightly-ping · run 3f2a1c",
+    path: "/app/workflows/wf_1/runs/wfrun_3f2a1c",
+    ids: { workflowId: "wf_1", runId: "wfrun_3f2a1c" },
+  };
+
+  it("names the page under the title and offers a starter about it", () => {
+    renderPanel(makeChat(), { context });
+    expect(screen.getByText(context.label)).toBeTruthy();
     expect(
-      container.querySelector('[aria-label="Assistant is working"]'),
-    ).not.toBeNull();
+      screen.getByRole("button", { name: /^Explain this page/ }),
+    ).toBeTruthy();
   });
 
-  it("hides the running indicator when idle", () => {
-    const { container } = renderPanel(makeChat({ status: "idle" }), () => (
-      <div data-testid="host-transcript" />
-    ));
-    expect(
-      container.querySelector('[aria-label="Assistant is working"]'),
-    ).toBeNull();
-  });
-});
-
-describe("AssistantPanel conversation title", () => {
-  it("shows the first user message as the conversation title", () => {
-    renderPanel(
-      makeChat({
-        messages: [
-          { id: "u", role: "user", text: "Create a PR review workflow" },
-          { id: "a", role: "assistant", text: "On it." },
-        ],
-      }),
-      () => <div data-testid="host-transcript" />,
-    );
-    expect(screen.getByText("Create a PR review workflow")).toBeTruthy();
+  it("shows no page line and no page starter without a context", () => {
+    renderPanel(makeChat());
+    expect(screen.queryByText(/Looking at/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Explain this page/ })).toBeNull();
   });
 
-  it("truncates a long first user message", () => {
-    const long = "x".repeat(120);
-    renderPanel(
-      makeChat({ messages: [{ id: "u", role: "user", text: long }] }),
-      () => <div data-testid="host-transcript" />,
-    );
-    expect(screen.getByText(`${"x".repeat(60)}…`)).toBeTruthy();
-  });
-
-  it("shows no conversation title on a fresh chat", () => {
-    renderPanel(makeChat(), () => <div data-testid="host-transcript" />);
-    // Only the static "Assistant" label is present, no derived title line.
-    expect(screen.getByText("Assistant")).toBeTruthy();
+  it("closes from the header toggle when docked and from a close button in a sheet", () => {
+    for (const layout of ["docked", "sheet"] as const) {
+      const onClose = vi.fn();
+      const { unmount } = renderPanel(makeChat(), { layout, onClose });
+      const close = screen.getByRole("button", { name: "Close assistant" });
+      expect(close.getAttribute("aria-expanded")).toBe(
+        layout === "docked" ? "true" : null,
+      );
+      fireEvent.click(close);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      unmount();
+    }
   });
 });
 
@@ -523,53 +437,6 @@ describe("nextModelSelection", () => {
   });
 });
 
-describe("AssistantPanel text-size control", () => {
-  // The zoom lives on the transcript wrapper (the conversation container's
-  // child), not the container itself, so it scales the transcript without
-  // scaling the history view's search box and buttons.
-  function zoomLayer(container: HTMLElement): HTMLElement {
-    const el = container.querySelector('[aria-label="Conversation"] > div');
-    if (!el) throw new Error("zoom layer not found");
-    return el as HTMLElement;
-  }
-
-  it("applies the font scale as a transcript zoom and respects the bounds", () => {
-    const { container } = renderPanel(makeChat(), () => (
-      <div data-testid="host-transcript" />
-    ));
-    // Default scale 1 → no visual change.
-    expect(zoomLayer(container).style.zoom).toBe("1");
-
-    fireEvent.click(screen.getByRole("button", { name: "Increase text size" }));
-    expect(zoomLayer(container).style.zoom).toBe("1.125");
-
-    // Walk down to the minimum (0.875) and confirm the control disables there.
-    fireEvent.click(screen.getByRole("button", { name: "Decrease text size" }));
-    fireEvent.click(screen.getByRole("button", { name: "Decrease text size" }));
-    expect(zoomLayer(container).style.zoom).toBe("0.875");
-    expect(
-      (
-        screen.getByRole("button", {
-          name: "Decrease text size",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true);
-  });
-
-  it("does not apply the zoom to the history view", () => {
-    const chat = makeChat({ threadId: "t1", status: "idle" });
-    const { container } = renderWith(chat, deleteClient([thread("t1")]));
-    fireEvent.click(screen.getByRole("button", { name: "Increase text size" }));
-    fireEvent.click(screen.getByRole("button", { name: "Chat history" }));
-    // The conversation container itself carries no zoom, and the history branch
-    // has no zoom wrapper — so the search box and list render at 1x.
-    const log = container.querySelector(
-      '[aria-label="Conversation"]',
-    ) as HTMLElement;
-    expect(log.style.zoom).toBe("");
-  });
-});
-
 describe("AssistantPanel history view", () => {
   it("toggles the conversation area between the chat and the history list", async () => {
     const chat = makeChat({ threadId: "t1", status: "idle" });
@@ -711,12 +578,7 @@ describe("AssistantPanel model selection display", () => {
   function renderWithModels(chat: AssistantChat, data: AssistantModels) {
     return render(
       <AssistantClientProvider client={modelsClient(data)}>
-        <AssistantPanel
-          chat={chat}
-          userId="u1"
-          onClose={() => {}}
-          renderTranscript={() => <div data-testid="host-transcript" />}
-        />
+        <AssistantPanel chat={chat} userId="u1" onClose={() => {}} />
       </AssistantClientProvider>,
     );
   }

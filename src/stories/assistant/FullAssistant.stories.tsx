@@ -10,7 +10,7 @@ import { STORY_USER_ID, stubClient, useStubAttachments } from './fixtures'
 
 /**
  * The whole assistant surface at app-shell scale: the dock mounted over a fake
- * Workflows page, opened from the corner launcher or the page's "Create with
+ * Workflows page, opened from the panel toggle or the page's "Create with
  * assistant" button (which seeds the composer). Sending a message replays the
  * stub client's scripted turn live — reasoning, a tool chip, the answer, a
  * workflow proposal with a connectable requirement, then the settled cost —
@@ -85,7 +85,7 @@ function AppShell() {
         <div className="p-6">
           <h1 className="font-medium text-foreground text-lg">Your workflows</h1>
           <p className="mt-1 max-w-lg text-muted-foreground text-sm">
-            Open the assistant from the corner launcher, or use “Create with
+            Open the assistant from the toggle at the top right, or use “Create with
             assistant” to start with a seeded composer. Send the message to
             watch a scripted turn stream in, then confirm the proposed workflow.
           </p>
@@ -108,7 +108,7 @@ function AppShell() {
   )
 }
 
-/** Opens the drawer once on mount. Must render inside the launcher provider. */
+/** Opens the panel once on mount. Must render inside the launcher provider. */
 function OpenOnMount() {
   const { openAssistant } = useAssistantLauncher()
   useEffect(() => {
@@ -141,14 +141,14 @@ function Docked() {
   )
 }
 
-/** The dock over the app shell, closed — open it from the launcher or the
+/** The dock over the app shell, closed — open it from the toggle or the
  *  seeded CTA. */
 export const FullAssistant: Story = {
   name: 'Full Assistant (closed)',
   render: () => <Docked />,
 }
 
-/** Same composition with the drawer already open. */
+/** Same composition with the panel already open. */
 export const FullAssistantOpen: Story = {
   name: 'Full Assistant (open)',
   render: () => (
