@@ -124,11 +124,9 @@ describe('assistant stories smoke', () => {
     })
   }
 
-  it('Panel Empty shows the branded zero-state', async () => {
+  it('Panel Empty shows the first-run starters', async () => {
     await mount(panelModule.default, panelModule.PanelEmpty)
-    expect(
-      screen.getByText(/Ask the assistant to do something/i),
-    ).toBeTruthy()
+    expect(screen.getByText('What should the assistant do?')).toBeTruthy()
     expect(
       screen.getByRole('button', { name: /^Create a workflow/ }),
     ).toBeTruthy()
@@ -140,23 +138,20 @@ describe('assistant stories smoke', () => {
     expect(screen.getByText('Create workflow')).toBeTruthy()
   })
 
-  it('Panel Streaming shows the working cue', async () => {
-    const { container } = await mount(panelModule.default, panelModule.PanelStreaming,
-    )
-    expect(
-      container.querySelector('[aria-label="Assistant is working"]'),
-    ).not.toBeNull()
+  it('Panel Streaming shows the stop control', async () => {
+    await mount(panelModule.default, panelModule.PanelStreaming)
+    expect(screen.getByRole('button', { name: 'Stop response' })).toBeTruthy()
   })
 
-  it('Dock Collapsed shows only the launcher button', async () => {
+  it('Dock Collapsed shows only the panel toggle', async () => {
     await mount(dockModule.default, dockModule.DockCollapsed)
     expect(screen.getByRole('button', { name: 'Open assistant' })).toBeTruthy()
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('complementary', { name: 'Assistant' })).toBeNull()
   })
 
-  it('Dock Expanded opens the drawer', async () => {
+  it('Dock Expanded opens the panel', async () => {
     await mount(dockModule.default, dockModule.DockExpanded)
-    expect(screen.getByRole('dialog', { name: 'Assistant' })).toBeTruthy()
+    expect(screen.getByRole('complementary', { name: 'Assistant' })).toBeTruthy()
   })
 
   it('Dock With Seed prefills the composer', async () => {
@@ -165,9 +160,9 @@ describe('assistant stories smoke', () => {
     expect(input.value).toContain('posts the launch poster')
   })
 
-  it('FullAssistant (open) shows the drawer over the app shell', async () => {
+  it('FullAssistant (open) shows the panel beside the app shell', async () => {
     await mount(fullModule.default, fullModule.FullAssistantOpen)
-    expect(screen.getByRole('dialog', { name: 'Assistant' })).toBeTruthy()
+    expect(screen.getByRole('complementary', { name: 'Assistant' })).toBeTruthy()
     expect(screen.getByText('Your workflows')).toBeTruthy()
   })
 

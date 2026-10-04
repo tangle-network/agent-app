@@ -10,6 +10,21 @@ import type { ReactNode } from "react";
 /** Define delivery modes for assistant interaction as either steering or queue */
 export type AssistantDeliveryMode = "steering" | "queue";
 
+/**
+ * The page the user has open while talking to the assistant. The panel header
+ * shows `label`, and every turn sends the whole object so the model answers
+ * about the same page the header names. Ids are the ones the assistant's tools
+ * accept (e.g. `{ workflowId, runId }`), so "this run" resolves without asking.
+ */
+export interface AssistantPageContext {
+  /** Short name of what is open, e.g. "nightly-ping · run 3f2a1c". */
+  label: string;
+  /** In-app path of the page, e.g. "/app/workflows/wf_1/runs/wfrun_2". */
+  path: string;
+  /** Tool-facing ids of the objects on the page. */
+  ids?: Record<string, string>;
+}
+
 /** Request body for `POST /api/v1/assistant/chat`. */
 export interface ChatRequest {
   message: string;
@@ -21,6 +36,8 @@ export interface ChatRequest {
   threadId?: string;
   /** Per-turn idempotency key — guards against double-charge on retry. */
   turnKey?: string;
+  /** The page the user has open; omitted when the host names none. */
+  context?: AssistantPageContext;
 }
 
 // --- Server SSE event payloads (one per `event:` name) ----------------------
@@ -259,13 +276,9 @@ export interface UsageInfo {
 }
 
 /**
- * The transcript slice handed to a host-supplied `renderTranscript` (see
- * {@link AssistantPanelProps}). It lets a host swap ONLY the conversation
- * rendering — to use its own message renderer — while the panel keeps owning the
- * dock chrome, composer, model picker, history, transport, and proposal
- * orchestration. The bound `renderProposal` returns the panel's own proposal
- * card so the host can place it (e.g. inline after the proposing turn) without
- * re-implementing the confirm/cancel flow.
+ * The transcript slice the panel hands `AssistantTranscript`: the reducer's
+ * messages plus turn-level state, and the panel's bound `renderProposal`, which
+ * returns the proposal card wired to the panel's confirm/cancel flow.
  */
 export interface AssistantTranscriptView {
   messages: ChatMessage[];
