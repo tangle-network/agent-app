@@ -32,6 +32,8 @@ describe.each([{ flags: [] }, { flags: ['--chat'] }, { flags: ['--headless'] }])
         const manifest = JSON.parse(readFileSync(join(target, 'package.json'), 'utf8'))
         expect(manifest.dependencies['@tangle-network/agent-app'])
           .toBe(override ?? scaffolder.version)
+        expect(manifest.devDependencies['@tangle-network/agent-eval'])
+          .toBe(app.devDependencies?.['@tangle-network/agent-eval'])
       }
     } finally {
       rmSync(scratch, { recursive: true, force: true })
