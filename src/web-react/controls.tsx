@@ -197,6 +197,11 @@ export interface PopoverSurfaceProps {
    *  `w-full` to inherit — the trigger is no longer its offset parent — so a
    *  menu that used to stretch to a full-width trigger declares it here. */
   matchTriggerWidth?: boolean
+  /** Preferred side. `above` suits controls docked at the bottom of a composer;
+   *  `below` suits headers, rows, and rails. Either flips when the other side has more room. */
+  side?: 'above' | 'below'
+  /** Which trigger edge the panel lines up with. `end` keeps a row's trailing menu over the row. */
+  align?: 'start' | 'end'
   /** Opt in to remeasurement when asynchronous or filtered content changes. */
   contentKey?: unknown
   children: ReactNode
@@ -231,6 +236,8 @@ export function PopoverSurface({
   id,
   'aria-label': ariaLabel,
   matchTriggerWidth,
+  side = 'above',
+  align = 'start',
   contentKey,
   children,
 }: PopoverSurfaceProps) {
@@ -259,13 +266,16 @@ export function PopoverSurface({
 
     const roomAbove = anchor.top - POPOVER_GAP - POPOVER_VIEWPORT_MARGIN
     const roomBelow = viewportHeight - anchor.bottom - POPOVER_GAP - POPOVER_VIEWPORT_MARGIN
-    const above = contentHeight <= roomAbove || roomAbove >= roomBelow
+    const above = side === 'above'
+      ? contentHeight <= roomAbove || roomAbove >= roomBelow
+      : !(contentHeight <= roomBelow || roomBelow >= roomAbove)
     const maxHeight = Math.max(POPOVER_MIN_HEIGHT, above ? roomAbove : roomBelow)
     const height = Math.min(contentHeight, maxHeight)
 
     const top = above ? Math.max(POPOVER_VIEWPORT_MARGIN, anchor.top - POPOVER_GAP - height) : anchor.bottom + POPOVER_GAP
     const rightBound = Math.max(POPOVER_VIEWPORT_MARGIN, viewportWidth - panelWidth - POPOVER_VIEWPORT_MARGIN)
-    const left = Math.min(Math.max(POPOVER_VIEWPORT_MARGIN, anchor.left), rightBound)
+    const preferredLeft = align === 'end' ? anchor.right - panelWidth : anchor.left
+    const left = Math.min(Math.max(POPOVER_VIEWPORT_MARGIN, preferredLeft), rightBound)
 
     setStyle({
       position: 'fixed',
@@ -275,7 +285,7 @@ export function PopoverSurface({
       visibility: 'visible',
       ...(matchTriggerWidth ? { minWidth: anchor.width } : {}),
     })
-  }, [matchTriggerWidth, panelRef, triggerRef])
+  }, [align, matchTriggerWidth, panelRef, side, triggerRef])
 
   // Layout effect: placement is resolved before the browser paints, so the
   // panel is never seen at the origin it mounts at.

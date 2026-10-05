@@ -46,6 +46,8 @@ Approvals attach to an action's effects, such as spending or publishing, rather 
   Unattended turns must handle or decline interactions that no human can answer.
 - For new conversational products, read [examples/default-workspace.md](examples/default-workspace.md).
   Use the shared workspace and composer while retaining product navigation, routes, storage, and domain content.
+- For a product's rail top, workspace switcher, or listing page, read [app-shell.md](docs/app-shell.md).
+  Products configure name, mark, noun, fields, accent and home content; they do not build their own.
   Show controls only for capabilities the backend actually supports.
   Resolve a selected profile on the server; the browser holds display metadata, not execution authority.
 - For UI changes, start with [product-surfaces.md](docs/product-surfaces.md): reports, dashboards, admin pages, and record lists use its [operational-page compositions](docs/product-surfaces.md#operational-pages).

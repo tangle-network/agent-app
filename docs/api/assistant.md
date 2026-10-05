@@ -4,7 +4,7 @@
 
 Source: `src/assistant/index.ts`
 
-66 exports.
+69 exports.
 
 ### `ASSISTANT_PANEL_ID`
 
@@ -99,7 +99,7 @@ interface AssistantLauncher
 `function`
 
 ```ts
-({ userId, children, }: { userId?: string | null | undefined; children: ReactNode; }) => Element
+({ userId, reservedWidth, dockMediaQuery, children, }: { userId?: string | null | undefined; reservedWidth?: number | u…
 ```
 
 ### `AssistantModelOption`
@@ -144,7 +144,7 @@ interface AssistantPageContext
 
 ### `AssistantPanelLayout`
 
-`type` — `docked`: a column beside the page (wide viewports).
+`type` — `docked`: a column beside the page, wherever the page keeps a usable column beside it.
 
 ```ts
 type AssistantPanelLayout
@@ -366,6 +366,22 @@ interface DoneEventData
 interface ErrorEventData
 ```
 
+### `MIN_PAGE_WIDTH`
+
+`const` — Narrowest page column the docked panel leaves beside it.
+
+```ts
+400
+```
+
+### `MIN_PANEL_WIDTH`
+
+`const` — Narrowest the panel may be dragged; below this the chat is unusable.
+
+```ts
+360
+```
+
 ### `pageLabelFromTitle`
 
 `function` — `title` minus the product suffix, or null when nothing page-specific is left.
@@ -516,6 +532,14 @@ interface UseAssistantChatOptions
 
 ```ts
 () => AssistantModels
+```
+
+### `useAssistantPageLabel`
+
+`function` — Names the open page for the assistant when its document title does not say enough, e.g.
+
+```ts
+(label: string | null | undefined) => void
 ```
 
 ### `useAssistantThreads`

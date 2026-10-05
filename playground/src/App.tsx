@@ -7,6 +7,7 @@ import { ComposerRoute } from './routes/ComposerRoute'
 import { RecordsRoute } from './routes/RecordsRoute'
 import { StudioRoute } from './routes/StudioRoute'
 import { WorkspaceRoute } from './routes/WorkspaceRoute'
+import { ShellRoute } from './routes/ShellRoute'
 
 type ThemeName = 'light' | 'dark'
 
@@ -24,7 +25,7 @@ const ROUTES = [
  *  needs on load, which the audit itself cannot reach by interacting first.
  *  `/studio/viewer` opens the media viewer so the popover hit test can probe
  *  the save-to-vault popover INSIDE it (see `StudioRoute`). */
-const AUDIT_PATHS: readonly string[] = ['/studio/viewer']
+const AUDIT_PATHS: readonly string[] = ['/studio/viewer', '/shell']
 
 function applyTheme(theme: ThemeName) {
   const root = document.documentElement
@@ -70,7 +71,9 @@ export function App() {
 
   return (
     <div className="flex h-full w-full flex-col bg-background text-foreground">
-      {path === '/workspace' ? (
+      {path === '/shell' ? (
+        <ShellRoute />
+      ) : path === '/workspace' ? (
         <WorkspaceRoute />
       ) : (
         <>
