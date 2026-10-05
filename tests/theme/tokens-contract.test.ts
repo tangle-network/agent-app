@@ -102,6 +102,9 @@ describe('legacy compatibility', () => {
     expect(extension.colors.input).toBe('hsl(var(--input))')
     expect(extension.backgroundColor.input).toContain('var(--bg-input)')
     expect(extension.textColor.warning.DEFAULT).toBe('hsl(var(--warning-strong))')
+    // text-primary is accent TEXT, not the fill indigo (2.6:1 on the dark canvas).
+    expect(extension.textColor.primary.DEFAULT).toContain('var(--accent-text)')
+    expect(extension.colors.primary.DEFAULT).toBe('hsl(var(--primary))')
     expect(extension.colors.warning.foreground).toBe('hsl(var(--warning-foreground))')
   })
 })

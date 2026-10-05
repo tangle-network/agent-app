@@ -342,7 +342,7 @@ export function ProvenanceValue({
   if (maxDepth <= 0) {
     return (
       <div
-        className={`inline-block max-w-full ${className ?? ''}`}
+        className={`inline-block max-w-full [overflow-wrap:anywhere] ${className ?? ''}`}
         data-provenance-basis={record.basis}
         data-provenance-standing={standing}
       >
@@ -361,7 +361,7 @@ export function ProvenanceValue({
   return (
     <div
       ref={rootRef}
-      className={`inline-block max-w-full ${className ?? ''}`}
+      className={`inline-block max-w-full [overflow-wrap:anywhere] ${className ?? ''}`}
       onKeyDown={onKeyDown}
       data-provenance-basis={record.basis}
       data-provenance-standing={standing}
