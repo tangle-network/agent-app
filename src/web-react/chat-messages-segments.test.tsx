@@ -3,10 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 
 // No `../brand` mock: web-react reaches the Tangle mark through `./brand-mark`,
-// a lazy boundary that degrades to reserved space when the opt-in
-// `@tangle-network/sandbox-ui` peer isn't installed. The branded first-run state
-// renders here via that spacer fallback precisely because web-react never pulls
-// the peer into its static graph — the contract this suite quietly depends on.
+// a lazy boundary that degrades to reserved space when the sandbox-ui brand
+// module cannot load. The branded first-run state renders here via that spacer
+// fallback. (web-react does import other sandbox-ui subpaths statically — the
+// profile editor and composer profile pill — so the peer itself is present.)
 
 import { ChatMessages, type ChatUiMessage } from './index'
 

@@ -13,8 +13,11 @@ export interface ComposerProfilePillProps extends Pick<AgentProfilePickerProps, 
    *   model and effort pickers, at their height and with a capped width.
    * - `menu-row`: the top row of a stacked agent menu panel, spanning it at the
    *   36px row height of the model and backend rows below it.
+   * - `mode-strip`: a quiet transparent pill inside a horizontally scrolling
+   *   mode strip (chat-react's `ComposerModeControls` `modes` slot), with an
+   *   inset focus ring the strip's edges cannot clip.
    */
-  placement?: 'composer' | 'menu-row'
+  placement?: 'composer' | 'menu-row' | 'mode-strip'
   className?: string
 }
 
@@ -28,6 +31,13 @@ const TRIGGER: Record<NonNullable<ComposerProfilePillProps['placement']>, string
     'h-9 w-full justify-between gap-1.5 rounded-full border-border bg-card px-3 text-sm font-medium ' +
     'text-foreground shadow-none hover:border-border hover:bg-accent ' +
     'data-[state=open]:border-border data-[state=open]:bg-accent',
+  // The strip scrolls horizontally and clips an outward ring at its edges, so
+  // the ring is drawn inside the trigger's own box.
+  'mode-strip':
+    'h-7 gap-1 rounded-full border-border bg-transparent font-normal text-muted-foreground shadow-none ' +
+    'hover:border-border hover:bg-transparent hover:text-foreground ' +
+    'data-[state=open]:border-border data-[state=open]:bg-transparent data-[state=open]:text-foreground ' +
+    'focus-visible:ring-inset',
 }
 
 /**

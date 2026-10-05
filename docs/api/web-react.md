@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-453 exports.
+456 exports.
 
 ### `acceptRejectionReason`
 
@@ -708,6 +708,30 @@ interface ComposerModeControlsProps
 
 ```ts
 interface ComposerPlanModeSelection
+```
+
+### `ComposerProfilePill`
+
+`function` — The thread's agent profile as a composer control.
+
+```ts
+({ selection, locked, lockReason, onNewChat, side, placement, className, }: ComposerProfilePillProps) => Element
+```
+
+### `ComposerProfilePillProps`
+
+`interface`
+
+```ts
+interface ComposerProfilePillProps
+```
+
+### `ComposerProfileSelection`
+
+`type` — The selection half of a thread's profile: the picker's own field names, so a rename upstream cannot drift past this.
+
+```ts
+type ComposerProfileSelection
 ```
 
 ### `ComposerSendFailure`
