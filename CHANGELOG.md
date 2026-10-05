@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.3
+
+- feat(workspace): share GTM-grade settings and workspace controls across agent apps (#775)
+
 ## 0.53.2
 
 - fix: align enrollment lease tests and scaffold engine cohort (#784)
