@@ -1,5 +1,5 @@
 /* GENERATED from @tangle-network/brand/styles/legacy-light.css
- * SHA-256: c1411109214534804065fd37bb08a206bd2bc3307afd8755765a78c2f8b82177
+ * SHA-256: f4d47f5d42d88810ae850c83e6d0e0a1f7be481d4e07b66ab3e29c796d02950f
  * Run node src/theme/build.mjs --write; do not edit colors or ratios here. */
 :where(:root),
 [data-sandbox-ui],
@@ -11,8 +11,14 @@
 [data-theme="aubergine-light"],
 [data-theme="arena"],
 [data-theme="arena-light"],
+[data-theme="super"],
+[data-theme="super-light"],
 [data-theme="tangle-dark"],
 [data-theme="tangle-light"],
+[data-theme="hospitality"],
+[data-theme="agents"],
+[data-theme="agents-light"],
+[data-theme="website"],
 .light,
 .dark {
     --agent-app-accent-hsl: 229.6552 93.5484% 81.7647%;
@@ -30,10 +36,14 @@
 }
 [data-sandbox-theme="vault"]:where(:not(.dark)),
 [data-sandbox-theme="dawn"]:where(:not(.dark)),
+[data-theme="hospitality"]:where(:not(.dark)),
+[data-theme="website"]:where(:not(.dark)),
 [data-theme="light"],
 [data-theme="aubergine-light"],
 [data-theme="arena-light"],
+[data-theme="super-light"],
 [data-theme="tangle-light"],
+[data-theme="agents-light"],
 .light,
 :where(:root) {
     --agent-app-accent-hsl: 243.2927 80.3922% 60%;
@@ -65,6 +75,14 @@
     --agent-app-accent-hsl: 162.931 93.5484% 24.3137%;
     --agent-app-accent-foreground-hsl: 0 0% 100%
 }
+[data-theme="super"] {
+    --agent-app-accent-hsl: 139.3846 40.8805% 68.8235%;
+    --agent-app-accent-foreground-hsl: 0 0% 0%
+}
+[data-theme="super-light"] {
+    --agent-app-accent-hsl: 148.2353 39.5349% 25.2941%;
+    --agent-app-accent-foreground-hsl: 0 0% 100%
+}
 [data-theme="tangle-dark"] {
     --agent-app-accent-hsl: 229.6552 93.5484% 81.7647%;
     --agent-app-accent-foreground-hsl: 0 0% 0%
@@ -72,4 +90,12 @@
 [data-theme="tangle-light"] {
     --agent-app-accent-hsl: 243.3962 75.3555% 58.6275%;
     --agent-app-accent-foreground-hsl: 0 0% 100%
+}
+[data-theme="hospitality"]:where(:not(.dark)) {
+    --agent-app-accent-hsl: 152.5 37.5% 25.098%;
+    --agent-app-accent-foreground-hsl: 0 0% 100%
+}
+.dark[data-theme="hospitality"] {
+    --agent-app-accent-hsl: 144.9231 31.1005% 59.0196%;
+    --agent-app-accent-foreground-hsl: 0 0% 0%
 }
