@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * `@tangle-network/agent-app/tailwind.css` is the one stylesheet an agent app
  * imports. It must compile every utility the shared packages write — Agent App,
@@ -11,7 +12,6 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { join, resolve } from 'node:path'
 
 import tailwindcss from '@tailwindcss/postcss'
-import { JSDOM } from 'jsdom'
 import postcss from 'postcss'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -99,7 +99,6 @@ describe('agent-app Tailwind source entry', () => {
     const start = css.indexOf(marker)
     expect(start).toBeGreaterThan(-1)
     const selector = css.slice(start, css.indexOf('{', start)).trim()
-    const { document } = new JSDOM('<!doctype html><body></body>').window
     const matches = (outer: string) => {
       document.body.innerHTML = outer.replace('X', '<i class="dark:[color-scheme:dark]" id="x"></i>')
       return document.getElementById('x')!.matches(selector)
