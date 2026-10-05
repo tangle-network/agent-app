@@ -398,6 +398,7 @@ function UpdatedAt({ value, formatDate, className = 'shrink-0' }: { value: Works
  */
 function ListRow({ item, fields, menu, reserveMenu, Link, formatDate }: ItemProps) {
   const detail = usefulDescription(item)
+  const mobileFields = fields.filter((field) => present(item.values?.[field.id]))
   return (
     <li className="group relative isolate flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60">
       {item.avatar ?? <WorkspaceInitial name={item.name} size="lg" />}
@@ -411,6 +412,18 @@ function ListRow({ item, fields, menu, reserveMenu, Link, formatDate }: ItemProp
           {item.name}
         </Link>
         {detail && <p className="truncate text-xs text-muted-foreground" title={detail}>{detail}</p>}
+        {/* Below md the columns are hidden, so their values ride under the name instead. */}
+        {mobileFields.length > 0 && (
+          <p className="truncate text-xs text-muted-foreground md:hidden">
+            {mobileFields.map((field, index) => (
+              <span key={field.id}>
+                {index > 0 && ' · '}
+                <span className="sr-only">{field.label}: </span>
+                {item.values![field.id]}
+              </span>
+            ))}
+          </p>
+        )}
       </div>
       {fields.map((field) => (
         <div key={field.id} className={`${FIELD_CELL} truncate text-sm text-muted-foreground`}>

@@ -101,6 +101,17 @@ describe('WorkspaceList', () => {
     expect(document.body.textContent).not.toContain('Invalid Date')
   })
 
+  it('keeps field values readable on a phone, where the columns are hidden', () => {
+    render(
+      <WorkspaceList
+        items={[item('a', 'Acme', { values: { year: '2025', status: 'In review', empty: '' } })]}
+        fields={[{ id: 'year', label: 'Tax year' }, { id: 'status', label: 'Status' }, { id: 'empty', label: 'Owner' }]}
+      />,
+    )
+    const phoneLine = document.querySelector('p.md\\:hidden')!
+    expect(phoneLine.textContent).toBe('Tax year: 2025 · Status: In review')
+  })
+
   it('designs the empty state around the one create action', () => {
     render(
       <WorkspaceList
