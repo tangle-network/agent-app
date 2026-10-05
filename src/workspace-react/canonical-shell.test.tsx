@@ -112,6 +112,17 @@ describe('WorkspaceList', () => {
     expect(phoneLine.textContent).toBe('Tax year: 2025 · Status: In review')
   })
 
+  it('gives the row menu a 44px target on touch screens and a readable avatar letter', () => {
+    render(<WorkspaceList items={[item('a', 'Acme')]} remove={async () => {}} />)
+    const menu = screen.getByRole('button', { name: 'Actions for Acme' })
+    expect(menu.className).toContain('[@media(pointer:coarse)]:h-11')
+    expect(menu.className).toContain('[@media(pointer:coarse)]:w-11')
+    const avatar = screen.getByRole('link', { name: 'Acme' }).closest('li')!.querySelector('span[aria-hidden]')!
+    // Accent on an accent tint vanishes on a dim dark-theme primary; the letter is foreground.
+    expect(avatar.className).toContain('text-foreground')
+    expect(avatar.className).not.toMatch(/(^|\s)text-primary(\s|$)/)
+  })
+
   it('designs the empty state around the one create action', () => {
     render(
       <WorkspaceList

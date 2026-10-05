@@ -81,7 +81,9 @@ export function WorkspaceInitial({ name, size = 'sm' }: { name: string; size?: '
   const letter = Array.from(name.trim())[0]?.toLocaleUpperCase() ?? '?'
   const box = size === 'lg' ? 'h-10 w-10 rounded-lg text-base' : 'h-6 w-6 rounded-md text-xs'
   return (
-    <span aria-hidden className={`flex shrink-0 items-center justify-center bg-primary/10 font-semibold text-primary ${box}`}>
+    // The letter is foreground on an accent tint, not accent on accent: a dim
+    // dark-theme primary (physim's aubergine) left a primary letter unreadable.
+    <span aria-hidden className={`flex shrink-0 items-center justify-center bg-primary/15 font-semibold text-foreground ring-1 ring-inset ring-primary/20 ${box}`}>
       {letter}
     </span>
   )
