@@ -49,7 +49,7 @@ function run(css = extraCss) {
   ], { cwd, encoding: 'utf8', env: { ...process.env, NODE_PATH: '' }, timeout: 10_000 })
 }
 
-function expectCompleted(result: ReturnType<typeof run>, status = 0): void {
+function assertCompleted(result: ReturnType<typeof run>, status = 0): void {
   const output = result.stdout + result.stderr
   expect(result.error).toBeUndefined()
   expect(result.signal).toBeNull()
@@ -62,11 +62,11 @@ describe('agent-app-theme-check CSS imports', () => {
   it('resolves relative --extra-css against cwd and skips an unavailable tailwindcss import', () => {
     // The local import also cycles back to globals.css; definitions from both
     // sheets must survive, and traversal must terminate.
-    expectCompleted(run())
+    assertCompleted(run())
   })
 
   it('does not crash on an unavailable bare import with an absolute --extra-css path', () => {
-    expectCompleted(run(join(cwd, extraCss)))
+    assertCompleted(run(join(cwd, extraCss)))
   })
 
   it('resolves installed package CSS from the importing file, not cwd or the checker', () => {
@@ -76,7 +76,7 @@ describe('agent-app-theme-check CSS imports', () => {
     }))
     write('apps/web/node_modules/@fixture/theme/tokens.css', "@import './nested.css';\n:root {\n  --app-accent: purple;\n}\n")
     write('apps/web/node_modules/@fixture/theme/nested.css', ':root {\n  --local-accent: blue;\n}\n')
-    expectCompleted(run())
+    assertCompleted(run())
   })
 
   it('skips CSS-only package exports that Node cannot resolve', () => {
@@ -84,13 +84,13 @@ describe('agent-app-theme-check CSS imports', () => {
       name: 'tailwindcss', exports: { '.': { style: './index.css' } },
     }))
     write('apps/web/node_modules/tailwindcss/index.css', ':root {\n  --external-token: red;\n}\n')
-    expectCompleted(run(join(cwd, extraCss)))
+    assertCompleted(run(join(cwd, extraCss)))
   })
 
   it('still fails for undefined tokens after skipping an unavailable package import', () => {
     write('apps/web/src/App.tsx', "export const color = 'var(--missing-token)'\n")
     const result = run()
-    expectCompleted(result, 1)
+    assertCompleted(result, 1)
     expect(result.stderr).toContain('theme contract FAILED')
     expect(result.stderr).toContain('--missing-token')
   })

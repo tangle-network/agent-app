@@ -25625,6 +25625,30 @@ interface ComposerModeControlsProps
 interface ComposerPlanModeSelection
 ```
 
+### `ComposerProfilePill`
+
+`function` — The thread's agent profile as a composer control.
+
+```ts
+({ selection, locked, lockReason, onNewChat, side, placement, className, }: ComposerProfilePillProps) => Element
+```
+
+### `ComposerProfilePillProps`
+
+`interface`
+
+```ts
+interface ComposerProfilePillProps
+```
+
+### `ComposerProfileSelection`
+
+`type` — The selection half of a thread's profile: the picker's own field names, so a rename upstream cannot drift past this.
+
+```ts
+type ComposerProfileSelection
+```
+
 ### `ComposerSendFailure`
 
 `interface` — The rejected send, handed to `onSendFailed` so the host can undo whatever it cleared optimistically — most importantly the staged attachments, which the composer does not own (`pendingFiles` is a pro…

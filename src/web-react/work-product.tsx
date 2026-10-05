@@ -20,6 +20,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { StatusPill, type StatusTone } from '@tangle-network/ui/primitives'
 
 import {
   parseReviewQueueItem,
@@ -52,14 +53,17 @@ const STATE_LABELS: Record<ReviewQueueState, string> = {
   blocked: 'Blocked',
 }
 
-const STATE_TONES: Record<ReviewQueueState, string> = {
-  intake: 'bg-secondary text-muted-foreground',
-  missing_info: 'bg-warning/10 text-warning',
-  working: 'bg-primary/10 text-primary',
-  ready_for_review: 'bg-success/10 text-success',
-  changes_requested: 'bg-warning/10 text-warning',
-  approved: 'bg-success/10 text-success',
-  blocked: 'bg-destructive/10 text-destructive',
+// Tones are ui's StatusPill vocabulary, so a queue state carries the same glyph
+// and colour as every other status in the product. Warning is "needs a person";
+// working is still moving (an open ring).
+const STATE_TONES: Record<ReviewQueueState, StatusTone> = {
+  intake: 'neutral',
+  missing_info: 'warning',
+  working: 'running',
+  ready_for_review: 'success',
+  changes_requested: 'warning',
+  approved: 'success',
+  blocked: 'danger',
 }
 
 const STATUS_LABELS: Record<WorkProductStatus, string> = {
@@ -71,13 +75,15 @@ const STATUS_LABELS: Record<WorkProductStatus, string> = {
   superseded: 'Superseded',
 }
 
-const STATUS_TONES: Record<WorkProductStatus, string> = {
-  draft: 'bg-primary/10 text-primary',
-  blocked: 'bg-destructive/10 text-destructive',
-  ready: 'bg-success/10 text-success',
-  changes_requested: 'bg-warning/10 text-warning',
-  approved: 'bg-success/10 text-success',
-  superseded: 'bg-secondary text-muted-foreground',
+// A draft is not yet a state anyone acts on, so it is neutral rather than the
+// brand accent it used to borrow.
+const STATUS_TONES: Record<WorkProductStatus, StatusTone> = {
+  draft: 'neutral',
+  blocked: 'danger',
+  ready: 'success',
+  changes_requested: 'warning',
+  approved: 'success',
+  superseded: 'neutral',
 }
 
 /** Human label for a queue state. */
@@ -91,19 +97,11 @@ export function workProductStatusLabel(status: WorkProductStatus): string {
 }
 
 function StatePill({ state }: { state: ReviewQueueState }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATE_TONES[state]}`}>
-      {STATE_LABELS[state]}
-    </span>
-  )
+  return <StatusPill tone={STATE_TONES[state]}>{STATE_LABELS[state]}</StatusPill>
 }
 
-function StatusPill({ status }: { status: WorkProductStatus }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_TONES[status]}`}>
-      {STATUS_LABELS[status]}
-    </span>
-  )
+function WorkProductStatusPill({ status }: { status: WorkProductStatus }) {
+  return <StatusPill tone={STATUS_TONES[status]}>{STATUS_LABELS[status]}</StatusPill>
 }
 
 // ── transcript anchor helpers + card ──────────────────────────────────────
@@ -151,7 +149,7 @@ export function WorkProductCard({ part, onOpen, className }: WorkProductCardProp
           {part.kind && ' · '}v{part.ref.version}
         </p>
       </div>
-      <StatusPill status={part.status} />
+      <WorkProductStatusPill status={part.status} />
       {onOpen && (
         <button
           type="button"

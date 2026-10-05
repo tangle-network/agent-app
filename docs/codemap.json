@@ -19841,6 +19841,24 @@
           "doc": "The plan-mode toggle state an entry surface docks beside the composer."
         },
         {
+          "name": "ComposerProfilePill",
+          "kind": "function",
+          "signature": "({ selection, locked, lockReason, onNewChat, side, placement, className, }: ComposerProfilePillProps) => Element",
+          "doc": "The thread's agent profile as a composer control."
+        },
+        {
+          "name": "ComposerProfilePillProps",
+          "kind": "interface",
+          "signature": "interface ComposerProfilePillProps",
+          "doc": null
+        },
+        {
+          "name": "ComposerProfileSelection",
+          "kind": "type",
+          "signature": "type ComposerProfileSelection",
+          "doc": "The selection half of a thread's profile: the picker's own field names, so a rename upstream cannot drift past this."
+        },
+        {
           "name": "ComposerSendFailure",
           "kind": "interface",
           "signature": "interface ComposerSendFailure",
