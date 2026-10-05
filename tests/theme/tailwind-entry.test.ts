@@ -88,4 +88,16 @@ describe('agent-app Tailwind source entry', () => {
     expect(start).toBeGreaterThan(-1)
     expect(css.slice(start, css.indexOf('}', start))).toContain('--border-soft')
   })
+
+  it('applies dark: utilities under both dark scopes', () => {
+    // Agent App's own interaction card writes `dark:[color-scheme:dark]`. Brand
+    // and tokens.css treat `.dark` and `[data-theme="dark"]` as dark, so the
+    // variant must too, or a `.dark` host renders the light variant.
+    const marker = '.dark\\:\\[color-scheme\\:dark\\]'
+    const start = css.indexOf(marker)
+    expect(start).toBeGreaterThan(-1)
+    const scope = css.slice(start + marker.length, css.indexOf('{', start))
+    expect(scope).toContain('.dark')
+    expect(scope).toContain('[data-theme="dark"]')
+  })
 })

@@ -7,7 +7,11 @@ const withForeground = (name: string) => ({
 const tier = (token: string) => `color-mix(in oklch, var(${token}) calc(<alpha-value> * 100%), transparent)`
 
 const agentAppPreset = {
-  darkMode: ['class', '[data-theme="dark"]'] as [string, string],
+  // Both dark scopes Brand and this package's tokens recognise: the `.dark` class
+  // (also how Brand's dark named themes are spelled, `.dark[data-theme="hospitality"]`)
+  // and `[data-theme="dark"]`. Naming only the attribute left every `.dark` host
+  // with `dark:` utilities that never applied.
+  darkMode: ['class', ':is(.dark, [data-theme="dark"])'] as [string, string],
   theme: {
     extend: {
       colors: {
