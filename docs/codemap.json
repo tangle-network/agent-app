@@ -760,7 +760,7 @@
         {
           "name": "AssistantLauncherProvider",
           "kind": "function",
-          "signature": "({ userId, children, }: { userId?: string | null | undefined; children: ReactNode; }) => Element",
+          "signature": "({ userId, reservedWidth, dockMediaQuery, children, }: { userId?: string | null | undefined; reservedWidth?: number | u…",
           "doc": null
         },
         {
@@ -797,7 +797,7 @@
           "name": "AssistantPanelLayout",
           "kind": "type",
           "signature": "type AssistantPanelLayout",
-          "doc": "`docked`: a column beside the page (wide viewports)."
+          "doc": "`docked`: a column beside the page, wherever the page keeps a usable column beside it."
         },
         {
           "name": "AssistantPanelProps",
@@ -962,6 +962,18 @@
           "doc": "Describe error event data including code and message fields"
         },
         {
+          "name": "MIN_PAGE_WIDTH",
+          "kind": "const",
+          "signature": "400",
+          "doc": "Narrowest page column the docked panel leaves beside it."
+        },
+        {
+          "name": "MIN_PANEL_WIDTH",
+          "kind": "const",
+          "signature": "360",
+          "doc": "Narrowest the panel may be dragged; below this the chat is unusable."
+        },
+        {
           "name": "pageLabelFromTitle",
           "kind": "function",
           "signature": "(title: string, titleSuffix?: RegExp | undefined, ignoreTitles?: readonly string[]) => string | null",
@@ -1074,6 +1086,12 @@
           "kind": "function",
           "signature": "() => AssistantModels",
           "doc": "Resolve and return the current assistant models from the per-client cache with immediate client swap updates"
+        },
+        {
+          "name": "useAssistantPageLabel",
+          "kind": "function",
+          "signature": "(label: string | null | undefined) => void",
+          "doc": "Names the open page for the assistant when its document title does not say enough, e.g."
         },
         {
           "name": "useAssistantThreads",
