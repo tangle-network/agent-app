@@ -9,8 +9,8 @@ import {
 import { STORY_USER_ID, stubClient, useStubAttachments } from './fixtures'
 
 /**
- * The floating launcher + right-side drawer, mounted over a fake page so the
- * overlay, focus trap, and resize handle read in context. The dock owns the
+ * The panel toggle + right-side panel, mounted beside a fake page so the
+ * docked layout and resize handle read in context. The dock owns the
  * real `useAssistantChat`, streaming through the stub client — sending a
  * message replays a scripted turn (reasoning → tool chip → answer → proposal
  * card → cost), and Confirm resolves it.
@@ -44,8 +44,8 @@ function FakePage() {
       <div className="p-6">
         <h1 className="font-medium text-foreground text-xl">Workflows</h1>
         <p className="mt-2 max-w-md text-muted-foreground text-sm">
-          The assistant dock floats above every page. Open it from the launcher
-          in the corner; the conversation survives the drawer closing.
+          The assistant panel opens beside every page. Open it from the toggle
+          at the top right or with ⌘E; the conversation survives it closing.
         </p>
       </div>
     </div>
@@ -53,7 +53,7 @@ function FakePage() {
 }
 
 /** Calls `openAssistant` once on mount (optionally with a composer seed) so a
- *  story can start with the drawer already open. Must render inside the
+ *  story can start with the panel already open. Must render inside the
  *  launcher provider — the meta decorator supplies it. */
 function OpenOnMount({ seed, children }: { seed?: string; children: ReactNode }) {
   const { openAssistant } = useAssistantLauncher()
@@ -63,10 +63,10 @@ function OpenOnMount({ seed, children }: { seed?: string; children: ReactNode })
   return <>{children}</>
 }
 
-/** Closed: just the floating launcher over the page. Click it to open the
- *  drawer. */
+/** Closed: just the panel toggle at the top right. Click it to open the
+ *  panel. */
 export const DockCollapsed: Story = {
-  name: 'Collapsed (launcher)',
+  name: 'Collapsed (toggle)',
   render: () => (
     <>
       <FakePage />
@@ -80,7 +80,7 @@ export const DockCollapsed: Story = {
   ),
 }
 
-/** Open on load: the drawer with a fresh, empty conversation. Escape, the
+/** Open on load: the panel with a fresh, empty conversation. Escape, the
  *  backdrop, or the X closes it; the left edge drag-resizes on desktop. */
 export const DockExpanded: Story = {
   name: 'Expanded',
@@ -104,7 +104,7 @@ export const DockExpanded: Story = {
 }
 
 /** The launcher seed path: a page-level "Create with assistant" action opens
- *  the drawer with the composer prefilled (consume-once). */
+ *  the panel with the composer prefilled (consume-once). */
 export const DockWithSeed: Story = {
   name: 'Expanded with Composer Seed',
   render: () => (

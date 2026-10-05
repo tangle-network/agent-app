@@ -2,21 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import type { LineApplicationRequest } from '@tangle-network/sandbox/core'
 import { createEnrolledApplicationLineHandler, type LiveSharedEnrollmentMember } from './application'
 
-// The development cohort pins Sandbox 0.59, whose parser drops these signed callback fields.
-vi.mock('@tangle-network/sandbox/core', async importOriginal => {
-  const actual = await importOriginal<typeof import('@tangle-network/sandbox/core')>()
-  return {
-    ...actual,
-    parseLineApplicationRequest: (value: unknown) => ({
-      ...actual.parseLineApplicationRequest(value),
-      subjectId: (value as { subjectId?: unknown }).subjectId,
-      memberRevision: (value as { memberRevision?: unknown }).memberRevision,
-      dispatchFence: (value as { dispatchFence?: unknown }).dispatchFence,
-      dispatchDeadline: (value as { dispatchDeadline?: unknown }).dispatchDeadline,
-    }),
-  }
-})
-
 const binding = 'global-agent-app'
 const subjectId = 'customer-subject'
 const memberRevision = '2026-10-02T00:00:00.000Z'
@@ -95,18 +80,32 @@ describe('shared enrolled application line', () => {
     expect(f.admitted).toEqual([])
   })
 
-  it('denies expired, distant, and missing dispatch leases before admission', async () => {
-    for (const [name, lease] of [
-      ['expired', { dispatchDeadline: new Date(Date.now() - 1).toISOString() }],
-      ['distant', { dispatchDeadline: new Date(Date.now() + 61_000).toISOString() }],
-      ['malformed', { dispatchDeadline: 'not-a-deadline' }],
-      ['missing', { dispatchFence: undefined }],
-    ] as const) {
-      const f = fixture()
-      const response = await f.handler(callback('@builder hello', `msg_${name}`, lease))
-      expect(response.status).toBe(403)
-      expect(f.admitted).toEqual([])
-    }
+  it.each([
+    ['expired', -1],
+    ['distant', 61_000],
+  ] as const)('denies a %s dispatch lease with 403 before admission', async (name, remaining) => {
+    const f = fixture()
+    const response = await f.handler(callback('@builder hello', `msg_${name}`, {
+      dispatchDeadline: new Date(Date.now() + remaining).toISOString(),
+    }))
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: { code: 'enrollment_binding_mismatch' } })
+    expect(f.admitted).toEqual([])
+  })
+
+  it.each([
+    ['malformed_deadline', { dispatchDeadline: 'not-a-deadline' }],
+    ['missing_fence', { dispatchFence: undefined }],
+    ['missing_deadline', { dispatchDeadline: undefined }],
+    ['missing_lease', { dispatchFence: undefined, dispatchDeadline: undefined }],
+  ] as const)('rejects %s with 400 before target resolution', async (name, lease) => {
+    // The real Sandbox parser rejects malformed/incomplete authority before authorization.
+    const f = fixture()
+    const response = await f.handler(callback('@builder hello', `msg_${name}`, lease))
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: { code: 'line_request_invalid' } })
+    expect(f.resolved).toEqual([])
+    expect(f.admitted).toEqual([])
   })
 
   it('rechecks the dispatch deadline after an awaited output read', async () => {

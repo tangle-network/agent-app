@@ -692,10 +692,10 @@
       "error": null,
       "exports": [
         {
-          "name": "adaptTranscript",
-          "kind": "function",
-          "signature": "(view: AssistantTranscriptView) => AdaptedTranscript",
-          "doc": "Fold the transcript view into transcript-order blocks: message runs (web-react `ChatUiMessage[]`) broken by quiet status lines."
+          "name": "ASSISTANT_PANEL_ID",
+          "kind": "const",
+          "signature": "\"assistant-panel\"",
+          "doc": "DOM id of the open panel, for the toggle's `aria-controls`."
         },
         {
           "name": "AssistantChat",
@@ -736,7 +736,7 @@
         {
           "name": "AssistantDock",
           "kind": "function",
-          "signature": "({ userId, navigate, balanceUsd, formatMoney, renderGraph, renderProviderIcon, onWorkflowMutation, onConnectRequirement…",
+          "signature": "({ userId, context, floatingToggle, navigate, balanceUsd, formatMoney, renderGraph, renderProviderIcon, onWorkflowMutat…",
           "doc": null
         },
         {
@@ -749,7 +749,7 @@
           "name": "assistantIsThinking",
           "kind": "function",
           "signature": "(state: AssistantState) => boolean",
-          "doc": "True while a turn is streaming but the model hasn't emitted its first answer token yet — drives the \"thinking\" affordance so a reasoning gap reads as working, not a frozen panel."
+          "doc": "True while a turn is streaming but the model hasn't emitted its first answer token yet."
         },
         {
           "name": "AssistantLauncher",
@@ -760,7 +760,7 @@
         {
           "name": "AssistantLauncherProvider",
           "kind": "function",
-          "signature": "({ children, }: { children: ReactNode; }) => Element",
+          "signature": "({ userId, children, }: { userId?: string | null | undefined; children: ReactNode; }) => Element",
           "doc": null
         },
         {
@@ -782,10 +782,22 @@
           "doc": "Outcome of a model-list fetch."
         },
         {
+          "name": "AssistantPageContext",
+          "kind": "interface",
+          "signature": "interface AssistantPageContext",
+          "doc": "The page the user has open while talking to the assistant."
+        },
+        {
           "name": "AssistantPanel",
           "kind": "function",
-          "signature": "({ chat, userId, onClose, navigate, balanceUsd, formatMoney, renderGraph, renderProviderIcon, renderMarkdown, toolRende…",
+          "signature": "({ chat, userId, onClose, layout, context, toggleRef, navigate, balanceUsd, formatMoney, renderGraph, renderProviderIco…",
           "doc": null
+        },
+        {
+          "name": "AssistantPanelLayout",
+          "kind": "type",
+          "signature": "type AssistantPanelLayout",
+          "doc": "`docked`: a column beside the page (wide viewports)."
         },
         {
           "name": "AssistantPanelProps",
@@ -794,10 +806,28 @@
           "doc": null
         },
         {
+          "name": "AssistantPanelToggle",
+          "kind": "function",
+          "signature": "({ open: openOverride, onToggle, className, style, buttonRef, }: AssistantPanelToggleProps) => Element",
+          "doc": null
+        },
+        {
+          "name": "AssistantPanelToggleProps",
+          "kind": "interface",
+          "signature": "interface AssistantPanelToggleProps",
+          "doc": null
+        },
+        {
           "name": "AssistantSendOptions",
           "kind": "interface",
           "signature": "interface AssistantSendOptions",
           "doc": "Define options for configuring how the assistant sends messages"
+        },
+        {
+          "name": "assistantShortcutLabel",
+          "kind": "function",
+          "signature": "() => string",
+          "doc": "The shortcut as the user's keyboard labels it."
         },
         {
           "name": "AssistantStreamEvent",
@@ -818,10 +848,16 @@
           "doc": "One past conversation in the history switcher."
         },
         {
+          "name": "AssistantTimelineOptions",
+          "kind": "interface",
+          "signature": "interface AssistantTimelineOptions",
+          "doc": null
+        },
+        {
           "name": "AssistantTranscript",
           "kind": "function",
-          "signature": "({ view, renderMarkdown, toolRenderers, renderConfirmedResult, emptyState, }: AssistantTranscriptProps) => Element",
-          "doc": "Render the assistant conversation: message runs through web-react's `ChatMessages` (quiet chrome — the label/meta row becomes a hover-revealed lane, which keeps the narrow dock panel uncluttered), st…"
+          "signature": "({ view, toolRenderers, renderConfirmedResult, emptyState, }: AssistantTranscriptProps) => Element",
+          "doc": null
         },
         {
           "name": "AssistantTranscriptProps",
@@ -833,7 +869,13 @@
           "name": "AssistantTranscriptView",
           "kind": "interface",
           "signature": "interface AssistantTranscriptView",
-          "doc": "The transcript slice handed to a host-supplied `renderTranscript` (see {@link AssistantPanelProps })."
+          "doc": "The transcript slice the panel hands `AssistantTranscript`: the reducer's messages plus turn-level state, and the panel's bound `renderProposal`, which returns the proposal card wired to the panel's…"
+        },
+        {
+          "name": "buildAssistantTimeline",
+          "kind": "function",
+          "signature": "(view: AssistantTranscriptView, options?: AssistantTimelineOptions) => AgentTimelineItem[]",
+          "doc": "Map the transcript view onto `AgentTimeline` items."
         },
         {
           "name": "ChatMessage",
@@ -902,6 +944,12 @@
           "doc": "Define data structure representing a delta event with associated text content"
         },
         {
+          "name": "DocumentPageContextOptions",
+          "kind": "interface",
+          "signature": "interface DocumentPageContextOptions",
+          "doc": "Pass module-level `titleSuffix`, `ignoreTitles` and `ids` so the context keeps its identity between renders."
+        },
+        {
           "name": "DoneEventData",
           "kind": "interface",
           "signature": "interface DoneEventData",
@@ -912,6 +960,12 @@
           "kind": "interface",
           "signature": "interface ErrorEventData",
           "doc": "Describe error event data including code and message fields"
+        },
+        {
+          "name": "pageLabelFromTitle",
+          "kind": "function",
+          "signature": "(title: string, titleSuffix?: RegExp | undefined, ignoreTitles?: readonly string[]) => string | null",
+          "doc": "`title` minus the product suffix, or null when nothing page-specific is left."
         },
         {
           "name": "PendingProposal",
@@ -1026,6 +1080,12 @@
           "kind": "function",
           "signature": "(userId: string | null) => AssistantThreads",
           "doc": "Resolve and manage assistant threads state for a given user including pending deletions and refresh logic"
+        },
+        {
+          "name": "useDocumentPageContext",
+          "kind": "function",
+          "signature": "({ path, titleSuffix, ignoreTitles, ids, }: DocumentPageContextOptions) => AssistantPageContext | null",
+          "doc": null
         }
       ]
     },
@@ -19295,6 +19355,48 @@
           "doc": null
         },
         {
+          "name": "AgentProfileRegistryError",
+          "kind": "class",
+          "signature": "class AgentProfileRegistryError",
+          "doc": null
+        },
+        {
+          "name": "AgentProfileRegistryFailure",
+          "kind": "type",
+          "signature": "type AgentProfileRegistryFailure",
+          "doc": "Registry search failures the editor renders distinctly."
+        },
+        {
+          "name": "AgentProfileRegistryMcpResult",
+          "kind": "interface",
+          "signature": "interface AgentProfileRegistryMcpResult",
+          "doc": null
+        },
+        {
+          "name": "AgentProfileRegistryMcpServer",
+          "kind": "interface",
+          "signature": "interface AgentProfileRegistryMcpServer",
+          "doc": "An MCP server offered by the official MCP Registry or a custom registry."
+        },
+        {
+          "name": "AgentProfileRegistryPort",
+          "kind": "interface",
+          "signature": "interface AgentProfileRegistryPort",
+          "doc": "Host-supplied registry search."
+        },
+        {
+          "name": "AgentProfileRegistrySkill",
+          "kind": "interface",
+          "signature": "interface AgentProfileRegistrySkill",
+          "doc": "A skill offered by a maintained catalog."
+        },
+        {
+          "name": "AgentProfileRegistrySkillsResult",
+          "kind": "interface",
+          "signature": "interface AgentProfileRegistrySkillsResult",
+          "doc": null
+        },
+        {
           "name": "AgentProfileResourceKind",
           "kind": "type",
           "signature": "type AgentProfileResourceKind",
@@ -19491,6 +19593,18 @@
           "kind": "type",
           "signature": "type ChatFreeTextField",
           "doc": "A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it."
+        },
+        {
+          "name": "ChatFundingFailure",
+          "kind": "interface",
+          "signature": "interface ChatFundingFailure",
+          "doc": null
+        },
+        {
+          "name": "ChatFundingRecovery",
+          "kind": "interface",
+          "signature": "interface ChatFundingRecovery",
+          "doc": "Presentation only."
         },
         {
           "name": "ChatInteraction",
@@ -20229,6 +20343,12 @@
           "kind": "function",
           "signature": "(msg: ChatMessageMetrics) => string | null",
           "doc": "\"38 tok/s\" from completion tokens over first-token→end duration; null when unknown."
+        },
+        {
+          "name": "getChatFundingRecovery",
+          "kind": "function",
+          "signature": "(failure: string | ChatFundingFailure | null | undefined) => ChatFundingRecovery | null",
+          "doc": "Recognize a paid-access refusal across HTTP and SDK-wrapped chat failures."
         },
         {
           "name": "HarnessGlyph",

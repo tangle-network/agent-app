@@ -48,7 +48,8 @@ Approvals attach to an action's effects, such as spending or publishing, rather 
   Use the shared workspace and composer while retaining product navigation, routes, storage, and domain content.
   Show controls only for capabilities the backend actually supports.
   Resolve a selected profile on the server; the browser holds display metadata, not execution authority.
-- For UI changes, read [product-surfaces.md](docs/product-surfaces.md) and the relevant [design tokens](docs/design-tokens.md).
+- For UI changes, start with [product-surfaces.md](docs/product-surfaces.md): reports, dashboards, admin pages, and record lists use its [operational-page compositions](docs/product-surfaces.md#operational-pages).
+  Read the relevant [design tokens](docs/design-tokens.md).
   For model and effort controls, read [ui-picker-canon.md](docs/ui-picker-canon.md).
   Keep selected values faithful to actual execution, including values absent from the declared option list.
   Use `PopoverSurface` for canonical popovers so embedding containers cannot clip them.

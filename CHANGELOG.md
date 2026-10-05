@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.53.2
+
+- fix: align enrollment lease tests and scaffold engine cohort (#784)
+
+## 0.53.1
+
+- feat(assistant): derive page context from the title and let hosts layer the toggle (#783)
+
+## 0.53.0
+
+- feat(assistant)!: dock the assistant as a right panel on the main chat primitives (#782)
+
+## 0.52.18
+
+- feat(profile): discover skills and MCP servers in the shared profile editor (#781)
+
+## 0.52.17
+
+- fix(web-react): share billing recovery for chat funding failures (#780)
+
+## 0.52.16
+
+- fix(deps): qualify sandbox-ui 0.122
+
+## 0.52.15
+
+- docs(ui): lead with shared operational page composition (#778)
+
+## 0.52.14
+
+- fix(deps): qualify sandbox-ui 0.121
+
 ## 0.52.13
 
 - fix(integrations): expose workspace actions on account cards (#774)

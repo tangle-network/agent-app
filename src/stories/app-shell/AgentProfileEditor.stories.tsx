@@ -29,12 +29,13 @@ type ResourceConstraints = Pick<AgentProfileEditorProps, 'allowedResourceKinds' 
   'allowExecutableFiles' | 'requireGitHubCommitSha' | 'requireUniqueSkillNames' | 'showToolsAndPermissions' |
   'publicHttpsMcpOnly'>
 
-function Preview({ initial, ...constraints }: { initial: AgentProfile } & ResourceConstraints) {
+function Preview({ initial, registry, ...constraints }: { initial: AgentProfile } & ResourceConstraints
+  & Pick<AgentProfileEditorProps, 'registry'>) {
   const [profile, setProfile] = useState(initial)
   return <main className="min-h-screen bg-background p-4 text-foreground sm:p-8">
     <div className="mx-auto max-w-3xl space-y-5">
       <header><h1 className="text-2xl font-semibold">Agent profile</h1><p className="mt-1 text-sm text-muted-foreground">Edit a local profile draft.</p></header>
-      <AgentProfileEditor value={profile} onChange={setProfile} {...constraints} />
+      <AgentProfileEditor value={profile} onChange={setProfile} registry={registry} {...constraints} />
       <details className="rounded-xl border border-border bg-card p-4"><summary className="cursor-pointer text-sm font-medium">Current profile data</summary>
         <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(profile, null, 2)}</pre></details>
     </div>
@@ -49,7 +50,8 @@ const meta: Meta<typeof AgentProfileEditor> = {
   render: args => <Preview initial={args.value} allowedResourceKinds={args.allowedResourceKinds}
     filePathPrefix={args.filePathPrefix} allowExecutableFiles={args.allowExecutableFiles}
     requireGitHubCommitSha={args.requireGitHubCommitSha} requireUniqueSkillNames={args.requireUniqueSkillNames}
-    showToolsAndPermissions={args.showToolsAndPermissions} publicHttpsMcpOnly={args.publicHttpsMcpOnly} />,
+    showToolsAndPermissions={args.showToolsAndPermissions} publicHttpsMcpOnly={args.publicHttpsMcpOnly}
+    registry={args.registry} />,
 }
 export default meta
 type Story = StoryObj<typeof AgentProfileEditor>
@@ -88,6 +90,35 @@ const referenceConstraints = {
 } as const
 
 export const ReferenceOnly: Story = { args: { value: referenceResources, ...referenceConstraints } }
+
+const storyRegistry: NonNullable<AgentProfileEditorProps['registry']> = {
+  async searchSkills(query) {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    const skills = [{
+      name: 'booking-guide',
+      description: 'Answer booking questions from the declared reference files.',
+      catalog: 'Tangle Network skills',
+      permissions: ['files.read'],
+      ref: { kind: 'github' as const, repository: 'tangle-network/skills', path: 'plugins/booking/skills/booking-guide/SKILL.md', ref: fixedCommit, name: 'booking-guide' },
+    }]
+    return { skills: skills.filter(skill => skill.name.includes(query.toLowerCase()) || !query), unavailable: [] }
+  },
+  async searchMcpServers(query) {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    const servers = [{
+      name: 'property-data',
+      description: 'Read property availability and reservations.',
+      catalog: 'Official MCP Registry',
+      server: { transport: 'http' as const, url: 'https://mcp.example.com/property-data' },
+    }]
+    return { mcpServers: servers.filter(server => server.name.includes(query.toLowerCase()) || !query), unavailable: [] }
+  },
+}
+
+export const RegistryDiscovery: Story = {
+  args: { value: referenceResources, ...referenceConstraints, registry: storyRegistry },
+}
+
 export const ExistingResourcesToRepair: Story = {
   args: { value: { resources: {
     files: [{ path: 'docs/old-guide.md', resource: { kind: 'github', repository: 'example/agent-guides', path: 'old-guide.md', ref: 'main' }, executable: true }],

@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 /**
- * Drawer-level behavior the panel's own tests cannot cover (the panel has no
- * dialog chrome): the composer's model picker must open INSIDE the dock, and
- * Escape must unwind one layer at a time — an open composer popover first, the
- * drawer itself second. The second test guards the dock's close-on-Escape
- * handler, which used to fire under an open popover and close the whole
- * drawer out from under the picker's own Escape handling.
+ * Dock-level behavior the panel's own tests cannot cover: the composer's model
+ * picker opens INSIDE the docked panel, Escape unwinds one layer at a time (an
+ * open composer popover first, the panel second), and the panel toggle and
+ * its ⌘E / Ctrl+E shortcut open and close the panel. jsdom has no matchMedia,
+ * so the dock takes its docked (wide viewport) layout here.
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { type ReactNode, useEffect } from "react";
@@ -13,7 +12,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { AssistantDock } from "./AssistantDock";
 import type { AssistantClient } from "./client";
 import { AssistantClientProvider } from "./client-context";
-import { AssistantLauncherProvider, useAssistantLauncher } from "./launcher";
+import {
+  AssistantLauncherProvider,
+  useAssistantLauncher,
+} from "./launcher";
 
 /** A fully-stubbed transport: the panel's mount-time model fetch resolves from
  *  a fixed catalog; no streaming is exercised here. */
@@ -70,9 +72,9 @@ beforeEach(() => {
 });
 
 describe("AssistantDock", () => {
-  it("opens the composer model picker inside the dialog and applies a selection", async () => {
+  it("opens the composer model picker inside the panel and applies a selection", async () => {
     renderOpenDock();
-    await screen.findByRole("dialog", { name: "Assistant" });
+    await screen.findByRole("complementary", { name: "Assistant" });
 
     const trigger = await screen.findByRole("button", { name: /Claude Sonnet/ });
     fireEvent.click(trigger);
@@ -89,9 +91,9 @@ describe("AssistantDock", () => {
     expect(screen.getByRole("button", { name: /GPT-5/ })).toBeTruthy();
   });
 
-  it("unwinds Escape one layer at a time: popover first, drawer second", async () => {
+  it("unwinds Escape one layer at a time: popover first, panel second", async () => {
     renderOpenDock();
-    await screen.findByRole("dialog", { name: "Assistant" });
+    await screen.findByRole("complementary", { name: "Assistant" });
 
     const trigger = await screen.findByRole("button", { name: /Claude Sonnet/ });
     fireEvent.click(trigger);
@@ -99,17 +101,47 @@ describe("AssistantDock", () => {
       await screen.findByPlaceholderText("Search models..."),
     ).toBeTruthy();
 
-    // First Escape belongs to the popover: it closes; the drawer stays open.
-    fireEvent.keyDown(document, { key: "Escape" });
+    // First Escape belongs to the popover: it closes; the panel stays open.
+    fireEvent.keyDown(screen.getByPlaceholderText("Search models..."), {
+      key: "Escape",
+    });
     await waitFor(() =>
       expect(screen.queryByPlaceholderText("Search models...")).toBeNull(),
     );
-    expect(screen.getByRole("dialog", { name: "Assistant" })).toBeTruthy();
+    const panel = screen.getByRole("complementary", { name: "Assistant" });
 
-    // The next Escape, with no popover open, closes the drawer as before.
-    fireEvent.keyDown(document, { key: "Escape" });
+    // The next Escape from inside the panel, with no popover open, closes it.
+    fireEvent.keyDown(screen.getByLabelText("Message input"), {
+      key: "Escape",
+    });
+    await waitFor(() => expect(panel.isConnected).toBe(false));
+  });
+
+  it("opens and closes from the toggle and the ⌘E shortcut, outside text fields", async () => {
+    render(
+      <AssistantClientProvider client={client}>
+        <AssistantLauncherProvider userId="u1">
+          <AssistantDock userId="u1" />
+        </AssistantLauncherProvider>
+      </AssistantClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Open assistant" }));
+    await screen.findByRole("complementary", { name: "Assistant" });
+    // Typing ⌘E inside the composer stays with the composer.
+    fireEvent.keyDown(screen.getByLabelText("Message input"), {
+      key: "e",
+      metaKey: true,
+    });
+    expect(screen.getByRole("complementary", { name: "Assistant" })).toBeTruthy();
+    fireEvent.keyDown(document.body, { key: "e", metaKey: true });
     await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Assistant" })).toBeNull(),
+      expect(screen.queryByRole("complementary", { name: "Assistant" })).toBeNull(),
+    );
+    fireEvent.keyDown(document.body, { key: "e", ctrlKey: true });
+    await screen.findByRole("complementary", { name: "Assistant" });
+    fireEvent.click(screen.getByRole("button", { name: "Close assistant" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Open assistant" })).toBeTruthy(),
     );
   });
 });

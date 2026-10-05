@@ -4,14 +4,14 @@
 
 Source: `src/assistant/index.ts`
 
-56 exports.
+66 exports.
 
-### `adaptTranscript`
+### `ASSISTANT_PANEL_ID`
 
-`function` — Fold the transcript view into transcript-order blocks: message runs (web-react `ChatUiMessage[]`) broken by quiet status lines.
+`const` — DOM id of the open panel, for the toggle's `aria-controls`.
 
 ```ts
-(view: AssistantTranscriptView) => AdaptedTranscript
+"assistant-panel"
 ```
 
 ### `AssistantChat`
@@ -67,7 +67,7 @@ type AssistantDeliveryMode
 `function`
 
 ```ts
-({ userId, navigate, balanceUsd, formatMoney, renderGraph, renderProviderIcon, onWorkflowMutation, onConnectRequirement…
+({ userId, context, floatingToggle, navigate, balanceUsd, formatMoney, renderGraph, renderProviderIcon, onWorkflowMutat…
 ```
 
 ### `AssistantDockProps`
@@ -80,7 +80,7 @@ interface AssistantDockProps
 
 ### `assistantIsThinking`
 
-`function` — True while a turn is streaming but the model hasn't emitted its first answer token yet — drives the "thinking" affordance so a reasoning gap reads as working, not a frozen panel.
+`function` — True while a turn is streaming but the model hasn't emitted its first answer token yet.
 
 ```ts
 (state: AssistantState) => boolean
@@ -99,7 +99,7 @@ interface AssistantLauncher
 `function`
 
 ```ts
-({ children, }: { children: ReactNode; }) => Element
+({ userId, children, }: { userId?: string | null | undefined; children: ReactNode; }) => Element
 ```
 
 ### `AssistantModelOption`
@@ -126,12 +126,28 @@ interface AssistantModels
 interface AssistantModelsResult
 ```
 
+### `AssistantPageContext`
+
+`interface` — The page the user has open while talking to the assistant.
+
+```ts
+interface AssistantPageContext
+```
+
 ### `AssistantPanel`
 
 `function`
 
 ```ts
-({ chat, userId, onClose, navigate, balanceUsd, formatMoney, renderGraph, renderProviderIcon, renderMarkdown, toolRende…
+({ chat, userId, onClose, layout, context, toggleRef, navigate, balanceUsd, formatMoney, renderGraph, renderProviderIco…
+```
+
+### `AssistantPanelLayout`
+
+`type` — `docked`: a column beside the page (wide viewports).
+
+```ts
+type AssistantPanelLayout
 ```
 
 ### `AssistantPanelProps`
@@ -142,12 +158,36 @@ interface AssistantModelsResult
 interface AssistantPanelProps
 ```
 
+### `AssistantPanelToggle`
+
+`function`
+
+```ts
+({ open: openOverride, onToggle, className, style, buttonRef, }: AssistantPanelToggleProps) => Element
+```
+
+### `AssistantPanelToggleProps`
+
+`interface`
+
+```ts
+interface AssistantPanelToggleProps
+```
+
 ### `AssistantSendOptions`
 
 `interface` — Define options for configuring how the assistant sends messages
 
 ```ts
 interface AssistantSendOptions
+```
+
+### `assistantShortcutLabel`
+
+`function` — The shortcut as the user's keyboard labels it.
+
+```ts
+() => string
 ```
 
 ### `AssistantStreamEvent`
@@ -174,12 +214,20 @@ interface AssistantThreads
 interface AssistantThreadSummary
 ```
 
-### `AssistantTranscript`
+### `AssistantTimelineOptions`
 
-`function` — Render the assistant conversation: message runs through web-react's `ChatMessages` (quiet chrome — the label/meta row becomes a hover-revealed lane, which keeps the narrow dock panel uncluttered), st…
+`interface`
 
 ```ts
-({ view, renderMarkdown, toolRenderers, renderConfirmedResult, emptyState, }: AssistantTranscriptProps) => Element
+interface AssistantTimelineOptions
+```
+
+### `AssistantTranscript`
+
+`function`
+
+```ts
+({ view, toolRenderers, renderConfirmedResult, emptyState, }: AssistantTranscriptProps) => Element
 ```
 
 ### `AssistantTranscriptProps`
@@ -192,10 +240,18 @@ interface AssistantTranscriptProps
 
 ### `AssistantTranscriptView`
 
-`interface` — The transcript slice handed to a host-supplied `renderTranscript` (see {@link AssistantPanelProps }).
+`interface` — The transcript slice the panel hands `AssistantTranscript`: the reducer's messages plus turn-level state, and the panel's bound `renderProposal`, which returns the proposal card wired to the panel's…
 
 ```ts
 interface AssistantTranscriptView
+```
+
+### `buildAssistantTimeline`
+
+`function` — Map the transcript view onto `AgentTimeline` items.
+
+```ts
+(view: AssistantTranscriptView, options?: AssistantTimelineOptions) => AgentTimelineItem[]
 ```
 
 ### `ChatMessage`
@@ -286,6 +342,14 @@ interface ConnectRequirementResult
 interface DeltaEventData
 ```
 
+### `DocumentPageContextOptions`
+
+`interface` — Pass module-level `titleSuffix`, `ignoreTitles` and `ids` so the context keeps its identity between renders.
+
+```ts
+interface DocumentPageContextOptions
+```
+
 ### `DoneEventData`
 
 `interface` — Describe the data emitted when a process turn completes including status and optional flags
@@ -300,6 +364,14 @@ interface DoneEventData
 
 ```ts
 interface ErrorEventData
+```
+
+### `pageLabelFromTitle`
+
+`function` — `title` minus the product suffix, or null when nothing page-specific is left.
+
+```ts
+(title: string, titleSuffix?: RegExp | undefined, ignoreTitles?: readonly string[]) => string | null
 ```
 
 ### `PendingProposal`
@@ -452,4 +524,12 @@ interface UseAssistantChatOptions
 
 ```ts
 (userId: string | null) => AssistantThreads
+```
+
+### `useDocumentPageContext`
+
+`function`
+
+```ts
+({ path, titleSuffix, ignoreTitles, ids, }: DocumentPageContextOptions) => AssistantPageContext | null
 ```

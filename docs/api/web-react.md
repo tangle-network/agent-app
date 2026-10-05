@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-442 exports.
+452 exports.
 
 ### `acceptRejectionReason`
 
@@ -92,6 +92,62 @@ interface AgentProfileChoicesProps
 
 ```ts
 interface AgentProfileEditorProps
+```
+
+### `AgentProfileRegistryError`
+
+`class`
+
+```ts
+class AgentProfileRegistryError
+```
+
+### `AgentProfileRegistryFailure`
+
+`type` — Registry search failures the editor renders distinctly.
+
+```ts
+type AgentProfileRegistryFailure
+```
+
+### `AgentProfileRegistryMcpResult`
+
+`interface`
+
+```ts
+interface AgentProfileRegistryMcpResult
+```
+
+### `AgentProfileRegistryMcpServer`
+
+`interface` — An MCP server offered by the official MCP Registry or a custom registry.
+
+```ts
+interface AgentProfileRegistryMcpServer
+```
+
+### `AgentProfileRegistryPort`
+
+`interface` — Host-supplied registry search.
+
+```ts
+interface AgentProfileRegistryPort
+```
+
+### `AgentProfileRegistrySkill`
+
+`interface` — A skill offered by a maintained catalog.
+
+```ts
+interface AgentProfileRegistrySkill
+```
+
+### `AgentProfileRegistrySkillsResult`
+
+`interface`
+
+```ts
+interface AgentProfileRegistrySkillsResult
 ```
 
 ### `AgentProfileResourceKind`
@@ -356,6 +412,22 @@ interface ChatEmptyStateProps
 
 ```ts
 type ChatFreeTextField
+```
+
+### `ChatFundingFailure`
+
+`interface`
+
+```ts
+interface ChatFundingFailure
+```
+
+### `ChatFundingRecovery`
+
+`interface` — Presentation only.
+
+```ts
+interface ChatFundingRecovery
 ```
 
 ### `ChatInteraction`
@@ -1340,6 +1412,14 @@ interface FlowWaterfallProps
 
 ```ts
 (msg: ChatMessageMetrics) => string | null
+```
+
+### `getChatFundingRecovery`
+
+`function` — Recognize a paid-access refusal across HTTP and SDK-wrapped chat failures.
+
+```ts
+(failure: string | ChatFundingFailure | null | undefined) => ChatFundingRecovery | null
 ```
 
 ### `HarnessGlyph`

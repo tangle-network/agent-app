@@ -3,8 +3,8 @@ import { useState } from 'react'
 import { ResizeHandle } from '../../assistant/ResizeHandle'
 
 /**
- * The drawer's drag-to-resize grip, mounted on the left edge of a stand-in
- * panel — the same wiring the dock uses (`usePanelWidth`), minus the
+ * The panel's drag-to-resize grip, mounted on the left edge of a stand-in
+ * panel — the same wiring the dock uses (the launcher's `panel` width), minus the
  * localStorage persistence: preview on every move, commit once on release,
  * arrow keys nudge in 24px steps when the grip is focused.
  */
