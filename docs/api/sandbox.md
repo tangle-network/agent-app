@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-187 exports.
+188 exports.
 
 ### `adaptSandboxStream`
 
@@ -60,6 +60,14 @@ interface AppToolDescriptor
 
 ```ts
 (profile: AgentProfile, _harness: Harness, effort: "none" | "auto" | "minimal" | "low" | "medium" | "high" | "xhigh" |…
+```
+
+### `backendModelFields`
+
+`function` — Spread a {@link ResolvedModel} onto a sandbox backend config as role-named fields.
+
+```ts
+(model: ResolvedModel) => { modelId: string; provider: string; apiKey?: string | undefined; baseUrl?: string | undefine…
 ```
 
 ### `buildAppToolMcpServers`
@@ -744,7 +752,7 @@ type ReadyRunningSandboxOutcome
 
 ### `ResolvedModel`
 
-`interface` — Represent a fully configured model with optional API key and base URL for sandbox platform integration
+`interface`
 
 ```ts
 interface ResolvedModel

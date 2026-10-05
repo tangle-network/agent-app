@@ -19,6 +19,33 @@ export interface ProviderResolutionConfig {
 }
 
 /** Represent a fully configured model with optional API key and base URL for sandbox platform integration */
+/**
+ * Spread a {@link ResolvedModel} onto a sandbox backend config as role-named
+ * fields. The model id's home on a standalone backend is `modelId`; routing
+ * rides `provider`/`apiKey`/`baseUrl` flat — the SDK folds them onto the wire.
+ *
+ * The deprecated nested `model` object rides along while agent-app's peer
+ * range still admits pre-fold SDK versions (< the 0.60.14 develop train):
+ * old SDKs forward only the nested object and drop the unknown flat fields,
+ * fold-aware SDKs see two AGREEING spellings and fold them. Delete the
+ * nested half when the peer floor moves past the fold.
+ */
+export function backendModelFields(model: ResolvedModel): {
+  modelId: string;
+  provider: string;
+  apiKey?: string;
+  baseUrl?: string;
+  model: { model: string; provider: string; apiKey?: string; baseUrl?: string };
+} {
+  const nested = {
+    model: model.model,
+    provider: model.provider,
+    ...(model.apiKey !== undefined ? { apiKey: model.apiKey } : {}),
+    ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
+  };
+  return { ...nested, modelId: model.model, model: nested };
+}
+
 export interface ResolvedModel {
   model: string
   provider: string

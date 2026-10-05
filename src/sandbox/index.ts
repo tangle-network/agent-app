@@ -41,6 +41,7 @@ import {
 import {
   resolveModel,
   resolveModelSelection,
+  backendModelFields,
   requireTransportableModel,
   SandboxModelResolutionError,
   type ProviderResolutionConfig,
@@ -56,6 +57,7 @@ export * from './binary-read'
 export {
   resolveModel,
   resolveModelSelection,
+  backendModelFields,
   requireTransportableModel,
   SandboxModelResolutionError,
 }
@@ -491,7 +493,7 @@ export interface SandboxRuntimeConfig {
   recoverMissingSandbox?: (
     failure: MissingSandboxFailure,
   ) => Promise<Outcome<StoppedSandboxResumeRecovery | null>>
-  // default false: bake resolveModel() into backend.model at create.
+  // default false: bake resolveModel() into the backend's model fields at create.
   backendModelAtCreate?: boolean
   // default false: write the profile's `resources.files` INTO the box after it
   // reaches running (via `box.exec`), instead of inlining them in the create
@@ -2536,7 +2538,7 @@ async function provisionWorkspaceSandbox(
     ...(userId ? { permissions: { initialUsers: [{ userId, role }] } } : {}),
     env,
     secrets,
-    backend: { type: harness, profile, ...(model ? { model } : {}) },
+    backend: { type: harness, profile, ...(model ? backendModelFields(model) : {}) },
     ...(storage ? { storage } : {}),
     ...(restore ? restore : {}),
     ...(shell.egressPolicy ? { egressPolicy: shell.egressPolicy } : {}),
@@ -3163,7 +3165,7 @@ export async function resolveSandboxPromptBackend(
   return {
     type: harness,
     profile,
-    ...(model ? { model } : {}),
+    ...(model ? backendModelFields(model) : {}),
     ...(options.interactions ? { interactions: options.interactions } : {}),
   }
 }

@@ -11875,6 +11875,12 @@
           "doc": "Attach explicit effort through the portable model contract consumed by providers."
         },
         {
+          "name": "backendModelFields",
+          "kind": "function",
+          "signature": "(model: ResolvedModel) => { modelId: string; provider: string; apiKey?: string | undefined; baseUrl?: string | undefine…",
+          "doc": "Spread a {@link ResolvedModel} onto a sandbox backend config as role-named fields."
+        },
+        {
           "name": "buildAppToolMcpServers",
           "kind": "function",
           "signature": "(options: BuildAppToolMcpServersOptions) => Record<string, AgentProfileMcpServer>",
@@ -12388,7 +12394,7 @@
           "name": "ResolvedModel",
           "kind": "interface",
           "signature": "interface ResolvedModel",
-          "doc": "Represent a fully configured model with optional API key and base URL for sandbox platform integration"
+          "doc": null
         },
         {
           "name": "resolveModel",
