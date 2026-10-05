@@ -94,7 +94,10 @@ roles for existing Agent App text and solid-control usage. The corresponding
 solid foregrounds are selected from Brand's own ink endpoints and checked for
 AA contrast during generation. `--warning-strong` supplies the warm label on
 subtle approval surfaces; a solid warning chip keeps
-`--warning-foreground`. The Canvas renderer receives concrete colors generated
+`--warning-foreground`. `text-primary` paints Brand's `--accent-text`, the
+bright indigo Brand keeps for accent text, because Brand's `--primary` is the
+fill indigo and reads about 2.6:1 as text on the dark canvas; `bg-primary`,
+`border-primary` and `ring-primary` keep the fill. The Canvas renderer receives concrete colors generated
 from Brand because its bitmap cannot resolve CSS variables.
 
 ## Scopes and overrides
