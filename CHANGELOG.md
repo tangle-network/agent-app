@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.9
+
+- Speak role-named model fields on sandbox backends (dual window)
+
 ## 0.53.8
 
 - docs(app-shell): require app utilities after package stylesheets (#790)
