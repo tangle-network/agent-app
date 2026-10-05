@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.5
+
+- feat(workspace): one canonical rail identity and workspace listing for every product (#786)
+
 ## 0.53.4
 
 - fix(assistant): dock wherever the page keeps a column, name pages, read at 15px (#785)
