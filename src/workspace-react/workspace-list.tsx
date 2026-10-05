@@ -264,7 +264,7 @@ export function WorkspaceList({
                     <span key={field.id} className={`${FIELD_CELL} truncate`}>{field.label}</span>
                   ))}
                   <span className={DATE_CELL}>{hasDates ? 'Updated' : ''}</span>
-                  {hasMenu && <span className="w-8 shrink-0" />}
+                  {hasMenu && <span className="w-8 shrink-0 [@media(pointer:coarse)]:w-11" />}
                 </div>
               )}
               <ul className="divide-y divide-border">
@@ -432,7 +432,7 @@ function ListRow({ item, fields, menu, reserveMenu, Link, formatDate }: ItemProp
         </div>
       ))}
       <UpdatedAt value={item.updatedAt} formatDate={formatDate} className={DATE_CELL} />
-      {menu.length > 0 ? <ItemMenu item={item} entries={menu} /> : reserveMenu ? <span className="w-8 shrink-0" /> : null}
+      {menu.length > 0 ? <ItemMenu item={item} entries={menu} /> : reserveMenu ? <span className="w-8 shrink-0 [@media(pointer:coarse)]:w-11" /> : null}
     </li>
   )
 }
@@ -488,7 +488,7 @@ function ItemMenu({ item, entries }: { item: WorkspaceListItem; entries: MenuEnt
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
         // Hidden until hover only where hover exists; a touch screen of any width shows it.
-        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:opacity-100 aria-expanded:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 transition hover:bg-muted hover:text-foreground focus-visible:opacity-100 aria-expanded:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
       >
         <svg aria-hidden className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
           <circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" />
