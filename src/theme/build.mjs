@@ -104,7 +104,7 @@ function project(node) {
 const provenance = `GENERATED from @tangle-network/brand/styles/legacy-light.css\n * SHA-256: ${sourceHash}\n * Run node src/theme/build.mjs --write; do not edit colors or ratios here.`
 const compat = `/* ${provenance} */\n${postcss.root({ nodes: canonical.nodes.map(project).filter(Boolean) }).toString()}\n`
 const toHex = (color) => '#' + rgb(color).map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('')
-function snapshot(defs) {
+function snapshot(defs, mode) {
   const projected = adapters(defs), result = {}
   const names = ['background', 'foreground', 'card', 'card-foreground', 'popover', 'popover-foreground',
     'primary', 'primary-foreground', 'secondary', 'secondary-foreground', 'muted', 'muted-foreground',
@@ -114,6 +114,12 @@ function snapshot(defs) {
   for (const [target, role] of [['primary', 'accent'], ['success', 'success'], ['destructive', 'danger']]) {
     result[target] = projected[`--agent-app-${role}-hsl`]
     result[`${target}Foreground`] = projected[`--agent-app-${role}-foreground-hsl`]
+  }
+  // Primary paints link text as well as controls. A readable solid label does
+  // not prove that the primary ink itself is readable on the canvas.
+  const primaryContrast = contrast(result.primary, result.background)
+  if (!(primaryContrast >= 4.5)) {
+    throw new Error(`Brand ${mode} primary text must reach 4.5:1 against --background (got ${primaryContrast.toFixed(2)}:1)`)
   }
   result.warningForeground = projected['--agent-app-warning-foreground-hsl']
   result.warningStrong = projected['--agent-app-warning-text-hsl']
@@ -130,7 +136,7 @@ function snapshot(defs) {
   result.canvasRender = Object.fromEntries(Object.entries(canvas).map(([key, role]) => [key, toHex(resolve(defs[role], defs))]))
   return result
 }
-const themes = `/** ${provenance} */\nexport const brandThemes = ${JSON.stringify({ light: snapshot(lightValues), dark: snapshot(darkValues) }, null, 2)} as const\n`
+const themes = `/** ${provenance} */\nexport const brandThemes = ${JSON.stringify({ light: snapshot(lightValues, 'light'), dark: snapshot(darkValues, 'dark') }, null, 2)} as const\n`
 const outputs = [['compat.generated.css', compat], ['brand.generated.ts', themes]]
 function check() {
   for (const [file, text] of outputs) {
