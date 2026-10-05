@@ -132,7 +132,9 @@ function buildUtilityRe(suffix: string): RegExp {
 function definedVars(cssFiles: string[]): Set<string> {
   const defs = new Set<string>()
   const visited = new Set<string>()
-  const visit = (file: string): void => {
+  const visit = (inputFile: string): void => {
+    // CLI paths are relative to cwd; createRequire needs an absolute filename.
+    const file = resolve(inputFile)
     if (visited.has(file)) return
     visited.add(file)
     let css: string
@@ -148,9 +150,19 @@ function definedVars(cssFiles: string[]): Set<string> {
     // definitions without making Brand a runtime dependency of the package.
     for (const m of css.matchAll(/@import\s+['"]([^'"]+)['"]/g)) {
       if (!m[1]) continue
-      const imported = m[1].startsWith('.')
-        ? resolve(dirname(file), m[1])
-        : createRequire(file).resolve(m[1])
+      let imported: string
+      try {
+        imported = m[1].startsWith('.')
+          ? resolve(dirname(file), m[1])
+          : createRequire(file).resolve(m[1])
+      } catch (error) {
+        // CSS build tools can resolve packages/exports unavailable to Node
+        // (e.g. tailwindcss). Keep scanning local definitions and imports;
+        // references to any uncollected tokens still fail the contract.
+        const code = (error as NodeJS.ErrnoException).code
+        if (code === 'MODULE_NOT_FOUND' || code === 'ERR_PACKAGE_PATH_NOT_EXPORTED') continue
+        throw error
+      }
       visit(imported)
     }
   }

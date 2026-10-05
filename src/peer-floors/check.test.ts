@@ -272,6 +272,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.122.0', range!)).toBe(true)
     expect(satisfiesRange('0.122.2', range!)).toBe(true)
     expect(satisfiesRange('0.123.2', range!)).toBe(true)
+    expect(satisfiesRange('0.123.3', range!)).toBe(true)
     expect(satisfiesRange('0.124.0', range!)).toBe(true)
     expect(satisfiesRange('0.125.0', range!)).toBe(false)
   })

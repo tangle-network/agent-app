@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.10
+
+- fix(theme-contract): handle relative extra CSS and bare package imports (#793)
+- docs: map shared pages to their agent-app owners across nine apps (#792)
+
 ## 0.53.9
 
 - Speak role-named model fields on sandbox backends (dual window)
