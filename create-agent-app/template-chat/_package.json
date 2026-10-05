@@ -31,7 +31,7 @@
     "hono": "^4.13.5",
     "viem": "^2.0.0",
     "@tangle-network/brand": "1.13.0",
-    "@tangle-network/sandbox-ui": "0.123.3",
+    "@tangle-network/sandbox-ui": "0.124.0",
     "@tangle-network/ui": "11.19.0",
     "lucide-react": "^1.35.0",
     "react": "^19.2.8",
