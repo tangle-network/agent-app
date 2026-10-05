@@ -75,9 +75,11 @@ export function AssistantLauncherProvider({
   /** The signed-in user. Open state and width persist per user; null keeps
    *  them in memory only. */
   userId?: string | null;
-  /** Pixels of host chrome beside the page column (a left sidebar, its
-   *  collapsed rail, or a gutter). The panel docks only where the page keeps a
-   *  usable column beside it. Defaults to a 16rem sidebar. */
+  /** Pixels of host chrome beside the page column while the panel is open (a
+   *  left sidebar, its collapsed rail, or a gutter). A host that hides its
+   *  sidebar to make room for the panel passes the hidden width. The panel
+   *  docks only where the page keeps a usable column beside it. Defaults to a
+   *  16rem sidebar. */
   reservedWidth?: number;
   /** Viewports where the host's layout can hold a panel beside its page, e.g.
    *  where its desktop shell starts. Defaults to 64rem. */

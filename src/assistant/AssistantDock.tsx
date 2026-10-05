@@ -297,7 +297,7 @@ export function AssistantDock({
           // Full screen on phones; on tablets the user's width, capped by the
           // viewport.
           style={{ width: wideSheet ? `min(${width}px, 100vw)` : "100%" }}
-          className="fixed inset-y-0 right-0 z-50 flex flex-col border-border border-l shadow-[var(--shadow-overlay)] focus:outline-none"
+          className={`fixed inset-y-0 right-0 z-50 flex flex-col shadow-[var(--shadow-overlay)] focus:outline-none ${wideSheet ? "border-border border-l" : ""}`}
         >
           {panel}
         </div>
