@@ -11,6 +11,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { join, resolve } from 'node:path'
 
 import tailwindcss from '@tailwindcss/postcss'
+import { JSDOM } from 'jsdom'
 import postcss from 'postcss'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -89,15 +90,28 @@ describe('agent-app Tailwind source entry', () => {
     expect(css.slice(start, css.indexOf('}', start))).toContain('--border-soft')
   })
 
-  it('applies dark: utilities under both dark scopes', () => {
+  it('applies dark: utilities under the nearest dark scope', () => {
     // Agent App's own interaction card writes `dark:[color-scheme:dark]`. Brand
-    // and tokens.css treat `.dark` and `[data-theme="dark"]` as dark, so the
-    // variant must too, or a `.dark` host renders the light variant.
+    // and tokens.css treat `.dark` and `[data-theme="dark"]` as dark and a
+    // nested `.light` as light again, so the variant must follow the same
+    // boundaries or a `.dark` host renders the light variant.
     const marker = '.dark\\:\\[color-scheme\\:dark\\]'
     const start = css.indexOf(marker)
     expect(start).toBeGreaterThan(-1)
-    const scope = css.slice(start + marker.length, css.indexOf('{', start))
-    expect(scope).toContain('.dark')
-    expect(scope).toContain('[data-theme="dark"]')
+    const selector = css.slice(start, css.indexOf('{', start)).trim()
+    const { document } = new JSDOM('<!doctype html><body></body>').window
+    const matches = (outer: string) => {
+      document.body.innerHTML = outer.replace('X', '<i class="dark:[color-scheme:dark]" id="x"></i>')
+      return document.getElementById('x')!.matches(selector)
+    }
+    expect(matches('<div class="dark">X</div>')).toBe(true)
+    expect(matches('<div data-theme="dark">X</div>')).toBe(true)
+    expect(matches('<div class="dark" data-theme="hospitality">X</div>')).toBe(true)
+    expect(matches('<div class="light"><div class="dark">X</div></div>')).toBe(true)
+    expect(matches('<div class="dark"><div class="light"><div class="dark">X</div></div></div>')).toBe(true)
+    expect(matches('X')).toBe(false)
+    expect(matches('<div class="light">X</div>')).toBe(false)
+    expect(matches('<div class="dark"><div class="light">X</div></div>')).toBe(false)
+    expect(matches('<div class="dark"><div data-theme="agents-light">X</div></div>')).toBe(false)
   })
 })

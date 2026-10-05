@@ -105,7 +105,9 @@ from Brand because its bitmap cannot resolve CSS variables.
 An unpinned root is light. `.dark`, `.light`, `[data-theme]`, and Brand's named
 themes select explicit scopes. Agent App's aliases rebind at each theme
 boundary so a nested mode uses its own values. The preset's `dark:` variant
-matches the same dark scopes, `.dark` and `[data-theme="dark"]`. Host overrides should live on
+follows the same boundaries: `.dark` and `[data-theme="dark"]` turn it on, a
+nested `.light` or `*-light` scope turns it off, and a dark scope inside that
+light island turns it on again. Host overrides should live on
 the boundary that owns the theme and follow the package stylesheet in cascade
 order. If a host changes both a field well and its utility-specific channel,
 keep those values paired; `--input` remains the edge.

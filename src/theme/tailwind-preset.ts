@@ -6,12 +6,17 @@ const withForeground = (name: string) => ({
 // Full-color tiers need an explicit alpha placeholder for Tailwind v3 /50 users.
 const tier = (token: string) => `color-mix(in oklch, var(${token}) calc(<alpha-value> * 100%), transparent)`
 
+// The dark scopes Brand and tokens.css recognise: the `.dark` class (also how
+// Brand spells its dark named themes, `.dark[data-theme="hospitality"]`) and
+// `[data-theme="dark"]`. A `.light` or `*-light` boundary inside a dark scope
+// turns `dark:` off again, and a dark scope inside that light island turns it
+// back on, so a utility follows the nearest boundary for two nested levels.
+const DARK = ':is(.dark, [data-theme="dark"])'
+const LIGHT = ':is(.light, [data-theme="light"], [data-theme$="-light"])'
+const darkVariant = `&:is(${DARK} *:not(${LIGHT} *), ${LIGHT} ${DARK} *)`
+
 const agentAppPreset = {
-  // Both dark scopes Brand and this package's tokens recognise: the `.dark` class
-  // (also how Brand's dark named themes are spelled, `.dark[data-theme="hospitality"]`)
-  // and `[data-theme="dark"]`. Naming only the attribute left every `.dark` host
-  // with `dark:` utilities that never applied.
-  darkMode: ['class', ':is(.dark, [data-theme="dark"])'] as [string, string],
+  darkMode: ['variant', darkVariant] as [string, string],
   theme: {
     extend: {
       colors: {
