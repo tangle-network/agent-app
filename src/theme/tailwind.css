@@ -1,0 +1,26 @@
+/**
+ * Tailwind SOURCE entry: `@tangle-network/agent-app/tailwind.css`.
+ *
+ * An agent app's whole stylesheet is:
+ *
+ *   @import 'tailwindcss';
+ *   @import '@tangle-network/agent-app/tailwind.css';
+ *   @config '../tailwind.config.ts'; // presets: [agentAppPreset]
+ *
+ * plus its own rules after the import. It lists no node_modules paths and links
+ * no package stylesheets: this file carries Sandbox UI's entry (Brand tokens,
+ * Sandbox runtime CSS, and the sources for Sandbox UI and ui), this package's
+ * tokens, and the source for this package's dist. Every shared utility compiles
+ * once, in the app's own layer order, so a package's `py-6` can no longer land
+ * after the app's `sm:py-8` (docs/app-shell.md, step 4).
+ *
+ * Order: Sandbox UI first, then Agent App, because Agent App refines it
+ * (focus treatment, composer exemptions, motion fallbacks).
+ *
+ * `@source` resolves relative to the installed file: from dist/theme/, `../`
+ * is this package's dist.
+ */
+@import '@tangle-network/sandbox-ui/tailwind.css';
+@import './tokens.css';
+
+@source '../**/*.js';

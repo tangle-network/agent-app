@@ -19,7 +19,7 @@ fail explicitly, not through a demo response.
 | `web/App.tsx` | Real session auth, workspace navigation, and full History |
 | `web/Conversation.tsx` | Conversation assembly and existing chat/replay callbacks |
 | `web/api.ts`, `web/uploads.ts` | Product URL, JSON, transcript, and inline-upload adapters |
-| `web/styles.css`, `tailwind.config.mjs` | Public styles, maintained preset, installed-package class scanning |
+| `web/styles.css`, `tailwind.config.mjs` | The one Agent App stylesheet entry and the maintained preset |
 | `vite.config.mjs`, `web/tsconfig.json` | Standalone browser build and browser-only types |
 | `src/chat.ts` | Authentication, store, turn, upload, and interaction factories |
 | `src/gateway.ts`, `src/sandbox.ts`, `src/worker.ts` | Existing API gateway, sandbox lane, and HTTP routes |

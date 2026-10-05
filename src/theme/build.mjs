@@ -1,6 +1,6 @@
 /** Build-only projection of the published Brand contract. No runtime imports. */
 import { createHash } from 'node:crypto'
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { copyFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -163,6 +163,8 @@ if (mode === '--write') {
     const dir = join(here, '../../dist/theme')
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, 'tokens.css'), css)
+    // The Tailwind source entry imports the sibling tokens.css written above.
+    copyFileSync(join(here, 'tailwind.css'), join(dir, 'tailwind.css'))
   }
 } else {
   throw new Error('Usage: node src/theme/build.mjs --write|--check|--dist|--stdout')

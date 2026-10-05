@@ -1,15 +1,8 @@
-/* Shared compiled styles load before this app's utilities so its responsive and container variants win the cascade. */
-@import 'tailwindcss/theme.css' layer(theme);
-@import 'tailwindcss/preflight.css' layer(base);
-@import '@tangle-network/sandbox-ui/styles';
-@import '@tangle-network/agent-app/styles';
-@import 'tailwindcss/utilities.css' layer(utilities);
+/* One package entry: Sandbox UI and Agent App styles plus the sources for every
+ * shared component's utilities, compiled once with this app's own. */
+@import 'tailwindcss';
+@import '@tangle-network/agent-app/tailwind.css';
 @config '../tailwind.config.mjs';
-
-/* Standalone consumer: scan installed public JS, never a monorepo src alias. */
-@source '../node_modules/@tangle-network/agent-app/dist';
-@source '../node_modules/@tangle-network/sandbox-ui/dist';
-@source '../node_modules/@tangle-network/ui/dist';
 
 body {
   margin: 0;
