@@ -1274,6 +1274,11 @@ describe('streamSandboxPrompt seam', () => {
     const [prompt, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
     expect(prompt).toBe('Assistant: prior\n\nUser: hello')
     expect(opts.backend.type).toBe('opencode')
+    expect(opts.backend.modelId).toBe('gpt-x')
+    expect(opts.backend.provider).toBe('openai-compat')
+    expect(opts.backend.apiKey).toBe('router-key')
+    expect(opts.backend.baseUrl).toBe('https://router')
+    // deprecated window: the nested copy rides along, agreeing
     expect(opts.backend.model).toEqual({
       model: 'gpt-x',
       provider: 'openai-compat',
@@ -2788,7 +2793,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(payload.idempotencyKey).toBe('box-w1')
   })
 
-  it('bakes resolved model + childKeyMint override into backend.model', async () => {
+  it('bakes resolved model + childKeyMint override into the backend model fields', async () => {
     listMock.mockResolvedValue([])
     createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
@@ -2798,6 +2803,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       childKeyMint: async () => ({ succeeded: true, value: 'child-key' }),
     })
     await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', userId: 'u9', harness: 'opencode' })
+    expect(createMock.mock.calls[0]![0].backend.modelId).toBeDefined()
     expect(createMock.mock.calls[0]![0].backend.model).toMatchObject({
       provider: 'openai-compat',
       model: 'm',
