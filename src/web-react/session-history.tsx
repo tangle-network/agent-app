@@ -34,6 +34,7 @@ import {
   sessionLabel,
   UNTITLED_SESSION_LABEL,
 } from '../session-shell/index'
+import { ActionDialog, ActionDialogButton } from './action-dialog'
 import { OVERLAY_SHADOW, PopoverSurface, usePopover } from './controls'
 
 // ---------------------------------------------------------------------------
@@ -429,19 +430,19 @@ export function useSessionActions({
   const dialogs = (
     <>
       {renameTarget && (
-        <SessionDialog
+        <ActionDialog
           title={text.renameTitle}
           onClose={() => setRenameTarget(null)}
           busy={busy}
           error={error}
           footer={
             <>
-              <DialogButton onClick={() => setRenameTarget(null)} disabled={busy} variant="ghost">
+              <ActionDialogButton onClick={() => setRenameTarget(null)} disabled={busy} variant="ghost">
                 {text.cancel}
-              </DialogButton>
-              <DialogButton onClick={() => void submitRename()} disabled={busy || !renameValue.trim()}>
+              </ActionDialogButton>
+              <ActionDialogButton onClick={() => void submitRename()} disabled={busy || !renameValue.trim()}>
                 {text.renameSubmit}
-              </DialogButton>
+              </ActionDialogButton>
             </>
           }
         >
@@ -461,115 +462,33 @@ export function useSessionActions({
             }}
             className="mt-1.5 h-9 w-full rounded-md border border-strong bg-background px-3 text-sm text-foreground"
           />
-        </SessionDialog>
+        </ActionDialog>
       )}
 
       {deleteTarget && (
-        <SessionDialog
+        <ActionDialog
           title={text.deleteTitle}
           onClose={() => setDeleteTarget(null)}
           busy={busy}
           error={error}
           footer={
             <>
-              <DialogButton onClick={() => setDeleteTarget(null)} disabled={busy} variant="ghost">
+              <ActionDialogButton onClick={() => setDeleteTarget(null)} disabled={busy} variant="ghost">
                 {text.cancel}
-              </DialogButton>
-              <DialogButton onClick={() => void confirmDelete()} disabled={busy} variant="destructive">
+              </ActionDialogButton>
+              <ActionDialogButton onClick={() => void confirmDelete()} disabled={busy} variant="destructive">
                 {text.deleteSubmit}
-              </DialogButton>
+              </ActionDialogButton>
             </>
           }
         >
           <p className="text-sm text-muted-foreground">{text.deleteBody(sessionLabel(deleteTarget))}</p>
-        </SessionDialog>
+        </ActionDialog>
       )}
     </>
   )
 
   return { openRename, openDelete, dialogs, busy }
-}
-
-function DialogButton({
-  children,
-  onClick,
-  disabled,
-  variant = 'primary',
-}: {
-  children: ReactNode
-  onClick: () => void
-  disabled?: boolean
-  variant?: 'primary' | 'ghost' | 'destructive'
-}) {
-  const tone =
-    variant === 'ghost'
-      ? 'text-muted-foreground hover:bg-accent hover:text-foreground'
-      : variant === 'destructive'
-        ? 'bg-destructive text-destructive-foreground hover:opacity-90'
-        : 'bg-primary text-primary-foreground hover:opacity-90'
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`h-9 rounded-md px-3 text-sm font-medium transition disabled:opacity-50 ${tone}`}
-    >
-      {children}
-    </button>
-  )
-}
-
-function SessionDialog({
-  title,
-  children,
-  footer,
-  onClose,
-  busy,
-  error,
-}: {
-  title: string
-  children: ReactNode
-  footer: ReactNode
-  onClose: () => void
-  busy: boolean
-  error: string | null
-}) {
-  // Escape closes unless a mutation is in flight — closing mid-write would hide
-  // the error the user needs to see.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [busy, onClose])
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={() => {
-          if (!busy) onClose()
-        }}
-        aria-hidden
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={`relative w-full max-w-sm rounded-xl border border-card-edge bg-popover p-5 ${OVERLAY_SHADOW}`}
-      >
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        <div className="mt-3">{children}</div>
-        {error && (
-          <p role="alert" className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {error}
-          </p>
-        )}
-        <div className="mt-5 flex justify-end gap-2">{footer}</div>
-      </div>
-    </div>
-  )
 }
 
 // ---------------------------------------------------------------------------
@@ -968,7 +887,7 @@ export function SessionHistoryPanel({
         </div>
       </div>
       {bulkTarget && (
-        <SessionDialog
+        <ActionDialog
           title={bulkTarget.title}
           onClose={() => {
             if (!bulkBusy) {
@@ -980,7 +899,7 @@ export function SessionHistoryPanel({
           error={bulkError}
           footer={
             <>
-              <DialogButton
+              <ActionDialogButton
                 onClick={() => {
                   setBulkTarget(null)
                   setBulkError(null)
@@ -989,15 +908,15 @@ export function SessionHistoryPanel({
                 variant="ghost"
               >
                 Cancel
-              </DialogButton>
-              <DialogButton onClick={() => void confirmBulkAction()} disabled={bulkBusy} variant="destructive">
+              </ActionDialogButton>
+              <ActionDialogButton onClick={() => void confirmBulkAction()} disabled={bulkBusy} variant="destructive">
                 {bulkBusy ? 'Working…' : deleteLabel}
-              </DialogButton>
+              </ActionDialogButton>
             </>
           }
         >
           <p className="text-sm text-muted-foreground">{bulkTarget.body}</p>
-        </SessionDialog>
+        </ActionDialog>
       )}
     </div>
   )

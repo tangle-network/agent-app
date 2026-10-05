@@ -2,6 +2,7 @@ import { SidebarLayout, type SidebarLayoutNavItem, type SidebarLayoutProps } fro
 import type { ReactNode } from 'react'
 
 import type { WorkspaceAppRecord } from '../workspace-apps'
+import { AgentRailIdentity, type AgentProductIdentity, type AgentWorkspaceIdentity } from './rail-identity'
 
 import {
   buildSessionNavItem,
@@ -94,6 +95,14 @@ export interface AgentWorkspaceActiveRoute {
 export interface AgentWorkspaceLayoutProps
   extends Omit<SidebarLayoutProps, 'activeId' | 'children' | 'navItems' | 'hideBelow' | 'railLabels'> {
   children: ReactNode
+  /**
+   * The product's name, mark, and home. With it the shell draws the canonical
+   * rail top — mark, then the open workspace and product name — so products
+   * stop hand-building `logo` and `railHeaderContent`.
+   */
+  product?: AgentProductIdentity
+  /** The open workspace and where else this person can go. Omit on the listing. */
+  workspace?: AgentWorkspaceIdentity | null
   /** Product-owned destinations. Shared Apps and History rows follow them. */
   navItems: SidebarLayoutNavItem[]
   /** Omit for a workflow-only shell with no conversational session rail. */
@@ -128,6 +137,8 @@ export function AgentWorkspaceLayout({
   apps,
   activeRoute,
   activeId,
+  product,
+  workspace,
   ...sidebarProps
 }: AgentWorkspaceLayoutProps) {
   const sessionNav = sessions
@@ -227,9 +238,25 @@ export function AgentWorkspaceLayout({
     ...(sessionNav ? [sessionNav] : []),
   ]
 
+  const hideBelow = sidebarProps.hideBelow ?? 'lg'
+  const identityProps = product
+    ? {
+        logo: product.mark,
+        logoHref: product.href,
+        railHeaderContent: (
+          <AgentRailIdentity
+            product={product}
+            workspace={workspace}
+            hideBelow={hideBelow}
+            LinkComponent={sidebarProps.LinkComponent}
+          />
+        ),
+      }
+    : {}
   const layoutProps = {
-    hideBelow: 'lg' as const,
+    hideBelow,
     railLabels: true,
+    ...identityProps,
     ...sidebarProps,
   }
 
@@ -247,3 +274,21 @@ export function AgentWorkspaceLayout({
 export { AgentWorkspaceCompanion, createAgentWorkspaceCompanionTabs, type AgentWorkspaceCompanionHandle, type AgentWorkspaceCompanionProps, type AgentWorkspaceCompanionTab, type AgentWorkspaceCompanionTool, type AgentWorkspaceCompanionTools, type AgentWorkspaceCompanionNavigation } from './companion'
 
 export { WorkspaceSwitcher, type WorkspaceSwitcherItem, type WorkspaceSwitcherProps } from '../web-react/workspace-switcher'
+
+export {
+  AgentRailIdentity,
+  DEFAULT_WORKSPACE_NOUN,
+  WorkspaceInitial,
+  type AgentProductIdentity,
+  type AgentRailIdentityProps,
+  type AgentWorkspaceIdentity,
+  type AgentWorkspaceNoun,
+} from './rail-identity'
+
+export {
+  WorkspaceList,
+  type WorkspaceListAction,
+  type WorkspaceListField,
+  type WorkspaceListItem,
+  type WorkspaceListProps,
+} from './workspace-list'
