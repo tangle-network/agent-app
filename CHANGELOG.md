@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.4
+
+- fix(assistant): dock wherever the page keeps a column, name pages, read at 15px (#785)
+
 ## 0.53.3
 
 - feat(workspace): share GTM-grade settings and workspace controls across agent apps (#775)
