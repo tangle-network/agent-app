@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.14
+
+- fix(theme): text-primary paints Brand accent text; long values wrap (#799)
+
 ## 0.53.13
 
 - feat(theme): one Tailwind source entry at ./tailwind.css (#797)
