@@ -20941,7 +20941,7 @@
         {
           "name": "PopoverSurface",
           "kind": "function",
-          "signature": "({ open, triggerRef, panelRef, className, role, id, \"aria-label\": ariaLabel, matchTriggerWidth, contentKey, children, }…",
+          "signature": "({ open, triggerRef, panelRef, className, role, id, \"aria-label\": ariaLabel, matchTriggerWidth, side, align, contentKey…",
           "doc": "The floating panel every canonical picker opens."
         },
         {
@@ -21999,6 +21999,12 @@
           "kind": "function",
           "signature": "(status: WorkProductStatus) => string",
           "doc": "Human label for a work-product status."
+        },
+        {
+          "name": "WorkspaceInitial",
+          "kind": "function",
+          "signature": "({ name, size }: { name: string; size?: \"sm\" | \"lg\" | undefined; }) => Element",
+          "doc": "The one workspace avatar: a rounded square with the first letter, tinted with the product accent."
         },
         {
           "name": "WorkspaceSwitcher",
@@ -23149,6 +23155,24 @@
       "error": null,
       "exports": [
         {
+          "name": "AgentProductIdentity",
+          "kind": "interface",
+          "signature": "interface AgentProductIdentity",
+          "doc": "What a product is called and how it is marked."
+        },
+        {
+          "name": "AgentRailIdentity",
+          "kind": "function",
+          "signature": "({ product, workspace, hideBelow, LinkComponent }: AgentRailIdentityProps) => Element",
+          "doc": "The top of every product's rail: which product, and which workspace."
+        },
+        {
+          "name": "AgentRailIdentityProps",
+          "kind": "interface",
+          "signature": "interface AgentRailIdentityProps",
+          "doc": null
+        },
+        {
           "name": "AgentWorkspaceActiveRoute",
           "kind": "interface",
           "signature": "interface AgentWorkspaceActiveRoute",
@@ -23203,9 +23227,15 @@
           "doc": "Supply only tools the product can actually serve."
         },
         {
+          "name": "AgentWorkspaceIdentity",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceIdentity",
+          "doc": "The workspace that is open, and where else this person can go."
+        },
+        {
           "name": "AgentWorkspaceLayout",
           "kind": "function",
-          "signature": "({ children, navItems, sessions, apps, activeRoute, activeId, ...sidebarProps }: AgentWorkspaceLayoutProps) => Element",
+          "signature": "({ children, navItems, sessions, apps, activeRoute, activeId, product, workspace, ...sidebarProps }: AgentWorkspaceLayo…",
           "doc": "The default agent workspace composition."
         },
         {
@@ -23213,6 +23243,12 @@
           "kind": "interface",
           "signature": "interface AgentWorkspaceLayoutProps",
           "doc": null
+        },
+        {
+          "name": "AgentWorkspaceNoun",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceNoun",
+          "doc": "The words a product uses for one workspace and for several."
         },
         {
           "name": "AgentWorkspaceSessionConfig",
@@ -23225,6 +23261,48 @@
           "kind": "function",
           "signature": "(tools: Partial<Record<AgentWorkspaceCompanionTool, (state: { active: boolean; }) => ReactNode>>) => AgentWorkspaceComp…",
           "doc": "Canonical order, labels, icons and lazy retention for companion tools."
+        },
+        {
+          "name": "DEFAULT_WORKSPACE_NOUN",
+          "kind": "const",
+          "signature": "AgentWorkspaceNoun",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceInitial",
+          "kind": "function",
+          "signature": "({ name, size }: { name: string; size?: \"sm\" | \"lg\" | undefined; }) => Element",
+          "doc": "The one workspace avatar: a rounded square with the first letter, tinted with the product accent."
+        },
+        {
+          "name": "WorkspaceList",
+          "kind": "function",
+          "signature": "({ items, noun, title, description, layout, fields, create, empty, rename, remove, removeConsequence, actions, children…",
+          "doc": "The listing every product opens on: one title, one primary action, the workspaces, and nothing that counts them."
+        },
+        {
+          "name": "WorkspaceListAction",
+          "kind": "interface",
+          "signature": "interface WorkspaceListAction",
+          "doc": "A non-destructive product action in an item's overflow menu."
+        },
+        {
+          "name": "WorkspaceListField",
+          "kind": "interface",
+          "signature": "interface WorkspaceListField",
+          "doc": "A product column: a value the user compares across workspaces (tax year, status, owner)."
+        },
+        {
+          "name": "WorkspaceListItem",
+          "kind": "interface",
+          "signature": "interface WorkspaceListItem",
+          "doc": "One workspace as the listing shows it."
+        },
+        {
+          "name": "WorkspaceListProps",
+          "kind": "interface",
+          "signature": "interface WorkspaceListProps",
+          "doc": null
         },
         {
           "name": "WorkspaceSwitcher",
