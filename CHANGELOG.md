@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.12
+
+- fix(theme): carry Brand 1.13 named themes in ./styles (#796)
+- feat(web-react): ComposerProfilePill beside ChatComposer; work-product pills on ui StatusPill (#795)
+
 ## 0.53.11
 
 - chore(deps): qualify sandbox-ui 0.123 and 0.124 on Brand 1.11 (#794)
