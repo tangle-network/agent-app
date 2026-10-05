@@ -67,12 +67,11 @@ name it also maps (`border-border`, `surface-container-*`), as it did when the
 app's compile loaded after the precompiled Sandbox bundle. Names only Brand
 registers, such as `text-eyebrow` and `bg-depth-1`, still compile.
 
-Two values move when an app adopts the entry, because the owner's value now
-applies where an extra copy of Tailwind's defaults used to win:
-`rounded-full` is Brand's `999px` instead of `calc(infinity * 1px)` (same
-geometry), and `rounded-2xl`/`rounded-3xl` follow this package's
-`--radius-2xl`/`--radius-3xl` (18px and 22px at the default scale) instead of
-Tailwind's 16px and 24px.
+One value moves when an app adopts the entry: `rounded-full` is Brand's
+`999px` instead of Tailwind's `calc(infinity * 1px)`, the same circle at every
+size this package renders. `--radius-2xl` and `--radius-3xl` keep Tailwind's
+1rem and 1.5rem, the values apps rendered while their own compile re-declared
+them after this package's tokens.
 
 `tests/theme/tailwind-entry.test.ts` compiles the built entry from outside
 the repo and fails if an Agent App, Sandbox UI or ui component utility is

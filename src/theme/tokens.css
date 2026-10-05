@@ -65,8 +65,13 @@
     --radius-md: calc(var(--radius-base) * var(--agent-app-radius-md-factor));
     --radius-lg: var(--radius-base);
     --radius-xl: calc(var(--radius-base) * var(--agent-app-radius-xl-factor));
-    --radius-2xl: calc(var(--radius-lg) + var(--radius-md));
-    --radius-3xl: calc(var(--radius-xl) + var(--radius-lg));
+    /* Brand registers no 2xl/3xl. These are Tailwind's own values, which is
+       what every app rendered while it compiled its utilities after this file
+       (its theme layer re-declared them). The single source entry
+       (./tailwind.css) compiles this file after Tailwind's theme, so a
+       different value here would visibly change every app that adopts it. */
+    --radius-2xl: 1rem;
+    --radius-3xl: 1.5rem;
 
     /* A studio notice, not a shared palette role. */
     --studio-notice-bg: color-mix(in srgb, hsl(var(--primary)) 8%, hsl(var(--card)));
