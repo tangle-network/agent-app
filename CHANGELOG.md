@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.7
+
+- fix(workspace): readable avatar letter on dark themes, 44px row menu on touch (#789)
+
 ## 0.53.6
 
 - fix(workspace): keep listing field values readable on a phone (#788)
