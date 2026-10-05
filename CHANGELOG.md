@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.11
+
+- chore(deps): qualify sandbox-ui 0.123 and 0.124 on Brand 1.11 (#794)
+
 ## 0.53.10
 
 - fix(theme-contract): handle relative extra CSS and bare package imports (#793)
