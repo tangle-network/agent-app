@@ -538,6 +538,7 @@
       "import": "./dist/theme-contract/index.js",
       "default": "./dist/theme-contract/index.js"
     },
+    "./tailwind.css": "./dist/theme/tailwind.css",
     "./styles": {
       "types": "./dist/theme/styles.d.ts",
       "default": "./dist/theme/tokens.css"

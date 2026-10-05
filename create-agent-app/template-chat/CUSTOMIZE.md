@@ -48,9 +48,10 @@ Discovery: **Does the public-package frontend work on the real Worker origin?**
 Wrangler's custom build runs the same frontend compiler for development and
 deployment. Refresh the browser after a rebuild. Do not point assets at source
 TSX, add a second auth origin, or introduce an HTML fallback over `/api/*` or
-`/v1/*`. `web/styles.css` imports both maintained public stylesheets and scans
-the installed Agent App, sandbox-ui, and ui distributions. Keep that standalone
-setup; a repository-local Tailwind alias is not a consumer proof.
+`/v1/*`. `web/styles.css` imports `@tangle-network/agent-app/tailwind.css`, which
+carries the shared styles and the sources for the installed Agent App,
+sandbox-ui, and ui distributions. Keep that standalone setup; do not add
+`node_modules` `@source` lines or a repository-local Tailwind alias.
 
 ## ⑤ Extend the product UI, not the primitive family
 

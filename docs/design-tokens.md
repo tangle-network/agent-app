@@ -35,10 +35,48 @@ review and test the generated diff. Do not edit generated values by hand.
 
 | Entry | Purpose |
 | --- | --- |
-| `@tangle-network/agent-app/styles` | Light-default stylesheet with explicit dark, light, and Brand named scopes. Import once in the app shell. |
+| `@tangle-network/agent-app/tailwind.css` | Tailwind v4 source entry for agent apps. Imports `@tangle-network/sandbox-ui/tailwind.css` (Brand tokens, named themes and registrations, Sandbox runtime CSS, and the sources for Sandbox UI and ui), then this package's tokens, and declares the source for this package's `dist`. |
+| `@tangle-network/agent-app/styles` | Light-default stylesheet with explicit dark, light, and Brand named scopes, for an app without a Tailwind compile. |
 | `@tangle-network/agent-app/theme` | Browser-safe `lightTheme`, `darkTheme`, `themeToCssVars`, and concrete bitmap Canvas colors. No runtime Brand or Node import. |
 | `@tangle-network/agent-app/tailwind-preset` | Existing utility names mapped to Brand roles and Agent App compatibility names. |
 | `@tangle-network/agent-app/theme-contract` | Node-only source scanner for missing CSS variables and selected dangerous utility names. |
+
+## One stylesheet entry
+
+An agent app that compiles Tailwind imports one package file and lists no
+`node_modules` paths:
+
+```css
+@import 'tailwindcss';
+@import '@tangle-network/agent-app/tailwind.css';
+@config '../tailwind.config.ts'; /* presets: [agentAppPreset] */
+
+/* the app's own rules */
+```
+
+Delete the app's `@source` lines for `node_modules/@tangle-network/*/dist`,
+the same globs in the Tailwind config `content`, and the `<link>` or `@import`
+of `@tangle-network/sandbox-ui/styles` and `@tangle-network/agent-app/styles`.
+The entry carries all of them, and every shared utility compiles once, in the
+app's own layer order.
+
+Each package declares the sources for its own `dist`; Tailwind resolves an
+`@source` relative to the installed file, under pnpm and npm alike. Brand's
+utility registrations arrive as `theme(default)`, so the preset decides any
+name it also maps (`border-border`, `surface-container-*`), as it did when the
+app's compile loaded after the precompiled Sandbox bundle. Names only Brand
+registers, such as `text-eyebrow` and `bg-depth-1`, still compile.
+
+Two values move when an app adopts the entry, because the owner's value now
+applies where an extra copy of Tailwind's defaults used to win:
+`rounded-full` is Brand's `999px` instead of `calc(infinity * 1px)` (same
+geometry), and `rounded-2xl`/`rounded-3xl` follow this package's
+`--radius-2xl`/`--radius-3xl` (18px and 22px at the default scale) instead of
+Tailwind's 16px and 24px.
+
+`tests/theme/tailwind-entry.test.ts` compiles the built entry from outside
+the repo and fails if an Agent App, Sandbox UI or ui component utility is
+missing, if a utility is emitted twice, or if Brand overrides the preset.
 
 Legacy `--background`, `--card`, `--popover`, `--border`, `--input`, status,
 and related values remain HSL **channels** so existing `hsl(var(--…))` callers
