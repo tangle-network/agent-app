@@ -1,5 +1,5 @@
 /** GENERATED from @tangle-network/brand/styles/legacy-light.css
- * SHA-256: c1411109214534804065fd37bb08a206bd2bc3307afd8755765a78c2f8b82177
+ * SHA-256: cd9b9142839d244a7515c2d0325f5dfa990997fa2afaeef314f3dc7e83a3adb2
  * Run node src/theme/build.mjs --write; do not edit colors or ratios here. */
 export const brandThemes = {
   "light": {
