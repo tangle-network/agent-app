@@ -4,7 +4,31 @@
 
 Source: `src/workspace-react/index.tsx`
 
-16 exports.
+28 exports.
+
+### `AgentProductIdentity`
+
+`interface` — What a product is called and how it is marked.
+
+```ts
+interface AgentProductIdentity
+```
+
+### `AgentRailIdentity`
+
+`function` — The top of every product's rail: which product, and which workspace.
+
+```ts
+({ product, workspace, hideBelow, LinkComponent }: AgentRailIdentityProps) => Element
+```
+
+### `AgentRailIdentityProps`
+
+`interface`
+
+```ts
+interface AgentRailIdentityProps
+```
 
 ### `AgentWorkspaceActiveRoute`
 
@@ -78,12 +102,20 @@ type AgentWorkspaceCompanionTool
 type AgentWorkspaceCompanionTools
 ```
 
+### `AgentWorkspaceIdentity`
+
+`interface` — The workspace that is open, and where else this person can go.
+
+```ts
+interface AgentWorkspaceIdentity
+```
+
 ### `AgentWorkspaceLayout`
 
 `function` — The default agent workspace composition.
 
 ```ts
-({ children, navItems, sessions, apps, activeRoute, activeId, ...sidebarProps }: AgentWorkspaceLayoutProps) => Element
+({ children, navItems, sessions, apps, activeRoute, activeId, product, workspace, ...sidebarProps }: AgentWorkspaceLayo…
 ```
 
 ### `AgentWorkspaceLayoutProps`
@@ -92,6 +124,14 @@ type AgentWorkspaceCompanionTools
 
 ```ts
 interface AgentWorkspaceLayoutProps
+```
+
+### `AgentWorkspaceNoun`
+
+`interface` — The words a product uses for one workspace and for several.
+
+```ts
+interface AgentWorkspaceNoun
 ```
 
 ### `AgentWorkspaceSessionConfig`
@@ -108,6 +148,62 @@ interface AgentWorkspaceSessionConfig
 
 ```ts
 (tools: Partial<Record<AgentWorkspaceCompanionTool, (state: { active: boolean; }) => ReactNode>>) => AgentWorkspaceComp…
+```
+
+### `DEFAULT_WORKSPACE_NOUN`
+
+`const`
+
+```ts
+AgentWorkspaceNoun
+```
+
+### `WorkspaceInitial`
+
+`function` — The one workspace avatar: a rounded square with the first letter, tinted with the product accent.
+
+```ts
+({ name, size }: { name: string; size?: "sm" | "lg" | undefined; }) => Element
+```
+
+### `WorkspaceList`
+
+`function` — The listing every product opens on: one title, one primary action, the workspaces, and nothing that counts them.
+
+```ts
+({ items, noun, title, description, layout, fields, create, empty, rename, remove, removeConsequence, actions, children…
+```
+
+### `WorkspaceListAction`
+
+`interface` — A non-destructive product action in an item's overflow menu.
+
+```ts
+interface WorkspaceListAction
+```
+
+### `WorkspaceListField`
+
+`interface` — A product column: a value the user compares across workspaces (tax year, status, owner).
+
+```ts
+interface WorkspaceListField
+```
+
+### `WorkspaceListItem`
+
+`interface` — One workspace as the listing shows it.
+
+```ts
+interface WorkspaceListItem
+```
+
+### `WorkspaceListProps`
+
+`interface`
+
+```ts
+interface WorkspaceListProps
 ```
 
 ### `WorkspaceSwitcher`

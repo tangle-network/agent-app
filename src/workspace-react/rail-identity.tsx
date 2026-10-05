@@ -1,6 +1,8 @@
-import { useId, useState, type ComponentType, type ReactNode } from 'react'
+import { useCallback, useState, type ComponentType, type ReactNode } from 'react'
 
-import { CheckGlyph, OVERLAY_SHADOW, PopoverSurface, usePopover } from '../web-react/controls'
+import { CheckGlyph, OVERLAY_SHADOW, PopoverSurface } from '../web-react/controls'
+import { usePopoverDialog } from '../web-react/popover-dialog'
+import { WorkspaceInitial } from '../web-react/workspace-switcher'
 
 /** What a product is called and how it is marked. The same three values for every product. */
 export interface AgentProductIdentity {
@@ -130,12 +132,13 @@ function WorkspaceMenu({
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const panelId = useId()
-  const changeOpen = (next: boolean) => {
+  const changeOpen = useCallback((next: boolean) => {
     setOpen(next)
     if (!next) setQuery('')
-  }
-  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, changeOpen)
+  }, [])
+  // A non-modal dialog, like WorkspaceSwitcher: opening focuses the first
+  // control, and Tab past the last one returns beside the trigger.
+  const { containerRef, triggerRef, panelRef, triggerProps, id: panelId } = usePopoverDialog(open, changeOpen)
   const noun = workspace.noun ?? DEFAULT_WORKSPACE_NOUN
   const options = workspace.hrefForWorkspace ? workspace.options ?? [] : []
   const search = query.trim().toLocaleLowerCase()
@@ -148,7 +151,6 @@ function WorkspaceMenu({
       <button
         type="button"
         {...triggerProps}
-        aria-controls={open ? panelId : undefined}
         aria-label={`${capitalize(noun.singular)}: ${workspace.name}. Switch ${noun.singular}`}
         title={`${workspace.name} · ${product.name}`}
         onClick={() => changeOpen(!open)}
@@ -163,7 +165,7 @@ function WorkspaceMenu({
       <PopoverSurface
         open={open}
         id={panelId}
-        role="menu"
+        role="dialog"
         aria-label={`Switch ${noun.singular}`}
         side="below"
         triggerRef={triggerRef}
@@ -188,8 +190,7 @@ function WorkspaceMenu({
                 key={option.id}
                 href={workspace.hrefForWorkspace!(option.id)}
                 to={workspace.hrefForWorkspace!(option.id)}
-                role="menuitem"
-                aria-current={option.id === workspace.id ? 'true' : undefined}
+                aria-current={option.id === workspace.id ? 'page' : undefined}
                 title={option.name}
                 onClick={close}
                 className={rowClass}
@@ -209,7 +210,7 @@ function WorkspaceMenu({
         {(workspace.listHref || workspace.createHref) && (
           <div className={options.length > 0 ? 'mt-1.5 border-t border-border pt-1.5' : undefined}>
             {workspace.listHref && (
-              <Link href={workspace.listHref} to={workspace.listHref} role="menuitem" onClick={close} className={rowClass}>
+              <Link href={workspace.listHref} to={workspace.listHref} onClick={close} className={rowClass}>
                 <svg aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                   <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
                 </svg>
@@ -217,7 +218,7 @@ function WorkspaceMenu({
               </Link>
             )}
             {workspace.createHref && (
-              <Link href={workspace.createHref} to={workspace.createHref} role="menuitem" onClick={close} className={rowClass}>
+              <Link href={workspace.createHref} to={workspace.createHref} onClick={close} className={rowClass}>
                 <svg aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
@@ -228,23 +229,5 @@ function WorkspaceMenu({
         )}
       </PopoverSurface>
     </div>
-  )
-}
-
-/**
- * The one workspace avatar: a rounded square with the first letter, tinted
- * with the product accent. Used by the switcher and the listing so a client
- * looks the same wherever it appears.
- */
-export function WorkspaceInitial({ name, size = 'sm' }: { name: string; size?: 'sm' | 'lg' }) {
-  const letter = Array.from(name.trim())[0]?.toLocaleUpperCase() ?? '?'
-  const box = size === 'lg' ? 'h-10 w-10 rounded-lg text-base' : 'h-6 w-6 rounded-md text-xs'
-  return (
-    <span
-      aria-hidden
-      className={`flex shrink-0 items-center justify-center bg-primary/10 font-semibold text-primary ${box}`}
-    >
-      {letter}
-    </span>
   )
 }

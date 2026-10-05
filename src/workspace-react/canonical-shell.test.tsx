@@ -53,11 +53,13 @@ describe('canonical rail identity', () => {
     )
     const trigger = screen.getAllByRole('button', { name: 'Client: Acme. Switch client' })[0]!
     fireEvent.click(trigger)
-    const menu = screen.getByRole('menu', { name: 'Switch client' })
-    expect(within(menu).getByRole('menuitem', { name: /Northern District/ }).getAttribute('href')).toBe('/app/w2/work')
-    expect(within(menu).getByRole('menuitem', { name: /Acme/ }).getAttribute('aria-current')).toBe('true')
-    expect(within(menu).getByRole('menuitem', { name: 'All clients' }).getAttribute('href')).toBe('/app')
-    expect(within(menu).getByRole('menuitem', { name: 'New client' }).getAttribute('href')).toBe('/app/new')
+    const panel = screen.getByRole('dialog', { name: 'Switch client' })
+    // Opening moves keyboard focus into the panel, which is portaled away from the rail.
+    expect(panel.contains(document.activeElement)).toBe(true)
+    expect(within(panel).getByRole('link', { name: /Northern District/ }).getAttribute('href')).toBe('/app/w2/work')
+    expect(within(panel).getByRole('link', { name: /Acme/ }).getAttribute('aria-current')).toBe('page')
+    expect(within(panel).getByRole('link', { name: 'All clients' }).getAttribute('href')).toBe('/app')
+    expect(within(panel).getByRole('link', { name: 'New client' }).getAttribute('href')).toBe('/app/new')
   })
 
   it('shows only the product on the listing, and keeps an explicit railHeaderContent for unmigrated products', () => {
@@ -131,6 +133,21 @@ describe('WorkspaceList', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(remove).toHaveBeenCalledTimes(2)
     expect(remove.mock.calls[0]![0].id).toBe('a')
+  })
+
+  it('creates from a name in the shared dialog and keeps the dialog open on a refusal', async () => {
+    const onCreate = vi.fn().mockRejectedValueOnce(new Error('That name is taken.')).mockResolvedValueOnce(undefined)
+    render(<WorkspaceList items={[]} noun={{ singular: 'client', plural: 'clients' }} create={{ onCreate }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'New client' }))
+    const dialog = screen.getByRole('dialog', { name: 'New client' })
+    const field = within(dialog).getByLabelText('Name')
+    fireEvent.change(field, { target: { value: '  Acme  ' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+    await waitFor(() => expect(within(dialog).getByRole('alert').textContent).toBe('That name is taken.'))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(onCreate).toHaveBeenNthCalledWith(1, 'Acme')
+    expect(onCreate).toHaveBeenCalledTimes(2)
   })
 
   it('offers search past eight items and says when nothing matches', () => {

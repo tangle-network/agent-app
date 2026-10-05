@@ -50,6 +50,12 @@ export function ActionDialog({
   busy: boolean
   error: string | null
 }) {
+  // Hand focus back to whatever opened the dialog when it closes.
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    return () => opener?.focus()
+  }, [])
+
   // Escape closes unless a mutation is in flight — closing mid-write would hide
   // the error the user needs to see.
   useEffect(() => {

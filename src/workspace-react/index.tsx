@@ -275,10 +275,10 @@ export { AgentWorkspaceCompanion, createAgentWorkspaceCompanionTabs, type AgentW
 
 export { WorkspaceSwitcher, type WorkspaceSwitcherItem, type WorkspaceSwitcherProps } from '../web-react/workspace-switcher'
 
+export { WorkspaceInitial } from '../web-react/workspace-switcher'
 export {
   AgentRailIdentity,
   DEFAULT_WORKSPACE_NOUN,
-  WorkspaceInitial,
   type AgentProductIdentity,
   type AgentRailIdentityProps,
   type AgentWorkspaceIdentity,

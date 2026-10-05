@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-452 exports.
+453 exports.
 
 ### `acceptRejectionReason`
 
@@ -2187,7 +2187,7 @@ type PickerVariant
 `function` — The floating panel every canonical picker opens.
 
 ```ts
-({ open, triggerRef, panelRef, className, role, id, "aria-label": ariaLabel, matchTriggerWidth, contentKey, children, }…
+({ open, triggerRef, panelRef, className, role, id, "aria-label": ariaLabel, matchTriggerWidth, side, align, contentKey…
 ```
 
 ### `PopoverSurfaceProps`
@@ -3596,6 +3596,14 @@ interface WorkProductCardProps
 
 ```ts
 (status: WorkProductStatus) => string
+```
+
+### `WorkspaceInitial`
+
+`function` — The one workspace avatar: a rounded square with the first letter, tinted with the product accent.
+
+```ts
+({ name, size }: { name: string; size?: "sm" | "lg" | undefined; }) => Element
 ```
 
 ### `WorkspaceSwitcher`

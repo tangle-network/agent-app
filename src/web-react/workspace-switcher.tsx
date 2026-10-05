@@ -42,11 +42,7 @@ export function WorkspaceSwitcher({
   const current = items.find((item) => item.id === value)
   const search = query.trim().toLocaleLowerCase()
   const visible = search ? items.filter((item) => item.name.toLocaleLowerCase().includes(search)) : items
-  const mark = (item?: WorkspaceSwitcherItem) => item?.icon ?? (
-    <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
-      {item?.name.trim().charAt(0).toLocaleUpperCase() || '?'}
-    </span>
-  )
+  const mark = (item?: WorkspaceSwitcherItem) => item?.icon ?? <WorkspaceInitial name={item?.name ?? ''} />
   return (
     <div ref={containerRef} className={`min-w-0 ${variant === 'block' ? 'w-full' : 'inline-flex'}`}>
       <button type="button" {...triggerProps} onClick={() => changeOpen(!open)}
@@ -73,5 +69,20 @@ export function WorkspaceSwitcher({
         {footer != null && <div className="mt-2 border-t border-border pt-2">{footer}</div>}
       </PopoverSurface>
     </div>
+  )
+}
+
+/**
+ * The one workspace avatar: a rounded square with the first letter, tinted
+ * with the product accent. The switchers and the listing all use it, so a
+ * client looks the same wherever it appears.
+ */
+export function WorkspaceInitial({ name, size = 'sm' }: { name: string; size?: 'sm' | 'lg' }) {
+  const letter = Array.from(name.trim())[0]?.toLocaleUpperCase() ?? '?'
+  const box = size === 'lg' ? 'h-10 w-10 rounded-lg text-base' : 'h-6 w-6 rounded-md text-xs'
+  return (
+    <span aria-hidden className={`flex shrink-0 items-center justify-center bg-primary/10 font-semibold text-primary ${box}`}>
+      {letter}
+    </span>
   )
 }

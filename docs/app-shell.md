@@ -86,5 +86,5 @@ A workspace's first destination is the product's own home content (for example, 
 
 1. Pass `product` (and `workspace` inside a workspace) to `AgentWorkspaceLayout`. Delete the product's `logo`, `railHeaderContent`, `ClientSwitcher`/`WorkspaceSelector`, and any `lg:hidden` mobile brand strip.
 2. Replace the listing route's markup with `WorkspaceList` inside the layout. Delete the local top bar, avatar helpers, delete dialog and counting copy.
-3. Keep the product's loader, routes, create flow and mutations. `WorkspaceList` takes them as `create`, `rename` and `remove`.
+3. Keep the product's loader, routes and mutations. `WorkspaceList` takes them as `create`, `rename` and `remove`. A product that creates from a name alone passes `create.onCreate(name)` and navigates from inside it; a richer creation flow keeps its own dialog behind `create.onSelect` or route behind `create.href`.
 4. Check 1440×1000 and 390×844 with an 80-character workspace name, one item, many items and none. The playground route `/shell?product=legal&page=workspace&data=worst` shows the target.

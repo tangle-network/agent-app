@@ -2,7 +2,8 @@ import { useId, useMemo, useState, type ComponentType, type ReactNode } from 're
 
 import { ActionDialog, ActionDialogButton } from '../web-react/action-dialog'
 import { OVERLAY_SHADOW, PopoverSurface, usePopover } from '../web-react/controls'
-import { DEFAULT_WORKSPACE_NOUN, WorkspaceInitial, type AgentWorkspaceNoun } from './rail-identity'
+import { WorkspaceInitial } from '../web-react/workspace-switcher'
+import { DEFAULT_WORKSPACE_NOUN, type AgentWorkspaceNoun } from './rail-identity'
 
 /** One workspace as the listing shows it. */
 export interface WorkspaceListItem {
@@ -45,8 +46,20 @@ export interface WorkspaceListProps {
   layout?: 'list' | 'grid'
   /** Product values, shown as columns (list) or under the description (grid). */
   fields?: readonly WorkspaceListField[]
-  /** The one primary action. Defaults its label to "New {singular}". */
-  create?: { label?: string; href?: string; onSelect?: () => void }
+  /**
+   * The one primary action, labelled "New {singular}" unless `label` says otherwise.
+   * `href` navigates; `onSelect` opens the product's own creation flow; `onCreate`
+   * asks for a name in the shared dialog and hands it over — reject with an Error
+   * to show its message, and navigate to the new workspace from inside it.
+   */
+  create?: {
+    label?: string
+    href?: string
+    onSelect?: () => void
+    onCreate?: (name: string) => Promise<void>
+    /** Placeholder for the name field. Defaults to "{Singular} name". */
+    namePlaceholder?: string
+  }
   /** First-use copy. The create action is offered beneath it. */
   empty?: { title?: string; description?: string }
   /** Persist a new name. Reject with an Error to show its message in the dialog. */
@@ -83,6 +96,10 @@ function capitalize(text: string): string {
 function defaultFormatDate(value: Date): string {
   const sameYear = value.getFullYear() === new Date().getFullYear()
   return value.toLocaleDateString(undefined, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function present(value: ReactNode): boolean {
+  return value !== null && value !== undefined && value !== false && value !== ''
 }
 
 function toDate(value: WorkspaceListItem['updatedAt']): Date | null {
@@ -129,6 +146,8 @@ export function WorkspaceList({
   const [renaming, setRenaming] = useState<WorkspaceListItem | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [removing, setRemoving] = useState<WorkspaceListItem | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [createValue, setCreateValue] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -138,8 +157,21 @@ export function WorkspaceList({
     [items, search],
   )
   const createLabel = create?.label ?? `New ${noun.singular}`
-  const createControl = create ? <CreateButton create={create} label={createLabel} Link={Link} /> : null
+  const openCreate = () => {
+    setError(null)
+    setCreateValue('')
+    setCreating(true)
+  }
+  const createControl = create
+    ? <CreateButton create={create.onCreate && !create.href ? { ...create, onSelect: openCreate } : create} label={createLabel} Link={Link} />
+    : null
+  const submitCreate = () => {
+    const name = createValue.trim()
+    if (!name || !create?.onCreate) return
+    void run(() => create.onCreate!(name), () => setCreating(false))
+  }
 
+  const hasDates = items.some((item) => toDate(item.updatedAt) !== null)
   const hasMenu = Boolean(rename) || Boolean(remove) || Boolean(actions)
   const menuFor = (item: WorkspaceListItem): MenuEntry[] => [
     ...(rename ? [{ id: 'rename', label: 'Rename', onSelect: () => { setError(null); setRenaming(item); setRenameValue(item.name) } }] : []),
@@ -177,7 +209,7 @@ export function WorkspaceList({
           <h1 id={headingId} className="text-xl font-semibold tracking-tight text-foreground">
             {title ?? capitalize(noun.plural)}
           </h1>
-          {description != null && <p className="mt-1 max-w-prose text-sm text-muted-foreground">{description}</p>}
+          {description != null && <div className="mt-1 max-w-prose text-sm text-muted-foreground">{description}</div>}
         </div>
         {items.length > 0 && createControl}
       </header>
@@ -231,7 +263,7 @@ export function WorkspaceList({
                   {fields.map((field) => (
                     <span key={field.id} className={`${FIELD_CELL} truncate`}>{field.label}</span>
                   ))}
-                  <span className={DATE_CELL}>Updated</span>
+                  <span className={DATE_CELL}>{hasDates ? 'Updated' : ''}</span>
                   {hasMenu && <span className="w-8 shrink-0" />}
                 </div>
               )}
@@ -271,6 +303,37 @@ export function WorkspaceList({
               }
             }}
             className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
+          />
+        </ActionDialog>
+      )}
+
+      {creating && create?.onCreate && (
+        <ActionDialog
+          title={createLabel}
+          onClose={() => setCreating(false)}
+          busy={busy}
+          error={error}
+          footer={
+            <>
+              <ActionDialogButton variant="ghost" onClick={() => setCreating(false)} disabled={busy}>Cancel</ActionDialogButton>
+              <ActionDialogButton onClick={submitCreate} disabled={busy || !createValue.trim()}>Create</ActionDialogButton>
+            </>
+          }
+        >
+          <label htmlFor={`${headingId}-create`} className="text-xs text-muted-foreground">Name</label>
+          <input
+            id={`${headingId}-create`}
+            value={createValue}
+            autoFocus
+            placeholder={create.namePlaceholder ?? `${capitalize(noun.singular)} name`}
+            onChange={(event) => setCreateValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !busy) {
+                event.preventDefault()
+                submitCreate()
+              }
+            }}
+            className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
           />
         </ActionDialog>
       )}
@@ -320,7 +383,9 @@ function UpdatedAt({ value, formatDate, className = 'shrink-0' }: { value: Works
   const date = toDate(value)
   if (!date) return <span className={className} />
   return (
-    <time dateTime={date.toISOString()} className={`${className} text-xs tabular-nums text-muted-foreground`}>
+    // Server and browser can format a date differently (zone, locale); the
+    // browser's reading is the one the user should see.
+    <time dateTime={date.toISOString()} suppressHydrationWarning className={`${className} text-xs tabular-nums text-muted-foreground`}>
       {formatDate(date)}
     </time>
   )
@@ -334,7 +399,7 @@ function UpdatedAt({ value, formatDate, className = 'shrink-0' }: { value: Works
 function ListRow({ item, fields, menu, reserveMenu, Link, formatDate }: ItemProps) {
   const detail = usefulDescription(item)
   return (
-    <li className="group relative flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60">
+    <li className="group relative isolate flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/60">
       {item.avatar ?? <WorkspaceInitial name={item.name} size="lg" />}
       <div className="min-w-0 flex-1">
         <Link
@@ -350,7 +415,7 @@ function ListRow({ item, fields, menu, reserveMenu, Link, formatDate }: ItemProp
       {fields.map((field) => (
         <div key={field.id} className={`${FIELD_CELL} truncate text-sm text-muted-foreground`}>
           <span className="sr-only">{field.label}: </span>
-          {item.values?.[field.id] ?? '—'}
+          {present(item.values?.[field.id]) ? item.values![field.id] : '—'}
         </div>
       ))}
       <UpdatedAt value={item.updatedAt} formatDate={formatDate} className={DATE_CELL} />
@@ -361,7 +426,7 @@ function ListRow({ item, fields, menu, reserveMenu, Link, formatDate }: ItemProp
 
 function GridCard({ item, fields, menu, Link, formatDate }: ItemProps) {
   const detail = usefulDescription(item)
-  const shownFields = fields.filter((field) => item.values?.[field.id] != null)
+  const shownFields = fields.filter((field) => present(item.values?.[field.id]))
   return (
     <li className="group relative isolate flex min-h-36 flex-col overflow-hidden rounded-xl border border-border bg-card p-4 transition-[border-color,box-shadow] hover:border-primary/40 hover:shadow-sm">
       <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-16 bg-gradient-to-b from-primary/[0.07] to-transparent" />
@@ -409,8 +474,8 @@ function ItemMenu({ item, entries }: { item: WorkspaceListItem; entries: MenuEnt
         aria-label={`Actions for ${item.name}`}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
-        // Always visible on touch screens, which have no hover to reveal it.
-        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:opacity-100 aria-expanded:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+        // Hidden until hover only where hover exists; a touch screen of any width shows it.
+        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:opacity-100 aria-expanded:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
       >
         <svg aria-hidden className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
           <circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" />
@@ -434,6 +499,8 @@ function ItemMenu({ item, entries }: { item: WorkspaceListItem; entries: MenuEnt
             role="menuitem"
             onClick={() => {
               setOpen(false)
+              // The dialog this opens returns focus to whatever had it — the trigger, not <body>.
+              triggerRef.current?.focus()
               entry.onSelect()
             }}
             className={`block w-full px-3 py-1.5 text-left text-sm transition ${
