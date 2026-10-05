@@ -45,7 +45,7 @@ function findRequiredRefLoop(defs: Record<string, Schema>): string[] | null {
 }
 
 describe('render_ui tool schema', () => {
-  const renderUi = buildAppToolOpenAITools({ proposalTypes: ['review'] }).find(
+  const renderUi = buildAppToolOpenAITools({ proposalTypes: ['review'], regulatedTypes: [] }).find(
     (tool) => tool.function.name === 'render_ui',
   )
   const parameters = renderUi?.function.parameters as Schema & { $defs: Record<string, Schema> }
@@ -61,7 +61,8 @@ describe('render_ui tool schema', () => {
 
   it('detects the loop that a nonempty recursive children array forms', () => {
     const defs = structuredClone(parameters.$defs)
-    ;(defs.stack.properties as Record<string, Schema>).children.minItems = 1
+    const stackProperties = defs.stack?.properties as Record<string, Schema>
+    stackProperties.children = { ...stackProperties.children, minItems: 1 }
     expect(findRequiredRefLoop(defs)).toEqual(['node', 'stack', 'node'])
   })
 })
