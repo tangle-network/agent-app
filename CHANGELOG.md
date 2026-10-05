@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.6
+
+- fix(workspace): keep listing field values readable on a phone (#788)
+- fix(tools): bundle a render_ui schema that Gemini accepts (#787)
+
 ## 0.53.5
 
 - feat(workspace): one canonical rail identity and workspace listing for every product (#786)
