@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.13
+
+- feat(theme): one Tailwind source entry at ./tailwind.css (#797)
+
 ## 0.53.12
 
 - fix(theme): carry Brand 1.13 named themes in ./styles (#796)
