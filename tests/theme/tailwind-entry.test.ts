@@ -84,7 +84,8 @@ describe('agent-app Tailwind source entry', () => {
     // softer --border-soft tier. Sandbox UI imports Brand as theme(default) so
     // the preset still wins, as it did when the app compiled after a
     // precompiled bundle.
-    const rule = css.match(/\.border-border \{[^}]*\}/)?.[0] ?? ''
-    expect(rule).toContain('--border-soft')
+    const start = css.indexOf('.border-border ')
+    expect(start).toBeGreaterThan(-1)
+    expect(css.slice(start, css.indexOf('}', start))).toContain('--border-soft')
   })
 })
