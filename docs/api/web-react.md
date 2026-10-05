@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-445 exports.
+452 exports.
 
 ### `acceptRejectionReason`
 
@@ -60,6 +60,22 @@ interface AgentActivityPanelProps
 
 ```ts
 interface AgentActivityRecord
+```
+
+### `AgentProfileChoices`
+
+`function` — Selection-only profile rows for an existing settings surface, with no nested portal or authoring policy.
+
+```ts
+({ value, profiles, onChange, disabled, locked, lockReason, onNewChat, label }: AgentProfileChoicesProps) => Element
+```
+
+### `AgentProfileChoicesProps`
+
+`interface`
+
+```ts
+interface AgentProfileChoicesProps
 ```
 
 ### `AgentProfileEditor`
@@ -172,6 +188,22 @@ interface AgentProfileViewerProps
 
 ```ts
 interface AgentSessionControlsProps
+```
+
+### `AgentSettingsPopover`
+
+`function` — One settings surface for entry, docked and embedded composers.
+
+```ts
+({ label, summary, children, open: controlledOpen, onOpenChange, disabled, className, panelClassName, }: AgentSettingsP…
+```
+
+### `AgentSettingsPopoverProps`
+
+`interface`
+
+```ts
+interface AgentSettingsPopoverProps
 ```
 
 ### `ApiAccessKey`
@@ -3564,4 +3596,28 @@ interface WorkProductCardProps
 
 ```ts
 (status: WorkProductStatus) => string
+```
+
+### `WorkspaceSwitcher`
+
+`function` — Searchable workspace/client/project selection, shared across all workspace shells.
+
+```ts
+({ items, value, onChange, label, placeholder, searchLabel, emptyLabel, collapsed, variant, footer, open: controlledOpe…
+```
+
+### `WorkspaceSwitcherItem`
+
+`interface`
+
+```ts
+interface WorkspaceSwitcherItem
+```
+
+### `WorkspaceSwitcherProps`
+
+`interface`
+
+```ts
+interface WorkspaceSwitcherProps
 ```

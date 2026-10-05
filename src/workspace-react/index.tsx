@@ -245,3 +245,5 @@ export function AgentWorkspaceLayout({
 }
 
 export { AgentWorkspaceCompanion, createAgentWorkspaceCompanionTabs, type AgentWorkspaceCompanionHandle, type AgentWorkspaceCompanionProps, type AgentWorkspaceCompanionTab, type AgentWorkspaceCompanionTool, type AgentWorkspaceCompanionTools, type AgentWorkspaceCompanionNavigation } from './companion'
+
+export { WorkspaceSwitcher, type WorkspaceSwitcherItem, type WorkspaceSwitcherProps } from '../web-react/workspace-switcher'

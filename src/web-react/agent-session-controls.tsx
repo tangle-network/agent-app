@@ -52,6 +52,7 @@ import type { CatalogModel } from '../runtime/model-catalog'
 import { ModelPicker, EffortPicker, CheckGlyph, OVERLAY_SHADOW, pickerRootClass, PopoverSurface, quietPickerTriggerClass, usePopover } from './controls'
 import type { EffortLevel, PickerVariant } from './controls'
 import { HarnessGlyph } from './harness-glyphs'
+import { AgentSettingsPopover } from './agent-settings-popover'
 
 /** Plain-English labels for the harnesses a product is likely to expose. Unknown
  *  ids fall back to the raw value so a new backend still renders a usable label. */
@@ -287,8 +288,13 @@ export interface AgentSessionControlsProps {
   /**
    * `inline` (default): model, harness, effort side by side — the prior
    * behavior. `compact`: model inline, harness + effort behind a gear popover.
+   * `grouped`: one named settings dialog containing the same controlled pickers.
    */
-  layout?: 'inline' | 'compact'
+  layout?: 'inline' | 'compact' | 'grouped'
+  /** Optional host-owned profile selector inside the grouped settings surface. */
+  profileControl?: ReactNode
+  /** Profile name or other current identity shown on the grouped trigger. */
+  settingsSummary?: ReactNode
   /** Hide the harness control entirely (single-harness products). */
   showHarness?: boolean
   /**
@@ -364,6 +370,8 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
     variant = 'chip',
     renderProviderBadge,
     className,
+    profileControl,
+    settingsSummary,
   } = props
   const { onModel, onHarness } = useCoherentHandlers(props)
   const [open, setOpen] = useState(false)
@@ -383,6 +391,17 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
       variant={variant}
     />
   )
+
+  if (layout === 'grouped') {
+    return (
+      <AgentSettingsPopover summary={settingsSummary ?? selectedModel?.name ?? model} className={className}>
+        {profileControl != null && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Profile</p>{profileControl}</div>}
+        <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Model</p>{modelPicker}</div>
+        {showHarness && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Agent backend</p><HarnessPicker value={harness} onChange={onHarness} available={availableHarnesses} lockReason={harnessLockReason} fullWidth variant={variant} /></div>}
+        {showEffort && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Thinking</p><EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} fullWidth variant={variant} /></div>}
+      </AgentSettingsPopover>
+    )
+  }
 
   if (layout === 'inline') {
     // The composer's controls slot wraps its children; this row must be able

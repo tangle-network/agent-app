@@ -120,7 +120,11 @@ export function usePopover(open: boolean, setOpen: (open: boolean) => void) {
       setOpen(false)
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !e.defaultPrevented) {
+        const ownPath = panelRef.current?.getAttribute(POPOVER_SURFACE_ATTR)
+        const focusedPath = document.activeElement?.closest(`[${POPOVER_SURFACE_ATTR}]`)?.getAttribute(POPOVER_SURFACE_ATTR)
+        if (ownPath && focusedPath?.startsWith(`${ownPath}${POPOVER_PATH_SEPARATOR}`)) return
+        e.preventDefault()
         setOpen(false)
         triggerRef.current?.focus()
       }
