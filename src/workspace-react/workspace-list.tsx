@@ -205,7 +205,7 @@ export function WorkspaceList({
   return (
     <section aria-labelledby={headingId} className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
           <h1 id={headingId} className="text-xl font-semibold tracking-tight text-foreground">
             {title ?? capitalize(noun.plural)}
           </h1>
