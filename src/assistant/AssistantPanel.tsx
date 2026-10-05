@@ -212,11 +212,11 @@ function FirstRun({
 }) {
   const starters = hasPage ? [PAGE_STARTER, ...STARTERS] : STARTERS;
   return (
-    <div className="px-4 pt-6 pb-4">
-      <h3 className="font-semibold text-[var(--font-size-lg)] text-foreground leading-snug">
+    <div className="px-6 pt-6 pb-4">
+      <h3 className="font-semibold text-[length:var(--font-size-lg)] text-foreground leading-snug">
         What should the assistant do?
       </h3>
-      <p className="mt-1.5 text-[var(--font-size-base)] text-muted-foreground leading-[1.5]">
+      <p className="mt-1.5 text-[length:var(--font-size-base)] text-muted-foreground leading-[1.5]">
         It creates workflows, checks usage, and manages API keys. Changes wait
         for your approval.
       </p>
@@ -508,7 +508,7 @@ export function AssistantPanel({
         )}
         <div className="flex min-w-0 flex-1 flex-col justify-center">
           <div className="flex min-w-0 items-baseline gap-2">
-            <h2 className="truncate font-semibold text-[var(--font-size-base)] text-foreground leading-tight">
+            <h2 className="truncate font-semibold text-[length:var(--font-size-base)] text-foreground leading-tight">
               Assistant
             </h2>
             {effectiveBalance != null && (

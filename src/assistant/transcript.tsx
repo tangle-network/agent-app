@@ -229,5 +229,10 @@ export function AssistantTranscript({
     [view, toolRenderers, renderConfirmedResult],
   );
   if (items.length === 0 && !view.isStreaming) return <>{emptyState}</>;
-  return <AgentTimeline items={items} isThinking={view.isThinking} />;
+  // The panel is narrow, so the prose column is inset 24px: tool rows bleed
+  // 12px past it and their expanded cards keep 12px from the panel edge, in
+  // line with the composer card below.
+  return (
+    <AgentTimeline items={items} isThinking={view.isThinking} className="px-6" />
+  );
 }

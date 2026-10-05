@@ -1530,7 +1530,8 @@ export function ChatComposer({
       </PopoverSurface>
 
       {focusShortcut && (
-        <div className="mt-1.5 flex justify-end px-1">
+        // A touch screen has no keyboard to press the shortcut on.
+        <div className="mt-1.5 flex justify-end px-1 [@media(pointer:coarse)]:hidden">
           <span className="text-xs text-muted-foreground">
             <kbd className="rounded border border-border bg-background px-1 py-0.5 text-xs">{IS_APPLE_PLATFORM ? 'Cmd' : 'Ctrl'}</kbd>
             <kbd className="ml-0.5 rounded border border-border bg-background px-1 py-0.5 text-xs">L</kbd>

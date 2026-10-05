@@ -34,6 +34,7 @@ export { ProposalCard, type ProposalCardProps } from "./ProposalCard";
 export {
   AssistantLauncherProvider,
   useAssistantLauncher,
+  useAssistantPageLabel,
   type AssistantLauncher,
   type AssistantPanelLayout,
 } from "./launcher";

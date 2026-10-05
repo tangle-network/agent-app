@@ -1,11 +1,13 @@
 /**
  * The assistant's place in the app shell: a right-side panel that mirrors the
  * left sidebar. A panel toggle opens and closes it (top right while closed,
- * the header's inner edge while open) and ⌘E / Ctrl+E does the same. On wide
- * viewports the panel docks beside the page: it is non-modal, resizable, and
- * the launcher's `inset` tells the shell how far to pad its page column so the
- * panel never covers page content. On narrower viewports it opens as a modal
- * sheet, full screen on phones. Width and open state persist per user.
+ * the header's inner edge while open) and ⌘E / Ctrl+E does the same. Wherever
+ * the page keeps a usable column beside it (the launcher's `reservedWidth` and
+ * `dockMediaQuery` say what the host's chrome takes), the panel docks beside
+ * the page: it is non-modal, resizable, and the launcher's `inset` tells the
+ * shell how far to pad its page column so the panel never covers page content.
+ * Where it would not fit, it opens as a modal sheet, full screen on phones.
+ * Width and open state persist per user.
  *
  * The dock owns the chat state (via useAssistantChat) so the conversation
  * survives the panel closing. Host-shell concerns (the user, navigation,
