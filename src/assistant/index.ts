@@ -34,9 +34,11 @@ export { ProposalCard, type ProposalCardProps } from "./ProposalCard";
 export {
   AssistantLauncherProvider,
   useAssistantLauncher,
+  useAssistantPageLabel,
   type AssistantLauncher,
   type AssistantPanelLayout,
 } from "./launcher";
+export { MIN_PAGE_WIDTH, MIN_PANEL_WIDTH } from "./usePanelPrefs";
 export {
   useDocumentPageContext,
   pageLabelFromTitle,

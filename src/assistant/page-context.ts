@@ -3,10 +3,12 @@
  * pages already name themselves in `<title>` for tabs and history, so the
  * title is the label; watching it keeps hosts free of per-page wiring and
  * follows titles that settle late (a run page names its workflow once the
- * workflow loads).
+ * workflow loads). A page whose title does not name what it shows sets its own
+ * label with `useAssistantPageLabel`, which wins over the title.
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useOptionalAssistantLauncher } from "./launcher";
 import type { AssistantPageContext } from "./types";
 
 const MAX_LABEL = 200;
@@ -60,10 +62,13 @@ export function useDocumentPageContext({
   ids,
 }: DocumentPageContextOptions): AssistantPageContext | null {
   const title = useDocumentTitle();
+  const pageLabel = useOptionalAssistantLauncher()?.pageLabel ?? null;
   return useMemo(() => {
-    const label = pageLabelFromTitle(title, titleSuffix, ignoreTitles);
+    const label =
+      (pageLabel && pageLabelFromTitle(pageLabel)) ??
+      pageLabelFromTitle(title, titleSuffix, ignoreTitles);
     if (!label) return null;
     const pageIds = ids?.(path);
     return { label, path, ...(pageIds ? { ids: pageIds } : {}) };
-  }, [title, path, titleSuffix, ignoreTitles, ids]);
+  }, [pageLabel, title, path, titleSuffix, ignoreTitles, ids]);
 }

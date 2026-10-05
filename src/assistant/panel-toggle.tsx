@@ -11,6 +11,7 @@ import { focusRing } from "@tangle-network/ui/utils";
 import { PanelRight } from "lucide-react";
 import type { CSSProperties, Ref } from "react";
 import { useOptionalAssistantLauncher } from "./launcher";
+import { useMediaQuery } from "./usePanelPrefs";
 
 /** DOM id of the open panel, for the toggle's `aria-controls`. */
 export const ASSISTANT_PANEL_ID = "assistant-panel";
@@ -48,6 +49,8 @@ export function AssistantPanelToggle({
   const open = openOverride ?? launcher?.open ?? false;
   const toggleAssistant = onToggle ?? launcher?.toggleAssistant;
   const label = open ? "Close assistant" : "Open assistant";
+  // A touch screen has no keyboard shortcut to advertise.
+  const touch = useMediaQuery("(pointer: coarse)", false);
   return (
     <button
       ref={buttonRef}
@@ -58,7 +61,7 @@ export function AssistantPanelToggle({
       // Only while the panel exists: an id reference to nothing fails a11y checks.
       aria-controls={open && launcher ? ASSISTANT_PANEL_ID : undefined}
       aria-keyshortcuts="Meta+E Control+E"
-      title={`${label} (${assistantShortcutLabel()})`}
+      title={touch ? label : `${label} (${assistantShortcutLabel()})`}
       style={style}
       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--accent-surface-soft)] hover:text-foreground ${focusRing} ${className ?? ""}`}
     >
