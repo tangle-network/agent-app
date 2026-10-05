@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.8
+
+- docs(app-shell): require app utilities after package stylesheets (#790)
+
 ## 0.53.7
 
 - fix(workspace): readable avatar letter on dark themes, 44px row menu on touch (#789)
