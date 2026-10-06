@@ -1,5 +1,5 @@
 /** GENERATED from @tangle-network/brand/styles/legacy-light.css
- * SHA-256: f4d47f5d42d88810ae850c83e6d0e0a1f7be481d4e07b66ab3e29c796d02950f
+ * SHA-256: 14616a7bcbdcbb3587912f566c71803ac5dd1d48adc5a36e8f3fc2f3ab7a6fe6
  * Run node src/theme/build.mjs --write; do not edit colors or ratios here. */
 export const brandThemes = {
   "light": {
@@ -9,7 +9,7 @@ export const brandThemes = {
     "cardForeground": "0 0% 17.6471%",
     "popover": "0 0% 100%",
     "popoverForeground": "0 0% 17.6471%",
-    "primary": "243.2927 80.3922% 60%",
+    "primary": "243.2787 80.6167% 55.4902%",
     "primaryForeground": "0 0% 100%",
     "secondary": "0 0% 94.902%",
     "secondaryForeground": "0 0% 17.6471%",
@@ -37,7 +37,7 @@ export const brandThemes = {
       "snapGuide": "#0369a1",
       "snapPage": "#ab4f09",
       "snapElement": "#b91c1c",
-      "selectionStroke": "#5047eb",
+      "selectionStroke": "#3c32e9",
       "selectionAnchorFill": "#ffffff",
       "placeholderFill": "#f7f7f7",
       "placeholderStroke": "#d0d0d0",
