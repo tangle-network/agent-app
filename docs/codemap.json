@@ -423,12 +423,6 @@
           "doc": "Describe an approval event with action details, user info, and optional edited fields"
         },
         {
-          "name": "ApprovalEventSchema",
-          "kind": "const",
-          "signature": "ZodObject<{ assetId: ZodString; variantId: ZodOptional<ZodString>; action: ZodEnum<{ approved: \"approved\"; rejected: \"r…",
-          "doc": "Validate approval event data including asset, action, user, timestamp, and optional fields"
-        },
-        {
           "name": "AssetContentMap",
           "kind": "type",
           "signature": "type AssetContentMap",
@@ -481,12 +475,6 @@
           "kind": "interface",
           "signature": "interface ConversionMetrics",
           "doc": "Define metrics for tracking impressions, clicks, conversions, and related rates"
-        },
-        {
-          "name": "ConversionMetricsSchema",
-          "kind": "const",
-          "signature": "ZodObject<{ impressions: ZodNumber; clicks: ZodNumber; conversions: ZodNumber; ctr: ZodNumber; cvr: ZodNumber; }, $stri…",
-          "doc": "Validate conversion metrics with nonnegative impressions, clicks, conversions, CTR, and CVR fields"
         },
         {
           "name": "CopyContent",
@@ -625,12 +613,6 @@
           "kind": "function",
           "signature": "(raw: unknown) => AssetSpec<AssetFormat>",
           "doc": "Validates an unknown value as an AssetSpec, including format-specific content validation."
-        },
-        {
-          "name": "safeParseAssetSpec",
-          "kind": "function",
-          "signature": "(raw: unknown) => AssetSpec<AssetFormat> | null",
-          "doc": "Safe parse — returns null instead of throwing."
         },
         {
           "name": "VideoCaption",
@@ -3475,36 +3457,6 @@
           "doc": "Widened to `unknown` — unlike its siblings this guard also runs over raw untyped stored rows (a transcript renderer reads `message.parts` before the typed projection), which is exactly what {@link me…"
         },
         {
-          "name": "isChatPlanPart",
-          "kind": "function",
-          "signature": "(part: ChatMessagePart) => part is ChatPlanPersistedPart",
-          "doc": "Resolve whether a chat message part is a persisted chat plan part"
-        },
-        {
-          "name": "isChatStepFinishPart",
-          "kind": "function",
-          "signature": "(part: ChatMessagePart) => part is ChatStepFinishPart",
-          "doc": "Determine if a chat message part represents the completion of a chat step"
-        },
-        {
-          "name": "isChatTextPart",
-          "kind": "function",
-          "signature": "(part: ChatMessagePart) => part is ChatTextPart",
-          "doc": "Resolve whether a chat message part is a text part based on its type property"
-        },
-        {
-          "name": "isChatToolPart",
-          "kind": "function",
-          "signature": "(part: ChatMessagePart) => part is ChatToolPart",
-          "doc": "Resolve whether a ChatMessagePart is specifically a ChatToolPart based on its type property"
-        },
-        {
-          "name": "isChatWorkProductPart",
-          "kind": "function",
-          "signature": "(part: ChatMessagePart) => part is WorkProductPersistedPart",
-          "doc": "Resolve whether a chat message part is a persisted work-product anchor"
-        },
-        {
           "name": "ListMessagesOptions",
           "kind": "interface",
           "signature": "interface ListMessagesOptions",
@@ -3906,18 +3858,6 @@
           "doc": "Build scoped MCP server entry options for the design canvas environment"
         },
         {
-          "name": "CANVAS_ELEMENT_KINDS",
-          "kind": "const",
-          "signature": "readonly string[]",
-          "doc": "Provide a readonly array of string identifiers representing canvas element kinds"
-        },
-        {
-          "name": "CANVAS_MCP_TOOL_NAMES",
-          "kind": "const",
-          "signature": "string[]",
-          "doc": "Extract names of all tools from the CANVAS_MCP_TOOLS array"
-        },
-        {
           "name": "CANVAS_MCP_TOOLS",
           "kind": "const",
           "signature": "McpToolDefinition<DesignCanvasMcpToolEnv>[]",
@@ -4062,22 +4002,10 @@
           "doc": "Export quality preset — pins pixel density, optional output dimensions, bleed inclusion, and raster format so callers pass a preset id rather than a full parameter bag."
         },
         {
-          "name": "findCanvasMcpTool",
-          "kind": "function",
-          "signature": "(name: string) => McpToolDefinition<DesignCanvasMcpToolEnv> | undefined",
-          "doc": "Find the canvas MCP tool definition matching the given name or return undefined"
-        },
-        {
           "name": "findElement",
           "kind": "function",
           "signature": "(page: ScenePage, elementId: string) => { element: SceneElement; owner: SceneElement[]; index: number; } | null",
           "doc": "Depth-first search across a page including group children."
-        },
-        {
-          "name": "findPreset",
-          "kind": "function",
-          "signature": "(id: string) => SizePreset | null",
-          "doc": "Resolve a size preset by its identifier or return null if not found"
         },
         {
           "name": "GroupElement",
@@ -4666,12 +4594,6 @@
           "kind": "function",
           "signature": "(cropRect: ExportCropRect, stageScale: number, stageX: number, stageY: number) => { x: number; y: number; width: number…",
           "doc": "Build the toDataURL crop rect translated to stage output coordinates."
-        },
-        {
-          "name": "downloadDataUrl",
-          "kind": "function",
-          "signature": "(dataUrl: string, filename: string) => void",
-          "doc": "Trigger a browser download for a data URL."
         },
         {
           "name": "DUPLICATE_OFFSET",
@@ -10123,7 +10045,6 @@
       "id": "./preflight",
       "source": "src/preflight/index.ts",
       "dependsOn": [
-        "alerting",
         "signoff"
       ],
       "error": null,
@@ -10211,18 +10132,6 @@
           "kind": "interface",
           "signature": "interface SandboxAuthProbeConfig",
           "doc": "Define configuration options for probing sandbox authentication endpoints"
-        },
-        {
-          "name": "slackAlertProbe",
-          "kind": "function",
-          "signature": "(config: SlackAlertProbeConfig) => PreflightProbe",
-          "doc": "Probe that the Slack alerting credential is alive, via `auth.test` — no message is posted."
-        },
-        {
-          "name": "SlackAlertProbeConfig",
-          "kind": "interface",
-          "signature": "interface SlackAlertProbeConfig",
-          "doc": "Define configuration options for probing that the Slack alerting channel is live"
         }
       ]
     },
@@ -10230,7 +10139,6 @@
       "id": "./preflight/cli",
       "source": "src/preflight/cli.ts",
       "dependsOn": [
-        "alerting",
         "signoff"
       ],
       "error": null,
@@ -13028,12 +12936,6 @@
           "doc": "Place a caption near the playhead inside FREE space only — the caption track never double-books."
         },
         {
-          "name": "clampClipDuration",
-          "kind": "function",
-          "signature": "(input: { startFrame: number; durationFrames: number; sequenceDurationFrames: number; }) => number",
-          "doc": "Clamp clip duration to fit within sequence bounds and minimum length constraints"
-        },
-        {
           "name": "clampClipStart",
           "kind": "function",
           "signature": "(input: { startFrame: number; durationFrames: number; sequenceDurationFrames: number; }) => number",
@@ -13086,12 +12988,6 @@
           "kind": "interface",
           "signature": "interface ExtendSequenceOperation",
           "doc": "Define an operation to extend a sequence by a specified number of frames"
-        },
-        {
-          "name": "findSequenceMcpTool",
-          "kind": "function",
-          "signature": "(name: string) => SequenceMcpToolDefinition | undefined",
-          "doc": "Resolve the SequenceMcpToolDefinition matching the given name or return undefined"
         },
         {
           "name": "formatSeconds",
@@ -16308,12 +16204,6 @@
           "kind": "const",
           "signature": "1",
           "doc": "Define the minimum number of images required for processing or validation"
-        },
-        {
-          "name": "modelMessage",
-          "kind": "function",
-          "signature": "(model: MediaModelOption | undefined, loading: boolean, count: number) => string | null",
-          "doc": "DEPRECATED (the composer renders availability in the pill/menu/lane states since #463) — resolve the status message for a media model."
         },
         {
           "name": "ModelOptionMetadata",
@@ -21308,12 +21198,6 @@
           "kind": "type",
           "signature": "type ReviewQueueState",
           "doc": null
-        },
-        {
-          "name": "reviewQueueStateLabel",
-          "kind": "function",
-          "signature": "(state: ReviewQueueState) => string",
-          "doc": "Human label for a queue state."
         },
         {
           "name": "rollUpProvenanceStanding",

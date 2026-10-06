@@ -86,11 +86,6 @@ const STATUS_TONES: Record<WorkProductStatus, StatusTone> = {
   superseded: 'neutral',
 }
 
-/** Human label for a queue state. */
-export function reviewQueueStateLabel(state: ReviewQueueState): string {
-  return STATE_LABELS[state]
-}
-
 /** Human label for a work-product status. */
 export function workProductStatusLabel(status: WorkProductStatus): string {
   return STATUS_LABELS[status]

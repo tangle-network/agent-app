@@ -521,14 +521,6 @@ Source: `src/assets/index.ts`
 interface ApprovalEvent
 ```
 
-### `ApprovalEventSchema`
-
-`const` — Validate approval event data including asset, action, user, timestamp, and optional fields
-
-```ts
-ZodObject<{ assetId: ZodString; variantId: ZodOptional<ZodString>; action: ZodEnum<{ approved: "approved"; rejected: "r…
-```
-
 ### `AssetContentMap`
 
 `type` — Map asset keys to their corresponding content types for various media and copy formats
@@ -599,14 +591,6 @@ ZodObject<{ primaryColor: ZodString; accentColor: ZodString; textColor: ZodStrin
 
 ```ts
 interface ConversionMetrics
-```
-
-### `ConversionMetricsSchema`
-
-`const` — Validate conversion metrics with nonnegative impressions, clicks, conversions, CTR, and CVR fields
-
-```ts
-ZodObject<{ impressions: ZodNumber; clicks: ZodNumber; conversions: ZodNumber; ctr: ZodNumber; cvr: ZodNumber; }, $stri…
 ```
 
 ### `CopyContent`
@@ -791,14 +775,6 @@ interface ImageTextLayer
 
 ```ts
 (raw: unknown) => AssetSpec<AssetFormat>
-```
-
-### `safeParseAssetSpec`
-
-`function` — Safe parse — returns null instead of throwing.
-
-```ts
-(raw: unknown) => AssetSpec<AssetFormat> | null
 ```
 
 ### `VideoCaption`
@@ -4502,46 +4478,6 @@ interface CreateThreadInput
 (part: unknown) => part is ChatMentionPart
 ```
 
-### `isChatPlanPart`
-
-`function` — Resolve whether a chat message part is a persisted chat plan part
-
-```ts
-(part: ChatMessagePart) => part is ChatPlanPersistedPart
-```
-
-### `isChatStepFinishPart`
-
-`function` — Determine if a chat message part represents the completion of a chat step
-
-```ts
-(part: ChatMessagePart) => part is ChatStepFinishPart
-```
-
-### `isChatTextPart`
-
-`function` — Resolve whether a chat message part is a text part based on its type property
-
-```ts
-(part: ChatMessagePart) => part is ChatTextPart
-```
-
-### `isChatToolPart`
-
-`function` — Resolve whether a ChatMessagePart is specifically a ChatToolPart based on its type property
-
-```ts
-(part: ChatMessagePart) => part is ChatToolPart
-```
-
-### `isChatWorkProductPart`
-
-`function` — Resolve whether a chat message part is a persisted work-product anchor
-
-```ts
-(part: ChatMessagePart) => part is WorkProductPersistedPart
-```
-
 ### `ListMessagesOptions`
 
 `interface` — Define options to configure message listing with optional limit and offset parameters
@@ -5032,22 +4968,6 @@ interface Bounds
 type BuildDesignCanvasMcpServerEntryOptions
 ```
 
-### `CANVAS_ELEMENT_KINDS`
-
-`const` — Provide a readonly array of string identifiers representing canvas element kinds
-
-```ts
-readonly string[]
-```
-
-### `CANVAS_MCP_TOOL_NAMES`
-
-`const` — Extract names of all tools from the CANVAS_MCP_TOOLS array
-
-```ts
-string[]
-```
-
 ### `CANVAS_MCP_TOOLS`
 
 `const` — Provide a collection of MCP tool definitions for manipulating and querying the design canvas environment
@@ -5240,28 +5160,12 @@ type ExportFormat
 interface ExportPreset
 ```
 
-### `findCanvasMcpTool`
-
-`function` — Find the canvas MCP tool definition matching the given name or return undefined
-
-```ts
-(name: string) => McpToolDefinition<DesignCanvasMcpToolEnv> | undefined
-```
-
 ### `findElement`
 
 `function` — Depth-first search across a page including group children.
 
 ```ts
 (page: ScenePage, elementId: string) => { element: SceneElement; owner: SceneElement[]; index: number; } | null
-```
-
-### `findPreset`
-
-`function` — Resolve a size preset by its identifier or return null if not found
-
-```ts
-(id: string) => SizePreset | null
 ```
 
 ### `GroupElement`
@@ -6035,14 +5939,6 @@ interface DesignCanvasProps
 
 ```ts
 (cropRect: ExportCropRect, stageScale: number, stageX: number, stageY: number) => { x: number; y: number; width: number…
-```
-
-### `downloadDataUrl`
-
-`function` — Trigger a browser download for a data URL.
-
-```ts
-(dataUrl: string, filename: string) => void
 ```
 
 ### `DUPLICATE_OFFSET`
@@ -13052,7 +12948,7 @@ interface TangleTierState
 
 ## `./preflight`
 
-Source: `src/preflight/index.ts` · depends on `alerting`, `signoff`
+Source: `src/preflight/index.ts` · depends on `signoff`
 
 ### `formatPreflightReport`
 
@@ -13166,26 +13062,10 @@ interface RouterChatProbeConfig
 interface SandboxAuthProbeConfig
 ```
 
-### `slackAlertProbe`
-
-`function` — Probe that the Slack alerting credential is alive, via `auth.test` — no message is posted.
-
-```ts
-(config: SlackAlertProbeConfig) => PreflightProbe
-```
-
-### `SlackAlertProbeConfig`
-
-`interface` — Define configuration options for probing that the Slack alerting channel is live
-
-```ts
-interface SlackAlertProbeConfig
-```
-
 
 ## `./preflight/cli`
 
-Source: `src/preflight/cli.ts` · depends on `alerting`, `signoff`
+Source: `src/preflight/cli.ts` · depends on `signoff`
 
 ### `loadProbes`
 
@@ -16821,14 +16701,6 @@ type CaptionTargetResolution
 (input: { playheadFrame: number; fps: number; sequenceDurationFrames: number; occupiedIntervals: TimelineInterval[]; })…
 ```
 
-### `clampClipDuration`
-
-`function` — Clamp clip duration to fit within sequence bounds and minimum length constraints
-
-```ts
-(input: { startFrame: number; durationFrames: number; sequenceDurationFrames: number; }) => number
-```
-
 ### `clampClipStart`
 
 `function` — Clamp the clip start frame within the valid range of the sequence duration and clip length
@@ -16899,14 +16771,6 @@ interface DeleteClipOperation
 
 ```ts
 interface ExtendSequenceOperation
-```
-
-### `findSequenceMcpTool`
-
-`function` — Resolve the SequenceMcpToolDefinition matching the given name or return undefined
-
-```ts
-(name: string) => SequenceMcpToolDefinition | undefined
 ```
 
 ### `formatSeconds`
@@ -21099,14 +20963,6 @@ type MediaTypeFilter
 
 ```ts
 1
-```
-
-### `modelMessage`
-
-`function` — DEPRECATED (the composer renders availability in the pill/menu/lane states since #463) — resolve the status message for a media model.
-
-```ts
-(model: MediaModelOption | undefined, loading: boolean, count: number) => string | null
 ```
 
 ### `ModelOptionMetadata`
@@ -27611,14 +27467,6 @@ interface ReviewQueuePanelProps
 
 ```ts
 type ReviewQueueState
-```
-
-### `reviewQueueStateLabel`
-
-`function` — Human label for a queue state.
-
-```ts
-(state: ReviewQueueState) => string
 ```
 
 ### `rollUpProvenanceStanding`

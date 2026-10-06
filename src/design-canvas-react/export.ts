@@ -243,21 +243,3 @@ export function exportDocumentJson(document: SceneDocument): string {
 // ---------------------------------------------------------------------------
 // Browser download helper
 // ---------------------------------------------------------------------------
-
-/**
- * Trigger a browser download for a data URL. Safe to import in SSR — the
- * function is a no-op when `document` is not defined (e.g. server-side render
- * or test environment without a DOM). The integrator must not rely on the
- * download executing in those contexts.
- */
-export function downloadDataUrl(dataUrl: string, filename: string): void {
-  if (typeof globalThis.document === 'undefined') return
-
-  const a = globalThis.document.createElement('a')
-  a.href = dataUrl
-  a.download = filename
-  a.style.display = 'none'
-  globalThis.document.body.appendChild(a)
-  a.click()
-  globalThis.document.body.removeChild(a)
-}

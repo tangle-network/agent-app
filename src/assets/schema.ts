@@ -202,26 +202,6 @@ export const CopyContentSchema = z.object({
 })
 
 // --- Approval ---
-
-/** Validate approval event data including asset, action, user, timestamp, and optional fields */
-export const ApprovalEventSchema = z.object({
-  assetId: z.string(),
-  variantId: z.string().optional(),
-  action: z.enum(['approved', 'rejected', 'edited', 'scheduled']),
-  editedFields: z.array(z.string()).optional(),
-  userId: z.string(),
-  timestamp: z.string(),
-})
-
-/** Validate conversion metrics with nonnegative impressions, clicks, conversions, CTR, and CVR fields */
-export const ConversionMetricsSchema = z.object({
-  impressions: z.number().nonnegative(),
-  clicks: z.number().nonnegative(),
-  conversions: z.number().nonnegative(),
-  ctr: z.number().nonnegative(),
-  cvr: z.number().nonnegative(),
-})
-
 // --- Content map for discriminated parse ---
 
 const AssetFormatValues = [
@@ -298,15 +278,4 @@ export function parseAssetSpec(raw: unknown): AssetSpec {
   const contentSchema = ContentSchemaByFormat[base.format]
   const content = contentSchema.parse((raw as Record<string, unknown>).content)
   return { ...base, content } as AssetSpec
-}
-
-/**
- * Safe parse — returns null instead of throwing.
- */
-export function safeParseAssetSpec(raw: unknown): AssetSpec | null {
-  try {
-    return parseAssetSpec(raw)
-  } catch {
-    return null
-  }
 }

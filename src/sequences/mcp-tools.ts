@@ -784,8 +784,3 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
     },
   },
 ]
-
-/** Resolve the SequenceMcpToolDefinition matching the given name or return undefined */
-export function findSequenceMcpTool(name: string): SequenceMcpToolDefinition | undefined {
-  return SEQUENCE_MCP_TOOLS.find((tool) => tool.name === name)
-}

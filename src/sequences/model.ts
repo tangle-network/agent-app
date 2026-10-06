@@ -190,19 +190,6 @@ export function clampClipStart(input: {
   return Math.max(0, Math.min(input.sequenceDurationFrames - input.durationFrames, input.startFrame))
 }
 
-/** Clamp clip duration to fit within sequence bounds and minimum length constraints */
-export function clampClipDuration(input: {
-  startFrame: number
-  durationFrames: number
-  sequenceDurationFrames: number
-}): number {
-  assertSequenceDuration(input.sequenceDurationFrames)
-  if (input.startFrame < 0 || input.startFrame >= input.sequenceDurationFrames) {
-    throw new Error('startFrame must be inside the sequence')
-  }
-  return Math.max(MIN_SEQUENCE_CLIP_FRAMES, Math.min(input.durationFrames, input.sequenceDurationFrames - input.startFrame))
-}
-
 /** Validate that a clip's start and duration fit within the sequence duration without overflow */
 export function assertClipFitsSequence(input: {
   startFrame: number

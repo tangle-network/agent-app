@@ -136,19 +136,6 @@ export function laneUnavailable(models: readonly MediaModelOption[]): boolean {
   return models.length === 0 || models.every((model) => model.status === 'unavailable')
 }
 
-/** DEPRECATED (the composer renders availability in the pill/menu/lane states since #463) — resolve the status message for a media model.
- *  @deprecated The composer no longer renders an availability status line (#463) — availability is
- *  carried by the model pill, the menu rows, and the lane-down notice. Kept only for external
- *  consumers; removal is a breaking change. */
-export function modelMessage(model: MediaModelOption | undefined, loading: boolean, count: number): string | null {
-  if (loading) return 'Loading media models...'
-  if (count === 0) return 'No models are available for this media type.'
-  if (!model) return 'Select a model.'
-  if (model.status === 'unavailable') return model.reason ?? 'This model is not configured.'
-  if (model.status === 'limited') return model.reason ? `Limited: ${model.reason}` : 'Limited availability.'
-  return null
-}
-
 /** Define fields required to configure and request various types of media generation */
 export interface GenerationRequestFields {
   workspaceId: string

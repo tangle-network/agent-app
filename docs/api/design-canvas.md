@@ -4,7 +4,7 @@
 
 Source: `src/design-canvas/index.ts`
 
-103 exports.
+99 exports.
 
 ### `AddElementOperation`
 
@@ -148,22 +148,6 @@ interface Bounds
 
 ```ts
 type BuildDesignCanvasMcpServerEntryOptions
-```
-
-### `CANVAS_ELEMENT_KINDS`
-
-`const` — Provide a readonly array of string identifiers representing canvas element kinds
-
-```ts
-readonly string[]
-```
-
-### `CANVAS_MCP_TOOL_NAMES`
-
-`const` — Extract names of all tools from the CANVAS_MCP_TOOLS array
-
-```ts
-string[]
 ```
 
 ### `CANVAS_MCP_TOOLS`
@@ -358,28 +342,12 @@ type ExportFormat
 interface ExportPreset
 ```
 
-### `findCanvasMcpTool`
-
-`function` — Find the canvas MCP tool definition matching the given name or return undefined
-
-```ts
-(name: string) => McpToolDefinition<DesignCanvasMcpToolEnv> | undefined
-```
-
 ### `findElement`
 
 `function` — Depth-first search across a page including group children.
 
 ```ts
 (page: ScenePage, elementId: string) => { element: SceneElement; owner: SceneElement[]; index: number; } | null
-```
-
-### `findPreset`
-
-`function` — Resolve a size preset by its identifier or return null if not found
-
-```ts
-(id: string) => SizePreset | null
 ```
 
 ### `GroupElement`
