@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.17
+
+- fix(theme): dark: utilities apply under the .dark class as well as data-theme
+
 ## 0.53.16
 
 - ci: deploy the component catalog from an empty workspace (#804)
