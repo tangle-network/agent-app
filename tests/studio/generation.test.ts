@@ -38,7 +38,6 @@ import {
   optimisticGeneration,
   outputPathFor,
   preferredModelId,
-  selectedModelsWithDefaults,
   userSafeGenerationMessage,
 } from '../../src/studio/generation'
 import { FALLBACK_VIDEO_MODEL_OPTIONS } from '../../src/studio/model-options'
@@ -373,11 +372,6 @@ describe('model selection', () => {
     expect(laneUnavailable([unavailable, limited])).toBe(false)
   })
 
-  it('selectedModelsWithDefaults keeps a valid selection and resets missing/unavailable ones', () => {
-    const out = selectedModelsWithDefaults({ image: 'img-b', video: undefined }, catalog)
-    expect(out.image).toBe('img-b') // limited but routable → kept
-    expect(out.video).toBe('vid-x') // none routable → resets to the fallback
-  })
 })
 
 describe('buildGenerationRequestBody', () => {

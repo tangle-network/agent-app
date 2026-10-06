@@ -289,9 +289,7 @@ export function StudioComposer({
   // no catalog yet keep it; an intentionally-uncurated i2v sibling stays (it is
   // reached by attaching a reference, never listed); anything else must be
   // present in the curated list, or the lane falls back to its
-  // default. The deleted ComposerHero defended this via selectedModelsWithDefaults;
-  // that helper resolves over the FULL catalog and would resurrect
-  // curation-removed defaults, so the guard is re-derived here over curatedModels.
+  // default. Check curatedModels so a default removed by curation cannot return.
   const retained = selectedModels[type]
   const retainedUsable = retained !== undefined && (
     !catalog

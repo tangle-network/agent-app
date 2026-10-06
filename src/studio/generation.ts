@@ -99,28 +99,6 @@ export function generationSavedToVault(generation: Generation): boolean {
   return generationVaultPath(generation) !== null
 }
 
-/** DEPRECATED (orphaned since #449 deleted its consumer) — resolve selected models by applying catalog defaults.
- *  @deprecated Orphaned since its consumer (the pre-revamp ComposerHero) was deleted in #449;
- *  the composer re-derives the guard over curated models inline. Kept for external consumers;
- *  removal is a breaking change. */
-export function selectedModelsWithDefaults(
-  current: Partial<Record<GenerationType, string>>,
-  catalog: MediaModelCatalogResponse,
-): Partial<Record<GenerationType, string>> {
-  const next = { ...current }
-  for (const key of GENERATION_TYPES) {
-    const models = catalog.models[key] ?? []
-    const currentOption = models.find((model) => model.id === next[key])
-    // Reset when: no selection, selection not in catalog, or selection is unavailable.
-    // This ensures the Generate button is never stuck disabled when routeable
-    // models exist but the stored default isn't one of them.
-    if (!next[key] || !currentOption || currentOption.status === 'unavailable') {
-      next[key] = preferredModelId(key, catalog) ?? ''
-    }
-  }
-  return next
-}
-
 /** Resolve the preferred model ID for a given generation type from the media model catalog */
 export function preferredModelId(type: GenerationType, catalog: MediaModelCatalogResponse | null): string | undefined {
   if (!catalog) return undefined
