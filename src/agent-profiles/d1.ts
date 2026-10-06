@@ -1,7 +1,9 @@
 /** Atomic D1 adapter for `/agent-profiles`. Products apply the SQL in their own migration. */
-import { snapshotAgentProfile, type AgentProfileDiff } from '@tangle-network/agent-interface'
+import { snapshotAgentProfile } from '@tangle-network/agent-interface'
 import {
+  parseProfileRevisionDiff,
   ProfileConflictError,
+  serializeProfileRevisionDiff,
   type ProfileBinding,
   type ProfileBindingKey,
   type ProfileKnowledgeEvent,
@@ -205,7 +207,7 @@ function revisionFromRow(row: RevisionRow): ProfileRevision {
   return { id: row.revision_id, workspaceId: row.workspace_id, profileId: row.profile_id,
     parentId: row.parent_id, profile: snapshotAgentProfile(JSON.parse(row.profile_json)),
     knowledgeText: row.knowledge_text, author: { kind: row.author_kind, id: row.author_id },
-    reason: row.reason, diff: JSON.parse(row.diff_json) as AgentProfileDiff[],
+    reason: row.reason, ...parseProfileRevisionDiff(row.diff_json),
     authorityDigest: row.authority_digest, planDigest: row.plan_digest,
     state: row.state, createdAt: row.created_at }
 }
@@ -294,7 +296,7 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database): ProfileRevi
     async appendRevision(revision, expectedActiveId, activate) {
       const rowValues = [revision.id, revision.workspaceId, revision.profileId, revision.parentId,
         JSON.stringify(revision.profile), revision.knowledgeText, revision.author.kind, revision.author.id,
-        revision.reason, JSON.stringify(revision.diff), revision.authorityDigest, revision.planDigest,
+        revision.reason, serializeProfileRevisionDiff(revision), revision.authorityDigest, revision.planDigest,
         revision.state, revision.createdAt]
       const insert = db.prepare(`INSERT INTO agent_profile_revision
         (revision_id, workspace_id, profile_id, parent_id, profile_json, knowledge_text,
