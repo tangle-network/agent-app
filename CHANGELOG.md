@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.16
+
+- ci: deploy the component catalog from an empty workspace (#804)
+
 ## 0.53.15
 
 - ci: run workflows on self-hosted runners; publish only new versions from hosted (#803)
