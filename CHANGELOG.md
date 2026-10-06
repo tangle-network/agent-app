@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.15
+
+- ci: run workflows on self-hosted runners; publish only new versions from hosted (#803)
+
 ## 0.53.14
 
 - fix(theme): text-primary paints Brand accent text; long values wrap (#799)
