@@ -27,7 +27,7 @@ type AssignableWorkspaceRole
 `function` — Whether `actorRole` may set/clear a member currently at `targetRole`.
 
 ```ts
-(actorRole: "viewer" | "editor" | "admin" | "owner", targetRole: "viewer" | "editor" | "admin" | "owner") => boolean
+(actorRole: "owner" | "viewer" | "editor" | "admin", targetRole: "owner" | "viewer" | "editor" | "admin") => boolean
 ```
 
 ### `generateInvitationToken`
@@ -59,7 +59,7 @@ type AssignableWorkspaceRole
 `function` — True when `actual` is at least `minimum` on the organization ladder.
 
 ```ts
-(actual: "member" | "admin" | "owner" | "billing", minimum: "member" | "admin" | "owner" | "billing") => boolean
+(actual: "member" | "owner" | "admin" | "billing", minimum: "member" | "owner" | "admin" | "billing") => boolean
 ```
 
 ### `hasWorkspaceRole`
@@ -67,7 +67,7 @@ type AssignableWorkspaceRole
 `function` — True when `actual` is at least `minimum` on the workspace ladder.
 
 ```ts
-(actual: "viewer" | "editor" | "admin" | "owner", minimum: "viewer" | "editor" | "admin" | "owner") => boolean
+(actual: "owner" | "viewer" | "editor" | "admin", minimum: "owner" | "viewer" | "editor" | "admin") => boolean
 ```
 
 ### `INVITATION_EXPIRY_DAYS`
@@ -171,7 +171,7 @@ interface InviteValidationResult
 `const` — Map organization roles to their hierarchical rank for permission and access control purposes
 
 ```ts
-Record<"member" | "admin" | "owner" | "billing", number>
+Record<"member" | "owner" | "admin" | "billing", number>
 ```
 
 ### `ORGANIZATION_ROLES`
@@ -235,7 +235,7 @@ interface RenderInvitationEmailInput
 `function` — The effective workspace role a request runs at: org owner/admin → owner of every workspace; otherwise the explicit per-workspace role (or null = no access).
 
 ```ts
-(organizationRole: string | null | undefined, workspaceRole: "viewer" | "editor" | "admin" | "owner" | null | undefined…
+(organizationRole: string | null | undefined, workspaceRole: "owner" | "viewer" | "editor" | "admin" | null | undefined…
 ```
 
 ### `SandboxWorkspaceRole`
@@ -259,7 +259,7 @@ type SandboxWorkspaceRole
 `const` — Map workspace roles to their corresponding hierarchical rank values
 
 ```ts
-Record<"viewer" | "editor" | "admin" | "owner", number>
+Record<"owner" | "viewer" | "editor" | "admin", number>
 ```
 
 ### `WORKSPACE_ROLES`
@@ -291,7 +291,7 @@ type WorkspaceRole
 `function` — Map a workspace role to the corresponding collaboration access level
 
 ```ts
-(role: "viewer" | "editor" | "admin" | "owner") => WorkspaceCollaborationAccess
+(role: "owner" | "viewer" | "editor" | "admin") => WorkspaceCollaborationAccess
 ```
 
 ### `workspaceRoleToSandboxRole`
@@ -299,5 +299,5 @@ type WorkspaceRole
 `function` — Map a workspace role to its corresponding sandbox workspace role
 
 ```ts
-(role: "viewer" | "editor" | "admin" | "owner") => SandboxWorkspaceRole
+(role: "owner" | "viewer" | "editor" | "admin") => SandboxWorkspaceRole
 ```
