@@ -26,7 +26,8 @@ An optional `AgentWorkspaceCompanionHandle` ref exposes `openTab(id)`.
 It returns false for unknown tabs and opens a configured tab through the normal callbacks.
 Artifact links can call `openTab('files')` without duplicating tab persistence.
 
-The shared layout supplies the floating right-panel expander and mobile drawer.
+The shared layout supplies the right-panel expander and mobile drawer.
+The expander sits in its own column at the conversation edge, so it never covers a message.
 Do not add a second expander, repeated title, or fake connection status.
 This component requires sandbox-ui's `keepRightMounted` and `collapsedControlsPlacement` layout seams.
 Publish and adopt that dependency before delivering the Agent App component.

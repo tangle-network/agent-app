@@ -774,9 +774,6 @@ export function SessionHistoryPanel({
                   >
                     Deselect all
                   </button>
-                  <span className="text-xs text-muted-foreground" aria-live="polite">
-                    {selectedCount} selected
-                  </span>
                   {selectedCount > 0 && (
                     <button
                       type="button"

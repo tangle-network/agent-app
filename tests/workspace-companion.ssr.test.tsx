@@ -9,3 +9,11 @@ it('renders the conversation on the server without storage or tool initializatio
   expect(html).toContain('Open right panel')
   expect(initialize).not.toHaveBeenCalled()
 })
+
+it('keeps the right-panel expander beside the conversation instead of floating over it', () => {
+  const html = renderToString(<AgentWorkspaceCompanion tabs={[{ id: 'files', label: 'Files', renderContent: () => <p>Files</p> }]}><p>Server conversation</p></AgentWorkspaceCompanion>)
+  const expander = html.slice(0, html.indexOf('aria-label="Open right panel"'))
+  const column = expander.slice(expander.lastIndexOf('<div class="'))
+  expect(column).toContain('shrink-0')
+  expect(column).not.toContain('absolute')
+})
