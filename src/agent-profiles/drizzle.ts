@@ -52,6 +52,8 @@ export function createAgentProfileTables() {
     channel: text('channel').notNull(),
     messageId: text('message_id').notNull(),
     inputHash: text('input_hash').notNull(),
+    conversationId: text('conversation_id'),
+    createdAt: integer('created_at').notNull(),
     profileId: text('profile_id'),
     revisionId: text('revision_id'),
     pinnedRevisionId: text('pinned_revision_id'),
@@ -60,7 +62,10 @@ export function createAgentProfileTables() {
     outcome: text('outcome', { enum: ['switched', 'refused'] }).notNull(),
     message: text('message').notNull(),
     conflictsJson: text('conflicts_json').notNull(),
-  }, table => [primaryKey({ columns: [table.workspaceId, table.memberId, table.channel, table.messageId] })])
+  }, table => [
+    primaryKey({ columns: [table.workspaceId, table.memberId, table.channel, table.messageId] }),
+    index('agent_profile_switch_conversation').on(table.workspaceId, table.conversationId, table.createdAt),
+  ])
 
   const turnPins = sqliteTable('agent_profile_turn_pin', {
     workspaceId: text('workspace_id').notNull(),
