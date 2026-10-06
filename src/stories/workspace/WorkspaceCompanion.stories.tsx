@@ -43,3 +43,27 @@ type Story = StoryObj<typeof CompanionStory>
 export const Collapsed: Story = {}
 export const Expanded: Story = { args: { defaultOpen: true } }
 export const ConversationOnly: Story = { args: { noTools: true } }
+
+/** A conversation written the way product threads are: a `flex-1` section whose
+ *  message list scrolls on its own above a shrink-0 composer. Many turns and a
+ *  narrow phone must keep the composer on screen. */
+function LongConversationStory() {
+  const turns = Array.from({ length: 24 }, (_, i) => i)
+  return (
+    <div className="h-screen bg-background text-foreground">
+      <AgentWorkspaceCompanion tools={{ files: () => <FilesPane /> }} persistenceKey="storybook-companion-long">
+        <section className="flex flex-1 flex-col min-w-0">
+          <div data-testid="message-list" className="flex-1 overflow-y-auto px-4 py-6">
+            {turns.map((i) => (
+              <p key={i} className="mb-4 text-sm leading-6">Turn {i + 1}: compare the filing deadline for Northwind Industries Holdings International LLC against the Delaware annual report window.</p>
+            ))}
+          </div>
+          <div className="shrink-0 border-t border-border bg-background p-4">
+            <textarea aria-label="Message" placeholder="Message your agent" className="h-40 w-full resize-none rounded-2xl border border-border bg-card p-4 text-base" />
+          </div>
+        </section>
+      </AgentWorkspaceCompanion>
+    </div>
+  )
+}
+export const LongConversation: StoryObj<typeof LongConversationStory> = { render: () => <LongConversationStory /> }
