@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.4
+
+- fix(workspace): bound the companion conversation to the pane height (#815)
+
 ## 0.55.3
 
 - fix(web-react,vault): wrap Send below the picker, dock in the document pane when narrow, sandbox-ui 0.127 peer (#814)
