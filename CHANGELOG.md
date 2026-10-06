@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.54.1
+
+- fix(deps): update the lockfile for the sandbox-ui 0.126.1 devDependency (#810)
+- feat(chat): error notice parts for failed turns; keep companion tabs visible in a narrow pane (#806)
+- fix(deps): accept sandbox-ui 0.126 as a peer (#808)
+- fix(sandbox): send only the nested model object on sandbox backends (#807)
+
 ## 0.54.0
 
 - feat!: remove agent-app subpaths no product imports (#805)
