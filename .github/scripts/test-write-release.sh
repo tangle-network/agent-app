@@ -243,6 +243,7 @@ NODE
 
 set_seed_version 0.49.38
 git -C "$SEED" commit --quiet --allow-empty -m 'fix(auth)!: require identity discriminator'
+git -C "$SEED" commit --quiet --allow-empty -m 'refactor(stories): share fixtures'
 BASE=$(git -C "$SEED" rev-parse HEAD)
 git --git-dir="$ORIGIN" fetch --quiet "$SEED" "$BASE"
 git --git-dir="$ORIGIN" update-ref refs/heads/main "$BASE"

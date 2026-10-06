@@ -10,8 +10,15 @@ const { version } = JSON.parse(readFileSync(manifestPath, 'utf8'))
 const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version)
 if (!match) throw new Error(`Invalid base package version: ${version}`)
 
-const subject = execFileSync('git', ['log', '-1', '--format=%s', sourceSha], { encoding: 'utf8' }).trim()
-const breaking = /^[a-z]+(?:\([^)]+\))?!:/.test(subject)
+// Match write-release.sh's first-parent release boundary; the writer has no tags.
+const lastRelease = execFileSync('git', [
+  'log', '--first-parent', '-1', '--format=%H', '--extended-regexp',
+  '--grep=^chore\\(release\\): [0-9]+\\.[0-9]+\\.[0-9]+ \\[skip release\\]$', sourceSha,
+], { encoding: 'utf8' }).trim()
+const range = lastRelease ? `${lastRelease}..${sourceSha}` : sourceSha
+const subjects = execFileSync('git', ['log', '--first-parent', '--format=%s', range], { encoding: 'utf8' })
+  .trim().split('\n')
+const breaking = subjects.some((subject) => /^[a-z]+(?:\([^)]+\))?!:/.test(subject))
 let next
 if (breaking) {
   next = match[1] === '0'

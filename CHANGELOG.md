@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.57.0
+
+- fix(release)!: count breaking commits since last release (#829)
+
+## 0.56.5
+
+- refactor(stories): reuse shared canvas poster (#828)
+- refactor(stories): reuse shared app-shell chat data (#827)
+
 ## 0.56.4
 
 - refactor(stories): reuse shared chat fixtures (#826)
