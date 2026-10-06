@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.0
+
+- feat!: remove 18 agent-app helpers that nothing references (#811)
+
 ## 0.54.1
 
 - fix(deps): update the lockfile for the sandbox-ui 0.126.1 devDependency (#810)
