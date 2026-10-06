@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * `@tangle-network/agent-app/tailwind.css` is the one stylesheet an agent app
  * imports. It must compile every utility the shared packages write — Agent App,
@@ -87,5 +88,29 @@ describe('agent-app Tailwind source entry', () => {
     const start = css.indexOf('.border-border ')
     expect(start).toBeGreaterThan(-1)
     expect(css.slice(start, css.indexOf('}', start))).toContain('--border-soft')
+  })
+
+  it('applies dark: utilities under the nearest dark scope', () => {
+    // Agent App's own interaction card writes `dark:[color-scheme:dark]`. Brand
+    // and tokens.css treat `.dark` and `[data-theme="dark"]` as dark and a
+    // nested `.light` as light again, so the variant must follow the same
+    // boundaries or a `.dark` host renders the light variant.
+    const marker = '.dark\\:\\[color-scheme\\:dark\\]'
+    const start = css.indexOf(marker)
+    expect(start).toBeGreaterThan(-1)
+    const selector = css.slice(start, css.indexOf('{', start)).trim()
+    const matches = (outer: string) => {
+      document.body.innerHTML = outer.replace('X', '<i class="dark:[color-scheme:dark]" id="x"></i>')
+      return document.getElementById('x')!.matches(selector)
+    }
+    expect(matches('<div class="dark">X</div>')).toBe(true)
+    expect(matches('<div data-theme="dark">X</div>')).toBe(true)
+    expect(matches('<div class="dark" data-theme="hospitality">X</div>')).toBe(true)
+    expect(matches('<div class="light"><div class="dark">X</div></div>')).toBe(true)
+    expect(matches('<div class="dark"><div class="light"><div class="dark">X</div></div></div>')).toBe(true)
+    expect(matches('X')).toBe(false)
+    expect(matches('<div class="light">X</div>')).toBe(false)
+    expect(matches('<div class="dark"><div class="light">X</div></div>')).toBe(false)
+    expect(matches('<div class="dark"><div data-theme="agents-light">X</div></div>')).toBe(false)
   })
 })
