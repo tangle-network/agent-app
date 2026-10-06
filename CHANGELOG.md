@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.7
+
+- fix(sandbox): resume with only the env keys a runtime rebuild names (#818)
+
 ## 0.55.6
 
 - chore(theme): build on brand 1.15.7 so accent text reads on the selected tint (#817)
