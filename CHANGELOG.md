@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.57.1
+
+- fix(agent-profiles): reuse admitted turn pins on retry (#832)
+- fix(agent-profiles): attest per-turn effective plans (#831)
+- feat(agent-profiles): add shared revision and binding contract (#830)
+
 ## 0.57.0
 
 - fix(release)!: count breaking commits since last release (#829)
