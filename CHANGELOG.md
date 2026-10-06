@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.1
+
+- fix(chat): unify exact native completion receipts (#819)
+
 ## 0.56.0
 
 - feat(chat-routes)!: own the plan follow-up attach and turn resets; guard product-local durability (#820)
