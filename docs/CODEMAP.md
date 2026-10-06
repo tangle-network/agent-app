@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_111 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_106 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -70,7 +70,6 @@ _111 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./record`](api/record.md) | 33 | — |
 | [`./record/drizzle`](api/record-drizzle.md) | 22 | — |
 | [`./redact`](api/redact.md) | 15 | — |
-| [`./run`](api/run.md) | 10 | `harness` |
 | [`./runtime`](api/runtime.md) | 71 | `tools` |
 | [`./sandbox`](api/sandbox.md) | 188 | `harness`, `profile`, `runtime`, `tools` |
 | [`./sequences`](api/sequences.md) | 113 | `tools`, `web` |
@@ -89,14 +88,11 @@ _111 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./stream`](api/stream.md) | 57 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 70 | — |
 | [`./studio-react`](api/studio-react.md) | 47 | `studio`, `web-react` |
-| [`./tangle`](api/tangle.md) | 7 | — |
 | [`./teams`](api/teams.md) | 37 | — |
 | [`./teams-react`](api/teams-react.md) | 10 | `brand`, `teams` |
-| [`./teams-react/lazy`](api/teams-react-lazy.md) | 6 | `brand`, `teams` |
 | [`./teams/drizzle`](api/teams-drizzle.md) | 26 | — |
 | [`./teams/invitations-api`](api/teams-invitations-api.md) | 13 | — |
 | [`./teams/members-api`](api/teams-members-api.md) | 9 | — |
-| [`./teams/resend`](api/teams-resend.md) | 2 | — |
 | [`./theme`](api/theme.md) | 6 | — |
 | [`./theme-contract`](api/theme-contract.md) | 4 | `legibility`, `signoff` |
 | [`./theme-contract/cli`](api/theme-contract-cli.md) | 0 | `legibility`, `signoff` |
@@ -111,7 +107,6 @@ _111 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./web`](api/web.md) | 43 | — |
 | [`./web-react`](api/web-react.md) | 456 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/async`](api/web-react-async.md) | 35 | — |
-| [`./web-react/session-gateway`](api/web-react-session-gateway.md) | 22 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
@@ -704,16 +699,6 @@ Source: `src/redact/index.ts` · 15 exports
 
 [Full API →](api/redact.md)
 
-## `./run`
-
-Source: `src/run/index.ts` · 10 exports
-
-Depends on: `harness`
-
-`ExecutionMode`, `executionModeForProfile`, `isKnownSandboxHarness`, `ProfileHarness`, `resolveExecutionMode`, `ROUTER_HARNESS`, `RouterHarness`, `runAgent`, `RunAgentBranches`, `ShellProfile`
-
-[Full API →](api/run.md)
-
 ## `./runtime`
 
 Source: `src/runtime/index.ts` · 71 exports
@@ -874,14 +859,6 @@ Depends on: `studio`, `web-react`
 
 [Full API →](api/studio-react.md)
 
-## `./tangle`
-
-Source: `src/tangle/index.ts` · 7 exports
-
-`BrokerToken`, `BrokerTokenMinter`, `BrokerTokenProvider`, `BrokerTokenProviderOptions`, `buildConsentUrl`, `ConsentUrlInput`, `createBrokerTokenProvider`
-
-[Full API →](api/tangle.md)
-
 ## `./teams`
 
 Source: `src/teams/index.ts` · 37 exports
@@ -899,16 +876,6 @@ Depends on: `brand`, `teams`
 `InvitationsPanel`, `InvitationsPanelProps`, `InvitationView`, `InviteAcceptDetails`, `InviteAcceptPage`, `InviteAcceptPageProps`, `InviteAcceptStatus`, `MembersPanel`, `MembersPanelProps`, `MemberView`
 
 [Full API →](api/teams-react.md)
-
-## `./teams-react/lazy`
-
-Source: `src/teams-react/lazy.tsx` · 6 exports
-
-Depends on: `brand`, `teams`
-
-`InvitationsPanelLazy`, `InvitationsPanelProps`, `InviteAcceptPageLazy`, `InviteAcceptPageProps`, `MembersPanelLazy`, `MembersPanelProps`
-
-[Full API →](api/teams-react-lazy.md)
 
 ## `./teams/drizzle`
 
@@ -933,14 +900,6 @@ Source: `src/teams/members-api.ts` · 9 exports
 `createMembersApi`, `EnforceSeatSeam`, `MemberListEntry`, `MembersApiActor`, `MembersApiOptions`, `MemberSyncSeam`, `SeatLimitError`, `UserLookupTable`, `WorkspaceLookupTable`
 
 [Full API →](api/teams-members-api.md)
-
-## `./teams/resend`
-
-Source: `src/teams/resend.ts` · 2 exports
-
-`createResendInvitationSender`, `ResendInvitationSenderOptions`
-
-[Full API →](api/teams-resend.md)
 
 ## `./theme`
 
@@ -1065,16 +1024,6 @@ Source: `src/web-react/async/index.ts` · 35 exports
 `AsyncEmptyAction`, `AsyncEmptySpec`, `asyncErrorMessage`, `AsyncErrorRenderProps`, `AsyncLoadContext`, `AsyncRequestError`, `AsyncResolution`, `AsyncResourceState`, `AsyncResourceStatus`, `AsyncRetryable`, `AsyncView`, `AsyncViewProps`, `CONFIRMED_WRITE`, `ConfirmedMutation`, `confirmJson`, `confirmResponse`, `confirmWrite`, `DEFAULT_ASYNC_ERROR_MESSAGE`, `defaultIsEmpty`, `isConfirmedWrite`, `MutationConfirmed`, `MutationOutcome`, `MutationRejected`, `MutationState`, `MutationStatus`, `MutationStatusLabels`, `MutationStatusProps`, `readOkJson`, `rejectWrite`, `requireOk`, `resolveAsyncValue`, `useAsyncResource`, `UseAsyncResourceOptions`, `useConfirmedMutation`, `UseConfirmedMutationOptions`
 
 [Full API →](api/web-react-async.md)
-
-## `./web-react/session-gateway`
-
-Source: `src/web-react/session-gateway.ts` · 22 exports
-
-Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product`
-
-`APPLIED_SEQ_CAP`, `createSessionGatewayLane`, `createSessionStreamGrantFetcher`, `GATEWAY_TERMINAL_EVENT_TYPES`, `GATEWAY_TRANSPORT_NOTICE_TYPES`, `gatewayFrameToTurnEvent`, `GatewayTurnEvent`, `isGatewayTransportNotice`, `isTerminalGatewayEvent`, `parseSessionStreamGrant`, `ReplayCursorStorage`, `SessionGatewayClientConfigLike`, `SessionGatewayClientFactory`, `SessionGatewayClientLike`, `SessionGatewayLaneOptions`, `SessionGatewayLiveViewAttachment`, `SessionGatewayLiveViewConnector`, `SessionGatewayLiveViewHandlers`, `SessionGrantUnavailableReason`, `SessionStreamGrant`, `SessionStreamGrantFetcherOptions`, `SessionStreamGrantResponse`
-
-[Full API →](api/web-react-session-gateway.md)
 
 ## `./web-react/terminal`
 

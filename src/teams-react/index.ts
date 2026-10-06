@@ -7,8 +7,7 @@
  * `./teams/invitations-api` over fetch.
  *
  * Never re-exported from the package root: `react` is an optional peer (the
- * `web-react` precedent). DOM access begins only inside component render. A
- * `React.lazy` code-split entry lives at `./teams-react/lazy`.
+ * `web-react` precedent). DOM access begins only inside component render.
  */
 export * from './contracts'
 export * from './components/index'
