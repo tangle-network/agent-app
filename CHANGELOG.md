@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.0
+
+- feat(chat-routes)!: own the plan follow-up attach and turn resets; guard product-local durability (#820)
+
 ## 0.55.7
 
 - fix(sandbox): resume with only the env keys a runtime rebuild names (#818)
