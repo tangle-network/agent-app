@@ -115,6 +115,26 @@
       "import": "./dist/profile/index.js",
       "default": "./dist/profile/index.js"
     },
+    "./agent-profiles": {
+      "types": "./dist/agent-profiles/index.d.ts",
+      "import": "./dist/agent-profiles/index.js",
+      "default": "./dist/agent-profiles/index.js"
+    },
+    "./agent-profiles/d1": {
+      "types": "./dist/agent-profiles/d1.d.ts",
+      "import": "./dist/agent-profiles/d1.js",
+      "default": "./dist/agent-profiles/d1.js"
+    },
+    "./agent-profiles/drizzle": {
+      "types": "./dist/agent-profiles/drizzle.d.ts",
+      "import": "./dist/agent-profiles/drizzle.js",
+      "default": "./dist/agent-profiles/drizzle.js"
+    },
+    "./agent-profiles/reaper": {
+      "types": "./dist/agent-profiles/reaper.d.ts",
+      "import": "./dist/agent-profiles/reaper.js",
+      "default": "./dist/agent-profiles/reaper.js"
+    },
     "./prompt": {
       "types": "./dist/prompt/index.d.ts",
       "import": "./dist/prompt/index.js",
