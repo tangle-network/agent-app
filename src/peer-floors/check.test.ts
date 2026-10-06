@@ -143,8 +143,8 @@ describe('this package audits itself', () => {
     ) as { peerDependencies?: Record<string, string> }
     const range = own.peerDependencies?.['@tangle-network/agent-interface']
 
-    // Interface minors are additive. Require the minor the verified Runtime line
-    // requires, admit later 2.x minors, and reject the next major.
+    // The verified Runtime line admits Interface 2.13+; the profile materializer
+    // consumer also qualifies Interface 3. Reject the unqualified next major.
     expect(range).toBeDefined()
     expect(satisfiesRange('1.9.0', range!)).toBe(false)
     expect(satisfiesRange('2.1.1', range!)).toBe(false)
@@ -152,7 +152,8 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('2.11.0', range!)).toBe(false)
     expect(satisfiesRange('2.12.0', range!)).toBe(false)
     expect(satisfiesRange('2.13.0', range!)).toBe(true)
-    expect(satisfiesRange('3.0.0', range!)).toBe(false)
+    expect(satisfiesRange('3.0.0', range!)).toBe(true)
+    expect(satisfiesRange('4.0.0', range!)).toBe(false)
   })
 
   it('supports the verified Runtime 0.282, 0.283, 0.285, 0.289, 0.291, and 0.293 lines', async () => {
@@ -315,7 +316,7 @@ describe('this package audits itself', () => {
   const verifiedWindows: Array<[string, string[], string[], string[]]> = [
     ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.1', '0.199.999', '0.200.0', '0.200.1', '0.200.999', '0.201.0', '0.202.0', '0.203.0', '0.203.999', '0.204.0', '0.204.999', '0.205.1', '0.205.999'], ['0.205.0', '0.206.0']],
     ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999', '0.54.0', '0.55.2', '0.58.1', '0.58.999', '0.59.0', '0.59.999', '0.60.3', '0.60.999'], ['0.56.0', '0.57.0', '0.58.0', '0.60.0', '0.60.1', '0.60.2', '0.61.0']],
-    ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0', '2.14.0', '2.15.0', '2.16.0', '2.17.0'], ['3.0.0']],
+    ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0', '2.14.0', '2.15.0', '2.16.0', '2.17.0', '3.0.0'], ['4.0.0']],
   ]
 
   it.each(verifiedWindows)('keeps the %s peer on the verified window', async (name, below, admitted, above) => {

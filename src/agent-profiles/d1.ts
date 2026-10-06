@@ -79,6 +79,8 @@ CREATE TABLE agent_profile_switch_receipt (
   channel TEXT NOT NULL,
   message_id TEXT NOT NULL,
   input_hash TEXT NOT NULL,
+  conversation_id TEXT,
+  created_at INTEGER NOT NULL,
   profile_id TEXT,
   revision_id TEXT,
   pinned_revision_id TEXT,
@@ -89,6 +91,7 @@ CREATE TABLE agent_profile_switch_receipt (
   conflicts_json TEXT NOT NULL,
   PRIMARY KEY (workspace_id, member_id, channel, message_id)
 );
+CREATE INDEX agent_profile_switch_conversation ON agent_profile_switch_receipt(workspace_id, conversation_id, created_at);
 CREATE TABLE agent_profile_turn_pin (
   workspace_id TEXT NOT NULL,
   member_id TEXT NOT NULL,
@@ -168,6 +171,8 @@ interface SwitchRow {
   channel: string
   message_id: string
   input_hash: string
+  conversation_id: string | null
+  created_at: number
   profile_id: string | null
   revision_id: string | null
   pinned_revision_id: string | null
@@ -215,10 +220,23 @@ function revisionFromRow(row: RevisionRow): ProfileRevision {
 function receiptFromRow(row: SwitchRow): ProfileSwitchReceipt {
   return { key: { workspaceId: row.workspace_id, memberId: row.member_id, channel: row.channel },
     messageId: row.message_id, inputHash: row.input_hash, profileId: row.profile_id,
+    conversationId: row.conversation_id, createdAt: row.created_at,
     revisionId: row.revision_id, pinnedRevisionId: row.pinned_revision_id,
     authorityDigest: row.authority_digest, planDigest: row.plan_digest,
     outcome: row.outcome, message: row.message,
     conflicts: JSON.parse(row.conflicts_json) as string[] }
+}
+
+/** Product auth stays outside this read. The receipt itself is the durable chat marker. */
+export async function listD1ProfileSwitchReceipts(
+  db: ProfileD1Database,
+  workspaceId: string,
+  conversationId: string,
+): Promise<ProfileSwitchReceipt[]> {
+  const rows = await db.prepare(`SELECT * FROM agent_profile_switch_receipt
+    WHERE workspace_id = ? AND conversation_id = ? AND outcome = 'switched'
+    ORDER BY created_at, message_id`).bind(workspaceId, conversationId).all<SwitchRow>()
+  return rows.results.map(receiptFromRow)
 }
 
 function turnFromRow(row: TurnRow): ProfileTurnPin {
@@ -338,12 +356,13 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database): ProfileRevi
       const key = receipt.key
       const versionGuard = `${bindingVersion} = ?`
       const insertReceipt = (requireEventId?: string) => db.prepare(`INSERT INTO agent_profile_switch_receipt
-        (workspace_id, member_id, channel, message_id, input_hash, profile_id, revision_id,
+        (workspace_id, member_id, channel, message_id, input_hash, conversation_id, created_at, profile_id, revision_id,
          pinned_revision_id, authority_digest, plan_digest, outcome, message, conflicts_json)
-        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           ${requireEventId ? `(SELECT ? WHERE EXISTS (SELECT 1 FROM agent_profile_binding_event WHERE event_id = ?))` : '?'}, ?
         WHERE ${versionGuard} ${requireEventId ? '' : 'ON CONFLICT DO NOTHING'}`)
         .bind(...keyValues(key), receipt.messageId, receipt.inputHash,
+          receipt.conversationId ?? null, receipt.createdAt ?? Date.now(),
           receipt.profileId, receipt.revisionId, receipt.pinnedRevisionId,
           receipt.authorityDigest, receipt.planDigest, receipt.outcome,
           receipt.message, ...(requireEventId ? [requireEventId] : []),

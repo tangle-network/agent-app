@@ -92,6 +92,9 @@ export interface ProfileSwitchReceipt {
   key: ProfileBindingKey
   messageId: string
   inputHash: string
+  /** Visible conversation that should render this switch marker on reload. */
+  conversationId?: string | null
+  createdAt?: number
   profileId: string | null
   revisionId: string | null
   /** A rollback binds the previous immutable revision, not the current head. */
@@ -340,6 +343,7 @@ export interface SwitchProfileInput {
   key: ProfileBindingKey
   messageId: string
   content: string
+  conversationId?: string
   choice: { name: string } | { profileId: string }
   profiles: readonly SwitchableProfile[]
   /** Product's role/phone allowlist decision for the authenticated member. */
@@ -400,6 +404,7 @@ export async function switchProfile(input: SwitchProfileInput): Promise<ProfileS
     }
   }
   return input.store.recordSwitch({ key: input.key, messageId: input.messageId, inputHash,
+    conversationId: input.conversationId,
     profileId: revision?.profileId ?? null, revisionId: revision?.id ?? null,
     pinnedRevisionId: null, authorityDigest: revision?.authorityDigest ?? null,
     planDigest, outcome, message, conflicts }, binding?.version ?? 0)
@@ -417,6 +422,7 @@ export async function handleProfileSwitchText(
   if (previous) return previous
   const binding = await input.store.getBinding(input.key)
   return input.store.recordSwitch({ key: input.key, messageId: input.messageId, inputHash,
+    conversationId: input.conversationId,
     profileId: null, revisionId: null, pinnedRevisionId: null, outcome: 'refused',
     authorityDigest: null, planDigest: null, conflicts: [],
     message: 'Send only “Switch to [agent name]” to change agents.' },
@@ -428,6 +434,7 @@ export async function rollbackProfileBinding(input: {
   store: ProfileRevisionStore
   key: ProfileBindingKey
   messageId: string
+  conversationId?: string
   actorRole: 'owner' | 'manager' | 'member' | 'viewer'
   canSelect: (profileId: string) => Promise<boolean>
   prepareAuthority: SwitchProfileInput['prepareAuthority']
@@ -458,6 +465,7 @@ export async function rollbackProfileBinding(input: {
       conflicts = prepared.conflicts
     } catch {
       return input.store.recordSwitch({ key: input.key, messageId: input.messageId, inputHash,
+        conversationId: input.conversationId,
         profileId: null, revisionId: null, pinnedRevisionId: null, outcome: 'refused',
         authorityDigest: null, planDigest: null, conflicts: [],
         message: 'Could not prepare the previous profile; your current agent is unchanged.' },
@@ -465,6 +473,7 @@ export async function rollbackProfileBinding(input: {
     }
   }
   return input.store.recordSwitch({ key: input.key, messageId: input.messageId, inputHash,
+    conversationId: input.conversationId,
     profileId: parent.profileId, revisionId: parent.id, pinnedRevisionId: parent.id,
     authorityDigest: parent.authorityDigest, planDigest, outcome: 'switched', conflicts,
     message: `Now talking to ${parent.profile.name ?? 'this profile'}` }, binding.version)
