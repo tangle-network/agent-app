@@ -9,7 +9,7 @@
  *
  *     "scripts": { "peer-check": "agent-app-peer-check" }
  *
- * Three gates, one report, one exit code:
+ * Four gates, one report, one exit code:
  *
  *   PEER FLOORS      — is the installed version inside the range the shell
  *                      declares. `pnpm` only WARNS on an unmet peer that is
@@ -22,6 +22,9 @@
  *                      bytes.
  *   DECLARED PINS   — do installed exact Tangle versions match the consumer's
  *                     dependency and development dependency declarations.
+ *   DURABILITY OWNERS — does product source write the shared turn tables,
+ *                     open its own session-event replay, or mint follow-up
+ *                     execution ids that Agent App already owns.
  *
  * The source gate runs FIRST and independently: it needs no installed shell, so
  * a repo whose install is broken still gets the answer that explains why.
@@ -35,6 +38,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { checkAllPeerFloors, checkPeerFloors, formatPeerFloorReport } from './check'
 import { checkDependencySources, formatDependencySourceReport } from './dependency-source'
+import { checkDurabilityOwners, formatDurabilityOwnerReport } from './durability-owners'
 import { invokedAsScript } from '../signoff/invoked-as-script'
 
 interface CliArgs {
@@ -109,6 +113,19 @@ function main(): void {
     if (!checkDeclaredPins(appDir)) failed = true
   } catch (err) {
     process.stderr.write(`agent-app-peer-check (declared pins) failed: ${err instanceof Error ? err.message : String(err)}\n`)
+    failed = true
+  }
+
+  try {
+    const durability = checkDurabilityOwners({ repoDir: appDir, exclude })
+    const report = formatDurabilityOwnerReport(durability)
+    if (durability.ok) process.stdout.write(`${report}\n`)
+    else {
+      process.stderr.write(`${report}\n`)
+      failed = true
+    }
+  } catch (err) {
+    process.stderr.write(`agent-app-peer-check (durability owners) failed: ${err instanceof Error ? err.message : String(err)}\n`)
     failed = true
   }
 

@@ -488,7 +488,7 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
     expect(partial.content).toBe('Checking ')
     expect(await turnStore.getStatus('mission-step-7')).toBe('running')
 
-    // The durable driver re-invokes. `resetBuffer` clears the partial turn
+    // The durable driver re-invokes. The store's `resetEvents` clears the partial turn
     // buffer; the assistant ROW is addressed by the same deterministic id.
     const res = await runDetachedTurn({
       store: turnStore,
@@ -497,7 +497,6 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
       events: (async function* () { for (const e of TURN_EVENTS) yield e })(),
       model: 'm',
       persist,
-      resetBuffer: async () => {},
     })
 
     expect(res.state).toBe('completed')

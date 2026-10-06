@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-213 exports.
+228 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -670,6 +670,14 @@ interface CreateAttachmentUploadRouteOptions
 interface CreateChatTurnRoutesOptions
 ```
 
+### `createD1PlanFollowUpGate`
+
+`function` — Exclusive claim over a follow-up execution in the shared `turn_status` table.
+
+```ts
+(db: D1LikeForPlanFollowUps, options?: PlanFollowUpGateOptions) => PlanFollowUpGate
+```
+
 ### `CreateLegacyAttachmentUploadRouteOptions`
 
 `interface` — Stable route options for products using the original writer contract.
@@ -724,6 +732,22 @@ interface CreateSandboxFileIndexRouteOptions
 
 ```ts
 interface CreateUploadRouteOptions
+```
+
+### `D1BoundForPlanFollowUps`
+
+`interface` — A bound D1 statement used by the follow-up gate.
+
+```ts
+interface D1BoundForPlanFollowUps
+```
+
+### `D1LikeForPlanFollowUps`
+
+`interface` — Structural D1 contract for the follow-up gate.
+
+```ts
+interface D1LikeForPlanFollowUps
 ```
 
 ### `DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS`
@@ -1246,6 +1270,78 @@ type OpenModelStream
 (raw: unknown) => FileMention[]
 ```
 
+### `parsePlanFollowUpAttach`
+
+`function` — Parse a follow-up descriptor.
+
+```ts
+(value: unknown) => PlanFollowUpAttach | null
+```
+
+### `PlanFollowUpAdmission`
+
+`type` — Result of one exclusive follow-up claim.
+
+```ts
+type PlanFollowUpAdmission
+```
+
+### `PlanFollowUpAttach`
+
+`interface` — The descriptor a decided plan card sends back to the chat route.
+
+```ts
+interface PlanFollowUpAttach
+```
+
+### `planFollowUpExecutionId`
+
+`function` — The Sidecar's execution id for a follow-up turn.
+
+```ts
+(sessionId: string, turnId: string) => string
+```
+
+### `PlanFollowUpGate`
+
+`interface` — Exclusive claim over one follow-up execution's `turn_status` row.
+
+```ts
+interface PlanFollowUpGate
+```
+
+### `PlanFollowUpGateOptions`
+
+`interface` — Configure the follow-up gate.
+
+```ts
+interface PlanFollowUpGateOptions
+```
+
+### `PlanFollowUpOutcome`
+
+`type` — The decision a follow-up continues.
+
+```ts
+type PlanFollowUpOutcome
+```
+
+### `PlanFollowUpResolution`
+
+`type` — Result of checking a follow-up descriptor against the session's persisted plans.
+
+```ts
+type PlanFollowUpResolution
+```
+
+### `PlanFollowUpSettlement`
+
+`type` — Result of settling a claim.
+
+```ts
+type PlanFollowUpSettlement
+```
+
 ### `produceChatTurnWithIntelligence`
 
 `function` — Adapter for product producer factories.
@@ -1494,6 +1590,14 @@ type ResolveChatAttachmentsResult
 (value: number | undefined) => number
 ```
 
+### `resolvePlanFollowUpRequest`
+
+`function` — Validate a follow-up request against what the session actually persisted: the plan must be in this session at this revision and must already carry the claimed decision.
+
+```ts
+(input: { sessionId: string; planFollowUp: unknown; messages: readonly { role: string; parts?: unknown; }[]; }) => Plan…
+```
+
 ### `rowIdOf`
 
 `function` — The row id an `appendMessage` actually returned, or `null` when the store returned nothing usable.
@@ -1638,6 +1742,14 @@ type StaleTurnLockSessionProbeResult
 interface StreamChatRouteAsSandboxOptions
 ```
 
+### `streamPlanFollowUpEvents`
+
+`function` — Attach to the already-enqueued follow-up execution: replay its buffered events from the start, then follow it live to completion.
+
+```ts
+(box: SandboxInstance, sessionId: string, executionId: string, options?: { timeoutMs?: number | undefined; }) => AsyncG…
+```
+
 ### `streamWithModelFailover`
 
 `function` — Wrap `open` in reactive model failover, streaming from the first model in `models` that reaches its commit point.
@@ -1652,6 +1764,14 @@ interface StreamChatRouteAsSandboxOptions
 
 ```ts
 (reason: string) => string
+```
+
+### `unwrapSessionEventPayload`
+
+`function` — Session events carry two payload shapes: replayed events hold the stream event under `data`, while live events nest it under `data.properties`.
+
+```ts
+(event: SandboxEvent) => SandboxEvent
 ```
 
 ### `UPLOAD_INLINE_MAX_BYTES`

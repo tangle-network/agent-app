@@ -72,10 +72,10 @@ type ParsePlanSubmittedResult
 
 ### `planFollowUpTurnId`
 
-`function` — Generate a unique follow-up turn ID based on the plan ID and its outcome
+`function` — The follow-up turn the Sandbox platform enqueues when one plan revision is decided.
 
 ```ts
-(planId: string, outcome: "approved" | "rejected") => string
+(planId: string, revision: number, outcome: "approved" | "rejected") => string
 ```
 
 ### `planPartKey`

@@ -43,7 +43,7 @@ the turn when the other read is unavailable.
 
 `runDetachedTurn` preserves errors from status reads, completed-result reads,
 buffer resets and terminal status writes. Re-streaming an existing running
-buffer requires a successful `resetBuffer`. This is buffer integrity, not an
+buffer requires a successful `resetEvents` on the turn store. This is buffer integrity, not an
 execution dispatcher: the supplied source must still attach to the original
 execution. A completed buffer without either a retained result or its assistant
 row is not reported as an empty success. Cached recovery keeps usage already

@@ -126,13 +126,6 @@ export interface DetachedTurnOptions {
    *  `readCompletedSandboxTurn` so the exact completed session message
    *  restores tool/file parts as well as text. */
   completedResult?: () => Promise<DetachedTurnFinal | null | undefined>
-  /** Clear the prior partial buffer for `turnId` before a genuine re-stream.
-   *  A crash mid-run leaves buffered rows at seqs 1..N with status `running`;
-   *  re-streaming restarts the tap's seq at 0 and would duplicate/interleave
-   *  rows. Wire this (delete `turnId`'s buffered events) so a retry is clean.
-   *  A re-stream over an existing `running` buffer requires this operation to
-   *  succeed. Missing or failed reset leaves the existing stream untouched. */
-  resetBuffer?: (turnId: string) => Promise<void>
   /** Own the durable assistant row for this turn instead of returning the body
    *  for the caller to insert — and keep it in step with the stream.
    *
@@ -253,8 +246,9 @@ function cachedResultFrom(
  *   re-streaming (a second event sequence would collide with the buffered one).
  * - Crash-safe: a `running` turn (a prior attempt crashed mid-tap) consults
  *   `completedResult` to detect a run that finished server-side; only a run that
- *   genuinely did not complete is re-streamed, and then over a `resetBuffer`-
- *   cleared buffer so seqs don't corrupt.
+ *   genuinely did not complete is re-streamed, and then over a buffer the
+ *   store's `resetEvents` cleared so seqs don't corrupt. A store without
+ *   `resetEvents` refuses that re-stream and leaves the existing buffer intact.
  * - Marks the turn `running` under `scopeId` so a mid-run browser finds it.
  * - Settles `complete`/`error` so the client stops tailing and billing/render
  *   can branch on `state`.
@@ -408,10 +402,10 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
     }
     // Genuine re-run: clear the partial buffer first, or the fresh tap's seq
     // (restarting at 0) interleaves with the orphaned rows.
-    if (!opts.resetBuffer) {
-      throw new Error('Detached turn recovery requires resetBuffer before replaying an existing stream')
+    if (!store.resetEvents) {
+      throw new Error('Detached turn recovery requires a TurnEventStore with resetEvents before replaying an existing stream')
     }
-    await opts.resetBuffer(turnId)
+    await store.resetEvents(turnId)
   }
 
   const tap = createBufferedTurnTap({

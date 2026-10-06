@@ -138,6 +138,7 @@ The D1 store needs its tables. Add to your migrations:
 import {
   TURN_EVENTS_MIGRATION_SQL,
   TURN_STATUS_SCOPE_MIGRATION_SQL,
+  TURN_STATUS_LEASE_MIGRATION_SQL,
   TURN_STATUS_RETENTION_MIGRATION_SQL,
 } from '@tangle-network/agent-app/stream'
 ```
@@ -147,6 +148,9 @@ import {
 - **`TURN_STATUS_SCOPE_MIGRATION_SQL`** — `ALTER TABLE turn_status ADD COLUMN
   scopeId TEXT`. Run **only** on a deployment whose `turn_status` predates
   `scopeId`/`listRunning`. New deployments already have the column.
+- **`TURN_STATUS_LEASE_MIGRATION_SQL`** — `ALTER TABLE turn_status ADD COLUMN
+  leaseToken TEXT`. Run **only** on a deployment whose `turn_status` predates the
+  column `createD1PlanFollowUpGate` (`/chat-routes`) fences follow-up claims on.
 - **`TURN_STATUS_RETENTION_MIGRATION_SQL`** — adds the `(status, updatedAt)`
   index for cleanup on a deployment that already has the turn tables. New
   deployments receive the index from `TURN_EVENTS_MIGRATION_SQL`.

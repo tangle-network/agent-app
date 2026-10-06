@@ -120,7 +120,8 @@ CREATE TABLE IF NOT EXISTS turn_status (
   turnId TEXT PRIMARY KEY,
   status TEXT NOT NULL,
   scopeId TEXT,
-  updatedAt TEXT NOT NULL
+  updatedAt TEXT NOT NULL,
+  leaseToken TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_turn_status_scope ON turn_status (scopeId, status);
 CREATE INDEX IF NOT EXISTS idx_turn_status_retention ON turn_status (status, updatedAt);

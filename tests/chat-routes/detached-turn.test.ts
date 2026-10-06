@@ -253,16 +253,12 @@ describe('runDetachedTurn', () => {
     expect(await store.getStatus('t1')).toBe('complete')
   })
 
-  it('crash-retry: a running turn that did NOT finish clears the buffer via resetBuffer, then re-streams', async () => {
+  it('crash-retry: a running turn that did NOT finish clears the buffer via the store, then re-streams', async () => {
     const store = createMemoryTurnEventStore()
     await store.setStatus('t1', 'running', 'thread-1')
     // A stale partial row from the crashed attempt.
     await store.append('t1', [{ seq: 7, event: JSON.stringify({ type: 'text', text: 'stale' }) }])
-    const resetBuffer = vi.fn(async (turnId: string) => {
-      // Simulate a real store clearing the turn's rows.
-      const rows = await store.read(turnId, 0)
-      for (const _ of rows) void _
-    })
+    const resetEvents = vi.spyOn(store, 'resetEvents')
 
     async function* events(): AsyncGenerator<unknown> {
       yield partUpdated({ type: 'text', id: 'x', text: 'fresh' }, 'fresh')
@@ -275,10 +271,10 @@ describe('runDetachedTurn', () => {
       scopeId: 'thread-1',
       events: events(),
       completedResult: async () => null, // genuinely not finished
-      resetBuffer,
     })
 
-    expect(resetBuffer).toHaveBeenCalledWith('t1')
+    expect(resetEvents).toHaveBeenCalledWith('t1')
+    expect((await store.read('t1', 0)).some((row) => row.event.includes('stale'))).toBe(false)
     expect(res).toMatchObject({ state: 'completed', text: 'fresh', cached: false })
   })
 
