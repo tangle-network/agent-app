@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.3
+
+- refactor(web-react): simplify attachment re-exports (#822)
+
 ## 0.56.2
 
 - fix(chat-routes): shared plan follow-up stream parity with GTM; lease column opt-in (#821)
