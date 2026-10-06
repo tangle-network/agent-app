@@ -1363,7 +1363,7 @@ describe('VaultPane — empty vault, empty search, pane switcher', () => {
 
 describe('VaultPane — dock placement by pane width', () => {
   const dock = (props: VaultDockRenderProps) =>
-    createElement('div', { 'data-testid': 'dock', 'data-open': String(props.open) }, 'review')
+    createElement('div', { 'data-testid': 'dock', 'data-open': String(props.open), 'data-placement': props.placement }, 'review')
 
   function withPaneWidth(width: number) {
     const original = globalThis.ResizeObserver
@@ -1386,6 +1386,7 @@ describe('VaultPane — dock placement by pane width', () => {
       expect(screen.getByTestId('artifact')).toBeTruthy()
       fireEvent.click(screen.getByRole('button', { name: 'Review' }))
       expect(screen.getByTestId('dock').closest('[data-vault-dock="inline"]')).toBeTruthy()
+      expect(screen.getByTestId('dock').getAttribute('data-placement')).toBe('inline')
       expect(screen.queryByTestId('artifact')).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: 'Review' }))
       expect(screen.getByTestId('artifact')).toBeTruthy()
@@ -1400,6 +1401,7 @@ describe('VaultPane — dock placement by pane width', () => {
       mount({ renderDock: dock, dockToggle: false, dockLabel: 'Review' })
       await openFile('a.md')
       expect(screen.getByTestId('dock').closest('[data-vault-dock="inline"]')).toBeNull()
+      expect(screen.getByTestId('dock').getAttribute('data-placement')).toBe('side')
       expect(screen.getByTestId('artifact')).toBeTruthy()
       expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
     } finally {

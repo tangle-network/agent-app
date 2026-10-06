@@ -145,6 +145,10 @@ export interface VaultDockRenderProps {
   file: VaultFile | null
   open: boolean
   onClose: () => void
+  /** Where the dock is drawn. `side`: a column beside the document, sized by
+   *  the dock. `inline`: in the document pane of a pane narrower than 960px,
+   *  where the dock should fill its container. */
+  placement: 'side' | 'inline'
 }
 
 /** Configures the dock toggle VaultPane renders above the artifact pane. */

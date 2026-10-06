@@ -1118,7 +1118,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                   <ReadErrorState message={readError} onRetry={() => setReloadNonce((n) => n + 1)} />
                 ) : selectedFile && renderDock && dockInline && dockOpen ? (
                   <div data-vault-dock="inline" className="flex h-full min-h-0 flex-col overflow-y-auto">
-                    {renderDock({ file: selectedFile, open: true, onClose: () => setDockOpen(false) })}
+                    {renderDock({ file: selectedFile, open: true, onClose: () => setDockOpen(false), placement: 'inline' })}
                   </div>
                 ) : selectedFile && canWrite && isMarkdownCapable && editorMode === 'source' ? (
                   <SourceEditor
@@ -1150,6 +1150,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
           file: selectedFile,
           open: persistentDock ? true : dockOpen,
           onClose: persistentDock ? () => {} : () => setDockOpen(false),
+          placement: 'side',
         })}
 
         <ConfirmDialog
