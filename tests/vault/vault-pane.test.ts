@@ -1309,3 +1309,54 @@ it('coalesces a refresh with a pending save into one read after both settle', as
   await waitFor(() => expect(port.readFile).toHaveBeenCalledTimes(reads + 1))
   expect((screen.getByRole('textbox', { name: 'Source editor' }) as HTMLTextAreaElement).value).toBe('saved new draft')
 })
+
+describe('VaultPane — empty vault, empty search, pane switcher', () => {
+  it('replaces a blank tree with an empty state that offers New file, and drops the document pane', async () => {
+    const tree = vi.fn(renderTree)
+    mount({ port: fakePort({ listTree: vi.fn(async () => []) }), renderTree: tree })
+    expect(await screen.findByText('No files yet')).toBeTruthy()
+    expect(tree).not.toHaveBeenCalled()
+    // Nothing to search and nothing to switch to.
+    expect(screen.queryByLabelText('Search vault')).toBeNull()
+    expect(screen.queryByRole('navigation')).toBeNull()
+    expect(screen.getByRole('region', { hidden: true, name: 'Vault document' }).className).toContain('hidden')
+    expect(screen.getByRole('region', { hidden: true, name: 'Vault document' }).className).not.toContain('@[45rem]/vault:flex')
+    fireEvent.click(screen.getByRole('button', { name: 'New file' }))
+    expect(screen.getByLabelText('New file path')).toBeTruthy()
+  })
+
+  it('explains a read-only empty vault without offering an action it cannot take', async () => {
+    mount({ port: fakePort({ listTree: vi.fn(async () => []) }), canWrite: false })
+    expect(await screen.findByText('Files appear here once they are added.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'New file' })).toBeNull()
+  })
+
+  it('renders a product empty state in place of the default', async () => {
+    mount({
+      port: fakePort({ listTree: vi.fn(async () => []) }),
+      treeEmptyState: createElement('p', null, 'Upload a contract to start'),
+    })
+    expect(await screen.findByText('Upload a contract to start')).toBeTruthy()
+    expect(screen.queryByText('No files yet')).toBeNull()
+  })
+
+  it('says when a search matches nothing and clears it', async () => {
+    mount()
+    await screen.findByTestId('tree-a.md')
+    fireEvent.change(screen.getByLabelText('Search vault'), { target: { value: 'zzz' } })
+    expect(screen.getByText('No files match “zzz”.')).toBeTruthy()
+    expect(screen.queryByTestId('tree')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(await screen.findByTestId('tree-a.md')).toBeTruthy()
+  })
+
+  it('shows the narrow-pane switcher only once a document is open', async () => {
+    mount()
+    await screen.findByTestId('tree-a.md')
+    expect(screen.queryByRole('navigation', { name: 'Vault navigation' })).toBeNull()
+    await openFile('a.md')
+    const nav = screen.getByRole('navigation', { name: 'Vault navigation' })
+    expect(nav.textContent).toContain('Files')
+    expect(nav.textContent).toContain('a.md')
+  })
+})

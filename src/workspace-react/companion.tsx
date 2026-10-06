@@ -175,7 +175,10 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
     <Tabs key={persistenceKey} value={active} onValueChange={selectTab} className={`flex h-full min-h-0 min-w-0 flex-1 flex-col ${className ?? ''}`}>
       <WorkspaceLayout
         className="h-full min-h-0 min-w-0 flex-1"
-        collapsedControlsPlacement="overlay"
+        // The expander takes its own column at the conversation's edge. Floated
+        // over the conversation it covered the top-right of a right-aligned
+        // user message on a phone, hiding part of its text.
+        collapsedControlsPlacement="edge"
         keepRightMounted
         center={children}
         left={navigation?.content}

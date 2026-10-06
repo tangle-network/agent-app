@@ -54,13 +54,13 @@ export default meta
 export const ExistingDocument: StoryObj<typeof RefreshingVault> = {}
 
 
-function ResponsiveVault({ externalNavigation = false, initialWidth }: { externalNavigation?: boolean; initialWidth?: number }) {
+function ResponsiveVault({ externalNavigation = false, initialWidth, empty = false }: { externalNavigation?: boolean; initialWidth?: number; empty?: boolean }) {
   const paneRef = useRef<VaultPaneHandle>(null)
   const [width, setWidth] = useState(initialWidth ?? (externalNavigation ? 960 : 390))
-  const [path, setPath] = useState<string | null>('brief.md')
+  const [path, setPath] = useState<string | null>(empty ? null : 'brief.md')
   const [navigationResult, setNavigationResult] = useState('')
   const port = useMemo<VaultDataPort>(() => {
-    const documents = new Map([
+    const documents = new Map(empty ? [] : [
       ['brief.md', content],
       ['notes.md', '# Notes\n\nKeep unsaved work while browsing files.'],
     ])
@@ -77,7 +77,7 @@ function ResponsiveVault({ externalNavigation = false, initialWidth }: { externa
       async createFile(path) { documents.set(path, ''); return path },
       async deleteFile(path) { documents.delete(path) },
     }
-  }, [])
+  }, [empty])
   async function openNewArtifact() {
     const nextPath = await port.createFile('artifact.md')
     await port.writeFile(nextPath, '# Fresh artifact\n\nThis file was created after the tree was loaded.')
@@ -164,4 +164,12 @@ export const ExternalFileNavigation: StoryObj<typeof RefreshingVault> = {
 
 export const DesktopHeaders: StoryObj<typeof RefreshingVault> = {
   render: () => <ResponsiveVault initialWidth={960} />,
+}
+
+export const EmptyVault: StoryObj<typeof RefreshingVault> = {
+  render: () => <ResponsiveVault empty initialWidth={960} />,
+}
+
+export const EmptyVaultNarrow: StoryObj<typeof RefreshingVault> = {
+  render: () => <ResponsiveVault empty initialWidth={390} />,
 }

@@ -222,5 +222,11 @@ export interface VaultPaneProps {
   /** Rendered in the document pane while no file is selected. Defaults to an
    *  empty pane, which suits hosts that float other UI over that area. */
   emptyState?: ReactNode
+  /** Rendered in the tree pane when the vault holds no files or folders. The
+   *  tree pane then spans the whole vault, since there is no document to show
+   *  beside it. Defaults to a short explanation with a New file action when
+   *  creating is allowed; pass your own to name a product action such as an
+   *  upload, or `null` to render nothing. */
+  treeEmptyState?: ReactNode
   className?: string
 }

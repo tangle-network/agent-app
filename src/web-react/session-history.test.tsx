@@ -445,8 +445,11 @@ describe('SessionHistoryPanel', () => {
       onBulkAction,
     })
 
+    // The selection is shown on the rows and by the action it enables, never
+    // as a running count.
+    expect(screen.queryByRole('button', { name: 'Delete selected' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
-    expect(screen.getByText('2 selected')).toBeTruthy()
+    expect(screen.queryByText(/\d+ selected/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }))
     expect(screen.getByRole('dialog')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /^Delete$/ }))

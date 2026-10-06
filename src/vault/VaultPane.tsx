@@ -274,6 +274,49 @@ function TreeErrorState({ label, message, onRetry }: { label: string; message: s
   )
 }
 
+/**
+ * The tree pane when the vault holds nothing at all. It sits under the header
+ * whose controls add files, so it names the state and offers the same action
+ * instead of leaving a blank column under a search box with nothing to search.
+ */
+function TreeEmptyState({ canCreate, onCreate }: { canCreate: boolean; onCreate: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+      <div>
+        <h3 className="text-sm font-medium text-foreground">No files yet</h3>
+        <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+          {canCreate ? 'Create a file to start.' : 'Files appear here once they are added.'}
+        </p>
+      </div>
+      {canCreate && (
+        <button
+          type="button"
+          onClick={onCreate}
+          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          New file
+        </button>
+      )}
+    </div>
+  )
+}
+
+function TreeNoMatchState({ query, onClear }: { query: string; onClear: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-3 p-6 text-center">
+      <p className="max-w-xs break-words text-xs text-muted-foreground">No files match “{query}”.</p>
+      <button
+        type="button"
+        onClick={onClear}
+        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+      >
+        Clear search
+      </button>
+    </div>
+  )
+}
+
 function OperationErrorAlert({
   message,
   retryLabel,
@@ -327,6 +370,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     pathBarClassName,
     label = 'Vault',
     emptyState,
+    treeEmptyState,
     fileActions,
   } = props
   const noun = label.toLowerCase()
@@ -803,6 +847,14 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   }, [selectedFile, port, refresh, commitPath, reportFailure])
 
   const createFileName = newPath.trim().split('/').pop()?.trim() ?? ''
+  const openCreate = () => { setCreateError(null); setNewPath(activeFolder ? `${activeFolder}/` : ''); setCreateOpen(true) }
+  // A loaded vault with nothing in it has no document to show beside the tree,
+  // so the tree pane takes the whole width and carries the empty state. A
+  // selected path still opens the document pane: a committed file can be
+  // readable before the tree lists it.
+  const vaultEmpty = treeLoaded && treePaths.files.size === 0 && treePaths.directories.size === 0
+  const treeSpansPane = vaultEmpty && !selectedPath
+  const trimmedQuery = query.trim()
 
   let treeContent: ReactNode
   if (!treeLoaded && (treeLoading || !treeError)) {
@@ -820,11 +872,15 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
             onDismiss={() => setTreeError(null)}
           />
         )}
-        {renderTree({
-          root: visibleRoot,
-          selectedPath: resolvedSelectedPath ?? undefined,
-          onSelect: handleTreeSelect,
-        })}
+        {vaultEmpty && !trimmedQuery
+          ? (treeEmptyState !== undefined ? treeEmptyState : <TreeEmptyState canCreate={canCreate} onCreate={openCreate} />)
+          : trimmedQuery && (visibleRoot.children?.length ?? 0) === 0
+            ? <TreeNoMatchState query={trimmedQuery} onClear={() => setQuery('')} />
+            : renderTree({
+              root: visibleRoot,
+              selectedPath: resolvedSelectedPath ?? undefined,
+              onSelect: handleTreeSelect,
+            })}
       </>
     )
   }
@@ -833,6 +889,10 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     <EditorErrorBoundary label={label} onReset={() => { commitPath(null); setSelectedFile(null) }}>
       <div className={`flex min-h-0 min-w-0 flex-1 overflow-hidden ${className ?? ''}`}>
         <div className="@container/vault flex min-w-0 flex-1 flex-col">
+          {/* The pane switcher exists only while there is a document to switch
+              to; with nothing selected the Files pane is already all there is,
+              and a lone Files chip would be a control that does nothing. */}
+          {selectedPath && (
           <nav aria-label={`${label} navigation`} className="flex shrink-0 items-center gap-1 border-b border-border p-2 @[45rem]/vault:hidden">
             <button
               type="button"
@@ -862,11 +922,12 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               </button>
             )}
           </nav>
+          )}
           <div className="flex min-h-0 min-w-0 flex-1">
-            <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col border-r border-border bg-background @[45rem]/vault:flex @[45rem]/vault:w-[23rem] @[45rem]/vault:min-w-[23rem] @[45rem]/vault:flex-none`}>
+            <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col bg-background @[45rem]/vault:flex ${treeSpansPane ? '' : 'border-r border-border @[45rem]/vault:w-[23rem] @[45rem]/vault:min-w-[23rem] @[45rem]/vault:flex-none'}`}>
               <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
                 <div className="min-w-0 flex-1">
-                  <input
+                  {!vaultEmpty && <input
                     ref={searchRef}
                     type="text"
                     value={query}
@@ -874,7 +935,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                     placeholder={activeFolder ? `Search ${activeFolder}…` : 'Search…'}
                     aria-label={`Search ${noun}`}
                     className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
-                  />
+                  />}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {headerActions}
@@ -892,7 +953,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                       type="button"
                       title="New file"
                       aria-label={activeFolder ? `New ${noun} file in ${activeFolder}` : `New ${noun} file`}
-                      onClick={() => { setCreateError(null); setNewPath(activeFolder ? `${activeFolder}/` : ''); setCreateOpen(true) }}
+                      onClick={openCreate}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
                     >
                       <Plus className="h-4 w-4" aria-hidden="true" />
@@ -932,7 +993,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               role="region"
               aria-label={`${label} document`}
               tabIndex={-1}
-              className={`${showFiles ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden @[45rem]/vault:flex`}
+              className={`${showFiles || treeSpansPane ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden ${treeSpansPane ? '' : '@[45rem]/vault:flex'}`}
             >
               {selectedFile && (
                 <div className={`flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4 ${pathBarClassName ?? 'bg-card'}`}>
