@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.3
+
+- feat(agent-profiles): persist switch markers per conversation
+
 ## 0.57.2
 
 - fix(agent-profiles): record knowledge changes in revision diffs
