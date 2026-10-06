@@ -20,30 +20,28 @@ export interface ProviderResolutionConfig {
 
 /** Represent a fully configured model with optional API key and base URL for sandbox platform integration */
 /**
- * Spread a {@link ResolvedModel} onto a sandbox backend config as role-named
- * fields. The model id's home on a standalone backend is `modelId`; routing
- * rides `provider`/`apiKey`/`baseUrl` flat — the SDK folds them onto the wire.
+ * Spread a {@link ResolvedModel} onto a sandbox backend config as the nested
+ * `model` object — the one spelling every admitted SDK accepts.
  *
- * The deprecated nested `model` object rides along while agent-app's peer
- * range still admits pre-fold SDK versions (< the 0.60.14 develop train):
- * old SDKs forward only the nested object and drop the unknown flat fields,
- * fold-aware SDKs see two AGREEING spellings and fold them. Delete the
- * nested half when the peer floor moves past the fold.
+ * Do not add the role-named flat fields (`modelId`, `provider`, `apiKey`,
+ * `baseUrl`) beside it until the sandbox peer floor reaches the release that
+ * folds them (0.60.16). A pre-fold SDK forwards the whole backend unchanged,
+ * and the platform's strict backend schema refuses the extra keys:
+ * agent-app 0.53.10–0.54.0 emitted both, and every sandbox chat turn on a
+ * product resolving sandbox < 0.60.16 failed with "unrecognized_keys
+ * provider, apiKey, baseUrl, modelId at path backend" (Creative, 2026-10-06).
  */
 export function backendModelFields(model: ResolvedModel): {
-  modelId: string;
-  provider: string;
-  apiKey?: string;
-  baseUrl?: string;
   model: { model: string; provider: string; apiKey?: string; baseUrl?: string };
 } {
-  const nested = {
-    model: model.model,
-    provider: model.provider,
-    ...(model.apiKey !== undefined ? { apiKey: model.apiKey } : {}),
-    ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
+  return {
+    model: {
+      model: model.model,
+      provider: model.provider,
+      ...(model.apiKey !== undefined ? { apiKey: model.apiKey } : {}),
+      ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
+    },
   };
-  return { ...nested, modelId: model.model, model: nested };
 }
 
 export interface ResolvedModel {

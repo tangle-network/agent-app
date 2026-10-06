@@ -4,7 +4,7 @@
  * Every Tangle agent product resolves the SAME thing from env: the Tangle Router
  * (OpenAI-compatible, metered at the platform markup against a single
  * `TANGLE_API_KEY`) by default, with a direct-Anthropic BYOK escape hatch. The
- * shape feeds the sandbox backend's role-named model fields (see
+ * shape feeds the sandbox backend's nested `model` object (see
  * `backendModelFields`). Lifted here so no product
  * hand-rolls the env parsing + the router default.
  */
