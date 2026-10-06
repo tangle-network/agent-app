@@ -115,6 +115,7 @@ export interface ProfileRevisionStore {
   recordSwitch(receipt: ProfileSwitchReceipt, expectedVersion: number): Promise<ProfileSwitchReceipt>
   /** Persist one immutable pin under a message id; retries must return the same pin. */
   pinTurn(pin: ProfileTurnPin, expectedBindingVersion: number): Promise<ProfileTurnPin>
+  getTurnPin(key: ProfileBindingKey, messageId: string, inputHash: string): Promise<ProfileTurnPin | null>
   listKnowledgeEvents(workspaceId: string, profileId: string): Promise<ProfileKnowledgeEvent[]>
   appendKnowledgeEvent(event: ProfileKnowledgeEvent): Promise<void>
 }
@@ -457,6 +458,9 @@ export async function admitProfileTurn(input: {
   verifyEffectivePlan?: (revision: ProfileRevision, effectivePlanDigest: string,
     key: ProfileBindingKey) => Promise<boolean>
 }): Promise<ProfileTurnPin> {
+  const inputHash = sha256Utf8(input.content)
+  const prior = await input.store.getTurnPin(input.key, input.messageId, inputHash)
+  if (prior) return prior
   const binding = await input.store.getBinding(input.key)
   if (!binding) throw new ProfileAccessError('Choose a profile before sending a message')
   const revision = binding.pinnedRevisionId
@@ -473,7 +477,7 @@ export async function admitProfileTurn(input: {
   if (!planMatches) {
     throw new ProfileAccessError('The selected managed plan is not active for this turn')
   }
-  return input.store.pinTurn({ ...input.key, messageId: input.messageId, inputHash: sha256Utf8(input.content),
+  return input.store.pinTurn({ ...input.key, messageId: input.messageId, inputHash,
     profileId: revision.profileId, revisionId: revision.id,
     authorityDigest: revision.authorityDigest, planDigest: input.observedManagedPlanDigest }, binding.version)
 }
