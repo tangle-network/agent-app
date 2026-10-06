@@ -18,7 +18,12 @@ export * from './protected-runtime-producer'
 export * from './model-failover-stream'
 export * from './draft-persistence'
 export * from './detached-turn'
-export * from './completed-sandbox-turn'
+export {
+  type CompletedSandboxTurnSource,
+  type ReadCompletedSandboxTurnOptions,
+  readCompletedSandboxTurn,
+  recoverSandboxAssistantMessage,
+} from './completed-sandbox-turn'
 export * from './native-completion'
 export * from './plan-follow-up'
 export * from './durable-projection'

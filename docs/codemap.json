@@ -3005,7 +3005,7 @@
         {
           "name": "readCompletedSandboxTurn",
           "kind": "function",
-          "signature": "(box: CompletedSandboxTurnSource, options: ReadCompletedSandboxTurnOptions) => Promise<DetachedTurnFinal | null>",
+          "signature": "(box: CompletedSandboxTurnSource, options: ReadCompletedSandboxTurnOptions) => Promise<(DetachedTurnFinal & Pick<...>)…",
           "doc": "Read the exact completed turn from its keyed cache and completed message."
         },
         {

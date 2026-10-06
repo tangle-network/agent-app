@@ -21,7 +21,7 @@ import {
 } from '../stream/index'
 import { addStepFinishUsage } from './sandbox-turn-usage'
 import type { DetachedTurnFinal } from './detached-turn'
-import type { ChatTurnUsage } from './turn-routes'
+import type { ChatTurnModelAttribution, ChatTurnUsage } from './turn-routes'
 
 /** The official Sandbox methods needed for completed-turn recovery. */
 export type CompletedSandboxTurnSource = Pick<
@@ -51,7 +51,8 @@ function firstNumber(record: JsonRecord | undefined, keys: string[]): number | u
   return undefined
 }
 
-function usageFromResult(result: JsonRecord | undefined): ChatTurnUsage {
+/** @internal Shared terminal-result decoder; callers must establish exact turn identity. */
+export function usageFromResult(result: JsonRecord | undefined): ChatTurnUsage {
   const raw = asRecord(result?.usage) ?? asRecord(result?.tokenUsage)
   const inputTokens = firstNumber(raw, ['inputTokens', 'promptTokens', 'input'])
   const outputTokens = firstNumber(raw, ['outputTokens', 'completionTokens', 'output'])
@@ -76,6 +77,37 @@ function usageFromResult(result: JsonRecord | undefined): ChatTurnUsage {
     ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
     ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
     ...(costUsd !== undefined ? { costUsd } : {}),
+  }
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined
+}
+
+/** @internal Attribution travels with the same validated result as content and usage. */
+export function attributionFromResult(result: Record<string, unknown> | undefined): Pick<
+  ChatTurnModelAttribution,
+  'servedModel' | 'servedProvider' | 'servedSource'
+> {
+  const metadata = asRecord(result?.metadata)
+  const modelAttribution = asRecord(result?.modelAttribution) ?? asRecord(metadata?.modelAttribution)
+  const backend = asRecord(result?.effectiveBackend) ?? asRecord(metadata?.effectiveBackend)
+  const source = nonEmptyString(result?.servedSource)
+    ?? nonEmptyString(modelAttribution?.servedSource)
+    ?? nonEmptyString(backend?.source)
+  const servedSource = source === 'request' || source === 'environment' || source === 'profile'
+    ? source
+    : undefined
+  const servedModel = nonEmptyString(result?.servedModel)
+    ?? nonEmptyString(modelAttribution?.servedModel)
+    ?? nonEmptyString(backend?.model)
+  const servedProvider = nonEmptyString(result?.servedProvider)
+    ?? nonEmptyString(modelAttribution?.servedProvider)
+    ?? nonEmptyString(backend?.provider)
+  return {
+    ...(servedModel ? { servedModel } : {}),
+    ...(servedProvider ? { servedProvider } : {}),
+    ...(servedSource ? { servedSource } : {}),
   }
 }
 
@@ -166,11 +198,13 @@ function hasUsage(usage: ChatTurnUsage): boolean {
  * Read the exact completed turn from its keyed cache and completed message.
  * Never borrow a session-wide aggregate from a concurrently advancing session.
  * Observation failure is retryable and distinct from successful absent reads.
+ * Model attribution comes from that same identity-checked cache record, never
+ * from a second unchecked lookup that could belong to a different turn.
  */
 export async function readCompletedSandboxTurn(
   box: CompletedSandboxTurnSource,
   options: ReadCompletedSandboxTurnOptions,
-): Promise<DetachedTurnFinal | null> {
+): Promise<(DetachedTurnFinal & Pick<ChatTurnModelAttribution, 'servedModel' | 'servedProvider' | 'servedSource'>) | null> {
   const { turnId, sessionId, log } = options
   const session = box.session(sessionId)
   const [cacheOutcome, messagesOutcome] = await Promise.allSettled([
@@ -256,5 +290,6 @@ export async function readCompletedSandboxTurn(
     ...(text !== undefined ? { text } : {}),
     ...(hasUsage(usage) ? { usage } : {}),
     ...(parts ? { parts } : {}),
+    ...attributionFromResult(result),
   }
 }
