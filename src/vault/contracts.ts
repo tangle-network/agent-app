@@ -228,5 +228,10 @@ export interface VaultPaneProps {
    *  creating is allowed; pass your own to name a product action such as an
    *  upload, or `null` to render nothing. */
   treeEmptyState?: ReactNode
+  /** Label of the button that opens a PERSISTENT dock (`dockToggle={false}`)
+   *  when the pane is narrower than 960px. There the dock opens in the
+   *  document pane instead of beside it, so render it to fill its container.
+   *  Defaults to 'Details'. */
+  dockLabel?: string
   className?: string
 }

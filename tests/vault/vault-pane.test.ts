@@ -1360,3 +1360,50 @@ describe('VaultPane — empty vault, empty search, pane switcher', () => {
     expect(nav.textContent).toContain('a.md')
   })
 })
+
+describe('VaultPane — dock placement by pane width', () => {
+  const dock = (props: VaultDockRenderProps) =>
+    createElement('div', { 'data-testid': 'dock', 'data-open': String(props.open) }, 'review')
+
+  function withPaneWidth(width: number) {
+    const original = globalThis.ResizeObserver
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width, height: 600, top: 0, left: 0, right: width, bottom: 600, x: 0, y: 0, toJSON: () => ({}) } as DOMRect)
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver
+    return () => { globalThis.ResizeObserver = original; rect.mockRestore() }
+  }
+
+  it('opens a persistent dock in the document pane on a narrow pane instead of squeezing the document', async () => {
+    const restore = withPaneWidth(390)
+    try {
+      mount({ renderDock: dock, dockToggle: false, dockLabel: 'Review' })
+      await openFile('a.md')
+      // The document is what a narrow pane shows first; the dock is one tap away.
+      expect(screen.queryByTestId('dock')).toBeNull()
+      expect(screen.getByTestId('artifact')).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'Review' }))
+      expect(screen.getByTestId('dock').closest('[data-vault-dock="inline"]')).toBeTruthy()
+      expect(screen.queryByTestId('artifact')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Review' }))
+      expect(screen.getByTestId('artifact')).toBeTruthy()
+    } finally {
+      restore()
+    }
+  })
+
+  it('keeps a persistent dock beside the document on a wide pane, with no toggle', async () => {
+    const restore = withPaneWidth(1200)
+    try {
+      mount({ renderDock: dock, dockToggle: false, dockLabel: 'Review' })
+      await openFile('a.md')
+      expect(screen.getByTestId('dock').closest('[data-vault-dock="inline"]')).toBeNull()
+      expect(screen.getByTestId('artifact')).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
+    } finally {
+      restore()
+    }
+  })
+})

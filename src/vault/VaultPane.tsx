@@ -18,6 +18,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -39,6 +40,9 @@ import type {
   VaultRichParts,
   VaultTreeNode,
 } from './contracts'
+
+/** Narrowest pane that places a dock beside the document rather than in it. */
+const DOCK_SIDE_MIN_PX = 960
 
 const IDENTITY_CODEC: VaultMarkdownCodec = {
   parse: (raw) => raw,
@@ -371,6 +375,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     label = 'Vault',
     emptyState,
     treeEmptyState,
+    dockLabel = 'Details',
     fileActions,
   } = props
   const noun = label.toLowerCase()
@@ -430,6 +435,22 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<VaultOperationFailure | null>(null)
   const [dockOpen, setDockOpen] = useState(false)
+  // Below DOCK_SIDE_MIN_PX of pane width a side dock squeezes the document to
+  // nothing (measured on Legal at 390px: the review panel took the whole width
+  // and the document and its Files switcher were unreachable). There the dock
+  // opens IN the document pane instead, behind a path-bar toggle. Measured, not
+  // a media query: the pane is often a drawer or a split inside a wide window.
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [dockInline, setDockInline] = useState(false)
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    if (!root || !renderDock || typeof ResizeObserver === 'undefined') return
+    const apply = (width: number) => { if (width > 0) setDockInline(width < DOCK_SIDE_MIN_PX) }
+    apply(root.getBoundingClientRect().width)
+    const observer = new ResizeObserver((entries) => apply(entries[0]?.contentRect.width ?? 0))
+    observer.observe(root)
+    return () => observer.disconnect()
+  }, [renderDock])
   const [pendingNav, setPendingNav] = useState<PendingNav>(null)
   const [query, setQuery] = useState('')
   const [folderPath, setFolderPath] = useState<string | null>(null)
@@ -847,6 +868,8 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   }, [selectedFile, port, refresh, commitPath, reportFailure])
 
   const createFileName = newPath.trim().split('/').pop()?.trim() ?? ''
+  const dockButtonLabel = persistentDock ? dockLabel : dockToggleCfg.label
+  const dockBlockedByDraft = !persistentDock && (dockToggleCfg.disabledWhenDirty ?? true) && isDirty
   const openCreate = () => { setCreateError(null); setNewPath(activeFolder ? `${activeFolder}/` : ''); setCreateOpen(true) }
   // A loaded vault with nothing in it has no document to show beside the tree,
   // so the tree pane takes the whole width and carries the empty state. A
@@ -887,7 +910,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
 
   return (
     <EditorErrorBoundary label={label} onReset={() => { commitPath(null); setSelectedFile(null) }}>
-      <div className={`flex min-h-0 min-w-0 flex-1 overflow-hidden ${className ?? ''}`}>
+      <div ref={rootRef} className={`flex min-h-0 min-w-0 flex-1 overflow-hidden ${className ?? ''}`}>
         <div className="@container/vault flex min-w-0 flex-1 flex-col">
           {/* The pane switcher exists only while there is a document to switch
               to; with nothing selected the Files pane is already all there is,
@@ -1029,13 +1052,13 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                         </button>
                       </div>
                     )}
-                    {renderDock && !persistentDock && (
+                    {renderDock && (!persistentDock || dockInline) && (
                       <button
                         type="button"
-                        aria-label={dockToggleCfg.label}
+                        aria-label={dockButtonLabel}
                         aria-pressed={dockOpen}
-                        disabled={(dockToggleCfg.disabledWhenDirty ?? true) && isDirty}
-                        title={(dockToggleCfg.disabledWhenDirty ?? true) && isDirty ? 'Save your changes first' : (dockToggleCfg.title ?? dockToggleCfg.label)}
+                        disabled={dockBlockedByDraft}
+                        title={dockBlockedByDraft ? 'Save your changes first' : (persistentDock ? dockLabel : (dockToggleCfg.title ?? dockToggleCfg.label))}
                         onClick={() => setDockOpen((v) => !v)}
                         className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs transition-colors disabled:pointer-events-none disabled:opacity-40 ${
                           dockOpen
@@ -1043,7 +1066,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                         }`}
                       >
-                        {dockToggleCfg.label}
+                        {dockButtonLabel}
                       </button>
                     )}
                     {fileActions?.(selectedFile)}
@@ -1093,6 +1116,10 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                   <EditorSkeleton />
                 ) : readError && selectedFile?.path !== resolvedSelectedPath ? (
                   <ReadErrorState message={readError} onRetry={() => setReloadNonce((n) => n + 1)} />
+                ) : selectedFile && renderDock && dockInline && dockOpen ? (
+                  <div data-vault-dock="inline" className="flex h-full min-h-0 flex-col overflow-y-auto">
+                    {renderDock({ file: selectedFile, open: true, onClose: () => setDockOpen(false) })}
+                  </div>
                 ) : selectedFile && canWrite && isMarkdownCapable && editorMode === 'source' ? (
                   <SourceEditor
                     path={selectedFile.path}
@@ -1119,7 +1146,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
           </div>
         </div>
 
-        {renderDock && selectedFile && renderDock({
+        {renderDock && selectedFile && !dockInline && renderDock({
           file: selectedFile,
           open: persistentDock ? true : dockOpen,
           onClose: persistentDock ? () => {} : () => setDockOpen(false),
