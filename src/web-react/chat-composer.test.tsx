@@ -306,22 +306,22 @@ describe('ChatComposer layout', () => {
   })
 
   it('keeps Send out of the controls slot, so a wrapping picker set cannot displace it', () => {
-    // What holds Send on the right is the row's structure, not a scroll box:
-    // controls reflow only INSIDE the slot, Send is the slot's sibling rather
-    // than its content, Send never shrinks, and the slot both takes the row's
-    // slack and may shrink under its own content instead of shoving Send off
-    // the edge. A picker set that outgrows the row therefore costs a second
-    // line, never Send's place on the first.
+    // What holds Send clear of the controls is the row's structure, not a
+    // scroll box: controls reflow only INSIDE the slot, Send is not the slot's
+    // content, Send never shrinks, and the slot takes the row's slack but never
+    // shrinks below its widest control. A picker set that outgrows the row
+    // wraps inside the slot; when even one control cannot share the line with
+    // Send, Send moves to its own line instead of being drawn over it.
     render(<ChatComposer onSend={() => {}} controls={<button type="button">Model</button>} />)
     const send = screen.getByLabelText('Send')
     const slot = screen.getByText('Model').parentElement as HTMLElement
 
     expect(slot.contains(send)).toBe(false)
-    expect(send.parentElement).toBe(slot.parentElement)
+    expect(screen.getByTestId('composer-actions').contains(send)).toBe(true)
     expect(send.className).toContain('shrink-0')
     expect(slot.className).toContain('flex-wrap')
     expect(slot.className).toContain('flex-1')
-    expect(slot.className).toContain('min-w-0')
+    expect(slot.className).toContain('min-w-min')
   })
 })
 
@@ -1212,15 +1212,33 @@ describe('ChatComposer input sizing and trailing slot', () => {
     const send = screen.getByLabelText('Send')
 
     expect(slot.contains(trailing)).toBe(false)
-    expect(trailing.parentElement).toBe(slot.parentElement)
-    expect(trailing.className).toContain('shrink-0')
-    // A trailing slot holds pickers in real surfaces, so an overflow box above
+        // A trailing slot holds pickers in real surfaces, so an overflow box above
     // it would clip their popovers exactly as one over the controls slot does.
     const root = container.firstElementChild as HTMLElement
     for (let el: HTMLElement | null = trailing; el && root.contains(el); el = el.parentElement) {
       expect(el.className).not.toMatch(/overflow(-[xy])?-(auto|scroll|hidden|clip)/)
     }
-    expect(send.parentElement).toBe(slot.parentElement)
+    // Trailing content and Send wrap together as one group beside the slot.
+    const actions = screen.getByTestId('composer-actions')
+    expect(actions.parentElement).toBe(slot.parentElement)
+    expect(actions.contains(trailing)).toBe(true)
+    expect(actions.contains(send)).toBe(true)
+  })
+
+  it('lets the row wrap and never lets the controls slot shrink below its widest control', () => {
+    // jsdom has no layout, so this pins the classes that decide it; the
+    // geometry itself is proven in Chromium by playground/scripts/composer-row-overlap.mjs.
+    render(
+      <ChatComposer
+        onSend={() => {}}
+        controls={<button type="button">Plan</button>}
+        trailing={<button type="button">Model</button>}
+      />,
+    )
+    const slot = screen.getByTestId('composer-controls')
+    expect(slot.className).toContain('min-w-min')
+    expect(slot.className).not.toContain('min-w-0')
+    expect(slot.parentElement!.className).toContain('flex-wrap')
   })
 
   it('renders no trailing slot when nothing is passed', () => {

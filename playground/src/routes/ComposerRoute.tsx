@@ -5,6 +5,7 @@ import {
   ModelPicker,
   type ComposerFile,
 } from '@tangle-network/agent-app/web-react'
+import { ComposerModeControls } from '@tangle-network/agent-app/chat-react'
 import type { Harness } from '@tangle-network/agent-app/harness'
 import { makeModels } from '../fixtures'
 
@@ -59,6 +60,10 @@ export function ComposerRoute() {
   const [compactModel, setCompactModel] = useState(models[0]!.id)
   const [compactHarness, setCompactHarness] = useState<Harness>('claude-code')
   const [compactEffort, setCompactEffort] = useState('medium')
+  const [phoneModel, setPhoneModel] = useState(models[0]!.id)
+  const [phonePlan, setPhonePlan] = useState(false)
+  const [phoneHarness, setPhoneHarness] = useState<Harness>('claude-code')
+  const [phoneEffort, setPhoneEffort] = useState('medium')
   const pill = (
     <ModelPicker value={model} onChange={setModel} models={models} />
   )
@@ -132,6 +137,32 @@ export function ComposerRoute() {
               onSend={() => {}}
               placeholder="Message the assistant…"
               controls={pill}
+            />
+          </div>
+        </Demo>
+
+        {/* A 390px phone with 16px gutters: the Plan chip in the controls slot
+            and a model picker in the trailing slot cannot share one line with
+            Send. The actions group must wrap below instead of being drawn over
+            the chip. playground/scripts/composer-row-overlap.mjs measures it. */}
+        <Demo title="Phone width (358px card) — Plan chip, model picker, attach">
+          <div data-composer-overlap="phone" className="w-[358px]">
+            <ChatComposer
+              onSend={() => {}}
+              placeholder="Ask about compliance, filings, or regulations..."
+              onAttach={() => {}}
+              controls={<ComposerModeControls planMode={{ enabled: phonePlan, setEnabled: setPhonePlan }} />}
+              trailing={
+                <AgentSessionControls
+                  models={models}
+                  model={phoneModel}
+                  onModelChange={setPhoneModel}
+                  harness={phoneHarness}
+                  onHarnessChange={setPhoneHarness}
+                  effort={phoneEffort}
+                  onEffortChange={setPhoneEffort}
+                />
+              }
             />
           </div>
         </Demo>

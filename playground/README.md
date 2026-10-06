@@ -51,6 +51,20 @@ Returns real WCAG violations (exact contrast ratios, missing labels/roles) with
 element selectors — the trustworthy alternative to LLM "visual" audits. Prefer
 this for visual QA.
 
+## Composer row overlap check
+
+```bash
+npm run dev                                                     # in one shell
+SHOT_DIR=/tmp/composer node scripts/composer-row-overlap.mjs    # /composer × light/dark
+```
+
+Measures every `[data-composer-overlap]` host on `/composer` in real Chromium.
+No child of the composer's controls slot may intersect another element on the
+action row, spill past its slot, or push a row control past the card's edge.
+The phone-width host reproduces Legal's thread composer at 390px: a Plan chip in
+`controls` and the session controls in `trailing`. Before the row learned to
+wrap, the chip was squeezed to nothing and drawn under the model picker.
+
 ## Popover hit-test audit
 
 ```bash

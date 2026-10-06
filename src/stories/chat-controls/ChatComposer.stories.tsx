@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useState, type ReactNode } from 'react'
 
-import { ChatComposer, ModelPicker, type MentionItem } from '../../web-react'
+import type { Harness } from '../../harness'
+
+import { AgentSessionControls, ChatComposer, ComposerModeControls, ModelPicker, type MentionItem } from '../../web-react'
 import {
   catalogModels,
   DEFAULT_MODEL_ID,
@@ -272,6 +274,46 @@ export const IconSend: Story = {
       floating
     />
   ),
+}
+
+/** Phone width (358px card inside a 390px viewport): a Plan chip in the
+ *  controls slot and the session controls in the trailing slot cannot share a
+ *  line with Send, so the trailing group and Send wrap below, right-aligned,
+ *  instead of being drawn over the chip. */
+export const PhoneWidthPlanAndPicker: Story = {
+  name: 'Phone width — Plan chip and trailing picker',
+  decorators: [
+    (Story) => (
+      <div className="w-[358px] max-w-full">
+        <Story />
+      </div>
+    ),
+  ],
+  render: function PhoneWidth() {
+    const [plan, setPlan] = useState(false)
+    const [model, setModel] = useState(DEFAULT_MODEL_ID)
+    const [harness, setHarness] = useState<Harness>('claude-code')
+    const [effort, setEffort] = useState('medium')
+    return (
+      <ChatComposer
+        onSend={() => {}}
+        placeholder="Ask about compliance, filings, or regulations..."
+        onAttach={() => {}}
+        controls={<ComposerModeControls planMode={{ enabled: plan, setEnabled: setPlan }} />}
+        trailing={
+          <AgentSessionControls
+            models={catalogModels}
+            model={model}
+            onModelChange={setModel}
+            harness={harness}
+            onHarnessChange={setHarness}
+            effort={effort}
+            onEffortChange={setEffort}
+          />
+        }
+      />
+    )
+  },
 }
 
 /** Pill vs both icon tones — the canon shape and the opt-in brand surface. */
