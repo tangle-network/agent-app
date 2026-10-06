@@ -275,7 +275,9 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.123.3', range!)).toBe(true)
     expect(satisfiesRange('0.124.0', range!)).toBe(true)
     expect(satisfiesRange('0.125.0', range!)).toBe(true)
-    expect(satisfiesRange('0.126.0', range!)).toBe(false)
+    expect(satisfiesRange('0.126.0', range!)).toBe(true)
+    expect(satisfiesRange('0.126.1', range!)).toBe(true)
+    expect(satisfiesRange('0.127.0', range!)).toBe(false)
   })
 
   it('requires the UI release that exports openui-schema', async () => {
