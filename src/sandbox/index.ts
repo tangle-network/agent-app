@@ -399,6 +399,7 @@ export interface SandboxRuntimeConfig {
    * Workspace app credentials resolved on creation and before every reuse,
    * resume, or recovery. Fresh values override env in the creation payload.
    * The SDK updates retained runtimes before bootstrap and refuses runtime-managed keys.
+   * A resume receives only the keys the platform names as required to rebuild a runtime.
    * Throw when required credentials cannot be minted; renewal failure preserves
    * the sandbox and prevents dispatch. Requires the matching Sandbox runtime.
    */
@@ -1936,15 +1937,44 @@ async function resumeStoppedBox(
 ): Promise<Outcome<SandboxInstance>> {
   try {
     livenessVerifiedAt.delete(box.id)
-    await box.resume({
-      timeoutMs,
-      ...(Object.keys(runtimeEnv).length > 0 ? { env: runtimeEnv } : {}),
-    })
+    await resumeWithRequiredRuntimeEnv(box, timeoutMs, runtimeEnv)
     await box.waitFor('running', { timeoutMs, ...(onProgress ? { onProgress } : {}) })
     return ok(box)
   } catch (cause) {
     return fail(stoppedBoxResumeError(box, cause))
   }
+}
+
+// Sandbox resume takes `env` only for public keys whose values the platform
+// withholds at rest, and uses them only to rebuild a removed runtime; any
+// other key is refused (400 RESUME_ENV_KEY_NOT_ACCEPTED). A rebuild that lacks
+// values names them (409 RESUME_ENV_REQUIRED, `missingEnvKeys`). So resume
+// without env and supply exactly the named keys from the fresh runtime env.
+// finalizeExistingBox then delivers every fresh value through setRuntimeEnv.
+async function resumeWithRequiredRuntimeEnv(
+  box: SandboxInstance,
+  timeoutMs: number,
+  runtimeEnv: Record<string, string>,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  try {
+    await box.resume({ timeoutMs })
+  } catch (cause) {
+    const missingEnvKeys = resumeEnvRequiredKeys(cause)
+    if (!missingEnvKeys?.length || missingEnvKeys.some((key) => runtimeEnv[key] === undefined)) throw cause
+    await box.resume({
+      timeoutMs: Math.max(1, deadline - Date.now()),
+      env: Object.fromEntries(missingEnvKeys.map((key) => [key, runtimeEnv[key]!])),
+    })
+  }
+}
+
+// Matched by code so SDK versions without ResumeEnvRequiredError still load.
+function resumeEnvRequiredKeys(cause: unknown): string[] | undefined {
+  if (typeof cause !== 'object' || cause === null) return undefined
+  const { code, missingEnvKeys } = cause as { code?: unknown; missingEnvKeys?: unknown }
+  if (code !== 'RESUME_ENV_REQUIRED' || !Array.isArray(missingEnvKeys)) return undefined
+  return missingEnvKeys.filter((key): key is string => typeof key === 'string')
 }
 
 // State-preserving recovery for a box that failed the reuse gate: stop (keeps
