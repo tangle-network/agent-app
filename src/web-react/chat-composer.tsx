@@ -406,8 +406,10 @@ export interface ChatComposerProps {
   /** Pixel height the input grows to before it scrolls. Default 168. */
   maxHeight?: number
   /** Content between the controls slot and Send — a token meter, a cost, a
-   *  status line. It sits outside the controls slot and never shrinks, so a
-   *  wrapping picker set cannot push it away. */
+   *  status line, a model picker. It sits outside the controls slot, so a
+   *  wrapping picker set cannot push it away; it travels with Send onto its
+   *  own line when the row is too narrow for both, and wraps inside that line
+   *  rather than overflowing the card. */
   trailing?: ReactNode
   /**
    * Opt-in `@`-mentions. Present ⇒ the textarea is swapped for a lazily
@@ -1333,7 +1335,13 @@ export function ChatComposer({
           textareaInput
         )}
 
-        <div className="flex items-end gap-2">
+        {/* The row wraps rather than overlaps. The controls slot never shrinks
+            below its widest control (`min-w-min`), so when the controls and the
+            actions group cannot share one line the actions group moves to its
+            own line, right-aligned, instead of being drawn over a squeezed
+            control. With `min-w-0` here a single Plan chip was compressed to
+            nothing at 390px and painted underneath a trailing model picker. */}
+        <div className="flex flex-wrap items-end gap-2">
           {onAttach && (
             <>
               <button
@@ -1383,109 +1391,114 @@ export function ChatComposer({
               stay operable. Rendered even when empty so Send stays right-aligned. */}
           <div
             data-testid="composer-controls"
-            className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5"
+            className="flex min-w-min flex-1 flex-wrap items-center gap-1.5"
           >
             {showInline && controls}
           </div>
 
           {/* Trailing content is the controls slot's SIBLING, not its content:
-              the slot is where a picker set is allowed to wrap and shrink, and
-              a meter or a status line put inside it would be pushed onto the
-              second line by the very pickers it reports on. */}
-          {trailing && (
-            <div data-testid="composer-trailing" className="flex shrink-0 items-center gap-1.5">
-              {trailing}
-            </div>
-          )}
-          {/* Dictation sits beside Send: it produces input, like typing. The
-              button renders only when the host takes audio AND the browser can
-              record — a dead mic is worse than no mic. While recording, the
-              elapsed seconds (not the pulsing dot, which reduced motion
-              collapses) are the signal, and the stop control is never
-              disabled: a `disabled` flip mid-capture must not strand the mic. */}
-          {onDictate && dictation.supported ? (
-            dictation.recording ? (
-              <div className="flex shrink-0 items-center gap-1.5">
-                <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
-                <span
-                  aria-hidden="true"
-                  data-testid="composer-dictate-elapsed"
-                  className="text-xs tabular-nums text-muted-foreground"
-                >
-                  {formatDictationElapsed(dictation.elapsedSeconds)}
-                </span>
-                <span role="status" className="sr-only">
-                  Recording
-                </span>
+              the slot is where a picker set is allowed to wrap, and a meter or
+              a status line put inside it would be pushed onto the second line
+              by the very pickers it reports on. Trailing content, dictation
+              and Send travel together as one group: when the row wraps they
+              move to the next line right-aligned, so Send never lands alone at
+              the start of a line. */}
+          <div data-testid="composer-actions" className="ml-auto flex min-w-0 max-w-full items-end justify-end gap-2">
+            {trailing && (
+              <div data-testid="composer-trailing" className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+                {trailing}
+              </div>
+            )}
+            {/* Dictation sits beside Send: it produces input, like typing. The
+                button renders only when the host takes audio AND the browser can
+                record — a dead mic is worse than no mic. While recording, the
+                elapsed seconds (not the pulsing dot, which reduced motion
+                collapses) are the signal, and the stop control is never
+                disabled: a `disabled` flip mid-capture must not strand the mic. */}
+            {onDictate && dictation.supported ? (
+              dictation.recording ? (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
+                  <span
+                    aria-hidden="true"
+                    data-testid="composer-dictate-elapsed"
+                    className="text-xs tabular-nums text-muted-foreground"
+                  >
+                    {formatDictationElapsed(dictation.elapsedSeconds)}
+                  </span>
+                  <span role="status" className="sr-only">
+                    Recording
+                  </span>
+                  <button
+                    type="button"
+                    onClick={dictation.stop}
+                    aria-label="Stop dictation"
+                    title="Stop dictation"
+                    className="shrink-0 rounded-lg p-2 text-destructive transition hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <StopGlyph className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
                 <button
                   type="button"
-                  onClick={dictation.stop}
-                  aria-label="Stop dictation"
-                  title="Stop dictation"
-                  className="shrink-0 rounded-lg p-2 text-destructive transition hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={dictation.start}
+                  disabled={disabled}
+                  aria-label="Dictate message"
+                  title="Dictate message"
+                  className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <StopGlyph className="h-4 w-4" />
+                  <MicGlyph className="h-4 w-4" />
                 </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={dictation.start}
-                disabled={disabled}
-                aria-label="Dictate message"
-                title="Dictate message"
-                className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <MicGlyph className="h-4 w-4" />
-              </button>
-            )
-          ) : null}
+              )
+            ) : null}
 
-          {isStreaming ? (
-            sendVariant === 'icon' ? (
+            {isStreaming ? (
+              sendVariant === 'icon' ? (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  aria-label="Stop response"
+                  title="Stop"
+                  className="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-border bg-transparent text-foreground transition hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <StopGlyph className="h-3 w-3" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  aria-label="Stop response"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-destructive/15 px-3.5 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+                >
+                  <StopGlyph className="h-3.5 w-3.5" />
+                  <span>Stop</span>
+                </button>
+              )
+            ) : sendVariant === 'icon' ? (
               <button
                 type="button"
-                onClick={onCancel}
-                aria-label="Stop response"
-                title="Stop"
-                className="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-border bg-transparent text-foreground transition hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={send}
+                disabled={!canSend}
+                aria-label={sendLabel}
+                title={sendLabel}
+                className={`inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full ${sendTone === 'primary' ? 'bg-primary text-primary-foreground' : 'bg-foreground text-background'} transition ${sendTone === 'primary' ? 'hover:bg-primary/90' : 'hover:opacity-90'} disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card`}
               >
-                <StopGlyph className="h-3 w-3" />
+                <ArrowUpGlyph className="h-4 w-4" />
               </button>
             ) : (
               <button
                 type="button"
-                onClick={onCancel}
-                aria-label="Stop response"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-destructive/15 px-3.5 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+                onClick={send}
+                disabled={!canSend}
+                aria-label={sendLabel}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
               >
-                <StopGlyph className="h-3.5 w-3.5" />
-                <span>Stop</span>
+                <SendGlyph className="h-3.5 w-3.5" />
+                <span>{sendLabel}</span>
               </button>
-            )
-          ) : sendVariant === 'icon' ? (
-            <button
-              type="button"
-              onClick={send}
-              disabled={!canSend}
-              aria-label={sendLabel}
-              title={sendLabel}
-              className={`inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full ${sendTone === 'primary' ? 'bg-primary text-primary-foreground' : 'bg-foreground text-background'} transition ${sendTone === 'primary' ? 'hover:bg-primary/90' : 'hover:opacity-90'} disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card`}
-            >
-              <ArrowUpGlyph className="h-4 w-4" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={send}
-              disabled={!canSend}
-              aria-label={sendLabel}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
-            >
-              <SendGlyph className="h-3.5 w-3.5" />
-              <span>{sendLabel}</span>
-            </button>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
