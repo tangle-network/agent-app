@@ -21728,10 +21728,22 @@
           "doc": "Human label for a work-product status."
         },
         {
+          "name": "WorkProductStatusPill",
+          "kind": "function",
+          "signature": "({ status, size, className, }: { status: WorkProductStatus; size?: \"md\" | \"sm\" | undefined; className?: string | undefi…",
+          "doc": "A work-product status as a StatusPill: the one rendering of this state, so a product's review page and the transcript card never disagree on it."
+        },
+        {
+          "name": "workProductStatusTone",
+          "kind": "function",
+          "signature": "(status: WorkProductStatus) => StatusTone",
+          "doc": "StatusPill tone for a work-product status."
+        },
+        {
           "name": "WorkspaceInitial",
           "kind": "function",
           "signature": "({ name, size }: { name: string; size?: \"sm\" | \"lg\" | undefined; }) => Element",
-          "doc": "The one workspace avatar: a rounded square with the first letter, tinted with the product accent."
+          "doc": "The one workspace avatar: ui's IconTile with the workspace's initials on a categorical tone derived from its name."
         },
         {
           "name": "WorkspaceSwitcher",
@@ -22846,7 +22858,7 @@
           "name": "WorkspaceInitial",
           "kind": "function",
           "signature": "({ name, size }: { name: string; size?: \"sm\" | \"lg\" | undefined; }) => Element",
-          "doc": "The one workspace avatar: a rounded square with the first letter, tinted with the product accent."
+          "doc": "The one workspace avatar: ui's IconTile with the workspace's initials on a categorical tone derived from its name."
         },
         {
           "name": "WorkspaceList",

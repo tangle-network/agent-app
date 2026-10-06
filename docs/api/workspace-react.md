@@ -160,7 +160,7 @@ AgentWorkspaceNoun
 
 ### `WorkspaceInitial`
 
-`function` — The one workspace avatar: a rounded square with the first letter, tinted with the product accent.
+`function` — The one workspace avatar: ui's IconTile with the workspace's initials on a categorical tone derived from its name.
 
 ```ts
 ({ name, size }: { name: string; size?: "sm" | "lg" | undefined; }) => Element

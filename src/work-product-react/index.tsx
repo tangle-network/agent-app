@@ -28,7 +28,7 @@ import {
   ExceptionList,
   ProvenanceStamp,
   QualityCheckList,
-  workProductStatusLabel,
+  WorkProductStatusPill,
 } from '../web-react/work-product'
 import type {
   EvidenceEntry,
@@ -139,21 +139,26 @@ export function WorkProductPane({
     [loadVersionBody],
   )
 
+  const blockingCount = unresolvedBlockingExceptions(workProduct.exceptions).length
+
   return (
     <div className={`flex min-h-0 flex-col gap-3 ${className ?? ''}`}>
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">
-            {artifact?.title ?? workProduct.scopeKey}
-            <span className="ml-1.5 text-xs font-normal text-muted-foreground">v{workProduct.version}</span>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {artifact?.kind && <span className="font-mono">{artifact.kind} · </span>}
-            {workProductStatusLabel(workProduct.status)}
-            {unresolvedBlockingExceptions(workProduct.exceptions).length > 0 && (
-              <span className="text-destructive"> · {unresolvedBlockingExceptions(workProduct.exceptions).length} blocking</span>
-            )}
-          </p>
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="min-w-0 truncate text-sm font-semibold text-foreground">
+              {artifact?.title ?? workProduct.scopeKey}
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">v{workProduct.version}</span>
+            </p>
+            <WorkProductStatusPill status={workProduct.status} size="sm" className="shrink-0" />
+          </div>
+          {(artifact?.kind || blockingCount > 0) && (
+            <p className="text-xs text-muted-foreground">
+              {artifact?.kind && <span className="font-mono">{artifact.kind}</span>}
+              {artifact?.kind && blockingCount > 0 && ' · '}
+              {blockingCount > 0 && <span className="text-destructive">{blockingCount} blocking</span>}
+            </p>
+          )}
         </div>
         <ProvenanceStamp provenance={workProduct.provenance} backtest={backtest} />
       </div>
@@ -200,7 +205,7 @@ export function WorkProductPane({
               <div key={`${entry.version}:${entry.status}:${entry.at}`} className="rounded-lg border border-border bg-card px-3 py-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium text-foreground">v{entry.version}</span>
-                  <span className="text-xs text-muted-foreground">{workProductStatusLabel(entry.status)}</span>
+                  <WorkProductStatusPill status={entry.status} size="sm" />
                   {entry.reviewedBy && <span className="text-xs text-muted-foreground">by {entry.reviewedBy}</span>}
                   <span className="flex-1" />
                   {loadVersionBody && prior?.artifactPath && entry.artifactPath && (
