@@ -512,8 +512,7 @@ CREATE TABLE IF NOT EXISTS turn_status (
   turnId TEXT PRIMARY KEY,
   status TEXT NOT NULL,
   scopeId TEXT,
-  updatedAt TEXT NOT NULL,
-  leaseToken TEXT
+  updatedAt TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_turn_status_scope ON turn_status (scopeId, status);
 CREATE INDEX IF NOT EXISTS idx_turn_status_retention ON turn_status (status, updatedAt);
@@ -524,8 +523,9 @@ CREATE INDEX IF NOT EXISTS idx_turn_status_retention ON turn_status (status, upd
  *  deployments). SQLite ignores a duplicate-add error if already applied. */
 export const TURN_STATUS_SCOPE_MIGRATION_SQL = `ALTER TABLE turn_status ADD COLUMN scopeId TEXT;`
 
-/** For deployments whose `turn_status` table predates `leaseToken` — run once
- *  to add the column `createD1PlanFollowUpGate` fences its claims on. */
+/** Run once before using `createD1PlanFollowUpGate`: it adds the lease column
+ *  the gate fences its claims on. Stores that never take follow-up claims do
+ *  not need it, so the base turn tables leave it out. */
 export const TURN_STATUS_LEASE_MIGRATION_SQL = 'ALTER TABLE turn_status ADD COLUMN leaseToken TEXT;'
 
 /** For deployments that already have the turn tables, add the index used by
