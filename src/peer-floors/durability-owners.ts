@@ -52,7 +52,7 @@ const SKIP_DIRS = new Set([
 ])
 
 /** One product-local durability primitive the shared owner already provides. */
-export interface DurabilityOwnerViolation {
+interface DurabilityOwnerViolation {
   readonly file: string
   readonly line: number
   readonly rule: string
