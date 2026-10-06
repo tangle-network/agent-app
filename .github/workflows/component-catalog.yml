@@ -98,6 +98,10 @@ jobs:
     env:
       CATALOG_BRANCH: ${{ needs.deployment-credentials.outputs.branch }}
     steps:
+      # Self-hosted workspaces persist between jobs. Start empty so the build
+      # job's checkout and pnpm lockfile cannot change how Wrangler installs.
+      - name: Start from an empty workspace
+        run: find "$GITHUB_WORKSPACE" -mindepth 1 -delete
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: agent-app-catalog-${{ github.sha }}
@@ -105,6 +109,7 @@ jobs:
       - uses: cloudflare/wrangler-action@25853364521e0d392ece9b0c1e97a4b37b638087
         id: deploy
         with:
+          packageManager: npm
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy storybook-static --project-name=agent-app-storybook --branch=${{ env.CATALOG_BRANCH }}
