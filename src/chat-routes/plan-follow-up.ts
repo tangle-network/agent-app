@@ -227,9 +227,9 @@ interface PlanFollowUpStatusRow {
  * table. Every claim writes a random lease and confirms ownership from the
  * row returned by the same D1 batch. A running claim older than
  * `staleAfterMs` may be reclaimed; the superseded holder then settles into
- * `lease_lost` instead of overwriting the newer claim. The table needs the
- * `leaseToken` column from `TURN_EVENTS_MIGRATION_SQL` or, for an older table,
- * `TURN_STATUS_LEASE_MIGRATION_SQL` (both in `/stream`).
+ * `lease_lost` instead of overwriting the newer claim. Apply
+ * `TURN_STATUS_LEASE_MIGRATION_SQL` (from `/stream`) once after the turn
+ * tables: it adds the `leaseToken` column the claim writes.
  */
 export function createD1PlanFollowUpGate(
   db: D1LikeForPlanFollowUps,

@@ -29,7 +29,7 @@ function attach(outcome: 'approved' | 'rejected' = 'approved', revision = 2) {
   return { planId: PLAN_ID, revision, outcome, turnId: planFollowUpTurnId(PLAN_ID, revision, outcome) }
 }
 
-function d1(migration = TURN_EVENTS_MIGRATION_SQL): D1LikeForPlanFollowUps & { sqlite: DatabaseSync } {
+function d1(migration = `${TURN_EVENTS_MIGRATION_SQL}\n${TURN_STATUS_LEASE_MIGRATION_SQL}`): D1LikeForPlanFollowUps & { sqlite: DatabaseSync } {
   const sqlite = new DatabaseSync(':memory:')
   sqlite.exec(migration)
   type Statement = { bind(...values: unknown[]): Statement; run(): Promise<unknown>; execute(): unknown }
@@ -201,10 +201,9 @@ describe('createD1PlanFollowUpGate', () => {
       .resolves.toEqual({ admitted: true, lease: 'lease-retry' })
   })
 
-  it('upgrades a turn_status table created before the lease column', async () => {
-    const legacy = TURN_EVENTS_MIGRATION_SQL.replace(',\n  leaseToken TEXT', '')
-    expect(legacy).not.toContain('leaseToken')
-    const db = d1(legacy)
+  it('needs the lease migration on top of the base turn tables', async () => {
+    expect(TURN_EVENTS_MIGRATION_SQL).not.toContain('leaseToken')
+    const db = d1(TURN_EVENTS_MIGRATION_SQL)
     await expect(createD1PlanFollowUpGate(db).admit(executionId, SESSION_ID)).rejects.toThrow()
     db.sqlite.exec(TURN_STATUS_LEASE_MIGRATION_SQL)
     await expect(createD1PlanFollowUpGate(db, { createLease: () => 'lease' }).admit(executionId, SESSION_ID))

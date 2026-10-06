@@ -15979,7 +15979,7 @@
           "name": "TURN_STATUS_LEASE_MIGRATION_SQL",
           "kind": "const",
           "signature": "\"ALTER TABLE turn_status ADD COLUMN leaseToken TEXT;\"",
-          "doc": "For deployments whose `turn_status` table predates `leaseToken` — run once to add the column `createD1PlanFollowUpGate` fences its claims on."
+          "doc": "Run once before using `createD1PlanFollowUpGate`: it adds the lease column the gate fences its claims on."
         },
         {
           "name": "TURN_STATUS_RETENTION_MIGRATION_SQL",

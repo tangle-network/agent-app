@@ -408,7 +408,7 @@ interface StreamEvent
 
 ### `TURN_STATUS_LEASE_MIGRATION_SQL`
 
-`const` — For deployments whose `turn_status` table predates `leaseToken` — run once to add the column `createD1PlanFollowUpGate` fences its claims on.
+`const` — Run once before using `createD1PlanFollowUpGate`: it adds the lease column the gate fences its claims on.
 
 ```ts
 "ALTER TABLE turn_status ADD COLUMN leaseToken TEXT;"
