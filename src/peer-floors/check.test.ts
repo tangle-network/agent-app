@@ -282,7 +282,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.128.0', range!)).toBe(false)
   })
 
-  it('requires the UI release that exports IconTile', async () => {
+  it('requires the UI release that exports MessageAuthor', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -290,11 +290,11 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/ui']
 
     expect(range).toBeDefined()
-    // 11.17.0 is the first UI release with IconTile, which WorkspaceInitial
-    // renders; 11.16.x also lacks openui-schema's later fixes.
-    expect(satisfiesRange('11.16.5', range!)).toBe(false)
-    expect(satisfiesRange('11.17.0', range!)).toBe(true)
-    expect(satisfiesRange('11.22.2', range!)).toBe(true)
+    // 11.25.0 is the first UI release with MessageAuthor and
+    // isViewerMessage, which ChatMessages renders for a message's author.
+    expect(satisfiesRange('11.24.0', range!)).toBe(false)
+    expect(satisfiesRange('11.25.0', range!)).toBe(true)
+    expect(satisfiesRange('11.30.1', range!)).toBe(true)
     expect(satisfiesRange('12.0.0', range!)).toBe(false)
   })
 
