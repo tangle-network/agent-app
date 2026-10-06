@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.56.4
+
+- refactor(stories): reuse shared chat fixtures (#826)
+- refactor(stories): reuse shared sequence fixtures (#825)
+- refactor(studio)!: remove orphaned model-default helper (#824)
+- test(chat-react): remove re-export identity check (#823)
+
 ## 0.56.3
 
 - refactor(web-react): simplify attachment re-exports (#822)
