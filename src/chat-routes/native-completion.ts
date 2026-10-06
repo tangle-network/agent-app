@@ -6,7 +6,12 @@
 
 import type { SandboxInstance, SessionInfo, SessionMessage } from '@tangle-network/sandbox'
 import type { ChatTurnUsage } from './turn-routes'
-import { readCompletedSandboxTurn, recoverSandboxAssistantMessage } from './completed-sandbox-turn'
+import {
+  attributionFromResult,
+  readCompletedSandboxTurn,
+  recoverSandboxAssistantMessage,
+  usageFromResult,
+} from './completed-sandbox-turn'
 
 export interface NativeCompletionReceipt {
   state: 'completed' | 'failed'
@@ -79,10 +84,6 @@ function timestamp(value: Date | number | null | undefined): number | undefined 
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
-function nonEmptyString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value : undefined
-}
-
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -94,55 +95,12 @@ function isSandboxNotFoundError(value: unknown): boolean {
   return error?.name === 'NotFoundError' || error?.code === 'NOT_FOUND' || error?.status === 404
 }
 
-function attribution(result: Record<string, unknown> | undefined): Pick<
-  NativeCompletionTurnReceipt,
-  'servedModel' | 'servedProvider' | 'servedSource'
-> {
-  const metadata = record(result?.metadata)
-  const modelAttribution = record(result?.modelAttribution) ?? record(metadata?.modelAttribution)
-  const backend = record(result?.effectiveBackend) ?? record(metadata?.effectiveBackend)
-  const source = nonEmptyString(result?.servedSource)
-    ?? nonEmptyString(modelAttribution?.servedSource)
-    ?? nonEmptyString(backend?.source)
-  const servedSource = source === 'request' || source === 'environment' || source === 'profile'
-    ? source
-    : undefined
-  const servedModel = nonEmptyString(result?.servedModel)
-    ?? nonEmptyString(modelAttribution?.servedModel)
-    ?? nonEmptyString(backend?.model)
-  const servedProvider = nonEmptyString(result?.servedProvider)
-    ?? nonEmptyString(modelAttribution?.servedProvider)
-    ?? nonEmptyString(backend?.provider)
-  return {
-    ...(servedModel ? { servedModel } : {}),
-    ...(servedProvider ? { servedProvider } : {}),
-    ...(servedSource ? { servedSource } : {}),
-  }
-}
-
-function usageFromResult(result: Record<string, unknown> | undefined): ChatTurnUsage {
-  const raw = record(result?.usage) ?? record(result?.tokenUsage)
-  const number = (value: unknown): number | undefined =>
-    typeof value === 'number' && Number.isFinite(value) ? value : undefined
-  return {
-    ...(number(raw?.inputTokens) !== undefined ? { inputTokens: number(raw?.inputTokens) } : {}),
-    ...(number(raw?.outputTokens) !== undefined ? { outputTokens: number(raw?.outputTokens) } : {}),
-    ...(number(raw?.cacheReadTokens) !== undefined ? { cacheReadTokens: number(raw?.cacheReadTokens) } : {}),
-    ...(number(raw?.cacheWriteTokens) !== undefined ? { cacheWriteTokens: number(raw?.cacheWriteTokens) } : {}),
-    ...(number(result?.costUsd) !== undefined ? { costUsd: number(result?.costUsd) } : {}),
-  }
-}
-
 function interruptedMessages(messages: SessionMessage[], turnId: string): SessionMessage[] {
   return messages.filter((message) =>
     message.role === 'assistant'
     && message.metadata?.turnId === turnId
     && (message.metadata.interrupted === true || message.metadata.status === 'interrupted'),
   )
-}
-
-function mergeUsage(messageUsage: ChatTurnUsage, resultUsage: ChatTurnUsage): ChatTurnUsage {
-  return { ...messageUsage, ...resultUsage }
 }
 
 function consistent<T>(values: Array<T | undefined>): T | undefined {
@@ -259,7 +217,9 @@ export async function observeNativeCompletion(
   }
   if (admittedTurnIds.some((turnId) => runsByTurnId.get(turnId)?.status === 'active')) return { state: 'running' }
 
-  const messages = await exactSession.messages({ limit: 1_000 })
+  // Completed recovery owns its message read. Load interrupted history only
+  // when it is needed, and share that one read across failed continuations.
+  let messages: SessionMessage[] | undefined
   const recovered: NativeCompletionTurnReceipt[] = []
   for (const turnId of admittedTurnIds) {
     const run = runsByTurnId.get(turnId)
@@ -270,21 +230,20 @@ export async function observeNativeCompletion(
     const completed = run.status === 'completed'
       ? await readCompletedSandboxTurn(source, { turnId, sessionId: options.sessionId })
       : null
-    const cached = run.status === 'completed'
-      ? await source.findCompletedTurn(turnId, { sessionId: options.sessionId })
-      : null
     if (run.status === 'completed' && completed) {
       recovered.push({
+        ...completed,
         turnId,
         state: 'completed',
         text: completed.text ?? '',
         parts: completed.parts ?? [],
         usage: completed.usage ?? {},
-        ...attribution(cached?.result),
       })
       continue
     }
-    const interrupted = interruptedMessages(messages, turnId)
+    const interrupted = run.status === 'failed' || run.status === 'cancelled'
+      ? interruptedMessages(messages ??= await exactSession.messages({ limit: 1_000 }), turnId)
+      : []
     if ((run.status === 'failed' || run.status === 'cancelled') && interrupted.length === 1) {
       const message = recoverSandboxAssistantMessage(interrupted[0]!)
       const result = await exactSession.result({ executionId: turnId })
@@ -293,11 +252,8 @@ export async function observeNativeCompletion(
         state: 'failed',
         text: message.text ?? result.response ?? '',
         parts: message.parts ?? [],
-        usage: mergeUsage(message.usage ?? {}, {
-          ...usageFromResult(result as unknown as Record<string, unknown>),
-          ...(result.costUsd !== undefined ? { costUsd: result.costUsd } : {}),
-        }),
-        ...attribution(result as unknown as Record<string, unknown>),
+        usage: { ...message.usage, ...usageFromResult(result as unknown as Record<string, unknown>) },
+        ...attributionFromResult(result as unknown as Record<string, unknown>),
         error: result.error ?? interrupted[0]!.metadata?.interruptReason ?? status.failureReason?.message,
       })
       continue
