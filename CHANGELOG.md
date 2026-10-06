@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.0
+
+- feat!: remove agent-app subpaths no product imports (#805)
+
 ## 0.53.17
 
 - fix(theme): dark: utilities apply under the .dark class as well as data-theme
