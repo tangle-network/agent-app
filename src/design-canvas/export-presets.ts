@@ -43,12 +43,6 @@ export const SIZE_PRESETS: readonly SizePreset[] = [
   { id: 'us-letter-landscape', label: 'US Letter Landscape', category: 'print', width: 1100, height: 850 },
   { id: 'us-letter-portrait', label: 'US Letter Portrait', category: 'print', width: 850, height: 1100 },
 ] as const
-
-/** Resolve a size preset by its identifier or return null if not found */
-export function findPreset(id: string): SizePreset | null {
-  return SIZE_PRESETS.find((p) => p.id === id) ?? null
-}
-
 /** Match a (width, height) pair against the preset table. Returns the first
  *  exact match or null — used to drive the dropdown selection indicator. */
 export function matchPreset(width: number, height: number): SizePreset | null {

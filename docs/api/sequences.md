@@ -4,7 +4,7 @@
 
 Source: `src/sequences/index.ts`
 
-113 exports.
+111 exports.
 
 ### `AddCaptionOperation`
 
@@ -174,14 +174,6 @@ type CaptionTargetResolution
 (input: { playheadFrame: number; fps: number; sequenceDurationFrames: number; occupiedIntervals: TimelineInterval[]; })…
 ```
 
-### `clampClipDuration`
-
-`function` — Clamp clip duration to fit within sequence bounds and minimum length constraints
-
-```ts
-(input: { startFrame: number; durationFrames: number; sequenceDurationFrames: number; }) => number
-```
-
 ### `clampClipStart`
 
 `function` — Clamp the clip start frame within the valid range of the sequence duration and clip length
@@ -252,14 +244,6 @@ interface DeleteClipOperation
 
 ```ts
 interface ExtendSequenceOperation
-```
-
-### `findSequenceMcpTool`
-
-`function` — Resolve the SequenceMcpToolDefinition matching the given name or return undefined
-
-```ts
-(name: string) => SequenceMcpToolDefinition | undefined
 ```
 
 ### `formatSeconds`

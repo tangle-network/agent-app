@@ -351,37 +351,10 @@ function toChatMessagePart(part: Record<string, unknown>): ChatMessagePart | nul
     }
   }
 }
-
-/** Resolve whether a ChatMessagePart is specifically a ChatToolPart based on its type property */
-export function isChatToolPart(part: ChatMessagePart): part is ChatToolPart {
-  return part.type === 'tool'
-}
-
-/** Resolve whether a chat message part is a text part based on its type property */
-export function isChatTextPart(part: ChatMessagePart): part is ChatTextPart {
-  return part.type === 'text'
-}
-
 /** Resolve whether a ChatMessagePart is a ChatInteractionPart based on its type property */
 export function isChatInteractionPart(part: ChatMessagePart): part is ChatInteractionPart {
   return part.type === 'interaction'
 }
-
-/** Resolve whether a chat message part is a persisted chat plan part */
-export function isChatPlanPart(part: ChatMessagePart): part is ChatPlanPart {
-  return part.type === 'plan'
-}
-
-/** Resolve whether a chat message part is a persisted work-product anchor */
-export function isChatWorkProductPart(part: ChatMessagePart): part is ChatWorkProductPart {
-  return part.type === 'work_product'
-}
-
-/** Determine if a chat message part represents the completion of a chat step */
-export function isChatStepFinishPart(part: ChatMessagePart): part is ChatStepFinishPart {
-  return part.type === 'step-finish'
-}
-
 /** Widened to `unknown` — unlike its siblings this guard also runs over raw
  *  untyped stored rows (a transcript renderer reads `message.parts` before the
  *  typed projection), which is exactly what {@link mentionPartsFromMessageParts}

@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-457 exports.
+456 exports.
 
 ### `acceptRejectionReason`
 
@@ -2916,14 +2916,6 @@ interface ReviewQueuePanelProps
 
 ```ts
 type ReviewQueueState
-```
-
-### `reviewQueueStateLabel`
-
-`function` — Human label for a queue state.
-
-```ts
-(state: ReviewQueueState) => string
 ```
 
 ### `rollUpProvenanceStanding`

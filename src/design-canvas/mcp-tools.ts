@@ -200,7 +200,6 @@ function collectPageSlotAttrs(page: ScenePage): Map<string, { elementId: string;
   return slots
 }
 
-
 // ---------------------------------------------------------------------------
 // JSON Schema helpers
 // ---------------------------------------------------------------------------
@@ -1004,15 +1003,3 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
 ]
 
 export { CANVAS_MCP_TOOLS }
-
-/** Find the canvas MCP tool definition matching the given name or return undefined */
-export function findCanvasMcpTool(
-  name: string,
-): McpToolDefinition<DesignCanvasMcpToolEnv> | undefined {
-  return CANVAS_MCP_TOOLS.find((tool) => tool.name === name)
-}
-
-/** Extract names of all tools from the CANVAS_MCP_TOOLS array */
-export const CANVAS_MCP_TOOL_NAMES = CANVAS_MCP_TOOLS.map((t) => t.name)
-/** Provide a readonly array of string identifiers representing canvas element kinds */
-export const CANVAS_ELEMENT_KINDS: readonly string[] = SCENE_ELEMENT_KINDS

@@ -4,7 +4,7 @@
 
 Source: `src/studio/index.ts`
 
-70 exports.
+69 exports.
 
 ### `aspectRatioFromOptions`
 
@@ -364,14 +364,6 @@ type MediaTypeFilter
 
 ```ts
 1
-```
-
-### `modelMessage`
-
-`function` — DEPRECATED (the composer renders availability in the pill/menu/lane states since #463) — resolve the status message for a media model.
-
-```ts
-(model: MediaModelOption | undefined, loading: boolean, count: number) => string | null
 ```
 
 ### `ModelOptionMetadata`

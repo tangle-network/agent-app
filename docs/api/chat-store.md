@@ -4,7 +4,7 @@
 
 Source: `src/chat-store/index.ts`
 
-64 exports.
+59 exports.
 
 ### `AppendMessageInput`
 
@@ -380,46 +380,6 @@ interface CreateThreadInput
 
 ```ts
 (part: unknown) => part is ChatMentionPart
-```
-
-### `isChatPlanPart`
-
-`function` — Resolve whether a chat message part is a persisted chat plan part
-
-```ts
-(part: ChatMessagePart) => part is ChatPlanPersistedPart
-```
-
-### `isChatStepFinishPart`
-
-`function` — Determine if a chat message part represents the completion of a chat step
-
-```ts
-(part: ChatMessagePart) => part is ChatStepFinishPart
-```
-
-### `isChatTextPart`
-
-`function` — Resolve whether a chat message part is a text part based on its type property
-
-```ts
-(part: ChatMessagePart) => part is ChatTextPart
-```
-
-### `isChatToolPart`
-
-`function` — Resolve whether a ChatMessagePart is specifically a ChatToolPart based on its type property
-
-```ts
-(part: ChatMessagePart) => part is ChatToolPart
-```
-
-### `isChatWorkProductPart`
-
-`function` — Resolve whether a chat message part is a persisted work-product anchor
-
-```ts
-(part: ChatMessagePart) => part is WorkProductPersistedPart
 ```
 
 ### `ListMessagesOptions`

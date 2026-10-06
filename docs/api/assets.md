@@ -4,7 +4,7 @@
 
 Source: `src/assets/index.ts`
 
-44 exports.
+41 exports.
 
 ### `ApprovalEvent`
 
@@ -12,14 +12,6 @@ Source: `src/assets/index.ts`
 
 ```ts
 interface ApprovalEvent
-```
-
-### `ApprovalEventSchema`
-
-`const` — Validate approval event data including asset, action, user, timestamp, and optional fields
-
-```ts
-ZodObject<{ assetId: ZodString; variantId: ZodOptional<ZodString>; action: ZodEnum<{ approved: "approved"; rejected: "r…
 ```
 
 ### `AssetContentMap`
@@ -92,14 +84,6 @@ ZodObject<{ primaryColor: ZodString; accentColor: ZodString; textColor: ZodStrin
 
 ```ts
 interface ConversionMetrics
-```
-
-### `ConversionMetricsSchema`
-
-`const` — Validate conversion metrics with nonnegative impressions, clicks, conversions, CTR, and CVR fields
-
-```ts
-ZodObject<{ impressions: ZodNumber; clicks: ZodNumber; conversions: ZodNumber; ctr: ZodNumber; cvr: ZodNumber; }, $stri…
 ```
 
 ### `CopyContent`
@@ -284,14 +268,6 @@ interface ImageTextLayer
 
 ```ts
 (raw: unknown) => AssetSpec<AssetFormat>
-```
-
-### `safeParseAssetSpec`
-
-`function` — Safe parse — returns null instead of throwing.
-
-```ts
-(raw: unknown) => AssetSpec<AssetFormat> | null
 ```
 
 ### `VideoCaption`

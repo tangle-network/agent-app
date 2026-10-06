@@ -4,7 +4,7 @@
 
 Source: `src/design-canvas-react/index.ts`
 
-131 exports.
+130 exports.
 
 ### `addElementCommand`
 
@@ -324,14 +324,6 @@ interface DesignCanvasProps
 
 ```ts
 (cropRect: ExportCropRect, stageScale: number, stageX: number, stageY: number) => { x: number; y: number; width: number…
-```
-
-### `downloadDataUrl`
-
-`function` — Trigger a browser download for a data URL.
-
-```ts
-(dataUrl: string, filename: string) => void
 ```
 
 ### `DUPLICATE_OFFSET`
