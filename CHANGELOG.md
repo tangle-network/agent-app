@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.0
+
+- fix(release)!: count breaking commits since last release (#829)
+
 ## 0.56.5
 
 - refactor(stories): reuse shared canvas poster (#828)
