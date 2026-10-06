@@ -55,6 +55,34 @@ describe('ChatMessages segmented turns', () => {
     ).toContain('agent-app-message-copy')
   })
 
+  it('renders a notice segment in its status tone, after the answer text and apart from it', () => {
+    const message: ChatUiMessage = {
+      id: 'failed-1',
+      role: 'assistant',
+      content: '',
+      segments: [
+        { kind: 'text', content: 'Partial answer' },
+        { kind: 'notice', tone: 'error', content: 'The sandbox agent returned an error.' },
+        { kind: 'notice', tone: 'warning', content: 'Served by a fallback model.' },
+      ],
+    }
+    const { container, getByText } = render(
+      <ChatMessages messages={[message]} renderMarkdown={(content) => <p>{content}</p>} />,
+    )
+
+    const error = getByText('The sandbox agent returned an error.').closest('[data-notice-tone]')
+    expect(error?.getAttribute('data-notice-tone')).toBe('error')
+    expect(error?.className).toContain('text-destructive')
+    expect(error?.className).not.toContain('text-warning')
+    const warning = getByText('Served by a fallback model.').closest('[data-notice-tone]')
+    expect(warning?.className).toContain('text-warning-strong')
+    // The notice is not answer prose: the markdown renderer never received it.
+    expect(getByText('Partial answer').closest('[data-notice-tone]')).toBeNull()
+    expect(indexIn(container, 'Partial answer')).toBeLessThan(
+      indexIn(container, 'The sandbox agent returned an error.'),
+    )
+  })
+
   it('renders text and tool segments in chronological order', () => {
     const message: ChatUiMessage = {
       id: 'm1',

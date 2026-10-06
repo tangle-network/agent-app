@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-456 exports.
+457 exports.
 
 ### `acceptRejectionReason`
 
@@ -508,6 +508,14 @@ type ChatMessageSegment
 
 ```ts
 interface ChatMessagesProps
+```
+
+### `ChatNoticeTone`
+
+`type` — Status tone of a {@link ChatMessageSegment} notice.
+
+```ts
+type ChatNoticeTone
 ```
 
 ### `ChatSelectField`
@@ -2072,7 +2080,7 @@ interface ModelPickerProps
 
 ### `NoticeKind`
 
-`type` — Define specific string literals representing different kinds of notices
+`type` — Kinds of transcript notice.
 
 ```ts
 type NoticeKind
@@ -2080,7 +2088,7 @@ type NoticeKind
 
 ### `noticePart`
 
-`function` — Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction).
+`function` — Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error).
 
 ```ts
 (noticeKind: NoticeKind, id: string, text: string) => NoticePersistedPart

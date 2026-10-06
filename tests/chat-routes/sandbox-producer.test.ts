@@ -1028,6 +1028,34 @@ describe('createSandboxChatProducer', () => {
     expect(producer.finalText()).not.toContain('---')
   })
 
+  it.each(['raw', 'throw'] as const)('errorNotice persists a %s terminal error as an error notice part, never as answer text', async (source) => {
+    const answer = 'Partial answer'
+    const partial = [partUpdated({ type: 'text', id: 'partial', text: answer }, answer)]
+    const rawError = { type: 'error', data: { error: 'model rejected' } }
+    const producer = createSandboxChatProducer({
+      errorNotice: true,
+      events: source === 'raw'
+        ? feed([...partial, rawError])
+        : throwingFeed(partial, new Error('disconnected')),
+    })
+
+    const events = await drain(producer.stream)
+
+    expect(events.filter((event) => event.type === 'text')).toEqual([{ type: 'text', text: answer }])
+    const notices = events.filter((event) => event.type === 'notice')
+    expect(notices).toEqual([
+      expect.objectContaining({ type: 'notice', id: 'error-1', noticeKind: 'error' }),
+    ])
+    const noticeText = (notices[0] as { text: string }).text
+    expect(noticeText).toMatch(source === 'raw' ? /model rejected/ : /.+/)
+    expect(events.at(-1)).toMatchObject({ type: 'error' })
+    expect(producer.finalText()).toBe(answer)
+    expect(producer.assistantParts?.()).toEqual([
+      expect.objectContaining({ type: 'text', text: answer }),
+      { type: 'notice', id: 'error-1', noticeKind: 'error', text: noticeText },
+    ])
+  })
+
   it.each(['raw', 'throw'] as const)('keeps partial answers and structured %s errors without diagnostic text', async (source) => {
     const answer = 'Partial answer. The sandbox agent returned an error before producing a visible answer.\n\nError: quoted example'
     const partial = [partUpdated({ type: 'text', id: 'partial', text: answer }, answer)]

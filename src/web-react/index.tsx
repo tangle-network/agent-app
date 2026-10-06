@@ -258,6 +258,13 @@ export function pendingApprovalOf(call: ChatToolCallInfo): { proposalId: string 
 export type ChatMessageSegment =
   | { kind: 'text'; content: string }
   | { kind: 'tool'; call: ChatToolCallInfo }
+  /** An out-of-band transcript notice — a failed turn's error, a warning —
+   *  rendered in its status tone so it never reads as answer prose. Map a
+   *  persisted `notice` part (`noticeKind: 'error' | 'warning'`) to this. */
+  | { kind: 'notice'; tone: ChatNoticeTone; content: string }
+
+/** Status tone of a {@link ChatMessageSegment} notice. */
+export type ChatNoticeTone = 'error' | 'warning'
 
 /** Describe the structure and properties of a chat message with roles, content, and optional metadata */
 export interface ChatUiMessage extends ChatMessageMetrics {
@@ -1070,12 +1077,15 @@ function SegmentedBody({
   const groups: Array<
     | { kind: 'text'; index: number; content: string }
     | { kind: 'tools'; index: number; calls: ChatToolCallInfo[] }
+    | { kind: 'notice'; index: number; tone: ChatNoticeTone; content: string }
   > = []
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]
     if (!seg) continue
     if (seg.kind === 'text') {
       groups.push({ kind: 'text', index: i, content: seg.content })
+    } else if (seg.kind === 'notice') {
+      groups.push({ kind: 'notice', index: i, tone: seg.tone, content: seg.content })
     } else {
       const last = groups[groups.length - 1]
       if (last && last.kind === 'tools') last.calls.push(seg.call)
@@ -1095,6 +1105,10 @@ function SegmentedBody({
   // layout is byte-for-byte what it was.
   const children: ReactNode[] = []
   for (const g of groups) {
+    if (g.kind === 'notice') {
+      children.push(<SegmentNotice key={`notice-${g.index}`} tone={g.tone} content={g.content} />)
+      continue
+    }
     if (g.kind === 'text') {
       children.push(
         <SegmentText
@@ -1273,7 +1287,7 @@ function AssistantMessageImpl({
   // perpetually "Thinking…" after its answer segments are visible.
   const hasAnswerText =
     content !== '' ||
-    (segments?.some((s) => s.kind === 'text' && s.content.trim() !== '') ??
+    (segments?.some((s) => (s.kind === 'text' || s.kind === 'notice') && s.content.trim() !== '') ??
       false)
   const reasoningScrollRef = useRef<HTMLDivElement>(null)
   // Measure visible thinking time: first reasoning reveal → first answer text.
@@ -1470,6 +1484,30 @@ function ThinkingRow({ agentLabel, chrome = 'labeled' }: { agentLabel: string; c
         </svg>
         Thinking{seconds >= 3 ? ` · ${seconds}s` : '...'}
       </div>
+    </div>
+  )
+}
+
+const NOTICE_TONE_CLASS: Record<ChatNoticeTone, string> = {
+  error: 'border-destructive/40 bg-destructive/5 text-destructive',
+  warning: 'border-warning/40 bg-warning/10 text-warning-strong',
+}
+
+/** An in-turn notice segment: the same status-toned box as the stream error
+ *  row, inline in the transcript. Not `role="alert"` — a reloaded history must
+ *  not re-announce every past failure; the live failure path keeps
+ *  `StreamErrorRow` for that. */
+function SegmentNotice({ tone, content }: { tone: ChatNoticeTone; content: string }) {
+  return (
+    <div
+      data-notice-tone={tone}
+      className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm ${NOTICE_TONE_CLASS[tone]}`}
+    >
+      <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 8v4m0 4h.01" />
+      </svg>
+      <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{content}</span>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@tangle-network/sandbox-ui/primitives'
 import { WorkspaceLayout } from '@tangle-network/sandbox-ui/workspace'
 import { FlaskConical, FolderOpen, GitCompare, Monitor, Terminal } from 'lucide-react'
@@ -196,15 +196,7 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
         persistenceKey={persistenceKey}
         minRightWidth={280}
         rightContentClassName="flex flex-col overflow-hidden"
-        rightHeader={tabs.length > 0 ? (
-          <TabsList aria-label={label} className="h-9 max-w-full justify-start overflow-x-auto bg-transparent p-0">
-            {tabs.map((tab) => (
-              <TabsTrigger key={tab.id} value={tab.id} className="gap-1.5 px-2.5 text-sm">
-                {tab.icon}<span>{tab.label}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        ) : undefined}
+        rightHeader={tabs.length > 0 ? <CompanionTabList tabs={tabs} active={active} label={label} /> : undefined}
         right={tabs.length > 0 ? tabs.map((tab) => {
           const isActive = tab.id === active
           const retained = tab.keepMounted && visited.has(tab.id)
@@ -225,3 +217,67 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
     </Tabs>
   )
 })
+
+/**
+ * The companion's tab row. When every labelled tab does not fit the pane (a
+ * phone drawer, a narrow resized pane), inactive tabs that have an icon drop to
+ * icon-only and the active tab keeps its label, so no tab hides behind the
+ * close button. Labels stay in the accessibility tree either way. The row
+ * returns to full labels once the pane is wide enough for them again.
+ */
+function CompanionTabList({ tabs, active, label }: { tabs: readonly AgentWorkspaceCompanionTab[]; active: string | undefined; label: string }) {
+  const frameRef = useRef<HTMLDivElement>(null)
+  const fullWidth = useRef(0)
+  const [compact, setCompact] = useState(false)
+  const signature = tabs.map((tab) => `${tab.id}\u0000${tab.label}\u0000${tab.icon ? 1 : 0}`).join('\u0001')
+
+  useLayoutEffect(() => {
+    fullWidth.current = 0
+    setCompact(false)
+  }, [signature])
+
+  useLayoutEffect(() => {
+    const frame = frameRef.current
+    const list = frame?.firstElementChild
+    if (!frame || !(list instanceof HTMLElement)) return
+    const fit = () => {
+      const available = frame.clientWidth
+      if (!compact) {
+        fullWidth.current = list.scrollWidth
+        if (list.scrollWidth > available + 1) setCompact(true)
+      } else if (fullWidth.current > 0 && available >= fullWidth.current) {
+        setCompact(false)
+      }
+    }
+    fit()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(fit)
+    observer.observe(frame)
+    return () => observer.disconnect()
+  }, [compact, signature])
+
+  useEffect(() => {
+    const trigger = frameRef.current?.querySelector<HTMLElement>('[role="tab"][data-state="active"]')
+    trigger?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [active, compact])
+
+  return (
+    <div ref={frameRef} className="min-w-0" data-compact={compact ? '' : undefined}>
+      <TabsList aria-label={label} className="h-9 max-w-full justify-start overflow-x-auto bg-transparent p-0">
+        {tabs.map((tab) => {
+          const iconOnly = compact && tab.icon && tab.id !== active
+          return (
+            <TabsTrigger
+              key={tab.id}
+              value={tab.id}
+              title={iconOnly ? tab.label : undefined}
+              className={iconOnly ? 'gap-1.5 px-2 text-sm' : 'gap-1.5 px-2.5 text-sm'}
+            >
+              {tab.icon}<span className={iconOnly ? 'sr-only' : undefined}>{tab.label}</span>
+            </TabsTrigger>
+          )
+        })}
+      </TabsList>
+    </div>
+  )
+}

@@ -113,6 +113,18 @@ describe('consumeChatStream', () => {
     expect(result.receivedContent).toBe(true)
   })
 
+  it('dispatches error notices', () => {
+    const notices: unknown[] = []
+    dispatchChatStreamLine(JSON.stringify({
+      type: 'notice',
+      id: 'error-1',
+      noticeKind: 'error',
+      text: 'The sandbox agent returned an error.',
+    }), { onNotice: (notice) => notices.push(notice) })
+
+    expect(notices).toEqual([{ id: 'error-1', noticeKind: 'error', text: 'The sandbox agent returned an error.' }])
+  })
+
   it('dispatches structured error detail alongside the legacy message callback', () => {
     const messages: string[] = []
     const details: unknown[] = []

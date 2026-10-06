@@ -255,3 +255,40 @@ describe('shared companion defaults', () => {
   })
 
 })
+
+describe('companion tab row in a narrow pane', () => {
+  it('drops inactive tabs to icon-only when the labels do not fit, and restores them when they do', async () => {
+    let frameWidth = 300
+    const observers: Array<(entries: unknown[]) => void> = []
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: (entries: unknown[]) => void) { observers.push(callback) }
+      observe() {}
+      disconnect() {}
+    })
+    const isFrame = (el: HTMLElement) => el.firstElementChild?.getAttribute('role') === 'tablist'
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return isFrame(this) ? frameWidth : 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.getAttribute('role') === 'tablist' ? 420 : 0
+    })
+    const icon = <svg aria-hidden />
+    const iconTabs: AgentWorkspaceCompanionTab[] = [
+      { id: 'files', label: 'Files', icon, renderContent: () => <p>File viewer</p> },
+      { id: 'actions', label: 'Needs you', icon, renderContent: () => <p>Actions</p> },
+      { id: 'node', label: 'Inspect', icon, renderContent: () => <p>Inspector</p> },
+    ]
+    render(<AgentWorkspaceCompanion tabs={iconTabs} defaultOpen activeTabId="node"><p>Conversation</p></AgentWorkspaceCompanion>)
+
+    const labelOf = (name: string) => screen.getByRole('tab', { name }).querySelector('span')
+    await waitFor(() => expect(labelOf('Files')?.className).toBe('sr-only'))
+    expect(labelOf('Needs you')?.className).toBe('sr-only')
+    expect(labelOf('Inspect')?.className ?? '').not.toContain('sr-only')
+
+    frameWidth = 500
+    act(() => { observers.forEach((notify) => notify([])) })
+    await waitFor(() => expect(labelOf('Files')?.className ?? '').not.toContain('sr-only'))
+    expect(labelOf('Needs you')?.className ?? '').not.toContain('sr-only')
+    vi.unstubAllGlobals()
+  })
+})

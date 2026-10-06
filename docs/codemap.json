@@ -7958,13 +7958,13 @@
           "name": "NoticeKind",
           "kind": "type",
           "signature": "type NoticeKind",
-          "doc": "Define specific string literals representing different kinds of notices"
+          "doc": "Kinds of transcript notice."
         },
         {
           "name": "noticePart",
           "kind": "function",
           "signature": "(noticeKind: NoticeKind, id: string, text: string) => NoticePersistedPart",
-          "doc": "Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction)."
+          "doc": "Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error)."
         },
         {
           "name": "noticePartKey",
@@ -19504,6 +19504,12 @@
           "doc": "Define properties for rendering chat messages with optional models, markdown, extras, and durable cards"
         },
         {
+          "name": "ChatNoticeTone",
+          "kind": "type",
+          "signature": "type ChatNoticeTone",
+          "doc": "Status tone of a {@link ChatMessageSegment} notice."
+        },
+        {
           "name": "ChatSelectField",
           "kind": "type",
           "signature": "type ChatSelectField",
@@ -20677,13 +20683,13 @@
           "name": "NoticeKind",
           "kind": "type",
           "signature": "type NoticeKind",
-          "doc": "Define specific string literals representing different kinds of notices"
+          "doc": "Kinds of transcript notice."
         },
         {
           "name": "noticePart",
           "kind": "function",
           "signature": "(noticeKind: NoticeKind, id: string, text: string) => NoticePersistedPart",
-          "doc": "Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction)."
+          "doc": "Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error)."
         },
         {
           "name": "noticePartKey",
