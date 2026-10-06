@@ -1,13 +1,13 @@
 /**
  * Local fixtures + harness helpers for the design-canvas stories.
  *
- * `makeLaunchPosterScene` mirrors the shared `../fixtures/canvas.ts` fixture
- * (kept local so these stories are self-contained); the multi-page and empty
+ * The poster adapts the shared canvas fixture; the multi-page and empty
  * scenes are additions covering the editor's page strip, layers states, and
  * empty-state doors.
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { makeLaunchPosterScene as makeBaseLaunchPosterScene } from '../fixtures/canvas'
 import type { SceneDocument, ScenePage } from '../../design-canvas'
 import { applySceneOperations } from '../../design-canvas'
 import type { SceneOperation } from '../../design-canvas'
@@ -36,161 +36,17 @@ const HERO_ART_SRC = `data:image/svg+xml,${encodeURIComponent(
     '</svg>',
 )}`
 
-/** Single-page poster scene — populated enough that every editor surface
- *  (layers, toolbar, rulers, guides) renders with real content. Text elements
- *  reference Inter, loaded in `.storybook/preview-head.html`. */
+/** Keep the local Glow and Badge placement while sharing the poster artwork. */
 export function makeLaunchPosterScene(): SceneDocument {
-  return {
-    schemaVersion: 1,
-    title: 'Launch poster',
-    pages: [
-      {
-        id: 'page-1',
-        name: 'Square',
-        width: 1080,
-        height: 1080,
-        background: '#0f172a',
-        bleed: null,
-        guides: { vertical: [540], horizontal: [540] },
-        elements: [
-          {
-            id: 'el-bg',
-            kind: 'rect',
-            name: 'Panel',
-            x: 80,
-            y: 80,
-            rotation: 0,
-            opacity: 1,
-            locked: false,
-            visible: true,
-            width: 920,
-            height: 920,
-            fill: '#1e293b',
-            cornerRadius: 32,
-          },
-          {
-            id: 'el-accent',
-            kind: 'rect',
-            name: 'Accent bar',
-            x: 140,
-            y: 160,
-            rotation: 0,
-            opacity: 1,
-            locked: false,
-            visible: true,
-            width: 220,
-            height: 24,
-            fill: '#3b82f6',
-            cornerRadius: 12,
-          },
-          {
-            id: 'el-ellipse',
-            kind: 'ellipse',
-            name: 'Glow',
-            // Bottom-right accent, aligned to the content grid (right/bottom
-            // edges on the 940 margin) — clear of every text box, doubling as
-            // a halo behind the rotated Badge centered on it.
-            x: 660,
-            y: 660,
-            rotation: 0,
-            opacity: 0.85,
-            locked: false,
-            visible: true,
-            width: 280,
-            height: 280,
-            fill: '#f59e0b',
-          },
-          {
-            id: 'el-title',
-            kind: 'text',
-            name: 'Headline',
-            x: 140,
-            y: 240,
-            rotation: 0,
-            opacity: 1,
-            locked: false,
-            visible: true,
-            text: 'Ship the agent.',
-            width: 760,
-            fontFamily: 'Inter',
-            fontSize: 96,
-            fontStyle: 'bold',
-            fill: '#f8fafc',
-            align: 'left',
-            lineHeight: 1.1,
-            letterSpacing: 0,
-          },
-          {
-            id: 'el-sub',
-            kind: 'text',
-            name: 'Subhead',
-            x: 140,
-            y: 420,
-            rotation: 0,
-            opacity: 1,
-            locked: false,
-            visible: true,
-            text: 'A visual audit playground for agent-app surfaces.',
-            width: 700,
-            fontFamily: 'Inter',
-            fontSize: 36,
-            fontStyle: 'normal',
-            fill: '#94a3b8',
-            align: 'left',
-            lineHeight: 1.3,
-            letterSpacing: 0,
-          },
-          {
-            id: 'el-line',
-            kind: 'line',
-            name: 'Underline',
-            x: 140,
-            y: 560,
-            rotation: 0,
-            opacity: 1,
-            locked: false,
-            visible: true,
-            points: [0, 0, 640, 0],
-            stroke: '#3b82f6',
-            strokeWidth: 6,
-          },
-          {
-            id: 'el-chip',
-            kind: 'rect',
-            name: 'CTA chip',
-            x: 140,
-            y: 700,
-            rotation: 0,
-            opacity: 1,
-            locked: false,
-            visible: true,
-            width: 300,
-            height: 96,
-            fill: '#3b82f6',
-            cornerRadius: 48,
-          },
-          {
-            id: 'el-rotated',
-            kind: 'rect',
-            name: 'Badge',
-            // Centered on the Glow halo (both center at 800,800).
-            x: 720,
-            y: 720,
-            rotation: 18,
-            opacity: 1,
-            locked: false,
-            visible: true,
-            width: 160,
-            height: 160,
-            fill: '#22c55e',
-            cornerRadius: 24,
-          },
-        ],
-      },
-    ],
-    settings: { dpi: 96 },
-    metadata: {},
-  }
+  const scene = makeBaseLaunchPosterScene()
+  const elements = scene.pages[0]?.elements
+  const glow = elements?.find((element) => element.id === 'el-ellipse')
+  const badge = elements?.find((element) => element.id === 'el-rotated')
+  if (!glow || !badge) throw new Error('shared poster fixture is missing its Glow or Badge')
+  glow.x = 660
+  glow.y = 660
+  badge.x = 720
+  return scene
 }
 
 /** One blank 1080×1080 page — drives the branded empty state (three doors). */
