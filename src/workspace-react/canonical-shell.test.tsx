@@ -118,8 +118,10 @@ describe('WorkspaceList', () => {
     expect(menu.className).toContain('[@media(pointer:coarse)]:h-11')
     expect(menu.className).toContain('[@media(pointer:coarse)]:w-11')
     const avatar = screen.getByRole('link', { name: 'Acme' }).closest('li')!.querySelector('span[aria-hidden]')!
-    // Accent on an accent tint vanishes on a dim dark-theme primary; the letter is foreground.
-    expect(avatar.className).toContain('text-foreground')
+    // Accent on an accent tint vanishes on a dim dark-theme primary. The mark is
+    // an IconTile: its initials use the tone's own text token, solved against
+    // that tone's fill in both themes, never the product primary.
+    expect(avatar.className).toMatch(/text-\[var\(--tone-[a-z]+-text\)\]/)
     expect(avatar.className).not.toMatch(/(^|\s)text-primary(\s|$)/)
   })
 
