@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.5
+
+- feat(web-react): export WorkProductStatusPill; IconTile workspace identity (#816)
+
 ## 0.55.4
 
 - fix(workspace): bound the companion conversation to the pane height (#815)
