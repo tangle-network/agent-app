@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.1
+
+- fix(web-react): wrap the composer row instead of drawing controls under trailing pickers (#812)
+
 ## 0.55.0
 
 - feat!: remove 18 agent-app helpers that nothing references (#811)
