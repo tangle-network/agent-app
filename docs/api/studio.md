@@ -4,7 +4,7 @@
 
 Source: `src/studio/index.ts`
 
-69 exports.
+68 exports.
 
 ### `aspectRatioFromOptions`
 
@@ -484,14 +484,6 @@ type ModelOptionValue
 
 ```ts
 type SaveGenerationsToVault
-```
-
-### `selectedModelsWithDefaults`
-
-`function` — DEPRECATED (orphaned since #449 deleted its consumer) — resolve selected models by applying catalog defaults.
-
-```ts
-(current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…
 ```
 
 ### `StudioMediaActions`

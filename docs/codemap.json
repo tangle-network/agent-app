@@ -16392,12 +16392,6 @@
           "doc": null
         },
         {
-          "name": "selectedModelsWithDefaults",
-          "kind": "function",
-          "signature": "(current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…",
-          "doc": "DEPRECATED (orphaned since #449 deleted its consumer) — resolve selected models by applying catalog defaults."
-        },
-        {
           "name": "StudioMediaActions",
           "kind": "interface",
           "signature": "interface StudioMediaActions",

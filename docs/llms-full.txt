@@ -21213,14 +21213,6 @@ type ModelOptionValue
 type SaveGenerationsToVault
 ```
 
-### `selectedModelsWithDefaults`
-
-`function` — DEPRECATED (orphaned since #449 deleted its consumer) — resolve selected models by applying catalog defaults.
-
-```ts
-(current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…
-```
-
 ### `StudioMediaActions`
 
 `interface` — Every media action a tile / viewer / batch bar can offer.
