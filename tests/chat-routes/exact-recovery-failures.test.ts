@@ -87,13 +87,13 @@ describe('detached recovery admission guards', () => {
     const store = createMemoryTurnEventStore()
     await store.setStatus('turn', status, 'thread')
     const source = forbiddenEvents()
-    const resetBuffer = vi.fn(async () => undefined)
+    const resetEvents = vi.spyOn(store, 'resetEvents')
     await expect(runDetachedTurn({
-      store, turnId: 'turn', scopeId: 'thread', events: source.events, resetBuffer,
+      store, turnId: 'turn', scopeId: 'thread', events: source.events,
       completedResult: async () => { throw new Error('completion unavailable') },
     })).rejects.toThrow('completion unavailable')
     expect(source.opened).not.toHaveBeenCalled()
-    expect(resetBuffer).not.toHaveBeenCalled()
+    expect(resetEvents).not.toHaveBeenCalled()
     expect(await store.getStatus('turn')).toBe(status)
   })
 
@@ -103,11 +103,12 @@ describe('detached recovery admission guards', () => {
     const retained = [{ seq: 7, event: '{"type":"text","text":"Retained"}' }]
     await store.append('turn', retained)
     const source = forbiddenEvents()
+    if (failReset) vi.spyOn(store, 'resetEvents').mockRejectedValue(new Error('reset unavailable'))
+    else delete store.resetEvents
     await expect(runDetachedTurn({
       store, turnId: 'turn', scopeId: 'thread', events: source.events,
       completedResult: async () => null,
-      ...(failReset ? { resetBuffer: async () => { throw new Error('reset unavailable') } } : {}),
-    })).rejects.toThrow(failReset ? 'reset unavailable' : 'requires resetBuffer')
+    })).rejects.toThrow(failReset ? 'reset unavailable' : 'requires a TurnEventStore with resetEvents')
     expect(source.opened).not.toHaveBeenCalled()
     expect(await store.read('turn', 0)).toEqual(retained)
   })
@@ -116,13 +117,13 @@ describe('detached recovery admission guards', () => {
     const store = createMemoryTurnEventStore()
     await store.setStatus('turn', 'running', 'thread')
     const source = forbiddenEvents()
-    const resetBuffer = vi.fn(async () => undefined)
+    const resetEvents = vi.spyOn(store, 'resetEvents')
     await expect(runDetachedTurn({
-      store, turnId: 'turn', scopeId: 'thread', events: source.events, resetBuffer,
+      store, turnId: 'turn', scopeId: 'thread', events: source.events,
       completedResult: async () => ({ text: 'Retained result', usage: { inputTokens: 8 } }),
     })).resolves.toMatchObject({ state: 'completed', cached: true, text: 'Retained result' })
     expect(source.opened).not.toHaveBeenCalled()
-    expect(resetBuffer).not.toHaveBeenCalled()
+    expect(resetEvents).not.toHaveBeenCalled()
     expect(await store.getStatus('turn')).toBe('complete')
   })
 
@@ -144,13 +145,13 @@ describe('detached recovery admission guards', () => {
     await store.setStatus('turn', 'running', 'thread')
     const source = forbiddenEvents()
     const remote = recoverySource({ cacheError: true, messagesError: true })
-    const resetBuffer = vi.fn(async () => undefined)
+    const resetEvents = vi.spyOn(store, 'resetEvents')
     await expect(runDetachedTurn({
-      store, turnId: 'turn', scopeId: 'thread', events: source.events, resetBuffer,
+      store, turnId: 'turn', scopeId: 'thread', events: source.events,
       completedResult: () => readCompletedSandboxTurn(remote.box, identity),
     })).rejects.toThrow('could not be verified')
     expect(source.opened).not.toHaveBeenCalled()
-    expect(resetBuffer).not.toHaveBeenCalled()
+    expect(resetEvents).not.toHaveBeenCalled()
   })
 })
 

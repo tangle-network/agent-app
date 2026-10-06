@@ -406,6 +406,28 @@ describe('turn-event retention', () => {
     }
   })
 
+  it('resets one running turn\'s events for a clean re-stream and keeps its status', async () => {
+    const memory = createMemoryTurnEventStore()
+    const d1 = d1TurnStore()
+    try {
+      for (const store of [memory, d1.store]) {
+        await store.setStatus('crashed', 'running', 'thread-1')
+        await store.append('crashed', [{ seq: 7, event: 'orphaned' }])
+        await store.setStatus('peer', 'running', 'thread-1')
+        await store.append('peer', [{ seq: 1, event: 'peer-event' }])
+
+        await store.resetEvents!('crashed')
+        await store.append('crashed', [{ seq: 0, event: 'fresh' }])
+
+        expect(await store.getStatus('crashed')).toBe('running')
+        expect(await store.read('crashed', -1)).toEqual([{ seq: 0, event: 'fresh' }])
+        expect(await store.read('peer', 0)).toEqual([{ seq: 1, event: 'peer-event' }])
+      }
+    } finally {
+      d1.close()
+    }
+  })
+
   it('prunes only terminal turns strictly before the cutoff and never a running turn', async () => {
     const now = { value: 0 }
     const memory = createMemoryTurnEventStore({ now: () => now.value })

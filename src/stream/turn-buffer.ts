@@ -53,6 +53,10 @@ export interface TurnEventStore {
    *  a row abandoned by a dead process. Optional: a store records it only if
    *  `setStatus` was given a `scopeId`. */
   listRunning?(scopeId: string): Promise<string[]>
+  /** Remove one turn's buffered events and keep its status, so a genuine
+   *  re-stream after a crash starts at seq 0 without interleaving orphaned
+   *  rows. `runDetachedTurn` requires it to recover a `running` turn. */
+  resetEvents?(turnId: string): Promise<void>
   /** Explicitly remove one turn's events and status. Optional so existing
    *  custom stores remain source-compatible; the built-in D1 and memory stores
    *  provide it. */
@@ -508,7 +512,8 @@ CREATE TABLE IF NOT EXISTS turn_status (
   turnId TEXT PRIMARY KEY,
   status TEXT NOT NULL,
   scopeId TEXT,
-  updatedAt TEXT NOT NULL
+  updatedAt TEXT NOT NULL,
+  leaseToken TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_turn_status_scope ON turn_status (scopeId, status);
 CREATE INDEX IF NOT EXISTS idx_turn_status_retention ON turn_status (status, updatedAt);
@@ -518,6 +523,10 @@ CREATE INDEX IF NOT EXISTS idx_turn_status_retention ON turn_status (status, upd
  *  run once to add the column (the CREATE above already includes it for new
  *  deployments). SQLite ignores a duplicate-add error if already applied. */
 export const TURN_STATUS_SCOPE_MIGRATION_SQL = `ALTER TABLE turn_status ADD COLUMN scopeId TEXT;`
+
+/** For deployments whose `turn_status` table predates `leaseToken` — run once
+ *  to add the column `createD1PlanFollowUpGate` fences its claims on. */
+export const TURN_STATUS_LEASE_MIGRATION_SQL = 'ALTER TABLE turn_status ADD COLUMN leaseToken TEXT;'
 
 /** For deployments that already have the turn tables, add the index used by
  *  terminal-turn retention without rerunning the table migration. */
@@ -595,6 +604,9 @@ export function createD1TurnEventStore(
         .all<{ turnId: string }>()
       return results.map((r) => r.turnId)
     },
+    async resetEvents(turnId) {
+      await db.prepare('DELETE FROM turn_events WHERE turnId = ?').bind(turnId).run()
+    },
     async deleteTurn(turnId) {
       await runAtomicTurnBatch(db, [
         db.prepare('DELETE FROM turn_events WHERE turnId = ?').bind(turnId),
@@ -663,6 +675,9 @@ export function createMemoryTurnEventStore(
           const updatedDelta = (updatedAt.get(right) ?? 0) - (updatedAt.get(left) ?? 0)
           return updatedDelta || order.indexOf(right) - order.indexOf(left)
         })
+    },
+    async resetEvents(turnId) {
+      events.delete(turnId)
     },
     async deleteTurn(turnId) {
       events.delete(turnId)

@@ -166,3 +166,19 @@ In a real install both are `node_modules` and nothing changes; hardcoding the in
 
 - `vendored-tarball/` — insurance's defect, reproduced from `f7d0f51`: a clean `package.json`, the `pnpm-workspace.yaml` override, all three lockfile shapes, the committed pack, and the `file+vendor+agent-app+…tgz` virtual-store directory it installed as. Four findings across four lanes.
 - `in-repo-source/` — the exception's reference shape: a playground on `file:..`, a `link:` to an in-repo package, `workspace:*` and `catalog:`. Zero findings.
+
+## Durability owners
+
+The same bin also fails product source that rebuilds turn durability Agent App owns:
+
+| Rule | Matches | Shared owner |
+|---|---|---|
+| `turn-tables` | `INSERT INTO`, `UPDATE` or `DELETE FROM` on `turn_status` or `turn_events` | `TurnEventStore` (`setStatus`, `resetEvents`, `deleteTurn`, `pruneTerminalTurns`) and `createD1PlanFollowUpGate` |
+| `session-replay` | `box.session(id).events(...)` | `streamPlanFollowUpEvents` and the sandbox chat producer |
+| `execution-identity` | a `plan-followup-` literal | `planFollowUpExecutionId`, byte-identical to the Sidecar |
+
+It reads source only: tests, fixtures, migrations, scripts and build output are skipped.
+Before this gate existed, four products had copied the plan follow-up attach, and their copies used three different execution identities.
+A line that must stay product-local carries `agent-app-durability-owner: <reason>` on it or within the three lines above it.
+An example is a project deletion that cascades through its sessions' turns.
+The report counts these named exceptions.
