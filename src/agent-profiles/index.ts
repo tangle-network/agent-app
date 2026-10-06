@@ -34,7 +34,7 @@ export interface ProfileRevision {
   reason: string
   diff: AgentProfileDiff[]
   authorityDigest: string
-  /** `hashWorkspacePlan` from ADC; supplied by the product materializer, never inferred here. */
+  /** ADC hash of the public profile plan, without per-turn product attachments. */
   planDigest: string
   state: ProfileRevisionState
   createdAt: number
@@ -64,6 +64,7 @@ export interface ProfileTurnPin {
   profileId: string
   revisionId: string
   authorityDigest: string
+  /** Effective ADC plan selected by the executor, including allowed turn attachments. */
   planDigest: string
 }
 
@@ -450,8 +451,11 @@ export async function admitProfileTurn(input: {
   key: ProfileBindingKey
   messageId: string
   content: string
-  /** Digest selected by the executor from ADC's managed manifest for this revision and turn. */
+  /** Effective ADC plan digest selected by the executor for this revision and turn. */
   observedManagedPlanDigest: string
+  /** Required if trusted per-turn attachments change the public profile plan. */
+  verifyEffectivePlan?: (revision: ProfileRevision, effectivePlanDigest: string,
+    key: ProfileBindingKey) => Promise<boolean>
 }): Promise<ProfileTurnPin> {
   const binding = await input.store.getBinding(input.key)
   if (!binding) throw new ProfileAccessError('Choose a profile before sending a message')
@@ -460,12 +464,18 @@ export async function admitProfileTurn(input: {
     : await input.store.getActiveRevision(input.key.workspaceId, binding.profileId)
   if (!revision) throw new ProfileConflictError('The bound profile revision is unavailable')
   if (revision.authorityDigest !== binding.authorityDigest ||
-      revision.planDigest !== input.observedManagedPlanDigest) {
+      !/^sha256:[a-f0-9]{64}$/.test(input.observedManagedPlanDigest)) {
+    throw new ProfileAccessError('The selected managed plan is not active for this turn')
+  }
+  const planMatches = revision.planDigest === input.observedManagedPlanDigest ||
+    (input.verifyEffectivePlan !== undefined &&
+      await input.verifyEffectivePlan(revision, input.observedManagedPlanDigest, input.key))
+  if (!planMatches) {
     throw new ProfileAccessError('The selected managed plan is not active for this turn')
   }
   return input.store.pinTurn({ ...input.key, messageId: input.messageId, inputHash: sha256Utf8(input.content),
     profileId: revision.profileId, revisionId: revision.id,
-    authorityDigest: revision.authorityDigest, planDigest: revision.planDigest }, binding.version)
+    authorityDigest: revision.authorityDigest, planDigest: input.observedManagedPlanDigest }, binding.version)
 }
 
 const textChangeSchema = z.object({

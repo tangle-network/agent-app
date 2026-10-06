@@ -394,14 +394,13 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database): ProfileRevi
                 AND h.version = (SELECT MAX(version) FROM agent_profile_activation_event
                   WHERE workspace_id = b.workspace_id AND profile_id = b.profile_id))))
         ) AND EXISTS (SELECT 1 FROM agent_profile_revision r WHERE r.workspace_id = ?
-          AND r.profile_id = ? AND r.revision_id = ? AND r.authority_digest = ?
-          AND r.plan_digest = ?)
+          AND r.profile_id = ? AND r.revision_id = ? AND r.authority_digest = ?)
         ON CONFLICT DO NOTHING`)
         .bind(...keyValues(key), pin.messageId, pin.inputHash, pin.profileId, pin.revisionId,
           pin.authorityDigest, pin.planDigest, ...keyValues(key), expectedBindingVersion,
           pin.profileId, pin.authorityDigest,
           pin.revisionId, pin.revisionId, key.workspaceId,
-          pin.profileId, pin.revisionId, pin.authorityDigest, pin.planDigest).run()
+          pin.profileId, pin.revisionId, pin.authorityDigest).run()
       const saved = await getTurnPin(key, pin.messageId, pin.inputHash)
       if (!saved || (inserted.meta.changes === 0 && saved.revisionId !== pin.revisionId)) {
         throw new ProfileConflictError('Profile binding changed during turn admission')

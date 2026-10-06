@@ -17,7 +17,9 @@
 Unknown fields stay in `AUTHORITY`.
 `appendSystemPrompt` stays in `AUTHORITY` because it uses a distinct launch control that the text binding does not replace.
 The authority digest is the canonical digest of the profile with only the text fields removed.
-The full workspace plan digest is recorded separately from `hashWorkspacePlan`.
+Each revision records ADC's hash of its public profile plan.
+The turn pin records the effective plan digest selected by the executor.
+Trusted product attachments may change the effective digest without changing the saved profile.
 
 `proposeRevision` appends one immutable profile snapshot, parent, author kind (`person`, `agent`, `optimizer`), reason and canonical diff.
 An owner or manager may activate a text edit for the next message using an expected active revision; a conflict says the text changed since it was opened and requires review.
@@ -45,7 +47,8 @@ Each member/channel binding selects a profile and may pin a revision.
 Phone access still requires the product's owner allowlist.
 Command receipts are keyed by message id and input hash so a retry cannot change its meaning.
 
-Turn admission persists profile id, immutable revision id, authority digest and that revision's managed plan digest with the message identity.
+Turn admission persists profile id, immutable revision id, authority digest and the executor's effective managed plan digest with the message identity.
+When per-turn product attachments change the revision's public plan digest, the product must attest that the effective plan derives from that revision and the authenticated turn.
 An in-flight turn keeps that pin if the binding moves later.
 Every switch stays in the same conversation and shows `Now talking to <name>`.
 For a text edit, the product prepares the newly active revision's plan before the next turn, even when the member binding still names the prior plan; the turn pin records the new plan digest.
