@@ -1,5 +1,5 @@
 /* GENERATED from @tangle-network/brand/styles/legacy-light.css
- * SHA-256: f4d47f5d42d88810ae850c83e6d0e0a1f7be481d4e07b66ab3e29c796d02950f
+ * SHA-256: 14616a7bcbdcbb3587912f566c71803ac5dd1d48adc5a36e8f3fc2f3ab7a6fe6
  * Run node src/theme/build.mjs --write; do not edit colors or ratios here. */
 :where(:root),
 [data-sandbox-ui],
@@ -46,7 +46,7 @@
 [data-theme="agents-light"],
 .light,
 :where(:root) {
-    --agent-app-accent-hsl: 243.2927 80.3922% 60%;
+    --agent-app-accent-hsl: 243.2787 80.6167% 55.4902%;
     --agent-app-accent-foreground-hsl: 0 0% 100%;
     --agent-app-success-hsl: 162.931 93.5484% 24.3137%;
     --agent-app-success-foreground-hsl: 0 0% 100%;
@@ -64,7 +64,7 @@
     --agent-app-accent-foreground-hsl: 0 0% 0%
 }
 [data-theme="aubergine-light"] {
-    --agent-app-accent-hsl: 263.3898 69.9605% 50.3922%;
+    --agent-app-accent-hsl: 263.6364 70.2128% 46.0784%;
     --agent-app-accent-foreground-hsl: 0 0% 100%
 }
 [data-theme="arena"] {
@@ -72,7 +72,7 @@
     --agent-app-accent-foreground-hsl: 0 0% 0%
 }
 [data-theme="arena-light"] {
-    --agent-app-accent-hsl: 162.931 93.5484% 24.3137%;
+    --agent-app-accent-hsl: 163.2 94.3396% 20.7843%;
     --agent-app-accent-foreground-hsl: 0 0% 100%
 }
 [data-theme="super"] {
@@ -88,7 +88,7 @@
     --agent-app-accent-foreground-hsl: 0 0% 0%
 }
 [data-theme="tangle-light"] {
-    --agent-app-accent-hsl: 243.3962 75.3555% 58.6275%;
+    --agent-app-accent-hsl: 243.5714 75% 56.0784%;
     --agent-app-accent-foreground-hsl: 0 0% 100%
 }
 [data-theme="hospitality"]:where(:not(.dark)) {
@@ -96,6 +96,6 @@
     --agent-app-accent-foreground-hsl: 0 0% 100%
 }
 .dark[data-theme="hospitality"] {
-    --agent-app-accent-hsl: 144.9231 31.1005% 59.0196%;
+    --agent-app-accent-hsl: 144.4898 31.6129% 69.6078%;
     --agent-app-accent-foreground-hsl: 0 0% 0%
 }
