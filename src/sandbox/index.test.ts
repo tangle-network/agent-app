@@ -204,7 +204,7 @@ describe('workspace runtime environment renewal', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
-  it('supplies renewed runtime credentials to the SDK before resuming a stopped sandbox', async () => {
+  it('mints runtime credentials before resuming a stopped sandbox and renews it after', async () => {
     const box = fakeBox({ setRuntimeEnv: vi.fn().mockResolvedValue(undefined) })
     listMock.mockResolvedValueOnce([]).mockResolvedValueOnce([box])
     const order: string[] = []
@@ -218,11 +218,75 @@ describe('workspace runtime environment renewal', () => {
     await expect(ensureWorkspaceSandbox(shell, scope)).resolves.toBe(box)
     expect(runtimeEnv).toHaveBeenCalledOnce()
     expect(order.slice(0, 2)).toEqual(['runtime-env', 'resume'])
-    expect(box.resume).toHaveBeenCalledOnce()
-    expect(box.resume).toHaveBeenCalledWith(expect.objectContaining({
-      env: { APP_TOKEN: 'after-resume' },
-    }))
+    expect(box.resume).toHaveBeenCalledExactlyOnceWith({ timeoutMs: expect.any(Number) })
     expect(box.setRuntimeEnv).toHaveBeenCalledExactlyOnceWith({ APP_TOKEN: 'after-resume' })
+    expect(box.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  // The Sandbox resume contract: `env` may carry only keys the platform
+  // withholds at rest, and a removed runtime needs every withheld key.
+  function platformResume(contract: { withheldKeys: string[]; runtimeRemoved: boolean }) {
+    return vi.fn(async (options: { env?: Record<string, string> } = {}) => {
+      const rejected = Object.keys(options.env ?? {}).filter((key) => !contract.withheldKeys.includes(key))
+      if (rejected.length > 0) {
+        throw Object.assign(new Error(`Project does not accept these env keys on resume: ${rejected.join(', ')}`), {
+          code: 'RESUME_ENV_KEY_NOT_ACCEPTED', status: 400,
+        })
+      }
+      const missingEnvKeys = contract.runtimeRemoved
+        ? contract.withheldKeys.filter((key) => options.env?.[key] === undefined)
+        : []
+      if (missingEnvKeys.length > 0) {
+        throw Object.assign(new Error('Project cannot resume: a new runtime needs env values'), {
+          code: 'RESUME_ENV_REQUIRED', status: 409, missingEnvKeys,
+        })
+      }
+    })
+  }
+
+  it('resumes a stopped sandbox whose app env the platform stores, then renews every value', async () => {
+    const resume = platformResume({ withheldKeys: [], runtimeRemoved: false })
+    const box = fakeBox({ resume, setRuntimeEnv: vi.fn().mockResolvedValue(undefined) })
+    listMock.mockResolvedValueOnce([]).mockResolvedValueOnce([box])
+    const fresh = { APP_USER_ID: 'u1', APP_API_BEARER: 'fresh-browse', APP_TOOL_BEARER: 'fresh-tool' }
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { runtimeEnv: async () => fresh })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).resolves.toBe(box)
+    expect(resume).toHaveBeenCalledExactlyOnceWith({ timeoutMs: expect.any(Number) })
+    expect(box.setRuntimeEnv).toHaveBeenCalledExactlyOnceWith(fresh)
+    expect(box.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('supplies exactly the keys a runtime rebuild names', async () => {
+    const resume = platformResume({ withheldKeys: ['WORKSPACE_CAPABILITY_TOKEN'], runtimeRemoved: true })
+    const box = fakeBox({ resume, setRuntimeEnv: vi.fn().mockResolvedValue(undefined) })
+    listMock.mockResolvedValueOnce([]).mockResolvedValueOnce([box])
+    const fresh = { WORKSPACE_CAPABILITY_TOKEN: 'fresh-capability', APP_USER_ID: 'u1' }
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { runtimeEnv: async () => fresh })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).resolves.toBe(box)
+    expect(resume.mock.calls).toEqual([
+      [{ timeoutMs: expect.any(Number) }],
+      [{ timeoutMs: expect.any(Number), env: { WORKSPACE_CAPABILITY_TOKEN: 'fresh-capability' } }],
+    ])
+    expect(box.setRuntimeEnv).toHaveBeenCalledExactlyOnceWith(fresh)
+    expect(box.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a rebuild requirement the runtime env cannot meet', async () => {
+    const resume = platformResume({ withheldKeys: ['CUSTOMER_TOKEN'], runtimeRemoved: true })
+    const box = fakeBox({ resume, setRuntimeEnv: vi.fn() })
+    listMock.mockResolvedValueOnce([]).mockResolvedValueOnce([box])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { runtimeEnv: async () => ({ APP_TOKEN: 'fresh' }) })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).rejects.toMatchObject({
+      code: 'RESUME_ENV_REQUIRED', missingEnvKeys: ['CUSTOMER_TOKEN'],
+    })
+    expect(resume).toHaveBeenCalledOnce()
+    expect(box.setRuntimeEnv).not.toHaveBeenCalled()
     expect(box.delete).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
   })
@@ -1094,12 +1158,12 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
 
     expect(rejection).toBeInstanceOf(SandboxRecoveryFailedError)
     expect(rejection).toMatchObject({ phase: 'probe', stage: 'resumed' })
-    // Both SDK resumes receive the authorized app env; the existing workspace stays intact.
+    // Credentials are minted once before either restart; neither resume needs
+    // app env while its runtime exists. The existing workspace stays intact.
     expect(runtimeEnv).toHaveBeenCalledOnce()
-    expect(resume).toHaveBeenCalledTimes(2)
     expect(resume.mock.calls).toEqual([
-      [expect.objectContaining({ env: { APP_TOKEN: 'fresh-runtime-token' } })],
-      [expect.objectContaining({ env: { APP_TOKEN: 'fresh-runtime-token' } })],
+      [{ timeoutMs: expect.any(Number) }],
+      [{ timeoutMs: expect.any(Number) }],
     ])
     expect(stopped.stop).toHaveBeenCalledOnce()
     expect(del).not.toHaveBeenCalled()
