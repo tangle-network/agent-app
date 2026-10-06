@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.2
+
+- fix(vault,workspace,history): empty vault state, no lone pane chip, expander beside the conversation, no selection count (#813)
+
 ## 0.55.1
 
 - fix(web-react): wrap the composer row instead of drawing controls under trailing pickers (#812)
