@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.57.2
+
+- fix(agent-profiles): record knowledge changes in revision diffs
+- feat(peers): support interface 3 profile materializer
+
 ## 0.57.1
 
 - fix(agent-profiles): reuse admitted turn pins on retry (#832)
