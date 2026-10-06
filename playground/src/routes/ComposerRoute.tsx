@@ -167,6 +167,31 @@ export function ComposerRoute() {
           </div>
         </Demo>
 
+        {/* A 320px phone beside the workspace companion's expander column:
+            the card is 256px, too narrow for the model picker and Send to share
+            even the actions group's own line. Send must wrap below the picker. */}
+        <Demo title="Small phone (256px card) — model picker and Send">
+          <div data-composer-overlap="small-phone" className="w-[256px]">
+            <ChatComposer
+              onSend={() => {}}
+              placeholder="Ask about compliance, filings, or regulations..."
+              onAttach={() => {}}
+              controls={<ComposerModeControls planMode={{ enabled: phonePlan, setEnabled: setPhonePlan }} />}
+              trailing={
+                <AgentSessionControls
+                  models={models}
+                  model={phoneModel}
+                  onModelChange={setPhoneModel}
+                  harness={phoneHarness}
+                  onHarnessChange={setPhoneHarness}
+                  effort={phoneEffort}
+                  onEffortChange={setPhoneEffort}
+                />
+              }
+            />
+          </div>
+        </Demo>
+
         <Demo title="Host scroll rail (inline) — model, backend, thinking">
           <HostScrollRail label="rail-inline">
             <AgentSessionControls

@@ -145,6 +145,10 @@ export interface VaultDockRenderProps {
   file: VaultFile | null
   open: boolean
   onClose: () => void
+  /** Where the dock is drawn. `side`: a column beside the document, sized by
+   *  the dock. `inline`: in the document pane of a pane narrower than 960px,
+   *  where the dock should fill its container. */
+  placement: 'side' | 'inline'
 }
 
 /** Configures the dock toggle VaultPane renders above the artifact pane. */
@@ -228,5 +232,10 @@ export interface VaultPaneProps {
    *  creating is allowed; pass your own to name a product action such as an
    *  upload, or `null` to render nothing. */
   treeEmptyState?: ReactNode
+  /** Label of the button that opens a PERSISTENT dock (`dockToggle={false}`)
+   *  when the pane is narrower than 960px. There the dock opens in the
+   *  document pane instead of beside it, so render it to fill its container.
+   *  Defaults to 'Details'. */
+  dockLabel?: string
   className?: string
 }

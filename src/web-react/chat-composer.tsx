@@ -1402,8 +1402,11 @@ export function ChatComposer({
               by the very pickers it reports on. Trailing content, dictation
               and Send travel together as one group: when the row wraps they
               move to the next line right-aligned, so Send never lands alone at
-              the start of a line. */}
-          <div data-testid="composer-actions" className="ml-auto flex min-w-0 max-w-full items-end justify-end gap-2">
+              the start of a line. The group wraps inside itself too: when a
+              trailing picker and Send cannot share even their own line (a
+              320px phone), Send drops below the picker, right-aligned, instead
+              of being drawn over it. */}
+          <div data-testid="composer-actions" className="ml-auto flex min-w-0 max-w-full flex-wrap items-end justify-end gap-2">
             {trailing && (
               <div data-testid="composer-trailing" className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
                 {trailing}
