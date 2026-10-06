@@ -278,8 +278,7 @@ export function noticePartKey(id: string): string {
   return `notice:${id}`
 }
 
-/** Define specific string literals representing different kinds of notices */
-/** `error` marks a turn that failed: products render it in the danger tone
+/** Kinds of transcript notice. `error` marks a turn that failed: products render it in the danger tone
  *  instead of as answer prose (see `createSandboxChatProducer`'s `errorNotice`). */
 export type NoticeKind = 'warning' | 'auto-declined' | 'error'
 
