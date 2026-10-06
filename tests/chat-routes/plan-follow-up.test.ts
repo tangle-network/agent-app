@@ -123,6 +123,7 @@ describe('streamPlanFollowUpEvents', () => {
     const box = fakeBox([
       { type: 'message.part.updated', data: { properties: { part: { type: 'text', text: 'live' } } } },
       { type: 'message.part.updated', data: { part: { type: 'text', text: 'replayed' } } },
+      { type: 'message.part.updated', data: { type: 'message.part.updated', part: { type: 'text', text: 'typed' } } },
       { type: 'result', data: { finalText: 'ok' } },
     ] as SandboxEvent[], capture)
     const events = await drain(streamPlanFollowUpEvents(box, SESSION_ID, 'exec-1'))
@@ -131,6 +132,7 @@ describe('streamPlanFollowUpEvents', () => {
     expect(events.map((event) => event.data)).toEqual([
       { part: { type: 'text', text: 'live' } },
       { part: { type: 'text', text: 'replayed' } },
+      { part: { type: 'text', text: 'typed' } },
       { finalText: 'ok' },
     ])
   })

@@ -142,16 +142,24 @@ export function resolvePlanFollowUpRequest(input: {
 /**
  * Session events carry two payload shapes: replayed events hold the stream
  * event under `data`, while live events nest it under `data.properties`.
- * Downstream reads `data.<field>`, so a live event is unwrapped.
+ * Downstream reads `data.<field>`, so a live event is unwrapped. A replayed
+ * payload that still carries its own `type` drops it, so `data` holds only the
+ * event's fields.
  */
 export function unwrapSessionEventPayload(event: SandboxEvent): SandboxEvent {
   const data = event.data && typeof event.data === 'object' && !Array.isArray(event.data)
     ? event.data as Record<string, unknown>
     : undefined
-  const properties = data?.properties && typeof data.properties === 'object' && !Array.isArray(data.properties)
+  if (!data) return event
+  const properties = data.properties && typeof data.properties === 'object' && !Array.isArray(data.properties)
     ? data.properties as Record<string, unknown>
     : undefined
-  return properties ? { ...event, data: properties } as SandboxEvent : event
+  if (properties) return { ...event, data: properties } as SandboxEvent
+  if (typeof data.type === 'string') {
+    const { type: _type, ...rest } = data
+    return { ...event, data: rest } as SandboxEvent
+  }
+  return event
 }
 
 /**
