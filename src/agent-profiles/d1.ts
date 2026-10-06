@@ -275,6 +275,7 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database): ProfileRevi
     getActiveRevision,
     getBinding,
     getSwitchReceipt,
+    getTurnPin,
     async listKnowledgeEvents(workspaceId, profileId) {
       const rows = await db.prepare(`SELECT * FROM agent_profile_knowledge_event
         WHERE workspace_id = ? AND profile_id = ? ORDER BY created_at, event_id`)

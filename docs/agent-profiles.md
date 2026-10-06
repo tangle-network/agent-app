@@ -50,6 +50,7 @@ Command receipts are keyed by message id and input hash so a retry cannot change
 Turn admission persists profile id, immutable revision id, authority digest and the executor's effective managed plan digest with the message identity.
 When per-turn product attachments change the revision's public plan digest, the product must attest that the effective plan derives from that revision and the authenticated turn.
 An in-flight turn keeps that pin if the binding moves later.
+A retry with the same message id and input hash returns its original pin before reading the current binding.
 Every switch stays in the same conversation and shows `Now talking to <name>`.
 For a text edit, the product prepares the newly active revision's plan before the next turn, even when the member binding still names the prior plan; the turn pin records the new plan digest.
 For a text-only switch, the next turn uses the selected text through a per-turn prompt binding.
