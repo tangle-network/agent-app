@@ -95,8 +95,27 @@ function StatePill({ state }: { state: ReviewQueueState }) {
   return <StatusPill tone={STATE_TONES[state]}>{STATE_LABELS[state]}</StatusPill>
 }
 
-function WorkProductStatusPill({ status }: { status: WorkProductStatus }) {
-  return <StatusPill tone={STATUS_TONES[status]}>{STATUS_LABELS[status]}</StatusPill>
+/** StatusPill tone for a work-product status. */
+export function workProductStatusTone(status: WorkProductStatus): StatusTone {
+  return STATUS_TONES[status]
+}
+
+/** A work-product status as a StatusPill: the one rendering of this state, so
+ *  a product's review page and the transcript card never disagree on it. */
+export function WorkProductStatusPill({
+  status,
+  size,
+  className,
+}: {
+  status: WorkProductStatus
+  size?: 'sm' | 'md'
+  className?: string
+}) {
+  return (
+    <StatusPill tone={STATUS_TONES[status]} size={size} className={className}>
+      {STATUS_LABELS[status]}
+    </StatusPill>
+  )
 }
 
 // ── transcript anchor helpers + card ──────────────────────────────────────

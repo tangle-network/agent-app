@@ -28173,9 +28173,25 @@ interface WorkProductCardProps
 (status: WorkProductStatus) => string
 ```
 
+### `WorkProductStatusPill`
+
+`function` — A work-product status as a StatusPill: the one rendering of this state, so a product's review page and the transcript card never disagree on it.
+
+```ts
+({ status, size, className, }: { status: WorkProductStatus; size?: "md" | "sm" | undefined; className?: string | undefi…
+```
+
+### `workProductStatusTone`
+
+`function` — StatusPill tone for a work-product status.
+
+```ts
+(status: WorkProductStatus) => StatusTone
+```
+
 ### `WorkspaceInitial`
 
-`function` — The one workspace avatar: a rounded square with the first letter, tinted with the product accent.
+`function` — The one workspace avatar: ui's IconTile with the workspace's initials on a categorical tone derived from its name.
 
 ```ts
 ({ name, size }: { name: string; size?: "sm" | "lg" | undefined; }) => Element
@@ -29597,7 +29613,7 @@ AgentWorkspaceNoun
 
 ### `WorkspaceInitial`
 
-`function` — The one workspace avatar: a rounded square with the first letter, tinted with the product accent.
+`function` — The one workspace avatar: ui's IconTile with the workspace's initials on a categorical tone derived from its name.
 
 ```ts
 ({ name, size }: { name: string; size?: "sm" | "lg" | undefined; }) => Element

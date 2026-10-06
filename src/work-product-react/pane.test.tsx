@@ -103,4 +103,11 @@ describe('WorkProductPane (sandbox-ui composition)', () => {
     // No diff tab without a baseline; the artifact body renders instead.
     expect(screen.queryByRole('tab', { name: 'Diff' })).toBeNull()
   })
+
+  it('shows the work-product status as a success StatusPill in the header, not plain text', () => {
+    render(<WorkProductPane workProduct={RECORD} defaultTab="artifact" />)
+    const pills = screen.getAllByText('Ready for review')
+    const header = pills[0]!.closest('span[class*="rounded-full"]')
+    expect(header?.className).toContain('--surface-success-bg')
+  })
 })

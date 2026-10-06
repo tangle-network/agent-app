@@ -1,4 +1,5 @@
 import { useCallback, useState, type ReactNode } from 'react'
+import { IconTile } from '@tangle-network/ui/primitives'
 import { CheckGlyph, OVERLAY_SHADOW, PopoverSurface } from './controls'
 import { usePopoverDialog } from './popover-dialog'
 
@@ -73,18 +74,11 @@ export function WorkspaceSwitcher({
 }
 
 /**
- * The one workspace avatar: a rounded square with the first letter, tinted
- * with the product accent. The switchers and the listing all use it, so a
- * client looks the same wherever it appears.
+ * The one workspace avatar: ui's IconTile with the workspace's initials on a
+ * categorical tone derived from its name. The switchers and the listing all
+ * use it, so a client gets the same mark and colour wherever it appears, and
+ * two clients side by side are told apart by more than their first letter.
  */
 export function WorkspaceInitial({ name, size = 'sm' }: { name: string; size?: 'sm' | 'lg' }) {
-  const letter = Array.from(name.trim())[0]?.toLocaleUpperCase() ?? '?'
-  const box = size === 'lg' ? 'h-10 w-10 rounded-lg text-base' : 'h-6 w-6 rounded-md text-xs'
-  return (
-    // The letter is foreground on an accent tint, not accent on accent: a dim
-    // dark-theme primary (physim's aubergine) left a primary letter unreadable.
-    <span aria-hidden className={`flex shrink-0 items-center justify-center bg-primary/15 font-semibold text-foreground ring-1 ring-inset ring-primary/20 ${box}`}>
-      {letter}
-    </span>
-  )
+  return <IconTile name={name.trim() || '?'} size={size} />
 }

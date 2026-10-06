@@ -281,7 +281,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.128.0', range!)).toBe(false)
   })
 
-  it('requires the UI release that exports openui-schema', async () => {
+  it('requires the UI release that exports IconTile', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -289,9 +289,11 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/ui']
 
     expect(range).toBeDefined()
-    expect(satisfiesRange('11.11.2', range!)).toBe(false)
-    expect(satisfiesRange('11.11.3', range!)).toBe(true)
-    expect(satisfiesRange('11.11.5', range!)).toBe(true)
+    // 11.17.0 is the first UI release with IconTile, which WorkspaceInitial
+    // renders; 11.16.x also lacks openui-schema's later fixes.
+    expect(satisfiesRange('11.16.5', range!)).toBe(false)
+    expect(satisfiesRange('11.17.0', range!)).toBe(true)
+    expect(satisfiesRange('11.22.2', range!)).toBe(true)
     expect(satisfiesRange('12.0.0', range!)).toBe(false)
   })
 

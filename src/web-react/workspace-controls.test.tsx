@@ -5,7 +5,8 @@ import { renderToString } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { AgentSettingsPopover } from './agent-settings-popover'
 import { AgentSessionControls } from './agent-session-controls'
-import { WorkspaceSwitcher } from './workspace-switcher'
+import { WorkspaceInitial, WorkspaceSwitcher } from './workspace-switcher'
+import { TONE_CLASSES, toneFor } from '@tangle-network/ui/primitives'
 import { ModelPicker } from './controls'
 import type { CatalogModel } from '../runtime/model-catalog'
 
@@ -15,6 +16,20 @@ function Switcher({ onChange = () => {} }: { onChange?: (id: string) => void }) 
   const [value, setValue] = useState('a')
   return <WorkspaceSwitcher value={value} items={items} onChange={(id) => { setValue(id); onChange(id) }} />
 }
+
+describe('workspace identity mark', () => {
+  it('renders two initials on the categorical tone derived from the name', () => {
+    const { container } = render(<WorkspaceInitial name="Acme Holdings" size="lg" />)
+    const tile = container.firstElementChild as HTMLElement
+    expect(tile.textContent).toBe('AH')
+    expect(tile.getAttribute('aria-hidden')).toBe('true')
+    for (const cls of TONE_CLASSES[toneFor('Acme Holdings')].surface.split(' ')) expect(tile.className).toContain(cls)
+  })
+  it('falls back to a question mark for a blank name', () => {
+    const { container } = render(<WorkspaceInitial name="   " />)
+    expect(container.firstElementChild?.textContent).toBe('?')
+  })
+})
 
 describe('shared workspace switcher', () => {
   it('opens a named dialog outside clipping hosts and focuses search', () => {
