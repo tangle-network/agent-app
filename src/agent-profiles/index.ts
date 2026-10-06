@@ -32,6 +32,8 @@ export interface ProfileRevision {
   knowledgeText: string
   author: { kind: ProfileAuthorKind; id: string }
   reason: string
+  /** `null` means an older stored revision did not record the knowledge delta. */
+  knowledgeTextChanged?: boolean | null
   diff: AgentProfileDiff[]
   authorityDigest: string
   /** ADC hash of the public profile plan, without per-turn product attachments. */
@@ -132,6 +134,25 @@ export class ProfileAccessError extends Error {
     super(message)
     this.name = 'ProfileAccessError'
   }
+}
+
+/** Keep the existing diff column readable while adding the separate knowledge text axis. */
+export function parseProfileRevisionDiff(value: string): {
+  diff: AgentProfileDiff[]; knowledgeTextChanged: boolean | null
+} {
+  const parsed: unknown = JSON.parse(value)
+  if (Array.isArray(parsed)) return { diff: parsed as AgentProfileDiff[], knowledgeTextChanged: null }
+  if (!parsed || typeof parsed !== 'object' || !('profile' in parsed) ||
+      !Array.isArray(parsed.profile) || !('knowledgeTextChanged' in parsed) ||
+      (parsed.knowledgeTextChanged !== null && typeof parsed.knowledgeTextChanged !== 'boolean')) {
+    throw new TypeError('Stored profile revision diff is invalid')
+  }
+  return { diff: parsed.profile as AgentProfileDiff[],
+    knowledgeTextChanged: parsed.knowledgeTextChanged }
+}
+
+export function serializeProfileRevisionDiff(revision: Pick<ProfileRevision, 'diff' | 'knowledgeTextChanged'>): string {
+  return JSON.stringify({ profile: revision.diff, knowledgeTextChanged: revision.knowledgeTextChanged ?? null })
 }
 
 /** Remove exactly the declared text axes. Unknown future fields remain authority. */
@@ -259,7 +280,9 @@ export async function proposeRevision(input: ProposeRevisionInput): Promise<Prof
   const revision: ProfileRevision = {
     id: input.id ?? crypto.randomUUID(), workspaceId: input.workspaceId, profileId: input.profileId,
     parentId: previous?.id ?? null, profile, knowledgeText: input.knowledgeText,
-    author: input.author, reason: input.reason.trim(), diff, authorityDigest,
+    author: input.author, reason: input.reason.trim(), diff,
+    knowledgeTextChanged: previous ? previous.knowledgeText !== input.knowledgeText : input.knowledgeText.length > 0,
+    authorityDigest,
     planDigest: input.planDigest, state, createdAt: input.now ?? Date.now(),
   }
   if (!await input.store.appendRevision(revision, input.expectedRevisionId, state === 'active')) {
