@@ -41,6 +41,12 @@ record throws and must be retried as a read, not interpreted as permission to
 start another execution. Either independently exact record can still recover
 the turn when the other read is unavailable.
 
+The returned `servedModel`, `servedProvider`, and `servedSource`, when present,
+come from the same identity-checked cache record as the result content and
+usage. An exact message may recover content when the cache is unavailable or
+mismatched; it does not authorize borrowing attribution from that cache.
+Do not perform a second cache lookup to label an already-recovered receipt.
+
 `runDetachedTurn` preserves errors from status reads, completed-result reads,
 buffer resets and terminal status writes. Re-streaming an existing running
 buffer requires a successful `resetBuffer`. This is buffer integrity, not an
@@ -56,6 +62,14 @@ Use `observeNativeCompletion` with `runNativeCompletionWorkflow` when another re
 The observer reads admitted execution records and never sends a prompt or cancels work.
 It preserves partial output from failed turns and aggregates receipts in admission order.
 Missing usage remains unknown.
+
+Completed and interrupted native results use the completed-turn module's one
+terminal usage decoder, including reasoning tokens, cache-token aliases, and
+finite numeric-string receipts. Failed results remain failed; recording their
+usage does not authorize billing or a replacement execution. Interrupted
+message history is read only when needed and reused across failed continuations.
+Completed recovery retains its independent-cache-or-message fallback instead
+of being gated by another unconditional message read.
 
 Register the Workflow before native dispatch, using stable session, execution, and replay identities.
 Then call `await args.handoffCompletion()` from the assembled route's producer.
