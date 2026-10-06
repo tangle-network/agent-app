@@ -1239,6 +1239,9 @@ describe('ChatComposer input sizing and trailing slot', () => {
     expect(slot.className).toContain('min-w-min')
     expect(slot.className).not.toContain('min-w-0')
     expect(slot.parentElement!.className).toContain('flex-wrap')
+    // Inside the actions group, Send wraps below a trailing picker it cannot
+    // share a line with rather than being drawn over it.
+    expect(screen.getByTestId('composer-actions').className).toContain('flex-wrap')
   })
 
   it('renders no trailing slot when nothing is passed', () => {

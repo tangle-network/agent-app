@@ -55,6 +55,24 @@ const MEASURE = () => {
       const r = child.getBoundingClientRect()
       if (r.right > slot.right + 0.5) hits.push(`"${(child.textContent ?? '').trim()}" spills past its slot`)
     }
+    // Inside the actions group nothing may be drawn over anything else either:
+    // a trailing picker and Send that cannot share a line must wrap, not stack.
+    const actions = host.querySelector('[data-testid="composer-actions"]')
+    // Compare the buttons themselves, not their wrappers: a `min-w-0` trailing
+    // slot can shrink while the picker inside it keeps its width and spills
+    // under Send, and the two wrappers' boxes would still look disjoint.
+    if (actions) {
+      const items = [...actions.querySelectorAll('button')]
+      const name = (el) => (el.textContent ?? '').trim() || el.getAttribute('aria-label') || el.tagName
+      for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+          if (items[i].contains(items[j]) || items[j].contains(items[i])) continue
+          if (intersects(items[i].getBoundingClientRect(), items[j].getBoundingClientRect())) {
+            hits.push(`"${name(items[i])}" under "${name(items[j])}"`)
+          }
+        }
+      }
+    }
     const actionRect = (others.at(-1) ?? controls).getBoundingClientRect()
     // Nothing on the row may be pushed past the card's own edge either: a
     // trailing group that cannot shrink or wrap overflows the card instead.
