@@ -91,7 +91,7 @@ export interface ProducerNoticeEvent {
   type: 'notice'
   id: string
   /** Kept inline with `/interactions`' `NoticeKind` so this file stays import-free. */
-  noticeKind: 'warning' | 'auto-declined'
+  noticeKind: 'warning' | 'auto-declined' | 'error'
   text: string
 }
 

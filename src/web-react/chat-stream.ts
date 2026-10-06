@@ -86,7 +86,7 @@ export interface ChatStreamCallbacks {
   onToolCall?: (call: ChatStreamToolCall) => void
   onToolResult?: (result: ChatStreamToolResult) => void
   onUsage?: (usage: { promptTokens: number; completionTokens: number }) => void
-  onNotice?: (notice: { id: string; noticeKind: 'warning' | 'auto-declined'; text: string }) => void
+  onNotice?: (notice: { id: string; noticeKind: 'warning' | 'auto-declined' | 'error'; text: string }) => void
   onMetadata?: (data: Record<string, unknown>) => void
   /** Structured detail from a loop-level error event. Fired alongside the
    *  legacy string-only `onErrorEvent` callback. */
@@ -189,7 +189,7 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
     case 'notice': {
       if (
         typeof evt.id === 'string' &&
-        (evt.noticeKind === 'warning' || evt.noticeKind === 'auto-declined') &&
+        (evt.noticeKind === 'warning' || evt.noticeKind === 'auto-declined' || evt.noticeKind === 'error') &&
         typeof evt.text === 'string'
       ) {
         cb.onNotice?.({ id: evt.id, noticeKind: evt.noticeKind, text: evt.text })

@@ -279,7 +279,9 @@ export function noticePartKey(id: string): string {
 }
 
 /** Define specific string literals representing different kinds of notices */
-export type NoticeKind = 'warning' | 'auto-declined'
+/** `error` marks a turn that failed: products render it in the danger tone
+ *  instead of as answer prose (see `createSandboxChatProducer`'s `errorNotice`). */
+export type NoticeKind = 'warning' | 'auto-declined' | 'error'
 
 /**
  * Persisted-part shapes the codecs below produce — the SAME rows
@@ -310,7 +312,7 @@ export type NoticePersistedPart = {
 }
 
 /** Builds the persisted/streamed `notice` part — a one-line transcript notice
- *  explaining an out-of-band event (warning, auto-declined interaction). */
+ *  explaining an out-of-band event (warning, auto-declined interaction, turn error). */
 export function noticePart(noticeKind: NoticeKind, id: string, text: string): NoticePersistedPart {
   return { type: 'notice', id, noticeKind, text }
 }
