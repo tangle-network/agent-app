@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-57 exports.
+58 exports.
 
 ### `asRecord`
 
@@ -404,6 +404,14 @@ interface StreamEvent
 
 ```ts
 "\nCREATE TABLE IF NOT EXISTS turn_events (\n turnId TEXT NOT NULL,\n seq INTEGER NOT NULL,\n event TEXT NOT NULL,\n PR…
+```
+
+### `TURN_STATUS_LEASE_MIGRATION_SQL`
+
+`const` — For deployments whose `turn_status` table predates `leaseToken` — run once to add the column `createD1PlanFollowUpGate` fences its claims on.
+
+```ts
+"ALTER TABLE turn_status ADD COLUMN leaseToken TEXT;"
 ```
 
 ### `TURN_STATUS_RETENTION_MIGRATION_SQL`

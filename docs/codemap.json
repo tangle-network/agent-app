@@ -2379,6 +2379,12 @@
           "doc": "Define options to configure chat turn routes including authorization, storage, and event buffering"
         },
         {
+          "name": "createD1PlanFollowUpGate",
+          "kind": "function",
+          "signature": "(db: D1LikeForPlanFollowUps, options?: PlanFollowUpGateOptions) => PlanFollowUpGate",
+          "doc": "Exclusive claim over a follow-up execution in the shared `turn_status` table."
+        },
+        {
           "name": "CreateLegacyAttachmentUploadRouteOptions",
           "kind": "interface",
           "signature": "interface CreateLegacyAttachmentUploadRouteOptions",
@@ -2419,6 +2425,18 @@
           "kind": "interface",
           "signature": "interface CreateUploadRouteOptions",
           "doc": "Define options to authorize uploads and configure file size limits and upload directory"
+        },
+        {
+          "name": "D1BoundForPlanFollowUps",
+          "kind": "interface",
+          "signature": "interface D1BoundForPlanFollowUps",
+          "doc": "A bound D1 statement used by the follow-up gate."
+        },
+        {
+          "name": "D1LikeForPlanFollowUps",
+          "kind": "interface",
+          "signature": "interface D1LikeForPlanFollowUps",
+          "doc": "Structural D1 contract for the follow-up gate."
         },
         {
           "name": "DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS",
@@ -2811,6 +2829,60 @@
           "doc": "Validates the untyped `mentions` array off the wire, mirroring {@link parseChatTurnParts}: the typed list, or `ChatTurnInputError` (400) naming the offending entry."
         },
         {
+          "name": "parsePlanFollowUpAttach",
+          "kind": "function",
+          "signature": "(value: unknown) => PlanFollowUpAttach | null",
+          "doc": "Parse a follow-up descriptor."
+        },
+        {
+          "name": "PlanFollowUpAdmission",
+          "kind": "type",
+          "signature": "type PlanFollowUpAdmission",
+          "doc": "Result of one exclusive follow-up claim."
+        },
+        {
+          "name": "PlanFollowUpAttach",
+          "kind": "interface",
+          "signature": "interface PlanFollowUpAttach",
+          "doc": "The descriptor a decided plan card sends back to the chat route."
+        },
+        {
+          "name": "planFollowUpExecutionId",
+          "kind": "function",
+          "signature": "(sessionId: string, turnId: string) => string",
+          "doc": "The Sidecar's execution id for a follow-up turn."
+        },
+        {
+          "name": "PlanFollowUpGate",
+          "kind": "interface",
+          "signature": "interface PlanFollowUpGate",
+          "doc": "Exclusive claim over one follow-up execution's `turn_status` row."
+        },
+        {
+          "name": "PlanFollowUpGateOptions",
+          "kind": "interface",
+          "signature": "interface PlanFollowUpGateOptions",
+          "doc": "Configure the follow-up gate."
+        },
+        {
+          "name": "PlanFollowUpOutcome",
+          "kind": "type",
+          "signature": "type PlanFollowUpOutcome",
+          "doc": "The decision a follow-up continues."
+        },
+        {
+          "name": "PlanFollowUpResolution",
+          "kind": "type",
+          "signature": "type PlanFollowUpResolution",
+          "doc": "Result of checking a follow-up descriptor against the session's persisted plans."
+        },
+        {
+          "name": "PlanFollowUpSettlement",
+          "kind": "type",
+          "signature": "type PlanFollowUpSettlement",
+          "doc": "Result of settling a claim."
+        },
+        {
           "name": "produceChatTurnWithIntelligence",
           "kind": "function",
           "signature": "(options: ChatTurnIntelligenceOptions & { produce: () => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>; }) =>…",
@@ -2997,6 +3069,12 @@
           "doc": "Coerce the caller's budget to a finite, bounded, non-negative integer."
         },
         {
+          "name": "resolvePlanFollowUpRequest",
+          "kind": "function",
+          "signature": "(input: { sessionId: string; planFollowUp: unknown; messages: readonly { role: string; parts?: unknown; }[]; }) => Plan…",
+          "doc": "Validate a follow-up request against what the session actually persisted: the plan must be in this session at this revision and must already carry the claimed decision."
+        },
+        {
           "name": "rowIdOf",
           "kind": "function",
           "signature": "(inserted: unknown) => string | null",
@@ -3105,6 +3183,12 @@
           "doc": null
         },
         {
+          "name": "streamPlanFollowUpEvents",
+          "kind": "function",
+          "signature": "(box: SandboxInstance, sessionId: string, executionId: string, options?: { timeoutMs?: number | undefined; }) => AsyncG…",
+          "doc": "Attach to the already-enqueued follow-up execution: replay its buffered events from the start, then follow it live to completion."
+        },
+        {
           "name": "streamWithModelFailover",
           "kind": "function",
           "signature": "(options: ModelFailoverStreamOptions) => ModelFailoverStreamHandle",
@@ -3115,6 +3199,12 @@
           "kind": "function",
           "signature": "(reason: string) => string",
           "doc": "Condense an abandoned attempt's raw failure text into something safe to show a customer in the transcript."
+        },
+        {
+          "name": "unwrapSessionEventPayload",
+          "kind": "function",
+          "signature": "(event: SandboxEvent) => SandboxEvent",
+          "doc": "Session events carry two payload shapes: replayed events hold the stream event under `data`, while live events nest it under `data.properties`."
         },
         {
           "name": "UPLOAD_INLINE_MAX_BYTES",
@@ -9514,8 +9604,8 @@
         {
           "name": "planFollowUpTurnId",
           "kind": "function",
-          "signature": "(planId: string, outcome: \"approved\" | \"rejected\") => string",
-          "doc": "Generate a unique follow-up turn ID based on the plan ID and its outcome"
+          "signature": "(planId: string, revision: number, outcome: \"approved\" | \"rejected\") => string",
+          "doc": "The follow-up turn the Sandbox platform enqueues when one plan revision is decided."
         },
         {
           "name": "planPartKey",
@@ -15884,6 +15974,12 @@
           "kind": "const",
           "signature": "\"\\nCREATE TABLE IF NOT EXISTS turn_events (\\n turnId TEXT NOT NULL,\\n seq INTEGER NOT NULL,\\n event TEXT NOT NULL,\\n PR…",
           "doc": "Schema for the D1 store — append to the product's migrations."
+        },
+        {
+          "name": "TURN_STATUS_LEASE_MIGRATION_SQL",
+          "kind": "const",
+          "signature": "\"ALTER TABLE turn_status ADD COLUMN leaseToken TEXT;\"",
+          "doc": "For deployments whose `turn_status` table predates `leaseToken` — run once to add the column `createD1PlanFollowUpGate` fences its claims on."
         },
         {
           "name": "TURN_STATUS_RETENTION_MIGRATION_SQL",
