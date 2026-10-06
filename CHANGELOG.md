@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.2
+
+- fix(chat-routes): shared plan follow-up stream parity with GTM; lease column opt-in (#821)
+
 ## 0.56.1
 
 - fix(chat): unify exact native completion receipts (#819)
