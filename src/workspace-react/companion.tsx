@@ -180,7 +180,16 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
         // user message on a phone, hiding part of its text.
         collapsedControlsPlacement="edge"
         keepRightMounted
-        center={children}
+        // The layout's center is a block scroller, so a conversation written as
+        // `flex flex-1 flex-col` (message list `flex-1 overflow-y-auto`, then a
+        // shrink-0 composer) got no height bound: the whole conversation grew
+        // with its content and a tall composer was pushed below the fold. A
+        // one-cell grid whose row is `minmax(0, 1fr)` gives the conversation
+        // exactly the pane's height: a grid item spanning a track with a zero
+        // minimum has no content-based minimum, which a flex column would still
+        // impose on a child without `min-h-0`. The message list then scrolls on
+        // its own and the composer stays on screen.
+        center={<div data-companion-center className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">{children}</div>}
         left={navigation?.content}
         leftContentClassName="py-0"
         leftHeader={navigation && (navigation.header !== undefined ? navigation.header : <span className="text-sm font-medium">{navigation.label ?? 'Chats'}</span>)}

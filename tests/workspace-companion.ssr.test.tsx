@@ -17,3 +17,11 @@ it('keeps the right-panel expander beside the conversation instead of floating o
   expect(column).toContain('shrink-0')
   expect(column).not.toContain('absolute')
 })
+
+it('bounds the conversation to the pane height so its own list scrolls and the composer stays on screen', () => {
+  const html = renderToString(<AgentWorkspaceCompanion tabs={[{ id: 'files', label: 'Files', renderContent: () => <p>Files</p> }]}><section className="flex flex-1 flex-col">Server conversation</section></AgentWorkspaceCompanion>)
+  const before = html.slice(0, html.indexOf('<section'))
+  const wrapper = before.slice(before.lastIndexOf('<div'))
+  expect(wrapper).toContain('data-companion-center')
+  for (const cls of ['grid', 'h-full', 'min-h-0', 'grid-rows-[minmax(0,1fr)]']) expect(wrapper.split('"').join(' ').split(' ')).toContain(cls)
+})
