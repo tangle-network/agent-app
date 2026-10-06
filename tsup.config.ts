@@ -3,7 +3,6 @@ import { defineConfig } from 'tsup'
 export default defineConfig({
   entry: {
     'tools/index': 'src/tools/index.ts',
-    'tangle/index': 'src/tangle/index.ts',
     'runtime/index': 'src/runtime/index.ts',
     'catalog/index': 'src/catalog/index.ts',
     'eval/index': 'src/eval/index.ts',
@@ -21,7 +20,6 @@ export default defineConfig({
     'peer-floors/cli': 'src/peer-floors/cli.ts',
     'spend/index': 'src/spend/index.ts',
     'spend/cli': 'src/spend/cli.ts',
-    'run/index': 'src/run/index.ts',
     'harness/index': 'src/harness/index.ts',
     'config/index': 'src/config/index.ts',
     'preset-cloudflare/index': 'src/preset-cloudflare/index.ts',
@@ -61,7 +59,6 @@ export default defineConfig({
     'workspace-apps/index': 'src/workspace-apps/index.ts',
     'workspace-react/index': 'src/workspace-react/index.tsx',
     'web-react/terminal': 'src/web-react/terminal.ts',
-    'web-react/session-gateway': 'src/web-react/session-gateway.ts',
     'web-react/async/index': 'src/web-react/async/index.ts',
     'assistant/index': 'src/assistant/index.ts',
     'brand/index': 'src/brand/index.tsx',
@@ -82,9 +79,7 @@ export default defineConfig({
     'teams/drizzle': 'src/teams/drizzle.ts',
     'teams/members-api': 'src/teams/members-api.ts',
     'teams/invitations-api': 'src/teams/invitations-api.ts',
-    'teams/resend': 'src/teams/resend.ts',
     'teams-react/index': 'src/teams-react/index.ts',
-    'teams-react/lazy': 'src/teams-react/lazy.tsx',
     'intakes/index': 'src/intakes/index.ts',
     'intakes/drizzle': 'src/intakes/drizzle.ts',
     'intakes/api': 'src/intakes/api.ts',

@@ -60,11 +60,6 @@
       "import": "./dist/tools/index.js",
       "default": "./dist/tools/index.js"
     },
-    "./tangle": {
-      "types": "./dist/tangle/index.d.ts",
-      "import": "./dist/tangle/index.js",
-      "default": "./dist/tangle/index.js"
-    },
     "./platform": {
       "types": "./dist/platform/index.d.ts",
       "import": "./dist/platform/index.js",
@@ -134,11 +129,6 @@
       "types": "./dist/sandbox/index.d.ts",
       "import": "./dist/sandbox/index.js",
       "default": "./dist/sandbox/index.js"
-    },
-    "./run": {
-      "types": "./dist/run/index.d.ts",
-      "import": "./dist/run/index.js",
-      "default": "./dist/run/index.js"
     },
     "./config": {
       "types": "./dist/config/index.d.ts",
@@ -299,11 +289,6 @@
       "import": "./dist/web-react/terminal.js",
       "default": "./dist/web-react/terminal.js"
     },
-    "./web-react/session-gateway": {
-      "types": "./dist/web-react/session-gateway.d.ts",
-      "import": "./dist/web-react/session-gateway.js",
-      "default": "./dist/web-react/session-gateway.js"
-    },
     "./work-product": {
       "types": "./dist/work-product/index.d.ts",
       "import": "./dist/work-product/index.js",
@@ -453,20 +438,10 @@
       "import": "./dist/teams/invitations-api.js",
       "default": "./dist/teams/invitations-api.js"
     },
-    "./teams/resend": {
-      "types": "./dist/teams/resend.d.ts",
-      "import": "./dist/teams/resend.js",
-      "default": "./dist/teams/resend.js"
-    },
     "./teams-react": {
       "types": "./dist/teams-react/index.d.ts",
       "import": "./dist/teams-react/index.js",
       "default": "./dist/teams-react/index.js"
-    },
-    "./teams-react/lazy": {
-      "types": "./dist/teams-react/lazy.d.ts",
-      "import": "./dist/teams-react/lazy.js",
-      "default": "./dist/teams-react/lazy.js"
     },
     "./intakes": {
       "types": "./dist/intakes/index.d.ts",
@@ -648,7 +623,6 @@
     "react-dom": "^19.2.8",
     "react-konva": "^19.2.5",
     "react-router": "^8.3.1",
-    "resend": "^6.25.0",
     "semver": "^7.8.5",
     "storybook": "^10.5.10",
     "tailwindcss": "^4.3.3",
@@ -700,7 +674,6 @@
     "react-dom": ">=18",
     "react-konva": ">=18",
     "react-router": ">=8.3.0",
-    "resend": ">=6",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@tangle-network/browser-agent-driver": "^0.36.1",
     "@tangle-network/tcloud": "^0.5.2 || >=0.8.1 <0.9.0",
@@ -779,9 +752,6 @@
       "optional": true
     },
     "lucide-react": {
-      "optional": true
-    },
-    "resend": {
       "optional": true
     },
     "pdf-lib": {

@@ -222,7 +222,6 @@ describe('browser-safe subpath manifest', () => {
       'web-react/terminal',
       'design-canvas-react/engine',
       'design-canvas-react/lazy',
-      'teams-react/lazy',
       'intakes-react/lazy',
       'vault/lazy',
     ]) {
