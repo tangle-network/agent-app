@@ -1274,11 +1274,11 @@ describe('streamSandboxPrompt seam', () => {
     const [prompt, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
     expect(prompt).toBe('Assistant: prior\n\nUser: hello')
     expect(opts.backend.type).toBe('opencode')
-    expect(opts.backend.modelId).toBe('gpt-x')
-    expect(opts.backend.provider).toBe('openai-compat')
-    expect(opts.backend.apiKey).toBe('router-key')
-    expect(opts.backend.baseUrl).toBe('https://router')
-    // deprecated window: the nested copy rides along, agreeing
+    // Only the nested spelling: a pre-fold SDK forwards the backend as-is and
+    // the platform's strict schema refuses role-named keys beside it.
+    for (const key of ['modelId', 'provider', 'apiKey', 'baseUrl']) {
+      expect(opts.backend).not.toHaveProperty(key)
+    }
     expect(opts.backend.model).toEqual({
       model: 'gpt-x',
       provider: 'openai-compat',
@@ -2803,7 +2803,9 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       childKeyMint: async () => ({ succeeded: true, value: 'child-key' }),
     })
     await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', userId: 'u9', harness: 'opencode' })
-    expect(createMock.mock.calls[0]![0].backend.modelId).toBeDefined()
+    for (const key of ['modelId', 'provider', 'apiKey', 'baseUrl']) {
+      expect(createMock.mock.calls[0]![0].backend).not.toHaveProperty(key)
+    }
     expect(createMock.mock.calls[0]![0].backend.model).toMatchObject({
       provider: 'openai-compat',
       model: 'm',
