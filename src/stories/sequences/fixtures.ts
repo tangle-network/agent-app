@@ -1,12 +1,7 @@
-/**
- * Sequences-area story fixtures. Self-contained on purpose: the shared
- * `src/stories/fixtures/` barrel was absent from the working tree when these
- * stories were written, so this file mirrors its `makePlaygroundReelTimeline`
- * and `makeSolidFrameProvider` byte-for-byte behavior (same shapes, same
- * solid-color provider — no media decode, no network) and adds the
- * multi-track, empty, and lookup variants the sequence stories need. If the
- * shared fixtures return, the reel/provider below can be re-pointed at them.
- */
+/** Additional sequence story fixtures. The reel and frame provider live in ../fixtures/sequences. */
+
+import { makePlaygroundReelTimeline, makeSolidFrameProvider } from '../fixtures/sequences'
+export { makePlaygroundReelTimeline, makeSolidFrameProvider }
 
 import type {
   SequenceApplyResult,
@@ -15,97 +10,6 @@ import type {
   SequenceTimeline,
   SequenceTrack,
 } from '../../sequences'
-import type { VideoFrameProvider } from '../../sequences-react'
-
-// ── Two-track reel (video + captions) ─────────────────────────────────────────
-
-export function makePlaygroundReelTimeline(): SequenceTimeline {
-  const fps = 30
-  const durationFrames = 600 // 20s
-  const tracks: SequenceTrack[] = [
-    { id: 'track-video', kind: 'video', name: 'Video', sortOrder: 0, locked: false, muted: false, metadata: {} },
-    { id: 'track-caption', kind: 'caption', name: 'Captions', sortOrder: 1, locked: false, muted: false, metadata: {} },
-  ]
-  const clips: SequenceClip[] = [
-    {
-      id: 'clip-intro',
-      trackId: 'track-video',
-      label: 'intro.mp4',
-      startFrame: 0,
-      durationFrames: 180,
-      sourceInFrame: 0,
-      sourceOutFrame: null,
-      disabled: false,
-      media: { url: 'https://example.com/intro.mp4', kind: 'video', durationSeconds: 6 },
-      metadata: {},
-    },
-    {
-      id: 'clip-demo',
-      trackId: 'track-video',
-      label: 'demo.mp4',
-      startFrame: 190,
-      durationFrames: 240,
-      sourceInFrame: 0,
-      sourceOutFrame: null,
-      disabled: false,
-      media: { url: 'https://example.com/demo.mp4', kind: 'video', durationSeconds: 8 },
-      metadata: {},
-    },
-    {
-      id: 'clip-outro',
-      trackId: 'track-video',
-      label: 'outro.mp4',
-      startFrame: 440,
-      durationFrames: 150,
-      sourceInFrame: 0,
-      sourceOutFrame: null,
-      disabled: false,
-      media: { url: 'https://example.com/outro.mp4', kind: 'video', durationSeconds: 5 },
-      metadata: {},
-    },
-    {
-      id: 'cap-1',
-      trackId: 'track-caption',
-      label: 'Caption 1',
-      startFrame: 10,
-      durationFrames: 150,
-      sourceInFrame: 0,
-      sourceOutFrame: null,
-      disabled: false,
-      text: 'Meet the agent playground',
-      language: 'en',
-      metadata: {},
-    },
-    {
-      id: 'cap-2',
-      trackId: 'track-caption',
-      label: 'Caption 2',
-      startFrame: 200,
-      durationFrames: 200,
-      sourceInFrame: 0,
-      sourceOutFrame: null,
-      disabled: false,
-      text: 'Audit every surface, light and dark',
-      language: 'en',
-      metadata: {},
-    },
-  ]
-  return {
-    sequence: {
-      id: 'seq-1',
-      title: 'Playground reel',
-      fps,
-      width: 1920,
-      height: 1080,
-      aspectRatio: '16:9',
-      durationFrames,
-      status: 'active',
-      metadata: {},
-    },
-    tracks,
-    clips,
-  }
-}
 
 /** Prebuilt instance for stories that don't need isolation. */
 const playgroundReelTimeline: SequenceTimeline = makePlaygroundReelTimeline()
@@ -364,37 +268,6 @@ export function clipOf(timeline: SequenceTimeline, clipId: string): SequenceClip
   const clip = timeline.clips.find((candidate) => candidate.id === clipId)
   if (!clip) throw new Error(`fixture clip missing: ${clipId}`)
   return clip
-}
-
-// ── Frame provider (deterministic solid color — no media decode) ─────────────
-
-/**
- * Simplest valid `VideoFrameProvider`: paints a deterministic solid color into
- * the preview rect. `drawFrame` never touches network or <video>/<img>. The
- * color cycles by second so scrubbing is visibly distinct.
- */
-export function makeSolidFrameProvider(): VideoFrameProvider {
-  const palette = ['#1e293b', '#3b82f6', '#f59e0b', '#22c55e', '#ef4444', '#a855f7']
-  return {
-    async drawFrame(mediaUrl, sourceSeconds, ctx, rect) {
-      const color = palette[Math.floor(sourceSeconds) % palette.length] ?? '#1e293b'
-      ctx.fillStyle = color
-      ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
-      ctx.fillStyle = 'rgba(255,255,255,0.7)'
-      ctx.font = `${Math.max(12, Math.round(rect.height / 12))}px sans-serif`
-      ctx.fillText(
-        `${mediaUrl.split('/').pop()} @ ${sourceSeconds.toFixed(1)}s`,
-        rect.x + 12,
-        rect.y + rect.height / 2,
-      )
-    },
-    prefetch() {
-      /* no-op: nothing to warm for a solid-color provider */
-    },
-    dispose() {
-      /* no-op: no pooled resources */
-    },
-  }
 }
 
 /**
