@@ -26,6 +26,13 @@ export interface ProfileD1Database {
   batch(statements: ProfileD1Statement[]): Promise<{ meta: { changes: number } }[]>
 }
 
+/** Trusted product SQL checked in the same D1 transaction as an agent-authored save. */
+export interface ProfileD1RevisionWriteGuard {
+  /** A boolean SQLite expression with bound values; never build it from model input. */
+  sql: string
+  values: (string | number | null)[]
+}
+
 export const AGENT_PROFILE_D1_SCHEMA_SQL = `
 CREATE TABLE agent_profile_revision (
   revision_id TEXT PRIMARY KEY,
@@ -245,7 +252,12 @@ function turnFromRow(row: TurnRow): ProfileTurnPin {
     revisionId: row.revision_id, authorityDigest: row.authority_digest, planDigest: row.plan_digest }
 }
 
-export function createD1ProfileRevisionStore(db: ProfileD1Database): ProfileRevisionStore {
+export function createD1ProfileRevisionStore(db: ProfileD1Database,
+  options: { revisionWriteGuard?: ProfileD1RevisionWriteGuard } = {}): ProfileRevisionStore {
+  const writeGuard = options.revisionWriteGuard
+  if (writeGuard && (!writeGuard.sql.trim() || /;|--|\/\*/.test(writeGuard.sql))) {
+    throw new TypeError('Revision write guard must be a single trusted SQL expression')
+  }
   const currentActivation = `(SELECT revision_id FROM agent_profile_activation_event
     WHERE workspace_id = ? AND profile_id = ? ORDER BY version DESC LIMIT 1)`
   const bindingVersion = `(SELECT COALESCE(MAX(version), 0) FROM agent_profile_binding_event
@@ -321,9 +333,9 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database): ProfileRevi
          author_kind, author_id, reason, diff_json, authority_digest, plan_digest, state, created_at)
         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${expectedActiveId === null
           ? `${currentActivation} IS NULL`
-          : `${currentActivation} = ?`}`)
+          : `${currentActivation} = ?`}${writeGuard ? ` AND (${writeGuard.sql})` : ''}`)
         .bind(...rowValues, revision.workspaceId, revision.profileId,
-          ...(expectedActiveId === null ? [] : [expectedActiveId]))
+          ...(expectedActiveId === null ? [] : [expectedActiveId]), ...(writeGuard?.values ?? []))
       if (!activate) return (await insert.run()).meta.changes === 1
       const activateEvent = db.prepare(`INSERT INTO agent_profile_activation_event
         (event_id, workspace_id, profile_id, version, revision_id, created_at)
@@ -331,11 +343,13 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database): ProfileRevi
           WHERE workspace_id = ? AND profile_id = ?), 0) + 1, ?, ?
         WHERE EXISTS (SELECT 1 FROM agent_profile_revision WHERE revision_id = ?
           AND workspace_id = ? AND profile_id = ?)
-          AND ${expectedActiveId === null ? `${currentActivation} IS NULL` : `${currentActivation} = ?`}`)
+          AND ${expectedActiveId === null ? `${currentActivation} IS NULL` : `${currentActivation} = ?`}
+          ${writeGuard ? `AND (${writeGuard.sql})` : ''}`)
         .bind(crypto.randomUUID(), revision.workspaceId, revision.profileId,
           revision.workspaceId, revision.profileId, revision.id, Date.now(),
           revision.id, revision.workspaceId, revision.profileId,
-          revision.workspaceId, revision.profileId, ...(expectedActiveId === null ? [] : [expectedActiveId]))
+          revision.workspaceId, revision.profileId, ...(expectedActiveId === null ? [] : [expectedActiveId]),
+          ...(writeGuard?.values ?? []))
       const [inserted, activated] = await db.batch([insert, activateEvent])
       return inserted?.meta.changes === 1 && activated?.meta.changes === 1
     },
