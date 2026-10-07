@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.16
+
+- fix(profiles): return winning receipt for delayed duplicate switch (#851)
+
 ## 0.57.15
 
 - fix(agent-profiles): keep bound profiles canonical JSON
