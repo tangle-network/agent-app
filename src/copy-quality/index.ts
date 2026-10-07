@@ -236,7 +236,10 @@ export function scanCopy(text: string, options: CopyScanOptions = {}): CopyScanR
   const surface = options.surface ?? 'long'
   const prose = proseOf(text)
   const paragraphs = paragraphsOf(prose)
-  const banned = [...BAN_REGEXES, ...(options.extraBanned ?? []).map((word) => ({ word, regex: termRegex(word) }))]
+  // An extra already in the Ban tier (or listed twice) must not count twice.
+  const extras = [...new Set((options.extraBanned ?? []).map((word) => word.toLowerCase()))]
+    .filter((word) => !BAN_WORDS.includes(word))
+  const banned = [...BAN_REGEXES, ...extras.map((word) => ({ word, regex: termRegex(word) }))]
   const findings: CopyTellFinding[] = []
   let contrastParagraphs = 0
   let tellWords = 0
