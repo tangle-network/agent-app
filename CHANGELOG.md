@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.13
+
+- fix(chat-react): block send until entry composer is ready
+
 ## 0.57.12
 
 - Create text profiles from consented authority baseline
