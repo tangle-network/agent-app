@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.17
+
+- fix(profiles): bind trusted source identity into switch receipts (#852)
+
 ## 0.57.16
 
 - fix(profiles): return winning receipt for delayed duplicate switch (#851)
