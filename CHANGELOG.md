@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.58.1
+
+- feat(profile): vendored humanizer review skill and one em-dash rule (#861)
+- fix(copy-quality): a product-banned cap word counts once, in the ban tier (#859)
+
 ## 0.58.0
 
 - fix(copy-quality): count an extra that repeats the Ban tier once (#858)
