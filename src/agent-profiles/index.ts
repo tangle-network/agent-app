@@ -312,7 +312,7 @@ export async function promoteRevision(input: {
   ])
   if (!revision || revision.parentId !== (head?.id ?? null)) throw new ProfileConflictError('Profile parent changed')
   if (revision.authorityDigest !== head?.authorityDigest &&
-      (!input.verifyConsent || !await input.verifyConsent(revision))) {
+      (input.actorRole !== 'owner' || !input.verifyConsent || !await input.verifyConsent(revision))) {
     throw new ProfileAccessError('Authority changes require owner consent')
   }
   if (!await input.store.promoteRevision(input.workspaceId, input.profileId, revision.id, head?.id ?? null)) {
