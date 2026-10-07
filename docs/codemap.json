@@ -10935,6 +10935,7 @@
       "id": "./profile",
       "source": "src/profile/index.ts",
       "dependsOn": [
+        "copy-quality",
         "skills"
       ],
       "error": null,

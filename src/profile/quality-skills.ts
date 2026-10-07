@@ -4,18 +4,19 @@
  * `human-prose` was copied into three products byte-for-byte (GTM's catalog,
  * tax, creative), each with its own frontmatter. This module is now its one
  * source; a product adds its own vocabulary through options instead of editing
- * a copy. Banned-word detection belongs to the copy checks that scan outgoing
- * text; pass their word list as `bannedWords` so the skill and the check
- * enforce the same list.
+ * a copy. The vocabulary comes from the copy-quality scanner's ban and cap
+ * tiers, so the words the skill tells the agent to avoid are the words the
+ * scanner flags.
  */
 
+import { bannedCopyVocabulary, CAP_WORDS } from '../copy-quality/index'
 import { skillEntryFromMarkdown, type SkillEntry } from '../skills/index'
 
 export const HUMAN_PROSE_SKILL_ID = 'human-prose'
 
 /** Product additions to the shared writing skill. */
 export interface HumanProseSkillOptions {
-  /** Words the agent must not use in audience-facing prose. */
+  /** Product words to ban in addition to the copy-quality ban tier. */
   bannedWords?: readonly string[]
   /** Product terms, keyed by the wording to avoid. */
   preferredTerms?: Readonly<Record<string, string>>
@@ -69,13 +70,16 @@ Below 35/50, cut and rewrite. Do not ship slop.`
 const HUMAN_PROSE_ATTRIBUTION = 'Adapted from the stop-slop ruleset (github.com/hardikpandya/stop-slop).'
 
 function vocabularySection(options: HumanProseSkillOptions): string {
-  const banned = [...new Set((options.bannedWords ?? []).map((word) => word.trim()).filter(Boolean))]
+  const banned = bannedCopyVocabulary((options.bannedWords ?? []).map((word) => word.trim()).filter(Boolean))
+  const capped = CAP_WORDS.filter((word) => !banned.includes(word))
   const preferred = Object.entries(options.preferredTerms ?? {})
     .map(([avoid, use]) => [avoid.trim(), use.trim()] as const)
     .filter(([avoid, use]) => avoid && use)
-  if (banned.length === 0 && preferred.length === 0) return ''
-  const parts = ['## Product vocabulary']
-  if (banned.length > 0) parts.push(`Do not use these in audience-facing prose: ${banned.join(', ')}.`)
+  const parts = [
+    '## Vocabulary',
+    `Never use these in audience-facing prose: ${banned.join(', ')}.`,
+    `Use at most one of these per paragraph: ${capped.join(', ')}.`,
+  ]
   if (preferred.length > 0) {
     parts.push(['Use the product term:', ...preferred.map(([avoid, use]) => `- "${use}", not "${avoid}"`)].join('\n'))
   }

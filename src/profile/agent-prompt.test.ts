@@ -135,7 +135,8 @@ describe('default quality skills', () => {
     expect(frontmatter.name).toBe('human-prose')
     expect(frontmatter.description).toMatch(/structural tells/)
     expect(body).toContain('## The patterns to cut')
-    expect(body).not.toContain('## Product vocabulary')
+    expect(body).toContain('Never use these in audience-facing prose: delve,')
+    expect(body).toContain('Use at most one of these per paragraph: seamless,')
     const index = composeSkills({ skills: [skill!], mode: 'mounted', skillDir: '.opencode/skills' }).promptSection
     expect(index).toContain('(read .opencode/skills/human-prose/SKILL.md)')
   })
@@ -146,7 +147,8 @@ describe('default quality skills', () => {
       preferredTerms: { 'AI-powered': 'name the capability' },
       reviewSkillId: 'humanizer',
     })
-    expect(skill.skillMd).toContain('Do not use these in audience-facing prose: leverage, seamless.')
+    expect(skill.skillMd).toMatch(/Never use these in audience-facing prose: leverage, seamless, delve,/)
+    expect(skill.skillMd).not.toMatch(/per paragraph: seamless,/)
     expect(skill.skillMd).toContain('- "name the capability", not "AI-powered"')
     expect(skill.skillMd).toContain('`humanizer` skill')
     expect(skill.skillMd.trimEnd().endsWith('(github.com/hardikpandya/stop-slop).')).toBe(true)

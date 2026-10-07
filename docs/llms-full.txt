@@ -14060,7 +14060,7 @@ type VaultKv
 
 ## `./profile`
 
-Source: `src/profile/index.ts` · depends on `skills`
+Source: `src/profile/index.ts` · depends on `copy-quality`, `skills`
 
 ### `AgentPromptInput`
 

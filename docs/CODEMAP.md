@@ -69,7 +69,7 @@ _111 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./preflight`](api/preflight.md) | 14 | `signoff` |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | `signoff` |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 34 | `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`, `web` |
-| [`./profile`](api/profile.md) | 79 | `skills` |
+| [`./profile`](api/profile.md) | 79 | `copy-quality`, `skills` |
 | [`./prompt`](api/prompt.md) | 3 | — |
 | [`./public-consultation`](api/public-consultation.md) | 11 | `chat-routes`, `stream`, `tools` |
 | [`./record`](api/record.md) | 33 | — |
@@ -706,7 +706,7 @@ Depends on: `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`,
 
 Source: `src/profile/index.ts` · 79 exports
 
-Depends on: `skills`
+Depends on: `copy-quality`, `skills`
 
 `AgentPromptInput`, `AgentPromptSection`, `assertProfilePromptWithinBudget`, `assertSkillDeliveryDisjoint`, `assertSystemPromptWithinBudget`, `captureModelInput`, `CaptureModelInputInput`, `composeAgentProfile`, `ComposedSkills`, `ComposeProfileBudget`, `composeShellResources`, `ComposeShellResourcesInput`, `composeSkills`, `CorpusEntry`, `CorpusLoadResult`, `corpusSkills`, `createMemoryModelInputStore`, `DEFAULT_HOME_LIMITS`, `DEFAULT_MAX_SYSTEM_PROMPT_BYTES`, `defaultHomeFiles`, `defaultQualitySkills`, `diffProfileFingerprints`, `fingerprintAgentProfile`, `formatProfileDrift`, `GlobModules`, `HUMAN_PROSE_SKILL_ID`, `humanProseSkill`, `HumanProseSkillOptions`, `largestPromptSections`, `LEARNED_GUIDANCE_SECTION_ID`, `LoadCorpusOptions`, `loadMarkdownCorpus`, `mergeComposedSkills`, `MODEL_INPUT_RECORD_SCHEMA`, `modelInputBlob`, `ModelInputBlob`, `ModelInputKind`, `ModelInputMediaType`, `ModelInputOutcome`, `ModelInputRecord`, `ModelInputRef`, `ModelInputSectionRef`, `ModelInputStore`, `OPERATING_CONTRACT_CLAUSES`, `OPERATING_CONTRACT_VERSION`, `OperatingContractClause`, `OperatingContractClauseId`, `OperatingContractOptions`, `parseCorpusSkills`, `ParsedSkill`, `parseSkillFrontmatter`, `profile`, `ProfileChannels`, `ProfileDrift`, `ProfileDriftEntry`, `ProfileFingerprint`, `ProfileFingerprintContext`, `ProfileOverlay`, `QualitySkillOptions`, `readModelInput`, `registrySkills`, `renderAgentPrompt`, `RenderedAgentPrompt`, `RenderedAgentPromptSection`, `RenderedOperatingContract`, `renderInlineSkills`, `renderOperatingContract`, `renderSkillIndex`, `SkillDeliveryMode`, `SkillEntry`, `skillEntryFromMarkdown`, `SkillFrontmatter`, `skillMountPath`, `skillRefs`, `stripComments`, `UserSkill`, `userSkillMounts`, `withDefaultAgentHome`, `withDefaultQualitySkills`
 
