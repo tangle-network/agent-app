@@ -4,7 +4,7 @@
 
 Source: `src/agent-profiles/index.ts`
 
-35 exports.
+36 exports.
 
 ### `addProfileKnowledgeDocument`
 
@@ -195,7 +195,15 @@ interface ProfileToolContext
 `function` — Shared self-edit tools; only the authenticated active turn can name the profile.
 
 ```ts
-(context: ProfileToolContext) => McpToolDefinition<Record<string, never>>[]
+<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => McpToolDefinition<Record<string, never>>[]
+```
+
+### `ProfileToolTurn`
+
+`interface`
+
+```ts
+interface ProfileToolTurn
 ```
 
 ### `ProfileTurnPin`

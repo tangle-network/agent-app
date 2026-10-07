@@ -24,8 +24,9 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState, memo, type ReactNode } from 'react'
+import { isViewerMessage, MessageAuthor } from '@tangle-network/ui/chat'
 import { InlineToolItem, RunRowShell } from '@tangle-network/ui/run'
-import type { ToolPart } from '@tangle-network/ui/types'
+import type { ChatAuthor, ToolPart } from '@tangle-network/ui/types'
 import { useSmoothText } from './smooth-text'
 import { useArrivalStyle } from './motion'
 import { BrainGlyph, ChevronDown, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, usePending } from './controls'
@@ -280,6 +281,12 @@ export interface ChatUiMessage extends ChatMessageMetrics {
   /** Persisted assistant parts. When `ChatMessages.durableCards` is supplied,
    * shared plan/question cards render directly from these projections. */
   parts?: Array<Record<string, unknown>>
+  /** Who wrote the message, when more than one person shares the thread: a
+   *  client, an attorney and the agent. A user message whose author is not
+   *  `ChatMessages.viewerId` is someone else's: start-aligned on a card under
+   *  their avatar, name and role. An assistant message's author replaces the
+   *  agent label. Absent → today's rendering, byte-identical. */
+  author?: ChatAuthor
 }
 
 /** Define properties for rendering chat messages with optional models, markdown, extras, and durable cards */
@@ -347,6 +354,9 @@ export interface ChatMessagesProps {
    *  surface for review. `onOpen` opens the product's queue/detail surface.
    *  Absent → today's rendering, byte-identical (no card row). */
   workProductCards?: { onOpen?: (part: WorkProductPersistedPart) => void }
+  /** The reader's participant id, compared with each user message's
+   *  `author.id`. A user message without an author is always the reader's. */
+  viewerId?: string
 }
 
 /** One starting "door" in the chat first-run state — a concrete, labeled action
@@ -1323,9 +1333,16 @@ function AssistantMessageImpl({
   const quiet = chrome === 'quiet'
   return (
     <div className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
+      {quiet && msg.author && <MessageAuthor author={msg.author} className="mb-1.5" />}
       {!quiet && (
-        <div className="mb-1 flex items-baseline gap-2 text-xs tabular-nums text-muted-foreground">
-          <span className="font-semibold uppercase tracking-[0.05em]">{agentLabel}</span>
+        <div
+          className={`mb-1 flex ${msg.author ? 'items-center' : 'items-baseline'} gap-2 text-xs tabular-nums text-muted-foreground`}
+        >
+          {msg.author ? (
+            <MessageAuthor author={msg.author} />
+          ) : (
+            <span className="font-semibold uppercase tracking-[0.05em]">{agentLabel}</span>
+          )}
           {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
           {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
           {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
@@ -1538,11 +1555,59 @@ function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () =>
 }
 
 /**
+ * Someone other than the reader, in a thread several people share: start-
+ * aligned under their avatar, name and role, on a card rather than the
+ * reader's inverse fill, so "mine" and "theirs" differ before the names are
+ * read. Mirrors the reader's bubble otherwise: the same width cap, the same
+ * attachment row and, in quiet chrome, the same copy lane.
+ */
+function OtherPersonMessage({
+  msg,
+  author,
+  quiet,
+  messageClassName,
+  resolveAttachmentUrl,
+}: {
+  msg: ChatUiMessage
+  author: ChatAuthor
+  quiet: boolean
+  messageClassName: string
+  resolveAttachmentUrl?: (part: ChatAttachmentPart) => string
+}) {
+  const attachments = resolveAttachmentUrl ? attachmentPartsFromMessageParts(msg.parts) : []
+  return (
+    <div className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
+      <div className={`w-fit ${quiet ? 'max-w-[72%]' : 'max-w-[85%]'}`}>
+        <MessageAuthor author={author} className="mb-1.5" />
+        <div
+          className={`w-fit max-w-full rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-2.5 text-[hsl(var(--foreground))] ${quiet ? '' : 'rounded-tl-md '}${messageClassName}`}
+        >
+          <p className="whitespace-pre-wrap">{msg.content}</p>
+        </div>
+        {resolveAttachmentUrl && attachments.length > 0 && (
+          <div className="mt-1.5">
+            <MessageAttachments parts={attachments} resolveFileUrl={resolveAttachmentUrl} justify="start" />
+          </div>
+        )}
+      </div>
+      {quiet && (
+        <div data-testid="message-meta-lane" className={`${QUIET_META_LANE_CLASS} justify-start`}>
+          <CopyMessageButton text={msg.content} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
  * The message thread: one centered column; user messages are right-aligned
  * bubbles with a User label; agent messages carry an Agent meta line with
  * model id, tokens/sec, and cost, plus a collapsible thinking section and
  * tool rows. `chrome="quiet"` opts into the label-free variant: the
  * label/meta row becomes a hover-revealed meta lane under each row.
+ * A thread shared by several people passes each message's `author` and the
+ * reader's `viewerId`: the reader's own messages stay right-aligned, everyone
+ * else's are named, and a named agent replaces the agent label.
  */
 export function ChatMessages({
   messages,
@@ -1565,6 +1630,7 @@ export function ChatMessages({
   header,
   resolveAttachmentUrl,
   workProductCards,
+  viewerId,
 }: ChatMessagesProps) {
   const messageClassName =
     messageSize === 'large'
@@ -1598,7 +1664,16 @@ export function ChatMessages({
     <>
       {header}
       {messages.map((msg) =>
-        msg.role === 'user' ? (
+        msg.role === 'user' && msg.author && !isViewerMessage(msg.author, viewerId) ? (
+          <OtherPersonMessage
+            key={msg.id}
+            msg={msg}
+            author={msg.author}
+            quiet={quiet}
+            messageClassName={messageClassName}
+            resolveAttachmentUrl={resolveAttachmentUrl}
+          />
+        ) : msg.role === 'user' ? (
           <div key={msg.id} className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
             <div className={`ml-auto w-fit ${quiet ? 'max-w-[72%]' : 'max-w-[85%]'}`}>
               {!quiet && (

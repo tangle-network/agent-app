@@ -8,8 +8,8 @@ _110 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 |---|---|---|
 | [`./agent-enrollment`](api/agent-enrollment.md) | 15 | `hosted-agent` |
 | [`./agent-enrollment/drizzle`](api/agent-enrollment-drizzle.md) | 5 | `hosted-agent` |
-| [`./agent-profiles`](api/agent-profiles.md) | 35 | `tools` |
-| [`./agent-profiles/d1`](api/agent-profiles-d1.md) | 5 | `tools` |
+| [`./agent-profiles`](api/agent-profiles.md) | 36 | `tools` |
+| [`./agent-profiles/d1`](api/agent-profiles-d1.md) | 6 | `tools` |
 | [`./agent-profiles/drizzle`](api/agent-profiles-drizzle.md) | 1 | `tools` |
 | [`./agent-profiles/reaper`](api/agent-profiles-reaper.md) | 5 | `tools` |
 | [`./alerting`](api/alerting.md) | 8 | — |
@@ -141,21 +141,21 @@ Depends on: `hosted-agent`
 
 ## `./agent-profiles`
 
-Source: `src/agent-profiles/index.ts` · 35 exports
+Source: `src/agent-profiles/index.ts` · 36 exports
 
 Depends on: `tools`
 
-`addProfileKnowledgeDocument`, `admitProfileTurn`, `bindProfileText`, `handleProfileSwitchText`, `normalizeProfileName`, `parseProfileRevisionDiff`, `parseProfileSwitch`, `PROFILE_CHANGE_POLICY`, `ProfileAccessError`, `profileAuthority`, `profileAuthorityDigest`, `ProfileAuthorKind`, `ProfileBinding`, `ProfileBindingKey`, `ProfileConflictError`, `ProfileKnowledgeDocument`, `ProfileKnowledgeEvent`, `ProfileRevision`, `ProfileRevisionState`, `ProfileRevisionStore`, `ProfileSwitchReceipt`, `profileTextChange`, `ProfileToolContext`, `profileTools`, `ProfileTurnPin`, `projectKnowledgeDocuments`, `promoteRevision`, `proposeRevision`, `ProposeRevisionInput`, `removeProfileKnowledgeDocument`, `rollbackProfileBinding`, `serializeProfileRevisionDiff`, `SwitchableProfile`, `switchProfile`, `SwitchProfileInput`
+`addProfileKnowledgeDocument`, `admitProfileTurn`, `bindProfileText`, `handleProfileSwitchText`, `normalizeProfileName`, `parseProfileRevisionDiff`, `parseProfileSwitch`, `PROFILE_CHANGE_POLICY`, `ProfileAccessError`, `profileAuthority`, `profileAuthorityDigest`, `ProfileAuthorKind`, `ProfileBinding`, `ProfileBindingKey`, `ProfileConflictError`, `ProfileKnowledgeDocument`, `ProfileKnowledgeEvent`, `ProfileRevision`, `ProfileRevisionState`, `ProfileRevisionStore`, `ProfileSwitchReceipt`, `profileTextChange`, `ProfileToolContext`, `profileTools`, `ProfileToolTurn`, `ProfileTurnPin`, `projectKnowledgeDocuments`, `promoteRevision`, `proposeRevision`, `ProposeRevisionInput`, `removeProfileKnowledgeDocument`, `rollbackProfileBinding`, `serializeProfileRevisionDiff`, `SwitchableProfile`, `switchProfile`, `SwitchProfileInput`
 
 [Full API →](api/agent-profiles.md)
 
 ## `./agent-profiles/d1`
 
-Source: `src/agent-profiles/d1.ts` · 5 exports
+Source: `src/agent-profiles/d1.ts` · 6 exports
 
 Depends on: `tools`
 
-`AGENT_PROFILE_D1_SCHEMA_SQL`, `createD1ProfileRevisionStore`, `listD1ProfileSwitchReceipts`, `ProfileD1Database`, `ProfileD1Statement`
+`AGENT_PROFILE_D1_SCHEMA_SQL`, `createD1ProfileRevisionStore`, `listD1ProfileSwitchReceipts`, `ProfileD1Database`, `ProfileD1RevisionWriteGuard`, `ProfileD1Statement`
 
 [Full API →](api/agent-profiles-d1.md)
 

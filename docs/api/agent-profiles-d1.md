@@ -4,7 +4,7 @@
 
 Source: `src/agent-profiles/d1.ts`
 
-5 exports.
+6 exports.
 
 ### `AGENT_PROFILE_D1_SCHEMA_SQL`
 
@@ -19,7 +19,7 @@ Source: `src/agent-profiles/d1.ts`
 `function`
 
 ```ts
-(db: ProfileD1Database) => ProfileRevisionStore
+(db: ProfileD1Database, options?: { revisionWriteGuard?: ProfileD1RevisionWriteGuard | undefined; }) => ProfileRevision…
 ```
 
 ### `listD1ProfileSwitchReceipts`
@@ -36,6 +36,14 @@ Source: `src/agent-profiles/d1.ts`
 
 ```ts
 interface ProfileD1Database
+```
+
+### `ProfileD1RevisionWriteGuard`
+
+`interface` — Trusted product SQL checked in the same D1 transaction as an agent-authored save.
+
+```ts
+interface ProfileD1RevisionWriteGuard
 ```
 
 ### `ProfileD1Statement`

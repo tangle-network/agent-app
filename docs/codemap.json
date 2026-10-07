@@ -293,8 +293,14 @@
         {
           "name": "profileTools",
           "kind": "function",
-          "signature": "(context: ProfileToolContext) => McpToolDefinition<Record<string, never>>[]",
+          "signature": "<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => McpToolDefinition<Record<string, never>>[]",
           "doc": "Shared self-edit tools; only the authenticated active turn can name the profile."
+        },
+        {
+          "name": "ProfileToolTurn",
+          "kind": "interface",
+          "signature": "interface ProfileToolTurn",
+          "doc": null
         },
         {
           "name": "ProfileTurnPin",
@@ -381,7 +387,7 @@
         {
           "name": "createD1ProfileRevisionStore",
           "kind": "function",
-          "signature": "(db: ProfileD1Database) => ProfileRevisionStore",
+          "signature": "(db: ProfileD1Database, options?: { revisionWriteGuard?: ProfileD1RevisionWriteGuard | undefined; }) => ProfileRevision…",
           "doc": null
         },
         {
@@ -395,6 +401,12 @@
           "kind": "interface",
           "signature": "interface ProfileD1Database",
           "doc": null
+        },
+        {
+          "name": "ProfileD1RevisionWriteGuard",
+          "kind": "interface",
+          "signature": "interface ProfileD1RevisionWriteGuard",
+          "doc": "Trusted product SQL checked in the same D1 transaction as an agent-authored save."
         },
         {
           "name": "ProfileD1Statement",

@@ -6,6 +6,8 @@ import {
   chatThread,
   densityThread,
   erroredToolCallMessage,
+  multiPartyAuthors,
+  multiPartyThread,
   proposalAwaitingApprovalMessage,
   reasoningToolThread,
   shortThread,
@@ -313,4 +315,23 @@ export const BeforeAfter: Story = {
       ))}
     </div>
   ),
+}
+
+/** A thread three participants share, on the client's screen: the client's own
+ *  messages stay right-aligned; the attorney and the agent are named. */
+export const MultiParty: Story = {
+  name: 'Multi-party (client view)',
+  args: { messages: multiPartyThread, viewerId: multiPartyAuthors.client.id },
+}
+
+/** The same thread on the attorney's screen. */
+export const MultiPartyAttorneyView: Story = {
+  name: 'Multi-party (attorney view)',
+  args: { messages: multiPartyThread, viewerId: multiPartyAuthors.attorney.id },
+}
+
+/** Quiet chrome keeps every name; the copy lane sits on each sender's side. */
+export const QuietMultiParty: Story = {
+  name: 'Quiet multi-party',
+  args: { messages: multiPartyThread, viewerId: multiPartyAuthors.client.id, chrome: 'quiet' },
 }
