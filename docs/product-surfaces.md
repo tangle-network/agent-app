@@ -572,6 +572,10 @@ Each "still not structural" cell is a real piece of work, not a caveat: closing 
 
 `AgentProfileViewer` from `/web-react` presents configured profile data without disabled forms.
 Use `AgentProfileEditor` only when the user chooses to edit a draft.
+Pass `onSaveStateChange` to disable the product Save action while `pending` or `invalid` is true.
+Unapplied JSON, resource edits, and unfinished tool or MCP additions stay inside the editor until applied.
+The callback keeps the host from saving an older canonical value while those edits remain on screen.
+The product still validates and authorizes the final profile on the server.
 The viewer shows model hints, instructions, tool policy, MCP aliases, and declared resources.
 It does not claim that a resource loaded or a model served a request.
 MCP URLs, headers, environment values, and connection identifiers stay private.

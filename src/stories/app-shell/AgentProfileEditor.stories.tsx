@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import type { AgentProfile } from '@tangle-network/agent-interface/profile'
-import { AgentProfileEditor, type AgentProfileEditorProps } from '../../web-react/agent-profile-editor'
+import { AgentProfileEditor, type AgentProfileEditorProps, type AgentProfileEditorSaveState } from '../../web-react/agent-profile-editor'
 
 const example: AgentProfile = {
   name: 'Research assistant',
@@ -32,10 +32,15 @@ type ResourceConstraints = Pick<AgentProfileEditorProps, 'allowedResourceKinds' 
 function Preview({ initial, registry, ...constraints }: { initial: AgentProfile } & ResourceConstraints
   & Pick<AgentProfileEditorProps, 'registry'>) {
   const [profile, setProfile] = useState(initial)
+  const [saveState, setSaveState] = useState<AgentProfileEditorSaveState>({ pending: false, invalid: false })
+  const [saved, setSaved] = useState<AgentProfile | null>(null)
   return <main className="min-h-screen bg-background p-4 text-foreground sm:p-8">
     <div className="mx-auto max-w-3xl space-y-5">
       <header><h1 className="text-2xl font-semibold">Agent profile</h1><p className="mt-1 text-sm text-muted-foreground">Edit a local profile draft.</p></header>
-      <AgentProfileEditor value={profile} onChange={setProfile} registry={registry} {...constraints} />
+      <AgentProfileEditor value={profile} onChange={setProfile} onSaveStateChange={setSaveState} registry={registry} {...constraints} />
+      <button type="button" className="rounded-lg border border-border bg-card px-4 py-2 text-sm disabled:opacity-50" disabled={saveState.pending || saveState.invalid} onClick={() => setSaved(profile)}>Save profile</button>
+      {saveState.pending && <p role="status">Apply or discard unfinished edits before saving.</p>}
+      {saved && <pre aria-label="Saved profile" className="whitespace-pre-wrap break-all text-xs">{JSON.stringify(saved, null, 2)}</pre>}
       <details className="rounded-xl border border-border bg-card p-4"><summary className="cursor-pointer text-sm font-medium">Current profile data</summary>
         <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(profile, null, 2)}</pre></details>
     </div>
