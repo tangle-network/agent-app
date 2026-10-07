@@ -10,7 +10,6 @@ import {
   composeSkills,
   DEFAULT_MAX_SYSTEM_PROMPT_BYTES,
   largestPromptSections,
-  makeEvolvableSection,
   parseCorpusSkills,
   skillRefs,
   stripComments,
@@ -236,44 +235,6 @@ describe('stripComments', () => {
   it('strips HTML comments and trims', () => {
     expect(stripComments('<!-- placeholder -->\n  ')).toBe('')
     expect(stripComments('<!-- note -->real body')).toBe('real body')
-  })
-})
-
-describe('makeEvolvableSection', () => {
-  it('uses the loaded body when populated, trimmed', () => {
-    const section = makeEvolvableSection({
-      id: 'learned-guidance',
-      title: 'Learned guidance',
-      load: () => '  evolved body  ',
-      baseline: 'BASELINE',
-    })
-    expect(section).toEqual({
-      id: 'learned-guidance',
-      title: 'Learned guidance',
-      body: 'evolved body',
-      evolvable: true,
-    })
-  })
-
-  it('falls back to the baseline when the loaded body is all comments', () => {
-    const section = makeEvolvableSection({
-      id: 'learned-guidance',
-      title: 'Learned guidance',
-      load: () => '<!-- no gated promotion yet -->',
-      baseline: 'BASELINE BODY',
-    })
-    expect(section.body).toBe('BASELINE BODY')
-  })
-
-  it('falls back to the baseline when the loader returns empty', () => {
-    const section = makeEvolvableSection({
-      id: 'learned-guidance',
-      title: 'Learned guidance',
-      load: () => '',
-      baseline: 'BASELINE BODY',
-    })
-    expect(section.body).toBe('BASELINE BODY')
-    expect(section.evolvable).toBe(true)
   })
 })
 

@@ -13937,6 +13937,22 @@ type VaultKv
 
 Source: `src/profile/index.ts` · depends on `skills`
 
+### `AgentPromptInput`
+
+`interface` — Inputs to {@link renderAgentPrompt}.
+
+```ts
+interface AgentPromptInput
+```
+
+### `AgentPromptSection`
+
+`interface` — A titled prompt section a product supplies.
+
+```ts
+interface AgentPromptSection
+```
+
 ### `assertProfilePromptWithinBudget`
 
 `function` — Run {@link assertSystemPromptWithinBudget} over a profile-shaped object's `prompt.systemPrompt`.
@@ -13959,6 +13975,22 @@ Source: `src/profile/index.ts` · depends on `skills`
 
 ```ts
 (systemPrompt: string, budget?: ComposeProfileBudget, origin?: string) => void
+```
+
+### `captureModelInput`
+
+`function` — Store every input, then build the record a receipt links to.
+
+```ts
+(input: CaptureModelInputInput) => Promise<ModelInputOutcome<ModelInputRecord>>
+```
+
+### `CaptureModelInputInput`
+
+`interface`
+
+```ts
+interface CaptureModelInputInput
 ```
 
 ### `composeAgentProfile`
@@ -14033,6 +14065,14 @@ interface CorpusLoadResult
 (corpus: CorpusEntry[], anchor: string) => AgentProfileFileMount[]
 ```
 
+### `createMemoryModelInputStore`
+
+`function` — In-memory store.
+
+```ts
+() => ModelInputStore & { readonly size: number; }
+```
+
 ### `DEFAULT_HOME_LIMITS`
 
 `const` — Unicode code-point budgets.
@@ -14057,20 +14097,20 @@ interface CorpusLoadResult
 () => AgentProfileFileMount[]
 ```
 
+### `defaultQualitySkills`
+
+`function` — The quality skills mounted by default.
+
+```ts
+(options?: QualitySkillOptions) => SkillEntry[]
+```
+
 ### `diffProfileFingerprints`
 
 `function` — Channel-by-channel comparison of two fingerprints.
 
 ```ts
 (a: ProfileFingerprint, b: ProfileFingerprint) => ProfileDrift
-```
-
-### `EvolvableSectionInput`
-
-`interface` — Inputs to {@link makeEvolvableSection}.
-
-```ts
-interface EvolvableSectionInput
 ```
 
 ### `fingerprintAgentProfile`
@@ -14097,12 +14137,44 @@ interface EvolvableSectionInput
 type GlobModules
 ```
 
+### `HUMAN_PROSE_SKILL_ID`
+
+`const`
+
+```ts
+"human-prose"
+```
+
+### `humanProseSkill`
+
+`function` — The shared writing skill as a mountable {@link SkillEntry}.
+
+```ts
+(options?: HumanProseSkillOptions) => SkillEntry
+```
+
+### `HumanProseSkillOptions`
+
+`interface` — Product additions to the shared writing skill.
+
+```ts
+interface HumanProseSkillOptions
+```
+
 ### `largestPromptSections`
 
 `function` — Largest markdown-heading-delimited sections of a prompt, by UTF-8 bytes.
 
 ```ts
 (prompt: string, top?: number) => { title: string; bytes: number; }[]
+```
+
+### `LEARNED_GUIDANCE_SECTION_ID`
+
+`const` — Section id of the evolvable learned guidance, shared by every product and its loop.
+
+```ts
+"learned-guidance"
 ```
 
 ### `LoadCorpusOptions`
@@ -14121,20 +14193,132 @@ interface LoadCorpusOptions
 (options: LoadCorpusOptions, importMetaUrl?: string | undefined) => CorpusLoadResult
 ```
 
-### `makeEvolvableSection`
-
-`function` — Build the one evolvable (`evolvable: true`) domain section whose body comes from the product's loader, falling back to the required baseline when the loaded body is empty after stripping comments.
-
-```ts
-(input: EvolvableSectionInput) => AgentProfileSection
-```
-
 ### `mergeComposedSkills`
 
 `function` — Combine multiple {@link ComposedSkills} batches (e.g.
 
 ```ts
 (batches: ComposedSkills[]) => ComposedSkills
+```
+
+### `MODEL_INPUT_RECORD_SCHEMA`
+
+`const`
+
+```ts
+"agent-app.model-input.v1"
+```
+
+### `modelInputBlob`
+
+`function` — Address one input by its content.
+
+```ts
+(kind: ModelInputKind, content: string, mediaType?: ModelInputMediaType) => Promise<ModelInputBlob>
+```
+
+### `ModelInputBlob`
+
+`interface`
+
+```ts
+interface ModelInputBlob
+```
+
+### `ModelInputKind`
+
+`type` — What an input was.
+
+```ts
+type ModelInputKind
+```
+
+### `ModelInputMediaType`
+
+`type`
+
+```ts
+type ModelInputMediaType
+```
+
+### `ModelInputOutcome`
+
+`type`
+
+```ts
+type ModelInputOutcome
+```
+
+### `ModelInputRecord`
+
+`interface` — The record an execution receipt embeds.
+
+```ts
+interface ModelInputRecord
+```
+
+### `ModelInputRef`
+
+`type` — A blob without its content: what a record carries.
+
+```ts
+type ModelInputRef
+```
+
+### `ModelInputSectionRef`
+
+`interface` — One system-prompt section's identity, from {@link RenderedAgentPrompt}.
+
+```ts
+interface ModelInputSectionRef
+```
+
+### `ModelInputStore`
+
+`interface` — Content-addressed blob storage for model inputs.
+
+```ts
+interface ModelInputStore
+```
+
+### `OPERATING_CONTRACT_CLAUSES`
+
+`const` — The clauses in render order.
+
+```ts
+readonly OperatingContractClause[]
+```
+
+### `OPERATING_CONTRACT_VERSION`
+
+`const` — Version of the clause wording below.
+
+```ts
+1
+```
+
+### `OperatingContractClause`
+
+`interface`
+
+```ts
+interface OperatingContractClause
+```
+
+### `OperatingContractClauseId`
+
+`type`
+
+```ts
+type OperatingContractClauseId
+```
+
+### `OperatingContractOptions`
+
+`interface` — Product adjustments to the shared contract.
+
+```ts
+interface OperatingContractOptions
 ```
 
 ### `parseCorpusSkills`
@@ -14217,6 +14401,22 @@ interface ProfileFingerprintContext
 interface ProfileOverlay
 ```
 
+### `QualitySkillOptions`
+
+`interface`
+
+```ts
+interface QualitySkillOptions
+```
+
+### `readModelInput`
+
+`function` — Load one input back and verify its content still matches its digest.
+
+```ts
+(store: ModelInputStore, ref: Pick<ModelInputRef, "digest">) => Promise<ModelInputOutcome<ModelInputBlob>>
+```
+
 ### `registrySkills`
 
 `function` — Project the registry's free-tier (or `tier`-matched) entries onto SDK file mounts at the harness skill-discovery path.
@@ -14225,12 +14425,52 @@ interface ProfileOverlay
 (registry: SkillEntry[], tier?: string) => AgentProfileFileMount[]
 ```
 
+### `renderAgentPrompt`
+
+`function` — Render the product system prompt.
+
+```ts
+(input: AgentPromptInput) => RenderedAgentPrompt
+```
+
+### `RenderedAgentPrompt`
+
+`interface`
+
+```ts
+interface RenderedAgentPrompt
+```
+
+### `RenderedAgentPromptSection`
+
+`interface` — One rendered section, in prompt order.
+
+```ts
+interface RenderedAgentPromptSection
+```
+
+### `RenderedOperatingContract`
+
+`interface`
+
+```ts
+interface RenderedOperatingContract
+```
+
 ### `renderInlineSkills`
 
 `function` — Render every (tier-filtered) skill's full body inline into the prompt — the `inline` delivery mode.
 
 ```ts
 (input: RenderInlineSkillsInput) => string
+```
+
+### `renderOperatingContract`
+
+`function` — Render the contract as a prompt section.
+
+```ts
+(options?: OperatingContractOptions) => RenderedOperatingContract
 ```
 
 ### `renderSkillIndex`
@@ -14291,7 +14531,7 @@ interface SkillFrontmatter
 
 ### `stripComments`
 
-`function` — True body of an addendum file with HTML comments stripped — an all-comment placeholder counts as empty, so the loader falls back to the baseline.
+`function` — Body of a loaded markdown file with HTML comments removed and whitespace trimmed, so an all-comment placeholder counts as empty.
 
 ```ts
 (raw: string) => string
@@ -14319,6 +14559,14 @@ interface UserSkill
 
 ```ts
 (profile: AgentProfile) => AgentProfile
+```
+
+### `withDefaultQualitySkills`
+
+`function` — Append the default quality skills to a product's skills.
+
+```ts
+(productSkills: readonly SkillEntry[], options?: QualitySkillOptions) => SkillEntry[]
 ```
 
 
