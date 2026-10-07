@@ -68,7 +68,7 @@ make_tarball '@tangle-network/agent-app' 1.2.3 "$ROOT_TGZ"
 make_tarball '@tangle-network/create-agent-app' 1.2.3 "$CREATE_TGZ"
 
 run() {
-  env -u FORCE_COLOR -u NO_COLOR PATH="$TMP/bin:$PATH" NPM_LOG="$TMP/npm.log" NPM_STATE="$TMP/state" EXPECTED_VERSION=1.2.3 "$@"
+  env -u FORCE_COLOR -u NO_COLOR PATH="$TMP/bin:$PATH" NPM_LOG="$TMP/npm.log" NPM_STATE="$TMP/state" EXPECTED_VERSION=1.2.3 NODE_AUTH_TOKEN=test-token "$@"
 }
 reset() {
   rm -rf "$TMP/state"
@@ -95,10 +95,10 @@ run bash "$SCRIPT" validate "$ROOT_TGZ" "$CREATE_TGZ" >/dev/null
 reset
 run env NODE_AUTH_TOKEN=ambient-token bash "$SCRIPT" publish agent-app "$ROOT_TGZ" >/dev/null
 [[ $(grep -c '^publish|' "$TMP/npm.log") -eq 1 ]]
-grep -Fq "publish|@tangle-network/agent-app@1.2.3|$ROOT_TGZ|||" "$TMP/npm.log"
-grep '^publish|' "$TMP/npm.log" | grep -Fq -- '--provenance'
+grep -Fq "publish|@tangle-network/agent-app@1.2.3|$ROOT_TGZ|ambient-token||" "$TMP/npm.log"
+! grep '^publish|' "$TMP/npm.log" | grep -Fq -- '--provenance'
 grep '^publish|' "$TMP/npm.log" | grep -Fq -- '--ignore-scripts'
-grep '^view|' "$TMP/npm.log" | grep -Eq '\|\|$'
+grep '^view|' "$TMP/npm.log" | grep -Eq '\|ambient-token\|$'
 
 reset
 printf '2\n' > "$TMP/state/root.delay"
@@ -122,10 +122,10 @@ fails 'not visible after 2 registry checks' run env REGISTRY_VERIFY_ATTEMPTS=2 R
 reset
 run bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ" >/dev/null
 [[ $(grep -c '^publish|' "$TMP/npm.log") -eq 1 ]]
-grep -Fq "publish|@tangle-network/create-agent-app@1.2.3|$CREATE_TGZ|||" "$TMP/npm.log"
-grep '^publish|' "$TMP/npm.log" | grep -Fq -- '--provenance'
+grep -Fq "publish|@tangle-network/create-agent-app@1.2.3|$CREATE_TGZ|test-token||" "$TMP/npm.log"
+! grep '^publish|' "$TMP/npm.log" | grep -Fq -- '--provenance'
 grep '^publish|' "$TMP/npm.log" | grep -Fq -- '--ignore-scripts'
-grep '^view|' "$TMP/npm.log" | grep -Eq '\|\|$'
+grep '^view|' "$TMP/npm.log" | grep -Eq '\|test-token\|$'
 
 reset
 sri "$ROOT_TGZ" > "$TMP/state/root.integrity"
@@ -171,7 +171,7 @@ fails 'registry tarball mismatch' run bash "$SCRIPT" publish agent-app "$ROOT_TG
 no_publish
 
 reset
-fails 'must not be exposed' run env CREATE_AGENT_APP_NPM_TOKEN=wrong-job bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ"
+fails 'Use NODE_AUTH_TOKEN' run env CREATE_AGENT_APP_NPM_TOKEN=wrong-job bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ"
 no_publish
 
 reset
