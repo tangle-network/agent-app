@@ -79,6 +79,12 @@ export const DEFAULT_BANNED_TERMS: readonly BannedTerm[] = [
   { term: 'payload', instead: 'name what was sent: "your answers", "the document"' },
   { term: 'null', instead: 'a value the code failed to fill — render the real value or written fallback copy' },
   { term: 'undefined', instead: 'a value the code failed to fill — render the real value or written fallback copy' },
+  // Microcopy bans from nutlope/hallmark (MIT, revision 13ac0ec7e148655948100b6396439e481361d690,
+  // skills/hallmark/references/copy.md). "Something went wrong" shipped as this kit's own fallback.
+  { term: 'Oops', instead: 'say what broke and what to do: "That file is over 25 MB. Upload a smaller one."' },
+  { term: 'Uh oh', instead: 'say what broke and what to do: "That file is over 25 MB. Upload a smaller one."' },
+  { term: 'Something went wrong', instead: 'name the thing that broke and the next step: "The upload stopped. Try again."' },
+  { term: 'Click here', instead: 'link text that stands alone: "View pricing plans"' },
 ]
 
 /**

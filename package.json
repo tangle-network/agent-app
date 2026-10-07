@@ -543,6 +543,11 @@
       "import": "./dist/legibility/index.js",
       "default": "./dist/legibility/index.js"
     },
+    "./copy-quality": {
+      "types": "./dist/copy-quality/index.d.ts",
+      "import": "./dist/copy-quality/index.js",
+      "default": "./dist/copy-quality/index.js"
+    },
     "./peer-floors": {
       "types": "./dist/peer-floors/check.d.ts",
       "import": "./dist/peer-floors/check.js",

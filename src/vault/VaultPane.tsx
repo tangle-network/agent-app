@@ -177,7 +177,7 @@ class EditorErrorBoundary extends Component<{ children: ReactNode; label: string
         ? this.state.error.message
         : typeof this.state.error === 'string'
           ? this.state.error
-          : `Something went wrong loading ${this.props.label}`
+          : `${this.props.label} did not load. Reload the page to try again.`
       return (
         <div className="flex h-full flex-1 flex-col items-center justify-center p-8 text-center">
           <h3 className="mb-1 text-sm font-medium text-foreground">{this.props.label} failed to load</h3>
