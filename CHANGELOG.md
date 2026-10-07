@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.58.0
+
+- fix(copy-quality): count an extra that repeats the Ban tier once (#858)
+- feat(profile)!: shared operating contract, prompt renderer, quality skills, model-input record (#857)
+- feat(copy-quality): base-form vocabulary with inflection matching (#856)
+
 ## 0.57.20
 
 - feat(copy-quality): deterministic AI-tell scanner for agent-written copy (#855)
