@@ -23,6 +23,7 @@
     "src/chat-routes/index.ts",
     "src/chat-store/index.ts",
     "src/config/index.ts",
+    "src/copy-quality/index.ts",
     "src/crypto/index.ts",
     "src/design-canvas-react/engine.ts",
     "src/design-canvas-react/index.ts",

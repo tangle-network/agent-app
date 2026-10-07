@@ -48,6 +48,9 @@ const BROWSER_NONREACT = new Set([
   // chat body imports the parser directly. Its route factory is web-standard
   // `Request`/`Response` only, so the whole subpath stays client-safe.
   'openui',
+  // The copy-quality leaf is a pure scanner over strings; an editor can lint a
+  // draft in the browser with the same rules the server scores.
+  'copy-quality',
 ])
 
 /** Browser-intended when a client bundle imports it: the whole `*-react` family,

@@ -69,10 +69,11 @@ export function presentError(code: string, message: string): ErrorView {
         cta: CONNECT_CTA,
       };
     case "TOOL_FAILED":
+      return { message: message || "A tool failed before the reply finished. Try again.", cta: null };
     case "NETWORK":
-      return { message: message || "Something went wrong.", cta: null };
+      return { message: message || "The connection dropped before the reply finished. Try again.", cta: null };
     default:
-      return { message: message || "Something went wrong.", cta: null };
+      return { message: message || "The reply did not finish. Try again.", cta: null };
   }
 }
 

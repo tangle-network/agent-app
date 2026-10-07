@@ -96,6 +96,10 @@ CPA, a litigator, a founder.
 payload, mutation, idempotent, cursor, enum, nullable, schema, buffer, provision,
 dispatch, sandbox, execution, thread, effort, token, upstream, backend, harness.*
 
+**Microcopy bans** (from [hallmark](https://github.com/nutlope/hallmark)): *Oops, Uh oh,
+Something went wrong, Click here.* An error names what broke and the next step;
+link text stands alone.
+
 **Passes when** every visible word is one the reader would use unprompted.
 
 **Fails when:** any banned word is on screen; an internal tool name leaks into a

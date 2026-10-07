@@ -103,6 +103,7 @@ export default defineConfig({
     'theme-contract/index': 'src/theme-contract/index.ts',
     'theme-contract/cli': 'src/theme-contract/cli.ts',
     'legibility/index': 'src/legibility/index.ts',
+    'copy-quality/index': 'src/copy-quality/index.ts',
     'legibility/cli': 'src/legibility/cli.ts',
     'forms/index': 'src/forms/index.ts',
     'preflight/cli': 'src/preflight/cli.ts',
