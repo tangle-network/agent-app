@@ -4,7 +4,7 @@
 
 Source: `src/profile/index.ts`
 
-79 exports.
+83 exports.
 
 ### `AgentPromptInput`
 
@@ -212,6 +212,38 @@ type GlobModules
 
 ```ts
 "human-prose"
+```
+
+### `HUMANIZER_LICENSE`
+
+`const` — The upstream MIT license, shipped with the vendored file.
+
+```ts
+string
+```
+
+### `HUMANIZER_SKILL_ID`
+
+`const`
+
+```ts
+"humanizer"
+```
+
+### `HUMANIZER_SOURCE`
+
+`const`
+
+```ts
+{ readonly repository: "https://github.com/blader/humanizer"; readonly revision: "225a6f39ac85f76ee48dbad772ea4abe4ed6c…
+```
+
+### `humanizerSkill`
+
+`function` — The vendored skill as a mountable entry, with the upstream license beside it.
+
+```ts
+() => SkillEntry
 ```
 
 ### `humanProseSkill`
