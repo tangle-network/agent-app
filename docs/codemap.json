@@ -4136,13 +4136,13 @@
           "name": "BAN_WORDS",
           "kind": "const",
           "signature": "readonly string[]",
-          "doc": "Ban-tier vocabulary: ai-tells.md \"Vocabulary → Ban\", with inflections."
+          "doc": "Ban-tier vocabulary: ai-tells.md \"Vocabulary → Ban\"."
         },
         {
           "name": "bannedCopyVocabulary",
           "kind": "function",
           "signature": "(extra?: readonly string[]) => string[]",
-          "doc": "Banned words and phrases, lowercased and deduplicated, for prompts that list them."
+          "doc": "Banned words and phrases for prompts that list them: base forms, lowercased, deduplicated, product extras first."
         },
         {
           "name": "CAP_WORDS",
