@@ -2,12 +2,16 @@
 
 # agent-app code map
 
-_106 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_110 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
 | [`./agent-enrollment`](api/agent-enrollment.md) | 15 | `hosted-agent` |
 | [`./agent-enrollment/drizzle`](api/agent-enrollment-drizzle.md) | 5 | `hosted-agent` |
+| [`./agent-profiles`](api/agent-profiles.md) | 35 | `tools` |
+| [`./agent-profiles/d1`](api/agent-profiles-d1.md) | 5 | `tools` |
+| [`./agent-profiles/drizzle`](api/agent-profiles-drizzle.md) | 1 | `tools` |
+| [`./agent-profiles/reaper`](api/agent-profiles-reaper.md) | 5 | `tools` |
 | [`./alerting`](api/alerting.md) | 8 | — |
 | [`./app-auth`](api/app-auth.md) | 13 | `platform` |
 | [`./app-oauth`](api/app-oauth.md) | 19 | — |
@@ -134,6 +138,46 @@ Depends on: `hosted-agent`
 `AgentEnrollmentClaimTable`, `AgentEnrollmentDatabase`, `AgentInstanceClaimTable`, `createDrizzleAgentEnrollmentStore`, `CreateDrizzleAgentEnrollmentStoreOptions`
 
 [Full API →](api/agent-enrollment-drizzle.md)
+
+## `./agent-profiles`
+
+Source: `src/agent-profiles/index.ts` · 35 exports
+
+Depends on: `tools`
+
+`addProfileKnowledgeDocument`, `admitProfileTurn`, `bindProfileText`, `handleProfileSwitchText`, `normalizeProfileName`, `parseProfileRevisionDiff`, `parseProfileSwitch`, `PROFILE_CHANGE_POLICY`, `ProfileAccessError`, `profileAuthority`, `profileAuthorityDigest`, `ProfileAuthorKind`, `ProfileBinding`, `ProfileBindingKey`, `ProfileConflictError`, `ProfileKnowledgeDocument`, `ProfileKnowledgeEvent`, `ProfileRevision`, `ProfileRevisionState`, `ProfileRevisionStore`, `ProfileSwitchReceipt`, `profileTextChange`, `ProfileToolContext`, `profileTools`, `ProfileTurnPin`, `projectKnowledgeDocuments`, `promoteRevision`, `proposeRevision`, `ProposeRevisionInput`, `removeProfileKnowledgeDocument`, `rollbackProfileBinding`, `serializeProfileRevisionDiff`, `SwitchableProfile`, `switchProfile`, `SwitchProfileInput`
+
+[Full API →](api/agent-profiles.md)
+
+## `./agent-profiles/d1`
+
+Source: `src/agent-profiles/d1.ts` · 5 exports
+
+Depends on: `tools`
+
+`AGENT_PROFILE_D1_SCHEMA_SQL`, `createD1ProfileRevisionStore`, `listD1ProfileSwitchReceipts`, `ProfileD1Database`, `ProfileD1Statement`
+
+[Full API →](api/agent-profiles-d1.md)
+
+## `./agent-profiles/drizzle`
+
+Source: `src/agent-profiles/drizzle.ts` · 1 exports
+
+Depends on: `tools`
+
+`createAgentProfileTables`
+
+[Full API →](api/agent-profiles-drizzle.md)
+
+## `./agent-profiles/reaper`
+
+Source: `src/agent-profiles/reaper.ts` · 5 exports
+
+Depends on: `tools`
+
+`MIN_PROFILE_REAP_GRACE_MS`, `ProfileReapCandidate`, `ProfileReapDecision`, `ProfileReaperPort`, `runProfileReaper`
+
+[Full API →](api/agent-profiles-reaper.md)
 
 ## `./alerting`
 

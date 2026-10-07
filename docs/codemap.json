@@ -145,6 +145,322 @@
       ]
     },
     {
+      "id": "./agent-profiles",
+      "source": "src/agent-profiles/index.ts",
+      "dependsOn": [
+        "tools"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "addProfileKnowledgeDocument",
+          "kind": "function",
+          "signature": "(input: { store: ProfileRevisionStore; workspaceId: string; profileId: string; documentId: string; content: string; act…",
+          "doc": null
+        },
+        {
+          "name": "admitProfileTurn",
+          "kind": "function",
+          "signature": "(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; content: string; observedManagedPlanD…",
+          "doc": null
+        },
+        {
+          "name": "bindProfileText",
+          "kind": "function",
+          "signature": "(consentedBaseline: AgentProfile, selected: AgentProfile) => AgentProfile",
+          "doc": "The per-turn text overlay is validated without admitting tools, model, MCP or resources."
+        },
+        {
+          "name": "handleProfileSwitchText",
+          "kind": "function",
+          "signature": "(input: Omit<SwitchProfileInput, \"choice\">) => Promise<ProfileSwitchReceipt | null>",
+          "doc": "Call before dispatching a chat message; a recognized command is never sent to the model."
+        },
+        {
+          "name": "normalizeProfileName",
+          "kind": "function",
+          "signature": "(name: string) => string",
+          "doc": null
+        },
+        {
+          "name": "parseProfileRevisionDiff",
+          "kind": "function",
+          "signature": "(value: string) => { diff: AgentProfileDiff[]; knowledgeTextChanged: boolean | null; }",
+          "doc": "Keep the existing diff column readable while adding the separate knowledge text axis."
+        },
+        {
+          "name": "parseProfileSwitch",
+          "kind": "function",
+          "signature": "(text: string) => { name: string; } | { invalid: true; } | null",
+          "doc": null
+        },
+        {
+          "name": "PROFILE_CHANGE_POLICY",
+          "kind": "const",
+          "signature": "{ readonly textEdit: { readonly admission: \"automatic\"; readonly conversation: \"same\"; readonly destructive: false; };…",
+          "doc": "The decision table used by every write path; products may narrow access, never widen it."
+        },
+        {
+          "name": "ProfileAccessError",
+          "kind": "class",
+          "signature": "class ProfileAccessError",
+          "doc": null
+        },
+        {
+          "name": "profileAuthority",
+          "kind": "function",
+          "signature": "(profile: AgentProfile) => AgentProfile",
+          "doc": "Remove exactly the declared text axes."
+        },
+        {
+          "name": "profileAuthorityDigest",
+          "kind": "function",
+          "signature": "(profile: AgentProfile) => string",
+          "doc": null
+        },
+        {
+          "name": "ProfileAuthorKind",
+          "kind": "type",
+          "signature": "type ProfileAuthorKind",
+          "doc": null
+        },
+        {
+          "name": "ProfileBinding",
+          "kind": "interface",
+          "signature": "interface ProfileBinding",
+          "doc": null
+        },
+        {
+          "name": "ProfileBindingKey",
+          "kind": "interface",
+          "signature": "interface ProfileBindingKey",
+          "doc": null
+        },
+        {
+          "name": "ProfileConflictError",
+          "kind": "class",
+          "signature": "class ProfileConflictError",
+          "doc": null
+        },
+        {
+          "name": "ProfileKnowledgeDocument",
+          "kind": "interface",
+          "signature": "interface ProfileKnowledgeDocument",
+          "doc": null
+        },
+        {
+          "name": "ProfileKnowledgeEvent",
+          "kind": "interface",
+          "signature": "interface ProfileKnowledgeEvent",
+          "doc": "Remove events name only adds they observed; a concurrent add survives."
+        },
+        {
+          "name": "ProfileRevision",
+          "kind": "interface",
+          "signature": "interface ProfileRevision",
+          "doc": null
+        },
+        {
+          "name": "ProfileRevisionState",
+          "kind": "type",
+          "signature": "type ProfileRevisionState",
+          "doc": null
+        },
+        {
+          "name": "ProfileRevisionStore",
+          "kind": "interface",
+          "signature": "interface ProfileRevisionStore",
+          "doc": null
+        },
+        {
+          "name": "ProfileSwitchReceipt",
+          "kind": "interface",
+          "signature": "interface ProfileSwitchReceipt",
+          "doc": null
+        },
+        {
+          "name": "profileTextChange",
+          "kind": "function",
+          "signature": "(revision: ProfileRevision, changes: { name?: string | undefined; description?: string | null | undefined; systemPrompt…",
+          "doc": null
+        },
+        {
+          "name": "ProfileToolContext",
+          "kind": "interface",
+          "signature": "interface ProfileToolContext",
+          "doc": null
+        },
+        {
+          "name": "profileTools",
+          "kind": "function",
+          "signature": "(context: ProfileToolContext) => McpToolDefinition<Record<string, never>>[]",
+          "doc": "Shared self-edit tools; only the authenticated active turn can name the profile."
+        },
+        {
+          "name": "ProfileTurnPin",
+          "kind": "interface",
+          "signature": "interface ProfileTurnPin",
+          "doc": null
+        },
+        {
+          "name": "projectKnowledgeDocuments",
+          "kind": "function",
+          "signature": "(events: readonly ProfileKnowledgeEvent[]) => ProfileKnowledgeDocument[]",
+          "doc": null
+        },
+        {
+          "name": "promoteRevision",
+          "kind": "function",
+          "signature": "(input: { store: ProfileRevisionStore; workspaceId: string; profileId: string; revisionId: string; actorRole: \"member\"…",
+          "doc": null
+        },
+        {
+          "name": "proposeRevision",
+          "kind": "function",
+          "signature": "(input: ProposeRevisionInput) => Promise<ProfileRevision>",
+          "doc": "All authors use one immutable write path."
+        },
+        {
+          "name": "ProposeRevisionInput",
+          "kind": "interface",
+          "signature": "interface ProposeRevisionInput",
+          "doc": null
+        },
+        {
+          "name": "removeProfileKnowledgeDocument",
+          "kind": "function",
+          "signature": "(input: { store: ProfileRevisionStore; workspaceId: string; profileId: string; documentId: string; actorRole: \"member\"…",
+          "doc": null
+        },
+        {
+          "name": "rollbackProfileBinding",
+          "kind": "function",
+          "signature": "(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; conversationId?: string | undefined;…",
+          "doc": "One-step rollback moves this member/channel to its previous immutable revision."
+        },
+        {
+          "name": "serializeProfileRevisionDiff",
+          "kind": "function",
+          "signature": "(revision: Pick<ProfileRevision, \"diff\" | \"knowledgeTextChanged\">) => string",
+          "doc": null
+        },
+        {
+          "name": "SwitchableProfile",
+          "kind": "interface",
+          "signature": "interface SwitchableProfile",
+          "doc": null
+        },
+        {
+          "name": "switchProfile",
+          "kind": "function",
+          "signature": "(input: SwitchProfileInput) => Promise<ProfileSwitchReceipt>",
+          "doc": "The picker and deterministic text command converge here."
+        },
+        {
+          "name": "SwitchProfileInput",
+          "kind": "interface",
+          "signature": "interface SwitchProfileInput",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./agent-profiles/d1",
+      "source": "src/agent-profiles/d1.ts",
+      "dependsOn": [
+        "tools"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "AGENT_PROFILE_D1_SCHEMA_SQL",
+          "kind": "const",
+          "signature": "\"\\nCREATE TABLE agent_profile_revision (\\n revision_id TEXT PRIMARY KEY,\\n workspace_id TEXT NOT NULL,\\n profile_id TEX…",
+          "doc": null
+        },
+        {
+          "name": "createD1ProfileRevisionStore",
+          "kind": "function",
+          "signature": "(db: ProfileD1Database) => ProfileRevisionStore",
+          "doc": null
+        },
+        {
+          "name": "listD1ProfileSwitchReceipts",
+          "kind": "function",
+          "signature": "(db: ProfileD1Database, workspaceId: string, conversationId: string) => Promise<ProfileSwitchReceipt[]>",
+          "doc": "Product auth stays outside this read."
+        },
+        {
+          "name": "ProfileD1Database",
+          "kind": "interface",
+          "signature": "interface ProfileD1Database",
+          "doc": null
+        },
+        {
+          "name": "ProfileD1Statement",
+          "kind": "interface",
+          "signature": "interface ProfileD1Statement",
+          "doc": "Structural subset of Cloudflare D1; keeps the optional driver out of other subpaths."
+        }
+      ]
+    },
+    {
+      "id": "./agent-profiles/drizzle",
+      "source": "src/agent-profiles/drizzle.ts",
+      "dependsOn": [
+        "tools"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "createAgentProfileTables",
+          "kind": "function",
+          "signature": "() => { revisions: SQLiteTableWithColumns<{ name: \"agent_profile_revision\"; schema: undefined; columns: { id: SQLiteCol…",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./agent-profiles/reaper",
+      "source": "src/agent-profiles/reaper.ts",
+      "dependsOn": [
+        "tools"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "MIN_PROFILE_REAP_GRACE_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Separate cleanup policy."
+        },
+        {
+          "name": "ProfileReapCandidate",
+          "kind": "interface",
+          "signature": "interface ProfileReapCandidate",
+          "doc": null
+        },
+        {
+          "name": "ProfileReapDecision",
+          "kind": "interface",
+          "signature": "interface ProfileReapDecision",
+          "doc": null
+        },
+        {
+          "name": "ProfileReaperPort",
+          "kind": "interface",
+          "signature": "interface ProfileReaperPort",
+          "doc": null
+        },
+        {
+          "name": "runProfileReaper",
+          "kind": "function",
+          "signature": "(input: { port: ProfileReaperPort; now?: number | undefined; graceMs?: number | undefined; dryRun?: boolean | undefined…",
+          "doc": "Defaults to a logged dry run; a destructive pass requires a prior dry-run receipt."
+        }
+      ]
+    },
+    {
       "id": "./alerting",
       "source": "src/alerting/index.ts",
       "dependsOn": [],
@@ -2099,7 +2415,7 @@
         {
           "name": "buildMentionPromptBlock",
           "kind": "function",
-          "signature": "(mentions: readonly Pick<FileMention, \"path\" | \"name\">[]) => string",
+          "signature": "(mentions: readonly Pick<FileMention, \"name\" | \"path\">[]) => string",
           "doc": "The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`."
         },
         {
@@ -3297,7 +3613,7 @@
         {
           "name": "buildAttachmentPromptBlock",
           "kind": "function",
-          "signature": "(atts: readonly Pick<ChatAttachmentPart, \"path\" | \"name\">[], header?: string) => string",
+          "signature": "(atts: readonly Pick<ChatAttachmentPart, \"name\" | \"path\">[], header?: string) => string",
           "doc": "The agent-facing pointer block appended to the dispatched prompt — never persisted in `message.content`."
         },
         {
@@ -16755,7 +17071,7 @@
         {
           "name": "canManageWorkspaceMemberRole",
           "kind": "function",
-          "signature": "(actorRole: \"viewer\" | \"editor\" | \"admin\" | \"owner\", targetRole: \"viewer\" | \"editor\" | \"admin\" | \"owner\") => boolean",
+          "signature": "(actorRole: \"owner\" | \"viewer\" | \"editor\" | \"admin\", targetRole: \"owner\" | \"viewer\" | \"editor\" | \"admin\") => boolean",
           "doc": "Whether `actorRole` may set/clear a member currently at `targetRole`."
         },
         {
@@ -16779,13 +17095,13 @@
         {
           "name": "hasOrganizationRole",
           "kind": "function",
-          "signature": "(actual: \"member\" | \"admin\" | \"owner\" | \"billing\", minimum: \"member\" | \"admin\" | \"owner\" | \"billing\") => boolean",
+          "signature": "(actual: \"member\" | \"owner\" | \"admin\" | \"billing\", minimum: \"member\" | \"owner\" | \"admin\" | \"billing\") => boolean",
           "doc": "True when `actual` is at least `minimum` on the organization ladder."
         },
         {
           "name": "hasWorkspaceRole",
           "kind": "function",
-          "signature": "(actual: \"viewer\" | \"editor\" | \"admin\" | \"owner\", minimum: \"viewer\" | \"editor\" | \"admin\" | \"owner\") => boolean",
+          "signature": "(actual: \"owner\" | \"viewer\" | \"editor\" | \"admin\", minimum: \"owner\" | \"viewer\" | \"editor\" | \"admin\") => boolean",
           "doc": "True when `actual` is at least `minimum` on the workspace ladder."
         },
         {
@@ -16863,7 +17179,7 @@
         {
           "name": "ORGANIZATION_ROLE_RANK",
           "kind": "const",
-          "signature": "Record<\"member\" | \"admin\" | \"owner\" | \"billing\", number>",
+          "signature": "Record<\"member\" | \"owner\" | \"admin\" | \"billing\", number>",
           "doc": "Map organization roles to their hierarchical rank for permission and access control purposes"
         },
         {
@@ -16911,7 +17227,7 @@
         {
           "name": "resolveWorkspaceRole",
           "kind": "function",
-          "signature": "(organizationRole: string | null | undefined, workspaceRole: \"viewer\" | \"editor\" | \"admin\" | \"owner\" | null | undefined…",
+          "signature": "(organizationRole: string | null | undefined, workspaceRole: \"owner\" | \"viewer\" | \"editor\" | \"admin\" | null | undefined…",
           "doc": "The effective workspace role a request runs at: org owner/admin → owner of every workspace; otherwise the explicit per-workspace role (or null = no access)."
         },
         {
@@ -16929,7 +17245,7 @@
         {
           "name": "WORKSPACE_ROLE_RANK",
           "kind": "const",
-          "signature": "Record<\"viewer\" | \"editor\" | \"admin\" | \"owner\", number>",
+          "signature": "Record<\"owner\" | \"viewer\" | \"editor\" | \"admin\", number>",
           "doc": "Map workspace roles to their corresponding hierarchical rank values"
         },
         {
@@ -16953,13 +17269,13 @@
         {
           "name": "workspaceRoleToCollaborationAccess",
           "kind": "function",
-          "signature": "(role: \"viewer\" | \"editor\" | \"admin\" | \"owner\") => WorkspaceCollaborationAccess",
+          "signature": "(role: \"owner\" | \"viewer\" | \"editor\" | \"admin\") => WorkspaceCollaborationAccess",
           "doc": "Map a workspace role to the corresponding collaboration access level"
         },
         {
           "name": "workspaceRoleToSandboxRole",
           "kind": "function",
-          "signature": "(role: \"viewer\" | \"editor\" | \"admin\" | \"owner\") => SandboxWorkspaceRole",
+          "signature": "(role: \"owner\" | \"viewer\" | \"editor\" | \"admin\") => SandboxWorkspaceRole",
           "doc": "Map a workspace role to its corresponding sandbox workspace role"
         }
       ]
@@ -19330,7 +19646,7 @@
         {
           "name": "buildMentionPromptBlock",
           "kind": "function",
-          "signature": "(mentions: readonly Pick<FileMention, \"path\" | \"name\">[]) => string",
+          "signature": "(mentions: readonly Pick<FileMention, \"name\" | \"path\">[]) => string",
           "doc": "The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`."
         },
         {
