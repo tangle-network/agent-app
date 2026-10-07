@@ -269,12 +269,12 @@ for (const [name, block] of [
   check(block.includes('github-token: ${{ github.token }}') && block.includes('repository: ${{ github.repository }}'), `${name} cannot download across runs`)
   check(block.includes('sha256sum --check SHA256SUMS') && block.includes('CONTROL_SHA'), `${name} does not verify the artifact`)
 }
-check(agentPublishJob.includes('runs-on: [self-hosted, ci-public]') && !agentPublishJob.includes('id-token: write') && !agentPublishJob.includes('contents: write'), 'Agent App publisher runner or permissions are wrong')
-check(agentPublishJob.includes('NODE_AUTH_TOKEN: ${{ secrets.AGENT_APP_NPM_TOKEN }}') && !agentPublishJob.includes('CREATE_AGENT_APP_NPM_TOKEN'), 'Agent App publisher lacks its dedicated npm token')
-check(agentPublishJob.includes('registry-url: https://registry.npmjs.org'), 'Agent App publisher lacks npm registry configuration')
+check(agentPublishJob.includes('id-token: write') && !agentPublishJob.includes('contents: write'), 'Agent App publisher permissions are wrong')
+check(!agentPublishJob.includes('secrets.') && !agentPublishJob.includes('CREATE_AGENT_APP_NPM_TOKEN'), 'Agent App publisher receives a long-lived secret')
+check(!agentPublishJob.includes('registry-url:'), 'Agent App publisher receives token npm configuration')
 check(agentPublishJob.includes('publish agent-app agent-app.tgz') && !agentPublishJob.includes('create-agent-app.tgz'), 'Agent App publisher can publish the wrong tarball')
-check(createPublishJob.includes('runs-on: [self-hosted, ci-public]') && !createPublishJob.includes('id-token: write') && !createPublishJob.includes('contents: write'), 'create-agent-app publisher runner or permissions are wrong')
-check(createPublishJob.includes('NODE_AUTH_TOKEN: ${{ secrets.CREATE_AGENT_APP_NPM_TOKEN }}') && !createPublishJob.includes('secrets.AGENT_APP_NPM_TOKEN'), 'create-agent-app publisher lacks its dedicated npm token')
+check(createPublishJob.includes('id-token: write') && !createPublishJob.includes('contents: write'), 'create-agent-app publisher permissions are wrong')
+check(!createPublishJob.includes('secrets.') && !createPublishJob.includes('CREATE_AGENT_APP_NPM_TOKEN'), 'create-agent-app publisher receives a long-lived secret')
 check(createPublishJob.includes('registry-url: https://registry.npmjs.org'), 'create-agent-app publisher lacks npm registry configuration')
 check(createPublishJob.includes('publish create-agent-app create-agent-app.tgz') && !createPublishJob.includes('publish agent-app '), 'create-agent-app publisher can publish the wrong tarball')
 
@@ -287,7 +287,7 @@ check(safetyIssueJob.includes("needs.package_release.result == 'failure'"), 'fai
 check(safetyClearJob.includes("needs.package_release.result == 'success'"), 'successful verification does not clear the rolling issue')
 check(safetyIssueJob.includes("!contains(github.event.head_commit.message, '[skip release]')"), 'skip-release pushes open the rolling issue')
 
-check(!script.includes('publish "$tarball" --provenance') && script.includes('--ignore-scripts'), 'self-hosted publish asks for unsupported npm provenance or allows lifecycle scripts')
+check(script.includes('--provenance') && script.includes('--ignore-scripts'), 'publish command lacks provenance or allows lifecycle scripts')
 
 const parsePackFilename = (input) => spawnSync(process.execPath, [packFilenameScript], { input, encoding: 'utf8' })
 const validPack = parsePackFilename(JSON.stringify([{ filename: 'tangle-network-agent-app-0.44.44.tgz', files: Array.from({ length: 500 }, (_, index) => ({ path: `dist/${index}.js` })) }]))

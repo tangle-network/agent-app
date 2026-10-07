@@ -386,14 +386,14 @@ jobs:
       needs.package_release.result == 'success' &&
       needs.package_release.outputs.mode == 'tag' &&
       needs.package_release.outputs.publish-agent-app == 'true'
-    runs-on: [self-hosted, ci-public]
+    runs-on: ubuntu-latest
     permissions:
       actions: read
+      id-token: write
     steps:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.18.0
-          registry-url: https://registry.npmjs.org
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: ${{ needs.package_release.outputs.artifact-id }}
@@ -407,7 +407,6 @@ jobs:
           EXPECTED_VERSION: ${{ needs.package_release.outputs.version }}
           CONTROL_SHA: ${{ needs.package_release.outputs.publish-control-sha }}
           NPM_CONFIG_IGNORE_SCRIPTS: 'true'
-          NODE_AUTH_TOKEN: ${{ secrets.AGENT_APP_NPM_TOKEN }}
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/publish-bundle"
@@ -424,9 +423,10 @@ jobs:
       needs.package_release.outputs.mode == 'tag' &&
       needs.package_release.outputs.publish-create-agent-app == 'true' &&
       (needs.publish_agent_app.result == 'success' || needs.publish_agent_app.result == 'skipped')
-    runs-on: [self-hosted, ci-public]
+    runs-on: ubuntu-latest
     permissions:
       actions: read
+      id-token: write
     steps:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -445,7 +445,6 @@ jobs:
           EXPECTED_VERSION: ${{ needs.package_release.outputs.version }}
           CONTROL_SHA: ${{ needs.package_release.outputs.publish-control-sha }}
           NPM_CONFIG_IGNORE_SCRIPTS: 'true'
-          NODE_AUTH_TOKEN: ${{ secrets.CREATE_AGENT_APP_NPM_TOKEN }}
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/publish-bundle"
