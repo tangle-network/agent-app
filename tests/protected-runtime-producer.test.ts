@@ -168,15 +168,8 @@ describe('protected Runtime chat producer', () => {
         ANTHROPIC_API_KEY: token, ANTHROPIC_AUTH_TOKEN: token,
         ANTHROPIC_BASE_URL: 'https://candidate-router.tangle.tools',
       } })
-      if (url.endsWith('/settle')) {
-        const settlement = await fixturePort.settleGrant(body)
-        return Response.json({ ...settlement,
-          calls: settlement.calls.map(({ costProvenance: _provenance, ...call }) => ({ ...call,
-            cacheWriteTokens: 0, cacheWrite5mTokens: 0, cacheWrite1hTokens: 0 })),
-          billing: { status: 'settled', authorizationId: 'synthetic-authorization', transactionId: 'synthetic-transaction',
-            reservedCostUsdNanos: 1_000_000_000, settledCostUsdNanos: 100_000 },
-        })
-      }
+      // Router serves Runtime's exact settlement ledger.
+      if (url.endsWith('/settle')) return Response.json(await fixturePort.settleGrant(body))
       throw new Error(`Unexpected fixture URL ${url}`)
     }))
     options.grant = { ...options.grant, port: createRouterProtectedModelPort({ apiKey: 'synthetic-parent-key', maxCostUsd: 1, onSettlement: audit }) }

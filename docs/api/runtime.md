@@ -376,10 +376,10 @@ interface RouterProtectedModelPortOptions
 
 ### `RouterProtectedModelSettlement`
 
-`interface`
+`type` — Router's settle response is Runtime's exact settlement ledger.
 
 ```ts
-interface RouterProtectedModelSettlement
+type RouterProtectedModelSettlement
 ```
 
 ### `runAppToolLoop`

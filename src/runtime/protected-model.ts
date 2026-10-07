@@ -78,10 +78,10 @@ export function createRouterProtectedModelPort(options: RouterProtectedModelPort
       return activation
     },
     settle: async (value) => {
-      const wire = await request<RouterProtectedModelSettlement>('settle', value, true)
-      const projected = runtimeSettlement(wire, options.maxCostUsd)
-      receipts.set(value.preparationId, wire)
-      return projected
+      const settlement = await request<RouterProtectedModelSettlement>('settle', value, true)
+      assertWithinCap(settlement, options.maxCostUsd)
+      receipts.set(value.preparationId, settlement)
+      return settlement
     },
   }
   const port = createProtectedAgentCandidateModelPort({
@@ -107,55 +107,25 @@ export function createRouterProtectedModelPort(options: RouterProtectedModelPort
   }
 }
 
-export interface RouterProtectedModelSettlement extends Omit<Awaited<ReturnType<AgentCandidateModelGrantClient['settle']>>, 'calls'> {
-  billing: {
-    status: string
-    authorizationId?: string
-    transactionId?: string
-    reservedCostUsdNanos: number
-    settledCostUsdNanos: number
-  }
-  calls: Array<Omit<Awaited<ReturnType<AgentCandidateModelGrantClient['settle']>>['calls'][number], 'costProvenance'> & {
-    cacheWriteTokens: number
-    cacheWrite5mTokens: number
-    cacheWrite1hTokens: number
-  }>
-}
+/**
+ * Router's settle response is Runtime's exact settlement ledger. Router keeps
+ * the billing hold and charge behind it and refuses a settlement outside the
+ * grant's frozen limits; Runtime rejects unknown or missing ledger fields.
+ */
+export type RouterProtectedModelSettlement = Awaited<ReturnType<AgentCandidateModelGrantClient['settle']>>
 
-/** Check Router's billing extension before projecting its portable Runtime ledger. */
-function runtimeSettlement(wire: RouterProtectedModelSettlement, capUsd: number): Awaited<ReturnType<AgentCandidateModelGrantClient['settle']>> {
-  const billing = wire?.billing
-  if (!Array.isArray(wire?.calls) || !billing || billing.status !== 'settled'
-    || typeof billing.authorizationId !== 'string' || billing.authorizationId.length === 0
-    || billing.reservedCostUsdNanos !== Math.round(capUsd * 1_000_000_000)
-    || !Number.isSafeInteger(billing.settledCostUsdNanos) || billing.settledCostUsdNanos < 0
-    || billing.settledCostUsdNanos > billing.reservedCostUsdNanos
-    || (billing.settledCostUsdNanos > 0 && (typeof billing.transactionId !== 'string' || billing.transactionId.length === 0))) {
-    throw new Error('Protected model billing receipt is incomplete or exceeds its reservation')
-  }
-  const billingFields = new Set(['status', 'authorizationId', 'transactionId', 'reservedCostUsdNanos', 'settledCostUsdNanos'])
-  if (Object.keys(billing).some((key) => !billingFields.has(key))) {
-    throw new Error('Protected model billing receipt contains an unknown field')
-  }
+/** Bound the ledger's cumulative cost by this turn's cap before anything retains it. */
+function assertWithinCap(settlement: RouterProtectedModelSettlement, capUsd: number): void {
+  if (!Array.isArray(settlement?.calls)) throw new Error('Protected model settlement has no call ledger')
+  const capNanos = Math.round(capUsd * 1_000_000_000)
   let cost = 0
-  const calls = wire.calls.map(({ cacheWriteTokens, cacheWrite5mTokens, cacheWrite1hTokens, ...call }) => {
-    for (const count of [cacheWriteTokens, cacheWrite5mTokens, cacheWrite1hTokens]) {
-      if (!Number.isSafeInteger(count) || count < 0 || count > call.accountedInputTokens) {
-        throw new Error('Protected model cache-write receipt is invalid')
-      }
-    }
-    if (cacheWrite5mTokens + cacheWrite1hTokens > cacheWriteTokens) {
-      throw new Error('Protected model cache-write receipt does not reconcile')
-    }
-    if (!Number.isSafeInteger(call.costUsdNanos) || call.costUsdNanos < 0) {
+  for (const call of settlement.calls) {
+    if (!Number.isSafeInteger(call?.costUsdNanos) || call.costUsdNanos < 0) {
       throw new Error('Protected model call cost is invalid')
     }
     cost += call.costUsdNanos
-    if (!Number.isSafeInteger(cost)) throw new Error('Protected model cumulative cost is invalid')
-    if ('costProvenance' in call) throw new Error('Router call receipt contains an unknown field')
-    return { ...call, costProvenance: 'observed' as const }
-  })
-  if (cost !== billing.settledCostUsdNanos) throw new Error('Protected model billing does not match its call ledger')
-  const { billing: _billing, ...settlement } = wire
-  return { ...settlement, calls }
+    if (!Number.isSafeInteger(cost) || cost > capNanos) {
+      throw new Error('Protected model settlement exceeds its cost cap')
+    }
+  }
 }
