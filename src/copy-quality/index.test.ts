@@ -96,6 +96,10 @@ describe('bannedCopyVocabulary', () => {
   it('applies inflection matching to product extras too', () => {
     expect(scanCopy('Disrupting the market.', { extraBanned: ['disrupt'] }).pass).toBe(false)
   })
+
+  it('counts an extra that repeats the Ban tier once', () => {
+    expect(scanCopy('We leverage it.', { extraBanned: ['Leverage', 'leverage'] }).counts.ban).toBe(1)
+  })
 })
 
 describe('metric claims', () => {
