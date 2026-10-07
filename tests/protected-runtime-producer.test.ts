@@ -88,6 +88,22 @@ describe('protected Runtime chat producer', () => {
     expect(producer.usage?.()).toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: 0, costUsd: 0.0001 })
   })
 
+  it('sends prior chat rows to the provider as role and content only', async () => {
+    const { options } = fixture()
+    const bodies: Array<{ messages: Array<Record<string, unknown>> }> = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)))
+      return response({ content: 'A useful finding.' })
+    }))
+    const rows = [
+      { id: 'message-1', role: 'user', content: 'Earlier request', parts: [{ type: 'text', text: 'Earlier request' }], createdAt: 1 },
+      { id: 'message-2', role: 'assistant', content: 'Earlier answer', turnId: 'turn-1' },
+    ]
+    await drain(createProtectedRuntimeChatProducer({ ...options, priorMessages: rows }))
+    const history = bodies[0]?.messages.filter(message => message.content === 'Earlier request' || message.content === 'Earlier answer')
+    expect(history).toEqual([{ role: 'user', content: 'Earlier request' }, { role: 'assistant', content: 'Earlier answer' }])
+  })
+
   it.each([
     { streamed: undefined, final: 'A useful finding.', status: 200 },
     { streamed: 'A useful ', final: 'A useful finding.', status: 200 },
