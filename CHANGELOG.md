@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.15
+
+- fix(agent-profiles): keep bound profiles canonical JSON
+
 ## 0.57.14
 
 - fix(runtime): accept the settlement ledger Router serves
