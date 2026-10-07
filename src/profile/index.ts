@@ -92,6 +92,7 @@ export {
   type HumanProseSkillOptions,
   type QualitySkillOptions,
 } from './quality-skills'
+export { HUMANIZER_LICENSE, HUMANIZER_SKILL_ID, HUMANIZER_SOURCE, humanizerSkill } from './humanizer-skill'
 export {
   captureModelInput,
   createMemoryModelInputStore,

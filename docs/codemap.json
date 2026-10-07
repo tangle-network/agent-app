@@ -11097,6 +11097,30 @@
           "doc": null
         },
         {
+          "name": "HUMANIZER_LICENSE",
+          "kind": "const",
+          "signature": "string",
+          "doc": "The upstream MIT license, shipped with the vendored file."
+        },
+        {
+          "name": "HUMANIZER_SKILL_ID",
+          "kind": "const",
+          "signature": "\"humanizer\"",
+          "doc": null
+        },
+        {
+          "name": "HUMANIZER_SOURCE",
+          "kind": "const",
+          "signature": "{ readonly repository: \"https://github.com/blader/humanizer\"; readonly revision: \"225a6f39ac85f76ee48dbad772ea4abe4ed6c…",
+          "doc": null
+        },
+        {
+          "name": "humanizerSkill",
+          "kind": "function",
+          "signature": "() => SkillEntry",
+          "doc": "The vendored skill as a mountable entry, with the upstream license beside it."
+        },
+        {
           "name": "humanProseSkill",
           "kind": "function",
           "signature": "(options?: HumanProseSkillOptions) => SkillEntry",
