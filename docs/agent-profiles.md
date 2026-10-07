@@ -31,7 +31,8 @@ The current revision and member/channel binding are derived from the latest even
 
 | Change | Admission | Conversation | Cleanup |
 |---|---|---|---|
-| Text edit or same-authority switch | Automatic | Same | None inline |
+| Text edit | Automatic | Same | None inline |
+| Same-authority switch | Prepare managed plan, health-check, then guarded binding event | Same | None inline |
 | Different-authority switch | Prepare managed plan, health-check, then guarded binding event | Same | None of the user's workspace files inline |
 | Authority edit | Editor and verified consent | Same | None inline |
 | Optimizer revision | Candidate until evaluated and promoted | Same | None inline |
@@ -54,7 +55,7 @@ A retry with the same message id and input hash returns its original pin before 
 Every switch stays in the same conversation and shows `Now talking to <name>`.
 For a text edit, the product prepares the newly active revision's plan before the next turn, even when the member binding still names the prior plan; the turn pin records the new plan digest.
 For a text-only switch, the next turn uses the selected text through a per-turn prompt binding.
-For an authority switch, the product prepares and health-checks the target managed plan before appending the binding event.
+Every switch prepares and health-checks its target managed plan before appending the binding event, including when the public plan digest matches the current binding. A missing external secret must leave the prior binding in place.
 The runtime selects the pinned managed digest for each turn, so an in-flight turn keeps its old profile.
 If preparation fails, the old binding remains and a failure receipt is appended.
 

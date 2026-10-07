@@ -16,7 +16,7 @@ export type ProfileRevisionState = 'active' | 'candidate' | 'pending-consent'
 /** The decision table used by every write path; products may narrow access, never widen it. */
 export const PROFILE_CHANGE_POLICY = {
   textEdit: { admission: 'automatic', conversation: 'same', destructive: false },
-  sameAuthoritySwitch: { admission: 'automatic', conversation: 'same', destructive: false },
+  sameAuthoritySwitch: { admission: 'prepare-then-flip', conversation: 'same', destructive: false },
   differentAuthoritySwitch: { admission: 'prepare-then-flip', conversation: 'same', destructive: false },
   authorityEdit: { admission: 'editor-consent', conversation: 'same', destructive: false },
   optimizerRevision: { admission: 'eval-promotion', conversation: 'same', destructive: false },
@@ -380,23 +380,16 @@ export async function switchProfile(input: SwitchProfileInput): Promise<ProfileS
   let planDigest: string | null = null
   let conflicts: string[] = []
   if (revision && target) {
-    const admission = binding?.authorityDigest === revision.authorityDigest
-      ? PROFILE_CHANGE_POLICY.sameAuthoritySwitch.admission
-      : PROFILE_CHANGE_POLICY.differentAuthoritySwitch.admission
-    if (admission === 'prepare-then-flip' || binding?.planDigest !== revision.planDigest) {
-      try {
-        const prepared = await input.prepareAuthority(revision, input.key)
-        if (!prepared.healthy || prepared.planDigest !== revision.planDigest) {
-          throw new ProfileConflictError('The managed plan was not prepared for this revision')
-        }
-        planDigest = prepared.planDigest
-        conflicts = prepared.conflicts
-      } catch {
-        revision = null
-        message = `Could not prepare ${target.name}; your current agent is unchanged.`
+    try {
+      const prepared = await input.prepareAuthority(revision, input.key)
+      if (!prepared.healthy || prepared.planDigest !== revision.planDigest) {
+        throw new ProfileConflictError('The managed plan was not prepared for this revision')
       }
-    } else {
-      planDigest = binding.planDigest
+      planDigest = prepared.planDigest
+      conflicts = prepared.conflicts
+    } catch {
+      revision = null
+      message = `Could not prepare ${target.name}; your current agent is unchanged.`
     }
     if (revision && planDigest) {
       outcome = 'switched'
