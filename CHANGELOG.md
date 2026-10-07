@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.20
+
+- feat(copy-quality): deterministic AI-tell scanner for agent-written copy (#855)
+
 ## 0.57.19
 
 - docs: score live jobs against outcome contracts (#854)
