@@ -179,6 +179,7 @@ export function EntryComposer({
           // for new surfaces.
           sendVariant="icon"
           disabled={disabled}
+          sendDisabled={!ready}
           autoFocus
           // A hero composer autofocuses on mount, so the Cmd/Ctrl+L hint
           // would advertise a shortcut to the input the user is already in.

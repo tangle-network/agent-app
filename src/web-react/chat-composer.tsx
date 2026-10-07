@@ -316,6 +316,8 @@ export interface ChatComposerProps {
   /** Block input + send (e.g. while restoring). Distinct from `isStreaming`,
    *  which keeps the textarea editable so the next turn can be composed. */
   disabled?: boolean
+  /** Block sending while keeping the draft editable (e.g. model choices load). */
+  sendDisabled?: boolean
   placeholder?: string
 
   /** Controlled value. Omit for self-managed internal state (cleared on send). */
@@ -519,6 +521,7 @@ export function ChatComposer({
   onCancel,
   isStreaming = false,
   disabled = false,
+  sendDisabled = false,
   placeholder = 'Message the agent…',
   value,
   onValueChange,
@@ -723,7 +726,7 @@ export function ChatComposer({
   // shows Stop while streaming, so `canSubmitWhileBusy` opens Enter, not a
   // second visible control.
   const sendBlockedByStream = isStreaming && !canSubmitWhileBusy
-  const canSend = hasSendable && !sendBlockedByStream && !disabled
+  const canSend = hasSendable && !sendBlockedByStream && !disabled && !sendDisabled
 
   const [failedSend, setFailedSend] = useState<FailedSend | null>(null)
 
@@ -782,7 +785,7 @@ export function ChatComposer({
 
   const send = useCallback(() => {
     const trimmed = text.trim()
-    if (sendBlockedByStream || disabled) return
+    if (sendBlockedByStream || disabled || sendDisabled) return
     const readyFiles = pendingFiles.filter((f) => f.status === 'ready')
     const sendable = canSubmitAttachmentsOnly ? pendingFiles : readyFiles
     if (!trimmed && sendable.length === 0 && !selectedSkillId) return
@@ -817,6 +820,7 @@ export function ChatComposer({
     text,
     sendBlockedByStream,
     disabled,
+    sendDisabled,
     canSubmitAttachmentsOnly,
     attachmentsNotReadyMessage,
     onSendParts,
@@ -831,11 +835,11 @@ export function ChatComposer({
   // the affordance), so it never competes with the primary control.
   const retryFailedSend = useCallback(() => {
     const failure = failedSend
-    if (!failure || sendBlockedByStream || disabled) return
+    if (!failure || sendBlockedByStream || disabled || sendDisabled) return
     setFailedSend(null)
     const caret = { start: failure.text.length, end: failure.text.length }
     dispatchSend(failure.text, failure.trimmed, failure.parts, caret)
-  }, [failedSend, sendBlockedByStream, disabled, dispatchSend])
+  }, [failedSend, sendBlockedByStream, disabled, sendDisabled, dispatchSend])
 
   // ── '/' commands ─────────────────────────────────────────────────────────
   // General commands exist only while the WHOLE draft is one leading slash
