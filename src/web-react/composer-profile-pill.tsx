@@ -4,7 +4,7 @@ import type { AgentProfilePickerProps } from '@tangle-network/sandbox-ui/chat'
 /** The selection half of a thread's profile: the picker's own field names, so a rename upstream cannot drift past this. */
 export type ComposerProfileSelection = Pick<AgentProfilePickerProps, 'value' | 'onChange' | 'profiles' | 'disabled'>
 
-export interface ComposerProfilePillProps extends Pick<AgentProfilePickerProps, 'locked' | 'lockReason' | 'onNewChat' | 'side'> {
+export interface ComposerProfilePillProps extends Pick<AgentProfilePickerProps, 'locked' | 'lockReason' | 'onNewChat' | 'side' | 'capabilities' | 'onCreate' | 'onUpdate' | 'onDelete'> {
   /** The catalog and the current choice; products pass their server-resolvable profiles only. */
   selection: ComposerProfileSelection
   /**
@@ -41,16 +41,20 @@ const TRIGGER: Record<NonNullable<ComposerProfilePillProps['placement']>, string
 }
 
 /**
- * The thread's agent profile as a composer control. Selection only: no create,
- * edit or delete handlers are wired, so it offers exactly the catalog the
- * server resolves. A thread's profile is fixed once its first message exists;
- * pass `locked` then, and `onNewChat` to offer a fresh thread from the lock.
+ * The thread's agent profile as a composer control. The server owns catalog
+ * writes and selection; pass its callbacks to enable authoring and switching
+ * within the current conversation. `locked` is reserved for a product-specific
+ * admission constraint, not a conversation that already has messages.
  */
 export function ComposerProfilePill({
   selection,
   locked,
-  lockReason = 'The profile is fixed after the first message.',
+  lockReason,
   onNewChat,
+  capabilities,
+  onCreate,
+  onUpdate,
+  onDelete,
   side,
   placement = 'composer',
   className,
@@ -64,6 +68,10 @@ export function ComposerProfilePill({
       locked={locked}
       lockReason={lockReason}
       onNewChat={onNewChat}
+      capabilities={capabilities}
+      onCreate={onCreate}
+      onUpdate={onUpdate}
+      onDelete={onDelete}
       side={side}
       // The picker root shrink-wraps, which makes a trigger's own `w-full` a
       // no-op, so a full-width row widens the root as well.
