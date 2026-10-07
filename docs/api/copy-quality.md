@@ -8,7 +8,7 @@ Source: `src/copy-quality/index.ts`
 
 ### `BAN_WORDS`
 
-`const` — Ban-tier vocabulary: ai-tells.md "Vocabulary → Ban", with inflections.
+`const` — Ban-tier vocabulary: ai-tells.md "Vocabulary → Ban".
 
 ```ts
 readonly string[]
@@ -16,7 +16,7 @@ readonly string[]
 
 ### `bannedCopyVocabulary`
 
-`function` — Banned words and phrases, lowercased and deduplicated, for prompts that list them.
+`function` — Banned words and phrases for prompts that list them: base forms, lowercased, deduplicated, product extras first.
 
 ```ts
 (extra?: readonly string[]) => string[]
