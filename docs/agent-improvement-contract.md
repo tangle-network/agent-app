@@ -47,6 +47,8 @@ cancels an outstanding read itself: retain an existing abort-aware transport.
 Do not double-wrap an execution. Native completion/workflow owners still own
 work that outlives a viewer or process.
 
+For scoring each live job against an outcome contract and routing failures to the profile or capability lever, read [live-outcome-optimization.md](live-outcome-optimization.md).
+
 ## Keep the complete evidence chain
 
 | Stage | Existing owner | Product supplies |
