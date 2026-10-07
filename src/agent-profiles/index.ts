@@ -231,9 +231,17 @@ export function bindProfileText(consentedBaseline: AgentProfile, selected: Agent
   if (profileAuthorityDigest(consentedBaseline) !== profileAuthorityDigest(selected)) {
     throw new ProfileAccessError('Profile authority differs; prepare its managed plan before the next turn')
   }
-  const result: AgentProfile = { ...consentedBaseline, name: selected.name, description: selected.description }
-  const prompt = { ...consentedBaseline.prompt, systemPrompt: selected.prompt?.systemPrompt,
-    instructions: selected.prompt?.instructions }
+  // Profiles are digested as RFC 8785 JSON, which has no `undefined`: an
+  // absent selected field removes the baseline's value instead of storing it.
+  const result: AgentProfile = { ...consentedBaseline, name: selected.name }
+  if (selected.description === undefined) delete result.description
+  else result.description = selected.description
+  const prompt: NonNullable<AgentProfile['prompt']> = { ...consentedBaseline.prompt }
+  const { systemPrompt, instructions } = selected.prompt ?? {}
+  if (systemPrompt === undefined) delete prompt.systemPrompt
+  else prompt.systemPrompt = systemPrompt
+  if (instructions === undefined) delete prompt.instructions
+  else prompt.instructions = instructions
   if (Object.values(prompt).some(value => value !== undefined)) result.prompt = prompt
   else delete result.prompt
   return snapshotAgentProfile(result)
