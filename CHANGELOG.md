@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.12
+
+- Create text profiles from consented authority baseline
+
 ## 0.57.11
 
 - Expose shared active profile catalog and composer authoring
