@@ -390,6 +390,17 @@ export function normalizeProfileName(name: string): string {
   return name.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
+/** A source identity joins the command hash without entering the receipt row. */
+export function profileSwitchInputHashFromContentHash(contentHash: string,
+  identityContext?: string): string {
+  return identityContext === undefined ? contentHash
+    : sha256Utf8(JSON.stringify([identityContext, contentHash]))
+}
+
+export function profileSwitchInputHash(content: string, identityContext?: string): string {
+  return profileSwitchInputHashFromContentHash(sha256Utf8(content), identityContext)
+}
+
 export interface SwitchableProfile {
   id: string
   name: string
@@ -401,6 +412,8 @@ export interface SwitchProfileInput {
   key: ProfileBindingKey
   messageId: string
   content: string
+  /** Trusted source identity, such as a phone sender; replay must preserve it. */
+  identityContext?: string
   conversationId?: string
   choice: { name: string } | { profileId: string }
   profiles: readonly SwitchableProfile[]
@@ -414,7 +427,7 @@ export interface SwitchProfileInput {
 
 /** The picker and deterministic text command converge here. Models cannot call it. */
 export async function switchProfile(input: SwitchProfileInput): Promise<ProfileSwitchReceipt> {
-  const inputHash = sha256Utf8(input.content)
+  const inputHash = profileSwitchInputHash(input.content, input.identityContext)
   const previousReceipt = await input.store.getSwitchReceipt(input.key, input.messageId, inputHash)
   if (previousReceipt) return previousReceipt
   const binding = await input.store.getBinding(input.key)
@@ -468,7 +481,7 @@ export async function handleProfileSwitchText(
   const parsed = parseProfileSwitch(input.content)
   if (!parsed) return null
   if ('name' in parsed) return switchProfile({ ...input, choice: parsed })
-  const inputHash = sha256Utf8(input.content)
+  const inputHash = profileSwitchInputHash(input.content, input.identityContext)
   const previous = await input.store.getSwitchReceipt(input.key, input.messageId, inputHash)
   if (previous) return previous
   const binding = await input.store.getBinding(input.key)
