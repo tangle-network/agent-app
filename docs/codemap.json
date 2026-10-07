@@ -285,6 +285,18 @@
           "doc": null
         },
         {
+          "name": "profileSwitchInputHash",
+          "kind": "function",
+          "signature": "(content: string, identityContext?: string | undefined) => string",
+          "doc": null
+        },
+        {
+          "name": "profileSwitchInputHashFromContentHash",
+          "kind": "function",
+          "signature": "(contentHash: string, identityContext?: string | undefined) => string",
+          "doc": "A source identity joins the command hash without entering the receipt row."
+        },
+        {
           "name": "ProfileSwitchReceipt",
           "kind": "interface",
           "signature": "interface ProfileSwitchReceipt",

@@ -4,7 +4,7 @@
 
 Source: `src/agent-profiles/index.ts`
 
-38 exports.
+40 exports.
 
 ### `addProfileKnowledgeDocument`
 
@@ -180,6 +180,22 @@ type ProfileRevisionState
 
 ```ts
 interface ProfileRevisionStore
+```
+
+### `profileSwitchInputHash`
+
+`function`
+
+```ts
+(content: string, identityContext?: string | undefined) => string
+```
+
+### `profileSwitchInputHashFromContentHash`
+
+`function` — A source identity joins the command hash without entering the receipt row.
+
+```ts
+(contentHash: string, identityContext?: string | undefined) => string
 ```
 
 ### `ProfileSwitchReceipt`

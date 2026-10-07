@@ -29,7 +29,9 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
   options = { ...options,
     grant: { ...options.grant, resolve: structuredClone(options.grant.resolve), reserve: structuredClone(options.grant.reserve) },
     tools: options.tools.map(tool => ({ ...tool, inputSchema: structuredClone(tool.inputSchema) })),
-    priorMessages: options.priorMessages ? structuredClone(options.priorMessages) : undefined,
+    // Chat history rows carry storage fields (id, parts, timestamps). The
+    // provider receives exactly role and content; Anthropic rejects extra keys.
+    priorMessages: options.priorMessages?.map(({ role, content }) => ({ role, content })),
   }
   const tools = new Map(options.tools.map(tool => [tool.name, tool]))
   if (tools.size !== options.tools.length) throw new Error('Duplicate protected tool name')
