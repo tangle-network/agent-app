@@ -22,6 +22,7 @@ The turn pin records the effective plan digest selected by the executor.
 Trusted product attachments may change the effective digest without changing the saved profile.
 
 `proposeRevision` appends one immutable profile snapshot, parent, author kind (`person`, `agent`, `optimizer`), reason and canonical diff.
+`createTextProfile` is the shared path for a user-created second profile in a one-profile app: it copies only the active baseline's consented authority, sets a distinct name, appends the user's instruction to the baseline instructions, and delegates ADC's exact plan hash to the product. The caller supplies the complete authenticated workspace catalog for duplicate-name refusal and a trusted owner/manager role. A normalized workspace/name pair maps to one profile id, so concurrent creates of the same name conflict instead of making the text command ambiguous. A name that was used and later renamed remains reserved by that id. Products still authenticate the endpoint, scope catalog reads, prepare the managed plan, and use `switchProfile` to move the binding; this helper never grants new tools, model, MCP, secrets or sandbox permissions.
 An owner or manager may activate a text edit for the next message using an expected active revision; a conflict says the text changed since it was opened and requires review.
 Authority edits require a verified consent decision before activation.
 Optimizer proposals remain candidates until promoted.

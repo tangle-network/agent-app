@@ -4,7 +4,7 @@
 
 Source: `src/agent-profiles/d1.ts`
 
-6 exports.
+8 exports.
 
 ### `AGENT_PROFILE_D1_SCHEMA_SQL`
 
@@ -19,7 +19,15 @@ Source: `src/agent-profiles/d1.ts`
 `function`
 
 ```ts
-(db: ProfileD1Database, options?: { revisionWriteGuard?: ProfileD1RevisionWriteGuard | undefined; }) => ProfileRevision…
+(db: ProfileD1Database, options?: { revisionWriteGuard?: ProfileD1RevisionWriteGuard | undefined; bindingWriteGuard?: P…
+```
+
+### `listD1ActiveProfileRevisions`
+
+`function` — Product auth and profile visibility stay outside this workspace-scoped catalog read.
+
+```ts
+(db: ProfileD1Database, workspaceId: string) => Promise<ProfileRevision[]>
 ```
 
 ### `listD1ProfileSwitchReceipts`
@@ -28,6 +36,14 @@ Source: `src/agent-profiles/d1.ts`
 
 ```ts
 (db: ProfileD1Database, workspaceId: string, conversationId: string) => Promise<ProfileSwitchReceipt[]>
+```
+
+### `ProfileD1BindingWriteGuard`
+
+`type` — Trusted product predicate evaluated when a binding event commits.
+
+```ts
+type ProfileD1BindingWriteGuard
 ```
 
 ### `ProfileD1Database`

@@ -294,6 +294,56 @@ export async function proposeRevision(input: ProposeRevisionInput): Promise<Prof
   return revision
 }
 
+export interface CreateTextProfileInput {
+  store: ProfileRevisionStore
+  workspaceId: string
+  /** An active profile whose authority the new profile inherits exactly. */
+  baselineProfileId: string
+  /** Include builtins and user profiles from the authenticated workspace catalog. */
+  existingProfiles: readonly { name: string }[]
+  name: string
+  instructions: string
+  authorId: string
+  actorRole: 'owner' | 'manager' | 'member' | 'viewer'
+  /** Product computes ADC's hashWorkspacePlan for the complete authored snapshot. */
+  planDigest: (profile: AgentProfile) => string | Promise<string>
+  now?: number
+}
+
+/** Create a distinct text persona without granting new model, tool, MCP or secret authority. */
+export async function createTextProfile(input: CreateTextProfileInput): Promise<ProfileRevision> {
+  if (input.actorRole !== 'owner' && input.actorRole !== 'manager') {
+    throw new ProfileAccessError('Only an owner or manager can create a profile')
+  }
+  const name = input.name.trim().replace(/\s+/g, ' ')
+  const normalizedName = normalizeProfileName(name)
+  if (!normalizedName) throw new TypeError('A profile needs a name')
+  if (input.existingProfiles.some(profile => normalizeProfileName(profile.name) === normalizedName)) {
+    throw new ProfileConflictError('A profile with that name already exists')
+  }
+  const baseline = await input.store.getActiveRevision(input.workspaceId, input.baselineProfileId)
+  if (!baseline) throw new ProfileConflictError('The baseline profile is not active')
+  // Equal names map to one id, so two concurrent creates cannot create an
+  // ambiguous text command even when both read the catalog before either writes.
+  const profileId = `custom-${sha256Utf8(`${input.workspaceId}\0${normalizedName}`).slice(7, 39)}`
+  const addedInstruction = input.instructions.trim()
+  const profile = bindProfileText(baseline.profile, {
+    ...baseline.profile, name,
+    prompt: {
+      ...baseline.profile.prompt,
+      instructions: [...(baseline.profile.prompt?.instructions ?? []),
+        ...(addedInstruction ? [addedInstruction] : [])],
+    },
+  })
+  return proposeRevision({
+    store: input.store, workspaceId: input.workspaceId, profileId,
+    expectedRevisionId: null, profile, knowledgeText: '',
+    planDigest: await input.planDigest(profile),
+    author: { kind: 'person', id: input.authorId }, actorRole: input.actorRole,
+    reason: 'Created a text profile from an approved baseline', now: input.now,
+  })
+}
+
 export async function promoteRevision(input: {
   store: ProfileRevisionStore
   workspaceId: string

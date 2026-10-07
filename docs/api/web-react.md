@@ -723,7 +723,7 @@ interface ComposerPlanModeSelection
 `function` — The thread's agent profile as a composer control.
 
 ```ts
-({ selection, locked, lockReason, onNewChat, side, placement, className, }: ComposerProfilePillProps) => Element
+({ selection, locked, lockReason, onNewChat, capabilities, onCreate, onUpdate, onDelete, side, placement, className, }:…
 ```
 
 ### `ComposerProfilePillProps`

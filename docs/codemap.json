@@ -171,6 +171,18 @@
           "doc": "The per-turn text overlay is validated without admitting tools, model, MCP or resources."
         },
         {
+          "name": "createTextProfile",
+          "kind": "function",
+          "signature": "(input: CreateTextProfileInput) => Promise<ProfileRevision>",
+          "doc": "Create a distinct text persona without granting new model, tool, MCP or secret authority."
+        },
+        {
+          "name": "CreateTextProfileInput",
+          "kind": "interface",
+          "signature": "interface CreateTextProfileInput",
+          "doc": null
+        },
+        {
           "name": "handleProfileSwitchText",
           "kind": "function",
           "signature": "(input: Omit<SwitchProfileInput, \"choice\">) => Promise<ProfileSwitchReceipt | null>",
@@ -387,14 +399,26 @@
         {
           "name": "createD1ProfileRevisionStore",
           "kind": "function",
-          "signature": "(db: ProfileD1Database, options?: { revisionWriteGuard?: ProfileD1RevisionWriteGuard | undefined; }) => ProfileRevision…",
+          "signature": "(db: ProfileD1Database, options?: { revisionWriteGuard?: ProfileD1RevisionWriteGuard | undefined; bindingWriteGuard?: P…",
           "doc": null
+        },
+        {
+          "name": "listD1ActiveProfileRevisions",
+          "kind": "function",
+          "signature": "(db: ProfileD1Database, workspaceId: string) => Promise<ProfileRevision[]>",
+          "doc": "Product auth and profile visibility stay outside this workspace-scoped catalog read."
         },
         {
           "name": "listD1ProfileSwitchReceipts",
           "kind": "function",
           "signature": "(db: ProfileD1Database, workspaceId: string, conversationId: string) => Promise<ProfileSwitchReceipt[]>",
           "doc": "Product auth stays outside this read."
+        },
+        {
+          "name": "ProfileD1BindingWriteGuard",
+          "kind": "type",
+          "signature": "type ProfileD1BindingWriteGuard",
+          "doc": "Trusted product predicate evaluated when a binding event commits."
         },
         {
           "name": "ProfileD1Database",
@@ -19970,7 +19994,7 @@
         {
           "name": "ComposerProfilePill",
           "kind": "function",
-          "signature": "({ selection, locked, lockReason, onNewChat, side, placement, className, }: ComposerProfilePillProps) => Element",
+          "signature": "({ selection, locked, lockReason, onNewChat, capabilities, onCreate, onUpdate, onDelete, side, placement, className, }:…",
           "doc": "The thread's agent profile as a composer control."
         },
         {
