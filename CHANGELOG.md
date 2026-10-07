@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.9
+
+- Accept sandbox-ui 0.128 for profile picker consumers
+
 ## 0.57.8
 
 - ci: run workflows on GitHub-hosted runners again (#843)
