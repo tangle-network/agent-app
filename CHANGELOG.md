@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.8
+
+- ci: run workflows on GitHub-hosted runners again (#843)
+
 ## 0.57.7
 
 - fix(release): publish packages tokenlessly through npm trusted publishing
