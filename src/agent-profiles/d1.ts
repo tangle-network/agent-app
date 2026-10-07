@@ -426,8 +426,19 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database,
             ...(bindingGuard?.values ?? []))
         // A failed event makes the receipt's required message NULL. D1's batch
         // rolls back both writes instead of leaving a success receipt without a binding.
-        const [moved, inserted] = await db.batch([move, insertReceipt(eventId)])
-        if (moved?.meta.changes !== 1 || inserted?.meta.changes !== 1) {
+        let outcome: { meta: { changes: number } }[]
+        try {
+          outcome = await db.batch([move, insertReceipt(eventId)])
+        } catch (error) {
+          const prior = await getSwitchReceipt(key, receipt.messageId, receipt.inputHash)
+          if (prior) return prior
+          throw error
+        }
+        if (outcome[0]?.meta.changes !== 1 || outcome[1]?.meta.changes !== 1) {
+          // Another copy of this message may have won before a later switch.
+          // Its immutable receipt is still the answer for this message.
+          const prior = await getSwitchReceipt(key, receipt.messageId, receipt.inputHash)
+          if (prior) return prior
           throw new ProfileConflictError('Profile binding changed during switch')
         }
       }
