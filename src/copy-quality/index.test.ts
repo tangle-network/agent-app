@@ -100,6 +100,11 @@ describe('bannedCopyVocabulary', () => {
   it('counts an extra that repeats the Ban tier once', () => {
     expect(scanCopy('We leverage it.', { extraBanned: ['Leverage', 'leverage'] }).counts.ban).toBe(1)
   })
+
+  it('moves a cap-tier word a product bans into the ban tier only', () => {
+    const result = scanCopy('A robust, seamless queue.', { extraBanned: ['robust', 'seamless'] })
+    expect(result.counts).toEqual({ ban: 2, cap: 0, weak: 0 })
+  })
 })
 
 describe('metric claims', () => {
