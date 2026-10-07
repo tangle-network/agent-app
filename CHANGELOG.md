@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.18
+
+- fix(chat-routes): send protected history as role and content only
+
 ## 0.57.17
 
 - fix(profiles): bind trusted source identity into switch receipts (#852)
