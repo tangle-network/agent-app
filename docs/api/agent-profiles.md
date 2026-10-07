@@ -4,7 +4,7 @@
 
 Source: `src/agent-profiles/index.ts`
 
-36 exports.
+38 exports.
 
 ### `addProfileKnowledgeDocument`
 
@@ -28,6 +28,22 @@ Source: `src/agent-profiles/index.ts`
 
 ```ts
 (consentedBaseline: AgentProfile, selected: AgentProfile) => AgentProfile
+```
+
+### `createTextProfile`
+
+`function` — Create a distinct text persona without granting new model, tool, MCP or secret authority.
+
+```ts
+(input: CreateTextProfileInput) => Promise<ProfileRevision>
+```
+
+### `CreateTextProfileInput`
+
+`interface`
+
+```ts
+interface CreateTextProfileInput
 ```
 
 ### `handleProfileSwitchText`

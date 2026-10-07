@@ -202,6 +202,22 @@ Source: `src/agent-profiles/index.ts` · depends on `tools`
 (consentedBaseline: AgentProfile, selected: AgentProfile) => AgentProfile
 ```
 
+### `createTextProfile`
+
+`function` — Create a distinct text persona without granting new model, tool, MCP or secret authority.
+
+```ts
+(input: CreateTextProfileInput) => Promise<ProfileRevision>
+```
+
+### `CreateTextProfileInput`
+
+`interface`
+
+```ts
+interface CreateTextProfileInput
+```
+
 ### `handleProfileSwitchText`
 
 `function` — Call before dispatching a chat message; a recognized command is never sent to the model.
@@ -484,7 +500,15 @@ Source: `src/agent-profiles/d1.ts` · depends on `tools`
 `function`
 
 ```ts
-(db: ProfileD1Database, options?: { revisionWriteGuard?: ProfileD1RevisionWriteGuard | undefined; }) => ProfileRevision…
+(db: ProfileD1Database, options?: { revisionWriteGuard?: ProfileD1RevisionWriteGuard | undefined; bindingWriteGuard?: P…
+```
+
+### `listD1ActiveProfileRevisions`
+
+`function` — Product auth and profile visibility stay outside this workspace-scoped catalog read.
+
+```ts
+(db: ProfileD1Database, workspaceId: string) => Promise<ProfileRevision[]>
 ```
 
 ### `listD1ProfileSwitchReceipts`
@@ -493,6 +517,14 @@ Source: `src/agent-profiles/d1.ts` · depends on `tools`
 
 ```ts
 (db: ProfileD1Database, workspaceId: string, conversationId: string) => Promise<ProfileSwitchReceipt[]>
+```
+
+### `ProfileD1BindingWriteGuard`
+
+`type` — Trusted product predicate evaluated when a binding event commits.
+
+```ts
+type ProfileD1BindingWriteGuard
 ```
 
 ### `ProfileD1Database`
@@ -25798,7 +25830,7 @@ interface ComposerPlanModeSelection
 `function` — The thread's agent profile as a composer control.
 
 ```ts
-({ selection, locked, lockReason, onNewChat, side, placement, className, }: ComposerProfilePillProps) => Element
+({ selection, locked, lockReason, onNewChat, capabilities, onCreate, onUpdate, onDelete, side, placement, className, }:…
 ```
 
 ### `ComposerProfilePillProps`
