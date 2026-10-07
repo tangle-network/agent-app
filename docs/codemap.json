@@ -19823,6 +19823,12 @@
           "doc": null
         },
         {
+          "name": "AgentProfileEditorSaveState",
+          "kind": "interface",
+          "signature": "interface AgentProfileEditorSaveState",
+          "doc": null
+        },
+        {
           "name": "AgentProfileRegistryError",
           "kind": "class",
           "signature": "class AgentProfileRegistryError",

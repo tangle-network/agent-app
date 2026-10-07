@@ -205,7 +205,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.9.0', range!)).toBe(false)
   })
 
-  it('admits the tested Hub SDK 0.24 line without claiming 0.25', async () => {
+  it('admits the tested Hub SDK lines without claiming untested minors', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -213,7 +213,6 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/hub-sdk']
 
     expect(range).toBeDefined()
-    expect(own.devDependencies?.['@tangle-network/hub-sdk']).toBe('0.24.0')
     expect(satisfiesRange('0.19.3', range!)).toBe(true)
     expect(satisfiesRange('0.21.0', range!)).toBe(true)
     expect(satisfiesRange('0.22.0', range!)).toBe(false)
@@ -224,6 +223,9 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.24.0', range!)).toBe(true)
     expect(satisfiesRange('0.24.999', range!)).toBe(true)
     expect(satisfiesRange('0.25.0', range!)).toBe(false)
+    expect(satisfiesRange('0.26.0', range!)).toBe(false)
+    expect(satisfiesRange('0.27.0', range!)).toBe(true)
+    expect(satisfiesRange('0.28.0', range!)).toBe(false)
   })
 
   it('admits the tested Integrations lines without admitting 0.58', async () => {
@@ -242,7 +244,7 @@ describe('this package audits itself', () => {
     }
   })
 
-  it('admits the Knowledge lines compatible with Eval 0.203 and 0.205', async () => {
+  it('admits the tested Knowledge lines without claiming the next major', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -255,7 +257,8 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('19.0.0', range!)).toBe(false)
     expect(satisfiesRange('19.0.1', range!)).toBe(true)
     expect(satisfiesRange('19.999.0', range!)).toBe(true)
-    expect(satisfiesRange('20.0.0', range!)).toBe(false)
+    expect(satisfiesRange('20.0.0', range!)).toBe(true)
+    expect(satisfiesRange('21.0.0', range!)).toBe(false)
   })
 
   it('admits qualified Sandbox UI releases without claiming the next minor', async () => {

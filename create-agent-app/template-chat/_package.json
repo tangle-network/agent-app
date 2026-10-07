@@ -23,15 +23,15 @@
   "dependencies": {
     "@tangle-network/agent-app": "__AGENT_APP_VERSION__",
     "@tangle-network/agent-gateway": "0.11.4",
-    "@tangle-network/agent-interface": "2.17.0",
-    "@tangle-network/agent-runtime": "0.293.0",
-    "@tangle-network/sandbox": "0.60.10",
+    "@tangle-network/agent-interface": "3.1.1",
+    "@tangle-network/agent-runtime": "0.308.0",
+    "@tangle-network/sandbox": "0.60.22",
     "better-auth": "^1.7.2",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.5",
     "viem": "^2.0.0",
     "@tangle-network/brand": "1.17.0",
-    "@tangle-network/sandbox-ui": "0.128.1",
+    "@tangle-network/sandbox-ui": "0.128.2",
     "@tangle-network/ui": "11.26.0",
     "lucide-react": "^1.35.0",
     "react": "^19.2.8",
@@ -40,13 +40,13 @@
     "nanostores": "1.5.4"
   },
   "peerDependencies": {
-    "@tangle-network/agent-eval": ">=0.205.1 <0.206.0",
-    "@tangle-network/agent-integrations": ">=0.60.0 <0.61.0"
+    "@tangle-network/agent-eval": ">=0.209.1 <0.210.0",
+    "@tangle-network/agent-integrations": ">=0.66.0 <0.67.0"
   },
   "devDependencies": {
-    "@tangle-network/agent-eval": "0.205.1",
-    "@tangle-network/agent-integrations": "0.60.0",
-    "@tangle-network/agent-knowledge": "19.0.1",
+    "@tangle-network/agent-eval": "0.209.1",
+    "@tangle-network/agent-integrations": "0.66.0",
+    "@tangle-network/agent-knowledge": "20.0.0",
     "@cloudflare/workers-types": "^5.20260827.1",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.20.1",

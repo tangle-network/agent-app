@@ -25590,6 +25590,14 @@ interface AgentProfileChoicesProps
 interface AgentProfileEditorProps
 ```
 
+### `AgentProfileEditorSaveState`
+
+`interface`
+
+```ts
+interface AgentProfileEditorSaveState
+```
+
 ### `AgentProfileRegistryError`
 
 `class`
