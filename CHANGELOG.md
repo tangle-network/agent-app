@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.10
+
+- Prepare every profile switch before binding flip (#845)
+
 ## 0.57.9
 
 - Accept sandbox-ui 0.128 for profile picker consumers
