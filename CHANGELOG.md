@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.19
+
+- docs: score live jobs against outcome contracts (#854)
+
 ## 0.57.18
 
 - fix(chat-routes): send protected history as role and content only
