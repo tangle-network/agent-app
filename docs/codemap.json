@@ -10935,10 +10935,23 @@
       "id": "./profile",
       "source": "src/profile/index.ts",
       "dependsOn": [
+        "copy-quality",
         "skills"
       ],
       "error": null,
       "exports": [
+        {
+          "name": "AgentPromptInput",
+          "kind": "interface",
+          "signature": "interface AgentPromptInput",
+          "doc": "Inputs to {@link renderAgentPrompt}."
+        },
+        {
+          "name": "AgentPromptSection",
+          "kind": "interface",
+          "signature": "interface AgentPromptSection",
+          "doc": "A titled prompt section a product supplies."
+        },
         {
           "name": "assertProfilePromptWithinBudget",
           "kind": "function",
@@ -10956,6 +10969,18 @@
           "kind": "function",
           "signature": "(systemPrompt: string, budget?: ComposeProfileBudget, origin?: string) => void",
           "doc": "Enforce {@link ComposeProfileBudget} on a composed system prompt: over budget throws (or warns with `warnOnly`) with the actual size and the top-3 largest sections."
+        },
+        {
+          "name": "captureModelInput",
+          "kind": "function",
+          "signature": "(input: CaptureModelInputInput) => Promise<ModelInputOutcome<ModelInputRecord>>",
+          "doc": "Store every input, then build the record a receipt links to."
+        },
+        {
+          "name": "CaptureModelInputInput",
+          "kind": "interface",
+          "signature": "interface CaptureModelInputInput",
+          "doc": null
         },
         {
           "name": "composeAgentProfile",
@@ -11012,6 +11037,12 @@
           "doc": "Project corpus entries onto SDK file mounts at a relative path under `<anchor>/`."
         },
         {
+          "name": "createMemoryModelInputStore",
+          "kind": "function",
+          "signature": "() => ModelInputStore & { readonly size: number; }",
+          "doc": "In-memory store."
+        },
+        {
           "name": "DEFAULT_HOME_LIMITS",
           "kind": "const",
           "signature": "{ readonly 'AGENTS.md': 12000; readonly 'SOUL.md': 8000; readonly 'IDENTITY.md': 4000; readonly 'USER.md': 4000; readon…",
@@ -11030,16 +11061,16 @@
           "doc": "Canonical seed records."
         },
         {
+          "name": "defaultQualitySkills",
+          "kind": "function",
+          "signature": "(options?: QualitySkillOptions) => SkillEntry[]",
+          "doc": "The quality skills mounted by default."
+        },
+        {
           "name": "diffProfileFingerprints",
           "kind": "function",
           "signature": "(a: ProfileFingerprint, b: ProfileFingerprint) => ProfileDrift",
           "doc": "Channel-by-channel comparison of two fingerprints."
-        },
-        {
-          "name": "EvolvableSectionInput",
-          "kind": "interface",
-          "signature": "interface EvolvableSectionInput",
-          "doc": "Inputs to {@link makeEvolvableSection}."
         },
         {
           "name": "fingerprintAgentProfile",
@@ -11060,10 +11091,34 @@
           "doc": "A Vite eager `?raw` glob result: glob key -> raw file body."
         },
         {
+          "name": "HUMAN_PROSE_SKILL_ID",
+          "kind": "const",
+          "signature": "\"human-prose\"",
+          "doc": null
+        },
+        {
+          "name": "humanProseSkill",
+          "kind": "function",
+          "signature": "(options?: HumanProseSkillOptions) => SkillEntry",
+          "doc": "The shared writing skill as a mountable {@link SkillEntry}."
+        },
+        {
+          "name": "HumanProseSkillOptions",
+          "kind": "interface",
+          "signature": "interface HumanProseSkillOptions",
+          "doc": "Product additions to the shared writing skill."
+        },
+        {
           "name": "largestPromptSections",
           "kind": "function",
           "signature": "(prompt: string, top?: number) => { title: string; bytes: number; }[]",
           "doc": "Largest markdown-heading-delimited sections of a prompt, by UTF-8 bytes."
+        },
+        {
+          "name": "LEARNED_GUIDANCE_SECTION_ID",
+          "kind": "const",
+          "signature": "\"learned-guidance\"",
+          "doc": "Section id of the evolvable learned guidance, shared by every product and its loop."
         },
         {
           "name": "LoadCorpusOptions",
@@ -11078,16 +11133,100 @@
           "doc": "Load a markdown corpus, preferring a Vite glob-result map and falling back to a Node fs walk."
         },
         {
-          "name": "makeEvolvableSection",
-          "kind": "function",
-          "signature": "(input: EvolvableSectionInput) => AgentProfileSection",
-          "doc": "Build the one evolvable (`evolvable: true`) domain section whose body comes from the product's loader, falling back to the required baseline when the loaded body is empty after stripping comments."
-        },
-        {
           "name": "mergeComposedSkills",
           "kind": "function",
           "signature": "(batches: ComposedSkills[]) => ComposedSkills",
           "doc": "Combine multiple {@link ComposedSkills} batches (e.g."
+        },
+        {
+          "name": "MODEL_INPUT_RECORD_SCHEMA",
+          "kind": "const",
+          "signature": "\"agent-app.model-input.v1\"",
+          "doc": null
+        },
+        {
+          "name": "modelInputBlob",
+          "kind": "function",
+          "signature": "(kind: ModelInputKind, content: string, mediaType?: ModelInputMediaType) => Promise<ModelInputBlob>",
+          "doc": "Address one input by its content."
+        },
+        {
+          "name": "ModelInputBlob",
+          "kind": "interface",
+          "signature": "interface ModelInputBlob",
+          "doc": null
+        },
+        {
+          "name": "ModelInputKind",
+          "kind": "type",
+          "signature": "type ModelInputKind",
+          "doc": "What an input was."
+        },
+        {
+          "name": "ModelInputMediaType",
+          "kind": "type",
+          "signature": "type ModelInputMediaType",
+          "doc": null
+        },
+        {
+          "name": "ModelInputOutcome",
+          "kind": "type",
+          "signature": "type ModelInputOutcome",
+          "doc": null
+        },
+        {
+          "name": "ModelInputRecord",
+          "kind": "interface",
+          "signature": "interface ModelInputRecord",
+          "doc": "The record an execution receipt embeds."
+        },
+        {
+          "name": "ModelInputRef",
+          "kind": "type",
+          "signature": "type ModelInputRef",
+          "doc": "A blob without its content: what a record carries."
+        },
+        {
+          "name": "ModelInputSectionRef",
+          "kind": "interface",
+          "signature": "interface ModelInputSectionRef",
+          "doc": "One system-prompt section's identity, from {@link RenderedAgentPrompt}."
+        },
+        {
+          "name": "ModelInputStore",
+          "kind": "interface",
+          "signature": "interface ModelInputStore",
+          "doc": "Content-addressed blob storage for model inputs."
+        },
+        {
+          "name": "OPERATING_CONTRACT_CLAUSES",
+          "kind": "const",
+          "signature": "readonly OperatingContractClause[]",
+          "doc": "The clauses in render order."
+        },
+        {
+          "name": "OPERATING_CONTRACT_VERSION",
+          "kind": "const",
+          "signature": "1",
+          "doc": "Version of the clause wording below."
+        },
+        {
+          "name": "OperatingContractClause",
+          "kind": "interface",
+          "signature": "interface OperatingContractClause",
+          "doc": null
+        },
+        {
+          "name": "OperatingContractClauseId",
+          "kind": "type",
+          "signature": "type OperatingContractClauseId",
+          "doc": null
+        },
+        {
+          "name": "OperatingContractOptions",
+          "kind": "interface",
+          "signature": "interface OperatingContractOptions",
+          "doc": "Product adjustments to the shared contract."
         },
         {
           "name": "parseCorpusSkills",
@@ -11150,16 +11289,58 @@
           "doc": "Overlay overrides applied on top of the channel mounts."
         },
         {
+          "name": "QualitySkillOptions",
+          "kind": "interface",
+          "signature": "interface QualitySkillOptions",
+          "doc": null
+        },
+        {
+          "name": "readModelInput",
+          "kind": "function",
+          "signature": "(store: ModelInputStore, ref: Pick<ModelInputRef, \"digest\">) => Promise<ModelInputOutcome<ModelInputBlob>>",
+          "doc": "Load one input back and verify its content still matches its digest."
+        },
+        {
           "name": "registrySkills",
           "kind": "function",
           "signature": "(registry: SkillEntry[], tier?: string) => AgentProfileFileMount[]",
           "doc": "Project the registry's free-tier (or `tier`-matched) entries onto SDK file mounts at the harness skill-discovery path."
         },
         {
+          "name": "renderAgentPrompt",
+          "kind": "function",
+          "signature": "(input: AgentPromptInput) => RenderedAgentPrompt",
+          "doc": "Render the product system prompt."
+        },
+        {
+          "name": "RenderedAgentPrompt",
+          "kind": "interface",
+          "signature": "interface RenderedAgentPrompt",
+          "doc": null
+        },
+        {
+          "name": "RenderedAgentPromptSection",
+          "kind": "interface",
+          "signature": "interface RenderedAgentPromptSection",
+          "doc": "One rendered section, in prompt order."
+        },
+        {
+          "name": "RenderedOperatingContract",
+          "kind": "interface",
+          "signature": "interface RenderedOperatingContract",
+          "doc": null
+        },
+        {
           "name": "renderInlineSkills",
           "kind": "function",
           "signature": "(input: RenderInlineSkillsInput) => string",
           "doc": "Render every (tier-filtered) skill's full body inline into the prompt — the `inline` delivery mode."
+        },
+        {
+          "name": "renderOperatingContract",
+          "kind": "function",
+          "signature": "(options?: OperatingContractOptions) => RenderedOperatingContract",
+          "doc": "Render the contract as a prompt section."
         },
         {
           "name": "renderSkillIndex",
@@ -11207,7 +11388,7 @@
           "name": "stripComments",
           "kind": "function",
           "signature": "(raw: string) => string",
-          "doc": "True body of an addendum file with HTML comments stripped — an all-comment placeholder counts as empty, so the loader falls back to the baseline."
+          "doc": "Body of a loaded markdown file with HTML comments removed and whitespace trimmed, so an all-comment placeholder counts as empty."
         },
         {
           "name": "UserSkill",
@@ -11226,6 +11407,12 @@
           "kind": "function",
           "signature": "(profile: AgentProfile) => AgentProfile",
           "doc": "Compose home instructions, not per-turn writes to persistent memory."
+        },
+        {
+          "name": "withDefaultQualitySkills",
+          "kind": "function",
+          "signature": "(productSkills: readonly SkillEntry[], options?: QualitySkillOptions) => SkillEntry[]",
+          "doc": "Append the default quality skills to a product's skills."
         }
       ]
     },
