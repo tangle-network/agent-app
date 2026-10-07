@@ -21,6 +21,14 @@ describe('scanCopy', () => {
     expect(categories('The leverage-ratio field stays.')).toEqual([])
   })
 
+  it('matches inflections and hyphens written as spaces from one base form', () => {
+    for (const text of ['Leveraging containers.', 'Real synergies.', 'A game changer.', 'Two game-changers.', 'Intricately built.']) {
+      expect(scanCopy(text).counts.ban, text).toBe(1)
+    }
+    expect(scanCopy('A cutting edge, seamlessly built tool.').counts.cap).toBe(1)
+    expect(scanCopy('The realty team and the delivery van.').findings).toEqual([])
+  })
+
   it('allows one cap-tier word per paragraph and fails two', () => {
     expect(scanCopy('A robust queue for jobs.').pass).toBe(true)
     expect(categories('A robust, seamless queue for jobs.')).toEqual(['cap:cap-words'])
@@ -77,11 +85,20 @@ describe('scanCopy', () => {
 })
 
 describe('bannedCopyVocabulary', () => {
-  it('lists the ban tier once, lowercased, with extras first', () => {
+  it('lists base forms once, lowercased, with extras first', () => {
     const vocabulary = bannedCopyVocabulary(['Synergy', 'Blazing'])
     expect(vocabulary.slice(0, 2)).toEqual(['synergy', 'blazing'])
     expect(vocabulary).toContain('delve')
+    expect(vocabulary).not.toContain('delving')
     expect(new Set(vocabulary).size).toBe(vocabulary.length)
+  })
+
+  it('applies inflection matching to product extras too', () => {
+    expect(scanCopy('Disrupting the market.', { extraBanned: ['disrupt'] }).pass).toBe(false)
+  })
+
+  it('counts an extra that repeats the Ban tier once', () => {
+    expect(scanCopy('We leverage it.', { extraBanned: ['Leverage', 'leverage'] }).counts.ban).toBe(1)
   })
 })
 

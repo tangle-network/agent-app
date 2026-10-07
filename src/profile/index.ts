@@ -1,5 +1,5 @@
 /**
- * Profile composer + evolvable-section seam for agent products.
+ * Profile composer and system-prompt renderer for agent products.
  *
  * The standard "load a deployable AgentProfile, including skills, plus the
  * skills the end user added to their own instance" entry point. A product holds
@@ -24,14 +24,12 @@
  * delegation/app-tool MCP map, and the override strings; nothing here reaches
  * for env, a glob, or a specific product's profile.
  *
- * The evolvable-section seam is the loader closure. A product's single
- * self-improvable domain section (the one `applyDomainPatch` targets) loads its
- * body from a deployed markdown override, falling back to an in-tree baseline.
- * The `import.meta.glob('<lit>', ...)` literal must stay at the CONSUMER call
- * site (Vite static-analyzes it), so `makeEvolvableSection` takes the loader as
- * a closure and a REQUIRED `baseline` — it never constructs a glob and never
- * defaults the baseline, so a product can't render an empty learned-guidance
- * section. `stripComments` is the shared "is this addendum really empty?" test.
+ * The system prompt itself comes from `renderAgentPrompt` (./agent-prompt):
+ * identity, the shared operating contract (./operating-contract), environment,
+ * tool conventions, the skill index, domain guidance ending in the evolvable
+ * learned guidance, and the workspace overlay. The default quality skills
+ * (./quality-skills) join the product's skills, and `captureModelInput`
+ * (./model-input) stores what the model saw for the turn's receipt.
  */
 
 import type {
@@ -62,13 +60,54 @@ export {
   type ComposeProfileBudget,
 } from './budget'
 
-/** Re-expose the agent-eval section/render substrate so a product wires the
- *  evolvable surface through ONE subpath: `makeEvolvableSection` builds the
- *  section, `profile.renderProfile` renders it, `profile.applyDomainPatch` lets
- *  the loop patch it by id. The rendering/patching engine stays in agent-eval;
- *  reach it through this namespace (re-exporting the bare fns would leak
- *  agent-eval's un-nameable AgentProfile type into our generated d.ts). */
+/** Re-expose agent-eval's `profile` namespace for products that still render
+ *  through `profile.renderProfile`; new prompts use {@link renderAgentPrompt}.
+ *  Re-exporting the bare functions would leak agent-eval's un-nameable
+ *  AgentProfile type into our generated d.ts. */
 export { profile }
+
+export {
+  LEARNED_GUIDANCE_SECTION_ID,
+  renderAgentPrompt,
+  stripComments,
+  type AgentPromptInput,
+  type AgentPromptSection,
+  type RenderedAgentPrompt,
+  type RenderedAgentPromptSection,
+} from './agent-prompt'
+export {
+  OPERATING_CONTRACT_CLAUSES,
+  OPERATING_CONTRACT_VERSION,
+  renderOperatingContract,
+  type OperatingContractClause,
+  type OperatingContractClauseId,
+  type OperatingContractOptions,
+  type RenderedOperatingContract,
+} from './operating-contract'
+export {
+  defaultQualitySkills,
+  HUMAN_PROSE_SKILL_ID,
+  humanProseSkill,
+  withDefaultQualitySkills,
+  type HumanProseSkillOptions,
+  type QualitySkillOptions,
+} from './quality-skills'
+export {
+  captureModelInput,
+  createMemoryModelInputStore,
+  MODEL_INPUT_RECORD_SCHEMA,
+  modelInputBlob,
+  readModelInput,
+  type CaptureModelInputInput,
+  type ModelInputBlob,
+  type ModelInputKind,
+  type ModelInputMediaType,
+  type ModelInputOutcome,
+  type ModelInputRecord,
+  type ModelInputRef,
+  type ModelInputSectionRef,
+  type ModelInputStore,
+} from './model-input'
 
 /** The file-mount channels layered onto `resources.files`. The first three
  *  mirror {@link ComposeShellResourcesInput}; `userSkills` is the per-user /
@@ -229,49 +268,6 @@ function pruneEmptyResourceChannels(profile: AgentProfile): AgentProfile {
   const out: AgentProfile = { ...profile, resources: kept }
   if (kept && Object.keys(kept).length === 0) delete out.resources
   return out
-}
-
-/** True body of an addendum file with HTML comments stripped — an all-comment
- *  placeholder counts as empty, so the loader falls back to the baseline. */
-export function stripComments(raw: string): string {
-  return raw.replace(/<!--[\s\S]*?-->/g, '').trim()
-}
-
-/** Inputs to {@link makeEvolvableSection}. */
-export interface EvolvableSectionInput {
-  /** Section id the self-improvement loop targets with `applyDomainPatch`. */
-  id: string
-  /** Section title rendered as `### <title>`. */
-  title: string
-  /**
-   * Load the deployed section body. The CONSUMER supplies this closure and runs
-   * its own `import.meta.glob('<lit>', { eager: true, query: '?raw', import:
-   * 'default' })` inside it — the literal must stay at the call site so Vite can
-   * static-analyze it; a glob constructed here would not resolve the product's
-   * files. Return the raw markdown (comments and all); `makeEvolvableSection`
-   * applies {@link stripComments} to decide whether it is really populated.
-   */
-  load: () => string
-  /**
-   * The in-tree fallback body, used when `load()` returns an
-   * all-comments/empty placeholder. REQUIRED — no internal default — so a
-   * product can never accidentally render an empty evolvable section.
-   */
-  baseline: string
-}
-
-/**
- * Build the one evolvable (`evolvable: true`) domain section whose body comes
- * from the product's loader, falling back to the required baseline when the
- * loaded body is empty after stripping comments. Returns the agent-eval
- * `AgentProfileSection` shape — drop it straight into `prodProfile`'s shipped
- * sections. The loader is the only seam; the empty-vs-populated rule and the
- * baseline fallback are the lifted algebra.
- */
-export function makeEvolvableSection(input: EvolvableSectionInput): profile.AgentProfileSection {
-  const loaded = input.load()
-  const body = stripComments(loaded) ? loaded.trim() : input.baseline
-  return { id: input.id, title: input.title, body, evolvable: true }
 }
 
 export {

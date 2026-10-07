@@ -78,27 +78,25 @@ export interface CopyScanResult {
   words: number
 }
 
-/** Ban-tier vocabulary: ai-tells.md "Vocabulary → Ban", with inflections. */
+/**
+ * Ban-tier vocabulary: ai-tells.md "Vocabulary → Ban". Base forms; the scanner
+ * also matches inflections ("leveraging", "synergies") and a hyphen written as
+ * a space ("game changer"), so prompts can list each word once.
+ */
 export const BAN_WORDS: readonly string[] = [
-  'delve', 'delves', 'delving', 'delved',
-  'tapestry', 'testament to', 'realm', 'embark', 'embarks', 'embarking',
-  'beacon', 'multifaceted', 'paradigm', 'paradigm shift', 'synergy', 'synergies',
-  'myriad', 'plethora', 'meticulous', 'meticulously', 'intricate',
-  'utilize', 'utilizes', 'utilizing', 'utilized',
-  'leverage', 'leverages', 'leveraging', 'leveraged',
-  'supercharge', 'supercharges', 'supercharged', 'supercharging',
-  'turbocharge', 'turbocharged', 'game-changer', 'game changer', 'game-changing',
+  'delve', 'tapestry', 'testament to', 'realm', 'embark', 'beacon', 'multifaceted',
+  'paradigm', 'synergy', 'myriad', 'plethora', 'meticulous', 'intricate', 'utilize',
+  'leverage', 'supercharge', 'turbocharge', 'game-changer', 'game-changing',
   'ever-evolving landscape', 'plays a crucial role',
 ]
 
-/** Cap-tier vocabulary: ai-tells.md "Vocabulary → Cap" plus empty intensifiers. */
+/** Cap-tier vocabulary: ai-tells.md "Vocabulary → Cap" plus empty intensifiers. Base forms. */
 export const CAP_WORDS: readonly string[] = [
-  'seamless', 'seamlessly', 'robust', 'streamline', 'streamlines', 'streamlined',
-  'empower', 'empowers', 'elevate', 'elevates', 'unlock', 'unlocks', 'unleash',
-  'harness', 'foster', 'enhance', 'enhances', 'optimize', 'optimizes',
-  'cutting-edge', 'innovative', 'revolutionary', 'transformative', 'holistic',
-  'comprehensive', 'pivotal', 'crucial', 'vital', 'powerful', 'next-level',
-  'world-class', 'best-in-class', 'landscape', 'navigate', 'ecosystem', 'journey',
+  'seamless', 'robust', 'streamline', 'empower', 'elevate', 'unlock', 'unleash',
+  'harness', 'foster', 'enhance', 'optimize', 'cutting-edge', 'innovative',
+  'revolutionary', 'transformative', 'holistic', 'comprehensive', 'pivotal', 'crucial',
+  'vital', 'powerful', 'next-level', 'world-class', 'best-in-class', 'landscape',
+  'navigate', 'ecosystem', 'journey',
   'truly', 'genuinely', 'incredibly', 'deeply', 'fundamentally', 'significantly',
   'simply', 'actually', 'literally', 'quietly',
 ]
@@ -179,12 +177,28 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function wordRegex(word: string): RegExp {
-  return new RegExp(`(?<![\\w-])${escapeRegExp(word).replace(/ /g, '\\s+')}(?![\\w-])`, 'gi')
+/** Inflections of one word: "leverage" → leverages, leveraged, leveraging. */
+function inflected(word: string): string {
+  const stem = escapeRegExp(word)
+  if (/e$/.test(word)) return `${stem.slice(0, -1)}(?:e|es|ed|ing|ely)`
+  if (/[^aeiou]y$/.test(word)) return `${stem.slice(0, -1)}(?:y|ies|ied|ying|ily)`
+  return `${stem}(?:s|es|ed|ing|ly)?`
 }
 
-const BAN_REGEXES = BAN_WORDS.map((word) => ({ word, regex: wordRegex(word) }))
-const CAP_REGEXES = CAP_WORDS.map((word) => ({ word, regex: wordRegex(word) }))
+/**
+ * A whole-word matcher for a term. A single word (hyphenated or not) also
+ * matches its inflections; a phrase matches as written. Hyphens and spaces in
+ * a term match either, and a space matches any run of whitespace.
+ */
+function termRegex(term: string): RegExp {
+  const body = /\s/.test(term.trim())
+    ? escapeRegExp(term.trim())
+    : inflected(term.trim())
+  return new RegExp(`(?<![\\w-])${body.replace(/-|\s+/g, '[-\\s]+')}(?![\\w-])`, 'gi')
+}
+
+const BAN_REGEXES = BAN_WORDS.map((word) => ({ word, regex: termRegex(word) }))
+const CAP_REGEXES = CAP_WORDS.map((word) => ({ word, regex: termRegex(word) }))
 
 /** The prose a reader reads: code, URLs and quote styles normalized away. */
 export function proseOf(text: string): string {
@@ -222,7 +236,10 @@ export function scanCopy(text: string, options: CopyScanOptions = {}): CopyScanR
   const surface = options.surface ?? 'long'
   const prose = proseOf(text)
   const paragraphs = paragraphsOf(prose)
-  const banned = [...BAN_REGEXES, ...(options.extraBanned ?? []).map((word) => ({ word, regex: wordRegex(word) }))]
+  // An extra already in the Ban tier (or listed twice) must not count twice.
+  const extras = [...new Set((options.extraBanned ?? []).map((word) => word.toLowerCase()))]
+    .filter((word) => !BAN_WORDS.includes(word))
+  const banned = [...BAN_REGEXES, ...extras.map((word) => ({ word, regex: termRegex(word) }))]
   const findings: CopyTellFinding[] = []
   let contrastParagraphs = 0
   let tellWords = 0
@@ -298,7 +315,10 @@ export function chatWrapperIn(text: string): string | null {
   return null
 }
 
-/** Banned words and phrases, lowercased and deduplicated, for prompts that list them. */
+/**
+ * Banned words and phrases for prompts that list them: base forms, lowercased,
+ * deduplicated, product extras first. The scanner matches their inflections.
+ */
 export function bannedCopyVocabulary(extra: readonly string[] = []): string[] {
   return [...new Set([...extra, ...BAN_WORDS].map((word) => word.toLowerCase()))]
 }
