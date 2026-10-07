@@ -371,7 +371,7 @@ interface ChatAttachmentPart
 `function`
 
 ```ts
-({ onSend, onSendParts, onSendFailed, sendFailureMessage, onCancel, isStreaming, disabled, placeholder, value, onValueC…
+({ onSend, onSendParts, onSendFailed, sendFailureMessage, onCancel, isStreaming, disabled, sendDisabled, placeholder, v…
 ```
 
 ### `ChatComposerProps`

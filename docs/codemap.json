@@ -19730,7 +19730,7 @@
         {
           "name": "ChatComposer",
           "kind": "function",
-          "signature": "({ onSend, onSendParts, onSendFailed, sendFailureMessage, onCancel, isStreaming, disabled, placeholder, value, onValueC…",
+          "signature": "({ onSend, onSendParts, onSendFailed, sendFailureMessage, onCancel, isStreaming, disabled, sendDisabled, placeholder, v…",
           "doc": null
         },
         {
