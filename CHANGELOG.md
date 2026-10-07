@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.2
+
+- fix(sandbox): route profile files too large for one file-API request through chunked upload (#862)
+
 ## 0.58.1
 
 - feat(profile): vendored humanizer review skill and one em-dash rule (#861)
