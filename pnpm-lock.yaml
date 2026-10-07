@@ -61,8 +61,8 @@ importers:
         specifier: 0.11.4
         version: 0.11.4
       '@tangle-network/agent-integrations':
-        specifier: 0.66.0
-        version: 0.66.0(@opentelemetry/api@1.9.1)(@types/node@24.13.3)
+        specifier: 0.67.0
+        version: 0.67.0(@opentelemetry/api@1.9.1)(@types/node@24.13.3)
       '@tangle-network/agent-interface':
         specifier: 3.1.1
         version: 3.1.1
@@ -70,8 +70,8 @@ importers:
         specifier: 20.0.0
         version: 20.0.0(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)
       '@tangle-network/agent-profile-materialize':
-        specifier: 0.22.0
-        version: 0.22.0(@tangle-network/agent-interface@3.1.1)
+        specifier: 0.21.0
+        version: 0.21.0(@tangle-network/agent-interface@3.1.1)
       '@tangle-network/agent-runtime':
         specifier: 0.308.0
         version: 0.308.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)(@tangle-network/sandbox@0.60.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
@@ -2745,8 +2745,8 @@ packages:
     resolution: {integrity: sha512-ZoOpwcTF7wfvzu7ax1t0jtwY/6zBTwFv+hTn0LJI5sm+K1To1LFwhTdYHkhZMsyP138BAaw6Rvw8u1VTdHbQVw==}
     engines: {node: '>=22.13.0'}
 
-  '@tangle-network/agent-integrations@0.66.0':
-    resolution: {integrity: sha512-+2hTSlzmSFI6L637HFSoNy1VlSLc4K1WD5MYfIZq5UaUu2ofhsCU4NcgD3d4hmklXgjFMOqFkA610JOJimAWzA==}
+  '@tangle-network/agent-integrations@0.67.0':
+    resolution: {integrity: sha512-/2txUokJpW2G0So9yG1OuJT2uWe/9cHhdY042RFYNooqQxR1zk5AkHyj2lKivhpTcylGYa9GPdjHHxnl4dILDQ==}
     engines: {node: '>=20.19.0'}
 
   '@tangle-network/agent-interface@2.17.0':
@@ -2765,11 +2765,6 @@ packages:
 
   '@tangle-network/agent-profile-materialize@0.21.0':
     resolution: {integrity: sha512-jWUWBswQUDZQ+ukiAj1UROvTGvZbXWfpqKSyEiQsaHLhv1+aPzYg9jLLcoynyMm+OkbPm4IoLPkQqpa6KeGC9Q==}
-    peerDependencies:
-      '@tangle-network/agent-interface': ^3.0.0
-
-  '@tangle-network/agent-profile-materialize@0.22.0':
-    resolution: {integrity: sha512-ElR+2NHcqea+iYGmjQ7HNLbIFEJtXv4MNzKabEtWNy9zecNxqalpWNOnVjeyKc4HS6Q+/ngqjhLNuWxcNyUhhg==}
     peerDependencies:
       '@tangle-network/agent-interface': ^3.0.0
 
@@ -8595,7 +8590,7 @@ snapshots:
     dependencies:
       hono: 4.13.5
 
-  '@tangle-network/agent-integrations@0.66.0(@opentelemetry/api@1.9.1)(@types/node@24.13.3)':
+  '@tangle-network/agent-integrations@0.67.0(@opentelemetry/api@1.9.1)(@types/node@24.13.3)':
     dependencies:
       '@duckdb/node-api': 1.5.5-r.5
       '@ph0ny/sdk': 0.1.3
@@ -8648,10 +8643,6 @@ snapshots:
       zod: 4.6.5
 
   '@tangle-network/agent-profile-materialize@0.21.0(@tangle-network/agent-interface@3.1.1)':
-    dependencies:
-      '@tangle-network/agent-interface': 3.1.1
-
-  '@tangle-network/agent-profile-materialize@0.22.0(@tangle-network/agent-interface@3.1.1)':
     dependencies:
       '@tangle-network/agent-interface': 3.1.1
 
