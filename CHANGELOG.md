@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.6
+
+- Require owner role for profile authority promotion
+
 ## 0.57.5
 
 - fix(agent-profiles): guard binding commit with product predicate (#840)
