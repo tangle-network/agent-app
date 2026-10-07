@@ -220,6 +220,15 @@ describe('parseSkillFrontmatter', () => {
     expect(frontmatter).toEqual({ id: 'x' })
   })
 
+  it('reads a block-scalar description and skips an unknown nested map', () => {
+    const raw = '---\nname: humanizer\ndescription: |\n  Rewrite AI text.\n  Keep the meaning.\nlicense: MIT\nmetadata:\n  version: "3.1.0"\n---\n\nbody\n'
+    const { frontmatter, body } = parseSkillFrontmatter(raw)
+    expect(frontmatter).toEqual({ name: 'humanizer', description: 'Rewrite AI text.\nKeep the meaning.' })
+    expect(body).toBe('body\n')
+    const folded = parseSkillFrontmatter('---\ndescription: >\n  One line\n  continued.\n---\n')
+    expect(folded.frontmatter.description).toBe('One line continued.')
+  })
+
   it('throws on an opened block with no closing "---" (truncated frontmatter)', () => {
     const raw = '---\nid: x\n\nno closing delimiter\n'
     expect(() => parseSkillFrontmatter(raw)).toThrow(/closing/)

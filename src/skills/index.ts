@@ -475,11 +475,28 @@ export function parseSkillFrontmatter(raw: string): ParsedSkill {
       continue
     }
 
-    if (scalarKeys.has(key)) {
-      ;(frontmatter as Record<string, string>)[key] = parseFrontmatterScalar(rest)
-    }
-    // Unknown scalar key: ignored, forward-compat.
+    // Indented lines under a key: a block scalar (`description: |`) for a known
+    // key, or a nested map (`metadata:`) under an unknown one.
     i++
+    const children: string[] = []
+    while (i < blockLines.length && /^(?:\s+\S|\s*$)/.test(blockLines[i] ?? '')) {
+      children.push(blockLines[i] ?? '')
+      i++
+    }
+    const indicator = rest.trim()
+    if (scalarKeys.has(key)) {
+      if (/^[|>][-+]?$/.test(indicator)) {
+        const lines = children.map((child) => child.trim())
+        ;(frontmatter as Record<string, string>)[key] = (indicator.startsWith('|')
+          ? lines.join('\n')
+          : lines.filter(Boolean).join(' ')).trim()
+      } else if (children.some((child) => child.trim() !== '')) {
+        throw new Error(`parseSkillFrontmatter: unrecognized frontmatter line: ${JSON.stringify(children.find((child) => child.trim() !== ''))}`)
+      } else {
+        ;(frontmatter as Record<string, string>)[key] = parseFrontmatterScalar(rest)
+      }
+    }
+    // Unknown key and its nested lines: ignored, forward-compat.
   }
 
   return { frontmatter, body, raw }
