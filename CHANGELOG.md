@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.11
+
+- Expose shared active profile catalog and composer authoring
+
 ## 0.57.10
 
 - Prepare every profile switch before binding flip (#845)
