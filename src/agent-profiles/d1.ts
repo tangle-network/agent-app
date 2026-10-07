@@ -237,6 +237,20 @@ function receiptFromRow(row: SwitchRow): ProfileSwitchReceipt {
     conflicts: JSON.parse(row.conflicts_json) as string[] }
 }
 
+/** Product auth and profile visibility stay outside this workspace-scoped catalog read. */
+export async function listD1ActiveProfileRevisions(
+  db: ProfileD1Database,
+  workspaceId: string,
+): Promise<ProfileRevision[]> {
+  const rows = await db.prepare(`SELECT r.* FROM agent_profile_activation_event h
+    JOIN agent_profile_revision r ON r.revision_id = h.revision_id
+    WHERE h.workspace_id = ? AND h.version = (
+      SELECT MAX(latest.version) FROM agent_profile_activation_event latest
+      WHERE latest.workspace_id = h.workspace_id AND latest.profile_id = h.profile_id
+    ) ORDER BY h.profile_id`).bind(workspaceId).all<RevisionRow>()
+  return rows.results.map(revisionFromRow)
+}
+
 /** Product auth stays outside this read. The receipt itself is the durable chat marker. */
 export async function listD1ProfileSwitchReceipts(
   db: ProfileD1Database,
