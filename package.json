@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.57.6",
+  "version": "0.57.8",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -605,8 +605,8 @@
     "@tangle-network/brand": "1.17.0",
     "@tangle-network/hub-sdk": "0.24.0",
     "@tangle-network/sandbox": "0.60.10",
-    "@tangle-network/sandbox-ui": "0.128.1",
-    "@tangle-network/ui": "11.26.0",
+    "@tangle-network/sandbox-ui": "0.127.1",
+    "@tangle-network/ui": "11.25.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.6",
