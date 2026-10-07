@@ -33,6 +33,9 @@ export interface ProfileD1RevisionWriteGuard {
   values: (string | number | null)[]
 }
 
+/** Trusted product predicate evaluated when a binding event commits. */
+export type ProfileD1BindingWriteGuard = (receipt: ProfileSwitchReceipt) => ProfileD1RevisionWriteGuard
+
 export const AGENT_PROFILE_D1_SCHEMA_SQL = `
 CREATE TABLE agent_profile_revision (
   revision_id TEXT PRIMARY KEY,
@@ -253,7 +256,8 @@ function turnFromRow(row: TurnRow): ProfileTurnPin {
 }
 
 export function createD1ProfileRevisionStore(db: ProfileD1Database,
-  options: { revisionWriteGuard?: ProfileD1RevisionWriteGuard } = {}): ProfileRevisionStore {
+  options: { revisionWriteGuard?: ProfileD1RevisionWriteGuard;
+    bindingWriteGuard?: ProfileD1BindingWriteGuard } = {}): ProfileRevisionStore {
   const writeGuard = options.revisionWriteGuard
   if (writeGuard && (!writeGuard.sql.trim() || /;|--|\/\*/.test(writeGuard.sql))) {
     throw new TypeError('Revision write guard must be a single trusted SQL expression')
@@ -369,6 +373,10 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database,
     async recordSwitch(receipt, expectedVersion) {
       const key = receipt.key
       const versionGuard = `${bindingVersion} = ?`
+      const bindingGuard = receipt.outcome === 'switched' ? options.bindingWriteGuard?.(receipt) : undefined
+      if (bindingGuard && (!bindingGuard.sql.trim() || /;|--|\/\*/.test(bindingGuard.sql))) {
+        throw new TypeError('Binding write guard must be a single trusted SQL expression')
+      }
       const insertReceipt = (requireEventId?: string) => db.prepare(`INSERT INTO agent_profile_switch_receipt
         (workspace_id, member_id, channel, message_id, input_hash, conversation_id, created_at, profile_id, revision_id,
          pinned_revision_id, authority_digest, plan_digest, outcome, message, conflicts_json)
@@ -394,12 +402,14 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database,
             AND EXISTS (SELECT 1 FROM agent_profile_revision r WHERE r.workspace_id = ?
               AND r.profile_id = ? AND r.revision_id = ? AND r.authority_digest = ?)
             AND (? IS NOT NULL OR ${currentActivation} = ?)
+            ${bindingGuard ? `AND (${bindingGuard.sql})` : ''}
           ON CONFLICT DO NOTHING`)
           .bind(eventId, ...keyValues(key), receipt.profileId, receipt.pinnedRevisionId,
             receipt.authorityDigest, receipt.planDigest, expectedVersion + 1,
             receipt.messageId, Date.now(), ...keyValues(key), expectedVersion,
             key.workspaceId, receipt.profileId, receipt.revisionId, receipt.authorityDigest,
-            receipt.pinnedRevisionId, key.workspaceId, receipt.profileId, receipt.revisionId)
+            receipt.pinnedRevisionId, key.workspaceId, receipt.profileId, receipt.revisionId,
+            ...(bindingGuard?.values ?? []))
         // A failed event makes the receipt's required message NULL. D1's batch
         // rolls back both writes instead of leaving a success receipt without a binding.
         const [moved, inserted] = await db.batch([move, insertReceipt(eventId)])
