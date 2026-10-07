@@ -34,7 +34,7 @@ jobs:
         github.event_name == 'push' && github.ref == 'refs/heads/main' &&
         !contains(github.event.head_commit.message, '[skip release]')
       )
-    runs-on: [self-hosted, ci-public]
+    runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
@@ -49,8 +49,6 @@ jobs:
       artifact-id: ${{ steps.artifact.outputs.artifact-id }}
       artifact-run-id: ${{ steps.artifact.outputs.artifact-run-id }}
       artifact-digest: ${{ steps.artifact.outputs.artifact-digest }}
-      publish-agent-app: ${{ steps.registry.outputs.agent-app }}
-      publish-create-agent-app: ${{ steps.registry.outputs.create-agent-app }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -320,34 +318,13 @@ jobs:
           cmp "$EXPECTED" RELEASE_PROVENANCE
           bash publish-packages.sh validate agent-app.tgz create-agent-app.tgz
 
-      # npm trusted publishing runs only on GitHub-hosted runners, so each hosted
-      # publish job starts only when npm lacks its package at this version.
-      - name: Decide which packages publish
-        if: steps.release.outputs.mode == 'tag'
-        id: registry
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          set -euo pipefail
-          for package in agent-app create-agent-app; do
-            manifest=package.json
-            [[ "$package" == create-agent-app ]] && manifest=create-agent-app/package.json
-            name=$(node -p "require('./$manifest').name")
-            if npm view "$name@$VERSION" version --registry=https://registry.npmjs.org 2>/dev/null | grep -qx "$VERSION"; then
-              echo "$name@$VERSION is already on npm"
-              echo "$package=false" >> "$GITHUB_OUTPUT"
-            else
-              echo "$package=true" >> "$GITHUB_OUTPUT"
-            fi
-          done
-
   write_release:
     needs: package_release
     if: >-
       always() &&
       needs.package_release.outputs.mode == 'auto' &&
       needs.package_release.result == 'success'
-    runs-on: [self-hosted, ci-public]
+    runs-on: ubuntu-latest
     permissions:
       actions: write
       contents: write
@@ -384,8 +361,7 @@ jobs:
     if: >-
       always() &&
       needs.package_release.result == 'success' &&
-      needs.package_release.outputs.mode == 'tag' &&
-      needs.package_release.outputs.publish-agent-app == 'true'
+      needs.package_release.outputs.mode == 'tag'
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -421,8 +397,7 @@ jobs:
       always() &&
       needs.package_release.result == 'success' &&
       needs.package_release.outputs.mode == 'tag' &&
-      needs.package_release.outputs.publish-create-agent-app == 'true' &&
-      (needs.publish_agent_app.result == 'success' || needs.publish_agent_app.result == 'skipped')
+      needs.publish_agent_app.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -462,7 +437,7 @@ jobs:
         needs.package_release.result == 'failure' ||
         needs.package_release.result == 'cancelled'
       )
-    runs-on: [self-hosted, ci-public]
+    runs-on: ubuntu-latest
     permissions:
       issues: write
     steps:
@@ -497,7 +472,7 @@ jobs:
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.package_release.result == 'success' &&
       needs.package_release.outputs.mode == 'auto'
-    runs-on: [self-hosted, ci-public]
+    runs-on: ubuntu-latest
     permissions:
       issues: write
     steps:
