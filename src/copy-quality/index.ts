@@ -240,6 +240,8 @@ export function scanCopy(text: string, options: CopyScanOptions = {}): CopyScanR
   const extras = [...new Set((options.extraBanned ?? []).map((word) => word.toLowerCase()))]
     .filter((word) => !BAN_WORDS.includes(word))
   const banned = [...BAN_REGEXES, ...extras.map((word) => ({ word, regex: termRegex(word) }))]
+  // A product that bans a cap-tier word outright gets one finding for it, not two.
+  const capped = CAP_REGEXES.filter(({ word }) => !extras.includes(word))
   const findings: CopyTellFinding[] = []
   let contrastParagraphs = 0
   let tellWords = 0
@@ -251,7 +253,7 @@ export function scanCopy(text: string, options: CopyScanOptions = {}): CopyScanR
         findings.push({ tier: 'ban', category: 'banned-word', match: match[0], paragraph: index, fix: `Replace "${word}" with the fact it stands in for.` })
       }
     }
-    const capMatches = CAP_REGEXES.flatMap(({ regex }) => [...paragraph.matchAll(regex)].map((match) => match[0]))
+    const capMatches = capped.flatMap(({ regex }) => [...paragraph.matchAll(regex)].map((match) => match[0]))
     tellWords += capMatches.length
     if (capMatches.length >= 2) {
       findings.push({ tier: 'cap', category: 'cap-words', match: capMatches.join(', '), paragraph: index, fix: 'Two cap-tier words in one paragraph: rewrite it from the facts.' })

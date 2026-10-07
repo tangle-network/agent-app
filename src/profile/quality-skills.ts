@@ -54,7 +54,7 @@ Load before writing anything for an audience: briefs, emails, posts, captions, a
 
 **Filler adverbs.** Delete "really, just, literally, actually, simply, honestly, genuinely, truly, fundamentally, importantly, crucially". The sentence is stronger without them.
 
-**Punctuation.** Prefer commas and periods over em-dashes. Overusing the em-dash is itself a machine tell.
+**Punctuation.** No em dashes in short copy (headlines, ads, subject lines, social posts); at most two per page in long copy. Use a period, comma or colon instead. Overusing the em dash is itself a machine tell.
 
 ## Self-check before sending
 
