@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.57.5
+
+- fix(agent-profiles): guard binding commit with product predicate (#840)
+- feat(web-react): name each person in a ChatMessages thread shared by several people (#839)
+
 ## 0.57.4
 
 - feat(theme): carry GTM's card edge, tertiary tier and prose colors (#838)
