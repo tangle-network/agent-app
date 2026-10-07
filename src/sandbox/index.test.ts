@@ -4273,6 +4273,45 @@ describe('writeProfileFilesToBox — file API transport', () => {
     expect(exec).toHaveBeenCalled() // relative file went via exec because box.fs.writeMany is absent
   })
 
+  it('uploads a file too large for one file-API request through fs.uploadData', async () => {
+    const writeMany = vi.fn().mockResolvedValue(undefined)
+    const uploadData = vi.fn().mockResolvedValue(undefined)
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec, fs: { supportsWriteMode: true, writeMany, uploadData } } as unknown as Partial<SandboxInstance>)
+    const huge = 'x'.repeat(1_500_000)
+    const res = await writeProfileFilesToBox(box, [
+      inlineMount('vault/creative/ad.html', huge),
+      inlineMount('skills/seo.md', '# SEO'),
+    ], { paceMs: 0 })
+    expect(res.succeeded).toBe(true)
+    expect(writeMany).toHaveBeenCalledWith(
+      [{ path: 'skills/seo.md', content: '# SEO' }],
+      expect.objectContaining({ paceMs: 0 }),
+    )
+    expect(uploadData).toHaveBeenCalledTimes(1)
+    expect(uploadData).toHaveBeenCalledWith('vault/creative/ad.html', huge, undefined)
+    expect(exec).not.toHaveBeenCalled()
+  })
+
+  it('fails loud with the cause when a chunked upload rejects', async () => {
+    const tooLarge = Object.assign(new Error('over the upload session cap'), { status: 413, code: 'PAYLOAD_TOO_LARGE' })
+    const uploadData = vi.fn().mockRejectedValue(tooLarge)
+    const box = fakeBox({ fs: { supportsWriteMode: true, writeMany: vi.fn(), uploadData } } as unknown as Partial<SandboxInstance>)
+    const res = await writeProfileFilesToBox(box, [inlineMount('vault/huge.html', 'x'.repeat(1_500_000))], { paceMs: 0 })
+    expect(res.succeeded).toBe(false)
+    if (res.succeeded) return
+    expect(res.error.message).toBe('writeProfileFilesToBox: chunked upload failed for vault/huge.html')
+    expect(res.error.cause).toBe(tooLarge)
+  })
+
+  it('writes a too-large file through exec chunks when the SDK has no fs.uploadData', async () => {
+    const { box, writeMany, exec } = dualBox()
+    const res = await writeProfileFilesToBox(box, [inlineMount('vault/huge.html', 'x'.repeat(1_100_000))], { paceMs: 0 })
+    expect(res.succeeded).toBe(true)
+    expect(writeMany).not.toHaveBeenCalled()
+    expect(exec).toHaveBeenCalled()
+  })
+
   it('writes a large relative file in a single batched request (no chunking)', async () => {
     const { box, writeMany, exec } = dualBox()
     const big = 'x'.repeat(50_000)

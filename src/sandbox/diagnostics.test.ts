@@ -36,6 +36,15 @@ describe('sandbox provisioning error diagnostics', () => {
       .toBe('I couldn\'t finish copying your Vault into the sandbox, so I stopped rather than work from a partial copy. The copy resumes where it left off — try again in a moment.')
   })
 
+  it('names a workspace file, not an attachment, when a profile file write is too large', () => {
+    const diagnostics = serializeSandboxProvisioningError(new Error('writeProfileFilesToBox: file-API batch write failed', {
+      cause: Object.assign(new Error('Request body exceeds the 1048576 byte limit'), { code: 'PAYLOAD_TOO_LARGE', status: 413 }),
+    }))
+
+    expect(formatSandboxProvisioningUserMessage(diagnostics))
+      .toBe('A workspace file is too large to copy into the sandbox. The support details name the file.')
+  })
+
   it('surfaces a bare 413 as an attachment size failure', () => {
     const diagnostics = serializeSandboxProvisioningError(new Error('hydration failed', {
       cause: Object.assign(new Error('upload failed'), { status: 413 }),
