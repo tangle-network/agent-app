@@ -4125,6 +4125,106 @@
       ]
     },
     {
+      "id": "./copy-quality",
+      "source": "src/copy-quality/index.ts",
+      "dependsOn": [
+        "work-product"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "BAN_WORDS",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Ban-tier vocabulary: ai-tells.md \"Vocabulary → Ban\", with inflections."
+        },
+        {
+          "name": "bannedCopyVocabulary",
+          "kind": "function",
+          "signature": "(extra?: readonly string[]) => string[]",
+          "doc": "Banned words and phrases, lowercased and deduplicated, for prompts that list them."
+        },
+        {
+          "name": "CAP_WORDS",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Cap-tier vocabulary: ai-tells.md \"Vocabulary → Cap\" plus empty intensifiers."
+        },
+        {
+          "name": "chatWrapperIn",
+          "kind": "function",
+          "signature": "(text: string) => string | null",
+          "doc": "The chat wrapper around a deliverable (\"Here's a draft…\", \"Hope this helps\"), or null."
+        },
+        {
+          "name": "CopyScanOptions",
+          "kind": "interface",
+          "signature": "interface CopyScanOptions",
+          "doc": null
+        },
+        {
+          "name": "CopyScanResult",
+          "kind": "interface",
+          "signature": "interface CopyScanResult",
+          "doc": null
+        },
+        {
+          "name": "CopySurface",
+          "kind": "type",
+          "signature": "type CopySurface",
+          "doc": null
+        },
+        {
+          "name": "CopyTellCategory",
+          "kind": "type",
+          "signature": "type CopyTellCategory",
+          "doc": null
+        },
+        {
+          "name": "CopyTellFinding",
+          "kind": "interface",
+          "signature": "interface CopyTellFinding",
+          "doc": null
+        },
+        {
+          "name": "CopyTellTier",
+          "kind": "type",
+          "signature": "type CopyTellTier",
+          "doc": null
+        },
+        {
+          "name": "MetricClaim",
+          "kind": "interface",
+          "signature": "interface MetricClaim",
+          "doc": null
+        },
+        {
+          "name": "metricClaims",
+          "kind": "function",
+          "signature": "(text: string) => MetricClaim[]",
+          "doc": "Every figure in `text` a reader would take as a measured fact."
+        },
+        {
+          "name": "proseOf",
+          "kind": "function",
+          "signature": "(text: string) => string",
+          "doc": "The prose a reader reads: code, URLs and quote styles normalized away."
+        },
+        {
+          "name": "scanCopy",
+          "kind": "function",
+          "signature": "(text: string, options?: CopyScanOptions) => CopyScanResult",
+          "doc": "Scan copy for AI tells."
+        },
+        {
+          "name": "unsourcedMetrics",
+          "kind": "function",
+          "signature": "(copy: string, sources: readonly string[]) => MetricClaim[]",
+          "doc": "Metric claims in `copy` whose value appears in none of `sources`: figures the writer cannot point to."
+        }
+      ]
+    },
+    {
       "id": "./crypto",
       "source": "src/crypto/index.ts",
       "dependsOn": [
@@ -22516,7 +22616,7 @@
         {
           "name": "DEFAULT_ASYNC_ERROR_MESSAGE",
           "kind": "const",
-          "signature": "\"Something went wrong. Please try again.\"",
+          "signature": "\"This did not load. Try again.\"",
           "doc": null
         },
         {

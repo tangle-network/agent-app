@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_110 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_111 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -28,6 +28,7 @@ _110 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./chatgpt-react`](api/chatgpt-react.md) | 5 | `agent-enrollment`, `web-react` |
 | [`./chatgpt-react/styles`](api/chatgpt-react-styles.md) | 0 | `agent-enrollment`, `web-react` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
+| [`./copy-quality`](api/copy-quality.md) | 15 | `work-product` |
 | [`./crypto`](api/crypto.md) | 10 | `billing` |
 | [`./design-canvas`](api/design-canvas.md) | 99 | `tools`, `web` |
 | [`./design-canvas-react`](api/design-canvas-react.md) | 130 | `brand`, `design-canvas`, `theme` |
@@ -324,6 +325,16 @@ Depends on: `knowledge`, `runtime`
 `AgentAppConfig`, `agentAppConfigJsonSchema`, `AgentIdentityConfig`, `AgentIntegrationsConfig`, `AgentKnowledgeConfig`, `AgentTaxonomyConfig`, `AgentUiConfig`, `defineAgentApp`, `KnowledgeLoopConfig`, `KnowledgeRequirementSpec`, `KnowledgeSourceSpec`, `SatisfiedByRule`, `TangleModelConfig`
 
 [Full API →](api/config.md)
+
+## `./copy-quality`
+
+Source: `src/copy-quality/index.ts` · 15 exports
+
+Depends on: `work-product`
+
+`BAN_WORDS`, `bannedCopyVocabulary`, `CAP_WORDS`, `chatWrapperIn`, `CopyScanOptions`, `CopyScanResult`, `CopySurface`, `CopyTellCategory`, `CopyTellFinding`, `CopyTellTier`, `MetricClaim`, `metricClaims`, `proseOf`, `scanCopy`, `unsourcedMetrics`
+
+[Full API →](api/copy-quality.md)
 
 ## `./crypto`
 

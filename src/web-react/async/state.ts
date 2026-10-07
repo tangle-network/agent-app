@@ -49,7 +49,7 @@ export type AsyncResolution<T> =
   | { readonly status: 'empty'; readonly value: T }
   | { readonly status: 'ready'; readonly value: T }
 
-export const DEFAULT_ASYNC_ERROR_MESSAGE = 'Something went wrong. Please try again.'
+export const DEFAULT_ASYNC_ERROR_MESSAGE = 'This did not load. Try again.'
 
 /**
  * Default emptiness rule: `null`/`undefined`, an empty array, an empty `Map` or

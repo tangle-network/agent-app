@@ -147,7 +147,7 @@ interface ConfirmedMutation
 `const`
 
 ```ts
-"Something went wrong. Please try again."
+"This did not load. Try again."
 ```
 
 ### `defaultIsEmpty`
