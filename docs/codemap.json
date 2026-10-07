@@ -11951,9 +11951,9 @@
         },
         {
           "name": "RouterProtectedModelSettlement",
-          "kind": "interface",
-          "signature": "interface RouterProtectedModelSettlement",
-          "doc": null
+          "kind": "type",
+          "signature": "type RouterProtectedModelSettlement",
+          "doc": "Router's settle response is Runtime's exact settlement ledger."
         },
         {
           "name": "runAppToolLoop",

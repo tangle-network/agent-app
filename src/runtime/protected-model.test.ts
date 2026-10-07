@@ -30,7 +30,8 @@ async function activeGrant(options = input(), env: Record<string, string> = acti
     if (url.endsWith('/resolve')) return Response.json(resolved)
     if (url.endsWith('/reserve')) return Response.json({ preparationId: body.preparationId, digest: grantDigest, expiresAtMs: body.expiresAtMs, enforcedLimits: body.limits, network: { mode: 'gateway-only', domains: ['candidate-router.tangle.tools'] } })
     if (url.endsWith('/activate')) return Response.json({ env })
-    return Response.json({ preparationId: body.preparationId, grantDigest, closed: true, usageWithinLimits: true, billing: { status: 'settled', authorizationId: 'hold-1', reservedCostUsdNanos: 100_000_000, settledCostUsdNanos: 0 }, calls: [], ...settlement })
+    // Router serves Runtime's exact settlement ledger (tangle-router toCandidateGrantRuntimeSettlement).
+    return Response.json({ preparationId: body.preparationId, grantDigest, closed: true, usageWithinLimits: true, calls: [], ...settlement })
   })
   vi.stubGlobal('fetch', fetchMock)
   const grant = grantOptions(options)
@@ -91,26 +92,26 @@ describe('Router protected model transport', () => {
     await expect(grant.port.resolve(grant.resolve)).rejects.toThrow('candidate_grant_draining')
     await expect(grant.port.resolve(grant.resolve)).rejects.not.toThrow('parent-secret')
   })
-  it('validates paid usage before retaining the complete Router billing receipt', async () => {
+  const paidCall = (costUsdNanos: number) => ({ callId: 'call-1', generationId: 'generation-1', traceSpanId: 'generation-1', status: 'succeeded', model, startedAtMs: Date.now() - 10, endedAtMs: Date.now(), inputTokens: 12, accountedInputTokens: 20, outputTokens: 5, cachedInputTokens: 0, reasoningTokens: 0, costUsdNanos, costProvenance: 'observed' })
+
+  it('accepts and retains the settled ledger Router actually serves', async () => {
     const onSettlement = vi.fn()
-    const call = { callId: 'call-1', generationId: 'generation-1', traceSpanId: 'generation-1', status: 'succeeded', model, startedAtMs: Date.now() - 10, endedAtMs: Date.now(), inputTokens: 12, accountedInputTokens: 20, outputTokens: 5, cachedInputTokens: 0, cacheWriteTokens: 8, cacheWrite5mTokens: 8, cacheWrite1hTokens: 0, reasoningTokens: 0, costUsdNanos: 1000 }
-    const billing = { status: 'settled', authorizationId: 'hold-1', transactionId: 'transaction-1', reservedCostUsdNanos: 100_000_000, settledCostUsdNanos: 1000 }
-    const { activate, grant, identity } = await activeGrant({ onSettlement }, activationEnv, { calls: [call], billing })
+    const call = paidCall(1000)
+    const { activate, grant, identity } = await activeGrant({ onSettlement }, activationEnv, { calls: [call] })
     await activate()
     const result = await grant.port.settleGrant({ ...identity, reason: 'completed' })
-    expect(result.calls[0]).toMatchObject({ accountedInputTokens: 20, costUsdNanos: 1000 })
-    expect(result.calls[0]).not.toHaveProperty('cacheWriteTokens')
-    expect(onSettlement).toHaveBeenCalledWith(expect.objectContaining({ calls: [call], billing }))
+    expect(result.calls[0]).toMatchObject({ accountedInputTokens: 20, costUsdNanos: 1000, costProvenance: 'observed' })
+    expect(onSettlement).toHaveBeenCalledWith(expect.objectContaining({ calls: [call], usageWithinLimits: true }))
   })
 
   it.each([
-    { status: 'settled', authorizationId: 'hold-1', reservedCostUsdNanos: 100_000_000, settledCostUsdNanos: 0, unknown: true },
-    { status: 'settled', authorizationId: 'hold-1', reservedCostUsdNanos: 100_000_000, settledCostUsdNanos: 1 },
-    { status: 'reserved', authorizationId: 'hold-1', reservedCostUsdNanos: 100_000_000, settledCostUsdNanos: 0 },
-    { status: 'settled', authorizationId: 'hold-1', reservedCostUsdNanos: 200_000_000, settledCostUsdNanos: 0 },
-  ])('refuses an unreconciled or incomplete billing receipt', async (billing) => {
+    { calls: [paidCall(100_000_001)] },
+    { calls: [paidCall(60_000_000), { ...paidCall(60_000_000), callId: 'call-2', generationId: 'generation-2', traceSpanId: 'generation-2' }] },
+    { calls: [paidCall(-1)] },
+    { calls: undefined },
+  ])('refuses a ledger above the turn cap or without valid costs', async (settlement) => {
     const onSettlement = vi.fn()
-    const { activate, grant, identity } = await activeGrant({ onSettlement }, activationEnv, { billing })
+    const { activate, grant, identity } = await activeGrant({ onSettlement }, activationEnv, settlement)
     await activate()
     await expect(grant.port.settleGrant({ ...identity, reason: 'completed' })).rejects.toThrow()
     expect(onSettlement).not.toHaveBeenCalled()
