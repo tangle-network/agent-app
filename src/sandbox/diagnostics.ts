@@ -377,6 +377,11 @@ export function formatSandboxProvisioningUserMessage(
     || cause.status === 413
     || cause.status === '413'
   ))) {
+    // Profile and workspace files reach the box through writeProfileFilesToBox;
+    // naming an attachment there sends people looking for one they never sent.
+    if (diagnostics.causes.some((cause) => cause.message?.startsWith('writeProfileFilesToBox'))) {
+      return 'A workspace file is too large to copy into the sandbox. The support details name the file.'
+    }
     return 'An attachment is too large for the sandbox to accept. Use a smaller file and try again.'
   }
 

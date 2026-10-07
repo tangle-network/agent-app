@@ -1294,6 +1294,22 @@ function profileFileMode(mount: AgentProfileFileMount): number | undefined {
   return isExecutableProfileFile(mount) ? 0o755 : undefined
 }
 
+// The sandbox gateway rejects request bodies over 1 MiB, and `writeMany` sends
+// each file as one JSON string, so a file larger than one request can never
+// land through it — the SDK splits batches but not files. Such a file goes
+// through the chunked `fs.uploadData` when the SDK has it and the chunked exec
+// path otherwise: the rule the SDK's `materializeProfileFileMounts` applies.
+const PROFILE_FILE_API_MAX_JSON_BYTES = 1024 * 1024 - 16 * 1024
+
+function fitsProfileFileApi(content: string): boolean {
+  const encoder = new TextEncoder()
+  // JSON escaping grows one byte to at most six (`\u001f`).
+  if (encoder.encode(content).byteLength * 6 <= PROFILE_FILE_API_MAX_JSON_BYTES) return true
+  return encoder.encode(JSON.stringify(content)).byteLength <= PROFILE_FILE_API_MAX_JSON_BYTES
+}
+
+type ProfileFileUpload = (remotePath: string, data: string, options?: { mode?: number }) => Promise<unknown>
+
 function fileApiSupportsMode(box: SandboxInstance): boolean {
   const fs = box.fs as (SandboxInstance['fs'] & { supportsWriteMode?: boolean }) | undefined
   return fs?.supportsWriteMode === true
@@ -1319,7 +1335,9 @@ export async function writeProfileFilesToBox(
   // exec because they do not expose `supportsWriteMode` or forward file modes.
   const fileApiAvailable = typeof box.fs?.writeMany === 'function'
   const modeAwareFileApi = fileApiSupportsMode(box)
+  const uploadData = (box.fs as { uploadData?: ProfileFileUpload } | undefined)?.uploadData
   const viaFileApi: { path: string; content: string; mode?: number }[] = []
+  const viaUpload: { path: string; content: string; mode?: number }[] = []
   const viaExec: AgentProfileFileMount[] = []
   for (const mount of files) {
     if (mount.resource.kind !== 'inline') continue
@@ -1327,11 +1345,11 @@ export async function writeProfileFilesToBox(
     const executable = isExecutableProfileFile(mount)
     if (fileApiPath !== null && (!executable || modeAwareFileApi)) {
       const mode = profileFileMode(mount)
-      viaFileApi.push({
-        path: fileApiPath,
-        content: mount.resource.content ?? '',
-        ...(mode !== undefined ? { mode } : {}),
-      })
+      const content = mount.resource.content ?? ''
+      const write = { path: fileApiPath, content, ...(mode !== undefined ? { mode } : {}) }
+      if (fitsProfileFileApi(content)) viaFileApi.push(write)
+      else if (typeof uploadData === 'function') viaUpload.push(write)
+      else viaExec.push(mount)
     }
     else viaExec.push(mount)
   }
@@ -1343,6 +1361,14 @@ export async function writeProfileFilesToBox(
       await box.fs.writeMany(viaFileApi, { paceMs, maxRetries })
     } catch (err) {
       return fail(new Error('writeProfileFilesToBox: file-API batch write failed', { cause: err }))
+    }
+  }
+  for (const upload of viaUpload) {
+    // The SDK paces, retries, and checksums each chunked upload session.
+    try {
+      await uploadData!.call(box.fs, upload.path, upload.content, upload.mode !== undefined ? { mode: upload.mode } : undefined)
+    } catch (err) {
+      return fail(new Error(`writeProfileFilesToBox: chunked upload failed for ${upload.path}`, { cause: err }))
     }
   }
 
