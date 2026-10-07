@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.57.4
+
+- feat(theme): carry GTM's card edge, tertiary tier and prose colors (#838)
+- fix(release): publish packages on self-hosted runners (#837)
+- fix(agent-profiles): guard self-edit at revision commit [skip release]
+
 ## 0.57.3
 
 - feat(agent-profiles): persist switch markers per conversation

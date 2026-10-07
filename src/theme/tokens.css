@@ -53,7 +53,12 @@
     /* Old app names, canonical role decisions. Keep the MD3 surface ladder
        intact: card/container/high/highest are not interchangeable. */
     --border-soft: var(--border-subtle);
-    --card-edge: var(--border-default);
+    /* GTM's card edge: a softened --border, so cards separate from the canvas
+       without a hard rule. Dark keeps more of it (below). */
+    --card-edge: color-mix(in oklch, hsl(var(--border)) 60%, transparent);
+    /* The tertiary container is a neutral nested tier, as GTM renders it,
+       not Brand's success tint. */
+    --md3-tertiary-container: var(--md3-surface-container-high);
     --shadow-raised: var(--shadow-card);
     --focus-ring-width: 2px;
     --focus-ring-offset: 2px;
@@ -75,7 +80,42 @@
   .dark,
   [data-theme='dark'] {
     --studio-notice-bg: color-mix(in srgb, hsl(var(--primary)) 15%, hsl(var(--card)));
+    --card-edge: color-mix(in oklch, hsl(var(--border)) 80%, transparent);
   }
+}
+
+/* Typography plugin colors on Brand tokens, as GTM sets them, so markdown and
+   editor prose keeps Brand's ink and contrast in both themes. Unlayered at
+   class specificity so it wins over the plugin's own .prose and .prose-invert
+   values; a host can still scope its own. */
+.prose {
+  --tw-prose-body: var(--text-primary);
+  --tw-prose-headings: var(--text-primary);
+  --tw-prose-lead: var(--text-primary);
+  --tw-prose-links: var(--brand-strong);
+  --tw-prose-bold: var(--text-primary);
+  --tw-prose-counters: var(--text-secondary);
+  --tw-prose-bullets: var(--text-secondary);
+  --tw-prose-hr: var(--border-default);
+  --tw-prose-quotes: var(--text-primary);
+  --tw-prose-quote-borders: var(--brand-primary);
+  --tw-prose-captions: var(--text-secondary);
+  --tw-prose-code: var(--md3-on-primary-container);
+  --tw-prose-pre-code: var(--text-primary);
+  --tw-prose-pre-bg: var(--bg-input);
+  --tw-prose-th-borders: var(--border-default);
+  --tw-prose-td-borders: var(--border-subtle);
+  --tw-prose-kbd: var(--text-primary);
+}
+.dark .prose,
+[data-theme='dark'] .prose {
+  --tw-prose-links: var(--brand-glow);
+  --tw-prose-counters: var(--text-muted);
+  --tw-prose-bullets: var(--md3-outline);
+  --tw-prose-quote-borders: var(--brand-cool);
+  --tw-prose-captions: var(--text-muted);
+  --tw-prose-code: var(--text-primary);
+  --tw-prose-pre-bg: var(--md3-surface-container-lowest);
 }
 
 /* Existing focus contract: host utilities can opt out; no unlayered floor. */

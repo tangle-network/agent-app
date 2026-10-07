@@ -63,7 +63,7 @@ NODE
 }
 
 npm_command() {
-  env -u CREATE_AGENT_APP_NPM_TOKEN -u NODE_AUTH_TOKEN npm "$@"
+  env -u CREATE_AGENT_APP_NPM_TOKEN npm "$@"
 }
 
 registry_integrity() {
@@ -100,7 +100,7 @@ wait_for_registry_integrity() {
 publish_one() {
   local tarball=$1 name=$2 version=$3 key=$4
   local local_sri remote_sri status
-  local args=(publish "$tarball" --provenance --access public --ignore-scripts --registry="$REGISTRY")
+  local args=(publish "$tarball" --access public --ignore-scripts --registry="$REGISTRY")
   local_sri=$(integrity "$tarball")
 
   if remote_sri=$(registry_integrity "$name" "$version" "$key"); then
@@ -143,13 +143,14 @@ case "$command" in
     ;;
   publish)
     [[ $# -eq 2 ]] || die "usage: EXPECTED_VERSION=x.y.z $0 publish <agent-app|create-agent-app> <package.tgz>"
+    [[ -n "${NODE_AUTH_TOKEN:-}" ]] || die 'NODE_AUTH_TOKEN is required for self-hosted publication.'
     case "$1" in
       agent-app)
         [[ -z "${CREATE_AGENT_APP_NPM_TOKEN:-}" ]] || die 'CREATE_AGENT_APP_NPM_TOKEN must not be exposed to the agent-app publisher.'
         name=$ROOT_NAME
         ;;
       create-agent-app)
-        [[ -z "${CREATE_AGENT_APP_NPM_TOKEN:-}" ]] || die 'CREATE_AGENT_APP_NPM_TOKEN must not be exposed to the OIDC publisher.'
+        [[ -z "${CREATE_AGENT_APP_NPM_TOKEN:-}" ]] || die 'Use NODE_AUTH_TOKEN for the create-agent-app publisher.'
         name=$CREATE_NAME
         ;;
       *) die "unknown package selector: $1" ;;

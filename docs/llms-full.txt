@@ -367,7 +367,15 @@ interface ProfileToolContext
 `function` — Shared self-edit tools; only the authenticated active turn can name the profile.
 
 ```ts
-(context: ProfileToolContext) => McpToolDefinition<Record<string, never>>[]
+<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => McpToolDefinition<Record<string, never>>[]
+```
+
+### `ProfileToolTurn`
+
+`interface`
+
+```ts
+interface ProfileToolTurn
 ```
 
 ### `ProfileTurnPin`
@@ -476,7 +484,7 @@ Source: `src/agent-profiles/d1.ts` · depends on `tools`
 `function`
 
 ```ts
-(db: ProfileD1Database) => ProfileRevisionStore
+(db: ProfileD1Database, options?: { revisionWriteGuard?: ProfileD1RevisionWriteGuard | undefined; }) => ProfileRevision…
 ```
 
 ### `listD1ProfileSwitchReceipts`
@@ -493,6 +501,14 @@ Source: `src/agent-profiles/d1.ts` · depends on `tools`
 
 ```ts
 interface ProfileD1Database
+```
+
+### `ProfileD1RevisionWriteGuard`
+
+`interface` — Trusted product SQL checked in the same D1 transaction as an agent-authored save.
+
+```ts
+interface ProfileD1RevisionWriteGuard
 ```
 
 ### `ProfileD1Statement`

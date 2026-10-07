@@ -537,17 +537,24 @@ export function profileTextChange(revision: ProfileRevision, changes: z.infer<ty
   return { profile: snapshotAgentProfile(profile), knowledgeText: changes.knowledgeText ?? revision.knowledgeText }
 }
 
-export interface ProfileToolContext {
+export interface ProfileToolTurn {
+  workspaceId: string; profileId: string; revisionId: string
+  memberId: string; role: 'owner' | 'manager' | 'member' | 'viewer'
+}
+
+export interface ProfileToolContext<TTurn extends ProfileToolTurn = ProfileToolTurn> {
   /** Resolve the running turn from the trusted server session; never from tool arguments. */
-  activeTurn(): Promise<{ workspaceId: string; profileId: string; revisionId: string;
-    memberId: string; role: 'owner' | 'manager' | 'member' | 'viewer' }>
+  activeTurn(): Promise<TTurn>
   /** Product computes the plan with ADC, returning `hashWorkspacePlan(plan)`. */
   planDigest(profile: AgentProfile, knowledgeText: string): Promise<string>
   store: ProfileRevisionStore
+  /** Return a store whose revision append atomically rechecks product turn authority. */
+  storeForTurn?(turn: TTurn): ProfileRevisionStore
 }
 
 /** Shared self-edit tools; only the authenticated active turn can name the profile. */
-export function profileTools(context: ProfileToolContext): McpToolDefinition<Record<string, never>>[] {
+export function profileTools<TTurn extends ProfileToolTurn>(
+  context: ProfileToolContext<TTurn>): McpToolDefinition<Record<string, never>>[] {
   return [{
     name: 'profile.read',
     description: 'Read the active agent profile text and revision. Saved text applies on the next message.',
@@ -574,7 +581,8 @@ export function profileTools(context: ProfileToolContext): McpToolDefinition<Rec
       const current = await context.store.getActiveRevision(turn.workspaceId, turn.profileId)
       if (!current || current.id !== expectedRevisionId) throw new ProfileConflictError('The profile changed; read it again')
       const next = profileTextChange(current, changes)
-      const revision = await proposeRevision({ store: context.store, workspaceId: turn.workspaceId,
+      const revision = await proposeRevision({ store: context.storeForTurn?.(turn) ?? context.store,
+        workspaceId: turn.workspaceId,
         profileId: turn.profileId, expectedRevisionId, ...next,
         planDigest: await context.planDigest(next.profile, next.knowledgeText),
         author: { kind: 'agent', id: turn.memberId }, actorRole: turn.role,
