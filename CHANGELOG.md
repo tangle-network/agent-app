@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.7
+
+- feat: inspect complete agent profiles with clear prompt layers (#866)
+
 ## 0.58.6
 
 - Forward per-turn MCP credentials through Sandbox prompt helper
