@@ -307,7 +307,7 @@ describe('AgentSessionControls trigger variant', () => {
       expect(borderClasses(trigger)).toEqual([])
       expect(classesOf(trigger)).not.toContain('rounded-full')
       expect(classesOf(trigger)).not.toContain('bg-card')
-      expect(classesOf(trigger)).toContain('h-7')
+      expect(classesOf(trigger)).toContain('h-[var(--control-height-sm,2rem)]')
       expect(classesOf(trigger)).toContain('font-normal')
     }
   })

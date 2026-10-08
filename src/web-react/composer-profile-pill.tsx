@@ -34,7 +34,7 @@ const TRIGGER: Record<NonNullable<ComposerProfilePillProps['placement']>, string
   // The strip scrolls horizontally and clips an outward ring at its edges, so
   // the ring is drawn inside the trigger's own box.
   'mode-strip':
-    'h-7 gap-1 rounded-full border-border bg-transparent font-normal text-muted-foreground shadow-none ' +
+    'h-[var(--control-height-sm,2rem)] gap-1 rounded-full border-border bg-transparent font-normal text-muted-foreground shadow-none ' +
     'hover:border-border hover:bg-transparent hover:text-foreground ' +
     'data-[state=open]:border-border data-[state=open]:bg-transparent data-[state=open]:text-foreground ' +
     'focus-visible:ring-inset',
