@@ -382,9 +382,8 @@ export function pickerRootClass(fullWidth: boolean): string {
 /**
  * How a picker's TRIGGER is drawn. The menu it opens is the same either way.
  *
- *  - `chip` (default): the 36px bordered pill — `rounded-full border
- *    border-border bg-card font-medium`. A consumer that names no variant
- *    renders exactly what it rendered before this prop existed.
+ *  - `chip` (default): the 32px bordered pill — `rounded-full border
+ *    border-border bg-card font-medium`, on the composer row's height.
  *  - `quiet`: a 32px borderless text button (the control scale's sm, the
  *    composer row's one height) — muted label, small glyph, a
  *    surface fill on hover and while the menu is open, nothing else. For a
@@ -714,7 +713,7 @@ export function ModelPicker({
         className={`${
           variant === 'quiet'
             ? quietPickerTriggerClass({ interactive: !disabled })
-            : `inline-flex min-h-[36px] items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition ${disabled ? '' : 'hover:bg-accent'}`
+            : `inline-flex min-h-[var(--control-height-sm,2rem)] items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition ${disabled ? '' : 'hover:bg-accent'}`
         } max-w-full disabled:cursor-not-allowed disabled:opacity-50`}
       >
         {triggerContent ?? <>
@@ -1032,7 +1031,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         className={`${
           variant === 'quiet'
             ? quietPickerTriggerClass()
-            : 'inline-flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent'
+            : 'inline-flex min-h-[var(--control-height-sm,2rem)] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent'
         } ${fullWidth ? 'w-full' : ''}`}
       >
         <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
