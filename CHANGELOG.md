@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.19
+
+- fix(profile-editor): check MCP servers with manual redirects so the check runs in Workers
+
 ## 0.58.18
 
 - feat(web-react): accept sandbox-ui 0.129 and title pages with PageHeader (#880)
