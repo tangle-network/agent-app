@@ -4,7 +4,7 @@
 
 Source: `src/integrations-react/index.ts`
 
-18 exports.
+20 exports.
 
 ### `createHubIntegrationsClient`
 
@@ -38,6 +38,14 @@ Source: `src/integrations-react/index.ts`
 "tangle:hub-connected"
 ```
 
+### `HubAccountStatus`
+
+`interface` — Host-owned access state for one account, such as whether this agent can use it.
+
+```ts
+interface HubAccountStatus
+```
+
 ### `HubConnectCallbackPage`
 
 `function` — The callback only signals completion; the opener verifies fresh Hub state.
@@ -68,6 +76,14 @@ type HubIntegrationCapabilities
 
 ```ts
 type HubIntegrationCapability
+```
+
+### `HubIntegrationsAccounts`
+
+`interface` — Lists each connected account once, with its host status and one inline host control.
+
+```ts
+interface HubIntegrationsAccounts
 ```
 
 ### `HubIntegrationsClient`

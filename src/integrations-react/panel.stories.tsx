@@ -35,3 +35,6 @@ export default meta
 type Story = StoryObj<typeof HubIntegrationsPanel>
 export const Cards: Story = {}
 export const Tiles: Story = { args: { layout: 'tiles' } }
+export const AgentAccounts: Story = { args: { layout: 'tiles', accounts: {
+  title: 'Connected accounts', getStatus: () => ({ label: 'Enabled for this agent', tone: 'success' }),
+} } }

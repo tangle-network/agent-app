@@ -7,6 +7,8 @@ The Hub SDK remains on the server at runtime and does not enter the browser bund
 The other Agent App subpaths retain their existing Sandbox UI peer window.
 
 Mount `createHubSettingsRoutes` at `/api/hub/settings` on the app server.
+Set `oauthCallbackPath` to the exact path of the page that renders `HubConnectCallbackPage`.
+The routes then accept an OAuth start only when it returns to that path with the `provider`, `nonce`, and `context` parameters the panel adds, and nothing else.
 Its `authorize` callback must check the signed-in caller, CSRF, workspace role, and the exact `HubSettingsOperation` for every read and write.
 Compare the three expected identity headers below with the **server-derived** principal on both authorization calls.
 Treat the headers as stale-session checks, never as authentication or grants.
@@ -52,9 +54,11 @@ function ConnectCallback() {
 The app derives `identity` and `can` from its signed-in state.
 The host may render additional API-key metadata fields through `renderApiKeyMetadata`.
 Custom signup flows use `onUnsupportedConnect`; the panel does not redirect to Platform management.
-Use `getConnectionContext` and `getConnectionActions` for host-owned workspace access on each account's existing card.
-The host authorizes those actions and updates their context only after its server confirms the change.
-Selecting an account stays on its card; Manage opens its connection settings.
+For host-owned access, such as which accounts one agent or workspace may use, pass `accounts`.
+The panel then lists each connected account once, with the host's `getStatus` and one inline `getPrimaryAction` control, followed by a catalog of providers that have no account yet.
+Manage opens the account's permissions, test, Disconnect, and Connect another account, and repeats the host's status and control there.
+The host authorizes the control and supplies the new status only after its server confirms the change.
+Without `accounts`, `getConnectionContext` and `getConnectionActions` decorate each account inside its catalog card.
 
 OAuth opens a popup during the user gesture.
 The callback broadcasts an opaque provider, nonce, and context signal.

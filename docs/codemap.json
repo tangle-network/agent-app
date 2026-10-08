@@ -8073,6 +8073,12 @@
           "doc": null
         },
         {
+          "name": "HubAccountStatus",
+          "kind": "interface",
+          "signature": "interface HubAccountStatus",
+          "doc": "Host-owned access state for one account, such as whether this agent can use it."
+        },
+        {
           "name": "HubConnectCallbackPage",
           "kind": "function",
           "signature": "({ returnHref }: HubConnectCallbackPageProps) => Element",
@@ -8095,6 +8101,12 @@
           "kind": "type",
           "signature": "type HubIntegrationCapability",
           "doc": null
+        },
+        {
+          "name": "HubIntegrationsAccounts",
+          "kind": "interface",
+          "signature": "interface HubIntegrationsAccounts",
+          "doc": "Lists each connected account once, with its host status and one inline host control."
         },
         {
           "name": "HubIntegrationsClient",
