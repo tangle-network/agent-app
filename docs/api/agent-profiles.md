@@ -4,7 +4,7 @@
 
 Source: `src/agent-profiles/index.ts`
 
-40 exports.
+47 exports.
 
 ### `addProfileKnowledgeDocument`
 
@@ -28,6 +28,22 @@ Source: `src/agent-profiles/index.ts`
 
 ```ts
 (consentedBaseline: AgentProfile, selected: AgentProfile) => AgentProfile
+```
+
+### `createInMemorySelfMountStorage`
+
+`function` — Non-durable default for tests and single-instance products.
+
+```ts
+() => SelfMountStorage
+```
+
+### `createMountProfileChangeTool`
+
+`function` — The permitted, idempotent self-mount verb as an app tool.
+
+```ts
+(deps: MountProfileChangeDeps) => AppToolDefinition<Record<string, unknown>>
 ```
 
 ### `createTextProfile`
@@ -54,6 +70,22 @@ interface CreateTextProfileInput
 (input: Omit<SwitchProfileInput, "choice">) => Promise<ProfileSwitchReceipt | null>
 ```
 
+### `MountProfileChangeDeps`
+
+`interface`
+
+```ts
+interface MountProfileChangeDeps
+```
+
+### `MountProfileChangeResult`
+
+`interface`
+
+```ts
+interface MountProfileChangeResult
+```
+
 ### `normalizeProfileName`
 
 `function`
@@ -76,6 +108,14 @@ interface CreateTextProfileInput
 
 ```ts
 (text: string) => { name: string; } | { invalid: true; } | null
+```
+
+### `PERMITTED_SELF_MOUNT_DIMENSIONS`
+
+`const` — The only profile dimensions an agent may change on its own mounted state.
+
+```ts
+readonly ["skills"]
 ```
 
 ### `PROFILE_CHANGE_POLICY`
@@ -292,6 +332,22 @@ interface ProposeRevisionInput
 
 ```ts
 (input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; conversationId?: string | undefined;…
+```
+
+### `SelfMountSkillEntry`
+
+`interface`
+
+```ts
+interface SelfMountSkillEntry
+```
+
+### `SelfMountStorage`
+
+`interface` — Durable mounted-skill state, keyed by the product's scope.
+
+```ts
+interface SelfMountStorage
 ```
 
 ### `serializeProfileRevisionDiff`

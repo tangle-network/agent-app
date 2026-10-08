@@ -696,8 +696,7 @@ describe('ChatComposer seed', () => {
 
     rerender(<ChatComposer onSend={vi.fn()} sendVariant="icon" />)
     const icon = screen.getByRole('button', { name: 'Send' })
-    expect(icon.className).toContain('h-[34px]')
-    expect(icon.className).toContain('w-[34px]')
+    expect(icon.className).toContain('size-[var(--control-height-sm,2rem)]')
     // Inverted fg/bg, not the brand fill — the canon circular grammar.
     expect(icon.className).toContain('bg-foreground')
     expect(icon.className).toContain('text-background')
@@ -738,7 +737,7 @@ describe('ChatComposer seed', () => {
   it('keeps a circular outlined stop while streaming in the icon variant', () => {
     render(<ChatComposer onSend={vi.fn()} onCancel={vi.fn()} isStreaming sendVariant="icon" />)
     const stop = screen.getByRole('button', { name: 'Stop response' })
-    expect(stop.className).toContain('h-[34px]')
+    expect(stop.className).toContain('size-[var(--control-height-sm,2rem)]')
     expect(stop.className).toContain('rounded-full')
     expect(stop.className).toContain('border-border')
     expect(stop.textContent).toBe('')

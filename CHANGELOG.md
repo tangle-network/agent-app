@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.58.15
+
+- fix(web-react): put composer chips and the plan toggle on the 32px step (#876)
+- test(integrations): demonstrate workspace search reset [skip release] (#875)
+- feat(agent-profiles): live self-mounting — the permitted, idempotent self-improve verb
+
+## 0.58.14
+
+- fix(web-react): put the composer row on one 32px control height (#874)
+
+## 0.58.13
+
+- fix(integrations): reset account search when workspace changes (#873)
+
 ## 0.58.12
 
 - fix(integrations): make account cards and catalog directly accessible (#871)
