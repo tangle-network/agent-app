@@ -1,0 +1,90 @@
+[
+  {
+    "label": "desktop",
+    "theme": "light",
+    "layout": "cards",
+    "box": {
+      "x": 436,
+      "y": 116,
+      "width": 408,
+      "height": 226
+    }
+  },
+  {
+    "label": "desktop",
+    "theme": "light",
+    "layout": "tiles",
+    "box": {
+      "x": 226,
+      "y": 116,
+      "width": 198,
+      "height": 198
+    }
+  },
+  {
+    "label": "desktop",
+    "theme": "dark",
+    "layout": "cards",
+    "box": {
+      "x": 436,
+      "y": 116,
+      "width": 408,
+      "height": 226
+    }
+  },
+  {
+    "label": "desktop",
+    "theme": "dark",
+    "layout": "tiles",
+    "box": {
+      "x": 226,
+      "y": 116,
+      "width": 198,
+      "height": 198
+    }
+  },
+  {
+    "label": "phone",
+    "theme": "light",
+    "layout": "cards",
+    "box": {
+      "x": 16,
+      "y": 442,
+      "width": 358,
+      "height": 200
+    }
+  },
+  {
+    "label": "phone",
+    "theme": "light",
+    "layout": "tiles",
+    "box": {
+      "x": 139.328125,
+      "y": 204,
+      "width": 111.328125,
+      "height": 136
+    }
+  },
+  {
+    "label": "phone",
+    "theme": "dark",
+    "layout": "cards",
+    "box": {
+      "x": 16,
+      "y": 442,
+      "width": 358,
+      "height": 200
+    }
+  },
+  {
+    "label": "phone",
+    "theme": "dark",
+    "layout": "tiles",
+    "box": {
+      "x": 139.328125,
+      "y": 204,
+      "width": 111.328125,
+      "height": 136
+    }
+  }
+]

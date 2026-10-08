@@ -72,3 +72,5 @@ The server action endpoint returns at most 200 actions; reaching that limit show
 Each write waits for a server receipt and then rereads authoritative state.
 An accepted write with a failed reread appears as a distinct refresh warning.
 The host must retain `createHubSettingsRoutes`' exact operation allowlist and repeat authorization.
+
+Pass `layout="tiles"` to `HubIntegrationsPanel` for a compact, icon-led catalog. The default `cards` layout retains descriptions. Both layouts use the same connection selection, permissions, and actions.

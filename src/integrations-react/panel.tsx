@@ -6,6 +6,7 @@ import {
   OAuthConnectionParameterDialog,
   ProviderIcon,
   type IntegrationDisplayAction,
+  type IntegrationsCatalogProps,
   type IntegrationSort,
 } from '@tangle-network/sandbox-ui/integrations'
 import { Button, StatusPill, type StatusTone } from '@tangle-network/ui/primitives'
@@ -43,6 +44,8 @@ export interface HubIntegrationsPanelProps {
   can: HubIntegrationCapabilities
   callbackPath: string
   title?: string
+  /** Compact, icon-led tiles or descriptive cards. Defaults to cards. */
+  layout?: IntegrationsCatalogProps['layout']
   className?: string
   onRequestIntegration?: (prefill: string) => void
   onUnsupportedConnect?: (provider: HubProvider) => void
@@ -251,6 +254,7 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
       </> : null}
       {props.accounts && hub.connections.status === 'error' ? null : <IntegrationsCatalog
       title={props.title ?? 'Integrations'}
+      layout={props.layout}
       rows={catalogRows}
       query={query}
       onQueryChange={setQuery}
