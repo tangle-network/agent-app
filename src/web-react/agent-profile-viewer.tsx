@@ -5,15 +5,12 @@ export interface AgentProfileViewerProps {
   profile: AgentProfile
   className?: string
   defaultExpanded?: boolean
+  /** Hide the identity when the surrounding workspace already names the agent. */
+  showIdentity?: boolean
 }
 
 function nonempty(value: string | undefined): value is string {
   return Boolean(value?.trim())
-}
-
-function preview(value: string, limit = 120): string {
-  const flat = value.replace(/\s+/g, ' ').trim()
-  return flat.length > limit ? `${flat.slice(0, limit - 1)}…` : flat
 }
 
 function resourceName(resource: AgentProfileResourceRef): string {
@@ -31,19 +28,19 @@ function ResourceRow({ label, resource, path }: {
   return (
     <li className="min-w-0 py-2 first:pt-0 last:pb-0">
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="shrink-0 text-xs font-medium text-muted-foreground">{label}</span>
-        {path && <code className="break-all font-mono text-xs text-foreground">{path}</code>}
+        <span className="shrink-0 text-sm font-medium text-muted-foreground">{label}</span>
+        {path && <code className="break-all font-mono text-sm text-foreground">{path}</code>}
         <span className="min-w-0 break-all text-sm text-foreground">{name}</span>
         {resource.kind === 'github' && resource.ref && (
-          <span className="shrink-0 text-xs text-muted-foreground">at {resource.ref}</span>
+          <span className="shrink-0 text-sm text-muted-foreground">at {resource.ref}</span>
         )}
       </div>
       {resource.kind === 'inline' && nonempty(resource.content) && (
         <details className="mt-1.5">
-          <summary className="w-fit cursor-pointer select-none text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <summary className="w-fit cursor-pointer select-none text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             View inline content
           </summary>
-          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-3 text-xs leading-relaxed text-foreground">
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-3 text-sm leading-relaxed text-foreground">
             {resource.content}
           </pre>
         </details>
@@ -52,31 +49,31 @@ function ResourceRow({ label, resource, path }: {
   )
 }
 
-function PromptDetail({ label, note, value }: { label: string; note?: string; value: string }) {
-  return (
-    <details className="group/prompt min-w-0">
-      <summary className="flex min-w-0 cursor-pointer list-none items-start gap-2 rounded-md py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-        <span aria-hidden="true" className="mt-1 shrink-0 text-muted-foreground transition-transform group-open/prompt:rotate-90">›</span>
-        <span className="min-w-0 flex-1">
-          <span className="font-medium text-foreground">{label}</span>
-          {note && <span className="ml-2 text-xs text-muted-foreground">{note}</span>}
-          <span className="mt-1 block truncate text-xs text-muted-foreground">{preview(value)}</span>
-        </span>
-      </summary>
-      <pre className="mb-2 ml-4 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-3 text-sm leading-relaxed text-foreground">
-        {value}
-      </pre>
-    </details>
-  )
+function PromptDetail({ label, note, value }: { label?: string; note?: string; value: string }) {
+  return <div className="min-w-0 space-y-2">
+    {label && <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+      <h4 className="font-medium text-foreground">{label}</h4>
+      {note && <span className="text-sm text-muted-foreground">{note}</span>}
+    </div>}
+    <div className="whitespace-pre-wrap break-words text-sm leading-7 text-foreground">{value}</div>
+  </div>
 }
 
 function ProfileSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="min-w-0 py-3 first:pt-0 last:pb-0" aria-label={title}>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
-      {children}
-    </section>
-  )
+  return <section className="grid min-w-0 gap-3 border-t border-border py-6 first:border-t-0 first:pt-0 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-6" aria-label={title}>
+    <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+    <div className="min-w-0">{children}</div>
+  </section>
+}
+
+function ProfileConfiguration({ expanded, children }: { expanded: boolean; children: ReactNode }) {
+  if (expanded) return <div>{children}</div>
+  return <details className="group/config border-t border-border pt-4">
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm py-2 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+      Profile configuration <span aria-hidden="true" className="text-muted-foreground group-open/config:rotate-90">›</span>
+    </summary>
+    <div className="pt-4">{children}</div>
+  </details>
 }
 
 function permissionRows(profile: AgentProfile): Array<[string, string]> {
@@ -110,7 +107,7 @@ function configuredResources(profile: AgentProfile) {
 }
 
 /** Read-only view of configured profile data. It does not imply runtime materialization. */
-export function AgentProfileViewer({ profile, className = '', defaultExpanded = true }: AgentProfileViewerProps) {
+export function AgentProfileViewer({ profile, className = '', defaultExpanded = true, showIdentity = true }: AgentProfileViewerProps) {
   const permissions = permissionRows(profile)
   const resources = configuredResources(profile)
   const prompt = profile.prompt
@@ -126,47 +123,23 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
     profile.subagents && Object.keys(profile.subagents).length ||
     profile.hooks && Object.keys(profile.hooks).length || profile.modes && Object.keys(profile.modes).length)
   const hasProfileDetails = Boolean(profile.model?.default || profile.model?.small || profile.model?.reasoningEffort ||
-    profile.harness || profile.description || profile.version || profile.tags?.length || hasConfiguration)
+    profile.model?.provider || profile.harness || profile.description || profile.version || profile.tags?.length || hasConfiguration)
 
   return (
-    <section className={`min-w-0 text-sm ${className}`.trim()} aria-label="Agent profile">
-      <header className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
-        <h2 className="break-words text-lg font-semibold leading-tight text-foreground">
+    <section className={`min-w-0 text-sm text-foreground ${className}`.trim()} aria-label="Agent profile">
+      {(showIdentity || nonempty(profile.description)) && <header className="mb-6 min-w-0">
+        {showIdentity && <h2 className="break-words text-lg font-semibold leading-tight text-foreground">
           {nonempty(profile.name) ? profile.name : 'Unnamed profile'}
-        </h2>
-        {nonempty(profile.description) && (
-          <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed text-muted-foreground">{profile.description}</p>
-        )}
-        {(profile.model?.default || profile.model?.small || profile.model?.reasoningEffort || profile.harness || profile.version || profile.tags?.length) && (
-          <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-            {profile.model?.default && <div className="flex gap-1"><dt className="text-muted-foreground">Default model</dt><dd className="font-medium text-foreground">{profile.model.default}</dd></div>}
-            {profile.model?.small && <div className="flex gap-1"><dt className="text-muted-foreground">Small model</dt><dd className="font-medium text-foreground">{profile.model.small}</dd></div>}
-            {profile.model?.reasoningEffort && <div className="flex gap-1"><dt className="text-muted-foreground">Reasoning</dt><dd className="font-medium text-foreground">{profile.model.reasoningEffort}</dd></div>}
-            {profile.harness && <div className="flex gap-1"><dt className="text-muted-foreground">Preferred harness</dt><dd className="font-medium text-foreground">{profile.harness}</dd></div>}
-            {profile.version && <div className="flex gap-1"><dt className="text-muted-foreground">Version</dt><dd className="font-medium text-foreground">{profile.version}</dd></div>}
-            {profile.tags?.map(tag => <div key={tag} className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">{tag}</div>)}
-          </dl>
-        )}
-      </header>
-
-      {!hasProfileDetails && (
-        <p className="mt-4 border-t border-border pt-3 text-sm text-muted-foreground">No profile details are configured.</p>
-      )}
-
-      {hasConfiguration && <details open={defaultExpanded} className="group/config mt-4 rounded-xl border border-border bg-card p-4 shadow-sm">
-        <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-          <span aria-hidden="true" className="text-muted-foreground transition-transform group-open/config:rotate-90">›</span>
-          <span className="font-medium text-foreground">Profile configuration</span>
-          <span className="text-xs text-muted-foreground">
-            {[hasBehavior && 'Instructions', (tools.length || permissions.length) > 0 && 'Tools', mcp.length > 0 && 'MCP', (resources.length || profile.resources?.failOnError) && 'Resources', profile.connections?.length && 'Connections', profile.subagents && Object.keys(profile.subagents).length > 0 && 'Subagents', profile.hooks && Object.keys(profile.hooks).length > 0 && 'Hooks', profile.modes && Object.keys(profile.modes).length > 0 && 'Modes'].filter(Boolean).join(' · ')}
-          </span>
-        </summary>
-      <div className="divide-y divide-border border-t border-border">
+        </h2>}
+        {nonempty(profile.description) && <p className="mt-2 whitespace-pre-wrap break-words leading-6 text-muted-foreground">{profile.description}</p>}
+      </header>}
+      {!hasProfileDetails && <p className="text-muted-foreground">No profile details are configured.</p>}
+      {(hasConfiguration || profile.model || profile.harness || profile.version || profile.tags?.length) && <ProfileConfiguration expanded={defaultExpanded}>
         {hasBehavior && (
           <ProfileSection title="Instructions">
-            <div className="space-y-2">
+            <div className="space-y-6">
               {nonempty(prompt?.systemPrompt) && (
-                <PromptDetail label="System prompt" note="Replaces the harness default" value={prompt.systemPrompt} />
+                <PromptDetail label={nonempty(prompt.appendSystemPrompt) || instructions.length ? "System instructions" : undefined} note="Replaces default instructions" value={prompt.systemPrompt} />
               )}
               {nonempty(prompt?.appendSystemPrompt) && (
                 <PromptDetail
@@ -177,7 +150,7 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
               )}
               {instructions.length > 0 && (
                 <div className="space-y-1.5">
-                  <h4 className="font-medium text-foreground">Project instructions <span className="ml-1 font-normal text-xs text-muted-foreground">Lower-privilege workspace guidance</span></h4>
+                  <h4 className="font-medium text-foreground">Project instructions <span className="ml-1 font-normal text-sm text-muted-foreground">Lower-privilege workspace guidance</span></h4>
                   <ul className="space-y-2">
                     {instructions.map((instruction, index) => (
                       <li key={`${index}:${instruction}`}>
@@ -197,8 +170,21 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
           </ProfileSection>
         )}
 
+        {(profile.model?.default || profile.model?.small || profile.model?.provider || profile.model?.reasoningEffort || profile.harness) && <ProfileSection title="Model and runtime">
+          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+            {([
+              ['Default model', profile.model?.default], ['Provider', profile.model?.provider],
+              ['Preferred harness', profile.harness], ['Reasoning', profile.model?.reasoningEffort],
+              ['Small model', profile.model?.small],
+            ] as const).filter(([, value]) => value).map(([label, value]) => <div key={label} className="min-w-0">
+              <dt className="mb-1 text-sm text-muted-foreground">{label}</dt>
+              <dd className="break-words font-medium">{value}</dd>
+            </div>)}
+          </dl>
+        </ProfileSection>}
+
         {(tools.length > 0 || permissions.length > 0) && (
-          <ProfileSection title="Tool policy">
+          <ProfileSection title="Tools and permissions">
             <div>
               <ul className="divide-y divide-border/70">
                 {[...new Set([...tools.map(([name]) => name), ...permissions.map(([name]) => name)])].sort().map(name => {
@@ -206,8 +192,8 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
                   const policy = permissions.find(([permission]) => permission === name)?.[1]
                   return (
                     <li key={name} className="flex min-w-0 items-center justify-between gap-4 py-1.5 first:pt-0 last:pb-0">
-                      <code className="min-w-0 break-all font-mono text-xs text-foreground">{name}</code>
-                      <span className="shrink-0 text-xs text-muted-foreground">
+                      <code className="min-w-0 break-all font-mono text-sm text-foreground">{name}</code>
+                      <span className="shrink-0 text-sm text-muted-foreground">
                         {[enabled === undefined ? undefined : enabled ? 'Enabled' : 'Disabled', policy].filter(Boolean).join(' · ')}
                       </span>
                     </li>
@@ -224,7 +210,7 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
               {mcp.map(([name, server]) => (
                 <li key={name} className="flex min-w-0 items-center justify-between gap-4 py-1.5 first:pt-0 last:pb-0">
                   <span className="min-w-0 break-words font-medium text-foreground">{name}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{server.enabled === false ? 'Disabled in profile' : 'Enabled in profile'}</span>
+                  <span className="shrink-0 text-sm text-muted-foreground">{server.enabled === false ? 'Disabled in profile' : 'Enabled in profile'}</span>
                 </li>
               ))}
             </ul>
@@ -240,7 +226,7 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
                   {connection.capabilities.length > 0 && (
                     <ul className="mt-1 flex flex-wrap gap-1.5">
                       {connection.capabilities.map((capability, capabilityIndex) => (
-                        <li key={`${capability}:${capabilityIndex}`} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{capability}</li>
+                        <li key={`${capability}:${capabilityIndex}`} className="rounded-full bg-muted px-2 py-0.5 text-sm text-muted-foreground">{capability}</li>
                       ))}
                     </ul>
                   )}
@@ -256,7 +242,7 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
               {resources.map(({ key, ...item }) => <ResourceRow key={key} {...item} />)}
             </ul>
             {profile.resources?.failOnError && (
-              <p className="mt-2 text-xs text-muted-foreground">Profile configuration requires declared resources to load successfully.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Profile configuration requires declared resources to load successfully.</p>
             )}
           </ProfileSection>
         )}
@@ -267,7 +253,7 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
               {Object.entries(profile.subagents ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([name, subagent]) => (
                 <li key={name} className="py-1.5 first:pt-0 last:pb-0">
                   <p className="font-medium text-foreground">{name}</p>
-                  {nonempty(subagent.description) && <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground">{subagent.description}</p>}
+                  {nonempty(subagent.description) && <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{subagent.description}</p>}
                 </li>
               ))}
             </ul>
@@ -279,8 +265,8 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
             <ul className="space-y-1">
               {Object.entries(profile.hooks ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([event, commands]) => (
                 <li key={event} className="flex min-w-0 justify-between gap-4">
-                  <code className="font-mono text-xs text-foreground">{event}</code>
-                  <span className="text-xs text-muted-foreground">{commands.length} configured</span>
+                  <code className="font-mono text-sm text-foreground">{event}</code>
+                  <span className="text-sm text-muted-foreground">{commands.length} configured</span>
                 </li>
               ))}
             </ul>
@@ -291,13 +277,18 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
           <ProfileSection title="Modes">
             <ul className="flex flex-wrap gap-1.5">
               {Object.keys(profile.modes ?? {}).sort().map(mode => (
-                <li key={mode} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{mode}</li>
+                <li key={mode} className="rounded-full bg-muted px-2 py-0.5 text-sm text-muted-foreground">{mode}</li>
               ))}
             </ul>
           </ProfileSection>
         )}
-      </div>
-      </details>}
+        {(profile.version || profile.tags?.length) && <ProfileSection title="Metadata">
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-muted-foreground">
+            {profile.version && <span>Version {profile.version}</span>}
+            {profile.tags?.map(tag => <span key={tag}>{tag}</span>)}
+          </div>
+        </ProfileSection>}
+      </ProfileConfiguration>}
     </section>
   )
 }

@@ -57,24 +57,24 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return <section className="space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5">
-    <div><h2 className="text-base font-semibold text-foreground">{title}</h2>
+  return <section className="grid min-w-0 gap-4 border-t border-border py-6 first:border-t-0 first:pt-0 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-6">
+    <div><h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
       {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}</div>
-    {children}
+    <div className="min-w-0 space-y-4">{children}</div>
   </section>
 }
 
 function Disclosure({ title, description, detail, children }: {
   title: string; description?: string; detail?: string; children: ReactNode
 }) {
-  return <details className="group rounded-xl border border-border bg-card">
-    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-xl p-4 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5">
-      <span><span className="block text-base font-semibold text-foreground">{title}</span>
+  return <details className="group min-w-0 border-t border-border">
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-sm py-5 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <span><span className="block text-sm font-medium text-foreground">{title}</span>
         {description && <span className="mt-1 block text-sm text-muted-foreground">{description}</span>}</span>
       <span className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
         {detail}<span aria-hidden="true" className="transition-transform group-open:rotate-180">⌄</span></span>
     </summary>
-    <div className="space-y-4 border-t border-border p-4 sm:p-5">{children}</div>
+    <div className="min-w-0 space-y-4 pb-6">{children}</div>
   </details>
 }
 
@@ -340,7 +340,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
       {refs.length === 0 && <p className="text-sm text-muted-foreground">None configured.</p>}
       <ul className="space-y-2">{refs.map((ref, index) => {
         const issue = resourceIssue(key, resourceDraft(ref), refs, index, true)
-        return <li key={index} className="space-y-3 rounded-lg border border-border p-3 text-sm" aria-label={title + ' ' + (index + 1)}>
+        return <li key={index} className="space-y-3 border-b border-border py-3 text-sm" aria-label={title + ' ' + (index + 1)}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0"><span className="block break-words font-medium text-foreground">{ref.name || (ref.kind === 'github' ? ref.path : 'Inline resource')}</span>
               <span className={'block break-words text-xs ' + (ref.kind === 'github' && !ref.repository ? 'text-destructive' : 'text-muted-foreground')}>{ref.kind === 'github'
@@ -367,7 +367,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
         existing={refs}
         validate={ref => resourceIssue('skills', resourceDraft(ref), refs)}
         onAdd={ref => resources('skills', [...(value.resources?.skills ?? []), ref])} />}
-      <div className="space-y-3 rounded-lg border border-dashed border-border p-3">
+      <div className="space-y-3 border-t border-border pt-4">
         <ResourceFields draft={draft} disabled={editingDisabled} requireGitHubCommitSha={requireGitHubCommitSha}
           requireSkillName={key === 'skills' && requireUniqueSkillNames} pathPlaceholder={key === 'skills' ? 'research/SKILL.md' : 'tools/search.ts'}
           onChange={next => setResourceDrafts(current => ({ ...current, [key]: next }))} />
@@ -398,7 +398,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid JSON') }
   }
 
-  return <div className={'space-y-5 ' + (className ?? '')} aria-label="Agent profile editor">
+  return <div className={'min-w-0 ' + (className ?? '')} aria-label="Agent profile editor">
     {error && <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
     {jsonDirty && <p role="status" className="rounded-lg border border-border bg-muted p-3 text-sm text-foreground">Apply or discard edits in Advanced JSON before using the other fields.</p>}
     {unsupportedResources.length > 0 && <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground">
@@ -413,14 +413,23 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
       {invalidMcpCount} configured MCP {invalidMcpCount === 1 ? 'server needs' : 'servers need'} a public HTTPS endpoint before this product can save the profile.
       Review MCP servers or Advanced JSON. Existing values remain unchanged until you edit them.
     </p>}
-    <Section title="Profile" description="Name the agent and set its instructions.">
+    <Section title="Identity">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Name"><Input disabled={editingDisabled} value={value.name ?? ''} onChange={event => emit({ ...value, name: event.target.value })} /></Field>
         <Field label="Description"><Input disabled={editingDisabled} value={value.description ?? ''} onChange={event => emit({ ...value, description: event.target.value })} /></Field>
       </div>
-      <div role="group" aria-label="Agent instructions" className="space-y-2">
+    </Section>
+    <Section title="Instructions">
+      <Field label="System instructions" hint="Replaces default system instructions.">
+        <Textarea aria-label="System instructions" className="min-h-52 text-base leading-7 sm:text-sm" disabled={editingDisabled} value={value.prompt?.systemPrompt ?? ''}
+          onChange={event => prompt({ ...value.prompt, systemPrompt: event.target.value })} />
+      </Field>
+      <details className="group/instructions" open={Boolean(value.prompt?.appendSystemPrompt || value.prompt?.instructions?.length)}>
+        <summary className="cursor-pointer rounded-sm py-2 text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Additional instructions</summary>
+        <div className="mt-3 space-y-5">
+          <Field label="Append to system prompt" hint="Adds to the system prompt without replacing it."><Textarea className="min-h-24" disabled={editingDisabled} value={value.prompt?.appendSystemPrompt ?? ''} onChange={event => prompt({ ...value.prompt, appendSystemPrompt: event.target.value })} /></Field>
+          <div role="group" aria-label="Agent instructions" className="space-y-2">
         <p className="text-sm font-medium text-foreground">Agent instructions</p>
-        <p className="text-xs text-muted-foreground">Project-level instructions. Each entry remains separate.</p>
         <div className="space-y-2">{(value.prompt?.instructions ?? []).map((instruction, index) =>
           <div key={index} className="flex items-start gap-2">
             <Textarea aria-label={'Instruction ' + (index + 1)} className="min-h-20" disabled={editingDisabled} value={instruction}
@@ -431,18 +440,14 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
           <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => prompt({ ...value.prompt, instructions: [...(value.prompt?.instructions ?? []), ''] })}>Add instruction</Button>
         </div>
       </div>
-      <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer font-medium text-foreground">System prompt overrides</summary>
-        <div className="mt-4 space-y-4">
-          <Field label="Append to system prompt" hint="Keeps the harness system prompt and adds this text."><Textarea className="min-h-24" disabled={editingDisabled} value={value.prompt?.appendSystemPrompt ?? ''} onChange={event => prompt({ ...value.prompt, appendSystemPrompt: event.target.value })} /></Field>
-          <Field label="Replace system prompt" hint="Only use when the harness supports full replacement."><Textarea className="min-h-24" disabled={editingDisabled} value={value.prompt?.systemPrompt ?? ''} onChange={event => prompt({ ...value.prompt, systemPrompt: event.target.value })} /></Field>
         </div>
       </details>
     </Section>
-    <Section title="Model" description="Set model preferences. The host decides which models can run.">
+    <Section title="Model">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Default model"><Input disabled={editingDisabled} value={value.model?.default ?? ''} onChange={event => model({ ...value.model, default: event.target.value })} placeholder="provider/model" /></Field>
       </div>
-      <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer font-medium text-foreground">More model settings</summary>
+      <details><summary className="cursor-pointer rounded-sm py-2 text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">More model settings</summary>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <Field label="Small model"><Input disabled={editingDisabled} value={value.model?.small ?? ''} onChange={event => model({ ...value.model, small: event.target.value })} placeholder="provider/model" /></Field>
         <Field label="Provider hint"><Input disabled={editingDisabled} value={value.model?.provider ?? ''} onChange={event => model({ ...value.model, provider: event.target.value })} /></Field>
@@ -458,7 +463,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     {showToolsAndPermissions && <Disclosure title="Tools and permissions" description="Choose which tools are available and when each needs approval." detail={Object.keys(value.tools ?? {}).length + ' configured'}>
       {Object.keys(value.tools ?? {}).length === 0 && <p className="text-sm text-muted-foreground">No tool rules added.</p>}
       <div className="space-y-2">{Object.entries(value.tools ?? {}).slice(0, showAllTools ? undefined : 4).map(([name, enabled]) =>
-        <div key={name} className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3 text-sm">
+        <div key={name} className="flex flex-wrap items-center gap-3 border-b border-border py-3 text-sm">
           <label className="flex min-w-32 flex-1 items-center gap-2"><Switch disabled={editingDisabled} checked={enabled}
             onCheckedChange={checked => emit({ ...value, tools: { ...value.tools, [name]: checked } })} />{name}</label>
           <div className="flex min-w-36 items-center gap-2 text-muted-foreground"><span>Permission</span>
@@ -479,13 +484,13 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
       <p className="text-xs text-muted-foreground">Nested permission rules remain in Advanced JSON.</p>
     </Disclosure>}
     {allowsResource('skills') && resourceSection('skills', 'Skills', 'Add skill packages from a repository or inline content.')}
-    {allowsResource('tools') && resourceSection('tools', 'Tool files', 'Provide files that a supported harness can discover as tools.')}
+    {allowsResource('tools') && resourceSection('tools', 'Tool files', 'Files that define custom tools.')}
     <Disclosure title="MCP servers" description={publicHttpsMcpOnly
       ? 'Configure public HTTPS servers. Use secret references for credentials.'
       : 'Configure remote or local servers. Use secret references for credentials.'} detail={Object.keys(value.mcp ?? {}).length + ' configured'}>
       {Object.keys(value.mcp ?? {}).length === 0 && <p className="text-sm text-muted-foreground">No servers configured.</p>}
       <ul className="space-y-2">{Object.entries(value.mcp ?? {}).map(([name, server]) =>
-        <li key={name} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+        <li key={name} className="flex items-center justify-between gap-3 border-b border-border py-3 text-sm">
           <div className="min-w-0"><span className="font-medium">{name}</span>
             <span className="ml-2 text-xs text-muted-foreground">{server.enabled === false ? 'Disabled' : 'command' in server ? 'Local' : 'Remote'}</span>
             {server.enabled !== false && <p className="truncate text-xs text-muted-foreground">{'command' in server ? server.command : server.url}</p>}
@@ -494,7 +499,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
           </div>
           <Button type="button" variant="ghost" className="text-destructive" disabled={editingDisabled} onClick={() => { const mcp = { ...value.mcp }; delete mcp[name]; emit({ ...value, mcp }) }}>Remove</Button>
         </li>)}</ul>
-      <div className="grid gap-3 rounded-lg border border-dashed border-border p-3 sm:grid-cols-[1fr_10rem]">
+      <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-[1fr_10rem]">
         <Field label="Server name"><Input disabled={editingDisabled} value={mcpName} onChange={event => setMcpName(event.target.value)} placeholder="search" /></Field>
         <Field label="Transport"><Select disabled={editingDisabled} value={selectedMcpKind} onValueChange={kind => setMcpKind(kind as typeof mcpKind)}>
           <SelectTrigger aria-label="Transport"><SelectValue /></SelectTrigger><SelectContent>
@@ -514,11 +519,11 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
         onAdd={(name, server) => emit({ ...value, mcp: { ...value.mcp, [name]: server } })} />}
       <p className="text-xs text-muted-foreground">Arguments, headers, environment, and secret references remain in Advanced JSON.</p>
     </Disclosure>
-    {allowsResource('files') && <Disclosure title="Resource files" description="Configure files for the agent workspace. The runtime determines whether it can place them." detail={(value.resources?.files ?? []).length + ' configured'}>
+    {allowsResource('files') && <Disclosure title="Resource files" description="Files to add to the agent workspace." detail={(value.resources?.files ?? []).length + ' configured'}>
       {(value.resources?.files ?? []).length === 0 && <p className="text-sm text-muted-foreground">No resource files configured.</p>}
       <ul className="space-y-2">{(value.resources?.files ?? []).map((mount, index) => {
         const issues = fileIssues(fileDraft(mount), workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha, true)
-        return <li key={index} className="space-y-3 rounded-lg border border-border p-3 text-sm" aria-label={'Resource file ' + (index + 1)}>
+        return <li key={index} className="space-y-3 border-b border-border py-3 text-sm" aria-label={'Resource file ' + (index + 1)}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0"><span className="block break-words font-medium text-foreground">{mount.path}</span>
               <span className={'block break-words text-xs ' + (mount.resource.kind === 'github' && !mount.resource.repository ? 'text-destructive' : 'text-muted-foreground')}>{mount.resource.kind === 'github'
@@ -542,7 +547,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
               <Button type="button" variant="ghost" onClick={() => setFileEdit(null)}>Cancel</Button></div>
           </div>}
         </li>})}</ul>
-      {addingFile ? <div className="space-y-3 rounded-lg border border-dashed border-border p-3">
+      {addingFile ? <div className="space-y-3 border-t border-border pt-4">
         {fileFields(newFile, setNewFile)}
         <div className="flex gap-2"><Button type="button" variant="outline" disabled={editingDisabled}
           onClick={() => { if (saveFile(newFile)) { setNewFile({ path: workspaceFilePrefix ?? '', resource: { ...emptyResourceDraft(), kind: 'inline' }, executable: false }); setAddingFile(false) } }}>Add file</Button>

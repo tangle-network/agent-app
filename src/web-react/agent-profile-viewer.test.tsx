@@ -38,7 +38,7 @@ describe('AgentProfileViewer', () => {
 
     expect(html).toContain('Front desk')
     expect(html).toContain('You are the front desk agent.')
-    expect(html).toContain('Replaces the harness default')
+    expect(html).toContain('Replaces default instructions')
     expect(html).toContain('Use the guest ledger when relevant.')
     expect(html).toContain('Lower-privilege workspace guidance')
     expect(html).toContain('ledger.search')
@@ -97,7 +97,6 @@ describe('AgentProfileViewer configuration visibility', () => {
     expect(html).not.toContain('private command')
     expect(html).toContain('Modes')
     expect(html).toContain('careful')
-    expect(html).toContain('<details open=""')
   })
 
   it('starts compact when embedded in a narrow copilot', () => {
