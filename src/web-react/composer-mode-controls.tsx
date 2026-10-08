@@ -50,7 +50,7 @@ export function ComposerModeControls({ planMode }: ComposerModeControlsProps) {
         // Inset ring: this chip sits in a composer row that clips its overflow,
         // so an outward ring loses three of its four sides. Only the offset is
         // overridden — width and colour stay with the tokens.
-        'inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs transition-colors focus-visible:[outline-offset:-2px]',
+        'inline-flex h-[var(--control-height-sm,2rem)] items-center gap-1 rounded-full border px-2.5 text-sm transition-colors focus-visible:[outline-offset:-2px]',
         planMode.enabled
           ? 'border-primary/50 bg-primary/10 text-primary'
           : 'border-border bg-transparent text-muted-foreground hover:text-foreground',
