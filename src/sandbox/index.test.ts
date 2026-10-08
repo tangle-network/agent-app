@@ -1485,6 +1485,36 @@ describe('streamSandboxPrompt seam', () => {
     })
   })
 
+  it.each([false, true])('forwards an isolated secret profile receipt to the %s prompt admission', async (detach) => {
+    async function* events() { yield { type: 'done', data: { status: 'completed' } } }
+    const dispatchPrompt = vi.fn().mockResolvedValue({
+      sessionId: 'profile-thread-1', executionId: 'exec-1', status: 'running',
+      alreadyExisted: false, dispatched: true,
+    })
+    const streamPrompt = vi.fn((_prompt: string, _options: unknown) => events())
+    const box = fakeBox({ dispatchPrompt, streamPrompt })
+    const receipt = {
+      expectedPublicProfileRequestDigest: `sha256:${'a'.repeat(64)}` as const,
+      expectedSecretProfileReceipt: `hmac-sha256:${'b'.repeat(64)}` as const,
+    }
+
+    for await (const _ of streamSandboxPrompt(shell(), box, 'hello', {
+      sessionId: 'profile-thread-1', executionId: 'exec-1', detach,
+      secretProfileIsolation: true,
+      runtimeSecrets: { PROFILE_TURN_TOKEN: 'turn-only-secret' },
+      ...receipt,
+    })) void _
+
+    const admission = detach ? dispatchPrompt.mock.calls[0] : streamPrompt.mock.calls[0]
+    expect(admission?.[1]).toMatchObject({
+      ...receipt,
+      backend: {
+        metadata: { profileSecretIsolation: true },
+        runtimeSecrets: { PROFILE_TURN_TOKEN: 'turn-only-secret' },
+      },
+    })
+  })
+
   it('detached replay uses the supplied cursor without re-dispatching', async () => {
     async function* events() {
       yield { type: 'done', data: { status: 'completed' } }

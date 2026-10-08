@@ -2835,6 +2835,13 @@ export interface StreamSandboxPromptOptions {
   runtimeAttachments?: { mcp: Record<string, AgentProfileMcpServer> }
   /** Per-turn secret values used by runtime attachments; never stored in the profile or sandbox environment. */
   runtimeSecrets?: Record<string, string>
+  /** Mark a backend prepared for a secret-isolated native session. The caller creates
+   * that session and prepares its exact backend before dispatch. */
+  secretProfileIsolation?: true
+  /** SDK-issued digest of the prepared public backend request. */
+  expectedPublicProfileRequestDigest?: `sha256:${string}`
+  /** SDK-issued receipt for the prepared secret native profile revision. */
+  expectedSecretProfileReceipt?: `hmac-sha256:${string}`
   signal?: AbortSignal
   timeoutMs?: number
   requireVisibleAssistantOutput?: boolean
@@ -2940,6 +2947,12 @@ async function* detachedSandboxPromptEvents(
         executionId,
         turnId,
         backend,
+        ...(options.expectedPublicProfileRequestDigest
+          ? { expectedPublicProfileRequestDigest: options.expectedPublicProfileRequestDigest }
+          : {}),
+        ...(options.expectedSecretProfileReceipt
+          ? { expectedSecretProfileReceipt: options.expectedSecretProfileReceipt }
+          : {}),
         ...(options.requireVisibleAssistantOutput !== undefined
           ? { requireVisibleAssistantOutput: options.requireVisibleAssistantOutput }
           : {}),
@@ -3228,6 +3241,7 @@ export async function resolveSandboxPromptBackend(
     ...(model ? backendModelFields(model) : {}),
     ...(options.runtimeAttachments ? { runtimeAttachments: options.runtimeAttachments } : {}),
     ...(options.runtimeSecrets ? { runtimeSecrets: options.runtimeSecrets } : {}),
+    ...(options.secretProfileIsolation ? { metadata: { profileSecretIsolation: true as const } } : {}),
     ...(options.interactions ? { interactions: options.interactions } : {}),
   }
 }
@@ -3256,6 +3270,12 @@ export async function* streamSandboxPrompt(
         ...(options?.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
         ...(options?.requireVisibleAssistantOutput !== undefined
           ? { requireVisibleAssistantOutput: options.requireVisibleAssistantOutput }
+          : {}),
+        ...(options?.expectedPublicProfileRequestDigest
+          ? { expectedPublicProfileRequestDigest: options.expectedPublicProfileRequestDigest }
+          : {}),
+        ...(options?.expectedSecretProfileReceipt
+          ? { expectedSecretProfileReceipt: options.expectedSecretProfileReceipt }
           : {}),
         backend,
       } as StreamPromptOptions)
@@ -3630,6 +3650,12 @@ export async function driveSandboxTurn(
       ...(options.wallCapMs !== undefined ? { wallCapMs: options.wallCapMs } : {}),
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
+      ...(options.expectedPublicProfileRequestDigest
+        ? { expectedPublicProfileRequestDigest: options.expectedPublicProfileRequestDigest }
+        : {}),
+      ...(options.expectedSecretProfileReceipt
+        ? { expectedSecretProfileReceipt: options.expectedSecretProfileReceipt }
+        : {}),
       // Sandbox 0.37 drives through the session message lane, so a gateway
       // consumer can handle these events. Callers without one should omit
       // interactions so the run stays unattended.
