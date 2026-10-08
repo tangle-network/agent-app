@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.5
+
+- fix(web-react): make profile review and editing visually coherent (#864)
+
 ## 0.58.4
 
 - fix(chat): run protected chat on OpenAI grants without reasoning (#863)
