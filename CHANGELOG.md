@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.9
+
+- fix(integrations): accept the panel's OAuth return and list each account once
+
 ## 0.58.8
 
 - fix(sandbox): treat a 401 from any Sandbox API route as a bearer rejection
