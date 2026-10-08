@@ -19903,7 +19903,7 @@
         {
           "name": "AgentProfileViewer",
           "kind": "function",
-          "signature": "({ profile, className, defaultExpanded }: AgentProfileViewerProps) => Element",
+          "signature": "({ profile, className, defaultExpanded, showIdentity }: AgentProfileViewerProps) => Element",
           "doc": "Read-only view of configured profile data."
         },
         {

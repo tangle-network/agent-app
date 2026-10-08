@@ -2831,6 +2831,10 @@ export interface StreamSandboxPromptOptions {
   appToolMcp?: Record<string, AgentProfileMcpServer>
   baseProfileMcp?: Record<string, AgentProfileMcpServer>
   extraMcp?: Record<string, AgentProfileMcpServer>
+  /** Runtime-owned MCP tools for this turn, outside the authored profile. */
+  runtimeAttachments?: { mcp: Record<string, AgentProfileMcpServer> }
+  /** Per-turn secret values used by runtime attachments; never stored in the profile or sandbox environment. */
+  runtimeSecrets?: Record<string, string>
   signal?: AbortSignal
   timeoutMs?: number
   requireVisibleAssistantOutput?: boolean
@@ -3222,6 +3226,8 @@ export async function resolveSandboxPromptBackend(
     type: harness,
     profile,
     ...(model ? backendModelFields(model) : {}),
+    ...(options.runtimeAttachments ? { runtimeAttachments: options.runtimeAttachments } : {}),
+    ...(options.runtimeSecrets ? { runtimeSecrets: options.runtimeSecrets } : {}),
     ...(options.interactions ? { interactions: options.interactions } : {}),
   }
 }

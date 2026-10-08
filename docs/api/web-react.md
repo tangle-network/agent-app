@@ -171,7 +171,7 @@ type AgentProfileResourceKind
 `function` — Read-only view of configured profile data.
 
 ```ts
-({ profile, className, defaultExpanded }: AgentProfileViewerProps) => Element
+({ profile, className, defaultExpanded, showIdentity }: AgentProfileViewerProps) => Element
 ```
 
 ### `AgentProfileViewerProps`
