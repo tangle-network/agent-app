@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.3
+
+- fix(profile): guard unapplied editor drafts and qualify the SDK cohort
+
 ## 0.58.2
 
 - fix(sandbox): route profile files too large for one file-API request through chunked upload (#862)
