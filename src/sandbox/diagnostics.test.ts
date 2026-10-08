@@ -218,6 +218,46 @@ describe('sandbox provisioning error diagnostics', () => {
     expect(isSandboxApiBearerAuthFailure(diagnostics)).toBe(true)
   })
 
+  it.each([
+    '/v1/sandboxes?status=stopped',
+    '/v1/sandboxes?status=running',
+    '/v1/sandboxes',
+    '/v1/me',
+    'https://sandbox.tangle.tools/v1/sandboxes?status=stopped',
+  ])('classifies a sandbox API 401 on the list or account route %s as a bearer failure', (endpoint) => {
+    const diagnostics = serializeSandboxProvisioningError(new Error('Sandbox provisioning failed', {
+      cause: Object.assign(new Error('The parent key this credential was issued from has expired'), {
+        name: 'AuthError',
+        code: 'AUTH_ERROR',
+        status: 401,
+        endpoint,
+        origin: 'sandbox-api',
+      }),
+    }))
+
+    expect(isSandboxApiBearerAuthFailure(diagnostics)).toBe(true)
+    expect(formatSandboxProvisioningUserMessage(diagnostics))
+      .toContain('sandbox API credential was rejected')
+  })
+
+  it.each([
+    '/v1/sandboxes/sandbox-7d846d0cd24e/runtime',
+    '/v1/sandboxes/sandbox-7d846d0cd24e/runtime?token=secret',
+    '/health',
+  ])('does not classify %s as a sandbox API bearer failure', (endpoint) => {
+    const diagnostics = serializeSandboxProvisioningError(new Error('Sandbox provisioning failed', {
+      cause: Object.assign(new Error('Missing or invalid authentication'), {
+        name: 'AuthError',
+        code: 'AUTH_ERROR',
+        status: 401,
+        endpoint,
+        origin: 'sandbox-api',
+      }),
+    }))
+
+    expect(isSandboxApiBearerAuthFailure(diagnostics)).toBe(false)
+  })
+
   it('classifies absolute sandbox API URLs as bearer failures', () => {
     const diagnostics = serializeSandboxProvisioningError(new Error('Sandbox provisioning failed', {
       cause: Object.assign(new Error('Missing or invalid authentication'), {
