@@ -34,6 +34,8 @@ import {
   sessionLabel,
   UNTITLED_SESSION_LABEL,
 } from '../session-shell/index'
+import { Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@tangle-network/ui/primitives'
+
 import { ActionDialog, ActionDialogButton } from './action-dialog'
 import { OVERLAY_SHADOW, PopoverSurface, usePopover } from './controls'
 
@@ -449,7 +451,7 @@ export function useSessionActions({
           <label htmlFor="agent-app-rename-session" className="text-xs text-muted-foreground">
             {text.renameField}
           </label>
-          <input
+          <Input
             id="agent-app-rename-session"
             value={renameValue}
             autoFocus
@@ -460,7 +462,7 @@ export function useSessionActions({
                 void submitRename()
               }
             }}
-            className="mt-1.5 h-9 w-full rounded-md border border-strong bg-background px-3 text-sm text-foreground"
+            className="mt-1.5"
           />
         </ActionDialog>
       )}
@@ -737,58 +739,61 @@ export function SessionHistoryPanel({
         {hasAnySessions && (
           <div className="sticky top-0 z-10 bg-background px-4 sm:px-6">
             <div className={`flex flex-col gap-2 px-3 pb-3 pt-4 sm:flex-row sm:items-center sm:gap-3 ${column}`}>
-              <input
+              <Input
                 type="search"
                 value={query}
                 onChange={(e) => onQueryChange(e.target.value)}
                 placeholder="Search your sessions…"
                 aria-label="Search sessions"
-                className="h-9 min-w-0 appearance-none rounded-md border border-strong bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground sm:flex-1 [&::-webkit-search-cancel-button]:appearance-none"
+                className="sm:flex-1 [&::-webkit-search-cancel-button]:appearance-none"
               />
-              <select
-                value={sort}
-                onChange={(e) => onSortChange(e.target.value as SessionSort)}
-                aria-label="Sort sessions"
-                className="h-9 shrink-0 appearance-none rounded-md border border-strong bg-card px-2 text-sm text-foreground sm:w-[132px]"
-              >
-                <option value="newest">Newest</option>
-                <option value="oldest">Oldest</option>
-              </select>
+              <Select value={sort} onValueChange={(value) => onSortChange(value as SessionSort)}>
+                <SelectTrigger aria-label="Sort sessions" className="shrink-0 sm:w-[132px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest</SelectItem>
+                  <SelectItem value="oldest">Oldest</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {onBulkAction && (
               <div className={`flex flex-col gap-2 border-t border-border px-3 py-3 ${column}`}>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setSelectedIds(new Set(history.items.map((item) => item.id)))}
                     disabled={allVisibleSelected || history.items.length === 0}
-                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent disabled:opacity-50"
                   >
                     Select all
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setSelectedIds(new Set())}
                     disabled={selectedCount === 0}
-                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent disabled:opacity-50"
                   >
                     Deselect all
-                  </button>
+                  </Button>
                   {selectedCount > 0 && (
-                    <button
+                    <Button
                       type="button"
+                      variant="destructive"
+                      size="sm"
                       onClick={() => openBulkAction({ kind: 'selected', ids: [...selectedIds] })}
-                      className="h-8 rounded-md bg-destructive px-2.5 text-xs font-medium text-destructive-foreground transition hover:opacity-90"
                     >
                       {deleteLabel} selected
-                    </button>
+                    </Button>
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <label htmlFor="agent-app-session-age" className="text-xs text-muted-foreground">
                     Session age
                   </label>
-                  <input
+                  <Input
                     id="agent-app-session-age"
                     type="number"
                     min={1}
@@ -796,25 +801,28 @@ export function SessionHistoryPanel({
                     value={ageDays}
                     onChange={(event) => setAgeDays(event.target.value)}
                     aria-invalid={ageDays.length > 0 && !validAgeDays}
-                    className="h-8 w-20 rounded-md border border-strong bg-card px-2 text-xs tabular-nums text-foreground"
+                    size="sm"
+                    className="w-20 tabular-nums"
                   />
                   <span className="text-xs text-muted-foreground">days</span>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => openBulkAction({ kind: 'older-than', days: parsedAgeDays })}
                     disabled={!validAgeDays}
-                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent disabled:opacity-50"
                   >
                     {deleteLabel} older
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => openBulkAction({ kind: 'newer-than', days: parsedAgeDays })}
                     disabled={!validAgeDays}
-                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent disabled:opacity-50"
                   >
                     {deleteLabel} recent
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -929,13 +937,9 @@ function ErrorBlock({ message, onRetry, inline }: { message: string; onRetry: ()
       }
     >
       <span className="text-sm text-muted-foreground">{message}</span>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="h-8 rounded-md border border-border px-3 text-xs font-medium text-foreground transition hover:bg-accent"
-      >
+      <Button type="button" variant="outline" size="sm" onClick={onRetry}>
         Retry
-      </button>
+      </Button>
     </div>
   )
 }
@@ -983,12 +987,10 @@ function SessionRow({
   return (
     <div className={`group relative flex items-center gap-2 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent ${selected ? 'bg-primary/10' : ''}`}>
       {selectable && (
-        <input
-          type="checkbox"
+        <Checkbox
           checked={selected}
-          onChange={(event) => onSelectedChange(event.target.checked)}
+          onCheckedChange={(checked) => onSelectedChange(checked === true)}
           aria-label={`Select ${sessionLabel(session, untitledLabel)}`}
-          className="h-4 w-4 shrink-0 rounded border-border accent-primary"
         />
       )}
       <Link to={href} className="flex min-w-0 flex-1 items-center gap-3">
@@ -1004,8 +1006,10 @@ function SessionRow({
       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{timestamp}</span>
       {hasMenu && (
         <div ref={containerRef} className="relative shrink-0">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             {...triggerProps}
             aria-label="Session actions"
             aria-controls={menuOpen ? panelId : undefined}
@@ -1013,10 +1017,10 @@ function SessionRow({
             // Visible by default and hover-revealed only from `sm:` up: a
             // touch device has no hover, so an opacity-0 kebab is an action
             // the user can never reach.
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 aria-expanded:opacity-100"
+            className="text-muted-foreground focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 aria-expanded:opacity-100"
           >
             <span aria-hidden className="text-base leading-none">⋯</span>
-          </button>
+          </Button>
           <PopoverSurface
             open={menuOpen}
             id={panelId}
