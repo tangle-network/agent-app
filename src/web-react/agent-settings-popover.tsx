@@ -34,7 +34,7 @@ export function AgentSettingsPopover({
         type="button" {...triggerProps} disabled={disabled}
         aria-label={label} title={label} data-agent-settings-trigger=""
         onClick={() => changeOpen(!open)} data-state={open ? 'open' : 'closed'}
-        className="inline-flex min-h-9 max-w-[15rem] items-center gap-1.5 rounded-full border border-border bg-transparent px-2.5 text-sm font-normal text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-[var(--control-height-sm,2rem)] max-w-[15rem] items-center gap-1.5 rounded-full border border-border bg-transparent px-2.5 text-sm font-normal text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
       >
         <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
           <rect x="4" y="7" width="16" height="14" rx="3" /><path d="M12 7V3M9 3h6M1 12v4m22-4v4m-15-3h.01M16 13h.01M9 17h6" />

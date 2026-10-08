@@ -186,7 +186,7 @@ sandbox-ui merely to adopt this agent-app control.
 | `label` | `id` + host label, or `aria-label` / `aria-labelledby` | Associate the actual trigger, not an enclosing div. `aria-describedby` supplies help. |
 | `recents`, `popular` | `priorityGroup: { label, match }` | The pinned top section is predicate-based instead of id-list-based; `recommendedLabel` renames the featured section. |
 | `excludeProviders`, `modalities` | — | Filter the `models` array before passing it (`isChatCapableModel` handles the chat-surface trim). Do not filter the persisted value. |
-| `variant: "field" \| "pill"` | `variant: "chip" \| "quiet"` | `chip` is the default pill. `quiet` is the borderless 28px text button. Compose existing host form controls when an editable field is needed. |
+| `variant: "field" \| "pill"` | `variant: "chip" \| "quiet"` | `chip` is the default pill. `quiet` is the borderless 32px text button, the composer row's one height. Compose existing host form controls when an editable field is needed. |
 | `side`, `avoidCollisions`, `placeholder`, `triggerClassName` | — | Placement prefers above, flips when needed and clamps to the viewport. Use `triggerContent` for an intentional compact or unset-value label, not a second menu. |
 | — | `renderProviderBadge(provider)` | Override the provider logo/badge; defaults to `/web-react`'s `ProviderLogo`. |
 
