@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.58.16
+
+- feat(web-react): rebuild the profile editor on one type scale, composer pickers, and checked sources
+- feat(vault): collapsed, remembered file tree in a contained surface (#877)
+
 ## 0.58.15
 
 - fix(web-react): put composer chips and the plan toggle on the 32px step (#876)
