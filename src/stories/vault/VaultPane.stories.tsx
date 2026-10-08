@@ -7,6 +7,31 @@ const files: VaultTreeNode[] = [{ name: 'brief.md', path: 'brief.md', type: 'fil
 const content = '# Release brief\n\nReview the current evidence before approving the release.\n\nKeep this document open while refreshing.'
 const codec = { parse: (raw: string) => raw, serialize: (value: unknown) => String(value) }
 
+/** Builds folder nodes from flat file paths, as a product's port does. */
+function nestPaths(paths: string[]): VaultTreeNode[] {
+  const top: VaultTreeNode[] = []
+  const folders = new Map<string, VaultTreeNode>()
+  for (const path of paths) {
+    const parts = path.split('/')
+    let siblings = top
+    parts.forEach((name, i) => {
+      const at = parts.slice(0, i + 1).join('/')
+      if (i === parts.length - 1) {
+        siblings.push({ name, path: at, type: 'file' })
+        return
+      }
+      let folder = folders.get(at)
+      if (!folder) {
+        folder = { name, path: at, type: 'directory', children: [] }
+        folders.set(at, folder)
+        siblings.push(folder)
+      }
+      siblings = folder.children ?? []
+    })
+  }
+  return top
+}
+
 function RefreshingVault() {
   const [refreshKey, setRefreshKey] = useState(0)
   const port = useMemo<VaultDataPort>(() => {
@@ -63,10 +88,13 @@ function ResponsiveVault({ externalNavigation = false, initialWidth, empty = fal
     const documents = new Map(empty ? [] : [
       ['brief.md', content],
       ['notes.md', '# Notes\n\nKeep unsaved work while browsing files.'],
+      ['playbooks/launch.md', '# Launch playbook'],
+      ['playbooks/q4/pipeline-review.md', '# Q4 pipeline review'],
+      ['research/competitors/landscape.md', '# Competitive landscape'],
     ])
     return {
       async listTree() {
-        return [...documents.keys()].map((path) => ({ name: path, path, type: 'file' as const }))
+        return nestPaths([...documents.keys()])
       },
       async readFile(path) {
         const content = documents.get(path)
@@ -120,15 +148,7 @@ function ResponsiveVault({ externalNavigation = false, initialWidth, empty = fal
         selectedPath={path}
         onSelectedPathChange={setPath}
         codec={codec}
-        renderTree={({ root, onSelect }) => (
-          <div className="flex flex-col p-2">
-            {root.children?.map((file) => (
-              <button key={file.path} type="button" className="rounded p-3 text-left hover:bg-muted" onClick={() => onSelect(file.path)}>
-                {file.name}
-              </button>
-            ))}
-          </div>
-        )}
+        treeStateKey="storybook:responsive-vault"
         renderArtifact={({ richDraft, onRichChange, onSave, dirty }) => (
           <div className="flex h-full min-h-0 flex-col gap-3 p-3">
             <textarea

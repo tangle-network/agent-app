@@ -8148,7 +8148,7 @@
           "name": "HubIntegrationsAccounts",
           "kind": "interface",
           "signature": "interface HubIntegrationsAccounts",
-          "doc": "Lists each connected account once, with its host status and one inline host control."
+          "doc": "Shows each connected account once, with its host status and one inline host control."
         },
         {
           "name": "HubIntegrationsClient",
@@ -19370,6 +19370,12 @@
           "doc": null
         },
         {
+          "name": "VAULT_TREE_CHILD_PAGE",
+          "kind": "const",
+          "signature": "200",
+          "doc": "Children rendered per folder before a \"Show more\" row."
+        },
+        {
           "name": "VaultArtifactRenderProps",
           "kind": "interface",
           "signature": "interface VaultArtifactRenderProps",
@@ -19454,16 +19460,28 @@
           "doc": "The parsed form of a file's rich content."
         },
         {
+          "name": "VaultTree",
+          "kind": "function",
+          "signature": "({ root, selectedPath, activeFolder, onSelect, onFolderToggle, storageKey, expandAll, label, className, }: VaultTreePro…",
+          "doc": null
+        },
+        {
           "name": "VaultTreeNode",
           "kind": "interface",
           "signature": "interface VaultTreeNode",
           "doc": "One node in the vault tree."
         },
         {
+          "name": "VaultTreeProps",
+          "kind": "interface",
+          "signature": "interface VaultTreeProps",
+          "doc": null
+        },
+        {
           "name": "VaultTreeRenderProps",
           "kind": "interface",
           "signature": "interface VaultTreeRenderProps",
-          "doc": "Props the pane passes to the product's tree renderer (e.g."
+          "doc": "Props the pane passes to a product's replacement tree renderer."
         }
       ]
     },
