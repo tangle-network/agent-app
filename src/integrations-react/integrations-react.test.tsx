@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { HubClient, type HubConnection, type HubPolicy, type HubProvider, type HubTool } from '@tangle-network/hub-sdk'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -180,6 +180,58 @@ describe('integrations-react through the finite Hub settings server', () => {
     expect(screen.queryByRole('button', { name: 'More actions for Cloudbeds' })).toBeNull()
   })
 
+  it('lists each connected account once with its inline host control and offers only unconnected providers to connect', async () => {
+    const f = fixture()
+    const unconnected: HubProvider = { ...provider, providerId: 'github', title: 'GitHub', authKind: 'oauth2' }
+    f.setConnections([connection, { ...connection, id: 'conn_2', accountDisplay: 'Hotel B' }])
+    const client: HubIntegrationsClient = { ...f.client, providers: async () => [provider, unconnected] }
+    let enabled = new Set(['conn_1'])
+    const change = vi.fn()
+    const accounts = () => ({
+      title: 'Accounts', emptyLabel: 'No accounts connected yet.',
+      getStatus: (account: HubConnection) => enabled.has(account.id)
+        ? { label: 'Enabled for this agent', tone: 'success' as const } : { label: 'Not enabled', tone: 'neutral' as const },
+      getPrimaryAction: (account: HubConnection) => ({
+        id: 'agent-access', label: enabled.has(account.id) ? 'Remove from agent' : 'Enable for this agent', onSelect: () => change(account.id),
+      }),
+    })
+    const view = render(<HubIntegrationsPanel identity={identity} client={client} can={allow} callbackPath="/integrations/callback"
+      title="Connect an account" accounts={accounts()} />)
+    const list = await screen.findByRole('list', { name: 'Accounts' })
+    const rows = within(list).getAllByRole('listitem')
+    expect(rows.map(row => row.textContent)).toEqual([
+      expect.stringContaining('Hotel A'), expect.stringContaining('Hotel B'),
+    ])
+    expect(within(rows[0]!).getByText('Enabled for this agent')).toBeTruthy()
+    expect(screen.queryByRole('combobox', { name: 'Account for Cloudbeds' })).toBeNull()
+    expect(screen.queryByTestId('integration-cloudbeds')).toBeNull()
+    expect(screen.getByTestId('integration-github').getAttribute('data-connected')).toBe('false')
+    fireEvent.click(within(rows[1]!).getByRole('button', { name: 'Enable for this agent' }))
+    expect(change).toHaveBeenCalledExactlyOnceWith('conn_2')
+    enabled = new Set(['conn_2'])
+    view.rerender(<HubIntegrationsPanel identity={identity} client={client} can={allow} callbackPath="/integrations/callback"
+      title="Connect an account" accounts={accounts()} />)
+    expect(within(screen.getByTestId('hub-account-conn_2')).getByText('Enabled for this agent')).toBeTruthy()
+    expect(within(screen.getByTestId('hub-account-conn_1')).getByRole('button', { name: 'Enable for this agent' })).toBeTruthy()
+    fireEvent.click(within(screen.getByTestId('hub-account-conn_2')).getByRole('button', { name: 'Manage Cloudbeds account Hotel B' }))
+    await waitFor(() => expect(window.location.search).toBe('?integration=cloudbeds&connection=conn_2'))
+    const access = await screen.findByTestId('hub-account-access')
+    expect(within(access).getByText('Enabled for this agent')).toBeTruthy()
+    expect(within(access).getByRole('button', { name: 'Remove from agent' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Connect another account' })).toBeTruthy()
+  })
+
+  it('names a failed account read instead of rendering an empty account list', async () => {
+    const f = fixture()
+    const client: HubIntegrationsClient = { ...f.client, connections: async () => { throw new Error('Hub unavailable') } }
+    render(<HubIntegrationsPanel identity={identity} client={client} can={allow} callbackPath="/integrations/callback"
+      accounts={{ title: 'Accounts', emptyLabel: 'No accounts connected yet.' }} />)
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('Hub unavailable'))
+    expect(screen.queryByText('No accounts connected yet.')).toBeNull()
+    expect(screen.queryByTestId('integration-cloudbeds')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+  })
+
   it.each(['custom', 'none'] as const)('reaches an explicit host connector for a %s provider', async authKind => {
     const f = fixture()
     const custom: HubProvider = { ...provider, providerId: 'native', title: 'Native provider', authKind, configured: false }
@@ -323,6 +375,30 @@ describe('integrations-react through the finite Hub settings server', () => {
 })
 
 describe('OAuth completion fencing', () => {
+  it('sends a return URL that the settings server accepts for the named callback path', async () => {
+    const started: unknown[] = []
+    const hub = new HubClient({ baseUrl: 'https://hub.example', apiKey: 'server-only-key', fetch: async (input, init) => {
+      const url = new URL(String(input))
+      if (!url.pathname.endsWith('/github/start')) throw new Error(`Unexpected SDK request: ${url.pathname}`)
+      started.push(JSON.parse(String(init?.body)))
+      return Response.json({ success: true, data: { provider: 'github', redirectUrl: 'https://github.com/login/oauth/authorize', state: 's', expiresAt: 'later', scopes: [], cli: false } })
+    } })
+    const routes = createHubSettingsRoutes({
+      oauthCallbackPath: '/app/agent_1/integrations/connect-callback',
+      authorize: async () => ({ authorized: true as const, principal: identity }),
+      resolveClient: async principal => ({ principal, credentialSource: 'caller-account', client: hub }),
+    })
+    const client = createHubIntegrationsClient(({ path, init }) => routes.handle(new Request(`${window.location.origin}${path}`, init)))
+    const popup = { closed: false, close: vi.fn(), location: { href: '' } } as unknown as Window
+    vi.spyOn(window, 'open').mockReturnValue(popup)
+    const controller = new AbortController()
+    const pending = connectWithPopup({ client, identity, providerId: 'github', before: [], callbackPath: '/app/agent_1/integrations/connect-callback', signal: controller.signal, isCurrent: () => true })
+    await vi.waitFor(() => expect(popup.location.href).toBe('https://github.com/login/oauth/authorize'))
+    expect(started).toHaveLength(1)
+    controller.abort()
+    expect(await pending).toBe('cancelled')
+  })
+
   it('never treats a broadcast or pre-existing provider connection as completion', async () => {
     vi.useFakeTimers()
     const channels: Array<{ onmessage: ((event: { data: unknown }) => void) | null; close: () => void }> = []

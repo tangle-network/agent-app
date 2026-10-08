@@ -51,7 +51,7 @@ _111 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./intakes/api`](api/intakes-api.md) | 3 | — |
 | [`./intakes/drizzle`](api/intakes-drizzle.md) | 18 | — |
 | [`./integrations`](api/integrations.md) | 10 | — |
-| [`./integrations-react`](api/integrations-react.md) | 18 | `platform`, `web-react` |
+| [`./integrations-react`](api/integrations-react.md) | 20 | `platform`, `web-react` |
 | [`./interactions`](api/interactions.md) | 64 | `web` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
@@ -534,11 +534,11 @@ Source: `src/integrations/index.ts` · 10 exports
 
 ## `./integrations-react`
 
-Source: `src/integrations-react/index.ts` · 18 exports
+Source: `src/integrations-react/index.ts` · 20 exports
 
 Depends on: `platform`, `web-react`
 
-`createHubIntegrationsClient`, `HUB_CONNECT_CHANNEL`, `HUB_CONNECT_FAILED_MESSAGE_TYPE`, `HUB_CONNECTED_MESSAGE_TYPE`, `HubConnectCallbackPage`, `HubConnectCallbackPageProps`, `HubIntegrationCapabilities`, `HubIntegrationCapability`, `HubIntegrationsClient`, `HubIntegrationsIdentity`, `HubIntegrationsPanel`, `HubIntegrationsPanelProps`, `HubSettingsRequest`, `HubSettingsRequestFn`, `HubWriteReceipt`, `POPUP_TIMEOUT_MS`, `useHubIntegrations`, `UseHubIntegrationsOptions`
+`createHubIntegrationsClient`, `HUB_CONNECT_CHANNEL`, `HUB_CONNECT_FAILED_MESSAGE_TYPE`, `HUB_CONNECTED_MESSAGE_TYPE`, `HubAccountStatus`, `HubConnectCallbackPage`, `HubConnectCallbackPageProps`, `HubIntegrationCapabilities`, `HubIntegrationCapability`, `HubIntegrationsAccounts`, `HubIntegrationsClient`, `HubIntegrationsIdentity`, `HubIntegrationsPanel`, `HubIntegrationsPanelProps`, `HubSettingsRequest`, `HubSettingsRequestFn`, `HubWriteReceipt`, `POPUP_TIMEOUT_MS`, `useHubIntegrations`, `UseHubIntegrationsOptions`
 
 [Full API →](api/integrations-react.md)
 

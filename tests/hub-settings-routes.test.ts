@@ -298,6 +298,32 @@ describe('method/path and input allowlists', () => {
     expect(f.upstream).not.toHaveBeenCalled()
     expect((await routes.handle(new Request('https://app.example/settings/hub/providers'))).status).toBe(200)
   })
+
+  it('accepts only the panel callback shape when the host names its callback path', async () => {
+    const f = fixture(OAUTH)
+    const routes = createHubSettingsRoutes({ authorize: f.authorize, resolveClient: f.resolveClient, oauthCallbackPath: '/app/a1/integrations/connect-callback' })
+    const callback = 'https://app.example/app/a1/integrations/connect-callback'
+    const accepted = `${callback}?provider=github&nonce=3f1c2b9e-7d4a-4c1e-9a55-0f2d6c8b1a77&context=b2a1c3d4-e5f6-4789-a012-3456789abcde`
+    const response = await routes.handle(request('/connections/github/start', 'POST', { returnUrl: accepted }))
+    expect(response.status).toBe(200)
+    expect(f.authorize.mock.calls[0]?.[1]).toEqual({ operation: 'oauth.start', provider: 'github', input: { returnUrl: accepted } })
+    const authorizedCalls = f.authorize.mock.calls.length
+    for (const returnUrl of [
+      callback,
+      `${callback}?provider=slack&nonce=n1&context=c1`,
+      `${callback}?provider=github&nonce=n1`,
+      `${callback}?provider=github&nonce=n1&context=c1&next=%2Fadmin`,
+      `${callback}?provider=github&nonce=n1&nonce=n2&context=c1`,
+      `${callback}?provider=github&nonce=n%2F1&context=c1`,
+      `${callback}?provider=github&nonce=n1&context=c1#fragment`,
+      'https://app.example/app/a2/integrations/connect-callback?provider=github&nonce=n1&context=c1',
+    ]) {
+      expect((await routes.handle(request('/connections/github/start', 'POST', { returnUrl }))).status).toBe(400)
+    }
+    expect(f.authorize).toHaveBeenCalledTimes(authorizedCalls)
+    expect(f.upstream).toHaveBeenCalledTimes(1)
+    expect(() => createHubSettingsRoutes({ authorize: f.authorize, resolveClient: f.resolveClient, oauthCallbackPath: '//other.example/callback' })).toThrow('callback path')
+  })
 })
 
 describe('application authority and caller-bound credentials', () => {
