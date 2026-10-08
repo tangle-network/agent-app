@@ -610,6 +610,7 @@
       "id": "./app-auth",
       "source": "src/app-auth/index.ts",
       "dependsOn": [
+        "email",
         "platform"
       ],
       "error": null,
@@ -6573,6 +6574,128 @@
           "kind": "type",
           "signature": "type PdfInspectorWasm",
           "doc": "The compiled wasm, or a thunk that produces it on first use."
+        }
+      ]
+    },
+    {
+      "id": "./email",
+      "source": "src/email/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "approvalEmail",
+          "kind": "function",
+          "signature": "(product: EmailProduct, input: ApprovalEmailInput) => EmailMessage",
+          "doc": "An agent paused until someone approves what it wants to do."
+        },
+        {
+          "name": "ApprovalEmailAction",
+          "kind": "interface",
+          "signature": "interface ApprovalEmailAction",
+          "doc": "One action an agent is waiting to run."
+        },
+        {
+          "name": "ApprovalEmailInput",
+          "kind": "interface",
+          "signature": "interface ApprovalEmailInput",
+          "doc": "Input for {@link approvalEmail}."
+        },
+        {
+          "name": "digestEmail",
+          "kind": "function",
+          "signature": "(product: EmailProduct, input: DigestEmailInput) => EmailMessage",
+          "doc": "What happened in a workspace that day."
+        },
+        {
+          "name": "DigestEmailInput",
+          "kind": "interface",
+          "signature": "interface DigestEmailInput",
+          "doc": "Input for {@link digestEmail}."
+        },
+        {
+          "name": "EmailAction",
+          "kind": "interface",
+          "signature": "interface EmailAction",
+          "doc": "A button."
+        },
+        {
+          "name": "EmailAttachment",
+          "kind": "interface",
+          "signature": "interface EmailAttachment",
+          "doc": "An inline image the HTML references by `cid:`; the mail client must send it with the message."
+        },
+        {
+          "name": "EmailFooter",
+          "kind": "interface",
+          "signature": "interface EmailFooter",
+          "doc": "Why the recipient got the email and where they control it."
+        },
+        {
+          "name": "EmailItem",
+          "kind": "interface",
+          "signature": "interface EmailItem",
+          "doc": "One row in the email's list box: an approval request or a digest entry."
+        },
+        {
+          "name": "EmailLintIssue",
+          "kind": "interface",
+          "signature": "interface EmailLintIssue",
+          "doc": "One way an email's HTML would break in Gmail or Outlook."
+        },
+        {
+          "name": "EmailMessage",
+          "kind": "interface",
+          "signature": "interface EmailMessage",
+          "doc": "A rendered email, ready for any transport."
+        },
+        {
+          "name": "emailPreviewHtml",
+          "kind": "function",
+          "signature": "(message: Pick<EmailMessage, \"html\" | \"attachments\">) => string",
+          "doc": "The HTML with inline images embedded as data URIs, for browser previews and screenshots."
+        },
+        {
+          "name": "EmailProduct",
+          "kind": "interface",
+          "signature": "interface EmailProduct",
+          "doc": "The app an email comes from."
+        },
+        {
+          "name": "emailSender",
+          "kind": "function",
+          "signature": "(productName: string, address: string) => string",
+          "doc": "The From header for an app's mail: `GTM Agent · Tangle <noreply@tangle.tools>`."
+        },
+        {
+          "name": "inviteEmail",
+          "kind": "function",
+          "signature": "(product: EmailProduct, input: InviteEmailInput) => EmailMessage",
+          "doc": "Someone invited the recipient to a workspace."
+        },
+        {
+          "name": "InviteEmailInput",
+          "kind": "interface",
+          "signature": "interface InviteEmailInput",
+          "doc": "Input for {@link inviteEmail}."
+        },
+        {
+          "name": "lintEmailHtml",
+          "kind": "function",
+          "signature": "(html: string) => EmailLintIssue[]",
+          "doc": "Check rendered email HTML against what Gmail and Outlook render: a complete document, layout in presentation tables, styles inline (a `<style>` block may only add dark-mode and narrow-screen override…"
+        },
+        {
+          "name": "noticeEmail",
+          "kind": "function",
+          "signature": "(product: EmailProduct, input: NoticeEmailInput) => EmailMessage",
+          "doc": "Any other transactional message: one title, a short body and at most two buttons."
+        },
+        {
+          "name": "NoticeEmailInput",
+          "kind": "interface",
+          "signature": "interface NoticeEmailInput",
+          "doc": "Input for {@link noticeEmail}."
         }
       ]
     },
@@ -17916,12 +18039,6 @@
           "doc": "Define the number of days before an invitation expires"
         },
         {
-          "name": "InvitationEmailBrand",
-          "kind": "interface",
-          "signature": "interface InvitationEmailBrand",
-          "doc": "Define the structure for an invitation email brand including the RFC-5322 From header"
-        },
-        {
           "name": "InvitationEmailStatus",
           "kind": "type",
           "signature": "type InvitationEmailStatus",
@@ -18010,24 +18127,6 @@
           "kind": "function",
           "signature": "(value: string | undefined) => \"viewer\" | \"editor\" | \"admin\" | null",
           "doc": "Resolve invitation permission from a string or return null if invalid"
-        },
-        {
-          "name": "RenderedInvitationEmail",
-          "kind": "interface",
-          "signature": "interface RenderedInvitationEmail",
-          "doc": "Define the structure of a fully rendered invitation email with sender, subject, and content fields"
-        },
-        {
-          "name": "renderInvitationEmail",
-          "kind": "function",
-          "signature": "(input: RenderInvitationEmailInput, brand: InvitationEmailBrand) => RenderedInvitationEmail",
-          "doc": "Render the invitation email body — pure, deterministic, transport-free."
-        },
-        {
-          "name": "RenderInvitationEmailInput",
-          "kind": "interface",
-          "signature": "interface RenderInvitationEmailInput",
-          "doc": "Define input data required to render an invitation email template"
         },
         {
           "name": "resolveWorkspaceRole",

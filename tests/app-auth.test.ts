@@ -19,6 +19,7 @@ import {
   type AppAuthConfig,
   type AppAuthEmailClient,
 } from '../src/app-auth/index'
+import { lintEmailHtml } from '../src/email/index'
 import type { TangleSsoAccountStore, TangleSsoAuthClient } from '../src/platform/index'
 import { createDatabaseProvider } from '../src/store/index'
 
@@ -161,7 +162,7 @@ describe('createAppAuth: social providers (env-shaped)', () => {
 
 describe('createAppAuth: email wiring', () => {
   function captureClient() {
-    const sent: Array<{ from: string; to: string; subject: string; html: string }> = []
+    const sent: Array<Parameters<AppAuthEmailClient['emails']['send']>[0]> = []
     const client: AppAuthEmailClient = {
       emails: {
         send: async (message) => {
@@ -189,8 +190,13 @@ describe('createAppAuth: email wiring', () => {
     )
     expect(res.status).toBe(200)
     expect(sent).toHaveLength(1)
-    expect(sent[0]).toMatchObject({ from: 'My App <noreply@my.app>', to: 'ada@example.com', subject: 'Reset your password' })
+    expect(sent[0]).toMatchObject({ from: 'My App <noreply@my.app>', to: 'ada@example.com', subject: 'Reset your password — My App' })
     expect(sent[0]!.html).toContain('http://localhost:3000/api/auth/reset-password/')
+    expect(sent[0]!.text).toContain('Reset password: http://localhost:3000/api/auth/reset-password/')
+    // The branded layout's header mark travels with the message as an inline image.
+    expect(sent[0]!.html).toContain('src="cid:tangle-mark"')
+    expect(sent[0]!.attachments?.map((attachment) => attachment.contentId)).toEqual(['tangle-mark'])
+    expect(lintEmailHtml(sent[0]!.html)).toEqual([])
   })
 
   it('verifyOnSignUp sends the verification email with the appName subject', async () => {
@@ -200,7 +206,9 @@ describe('createAppAuth: email wiring', () => {
     })
     const res = await signUp(appAuth, 'http://localhost:3000', 'ada@example.com')
     expect(res.status).toBe(200)
-    expect(sent.some((m) => m.subject === 'Verify your My App email')).toBe(true)
+    const verification = sent.find((m) => m.subject === 'Verify your email — My App')
+    expect(verification?.text).toContain('Confirm ada@example.com to finish signing in to My App.')
+    expect(verification?.attachments).toHaveLength(1)
   })
 
   it('a lazy getter returning null warns and skips instead of crashing sign-up', async () => {
