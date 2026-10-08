@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.3
+
+- fix(deps): accept sandbox-ui 0.131 (#887)
+
 ## 0.59.2
 
 - fix(email): assert the exact footer lines instead of naming an address
