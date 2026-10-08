@@ -1,0 +1,56 @@
+[
+  {
+    "width": 1440,
+    "theme": "agent-light",
+    "overviewLabels": true,
+    "defaultMcpPrivacy": true,
+    "keyboardTabs": true,
+    "treeKeyboardDisclosure": true,
+    "rawCopyDownloadExact": true,
+    "editorSaveAndInvalidJsonGuard": true,
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "width": 1440,
+    "theme": "agent-dark",
+    "overviewLabels": true,
+    "defaultMcpPrivacy": true,
+    "keyboardTabs": true,
+    "treeKeyboardDisclosure": true,
+    "rawCopyDownloadExact": true,
+    "editorSaveAndInvalidJsonGuard": true,
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "width": 390,
+    "theme": "agent-light",
+    "overviewLabels": true,
+    "defaultMcpPrivacy": true,
+    "keyboardTabs": true,
+    "treeKeyboardDisclosure": true,
+    "rawCopyDownloadExact": true,
+    "editorSaveAndInvalidJsonGuard": true,
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "width": 390,
+    "theme": "agent-dark",
+    "overviewLabels": true,
+    "defaultMcpPrivacy": true,
+    "keyboardTabs": true,
+    "treeKeyboardDisclosure": true,
+    "rawCopyDownloadExact": true,
+    "editorSaveAndInvalidJsonGuard": true,
+    "overflow": false,
+    "errors": []
+  },
+  {
+    "case": "long-profile",
+    "width": 390,
+    "overflow": false,
+    "allFieldsPresent": true
+  }
+]

@@ -1,0 +1,55 @@
+{
+  "source": "927fdb96ef01283ecf420fbead656408b6f82e3e",
+  "base": "c8f15809",
+  "target": "Beelink2 source Storybook on port 6037",
+  "checks": {
+    "frozenInstall": "passed; includes prepare/build",
+    "typecheck": "passed",
+    "affectedTests": {
+      "files": 3,
+      "passed": 50
+    },
+    "browser": "4 complete journeys: 1440/390 \u00d7 light/dark; 1 long-profile phone boundary",
+    "redProof": "Updated existing prompt-label check fails on prior source c8f15809 (1 failed, 4 passed), then passes on final source",
+    "fullSignoff": "Not run: scoped React display and consumer behavior checks; no runtime, dependency, export subpath, build or generated-template change"
+  },
+  "pack": {
+    "name": "tangle-network-agent-app-0.58.6.tgz",
+    "status": "local consumer qualification only, not published version",
+    "sha256": "dafd76d79174dac695d8028afb0e4a04776cad92ee3efe2d52cef459389e9cde"
+  },
+  "coverage": [
+    "canonical JSON copy equals downloaded bytes and preserves extensions, null, arrays and MCP config",
+    "default overview continues to hide MCP URL/ref data",
+    "keyboard tabs and nested tree disclosures",
+    "editor save and invalid JSON guard",
+    "no page overflow or uncaught browser errors in checked states"
+  ],
+  "limitations": [
+    "Synthetic source Storybook, not served production evidence",
+    "Phone browser emulation, not physical handset",
+    "JSON shows supplied profile configuration, not assembled runtime request",
+    "Original video playback review pending root CUA transport recovery; decoded frame review passed"
+  ],
+  "sha256": {
+    "before-viewer-1440-agent-light.png": "57e3226540ced3b4418760ab512c624550d6b9a77e9951efb3b6026b8c14dbed",
+    "after-viewer-1440-agent-light.png": "a692fbe4a75aa166bb29554d33cd3253519ba401be10b249e90bb4f0ea3537be",
+    "before-viewer-1440-agent-dark.png": "7945e8e09e88a80173ed874ef4e982b55878e1c6bfee07b86dce049f9cf2d504",
+    "after-viewer-1440-agent-dark.png": "9c48a609439e49301dbb449d9068357b3153f15ea9e2dafe89c1b32b4b888da4",
+    "before-viewer-390-agent-light.png": "0ee47d75218243c2e63e5cd809c10e6b14c8f2ea3271c6b4d546a1d34bc608a9",
+    "after-viewer-390-agent-light.png": "438d3b9ede459724402e2a30fe34d7de4c0e54a59685a816292cd3dd94e882e7",
+    "before-viewer-390-agent-dark.png": "ad9a211fea96498b36fbc57b6ab44171117d2488d3f1656d84a271d586c6896e",
+    "after-viewer-390-agent-dark.png": "d95298b1ddcc0061511e7857b763870a4fa22519e2d0ad3f4bcfdfbb832d008f",
+    "before-editor-1440-agent-light.png": "8ab3dde06d694238d440fa3ad5815792938fcf76a0818b6cc348a9b438a23753",
+    "after-editor-1440-agent-light.png": "f4372602d107676232b080e67f9c4d26e2edaa821a25148f53aeaa5d3208e6d4",
+    "before-editor-390-agent-light.png": "cfdad14c0d1376eb86fdcfbda4f235d0b334efce1e954e5dd87a60e73acd8e9e",
+    "after-editor-390-agent-light.png": "b0105a1a68da771f023594ec5505e7d45bbe610d899fb40ef2611017ee4b4706",
+    "after-tree-390-agent-light.png": "771209955de0d82215c43622f509022b1dbcc68f56e01c4c12a9ea2675c829cc",
+    "after-raw-1440-agent-dark.png": "c1eb380abe9e373ecf2523961f75a6cdabf7f3eb88da8d95535c0d0352317974",
+    "after-raw-390-agent-light.png": "e26f76c35d1ffdd2cc5f4a4c932d7267e8f645d9e0cb09a80807d261981a9053",
+    "after-editor-390-agent-dark.png": "4d641c063b3ea819d53d7c998a80bc44b5016a7be5094fbfe9a9a7a700dd77ef",
+    "profile-inspector-1440.webm": "cd7522ab3896d71f8eb58497644ff2c659e4ec9bfa55efba3f7aaaac6c5f77cc",
+    "profile-inspector-390.webm": "7ff293f8d153e4faa0f69a48a5622cc0b9cc9ad0e346cd47c6bbbc708cda48a2",
+    "browser-receipt.json": "2327529fc873d58c943d679700b3c235d78cde87f234ddb350fd6803aff4d45a"
+  }
+}
