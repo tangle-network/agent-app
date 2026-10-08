@@ -283,7 +283,8 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.126.1', range!)).toBe(true)
     expect(satisfiesRange('0.127.1', range!)).toBe(true)
     expect(satisfiesRange('0.128.0', range!)).toBe(true)
-    expect(satisfiesRange('0.129.0', range!)).toBe(false)
+    expect(satisfiesRange('0.129.0', range!)).toBe(true)
+    expect(satisfiesRange('0.130.0', range!)).toBe(false)
   })
 
   it('requires the UI release that exports MessageAuthor', async () => {
