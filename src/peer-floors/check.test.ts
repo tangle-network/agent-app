@@ -274,7 +274,9 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.129.2', range!)).toBe(false)
     expect(satisfiesRange('0.130.0', range!)).toBe(true)
     expect(satisfiesRange('0.130.4', range!)).toBe(true)
-    expect(satisfiesRange('0.131.0', range!)).toBe(false)
+    // 0.131 adds opening an asset from its card; nothing this package imports changed.
+    expect(satisfiesRange('0.131.0', range!)).toBe(true)
+    expect(satisfiesRange('0.132.0', range!)).toBe(false)
   })
 
   it('requires the UI release that exports MessageAuthor', async () => {
