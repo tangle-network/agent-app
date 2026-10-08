@@ -288,7 +288,7 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
         </TabsList>
         <TabsContent value="accounts">
         {hub.connectStatus.status === 'connected' && hub.connectStatus.message ? <p role="status" className="mb-3 text-sm">{hub.connectStatus.message}</p> : null}
-        <HubAccountList accounts={props.accounts} connections={connectionList} providers={hub.providers.status === 'ready' ? hub.providers.value : []}
+        <HubAccountList key={scope} accounts={props.accounts} connections={connectionList} providers={hub.providers.status === 'ready' ? hub.providers.value : []}
           loading={hub.connections.status === 'loading'} error={hub.connections.status === 'error' ? hub.connections.message : null} busy={pending}
           onRetry={() => hub.refresh()} onManage={connection => hub.selectConnection(connection.providerId, connection.id)}
           canManage={connection => props.can({ operation: 'policies.list', connectionId: connection.id })}

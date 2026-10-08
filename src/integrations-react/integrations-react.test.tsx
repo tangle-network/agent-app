@@ -263,6 +263,18 @@ describe('integrations-react through the finite Hub settings server', () => {
     expect(onUnsupportedConnect).toHaveBeenCalledWith(custom)
   })
 
+  it('clears account search when the host switches workspace without remounting', async () => {
+    const f = fixture()
+    const client: HubIntegrationsClient = { ...f.client, providers: async () => [provider], connections: async () => [connection] }
+    const props = { client, can: allow, callbackPath: '/integrations/callback', accounts: { title: 'Accounts' } }
+    const view = render(<HubIntegrationsPanel {...props} identity={identity} />)
+    fireEvent.change(await screen.findByRole('searchbox', { name: 'Search accounts' }), { target: { value: 'another hotel' } })
+    expect(screen.getByText('No accounts match your search.')).toBeTruthy()
+    view.rerender(<HubIntegrationsPanel {...props} identity={other} />)
+    expect(await screen.findByTestId('hub-account-conn_1')).toBeTruthy()
+    expect(screen.getByRole('searchbox', { name: 'Search accounts' })).toHaveProperty('value', '')
+  })
+
   it('hides the prior account dialog and entered secret on an identity switch', async () => {
     const f = fixture()
     const client: HubIntegrationsClient = {
