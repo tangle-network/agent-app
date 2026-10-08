@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.12
+
+- fix(integrations): make account cards and catalog directly accessible (#871)
+
 ## 0.58.11
 
 - fix(integrations): offer a provider again after its only account is disconnected
