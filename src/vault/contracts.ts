@@ -233,8 +233,10 @@ export interface VaultPaneProps {
   /** Product controls for the open file, rendered in its path row before the
    *  download and delete actions (for example an Edit toggle). */
   fileActions?: (file: VaultFile) => ReactNode
-  /** Rendered in the document pane while no file is selected. Defaults to an
-   *  empty pane, which suits hosts that float other UI over that area. */
+  /** Rendered in the document pane while no file is selected. Defaults to a
+   *  "Select a file" state that offers the files this reader opened last
+   *  (remembered under `treeStateKey`); pass `null` for an empty pane, as a
+   *  host that floats other UI over that area would. */
   emptyState?: ReactNode
   /** Rendered in the tree pane when the vault holds no files or folders. The
    *  tree pane then spans the whole vault, since there is no document to show

@@ -261,7 +261,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('21.0.0', range!)).toBe(false)
   })
 
-  it('admits qualified Sandbox UI releases without claiming the next minor', async () => {
+  it('requires the Sandbox UI release that owns the vault tree, without claiming the next minor', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -269,21 +269,12 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/sandbox-ui']
 
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.116.9', range!)).toBe(false)
-    expect(satisfiesRange('0.117.0', range!)).toBe(true)
-    expect(satisfiesRange('0.117.1', range!)).toBe(true)
-    expect(satisfiesRange('0.118.0', range!)).toBe(false)
-    expect(satisfiesRange('0.122.0', range!)).toBe(true)
-    expect(satisfiesRange('0.122.2', range!)).toBe(true)
-    expect(satisfiesRange('0.123.2', range!)).toBe(true)
-    expect(satisfiesRange('0.123.3', range!)).toBe(true)
-    expect(satisfiesRange('0.124.0', range!)).toBe(true)
-    expect(satisfiesRange('0.125.0', range!)).toBe(true)
-    expect(satisfiesRange('0.126.0', range!)).toBe(true)
-    expect(satisfiesRange('0.126.1', range!)).toBe(true)
-    expect(satisfiesRange('0.127.1', range!)).toBe(true)
-    expect(satisfiesRange('0.128.0', range!)).toBe(true)
-    expect(satisfiesRange('0.129.0', range!)).toBe(false)
+    // ./vault imports VaultTree from `@tangle-network/sandbox-ui/vault-tree`, first shipped in 0.130.0.
+    expect(satisfiesRange('0.128.0', range!)).toBe(false)
+    expect(satisfiesRange('0.129.2', range!)).toBe(false)
+    expect(satisfiesRange('0.130.0', range!)).toBe(true)
+    expect(satisfiesRange('0.130.4', range!)).toBe(true)
+    expect(satisfiesRange('0.131.0', range!)).toBe(false)
   })
 
   it('requires the UI release that exports MessageAuthor', async () => {

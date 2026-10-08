@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
-import { VaultTree } from '../../vault/VaultTree'
+import { VaultTree } from '@tangle-network/sandbox-ui/vault-tree'
 import type { VaultTreeNode } from '../../vault/contracts'
 
 const root: VaultTreeNode = {

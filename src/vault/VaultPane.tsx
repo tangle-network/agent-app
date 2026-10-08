@@ -2,7 +2,7 @@
  * The shared 3-pane vault: tree | artifact viewer | optional agent dock. This is
  * shell mechanism — selection, the dirty-guard + pending-nav state machine,
  * rich/source editor modes, create/delete/refresh, skeletons, and an error
- * boundary — plus the vault's own tree (`VaultTree`) in a contained surface. It
+ * boundary — plus the vault's tree (sandbox-ui's `VaultTree`) in a contained surface. It
  * renders no artifact viewer of its own: that arrives through the
  * `renderArtifact` / `renderDock` seams, and `renderTree` can replace the tree.
  *
@@ -26,9 +26,10 @@ import {
   type ErrorInfo,
   type ReactNode,
 } from 'react'
-import { Download, Folder, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, FileText, Folder, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from './ConfirmDialog'
-import { VaultTree } from './VaultTree'
+import { readRecentFiles, recordRecentFile } from './recent-files'
+import { filterFileNodes, VaultTree } from '@tangle-network/sandbox-ui/vault-tree'
 import type {
   VaultEditorMode,
   VaultFile,
@@ -125,24 +126,6 @@ function findDirectory(nodes: VaultTreeNode[], path: string): VaultTreeNode | nu
     if (found) return found
   }
   return null
-}
-
-// Case-insensitive name filter over the tree: files survive when their name
-// matches; a directory survives whole (with all its children) when its own name
-// matches, otherwise only when some descendant survives.
-function filterNodes(nodes: VaultTreeNode[], q: string): VaultTreeNode[] {
-  const out: VaultTreeNode[] = []
-  for (const node of nodes) {
-    if (node.type === 'file') {
-      if (node.name.toLowerCase().includes(q)) out.push(node)
-    } else if (node.name.toLowerCase().includes(q)) {
-      out.push(node)
-    } else {
-      const children = filterNodes(node.children ?? [], q)
-      if (children.length > 0) out.push({ ...node, children })
-    }
-  }
-  return out
 }
 
 class EditorErrorBoundary extends Component<{ children: ReactNode; label: string; onReset?: () => void }, { error: unknown }> {
@@ -332,6 +315,52 @@ function OperationErrorAlert({
   )
 }
 
+/** How many recent files the empty document pane offers. */
+const RECENT_SHOWN = 5
+
+/**
+ * The document pane with nothing open: says what to do, and offers the files
+ * this reader opened last in this vault so returning work is one click away.
+ */
+function DocumentEmptyState({ label, recent, onOpen }: { label: string; recent: string[]; onOpen: (path: string) => void }) {
+  const recentHeadingId = useId()
+  return (
+    <div data-vault-document-empty className="flex h-full items-center justify-center overflow-y-auto p-8">
+      <div className="w-full max-w-sm text-center">
+        <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <FileText className="size-5" aria-hidden="true" />
+        </span>
+        <h3 className="mt-4 text-base font-semibold text-foreground">Select a file</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Choose a file in {label} to open it here.</p>
+        {recent.length > 0 && (
+          <section aria-labelledby={recentHeadingId} className="mt-8 text-left">
+            <h4 id={recentHeadingId} className="text-xs font-medium text-muted-foreground">Recently opened</h4>
+            <ul className="mt-2 overflow-hidden rounded-xl border border-border bg-card shadow-raised">
+              {recent.map((path) => {
+                const slash = path.lastIndexOf('/')
+                return (
+                  <li key={path} className="border-b border-border last:border-b-0">
+                    <button
+                      type="button"
+                      onClick={() => onOpen(path)}
+                      title={path}
+                      className="flex min-h-10 w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    >
+                      <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span className="min-w-0 truncate font-medium">{path.slice(slash + 1)}</span>
+                      {slash > 0 && <span className="ml-auto min-w-0 shrink truncate text-xs text-muted-foreground">{path.slice(0, slash)}</span>}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /**
  * Browse and edit files in the available pane width.
  * Below 45rem, Files and the selected document share one pane.
@@ -383,6 +412,8 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const searchRef = useRef<HTMLInputElement>(null)
   const documentRef = useRef<HTMLDivElement>(null)
   const treeHeadingId = useId()
+  const [recentFiles, setRecentFiles] = useState(() => ({ key: treeStateKey, paths: readRecentFiles(treeStateKey) }))
+  if (recentFiles.key !== treeStateKey) setRecentFiles({ key: treeStateKey, paths: readRecentFiles(treeStateKey) })
 
   useEffect(() => {
     setFilesOpen(false)
@@ -505,7 +536,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     const q = query.trim().toLowerCase()
     if (!q) return treeRoot
     const base = activeFolderNode ?? treeRoot
-    return { ...base, children: filterNodes(base.children ?? [], q) }
+    return { ...base, children: filterFileNodes(base.children ?? [], q) }
   }, [treeRoot, activeFolderNode, query])
 
   const commitPath = useCallback(
@@ -858,6 +889,15 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     }
   }, [selectedFile, port, refresh, commitPath, reportFailure])
 
+  // A file counts as opened once it is on screen, not when it is requested.
+  useEffect(() => {
+    if (!displayReadyPath || !treeStateKey) return
+    setRecentFiles({ key: treeStateKey, paths: recordRecentFile(treeStateKey, displayReadyPath) })
+  }, [displayReadyPath, treeStateKey])
+  const recentToOffer = recentFiles.paths
+    .filter((path) => path !== selectedPath && treePaths.files.has(path))
+    .slice(0, RECENT_SHOWN)
+
   const createFileName = newPath.trim().split('/').pop()?.trim() ?? ''
   const dockButtonLabel = persistentDock ? dockLabel : dockToggleCfg.label
   const dockBlockedByDraft = !persistentDock && (dockToggleCfg.disabledWhenDirty ?? true) && isDirty
@@ -1152,7 +1192,9 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                     onRichChange,
                     onSave: () => void saveCurrent(),
                   })
-                ) : (emptyState ?? null)}
+                ) : emptyState !== undefined ? emptyState : (
+                  <DocumentEmptyState label={label} recent={recentToOffer} onOpen={(path) => guardedOpen(path)} />
+                )}
               </div>
             </div>
           </div>
