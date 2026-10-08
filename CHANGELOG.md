@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.14
+
+- fix(web-react): put the composer row on one 32px control height (#874)
+
 ## 0.58.13
 
 - fix(integrations): reset account search when workspace changes (#873)
