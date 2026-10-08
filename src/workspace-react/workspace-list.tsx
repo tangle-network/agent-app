@@ -1,4 +1,5 @@
 import { useId, useMemo, useState, type ComponentType, type ReactNode } from 'react'
+import { PageHeader } from '@tangle-network/ui/primitives'
 
 import { ActionDialog, ActionDialogButton } from '../web-react/action-dialog'
 import { OVERLAY_SHADOW, PopoverSurface, usePopover } from '../web-react/controls'
@@ -204,15 +205,13 @@ export function WorkspaceList({
 
   return (
     <section aria-labelledby={headingId} className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-          <h1 id={headingId} className="text-xl font-semibold tracking-tight text-foreground">
-            {title ?? capitalize(noun.plural)}
-          </h1>
-          {description != null && <div className="mt-1 max-w-prose text-sm text-muted-foreground">{description}</div>}
-        </div>
-        {items.length > 0 && createControl}
-      </header>
+      <PageHeader
+        className="mb-0"
+        titleId={headingId}
+        title={title ?? capitalize(noun.plural)}
+        description={description}
+        actions={items.length > 0 ? createControl : null}
+      />
 
       {children != null && <div className="mt-6">{children}</div>}
 
