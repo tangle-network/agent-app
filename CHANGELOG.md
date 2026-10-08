@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.17
+
+- fix(web-react): render composer chips at exactly 32px (#879)
+
 ## 0.58.16
 
 - feat(web-react): rebuild the profile editor on one type scale, composer pickers, and checked sources
