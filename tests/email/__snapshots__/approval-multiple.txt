@@ -1,7 +1,7 @@
 Subject: Approve: create agent “Quinn” and 1 more — GTM Agent
 Preheader: The agent paused until you decide.
 
-GTM Agent
+Tangle GTM Agent
 
 2 approvals needed
 
@@ -19,4 +19,3 @@ Review: https://gtm.tangle.tools/app/ws_1/review
 Tangle Growth · GTM Agent
 You own this workspace.
 Manage notifications: https://gtm.tangle.tools/app/ws_1/settings
-Tangle Technologies, Inc., 3740 South Ocean Blvd, #1407, Highland Beach, FL 33487, USA

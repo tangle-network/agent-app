@@ -1,6 +1,9 @@
 /**
  * Transactional email for Tangle agent apps: one branded layout and typed
  * templates that each return `{ subject, preheader, html, text, attachments }`.
+ * The header is the Tangle lockup with the product name (`Tangle GTM Agent`);
+ * the footer names the workspace, the reason and a manage link, plus a postal
+ * address only when a marketing email such as a digest passes one.
  *
  * Transport-free and dependency-free, so it runs in Workers and Node alike:
  * the app hands the message to its own Resend or SES client. The header's
