@@ -17,6 +17,6 @@ Beelink2 checks against the final merged source:
 - `pnpm typecheck` passed.
 - `pnpm exec vitest run src/integrations-react/integrations-react.test.tsx` passed all 28 checks.
 - Browser checks at both viewports and themes passed. They assert tile geometry, no document overflow, search filtering, keyboard dialog open, and Escape close. [Geometry receipts](browser-receipt.json).
-- Removing `layout={props.layout}` produced the expected geometry failure, 1.8053 ratio against the 1.5 maximum. [Negative result](negative.log). Restoring the forwarding passed. [Restored result](restored.log).
+- Removing `layout={props.layout}` produced the expected geometry failure, 1.8053 ratio against the 1.5 maximum. [Negative result](negative.txt). Restoring the forwarding passed. [Restored result](restored.txt).
 
 Scoped UI qualification was used. Full package signoff, live OAuth, live API-key submission, and Builder's published adoption are outside this record. The first browser probe used a nested Connect button locator, but the maintained tile itself is the button; its timeout was corrected to exercise the actual keyboard target.
