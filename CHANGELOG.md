@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.5
+
+- fix(history): put SessionHistoryPanel on the shared ui controls (#889)
+
 ## 0.59.4
 
 - chore(peers): support runtime 0.313 and materializer 0.22
