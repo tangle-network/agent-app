@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.2
+
+- fix(email): assert the exact footer lines instead of naming an address
+
 ## 0.59.1
 
 - fix(email): Tangle lockup in the header; postal address only on request (#885)
