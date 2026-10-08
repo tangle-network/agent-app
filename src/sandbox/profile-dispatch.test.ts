@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { assertPrimeModelAgreement } from '@tangle-network/agent-profile-materialize'
-import type { AgentProfile } from '@tangle-network/agent-interface'
+import { defineAgentProfileSecretRef, type AgentProfile } from '@tangle-network/agent-interface'
 import type { SandboxInstance } from '@tangle-network/sandbox/core'
 import { fingerprintAgentProfile } from '../profile/fingerprint'
 import {
@@ -50,6 +50,25 @@ async function dispatch(lane: Lane, f: ReturnType<typeof fixture>, options: Stre
 }
 
 describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
+  it('delivers runtime MCP credentials only with the admitted turn backend', async () => {
+    const f = fixture()
+    const selected = profile()
+    const runtimeAttachments = { mcp: {
+      'profile-turn': { transport: 'http', url: 'https://app.invalid/api/tools/profile',
+        headers: { Authorization: defineAgentProfileSecretRef('PROFILE_TURN_TOKEN', 'bearer') },
+      },
+    } } as StreamSandboxPromptOptions['runtimeAttachments']
+    const runtimeSecrets = { PROFILE_TURN_TOKEN: 'turn-only-secret' }
+    const backend = await dispatch(lane, f, {
+      profile: selected, runtimeAttachments, runtimeSecrets,
+    })
+    expect(backend.runtimeAttachments).toEqual(runtimeAttachments)
+    expect(backend.runtimeSecrets).toEqual(runtimeSecrets)
+    expect(backend.profile).toEqual(expect.not.objectContaining({ runtimeSecrets }))
+    expect(backend.profile.mcp).toEqual(selected.mcp)
+    expect(selected).toEqual(profile())
+  })
+
   it('dispatches the supplied profile with its identity and preserves its capability boundaries', async () => {
     const f = fixture()
     const selected = profile()
