@@ -422,6 +422,21 @@ function rpcResult(message: unknown, id: number): unknown {
   return match.result
 }
 
+/**
+ * Fetch without following redirects. Cloudflare Workers accept only `follow`
+ * and `manual`, so a redirect is refused here instead: a server that moves the
+ * endpoint is asked for its final URL rather than followed to an address the
+ * policy never checked.
+ */
+async function sendManual(send: Send, url: string, init: RequestInit): Promise<Response> {
+  const response = await send(url, { ...init, redirect: 'manual' })
+  if ((response.status >= 300 && response.status < 400) || response.type === 'opaqueredirect') {
+    await response.body?.cancel()
+    throw new McpCheckFailure('protocol-error', 'The server redirected to another address. Enter the final MCP URL.', response.status || undefined)
+  }
+  return response
+}
+
 function statusFailure(status: number): McpCheckFailure {
   if (status === 401 || status === 403) {
     return new McpCheckFailure('auth-required', 'The server needs credentials. Add them as secret references in Advanced JSON.', status)
@@ -498,7 +513,7 @@ async function checkStreamableHttp(url: string, headers: Record<string, string>,
   let session: string | null = null
   let protocol: string | null = null
   async function post(message: object, id?: number): Promise<unknown> {
-    const response = await send(url, { method: 'POST', signal, redirect: 'error', body: JSON.stringify(message), headers: {
+    const response = await sendManual(send, url, { method: 'POST', signal, body: JSON.stringify(message), headers: {
       ...headers, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
       ...(session ? { 'Mcp-Session-Id': session } : {}), ...(protocol ? { 'MCP-Protocol-Version': protocol } : {}),
     } })
@@ -546,7 +561,7 @@ async function checkStreamableHttp(url: string, headers: Record<string, string>,
 
 async function checkSse(url: string, headers: Record<string, string>, send: Send, signal: AbortSignal,
   initialize: object, initialized: object): Promise<McpListing> {
-  const stream = await send(url, { method: 'GET', signal, redirect: 'error', headers: { ...headers, Accept: 'text/event-stream' } })
+  const stream = await sendManual(send, url, { method: 'GET', signal, headers: { ...headers, Accept: 'text/event-stream' } })
   if (!stream.ok) { await stream.body?.cancel(); throw statusFailure(stream.status) }
   if (!stream.body || !(stream.headers.get('content-type') ?? '').includes('text/event-stream')) {
     await stream.body?.cancel()
@@ -562,7 +577,7 @@ async function checkSse(url: string, headers: Record<string, string>, send: Send
       throw new McpCheckFailure('protocol-error', 'The server announced a message endpoint on another address.')
     }
     async function post(message: object) {
-      const response = await send(endpoint.href, { method: 'POST', signal, redirect: 'error', body: JSON.stringify(message),
+      const response = await sendManual(send, endpoint.href, { method: 'POST', signal, body: JSON.stringify(message),
         headers: { ...headers, 'Content-Type': 'application/json' } })
       await response.body?.cancel()
       if (!response.ok) throw statusFailure(response.status)

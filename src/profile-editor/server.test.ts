@@ -198,6 +198,20 @@ describe('checkMcpServer', () => {
     expect(health).toMatchObject({ ok: true, serverName: 'legacy', tools: [{ name: 'lookup' }] })
   })
 
+  it('never asks fetch to throw on redirects, which Cloudflare Workers reject, and refuses a redirect itself', async () => {
+    // Workers' fetch accepts only redirect 'follow' or 'manual'.
+    const workerFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.redirect !== undefined && init.redirect !== 'follow' && init.redirect !== 'manual') {
+        throw new TypeError(`Invalid redirect value, must be one of "follow" or "manual" ("${init.redirect}" specified).`)
+      }
+      return new Response(null, { status: 307, headers: { location: 'https://elsewhere.example.com/mcp' } })
+    }) as unknown as typeof globalThis.fetch
+    expect(await checkMcpServer({ url: 'https://moved.example.com/mcp' }, { fetch: workerFetch }))
+      .toMatchObject({ ok: false, problem: 'protocol-error', message: expect.stringContaining('redirected') })
+    expect(await checkMcpServer({ transport: 'sse', url: 'https://moved.example.com/sse' }, { fetch: workerFetch }))
+      .toMatchObject({ ok: false, problem: 'protocol-error' })
+  })
+
   it('reports credentials, non-MCP answers, refused addresses, local servers, and timeouts', async () => {
     const answer = (response: () => Response) => vi.fn(async () => response()) as unknown as typeof globalThis.fetch
     expect(await checkMcpServer({ url: 'https://auth.example.com/mcp' }, { fetch: answer(() => new Response('', { status: 401 })) }))
