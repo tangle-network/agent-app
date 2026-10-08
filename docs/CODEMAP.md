@@ -108,7 +108,7 @@ _113 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./trace`](api/trace.md) | 33 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting` |
 | [`./turn-stream`](api/turn-stream.md) | 57 | `chat-routes`, `crypto`, `stream` |
-| [`./vault`](api/vault.md) | 18 | — |
+| [`./vault`](api/vault.md) | 21 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
 | [`./web`](api/web.md) | 43 | — |
@@ -1054,9 +1054,9 @@ Depends on: `chat-routes`, `crypto`, `stream`
 
 ## `./vault`
 
-Source: `src/vault/index.ts` · 18 exports
+Source: `src/vault/index.ts` · 21 exports
 
-`ConfirmDialog`, `ConfirmDialogProps`, `VaultArtifactRenderProps`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneHandle`, `VaultPaneProps`, `VaultRichParts`, `VaultTreeNode`, `VaultTreeRenderProps`
+`ConfirmDialog`, `ConfirmDialogProps`, `VAULT_TREE_CHILD_PAGE`, `VaultArtifactRenderProps`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneHandle`, `VaultPaneProps`, `VaultRichParts`, `VaultTree`, `VaultTreeNode`, `VaultTreeProps`, `VaultTreeRenderProps`
 
 [Full API →](api/vault.md)
 

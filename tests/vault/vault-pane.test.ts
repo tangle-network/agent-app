@@ -243,27 +243,6 @@ describe('VaultPane — load + selection', () => {
     expect(screen.getByTestId('artifact').textContent).toContain('body A')
   })
 
-  it('opens a file when a shadow-DOM tree row click only exposes data attributes', async () => {
-    const inertTree = () =>
-      createElement(
-        'button',
-        {
-          type: 'button',
-          'data-testid': 'pierre-row',
-          'data-type': 'item',
-          'data-item-type': 'file',
-          'data-item-path': 'folder/c.md',
-        },
-        'c.md',
-      )
-
-    const { port } = mount({ renderTree: inertTree })
-    fireEvent.click(await screen.findByTestId('pierre-row'))
-
-    await waitFor(() => expect(port.readFile).toHaveBeenCalledWith('folder/c.md'))
-    await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('folder/c.md'))
-  })
-
   it('opens after a tree renderer reuses its initial selection callback', async () => {
     const listTree = vi.fn()
       .mockResolvedValueOnce([])
@@ -1098,10 +1077,9 @@ describe('VaultPane — dock toggle + refreshKey + headerActions', () => {
 
 /**
  * A folder row used to be a dead target: `collectFilePaths` kept only files, so
- * a directory path resolved to nothing, and both entry points (the `onSelect`
- * callback and the shadow-DOM click capture) dropped it with no branch of their
- * own. Clicking a folder now makes it the vault's active folder — the search
- * narrows to it, a new file lands in it, and clicking it again clears it.
+ * a directory path resolved to nothing. Clicking a folder makes it the vault's
+ * active folder — the search narrows to it, a new file lands in it, and
+ * clicking it again clears it.
  */
 describe('VaultPane — folder clicks', () => {
   it('makes a clicked folder the active folder and scopes the search to it', async () => {
@@ -1147,27 +1125,6 @@ describe('VaultPane — folder clicks', () => {
     fireEvent.change(pathInput, { target: { value: 'folder/new.md' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
     await waitFor(() => expect(port.createFile).toHaveBeenCalledWith('folder/new.md'))
-  })
-
-  it('answers a folder click that only exposes data attributes (shadow-DOM row)', async () => {
-    const inertTree = () =>
-      createElement(
-        'button',
-        {
-          type: 'button',
-          'data-testid': 'pierre-folder-row',
-          'data-type': 'item',
-          'data-item-type': 'directory',
-          'data-item-path': 'folder',
-        },
-        'folder',
-      )
-
-    mount({ renderTree: inertTree })
-    fireEvent.click(await screen.findByTestId('pierre-folder-row'))
-    await waitFor(() =>
-      expect(screen.getByText('folder', { selector: '[data-vault-folder]' })).toBeTruthy(),
-    )
   })
 
   it('drops the active folder when a refresh removes it', async () => {
