@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.0
+
+- feat(email)!: branded transactional email kit for agent apps (#884)
+
 ## 0.58.21
 
 - fix(sandbox): forward secret profile revision receipts (#882)
