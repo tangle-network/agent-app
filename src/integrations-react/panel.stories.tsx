@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
+import { Button } from '@tangle-network/ui/primitives'
 import { HubIntegrationsPanel } from './panel'
 import { createHubIntegrationsClient } from './client'
 import { useMemo, useState, type ComponentProps } from 'react'
@@ -70,3 +71,15 @@ function ManyAccountsFixture(args: ComponentProps<typeof HubIntegrationsPanel>) 
   }} />
 }
 export const ManyAccounts: Story = { args: { layout: 'tiles' }, render: args => <ManyAccountsFixture {...args} /> }
+
+function IdentitySwitchFixture(args: ComponentProps<typeof HubIntegrationsPanel>) {
+  const [workspace, setWorkspace] = useState('workspace-a')
+  return <div className="max-w-3xl space-y-6">
+    <div className="flex items-center justify-between gap-4">
+      <p className="font-medium">{workspace === 'workspace-a' ? 'Workspace A' : 'Workspace B'}</p>
+      <Button variant="outline" onClick={() => setWorkspace(current => current === 'workspace-a' ? 'workspace-b' : 'workspace-a')}>Switch workspace</Button>
+    </div>
+    <HubIntegrationsPanel {...args} identity={{ ...args.identity, workspaceId: workspace }} accounts={{ title: 'Accounts' }} />
+  </div>
+}
+export const WorkspaceSwitch: Story = { args: { layout: 'tiles' }, render: args => <IdentitySwitchFixture {...args} /> }
