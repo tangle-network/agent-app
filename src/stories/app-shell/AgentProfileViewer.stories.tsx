@@ -1,3 +1,4 @@
+import type { AgentProfile } from '@tangle-network/agent-interface/profile'
 import type { Meta, StoryObj } from '@storybook/react'
 import { AgentProfileViewer } from '../../web-react/agent-profile-viewer'
 
@@ -29,3 +30,23 @@ export const Copilot: Story = { args: { defaultExpanded: false }, render: args =
   <aside className="min-h-screen max-w-sm bg-background p-4 text-foreground"><AgentProfileViewer {...args} /></aside> }
 
 export const InWorkspace: Story = { args: { showIdentity: false } }
+
+
+/** Owner-authorized inspection preserves all canonical fields, including extensions. */
+export const FullProfile: Story = {
+  args: { showFullProfile: true, profile: {
+    ...meta.args?.profile as AgentProfile,
+    prompt: { systemPrompt: 'You are the front desk coordinator.', appendSystemPrompt: 'Ask before changing a booking.', instructions: ['Read the reference files before answering.', 'Confirm availability through the approved tools.'] },
+    extensions: { audit: { version: 3, enabled: true, empty: null, notes: 'Keep the original field values.\nPreserve every extension.' } },
+  } },
+}
+
+export const LongProfile: Story = {
+  args: { showFullProfile: true, profile: {
+    ...FullProfile.args?.profile as AgentProfile,
+    name: 'Research, content, and community assistant for a multilingual customer workspace',
+    description: 'Reviews current sources, drafts articles, and answers questions. Publishes only after the owner approves.',
+    prompt: { systemPrompt: 'Read every supplied source carefully.\n'.repeat(80), instructions: ['Reference: ' + 'long-reference-'.repeat(30)] },
+    extensions: { audit: { nested: { deeper: { content: 'unbroken'.repeat(100) } }, emptyArray: [], emptyObject: {}, falseValue: false, zeroValue: 0 } },
+  } },
+}

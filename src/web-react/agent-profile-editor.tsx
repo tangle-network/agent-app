@@ -4,6 +4,7 @@ import { agentProfileSchema } from '@tangle-network/agent-interface/profile-sche
 import { Button, Input, Textarea, Switch, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@tangle-network/sandbox-ui/primitives'
 import type { AgentProfileRegistryPort } from './agent-profile-registry'
 import { AgentProfileRegistryMcpSearch, AgentProfileRegistrySkillSearch } from './agent-profile-registry-search'
+import { ProfileCard, ProfileSectionHeading } from './agent-profile-layout'
 
 export type AgentProfileResourceKind = 'files' | 'skills' | 'tools' | 'agents' | 'commands' | 'instructions'
 
@@ -57,24 +58,20 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return <section className="grid min-w-0 gap-4 border-t border-border py-6 first:border-t-0 first:pt-0 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-6">
-    <div><h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
-      {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}</div>
-    <div className="min-w-0 space-y-4">{children}</div>
-  </section>
+  return <ProfileCard title={title} description={description}>{children}</ProfileCard>
 }
 
 function Disclosure({ title, description, detail, children }: {
   title: string; description?: string; detail?: string; children: ReactNode
 }) {
-  return <details className="group min-w-0 border-t border-border">
-    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-sm py-5 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      <span><span className="block text-sm font-medium text-foreground">{title}</span>
-        {description && <span className="mt-1 block text-sm text-muted-foreground">{description}</span>}</span>
-      <span className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+  return <details className="group min-w-0 overflow-hidden rounded-xl border border-border bg-card">
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-muted/35 px-4 py-3 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5">
+      <span className="min-w-0"><ProfileSectionHeading title={title} />
+        {description && <span className="mt-2 block text-sm leading-6 text-muted-foreground">{description}</span>}</span>
+      <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
         {detail}<span aria-hidden="true" className="transition-transform group-open:rotate-180">⌄</span></span>
     </summary>
-    <div className="min-w-0 space-y-4 pb-6">{children}</div>
+    <div className="min-w-0 space-y-4 border-t border-border p-4 sm:p-5">{children}</div>
   </details>
 }
 
@@ -398,7 +395,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid JSON') }
   }
 
-  return <div className={'min-w-0 ' + (className ?? '')} aria-label="Agent profile editor">
+  return <div className={'min-w-0 space-y-4 ' + (className ?? '')} aria-label="Agent profile editor">
     {error && <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
     {jsonDirty && <p role="status" className="rounded-lg border border-border bg-muted p-3 text-sm text-foreground">Apply or discard edits in Advanced JSON before using the other fields.</p>}
     {unsupportedResources.length > 0 && <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground">
@@ -419,17 +416,18 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
         <Field label="Description"><Input disabled={editingDisabled} value={value.description ?? ''} onChange={event => emit({ ...value, description: event.target.value })} /></Field>
       </div>
     </Section>
-    <Section title="Instructions">
-      <Field label="System instructions" hint="Replaces default system instructions.">
-        <Textarea aria-label="System instructions" className="min-h-52 text-base leading-7 sm:text-sm" disabled={editingDisabled} value={value.prompt?.systemPrompt ?? ''}
+    <Section title="Prompts and instructions">
+      <Field label="System prompt" hint="prompt.systemPrompt · Replaces the harness default where supported. Clear it to use the default.">
+        <Textarea aria-label="System prompt" className="min-h-52 text-base leading-7 sm:text-sm" disabled={editingDisabled} value={value.prompt?.systemPrompt ?? ''}
           onChange={event => prompt({ ...value.prompt, systemPrompt: event.target.value })} />
       </Field>
       <details className="group/instructions" open={Boolean(value.prompt?.appendSystemPrompt || value.prompt?.instructions?.length)}>
         <summary className="cursor-pointer rounded-sm py-2 text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Additional instructions</summary>
         <div className="mt-3 space-y-5">
-          <Field label="Append to system prompt" hint="Adds to the system prompt without replacing it."><Textarea className="min-h-24" disabled={editingDisabled} value={value.prompt?.appendSystemPrompt ?? ''} onChange={event => prompt({ ...value.prompt, appendSystemPrompt: event.target.value })} /></Field>
-          <div role="group" aria-label="Agent instructions" className="space-y-2">
-        <p className="text-sm font-medium text-foreground">Agent instructions</p>
+          <Field label="Appended system prompt" hint="prompt.appendSystemPrompt · Appended after the system prompt, or after the harness default when no override is set."><Textarea className="min-h-24" disabled={editingDisabled} value={value.prompt?.appendSystemPrompt ?? ''} onChange={event => prompt({ ...value.prompt, appendSystemPrompt: event.target.value })} /></Field>
+          <div role="group" aria-label="Project instructions" className="space-y-2">
+        <p className="text-sm font-medium text-foreground">Project instructions</p>
+        <p className="text-sm leading-6 text-muted-foreground">prompt.instructions · Lower-priority workspace guidance, separate from the system prompt.</p>
         <div className="space-y-2">{(value.prompt?.instructions ?? []).map((instruction, index) =>
           <div key={index} className="flex items-start gap-2">
             <Textarea aria-label={'Instruction ' + (index + 1)} className="min-h-20" disabled={editingDisabled} value={instruction}
@@ -443,7 +441,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
         </div>
       </details>
     </Section>
-    <Section title="Model">
+    <Section title="Model and runtime">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Default model"><Input disabled={editingDisabled} value={value.model?.default ?? ''} onChange={event => model({ ...value.model, default: event.target.value })} placeholder="provider/model" /></Field>
       </div>

@@ -579,7 +579,14 @@ The product still validates and authorizes the final profile on the server.
 The viewer shows model hints, instructions, tool policy, MCP aliases, and declared resources.
 It does not claim that a resource loaded or a model served a request.
 MCP URLs, headers, environment values, and connection identifiers stay private.
-The default view shows instructions directly and groups settings in flat divided sections.
+The overview groups settings in bordered cards with tinted headers and shared Brand color roles.
+Prompt fields retain their exact schema paths: `prompt.systemPrompt` overrides the system prompt,
+`prompt.appendSystemPrompt` adds system text, and `prompt.instructions` supplies lower-priority workspace guidance.
+Set `showFullProfile={true}` only in an owner-authorized context to offer Overview, JSON tree,
+and Raw views, plus copy and download of the full supplied profile. The JSON views preserve
+every field, including extensions, MCP configuration, and connection references; they do not redact.
+The host owns authorization and supplies secret references rather than credentials.
+The JSON is configured profile data, not a capture of the complete runtime request.
 Set `showIdentity={false}` when the workspace already names the agent.
 Set `defaultExpanded={false}` when embedding the viewer in a narrow Copilot panel.
 Keep execution receipts separate from configured profile data.

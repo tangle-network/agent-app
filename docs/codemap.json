@@ -19903,8 +19903,8 @@
         {
           "name": "AgentProfileViewer",
           "kind": "function",
-          "signature": "({ profile, className, defaultExpanded, showIdentity }: AgentProfileViewerProps) => Element",
-          "doc": "Read-only view of configured profile data."
+          "signature": "({ profile, className, showFullProfile, ...overview }: AgentProfileViewerProps) => Element",
+          "doc": "The JSON views use the original supplied object, including fields the overview does not summarize."
         },
         {
           "name": "AgentProfileViewerProps",

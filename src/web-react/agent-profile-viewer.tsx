@@ -1,4 +1,7 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { Button, CodeBlock, Tabs, TabsContent, TabsList, TabsTrigger } from '@tangle-network/sandbox-ui/primitives'
+import { CopyButton } from '@tangle-network/sandbox-ui/markdown'
+import { ProfileCard, ProfileSectionHeading } from './agent-profile-layout'
 import type { AgentProfile, AgentProfileResourceRef } from '@tangle-network/agent-interface/profile'
 
 export interface AgentProfileViewerProps {
@@ -7,6 +10,8 @@ export interface AgentProfileViewerProps {
   defaultExpanded?: boolean
   /** Hide the identity when the surrounding workspace already names the agent. */
   showIdentity?: boolean
+  /** Offer the complete supplied profile in an owner-authorized context. Contains MCP configuration and connection references. */
+  showFullProfile?: boolean
 }
 
 function nonempty(value: string | undefined): value is string {
@@ -49,30 +54,28 @@ function ResourceRow({ label, resource, path }: {
   )
 }
 
-function PromptDetail({ label, note, value }: { label?: string; note?: string; value: string }) {
-  return <div className="min-w-0 space-y-2">
-    {label && <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-      <h4 className="font-medium text-foreground">{label}</h4>
-      {note && <span className="text-sm text-muted-foreground">{note}</span>}
-    </div>}
-    <div className="whitespace-pre-wrap break-words text-sm leading-7 text-foreground">{value}</div>
+function PromptDetail({ label, path, note, value }: { label: string; path: string; note: string; value: string }) {
+  return <div className="min-w-0 space-y-3">
+    <div className="space-y-1">
+      <h4 className="text-sm font-semibold text-foreground">{label}</h4>
+      <code className="block break-all font-mono text-xs text-primary">{path}</code>
+      <p className="text-sm leading-6 text-muted-foreground">{note}</p>
+    </div>
+    <div className="whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/35 p-4 text-sm leading-7 text-foreground">{value}</div>
   </div>
 }
 
 function ProfileSection({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="grid min-w-0 gap-3 border-t border-border py-6 first:border-t-0 first:pt-0 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-6" aria-label={title}>
-    <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
-    <div className="min-w-0">{children}</div>
-  </section>
+  return <ProfileCard title={title}>{children}</ProfileCard>
 }
 
 function ProfileConfiguration({ expanded, children }: { expanded: boolean; children: ReactNode }) {
-  if (expanded) return <div>{children}</div>
+  if (expanded) return <div className="space-y-4">{children}</div>
   return <details className="group/config border-t border-border pt-4">
     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm py-2 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
       Profile configuration <span aria-hidden="true" className="text-muted-foreground group-open/config:rotate-90">›</span>
     </summary>
-    <div className="pt-4">{children}</div>
+    <div className="space-y-4 pt-4">{children}</div>
   </details>
 }
 
@@ -107,7 +110,7 @@ function configuredResources(profile: AgentProfile) {
 }
 
 /** Read-only view of configured profile data. It does not imply runtime materialization. */
-export function AgentProfileViewer({ profile, className = '', defaultExpanded = true, showIdentity = true }: AgentProfileViewerProps) {
+function ProfileOverview({ profile, defaultExpanded = true, showIdentity = true }: AgentProfileViewerProps) {
   const permissions = permissionRows(profile)
   const resources = configuredResources(profile)
   const prompt = profile.prompt
@@ -126,7 +129,7 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
     profile.model?.provider || profile.harness || profile.description || profile.version || profile.tags?.length || hasConfiguration)
 
   return (
-    <section className={`min-w-0 text-sm text-foreground ${className}`.trim()} aria-label="Agent profile">
+    <div className="min-w-0 text-sm text-foreground">
       {(showIdentity || nonempty(profile.description)) && <header className="mb-6 min-w-0">
         {showIdentity && <h2 className="break-words text-lg font-semibold leading-tight text-foreground">
           {nonempty(profile.name) ? profile.name : 'Unnamed profile'}
@@ -136,35 +139,38 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
       {!hasProfileDetails && <p className="text-muted-foreground">No profile details are configured.</p>}
       {(hasConfiguration || profile.model || profile.harness || profile.version || profile.tags?.length) && <ProfileConfiguration expanded={defaultExpanded}>
         {hasBehavior && (
-          <ProfileSection title="Instructions">
+          <ProfileSection title="Prompts and instructions">
             <div className="space-y-6">
+              {!nonempty(prompt?.systemPrompt) && <div className="space-y-1"><h4 className="text-sm font-semibold">System prompt</h4><code className="block font-mono text-xs text-primary">prompt.systemPrompt</code><p className="text-sm leading-6 text-muted-foreground">No override configured. The runtime supplies its default system prompt.</p></div>}
               {nonempty(prompt?.systemPrompt) && (
-                <PromptDetail label={nonempty(prompt.appendSystemPrompt) || instructions.length ? "System instructions" : undefined} note="Replaces default instructions" value={prompt.systemPrompt} />
+                <PromptDetail label="System prompt" path="prompt.systemPrompt" note="The profile’s system prompt override. Replaces the harness default where supported." value={prompt.systemPrompt} />
               )}
               {nonempty(prompt?.appendSystemPrompt) && (
                 <PromptDetail
-                  label="Added system prompt"
-                  note={nonempty(prompt.systemPrompt) ? 'Supplements the system prompt above' : 'Supplements the harness default'}
+                  label="Appended system prompt" path="prompt.appendSystemPrompt"
+                  note="Appended after the system prompt, or after the harness default when no override is set."
                   value={prompt.appendSystemPrompt}
                 />
               )}
               {instructions.length > 0 && (
                 <div className="space-y-1.5">
-                  <h4 className="font-medium text-foreground">Project instructions <span className="ml-1 font-normal text-sm text-muted-foreground">Lower-privilege workspace guidance</span></h4>
+                  <h4 className="text-sm font-semibold text-foreground">Project instructions</h4>
+                  <code className="block break-all font-mono text-xs text-primary">prompt.instructions</code>
+                  <p className="pb-2 text-sm leading-6 text-muted-foreground">Lower-priority workspace guidance. These entries are separate from the system prompt.</p>
                   <ul className="space-y-2">
                     {instructions.map((instruction, index) => (
                       <li key={`${index}:${instruction}`}>
-                        <PromptDetail label={`Instruction ${index + 1}`} value={instruction} />
+                        <div className="whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/35 p-4 text-sm leading-7">{instruction}</div>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
               {typeof resourceInstructions === 'string' && nonempty(resourceInstructions) && (
-                <PromptDetail label="Resource instructions" note="Configured in resources" value={resourceInstructions} />
+                <PromptDetail label="Resource instructions" path="resources.instructions" note="Instructions declared with workspace resources. Their loading is controlled by the runtime." value={resourceInstructions} />
               )}
               {resourceInstructions && typeof resourceInstructions !== 'string' && (
-                <ul><ResourceRow label="Instruction resource" resource={resourceInstructions} /></ul>
+                <ul><ResourceRow label="resources.instructions" resource={resourceInstructions} /></ul>
               )}
             </div>
           </ProfileSection>
@@ -289,6 +295,58 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
           </div>
         </ProfileSection>}
       </ProfileConfiguration>}
-    </section>
+    </div>
   )
+}
+
+function JsonValue({ value, name }: { value: unknown; name: string }) {
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value)
+    return <li className="min-w-0 list-none"><details open>
+      <summary className="cursor-pointer break-all rounded px-2 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <span className="font-medium text-primary">{name}</span>
+        <span className="ml-2 text-xs text-muted-foreground">{Array.isArray(value) ? `Array · ${entries.length}` : `Object · ${entries.length}`}</span>
+      </summary>
+      <ul className="ml-3 min-w-0 border-l border-border pl-3">
+        {entries.map(([key, child]) => <JsonValue key={key} name={key} value={child} />)}
+        {entries.length === 0 && <li className="block px-2 py-1 font-mono text-sm text-muted-foreground">{Array.isArray(value) ? '[]' : '{}'}</li>}
+      </ul>
+    </details></li>
+  }
+  return <li className="min-w-0 list-none px-2 py-2">
+    <span className="block break-all font-mono text-xs font-medium text-primary">{name}<span className="ml-2 font-normal text-muted-foreground">{value === null ? 'null' : typeof value}</span></span>
+    <span className="mt-1 block whitespace-pre-wrap break-words font-mono text-sm leading-6 text-foreground">{typeof value === 'string' ? value || '""' : JSON.stringify(value)}</span>
+  </li>
+}
+
+/** The JSON views use the original supplied object, including fields the overview does not summarize. */
+export function AgentProfileViewer({ profile, className = '', showFullProfile = false, ...overview }: AgentProfileViewerProps) {
+  const [view, setView] = useState('overview')
+  const json = showFullProfile ? JSON.stringify(profile, null, 2) : ''
+  return <section className={`min-w-0 text-sm text-foreground ${className}`.trim()} aria-label="Agent profile">
+    {showFullProfile ? <Tabs value={view} onValueChange={setView}>
+      <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-2">
+        <TabsList aria-label="Profile view" className="h-auto flex-wrap justify-start">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="json">JSON tree</TabsTrigger>
+          <TabsTrigger value="raw">Raw</TabsTrigger>
+        </TabsList>
+        <div className="flex items-center gap-2">
+          <CopyButton text={json} />
+          <Button asChild variant="outline" size="sm"><a href={`data:application/json;charset=utf-8,${encodeURIComponent(json)}`} download="agent-profile.json">Download</a></Button>
+        </div>
+      </div>
+      <TabsContent value="overview" className="mt-0"><ProfileOverview profile={profile} {...overview} /></TabsContent>
+      <TabsContent value="json" className="mt-0">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
+          <div className="border-b border-border bg-muted/35 p-4"><ProfileSectionHeading title="Full profile JSON" />
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Every configured field, including extensions. Expand or collapse any object.</p></div>
+          <ul className="min-w-0 p-2 sm:p-4">{Object.entries(profile).map(([key, value]) => <JsonValue key={key} name={key} value={value} />)}</ul>
+        </div>
+      </TabsContent>
+      <TabsContent value="raw" className="min-w-0 mt-0">
+        <CodeBlock code={json} language="json" label="agent-profile.json" showLineNumbers className="max-w-full" />
+      </TabsContent>
+    </Tabs> : <ProfileOverview profile={profile} {...overview} />}
+  </section>
 }
