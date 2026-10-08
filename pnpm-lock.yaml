@@ -70,11 +70,11 @@ importers:
         specifier: 20.0.0
         version: 20.0.0(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)
       '@tangle-network/agent-profile-materialize':
-        specifier: 0.21.0
-        version: 0.21.0(@tangle-network/agent-interface@3.1.1)
+        specifier: 0.22.0
+        version: 0.22.0(@tangle-network/agent-interface@3.1.1)
       '@tangle-network/agent-runtime':
-        specifier: 0.308.0
-        version: 0.308.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)(@tangle-network/sandbox@0.60.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
+        specifier: 0.313.1
+        version: 0.313.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)(@tangle-network/sandbox@0.60.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
       '@tangle-network/brand':
         specifier: 1.19.0
         version: 1.19.0(react@19.2.8)
@@ -2742,8 +2742,13 @@ packages:
     peerDependencies:
       '@tangle-network/agent-interface': ^3.0.0
 
-  '@tangle-network/agent-runtime@0.308.0':
-    resolution: {integrity: sha512-53AKBN1ZrAhR0yKrMu8Z+eeWJEAV1GvenJYryvungmUh9E+TCRc9f2hw3EJdO0FtPOy4VnM9Cqd9QRvgAk3vBw==}
+  '@tangle-network/agent-profile-materialize@0.22.0':
+    resolution: {integrity: sha512-ElR+2NHcqea+iYGmjQ7HNLbIFEJtXv4MNzKabEtWNy9zecNxqalpWNOnVjeyKc4HS6Q+/ngqjhLNuWxcNyUhhg==}
+    peerDependencies:
+      '@tangle-network/agent-interface': ^3.0.0
+
+  '@tangle-network/agent-runtime@0.313.1':
+    resolution: {integrity: sha512-Aq4UBA/A47hWR9nhO8sLItULFp9uMtVi1kfQJVf/I1LX2ZYC5PFfznCrYa47zoZtBf7NbNbj8gNTK6ZpHF8VMg==}
     engines: {node: '>=22.13.0'}
     hasBin: true
     peerDependencies:
@@ -8575,7 +8580,11 @@ snapshots:
     dependencies:
       '@tangle-network/agent-interface': 3.1.1
 
-  '@tangle-network/agent-runtime@0.308.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)(@tangle-network/sandbox@0.60.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
+  '@tangle-network/agent-profile-materialize@0.22.0(@tangle-network/agent-interface@3.1.1)':
+    dependencies:
+      '@tangle-network/agent-interface': 3.1.1
+
+  '@tangle-network/agent-runtime@0.313.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)(@tangle-network/sandbox@0.60.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
     dependencies:
       '@tangle-network/agent-core': 0.10.3(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
       '@tangle-network/agent-eval': 0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
@@ -8673,7 +8682,7 @@ snapshots:
 
   '@tangle-network/sandbox@0.59.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.57.1(typescript@7.0.2)(zod@4.4.3))':
     dependencies:
-      '@tangle-network/agent-core': 0.10.2(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
+      '@tangle-network/agent-core': 0.10.3(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
       '@tangle-network/agent-interface': 2.17.0
       zod: 4.6.5
     optionalDependencies:
