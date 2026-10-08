@@ -171,6 +171,18 @@
           "doc": "The per-turn text overlay is validated without admitting tools, model, MCP or resources."
         },
         {
+          "name": "createInMemorySelfMountStorage",
+          "kind": "function",
+          "signature": "() => SelfMountStorage",
+          "doc": "Non-durable default for tests and single-instance products."
+        },
+        {
+          "name": "createMountProfileChangeTool",
+          "kind": "function",
+          "signature": "(deps: MountProfileChangeDeps) => AppToolDefinition<Record<string, unknown>>",
+          "doc": "The permitted, idempotent self-mount verb as an app tool."
+        },
+        {
           "name": "createTextProfile",
           "kind": "function",
           "signature": "(input: CreateTextProfileInput) => Promise<ProfileRevision>",
@@ -189,6 +201,18 @@
           "doc": "Call before dispatching a chat message; a recognized command is never sent to the model."
         },
         {
+          "name": "MountProfileChangeDeps",
+          "kind": "interface",
+          "signature": "interface MountProfileChangeDeps",
+          "doc": null
+        },
+        {
+          "name": "MountProfileChangeResult",
+          "kind": "interface",
+          "signature": "interface MountProfileChangeResult",
+          "doc": null
+        },
+        {
           "name": "normalizeProfileName",
           "kind": "function",
           "signature": "(name: string) => string",
@@ -205,6 +229,12 @@
           "kind": "function",
           "signature": "(text: string) => { name: string; } | { invalid: true; } | null",
           "doc": null
+        },
+        {
+          "name": "PERMITTED_SELF_MOUNT_DIMENSIONS",
+          "kind": "const",
+          "signature": "readonly [\"skills\"]",
+          "doc": "The only profile dimensions an agent may change on its own mounted state."
         },
         {
           "name": "PROFILE_CHANGE_POLICY",
@@ -367,6 +397,18 @@
           "kind": "function",
           "signature": "(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; conversationId?: string | undefined;…",
           "doc": "One-step rollback moves this member/channel to its previous immutable revision."
+        },
+        {
+          "name": "SelfMountSkillEntry",
+          "kind": "interface",
+          "signature": "interface SelfMountSkillEntry",
+          "doc": null
+        },
+        {
+          "name": "SelfMountStorage",
+          "kind": "interface",
+          "signature": "interface SelfMountStorage",
+          "doc": "Durable mounted-skill state, keyed by the product's scope."
         },
         {
           "name": "serializeProfileRevisionDiff",
