@@ -97,7 +97,6 @@ describe('AgentProfileViewer configuration visibility', () => {
     expect(html).not.toContain('private command')
     expect(html).toContain('Modes')
     expect(html).toContain('careful')
-    expect(html).toContain('<details open=""')
   })
 
   it('starts compact when embedded in a narrow copilot', () => {

@@ -579,5 +579,7 @@ The product still validates and authorizes the final profile on the server.
 The viewer shows model hints, instructions, tool policy, MCP aliases, and declared resources.
 It does not claim that a resource loaded or a model served a request.
 MCP URLs, headers, environment values, and connection identifiers stay private.
+The default view shows instructions directly and groups settings in flat divided sections.
+Set `showIdentity={false}` when the workspace already names the agent.
 Set `defaultExpanded={false}` when embedding the viewer in a narrow Copilot panel.
 Keep execution receipts separate from configured profile data.
