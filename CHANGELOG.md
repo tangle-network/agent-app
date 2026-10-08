@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.18
+
+- feat(web-react): accept sandbox-ui 0.129 and title pages with PageHeader (#880)
+
 ## 0.58.17
 
 - fix(web-react): render composer chips at exactly 32px (#879)
