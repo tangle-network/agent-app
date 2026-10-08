@@ -32,6 +32,7 @@
     "src/design-canvas/index.ts",
     "src/documents/index.ts",
     "src/documents/pdf-inspector.ts",
+    "src/email/index.ts",
     "src/eval-campaign/index.ts",
     "src/eval/index.ts",
     "src/forms/index.ts",

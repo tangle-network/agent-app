@@ -28,7 +28,7 @@ navigable and is the seam a future package split would cut along.
   L0  Foundation          crypto · web · stream · redact · harness · missions · store
       (zero peers)         prompt · model-resolution · tangle · delegation · skills · knowledge
                            integrations · interactions · billing · eval-campaign · assets
-                           brand-extraction · studio · work-product
+                           brand-extraction · studio · work-product · email
 ```
 
 (`missions` sits at L0 — substrate-free, pure orchestration — but is consumed by
@@ -46,6 +46,8 @@ anywhere. `crypto` (AES-GCM fields) · `web` (request/body/rate-limit utils) ·
 ask contract + sidecar client + answer-route factory; `agent-interface` types
 peer, structural connection) · `billing` (budget-capped keys) ·
 `eval-campaign` · `assets` · `brand-extraction` · `studio` (generation types) ·
+`email` *(branded transactional email: one table layout, typed templates,
+plain-text parts, and a Gmail/Outlook lint; transport-free)* ·
 `documents` *(PDF/DOCX/text → text; import-free — the PDF engine arrives
 through a port, and `documents/pdf-inspector` is the one entry that binds the
 optional wasm peer)* · `openui` *(the host contract for agent-authored pages:

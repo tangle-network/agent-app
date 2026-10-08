@@ -1,8 +1,8 @@
 /**
  * better-auth config factory for agent products (#188 Phase 1). Every product
  * hand-rolls the same ~70–150 line setup — drizzle adapter over the standard
- * users/sessions/accounts/verifications tables, email+password with Resend
- * reset/verification mail, env-gated GitHub/Google social providers, session
+ * users/sessions/accounts/verifications tables, email+password with branded
+ * reset/verification mail (`./email`), env-gated GitHub/Google social providers, session
  * cookie cache, and a per-app cookie prefix — and tax additionally
  * re-implemented better-auth's cookie signing for its Tangle SSO callback.
  * `createAppAuth` owns that mechanism once and returns the configured
@@ -20,6 +20,7 @@
 
 import { betterAuth, type Auth, type BetterAuthOptions, type Session, type User } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { noticeEmail, type EmailAttachment, type EmailMessage, type EmailProduct } from '../email'
 import { createAuthGuard, type AuthGuard } from '../platform/guards'
 import {
   createBetterAuthSessionCookieMinter,
@@ -45,6 +46,8 @@ export interface AppAuthEmailClient {
       subject: string
       html: string
       text?: string
+      /** Inline images the HTML references by `cid:`, such as the Tangle mark. */
+      attachments?: EmailAttachment[]
     }): Promise<unknown>
   }
 }
@@ -55,7 +58,7 @@ export interface AppAuthEmailConfig {
    *  is absent (the products' dev default — mail is skipped with a warning,
    *  sign-up itself must not crash). */
   resend: AppAuthEmailClient | (() => AppAuthEmailClient | null)
-  /** RFC 5322 From, e.g. `'Legal Agent <noreply@legal.tangle.tools>'`. */
+  /** RFC 5322 From; build it with `emailSender` from `./email`, e.g. `Legal Agent · Tangle <noreply@tangle.tools>`. */
   from: string
   /** Send a verification email on sign-up and auto-sign-in after verifying
    *  (the tax/gtm behavior). Default false (the legal behavior). */
@@ -205,6 +208,10 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+function emailProduct(config: AppAuthConfig): EmailProduct {
+  return { name: config.appName, url: config.baseURL }
+}
+
 function resolveEmailClient(email: AppAuthEmailConfig): AppAuthEmailClient | null {
   return typeof email.resend === 'function' ? email.resend() : email.resend
 }
@@ -240,11 +247,12 @@ function deferDrizzleAdapter(
 
 /** Resend reports failures in the resolved value, not by rejecting — surface
  *  them loud so better-auth's flow (and the caller's logs) see the failure. */
-async function sendEmail(
-  client: AppAuthEmailClient,
-  message: { from: string; to: string; subject: string; html: string; text: string },
-): Promise<void> {
-  const result = (await client.emails.send(message)) as { error?: { message?: string } | null } | null | undefined
+async function sendEmail(client: AppAuthEmailClient, from: string, to: string, message: EmailMessage): Promise<void> {
+  const { subject, html, text, attachments } = message
+  const result = (await client.emails.send({ from, to, subject, html, text, attachments })) as
+    | { error?: { message?: string } | null }
+    | null
+    | undefined
   if (result && typeof result === 'object' && result.error) {
     throw new Error(`[app-auth] email send failed: ${result.error.message ?? 'unknown error'}`)
   }
@@ -291,13 +299,15 @@ function emailAndPasswordOptions(config: AppAuthConfig): BetterAuthOptions['emai
         warn('[app-auth] email client unavailable — password reset email not sent')
         return
       }
-      await sendEmail(client, {
-        from: email.from,
-        to: user.email,
+      await sendEmail(client, email.from, user.email, noticeEmail(emailProduct(config), {
         subject: 'Reset your password',
-        html: `<p>Click the link below to reset your password:</p><p><a href="${url}">${url}</a></p><p>This link expires in 1 hour.</p>`,
-        text: `Reset your password:\n\n${url}\n\nThis link expires in 1 hour.`,
-      })
+        title: 'Reset your password',
+        body: `Someone asked to reset the password for ${user.email}. If it was not you, ignore this email.`,
+        action: { label: 'Reset password', url },
+        showLink: true,
+        note: 'This link expires in 1 hour.',
+        footer: { reason: 'You received this because a password reset was requested for this address.' },
+      }))
     },
   }
 }
@@ -315,13 +325,15 @@ function emailVerificationOptions(config: AppAuthConfig): BetterAuthOptions['ema
         warn('[app-auth] email client unavailable — verification email not sent')
         return
       }
-      await sendEmail(client, {
-        from: email.from,
-        to: user.email,
-        subject: `Verify your ${config.appName} email`,
-        html: `<p>Verify your email to finish accessing ${config.appName}:</p><p><a href="${url}">${url}</a></p><p>This link expires in 1 hour.</p>`,
-        text: `Verify your email to finish accessing ${config.appName}:\n\n${url}\n\nThis link expires in 1 hour.`,
-      })
+      await sendEmail(client, email.from, user.email, noticeEmail(emailProduct(config), {
+        subject: 'Verify your email',
+        title: 'Verify your email',
+        body: `Confirm ${user.email} to finish signing in to ${config.appName}.`,
+        action: { label: 'Verify email', url },
+        showLink: true,
+        note: 'This link expires in 1 hour.',
+        footer: { reason: `You received this because this address was used to sign in to ${config.appName}.` },
+      }))
     },
   }
 }

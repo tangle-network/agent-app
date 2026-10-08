@@ -84,7 +84,7 @@ export interface InvitationsApiOptions {
   userTable: TeamParentTable & InvitationUserTable
   workspaceTable: TeamParentTable & InvitationWorkspaceTable
   access: Pick<WorkspaceAccessApi, 'getWorkspaceAccess'>
-  /** REQUIRED — the app's mail transport (e.g. Resend + renderInvitationEmail). */
+  /** REQUIRED — the app's mail transport (e.g. Resend + `inviteEmail` from `./email`). */
   sendInvitationEmail: SendInvitationEmailSeam
   /** OPTIONAL — seat-limit gate at create time; mirrors members-api. */
   enforceSeat?: EnforceSeatSeam

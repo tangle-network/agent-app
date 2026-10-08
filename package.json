@@ -70,6 +70,11 @@
       "import": "./dist/app-auth/index.js",
       "default": "./dist/app-auth/index.js"
     },
+    "./email": {
+      "types": "./dist/email/index.d.ts",
+      "import": "./dist/email/index.js",
+      "default": "./dist/email/index.js"
+    },
     "./app-oauth": {
       "types": "./dist/app-oauth/index.d.ts",
       "import": "./dist/app-oauth/index.js",
