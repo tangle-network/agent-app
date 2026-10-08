@@ -427,12 +427,19 @@ describe('SessionHistoryPanel', () => {
     expect(screen.getByLabelText('Search sessions')).toBeTruthy()
   })
 
-  it('reports search and sort changes to the product', () => {
+  it('reports search and sort changes to the product', async () => {
+    // jsdom lacks the layout APIs Radix Select calls while opening.
+    Element.prototype.scrollIntoView ??= vi.fn()
+    Element.prototype.hasPointerCapture ??= vi.fn(() => false)
+    Element.prototype.releasePointerCapture ??= vi.fn()
     const onQueryChange = vi.fn()
     const onSortChange = vi.fn()
     renderPanel({ onQueryChange, onSortChange })
     fireEvent.change(screen.getByLabelText('Search sessions'), { target: { value: 'acme' } })
-    fireEvent.change(screen.getByLabelText('Sort sessions'), { target: { value: 'oldest' } })
+    const sort = screen.getByRole('combobox', { name: 'Sort sessions' })
+    sort.focus()
+    fireEvent.keyDown(sort, { key: 'Enter' })
+    fireEvent.click(await screen.findByRole('option', { name: 'Oldest' }))
     expect(onQueryChange).toHaveBeenCalledWith('acme')
     expect(onSortChange).toHaveBeenCalledWith('oldest')
   })
