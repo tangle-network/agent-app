@@ -49,12 +49,12 @@ function ResourceRow({ label, resource, path }: {
   )
 }
 
-function PromptDetail({ label, note, value }: { label: string; note?: string; value: string }) {
+function PromptDetail({ label, note, value }: { label?: string; note?: string; value: string }) {
   return <div className="min-w-0 space-y-2">
-    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+    {label && <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
       <h4 className="font-medium text-foreground">{label}</h4>
       {note && <span className="text-sm text-muted-foreground">{note}</span>}
-    </div>
+    </div>}
     <div className="whitespace-pre-wrap break-words text-sm leading-7 text-foreground">{value}</div>
   </div>
 }
@@ -139,7 +139,7 @@ export function AgentProfileViewer({ profile, className = '', defaultExpanded = 
           <ProfileSection title="Instructions">
             <div className="space-y-6">
               {nonempty(prompt?.systemPrompt) && (
-                <PromptDetail label="System prompt" note="Replaces the harness default" value={prompt.systemPrompt} />
+                <PromptDetail label={nonempty(prompt.appendSystemPrompt) || instructions.length ? "System instructions" : undefined} note="Replaces default instructions" value={prompt.systemPrompt} />
               )}
               {nonempty(prompt?.appendSystemPrompt) && (
                 <PromptDetail

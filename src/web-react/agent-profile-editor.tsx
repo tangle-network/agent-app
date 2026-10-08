@@ -420,7 +420,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
       </div>
     </Section>
     <Section title="Instructions">
-      <Field label="System instructions" hint="Replaces the harness system prompt when supported.">
+      <Field label="System instructions" hint="Replaces default system instructions.">
         <Textarea aria-label="System instructions" className="min-h-52 text-base leading-7 sm:text-sm" disabled={editingDisabled} value={value.prompt?.systemPrompt ?? ''}
           onChange={event => prompt({ ...value.prompt, systemPrompt: event.target.value })} />
       </Field>
@@ -430,7 +430,6 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
           <Field label="Append to system prompt" hint="Adds to the system prompt without replacing it."><Textarea className="min-h-24" disabled={editingDisabled} value={value.prompt?.appendSystemPrompt ?? ''} onChange={event => prompt({ ...value.prompt, appendSystemPrompt: event.target.value })} /></Field>
           <div role="group" aria-label="Agent instructions" className="space-y-2">
         <p className="text-sm font-medium text-foreground">Agent instructions</p>
-        <p className="text-xs text-muted-foreground">Project-level instructions. Each entry remains separate.</p>
         <div className="space-y-2">{(value.prompt?.instructions ?? []).map((instruction, index) =>
           <div key={index} className="flex items-start gap-2">
             <Textarea aria-label={'Instruction ' + (index + 1)} className="min-h-20" disabled={editingDisabled} value={instruction}
@@ -485,7 +484,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
       <p className="text-xs text-muted-foreground">Nested permission rules remain in Advanced JSON.</p>
     </Disclosure>}
     {allowsResource('skills') && resourceSection('skills', 'Skills', 'Add skill packages from a repository or inline content.')}
-    {allowsResource('tools') && resourceSection('tools', 'Tool files', 'Provide files that a supported harness can discover as tools.')}
+    {allowsResource('tools') && resourceSection('tools', 'Tool files', 'Files that define custom tools.')}
     <Disclosure title="MCP servers" description={publicHttpsMcpOnly
       ? 'Configure public HTTPS servers. Use secret references for credentials.'
       : 'Configure remote or local servers. Use secret references for credentials.'} detail={Object.keys(value.mcp ?? {}).length + ' configured'}>
@@ -520,7 +519,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
         onAdd={(name, server) => emit({ ...value, mcp: { ...value.mcp, [name]: server } })} />}
       <p className="text-xs text-muted-foreground">Arguments, headers, environment, and secret references remain in Advanced JSON.</p>
     </Disclosure>
-    {allowsResource('files') && <Disclosure title="Resource files" description="Configure files for the agent workspace. The runtime determines whether it can place them." detail={(value.resources?.files ?? []).length + ' configured'}>
+    {allowsResource('files') && <Disclosure title="Resource files" description="Files to add to the agent workspace." detail={(value.resources?.files ?? []).length + ' configured'}>
       {(value.resources?.files ?? []).length === 0 && <p className="text-sm text-muted-foreground">No resource files configured.</p>}
       <ul className="space-y-2">{(value.resources?.files ?? []).map((mount, index) => {
         const issues = fileIssues(fileDraft(mount), workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha, true)

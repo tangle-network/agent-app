@@ -37,7 +37,7 @@ function Preview({ initial, registry, ...constraints }: { initial: AgentProfile 
   const [saved, setSaved] = useState<AgentProfile | null>(null)
   return <main className="min-h-screen bg-background p-4 text-foreground sm:p-8">
     <div className="mx-auto max-w-5xl space-y-5">
-      <header><h1 className="text-2xl font-semibold">Agent profile</h1><p className="mt-1 text-sm text-muted-foreground">Edit a local profile draft.</p></header>
+      <header><h1 className="text-2xl font-semibold">Agent profile</h1></header>
       <AgentProfileEditor value={profile} onChange={setProfile} onSaveStateChange={setSaveState} registry={registry} {...constraints} />
       <button type="button" className="rounded-lg border border-border bg-card px-4 py-2 text-sm disabled:opacity-50" disabled={saveState.pending || saveState.invalid} onClick={() => setSaved(profile)}>Save profile</button>
       {saveState.pending && <p role="status">Apply or discard unfinished edits before saving.</p>}
