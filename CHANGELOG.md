@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.4
+
+- chore(peers): support runtime 0.313 and materializer 0.22
+
 ## 0.59.3
 
 - fix(deps): accept sandbox-ui 0.131 (#887)
