@@ -107,10 +107,13 @@ describe('email templates', () => {
   })
 
   it('prints a postal address only when the product passes one', () => {
-    for (const message of Object.values(samples)) {
-      expect(message.html).not.toContain('[redacted]')
-      expect(message.text).not.toContain('Tangle Technologies')
-    }
+    // Without one, the footer is exactly the workspace, the reason and the manage link.
+    expect(samples.approval!.text.split('--\n')[1]).toBe([
+      'Tangle Growth · GTM Agent',
+      'You own this workspace.',
+      'Manage notifications: https://gtm.tangle.tools/app/ws_1/settings',
+      '',
+    ].join('\n'))
     const digest = digestEmail(product, {
       workspaceName: 'Tangle Growth', date: new Date('2026-10-08T07:00:00Z'), items: [], openUrl: '/app/ws_1',
       footer: { reason: 'You get a daily digest.', postalAddress: 'Example Co., 1 Main St, Springfield' },
