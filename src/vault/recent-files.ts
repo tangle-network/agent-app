@@ -6,7 +6,7 @@
 
 const PREFIX = 'tangle:vault-recent:'
 /** How many paths are kept; the empty state shows a few of them. */
-export const RECENT_FILE_LIMIT = 8
+const RECENT_FILE_LIMIT = 8
 
 function storage(key: string | undefined): Storage | null {
   if (!key || typeof window === 'undefined') return null
