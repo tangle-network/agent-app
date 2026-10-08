@@ -71,3 +71,34 @@ Knowledge documents are an add-wins event set.
 Add events commute; a remove event tombstones the add events it observed, so a concurrent add survives.
 Tombstones and unused managed resources are eligible only for a separate reaper: dry run first, no live binding or in-flight pin references, at least 24 hours old, and at least one successful turn after the replacement binding.
 Credentials from an old authority expire by TTL instead of being revoked during a switch.
+
+## Live self-mounting (the safe self-improve subset)
+
+The revision system above owns durable profile evolution: authority edits need
+editor consent, optimizer revisions promote through eval. **Self-mounting** is
+the complementary live dimension: the sandboxed agent adjusts its own mounted
+context (skills) through one audited verb — `createMountProfileChangeTool`
+from `./agent-profiles`.
+
+- **Permitted dimensions are schema-level**: `skills` today. Model, permissions,
+  tool denials and billing identity are not agent-changeable; refusals name
+  the permitted list.
+- **Idempotent**: dedupe by identity; re-applying a delta reports a no-op.
+- **Catalog-validated and capped**: only registry ids mount; context is a
+  budget (default cap 12). The baseline skill cannot be removed.
+- **Product-wired**: the product supplies its skill catalog, a storage port
+  (`{ get, set }`) and the persistence scope key.
+
+Self-improve means context and tooling — never self-authorize.
+
+## Profiles are a family, sandboxes are plural
+
+A sandbox carries no one-profile limit. The sidecar exposes per-session
+profiles (`POST /agents/sessions` with `backend.profile`, plus fork/list/
+abort/rebind), the sandbox SDK multiplexes them (`createSession`, per-run
+`runStream` profiles), and the provider accepts a per-turn
+`providerOptions.backend.profile` validated through `agentProfileSchema`.
+`create({ agentProfile })` is the provision-time convenience, not the ceiling:
+N agents with N profiles in one box is the supported shape, bounded only by
+the box's resources — which the payer owns. Every dynamic path materializes
+through the same validated door.
