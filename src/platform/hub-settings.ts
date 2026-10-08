@@ -1,5 +1,6 @@
 /** Finite, application-authorized account settings over the existing Hub SDK. */
 import { parseJsonObjectBody } from '../web/core'
+import { isHubConnectCallbackUrl } from './hub-connect-callback'
 
 /** Non-secret API-key setup shapes supported by the Hub SDK. */
 export type HubSettingsApiKeyMetadata =
@@ -71,6 +72,12 @@ export interface HubSettingsContext {
   /** Application-owned mount path, without a trailing slash. Default /api/hub/settings. */
   basePath?: string
   /**
+   * Local path of the page that renders `HubConnectCallbackPage`. When set, an
+   * OAuth start must return to exactly this path with the provider, nonce and
+   * context that the integrations panel adds, and nothing else.
+   */
+  oauthCallbackPath?: string
+  /**
    * Required on EVERY valid operation, including reads. Validate the current
    * session, CSRF protection, workspace role and exact target/decision here.
    * Return a denial Response or throw the app's auth Response to reject.
@@ -139,12 +146,13 @@ function metadata(value: unknown): HubSettingsApiKeyMetadata {
   }) }
 }
 
-function oauthInput(body: Record<string, unknown>, url: URL): HubSettingsOAuthInput {
+function oauthInput(body: Record<string, unknown>, url: URL, provider: string, callbackPath: string | undefined): HubSettingsOAuthInput {
   onlyKeys(body, ['returnUrl', 'connectionParameters'])
   const returnUrl = text(body.returnUrl, 2048)
   let destination: URL
   try { destination = new URL(returnUrl) } catch { invalid() }
   if (!['https:', 'http:'].includes(destination.protocol) || destination.origin !== url.origin || destination.username || destination.password) invalid()
+  if (callbackPath !== undefined && !isHubConnectCallbackUrl(destination, callbackPath, provider)) invalid()
   const input: HubSettingsOAuthInput = { returnUrl }
   if (body.connectionParameters !== undefined) {
     const parameters = record(body.connectionParameters)
@@ -205,7 +213,7 @@ const ROUTES = [
   { kind: 'policies', path: /^\/policies$/, methods: ['GET', 'PUT', 'DELETE'] },
 ] as const
 
-async function prepare(request: Request, basePath: string): Promise<Prepared | Response> {
+async function prepare(request: Request, basePath: string, callbackPath: string | undefined): Promise<Prepared | Response> {
   const url = new URL(request.url)
   if (!url.pathname.startsWith(`${basePath}/`)) return json({ error: 'Not found' }, 404)
   const path = url.pathname.slice(basePath.length)
@@ -264,7 +272,7 @@ async function prepare(request: Request, basePath: string): Promise<Prepared | R
     return { intent: { operation: 'provider.actions', provider: id, query: search, limit }, call: (hub) => hub.tools.search(search, { provider: id, limit }) }
   }
   if (route.kind === 'oauth') {
-    const input = freeze(oauthInput(await body(request), url))
+    const input = freeze(oauthInput(await body(request), url, id, callbackPath))
     return { intent: { operation: 'oauth.start', provider: id, input }, call: (hub) => hub.connections.start(id, input) }
   }
   if (route.kind === 'api-key') {
@@ -286,10 +294,12 @@ export function createHubSettingsRoutes(ctx: HubSettingsContext): HubSettingsRou
   }
   const basePath = ctx.basePath ?? '/api/hub/settings'
   if (!/^\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+$/.test(basePath)) throw new TypeError('Invalid Hub settings basePath')
+  const callbackPath = ctx.oauthCallbackPath
+  if (callbackPath !== undefined && !/^\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+$/.test(callbackPath)) throw new TypeError('Invalid Hub OAuth callback path')
 
   return { async handle(request) {
     let prepared: Prepared | Response
-    try { prepared = await prepare(request, basePath) } catch (error) {
+    try { prepared = await prepare(request, basePath, callbackPath) } catch (error) {
       if (error instanceof Response) return error
       throw error
     }
