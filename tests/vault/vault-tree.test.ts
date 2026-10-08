@@ -1,16 +1,15 @@
 // @vitest-environment jsdom
 /**
- * The built-in vault tree: folders start collapsed, a reader's expansion is
- * remembered per storage key and survives a remount, opening or linking to a
- * file reveals only that file's folders, and keyboard navigation follows the
- * tree pattern. VaultPane uses it whenever a product passes no `renderTree`.
+ * VaultPane's built-in tree (sandbox-ui's VaultTree, whose own behavior is
+ * tested there): a collapsed tree in a titled surface whose expansion is
+ * remembered under treeStateKey, a revealed linked file, open matches while
+ * searching, and the document pane's empty state with recently opened files.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
-import { VaultTree, VAULT_TREE_CHILD_PAGE } from '../../src/vault/VaultTree'
 import { VaultPane } from '../../src/vault/VaultPane'
 import type { VaultDataPort, VaultFile, VaultTreeNode } from '../../src/vault/contracts'
 
@@ -51,169 +50,12 @@ function queryRow(name: string) {
   return screen.queryByRole('treeitem', { name })
 }
 
-function mountTree(props: Partial<Parameters<typeof VaultTree>[0]> = {}) {
-  const onSelect = vi.fn()
-  const onFolderToggle = vi.fn()
-  const utils = render(createElement(VaultTree, { root: ROOT, onSelect, onFolderToggle, ...props }))
-  return { onSelect, onFolderToggle, ...utils }
-}
+// The pane lists the tree before it reads a file; under the full suite that
+// chain can outlast Testing Library's 1s default.
+const SETTLE = { timeout: 10_000 }
 
 beforeEach(() => window.localStorage.clear())
 afterEach(cleanup)
-
-describe('VaultTree — collapsed by default', () => {
-  it('lists only top-level rows, folders first, every folder closed', () => {
-    mountTree()
-    const names = screen.getAllByRole('treeitem').map((item) => item.textContent)
-    expect(names).toEqual(['playbooks', 'research', 'readme.md'])
-    expect(row('playbooks').getAttribute('aria-expanded')).toBe('false')
-    expect(row('research').getAttribute('aria-expanded')).toBe('false')
-    // Lazy: a closed folder's children are not mounted at all.
-    expect(queryRow('launch.md')).toBeNull()
-    expect(queryRow('icp.md')).toBeNull()
-  })
-
-  it('expands a folder on click and collapses it on the next click', () => {
-    const { onFolderToggle } = mountTree()
-    fireEvent.click(row('playbooks'))
-    expect(row('playbooks').getAttribute('aria-expanded')).toBe('true')
-    expect(row('launch.md')).toBeTruthy()
-    // Only one level opens: the nested folder stays closed.
-    expect(row('q4').getAttribute('aria-expanded')).toBe('false')
-    expect(queryRow('plan.md')).toBeNull()
-    expect(onFolderToggle).toHaveBeenLastCalledWith('playbooks', true)
-
-    fireEvent.click(row('playbooks'))
-    expect(queryRow('launch.md')).toBeNull()
-    expect(onFolderToggle).toHaveBeenLastCalledWith('playbooks', false)
-  })
-
-  it('opens a file on click without touching folders', () => {
-    const { onSelect, onFolderToggle } = mountTree()
-    fireEvent.click(row('readme.md'))
-    expect(onSelect).toHaveBeenCalledWith('readme.md')
-    expect(onFolderToggle).not.toHaveBeenCalled()
-  })
-})
-
-describe('VaultTree — remembered expansion', () => {
-  it('restores the folders a reader opened after a remount with the same key', () => {
-    const first = mountTree({ storageKey: 'user-1:ws-1' })
-    fireEvent.click(row('research'))
-    expect(row('icp.md')).toBeTruthy()
-    first.unmount()
-
-    mountTree({ storageKey: 'user-1:ws-1' })
-    expect(row('research').getAttribute('aria-expanded')).toBe('true')
-    expect(row('icp.md')).toBeTruthy()
-    expect(row('playbooks').getAttribute('aria-expanded')).toBe('false')
-  })
-
-  it('keeps each key separate and swaps state when the key changes', () => {
-    const { rerender } = mountTree({ storageKey: 'user-1:ws-1' })
-    fireEvent.click(row('research'))
-    expect(row('icp.md')).toBeTruthy()
-
-    rerender(createElement(VaultTree, { root: ROOT, onSelect: vi.fn(), storageKey: 'user-1:ws-2' }))
-    expect(queryRow('icp.md')).toBeNull()
-
-    rerender(createElement(VaultTree, { root: ROOT, onSelect: vi.fn(), storageKey: 'user-1:ws-1' }))
-    expect(row('icp.md')).toBeTruthy()
-  })
-
-  it('forgets expansion on remount when no key is given', () => {
-    const first = mountTree()
-    fireEvent.click(row('research'))
-    first.unmount()
-    mountTree()
-    expect(queryRow('icp.md')).toBeNull()
-  })
-
-  it('keeps working when storage throws', () => {
-    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked') })
-    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('full') })
-    try {
-      mountTree({ storageKey: 'user-1:ws-1' })
-      fireEvent.click(row('research'))
-      expect(row('icp.md')).toBeTruthy()
-    } finally {
-      getItem.mockRestore()
-      setItem.mockRestore()
-    }
-  })
-})
-
-describe('VaultTree — reveal', () => {
-  it('opens only the folders on the selected file’s path', () => {
-    mountTree({ selectedPath: 'playbooks/q4/plan.md' })
-    expect(row('playbooks').getAttribute('aria-expanded')).toBe('true')
-    expect(row('q4').getAttribute('aria-expanded')).toBe('true')
-    expect(row('plan.md').getAttribute('aria-selected')).toBe('true')
-    expect(row('research').getAttribute('aria-expanded')).toBe('false')
-    expect(queryRow('icp.md')).toBeNull()
-  })
-
-  it('respects a later collapse of the revealed folder', () => {
-    mountTree({ selectedPath: 'research/icp.md' })
-    fireEvent.click(row('research'))
-    expect(queryRow('icp.md')).toBeNull()
-  })
-
-  it('shows every match while filtering without changing remembered expansion', () => {
-    const { rerender } = mountTree({ storageKey: 'k', expandAll: true })
-    expect(row('plan.md')).toBeTruthy()
-    rerender(createElement(VaultTree, { root: ROOT, onSelect: vi.fn(), storageKey: 'k' }))
-    expect(queryRow('plan.md')).toBeNull()
-  })
-})
-
-describe('VaultTree — keyboard', () => {
-  it('moves, expands, enters, and leaves folders with the arrow keys', () => {
-    const { onSelect } = mountTree()
-    const tree = screen.getByRole('tree')
-    // One tab stop: the first row.
-    expect(within(tree).getAllByRole('treeitem').filter((item) => item.tabIndex === 0).map((item) => item.textContent)).toEqual(['playbooks'])
-
-    row('playbooks').focus()
-    fireEvent.keyDown(row('playbooks'), { key: 'ArrowRight' })
-    expect(row('playbooks').getAttribute('aria-expanded')).toBe('true')
-    fireEvent.keyDown(row('playbooks'), { key: 'ArrowRight' })
-    expect(document.activeElement).toBe(row('q4'))
-    fireEvent.keyDown(row('q4'), { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(row('launch.md'))
-    fireEvent.keyDown(row('launch.md'), { key: 'Enter' })
-    expect(onSelect).toHaveBeenCalledWith('playbooks/launch.md')
-    fireEvent.keyDown(row('launch.md'), { key: 'ArrowLeft' })
-    expect(document.activeElement).toBe(row('playbooks'))
-    fireEvent.keyDown(row('playbooks'), { key: 'ArrowLeft' })
-    expect(queryRow('launch.md')).toBeNull()
-    fireEvent.keyDown(row('playbooks'), { key: 'End' })
-    expect(document.activeElement).toBe(row('readme.md'))
-  })
-})
-
-describe('VaultTree — large folders', () => {
-  it('renders a large folder a page at a time', () => {
-    const count = VAULT_TREE_CHILD_PAGE + 50
-    const big: VaultTreeNode = {
-      name: 'Vault',
-      path: '',
-      type: 'directory',
-      children: [{
-        name: 'exports',
-        path: 'exports',
-        type: 'directory',
-        children: Array.from({ length: count }, (_, i) => ({ name: `row-${i}.csv`, path: `exports/row-${i}.csv`, type: 'file' as const })),
-      }],
-    }
-    render(createElement(VaultTree, { root: big, onSelect: vi.fn() }))
-    expect(screen.getAllByRole('treeitem')).toHaveLength(1)
-    fireEvent.click(row('exports'))
-    expect(screen.getAllByRole('treeitem')).toHaveLength(1 + VAULT_TREE_CHILD_PAGE)
-    fireEvent.click(screen.getByRole('button', { name: 'Show 50 more of 50' }))
-    expect(screen.getAllByRole('treeitem')).toHaveLength(1 + count)
-  })
-})
 
 describe('VaultPane — built-in tree', () => {
   function port(): VaultDataPort {
@@ -265,5 +107,31 @@ describe('VaultPane — built-in tree', () => {
     fireEvent.change(screen.getByLabelText('Search vault'), { target: { value: 'plan' } })
     expect(row('plan.md')).toBeTruthy()
     expect(queryRow('readme.md')).toBeNull()
+  })
+
+  it('says to select a file, then offers the files this reader opened last', async () => {
+    const first = render(createElement(VaultPane, { port: port(), renderArtifact, treeStateKey: 'u:w', label: 'Vault' }))
+    const empty = await screen.findByText('Select a file', undefined, SETTLE)
+    expect(empty.closest('[data-vault-document-empty]')).toBeTruthy()
+    expect(screen.queryByText('Recently opened')).toBeNull()
+    await waitFor(() => expect(row('readme.md')).toBeTruthy(), SETTLE)
+    fireEvent.click(row('readme.md'))
+    await waitFor(() => expect(screen.getByTestId('artifact').textContent).toBe('readme.md'), SETTLE)
+    first.unmount()
+
+    render(createElement(VaultPane, { port: port(), renderArtifact, treeStateKey: 'u:w', label: 'Vault' }))
+    const recent = await screen.findByRole('region', { name: 'Recently opened' }, SETTLE)
+    fireEvent.click(within(recent).getByRole('button', { name: /readme\.md/ }))
+    await waitFor(() => expect(screen.getByTestId('artifact').textContent).toBe('readme.md'), SETTLE)
+  })
+
+  it('keeps a host empty state, including null for an empty pane', async () => {
+    const custom = render(createElement(VaultPane, { port: port(), renderArtifact, emptyState: createElement('p', null, 'Pick a contract') }))
+    expect(await screen.findByText('Pick a contract', undefined, SETTLE)).toBeTruthy()
+    expect(screen.queryByText('Select a file')).toBeNull()
+    custom.unmount()
+    render(createElement(VaultPane, { port: port(), renderArtifact, emptyState: null }))
+    await waitFor(() => expect(row('playbooks')).toBeTruthy())
+    expect(screen.queryByText('Select a file')).toBeNull()
   })
 })

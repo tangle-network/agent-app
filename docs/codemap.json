@@ -19854,7 +19854,7 @@
         {
           "name": "VaultTree",
           "kind": "function",
-          "signature": "({ root, selectedPath, activeFolder, onSelect, onFolderToggle, storageKey, expandAll, label, className, }: VaultTreePro…",
+          "signature": "({ root, selectedPath, activeFolder, onSelect, onFolderToggle, storageKey, expandAll, label, className }: VaultTreeProp…",
           "doc": null
         },
         {
