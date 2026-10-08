@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.20
+
+- feat(vault): shared sandbox-ui tree and a Select-a-file empty state (#883)
+
 ## 0.58.19
 
 - fix(profile-editor): check MCP servers with manual redirects so the check runs in Workers
