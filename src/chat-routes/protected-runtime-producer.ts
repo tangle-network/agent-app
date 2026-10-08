@@ -9,6 +9,8 @@ import type { McpToolDefinition } from '../tools/mcp-rpc'
 import { createSandboxChatProducer } from './sandbox-producer'
 import type { ChatRouteEvent, ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
 
+const PROTECTED_CHAT_PROVIDERS: ReadonlySet<string> = new Set(['anthropic', 'openai'])
+
 export interface ProtectedRuntimeChatOptions {
   profile: AgentProfile
   prompt: string
@@ -77,7 +79,11 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
             reasoningTokens: settlement.calls.reduce((sum, call) => sum + call.reasoningTokens, 0),
             costUsd: settlement.calls.reduce((sum, call) => sum + call.costUsdNanos, 0) / 1e9,
           }
-          budgetEnforced = settlement.usageWithinLimits
+          // Execution limits carry no reasoning allowance, so a provider that
+          // reasons under a disabled-reasoning grant exceeded what was authorized.
+          const unauthorizedReasoning = usage.reasoningTokens! > 0 && options.grant.resolve.reasoningEffort === 'none'
+          budgetEnforced = settlement.usageWithinLimits && !unauthorizedReasoning
+          if (unauthorizedReasoning) throw new Error('Provider reported reasoning tokens although reasoning was disabled')
           if (!budgetEnforced) throw new Error('Provider settlement exceeded execution limits')
           if (auditError) throw auditError
           return settlement
@@ -87,10 +93,12 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
         signal.throwIfAborted()
         if (Date.now() >= options.grant.deadlineAtMs) throw new Error('Protected execution deadline expired')
         model = resolved.model
-        // Protected Anthropic requests permit only client tools. Their result
-        // text is included in input tokens, with no separately billed hosted tools.
-        if (resolved.provider !== 'anthropic' || resolved.reasoningEffort !== 'none') {
-          throw new Error('Protected chat currently requires Anthropic without reasoning')
+        // These providers serve client function tools over Chat Completions with
+        // reasoning disabled. Router refuses provider-hosted tools and cache
+        // markers on candidate grants, so tool-result text is billed as input and
+        // accounted input covers OpenAI's automatic cached prefix.
+        if (!PROTECTED_CHAT_PROVIDERS.has(resolved.provider) || resolved.reasoningEffort !== 'none') {
+          throw new Error('Protected chat currently requires an Anthropic or OpenAI model without reasoning')
         }
         toolTokens = 0
         const apiKey = activation.env.OPENAI_API_KEY

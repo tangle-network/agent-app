@@ -24,8 +24,8 @@ vi.mock('@tangle-network/agent-runtime/kernel', async importOriginal => {
 const digest = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as const
 const model = 'anthropic/claude-haiku-4-5-20251001'
 
-function fixture() {
-  const resolved = { requested: model, model, snapshot: model, provider: 'anthropic', reasoningEffort: 'none' as const }
+function fixture(provider = 'anthropic') {
+  const resolved = { requested: model, model, snapshot: model, provider, reasoningEffort: 'none' as const }
   const settle = vi.fn<AgentCandidateModelPort['settleGrant']>(async input => ({
     preparationId: input.preparationId, grantDigest: digest, closed: true, usageWithinLimits: true,
     calls: [{ callId: 'call-1', generationId: 'generation-1', traceSpanId: 'generation-1',
@@ -86,6 +86,46 @@ describe('protected Runtime chat producer', () => {
     expect(events.some(event => event.type === 'error')).toBe(false)
     expect(producer.finalText()).toBe('A useful finding.')
     expect(producer.usage?.()).toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: 0, costUsd: 0.0001 })
+  })
+
+  it('runs an OpenAI grant through the same Chat Completions executor', async () => {
+    const { options, settle } = fixture('openai')
+    const inference = vi.fn(async (url: string, init: RequestInit) => {
+      expect(url).toBe('https://candidate-router.tangle.tools/v1/chat/completions')
+      expect(JSON.parse(String(init.body))).toMatchObject({ reasoning_effort: 'none' })
+      return response({ content: 'A useful finding.' })
+    })
+    vi.stubGlobal('fetch', inference)
+    const producer = createProtectedRuntimeChatProducer(options)
+    const events = await drain(producer)
+    expect(inference).toHaveBeenCalledOnce()
+    expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'completed' }))
+    expect(events.some(event => event.type === 'error')).toBe(false)
+    expect(producer.finalText()).toBe('A useful finding.')
+  })
+
+  it('refuses a provider whose protected Chat Completions semantics are unverified', async () => {
+    const { options, settle } = fixture('google')
+    vi.stubGlobal('fetch', vi.fn())
+    const events = await drain(createProtectedRuntimeChatProducer(options))
+    expect(fetch).not.toHaveBeenCalled()
+    expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'failed' }))
+    expect(events.some(event => event.type === 'error')).toBe(true)
+  })
+
+  it('does not certify a disabled-reasoning budget when the provider reports reasoning', async () => {
+    const { options, settle } = fixture('openai')
+    const original = settle.getMockImplementation()!
+    settle.mockImplementation(async input => {
+      const settlement = await original(input)
+      return { ...settlement, calls: settlement.calls.map(call => ({ ...call, reasoningTokens: 1 })) }
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => response({ content: 'Completed work.' })))
+    const producer = createProtectedRuntimeChatProducer(options)
+    const events = await drain(producer)
+    expect(events).toContainEqual({ type: 'usage', usage: { promptTokens: 3, completionTokens: 2,
+      reasoningTokens: 1, toolTokens: 0, providerCostUsd: 0.0001, toolCallCount: 0, budgetEnforced: false } })
+    expect(events.some(event => event.type === 'error')).toBe(true)
   })
 
   it('sends prior chat rows to the provider as role and content only', async () => {
