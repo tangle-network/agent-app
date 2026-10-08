@@ -55,7 +55,7 @@ The app derives `identity` and `can` from its signed-in state.
 The host may render additional API-key metadata fields through `renderApiKeyMetadata`.
 Custom signup flows use `onUnsupportedConnect`; the panel does not redirect to Platform management.
 For host-owned access, such as which accounts one agent or workspace may use, pass `accounts`.
-The panel then lists each connected account once, with the host's `getStatus` and one inline `getPrimaryAction` control, followed by a catalog of providers that have no account yet.
+The panel separates Accounts and Add integration into tabs with counts. Accounts appear in searchable, icon-led cards with the host's `getStatus` and one inline `getPrimaryAction` control. Add integration opens the catalog of providers that have no account yet, without scrolling past existing accounts. An empty account collection opens the catalog by default; a confirmed new connection returns to Accounts.
 Manage opens the account's permissions, test, Disconnect, and Connect another account, and repeats the host's status and control there.
 The host authorizes the control and supplies the new status only after its server confirms the change.
 Without `accounts`, `getConnectionContext` and `getConnectionActions` decorate each account inside its catalog card.
