@@ -7,9 +7,18 @@ import { AgentProfileRegistryMcpSearch, AgentProfileRegistrySkillSearch } from '
 
 export type AgentProfileResourceKind = 'files' | 'skills' | 'tools' | 'agents' | 'commands' | 'instructions'
 
+export interface AgentProfileEditorSaveState {
+  /** Internal JSON, resource, or tool edits have not been applied to the profile. */
+  pending: boolean
+  /** Validation failed or stored values violate this editor's constraints. */
+  invalid: boolean
+}
+
 export interface AgentProfileEditorProps {
   value: AgentProfile
   onChange: (value: AgentProfile) => void
+  /** Disable the host's save action while edits are pending or invalid. */
+  onSaveStateChange?: (state: AgentProfileEditorSaveState) => void
   disabled?: boolean
   className?: string
   /** Hide unsupported resource controls. Existing entries remain in the profile and are flagged for review. */
@@ -220,7 +229,7 @@ function publicHttpsMcpError(server: AgentProfileMcpServer): string | null {
 /** Controlled editor for the canonical profile. The product owns save and execution authority. */
 export function AgentProfileEditor({ value, onChange, disabled = false, className, allowedResourceKinds,
   filePathPrefix, allowExecutableFiles = true, requireGitHubCommitSha = false, requireUniqueSkillNames = false,
-  showToolsAndPermissions = true, publicHttpsMcpOnly = false, registry }: AgentProfileEditorProps) {
+  showToolsAndPermissions = true, publicHttpsMcpOnly = false, registry, onSaveStateChange }: AgentProfileEditorProps) {
   const id = useId()
   const workspaceFilePrefix = normalizedFilePathPrefix(filePathPrefix)
   const [error, setError] = useState<string | null>(null)
@@ -254,6 +263,12 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     : 0
   const invalidMcpCount = publicHttpsMcpOnly
     ? Object.values(value.mcp ?? {}).filter(server => publicHttpsMcpError(server)).length : 0
+
+  const pending = jsonDirty || Boolean(resourceEdit || fileEdit || addingFile || newTool.trim() || mcpName.trim() || mcpTarget.trim()) ||
+    Object.values(resourceDrafts).some(draft => Boolean(draft.repository || draft.path || draft.ref || draft.name || draft.content))
+  const invalid = Boolean(error || unsupportedResources.length || constrainedEntryCount || invalidMcpCount)
+  useEffect(() => { onSaveStateChange?.({ pending, invalid }) }, [onSaveStateChange, pending, invalid])
+  useEffect(() => () => { onSaveStateChange?.({ pending: false, invalid: false }) }, [onSaveStateChange])
 
   function emit(next: AgentProfile) {
     if (jsonDirty) { setError('Apply or discard JSON edits first.'); return false }

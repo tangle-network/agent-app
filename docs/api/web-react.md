@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-458 exports.
+459 exports.
 
 ### `acceptRejectionReason`
 
@@ -92,6 +92,14 @@ interface AgentProfileChoicesProps
 
 ```ts
 interface AgentProfileEditorProps
+```
+
+### `AgentProfileEditorSaveState`
+
+`interface`
+
+```ts
+interface AgentProfileEditorSaveState
 ```
 
 ### `AgentProfileRegistryError`
