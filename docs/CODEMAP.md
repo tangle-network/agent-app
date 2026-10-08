@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_113 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_114 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -13,7 +13,7 @@ _113 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./agent-profiles/drizzle`](api/agent-profiles-drizzle.md) | 1 | `tools` |
 | [`./agent-profiles/reaper`](api/agent-profiles-reaper.md) | 5 | `tools` |
 | [`./alerting`](api/alerting.md) | 8 | — |
-| [`./app-auth`](api/app-auth.md) | 13 | `platform` |
+| [`./app-auth`](api/app-auth.md) | 13 | `email`, `platform` |
 | [`./app-oauth`](api/app-oauth.md) | 19 | — |
 | [`./assets`](api/assets.md) | 41 | — |
 | [`./assistant`](api/assistant.md) | 69 | `runtime`, `web-react` |
@@ -37,6 +37,7 @@ _113 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./design-canvas/drizzle`](api/design-canvas-drizzle.md) | 10 | `tools`, `web` |
 | [`./documents`](api/documents.md) | 37 | — |
 | [`./documents/pdf-inspector`](api/documents-pdf-inspector.md) | 4 | — |
+| [`./email`](api/email.md) | 19 | — |
 | [`./eval`](api/eval.md) | 21 | `tools` |
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
@@ -95,7 +96,7 @@ _113 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./stream`](api/stream.md) | 58 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 68 | — |
 | [`./studio-react`](api/studio-react.md) | 47 | `studio`, `web-react` |
-| [`./teams`](api/teams.md) | 37 | — |
+| [`./teams`](api/teams.md) | 33 | — |
 | [`./teams-react`](api/teams-react.md) | 10 | `brand`, `teams` |
 | [`./teams/drizzle`](api/teams-drizzle.md) | 26 | — |
 | [`./teams/invitations-api`](api/teams-invitations-api.md) | 13 | — |
@@ -194,7 +195,7 @@ Source: `src/alerting/index.ts` · 8 exports
 
 Source: `src/app-auth/index.ts` · 13 exports
 
-Depends on: `platform`
+Depends on: `email`, `platform`
 
 `AppAuth`, `AppAuthConfig`, `AppAuthEmailClient`, `AppAuthEmailConfig`, `AppAuthIdentitySsoConfig`, `AppAuthInstance`, `AppAuthOidcSsoConfig`, `AppAuthSchema`, `AppAuthSession`, `AppAuthSocialConfig`, `AppAuthSocialProviderConfig`, `AppAuthSsoConfig`, `createAppAuth`
 
@@ -413,6 +414,14 @@ Source: `src/documents/pdf-inspector.ts` · 4 exports
 `createPdfInspectorEngine`, `initPdfInspector`, `isPdfInspectorReady`, `PdfInspectorWasm`
 
 [Full API →](api/documents-pdf-inspector.md)
+
+## `./email`
+
+Source: `src/email/index.ts` · 19 exports
+
+`approvalEmail`, `ApprovalEmailAction`, `ApprovalEmailInput`, `digestEmail`, `DigestEmailInput`, `EmailAction`, `EmailAttachment`, `EmailFooter`, `EmailItem`, `EmailLintIssue`, `EmailMessage`, `emailPreviewHtml`, `EmailProduct`, `emailSender`, `inviteEmail`, `InviteEmailInput`, `lintEmailHtml`, `noticeEmail`, `NoticeEmailInput`
+
+[Full API →](api/email.md)
 
 ## `./eval`
 
@@ -938,9 +947,9 @@ Depends on: `studio`, `web-react`
 
 ## `./teams`
 
-Source: `src/teams/index.ts` · 37 exports
+Source: `src/teams/index.ts` · 33 exports
 
-`ASSIGNABLE_WORKSPACE_ROLES`, `AssignableWorkspaceRole`, `canManageWorkspaceMemberRole`, `generateInvitationToken`, `generateInviteToken`, `getInvitationExpiresAt`, `hasOrganizationRole`, `hasWorkspaceRole`, `INVITATION_EXPIRY_DAYS`, `InvitationEmailBrand`, `InvitationEmailStatus`, `InvitationPermission`, `InvitationStatus`, `InviteRejectionReason`, `InviteTokenState`, `inviteUrlForToken`, `InviteValidationResult`, `isAssignableWorkspaceRole`, `isInviteTokenShape`, `normalizeInvitationEmail`, `ORGANIZATION_ROLE_RANK`, `ORGANIZATION_ROLES`, `OrganizationRole`, `organizationRoleGrantsWorkspaceOwner`, `parseInvitationPermission`, `RenderedInvitationEmail`, `renderInvitationEmail`, `RenderInvitationEmailInput`, `resolveWorkspaceRole`, `SandboxWorkspaceRole`, `validateInviteToken`, `WORKSPACE_ROLE_RANK`, `WORKSPACE_ROLES`, `WorkspaceCollaborationAccess`, `WorkspaceRole`, `workspaceRoleToCollaborationAccess`, `workspaceRoleToSandboxRole`
+`ASSIGNABLE_WORKSPACE_ROLES`, `AssignableWorkspaceRole`, `canManageWorkspaceMemberRole`, `generateInvitationToken`, `generateInviteToken`, `getInvitationExpiresAt`, `hasOrganizationRole`, `hasWorkspaceRole`, `INVITATION_EXPIRY_DAYS`, `InvitationEmailStatus`, `InvitationPermission`, `InvitationStatus`, `InviteRejectionReason`, `InviteTokenState`, `inviteUrlForToken`, `InviteValidationResult`, `isAssignableWorkspaceRole`, `isInviteTokenShape`, `normalizeInvitationEmail`, `ORGANIZATION_ROLE_RANK`, `ORGANIZATION_ROLES`, `OrganizationRole`, `organizationRoleGrantsWorkspaceOwner`, `parseInvitationPermission`, `resolveWorkspaceRole`, `SandboxWorkspaceRole`, `validateInviteToken`, `WORKSPACE_ROLE_RANK`, `WORKSPACE_ROLES`, `WorkspaceCollaborationAccess`, `WorkspaceRole`, `workspaceRoleToCollaborationAccess`, `workspaceRoleToSandboxRole`
 
 [Full API →](api/teams.md)
 

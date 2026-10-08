@@ -4,7 +4,7 @@
 
 Source: `src/teams/index.ts`
 
-37 exports.
+33 exports.
 
 ### `ASSIGNABLE_WORKSPACE_ROLES`
 
@@ -76,14 +76,6 @@ type AssignableWorkspaceRole
 
 ```ts
 7
-```
-
-### `InvitationEmailBrand`
-
-`interface` — Define the structure for an invitation email brand including the RFC-5322 From header
-
-```ts
-interface InvitationEmailBrand
 ```
 
 ### `InvitationEmailStatus`
@@ -204,30 +196,6 @@ type OrganizationRole
 
 ```ts
 (value: string | undefined) => "viewer" | "editor" | "admin" | null
-```
-
-### `RenderedInvitationEmail`
-
-`interface` — Define the structure of a fully rendered invitation email with sender, subject, and content fields
-
-```ts
-interface RenderedInvitationEmail
-```
-
-### `renderInvitationEmail`
-
-`function` — Render the invitation email body — pure, deterministic, transport-free.
-
-```ts
-(input: RenderInvitationEmailInput, brand: InvitationEmailBrand) => RenderedInvitationEmail
-```
-
-### `RenderInvitationEmailInput`
-
-`interface` — Define input data required to render an invitation email template
-
-```ts
-interface RenderInvitationEmailInput
 ```
 
 ### `resolveWorkspaceRole`
