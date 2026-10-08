@@ -396,7 +396,7 @@ describe('EffortPicker width', () => {
 /**
  * The trigger VARIANT. `chip` is the shipped 36px bordered pill and the
  * default, so a consumer that names no variant renders the trigger it rendered
- * before the prop existed; `quiet` is the borderless 28px text button a
+ * before the prop existed; `quiet` is the borderless 32px text button a
  * composer whose card already draws the border opts into. jsdom paints
  * nothing, so what is pinned is the class contract: the border, the card fill,
  * and the pill radius are what the quiet trigger must NOT carry and the chip
@@ -427,7 +427,7 @@ describe('picker trigger variant', () => {
     expect(classes).not.toContain('bg-card')
     expect(classes).not.toContain('rounded-full')
     expect(classes).not.toContain('font-medium')
-    expect(classes).toContain('h-7')
+    expect(classes).toContain('h-[var(--control-height-sm,2rem)]')
     expect(classes).toContain('rounded-md')
     expect(classes).toContain('font-normal')
     expect(classes).toContain('text-muted-foreground')
@@ -451,7 +451,7 @@ describe('picker trigger variant', () => {
     expect(classes).not.toContain('bg-card')
     expect(classes).not.toContain('rounded-full')
     expect(classes).not.toContain('min-h-[36px]')
-    expect(classes).toContain('h-7')
+    expect(classes).toContain('h-[var(--control-height-sm,2rem)]')
     expect(classes).toContain('font-normal')
     expect(classes).toContain('text-muted-foreground')
   })

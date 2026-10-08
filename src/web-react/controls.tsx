@@ -385,7 +385,8 @@ export function pickerRootClass(fullWidth: boolean): string {
  *  - `chip` (default): the 36px bordered pill — `rounded-full border
  *    border-border bg-card font-medium`. A consumer that names no variant
  *    renders exactly what it rendered before this prop existed.
- *  - `quiet`: a 28px borderless text button — muted label, small glyph, a
+ *  - `quiet`: a 32px borderless text button (the control scale's sm, the
+ *    composer row's one height) — muted label, small glyph, a
  *    surface fill on hover and while the menu is open, nothing else. For a
  *    composer whose card already draws the border: three pills docked under
  *    the input there read as three more cards, not as the input's controls.
@@ -394,7 +395,7 @@ export type PickerVariant = 'chip' | 'quiet'
 
 /** The quiet trigger at rest: geometry, type, and keyboard focus. */
 const QUIET_PICKER_TRIGGER_BASE =
-  'inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-transparent px-2 text-sm font-normal text-muted-foreground transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  'inline-flex h-[var(--control-height-sm,2rem)] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-transparent px-2 text-sm font-normal text-muted-foreground transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 /** The fills a quiet trigger shows on hover and while its menu is open — the
  *  only two states it draws. Reads `data-state`, which every picker trigger
