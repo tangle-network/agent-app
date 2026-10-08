@@ -1,8 +1,8 @@
 /**
  * Seams between the shared VaultPane and the host product. Everything here is
- * interface-only: the pane never imports a file tree, an artifact viewer, a
- * dialog library, or a product's data client. The product supplies the data
- * (`VaultDataPort`) and the renderers (`renderTree`/`renderArtifact`/`renderDock`),
+ * interface-only: the pane never imports an artifact viewer, a dialog library,
+ * or a product's data client. The product supplies the data (`VaultDataPort`)
+ * and the renderers (`renderArtifact`/`renderDock`, optionally `renderTree`),
  * so the same 3-pane vault mounts in any Tangle agent product.
  *
  * `VaultTreeNode` BYTE-MATCHES sandbox-ui's `FileNode` so a product's tree
@@ -46,7 +46,7 @@ export interface VaultFile {
  * pane calls these; it never knows the transport.
  */
 export interface VaultDataPort {
-  /** List the full vault tree. The returned nodes feed `renderTree` directly. */
+  /** List the full vault tree. The returned nodes feed the tree directly. */
   listTree(): Promise<VaultTreeNode[]>
   /** Read a single file by path. */
   readFile(path: string): Promise<VaultFile>
@@ -113,7 +113,7 @@ export interface VaultPaneHandle {
   openFile: (path: string) => Promise<boolean>
 }
 
-/** Props the pane passes to the product's tree renderer (e.g. RichFileTree). */
+/** Props the pane passes to a product's replacement tree renderer. */
 export interface VaultTreeRenderProps {
   root: VaultTreeNode
   selectedPath?: string
@@ -169,8 +169,18 @@ export type VaultEditorMode = 'rich' | 'source'
 export interface VaultPaneProps {
   /** Product-owned data access. */
   port: VaultDataPort
-  /** Renders the left tree pane. The product passes sandbox-ui's RichFileTree. */
-  renderTree: (props: VaultTreeRenderProps) => ReactNode
+  /**
+   * Replaces the built-in tree. Omit it to use `VaultTree`: folders start
+   * collapsed, expansion is remembered under `treeStateKey`, and the open file's
+   * path is revealed.
+   */
+  renderTree?: (props: VaultTreeRenderProps) => ReactNode
+  /**
+   * Remembers which folders the reader expanded, in this browser, under this
+   * key. Pass the scope the tree belongs to, such as `${userId}:${workspaceId}`.
+   * Omit it and folders reopen collapsed on every visit.
+   */
+  treeStateKey?: string
   /** Renders the center artifact pane. The product passes sandbox-ui's FileArtifactPane. */
   renderArtifact: (props: VaultArtifactRenderProps) => ReactNode
   /** Renders an optional right dock (agent chat, metadata, …). Omit to hide. */

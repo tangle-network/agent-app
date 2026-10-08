@@ -1,10 +1,10 @@
 /**
  * The shared 3-pane vault: tree | artifact viewer | optional agent dock. This is
- * pure shell MECHANISM — selection, the dirty-guard + pending-nav state machine,
+ * shell mechanism — selection, the dirty-guard + pending-nav state machine,
  * rich/source editor modes, create/delete/refresh, skeletons, and an error
- * boundary. It renders NO file tree and NO artifact viewer of its own:
- * those arrive through the `renderTree` / `renderArtifact` / `renderDock` seams,
- * so a product wires sandbox-ui's RichFileTree + FileArtifactPane in ~10 lines.
+ * boundary — plus the vault's own tree (`VaultTree`) in a contained surface. It
+ * renders no artifact viewer of its own: that arrives through the
+ * `renderArtifact` / `renderDock` seams, and `renderTree` can replace the tree.
  *
  * Data flows exclusively through `port` (a `VaultDataPort`). The pane never
  * imports a fetch client, a router, a toast system, or a markdown library — the
@@ -19,15 +19,16 @@ import {
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useId,
   useMemo,
   useRef,
   useState,
   type ErrorInfo,
-  type MouseEvent,
   type ReactNode,
 } from 'react'
 import { Download, Folder, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from './ConfirmDialog'
+import { VaultTree } from './VaultTree'
 import type {
   VaultEditorMode,
   VaultFile,
@@ -43,6 +44,9 @@ import type {
 
 /** Narrowest pane that places a dock beside the document rather than in it. */
 const DOCK_SIDE_MIN_PX = 960
+
+/** Square header action on the control scale's small step, a touch target on coarse pointers. */
+const TREE_ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:size-10'
 
 const IDENTITY_CODEC: VaultMarkdownCodec = {
   parse: (raw) => raw,
@@ -121,28 +125,6 @@ function findDirectory(nodes: VaultTreeNode[], path: string): VaultTreeNode | nu
     if (found) return found
   }
   return null
-}
-
-/** The clicked tree row, files and directories alike. The type travels with the
- *  path so the caller routes on it instead of discarding everything that is not
- *  a file. */
-function treeClickTarget(event: MouseEvent<HTMLElement>): { path: string; type: string } | null {
-  const read = (el: HTMLElement) => {
-    const path = el.dataset.itemPath
-    return path ? { path, type: el.dataset.itemType ?? '' } : null
-  }
-
-  const path = event.nativeEvent.composedPath?.() ?? []
-  for (const item of path) {
-    if (!(item instanceof HTMLElement)) continue
-    if (item.dataset.type !== 'item') continue
-    return read(item)
-  }
-
-  const target = event.target instanceof HTMLElement
-    ? event.target.closest('[data-type="item"]')
-    : null
-  return target instanceof HTMLElement ? read(target) : null
 }
 
 // Case-insensitive name filter over the tree: files survive when their name
@@ -359,6 +341,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const {
     port,
     renderTree,
+    treeStateKey,
     renderArtifact,
     renderDock,
     canWrite = true,
@@ -399,6 +382,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const showFiles = filesOpen || !selectedPath
   const searchRef = useRef<HTMLInputElement>(null)
   const documentRef = useRef<HTMLDivElement>(null)
+  const treeHeadingId = useId()
 
   useEffect(() => {
     setFilesOpen(false)
@@ -513,11 +497,10 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     () => ({ name: label, path: '', type: 'directory', children: tree }),
     [tree, label],
   )
-  // With no query the whole vault stays on screen: the tree renderer owns
-  // expansion (both sandbox-ui trees keep it internal), so re-rooting on a
-  // plain folder click would fight the expand the click already performs. The
-  // folder scopes the SEARCH, which is where a narrowed list is what the reader
-  // asked for.
+  // With no query the whole vault stays on screen: the tree owns expansion, so
+  // re-rooting on a plain folder click would fight the expand the click already
+  // performs. The folder scopes the SEARCH, which is where a narrowed list is
+  // what the reader asked for.
   const visibleRoot = useMemo<VaultTreeNode>(() => {
     const q = query.trim().toLowerCase()
     if (!q) return treeRoot
@@ -744,6 +727,14 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const toggleFolder = useCallback((path: string) => {
     setFolderPath((current) => (current === path ? null : path))
   }, [])
+  // The built-in tree reports the folder's new state: expanding a folder makes
+  // it active, and collapsing the active folder or one around it clears it.
+  const handleFolderToggle = useCallback((path: string, expanded: boolean) => {
+    setFolderPath((current) => {
+      if (expanded) return path
+      return current && (current === path || current.startsWith(`${path}/`)) ? null : current
+    })
+  }, [])
 
   // Some tree models keep their original selection callback while resetting
   // paths internally. Keep the callable stable, but have it execute the latest
@@ -899,11 +890,24 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
           ? (treeEmptyState !== undefined ? treeEmptyState : <TreeEmptyState canCreate={canCreate} onCreate={openCreate} />)
           : trimmedQuery && (visibleRoot.children?.length ?? 0) === 0
             ? <TreeNoMatchState query={trimmedQuery} onClear={() => setQuery('')} />
-            : renderTree({
-              root: visibleRoot,
-              selectedPath: resolvedSelectedPath ?? undefined,
-              onSelect: handleTreeSelect,
-            })}
+            : renderTree
+              ? renderTree({
+                root: visibleRoot,
+                selectedPath: resolvedSelectedPath ?? undefined,
+                onSelect: handleTreeSelect,
+              })
+              : (
+                <VaultTree
+                  root={visibleRoot}
+                  selectedPath={resolvedSelectedPath ?? undefined}
+                  activeFolder={activeFolder}
+                  onSelect={handleTreeSelect}
+                  onFolderToggle={handleFolderToggle}
+                  storageKey={treeStateKey}
+                  expandAll={!!trimmedQuery}
+                  label={label}
+                />
+              )}
       </>
     )
   }
@@ -947,68 +951,76 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
           </nav>
           )}
           <div className="flex min-h-0 min-w-0 flex-1">
-            <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col bg-background @[45rem]/vault:flex ${treeSpansPane ? '' : 'border-r border-border @[45rem]/vault:w-[23rem] @[45rem]/vault:min-w-[23rem] @[45rem]/vault:flex-none'}`}>
-              <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
-                <div className="min-w-0 flex-1">
-                  {!vaultEmpty && <input
-                    ref={searchRef}
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder={activeFolder ? `Search ${activeFolder}…` : 'Search…'}
-                    aria-label={`Search ${noun}`}
-                    className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
-                  />}
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {headerActions}
-                  <button
-                    type="button"
-                    aria-label={`Refresh ${noun}`}
-                    title="Refresh"
-                    onClick={() => void refresh()}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  {canCreate && (
+            <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col p-2 @[45rem]/vault:flex @[45rem]/vault:p-3 ${treeSpansPane ? '' : '@[45rem]/vault:w-[23rem] @[45rem]/vault:min-w-[23rem] @[45rem]/vault:flex-none'}`}>
+              {/* The tree is its own surface: a card on the page background,
+                  so the file list reads as a finished panel rather than
+                  text floating on the canvas. */}
+              <section
+                aria-labelledby={treeHeadingId}
+                data-vault-tree-surface
+                className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-raised"
+              >
+                <div className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-3">
+                  <h2 id={treeHeadingId} className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                    {label}
+                  </h2>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {headerActions}
                     <button
                       type="button"
-                      title="New file"
-                      aria-label={activeFolder ? `New file in ${activeFolder}` : 'New file'}
-                      onClick={openCreate}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+                      aria-label={`Refresh ${noun}`}
+                      title="Refresh"
+                      onClick={() => void refresh()}
+                      className={`${TREE_ICON_BUTTON} text-muted-foreground hover:bg-muted hover:text-foreground`}
                     >
-                      <Plus className="h-4 w-4" aria-hidden="true" />
+                      <RefreshCw className="size-4" aria-hidden="true" />
                     </button>
-                  )}
+                    {canCreate && (
+                      <button
+                        type="button"
+                        title="New file"
+                        aria-label={activeFolder ? `New file in ${activeFolder}` : 'New file'}
+                        onClick={openCreate}
+                        className={`${TREE_ICON_BUTTON} bg-primary text-primary-foreground hover:bg-primary/90`}
+                      >
+                        <Plus className="size-4" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-              {activeFolder && (
-                <div className="flex items-center gap-1.5 border-b border-border bg-muted/40 px-4 py-1.5 text-xs">
-                  <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <span data-vault-folder className="min-w-0 flex-1 truncate font-medium text-foreground" title={activeFolder}>
-                    {activeFolder}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Clear the active folder"
-                    onClick={() => setFolderPath(null)}
-     className="shrink-0 rounded px-1 text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-                  >
-                    Clear
-                  </button>
+                {!vaultEmpty && (
+                  <div className="shrink-0 px-3 pb-2">
+                    <input
+                      ref={searchRef}
+                      type="search"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder={activeFolder ? `Search ${activeFolder}…` : `Search ${noun}…`}
+                      aria-label={`Search ${noun}`}
+                      className="h-8 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:text-base"
+                    />
+                  </div>
+                )}
+                {activeFolder && (
+                  <div className="mx-3 mb-2 flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs">
+                    <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <span data-vault-folder className="min-w-0 flex-1 truncate font-medium text-foreground" title={activeFolder}>
+                      {activeFolder}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Clear the active folder"
+                      onClick={() => setFolderPath(null)}
+                      className="shrink-0 rounded px-1 text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+                <div className="min-h-0 flex-1 overflow-y-auto border-t border-border px-1.5 py-1.5">
+                  {treeContent}
                 </div>
-              )}
-              <div
-                className="flex-1 overflow-y-auto"
-                onClickCapture={(event) => {
-                  const target = treeClickTarget(event)
-                  if (target) handleTreeSelect(target.path)
-                }}
-              >
-                {treeContent}
-              </div>
+              </section>
             </div>
 
             <div

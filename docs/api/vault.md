@@ -4,7 +4,7 @@
 
 Source: `src/vault/index.ts`
 
-18 exports.
+21 exports.
 
 ### `ConfirmDialog`
 
@@ -20,6 +20,14 @@ Source: `src/vault/index.ts`
 
 ```ts
 interface ConfirmDialogProps
+```
+
+### `VAULT_TREE_CHILD_PAGE`
+
+`const` — Children rendered per folder before a "Show more" row.
+
+```ts
+200
 ```
 
 ### `VaultArtifactRenderProps`
@@ -134,6 +142,14 @@ interface VaultPaneProps
 type VaultRichParts
 ```
 
+### `VaultTree`
+
+`function`
+
+```ts
+({ root, selectedPath, activeFolder, onSelect, onFolderToggle, storageKey, expandAll, label, className, }: VaultTreePro…
+```
+
 ### `VaultTreeNode`
 
 `interface` — One node in the vault tree.
@@ -142,9 +158,17 @@ type VaultRichParts
 interface VaultTreeNode
 ```
 
+### `VaultTreeProps`
+
+`interface`
+
+```ts
+interface VaultTreeProps
+```
+
 ### `VaultTreeRenderProps`
 
-`interface` — Props the pane passes to the product's tree renderer (e.g.
+`interface` — Props the pane passes to a product's replacement tree renderer.
 
 ```ts
 interface VaultTreeRenderProps
