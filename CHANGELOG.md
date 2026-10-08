@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.4
+
+- fix(chat): run protected chat on OpenAI grants without reasoning (#863)
+
 ## 0.58.3
 
 - fix(profile): guard unapplied editor drafts and qualify the SDK cohort
