@@ -49,7 +49,7 @@ import {
   type Harness,
 } from '../harness'
 import type { CatalogModel } from '../runtime/model-catalog'
-import { ModelPicker, EffortPicker, CheckGlyph, OVERLAY_SHADOW, pickerRootClass, PopoverSurface, quietPickerTriggerClass, usePopover } from './controls'
+import { ModelPicker, EffortPicker, CheckGlyph, fieldPickerTriggerClass, OVERLAY_SHADOW, pickerRootClass, PopoverSurface, quietPickerTriggerClass, usePopover } from './controls'
 import type { EffortLevel, PickerVariant } from './controls'
 import { HarnessGlyph } from './harness-glyphs'
 import { AgentSettingsPopover } from './agent-settings-popover'
@@ -138,41 +138,65 @@ const FOCUS_RING =
  *    the compact panel is an `overflow-y-auto` box, which clips a positioned
  *    descendant, and that surface is this package's answer to exactly that.
  */
-function HarnessPicker({
+export interface HarnessPickerProps {
+  /** The selected harness, or `''` for none when {@link HarnessPickerProps.defaultOption} is offered. */
+  value: Harness | ''
+  onChange: (h: Harness | '') => void
+  /** Harnesses to offer; defaults to the labeled set. */
+  available?: ReadonlyArray<Harness>
+  fullWidth?: boolean
+  /** Pin the control and say why; see the component notes. */
+  lockReason?: string
+  variant?: PickerVariant
+  /** Offer "no selection" as the first row; choosing it calls `onChange('')`. */
+  defaultOption?: { label: string }
+  /** Disable the trigger; unlike `lockReason` it explains nothing. */
+  disabled?: boolean
+  id?: string
+  'aria-describedby'?: string
+}
+
+export function HarnessPicker({
   value,
   onChange,
   available,
   fullWidth = false,
   lockReason,
   variant = 'chip',
-}: {
-  value: Harness
-  onChange: (h: Harness) => void
-  available?: ReadonlyArray<Harness>
-  fullWidth?: boolean
-  lockReason?: string
-  variant?: PickerVariant
-}) {
-  const [open, setOpen] = useState(false)
+  defaultOption,
+  disabled = false,
+  id,
+  'aria-describedby': ariaDescribedBy,
+}: HarnessPickerProps) {
+  const [requestedOpen, setOpen] = useState(false)
+  const open = requestedOpen && !disabled
   const [hintOpen, setHintOpen] = useState(false)
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
   const hintPanelRef = useRef<HTMLDivElement>(null)
   const panelId = useId()
   const reasonId = useId()
   const locked = lockReason !== undefined
+  const field = variant === 'field'
   const options = available ?? (Object.keys(HARNESS_LABELS) as Harness[])
   const showHint = () => setHintOpen(true)
   const hideHint = () => setHintOpen(false)
+  const label = value ? harnessLabel(value) : defaultOption?.label ?? 'Select harness'
+  const choose = (next: Harness | '') => {
+    onChange(next)
+    setOpen(false)
+  }
   return (
-    <div ref={containerRef} className={pickerRootClass(fullWidth)}>
+    <div ref={containerRef} className={pickerRootClass(fullWidth || field)}>
       <button
         type="button"
         {...triggerProps}
+        id={id}
+        disabled={disabled}
         aria-haspopup={locked ? undefined : true}
         aria-expanded={locked ? undefined : open}
         aria-controls={!locked && open ? panelId : undefined}
         aria-disabled={locked || undefined}
-        aria-describedby={locked ? reasonId : undefined}
+        aria-describedby={[locked ? reasonId : undefined, ariaDescribedBy].filter(Boolean).join(' ') || undefined}
         onClick={locked ? undefined : () => setOpen(!open)}
         onMouseEnter={locked ? showHint : undefined}
         onMouseLeave={locked ? hideHint : undefined}
@@ -181,18 +205,22 @@ function HarnessPicker({
         title="Agent backend"
         data-state={!locked && open ? 'open' : 'closed'}
         className={
-          variant === 'quiet'
+          field
+            ? fieldPickerTriggerClass({ interactive: !locked && !disabled })
+            : variant === 'quiet'
             ? `${quietPickerTriggerClass({ interactive: !locked })} w-full justify-between`
             : `inline-flex min-h-[36px] w-full items-center justify-between gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition ${
                 locked ? 'cursor-default' : 'hover:bg-accent'
               } ${FOCUS_RING}`
         }
       >
-        <span className="flex min-w-0 items-center gap-1.5">
+        <span className={`flex min-w-0 items-center ${field ? 'flex-1 gap-2' : 'gap-1.5'}`}>
           {/* Quiet inherits the trigger's tone, so the mark lifts with the
               label on hover instead of staying at full foreground. */}
-          <HarnessGlyph harness={value} className={variant === 'quiet' ? 'h-4 w-4 shrink-0' : 'h-4 w-4 shrink-0 text-foreground'} />
-          <span className="truncate">{harnessLabel(value)}</span>
+          {value
+            ? <HarnessGlyph harness={value} className={variant === 'quiet' ? 'h-4 w-4 shrink-0' : 'h-4 w-4 shrink-0 text-foreground'} />
+            : <GearGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          <span className={`truncate ${value ? '' : 'text-muted-foreground'}`}>{label}</span>
         </span>
         {locked ? (
           <LockGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -210,8 +238,8 @@ function HarnessPicker({
             role="tooltip"
             triggerRef={triggerRef}
             panelRef={hintPanelRef}
-            matchTriggerWidth={fullWidth}
-            className={`max-w-[248px] rounded-lg border border-card-edge bg-popover px-2.5 py-1.5 text-xs leading-snug text-muted-foreground ${OVERLAY_SHADOW}`}
+            matchTriggerWidth={fullWidth || field}
+            className={`max-w-[248px] rounded-lg border border-card-edge bg-popover px-2.5 py-1.5 text-sm leading-snug text-muted-foreground ${OVERLAY_SHADOW}`}
           >
             <span aria-hidden>{lockReason}</span>
           </PopoverSurface>
@@ -224,18 +252,31 @@ function HarnessPicker({
         triggerRef={triggerRef}
         panelRef={panelRef}
         matchTriggerWidth
+        side={field ? 'below' : undefined}
         className={`max-h-64 min-w-[248px] overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
       >
+          {defaultOption && (
+            <button
+              type="button"
+              role="menuitemradio"
+              aria-checked={value === ''}
+              onClick={() => choose('')}
+              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${FOCUS_RING} ${
+                value === '' ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
+              }`}
+            >
+              <GearGlyph className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate">{defaultOption.label}</span>
+              {value === '' && <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
+            </button>
+          )}
           {options.map((h) => (
             <button
               key={h}
               type="button"
               role="menuitemradio"
               aria-checked={h === value}
-              onClick={() => {
-                onChange(h)
-                setOpen(false)
-              }}
+              onClick={() => choose(h)}
               className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${FOCUS_RING} ${
                 h === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
               }`}
@@ -397,7 +438,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
       <AgentSettingsPopover summary={settingsSummary ?? selectedModel?.name ?? model} className={className}>
         {profileControl != null && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Profile</p>{profileControl}</div>}
         <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Model</p>{modelPicker}</div>
-        {showHarness && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Agent backend</p><HarnessPicker value={harness} onChange={onHarness} available={availableHarnesses} lockReason={harnessLockReason} fullWidth variant={variant} /></div>}
+        {showHarness && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Agent backend</p><HarnessPicker value={harness} onChange={(next) => { if (next) onHarness(next) }} available={availableHarnesses} lockReason={harnessLockReason} fullWidth variant={variant} /></div>}
         {showEffort && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Thinking</p><EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} fullWidth variant={variant} /></div>}
       </AgentSettingsPopover>
     )
@@ -413,7 +454,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
         {showHarness && (
           <HarnessPicker
             value={harness}
-            onChange={onHarness}
+            onChange={(next) => { if (next) onHarness(next) }}
             available={availableHarnesses}
             lockReason={harnessLockReason}
             variant={variant}
@@ -454,7 +495,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
                   <p className="text-xs font-medium text-foreground">Agent backend</p>
                   <HarnessPicker
                     value={harness}
-                    onChange={onHarness}
+                    onChange={(next) => { if (next) onHarness(next) }}
                     available={availableHarnesses}
                     fullWidth
                     lockReason={harnessLockReason}

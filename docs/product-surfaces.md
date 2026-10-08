@@ -455,7 +455,7 @@ That rule is the whole difference, and colour is not part of it: measured in Chr
 
 - **One animation, two meanings.** `animate-pulse` appears **14 times** in this package's shipped source — eleven of them real usages, three of them comments naming the class a surface deliberately moved off — and those eleven still carry two unrelated signals: a loading skeleton (`src/vault/VaultPane.tsx`, `src/web-react/session-history.tsx`, `src/web-react/message-attachments.tsx`, `src/web-react/record-grid.tsx`) and a live-running status dot (the dictation capture indicator in `src/web-react/chat-composer.tsx`). A reader cannot learn what pulsing means when it means both "no data yet" and "work in progress" — a 2s ease fade is the cue a placeholder uses, and a placeholder is the one thing a running agent is not. Every surface under `/web-react` is now off the ambiguous side of that: the streaming caret blinks on a hard step (`agent-caret`), and a label that is WAITING sweeps through its own glyphs (`agent-shimmer`) — the chat thinking row, and a delegated run still in flight in `src/web-react/mission-activity.tsx`, whose tone dot keeps the hue and drops the pulse. Inside `/web-react`, pulsing now means "no data yet" and nothing else.
 - **A component inventing its own timing.** The old studio composer hero hardcoded `duration-300` — a fourth number in a three-number scale, and one that did not move under `prefers-reduced-motion`. The composer rework (#449) deleted that component, and its replacement puts its one entrance (the option pills rising when the media type changes) in `src/studio-react/studio.css`, where the stylesheet's own `prefers-reduced-motion` block collapses it with every other studio animation. No file under `src/studio-react/` carries a Tailwind `duration-*` utility any more.
-- **A spinner with nothing to say.** Nine `animate-spin` uses; a spinner without a label naming what is being waited on communicates only "something", which is the one thing the reader already knew.
+- **A spinner with nothing to say.** 10 `animate-spin` uses; a spinner without a label naming what is being waited on communicates only "something", which is the one thing the reader already knew.
 
 ---
 
@@ -573,14 +573,25 @@ Each "still not structural" cell is a real piece of work, not a caveat: closing 
 `AgentProfileViewer` from `/web-react` presents configured profile data without disabled forms.
 Use `AgentProfileEditor` only when the user chooses to edit a draft.
 Pass `onSaveStateChange` to disable the product Save action while `pending` or `invalid` is true.
-Unapplied JSON, resource edits, and unfinished tool or MCP additions stay inside the editor until applied.
+Unapplied JSON, open add or edit panels, and unfinished MCP additions stay inside the editor until applied.
 The callback keeps the host from saving an older canonical value while those edits remain on screen.
 The product still validates and authorizes the final profile on the server.
+
+The editor's `config` says what a product offers: its sections, the model catalog its composer uses,
+its harnesses, GitHub and MCP checks, and upload limits. [Profile editor](./profile-editor.md) is the
+adoption guide, including the server route that answers the checks.
+The form uses one type size (14px; section titles 16px), one control height (`--control-height`), and
+8px/16px spacing. Labels name the setting in the person's words; help that explains a setting sits in an
+info tip, and a short sentence appears only when the person needs it to fill the field in. Schema paths
+and implementation notes do not appear in the form. Copy specific to one source, such as GitHub,
+appears only while that source is selected. Model, harness, and thinking fields reuse `ModelPicker`,
+`HarnessPicker`, and `EffortPicker` with `variant="field"`; they are never text inputs.
+
 The viewer shows model hints, instructions, tool policy, MCP aliases, and declared resources.
 It does not claim that a resource loaded or a model served a request.
 The default overview keeps MCP URLs, headers, environment values, and connection identifiers private.
 The overview groups settings in bordered cards with tinted headers and shared Brand color roles.
-Prompt fields retain their exact schema paths: `prompt.systemPrompt` overrides the system prompt,
+The viewer's prompt fields retain their exact schema paths: `prompt.systemPrompt` overrides the system prompt,
 `prompt.appendSystemPrompt` adds system text, and `prompt.instructions` supplies lower-priority workspace guidance.
 Set `showFullProfile={true}` only in an owner-authorized context to offer Overview, JSON tree,
 and Raw views, plus copy and download of the full supplied profile. The JSON views preserve

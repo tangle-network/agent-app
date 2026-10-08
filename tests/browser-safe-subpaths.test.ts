@@ -51,6 +51,9 @@ const BROWSER_NONREACT = new Set([
   // The copy-quality leaf is a pure scanner over strings; an editor can lint a
   // draft in the browser with the same rules the server scores.
   'copy-quality',
+  // The profile editor's port types, wire client, and URL policy; its server
+  // handler is the separate `profile-editor/server` subpath.
+  'profile-editor',
 ])
 
 /** Browser-intended when a client bundle imports it: the whole `*-react` family,

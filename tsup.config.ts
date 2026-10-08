@@ -13,6 +13,8 @@ export default defineConfig({
     'skills/index': 'src/skills/index.ts',
     'skills-placement/index': 'src/skills-placement/index.ts',
     'profile/index': 'src/profile/index.ts',
+    'profile-editor/index': 'src/profile-editor/index.ts',
+    'profile-editor/server': 'src/profile-editor/server.ts',
     'agent-profiles/index': 'src/agent-profiles/index.ts',
     'agent-profiles/d1': 'src/agent-profiles/d1.ts',
     'agent-profiles/drizzle': 'src/agent-profiles/drizzle.ts',

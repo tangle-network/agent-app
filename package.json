@@ -115,6 +115,16 @@
       "import": "./dist/profile/index.js",
       "default": "./dist/profile/index.js"
     },
+    "./profile-editor": {
+      "types": "./dist/profile-editor/index.d.ts",
+      "import": "./dist/profile-editor/index.js",
+      "default": "./dist/profile-editor/index.js"
+    },
+    "./profile-editor/server": {
+      "types": "./dist/profile-editor/server.d.ts",
+      "import": "./dist/profile-editor/server.js",
+      "default": "./dist/profile-editor/server.js"
+    },
     "./agent-profiles": {
       "types": "./dist/agent-profiles/index.d.ts",
       "import": "./dist/agent-profiles/index.js",
