@@ -1,7 +1,7 @@
 Subject: Join Tangle Growth — GTM Agent
 Preheader: drew@tangle.tools invited you to Tangle Growth.
 
-GTM Agent
+Tangle GTM Agent
 
 Join Tangle Growth
 
@@ -14,4 +14,3 @@ This invitation expires on Oct 15, 2026.
 --
 Tangle Growth · GTM Agent
 You received this because drew@tangle.tools invited this address.
-Tangle Technologies, Inc., [redacted], USA

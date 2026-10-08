@@ -38,7 +38,3 @@ export const EMAIL_PALETTE = {
  */
 export const EMAIL_FONT_STACK =
   "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif"
-
-/** The postal line every Tangle email footer carries (Stripe business profile support address). */
-export const TANGLE_POSTAL_ADDRESS =
-  'Tangle Technologies, Inc., [redacted], USA'

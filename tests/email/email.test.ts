@@ -91,8 +91,33 @@ describe('email templates', () => {
     for (const part of [html, text]) {
       expect(part).toContain('Tangle Growth · GTM Agent')
       expect(part).toContain('You own this workspace.')
-      expect(part).toContain('Tangle Technologies, Inc.')
     }
+  })
+
+  it('leads with the Tangle lockup and the product name, without doubling Tangle', () => {
+    const { html, text } = samples.approval!
+    expect(html).toMatch(/font-weight:700">Tangle<\/span><span[^>]*font-weight:500">&nbsp;GTM Agent<\/span>/)
+    expect(text.split('\n')[0]).toBe('Tangle GTM Agent')
+    const sandbox = noticeEmail({ name: 'Tangle Sandbox', url: 'https://sandbox.tangle.tools' }, {
+      subject: 'Hello', title: 'Hello', body: 'Hi.', footer: { reason: 'You have an account.' },
+    })
+    expect(sandbox.html).toContain('&nbsp;Sandbox</span>')
+    expect(sandbox.text.split('\n')[0]).toBe('Tangle Sandbox')
+    expect(sandbox.subject).toBe('Hello — Tangle Sandbox')
+  })
+
+  it('prints a postal address only when the product passes one', () => {
+    for (const message of Object.values(samples)) {
+      expect(message.html).not.toContain('[redacted]')
+      expect(message.text).not.toContain('Tangle Technologies')
+    }
+    const digest = digestEmail(product, {
+      workspaceName: 'Tangle Growth', date: new Date('2026-10-08T07:00:00Z'), items: [], openUrl: '/app/ws_1',
+      footer: { reason: 'You get a daily digest.', postalAddress: 'Example Co., 1 Main St, Springfield' },
+    })
+    expect(digest.html).toContain('Example Co., 1 Main St, Springfield')
+    expect(digest.text).toContain('Example Co., 1 Main St, Springfield')
+    expect(lintEmailHtml(digest.html)).toEqual([])
   })
 
   it('escapes product data in HTML and keeps it readable in text', () => {
@@ -118,7 +143,8 @@ describe('email templates', () => {
 
   it('embeds the Tangle mark inline and previews it as a data URI', () => {
     const message = samples.approval!
-    expect(message.html).toContain('<img src="cid:tangle-mark" width="28" height="28" alt="Tangle"')
+    // Decorative: the Tangle wordmark beside it carries the name.
+    expect(message.html).toContain('<img src="cid:tangle-mark" width="28" height="28" alt=""')
     expect(message.attachments).toEqual([
       expect.objectContaining({ contentId: 'tangle-mark', contentType: 'image/png', filename: 'tangle.png' }),
     ])

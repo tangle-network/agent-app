@@ -1,9 +1,13 @@
 import { TANGLE_MARK_PNG_BASE64 } from './mark.generated'
-import { EMAIL_FONT_STACK, EMAIL_PALETTE, TANGLE_POSTAL_ADDRESS } from './palette'
+import { EMAIL_FONT_STACK, EMAIL_PALETTE } from './palette'
 
 /** The app an email comes from. */
 export interface EmailProduct {
-  /** Shown beside the Tangle mark, after each subject and in the sender name, e.g. `GTM Agent`. */
+  /**
+   * The product name, e.g. `GTM Agent`. The header reads `Tangle GTM Agent`;
+   * subjects and the sender use the name alone. A name that already starts
+   * with `Tangle` (`Tangle Sandbox`) is not doubled.
+   */
   name: string
   /** The app's absolute origin; app-relative links resolve against it. */
   url: string
@@ -17,6 +21,12 @@ export interface EmailFooter {
   reason: string
   /** Where the recipient changes which emails they get; absolute or app-relative. */
   manageUrl?: string
+  /**
+   * The sender's postal address, for marketing mail such as a digest. Leave it
+   * unset on transactional mail (approvals, invites, sign-in), which does not
+   * need one.
+   */
+  postalAddress?: string
 }
 
 /** A button. `url` is absolute or app-relative. */
@@ -141,12 +151,23 @@ function link(label: string, href: string, style: string): string {
   return `<a class="t-link" href="${escapeHtml(href)}" style="color:${L.accentText};text-decoration:none;${style}">${escapeHtml(label)}</a>`
 }
 
+/** The product name after the `Tangle` logotype: `GTM Agent`, or `Sandbox` for `Tangle Sandbox`. */
+function productSuffix(product: EmailProduct): string {
+  return product.name.replace(/^Tangle\s+/i, '')
+}
+
+// Brand's lockup: the knot, `Tangle` in the logotype's bold, then the product
+// name at a lighter weight, as the product site headers set it.
 function header(product: EmailProduct): string {
+  const type = `font-family:${FONT};font-size:17px;line-height:20px;letter-spacing:-0.01em;color:${L.ink}`
   return [
     '<table role="presentation" cellpadding="0" cellspacing="0" border="0">',
     '<tr>',
-    `<td style="padding:0 10px 0 0;vertical-align:middle"><img src="cid:${MARK_CONTENT_ID}" width="28" height="28" alt="Tangle" style="display:block;width:28px;height:28px;border:0;outline:none;text-decoration:none"></td>`,
-    `<td class="t-ink" style="vertical-align:middle;font-family:${FONT};font-size:16px;line-height:20px;font-weight:600;letter-spacing:-0.01em;color:${L.ink}">${escapeHtml(product.name)}</td>`,
+    `<td style="padding:0 10px 0 0;vertical-align:middle"><img src="cid:${MARK_CONTENT_ID}" width="28" height="28" alt="" style="display:block;width:28px;height:28px;border:0;outline:none;text-decoration:none"></td>`,
+    `<td class="t-ink" style="vertical-align:middle;white-space:nowrap;${type}">`,
+    `<span class="t-ink" style="${type};font-weight:700">Tangle</span>`,
+    `<span class="t-ink" style="${type};font-weight:500">&nbsp;${escapeHtml(productSuffix(product))}</span>`,
+    '</td>',
     '</tr>',
     '</table>',
   ].join('')
@@ -213,9 +234,14 @@ function footerLines(footer: EmailFooter, product: EmailProduct): { html: string
     escapeHtml(where),
     escapeHtml(footer.reason),
     ...(manage ? [link('Manage notifications', manage, 'text-decoration:underline')] : []),
-    escapeHtml(TANGLE_POSTAL_ADDRESS),
+    ...(footer.postalAddress ? [escapeHtml(footer.postalAddress)] : []),
   ]
-  const text = [where, footer.reason, ...(manage ? [`Manage notifications: ${manage}`] : []), TANGLE_POSTAL_ADDRESS]
+  const text = [
+    where,
+    footer.reason,
+    ...(manage ? [`Manage notifications: ${manage}`] : []),
+    ...(footer.postalAddress ? [footer.postalAddress] : []),
+  ]
   return { html, text }
 }
 
@@ -270,7 +296,7 @@ function renderHtml(content: EmailContent, product: EmailProduct): string {
 }
 
 function renderText(content: EmailContent, product: EmailProduct): string {
-  const blocks: string[] = [product.name, content.title, ...content.paragraphs]
+  const blocks: string[] = [`Tangle ${productSuffix(product)}`, content.title, ...content.paragraphs]
   if (content.items && content.items.length > 0) {
     blocks.push(content.items.map((item) => {
       const lines = [`- ${item.title}`]
