@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.13
+
+- fix(integrations): reset account search when workspace changes (#873)
+
 ## 0.58.12
 
 - fix(integrations): make account cards and catalog directly accessible (#871)
