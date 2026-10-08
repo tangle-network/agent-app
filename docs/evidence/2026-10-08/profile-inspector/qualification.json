@@ -29,7 +29,7 @@
     "Synthetic source Storybook, not served production evidence",
     "Phone browser emulation, not physical handset",
     "JSON shows supplied profile configuration, not assembled runtime request",
-    "Original video playback review pending root CUA transport recovery; decoded frame review passed"
+    "Original video playback unverified: native CUA transport failed and the browser rejected the local file URL. Decoded frame review passed."
   ],
   "sha256": {
     "before-viewer-1440-agent-light.png": "57e3226540ced3b4418760ab512c624550d6b9a77e9951efb3b6026b8c14dbed",
