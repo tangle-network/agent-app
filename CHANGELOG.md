@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.10
+
+- feat: expose icon tile layout in Hub integrations (#869)
+
 ## 0.58.9
 
 - fix(integrations): accept the panel's OAuth return and list each account once
