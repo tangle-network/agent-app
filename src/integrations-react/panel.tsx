@@ -5,6 +5,7 @@ import {
   IntegrationsCatalog,
   OAuthConnectionParameterDialog,
   type IntegrationDisplayAction,
+  type IntegrationsCatalogProps,
   type IntegrationSort,
 } from '@tangle-network/sandbox-ui/integrations'
 import { Button } from '@tangle-network/ui/primitives'
@@ -19,6 +20,8 @@ export interface HubIntegrationsPanelProps {
   can: HubIntegrationCapabilities
   callbackPath: string
   title?: string
+  /** Compact, icon-led tiles or descriptive cards. Defaults to cards. */
+  layout?: IntegrationsCatalogProps['layout']
   className?: string
   onRequestIntegration?: (prefill: string) => void
   onUnsupportedConnect?: (provider: HubProvider) => void
@@ -137,6 +140,7 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
       />
     </> : <IntegrationsCatalog
       title={props.title ?? 'Integrations'}
+      layout={props.layout}
       rows={rows}
       query={query}
       onQueryChange={setQuery}
