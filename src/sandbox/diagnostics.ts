@@ -226,6 +226,16 @@ export function isSandboxAuthFailure(diagnostics: SafeSandboxErrorDiagnostics): 
   })
 }
 
+/**
+ * True when the Sandbox API refused the caller's bearer: a 401 from any
+ * Sandbox API route, including list and query routes such as
+ * `/v1/sandboxes?status=stopped`. The caller should invalidate its cached key
+ * and mint a new one once.
+ *
+ * Runtime routes (`/v1/sandboxes/{id}/runtime/...`) are excluded: the box's
+ * runtime authentication answers those, and a new Sandbox API key does not fix
+ * it. `isSandboxAuthFailure` covers them.
+ */
 export function isSandboxApiBearerAuthFailure(diagnostics: SafeSandboxErrorDiagnostics): boolean {
   return diagnostics.causes.some((cause) => {
     const status = typeof cause.status === 'number'
@@ -237,8 +247,8 @@ export function isSandboxApiBearerAuthFailure(diagnostics: SafeSandboxErrorDiagn
     if (cause.origin !== 'sandbox-api') return false
     if (typeof cause.endpoint !== 'string') return false
     const endpointPath = sandboxApiEndpointPath(cause.endpoint)
-    if (!endpointPath) return false
-    return /^\/v1\/sandboxes\/[^/?#]+(?:\/(?!runtime(?:[/?#]|$))[^?#]*)?(?:[?#].*)?$/.test(endpointPath)
+    if (!endpointPath || !/^\/v1(?:[/?#]|$)/.test(endpointPath)) return false
+    return !/^\/v1\/sandboxes\/[^/?#]+\/runtime(?:[/?#]|$)/.test(endpointPath)
   })
 }
 

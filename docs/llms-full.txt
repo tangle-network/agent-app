@@ -16403,7 +16403,7 @@ interface InspectablePrewarmClaimStore
 
 ### `isSandboxApiBearerAuthFailure`
 
-`function`
+`function` — True when the Sandbox API refused the caller's bearer: a 401 from any Sandbox API route, including list and query routes such as `/v1/sandboxes?status=stopped`.
 
 ```ts
 (diagnostics: SafeSandboxErrorDiagnostics) => boolean

@@ -12739,7 +12739,7 @@
           "name": "isSandboxApiBearerAuthFailure",
           "kind": "function",
           "signature": "(diagnostics: SafeSandboxErrorDiagnostics) => boolean",
-          "doc": null
+          "doc": "True when the Sandbox API refused the caller's bearer: a 401 from any Sandbox API route, including list and query routes such as `/v1/sandboxes?status=stopped`."
         },
         {
           "name": "isSandboxApiSandboxMissingFailure",
