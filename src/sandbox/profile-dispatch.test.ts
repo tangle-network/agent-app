@@ -216,6 +216,23 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
 })
 
 describe('profile preparation for product transports', () => {
+  it('forwards the native secret profile pin through durable drive turns', async () => {
+    const f = fixture()
+    const receipt = {
+      expectedPublicProfileRequestDigest: `sha256:${'a'.repeat(64)}` as const,
+      expectedSecretProfileReceipt: `hmac-sha256:${'b'.repeat(64)}` as const,
+    }
+    const result = await driveSandboxTurn(f.shell, f.box, 'hello', {
+      sessionId: 'profile-thread-1', profile: profile(),
+      secretProfileIsolation: true, ...receipt,
+    })
+    expect(result.succeeded).toBe(true)
+    expect(f.driveTurn).toHaveBeenCalledWith('hello', expect.objectContaining({
+      ...receipt,
+      backend: expect.objectContaining({ metadata: { profileSecretIsolation: true } }),
+    }))
+  })
+
   it('prepares a complete backend without provisioning configuration or a second profile composer', async () => {
     const selected = profile()
     const backend = await resolveSandboxPromptBackend(
