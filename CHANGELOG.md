@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.1
+
+- fix(email): Tangle lockup in the header; postal address only on request (#885)
+
 ## 0.59.0
 
 - feat(email)!: branded transactional email kit for agent apps (#884)
