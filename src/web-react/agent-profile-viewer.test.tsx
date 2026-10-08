@@ -38,9 +38,9 @@ describe('AgentProfileViewer', () => {
 
     expect(html).toContain('Front desk')
     expect(html).toContain('You are the front desk agent.')
-    expect(html).toContain('Replaces default instructions')
+    expect(html).toContain('Replaces the harness default')
     expect(html).toContain('Use the guest ledger when relevant.')
-    expect(html).toContain('Lower-privilege workspace guidance')
+    expect(html).toContain('Lower-priority workspace guidance')
     expect(html).toContain('ledger.search')
     expect(html).toContain('Disabled in profile')
     expect(html).toContain('private')

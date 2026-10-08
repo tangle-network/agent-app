@@ -168,10 +168,10 @@ type AgentProfileResourceKind
 
 ### `AgentProfileViewer`
 
-`function` — Read-only view of configured profile data.
+`function` — The JSON views use the original supplied object, including fields the overview does not summarize.
 
 ```ts
-({ profile, className, defaultExpanded, showIdentity }: AgentProfileViewerProps) => Element
+({ profile, className, showFullProfile, ...overview }: AgentProfileViewerProps) => Element
 ```
 
 ### `AgentProfileViewerProps`
