@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.59.6
+
+- chore(peers): accept agent-integrations 0.68 (#890)
+
 ## 0.59.5
 
 - fix(history): put SessionHistoryPanel on the shared ui controls (#889)
