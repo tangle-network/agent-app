@@ -109,7 +109,8 @@ export function lintEmailHtml(html: string): EmailLintIssue[] {
   }
 
   for (const img of tags(visible, 'img')) {
-    if (!attribute(img, 'alt')) issue('image', `Image without alt text: ${img.slice(0, 80)}`)
+    // alt="" is valid for a decorative image, such as a mark beside its own wordmark.
+    if (attribute(img, 'alt') === null) issue('image', `Image without alt text: ${img.slice(0, 80)}`)
     if (!attribute(img, 'width') || !attribute(img, 'height')) issue('image', `Image without width and height: ${img.slice(0, 80)}`)
     const src = attribute(img, 'src') ?? ''
     if (!/^(?:https:|cid:)/.test(src)) issue('image', `Image source must be https: or cid: (${src.slice(0, 40)})`)

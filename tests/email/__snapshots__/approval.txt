@@ -1,7 +1,7 @@
 Subject: Approve: create agent “Quinn” — GTM Agent
 Preheader: The agent paused in “Launch the Quinn voice agent” until you decide.
 
-GTM Agent
+Tangle GTM Agent
 
 Approval needed
 
@@ -17,4 +17,3 @@ Review: https://gtm.tangle.tools/app/ws_1/review
 Tangle Growth · GTM Agent
 You own this workspace.
 Manage notifications: https://gtm.tangle.tools/app/ws_1/settings
-Tangle Technologies, Inc., 3740 South Ocean Blvd, #1407, Highland Beach, FL 33487, USA

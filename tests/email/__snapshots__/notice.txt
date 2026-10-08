@@ -1,7 +1,7 @@
 Subject: Reset your password — GTM Agent
 Preheader: Someone asked to reset the password for ada@example.com.
 
-GTM Agent
+Tangle GTM Agent
 
 Reset your password
 
@@ -14,4 +14,3 @@ This link expires in 1 hour.
 --
 GTM Agent
 You received this because a password reset was requested for this address.
-Tangle Technologies, Inc., 3740 South Ocean Blvd, #1407, Highland Beach, FL 33487, USA
