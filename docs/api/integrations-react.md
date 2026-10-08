@@ -80,7 +80,7 @@ type HubIntegrationCapability
 
 ### `HubIntegrationsAccounts`
 
-`interface` — Lists each connected account once, with its host status and one inline host control.
+`interface` — Shows each connected account once, with its host status and one inline host control.
 
 ```ts
 interface HubIntegrationsAccounts

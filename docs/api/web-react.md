@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-459 exports.
+467 exports.
 
 ### `acceptRejectionReason`
 
@@ -28,6 +28,14 @@ Source: `src/web-react/index.tsx`
 
 ```ts
 type ActivityTone
+```
+
+### `AGENT_PROFILE_EDITOR_SECTIONS`
+
+`const`
+
+```ts
+readonly AgentProfileEditorSection[]
 ```
 
 ### `AgentActivityPage`
@@ -83,7 +91,23 @@ interface AgentProfileChoicesProps
 `function` — Controlled editor for the canonical profile.
 
 ```ts
-({ value, onChange, disabled, className, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGitHubCommi…
+({ value, onChange, disabled, className, config, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGit…
+```
+
+### `AgentProfileEditorConfig`
+
+`interface` — What a product offers in the editor.
+
+```ts
+interface AgentProfileEditorConfig
+```
+
+### `AgentProfileEditorModelCatalog`
+
+`interface` — The model catalog the selectors offer: the same list the product's chat composer uses.
+
+```ts
+interface AgentProfileEditorModelCatalog
 ```
 
 ### `AgentProfileEditorProps`
@@ -100,6 +124,14 @@ interface AgentProfileEditorProps
 
 ```ts
 interface AgentProfileEditorSaveState
+```
+
+### `AgentProfileEditorSection`
+
+`type` — Editor sections a product can offer, in display order.
+
+```ts
+type AgentProfileEditorSection
 ```
 
 ### `AgentProfileRegistryError`
@@ -1211,7 +1243,7 @@ interface EffortLevel
 `function` — Thinking-budget selector pill, styled to match {@link ModelPicker}.
 
 ```ts
-({ value, onChange, levels, label, fullWidth, variant }: EffortPickerProps) => Element
+({ value, onChange, levels, label, fullWidth, variant, disabled, id, "aria-describedby": ariaDescribedBy }: EffortPicke…
 ```
 
 ### `EffortPickerProps`
@@ -1300,6 +1332,14 @@ type FetchSessionPage
 
 ```ts
 (field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
+```
+
+### `fieldPickerTriggerClass`
+
+`function` — Trigger classes for a `field` picker.
+
+```ts
+({ interactive }?: { interactive?: boolean | undefined; }) => string
 ```
 
 ### `FieldValues`
@@ -1476,6 +1516,22 @@ interface FlowWaterfallProps
 
 ```ts
 interface HarnessGlyphProps
+```
+
+### `HarnessPicker`
+
+`function`
+
+```ts
+({ value, onChange, available, fullWidth, lockReason, variant, defaultOption, disabled, id, "aria-describedby": ariaDes…
+```
+
+### `HarnessPickerProps`
+
+`interface` — Pill-styled harness picker — inline, no sandbox-ui dependency.
+
+```ts
+interface HarnessPickerProps
 ```
 
 ### `hasSecretField`
@@ -2860,6 +2916,14 @@ type RecordGridWriteOutcome
 
 ```ts
 (record: ProvenanceRecord, policy?: ProvenanceConfidencePolicy) => ProvenanceStanding
+```
+
+### `ResourceFileLimits`
+
+`interface`
+
+```ts
+interface ResourceFileLimits
 ```
 
 ### `responseErrorMessage`

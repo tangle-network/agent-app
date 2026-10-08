@@ -1,18 +1,86 @@
-import { useEffect, useId, useState, type ReactNode } from 'react'
-import type { AgentProfile, AgentProfileFileMount, AgentProfileMcpServer, AgentProfileResourceRef } from '@tangle-network/agent-interface/profile'
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
+import type { AgentProfile, AgentProfileFileMount, AgentProfileResourceRef } from '@tangle-network/agent-interface/profile'
+import { REASONING_EFFORTS } from '@tangle-network/agent-interface/profile'
+import { reasoningEffortsFor } from '@tangle-network/agent-interface/harness-capabilities'
 import { agentProfileSchema } from '@tangle-network/agent-interface/profile-schema'
 import { Button, Input, Textarea, Switch, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@tangle-network/sandbox-ui/primitives'
+import { TooltipProvider } from '@tangle-network/ui/primitives'
+import { isModelCompatibleWithHarness, snapModelToHarness, type Harness } from '../harness'
+import type { CatalogModel } from '../runtime/model-catalog'
+import { publicHttpsUrlProblem, readSkillFrontmatter, type GitHubSourceCheck, type ProfileEditorGitHubPort, type ProfileEditorMcpPort } from '../profile-editor'
+import { EffortPicker, effortLevelsFromIds, ModelPicker, type EffortLevel } from './controls'
+import { HarnessPicker } from './agent-session-controls'
 import type { AgentProfileRegistryPort } from './agent-profile-registry'
-import { AgentProfileRegistryMcpSearch, AgentProfileRegistrySkillSearch } from './agent-profile-registry-search'
-import { ProfileCard, ProfileSectionHeading } from './agent-profile-layout'
+import { AgentProfileRegistrySkillSearch } from './agent-profile-registry-search'
+import { Field, fieldMessageId, formRow, formText, listRow, noAutofill, Notice, rowActions as rowActionsClass, Section, StatusLine } from './agent-profile-form-kit'
+import { GitHubSourcePicker } from './agent-profile-github-source'
+import { McpServersEditor } from './agent-profile-mcp-servers'
+import { ResourceFileDrop, type ResourceFileLimits } from './agent-profile-files'
 
 export type AgentProfileResourceKind = 'files' | 'skills' | 'tools' | 'agents' | 'commands' | 'instructions'
+
+/** Editor sections a product can offer, in display order. */
+export type AgentProfileEditorSection = 'identity' | 'prompts' | 'model' | 'tools' | 'skills' | 'toolFiles' | 'mcp' | 'files' | 'advanced'
+
+export const AGENT_PROFILE_EDITOR_SECTIONS: readonly AgentProfileEditorSection[] =
+  ['identity', 'prompts', 'model', 'tools', 'skills', 'toolFiles', 'mcp', 'files', 'advanced']
 
 export interface AgentProfileEditorSaveState {
   /** Internal JSON, resource, or tool edits have not been applied to the profile. */
   pending: boolean
   /** Validation failed or stored values violate this editor's constraints. */
   invalid: boolean
+}
+
+/** The model catalog the selectors offer: the same list the product's chat composer uses. */
+export interface AgentProfileEditorModelCatalog {
+  models: CatalogModel[]
+  loading?: boolean
+  error?: string | null
+  onRetry?: () => void
+  /** Label for an empty model setting, for example "Product default". */
+  defaultLabel?: string
+}
+
+/**
+ * What a product offers in the editor. Every part is optional; an omitted part
+ * falls back to the plain control or hides the section.
+ */
+export interface AgentProfileEditorConfig {
+  /** Sections to show, in the editor's fixed order. Defaults to every section the other props allow. */
+  sections?: readonly AgentProfileEditorSection[]
+  identity?: {
+    /** False when the product fixes the profile name. Defaults to true. */
+    nameEditable?: boolean
+  }
+  /** Catalog-backed model selectors. Without it, model fields are plain text inputs. */
+  models?: AgentProfileEditorModelCatalog
+  /** Harnesses the product runs. Omit to hide the harness selector. */
+  harnesses?: readonly Harness[]
+  /** Thinking levels for a harness and model. Defaults to the levels that harness applies, plus Auto. */
+  thinkingLevels?: (input: { harness?: Harness; model?: CatalogModel }) => readonly EffortLevel[]
+  /** GitHub sources through the product's checks. Without it, GitHub sources are typed by hand. */
+  github?: {
+    port: ProfileEditorGitHubPort
+    /**
+     * `reference` stores `{ kind: 'github', repository, path, ref }` pinned to the
+     * checked commit. `inline` stores the checked file's text, for products that
+     * do not fetch GitHub at run time.
+     */
+    storage: 'reference' | 'inline'
+    /** Where the person connects GitHub, shown when the workspace has no connection. */
+    connectHref?: string
+  }
+  mcp?: {
+    /** Health checks; each enabled remote server is checked automatically. */
+    port?: ProfileEditorMcpPort
+    /** Explain why servers are read-only here. Presence locks toggles and edits. */
+    lockReason?: string
+    /** Offer local command servers. Defaults to true unless `publicHttpsMcpOnly` is set. */
+    allowLocalCommand?: boolean
+  }
+  /** Limits for uploaded resource files. */
+  files?: ResourceFileLimits
 }
 
 export interface AgentProfileEditorProps {
@@ -22,6 +90,8 @@ export interface AgentProfileEditorProps {
   onSaveStateChange?: (state: AgentProfileEditorSaveState) => void
   disabled?: boolean
   className?: string
+  /** Product configuration: sections, model catalog, harnesses, and source checks. */
+  config?: AgentProfileEditorConfig
   /** Hide unsupported resource controls. Existing entries remain in the profile and are flagged for review. */
   allowedResourceKinds?: readonly AgentProfileResourceKind[]
   /** Require resource file workspace paths under this relative folder, for example `reference/`. */
@@ -50,69 +120,9 @@ function configuredResourceCount(profile: AgentProfile, kind: AgentProfileResour
   return Array.isArray(resource) ? resource.length : resource ? 1 : 0
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return <label className="block space-y-1.5 text-sm font-medium text-foreground">
-    <span>{label}</span>{children}
-    {hint && <span className="block text-xs font-normal text-muted-foreground">{hint}</span>}
-  </label>
-}
-
-function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return <ProfileCard title={title} description={description}>{children}</ProfileCard>
-}
-
-function Disclosure({ title, description, detail, children }: {
-  title: string; description?: string; detail?: string; children: ReactNode
-}) {
-  return <details className="group min-w-0 overflow-hidden rounded-xl border border-border bg-card">
-    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-muted/35 px-4 py-3 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5">
-      <span className="min-w-0"><ProfileSectionHeading title={title} />
-        {description && <span className="mt-2 block text-sm leading-6 text-muted-foreground">{description}</span>}</span>
-      <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-        {detail}<span aria-hidden="true" className="transition-transform group-open:rotate-180">⌄</span></span>
-    </summary>
-    <div className="min-w-0 space-y-4 border-t border-border p-4 sm:p-5">{children}</div>
-  </details>
-}
-
 function issueMessage(error: { issues: readonly { path: PropertyKey[]; message: string }[] }) {
   const issue = error.issues[0]
   return issue ? (issue.path.map(String).join('.') || 'Profile') + ': ' + issue.message : 'Invalid profile'
-}
-
-interface ResourceDraft {
-  kind: 'github' | 'inline'
-  repository: string
-  path: string
-  ref: string
-  name: string
-  content: string
-}
-
-interface FileDraft {
-  path: string
-  resource: ResourceDraft
-  executable: boolean
-}
-
-function emptyResourceDraft(): ResourceDraft {
-  return { kind: 'github', repository: '', path: '', ref: '', name: '', content: '' }
-}
-
-function resourceDraft(ref: AgentProfileResourceRef): ResourceDraft {
-  return ref.kind === 'github'
-    ? { ...emptyResourceDraft(), kind: 'github', repository: ref.repository ?? '', path: ref.path, ref: ref.ref ?? '', name: ref.name ?? '' }
-    : { ...emptyResourceDraft(), kind: 'inline', name: ref.name, content: ref.content }
-}
-
-function resourceRef(draft: ResourceDraft): AgentProfileResourceRef {
-  return draft.kind === 'inline'
-    ? { kind: 'inline', name: draft.name.trim(), content: draft.content }
-    : {
-      kind: 'github', repository: draft.repository.trim(), path: draft.path.trim(),
-      ...(draft.ref.trim() ? { ref: draft.ref.trim() } : {}),
-      ...(draft.name.trim() ? { name: draft.name.trim() } : {}),
-    }
 }
 
 function validRelativePath(path: string): boolean {
@@ -125,106 +135,60 @@ function normalizedFilePathPrefix(prefix?: string): string | undefined {
   return folder ? folder + '/' : undefined
 }
 
-function resourceError(draft: ResourceDraft, requireGitHubCommitSha = false, stored = false): string | null {
-  const checked = stored ? draft : resourceDraft(resourceRef(draft))
-  if (checked.kind === 'inline') return checked.name.trim() ? null : 'Enter a name for the inline file.'
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(checked.repository)) return 'Enter a GitHub repository as owner/repo.'
-  if (!checked.path) return 'Enter a path within the GitHub repository.'
+const SKILL_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/
+
+/** Problems with a stored or drafted GitHub reference under the product's constraints. */
+function githubRefIssue(ref: AgentProfileResourceRef, requireGitHubCommitSha: boolean): string | null {
+  if (ref.kind !== 'github') return null
+  const repository = ref.repository ?? ''
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) || repository.split('/').some(part => part === '.' || part === '..')) {
+    return 'Choose the GitHub repository for this file.'
+  }
+  if (!ref.path) return 'Choose a file in the repository.'
   if (requireGitHubCommitSha) {
-    if (checked.repository.length > 200 || checked.repository.split('/').some(segment => segment === '.' || segment === '..')) {
-      return 'Enter a GitHub repository as owner/repo.'
-    }
-    if (!/^[0-9a-f]{40}$/i.test(checked.ref)) return 'Enter a 40-character GitHub commit SHA.'
-    if (!validRelativePath(checked.path) || /[?#%]/.test(checked.path)) return 'Enter a relative repository path without traversal or URL characters.'
-    if (checked.name && (!checked.name.trim() || checked.name.length > 160 || /[\u0000-\u001f\u007f]/.test(checked.name))) {
-      return 'Enter a short file name without control characters.'
-    }
+    if (!/^[0-9a-f]{40}$/i.test(ref.ref ?? '')) return 'Pin this source to a 40-character GitHub commit SHA.'
+    if (!validRelativePath(ref.path) || /[?#%]/.test(ref.path)) return 'Use a relative repository path without traversal or URL characters.'
   }
   return null
 }
 
-function skillNameError(draft: ResourceDraft, refs: readonly AgentProfileResourceRef[], index?: number, stored = false): string | null {
-  const name = stored ? draft.name : draft.name.trim()
-  if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) {
-    return 'Enter a lowercase skill name of up to 64 letters, numbers, dots, dashes, or underscores.'
-  }
-  if (refs.some((ref, item) => item !== index && ref.name === name)) return 'A skill with that name already exists.'
-  return null
+function inlineSkillSummary(content: string): string | null {
+  const frontmatter = readSkillFrontmatter(content)
+  if (frontmatter.ok) return frontmatter.description
+  const line = content.split('\n').map(text => text.replace(/^#+\s*/, '').trim()).find(Boolean)
+  return line ? line.slice(0, 160) : null
 }
 
-function ResourceFields({ draft, onChange, disabled, pathPlaceholder, requireGitHubCommitSha, requireSkillName }: {
-  draft: ResourceDraft
-  onChange: (draft: ResourceDraft) => void
-  disabled: boolean
-  pathPlaceholder: string
-  requireGitHubCommitSha: boolean
-  requireSkillName?: boolean
-}) {
-  function change(field: keyof ResourceDraft, text: string) { onChange({ ...draft, [field]: text }) }
-  return <div className="grid gap-3 sm:grid-cols-2">
-    <Field label="Source"><Select disabled={disabled} value={draft.kind} onValueChange={kind => change('kind', kind)}>
-      <SelectTrigger aria-label="Source"><SelectValue /></SelectTrigger><SelectContent>
-        <SelectItem value="github">GitHub file</SelectItem><SelectItem value="inline">Inline content</SelectItem>
-      </SelectContent></Select></Field>
-    {draft.kind === 'github' ? <>
-      <Field label="Repository" hint="GitHub owner/repo"><Input disabled={disabled} value={draft.repository}
-        onChange={event => change('repository', event.target.value)} placeholder="owner/repo" /></Field>
-      <Field label="Repository path" hint="Relative to the repository root"><Input disabled={disabled} value={draft.path}
-        onChange={event => change('path', event.target.value)} placeholder={pathPlaceholder} /></Field>
-      <Field label={requireGitHubCommitSha ? 'Commit SHA' : 'Ref'} hint={requireGitHubCommitSha ? 'Use the full 40-character SHA of a fixed commit.' : 'Defaults to the main branch'}>
-        <Input disabled={disabled} value={draft.ref} onChange={event => change('ref', event.target.value)}
-          placeholder={requireGitHubCommitSha ? '40-character commit SHA' : 'main'} /></Field>
-      <Field label={requireSkillName ? 'Skill name' : 'Name'}
-        hint={requireSkillName ? 'Unique lowercase name, up to 64 letters, numbers, dots, dashes, or underscores.' : 'Defaults to the source filename'}>
-        <Input disabled={disabled} value={draft.name} onChange={event => change('name', event.target.value)}
-          placeholder={requireSkillName ? 'research' : undefined} /></Field>
-    </> : <>
-      <Field label={requireSkillName ? 'Skill name' : 'File name'}
-        hint={requireSkillName ? 'Unique lowercase name, up to 64 letters, numbers, dots, dashes, or underscores.' : undefined}>
-        <Input disabled={disabled} value={draft.name} onChange={event => change('name', event.target.value)}
-          placeholder={requireSkillName ? 'research' : 'guide.md'} /></Field>
-      <div className="sm:col-span-2"><Field label="Content"><Textarea className="min-h-32 font-mono text-sm" disabled={disabled}
-        value={draft.content} onChange={event => change('content', event.target.value)} /></Field></div>
-    </>}
-  </div>
+function sourceLine(ref: AgentProfileResourceRef): string {
+  if (ref.kind === 'inline') return `Written here · ${Math.max(1, Math.round(new TextEncoder().encode(ref.content).byteLength / 1024))} KB`
+  return ['GitHub', ref.repository ? `${ref.repository}/${ref.path}` : ref.path, ref.ref ? `@ ${ref.ref.slice(0, 7)}` : null].filter(Boolean).join(' · ')
 }
 
-function fileDraft(mount: AgentProfileFileMount): FileDraft {
-  return { path: mount.path, resource: resourceDraft(mount.resource), executable: mount.executable ?? false }
+function basename(path: string): string {
+  return path.split('/').filter(Boolean).pop() ?? path
 }
 
-function fileMount(draft: FileDraft): AgentProfileFileMount {
-  return { path: draft.path.trim(), resource: resourceRef(draft.resource), ...(draft.executable ? { executable: true } : {}) }
+/** A suggested skill name from frontmatter or the skill folder. */
+function suggestedSkillName(check: GitHubSourceCheck): string {
+  const fromFrontmatter = check.skill?.name ?? ''
+  const folder = check.path.split('/').slice(-2, -1)[0] ?? ''
+  const raw = fromFrontmatter || folder || basename(check.path).replace(/\.md$/i, '')
+  return raw.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '').slice(0, 64)
 }
 
-function fileIssues(draft: FileDraft, filePathPrefix: string | undefined, allowExecutableFiles: boolean,
-  requireGitHubCommitSha: boolean, stored = false): string[] {
-  const issues: string[] = []
-  const path = stored ? draft.path : draft.path.trim()
-  if (!path) issues.push('Enter a workspace path for the file.')
-  else if (filePathPrefix && (!path.startsWith(filePathPrefix) || !validRelativePath(path))) {
-    issues.push('Enter a relative workspace path under ' + filePathPrefix + ' without traversal.')
-  }
-  if (!allowExecutableFiles && draft.executable) issues.push('Executable resource files are not allowed.')
-  const resourceIssue = resourceError(draft.resource, requireGitHubCommitSha, stored)
-  if (resourceIssue) issues.push(resourceIssue)
-  return issues
+function defaultThinkingLevels({ harness, model }: { harness?: Harness; model?: CatalogModel }): readonly EffortLevel[] {
+  const efforts = harness ? reasoningEffortsFor(harness, { supportsReasoning: model?.supportsReasoning !== false }) : REASONING_EFFORTS
+  return [{ id: 'auto', label: 'Auto' }, ...effortLevelsFromIds(efforts)]
 }
 
-function publicHttpsMcpError(server: AgentProfileMcpServer): string | null {
-  if (server.enabled === false) return null
-  if (!('url' in server) || !server.url) return 'Use a public HTTPS MCP endpoint.'
-  try {
-    const url = new URL(server.url)
-    if (url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash &&
-      url.hostname.includes('.') && !/^\d+\.\d+\.\d+\.\d+$/.test(url.hostname) && !url.hostname.includes(':') &&
-      !url.hostname.endsWith('.local') && !url.hostname.endsWith('.internal')) return null
-  } catch { /* Invalid URLs are rejected below. */ }
-  return 'Use a public HTTPS MCP endpoint without credentials, query, fragment, or local address.'
-}
+type Panel =
+  | { kind: 'add-github' | 'add-inline'; section: 'skills' | 'tools' | 'files' }
+  | { kind: 'edit'; section: 'skills' | 'tools' | 'files'; index: number }
+
+interface InlineDraft { name: string; content: string; path: string; executable: boolean }
 
 /** Controlled editor for the canonical profile. The product owns save and execution authority. */
-export function AgentProfileEditor({ value, onChange, disabled = false, className, allowedResourceKinds,
+export function AgentProfileEditor({ value, onChange, disabled = false, className, config, allowedResourceKinds,
   filePathPrefix, allowExecutableFiles = true, requireGitHubCommitSha = false, requireUniqueSkillNames = false,
   showToolsAndPermissions = true, publicHttpsMcpOnly = false, registry, onSaveStateChange }: AgentProfileEditorProps) {
   const id = useId()
@@ -232,37 +196,68 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
   const [error, setError] = useState<string | null>(null)
   const [newTool, setNewTool] = useState('')
   const [showAllTools, setShowAllTools] = useState(false)
-  const [mcpName, setMcpName] = useState('')
-  const [mcpKind, setMcpKind] = useState<'http' | 'sse' | 'stdio'>('http')
-  const selectedMcpKind = publicHttpsMcpOnly && mcpKind === 'stdio' ? 'http' : mcpKind
-  const [mcpTarget, setMcpTarget] = useState('')
-  const [resourceDrafts, setResourceDrafts] = useState<Record<'skills' | 'tools', ResourceDraft>>({ skills: emptyResourceDraft(), tools: emptyResourceDraft() })
-  const [resourceEdit, setResourceEdit] = useState<{ key: 'skills' | 'tools'; index: number; draft: ResourceDraft } | null>(null)
-  const [newFile, setNewFile] = useState<FileDraft>(() => ({ path: normalizedFilePathPrefix(filePathPrefix) ?? '',
-    resource: { ...emptyResourceDraft(), kind: 'inline' }, executable: false }))
-  const [addingFile, setAddingFile] = useState(false)
-  const [fileEdit, setFileEdit] = useState<{ index: number; draft: FileDraft } | null>(null)
+  const [panel, setPanel] = useState<Panel | null>(null)
+  const [inlineDraft, setInlineDraft] = useState<InlineDraft>({ name: '', content: '', path: '', executable: false })
+  const [githubName, setGithubName] = useState<{ value: string; touched: boolean }>({ value: '', touched: false })
+  const [mcpPending, setMcpPending] = useState(false)
+  const [modelNotice, setModelNotice] = useState<string | null>(null)
   const [json, setJson] = useState(() => JSON.stringify(value, null, 2))
   const [jsonDirty, setJsonDirty] = useState(false)
   useEffect(() => { if (!jsonDirty) setJson(JSON.stringify(value, null, 2)) }, [value, jsonDirty])
   const editingDisabled = disabled || jsonDirty
+
+  const sectionAllowed = (section: AgentProfileEditorSection) => !config?.sections || config.sections.includes(section)
   const allowsResource = (kind: AgentProfileResourceKind) => !allowedResourceKinds || allowedResourceKinds.includes(kind)
+  const show = {
+    identity: sectionAllowed('identity'),
+    prompts: sectionAllowed('prompts'),
+    model: sectionAllowed('model'),
+    tools: sectionAllowed('tools') && showToolsAndPermissions,
+    skills: sectionAllowed('skills') && allowsResource('skills'),
+    toolFiles: sectionAllowed('toolFiles') && allowsResource('tools'),
+    mcp: sectionAllowed('mcp'),
+    files: sectionAllowed('files') && allowsResource('files'),
+    advanced: sectionAllowed('advanced'),
+  }
   const unsupportedResources = (Object.keys(RESOURCE_KIND_LABELS) as AgentProfileResourceKind[])
-    .filter(kind => !allowsResource(kind) && configuredResourceCount(value, kind) > 0)
+    .filter(kind => configuredResourceCount(value, kind) > 0 && !(
+      (kind === 'skills' && show.skills) || (kind === 'tools' && show.toolFiles) || (kind === 'files' && show.files) ||
+      (allowsResource(kind) && kind !== 'skills' && kind !== 'tools' && kind !== 'files')))
   const skills = value.resources?.skills ?? []
   const toolFiles = value.resources?.tools ?? []
+  const files = value.resources?.files ?? []
   const instructions = value.resources?.instructions
+
+  function skillIssue(ref: AgentProfileResourceRef, refs: readonly AgentProfileResourceRef[], index?: number): string | null {
+    if (requireUniqueSkillNames) {
+      const name = ref.name ?? ''
+      if (!SKILL_NAME.test(name)) return 'Use a lowercase name of up to 64 letters, numbers, dots, dashes, or underscores.'
+      if (refs.some((other, item) => item !== index && other.name === name)) return 'Another skill already uses this name.'
+    }
+    if (ref.kind === 'inline' && !ref.name.trim()) return 'Name this skill.'
+    return githubRefIssue(ref, requireGitHubCommitSha)
+  }
+  function fileIssue(mount: AgentProfileFileMount, index?: number): string | null {
+    const path = mount.path
+    if (!path.trim()) return 'Enter a workspace path for the file.'
+    if (!validRelativePath(path)) return 'Use a relative workspace path without traversal.'
+    if (workspaceFilePrefix && !path.startsWith(workspaceFilePrefix)) return `Place this file under ${workspaceFilePrefix}.`
+    if (files.some((other, item) => item !== index && other.path === path)) return 'Another file already uses this path.'
+    if (!allowExecutableFiles && mount.executable) return 'Executable files are not allowed in this product.'
+    if (mount.resource.kind === 'inline' && !mount.resource.name.trim()) return 'Name this file.'
+    return githubRefIssue(mount.resource, requireGitHubCommitSha)
+  }
   const constrainedEntryCount = workspaceFilePrefix || !allowExecutableFiles || requireGitHubCommitSha || requireUniqueSkillNames
-    ? (value.resources?.files ?? []).filter(mount => fileIssues(fileDraft(mount), workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha, true).length > 0).length +
-      skills.filter((ref, index) => resourceIssue('skills', resourceDraft(ref), skills, index, true)).length +
-      toolFiles.filter((ref, index) => requireGitHubCommitSha && resourceIssue('tools', resourceDraft(ref), toolFiles, index, true)).length +
-      Number(Boolean(requireGitHubCommitSha && instructions && typeof instructions === 'object' && resourceError(resourceDraft(instructions), true, true)))
+    ? files.filter((mount, index) => fileIssue(mount, index)).length +
+      skills.filter((ref, index) => skillIssue(ref, skills, index)).length +
+      toolFiles.filter(ref => requireGitHubCommitSha && githubRefIssue(ref, true)).length +
+      Number(Boolean(requireGitHubCommitSha && instructions && typeof instructions === 'object' && githubRefIssue(instructions, true)))
     : 0
   const invalidMcpCount = publicHttpsMcpOnly
-    ? Object.values(value.mcp ?? {}).filter(server => publicHttpsMcpError(server)).length : 0
+    ? Object.values(value.mcp ?? {}).filter(server => server.enabled !== false &&
+      (!('url' in server) || !server.url || publicHttpsUrlProblem(server.url) !== null)).length : 0
 
-  const pending = jsonDirty || Boolean(resourceEdit || fileEdit || addingFile || newTool.trim() || mcpName.trim() || mcpTarget.trim()) ||
-    Object.values(resourceDrafts).some(draft => Boolean(draft.repository || draft.path || draft.ref || draft.name || draft.content))
+  const pending = jsonDirty || panel !== null || mcpPending || Boolean(newTool.trim())
   const invalid = Boolean(error || unsupportedResources.length || constrainedEntryCount || invalidMcpCount)
   useEffect(() => { onSaveStateChange?.({ pending, invalid }) }, [onSaveStateChange, pending, invalid])
   useEffect(() => () => { onSaveStateChange?.({ pending: false, invalid: false }) }, [onSaveStateChange])
@@ -276,114 +271,29 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     return true
   }
   function prompt(next: NonNullable<AgentProfile['prompt']>) { emit({ ...value, prompt: next }) }
-  function model(next: NonNullable<AgentProfile['model']>) { emit({ ...value, model: next }) }
+  function model(next: NonNullable<AgentProfile['model']>) {
+    const cleaned = Object.fromEntries(Object.entries(next).filter(([, item]) => item !== undefined && item !== '')) as NonNullable<AgentProfile['model']>
+    const { model: _model, ...rest } = value
+    emit(Object.keys(cleaned).length ? { ...rest, model: cleaned } : rest)
+  }
   function resources(key: 'skills' | 'tools', refs: AgentProfileResourceRef[]) {
     return emit({ ...value, resources: { ...value.resources, [key]: refs } })
   }
-  function resourceIssue(key: 'skills' | 'tools', draft: ResourceDraft,
-    refs: readonly AgentProfileResourceRef[], index?: number, stored = false): string | null {
-    if (key === 'skills' && requireUniqueSkillNames) {
-      const issue = skillNameError(draft, refs, index, stored)
-      if (issue) return issue
-    }
-    return resourceError(draft, requireGitHubCommitSha, stored)
-  }
-  function addResource(key: 'skills' | 'tools') {
-    const draft = resourceDrafts[key]
-    const refs = value.resources?.[key] ?? []
-    const issue = resourceIssue(key, draft, refs)
-    if (issue) { setError(issue); return }
-    if (!resources(key, [...refs, resourceRef(draft)])) return
-    setResourceDrafts(current => ({ ...current, [key]: emptyResourceDraft() }))
-  }
-  function applyResourceEdit() {
-    if (!resourceEdit) return
-    const { key, index, draft } = resourceEdit
-    const refs = value.resources?.[key] ?? []
-    if (!refs[index]) { setError('This resource changed. Reopen it to edit.'); setResourceEdit(null); return }
-    const issue = resourceIssue(key, draft, refs, index)
-    if (issue) { setError(issue); return }
-    if (resources(key, refs.map((ref, item) => item === index ? resourceRef(draft) : ref))) setResourceEdit(null)
-  }
-  function saveFile(draft: FileDraft, index?: number) {
-    const path = draft.path.trim()
-    const issue = fileIssues(draft, workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha)[0]
-    if (issue) { setError(issue); return false }
-    const files = value.resources?.files ?? []
-    if (files.some((file, item) => file.path === path && item !== index)) {
-      setError('A resource file already uses that workspace path.')
-      return false
-    }
-    const next = index === undefined ? [...files, fileMount(draft)] : files.map((file, item) => item === index ? fileMount(draft) : file)
+  function setFiles(next: AgentProfileFileMount[]) {
     return emit({ ...value, resources: { ...value.resources, files: next } })
   }
-  function fileFields(draft: FileDraft, onChange: (draft: FileDraft) => void) {
-    return <div className="space-y-3">
-      <Field label="Workspace path" hint={workspaceFilePrefix ? 'Place this file under ' + workspaceFilePrefix : 'Relative to the agent workspace'}>
-        <Input disabled={editingDisabled} value={draft.path} onChange={event => onChange({ ...draft, path: event.target.value })}
-          placeholder={workspaceFilePrefix ? workspaceFilePrefix + 'guide.md' : 'docs/guide.md'} /></Field>
-      <ResourceFields draft={draft.resource} disabled={editingDisabled} pathPlaceholder="docs/guide.md" requireGitHubCommitSha={requireGitHubCommitSha}
-        onChange={resource => onChange({ ...draft, resource })} />
-      {allowExecutableFiles || draft.executable ? <label className="flex items-center gap-2 text-sm text-foreground">
-        <Switch disabled={editingDisabled || (!allowExecutableFiles && !draft.executable)} checked={draft.executable}
-          onCheckedChange={executable => { if (allowExecutableFiles || !executable) onChange({ ...draft, executable }) }} />Executable file</label>
-        : <p className="text-xs text-muted-foreground">Executable files are unavailable for this profile.</p>}
-    </div>
-  }
-  function resourceSection(key: 'skills' | 'tools', title: string, description: string) {
-    const refs = value.resources?.[key] ?? []
-    const draft = resourceDrafts[key]
-    return <Disclosure title={title} description={description} detail={refs.length ? refs.length + ' configured' : 'Optional'}>
-      {refs.length === 0 && <p className="text-sm text-muted-foreground">None configured.</p>}
-      <ul className="space-y-2">{refs.map((ref, index) => {
-        const issue = resourceIssue(key, resourceDraft(ref), refs, index, true)
-        return <li key={index} className="space-y-3 border-b border-border py-3 text-sm" aria-label={title + ' ' + (index + 1)}>
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0"><span className="block break-words font-medium text-foreground">{ref.name || (ref.kind === 'github' ? ref.path : 'Inline resource')}</span>
-              <span className={'block break-words text-xs ' + (ref.kind === 'github' && !ref.repository ? 'text-destructive' : 'text-muted-foreground')}>{ref.kind === 'github'
-                ? (ref.repository ? ref.repository + ' / ' : 'Repository required · ') + ref.path + (ref.ref ? ' @ ' + ref.ref : '')
-                : 'Inline content'}</span></div>
-            <div className="flex shrink-0 gap-1">
-              <Button type="button" variant="ghost" disabled={editingDisabled} aria-label={'Edit ' + title.toLowerCase() + ' ' + (index + 1)}
-                onClick={() => setResourceEdit({ key, index, draft: resourceDraft(ref) })}>Edit</Button>
-              <Button type="button" variant="ghost" className="text-destructive" disabled={editingDisabled} aria-label={'Remove ' + title.toLowerCase() + ' ' + (index + 1)}
-                onClick={() => { if (resources(key, refs.filter((_, item) => item !== index))) setResourceEdit(null) }}>Remove</Button>
-            </div>
-          </div>
-          {(requireGitHubCommitSha || (key === 'skills' && requireUniqueSkillNames)) && issue &&
-            <p className="text-xs text-destructive">{issue} Edit this resource before saving.</p>}
-          {resourceEdit?.key === key && resourceEdit.index === index && <div className="space-y-3 border-t border-border pt-3">
-            <ResourceFields draft={resourceEdit.draft} disabled={editingDisabled} requireGitHubCommitSha={requireGitHubCommitSha}
-              requireSkillName={key === 'skills' && requireUniqueSkillNames} pathPlaceholder={key === 'skills' ? 'research/SKILL.md' : 'tools/search.ts'}
-              onChange={next => setResourceEdit({ key, index, draft: next })} />
-            <div className="flex gap-2"><Button type="button" variant="outline" disabled={editingDisabled} onClick={applyResourceEdit}>Apply changes</Button>
-              <Button type="button" variant="ghost" onClick={() => setResourceEdit(null)}>Cancel</Button></div>
-          </div>}
-        </li>})}</ul>
-      {key === 'skills' && registry && <AgentProfileRegistrySkillSearch registry={registry} disabled={editingDisabled}
-        existing={refs}
-        validate={ref => resourceIssue('skills', resourceDraft(ref), refs)}
-        onAdd={ref => resources('skills', [...(value.resources?.skills ?? []), ref])} />}
-      <div className="space-y-3 border-t border-border pt-4">
-        <ResourceFields draft={draft} disabled={editingDisabled} requireGitHubCommitSha={requireGitHubCommitSha}
-          requireSkillName={key === 'skills' && requireUniqueSkillNames} pathPlaceholder={key === 'skills' ? 'research/SKILL.md' : 'tools/search.ts'}
-          onChange={next => setResourceDrafts(current => ({ ...current, [key]: next }))} />
-        <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => addResource(key)}>Add {key === 'skills' ? 'skill' : 'tool file'}</Button>
-      </div>
-      <p className="text-xs text-muted-foreground">GitHub files are fetched when the profile runs. Saving does not verify their contents or availability.</p>
-    </Disclosure>
-  }
-  function addMcp() {
-    const name = mcpName.trim()
-    const target = mcpTarget.trim()
-    if (!name || !target) { setError('Enter a server name and URL or command.'); return }
-    if (name in (value.mcp ?? {})) { setError('A server with that name already exists.'); return }
-    const server: AgentProfileMcpServer = selectedMcpKind === 'stdio' ? { command: target } : { transport: selectedMcpKind, url: target }
-    if (publicHttpsMcpOnly) {
-      const issue = publicHttpsMcpError(server)
-      if (issue) { setError(issue); return }
+  function openPanel(next: Panel | null) {
+    setPanel(next)
+    setError(null)
+    setGithubName({ value: '', touched: false })
+    if (next?.kind === 'edit') {
+      const ref = next.section === 'files' ? files[next.index]?.resource : (next.section === 'skills' ? skills : toolFiles)[next.index]
+      const mount = next.section === 'files' ? files[next.index] : undefined
+      setInlineDraft({ name: ref?.kind === 'inline' ? ref.name : ref?.name ?? '', content: ref?.kind === 'inline' ? ref.content : '',
+        path: mount?.path ?? '', executable: mount?.executable ?? false })
+    } else {
+      setInlineDraft({ name: '', content: '', path: next?.section === 'files' ? workspaceFilePrefix ?? '' : '', executable: false })
     }
-    if (emit({ ...value, mcp: { ...value.mcp, [name]: server } })) { setMcpName(''); setMcpTarget('') }
   }
   function applyJson() {
     try {
@@ -395,169 +305,416 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid JSON') }
   }
 
-  return <div className={'min-w-0 space-y-4 ' + (className ?? '')} aria-label="Agent profile editor">
-    {error && <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
-    {jsonDirty && <p role="status" className="rounded-lg border border-border bg-muted p-3 text-sm text-foreground">Apply or discard edits in Advanced JSON before using the other fields.</p>}
-    {unsupportedResources.length > 0 && <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground">
-      This profile contains resources this product does not support: {unsupportedResources.map(kind => RESOURCE_KIND_LABELS[kind] + ' (' + configuredResourceCount(value, kind) + ')').join(', ')}.
-      They remain in the profile. Review or remove them in Advanced JSON before saving.
-    </p>}
-    {constrainedEntryCount > 0 && <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground">
-      {constrainedEntryCount} configured resource {constrainedEntryCount === 1 ? 'entry needs' : 'entries need'} repair before this product can save the profile.
-      Review the resource sections or Advanced JSON. Existing values remain unchanged until you edit them.
-    </p>}
-    {invalidMcpCount > 0 && <p role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground">
-      {invalidMcpCount} configured MCP {invalidMcpCount === 1 ? 'server needs' : 'servers need'} a public HTTPS endpoint before this product can save the profile.
-      Review MCP servers or Advanced JSON. Existing values remain unchanged until you edit them.
-    </p>}
-    <Section title="Identity">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Name"><Input disabled={editingDisabled} value={value.name ?? ''} onChange={event => emit({ ...value, name: event.target.value })} /></Field>
-        <Field label="Description"><Input disabled={editingDisabled} value={value.description ?? ''} onChange={event => emit({ ...value, description: event.target.value })} /></Field>
-      </div>
-    </Section>
-    <Section title="Prompts and instructions">
-      <Field label="System prompt" hint="prompt.systemPrompt · Replaces the harness default where supported. Clear it to use the default.">
-        <Textarea aria-label="System prompt" className="min-h-52 text-base leading-7 sm:text-sm" disabled={editingDisabled} value={value.prompt?.systemPrompt ?? ''}
-          onChange={event => prompt({ ...value.prompt, systemPrompt: event.target.value })} />
+  // ── Model and runtime ─────────────────────────────────────────────────────
+  const catalog = config?.models
+  // The stored harness, even when the product's list omits it, so the selector reports what will run.
+  const harness = value.harness as Harness | undefined
+  const offeredModels = useMemo(() => !catalog ? [] : harness
+    ? catalog.models.filter(item => isModelCompatibleWithHarness(harness, item.id))
+    : catalog.models, [catalog, harness])
+  const selectedModel = catalog?.models.find(item => item.id === value.model?.default)
+  const thinkingLevels = (config?.thinkingLevels ?? defaultThinkingLevels)({ harness, model: selectedModel })
+  function changeHarness(next: Harness | '') {
+    setModelNotice(null)
+    const { harness: _harness, ...rest } = value
+    let nextModel = value.model
+    if (next && catalog && value.model?.default && !isModelCompatibleWithHarness(next, value.model.default)) {
+      const ids = catalog.models.map(item => item.id)
+      const snapped = snapModelToHarness(next, value.model.default, ids)
+      if (snapped !== value.model.default) {
+        nextModel = { ...value.model, default: snapped }
+        const name = catalog.models.find(item => item.id === snapped)?.name ?? snapped
+        setModelNotice(`Default model changed to ${name}, which runs on this harness.`)
+      }
+    }
+    emit({ ...rest, ...(next ? { harness: next } : {}), ...(nextModel ? { model: nextModel } : {}) })
+  }
+  function modelField(label: string, field: 'default' | 'small', info: ReactNode) {
+    const fieldId = `${id}-model-${field}`
+    const current = value.model?.[field] ?? ''
+    return <Field label={label} htmlFor={fieldId} info={info}>
+      {catalog
+        ? <ModelPicker id={fieldId} variant="field" value={current} onChange={next => model({ ...value.model, [field]: next || undefined })}
+          models={offeredModels} loading={catalog.loading} error={catalog.error} onRetry={catalog.onRetry} disabled={editingDisabled}
+          defaultOption={{ label: catalog.defaultLabel ?? 'Product default' }} />
+        : <Input id={fieldId} size="compact" value={current} disabled={editingDisabled} placeholder="provider/model" {...noAutofill}
+          onChange={event => model({ ...value.model, [field]: event.target.value || undefined })} />}
+    </Field>
+  }
+
+  // ── Resource rows and panels ─────────────────────────────────────────────
+  const github = config?.github
+  function refFromCheck(check: GitHubSourceCheck, name: string): AgentProfileResourceRef {
+    return github?.storage === 'inline'
+      ? { kind: 'inline', name, content: check.content }
+      : { kind: 'github', repository: check.repository, path: check.path, ref: check.commit.sha, ...(name ? { name } : {}) }
+  }
+  function addRef(section: 'skills' | 'tools', ref: AgentProfileResourceRef, index?: number): boolean {
+    const refs = section === 'skills' ? skills : toolFiles
+    const issue = section === 'skills' ? skillIssue(ref, refs, index ?? refs.length) : githubRefIssue(ref, requireGitHubCommitSha)
+    if (issue) { setError(issue); return false }
+    const next = index === undefined ? [...refs, ref] : refs.map((item, position) => position === index ? ref : item)
+    return resources(section, next)
+  }
+  function addFile(mount: AgentProfileFileMount, index?: number): boolean {
+    const issue = fileIssue(mount, index ?? files.length)
+    if (issue) { setError(issue); return false }
+    return setFiles(index === undefined ? [...files, mount] : files.map((item, position) => position === index ? mount : item))
+  }
+
+  function nameField(check: GitHubSourceCheck | null, section: 'skills' | 'tools') {
+    const fieldId = `${id}-${section}-github-name`
+    const suggested = check ? (section === 'skills' ? suggestedSkillName(check) : basename(check.path)) : ''
+    const name = githubName.touched ? githubName.value : suggested
+    const problem = section === 'skills' && requireUniqueSkillNames && name
+      ? skillIssue({ kind: 'inline', name, content: '' }, skills) : null
+    return <Field label={section === 'skills' ? 'Skill name' : 'File name'} htmlFor={fieldId} error={problem}
+      hint={section === 'skills' && !problem ? 'Shown to the agent in its skill list.' : undefined}>
+      <Input id={fieldId} size="compact" value={name} disabled={editingDisabled || !check} {...noAutofill}
+        aria-invalid={problem ? true : undefined} aria-describedby={fieldMessageId(fieldId)}
+        onChange={event => setGithubName({ value: event.target.value, touched: true })} />
+    </Field>
+  }
+  function githubNameValue(check: GitHubSourceCheck, section: 'skills' | 'tools'): string {
+    return (githubName.touched ? githubName.value : section === 'skills' ? suggestedSkillName(check) : basename(check.path)).trim()
+  }
+
+  function inlineEditor(section: 'skills' | 'tools' | 'files', index?: number) {
+    const prefix = `${id}-${section}-inline`
+    const isSkill = section === 'skills'
+    const isFile = section === 'files'
+    const name = inlineDraft.name.trim()
+    const frontmatter = isSkill && inlineDraft.content.trim() ? readSkillFrontmatter(inlineDraft.content) : null
+    const mount: AgentProfileFileMount | null = isFile ? { path: inlineDraft.path.trim(),
+      resource: { kind: 'inline', name: name || basename(inlineDraft.path.trim()), content: inlineDraft.content },
+      ...(inlineDraft.executable ? { executable: true } : {}) } : null
+    const problem = isFile ? (inlineDraft.path.trim() ? fileIssue(mount!, index ?? files.length) : null)
+      : isSkill && name ? skillIssue({ kind: 'inline', name, content: inlineDraft.content }, skills, index ?? skills.length) : null
+    const ready = !editingDisabled && !problem && (isFile ? inlineDraft.path.trim() !== '' : name !== '')
+    return <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
+      {isFile
+        ? <Field label="Workspace path" htmlFor={`${prefix}-path`} error={problem}
+          hint={!problem && workspaceFilePrefix ? `Files go under ${workspaceFilePrefix}` : undefined}>
+          <Input id={`${prefix}-path`} size="compact" value={inlineDraft.path} disabled={editingDisabled} {...noAutofill}
+            placeholder={(workspaceFilePrefix ?? '') + 'guide.md'} aria-invalid={problem ? true : undefined} aria-describedby={fieldMessageId(`${prefix}-path`)}
+            onChange={event => setInlineDraft({ ...inlineDraft, path: event.target.value })} />
+        </Field>
+        : <Field label={isSkill ? 'Skill name' : 'File name'} htmlFor={`${prefix}-name`} error={problem}>
+          <Input id={`${prefix}-name`} size="compact" value={inlineDraft.name} disabled={editingDisabled} {...noAutofill}
+            placeholder={isSkill ? 'research' : 'search.ts'} aria-invalid={problem ? true : undefined} aria-describedby={fieldMessageId(`${prefix}-name`)}
+            onChange={event => setInlineDraft({ ...inlineDraft, name: event.target.value })} />
+        </Field>}
+      <Field label="Content" htmlFor={`${prefix}-content`}
+        hint={frontmatter && !frontmatter.ok ? 'Start the skill with frontmatter that sets name and description, so the agent knows when to use it.' : undefined}>
+        <Textarea id={`${prefix}-content`} className="min-h-40 font-mono text-sm leading-6" disabled={editingDisabled} value={inlineDraft.content}
+          onChange={event => setInlineDraft({ ...inlineDraft, content: event.target.value })} />
       </Field>
-      <details className="group/instructions" open={Boolean(value.prompt?.appendSystemPrompt || value.prompt?.instructions?.length)}>
-        <summary className="cursor-pointer rounded-sm py-2 text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Additional instructions</summary>
-        <div className="mt-3 space-y-5">
-          <Field label="Appended system prompt" hint="prompt.appendSystemPrompt · Appended after the system prompt, or after the harness default when no override is set."><Textarea className="min-h-24" disabled={editingDisabled} value={value.prompt?.appendSystemPrompt ?? ''} onChange={event => prompt({ ...value.prompt, appendSystemPrompt: event.target.value })} /></Field>
-          <div role="group" aria-label="Project instructions" className="space-y-2">
-        <p className="text-sm font-medium text-foreground">Project instructions</p>
-        <p className="text-sm leading-6 text-muted-foreground">prompt.instructions · Lower-priority workspace guidance, separate from the system prompt.</p>
-        <div className="space-y-2">{(value.prompt?.instructions ?? []).map((instruction, index) =>
-          <div key={index} className="flex items-start gap-2">
-            <Textarea aria-label={'Instruction ' + (index + 1)} className="min-h-20" disabled={editingDisabled} value={instruction}
-              onChange={event => prompt({ ...value.prompt, instructions: (value.prompt?.instructions ?? []).map((item, i) => i === index ? event.target.value : item) })} />
-            <Button type="button" variant="ghost" className="pt-2 text-destructive" disabled={editingDisabled} aria-label={'Remove instruction ' + (index + 1)}
-              onClick={() => prompt({ ...value.prompt, instructions: (value.prompt?.instructions ?? []).filter((_, i) => i !== index) })}>Remove</Button>
-          </div>)}
-          <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => prompt({ ...value.prompt, instructions: [...(value.prompt?.instructions ?? []), ''] })}>Add instruction</Button>
-        </div>
+      {isFile && (allowExecutableFiles || inlineDraft.executable) && <label className={`flex items-center gap-3 ${formText.body}`}>
+        <Switch disabled={editingDisabled || (!allowExecutableFiles && !inlineDraft.executable)} checked={inlineDraft.executable}
+          onCheckedChange={executable => setInlineDraft({ ...inlineDraft, executable })} />Executable</label>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="compact" disabled={!ready} onClick={() => {
+          const saved = isFile ? addFile(mount!, index)
+            : addRef(section as 'skills' | 'tools', { kind: 'inline', name, content: inlineDraft.content }, index)
+          if (saved) openPanel(null)
+        }}>{index === undefined ? (isSkill ? 'Add skill' : 'Add file') : 'Save'}</Button>
+        <Button type="button" size="compact" variant="ghost" onClick={() => openPanel(null)}>Cancel</Button>
       </div>
-        </div>
-      </details>
-    </Section>
-    <Section title="Model and runtime">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Default model"><Input disabled={editingDisabled} value={value.model?.default ?? ''} onChange={event => model({ ...value.model, default: event.target.value })} placeholder="provider/model" /></Field>
-      </div>
-      <details><summary className="cursor-pointer rounded-sm py-2 text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">More model settings</summary>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <Field label="Small model"><Input disabled={editingDisabled} value={value.model?.small ?? ''} onChange={event => model({ ...value.model, small: event.target.value })} placeholder="provider/model" /></Field>
-        <Field label="Provider hint"><Input disabled={editingDisabled} value={value.model?.provider ?? ''} onChange={event => model({ ...value.model, provider: event.target.value })} /></Field>
-        <Field label="Thinking level"><Select disabled={editingDisabled} value={value.model?.reasoningEffort ?? 'default'}
-          onValueChange={level => model({ ...value.model, reasoningEffort: level === 'default' ? undefined : level as NonNullable<AgentProfile['model']>['reasoningEffort'] })}>
-          <SelectTrigger aria-label="Thinking level"><SelectValue /></SelectTrigger><SelectContent>
-            <SelectItem value="default">Harness default</SelectItem>
-            {['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'ultracode'].map(level => <SelectItem key={level} value={level}>{level}</SelectItem>)}
-          </SelectContent></Select></Field>
-        </div>
-      </details>
-    </Section>
-    {showToolsAndPermissions && <Disclosure title="Tools and permissions" description="Choose which tools are available and when each needs approval." detail={Object.keys(value.tools ?? {}).length + ' configured'}>
-      {Object.keys(value.tools ?? {}).length === 0 && <p className="text-sm text-muted-foreground">No tool rules added.</p>}
-      <div className="space-y-2">{Object.entries(value.tools ?? {}).slice(0, showAllTools ? undefined : 4).map(([name, enabled]) =>
-        <div key={name} className="flex flex-wrap items-center gap-3 border-b border-border py-3 text-sm">
-          <label className="flex min-w-32 flex-1 items-center gap-2"><Switch disabled={editingDisabled} checked={enabled}
-            onCheckedChange={checked => emit({ ...value, tools: { ...value.tools, [name]: checked } })} />{name}</label>
-          <div className="flex min-w-36 items-center gap-2 text-muted-foreground"><span>Permission</span>
-            <Select disabled={editingDisabled} value={typeof value.permissions?.[name] === 'string' ? value.permissions[name] as string : 'default'}
-              onValueChange={permission => { const permissions = { ...value.permissions }; if (permission !== 'default') permissions[name] = permission as 'allow' | 'ask' | 'deny'; else delete permissions[name]; emit({ ...value, permissions }) }}>
-              <SelectTrigger aria-label={'Permission for ' + name}><SelectValue /></SelectTrigger><SelectContent>
-                <SelectItem value="default">Default</SelectItem><SelectItem value="allow">Allow</SelectItem>
-                <SelectItem value="ask">Ask</SelectItem><SelectItem value="deny">Deny</SelectItem>
-              </SelectContent></Select>
+    </div>
+  }
+
+  function githubEditor(section: 'skills' | 'tools' | 'files', index?: number) {
+    if (!github) return null
+    const existing = index === undefined ? undefined
+      : section === 'files' ? files[index]?.resource : (section === 'skills' ? skills : toolFiles)[index]
+    const initial = existing?.kind === 'github' ? { repository: existing.repository, path: existing.path, ref: existing.ref } : undefined
+    const isFile = section === 'files'
+    const pathId = `${id}-${section}-github-path`
+    return <div className="rounded-lg border border-border bg-muted/30 p-4">
+      <GitHubSourcePicker port={github.port} purpose={section === 'skills' ? 'skill' : 'file'} disabled={editingDisabled}
+        connectHref={github.connectHref} initial={initial} onCancel={() => openPanel(null)}
+        actionLabel={index !== undefined ? 'Save' : section === 'skills' ? 'Add skill' : 'Add file'}
+        blocked={isFile && inlineDraft.path.trim() === '' ? 'Enter a workspace path.' : null}
+        onChoose={({ check }) => {
+          if (isFile) {
+            const path = (inlineDraft.path.trim() || (workspaceFilePrefix ?? '') + basename(check.path))
+            if (addFile({ path, resource: refFromCheck(check, basename(check.path)) }, index)) openPanel(null)
+            return
+          }
+          const name = githubNameValue(check, section as 'skills' | 'tools')
+          if (addRef(section as 'skills' | 'tools', refFromCheck(check, name), index)) openPanel(null)
+        }}>
+        {check => isFile
+          ? <GitHubFilePath check={check} id={pathId} value={inlineDraft.path} prefix={workspaceFilePrefix ?? ''} disabled={editingDisabled}
+            onChange={path => setInlineDraft(current => ({ ...current, path }))} issue={inlineDraft.path.trim() && check
+              ? fileIssue({ path: inlineDraft.path.trim(), resource: refFromCheck(check, basename(check.path)) }, index ?? files.length) : null} />
+          : nameField(check, section as 'skills' | 'tools')}
+      </GitHubSourcePicker>
+    </div>
+  }
+
+  function rowActions(label: string, section: 'skills' | 'tools' | 'files', index: number, ref: AgentProfileResourceRef) {
+    const canEdit = ref.kind === 'inline' || Boolean(github)
+    return <div className={rowActionsClass}>
+      {canEdit && <Button type="button" size="compact" variant="ghost" disabled={editingDisabled} aria-label={`Edit ${label}`}
+        onClick={() => openPanel({ kind: 'edit', section, index })}>Edit</Button>}
+      <Button type="button" size="compact" variant="ghost" className="text-destructive hover:text-destructive" disabled={editingDisabled}
+        aria-label={`Remove ${label}`} onClick={() => {
+          const removed = section === 'files' ? setFiles(files.filter((_, item) => item !== index))
+            : resources(section, (section === 'skills' ? skills : toolFiles).filter((_, item) => item !== index))
+          if (removed && panel?.kind === 'edit' && panel.section === section) openPanel(null)
+        }}>Remove</Button>
+    </div>
+  }
+
+  function refList(section: 'skills' | 'tools', refs: readonly AgentProfileResourceRef[], noun: string) {
+    if (refs.length === 0) return <p className={formText.muted}>No {noun}s yet.</p>
+    return <ul className="divide-y divide-border rounded-lg border border-border">{refs.map((ref, index) => {
+      const title = ref.name || (ref.kind === 'github' ? basename(ref.path) : `${noun} ${index + 1}`)
+      const issue = section === 'skills' ? skillIssue(ref, refs, index) : githubRefIssue(ref, requireGitHubCommitSha)
+      const described = ref.kind === 'inline' && section === 'skills' ? inlineSkillSummary(ref.content) : null
+      const words = (text: string) => text.toLowerCase().replace(/[-_\s]+/g, ' ').trim()
+      const summary = described && words(described) !== words(title) ? described : null
+      const editing = panel?.kind === 'edit' && panel.section === section && panel.index === index
+      return <li key={`${section}-${index}`} className="space-y-3 p-3" aria-label={`${noun} ${title}`}>
+        <div className={listRow}>
+          <div className="min-w-0">
+            <p className={`break-words ${formText.label}`}>{title}</p>
+            {summary && <p className={`line-clamp-2 ${formText.muted}`}>{summary}</p>}
+            {(ref.kind === 'github' || !summary) && <p className={`break-words ${formText.muted}`}>{sourceLine(ref)}</p>}
+            {issue && <p className={formText.error}>{issue}</p>}
           </div>
-          <Button type="button" variant="ghost" className="text-destructive" disabled={editingDisabled} onClick={() => { const tools = { ...value.tools }; delete tools[name]; emit({ ...value, tools }) }}>Remove</Button>
-        </div>)}</div>
-      {Object.keys(value.tools ?? {}).length > 4 && <Button type="button" variant="ghost" onClick={() => setShowAllTools(current => !current)}>
-        {showAllTools ? 'Show fewer rules' : 'Show ' + (Object.keys(value.tools ?? {}).length - 4) + ' more rules'}
-      </Button>}
-      <div className="flex gap-2"><Input aria-label="New tool name" disabled={editingDisabled} value={newTool} onChange={event => setNewTool(event.target.value)} placeholder="Tool name" />
-        <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => { const name = newTool.trim(); if (!name || name in (value.tools ?? {})) { setError('Enter a unique tool name.'); return } if (emit({ ...value, tools: { ...value.tools, [name]: true } })) setNewTool('') }}>Add tool</Button></div>
-      <p className="text-xs text-muted-foreground">Nested permission rules remain in Advanced JSON.</p>
-    </Disclosure>}
-    {allowsResource('skills') && resourceSection('skills', 'Skills', 'Add skill packages from a repository or inline content.')}
-    {allowsResource('tools') && resourceSection('tools', 'Tool files', 'Files that define custom tools.')}
-    <Disclosure title="MCP servers" description={publicHttpsMcpOnly
-      ? 'Configure public HTTPS servers. Use secret references for credentials.'
-      : 'Configure remote or local servers. Use secret references for credentials.'} detail={Object.keys(value.mcp ?? {}).length + ' configured'}>
-      {Object.keys(value.mcp ?? {}).length === 0 && <p className="text-sm text-muted-foreground">No servers configured.</p>}
-      <ul className="space-y-2">{Object.entries(value.mcp ?? {}).map(([name, server]) =>
-        <li key={name} className="flex items-center justify-between gap-3 border-b border-border py-3 text-sm">
-          <div className="min-w-0"><span className="font-medium">{name}</span>
-            <span className="ml-2 text-xs text-muted-foreground">{server.enabled === false ? 'Disabled' : 'command' in server ? 'Local' : 'Remote'}</span>
-            {server.enabled !== false && <p className="truncate text-xs text-muted-foreground">{'command' in server ? server.command : server.url}</p>}
-            {publicHttpsMcpOnly && publicHttpsMcpError(server) && <p className="text-xs text-destructive">
-              {publicHttpsMcpError(server)} Remove this server or edit it in Advanced JSON before saving.</p>}
-          </div>
-          <Button type="button" variant="ghost" className="text-destructive" disabled={editingDisabled} onClick={() => { const mcp = { ...value.mcp }; delete mcp[name]; emit({ ...value, mcp }) }}>Remove</Button>
-        </li>)}</ul>
-      <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-[1fr_10rem]">
-        <Field label="Server name"><Input disabled={editingDisabled} value={mcpName} onChange={event => setMcpName(event.target.value)} placeholder="search" /></Field>
-        <Field label="Transport"><Select disabled={editingDisabled} value={selectedMcpKind} onValueChange={kind => setMcpKind(kind as typeof mcpKind)}>
-          <SelectTrigger aria-label="Transport"><SelectValue /></SelectTrigger><SelectContent>
-            <SelectItem value="http">HTTP</SelectItem><SelectItem value="sse">SSE</SelectItem>
-            {!publicHttpsMcpOnly && <SelectItem value="stdio">Local command</SelectItem>}
-          </SelectContent></Select></Field>
-        <div className="sm:col-span-2"><Field label={selectedMcpKind === 'stdio' ? 'Command' : 'URL'}><Input disabled={editingDisabled} value={mcpTarget} onChange={event => setMcpTarget(event.target.value)} placeholder={selectedMcpKind === 'stdio' ? 'mcp-server' : 'https://example.com/mcp'} /></Field></div>
-        <div className="sm:col-span-2"><Button type="button" variant="outline" disabled={editingDisabled} onClick={addMcp}>Add server</Button></div>
-      </div>
-      {registry && <AgentProfileRegistryMcpSearch registry={registry} disabled={editingDisabled}
-        existingNames={Object.keys(value.mcp ?? {})}
-        validate={(name, server) => {
-          if (!name.trim()) return 'The registry returned a server without a usable name.'
-          if (name in (value.mcp ?? {})) return 'A server with that name already exists.'
-          return publicHttpsMcpOnly ? publicHttpsMcpError(server) : null
-        }}
-        onAdd={(name, server) => emit({ ...value, mcp: { ...value.mcp, [name]: server } })} />}
-      <p className="text-xs text-muted-foreground">Arguments, headers, environment, and secret references remain in Advanced JSON.</p>
-    </Disclosure>
-    {allowsResource('files') && <Disclosure title="Resource files" description="Files to add to the agent workspace." detail={(value.resources?.files ?? []).length + ' configured'}>
-      {(value.resources?.files ?? []).length === 0 && <p className="text-sm text-muted-foreground">No resource files configured.</p>}
-      <ul className="space-y-2">{(value.resources?.files ?? []).map((mount, index) => {
-        const issues = fileIssues(fileDraft(mount), workspaceFilePrefix, allowExecutableFiles, requireGitHubCommitSha, true)
-        return <li key={index} className="space-y-3 border-b border-border py-3 text-sm" aria-label={'Resource file ' + (index + 1)}>
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0"><span className="block break-words font-medium text-foreground">{mount.path}</span>
-              <span className={'block break-words text-xs ' + (mount.resource.kind === 'github' && !mount.resource.repository ? 'text-destructive' : 'text-muted-foreground')}>{mount.resource.kind === 'github'
-                ? (mount.resource.repository ? mount.resource.repository + ' / ' : 'Repository required · ') + mount.resource.path + (mount.resource.ref ? ' @ ' + mount.resource.ref : '')
-                : 'Inline · ' + mount.resource.name}{mount.executable ? ' · executable' : ''}</span></div>
-            <div className="flex shrink-0 gap-1">
-              <Button type="button" variant="ghost" disabled={editingDisabled} aria-label={'Edit resource file ' + (index + 1)}
-                onClick={() => setFileEdit({ index, draft: fileDraft(mount) })}>Edit</Button>
-              <Button type="button" variant="ghost" className="text-destructive" disabled={editingDisabled} aria-label={'Remove resource file ' + (index + 1)}
-                onClick={() => { if (emit({ ...value, resources: { ...value.resources, files: (value.resources?.files ?? []).filter((_, item) => item !== index) } })) setFileEdit(null) }}>Remove</Button>
+          {rowActions(title, section, index, ref)}
+        </div>
+        {editing && (ref.kind === 'github' && github ? githubEditor(section, index) : inlineEditor(section, index))}
+      </li>
+    })}</ul>
+  }
+
+  function addButtons(section: 'skills' | 'tools' | 'files', writeLabel: string) {
+    if (panel && panel.kind !== 'edit' && panel.section === section) {
+      return panel.kind === 'add-github' ? githubEditor(section) : inlineEditor(section)
+    }
+    return <div className="flex flex-wrap gap-2">
+      {github && <Button type="button" size="compact" variant="outline" disabled={editingDisabled}
+        onClick={() => openPanel({ kind: 'add-github', section })}>Add from GitHub</Button>}
+      <Button type="button" size="compact" variant="outline" disabled={editingDisabled}
+        onClick={() => openPanel({ kind: 'add-inline', section })}>{writeLabel}</Button>
+    </div>
+  }
+
+  const countLabel = (count: number, noun: string) => count ? `${count} ${noun}${count === 1 ? '' : 's'}` : undefined
+  const toolNames = Object.keys(value.tools ?? {})
+
+  return <TooltipProvider delayDuration={150}>
+    <div className={`@container/profile-editor min-w-0 space-y-4 ${className ?? ''}`} aria-label="Agent profile editor">
+      {error && <Notice tone="error">{error}</Notice>}
+      {jsonDirty && <Notice tone="info">Apply or discard your Advanced JSON edits before changing other fields.</Notice>}
+      {unsupportedResources.length > 0 && <Notice tone="error">
+        This profile has resources this product does not use: {unsupportedResources.map(kind => `${RESOURCE_KIND_LABELS[kind]} (${configuredResourceCount(value, kind)})`).join(', ')}.
+        Remove them in Advanced JSON before saving.
+      </Notice>}
+      {constrainedEntryCount > 0 && <Notice tone="error">
+        {constrainedEntryCount === 1 ? 'One resource needs' : `${constrainedEntryCount} resources need`} a fix before this profile can be saved. The affected rows say what to change.
+      </Notice>}
+      {invalidMcpCount > 0 && <Notice tone="error">
+        {invalidMcpCount === 1 ? 'One MCP server needs' : `${invalidMcpCount} MCP servers need`} a public HTTPS address before this profile can be saved.
+      </Notice>}
+
+      {show.identity && <Section title="Identity">
+        <div className={formRow}>
+          {config?.identity?.nameEditable !== false && <Field label="Name" htmlFor={`${id}-name`}>
+            <Input id={`${id}-name`} size="compact" disabled={editingDisabled} value={value.name ?? ''} {...noAutofill}
+              onChange={event => emit({ ...value, name: event.target.value })} />
+          </Field>}
+          <Field label="Description" htmlFor={`${id}-description`}>
+            <Input id={`${id}-description`} size="compact" disabled={editingDisabled} value={value.description ?? ''} {...noAutofill}
+              onChange={event => emit({ ...value, description: event.target.value })} />
+          </Field>
+        </div>
+      </Section>}
+
+      {show.prompts && <Section title="Instructions" description="What the agent is told before every conversation.">
+        <Field label="System prompt" htmlFor={`${id}-system`}
+          info="Replaces the harness's built-in system prompt. Leave it empty to keep the built-in prompt.">
+          <Textarea id={`${id}-system`} className="min-h-52 text-sm leading-6" disabled={editingDisabled} value={value.prompt?.systemPrompt ?? ''}
+            onChange={event => prompt({ ...value.prompt, systemPrompt: event.target.value })} />
+        </Field>
+        <details className="group/more" open={Boolean(value.prompt?.appendSystemPrompt || value.prompt?.instructions?.length) || undefined}>
+          <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 transition-transform group-open/more:rotate-90" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+            More instructions
+          </summary>
+          <div className="mt-4 space-y-4">
+            <Field label="Appended prompt" htmlFor={`${id}-append`}
+              info="Added after the system prompt, or after the built-in prompt when the system prompt is empty.">
+              <Textarea id={`${id}-append`} size="compact" className="min-h-24 text-sm leading-6" disabled={editingDisabled} value={value.prompt?.appendSystemPrompt ?? ''}
+                onChange={event => prompt({ ...value.prompt, appendSystemPrompt: event.target.value })} />
+            </Field>
+            <div role="group" aria-labelledby={`${id}-instructions-label`} className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <span id={`${id}-instructions-label`} className={formText.label}>Project instructions</span>
+              </div>
+              <p className={formText.muted}>Lower-priority guidance the agent reads like a project file.</p>
+              {(value.prompt?.instructions ?? []).map((instruction, index) =>
+                <div key={index} className="flex items-start gap-2">
+                  <Textarea aria-label={`Instruction ${index + 1}`} size="compact" className="min-h-20 text-sm leading-6" disabled={editingDisabled} value={instruction}
+                    onChange={event => prompt({ ...value.prompt, instructions: (value.prompt?.instructions ?? []).map((item, i) => i === index ? event.target.value : item) })} />
+                  <Button type="button" size="compact" variant="ghost" className="text-destructive hover:text-destructive" disabled={editingDisabled}
+                    aria-label={`Remove instruction ${index + 1}`}
+                    onClick={() => prompt({ ...value.prompt, instructions: (value.prompt?.instructions ?? []).filter((_, i) => i !== index) })}>Remove</Button>
+                </div>)}
+              <Button type="button" size="compact" variant="outline" disabled={editingDisabled}
+                onClick={() => prompt({ ...value.prompt, instructions: [...(value.prompt?.instructions ?? []), ''] })}>Add instruction</Button>
             </div>
           </div>
-          {issues.length > 0 && <div className="space-y-1 text-xs text-destructive">
-            {issues.map(issue => <p key={issue}>{issue} Edit this file before saving.</p>)}
-          </div>}
-          {mount.resource.kind === 'inline' && fileEdit?.index !== index && <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-2 text-xs text-muted-foreground">{mount.resource.content || '(Empty file)'}</pre>}
-          {fileEdit?.index === index && <div className="space-y-3 border-t border-border pt-3">
-            {fileFields(fileEdit.draft, draft => setFileEdit({ index, draft }))}
-            <div className="flex gap-2"><Button type="button" variant="outline" disabled={editingDisabled}
-              onClick={() => { if (saveFile(fileEdit.draft, index)) setFileEdit(null) }}>Apply changes</Button>
-              <Button type="button" variant="ghost" onClick={() => setFileEdit(null)}>Cancel</Button></div>
-          </div>}
-        </li>})}</ul>
-      {addingFile ? <div className="space-y-3 border-t border-border pt-4">
-        {fileFields(newFile, setNewFile)}
-        <div className="flex gap-2"><Button type="button" variant="outline" disabled={editingDisabled}
-          onClick={() => { if (saveFile(newFile)) { setNewFile({ path: workspaceFilePrefix ?? '', resource: { ...emptyResourceDraft(), kind: 'inline' }, executable: false }); setAddingFile(false) } }}>Add file</Button>
-          <Button type="button" variant="ghost" onClick={() => setAddingFile(false)}>Cancel</Button></div>
-      </div> : <Button type="button" variant="outline" disabled={editingDisabled} onClick={() => setAddingFile(true)}>Add file</Button>}
-    </Disclosure>}
-    <Disclosure title="Advanced JSON" description="Edit the full canonical profile, including hooks, modes, connections, and extensions.">
-      <label htmlFor={id + '-json'} className="sr-only">Full profile JSON</label>
-      <Textarea id={id + '-json'} className="min-h-72 font-mono text-xs" spellCheck={false} disabled={disabled} value={json} onChange={event => { setJson(event.target.value); setJsonDirty(true) }} />
-      <div className="flex flex-wrap items-center gap-3"><Button type="button" variant="outline" disabled={disabled || !jsonDirty} onClick={applyJson}>Apply JSON</Button>
-        {jsonDirty && <Button type="button" variant="ghost" className="text-destructive" disabled={disabled} onClick={() => { setJson(JSON.stringify(value, null, 2)); setJsonDirty(false); setError(null) }}>Discard JSON edits</Button>}</div>
-      <p className="text-xs text-muted-foreground">Profiles are public configuration. Store credentials in a vault and reference them by secret key.</p>
-    </Disclosure>
-  </div>
+        </details>
+      </Section>}
+
+      {show.model && <Section title="Model and runtime" description="Defaults for conversations and automations that do not choose their own.">
+        <div className={formRow}>
+          {modelField('Default model', 'default', 'Runs when a conversation or automation does not pick a model.')}
+          {config?.harnesses && config.harnesses.length > 0 && <Field label="Harness" htmlFor={`${id}-harness`}
+            info="The agent runtime that runs this profile, such as OpenCode or Codex.">
+            <HarnessPicker id={`${id}-harness`} variant="field" value={harness ?? ''} onChange={changeHarness}
+              available={config.harnesses} defaultOption={{ label: catalog?.defaultLabel ?? 'Product default' }} disabled={editingDisabled} />
+          </Field>}
+          <Field label="Thinking" htmlFor={`${id}-thinking`} info="How hard the agent reasons before answering. Auto lets the harness decide.">
+            <EffortPicker id={`${id}-thinking`} variant="field" label="" value={value.model?.reasoningEffort ?? 'auto'} levels={thinkingLevels}
+              disabled={editingDisabled}
+              onChange={level => model({ ...value.model, reasoningEffort: level === 'auto' ? undefined : level as NonNullable<AgentProfile['model']>['reasoningEffort'] })} />
+          </Field>
+          {modelField('Small model', 'small', 'A faster model for short tasks such as titles and summaries.')}
+        </div>
+        {modelNotice && <StatusLine tone="neutral">{modelNotice}</StatusLine>}
+      </Section>}
+
+      {show.tools && <Section title="Tools and permissions" description="Which tools the agent may use, and when it must ask first."
+        collapsible summary={countLabel(toolNames.length, 'rule')}>
+        {toolNames.length === 0 && <p className={formText.muted}>No tool rules yet.</p>}
+        {toolNames.length > 0 && <ul className="divide-y divide-border rounded-lg border border-border">
+          {Object.entries(value.tools ?? {}).slice(0, showAllTools ? undefined : 6).map(([name, enabled]) => {
+            const switchId = `${id}-tool-${name}`
+            return <li key={name} className="flex flex-wrap items-center gap-3 p-3">
+              <Switch id={switchId} disabled={editingDisabled} checked={enabled} aria-label={`Allow ${name}`}
+                onCheckedChange={checked => emit({ ...value, tools: { ...value.tools, [name]: checked } })} />
+              <label htmlFor={switchId} className={`min-w-24 flex-1 break-words ${formText.label}`}>{name}</label>
+              <Select disabled={editingDisabled} value={typeof value.permissions?.[name] === 'string' ? value.permissions[name] as string : 'default'}
+                onValueChange={permission => { const permissions = { ...value.permissions }; if (permission !== 'default') permissions[name] = permission as 'allow' | 'ask' | 'deny'; else delete permissions[name]; emit({ ...value, permissions }) }}>
+                <SelectTrigger size="compact" aria-label={`Permission for ${name}`} className="w-36 shadow-none"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default</SelectItem><SelectItem value="allow">Allow</SelectItem>
+                  <SelectItem value="ask">Ask first</SelectItem><SelectItem value="deny">Deny</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button type="button" size="compact" variant="ghost" className="text-destructive hover:text-destructive" disabled={editingDisabled}
+                aria-label={`Remove ${name}`} onClick={() => { const tools = { ...value.tools }; delete tools[name]; emit({ ...value, tools }) }}>Remove</Button>
+            </li>
+          })}
+        </ul>}
+        {toolNames.length > 6 && <Button type="button" size="compact" variant="ghost" onClick={() => setShowAllTools(current => !current)}>
+          {showAllTools ? 'Show fewer' : `Show ${toolNames.length - 6} more`}
+        </Button>}
+        <div className="flex gap-2">
+          <Input aria-label="New tool name" size="compact" disabled={editingDisabled} value={newTool} placeholder="Tool name" {...noAutofill}
+            onChange={event => setNewTool(event.target.value)} />
+          <Button type="button" size="compact" variant="outline" disabled={editingDisabled || !newTool.trim()} onClick={() => {
+            const name = newTool.trim()
+            if (name in (value.tools ?? {})) { setError('A rule for this tool already exists.'); return }
+            if (emit({ ...value, tools: { ...value.tools, [name]: true } })) setNewTool('')
+          }}>Add tool</Button>
+        </div>
+        <p className={formText.muted}>Nested permission rules are edited in Advanced JSON.</p>
+      </Section>}
+
+      {show.skills && <Section title="Skills" description="Instructions the agent loads when a task calls for them."
+        collapsible defaultOpen={skills.length > 0 || panel?.section === 'skills'} summary={countLabel(skills.length, 'skill')}>
+        {refList('skills', skills, 'Skill')}
+        {addButtons('skills', 'Write a skill')}
+        {registry && <AgentProfileRegistrySkillSearch registry={registry} disabled={editingDisabled} existing={skills}
+          validate={ref => skillIssue(ref, skills, skills.length)}
+          onAdd={ref => resources('skills', [...skills, ref])} />}
+      </Section>}
+
+      {show.toolFiles && <Section title="Tool files" description="Files that define custom tools."
+        collapsible defaultOpen={toolFiles.length > 0} summary={countLabel(toolFiles.length, 'file')}>
+        {refList('tools', toolFiles, 'Tool file')}
+        {addButtons('tools', 'Write a tool file')}
+      </Section>}
+
+      {show.mcp && <Section title="MCP servers" description="Tool servers the agent connects to."
+        collapsible defaultOpen={Object.keys(value.mcp ?? {}).length > 0} summary={countLabel(Object.keys(value.mcp ?? {}).length, 'server')}>
+        <McpServersEditor servers={value.mcp ?? {}} disabled={editingDisabled} port={config?.mcp?.port} lockReason={config?.mcp?.lockReason}
+          publicHttpsOnly={publicHttpsMcpOnly} allowLocalCommand={config?.mcp?.allowLocalCommand ?? !publicHttpsMcpOnly}
+          registry={registry} onPendingChange={setMcpPending}
+          onChange={next => { const { mcp: _mcp, ...rest } = value; return emit(Object.keys(next).length ? { ...value, mcp: next } : rest) }} />
+      </Section>}
+
+      {show.files && <Section title="Resource files" description="Reference files placed in the agent's workspace."
+        collapsible defaultOpen={files.length > 0 || panel?.section === 'files'} summary={countLabel(files.length, 'file')}>
+        {files.length === 0 && <p className={formText.muted}>No resource files yet.</p>}
+        {files.length > 0 && <ul className="divide-y divide-border rounded-lg border border-border">{files.map((mount, index) => {
+          const issue = fileIssue(mount, index)
+          const editing = panel?.kind === 'edit' && panel.section === 'files' && panel.index === index
+          return <li key={`${mount.path}-${index}`} className="space-y-3 p-3" aria-label={`Resource file ${mount.path}`}>
+            <div className={listRow}>
+              <div className="min-w-0">
+                <p className={`break-words [overflow-wrap:anywhere] ${formText.label}`}>{mount.path}</p>
+                <p className={`break-words ${formText.muted}`}>{sourceLine(mount.resource)}{mount.executable ? ' · Executable' : ''}</p>
+                {issue && <p className={formText.error}>{issue}</p>}
+              </div>
+              {rowActions(mount.path, 'files', index, mount.resource)}
+            </div>
+            {editing && (mount.resource.kind === 'github' && github ? githubEditor('files', index) : inlineEditor('files', index))}
+          </li>
+        })}</ul>}
+        {panel && panel.kind !== 'edit' && panel.section === 'files' && addButtons('files', 'Write a file')}
+        <ResourceFileDrop existingPaths={files.map(mount => mount.path)} pathPrefix={workspaceFilePrefix} limits={config?.files}
+          disabled={editingDisabled} actions={!(panel && panel.kind !== 'edit' && panel.section === 'files') && <>
+            {github && <Button type="button" size="compact" variant="outline" disabled={editingDisabled}
+              onClick={() => openPanel({ kind: 'add-github', section: 'files' })}>Add from GitHub</Button>}
+            <Button type="button" size="compact" variant="outline" disabled={editingDisabled}
+              onClick={() => openPanel({ kind: 'add-inline', section: 'files' })}>Write a file</Button>
+          </>} onAdd={added => {
+            const mounts = added.map(({ path, file }) => ({ path, resource: { kind: 'inline' as const, name: file.name, content: file.content } }))
+            const next = [...files, ...mounts]
+            const issue = mounts.map((mount, offset) => fileIssue(mount, files.length + offset)).find(Boolean)
+            if (issue) return issue
+            return setFiles(next) ? null : 'The profile did not accept these files.'
+          }} />
+      </Section>}
+
+      {show.advanced && <Section title="Advanced JSON" description="The complete profile, including hooks, modes, connections, and extensions." collapsible>
+        <label htmlFor={`${id}-json`} className="sr-only">Full profile JSON</label>
+        <Textarea id={`${id}-json`} className="min-h-72 font-mono text-sm leading-6" spellCheck={false} disabled={disabled} value={json}
+          onChange={event => { setJson(event.target.value); setJsonDirty(true) }} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" size="compact" variant="outline" disabled={disabled || !jsonDirty} onClick={applyJson}>Apply JSON</Button>
+          {jsonDirty && <Button type="button" size="compact" variant="ghost" className="text-destructive hover:text-destructive" disabled={disabled}
+            onClick={() => { setJson(JSON.stringify(value, null, 2)); setJsonDirty(false); setError(null) }}>Discard JSON edits</Button>}
+        </div>
+        <p className={formText.muted}>Reference credentials by secret name; never paste them into a profile.</p>
+      </Section>}
+    </div>
+  </TooltipProvider>
 }
+
+function GitHubFilePath({ check, id, value, prefix, disabled, onChange, issue }: {
+  check: GitHubSourceCheck | null
+  id: string
+  value: string
+  prefix: string
+  disabled: boolean
+  onChange: (path: string) => void
+  issue: string | null
+}) {
+  const suggested = check ? prefix + basename(check.path) : ''
+  // Suggest a path when a new source is checked; the person's own path stays.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (suggested && !value) onChange(suggested) }, [suggested])
+  return <Field label="Workspace path" htmlFor={id} error={issue} hint={!issue && prefix ? `Files go under ${prefix}` : undefined}>
+    <Input id={id} size="compact" value={value} disabled={disabled || !check} placeholder={prefix + 'guide.md'} {...noAutofill}
+      aria-invalid={issue ? true : undefined} aria-describedby={fieldMessageId(id)} onChange={event => onChange(event.target.value)} />
+  </Field>
+}
+

@@ -43,6 +43,7 @@ export * from './chat-composer'
 export { getChatFundingRecovery, type ChatFundingFailure, type ChatFundingRecovery } from './turn-funding-recovery'
 export { RouteChunkBoundary, type RouteChunkBoundaryProps } from './lazy-load-boundary'
 export * from './agent-profile-editor'
+export type { ResourceFileLimits } from './agent-profile-files'
 export * from './agent-profile-registry'
 export * from './agent-profile-viewer'
 export * from './composer-file-accept'
@@ -91,6 +92,7 @@ export {
   DEFAULT_EFFORT_LEVELS,
   EFFORT_METER_SEGMENTS,
   OVERLAY_SHADOW,
+  fieldPickerTriggerClass,
   type ModelPickerProps,
   type EffortPickerProps,
   type EffortLevel,
@@ -99,7 +101,9 @@ export {
 } from './controls'
 export {
   AgentSessionControls,
+  HarnessPicker,
   type AgentSessionControlsProps,
+  type HarnessPickerProps,
 } from './agent-session-controls'
 import type { CatalogModel } from '../runtime/model-catalog'
 // Re-export the model type the chat components consume, so a web-react consumer

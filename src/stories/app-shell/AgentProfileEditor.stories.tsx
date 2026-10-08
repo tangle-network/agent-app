@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import type { AgentProfile } from '@tangle-network/agent-interface/profile'
-import { AgentProfileEditor, type AgentProfileEditorProps, type AgentProfileEditorSaveState } from '../../web-react/agent-profile-editor'
+import { AgentProfileEditor, type AgentProfileEditorConfig, type AgentProfileEditorProps, type AgentProfileEditorSaveState } from '../../web-react/agent-profile-editor'
+import { productProfile, profileEditorGitHubPort, profileEditorMcpPort, profileEditorModels } from '../fixtures/profile-editor'
 
 const example: AgentProfile = {
   name: 'Research assistant',
@@ -30,15 +31,15 @@ type ResourceConstraints = Pick<AgentProfileEditorProps, 'allowedResourceKinds' 
   'allowExecutableFiles' | 'requireGitHubCommitSha' | 'requireUniqueSkillNames' | 'showToolsAndPermissions' |
   'publicHttpsMcpOnly'>
 
-function Preview({ initial, registry, ...constraints }: { initial: AgentProfile } & ResourceConstraints
-  & Pick<AgentProfileEditorProps, 'registry'>) {
+function Preview({ initial, registry, config, ...constraints }: { initial: AgentProfile } & ResourceConstraints
+  & Pick<AgentProfileEditorProps, 'registry' | 'config'>) {
   const [profile, setProfile] = useState(initial)
   const [saveState, setSaveState] = useState<AgentProfileEditorSaveState>({ pending: false, invalid: false })
   const [saved, setSaved] = useState<AgentProfile | null>(null)
   return <main className="min-h-screen bg-background p-4 text-foreground sm:p-8">
     <div className="mx-auto max-w-5xl space-y-5">
       <header><h1 className="text-2xl font-semibold">Agent profile</h1></header>
-      <AgentProfileEditor value={profile} onChange={setProfile} onSaveStateChange={setSaveState} registry={registry} {...constraints} />
+      <AgentProfileEditor value={profile} onChange={setProfile} onSaveStateChange={setSaveState} registry={registry} config={config} {...constraints} />
       <button type="button" className="rounded-lg border border-border bg-card px-4 py-2 text-sm disabled:opacity-50" disabled={saveState.pending || saveState.invalid} onClick={() => setSaved(profile)}>Save profile</button>
       {saveState.pending && <p role="status">Apply or discard unfinished edits before saving.</p>}
       {saved && <pre aria-label="Saved profile" className="whitespace-pre-wrap break-all text-xs">{JSON.stringify(saved, null, 2)}</pre>}
@@ -57,7 +58,7 @@ const meta: Meta<typeof AgentProfileEditor> = {
     filePathPrefix={args.filePathPrefix} allowExecutableFiles={args.allowExecutableFiles}
     requireGitHubCommitSha={args.requireGitHubCommitSha} requireUniqueSkillNames={args.requireUniqueSkillNames}
     showToolsAndPermissions={args.showToolsAndPermissions} publicHttpsMcpOnly={args.publicHttpsMcpOnly}
-    registry={args.registry} />,
+    registry={args.registry} config={args.config} />,
 }
 export default meta
 type Story = StoryObj<typeof AgentProfileEditor>
@@ -130,4 +131,36 @@ export const ExistingResourcesToRepair: Story = {
     files: [{ path: 'docs/old-guide.md', resource: { kind: 'github', repository: 'example/agent-guides', path: 'old-guide.md', ref: 'main' }, executable: true }],
     skills: [{ kind: 'github', repository: 'example/agent-guides', path: 'skills/booking/SKILL.md', ref: fixedCommit, name: 'booking-guide ' }],
   }, mcp: { local: { command: 'local-mcp' }, insecure: { transport: 'http', url: 'http://example.com/mcp' } } }, ...referenceConstraints },
+}
+
+/** A product's configuration: catalog-backed selectors, GitHub and MCP checks, and file upload limits. */
+const productConfig: AgentProfileEditorConfig = {
+  sections: ['identity', 'prompts', 'model', 'skills', 'mcp', 'files', 'advanced'],
+  identity: { nameEditable: false },
+  models: { models: profileEditorModels, defaultLabel: 'Product default' },
+  harnesses: ['opencode', 'codex', 'claude-code', 'pi'],
+  github: { port: profileEditorGitHubPort(), storage: 'inline', connectHref: '#integrations' },
+  mcp: { port: profileEditorMcpPort() },
+  files: { accept: ['.md', '.txt', '.json'], maxFileBytes: 64 * 1024 },
+}
+
+const productConstraints = {
+  filePathPrefix: 'profile-trials/',
+  allowExecutableFiles: false,
+  requireGitHubCommitSha: true,
+  requireUniqueSkillNames: true,
+  showToolsAndPermissions: false,
+  publicHttpsMcpOnly: true,
+} as const
+
+export const ProductConfigured: Story = {
+  args: { value: productProfile, config: productConfig, ...productConstraints },
+}
+
+export const GitHubNotConnected: Story = {
+  args: { value: productProfile, config: { ...productConfig, github: { ...productConfig.github!, port: profileEditorGitHubPort({ connected: false }) } }, ...productConstraints },
+}
+
+export const ProductEmpty: Story = {
+  args: { value: {}, config: productConfig, ...productConstraints },
 }

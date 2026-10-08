@@ -389,8 +389,23 @@ export function pickerRootClass(fullWidth: boolean): string {
  *    surface fill on hover and while the menu is open, nothing else. For a
  *    composer whose card already draws the border: three pills docked under
  *    the input there read as three more cards, not as the input's controls.
+ *  - `field`: a full-width form field — the same height, radius, border,
+ *    well, and focus treatment as a text input at `--control-height`. For a
+ *    settings form, where a pill among inputs reads as a different control.
  */
-export type PickerVariant = 'chip' | 'quiet'
+export type PickerVariant = 'chip' | 'quiet' | 'field'
+
+/**
+ * Trigger classes for a `field` picker. It matches `@tangle-network/ui`'s
+ * compact `Input` (height, `rounded-lg`, `--bg-input` well, border hover, and
+ * `:focus` halo) so a model or harness selector sits in a form as one more
+ * field. Written out here because `/web-react` controls stay free of the
+ * sandbox-ui peer.
+ */
+export function fieldPickerTriggerClass({ interactive = true }: { interactive?: boolean } = {}): string {
+  return `inline-flex h-[var(--control-height)] w-full min-w-0 items-center justify-between gap-2 whitespace-nowrap rounded-lg border border-border bg-[var(--bg-input)] px-3 text-left text-sm font-normal text-foreground transition-[border-color,box-shadow] duration-150 ease-out focus:outline-hidden focus:border-[var(--focus-border)] focus:ring-3 focus:ring-[var(--focus-halo)] disabled:cursor-not-allowed disabled:opacity-50 ${
+    interactive ? 'hover:border-[var(--border-strong)] data-[state=open]:border-[var(--focus-border)]' : 'cursor-default'}`
+}
 
 /** The quiet trigger at rest: geometry, type, and keyboard focus. */
 const QUIET_PICKER_TRIGGER_BASE =
@@ -497,6 +512,12 @@ export interface ModelPickerProps {
   variant?: PickerVariant
   /** Optional accessible trigger content for a picker docked beside an editable model field. */
   triggerContent?: ReactNode
+  /**
+   * Offer "no selection" as the first row, for a setting that may defer to a
+   * default chosen elsewhere. Choosing it calls `onChange('')`, and the trigger
+   * shows this label while `value` is empty.
+   */
+  defaultOption?: { label: string }
 }
 
 function formatPrice(p?: string): string | undefined {
@@ -578,7 +599,7 @@ export function ModelPicker({
   value, onChange, models, loading = false, error, onRetry, disabled = false,
   id, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy,
   renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup,
-  variant = 'chip', triggerContent,
+  variant = 'chip', triggerContent, defaultOption,
 }: ModelPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -680,7 +701,7 @@ export function ModelPicker({
   }, [sortedModels, priorityGroup, value])
 
   const select = (modelId: string) => {
-    if (disabled || loading || unavailable) return
+    if (disabled || (modelId && (loading || unavailable))) return
     changeOpen(false)
     triggerRef.current?.focus()
     onChange(modelId)
@@ -690,7 +711,7 @@ export function ModelPicker({
   )
 
   return (
-    <div ref={containerRef} className="relative inline-flex min-w-0 max-w-full">
+    <div ref={containerRef} className={variant === 'field' ? 'relative flex w-full min-w-0' : 'relative inline-flex min-w-0 max-w-full'}>
       <button
         type="button"
         {...triggerProps}
@@ -708,20 +729,23 @@ export function ModelPicker({
             changeOpen(true)
           }
         }}
-        title={selectedLabel || 'Select model'}
+        title={selectedLabel || defaultOption?.label || 'Select model'}
         data-state={expanded ? 'open' : 'closed'}
         className={`${
-          variant === 'quiet'
+          variant === 'field'
+            ? fieldPickerTriggerClass({ interactive: !disabled })
+            : variant === 'quiet'
             ? quietPickerTriggerClass({ interactive: !disabled })
             : `inline-flex min-h-[36px] items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition ${disabled ? '' : 'hover:bg-accent'}`
         } max-w-full disabled:cursor-not-allowed disabled:opacity-50`}
       >
-        {triggerContent ?? <>
+        {triggerContent ?? <span className={variant === 'field' ? 'flex min-w-0 flex-1 items-center gap-2' : 'contents'}>
           <span className="shrink-0" aria-hidden>
             {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
           </span>
-          <span className="max-w-[160px] truncate">{selectedLabel || 'Select model'}</span>
-        </>}
+          <span className={variant === 'field' ? `min-w-0 flex-1 truncate ${value ? '' : 'text-muted-foreground'}` : 'max-w-[160px] truncate'}>
+            {selectedLabel || defaultOption?.label || 'Select model'}</span>
+        </span>}
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
       {describeValue && value && <span id={valueId} className="sr-only">Selected model: {selectedLabel}</span>}
@@ -734,6 +758,8 @@ export function ModelPicker({
         contentKey={contentKey}
         triggerRef={triggerRef}
         panelRef={panelRef}
+        matchTriggerWidth={variant === 'field'}
+        side={variant === 'field' ? 'below' : undefined}
         className={`flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-card-edge bg-popover text-foreground ${OVERLAY_SHADOW}`}
       >
         <div className="shrink-0 border-b border-border px-3 py-2">
@@ -752,6 +778,20 @@ export function ModelPicker({
         </div>
         {/* min-h-0 lets results absorb the surface's viewport height limit. */}
         <div className="max-h-[520px] min-h-0 overflow-y-auto p-1 pb-2">
+          {defaultOption && !query.trim() && (
+            <button
+              type="button"
+              onClick={() => select('')}
+              aria-pressed={!value}
+              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
+                value ? 'hover:bg-accent' : 'bg-primary/10 font-medium'
+              }`}
+            >
+              <SparkleGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1">{defaultOption.label}</span>
+              {!value && <CheckGlyph className="h-3.5 w-3.5 shrink-0 text-primary" />}
+            </button>
+          )}
           {value && !selected && (
             <div className="mx-2 mb-1 mt-2 rounded-lg bg-secondary px-3 py-2 text-sm">
               <p className="text-xs font-medium text-muted-foreground">Saved model</p>
@@ -998,6 +1038,11 @@ export interface EffortPickerProps {
   fullWidth?: boolean
   /** Trigger treatment — see {@link PickerVariant}. Default `chip`. */
   variant?: PickerVariant
+  /** Disable the trigger and close an open menu; does not change the value. */
+  disabled?: boolean
+  /** Associations belong to the trigger button, for a picker labelled by a form field. */
+  id?: string
+  'aria-describedby'?: string
 }
 
 /** Thinking-budget selector pill, styled to match {@link ModelPicker}. Show
@@ -1006,9 +1051,12 @@ export interface EffortPickerProps {
  *
  *  The CANONICAL ecosystem effort picker — sandbox-ui's reasoning menu (inside
  *  its `chat/AgentSessionControls`) is legacy and frozen. */
-export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking', fullWidth = false, variant = 'chip' }: EffortPickerProps) {
-  const [open, setOpen] = useState(false)
+export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking', fullWidth = false, variant = 'chip',
+  disabled = false, id, 'aria-describedby': ariaDescribedBy }: EffortPickerProps) {
+  const [requestedOpen, setOpen] = useState(false)
+  const open = requestedOpen && !disabled
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
+  const field = variant === 'field'
   const panelId = useId()
   const rendered = reconcileEffortLevels(value, levels)
   // The strength ladder is computed over the DECLARED levels only, so admitting
@@ -1020,16 +1068,21 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
   const selected = rendered.find((l) => l.id === value)
 
   return (
-    <div ref={containerRef} className={pickerRootClass(fullWidth)}>
+    <div ref={containerRef} className={pickerRootClass(fullWidth || field)}>
       <button
         type="button"
         {...triggerProps}
+        id={id}
+        disabled={disabled}
+        aria-describedby={ariaDescribedBy}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
         title={label ? `${label} — how hard the agent reasons before answering` : 'Reasoning effort'}
         data-state={open ? 'open' : 'closed'}
         className={`${
-          variant === 'quiet'
+          field
+            ? fieldPickerTriggerClass({ interactive: !disabled })
+            : variant === 'quiet'
             ? quietPickerTriggerClass()
             : 'inline-flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent'
         } ${fullWidth ? 'w-full' : ''}`}
@@ -1037,7 +1090,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         {/* Full width gives the label the slack, so the meter and chevron park
             on the trailing edge and the glyph stays against the text. */}
-        <span className={fullWidth ? 'flex-1 truncate text-left' : undefined}>
+        <span className={fullWidth || field ? 'flex-1 truncate text-left' : undefined}>
           {label ? <span className="text-muted-foreground">{label}: </span> : null}
           {selected ? selected.label : '—'}
         </span>
@@ -1059,7 +1112,8 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         panelRef={panelRef}
         // A portaled panel has no `w-full` to inherit, so a full-width trigger
         // hands its measured width to the panel instead.
-        matchTriggerWidth={fullWidth}
+        matchTriggerWidth={fullWidth || field}
+        side={field ? 'below' : undefined}
         className={`w-44 overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
       >
           {rendered.map((l) => (

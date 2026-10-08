@@ -64,6 +64,15 @@ An editable model field can dock the canonical picker with `variant="quiet"` and
 The supplied content names the trigger; the picker retains its dropdown indicator, search, selection, and focus behavior.
 Omitting this slot preserves the selected-model label and provider icon.
 
+## Form fields
+
+A settings form uses the same pickers with `variant="field"`: a full-width trigger with the height,
+radius, well, and focus treatment of a compact text input, and a menu at least as wide as the field.
+`ModelPicker` and `HarnessPicker` take `defaultOption={{ label }}` for a setting that may defer to a
+default chosen elsewhere; choosing it calls `onChange('')`. `EffortPicker` represents that case with an
+`auto` level. Each takes an `id` so a form label names the trigger. `HarnessPicker` is exported for
+this use; the composer cluster still composes it through `AgentSessionControls`.
+
 ## Catalogue state and accessible trigger contract
 
 The implementation and public types live in [`controls.tsx`](../src/web-react/controls.tsx).

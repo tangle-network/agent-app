@@ -8106,7 +8106,7 @@
           "name": "HubIntegrationsAccounts",
           "kind": "interface",
           "signature": "interface HubIntegrationsAccounts",
-          "doc": "Lists each connected account once, with its host status and one inline host control."
+          "doc": "Shows each connected account once, with its host status and one inline host control."
         },
         {
           "name": "HubIntegrationsClient",
@@ -11449,6 +11449,398 @@
           "kind": "function",
           "signature": "(productSkills: readonly SkillEntry[], options?: QualitySkillOptions) => SkillEntry[]",
           "doc": "Append the default quality skills to a product's skills."
+        }
+      ]
+    },
+    {
+      "id": "./profile-editor",
+      "source": "src/profile-editor/index.ts",
+      "dependsOn": [
+        "skills"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "createProfileEditorClient",
+          "kind": "function",
+          "signature": "({ endpoint, fetch: fetchImpl }: ProfileEditorClientOptions) => ProfileEditorClient",
+          "doc": "Ports backed by the product route."
+        },
+        {
+          "name": "GitHubCommitSummary",
+          "kind": "interface",
+          "signature": "interface GitHubCommitSummary",
+          "doc": null
+        },
+        {
+          "name": "GitHubFileEntry",
+          "kind": "interface",
+          "signature": "interface GitHubFileEntry",
+          "doc": null
+        },
+        {
+          "name": "GitHubFileList",
+          "kind": "interface",
+          "signature": "interface GitHubFileList",
+          "doc": null
+        },
+        {
+          "name": "GitHubRepositorySummary",
+          "kind": "interface",
+          "signature": "interface GitHubRepositorySummary",
+          "doc": null
+        },
+        {
+          "name": "GitHubSourceCheck",
+          "kind": "interface",
+          "signature": "interface GitHubSourceCheck",
+          "doc": null
+        },
+        {
+          "name": "GitHubSourceFailure",
+          "kind": "interface",
+          "signature": "interface GitHubSourceFailure",
+          "doc": null
+        },
+        {
+          "name": "GitHubSourceOutcome",
+          "kind": "type",
+          "signature": "type GitHubSourceOutcome",
+          "doc": null
+        },
+        {
+          "name": "GitHubSourceProblem",
+          "kind": "type",
+          "signature": "type GitHubSourceProblem",
+          "doc": "Why a GitHub source cannot be used."
+        },
+        {
+          "name": "GitHubSourcePurpose",
+          "kind": "type",
+          "signature": "type GitHubSourcePurpose",
+          "doc": null
+        },
+        {
+          "name": "GitHubSourceRequest",
+          "kind": "interface",
+          "signature": "interface GitHubSourceRequest",
+          "doc": null
+        },
+        {
+          "name": "isCommitSha",
+          "kind": "function",
+          "signature": "(value: string) => boolean",
+          "doc": null
+        },
+        {
+          "name": "McpHealth",
+          "kind": "type",
+          "signature": "type McpHealth",
+          "doc": null
+        },
+        {
+          "name": "McpHealthProblem",
+          "kind": "type",
+          "signature": "type McpHealthProblem",
+          "doc": "Why an MCP server check failed."
+        },
+        {
+          "name": "McpTool",
+          "kind": "interface",
+          "signature": "interface McpTool",
+          "doc": null
+        },
+        {
+          "name": "parseGitHubLocation",
+          "kind": "function",
+          "signature": "(input: string) => { repository: string; ref?: string | undefined; path?: string | undefined; } | null",
+          "doc": "Normalize what a person types or pastes into `owner/repo`: a bare name pair, a `github.com` URL (including `/tree/` and `/blob/` links), or an SSH remote."
+        },
+        {
+          "name": "PROFILE_EDITOR_ROUTES",
+          "kind": "const",
+          "signature": "{ readonly repositories: \"github/repositories\"; readonly latest: \"github/latest\"; readonly commit: \"github/commit\"; rea…",
+          "doc": "The product route's subpaths, relative to the endpoint passed to {@link createProfileEditorClient}."
+        },
+        {
+          "name": "ProfileEditorClient",
+          "kind": "interface",
+          "signature": "interface ProfileEditorClient",
+          "doc": null
+        },
+        {
+          "name": "ProfileEditorClientOptions",
+          "kind": "interface",
+          "signature": "interface ProfileEditorClientOptions",
+          "doc": null
+        },
+        {
+          "name": "ProfileEditorGitHubPort",
+          "kind": "interface",
+          "signature": "interface ProfileEditorGitHubPort",
+          "doc": "GitHub lookups the editor needs, answered by the product with the workspace's connection."
+        },
+        {
+          "name": "ProfileEditorMcpPort",
+          "kind": "interface",
+          "signature": "interface ProfileEditorMcpPort",
+          "doc": "Connects to an MCP server and lists its tools."
+        },
+        {
+          "name": "publicHttpsUrlProblem",
+          "kind": "function",
+          "signature": "(value: string) => string | null",
+          "doc": "The address policy for products that connect only to public HTTPS servers: no credentials in the URL, no IP literals, and no single-label, `.local` or `.internal` hosts."
+        },
+        {
+          "name": "readSkillFrontmatter",
+          "kind": "function",
+          "signature": "(content: string) => { ok: true; name: string; description: string; } | { ok: false; message: string; }",
+          "doc": "Frontmatter `name` and `description` of an Agent Skill, or the reason the text is not one."
+        }
+      ]
+    },
+    {
+      "id": "./profile-editor/server",
+      "source": "src/profile-editor/server.ts",
+      "dependsOn": [
+        "skills"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "checkMcpServer",
+          "kind": "function",
+          "signature": "(server: AgentProfileMcpServer, options?: McpHealthCheckOptions) => Promise<McpHealth>",
+          "doc": "Connect to a remote MCP server, initialize a session, and list its tools."
+        },
+        {
+          "name": "createGitHubRestReader",
+          "kind": "function",
+          "signature": "(options?: GitHubRestReaderOptions) => GitHubSourceReader",
+          "doc": "A reader over GitHub's REST API with a person or installation token."
+        },
+        {
+          "name": "createGitHubSourceService",
+          "kind": "function",
+          "signature": "(reader: GitHubSourceReader, options?: GitHubSourceServiceOptions) => ProfileEditorGitHubPort",
+          "doc": "The editor's GitHub port, computed from a reader."
+        },
+        {
+          "name": "createMcpHealthChecker",
+          "kind": "function",
+          "signature": "(options?: McpHealthCheckOptions) => ProfileEditorMcpPort",
+          "doc": "The editor's MCP port, running checks in this process with the given address policy."
+        },
+        {
+          "name": "createProfileEditorClient",
+          "kind": "function",
+          "signature": "({ endpoint, fetch: fetchImpl }: ProfileEditorClientOptions) => ProfileEditorClient",
+          "doc": "Ports backed by the product route."
+        },
+        {
+          "name": "formatBytes",
+          "kind": "function",
+          "signature": "(bytes: number) => string",
+          "doc": null
+        },
+        {
+          "name": "GitHubCommitRecord",
+          "kind": "interface",
+          "signature": "interface GitHubCommitRecord",
+          "doc": null
+        },
+        {
+          "name": "GitHubCommitSummary",
+          "kind": "interface",
+          "signature": "interface GitHubCommitSummary",
+          "doc": null
+        },
+        {
+          "name": "GitHubFileEntry",
+          "kind": "interface",
+          "signature": "interface GitHubFileEntry",
+          "doc": null
+        },
+        {
+          "name": "GitHubFileList",
+          "kind": "interface",
+          "signature": "interface GitHubFileList",
+          "doc": null
+        },
+        {
+          "name": "githubPayload",
+          "kind": "const",
+          "signature": "{ repository(value: unknown): GitHubRepositoryRecord; repositories(value: unknown): GitHubRepositoryRecord[]; branch(va…",
+          "doc": "Parse GitHub REST payloads shared by the REST reader and other transports that relay GitHub's JSON."
+        },
+        {
+          "name": "GitHubReadError",
+          "kind": "class",
+          "signature": "class GitHubReadError",
+          "doc": "A GitHub read failure."
+        },
+        {
+          "name": "GitHubRepositoryRecord",
+          "kind": "interface",
+          "signature": "interface GitHubRepositoryRecord",
+          "doc": null
+        },
+        {
+          "name": "GitHubRepositorySummary",
+          "kind": "interface",
+          "signature": "interface GitHubRepositorySummary",
+          "doc": null
+        },
+        {
+          "name": "GitHubRestReaderOptions",
+          "kind": "interface",
+          "signature": "interface GitHubRestReaderOptions",
+          "doc": null
+        },
+        {
+          "name": "GitHubSourceCheck",
+          "kind": "interface",
+          "signature": "interface GitHubSourceCheck",
+          "doc": null
+        },
+        {
+          "name": "GitHubSourceFailure",
+          "kind": "interface",
+          "signature": "interface GitHubSourceFailure",
+          "doc": null
+        },
+        {
+          "name": "GitHubSourceOutcome",
+          "kind": "type",
+          "signature": "type GitHubSourceOutcome",
+          "doc": null
+        },
+        {
+          "name": "GitHubSourceProblem",
+          "kind": "type",
+          "signature": "type GitHubSourceProblem",
+          "doc": "Why a GitHub source cannot be used."
+        },
+        {
+          "name": "GitHubSourcePurpose",
+          "kind": "type",
+          "signature": "type GitHubSourcePurpose",
+          "doc": null
+        },
+        {
+          "name": "GitHubSourceReader",
+          "kind": "interface",
+          "signature": "interface GitHubSourceReader",
+          "doc": "The GitHub operations the source service needs."
+        },
+        {
+          "name": "GitHubSourceRequest",
+          "kind": "interface",
+          "signature": "interface GitHubSourceRequest",
+          "doc": null
+        },
+        {
+          "name": "GitHubSourceServiceOptions",
+          "kind": "interface",
+          "signature": "interface GitHubSourceServiceOptions",
+          "doc": null
+        },
+        {
+          "name": "GitHubTreeRecord",
+          "kind": "interface",
+          "signature": "interface GitHubTreeRecord",
+          "doc": null
+        },
+        {
+          "name": "handleProfileEditorRequest",
+          "kind": "function",
+          "signature": "(request: Request, path: string, options: ProfileEditorHandlerOptions) => Promise<Response>",
+          "doc": "Serve the editor's checks."
+        },
+        {
+          "name": "isCommitSha",
+          "kind": "function",
+          "signature": "(value: string) => boolean",
+          "doc": null
+        },
+        {
+          "name": "McpHealth",
+          "kind": "type",
+          "signature": "type McpHealth",
+          "doc": null
+        },
+        {
+          "name": "McpHealthCheckOptions",
+          "kind": "interface",
+          "signature": "interface McpHealthCheckOptions",
+          "doc": null
+        },
+        {
+          "name": "McpHealthProblem",
+          "kind": "type",
+          "signature": "type McpHealthProblem",
+          "doc": "Why an MCP server check failed."
+        },
+        {
+          "name": "McpTool",
+          "kind": "interface",
+          "signature": "interface McpTool",
+          "doc": null
+        },
+        {
+          "name": "parseGitHubLocation",
+          "kind": "function",
+          "signature": "(input: string) => { repository: string; ref?: string | undefined; path?: string | undefined; } | null",
+          "doc": "Normalize what a person types or pastes into `owner/repo`: a bare name pair, a `github.com` URL (including `/tree/` and `/blob/` links), or an SSH remote."
+        },
+        {
+          "name": "PROFILE_EDITOR_ROUTES",
+          "kind": "const",
+          "signature": "{ readonly repositories: \"github/repositories\"; readonly latest: \"github/latest\"; readonly commit: \"github/commit\"; rea…",
+          "doc": "The product route's subpaths, relative to the endpoint passed to {@link createProfileEditorClient}."
+        },
+        {
+          "name": "ProfileEditorClient",
+          "kind": "interface",
+          "signature": "interface ProfileEditorClient",
+          "doc": null
+        },
+        {
+          "name": "ProfileEditorClientOptions",
+          "kind": "interface",
+          "signature": "interface ProfileEditorClientOptions",
+          "doc": null
+        },
+        {
+          "name": "ProfileEditorGitHubPort",
+          "kind": "interface",
+          "signature": "interface ProfileEditorGitHubPort",
+          "doc": "GitHub lookups the editor needs, answered by the product with the workspace's connection."
+        },
+        {
+          "name": "ProfileEditorHandlerOptions",
+          "kind": "interface",
+          "signature": "interface ProfileEditorHandlerOptions",
+          "doc": null
+        },
+        {
+          "name": "ProfileEditorMcpPort",
+          "kind": "interface",
+          "signature": "interface ProfileEditorMcpPort",
+          "doc": "Connects to an MCP server and lists its tools."
+        },
+        {
+          "name": "publicHttpsUrlProblem",
+          "kind": "function",
+          "signature": "(value: string) => string | null",
+          "doc": "The address policy for products that connect only to public HTTPS servers: no credentials in the URL, no IP literals, and no single-label, `.local` or `.internal` hosts."
+        },
+        {
+          "name": "readSkillFrontmatter",
+          "kind": "function",
+          "signature": "(content: string) => { ok: true; name: string; description: string; } | { ok: false; message: string; }",
+          "doc": "Frontmatter `name` and `description` of an Agent Skill, or the reason the text is not one."
         }
       ]
     },
@@ -19785,6 +20177,7 @@
         "missions",
         "plans",
         "platform",
+        "profile-editor",
         "runtime",
         "session-shell",
         "trace",
@@ -19808,6 +20201,12 @@
           "name": "ActivityTone",
           "kind": "type",
           "signature": "type ActivityTone",
+          "doc": null
+        },
+        {
+          "name": "AGENT_PROFILE_EDITOR_SECTIONS",
+          "kind": "const",
+          "signature": "readonly AgentProfileEditorSection[]",
           "doc": null
         },
         {
@@ -19849,8 +20248,20 @@
         {
           "name": "AgentProfileEditor",
           "kind": "function",
-          "signature": "({ value, onChange, disabled, className, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGitHubCommi…",
+          "signature": "({ value, onChange, disabled, className, config, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGit…",
           "doc": "Controlled editor for the canonical profile."
+        },
+        {
+          "name": "AgentProfileEditorConfig",
+          "kind": "interface",
+          "signature": "interface AgentProfileEditorConfig",
+          "doc": "What a product offers in the editor."
+        },
+        {
+          "name": "AgentProfileEditorModelCatalog",
+          "kind": "interface",
+          "signature": "interface AgentProfileEditorModelCatalog",
+          "doc": "The model catalog the selectors offer: the same list the product's chat composer uses."
         },
         {
           "name": "AgentProfileEditorProps",
@@ -19863,6 +20274,12 @@
           "kind": "interface",
           "signature": "interface AgentProfileEditorSaveState",
           "doc": null
+        },
+        {
+          "name": "AgentProfileEditorSection",
+          "kind": "type",
+          "signature": "type AgentProfileEditorSection",
+          "doc": "Editor sections a product can offer, in display order."
         },
         {
           "name": "AgentProfileRegistryError",
@@ -20695,7 +21112,7 @@
         {
           "name": "EffortPicker",
           "kind": "function",
-          "signature": "({ value, onChange, levels, label, fullWidth, variant }: EffortPickerProps) => Element",
+          "signature": "({ value, onChange, levels, label, fullWidth, variant, disabled, id, \"aria-describedby\": ariaDescribedBy }: EffortPicke…",
           "doc": "Thinking-budget selector pill, styled to match {@link ModelPicker}."
         },
         {
@@ -20763,6 +21180,12 @@
           "kind": "function",
           "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
           "doc": "The submitted value for one field, or null when it has no answer yet."
+        },
+        {
+          "name": "fieldPickerTriggerClass",
+          "kind": "function",
+          "signature": "({ interactive }?: { interactive?: boolean | undefined; }) => string",
+          "doc": "Trigger classes for a `field` picker."
         },
         {
           "name": "FieldValues",
@@ -20895,6 +21318,18 @@
           "kind": "interface",
           "signature": "interface HarnessGlyphProps",
           "doc": null
+        },
+        {
+          "name": "HarnessPicker",
+          "kind": "function",
+          "signature": "({ value, onChange, available, fullWidth, lockReason, variant, defaultOption, disabled, id, \"aria-describedby\": ariaDes…",
+          "doc": null
+        },
+        {
+          "name": "HarnessPickerProps",
+          "kind": "interface",
+          "signature": "interface HarnessPickerProps",
+          "doc": "Pill-styled harness picker — inline, no sandbox-ui dependency."
         },
         {
           "name": "hasSecretField",
@@ -21935,6 +22370,12 @@
           "doc": "This record's own standing, ignoring its inputs."
         },
         {
+          "name": "ResourceFileLimits",
+          "kind": "interface",
+          "signature": "interface ResourceFileLimits",
+          "doc": null
+        },
+        {
           "name": "responseErrorMessage",
           "kind": "function",
           "signature": "(res: Response) => Promise<{ code?: string | undefined; message: string; }>",
@@ -22778,6 +23219,7 @@
         "missions",
         "plans",
         "platform",
+        "profile-editor",
         "runtime",
         "session-shell",
         "trace",
