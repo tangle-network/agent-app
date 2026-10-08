@@ -6,7 +6,6 @@ import {
   inviteUrlForToken,
   normalizeInvitationEmail,
   parseInvitationPermission,
-  renderInvitationEmail,
 } from '../../src/teams/invitations'
 
 describe('invitation pure helpers', () => {
@@ -42,35 +41,5 @@ describe('invitation pure helpers', () => {
     expect(inviteUrlForToken('https://app.example.com/', 'inv_abc')).toBe(
       'https://app.example.com/invite/inv_abc',
     )
-  })
-})
-
-describe('renderInvitationEmail', () => {
-  const base = {
-    to: 'invitee@x.com',
-    workspaceName: 'Acme',
-    inviterEmail: 'boss@x.com',
-    permission: 'editor',
-    inviteUrl: 'https://app/invite/inv_x',
-    expiresAt: new Date('2026-01-08T00:00:00.000Z'),
-  }
-
-  it('uses the brand from-address and an inviter+workspace subject', () => {
-    const msg = renderInvitationEmail(base, { fromAddress: 'GTM Agent <noreply@gtm.tangle.tools>' })
-    expect(msg.from).toBe('GTM Agent <noreply@gtm.tangle.tools>')
-    expect(msg.subject).toBe('boss@x.com invited you to Acme')
-    expect(msg.html).toContain('https://app/invite/inv_x')
-    expect(msg.html).toContain('as editor')
-    expect(msg.text).toContain('Accept the invitation: https://app/invite/inv_x')
-  })
-
-  it('escapes html in workspace name and inviter email', () => {
-    const msg = renderInvitationEmail(
-      { ...base, workspaceName: '<script>', inviterEmail: 'a&b@x.com' },
-      { fromAddress: 'X <x@x.com>' },
-    )
-    expect(msg.html).toContain('&lt;script&gt;')
-    expect(msg.html).toContain('a&amp;b@x.com')
-    expect(msg.html).not.toContain('<script>')
   })
 })

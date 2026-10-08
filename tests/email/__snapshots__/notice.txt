@@ -1,0 +1,17 @@
+Subject: Reset your password — GTM Agent
+Preheader: Someone asked to reset the password for ada@example.com.
+
+GTM Agent
+
+Reset your password
+
+Someone asked to reset the password for ada@example.com.
+
+Reset password: https://gtm.tangle.tools/api/auth/reset-password/tok?callbackURL=%2Freset&x=1
+
+This link expires in 1 hour.
+
+--
+GTM Agent
+You received this because a password reset was requested for this address.
+Tangle Technologies, Inc., [redacted], USA
