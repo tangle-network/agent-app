@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { PageHeader } from '@tangle-network/ui/primitives'
 
 export interface ApiAccessKey {
   id: string
@@ -147,10 +148,11 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
       <div className="mx-auto max-w-2xl space-y-8 px-4 py-8 sm:px-8">
         <div className="space-y-2">
           {accountHref && <a href={accountHref} className="text-sm text-muted-foreground hover:text-foreground">Account</a>}
-          <h1 className="text-2xl font-semibold text-foreground">API access</h1>
-          <p className="text-sm text-muted-foreground">
-            {description ?? 'Connect a client to your account. Each key acts with your permissions and only the access you choose.'}
-          </p>
+          <PageHeader
+            className="mb-0"
+            title="API access"
+            description={description ?? 'Connect a client to your account. Each key acts with your permissions and only the access you choose.'}
+          />
         </div>
 
         {error && <p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{error}</p>}
