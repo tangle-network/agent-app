@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.6
+
+- Forward per-turn MCP credentials through Sandbox prompt helper
+
 ## 0.58.5
 
 - fix(web-react): make profile review and editing visually coherent (#864)
