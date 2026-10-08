@@ -578,7 +578,7 @@ The callback keeps the host from saving an older canonical value while those edi
 The product still validates and authorizes the final profile on the server.
 The viewer shows model hints, instructions, tool policy, MCP aliases, and declared resources.
 It does not claim that a resource loaded or a model served a request.
-MCP URLs, headers, environment values, and connection identifiers stay private.
+The default overview keeps MCP URLs, headers, environment values, and connection identifiers private.
 The overview groups settings in bordered cards with tinted headers and shared Brand color roles.
 Prompt fields retain their exact schema paths: `prompt.systemPrompt` overrides the system prompt,
 `prompt.appendSystemPrompt` adds system text, and `prompt.instructions` supplies lower-priority workspace guidance.
