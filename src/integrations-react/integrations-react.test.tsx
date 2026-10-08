@@ -221,6 +221,19 @@ describe('integrations-react through the finite Hub settings server', () => {
     expect(screen.getByRole('button', { name: 'Connect another account' })).toBeTruthy()
   })
 
+  it('offers a provider again once its only account is disconnected', async () => {
+    const f = fixture()
+    f.setConnections([{ ...connection, status: 'revoked' }])
+    render(<HubIntegrationsPanel identity={identity} client={f.client} can={allow} callbackPath="/integrations/callback"
+      title="Connect an account" accounts={{ title: 'Accounts', emptyLabel: 'No accounts connected yet.' }} />)
+    const tile = await screen.findByTestId('integration-cloudbeds')
+    expect(tile.getAttribute('data-connected')).toBe('false')
+    expect(screen.getByText('No accounts connected yet.')).toBeTruthy()
+    expect(screen.queryByTestId('hub-account-conn_1')).toBeNull()
+    fireEvent.click(tile)
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+  })
+
   it('names a failed account read instead of rendering an empty account list', async () => {
     const f = fixture()
     const client: HubIntegrationsClient = { ...f.client, connections: async () => { throw new Error('Hub unavailable') } }

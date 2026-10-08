@@ -184,9 +184,13 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
     }
   })
   const selectedRow = rows.find(row => row.providerId === hub.provider?.providerId)
-  // With an account list, the catalog only offers providers that have no account yet.
-  const catalogRows = props.accounts ? rows.filter(row => row.connections.length === 0) : rows
   const connectionList = hub.connections.status === 'ready' ? hub.connections.value : []
+  // With an account list, the catalog offers providers without a connected account.
+  // The Hub keeps revoked connections listed; a provider with only those is connectable again.
+  const connectedProviders = new Set(connectionList.filter(connection => connection.status !== 'revoked').map(connection => connection.providerId))
+  const catalogRows = props.accounts
+    ? rows.filter(row => !connectedProviders.has(row.providerId)).map(row => ({ ...row, connections: [], selectedConnectionId: null }))
+    : rows
   const selectedConnection = hub.connection
   const detailError = hub.detail.status === 'error' ? hub.detail.message
     : hub.detail.status === 'ready' && hub.detail.value.truncated
