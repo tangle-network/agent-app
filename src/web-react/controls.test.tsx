@@ -441,7 +441,16 @@ describe('picker trigger variant', () => {
     expect(classes).toContain('border-border')
     expect(classes).toContain('bg-card')
     expect(classes).toContain('rounded-full')
-    expect(classes).toContain('min-h-[var(--control-height-sm,2rem)]')
+    expect(classes).toContain('h-[var(--control-height-sm,2rem)]')
+    expect(classes).not.toContain('py-1.5')
+  })
+
+  it('a full-width EffortPicker keeps the 36px settings-panel row', () => {
+    render(<EffortPicker value="medium" onChange={() => {}} fullWidth />)
+    const classes = classesOf(trigger())
+    expect(classes).toContain('min-h-[36px]')
+    expect(classes).toContain('w-full')
+    expect(classes).not.toContain('h-[var(--control-height-sm,2rem)]')
   })
 
   it('EffortPicker quiet draws no border, no card fill, no pill radius', () => {
@@ -450,7 +459,6 @@ describe('picker trigger variant', () => {
     expect(borderClasses(trigger())).toEqual([])
     expect(classes).not.toContain('bg-card')
     expect(classes).not.toContain('rounded-full')
-    expect(classes).not.toContain('min-h-[var(--control-height-sm,2rem)]')
     expect(classes).toContain('h-[var(--control-height-sm,2rem)]')
     expect(classes).toContain('font-normal')
     expect(classes).toContain('text-muted-foreground')

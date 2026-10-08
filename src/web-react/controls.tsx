@@ -407,6 +407,12 @@ export function fieldPickerTriggerClass({ interactive = true }: { interactive?: 
     interactive ? 'hover:border-[var(--border-strong)] data-[state=open]:border-[var(--focus-border)]' : 'cursor-default'}`
 }
 
+/** The chip trigger: a fixed 32px height (no vertical padding, so the 20px
+ *  line and the border cannot push it to 34px). A full-width EffortPicker in a
+ *  settings panel keeps the 36px field row instead. */
+const CHIP_PICKER_TRIGGER =
+  'inline-flex h-[var(--control-height-sm,2rem)] items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 text-sm font-medium text-foreground transition'
+
 /** The quiet trigger at rest: geometry, type, and keyboard focus. */
 const QUIET_PICKER_TRIGGER_BASE =
   'inline-flex h-[var(--control-height-sm,2rem)] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-transparent px-2 text-sm font-normal text-muted-foreground transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -736,7 +742,7 @@ export function ModelPicker({
             ? fieldPickerTriggerClass({ interactive: !disabled })
             : variant === 'quiet'
             ? quietPickerTriggerClass({ interactive: !disabled })
-            : `inline-flex min-h-[var(--control-height-sm,2rem)] items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition ${disabled ? '' : 'hover:bg-accent'}`
+            : `${CHIP_PICKER_TRIGGER} ${disabled ? '' : 'hover:bg-accent'}`
         } max-w-full disabled:cursor-not-allowed disabled:opacity-50`}
       >
         {triggerContent ?? <span className={variant === 'field' ? 'flex min-w-0 flex-1 items-center gap-2' : 'contents'}>
@@ -1084,7 +1090,9 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
             ? fieldPickerTriggerClass({ interactive: !disabled })
             : variant === 'quiet'
             ? quietPickerTriggerClass()
-            : 'inline-flex min-h-[var(--control-height-sm,2rem)] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent'
+            : fullWidth
+            ? 'inline-flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent'
+            : `${CHIP_PICKER_TRIGGER} shrink-0 hover:bg-accent`
         } ${fullWidth ? 'w-full' : ''}`}
       >
         <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
