@@ -975,7 +975,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                     <button
                       type="button"
                       title="New file"
-                      aria-label={activeFolder ? `New ${noun} file in ${activeFolder}` : `New ${noun} file`}
+                      aria-label={activeFolder ? `New file in ${activeFolder}` : 'New file'}
                       onClick={openCreate}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
                     >
@@ -1155,7 +1155,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
 
         <ConfirmDialog
           open={createOpen}
-          title={`Create ${noun} file`}
+          title="Create file"
           description={activeFolder ? `Add a new document to ${activeFolder}.` : `Add a new document to ${label}.`}
           confirmLabel={creating ? 'Creating…' : 'Create'}
           // A prefilled folder is a path with no file name yet, so emptiness is

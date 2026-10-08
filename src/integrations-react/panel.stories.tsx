@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { HubIntegrationsPanel } from './panel'
 import { createHubIntegrationsClient } from './client'
+import { useMemo, useState, type ComponentProps } from 'react'
 
 const providers = [
   ['github', 'GitHub', 'Development'], ['telegram', 'Telegram', 'Messaging'],
@@ -38,3 +39,34 @@ export const Tiles: Story = { args: { layout: 'tiles' } }
 export const AgentAccounts: Story = { args: { layout: 'tiles', accounts: {
   title: 'Connected accounts', getStatus: () => ({ label: 'Enabled for this agent', tone: 'success' }),
 } } }
+
+const manyProviders = [...providers, ...[
+  ['linear', 'Linear', 'Development'], ['figma', 'Figma', 'Design'], ['discord', 'Discord', 'Messaging'],
+  ['resend', 'Resend', 'Messaging'], ['airtable', 'Airtable', 'Productivity'], ['asana', 'Asana', 'Productivity'],
+].map(([providerId, title, category]) => ({ ...providers[0]!, providerId, title, category }))]
+const manyConnections = Array.from({ length: 24 }, (_, index) => ({
+  ...connection, id: `fixture-account-${index}`, providerId: providers[index % providers.length]!.providerId,
+  displayName: providers[index % providers.length]!.title,
+  accountDisplay: index === 0 ? 'Aleksandra Wiśniewska-Kowalczyk · northwind-communications@example.com' : `Example workspace ${index + 1}`,
+  health: index === 2 ? 'unhealthy' : 'healthy',
+}))
+
+function ManyAccountsFixture(args: ComponentProps<typeof HubIntegrationsPanel>) {
+  const [enabled, setEnabled] = useState(() => new Set(['fixture-account-0', 'fixture-account-2']))
+  const client = useMemo(() => createHubIntegrationsClient(async ({ path }) => {
+    const url = new URL(path, 'https://fixture.invalid')
+    if (url.pathname.endsWith('/providers')) return Response.json({ providers: manyProviders })
+    if (url.pathname.endsWith('/connections')) return Response.json({ connections: manyConnections })
+    if (url.pathname.endsWith('/actions')) return Response.json({ tools: [] })
+    if (url.pathname.endsWith('/policies')) return Response.json({ policies: [] })
+    return Response.json({ error: 'Read-only story' }, { status: 403 })
+  }), [])
+  return <HubIntegrationsPanel {...args} client={client} accounts={{
+    title: 'Accounts', description: 'Enable accounts for this agent. Manage changes the connected account wherever it is used.',
+    getStatus: account => ({ label: enabled.has(account.id) ? 'Enabled for this agent' : 'Not enabled', tone: enabled.has(account.id) ? 'success' : 'neutral' }),
+    getPrimaryAction: account => ({ id: 'agent-access', label: enabled.has(account.id) ? 'Remove from agent' : 'Enable for this agent', onSelect: () => setEnabled(previous => {
+      const next = new Set(previous); if (next.has(account.id)) next.delete(account.id); else next.add(account.id); return next
+    }) }),
+  }} />
+}
+export const ManyAccounts: Story = { args: { layout: 'tiles' }, render: args => <ManyAccountsFixture {...args} /> }

@@ -833,7 +833,7 @@ describe('VaultPane — create / delete call the port', () => {
   it('create calls port.createFile, refreshes, and selects the new file', async () => {
     const { port } = mount()
     await waitFor(() => expect(port.listTree).toHaveBeenCalled())
-    fireEvent.click(screen.getByLabelText('New vault file'))
+    fireEvent.click(screen.getByLabelText('New file'))
     fireEvent.change(screen.getByLabelText('New file path'), { target: { value: 'new.md' } })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Create' }))
@@ -866,13 +866,13 @@ describe('VaultPane — create / delete call the port', () => {
     const port = fakePort({ listTree, createFile })
     mount({ port, onOperationError })
     await screen.findByTestId('tree-a.md')
-    fireEvent.click(screen.getByLabelText('New vault file'))
+    fireEvent.click(screen.getByLabelText('New file'))
     fireEvent.change(screen.getByLabelText('New file path'), { target: { value: 'new.md' } })
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(screen.getByText('create exploded')).toBeTruthy())
-    expect(screen.getByRole('dialog', { name: 'Create vault file' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Create file' })).toBeTruthy()
     expect((screen.getByLabelText('New file path') as HTMLInputElement).value).toBe('new.md')
     expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(false)
     expect(onOperationError).toHaveBeenCalledWith(expect.objectContaining({
@@ -885,7 +885,7 @@ describe('VaultPane — create / delete call the port', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
 
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Create vault file' })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Create file' })).toBeNull())
     await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('new.md'))
     expect(createFile).toHaveBeenCalledTimes(2)
   })
@@ -937,13 +937,13 @@ describe('VaultPane — create / delete call the port', () => {
     const port = fakePort({ listTree, createFile })
     mount({ port, onOperationError })
     await screen.findByTestId('tree-a.md')
-    fireEvent.click(screen.getByLabelText('New vault file'))
+    fireEvent.click(screen.getByLabelText('New file'))
     fireEvent.change(screen.getByLabelText('New file path'), { target: { value: 'new.md' } })
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(screen.getByText(/The file was created, but Vault couldn't refresh/)).toBeTruthy())
-    expect(screen.queryByRole('dialog', { name: 'Create vault file' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Create file' })).toBeNull()
     expect(createFile).toHaveBeenCalledTimes(1)
     expect(onOperationError).toHaveBeenCalledTimes(1)
     expect(onOperationError).toHaveBeenCalledWith(expect.objectContaining({
@@ -1002,7 +1002,7 @@ describe('VaultPane — read-only (canWrite=false)', () => {
   it('hides create, delete, and the source/rich editor toggles', async () => {
     mount({ canWrite: false })
     await openFile('a.md')
-    expect(screen.queryByLabelText('New vault file')).toBeNull()
+    expect(screen.queryByLabelText('New file')).toBeNull()
     expect(screen.queryByLabelText('Delete this file')).toBeNull()
     expect(screen.queryByLabelText('Edit as source')).toBeNull()
     expect(screen.queryByLabelText('Edit as rich text')).toBeNull()
@@ -1138,7 +1138,7 @@ describe('VaultPane — folder clicks', () => {
     const { port } = mount()
     fireEvent.click(await screen.findByTestId('tree-folder'))
 
-    fireEvent.click(screen.getByLabelText('New vault file in folder'))
+    fireEvent.click(screen.getByLabelText('New file in folder'))
     const pathInput = screen.getByLabelText('New file path') as HTMLInputElement
     expect(pathInput.value).toBe('folder/')
     // A folder prefix is not yet a file — Create stays refused until it names one.
@@ -1321,7 +1321,7 @@ describe('VaultPane — empty vault, empty search, pane switcher', () => {
     expect(screen.queryByRole('navigation')).toBeNull()
     expect(screen.getByRole('region', { hidden: true, name: 'Vault document' }).className).toContain('hidden')
     expect(screen.getByRole('region', { hidden: true, name: 'Vault document' }).className).not.toContain('@[45rem]/vault:flex')
-    fireEvent.click(screen.getByRole('button', { name: 'New file' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'New file' })[0]!)
     expect(screen.getByLabelText('New file path')).toBeTruthy()
   })
 
