@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.11
+
+- fix(integrations): offer a provider again after its only account is disconnected
+
 ## 0.58.10
 
 - feat: expose icon tile layout in Hub integrations (#869)
