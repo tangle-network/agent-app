@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.21
+
+- fix(sandbox): forward secret profile revision receipts (#882)
+
 ## 0.58.20
 
 - feat(vault): shared sandbox-ui tree and a Select-a-file empty state (#883)
