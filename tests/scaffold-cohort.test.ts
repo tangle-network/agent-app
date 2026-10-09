@@ -30,6 +30,14 @@ describe.each([{ flags: [] }, { flags: ['--chat'] }, { flags: ['--headless'] }])
           ...(override ? ['--agent-app-version', override] : []),
         ])
         const manifest = JSON.parse(readFileSync(join(target, 'package.json'), 'utf8'))
+        // Let the release-age resolver keep Radix's exact internal cohort intact.
+        // Forcing focus-scope 1.1.16 under popover 1.2.0 removes required exports.
+        const workspace = readFileSync(join(target, 'pnpm-workspace.yaml'), 'utf8')
+        expect(workspace).toContain('minimumReleaseAge: 4320')
+        expect(workspace).toContain('minimumReleaseAgeStrict: true')
+        expect(workspace).toContain('strictPeerDependencies: true')
+        expect(workspace).toContain('  zod: 4.4.3')
+        expect(workspace).not.toMatch(/^\s+['"]?@radix-ui\//m)
         expect(manifest.dependencies['@tangle-network/agent-app'])
           .toBe(override ?? scaffolder.version)
         expect(manifest.devDependencies['@tangle-network/agent-eval'])
