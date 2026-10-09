@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.17
+
+- fix(operator): hand the app the agent key for each request (#910)
+
 ## 0.60.16
 
 - fix(operator): accept chat-store rows with typed parts in the chat adapter
