@@ -26,6 +26,7 @@ export const action = ({ request }) => api.handle(request)
 
 An app built on agent-app's chat stack does not write an adapter: `createChatOperatorAdapter` reads threads and messages from its chat store and runs turns through its own chat route.
 The app supplies its workspace roles, a `runTurn` that calls its chat route as the caller, and, optionally, running-turn discovery, files, journal, approvals, assets, and a scorecard.
+Thread reads receive the caller too, so an app whose conversations belong to one user rather than the whole workspace returns null for anyone else's.
 Its turns are driven exactly as a browser drives them, so the start request returns once the turn settles; apps whose turns are owned by a durable worker, such as GTM's completion Workflow, return as soon as the turn is admitted.
 
 `keys` uses the same callbacks as `createApiKeyRequestAuth`, so an app reuses its key store, revocation, expiry, and request limits.
