@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.6
+
+- fix(sandbox): require replacement key for recovery decisions (#897)
+
 ## 0.60.5
 
 - feat(email): per-action Approve and Deny links in the approval email (#896)
