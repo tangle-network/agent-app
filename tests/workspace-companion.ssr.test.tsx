@@ -6,16 +6,19 @@ it('renders the conversation on the server without storage or tool initializatio
   const initialize = vi.fn(() => <p>Terminal</p>)
   const html = renderToString(<AgentWorkspaceCompanion tabs={[{ id: 'terminal', label: 'Terminal', renderContent: initialize }]} persistenceKey="workspace"><p>Server conversation</p></AgentWorkspaceCompanion>)
   expect(html).toContain('Server conversation')
-  expect(html).toContain('Open right panel')
+  expect(html).toContain('Open workspace tools')
   expect(initialize).not.toHaveBeenCalled()
 })
 
-it('keeps the right-panel expander beside the conversation instead of floating over it', () => {
-  const html = renderToString(<AgentWorkspaceCompanion tabs={[{ id: 'files', label: 'Files', renderContent: () => <p>Files</p> }]}><p>Server conversation</p></AgentWorkspaceCompanion>)
-  const expander = html.slice(0, html.indexOf('aria-label="Open right panel"'))
-  const column = expander.slice(expander.lastIndexOf('<div class="'))
-  expect(column).toContain('shrink-0')
-  expect(column).not.toContain('absolute')
+it('puts the tools toggle flat inside the conversation header, not in an edge column or a float', () => {
+  const html = renderToString(<AgentWorkspaceCompanion header={<span>Launch plan</span>} tabs={[{ id: 'files', label: 'Files', renderContent: () => <p>Files</p> }, { id: 'agent', label: 'Agent', renderContent: () => <p>Agent</p> }]}><p>Server conversation</p></AgentWorkspaceCompanion>)
+  const header = html.slice(html.indexOf('data-workspace-header="center"'), html.indexOf('data-companion-center'))
+  expect(header).toContain('Launch plan')
+  expect(header).toContain('aria-label="Open workspace tools"')
+  expect(html.indexOf('data-workspace-surface')).toBeLessThan(html.indexOf('data-workspace-header="center"'))
+  expect(html).not.toContain('data-workspace-pane="right"')
+  const toggle = header.slice(header.lastIndexOf('<button', header.indexOf('aria-label="Open workspace tools"')), header.indexOf('</button>'))
+  for (const cls of ['absolute', 'shadow-sm', 'bg-card']) expect(toggle.split('"').join(' ').split(' ')).not.toContain(cls)
 })
 
 it('bounds the conversation to the pane height so its own list scrolls and the composer stays on screen', () => {

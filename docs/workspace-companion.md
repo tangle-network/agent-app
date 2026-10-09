@@ -26,11 +26,13 @@ An optional `AgentWorkspaceCompanionHandle` ref exposes `openTab(id)`.
 It returns false for unknown tabs and opens a configured tab through the normal callbacks.
 Artifact links can call `openTab('files')` without duplicating tab persistence.
 
-The shared layout supplies the right-panel expander and mobile drawer.
-The expander sits in its own column at the conversation edge, so it never covers a message.
-Do not add a second expander, repeated title, or fake connection status.
-This component requires sandbox-ui's `keepRightMounted` and `collapsedControlsPlacement` layout seams.
-Publish and adopt that dependency before delivering the Agent App component.
+The companion draws the conversation and its tools as one raised surface inside an even gutter on the recessed backdrop.
+The conversation has a header row; pass its quiet content, such as the title or a pending-review status, as `header`.
+The tools toggle sits flat in that row's top-right corner, named "Open workspace tools" from `label`, and its tooltip lists the configured tabs.
+An open pane shares the header height, the surface, and one divider; a closed pane leaves nothing at the window edge, and phones use the drawer.
+Do not draw a card, gutter, or header of your own around the conversation, float controls over it, or add a second expander.
+`tangle-drift` counts those as `shell_override` in product code.
+This component requires sandbox-ui 0.132's `surface="inset"` and `keepRightMounted` layout seams.
 
 Set `autoConnect: false` on `useSandboxTerminalConnection` for an optional companion terminal.
 Opening its tab then mounts the interface without provisioning a sandbox.

@@ -261,7 +261,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('21.0.0', range!)).toBe(false)
   })
 
-  it('requires the Sandbox UI release that owns the vault tree, without claiming the next minor', async () => {
+  it('requires the Sandbox UI release that owns the inset workspace surface, without claiming the next minor', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -269,14 +269,13 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/sandbox-ui']
 
     expect(range).toBeDefined()
-    // ./vault imports VaultTree from `@tangle-network/sandbox-ui/vault-tree`, first shipped in 0.130.0.
-    expect(satisfiesRange('0.128.0', range!)).toBe(false)
-    expect(satisfiesRange('0.129.2', range!)).toBe(false)
-    expect(satisfiesRange('0.130.0', range!)).toBe(true)
-    expect(satisfiesRange('0.130.4', range!)).toBe(true)
-    // 0.131 adds opening an asset from its card; nothing this package imports changed.
-    expect(satisfiesRange('0.131.0', range!)).toBe(true)
-    expect(satisfiesRange('0.132.0', range!)).toBe(false)
+    // AgentWorkspaceCompanion passes WorkspaceLayout `surface="inset"` and the right-pane
+    // control labels, first shipped in 0.132.0; earlier releases ignore them.
+    expect(satisfiesRange('0.130.4', range!)).toBe(false)
+    expect(satisfiesRange('0.131.5', range!)).toBe(false)
+    expect(satisfiesRange('0.132.0', range!)).toBe(true)
+    expect(satisfiesRange('0.132.3', range!)).toBe(true)
+    expect(satisfiesRange('0.133.0', range!)).toBe(false)
   })
 
   it('requires the UI release that exports MessageAuthor', async () => {

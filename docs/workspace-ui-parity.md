@@ -5,6 +5,7 @@ the outer shell and `AgentWorkspaceCompanion` for supported conversation tools.
 The companion owns responsive drawers, pane sizing, and visited-tab retention;
 products supply their existing files, checklists, previews, and actions.
 Do not add a second mobile header, drag-resize loop, or hidden desktop-only pane.
+The companion owns the conversation's surface, gutter, and header row; supply header content through `header`.
 
 `WorkspaceSwitcher` is exported from `/web-react` and `/workspace-react`.
 Supply authorized items, the current ID, selection callback, and any creation
