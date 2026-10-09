@@ -54,6 +54,7 @@ export default defineConfig({
     'plans/index': 'src/plans/index.ts',
     'missions/index': 'src/missions/index.ts',
     'platform/index': 'src/platform/index.ts',
+    'operator/index': 'src/operator/index.ts',
     'app-auth/index': 'src/app-auth/index.ts',
     'email/index': 'src/email/index.ts',
     'app-oauth/index': 'src/app-oauth/index.ts',

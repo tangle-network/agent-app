@@ -1,5 +1,7 @@
 # Headless application access
 
+For the standard operator routes and their typed client, use [the operator API](operator-api.md); this page covers the lower-level transport it builds on.
+
 ## Unreleased addition
 
 `createApiKeyFetch` is exported from `@tangle-network/agent-app/web`. It is a small application-boundary transport for an already-issued operator/API key, not another auth system, SDK for the Platform API, or agent execution loop.

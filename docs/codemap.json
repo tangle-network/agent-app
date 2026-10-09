@@ -10031,6 +10031,281 @@
       ]
     },
     {
+      "id": "./operator",
+      "source": "src/operator/index.ts",
+      "dependsOn": [
+        "platform",
+        "web"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "createOperatorApi",
+          "kind": "function",
+          "signature": "<Key extends RequestApiKey, Identity>(options: OperatorApiOptions<Key, Identity>) => OperatorApi",
+          "doc": "Mount the standard operator API."
+        },
+        {
+          "name": "createOperatorClient",
+          "kind": "function",
+          "signature": "(options: OperatorClientOptions) => OperatorClient",
+          "doc": "A typed client for one app's operator API."
+        },
+        {
+          "name": "matchOperatorRoute",
+          "kind": "function",
+          "signature": "(method: string, pathname: string, basePath?: string) => { route: { readonly id: \"describe\"; readonly method: \"GET\"; re…",
+          "doc": "Match a pathname under the base path to its route and decoded parameters."
+        },
+        {
+          "name": "OPERATOR_ACCESS",
+          "kind": "const",
+          "signature": "readonly [{ readonly scope: \"operator:read\"; readonly label: \"Read workspaces\"; readonly description: \"Read workspaces,…",
+          "doc": "Key permissions, with the labels an app's API access page shows."
+        },
+        {
+          "name": "OPERATOR_API_BASE_PATH",
+          "kind": "const",
+          "signature": "\"/api/operator/v1\"",
+          "doc": null
+        },
+        {
+          "name": "OPERATOR_API_SCOPES",
+          "kind": "const",
+          "signature": "readonly (\"operator:read\" | \"operator:write\" | \"operator:run\")[]",
+          "doc": null
+        },
+        {
+          "name": "OPERATOR_API_VERSION",
+          "kind": "const",
+          "signature": "\"v1\"",
+          "doc": "The standard operator API contract every agent app mounts at `/api/operator/v1`."
+        },
+        {
+          "name": "OPERATOR_ROUTES",
+          "kind": "const",
+          "signature": "readonly [{ readonly id: \"describe\"; readonly method: \"GET\"; readonly path: \"\"; readonly scopes: readonly [\"operator:re…",
+          "doc": "Route table: method, path pattern under the base path, and required scopes."
+        },
+        {
+          "name": "OPERATOR_SCOPE_DEPENDENCIES",
+          "kind": "const",
+          "signature": "Readonly<Record<string, readonly string[]>>",
+          "doc": null
+        },
+        {
+          "name": "OPERATOR_SETTLED_STATES",
+          "kind": "const",
+          "signature": "readonly OperatorTurnState[]",
+          "doc": null
+        },
+        {
+          "name": "OPERATOR_WORKSPACE_SCOPE_PREFIX",
+          "kind": "const",
+          "signature": "\"operator:workspace:\"",
+          "doc": "A key carrying one or more of these scopes reaches only the named workspaces and cannot create workspaces."
+        },
+        {
+          "name": "OperatorAdapter",
+          "kind": "interface",
+          "signature": "interface OperatorAdapter",
+          "doc": "The app's side of the operator API: storage and execution only."
+        },
+        {
+          "name": "OperatorApi",
+          "kind": "interface",
+          "signature": "interface OperatorApi",
+          "doc": null
+        },
+        {
+          "name": "OperatorApiOptions",
+          "kind": "interface",
+          "signature": "interface OperatorApiOptions",
+          "doc": null
+        },
+        {
+          "name": "OperatorAppInfo",
+          "kind": "interface",
+          "signature": "interface OperatorAppInfo",
+          "doc": null
+        },
+        {
+          "name": "OperatorApproval",
+          "kind": "interface",
+          "signature": "interface OperatorApproval",
+          "doc": null
+        },
+        {
+          "name": "OperatorApprovalKind",
+          "kind": "type",
+          "signature": "type OperatorApprovalKind",
+          "doc": null
+        },
+        {
+          "name": "OperatorAssetRef",
+          "kind": "interface",
+          "signature": "interface OperatorAssetRef",
+          "doc": null
+        },
+        {
+          "name": "OperatorCapability",
+          "kind": "type",
+          "signature": "type OperatorCapability",
+          "doc": null
+        },
+        {
+          "name": "OperatorClient",
+          "kind": "interface",
+          "signature": "interface OperatorClient",
+          "doc": null
+        },
+        {
+          "name": "OperatorClientOptions",
+          "kind": "interface",
+          "signature": "interface OperatorClientOptions",
+          "doc": null
+        },
+        {
+          "name": "OperatorContext",
+          "kind": "interface",
+          "signature": "interface OperatorContext",
+          "doc": "The verified caller of one operator request."
+        },
+        {
+          "name": "OperatorError",
+          "kind": "class",
+          "signature": "class OperatorError",
+          "doc": "A refusal with a stable code; adapters throw it for expected failures."
+        },
+        {
+          "name": "OperatorErrorBody",
+          "kind": "interface",
+          "signature": "interface OperatorErrorBody",
+          "doc": null
+        },
+        {
+          "name": "OperatorFile",
+          "kind": "interface",
+          "signature": "interface OperatorFile",
+          "doc": null
+        },
+        {
+          "name": "OperatorFileChange",
+          "kind": "interface",
+          "signature": "interface OperatorFileChange",
+          "doc": null
+        },
+        {
+          "name": "OperatorFileEntry",
+          "kind": "interface",
+          "signature": "interface OperatorFileEntry",
+          "doc": null
+        },
+        {
+          "name": "OperatorJournalEntry",
+          "kind": "interface",
+          "signature": "interface OperatorJournalEntry",
+          "doc": null
+        },
+        {
+          "name": "OperatorKeyStore",
+          "kind": "interface",
+          "signature": "interface OperatorKeyStore",
+          "doc": null
+        },
+        {
+          "name": "operatorKeyWorkspaces",
+          "kind": "function",
+          "signature": "(scopes: readonly string[]) => readonly string[] | null",
+          "doc": "The workspaces a key is restricted to, or null when it is unrestricted."
+        },
+        {
+          "name": "OperatorMetric",
+          "kind": "interface",
+          "signature": "interface OperatorMetric",
+          "doc": null
+        },
+        {
+          "name": "OperatorPrincipalInfo",
+          "kind": "interface",
+          "signature": "interface OperatorPrincipalInfo",
+          "doc": null
+        },
+        {
+          "name": "OperatorResult",
+          "kind": "type",
+          "signature": "type OperatorResult",
+          "doc": null
+        },
+        {
+          "name": "OperatorRole",
+          "kind": "type",
+          "signature": "type OperatorRole",
+          "doc": null
+        },
+        {
+          "name": "OperatorRouteId",
+          "kind": "type",
+          "signature": "type OperatorRouteId",
+          "doc": null
+        },
+        {
+          "name": "OperatorScope",
+          "kind": "type",
+          "signature": "type OperatorScope",
+          "doc": null
+        },
+        {
+          "name": "OperatorScorecard",
+          "kind": "interface",
+          "signature": "interface OperatorScorecard",
+          "doc": null
+        },
+        {
+          "name": "OperatorThread",
+          "kind": "interface",
+          "signature": "interface OperatorThread",
+          "doc": null
+        },
+        {
+          "name": "OperatorTurn",
+          "kind": "interface",
+          "signature": "interface OperatorTurn",
+          "doc": null
+        },
+        {
+          "name": "OperatorTurnState",
+          "kind": "type",
+          "signature": "type OperatorTurnState",
+          "doc": "`succeeded` and `failed` are settled."
+        },
+        {
+          "name": "OperatorWorkspace",
+          "kind": "interface",
+          "signature": "interface OperatorWorkspace",
+          "doc": null
+        },
+        {
+          "name": "operatorWorkspaceScope",
+          "kind": "function",
+          "signature": "(workspaceId: string) => string",
+          "doc": null
+        },
+        {
+          "name": "StartTurnInput",
+          "kind": "interface",
+          "signature": "interface StartTurnInput",
+          "doc": null
+        },
+        {
+          "name": "WaitForTurnOptions",
+          "kind": "interface",
+          "signature": "interface WaitForTurnOptions",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./peer-floors/check",
       "source": "src/peer-floors/check.ts",
       "dependsOn": [
