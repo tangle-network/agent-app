@@ -32,6 +32,15 @@ const samples: Record<string, EmailMessage> = {
     reviewUrl: '/app/ws_1/review',
     footer,
   }),
+  'approval-one-click': approvalEmail(product, {
+    actions: [
+      { summary: 'Create agent “Quinn”', detail: 'ph0ny', approveUrl: '/approval/act_a?t=sig_a', denyUrl: '/approval/act_d?t=sig_d' },
+      { summary: 'Synthesize speech “Hello”', detail: 'ph0ny', approveUrl: '/approval/act_b?t=sig_b', denyUrl: '/approval/act_e?t=sig_e' },
+    ],
+    approveUrl: '/app/ws_1/chat/thr_1',
+    reviewUrl: '/app/ws_1/review',
+    footer,
+  }),
   invite: inviteEmail(product, {
     workspaceName: 'Tangle Growth',
     inviter: 'drew@tangle.tools',
@@ -84,6 +93,21 @@ describe('email templates', () => {
     }).subject).toBe('Approve: API key rotation — GTM Agent')
     expect(samples.invite!.subject).toBe('Join Tangle Growth — GTM Agent')
     expect(samples.digest!.subject).toBe('Tangle Growth: 1 approval waiting, 6 turns — GTM Agent')
+  })
+
+  it('gives each action its own Approve and Deny, and a lone action its Approve button', () => {
+    const { html, text } = samples['approval-one-click']!
+    expect(html).toContain('href="https://gtm.tangle.tools/approval/act_a?t=sig_a"')
+    expect(html).toContain('href="https://gtm.tangle.tools/approval/act_e?t=sig_e"')
+    expect(text).toContain('  Approve: https://gtm.tangle.tools/approval/act_b?t=sig_b')
+    expect(text).toContain('  Deny: https://gtm.tangle.tools/approval/act_d?t=sig_d')
+    // Two actions: the button still opens the app.
+    expect(text).toContain('Approve: https://gtm.tangle.tools/app/ws_1/chat/thr_1')
+    const lone = approvalEmail(product, {
+      actions: [{ summary: 'Create agent “Quinn”', approveUrl: '/approval/act_a?t=sig_a', denyUrl: '/approval/act_d?t=sig_d' }],
+      approveUrl: '/app/ws_1/chat/thr_1', reviewUrl: '/app/ws_1/review', footer,
+    })
+    expect(lone.text).toContain('\nApprove: https://gtm.tangle.tools/approval/act_a?t=sig_a\n')
   })
 
   it('links into the app with absolute URLs and carries the footer in both parts', () => {

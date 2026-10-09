@@ -47,6 +47,8 @@ export interface EmailItem {
   detail?: string
   /** Makes the title a link; absolute or app-relative. */
   url?: string
+  /** Links under the row, such as one item's own Approve and Deny. */
+  links?: readonly EmailAction[]
 }
 
 /** An inline image the HTML references by `cid:`; the mail client must send it with the message. */
@@ -204,10 +206,16 @@ function items(list: readonly EmailItem[], product: EmailProduct): string {
     const detail = item.detail
       ? `<p class="t-muted" style="margin:2px 0 0;font-family:${FONT};font-size:13px;line-height:20px;color:${L.inkMuted}">${escapeHtml(item.detail)}</p>`
       : ''
+    const links = item.links && item.links.length > 0
+      ? `<p class="t-muted" style="margin:6px 0 0;font-family:${FONT};font-size:14px;line-height:20px;color:${L.inkMuted}">${item.links
+        .map((entry) => link(entry.label, resolveEmailUrl(entry.url, product), 'font-weight:600'))
+        .join('&nbsp;&nbsp;·&nbsp;&nbsp;')}</p>`
+      : ''
     return [
       `<tr><td class="t-rule" style="padding:14px 16px;${rule}">`,
       `<p class="t-ink" style="margin:0;font-family:${FONT};font-size:15px;line-height:22px;font-weight:600;color:${L.ink}">${title}</p>`,
       detail,
+      links,
       '</td></tr>',
     ].join('')
   })
@@ -331,6 +339,7 @@ function renderText(content: EmailContent, product: EmailProduct): string {
       const lines = [`- ${item.title}`]
       if (item.detail) lines.push(`  ${item.detail}`)
       if (item.url) lines.push(`  ${resolveEmailUrl(item.url, product)}`)
+      for (const entry of item.links ?? []) lines.push(`  ${entry.label}: ${resolveEmailUrl(entry.url, product)}`)
       return lines.join('\n')
     }).join('\n')
     blocks.push(entry.heading ? `${entry.heading}\n${list}` : list)

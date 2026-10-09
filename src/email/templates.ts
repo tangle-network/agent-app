@@ -26,6 +26,12 @@ export interface ApprovalEmailAction {
   summary: string
   /** Where it runs and until when, e.g. `ph0ny · open until Oct 9, 3:40 PM UTC`. */
   detail?: string
+  /**
+   * This action's own decision pages. Each must open a confirmation page that
+   * decides only on its POST: link scanners open every link in an email.
+   */
+  approveUrl?: string
+  denyUrl?: string
 }
 
 /** Input for {@link approvalEmail}. */
@@ -42,9 +48,11 @@ export interface ApprovalEmailInput {
 }
 
 /**
- * An agent paused until someone approves what it wants to do. Neither button
- * decides anything: link scanners open email links, so both lead to the app,
- * where the signed-in owner approves.
+ * An agent paused until someone approves what it wants to do. No link decides
+ * anything when opened: link scanners open email links. The buttons lead to
+ * the app, and an action's own Approve and Deny lead to a confirmation page
+ * whose button decides. With one action that has its own approve link, the
+ * Approve button opens it.
  */
 export function approvalEmail(product: EmailProduct, input: ApprovalEmailInput): EmailMessage {
   const [first, ...rest] = input.actions
@@ -58,8 +66,15 @@ export function approvalEmail(product: EmailProduct, input: ApprovalEmailInput):
     preheader: `The agent paused${where} until you decide.`,
     title: rest.length === 0 ? 'Approval needed' : `${input.actions.length} approvals needed`,
     paragraphs: [`The agent paused${where} until you decide. Nothing runs until you approve.`],
-    sections: [{ items: input.actions.map((action): EmailItem => ({ title: action.summary, ...(action.detail ? { detail: action.detail } : {}) })) }],
-    primary: { label: 'Approve', url: input.approveUrl },
+    sections: [{ items: input.actions.map((action): EmailItem => ({
+      title: action.summary,
+      ...(action.detail ? { detail: action.detail } : {}),
+      ...(action.approveUrl || action.denyUrl ? { links: [
+        ...(action.approveUrl ? [{ label: 'Approve', url: action.approveUrl }] : []),
+        ...(action.denyUrl ? [{ label: 'Deny', url: action.denyUrl }] : []),
+      ] } : {}),
+    })) }],
+    primary: { label: 'Approve', url: rest.length === 0 && first.approveUrl ? first.approveUrl : input.approveUrl },
     secondary: { label: 'Review', url: input.reviewUrl },
     footer: input.footer,
   })
