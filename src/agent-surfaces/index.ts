@@ -113,25 +113,28 @@ function fence(step: Pick<AgentSurfaceStep, 'language' | 'code'>): string {
 
 /**
  * The signup script the skill tells an agent to save and run. Node 18+ only,
- * no dependencies. It never prints the key; it writes `.tangle/api-key` with
- * mode 0600 and reports whether the owner's account can pay yet.
+ * no dependencies, in two short commands so a tool that kills long-running
+ * commands cannot cut the wait: `start` returns at once with the link and the
+ * confirmation code; `wait` polls for a few seconds and exits 0 once approved
+ * or 3 while the owner has not approved yet. It never prints the key; it
+ * writes `.tangle/api-key` with mode 0600.
  */
 export function agentSignupScript(platformOrigin = TANGLE_PLATFORM_ORIGIN): string {
   // The specifier is interpolated so this module's own import scan (the
   // browser-safe subpath gate) does not read script text as an import.
   return `// Requests a scoped Tangle key for this agent. The owner approves once.
-import { mkdirSync, writeFileSync } from ${JSON.stringify('node:fs')}
+//   node tangle-signup.mjs start --app <app> --agent-name <name> [--owner-email <email>] [--budget-usd <n>]
+//   node tangle-signup.mjs wait    (run again while it exits 3; exits 0 once approved)
+import { mkdirSync, readFileSync, writeFileSync } from ${JSON.stringify('node:fs')}
 
+const command = process.argv[2]
 const flag = (name) => {
   const index = process.argv.indexOf(\`--\${name}\`)
   return index > 0 ? process.argv[index + 1] : undefined
 }
 const platform = '${trimOrigin(platformOrigin)}'
-const app = flag('app')
-if (!app) throw new Error('Pass --app (for example --app sandbox)')
-const request = { app, agent_name: flag('agent-name') ?? 'coding-agent' }
-if (flag('owner-email')) request.owner_email = flag('owner-email')
-if (flag('budget-usd')) request.budget_usd = Number(flag('budget-usd'))
+const statePath = '.tangle/signup.json'
+mkdirSync('.tangle', { recursive: true, mode: 0o700 })
 
 async function post(path, body) {
   const response = await fetch(platform + path, {
@@ -142,39 +145,75 @@ async function post(path, body) {
   return { status: response.status, body: await response.json().catch(() => ({})) }
 }
 
-const started = await post('/cross-site/device/start', request)
-if (started.status !== 200) {
-  console.error(\`Signup refused (HTTP \${started.status}): \${JSON.stringify(started.body)}\`)
-  process.exit(1)
-}
-const grant = started.body.data
-console.log(grant.agent?.owner_notified
-  ? \`Approval email sent to \${request.owner_email}.\`
-  : 'Send your owner this approval link.')
-console.log(\`Approval link: \${grant.verification_uri_complete}\`)
-console.log(\`Confirmation code: \${grant.user_code} (expires in \${Math.round(grant.expires_in / 60)} minutes)\`)
-console.log('Waiting for approval...')
-
-const deadline = Date.now() + grant.expires_in * 1000
-while (Date.now() < deadline) {
-  await new Promise((resolve) => setTimeout(resolve, grant.interval * 1000))
-  const polled = await post('/cross-site/device/poll', { app, device_code: grant.device_code })
-  if (polled.status === 428) continue
-  if (polled.status !== 200) {
-    console.error(\`Approval failed (HTTP \${polled.status}): \${JSON.stringify(polled.body)}\`)
+if (command === 'start') {
+  const app = flag('app')
+  if (!app) {
+    console.error('Pass --app (for example --app sandbox)')
+    process.exit(2)
+  }
+  const request = { app, agent_name: flag('agent-name') ?? 'coding-agent' }
+  if (flag('owner-email')) request.owner_email = flag('owner-email')
+  if (flag('budget-usd')) request.budget_usd = Number(flag('budget-usd'))
+  const started = await post('/cross-site/device/start', request)
+  if (started.status !== 200) {
+    console.error(\`Signup refused (HTTP \${started.status}): \${JSON.stringify(started.body)}\`)
     process.exit(1)
   }
-  const { api_key: apiKey, key, account } = polled.body.data
-  mkdirSync('.tangle', { recursive: true, mode: 0o700 })
-  writeFileSync('.tangle/api-key', \`\${apiKey}\\n\`, { mode: 0o600 })
-  console.log(\`Approved. Key "\${key?.name ?? app}" saved to .tangle/api-key (spend cap $\${key?.budget_usd ?? 'none'}).\`)
-  if (account && !account.funded) {
-    console.log(\`The owner's account has no credit yet. Ask the owner to add credits: \${account.add_credits_url}\`)
+  const grant = started.body.data
+  const saved = {
+    app,
+    device_code: grant.device_code,
+    interval: grant.interval,
+    expires_at: Date.now() + grant.expires_in * 1000,
   }
+  writeFileSync(statePath, JSON.stringify(saved), { mode: 0o600 })
+  console.log(grant.agent?.owner_notified
+    ? \`Approval email sent to \${request.owner_email}.\`
+    : 'Send your owner this approval link.')
+  console.log(\`Approval link: \${grant.verification_uri_complete}\`)
+  console.log(\`Confirmation code: \${grant.user_code} (expires in \${Math.round(grant.expires_in / 60)} minutes)\`)
+  console.log('Next: run \`node tangle-signup.mjs wait\` until it prints Approved.')
   process.exit(0)
 }
-console.error('The approval link expired. Run this script again.')
-process.exit(1)
+
+if (command === 'wait') {
+  let saved
+  try {
+    saved = JSON.parse(readFileSync(statePath, 'utf8'))
+  } catch {
+    console.error('No pending signup. Run \`node tangle-signup.mjs start\` first.')
+    process.exit(1)
+  }
+  const stopAt = Math.min(saved.expires_at, Date.now() + Number(flag('seconds') ?? 8) * 1000)
+  for (;;) {
+    const polled = await post('/cross-site/device/poll', { app: saved.app, device_code: saved.device_code })
+    if (polled.status === 200) {
+      const { api_key: apiKey, key, account } = polled.body.data
+      writeFileSync('.tangle/api-key', \`\${apiKey}\\n\`, { mode: 0o600 })
+      console.log(\`Approved. Key "\${key?.name ?? saved.app}" saved to .tangle/api-key (spend cap $\${key?.budget_usd ?? 'none'}).\`)
+      if (account && !account.funded) {
+        console.log(\`The owner's account has no credit yet. Ask the owner to add credits: \${account.add_credits_url}\`)
+      }
+      process.exit(0)
+    }
+    if (polled.status !== 428) {
+      console.error(\`Approval failed (HTTP \${polled.status}): \${JSON.stringify(polled.body)}\`)
+      process.exit(1)
+    }
+    if (Date.now() >= saved.expires_at) {
+      console.error('The approval link expired. Run \`node tangle-signup.mjs start\` again.')
+      process.exit(1)
+    }
+    if (Date.now() + saved.interval * 1000 > stopAt) {
+      console.log('Still waiting for the owner to approve. Run \`node tangle-signup.mjs wait\` again.')
+      process.exit(3)
+    }
+    await new Promise((resolve) => setTimeout(resolve, saved.interval * 1000))
+  }
+}
+
+console.error('Usage: node tangle-signup.mjs start --app <app> --agent-name <name> [--owner-email <email>] | wait')
+process.exit(2)
 `
 }
 
@@ -202,19 +241,22 @@ function signupSection(config: AgentSurfaceConfig): string[] {
     '',
     fence({ language: 'js', code: agentSignupScript() }),
     '',
-    'Run it with your own name and the owner\'s email:',
+    'Start the request with your own name and the owner\'s email. It returns at once:',
     '',
     fence({
       language: 'bash',
-      code: `node tangle-signup.mjs --app ${config.signup.app} --agent-name "<your agent name>" --owner-email "<owner email>" --budget-usd ${budget}`,
+      code: `node tangle-signup.mjs start --app ${config.signup.app} --agent-name "<your agent name>" --owner-email "<owner email>" --budget-usd ${budget}`,
     }),
     '',
-    'What happens:',
+    'It prints the approval link and a confirmation code. Tangle emails the owner the same link; if you cannot give an email, omit `--owner-email` and send the owner the printed link yourself. Tell the owner the code if you can reach them.',
     '',
-    `1. Tangle emails the owner a one-time approval link. If you cannot give an email, omit \`--owner-email\` and send the owner the printed link yourself.`,
-    '2. The owner signs in (or creates an account and verifies the email), checks the confirmation code, and approves. That is the only human step.',
-    `3. The script writes the key to \`.tangle/api-key\` (mode 600). It can only be used for ${config.name}, it can spend at most the cap you requested, and the owner can revoke it under Keys at any time.`,
-    '4. If the script says the account has no credit, ask the owner to add credits at the printed link before your first paid call.',
+    'Then wait for the approval. Each run returns within about 8 seconds: exit code 3 and `Still waiting` mean run it again; exit code 0 and `Approved` mean the key is saved. Keep each run short rather than wrapping it in one long blocking loop, since many agent tools stop long commands.',
+    '',
+    fence({ language: 'bash', code: 'node tangle-signup.mjs wait' }),
+    '',
+    'What the owner does, once: sign in (or create an account and verify the email), check the confirmation code, and approve. That is the only human step.',
+    '',
+    `The key in \`.tangle/api-key\` (mode 600) can only be used for ${config.name}, can spend at most the cap you requested, and the owner can revoke it under Keys at any time. If \`wait\` says the account has no credit, ask the owner to add credits at the printed link before your first paid call.`,
     '',
     'Then load the key without printing it, and keep it out of version control:',
     '',
