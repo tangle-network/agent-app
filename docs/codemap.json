@@ -551,6 +551,129 @@
       ]
     },
     {
+      "id": "./agent-surfaces",
+      "source": "src/agent-surfaces/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "AGENT_MANIFEST_SCHEMA_VERSION",
+          "kind": "const",
+          "signature": "\"2026-10-09\"",
+          "doc": "Manifest schema this module emits."
+        },
+        {
+          "name": "AgentSignup",
+          "kind": "type",
+          "signature": "type AgentSignup",
+          "doc": "How an agent obtains a key."
+        },
+        {
+          "name": "agentSignupScript",
+          "kind": "function",
+          "signature": "(platformOrigin?: string) => string",
+          "doc": "The signup script the skill tells an agent to save and run."
+        },
+        {
+          "name": "AgentSurfaceConfig",
+          "kind": "interface",
+          "signature": "interface AgentSurfaceConfig",
+          "doc": null
+        },
+        {
+          "name": "AgentSurfaceError",
+          "kind": "interface",
+          "signature": "interface AgentSurfaceError",
+          "doc": null
+        },
+        {
+          "name": "AgentSurfaceFile",
+          "kind": "interface",
+          "signature": "interface AgentSurfaceFile",
+          "doc": null
+        },
+        {
+          "name": "agentSurfaceFiles",
+          "kind": "function",
+          "signature": "(config: AgentSurfaceConfig) => AgentSurfaceFile[]",
+          "doc": "Every static surface as files, for products that ship them as assets."
+        },
+        {
+          "name": "AgentSurfaceHandler",
+          "kind": "interface",
+          "signature": "interface AgentSurfaceHandler",
+          "doc": null
+        },
+        {
+          "name": "AgentSurfaceLink",
+          "kind": "interface",
+          "signature": "interface AgentSurfaceLink",
+          "doc": null
+        },
+        {
+          "name": "AgentSurfaceStep",
+          "kind": "interface",
+          "signature": "interface AgentSurfaceStep",
+          "doc": null
+        },
+        {
+          "name": "createAgentSurfaceHandler",
+          "kind": "function",
+          "signature": "(config: AgentSurfaceConfig, options?: { markdownPages?: Record<string, string> | undefined; }) => AgentSurfaceHandler",
+          "doc": "Request handler over {@link agentSurfaceFiles}."
+        },
+        {
+          "name": "prefersMarkdown",
+          "kind": "function",
+          "signature": "(accept: string | null | undefined) => boolean",
+          "doc": "True when `Accept` ranks `text/markdown` strictly above `text/html` and gives it a nonzero weight."
+        },
+        {
+          "name": "renderAgentManifest",
+          "kind": "function",
+          "signature": "(config: AgentSurfaceConfig) => Record<string, unknown>",
+          "doc": "The `/.well-known/tangle-agent.json` document."
+        },
+        {
+          "name": "renderAgentSetupSkill",
+          "kind": "function",
+          "signature": "(config: AgentSurfaceConfig) => string",
+          "doc": "The agent setup skill: valid SKILL.md and a plain copy-paste prompt."
+        },
+        {
+          "name": "renderHomeMarkdown",
+          "kind": "function",
+          "signature": "(config: AgentSurfaceConfig) => string",
+          "doc": "Markdown for the product's home page, served for `Accept: text/markdown`."
+        },
+        {
+          "name": "renderLlmsTxt",
+          "kind": "function",
+          "signature": "(config: AgentSurfaceConfig) => string",
+          "doc": "llms.txt index for the product."
+        },
+        {
+          "name": "TANGLE_PLATFORM_ORIGIN",
+          "kind": "const",
+          "signature": "\"https://id.tangle.tools\"",
+          "doc": null
+        },
+        {
+          "name": "withVaryAccept",
+          "kind": "function",
+          "signature": "(response: Response) => Response",
+          "doc": "A copy of `response` whose `Vary` includes `Accept`."
+        }
+      ]
+    },
+    {
+      "id": "./agent-surfaces/cli",
+      "source": "src/agent-surfaces/cli.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": []
+    },
+    {
       "id": "./alerting",
       "source": "src/alerting/index.ts",
       "dependsOn": [],
@@ -20564,6 +20687,18 @@
           "name": "AgentSettingsPopoverProps",
           "kind": "interface",
           "signature": "interface AgentSettingsPopoverProps",
+          "doc": null
+        },
+        {
+          "name": "AgentSetupBlock",
+          "kind": "function",
+          "signature": "({ productName, setupUrl, markdown, className }: AgentSetupBlockProps) => Element",
+          "doc": "The \"Hand this to your agent\" block for a product's docs page."
+        },
+        {
+          "name": "AgentSetupBlockProps",
+          "kind": "interface",
+          "signature": "interface AgentSetupBlockProps",
           "doc": null
         },
         {

@@ -6,6 +6,8 @@
     "src/**/*.test.{ts,tsx}",
     "src/stories/fixtures/**/*.ts",
     "src/stories/**/fixtures.ts",
+    "src/agent-surfaces/cli.ts",
+    "src/agent-surfaces/index.ts",
     "src/app-auth/index.ts",
     "src/app-oauth/index.ts",
     "src/assets/index.ts",

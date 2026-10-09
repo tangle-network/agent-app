@@ -58,6 +58,8 @@ export default defineConfig({
     'email/index': 'src/email/index.ts',
     'app-oauth/index': 'src/app-oauth/index.ts',
     'web/index': 'src/web/index.ts',
+    'agent-surfaces/index': 'src/agent-surfaces/index.ts',
+    'agent-surfaces/cli': 'src/agent-surfaces/cli.ts',
     'session-shell/index': 'src/session-shell/index.ts',
     'web-react/index': 'src/web-react/index.tsx',
     'work-product/index': 'src/work-product/index.ts',

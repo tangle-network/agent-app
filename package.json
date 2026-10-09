@@ -40,6 +40,7 @@
     "agent-app-peer-check": "./dist/peer-floors/cli.js",
     "agent-app-spend-check": "./dist/spend/cli.js",
     "agent-app-signoff": "./dist/signoff/cli.js",
+    "agent-app-agent-surfaces": "./dist/agent-surfaces/cli.js",
     "agent-app-verify-proof": "./dist/signoff/proof-cli.js",
     "tangle-agent": "bin/tangle-agent.mjs"
   },
@@ -303,6 +304,11 @@
       "types": "./dist/session-shell/index.d.ts",
       "import": "./dist/session-shell/index.js",
       "default": "./dist/session-shell/index.js"
+    },
+    "./agent-surfaces": {
+      "types": "./dist/agent-surfaces/index.d.ts",
+      "import": "./dist/agent-surfaces/index.js",
+      "default": "./dist/agent-surfaces/index.js"
     },
     "./web": {
       "types": "./dist/web/index.d.ts",
