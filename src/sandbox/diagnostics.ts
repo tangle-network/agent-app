@@ -349,6 +349,34 @@ export function isSandboxBoxConfigFailure(diagnostics: SafeSandboxErrorDiagnosti
   })
 }
 
+/**
+ * True when the Sandbox API answered a control-plane call with a server error
+ * (500, 502, 503 or 504), such as `A sandbox backend did not answer` or
+ * `Failed to resume project: fetch failed`. These clear within seconds, so a
+ * caller may retry once before surfacing them.
+ *
+ * Runtime routes are excluded (the box answers those), and so are the narrow
+ * failures that need a different action: a missing box, a box whose creation
+ * facts no longer hold, and host capacity.
+ */
+export function isSandboxApiTransientFailure(diagnostics: SafeSandboxErrorDiagnostics): boolean {
+  if (isSandboxApiSandboxMissingFailure(diagnostics)
+    || isSandboxBoxConfigFailure(diagnostics)
+    || isSandboxHostCapacityFailure(diagnostics)) return false
+  return diagnostics.causes.some((cause) => {
+    const status = typeof cause.status === 'number'
+      ? cause.status
+      : typeof cause.status === 'string'
+        ? Number.parseInt(cause.status, 10)
+        : undefined
+    if (status !== 500 && status !== 502 && status !== 503 && status !== 504) return false
+    if (cause.origin !== 'sandbox-api' || typeof cause.endpoint !== 'string') return false
+    const endpointPath = sandboxApiEndpointPath(cause.endpoint)
+    if (!endpointPath || !/^\/v1(?:[/?#]|$)/.test(endpointPath)) return false
+    return !/^\/v1\/sandboxes\/[^/?#]+\/runtime(?:[/?#]|$)/.test(endpointPath)
+  })
+}
+
 function sandboxApiEndpointPath(endpoint: string): string | null {
   if (endpoint.startsWith('/')) return endpoint
   try {
@@ -371,6 +399,10 @@ export function formatSandboxProvisioningUserMessage(
   // infrastructure that is healthy.
   if (diagnostics.causes.some((cause) => cause.code === 'vault.hydration_incomplete')) {
     return 'I couldn\'t finish copying your Vault into the sandbox, so I stopped rather than work from a partial copy. The copy resumes where it left off — try again in a moment.'
+  }
+
+  if (isSandboxApiTransientFailure(diagnostics)) {
+    return 'The sandbox service didn\'t answer just now. Send your message again in a moment.'
   }
 
   if (isSandboxApiBearerAuthFailure(diagnostics)) {
@@ -401,5 +433,5 @@ export function formatSandboxProvisioningUserMessage(
     return 'Too much attachment data is staged in the sandbox at once. Retry shortly.'
   }
 
-  return 'I\'m unable to connect to the sandbox right now. This usually means the sandbox service is not configured or is temporarily unavailable.'
+  return 'I\'m unable to connect to the sandbox right now. Send your message again in a moment; if it keeps failing, share the support details with the team.'
 }

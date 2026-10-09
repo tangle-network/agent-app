@@ -13353,6 +13353,12 @@
           "doc": "True when the sandbox API cannot find a sandbox resource or its backing container."
         },
         {
+          "name": "isSandboxApiTransientFailure",
+          "kind": "function",
+          "signature": "(diagnostics: SafeSandboxErrorDiagnostics) => boolean",
+          "doc": "True when the Sandbox API answered a control-plane call with a server error (500, 502, 503 or 504), such as `A sandbox backend did not answer` or `Failed to resume project: fetch failed`."
+        },
+        {
           "name": "isSandboxAuthFailure",
           "kind": "function",
           "signature": "(diagnostics: SafeSandboxErrorDiagnostics) => boolean",
