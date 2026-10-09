@@ -7,6 +7,11 @@ import {
   type ChatOperatorThread,
 } from '../src/operator'
 import type { RequestApiKey } from '../src/platform/api-key-auth'
+import type { ChatMessageRow } from '../src/chat-store'
+
+// Chat-store rows are accepted as they are, typed parts included.
+const _chatStoreRowsFit: (rows: ChatMessageRow[]) => ChatOperatorMessage[] = (rows) => rows
+void _chatStoreRowsFit
 
 type Identity = { userId: string }
 const ORIGIN = 'https://app.example'
