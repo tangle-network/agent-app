@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.15
+
+- fix(operator): give the chat adapter thread insert its caller (#908)
+
 ## 0.60.14
 
 - feat(operator): accept one Tangle agent key across every agent app (#906)
