@@ -165,7 +165,25 @@ describe('recovery manager', () => {
     })
 
     expect(next?.action).toBe('replacement_authorized')
-    expect(store.rows.get('w1')?.action).toBe('replacement_authorized')
+    expect(store.rows.get('w1')).toBe(next)
+    expect(store.rows.get('w1')?.replacementBoxKey).toBe(REPLACEMENT_KEY)
+  })
+
+  it('persists a decline without a replacement key', async () => {
+    const seed = stateWith('confirmation_required')
+    delete seed.replacementBoxKey
+    const store = memoryStore(seed)
+    const manager = createWorkspaceSandboxRecoveryManager(store)
+
+    const next = await manager.decide({
+      workspaceId: 'w1',
+      sandboxId: seed.sandboxId,
+      decision: 'decline',
+    })
+
+    expect(next?.action).toBe('deletion_declined')
+    expect(store.rows.get('w1')).toBe(next)
+    expect(store.rows.get('w1')?.replacementBoxKey).toBeUndefined()
   })
 
   it('ignores a decision about a sandbox that has already been replaced', async () => {
@@ -176,6 +194,7 @@ describe('recovery manager', () => {
       workspaceId: 'w1',
       sandboxId: 'sandbox-someone-elses',
       decision: 'replace',
+      replacementBoxKey: REPLACEMENT_KEY,
     })
 
     expect(next).toBeUndefined()

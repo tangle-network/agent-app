@@ -36,7 +36,8 @@ describe('recovery transitions', () => {
   })
   it.each([undefined, '', '   '])('replace requires a fresh explicit nonblank key: %j', async replacementBoxKey => {
     const { manager, store } = fixture('confirmation_required')
-    await expect(manager.decide({ workspaceId: 'w', sandboxId: box, decision: 'replace', replacementBoxKey }))
+    // Exercise JavaScript/untrusted input even though TypeScript rejects an absent key.
+    await expect(manager.decide({ workspaceId: 'w', sandboxId: box, decision: 'replace', replacementBoxKey: replacementBoxKey as string }))
       .rejects.toThrow(/replacement box key/)
     expect(store.write).not.toHaveBeenCalled()
   })

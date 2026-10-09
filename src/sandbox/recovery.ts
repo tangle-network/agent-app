@@ -337,13 +337,15 @@ export interface WorkspaceSandboxRecoveryStore<Snapshot extends WorkspaceSandbox
 export interface WorkspaceSandboxRecoveryManager<Snapshot extends WorkspaceSandboxSnapshot = WorkspaceSandboxSnapshot> {
   read: WorkspaceSandboxRecoveryStore<Snapshot>['read']
   record: WorkspaceSandboxRecoveryStore<Snapshot>['write']
-  /** Only a pending/declined recovery for this sandbox accepts a new decision. */
+  /** Only a pending/declined recovery for this sandbox accepts a new decision.
+   * Replacement requires a fresh, nonblank key; decline needs no key. */
   decide: (args: {
     workspaceId: string
     sandboxId: string
-    decision: WorkspaceSandboxRecoveryDecision
-    replacementBoxKey?: string
-  }) => Promise<WorkspaceSandboxRecoveryState<Snapshot> | undefined>
+  } & (
+    | { decision: 'replace'; replacementBoxKey: string }
+    | { decision: 'decline'; replacementBoxKey?: string }
+  )) => Promise<WorkspaceSandboxRecoveryState<Snapshot> | undefined>
   /** Only a started replacement with a chosen key may be completed. */
   complete: (args: {
     workspaceId: string
