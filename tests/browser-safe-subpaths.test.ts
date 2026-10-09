@@ -54,6 +54,9 @@ const BROWSER_NONREACT = new Set([
   // The profile editor's port types, wire client, and URL policy; its server
   // handler is the separate `profile-editor/server` subpath.
   'profile-editor',
+  // Agent surfaces render strings and answer web-standard Requests; a docs
+  // page imports the setup skill text from it.
+  'agent-surfaces',
 ])
 
 /** Browser-intended when a client bundle imports it: the whole `*-react` family,
