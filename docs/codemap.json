@@ -10452,6 +10452,12 @@
           "doc": null
         },
         {
+          "name": "PlatformAgentKeyContext",
+          "kind": "interface",
+          "signature": "interface PlatformAgentKeyContext",
+          "doc": "What `loadIdentity` receives for a request made with a Platform agent key."
+        },
+        {
           "name": "PlatformAgentOperatorKey",
           "kind": "interface",
           "signature": "interface PlatformAgentOperatorKey",

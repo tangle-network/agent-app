@@ -4,7 +4,7 @@
 
 Source: `src/operator/index.ts`
 
-52 exports.
+53 exports.
 
 ### `ChatOperatorAdapterOptions`
 
@@ -388,6 +388,14 @@ interface OperatorWorkspace
 
 ```ts
 interface PlatformAgentKeyAccess
+```
+
+### `PlatformAgentKeyContext`
+
+`interface` — What `loadIdentity` receives for a request made with a Platform agent key.
+
+```ts
+interface PlatformAgentKeyContext
 ```
 
 ### `PlatformAgentOperatorKey`

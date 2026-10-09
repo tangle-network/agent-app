@@ -13459,6 +13459,14 @@ interface OperatorWorkspace
 interface PlatformAgentKeyAccess
 ```
 
+### `PlatformAgentKeyContext`
+
+`interface` — What `loadIdentity` receives for a request made with a Platform agent key.
+
+```ts
+interface PlatformAgentKeyContext
+```
+
 ### `PlatformAgentOperatorKey`
 
 `interface` — An operator key that came from Platform agent signup.
