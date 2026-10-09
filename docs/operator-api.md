@@ -124,18 +124,19 @@ A transport failure on a turn start does not establish that the turn did not sta
 
 ## Fleet pattern
 
-A conductor workspace coordinates product workspaces through this API.
+A conductor workspace runs GTM, or any app's work, for several products.
 GTM implements it as `gtm fleet`; see GTM's `docs/fleet.md`.
+A product is described only by inputs any customer already has: its public site, docs, and repositories, and the conductor's standard connectors.
+The product itself changes nothing and serves nothing to the conductor; this API is how the conductor reaches its own app's workspaces, never the product's systems.
 
-- **Register.** The conductor holds one key per product workspace, restricted to that workspace with read and run scopes, stored encrypted on the server.
-  The conductor's agent refers to members by label and never sees a key.
-- **Dispatch.** The conductor starts one turn per product workspace with the week's objective and the draft contract.
-- **Submit, never post.** Product agents write drafts to their own files; they hold no shared publishing account.
+- **Register.** Each product runs in the conductor's own workspace or in a workspace of its own in the same app. The conductor holds one key per product, restricted to the workspace it runs in, with read and run scopes, stored encrypted on the server. The conductor's agent refers to products by label and never sees a key.
+- **Dispatch.** The conductor starts one turn per product with the week's objective, the product's public sources, and the draft contract.
+- **Submit, never post.** Each product's agent writes drafts to its own folder and holds no shared publishing account.
   The app refuses to bind a reserved publishing account, such as the company X account, to a product workspace.
 - **Collect.** The conductor reads each product's drafts into one editorial queue in its own files, with provenance.
 - **Deduplicate.** The conductor keeps a keyword-to-canonical-page map, so two of the company's pages never compete for one query; a colliding draft is marked, not queued as a second candidate.
 - **Publish.** Only the conductor owns the shared accounts, and posting goes through its approval flow.
-- **Measure.** The conductor reads each product's scorecard and approvals.
+- **Measure.** The conductor reads the scorecard and approvals of each workspace a product runs in.
 
 ## Adoption
 
@@ -146,6 +147,8 @@ GTM implements it as `gtm fleet`; see GTM's `docs/fleet.md`.
 | creative-agent | Private API and the ChatGPT agents surface | Not yet mounted |
 | tax-agent, insurance-agent, hospitality-agent, agent-builder | None | Not yet mounted |
 
+An app mounts this API so outside agents, such as a Claude Code session, can operate its own workspaces.
+No app needs it so that GTM can market that app's product: GTM works from public inputs only.
 To adopt: mount the splat route, implement the adapter over the app's existing turn admission and storage, and build the API access page from `OPERATOR_ACCESS`.
 Keep older private routes until their consumers move.
 
