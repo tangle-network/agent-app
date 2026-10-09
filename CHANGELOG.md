@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.5
+
+- feat(email): per-action Approve and Deny links in the approval email (#896)
+
 ## 0.60.4
 
 - feat(sandbox): forward the execution time limit from streamSandboxPrompt (#895)
