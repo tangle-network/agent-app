@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.3
+
+- feat(workspace): companion owns the conversation surface and header (#894)
+
 ## 0.60.2
 
 - fix(sandbox): classify transient Sandbox API errors and stop blaming configuration (#893)
