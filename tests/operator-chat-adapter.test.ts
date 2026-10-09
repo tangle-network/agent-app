@@ -17,7 +17,12 @@ type Identity = { userId: string }
 const ORIGIN = 'https://app.example'
 
 function setup(options: { reply?: (content: string) => Record<string, unknown>; running?: () => string[] | null } = {}) {
-  const threads = new Map<string, ChatOperatorThread>([['thread-b', { id: 'thread-b', workspaceId: 'ws-b', title: 'Other' }]])
+  const threads = new Map<string, ChatOperatorThread>([
+    ['thread-b', { id: 'thread-b', workspaceId: 'ws-b', title: 'Other' }],
+    ['thread-colleague', { id: 'thread-colleague', workspaceId: 'ws-a', title: 'A colleague\'s conversation' }],
+  ])
+  // Conversations that belong to one user, as in an app whose threads are per user.
+  const owners = new Map([['thread-colleague', 'colleague']])
   const messages = new Map<string, ChatOperatorMessage[]>()
   let clock = 0
   const runTurn = vi.fn(async (_ctx: unknown, input: { threadId: string; turnId: string; content: string }) => {
@@ -35,14 +40,17 @@ function setup(options: { reply?: (content: string) => Record<string, unknown>; 
       list: async () => [{ id: 'ws-a', name: 'Firm', role: 'owner' }],
     },
     threads: {
-      get: async (id) => threads.get(id) ?? null,
+      get: async (id, ctx) => {
+        const owner = owners.get(id)
+        return owner && owner !== ctx.identity.userId ? null : threads.get(id) ?? null
+      },
       create: async (_ctx, input) => {
         if (threads.has(input.id)) throw new Error('UNIQUE constraint failed: thread.id')
         const thread = { ...input }
         threads.set(input.id, thread)
         return thread
       },
-      listMessages: async (id) => messages.get(id) ?? [],
+      listMessages: async (id, ctx) => (owners.get(id) ?? ctx.identity.userId) === ctx.identity.userId ? messages.get(id) ?? [] : [],
     },
     runTurn,
     runningTurns: async () => options.running?.() ?? [],
@@ -105,5 +113,14 @@ describe('chat operator adapter', () => {
     expect(await client.getTurn('ws-a', 'thread-b', '1f0c5a3e-9b7d-4c21-8e6f-0a1b2c3d4e5f')).toMatchObject({ succeeded: false, status: 404 })
     runTurn.mockResolvedValueOnce(Response.json({ error: 'Seat required', code: 'billing.seat_required' }, { status: 402 }))
     expect(await client.startTurn('ws-a', { content: 'x' })).toMatchObject({ succeeded: false, status: 402, code: 'billing.seat_required' })
+    runTurn.mockResolvedValueOnce(Response.json({ error: { code: 'platform_key_required', message: 'Link your Tangle account' } }, { status: 403 }))
+    expect(await client.startTurn('ws-a', { content: 'y' })).toMatchObject({ succeeded: false, status: 403, code: 'platform_key_required', error: 'Link your Tangle account' })
+  })
+
+  it('reads and continues only the conversations the app lets this caller see', async () => {
+    const { client, runTurn } = setup()
+    expect(await client.getThread('ws-a', 'thread-colleague')).toMatchObject({ succeeded: false, status: 404 })
+    expect(await client.startTurn('ws-a', { content: 'x', threadId: 'thread-colleague' })).toMatchObject({ succeeded: false, status: 404, code: 'operator.thread_not_found' })
+    expect(runTurn).not.toHaveBeenCalled()
   })
 })

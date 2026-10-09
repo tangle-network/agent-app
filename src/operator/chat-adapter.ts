@@ -57,11 +57,15 @@ export interface ChatOperatorAdapterOptions<Identity> {
     create?(ctx: OperatorContext<Identity>, input: { name: string }): Promise<ChatOperatorWorkspace>
   }
   threads: {
-    get(threadId: string): Promise<ChatOperatorThread | null>
+    /**
+     * A thread this caller may read, or null. An app whose conversations
+     * belong to one user (not the whole workspace) applies that here.
+     */
+    get(threadId: string, ctx: OperatorContext<Identity>): Promise<ChatOperatorThread | null>
     /** Insert a thread with this id for this caller; agent-app's chat store accepts a caller-assigned id. */
     create(ctx: OperatorContext<Identity>, input: { id: string; workspaceId: string; title: string }): Promise<ChatOperatorThread>
     /** Oldest first. */
-    listMessages(threadId: string): Promise<ChatOperatorMessage[]>
+    listMessages(threadId: string, ctx: OperatorContext<Identity>): Promise<ChatOperatorMessage[]>
     list?(ctx: OperatorContext<Identity>, workspaceId: string, query: { cursor?: string; limit: number }): Promise<{ threads: ChatOperatorThread[]; nextCursor: string | null }>
   }
   /**
@@ -168,13 +172,13 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
     ...(iso(thread.updatedAt) ? { updatedAt: iso(thread.updatedAt)! } : {}),
   })
 
-  async function threadIn(workspaceId: string, threadId: string): Promise<ChatOperatorThread | null> {
-    const thread = await options.threads.get(threadId)
+  async function threadIn(ctx: OperatorContext<Identity>, workspaceId: string, threadId: string): Promise<ChatOperatorThread | null> {
+    const thread = await options.threads.get(threadId, ctx)
     return thread && thread.workspaceId === workspaceId ? thread : null
   }
 
   async function turnOf(ctx: OperatorContext<Identity>, workspaceId: string, threadId: string, turnId: string): Promise<OperatorTurn | null> {
-    const messages = await options.threads.listMessages(threadId)
+    const messages = await options.threads.listMessages(threadId, ctx)
     const userIndex = messages.findIndex((message) => message.role === 'user' && messageHasTurnId(message, turnId))
     if (userIndex < 0) return null
     const later = messages.slice(userIndex + 1)
@@ -219,7 +223,7 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
 
   async function ensureThread(ctx: OperatorContext<Identity>, workspaceId: string, input: StartTurnInput): Promise<string> {
     const id = (await sha256Hex(`operator-thread\0${ctx.key.keyId}\0${workspaceId}\0${input.turnId}`)).slice(0, 32)
-    const existing = await options.threads.get(id)
+    const existing = await options.threads.get(id, ctx)
     if (existing) {
       if (existing.workspaceId !== workspaceId) throw new OperatorError('operator.turn_identity_conflict', 409, 'This turn id belongs to another conversation')
       return id
@@ -229,7 +233,7 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       await options.threads.create(ctx, { id, workspaceId, title })
     } catch (error) {
       // A concurrent retry may have inserted the same id first.
-      if (!(await threadIn(workspaceId, id))) throw error
+      if (!(await threadIn(ctx, workspaceId, id))) throw error
     }
     return id
   }
@@ -246,7 +250,7 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       let threadId = input.threadId
       if (threadId === undefined) {
         threadId = await ensureThread(ctx, workspace.id, input)
-      } else if (!(await threadIn(workspace.id, threadId))) {
+      } else if (!(await threadIn(ctx, workspace.id, threadId))) {
         throw new OperatorError('operator.thread_not_found', 404, 'Thread not found')
       }
       // A retried start whose turn is already recorded reads it instead of running again.
@@ -258,10 +262,12 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       })
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { error?: unknown; code?: unknown }
+        // Apps answer `{ error, code }` or `{ error: { code, message } }`.
+        const nested = body.error && typeof body.error === 'object' ? body.error as { code?: unknown; message?: unknown } : {}
         throw new OperatorError(
-          typeof body.code === 'string' ? body.code : `operator.chat_${response.status}`,
+          typeof body.code === 'string' ? body.code : typeof nested.code === 'string' ? nested.code : `operator.chat_${response.status}`,
           response.status,
-          typeof body.error === 'string' ? body.error : 'The app refused the turn',
+          typeof body.error === 'string' ? body.error : typeof nested.message === 'string' ? nested.message : 'The app refused the turn',
           response.status === 429 || response.status >= 500,
         )
       }
@@ -272,13 +278,13 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       }
     },
     async getTurn(ctx, workspace, target) {
-      if (!(await threadIn(workspace.id, target.threadId))) return null
+      if (!(await threadIn(ctx, workspace.id, target.threadId))) return null
       return turnOf(ctx, workspace.id, target.threadId, target.turnId)
     },
     async getThread(ctx, workspace, threadId) {
-      const thread = await threadIn(workspace.id, threadId)
+      const thread = await threadIn(ctx, workspace.id, threadId)
       if (!thread) return null
-      const messages = await options.threads.listMessages(threadId)
+      const messages = await options.threads.listMessages(threadId, ctx)
       const lastUser = [...messages].reverse().find((message) => message.role === 'user')
       const turnId = lastUser ? turnIdOf(lastUser) : null
       return { thread: threadView(thread), latestTurn: turnId ? await turnOf(ctx, workspace.id, threadId, turnId) : null }
