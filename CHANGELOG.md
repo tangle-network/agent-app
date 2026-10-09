@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.20
+
+- fix(operator): expose operator declarations to NodeNext consumers (#913)
+
 ## 0.60.19
 
 - feat(platform): bill agent-key work to the key's one cap (#912)
