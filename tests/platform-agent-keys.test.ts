@@ -86,11 +86,19 @@ function memoryAccounts(seed: TangleSsoLocalAccount[] = []) {
   return { store, users, links }
 }
 
-type Identity = { userId: string }
+type Identity = { userId: string; platformApiKey?: string }
 
-function setup(options: { keys: Record<string, PlatformKey>; seed?: TangleSsoLocalAccount[]; workspaces?: Record<string, string> }) {
+function setup(options: {
+  keys: Record<string, PlatformKey>
+  seed?: TangleSsoLocalAccount[]
+  workspaces?: Record<string, string>
+  /** A store that keeps the Platform key on the session row: no per-user link. */
+  sessionStore?: boolean
+}) {
   const platform = fakePlatform(options.keys)
   const accounts = memoryAccounts(options.seed)
+  const { saveTangleLink, ...sessionAccounts } = accounts.store
+  void saveTangleLink
   // Workspace id -> owning app user. Roles come from the app, never the key.
   const workspaceOwners = options.workspaces ?? {}
   const view = (id: string): OperatorWorkspace => ({ id, name: id, role: 'owner' })
@@ -121,8 +129,8 @@ function setup(options: { keys: Record<string, PlatformKey>; seed?: TangleSsoLoc
   const api = createOperatorApi<RequestApiKey, Identity>({
     app: { id: 'test', name: 'Test App' },
     keys: withPlatformAgentKeys(appKeys, {
-      verifier, product: PRODUCT, accounts: accounts.store,
-      loadIdentity: async (userId) => (accounts.users.has(userId) ? { userId } : null),
+      verifier, product: PRODUCT, accounts: options.sessionStore ? sessionAccounts : accounts.store,
+      loadIdentity: async (userId, { platformApiKey }) => (accounts.users.has(userId) ? { userId, platformApiKey } : null),
     }),
     adapter,
     pollIntervalMs: 250,
@@ -235,6 +243,36 @@ describe('operator API with a Platform agent key', () => {
     expect(accounts.users.size).toBe(1)
     expect(accounts.store.upsertUserByEmail).toHaveBeenCalledTimes(1)
     expect(accounts.store.saveTangleLink).toHaveBeenCalledTimes(1)
+  })
+
+  it('hands the app the agent key for the request, never on the key it reports', async () => {
+    const { send, adapter } = setup({
+      keys: { 'sk-tan-a': agentKey({ userId: 'plat-a' }) },
+      seed: [{ userId: 'alice', email: 'plat-a@example.com', emailVerified: true, platformUserId: 'plat-a' }],
+    })
+    const described = await send('sk-tan-a', '')
+    expect(described.status).toBe(200)
+    expect(JSON.stringify(await described.json())).not.toContain('sk-tan-')
+    await send('sk-tan-a', '/workspaces')
+    const [ctx] = vi.mocked(adapter.listWorkspaces).mock.calls[0]!
+    // An owner who signed in keeps their own link, yet this request acts with
+    // the agent key, so its work spends the key's cap.
+    expect(ctx.identity).toEqual({ userId: 'alice', platformApiKey: 'sk-tan-a' })
+    expect(JSON.stringify(ctx.key)).not.toContain('sk-tan-')
+  })
+
+  it('serves a store that keeps the Platform key on the session row', async () => {
+    const { send, accounts, adapter } = setup({ keys: { 'sk-tan-a': agentKey({ userId: 'plat-a' }) }, sessionStore: true })
+    expect((await send('sk-tan-a', '/workspaces')).status).toBe(200)
+    expect((await send('sk-tan-a', '/workspaces')).status).toBe(200)
+    // One user, created once, with no link written; the key reaches the app
+    // through the identity instead.
+    expect([...accounts.users.keys()]).toEqual(['app-user-1'])
+    expect(accounts.links.size).toBe(0)
+    expect(accounts.store.saveTangleLink).not.toHaveBeenCalled()
+    for (const [ctx] of vi.mocked(adapter.listWorkspaces).mock.calls) {
+      expect(ctx.identity).toEqual({ userId: 'app-user-1', platformApiKey: 'sk-tan-a' })
+    }
   })
 
   it('acts as an owner already signed in to the app without touching their link', async () => {
