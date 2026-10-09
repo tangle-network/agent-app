@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.0
+
+- feat(email)!: digest sections and one-click unsubscribe
+
 ## 0.59.6
 
 - chore(peers): accept agent-integrations 0.68 (#890)
