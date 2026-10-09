@@ -24,7 +24,7 @@ export const OPERATOR_ACCESS = [
     scope: 'operator:run',
     requires: ['operator:read'],
     label: 'Run agents',
-    description: 'Requires read access. Start and continue agent turns, which can modify workspace files. Uses your plan and budget.',
+    description: 'Requires read access. Start, continue, and interrupt agent turns, and answer their questions and tool-permission requests. Agents can modify workspace files. Uses your plan and budget.',
   },
 ] as const
 

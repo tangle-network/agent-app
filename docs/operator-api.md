@@ -81,7 +81,7 @@ Work runs on the owner's plan and model budget, under the app's normal product p
 | --- | --- |
 | `operator:read` | Read workspaces, conversations, files, journal, assets, approvals, scorecards, and turn status. |
 | `operator:write` | Create workspaces; an app's older private routes may also use it for conversations and files. |
-| `operator:run` | Start and continue agent turns; requires `operator:read`. The agent can change workspace files and take actions the product allows. |
+| `operator:run` | Start and continue agent turns; requires `operator:read`. The agent can change workspace files and take actions the product allows. An app's older private routes may also use it to answer questions and tool-permission requests, or to interrupt a turn. |
 | `operator:workspace:<id>` | Restricts the key to the named workspaces. A restricted key cannot create workspaces, and apps refuse it on their older private routes. |
 
 `OPERATOR_ACCESS` carries the labels an app's API access page shows; `OPERATOR_SCOPE_DEPENDENCIES` carries the run-requires-read rule for the key issuer.
