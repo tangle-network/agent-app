@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.9
+
+- chore(deps): qualify published integrations 0.69 cohort (#901)
+
 ## 0.60.8
 
 - feat(agent-surfaces): generate a product's agent setup skill, llms.txt and manifest from one config (#899)
