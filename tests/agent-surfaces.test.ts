@@ -66,7 +66,8 @@ describe('agent setup skill', () => {
     ].map((heading) => skill.indexOf(heading))
     expect(order.every((index) => index > 0)).toBe(true)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
-    expect(skill).toContain('--app sandbox')
+    expect(skill).toContain('node tangle-signup.mjs start --app sandbox')
+    expect(skill).toContain('node tangle-signup.mjs wait')
     expect(skill).toContain('--budget-usd 10')
     // A pipe inside a table cell is escaped so the row keeps three columns.
     expect(skill).toContain('| HTTP 402 | No credit \\| none | Add credits |')
@@ -89,9 +90,9 @@ describe('agent setup skill', () => {
 })
 
 describe('agent signup script', () => {
-  it('waits for the owner, stores the key with mode 0600, and never prints it', async () => {
+  it('starts at once, waits in short re-runnable steps, stores the key with mode 0600, and never prints it', async () => {
     const calls: Array<{ path: string; body: Record<string, unknown> }> = []
-    let polls = 0
+    let approved = false
     const server = createServer((request, response) => {
       let raw = ''
       request.on('data', (chunk) => {
@@ -109,16 +110,15 @@ describe('agent signup script', () => {
                 device_code: 'dvc_test',
                 user_code: 'ABCD-EFGH',
                 verification_uri_complete: 'https://id.example/cross-site/device?app=sandbox&user_code=ABCD-EFGH',
-                expires_in: 60,
-                interval: 0.01,
+                expires_in: 600,
+                interval: 0.05,
                 agent: { owner_notified: true },
               },
             }),
           )
           return
         }
-        polls += 1
-        if (polls < 2) {
+        if (!approved) {
           response.statusCode = 428
           response.end(JSON.stringify({ success: false, error: { code: 'AUTHORIZATION_PENDING' } }))
           return
@@ -140,22 +140,33 @@ describe('agent signup script', () => {
     const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
     const dir = tempDir()
     writeFileSync(join(dir, 'tangle-signup.mjs'), agentSignupScript(origin))
+    const node = (args: string[]) =>
+      run(process.execPath, ['tangle-signup.mjs', ...args], { cwd: dir }).then(
+        (result) => ({ code: 0, ...result }),
+        (error: { code: number; stdout: string; stderr: string }) => error,
+      )
 
-    const { stdout } = await run(
-      process.execPath,
-      ['tangle-signup.mjs', '--app', 'sandbox', '--agent-name', 'bot', '--owner-email', 'owner@example.com', '--budget-usd', '10'],
-      { cwd: dir },
-    )
-
+    const started = await node(['start', '--app', 'sandbox', '--agent-name', 'bot', '--owner-email', 'owner@example.com', '--budget-usd', '10'])
+    expect(started.code).toBe(0)
     expect(calls[0]).toEqual({
       path: '/cross-site/device/start',
       body: { app: 'sandbox', agent_name: 'bot', owner_email: 'owner@example.com', budget_usd: 10 },
     })
-    expect(calls.slice(1).every((call) => call.body.device_code === 'dvc_test')).toBe(true)
-    expect(stdout).toContain('Approval email sent to owner@example.com.')
-    expect(stdout).toContain('Confirmation code: ABCD-EFGH')
-    expect(stdout).toContain('Ask the owner to add credits: https://id.example/app/billing')
-    expect(stdout).not.toContain('sk-tan-secretvalue')
+    expect(started.stdout).toContain('Approval email sent to owner@example.com.')
+    expect(started.stdout).toContain('Confirmation code: ABCD-EFGH')
+
+    const pending = await node(['wait', '--seconds', '0.2'])
+    expect(pending.code).toBe(3)
+    expect(pending.stdout).toContain('Still waiting')
+
+    approved = true
+    const done = await node(['wait'])
+    expect(done.code).toBe(0)
+    expect(calls.slice(1).every((call) => call.path === '/cross-site/device/poll' && call.body.device_code === 'dvc_test')).toBe(true)
+    expect(done.stdout).toContain('Ask the owner to add credits: https://id.example/app/billing')
+    for (const output of [started.stdout, pending.stdout, done.stdout]) {
+      expect(output).not.toContain('sk-tan-secretvalue')
+    }
     const keyPath = join(dir, '.tangle', 'api-key')
     expect(readFileSync(keyPath, 'utf8')).toBe('sk-tan-secretvalue\n')
     expect(statSync(keyPath).mode & 0o777).toBe(0o600)
@@ -174,7 +185,7 @@ describe('agent signup script', () => {
       join(dir, 'tangle-signup.mjs'),
       agentSignupScript(`http://127.0.0.1:${(server.address() as AddressInfo).port}`),
     )
-    const failure = await run(process.execPath, ['tangle-signup.mjs', '--app', 'sandbox'], { cwd: dir }).catch(
+    const failure = await run(process.execPath, ['tangle-signup.mjs', 'start', '--app', 'sandbox'], { cwd: dir }).catch(
       (error: { code: number; stderr: string }) => error,
     )
     expect(failure).toMatchObject({ code: 1 })
