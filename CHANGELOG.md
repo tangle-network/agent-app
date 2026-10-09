@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.19
+
+- feat(platform): bill agent-key work to the key's one cap (#912)
+
 ## 0.60.18
 
 - feat(operator): pass the caller to chat adapter thread reads (#911)
