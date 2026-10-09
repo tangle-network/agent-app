@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.2
+
+- fix(sandbox): classify transient Sandbox API errors and stop blaming configuration (#893)
+
 ## 0.60.1
 
 - feat(profile): append product prompts after the harness prompt by default (#892)
