@@ -1515,6 +1515,26 @@ describe('streamSandboxPrompt seam', () => {
     })
   })
 
+  it.each([false, true])('forwards the execution time limit to the %s prompt admission', async (detach) => {
+    async function* events() { yield { type: 'done', data: { status: 'completed' } } }
+    const dispatchPrompt = vi.fn().mockResolvedValue({
+      sessionId: 'thread-1', executionId: 'exec-1', status: 'running', alreadyExisted: false, dispatched: true,
+    })
+    const streamPrompt = vi.fn((_prompt: string, _options: unknown) => events())
+    const box = fakeBox({ dispatchPrompt, streamPrompt })
+    const fourHours = 4 * 60 * 60 * 1000
+
+    for await (const _ of streamSandboxPrompt(shell(), box, 'hello', {
+      sessionId: 'thread-1', executionId: 'exec-1', detach, ttlMs: fourHours,
+    })) void _
+
+    const admission = detach ? dispatchPrompt.mock.calls[0] : streamPrompt.mock.calls[0]
+    expect(admission?.[1]).toMatchObject({ ttlMs: fourHours })
+    expect(admission?.[1]).not.toHaveProperty('timeoutMs')
+    // The replay of a detached run names the execution only; the limit was admitted with it.
+    if (detach) expect(streamPrompt.mock.calls[0]?.[1]).not.toHaveProperty('ttlMs')
+  })
+
   it('detached replay uses the supplied cursor without re-dispatching', async () => {
     async function* events() {
       yield { type: 'done', data: { status: 'completed' } }
