@@ -1,7 +1,8 @@
 import { ArrowRight, CalendarDays, GitBranch, GitCommitHorizontal, GitPullRequest, MapPin, Phone, Users } from 'lucide-react'
+import { ApprovalDiffSummary } from '@tangle-network/ui/run'
 
 import { formatMinorAmount, formatWhen, type HubActionPreview } from '../hub-approvals'
-import { Chip, HubDiffSummary, HubFieldList } from './parts'
+import { Chip, HubFieldList } from './parts'
 
 /** Readable text of an HTML email body, for a preview that never renders markup. */
 function plainText(body: string, html: boolean): string {
@@ -46,9 +47,9 @@ function PullRequestPreview({ preview }: { preview: Extract<HubActionPreview, { 
           {preview.draft && <span className="rounded-md border border-border px-1.5 py-0.5 text-sm text-muted-foreground">Draft</span>}
         </div>
         {preview.title && <p className="mt-2 text-base font-semibold leading-6 text-foreground">{preview.title}</p>}
-        {preview.body && <p className="mt-1 line-clamp-4 whitespace-pre-line text-sm leading-6 text-muted-foreground">{preview.body}</p>}
+        {preview.body && <p className="mt-1 line-clamp-3 whitespace-pre-line text-sm leading-6 text-muted-foreground sm:line-clamp-4">{preview.body}</p>}
       </Panel>
-      {preview.files.length > 0 && <HubDiffSummary files={preview.files} />}
+      {preview.files.length > 0 && <ApprovalDiffSummary files={preview.files} />}
     </div>
   )
 }
@@ -116,7 +117,7 @@ function PostPreview({ preview, account }: { preview: Extract<HubActionPreview, 
             <span className="font-semibold text-foreground">{account ?? 'Your account'}</span>
             <span className="text-muted-foreground">{x ? '· now' : '· Post · Anyone'}</span>
           </p>
-          <p className={`mt-1 whitespace-pre-wrap break-words text-foreground ${x ? 'text-[15px] leading-6' : 'text-sm leading-6'}`}>{preview.text}</p>
+          <p className={`mt-1 whitespace-pre-wrap break-words text-foreground ${x ? 'text-base leading-6' : 'text-sm leading-6'}`}>{preview.text}</p>
           {preview.link && (
             <div className="mt-3 overflow-hidden rounded-lg border border-border">
               <div className="px-3 py-2">
@@ -216,7 +217,7 @@ export function HubActionPreviewView({ preview, account }: { preview: HubActionP
     case 'pull-request':
       return <PullRequestPreview preview={preview} />
     case 'files':
-      return preview.files.length > 0 ? <HubDiffSummary files={preview.files} /> : null
+      return preview.files.length > 0 ? <ApprovalDiffSummary files={preview.files} /> : null
     case 'commit':
       return (
         <Panel className="px-3 py-3">
@@ -225,10 +226,10 @@ export function HubActionPreviewView({ preview, account }: { preview: HubActionP
             {preview.repository ?? 'Commit'}
           </p>
           {preview.message && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-foreground">{preview.message}</p>}
-          <HubFieldList fields={[
+          <div className="mt-2"><HubFieldList fields={[
             ...(preview.tree ? [{ label: 'Tree', value: preview.tree.slice(0, 7), mono: true }] : []),
             ...preview.parents.map((parent) => ({ label: 'Parent', value: parent.slice(0, 7), mono: true })),
-          ]} />
+          ]} /></div>
         </Panel>
       )
     case 'branch':

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, X } from 'lucide-react'
-import { Button } from '@tangle-network/ui/primitives'
+import { Button, Label, RadioGroup, RadioGroupItem } from '@tangle-network/ui/primitives'
 
 import {
   HUB_APPROVAL_ACTIVE_PHASES,
@@ -187,14 +187,14 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
       <div className="flex items-start gap-3 px-4 pt-3">
         <HubProviderMark providerId={presentation.provider.id} name={presentation.provider.name} size={32} />
         <div className="min-w-0 flex-1">
-          <h3 className="break-words text-base font-semibold leading-6 text-foreground">{presentation.title}</h3>
+          <h3 className="line-clamp-2 break-words text-base font-semibold leading-6 text-foreground" title={presentation.title}>{presentation.title}</h3>
           <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {queue.length > 1 && (
             <>
               <Button variant="ghost" size="icon-sm" aria-label="Previous request" onClick={() => step(-1)}><ChevronLeft /></Button>
-              <span className="min-w-[3.25rem] text-center text-sm tabular-nums text-muted-foreground" aria-live="polite">
+              <span className="min-w-14 text-center text-sm tabular-nums text-muted-foreground" aria-live="polite">
                 {activeIndex + 1} of {queue.length}
               </span>
               <Button variant="ghost" size="icon-sm" aria-label="Next request" onClick={() => step(1)}><ChevronRight /></Button>
@@ -213,7 +213,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
       </div>
 
       {!collapsed && (
-        <div className="max-h-[min(42vh,420px)] space-y-3 overflow-y-auto px-4 pt-3">
+        <div className="max-h-64 space-y-3 overflow-y-auto px-4 pt-3 sm:max-h-96">
           {active.bundle?.steps && active.bundle.steps.length > 0 && (
             <ol className="space-y-1 text-sm" aria-label="Steps this approval covers">
               {active.bundle.steps.map((stepItem, index) => (
@@ -246,20 +246,19 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
           <fieldset className="space-y-2 rounded-xl border border-border bg-muted/30 px-3 py-3">
             <legend className="sr-only">Standing permission</legend>
             {scopes.length > 1 && (
-              <div className="space-y-1.5" role="radiogroup" aria-label="What the permission covers">
+              <RadioGroup
+                aria-label="What the permission covers"
+                value={chosenScope ?? undefined}
+                onValueChange={setScope}
+                className="gap-1.5"
+              >
                 {scopes.map((option) => (
-                  <label key={option.id} className="flex min-h-8 cursor-pointer items-start gap-2 text-sm text-foreground">
-                    <input
-                      type="radio"
-                      name={`hub-scope-${active.id}`}
-                      className="mt-0.5 size-4 accent-[hsl(var(--primary))]"
-                      checked={chosenScope === option.id}
-                      onChange={() => setScope(option.id)}
-                    />
-                    <span>{option.label}</span>
-                  </label>
+                  <div key={option.id} className="flex min-h-8 items-center gap-2">
+                    <RadioGroupItem id={`hub-scope-${active.id}-${option.id}`} value={option.id} />
+                    <Label htmlFor={`hub-scope-${active.id}-${option.id}`} className="cursor-pointer text-sm font-normal text-foreground">{option.label}</Label>
+                  </div>
                 ))}
-              </div>
+              </RadioGroup>
             )}
             {scopes.length === 1 && <p className="text-sm text-foreground">{scopes[0]?.label}</p>}
             <div className="flex flex-wrap gap-2">

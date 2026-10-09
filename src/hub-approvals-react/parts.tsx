@@ -1,11 +1,9 @@
 import { useState, type ReactNode } from 'react'
-import { ChevronRight, FileMinus, FilePen, FilePlus } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { ProviderIcon } from '@tangle-network/sandbox-ui/integrations'
-import { StatusPill, type StatusTone } from '@tangle-network/ui/primitives'
+import { Button, StatusPill, type StatusTone } from '@tangle-network/ui/primitives'
 
-import { HUB_APPROVAL_PHASE_LABELS, type HubActionFile, type HubApprovalPhase } from '../hub-approvals'
-
-const CHANGE_ICONS = { added: FilePlus, modified: FilePen, deleted: FileMinus } as const
+import { HUB_APPROVAL_PHASE_LABELS, type HubApprovalPhase } from '../hub-approvals'
 
 const PHASE_TONES: Record<HubApprovalPhase, StatusTone> = {
   waiting: 'warning',
@@ -35,7 +33,7 @@ export function HubProviderMark({ providerId, name, size = 28 }: { providerId: s
       className="flex shrink-0 items-center justify-center rounded-lg border border-border bg-background"
       style={{ width: size, height: size }}
     >
-      <ProviderIcon id={providerId} displayName={name} size={inner} className="rounded-[4px]" />
+      <ProviderIcon id={providerId} displayName={name} size={inner} className="rounded-sm" />
     </span>
   )
 }
@@ -47,15 +45,15 @@ export function HubRawDetails({ sections }: { sections: ReadonlyArray<{ label: s
   if (shown.length === 0) return null
   return (
     <div>
-      <button
-        type="button"
+      <Button
+        variant="bare"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex min-h-8 items-center gap-1 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex min-h-8 items-center gap-1 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground"
       >
         <ChevronRight aria-hidden className={`size-4 transition-transform ${open ? 'rotate-90' : ''}`} />
         Details
-      </button>
+      </Button>
       {open && (
         <div className="mt-2 space-y-3">
           {shown.map((section) => (
@@ -117,47 +115,4 @@ export function relativeTime(at: string | null | undefined, now = Date.now()): s
   if (minutes < 60) return `${minutes} min ago`
   if (minutes < 24 * 60) return `${Math.round(minutes / 60)} h ago`
   return new Date(then).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-function lineCount(value: number | undefined, sign: '+' | '−'): string {
-  return value === undefined ? `${sign}–` : `${sign}${value}`
-}
-
-/** The files a change writes with their +/− line counts, and totals once every count is known. */
-export function HubDiffSummary({ files }: { files: readonly HubActionFile[] }) {
-  if (files.length === 0) return null
-  const known = files.every((file) => file.additions !== undefined && file.deletions !== undefined)
-  const additions = files.reduce((sum, file) => sum + (file.additions ?? 0), 0)
-  const deletions = files.reduce((sum, file) => sum + (file.deletions ?? 0), 0)
-  return (
-    <div className="overflow-hidden rounded-lg border border-border bg-background">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2 text-sm">
-        <span className="font-medium text-foreground">{files.length === 1 ? '1 file' : `${files.length} files`}</span>
-        {known && (
-          <span className="tabular-nums">
-            <span className="text-[var(--surface-success-text)]">+{additions}</span>{' '}
-            <span className="text-[var(--surface-danger-text)]">−{deletions}</span>
-          </span>
-        )}
-      </div>
-      <ul className="max-h-56 divide-y divide-border/70 overflow-y-auto">
-        {files.map((file) => {
-          const Icon = CHANGE_ICONS[file.change]
-          return (
-            <li key={file.path} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-              <span className="flex min-w-0 items-center gap-2">
-                <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-                <span className="sr-only">{file.change}</span>
-                <span className="min-w-0 truncate font-mono text-foreground" title={file.path}>{file.path}</span>
-              </span>
-              <span className="shrink-0 tabular-nums">
-                <span className="text-[var(--surface-success-text)]">{lineCount(file.additions, '+')}</span>{' '}
-                <span className="text-[var(--surface-danger-text)]">{lineCount(file.deletions, '−')}</span>
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-    </div>
-  )
 }

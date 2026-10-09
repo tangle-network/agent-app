@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight, ShieldCheck } from 'lucide-react'
+import { Button } from '@tangle-network/ui/primitives'
 
 import { hubActionReceipt, presentHubAction, type HubApprovalItem, type HubApprovalPhase } from '../hub-approvals'
 import { closesIn, HubApprovalPhasePill, HubProviderMark, relativeTime } from './parts'
@@ -48,7 +49,7 @@ export function HubApprovalsList({ items, onSelect, selectedId, className = '' }
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
           <span className="flex size-10 items-center justify-center rounded-xl bg-muted"><ShieldCheck aria-hidden className="size-5 text-muted-foreground" /></span>
           <p className="text-sm font-medium text-foreground">No approvals in this conversation</p>
-          <p className="text-sm text-muted-foreground">When the agent asks to act on a connected account, the request appears here.</p>
+          <p className="text-sm text-muted-foreground">Requests to act on your connected accounts appear here.</p>
         </div>
       ) : (
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-2 py-3">
@@ -66,11 +67,11 @@ export function HubApprovalsList({ items, onSelect, selectedId, className = '' }
                   const selected = selectedId === item.id
                   return (
                     <li key={item.id}>
-                      <button
-                        type="button"
+                      <Button
+                        variant="bare"
                         onClick={() => onSelect?.(item)}
                         aria-current={selected ? 'true' : undefined}
-                        className={`flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'bg-muted' : ''}`}
+                        className={`flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-muted ${selected ? 'bg-muted' : ''}`}
                       >
                         <HubProviderMark providerId={presentation.provider.id} name={presentation.provider.name} size={28} />
                         <span className="min-w-0 flex-1">
@@ -81,7 +82,7 @@ export function HubApprovalsList({ items, onSelect, selectedId, className = '' }
                           <HubApprovalPhasePill phase={item.phase} label={item.phase === 'waiting' ? 'Waiting' : item.phase === 'blocked' ? 'Owner' : undefined} />
                           <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
                         </span>
-                      </button>
+                      </Button>
                     </li>
                   )
                 })}

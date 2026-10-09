@@ -43,17 +43,17 @@ export function HubApprovalRow({ item, expanded: controlled, onExpandedChange, o
   return (
     <div ref={ref} data-hub-approval-row={item.id} className={`rounded-xl border bg-card ${expanded ? 'border-border shadow-sm' : 'border-border/80'}`}>
       <div className="flex items-center gap-3 px-3 py-2">
-        <button
-          type="button"
+        <Button
+          variant="bare"
           aria-expanded={expanded}
           onClick={toggle}
-          className="flex min-h-9 min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-h-9 min-w-0 flex-1 items-center gap-3 rounded-md text-left"
         >
           <HubProviderMark providerId={presentation.provider.id} name={presentation.provider.name} size={24} />
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{title}</span>
           <HubApprovalPhasePill phase={item.phase} />
           <ChevronDown aria-hidden className={`size-4 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
-        </button>
+        </Button>
         {item.phase === 'waiting' && onReview && (
           <Button variant="outline" onClick={() => onReview(item)}>Review</Button>
         )}

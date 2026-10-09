@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
+import { ApprovalDiffSummary } from '@tangle-network/ui/run'
 
 import { hubActionReceipt, presentHubAction, type HubApprovalItem, type HubApprovalPhase } from '../hub-approvals'
-import { HubApprovalPhasePill, HubDiffSummary, HubFieldList, HubProviderMark, HubRawDetails } from './parts'
+import { HubApprovalPhasePill, HubFieldList, HubProviderMark, HubRawDetails } from './parts'
 
 function AudioPlayer({ src }: { src: string }) {
   const [failed, setFailed] = useState(false)
@@ -51,7 +52,7 @@ export function HubActionReceiptCard({ item, className = '' }: HubActionReceiptC
         <div className="mt-3 space-y-3">
           <HubFieldList fields={receipt.fields} />
           {receipt.media && <AudioPlayer src={receipt.media.src} />}
-          {receipt.files && <HubDiffSummary files={receipt.files} />}
+          {receipt.files && <ApprovalDiffSummary files={receipt.files} />}
           {receipt.error && (
             <p className="break-words rounded-lg border border-[var(--surface-danger-border)] bg-[var(--surface-danger-bg)] px-3 py-2 text-sm text-[var(--surface-danger-text)]">
               {receipt.error}

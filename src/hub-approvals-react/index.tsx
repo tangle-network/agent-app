@@ -11,11 +11,12 @@
  *
  * The components never fetch: a host maps its held calls into
  * `HubApprovalItem`s (`./hub-approvals`) and supplies the decision transport.
- * Logos come from Sandbox UI's provider icon set.
+ * Logos come from Sandbox UI's provider icon set; file changes render with
+ * `ui/run`'s `ApprovalDiffSummary`.
  */
 export { HubApprovalDock, type HubApprovalDecision, type HubApprovalDockProps, type HubApprovalPermissions } from './dock'
 export { HubApprovalsList, type HubApprovalsListProps } from './list'
 export { HubApprovalRow, type HubApprovalRowProps } from './row'
 export { HubActionReceiptCard, HubApprovalReceipts, type HubActionReceiptCardProps, type HubApprovalReceiptsProps } from './receipt'
 export { HubActionPreviewView } from './preview'
-export { HubApprovalPhasePill, HubDiffSummary, HubProviderMark } from './parts'
+export { HubApprovalPhasePill, HubProviderMark } from './parts'
