@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.10
+
+- fix(agent-surfaces): split agent signup into a quick start and short re-runnable waits (#902)
+- docs(operator): describe the fleet over public product inputs only (#903) [skip release]
+
 ## 0.60.9
 
 - chore(deps): qualify published integrations 0.69 cohort (#901)
