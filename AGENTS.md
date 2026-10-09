@@ -57,6 +57,7 @@ Approvals attach to an action's effects, such as spending or publishing, rather 
   Use `PopoverSurface` for canonical popovers so embedding containers cannot clip them.
   Canvas and sequence editors have separate surface contracts; check their implementation before applying picker rules.
   Compose shared run-row components from `@tangle-network/ui` instead of forking them.
+- For outside-agent access, operator keys, or fleet orchestration, read [operator-api.md](docs/operator-api.md).
 - For document extraction or upload changes, read [documents-module.md](docs/documents-module.md) and [office-attachment-defaults.md](docs/office-attachment-defaults.md).
   Preserve explicit unreadable/OCR outcomes and limits on expanded untrusted content.
 - For billing verification, read [spend-verification.md](docs/spend-verification.md).

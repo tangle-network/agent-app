@@ -65,6 +65,11 @@
       "import": "./dist/platform/index.js",
       "default": "./dist/platform/index.js"
     },
+    "./operator": {
+      "types": "./dist/operator/index.d.ts",
+      "import": "./dist/operator/index.js",
+      "default": "./dist/operator/index.js"
+    },
     "./app-auth": {
       "types": "./dist/app-auth/index.d.ts",
       "import": "./dist/app-auth/index.js",
