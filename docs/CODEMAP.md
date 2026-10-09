@@ -65,11 +65,11 @@ _117 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./object-store`](api/object-store.md) | 20 | `crypto` |
 | [`./openui`](api/openui.md) | 35 | `web` |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
-| [`./operator`](api/operator.md) | 49 | `platform`, `stream`, `web` |
+| [`./operator`](api/operator.md) | 52 | `platform`, `stream`, `web` |
 | [`./peer-floors/check`](api/peer-floors-check.md) | 23 | `signoff` |
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 1 | `signoff` |
 | [`./plans`](api/plans.md) | 12 | — |
-| [`./platform`](api/platform.md) | 82 | `billing`, `runtime`, `web` |
+| [`./platform`](api/platform.md) | 90 | `billing`, `runtime`, `web` |
 | [`./preflight`](api/preflight.md) | 14 | `signoff` |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | `signoff` |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 34 | `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`, `web` |
@@ -664,11 +664,11 @@ Depends on: `openui`
 
 ## `./operator`
 
-Source: `src/operator/index.ts` · 49 exports
+Source: `src/operator/index.ts` · 52 exports
 
 Depends on: `platform`, `stream`, `web`
 
-`ChatOperatorAdapterOptions`, `ChatOperatorMessage`, `ChatOperatorThread`, `ChatOperatorWorkspace`, `createChatOperatorAdapter`, `createOperatorApi`, `createOperatorClient`, `matchOperatorRoute`, `OPERATOR_ACCESS`, `OPERATOR_API_BASE_PATH`, `OPERATOR_API_SCOPES`, `OPERATOR_API_VERSION`, `OPERATOR_ROUTES`, `OPERATOR_SCOPE_DEPENDENCIES`, `OPERATOR_SETTLED_STATES`, `OPERATOR_WORKSPACE_SCOPE_PREFIX`, `OperatorAdapter`, `OperatorApi`, `OperatorApiOptions`, `OperatorAppInfo`, `OperatorApproval`, `OperatorApprovalKind`, `OperatorAssetRef`, `OperatorCapability`, `OperatorClient`, `OperatorClientOptions`, `OperatorContext`, `OperatorError`, `OperatorErrorBody`, `OperatorFile`, `OperatorFileChange`, `OperatorFileEntry`, `OperatorJournalEntry`, `OperatorKeyStore`, `operatorKeyWorkspaces`, `OperatorMetric`, `OperatorPrincipalInfo`, `OperatorResult`, `OperatorRole`, `OperatorRouteId`, `OperatorScope`, `OperatorScorecard`, `OperatorThread`, `OperatorTurn`, `OperatorTurnState`, `OperatorWorkspace`, `operatorWorkspaceScope`, `StartTurnInput`, `WaitForTurnOptions`
+`ChatOperatorAdapterOptions`, `ChatOperatorMessage`, `ChatOperatorThread`, `ChatOperatorWorkspace`, `createChatOperatorAdapter`, `createOperatorApi`, `createOperatorClient`, `matchOperatorRoute`, `OPERATOR_ACCESS`, `OPERATOR_API_BASE_PATH`, `OPERATOR_API_SCOPES`, `OPERATOR_API_VERSION`, `OPERATOR_ROUTES`, `OPERATOR_SCOPE_DEPENDENCIES`, `OPERATOR_SETTLED_STATES`, `OPERATOR_WORKSPACE_SCOPE_PREFIX`, `OperatorAdapter`, `OperatorApi`, `OperatorApiOptions`, `OperatorAppInfo`, `OperatorApproval`, `OperatorApprovalKind`, `OperatorAssetRef`, `OperatorCapability`, `OperatorClient`, `OperatorClientOptions`, `OperatorContext`, `OperatorError`, `OperatorErrorBody`, `OperatorFile`, `OperatorFileChange`, `OperatorFileEntry`, `OperatorJournalEntry`, `OperatorKeyStore`, `operatorKeyWorkspaces`, `OperatorMetric`, `OperatorPrincipalInfo`, `OperatorResult`, `OperatorRole`, `OperatorRouteId`, `OperatorScope`, `OperatorScorecard`, `OperatorThread`, `OperatorTurn`, `OperatorTurnState`, `OperatorWorkspace`, `operatorWorkspaceScope`, `PlatformAgentKeyAccess`, `PlatformAgentOperatorKey`, `StartTurnInput`, `WaitForTurnOptions`, `withPlatformAgentKeys`
 
 [Full API →](api/operator.md)
 
@@ -702,11 +702,11 @@ Source: `src/plans/index.ts` · 12 exports
 
 ## `./platform`
 
-Source: `src/platform/index.ts` · 82 exports
+Source: `src/platform/index.ts` · 90 exports
 
 Depends on: `billing`, `runtime`, `web`
 
-`AdminGuardOptions`, `ApiKeyRequestAuthOptions`, `assertBillableBalance`, `AssertBillableBalanceOptions`, `AuthGuard`, `AuthGuardOptions`, `BetterAuthSessionCookieMinterOptions`, `BetterAuthSessionCookieSource`, `BillableBalanceState`, `createAdminGuard`, `createApiKeyRequestAuth`, `createAuthGuard`, `createBetterAuthSessionCookieMinter`, `createHubSettingsRoutes`, `createPlatformBillingHttp`, `createSignedSsoState`, `createTanglePlatformBillingClient`, `createTangleSsoHandlers`, `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`, `DEFAULT_TANGLE_TIER_POLICY`, `FREE_TIER_SPEND_CAP_USD`, `getProductEntitlement`, `guardResolution`, `GuardResolution`, `HubSettingsApiKeyMetadata`, `HubSettingsClient`, `HubSettingsClientBinding`, `HubSettingsContext`, `HubSettingsGrant`, `HubSettingsOAuthInput`, `HubSettingsOperation`, `HubSettingsPrincipal`, `HubSettingsRoutes`, `isPlatformBillingHttpError`, `isProductEntitled`, `isSeatBillingEnabled`, `normalizeTanglePlanTier`, `normalizeTangleSsoEmail`, `parseAdminEmails`, `PlatformBalanceSnapshot`, `PlatformBillingHttp`, `PlatformBillingHttpError`, `PlatformBillingHttpOptions`, `PlatformIdentityStore`, `PlatformSubscriptionInfo`, `PlatformUsageProductRow`, `ProductEntitlement`, `ProductSeatOffer`, `ProductSeatOfferPeriod`, `readTangleTierState`, `RequestApiKey`, `resolveTangleSsoAccount`, `SeatBillingFlagOptions`, `seatCheckoutUrl`, `SeatStatus`, `signSessionCookieValue`, `SsoStateConfig`, `TangleIdentitySsoAccountStore`, `TangleIdentitySsoAuthClient`, `TangleIdentitySsoExchangeResult`, `TangleIdentitySsoHandlerOptions`, `TangleOidcSsoAccountStore`, `TangleOidcSsoAuthClient`, `TangleOidcSsoHandlerOptions`, `TangleOidcSsoTokens`, `TangleOidcSsoUser`, `TanglePlanTier`, `TangleSsoAccountConflictError`, `TangleSsoAccountConflictReason`, `TangleSsoAccountResolution`, `TangleSsoAccountResolutionInput`, `TangleSsoAccountStore`, `TangleSsoAuthClient`, `TangleSsoExchangeResult`, `TangleSsoHandlerOptions`, `TangleSsoHandlers`, `TangleSsoLocalAccount`, `TangleSsoSessionCookieArgs`, `TangleSsoUserCreateError`, `TangleTierPolicy`, `TangleTierState`, `verifySignedSsoState`
+`AdminGuardOptions`, `agentOperatorScopes`, `ApiKeyRequestAuthOptions`, `assertBillableBalance`, `AssertBillableBalanceOptions`, `AuthGuard`, `AuthGuardOptions`, `BetterAuthSessionCookieMinterOptions`, `BetterAuthSessionCookieSource`, `BillableBalanceState`, `createAdminGuard`, `createApiKeyRequestAuth`, `createAuthGuard`, `createBetterAuthSessionCookieMinter`, `createHubSettingsRoutes`, `createPlatformAgentKeyVerifier`, `createPlatformBillingHttp`, `createSignedSsoState`, `createTanglePlatformBillingClient`, `createTangleSsoHandlers`, `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`, `DEFAULT_TANGLE_TIER_POLICY`, `FREE_TIER_SPEND_CAP_USD`, `getProductEntitlement`, `guardResolution`, `GuardResolution`, `HubSettingsApiKeyMetadata`, `HubSettingsClient`, `HubSettingsClientBinding`, `HubSettingsContext`, `HubSettingsGrant`, `HubSettingsOAuthInput`, `HubSettingsOperation`, `HubSettingsPrincipal`, `HubSettingsRoutes`, `isPlatformBillingHttpError`, `isProductEntitled`, `isSeatBillingEnabled`, `normalizeTanglePlanTier`, `normalizeTangleSsoEmail`, `parseAdminEmails`, `PLATFORM_AGENT_KEY_PROVISIONER`, `PLATFORM_KEY_PREFIX`, `PlatformAgentKeyVerification`, `PlatformAgentKeyVerifier`, `PlatformAgentKeyVerifierOptions`, `PlatformBalanceSnapshot`, `PlatformBillingHttp`, `PlatformBillingHttpError`, `PlatformBillingHttpOptions`, `PlatformIdentityStore`, `platformKeyRefusal`, `PlatformSubscriptionInfo`, `PlatformUsageProductRow`, `ProductEntitlement`, `ProductSeatOffer`, `ProductSeatOfferPeriod`, `readTangleTierState`, `RequestApiKey`, `resolveTangleSsoAccount`, `SeatBillingFlagOptions`, `seatCheckoutUrl`, `SeatStatus`, `signSessionCookieValue`, `SsoStateConfig`, `TangleIdentitySsoAccountStore`, `TangleIdentitySsoAuthClient`, `TangleIdentitySsoExchangeResult`, `TangleIdentitySsoHandlerOptions`, `TangleOidcSsoAccountStore`, `TangleOidcSsoAuthClient`, `TangleOidcSsoHandlerOptions`, `TangleOidcSsoTokens`, `TangleOidcSsoUser`, `TanglePlanTier`, `TangleSsoAccountConflictError`, `TangleSsoAccountConflictReason`, `TangleSsoAccountResolution`, `TangleSsoAccountResolutionInput`, `TangleSsoAccountStore`, `TangleSsoAuthClient`, `TangleSsoExchangeResult`, `TangleSsoHandlerOptions`, `TangleSsoHandlers`, `TangleSsoLocalAccount`, `TangleSsoSessionCookieArgs`, `TangleSsoUserCreateError`, `TangleTierPolicy`, `TangleTierState`, `verifySignedSsoState`
 
 [Full API →](api/platform.md)
 

@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-82 exports.
+90 exports.
 
 ### `AdminGuardOptions`
 
@@ -12,6 +12,14 @@ Source: `src/platform/index.ts`
 
 ```ts
 interface AdminGuardOptions
+```
+
+### `agentOperatorScopes`
+
+`function` — The operator scopes an agent key grants at `product`: each `<product>:operator:<action>` becomes `operator:<action>`, and `*` grants every action.
+
+```ts
+(scopes: readonly string[], product: string, actions: readonly string[]) => string[]
 ```
 
 ### `ApiKeyRequestAuthOptions`
@@ -116,6 +124,14 @@ interface BillableBalanceState
 
 ```ts
 (ctx: HubSettingsContext) => HubSettingsRoutes
+```
+
+### `createPlatformAgentKeyVerifier`
+
+`function`
+
+```ts
+(options: PlatformAgentKeyVerifierOptions) => PlatformAgentKeyVerifier
 ```
 
 ### `createPlatformBillingHttp`
@@ -318,6 +334,46 @@ interface HubSettingsRoutes
 (raw: string | null | undefined) => string[]
 ```
 
+### `PLATFORM_AGENT_KEY_PROVISIONER`
+
+`const` — `provisionedByService` of keys minted by Platform agent signup.
+
+```ts
+"agent-signup"
+```
+
+### `PLATFORM_KEY_PREFIX`
+
+`const` — Platform agent keys at an agent app's own API.
+
+```ts
+"sk-tan-"
+```
+
+### `PlatformAgentKeyVerification`
+
+`type`
+
+```ts
+type PlatformAgentKeyVerification
+```
+
+### `PlatformAgentKeyVerifier`
+
+`interface`
+
+```ts
+interface PlatformAgentKeyVerifier
+```
+
+### `PlatformAgentKeyVerifierOptions`
+
+`interface`
+
+```ts
+interface PlatformAgentKeyVerifierOptions
+```
+
 ### `PlatformBalanceSnapshot`
 
 `interface` — Describe the platform balance and lifetime spending with an optional update timestamp
@@ -356,6 +412,14 @@ interface PlatformBillingHttpOptions
 
 ```ts
 interface PlatformIdentityStore
+```
+
+### `platformKeyRefusal`
+
+`function` — The typed refusal for a Platform rejection reason.
+
+```ts
+(reason: unknown) => { ok: false; status: 401 | 402 | 403; code: string; message: string; }
 ```
 
 ### `PlatformSubscriptionInfo`

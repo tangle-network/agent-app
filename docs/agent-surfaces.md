@@ -11,9 +11,12 @@ One typed config generates everything an agent reads, so the docs page, `llms.tx
 | `/` with `Accept: text/markdown` | The home page as markdown. Both representations carry `Vary: Accept`. |
 
 The signup section is rendered by the module, not by product config.
-Every product therefore describes Platform's agent signup the same way: the agent calls `POST https://id.tangle.tools/cross-site/device/start` with `agent_name`, `owner_email` and a `budget_usd` cap, the owner approves once, and the agent receives its own product-scoped, capped key that the owner can revoke under Keys.
+Every product therefore describes Platform's agent signup the same way: the agent calls `POST https://id.tangle.tools/cross-site/device/start` with `agent_name`, `owner_email` and a `budget_usd` cap, the owner approves once, and the agent receives one key, `Agent: <name>`, for every Tangle product the owner approved.
+The cap is shared across those products, and revoking the key under Keys stops it everywhere.
+By default a request asks for every agent-ready product; `--products sandbox,router` (`products` in the request) narrows it, and `*` also covers products added later.
 There is no free credit; paid calls are refused until the owner's account is funded.
-Platform accepts agent requests for `sandbox` and `router` keys; any other product uses `signup: { kind: 'manual', steps }` until Platform supports its key type.
+An agent that already holds a Tangle agent key reuses it instead of signing up again.
+A product Platform cannot yet grant uses `signup: { kind: 'manual', steps }`.
 
 ## Serve it from a Worker or server
 

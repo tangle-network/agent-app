@@ -29,6 +29,32 @@ The app supplies its workspace roles, a `runTurn` that calls its chat route as t
 Its turns are driven exactly as a browser drives them, so the start request returns once the turn settles; apps whose turns are owned by a durable worker, such as GTM's completion Workflow, return as soon as the turn is admitted.
 
 `keys` uses the same callbacks as `createApiKeyRequestAuth`, so an app reuses its key store, revocation, expiry, and request limits.
+
+### Accept Tangle agent keys
+
+One owner approval on id.tangle.tools gives an agent one key for every product it asked for.
+Wrap the app's key store so that key works here too:
+
+```ts
+import { withPlatformAgentKeys } from '@tangle-network/agent-app/operator'
+import { createPlatformAgentKeyVerifier } from '@tangle-network/agent-app/platform'
+
+const keys = withPlatformAgentKeys(appKeys, {
+  verifier: createPlatformAgentKeyVerifier({
+    platformUrl: 'https://id.tangle.tools', serviceName: 'gtm-agent', serviceToken, product: 'gtm-agent',
+  }),
+  product: 'gtm-agent',
+  accounts: tangleSsoAccountStore, // the store browser SSO uses
+  loadIdentity: (userId) => loadUser(userId),
+})
+```
+
+A Bearer key starting `sk-tan-` is verified at Platform for the app's product on each request, cached for at most two minutes, and refused with a typed status: 401 `agent_key.invalid` when revoked or expired, 402 `agent_key.payment_required` or `agent_key.budget_exhausted` when the owner has no credit or the shared cap is spent, and 403 `agent_key.product_not_granted` when the owner did not approve this app.
+Platform being unreachable answers 503; an unverified key is never admitted.
+Only the key's `<product>:operator:read|write|run` scopes (or `*`) become operator scopes.
+The key names no user: its owner's Tangle identity resolves through the app's SSO account store, and the first call creates and links that user exactly as a first browser sign-in would, with the agent key as the link's credential.
+A user already linked to that identity is used as it is.
+Workspace access still comes from `authorizeWorkspace`; every other key goes to the app's own store unchanged.
 `resolveIdentity` can refuse a class of key by throwing a `Response`, such as a key with a spending cap that must use the paid gateway.
 `adapter.authorizeWorkspace` applies the app's roles: `read` needs viewer access and `run` needs the role that may start agent work.
 A workspace the caller cannot reach answers 404, so a key cannot probe other owners' workspaces.
@@ -160,4 +186,4 @@ Keep older private routes until their consumers move.
 ## Not in v1
 
 Answering questions or approvals, interrupting a turn, and writing files stay on each app's own routes.
-Cross-app identity is not shared: each app issues its own keys for its own users.
+Apps still issue their own keys for their own users; a Tangle agent key is the one credential every app accepts.
