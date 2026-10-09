@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.11
+
+- fix(scaffold): preserve compatible Radix dependency cohorts (#904)
+
 ## 0.60.10
 
 - fix(agent-surfaces): split agent signup into a quick start and short re-runnable waits (#902)
