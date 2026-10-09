@@ -24,6 +24,10 @@ export const loader = ({ request }) => api.handle(request)
 export const action = ({ request }) => api.handle(request)
 ```
 
+An app built on agent-app's chat stack does not write an adapter: `createChatOperatorAdapter` reads threads and messages from its chat store and runs turns through its own chat route.
+The app supplies its workspace roles, a `runTurn` that calls its chat route as the caller, and, optionally, running-turn discovery, files, journal, approvals, assets, and a scorecard.
+Its turns are driven exactly as a browser drives them, so the start request returns once the turn settles; apps whose turns are owned by a durable worker, such as GTM's completion Workflow, return as soon as the turn is admitted.
+
 `keys` uses the same callbacks as `createApiKeyRequestAuth`, so an app reuses its key store, revocation, expiry, and request limits.
 `resolveIdentity` can refuse a class of key by throwing a `Response`, such as a key with a spending cap that must use the paid gateway.
 `adapter.authorizeWorkspace` applies the app's roles: `read` needs viewer access and `run` needs the role that may start agent work.
@@ -59,6 +63,7 @@ Errors are `{ error, code, retryable? }`.
 
 1. The caller generates a UUID `turnId` and posts the turn.
    Omitting `threadId` starts a new conversation; the response names it.
+   The response arrives once the app has admitted the turn, or, for an app whose turns are owned by the request, once the turn settles.
    A retry with the same `turnId` returns the same turn and never starts a second one.
 2. The caller reads the turn with `?wait=25`.
    The server holds the read until the turn settles, waits on a decision, or the hold ends.
