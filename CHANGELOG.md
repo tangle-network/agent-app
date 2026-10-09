@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.12
+
+- chore(deps): qualify Hub SDK 0.28 cohort (#900)
+
 ## 0.60.11
 
 - fix(scaffold): preserve compatible Radix dependency cohorts (#904)
