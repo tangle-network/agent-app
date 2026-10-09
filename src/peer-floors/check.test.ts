@@ -225,7 +225,9 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.25.0', range!)).toBe(false)
     expect(satisfiesRange('0.26.0', range!)).toBe(false)
     expect(satisfiesRange('0.27.0', range!)).toBe(true)
-    expect(satisfiesRange('0.28.0', range!)).toBe(false)
+    expect(satisfiesRange('0.28.0', range!)).toBe(true)
+    expect(satisfiesRange('0.28.999', range!)).toBe(true)
+    expect(satisfiesRange('0.29.0', range!)).toBe(false)
   })
 
   it('admits the tested Integrations lines without admitting 0.58', async () => {
