@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.7
+
+- feat(operator): add the standard operator API every agent app mounts (#898)
+
 ## 0.60.6
 
 - fix(sandbox): require replacement key for recovery decisions (#897)

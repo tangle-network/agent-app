@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.60.6",
+  "version": "0.60.7",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -65,6 +65,11 @@
       "types": "./dist/platform/index.d.ts",
       "import": "./dist/platform/index.js",
       "default": "./dist/platform/index.js"
+    },
+    "./operator": {
+      "types": "./dist/operator/index.d.ts",
+      "import": "./dist/operator/index.js",
+      "default": "./dist/operator/index.js"
     },
     "./app-auth": {
       "types": "./dist/app-auth/index.d.ts",
