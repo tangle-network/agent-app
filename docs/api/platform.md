@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-90 exports.
+95 exports.
 
 ### `AdminGuardOptions`
 
@@ -20,6 +20,22 @@ interface AdminGuardOptions
 
 ```ts
 (scopes: readonly string[], product: string, actions: readonly string[]) => string[]
+```
+
+### `AgentSpendOutcome`
+
+`type`
+
+```ts
+type AgentSpendOutcome
+```
+
+### `AgentSpendRefusal`
+
+`interface` — Bill work an agent app runs for a Platform agent key to that key's one cap.
+
+```ts
+interface AgentSpendRefusal
 ```
 
 ### `ApiKeyRequestAuthOptions`
@@ -132,6 +148,14 @@ interface BillableBalanceState
 
 ```ts
 (options: PlatformAgentKeyVerifierOptions) => PlatformAgentKeyVerifier
+```
+
+### `createPlatformAgentSpend`
+
+`function`
+
+```ts
+(options: PlatformAgentSpendOptions) => PlatformAgentSpend
 ```
 
 ### `createPlatformBillingHttp`
@@ -372,6 +396,22 @@ interface PlatformAgentKeyVerifier
 
 ```ts
 interface PlatformAgentKeyVerifierOptions
+```
+
+### `PlatformAgentSpend`
+
+`interface`
+
+```ts
+interface PlatformAgentSpend
+```
+
+### `PlatformAgentSpendOptions`
+
+`interface`
+
+```ts
+interface PlatformAgentSpendOptions
 ```
 
 ### `PlatformBalanceSnapshot`

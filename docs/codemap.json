@@ -10750,6 +10750,18 @@
           "doc": "The operator scopes an agent key grants at `product`: each `<product>:operator:<action>` becomes `operator:<action>`, and `*` grants every action."
         },
         {
+          "name": "AgentSpendOutcome",
+          "kind": "type",
+          "signature": "type AgentSpendOutcome",
+          "doc": null
+        },
+        {
+          "name": "AgentSpendRefusal",
+          "kind": "interface",
+          "signature": "interface AgentSpendRefusal",
+          "doc": "Bill work an agent app runs for a Platform agent key to that key's one cap."
+        },
+        {
           "name": "ApiKeyRequestAuthOptions",
           "kind": "interface",
           "signature": "interface ApiKeyRequestAuthOptions",
@@ -10831,6 +10843,12 @@
           "name": "createPlatformAgentKeyVerifier",
           "kind": "function",
           "signature": "(options: PlatformAgentKeyVerifierOptions) => PlatformAgentKeyVerifier",
+          "doc": null
+        },
+        {
+          "name": "createPlatformAgentSpend",
+          "kind": "function",
+          "signature": "(options: PlatformAgentSpendOptions) => PlatformAgentSpend",
           "doc": null
         },
         {
@@ -11011,6 +11029,18 @@
           "name": "PlatformAgentKeyVerifierOptions",
           "kind": "interface",
           "signature": "interface PlatformAgentKeyVerifierOptions",
+          "doc": null
+        },
+        {
+          "name": "PlatformAgentSpend",
+          "kind": "interface",
+          "signature": "interface PlatformAgentSpend",
+          "doc": null
+        },
+        {
+          "name": "PlatformAgentSpendOptions",
+          "kind": "interface",
+          "signature": "interface PlatformAgentSpendOptions",
           "doc": null
         },
         {

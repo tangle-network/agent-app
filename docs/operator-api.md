@@ -62,6 +62,17 @@ A store that keeps the Platform link per user also links it, with the agent key 
 A user already linked to that identity is used as it is.
 `loadIdentity` receives the agent key as `platformApiKey` for the request: put it on the identity and act with it, so the work spends the key's one cap, whether or not the owner has signed in. It is never on the key object; never store or log it.
 Workspace access still comes from `authorizeWorkspace`; every other key goes to the app's own store unchanged.
+
+### Bill agent-key work to its cap
+
+Work an app runs for an agent key must spend that key's one cap, even for an owner whose own credential already pays the app.
+`createPlatformAgentSpend` (`/platform`) does both halves:
+
+- `modelKey({ agentKey, name, expiresAt })` delegates a Router key from the agent key whose charges spend its cap directly. Give the turn that key for its model calls; Router refuses each call once the cap is spent.
+- `hold({ keyId, amountUsd, referenceId, expiresAt })` reserves the most the work can cost elsewhere, such as compute in the owner's sandbox, before it starts. `consume({ authorizationId, amountUsd })` spends what it measured, up to the hold, without charging the wallet again. `release` returns a hold whose work never ran.
+
+A spent or insufficient cap answers 402 `agent_key.budget_exhausted`, so refuse the work before it starts.
+An owner whose app credential is the agent key itself (an account the key created) already spends its cap and needs neither.
 `resolveIdentity` can refuse a class of key by throwing a `Response`, such as a key with a spending cap that must use the paid gateway.
 `adapter.authorizeWorkspace` applies the app's roles: `read` needs viewer access and `run` needs the role that may start agent work.
 A workspace the caller cannot reach answers 404, so a key cannot probe other owners' workspaces.
