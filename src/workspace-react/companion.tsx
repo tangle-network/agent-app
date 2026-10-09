@@ -51,6 +51,12 @@ export interface AgentWorkspaceCompanionHandle {
 
 export interface AgentWorkspaceCompanionProps {
   children: ReactNode
+  /**
+   * Quiet content for the conversation's header row, such as its title or a
+   * pending-review status. The row also holds the tools toggle, flat in its
+   * top-right corner, and aligns with the open tools pane's header.
+   */
+  header?: ReactNode
   /** Use tools for shared defaults; tabs overrides them for product-specific navigation. */
   tabs?: readonly AgentWorkspaceCompanionTab[]
   tools?: AgentWorkspaceCompanionTools
@@ -73,6 +79,7 @@ export interface AgentWorkspaceCompanionProps {
 /** Product-owned tools beside a conversation; omitted tools have no tabs or effects. */
 export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle, AgentWorkspaceCompanionProps>(function AgentWorkspaceCompanion({
   children,
+  header,
   tabs: customTabs,
   tools,
   navigation,
@@ -170,15 +177,21 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
   }), [selectTab, changeOpen])
 
   if (tabs.length === 0 && !navigation) return <>{children}</>
+  const toolsName = inSentence(label)
 
   return (
     <Tabs key={persistenceKey} value={active} onValueChange={selectTab} className={`flex h-full min-h-0 min-w-0 flex-1 flex-col ${className ?? ''}`}>
       <WorkspaceLayout
         className="h-full min-h-0 min-w-0 flex-1"
-        // The expander takes its own column at the conversation's edge. Floated
-        // over the conversation it covered the top-right of a right-aligned
-        // user message on a phone, hiding part of its text.
-        collapsedControlsPlacement="edge"
+        // One raised surface in an even gutter. The tools toggle sits flat in
+        // the conversation header's top-right corner instead of an edge column
+        // (which cost the conversation a column and showed a strip of another
+        // surface) or a float (which covered a right-aligned message on a phone).
+        surface="inset"
+        centerHeader={header === undefined ? undefined : <div className="flex min-w-0 items-center gap-2 px-2">{header}</div>}
+        rightOpenLabel={`Open ${toolsName}`}
+        rightCloseLabel={`Close ${toolsName}`}
+        rightControlHint={tabs.length > 0 ? tabs.map((tab) => tab.label).join(', ') : undefined}
         keepRightMounted
         // The layout's center is a block scroller, so a conversation written as
         // `flex flex-1 flex-col` (message list `flex-1 overflow-y-auto`, then a
@@ -229,6 +242,11 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
     </Tabs>
   )
 })
+
+/** "Workspace tools" reads as "workspace tools" mid-sentence; "CRM tools" keeps its acronym. */
+function inSentence(label: string): string {
+  return /^[A-Z][a-z]/.test(label) ? `${label.charAt(0).toLowerCase()}${label.slice(1)}` : label
+}
 
 /**
  * The companion's tab row. When every labelled tab does not fit the pane (a
