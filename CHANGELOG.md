@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.13
+
+- chore(deps): qualify published Integrations 0.70 cohort (#905)
+
 ## 0.60.12
 
 - chore(deps): qualify Hub SDK 0.28 cohort (#900)

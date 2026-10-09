@@ -10158,10 +10158,41 @@
       "source": "src/operator/index.ts",
       "dependsOn": [
         "platform",
+        "stream",
         "web"
       ],
       "error": null,
       "exports": [
+        {
+          "name": "ChatOperatorAdapterOptions",
+          "kind": "interface",
+          "signature": "interface ChatOperatorAdapterOptions",
+          "doc": null
+        },
+        {
+          "name": "ChatOperatorMessage",
+          "kind": "interface",
+          "signature": "interface ChatOperatorMessage",
+          "doc": "The message fields the adapter reads; agent-app's chat-store rows satisfy it."
+        },
+        {
+          "name": "ChatOperatorThread",
+          "kind": "interface",
+          "signature": "interface ChatOperatorThread",
+          "doc": null
+        },
+        {
+          "name": "ChatOperatorWorkspace",
+          "kind": "interface",
+          "signature": "interface ChatOperatorWorkspace",
+          "doc": null
+        },
+        {
+          "name": "createChatOperatorAdapter",
+          "kind": "function",
+          "signature": "<Identity>(options: ChatOperatorAdapterOptions<Identity>) => OperatorAdapter<Identity>",
+          "doc": "The operator adapter for an app built on agent-app's chat stack: threads and messages from its chat store, turns through its own chat route."
+        },
         {
           "name": "createOperatorApi",
           "kind": "function",

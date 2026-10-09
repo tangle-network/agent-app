@@ -4,7 +4,47 @@
 
 Source: `src/operator/index.ts`
 
-47 exports.
+52 exports.
+
+### `ChatOperatorAdapterOptions`
+
+`interface`
+
+```ts
+interface ChatOperatorAdapterOptions
+```
+
+### `ChatOperatorMessage`
+
+`interface` — The message fields the adapter reads; agent-app's chat-store rows satisfy it.
+
+```ts
+interface ChatOperatorMessage
+```
+
+### `ChatOperatorThread`
+
+`interface`
+
+```ts
+interface ChatOperatorThread
+```
+
+### `ChatOperatorWorkspace`
+
+`interface`
+
+```ts
+interface ChatOperatorWorkspace
+```
+
+### `createChatOperatorAdapter`
+
+`function` — The operator adapter for an app built on agent-app's chat stack: threads and messages from its chat store, turns through its own chat route.
+
+```ts
+<Identity>(options: ChatOperatorAdapterOptions<Identity>) => OperatorAdapter<Identity>
+```
 
 ### `createOperatorApi`
 
