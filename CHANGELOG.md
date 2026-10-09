@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.1
+
+- feat(profile): append product prompts after the harness prompt by default (#892)
+
 ## 0.60.0
 
 - feat(email)!: digest sections and one-click unsubscribe
