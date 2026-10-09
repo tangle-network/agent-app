@@ -2845,6 +2845,14 @@ export interface StreamSandboxPromptOptions {
   expectedSecretProfileReceipt?: `hmac-sha256:${string}`
   signal?: AbortSignal
   timeoutMs?: number
+  /**
+   * Execution time limit for this run, in milliseconds. Unset, the runtime
+   * falls back to `timeoutMs`, then to its one-hour default, so a turn that
+   * must run longer than an hour names it here. The runtime refuses a value
+   * above its deployment maximum before the run starts. `timeoutMs` stays the
+   * shorter first-output budget.
+   */
+  ttlMs?: number
   requireVisibleAssistantOutput?: boolean
   // When true, an interactive question event throws instead of yielding.
   // Use this for detached runs whose caller has no consumer to answer it.
@@ -2958,6 +2966,7 @@ async function* detachedSandboxPromptEvents(
           ? { requireVisibleAssistantOutput: options.requireVisibleAssistantOutput }
           : {}),
         ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+        ...(options.ttlMs !== undefined ? { ttlMs: options.ttlMs } : {}),
       } as DispatchPromptOptions)
   const admittedExecutionId = admission?.executionId ?? executionId
   if (!admittedExecutionId) {
@@ -3269,6 +3278,7 @@ export async function* streamSandboxPrompt(
         lastEventId: options?.lastEventId,
         ...(options?.signal ? { signal: options.signal } : {}),
         ...(options?.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+        ...(options?.ttlMs !== undefined ? { ttlMs: options.ttlMs } : {}),
         ...(options?.requireVisibleAssistantOutput !== undefined
           ? { requireVisibleAssistantOutput: options.requireVisibleAssistantOutput }
           : {}),
