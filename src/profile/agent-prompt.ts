@@ -1,6 +1,7 @@
 /**
  * The product system-prompt renderer: one layout for every product agent.
  *
+ *   # Product instructions   when the prompt follows a harness prompt
  *   identity                 who the agent is (product-owned, no heading)
  *   ## Operating contract    the shared, versioned rules (./operating-contract)
  *   ## Environment           facts about the machine and tools this turn has
@@ -23,6 +24,7 @@
  */
 
 import { assertSystemPromptWithinBudget, type ComposeProfileBudget } from './budget'
+import { defaultSystemPromptPlacement, HARNESS_PROMPT_RECAST, type SystemPromptPlacement } from './prompt-placement'
 import {
   renderOperatingContract,
   type OperatingContractClauseId,
@@ -66,6 +68,12 @@ export interface AgentPromptInput {
    *  profile knowledge. Rendered last under `## Workspace context`; sections
    *  with empty bodies are dropped. */
   overlay?: readonly AgentPromptSection[]
+  /** Harness the prompt runs under; it sets the default {@link placement}. */
+  harness?: string
+  /** `append` (the default for a harness with its own prompt) opens the prompt
+   *  with a section that hands the harness's coding guidance to the product's
+   *  instructions; place the result with `placedSystemPrompt`. */
+  placement?: SystemPromptPlacement
   /** Byte budget, enforced only when supplied. Pass the product's ceiling when
    *  this render is the final system prompt; when later turn sections are
    *  appended, gate the final string with `assertSystemPromptWithinBudget`. */
@@ -87,6 +95,8 @@ export interface RenderedAgentPromptSection {
 export interface RenderedAgentPrompt {
   /** Sections joined with a blank line. */
   prompt: string
+  /** Where the prompt belongs on the profile: `appendSystemPrompt` or `systemPrompt`. */
+  placement: SystemPromptPlacement
   bytes: number
   contractVersion: number
   /** Shared contract clauses this prompt carries. */
@@ -115,7 +125,9 @@ export function renderAgentPrompt(input: AgentPromptInput): RenderedAgentPrompt 
   if (!environment) throw new Error('renderAgentPrompt: environment is empty')
 
   const contract = renderOperatingContract(input.contract)
+  const placement = input.placement ?? defaultSystemPromptPlacement(input.harness)
   const sections: Array<Omit<RenderedAgentPromptSection, 'bytes'>> = [
+    ...(placement === 'append' ? [{ id: 'harness-recast', title: 'Product instructions', text: HARNESS_PROMPT_RECAST }] : []),
     { id: 'identity', title: 'Identity', text: identity },
     { id: 'operating-contract', title: 'Operating contract', text: contract.text },
     { id: 'environment', title: 'Environment', text: `## Environment\n\n${environment}` },
@@ -149,6 +161,7 @@ export function renderAgentPrompt(input: AgentPromptInput): RenderedAgentPrompt 
   if (input.budget) assertSystemPromptWithinBudget(prompt, input.budget, 'rendered agent prompt')
   return {
     prompt,
+    placement,
     bytes: byteLength(prompt),
     contractVersion: contract.version,
     contractClauseIds: contract.clauseIds,

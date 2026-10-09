@@ -144,6 +144,12 @@ describe('composeAgentProfile — overlay (mcp / prompt / name)', () => {
     expect(must(out.prompt).instructions).toEqual(['keep this'])
   })
 
+  it('moves the composed prompt after the harness prompt when asked to append', () => {
+    const out = composeAgentProfile(BASE, {}, { systemPrompt: 'per-turn prompt', systemPromptPlacement: 'append' })
+    expect(must(out.prompt)).toEqual({ appendSystemPrompt: 'per-turn prompt', instructions: ['keep this'] })
+    expect(must(composeAgentProfile(BASE, {}, { systemPromptPlacement: 'append' }).prompt).appendSystemPrompt).toBe('base prompt')
+  })
+
   it('passes the base prompt through unchanged when no override is given', () => {
     const out = composeAgentProfile(BASE, {})
     expect(must(out.prompt).systemPrompt).toBe('base prompt')

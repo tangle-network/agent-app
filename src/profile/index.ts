@@ -48,6 +48,7 @@ import {
   type SkillEntry,
 } from '../skills/index'
 import { assertSystemPromptWithinBudget, type ComposeProfileBudget } from './budget'
+import type { SystemPromptPlacement } from './prompt-placement'
 
 /** The prompt byte budget lives in `./budget` (import-free) so `/sandbox` can
  *  run the same gate without pulling agent-eval through this module. Re-exported
@@ -75,6 +76,13 @@ export {
   type RenderedAgentPrompt,
   type RenderedAgentPromptSection,
 } from './agent-prompt'
+export {
+  defaultSystemPromptPlacement,
+  HARNESS_PROMPT_RECAST,
+  HARNESSES_WITH_OWN_PROMPT,
+  placedSystemPrompt,
+  type SystemPromptPlacement,
+} from './prompt-placement'
 export {
   OPERATING_CONTRACT_CLAUSES,
   OPERATING_CONTRACT_VERSION,
@@ -171,6 +179,10 @@ export interface ProfileOverlay {
   instructions?: string[]
   /** Profile `name` override. When unset, the base name is kept. */
   name?: string
+  /** Where the composed system prompt goes. `append` moves it to
+   *  `prompt.appendSystemPrompt` so the harness keeps its own prompt; pass
+   *  `renderAgentPrompt(...).placement`. Defaults to `replace`. */
+  systemPromptPlacement?: SystemPromptPlacement
 }
 
 /** Project per-user skills onto SDK file mounts at the harness skill-discovery
@@ -252,6 +264,10 @@ export function composeAgentProfile(
   // point where every channel and overlay has been merged in.
   const systemPrompt = merged.prompt?.systemPrompt
   if (typeof systemPrompt === 'string') assertSystemPromptWithinBudget(systemPrompt, budget)
+  if (overlay.systemPromptPlacement === 'append' && typeof systemPrompt === 'string') {
+    const { systemPrompt: _replaced, appendSystemPrompt, ...prompt } = merged.prompt ?? {}
+    merged.prompt = { ...prompt, appendSystemPrompt: [systemPrompt, appendSystemPrompt].filter(Boolean).join('\n\n') }
+  }
   return pruneEmptyResourceChannels(merged)
 }
 
