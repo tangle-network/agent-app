@@ -1,4 +1,4 @@
-import { messageHasTurnId } from '../stream/turn-identity'
+import { messageHasTurnId } from '../stream/turn-identity.js'
 import type {
   OperatorApproval,
   OperatorAssetRef,
@@ -13,8 +13,8 @@ import type {
   OperatorTurnState,
   OperatorWorkspace,
   StartTurnInput,
-} from './contract'
-import { OperatorError, type OperatorAdapter, type OperatorContext } from './server'
+} from './contract.js'
+import { OperatorError, type OperatorAdapter, type OperatorContext } from './server.js'
 
 /** The message fields the adapter reads; agent-app's chat-store rows satisfy it. */
 export interface ChatOperatorMessage {
