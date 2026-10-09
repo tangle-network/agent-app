@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.18
+
+- feat(operator): pass the caller to chat adapter thread reads (#911)
+
 ## 0.60.17
 
 - fix(operator): hand the app the agent key for each request (#910)
