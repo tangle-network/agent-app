@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.8
+
+- feat(agent-surfaces): generate a product's agent setup skill, llms.txt and manifest from one config (#899)
+
 ## 0.60.7
 
 - feat(operator): add the standard operator API every agent app mounts (#898)
