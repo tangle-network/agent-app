@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.60.10
+
+- fix(agent-surfaces): split agent signup into a quick start and short re-runnable waits (#902)
+- docs(operator): describe the fleet over public product inputs only (#903) [skip release]
+
+## 0.60.9
+
+- chore(deps): qualify published integrations 0.69 cohort (#901)
+
+## 0.60.8
+
+- feat(agent-surfaces): generate a product's agent setup skill, llms.txt and manifest from one config (#899)
+
 ## 0.60.7
 
 - feat(operator): add the standard operator API every agent app mounts (#898)

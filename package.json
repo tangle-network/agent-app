@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.60.7",
+  "version": "0.60.10",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -40,6 +40,7 @@
     "agent-app-peer-check": "./dist/peer-floors/cli.js",
     "agent-app-spend-check": "./dist/spend/cli.js",
     "agent-app-signoff": "./dist/signoff/cli.js",
+    "agent-app-agent-surfaces": "./dist/agent-surfaces/cli.js",
     "agent-app-verify-proof": "./dist/signoff/proof-cli.js",
     "tangle-agent": "bin/tangle-agent.mjs"
   },
@@ -308,6 +309,11 @@
       "types": "./dist/session-shell/index.d.ts",
       "import": "./dist/session-shell/index.js",
       "default": "./dist/session-shell/index.js"
+    },
+    "./agent-surfaces": {
+      "types": "./dist/agent-surfaces/index.d.ts",
+      "import": "./dist/agent-surfaces/index.js",
+      "default": "./dist/agent-surfaces/index.js"
     },
     "./web": {
       "types": "./dist/web/index.d.ts",
@@ -622,7 +628,7 @@
     "@tangle-network/agent-docs": "0.2.1",
     "@tangle-network/agent-eval": "0.209.1",
     "@tangle-network/agent-gateway": "0.11.4",
-    "@tangle-network/agent-integrations": "0.68.0",
+    "@tangle-network/agent-integrations": "0.69.0",
     "@tangle-network/agent-interface": "3.1.1",
     "@tangle-network/agent-knowledge": "20.0.0",
     "@tangle-network/agent-profile-materialize": "0.22.0",
@@ -693,7 +699,7 @@
     "@firecrawl/pdf-inspector-wasm": ">=0.1.3",
     "@huggingface/transformers": ">=3",
     "@tangle-network/agent-eval": ">=0.199.0 <0.205.0 || >=0.205.1 <0.206.0 || >=0.209.1 <0.210.0",
-    "@tangle-network/agent-integrations": ">=0.54.2 <0.58.0 || >=0.59.0 <0.61.0 || >=0.66.0 <0.67.0 || >=0.67.0 <0.68.0 || >=0.68.0 <0.69.0",
+    "@tangle-network/agent-integrations": ">=0.54.2 <0.58.0 || >=0.59.0 <0.61.0 || >=0.66.0 <0.67.0 || >=0.67.0 <0.68.0 || >=0.68.0 <0.69.0 || >=0.69.0 <0.70.0",
     "@tangle-network/agent-interface": "^2.13.0 || ^3.0.0",
     "@tangle-network/agent-knowledge": "^17.1.2 || ^18.0.0 || ^19.0.1 || ^20.0.0",
     "@tangle-network/agent-profile-materialize": ">=0.20.1 <0.21.0 || >=0.21.0 <0.22.0 || >=0.22.0 <0.23.0",

@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-467 exports.
+469 exports.
 
 ### `acceptRejectionReason`
 
@@ -244,6 +244,22 @@ interface AgentSessionControlsProps
 
 ```ts
 interface AgentSettingsPopoverProps
+```
+
+### `AgentSetupBlock`
+
+`function` — The "Hand this to your agent" block for a product's docs page.
+
+```ts
+({ productName, setupUrl, markdown, className }: AgentSetupBlockProps) => Element
+```
+
+### `AgentSetupBlockProps`
+
+`interface`
+
+```ts
+interface AgentSetupBlockProps
 ```
 
 ### `ApiAccessKey`

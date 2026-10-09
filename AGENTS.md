@@ -59,6 +59,7 @@ Approvals attach to an action's effects, such as spending or publishing, rather 
   Compose shared run-row components from `@tangle-network/ui` instead of forking them.
 - For outside-agent access, operator keys, or fleet orchestration, read [operator-api.md](docs/operator-api.md).
 - For document extraction or upload changes, read [documents-module.md](docs/documents-module.md) and [office-attachment-defaults.md](docs/office-attachment-defaults.md).
+- For llms.txt, the agent manifest, markdown negotiation, or a product's agent setup prompt, read [agent-surfaces.md](docs/agent-surfaces.md).
   Preserve explicit unreadable/OCR outcomes and limits on expanded untrusted content.
 - For billing verification, read [spend-verification.md](docs/spend-verification.md).
   Preserve declared ownership, observation coverage, and uncertainty; missing observations cannot certify a clean bill.
