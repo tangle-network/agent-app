@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.4
+
+- feat(sandbox): forward the execution time limit from streamSandboxPrompt (#895)
+
 ## 0.60.3
 
 - feat(workspace): companion owns the conversation surface and header (#894)
