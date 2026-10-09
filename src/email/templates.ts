@@ -6,6 +6,7 @@ import {
   type EmailItem,
   type EmailMessage,
   type EmailProduct,
+  type EmailSection,
 } from './layout'
 
 /** Sentence case to mid-sentence: `Create agent` → `create agent`; acronyms such as `API key` keep their case. */
@@ -13,10 +14,6 @@ function midSentence(text: string): string {
   const first = text.split(/\s/, 1)[0] ?? ''
   if ((first.match(/[A-Z]/g) ?? []).length > 1) return text
   return text.charAt(0).toLowerCase() + text.slice(1)
-}
-
-function plural(count: number, one: string, many: string): string {
-  return count === 1 ? one : many
 }
 
 function day(date: Date): string {
@@ -61,7 +58,7 @@ export function approvalEmail(product: EmailProduct, input: ApprovalEmailInput):
     preheader: `The agent paused${where} until you decide.`,
     title: rest.length === 0 ? 'Approval needed' : `${input.actions.length} approvals needed`,
     paragraphs: [`The agent paused${where} until you decide. Nothing runs until you approve.`],
-    items: input.actions.map((action): EmailItem => ({ title: action.summary, ...(action.detail ? { detail: action.detail } : {}) })),
+    sections: [{ items: input.actions.map((action): EmailItem => ({ title: action.summary, ...(action.detail ? { detail: action.detail } : {}) })) }],
     primary: { label: 'Approve', url: input.approveUrl },
     secondary: { label: 'Review', url: input.reviewUrl },
     footer: input.footer,
@@ -101,26 +98,26 @@ export function inviteEmail(product: EmailProduct, input: InviteEmailInput): Ema
 /** Input for {@link digestEmail}. */
 export interface DigestEmailInput {
   workspaceName: string
-  /** The day the digest covers. */
+  /** The day the digest covers, in the workspace's own date. */
   date: Date
-  /** What happened, most important first. */
-  items: readonly EmailItem[]
+  /** The most useful facts in a few words, for the subject and preview: `2 approvals waiting, 14 turns`. */
+  headline: string
+  /** What happened and what waits, most important first; empty sections are left out. */
+  sections: readonly EmailSection[]
   /** Opens the workspace. */
   openUrl: string
   footer: EmailFooter
 }
 
-/** What happened in a workspace that day. */
+/** What happened in a workspace over a day, and what waits on the recipient. */
 export function digestEmail(product: EmailProduct, input: DigestEmailInput): EmailMessage {
-  const count = input.items.length
-  const updates = `${count} ${plural(count, 'update', 'updates')}`
   const date = input.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })
   return renderEmail(product, {
-    subject: emailSubject(`${input.workspaceName}: ${updates}`, product),
-    preheader: input.items[0]?.title ?? `Nothing new in ${input.workspaceName}.`,
-    title: `What happened in ${input.workspaceName}`,
-    paragraphs: [count === 0 ? `Nothing new on ${date}.` : `${updates} on ${date}.`],
-    items: input.items,
+    subject: emailSubject(`${input.workspaceName}: ${input.headline}`, product),
+    preheader: `${input.headline}.`,
+    title: `Your day in ${input.workspaceName}`,
+    paragraphs: [`${date}: ${input.headline}.`],
+    sections: input.sections,
     primary: { label: `Open ${product.name}`, url: input.openUrl },
     footer: input.footer,
   })

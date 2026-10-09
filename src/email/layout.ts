@@ -22,6 +22,12 @@ export interface EmailFooter {
   /** Where the recipient changes which emails they get; absolute or app-relative. */
   manageUrl?: string
   /**
+   * Turns this kind of email off in one request, without signing in; absolute
+   * or app-relative. Adds an Unsubscribe link and the RFC 8058
+   * `List-Unsubscribe` headers, so the endpoint must accept a POST.
+   */
+  unsubscribeUrl?: string
+  /**
    * The sender's postal address, for marketing mail such as a digest. Leave it
    * unset on transactional mail (approvals, invites, sign-in), which does not
    * need one.
@@ -35,7 +41,7 @@ export interface EmailAction {
   url: string
 }
 
-/** One row in the email's list box: an approval request or a digest entry. */
+/** One row in a list box: an approval request or a digest entry. */
 export interface EmailItem {
   title: string
   detail?: string
@@ -61,6 +67,14 @@ export interface EmailMessage {
   text: string
   /** Pass these through to the mail client; the header mark is one of them. */
   attachments: EmailAttachment[]
+  /** Extra message headers, such as `List-Unsubscribe`; pass them through too. */
+  headers: Record<string, string>
+}
+
+/** A titled list box; a template with one list leaves `heading` unset. */
+export interface EmailSection {
+  heading?: string
+  items: readonly EmailItem[]
 }
 
 /** What a template places in the shared layout. */
@@ -69,7 +83,7 @@ interface EmailContent {
   preheader: string
   title: string
   paragraphs: readonly string[]
-  items?: readonly EmailItem[]
+  sections?: readonly EmailSection[]
   primary?: EmailAction
   secondary?: EmailAction
   /** Print the primary link under the buttons for clients that strip them. */
@@ -173,6 +187,14 @@ function header(product: EmailProduct): string {
   ].join('')
 }
 
+function section(entry: EmailSection, product: EmailProduct): string {
+  if (entry.items.length === 0) return ''
+  const heading = entry.heading
+    ? `<p class="t-ink" style="margin:20px 0 6px;font-family:${FONT};font-size:13px;line-height:18px;font-weight:600;color:${L.ink}">${escapeHtml(entry.heading)}</p>`
+    : ''
+  return heading + items(entry.items, product)
+}
+
 function items(list: readonly EmailItem[], product: EmailProduct): string {
   const rows = list.map((item, index) => {
     const rule = index === 0 ? '' : `border-top:1px solid ${L.hairline};`
@@ -230,16 +252,22 @@ function small(html: string, margin: string, size = 13): string {
 function footerLines(footer: EmailFooter, product: EmailProduct): { html: string[]; text: string[] } {
   const where = footer.workspaceName ? `${footer.workspaceName} · ${product.name}` : product.name
   const manage = footer.manageUrl ? resolveEmailUrl(footer.manageUrl, product) : null
+  const unsubscribe = footer.unsubscribeUrl ? resolveEmailUrl(footer.unsubscribeUrl, product) : null
+  const links = [
+    ...(manage ? [link('Manage notifications', manage, 'text-decoration:underline')] : []),
+    ...(unsubscribe ? [link('Unsubscribe', unsubscribe, 'text-decoration:underline')] : []),
+  ]
   const html = [
     escapeHtml(where),
     escapeHtml(footer.reason),
-    ...(manage ? [link('Manage notifications', manage, 'text-decoration:underline')] : []),
+    ...(links.length > 0 ? [links.join(' &middot; ')] : []),
     ...(footer.postalAddress ? [escapeHtml(footer.postalAddress)] : []),
   ]
   const text = [
     where,
     footer.reason,
     ...(manage ? [`Manage notifications: ${manage}`] : []),
+    ...(unsubscribe ? [`Unsubscribe: ${unsubscribe}`] : []),
     ...(footer.postalAddress ? [footer.postalAddress] : []),
   ]
   return { html, text }
@@ -254,7 +282,7 @@ function renderHtml(content: EmailContent, product: EmailProduct): string {
   const body = [
     `<h1 class="t-ink" style="margin:0 0 12px;font-family:${FONT};font-size:22px;line-height:28px;font-weight:600;letter-spacing:-0.01em;color:${L.ink}">${escapeHtml(content.title)}</h1>`,
     ...content.paragraphs.map((text) => paragraph(text, '0 0 12px')),
-    content.items && content.items.length > 0 ? items(content.items, product) : '',
+    ...(content.sections ?? []).map((entry) => section(entry, product)),
     buttons(content, product),
     content.showPrimaryLink && primaryHref
       ? small(`Or open this link: ${link(primaryHref, primaryHref, 'word-break:break-all')}`, '20px 0 0')
@@ -297,13 +325,15 @@ function renderHtml(content: EmailContent, product: EmailProduct): string {
 
 function renderText(content: EmailContent, product: EmailProduct): string {
   const blocks: string[] = [`Tangle ${productSuffix(product)}`, content.title, ...content.paragraphs]
-  if (content.items && content.items.length > 0) {
-    blocks.push(content.items.map((item) => {
+  for (const entry of content.sections ?? []) {
+    if (entry.items.length === 0) continue
+    const list = entry.items.map((item) => {
       const lines = [`- ${item.title}`]
       if (item.detail) lines.push(`  ${item.detail}`)
       if (item.url) lines.push(`  ${resolveEmailUrl(item.url, product)}`)
       return lines.join('\n')
-    }).join('\n'))
+    }).join('\n')
+    blocks.push(entry.heading ? `${entry.heading}\n${list}` : list)
   }
   const actions = [content.primary, content.secondary]
     .filter((action): action is EmailAction => Boolean(action))
@@ -322,6 +352,12 @@ export function renderEmail(product: EmailProduct, content: EmailContent): Email
     html: renderHtml(content, product),
     text: renderText(content, product),
     attachments: [MARK_ATTACHMENT],
+    headers: content.footer.unsubscribeUrl
+      ? {
+          'List-Unsubscribe': `<${resolveEmailUrl(content.footer.unsubscribeUrl, product)}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        }
+      : {},
   }
 }
 

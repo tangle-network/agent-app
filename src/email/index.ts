@@ -20,6 +20,9 @@
  *   })
  *   await resend.emails.send({ from: emailSender('GTM Agent', 'noreply@tangle.tools'), to, ...message })
  *
+ * Every field the message carries goes to the mail client, `headers`
+ * included: a footer `unsubscribeUrl` adds the RFC 8058 one-click headers.
+ *
  * `lintEmailHtml` checks rendered HTML against Gmail and Outlook constraints;
  * `emailPreviewHtml` embeds the inline images for a browser preview.
  */
@@ -32,6 +35,7 @@ export {
   type EmailItem,
   type EmailMessage,
   type EmailProduct,
+  type EmailSection,
 } from './layout'
 export {
   approvalEmail,
