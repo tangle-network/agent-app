@@ -1188,6 +1188,7 @@ export {
   isSandboxAuthFailure,
   isSandboxApiBearerAuthFailure,
   isSandboxApiSandboxMissingFailure,
+  isSandboxApiTransientFailure,
   SANDBOX_BACKING_CONTAINER_MISSING_CODE,
   isSandboxHostCapacityFailure,
   type SafeSandboxErrorCause,

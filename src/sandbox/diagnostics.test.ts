@@ -4,6 +4,7 @@ import {
   formatSandboxProvisioningSupportDetails,
   isSandboxApiBearerAuthFailure,
   isSandboxApiSandboxMissingFailure,
+  isSandboxApiTransientFailure,
   SANDBOX_BACKING_CONTAINER_MISSING_CODE,
   isSandboxBoxConfigFailure,
   isSandboxAuthFailure,
@@ -70,7 +71,7 @@ describe('sandbox provisioning error diagnostics', () => {
     }))
 
     expect(formatSandboxProvisioningUserMessage(diagnostics))
-      .toBe('I\'m unable to connect to the sandbox right now. This usually means the sandbox service is not configured or is temporarily unavailable.')
+      .toBe('I\'m unable to connect to the sandbox right now. Send your message again in a moment; if it keeps failing, share the support details with the team.')
   })
 
   it('serializes a bounded safe cause chain from nested provisioning errors', () => {
@@ -286,6 +287,35 @@ describe('sandbox provisioning error diagnostics', () => {
     expect(isSandboxApiBearerAuthFailure(diagnostics)).toBe(false)
   })
 
+  it.each([
+    { endpoint: '/v1/sandboxes?status=stopped', status: 503, message: 'A sandbox backend did not answer; the list would be partial. Retry.' },
+    { endpoint: '/v1/sandboxes/sandbox-e6e3efdb7bff/resume', status: 500, message: 'Failed to resume project: fetch failed' },
+    { endpoint: '/v1/sandboxes/sandbox-e6e3efdb7bff', status: 502, message: 'error code: 502' },
+  ])('classifies a Sandbox API $status on $endpoint as transient with a retry message', ({ endpoint, status, message }) => {
+    const diagnostics = serializeSandboxProvisioningError(new Error('Sandbox provisioning failed', {
+      cause: Object.assign(new Error(message), { name: 'ServerError', code: 'SERVER_ERROR', status, endpoint, origin: 'sandbox-api' }),
+    }))
+
+    expect(isSandboxApiTransientFailure(diagnostics)).toBe(true)
+    const userMessage = formatSandboxProvisioningUserMessage(diagnostics)
+    expect(userMessage).toBe('The sandbox service didn\'t answer just now. Send your message again in a moment.')
+    expect(userMessage).not.toContain('not configured')
+  })
+
+  it.each([
+    ['a runtime route', { endpoint: '/v1/sandboxes/sandbox-e6e3efdb7bff/runtime/agents/run/stream', status: 503, message: 'busy' }],
+    ['a missing box', { endpoint: '/v1/sandboxes/sandbox-e6e3efdb7bff', status: 404, message: 'not found' }],
+    ['a backing container that is gone', { endpoint: '/v1/sandboxes/sandbox-e6e3efdb7bff/resume', status: 500, message: 'resume failed', code: SANDBOX_BACKING_CONTAINER_MISSING_CODE }],
+    ['host capacity', { endpoint: '/v1/sandboxes', status: 503, message: 'host has no available slot' }],
+    ['a client error', { endpoint: '/v1/sandboxes', status: 400, message: 'bad request' }],
+  ])('does not classify %s as transient', (_label, cause) => {
+    const diagnostics = serializeSandboxProvisioningError(new Error('Sandbox provisioning failed', {
+      cause: Object.assign(new Error(cause.message), { name: 'ServerError', origin: 'sandbox-api', ...cause }),
+    }))
+
+    expect(isSandboxApiTransientFailure(diagnostics)).toBe(false)
+  })
+
   it('keeps generic provisioning failures on the generic unavailable user message', () => {
     const diagnostics = serializeSandboxProvisioningError(new Error('provisioner blew up'))
 
@@ -294,6 +324,8 @@ describe('sandbox provisioning error diagnostics', () => {
       .toContain('connect to the sandbox right now')
     expect(formatSandboxProvisioningUserMessage(diagnostics))
       .not.toContain('runtime authentication failed')
+    expect(formatSandboxProvisioningUserMessage(diagnostics))
+      .not.toContain('not configured')
   })
 
   it('redacts secret-like values from nested messages, names, and support details', () => {
