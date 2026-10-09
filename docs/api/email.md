@@ -4,7 +4,7 @@
 
 Source: `src/email/index.ts`
 
-19 exports.
+20 exports.
 
 ### `approvalEmail`
 
@@ -32,7 +32,7 @@ interface ApprovalEmailInput
 
 ### `digestEmail`
 
-`function` — What happened in a workspace that day.
+`function` — What happened in a workspace over a day, and what waits on the recipient.
 
 ```ts
 (product: EmailProduct, input: DigestEmailInput) => EmailMessage
@@ -72,7 +72,7 @@ interface EmailFooter
 
 ### `EmailItem`
 
-`interface` — One row in the email's list box: an approval request or a digest entry.
+`interface` — One row in a list box: an approval request or a digest entry.
 
 ```ts
 interface EmailItem
@@ -108,6 +108,14 @@ interface EmailMessage
 
 ```ts
 interface EmailProduct
+```
+
+### `EmailSection`
+
+`interface` — A titled list box; a template with one list leaves `heading` unset.
+
+```ts
+interface EmailSection
 ```
 
 ### `emailSender`

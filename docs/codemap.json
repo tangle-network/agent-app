@@ -6605,7 +6605,7 @@
           "name": "digestEmail",
           "kind": "function",
           "signature": "(product: EmailProduct, input: DigestEmailInput) => EmailMessage",
-          "doc": "What happened in a workspace that day."
+          "doc": "What happened in a workspace over a day, and what waits on the recipient."
         },
         {
           "name": "DigestEmailInput",
@@ -6635,7 +6635,7 @@
           "name": "EmailItem",
           "kind": "interface",
           "signature": "interface EmailItem",
-          "doc": "One row in the email's list box: an approval request or a digest entry."
+          "doc": "One row in a list box: an approval request or a digest entry."
         },
         {
           "name": "EmailLintIssue",
@@ -6660,6 +6660,12 @@
           "kind": "interface",
           "signature": "interface EmailProduct",
           "doc": "The app an email comes from."
+        },
+        {
+          "name": "EmailSection",
+          "kind": "interface",
+          "signature": "interface EmailSection",
+          "doc": "A titled list box; a template with one list leaves `heading` unset."
         },
         {
           "name": "emailSender",
@@ -19953,7 +19959,7 @@
         {
           "name": "VaultTree",
           "kind": "function",
-          "signature": "({ root, selectedPath, activeFolder, onSelect, onFolderToggle, storageKey, expandAll, label, className }: VaultTreeProp…",
+          "signature": "({ root, selectedPath, activeFolder, onSelect, onFolderToggle, onFolderSelect, storageKey, expandAll, label, className…",
           "doc": null
         },
         {

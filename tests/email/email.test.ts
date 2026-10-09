@@ -42,12 +42,17 @@ const samples: Record<string, EmailMessage> = {
   digest: digestEmail(product, {
     workspaceName: 'Tangle Growth',
     date: new Date('2026-10-08T07:00:00Z'),
-    items: [
-      { title: 'Drafted 3 LinkedIn posts', detail: 'Waiting for your review', url: '/app/ws_1/publish' },
-      { title: 'Quinn completed 4 calls' },
+    headline: '1 approval waiting, 6 turns',
+    sections: [
+      { heading: 'Waiting on you', items: [{ title: 'Approve: create agent “Quinn”', detail: 'In “Launch Quinn”', url: '/app/ws_1/chat/thr_1' }] },
+      { heading: 'What the agent did', items: [
+        { title: '6 turns in 2 conversations', url: '/app/ws_1/history' },
+        { title: 'Drafted 3 LinkedIn posts', detail: 'Waiting for your review', url: '/app/ws_1/publish' },
+      ] },
+      { heading: 'Nothing here', items: [] },
     ],
     openUrl: '/app/ws_1',
-    footer: { ...footer, reason: 'You get a daily digest for this workspace.' },
+    footer: { ...footer, reason: 'You get a daily digest for this workspace.', unsubscribeUrl: '/email/unsubscribe?w=ws_1&t=tok' },
   }),
   notice: noticeEmail(product, {
     subject: 'Reset your password',
@@ -78,7 +83,7 @@ describe('email templates', () => {
       actions: [{ summary: 'API key rotation' }], approveUrl: '/a', reviewUrl: '/r', footer,
     }).subject).toBe('Approve: API key rotation — GTM Agent')
     expect(samples.invite!.subject).toBe('Join Tangle Growth — GTM Agent')
-    expect(samples.digest!.subject).toBe('Tangle Growth: 2 updates — GTM Agent')
+    expect(samples.digest!.subject).toBe('Tangle Growth: 1 approval waiting, 6 turns — GTM Agent')
   })
 
   it('links into the app with absolute URLs and carries the footer in both parts', () => {
@@ -115,7 +120,7 @@ describe('email templates', () => {
       '',
     ].join('\n'))
     const digest = digestEmail(product, {
-      workspaceName: 'Tangle Growth', date: new Date('2026-10-08T07:00:00Z'), items: [], openUrl: '/app/ws_1',
+      workspaceName: 'Tangle Growth', date: new Date('2026-10-08T07:00:00Z'), headline: '2 turns', sections: [], openUrl: '/app/ws_1',
       footer: { reason: 'You get a daily digest.', postalAddress: 'Example Co., 1 Main St, Springfield' },
     })
     expect(digest.html).toContain('Example Co., 1 Main St, Springfield')
@@ -155,6 +160,28 @@ describe('email templates', () => {
     const preview = emailPreviewHtml(message)
     expect(preview).not.toContain('cid:')
     expect(preview).toContain('src="data:image/png;base64,')
+  })
+})
+
+describe('digest sections and unsubscribe', () => {
+  it('titles each list, leaves out empty ones, and keeps them in the text part', () => {
+    const { html, text } = samples.digest!
+    expect(html).toContain('>Waiting on you</p>')
+    expect(html).toContain('>What the agent did</p>')
+    expect(html).not.toContain('Nothing here')
+    expect(text).toContain('Waiting on you\n- Approve: create agent “Quinn”\n  In “Launch Quinn”\n  https://gtm.tangle.tools/app/ws_1/chat/thr_1')
+  })
+
+  it('adds an Unsubscribe link and the one-click headers only when a footer asks', () => {
+    const { html, text, headers } = samples.digest!
+    expect(html).toContain('href="https://gtm.tangle.tools/email/unsubscribe?w=ws_1&amp;t=tok"')
+    expect(text).toContain('Unsubscribe: https://gtm.tangle.tools/email/unsubscribe?w=ws_1&t=tok')
+    expect(headers).toEqual({
+      'List-Unsubscribe': '<https://gtm.tangle.tools/email/unsubscribe?w=ws_1&t=tok>',
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    })
+    expect(samples.approval!.headers).toEqual({})
+    expect(samples.approval!.html).not.toContain('Unsubscribe')
   })
 })
 

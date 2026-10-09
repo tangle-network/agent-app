@@ -1,16 +1,23 @@
-Subject: Tangle Growth: 2 updates — GTM Agent
-Preheader: Drafted 3 LinkedIn posts
+Subject: Tangle Growth: 1 approval waiting, 6 turns — GTM Agent
+Preheader: 1 approval waiting, 6 turns.
 
 Tangle GTM Agent
 
-What happened in Tangle Growth
+Your day in Tangle Growth
 
-2 updates on Thursday, October 8.
+Thursday, October 8: 1 approval waiting, 6 turns.
 
+Waiting on you
+- Approve: create agent “Quinn”
+  In “Launch Quinn”
+  https://gtm.tangle.tools/app/ws_1/chat/thr_1
+
+What the agent did
+- 6 turns in 2 conversations
+  https://gtm.tangle.tools/app/ws_1/history
 - Drafted 3 LinkedIn posts
   Waiting for your review
   https://gtm.tangle.tools/app/ws_1/publish
-- Quinn completed 4 calls
 
 Open GTM Agent: https://gtm.tangle.tools/app/ws_1
 
@@ -18,3 +25,4 @@ Open GTM Agent: https://gtm.tangle.tools/app/ws_1
 Tangle Growth · GTM Agent
 You get a daily digest for this workspace.
 Manage notifications: https://gtm.tangle.tools/app/ws_1/settings
+Unsubscribe: https://gtm.tangle.tools/email/unsubscribe?w=ws_1&t=tok
