@@ -31,7 +31,7 @@ function setup(options: { reply?: (content: string) => Record<string, unknown>; 
     },
     threads: {
       get: async (id) => threads.get(id) ?? null,
-      create: async (input) => {
+      create: async (_ctx, input) => {
         if (threads.has(input.id)) throw new Error('UNIQUE constraint failed: thread.id')
         const thread = { ...input }
         threads.set(input.id, thread)

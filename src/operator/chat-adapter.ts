@@ -22,7 +22,7 @@ export interface ChatOperatorMessage {
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
   parts: ReadonlyArray<Record<string, unknown>> | null
-  createdAt: Date | string | number
+  createdAt?: Date | string | number | null
   model?: string | null
   servedModel?: string | null
   costUsd?: number | null
@@ -57,8 +57,8 @@ export interface ChatOperatorAdapterOptions<Identity> {
   }
   threads: {
     get(threadId: string): Promise<ChatOperatorThread | null>
-    /** Insert a thread with this id; agent-app's chat store accepts a caller-assigned id. */
-    create(input: { id: string; workspaceId: string; title: string }): Promise<ChatOperatorThread>
+    /** Insert a thread with this id for this caller; agent-app's chat store accepts a caller-assigned id. */
+    create(ctx: OperatorContext<Identity>, input: { id: string; workspaceId: string; title: string }): Promise<ChatOperatorThread>
     /** Oldest first. */
     listMessages(threadId: string): Promise<ChatOperatorMessage[]>
     list?(ctx: OperatorContext<Identity>, workspaceId: string, query: { cursor?: string; limit: number }): Promise<{ threads: ChatOperatorThread[]; nextCursor: string | null }>
@@ -221,7 +221,7 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
     }
     const title = (input.title ?? input.content.split('\n').find((line) => line.trim()) ?? 'New conversation').trim().slice(0, 80)
     try {
-      await options.threads.create({ id, workspaceId, title })
+      await options.threads.create(ctx, { id, workspaceId, title })
     } catch (error) {
       // A concurrent retry may have inserted the same id first.
       if (!(await threadIn(workspaceId, id))) throw error
