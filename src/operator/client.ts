@@ -1,4 +1,4 @@
-import { createApiKeyFetch } from '../web/api-key-fetch'
+import { createApiKeyFetch } from '../web/api-key-fetch.js'
 import {
   OPERATOR_API_BASE_PATH,
   type OperatorApproval,
@@ -13,7 +13,7 @@ import {
   type OperatorTurn,
   type OperatorWorkspace,
   type StartTurnInput,
-} from './contract'
+} from './contract.js'
 
 export type OperatorResult<T> =
   | { succeeded: true; value: T }

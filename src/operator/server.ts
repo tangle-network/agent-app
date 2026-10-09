@@ -1,4 +1,4 @@
-import { createApiKeyRequestAuth, type RequestApiKey } from '../platform/api-key-auth'
+import { createApiKeyRequestAuth, type RequestApiKey } from '../platform/api-key-auth.js'
 import {
   OPERATOR_API_BASE_PATH,
   OPERATOR_API_VERSION,
@@ -15,7 +15,7 @@ import {
   type OperatorTurn,
   type OperatorWorkspace,
   type StartTurnInput,
-} from './contract'
+} from './contract.js'
 
 /** The verified caller of one operator request. */
 export interface OperatorContext<Identity> {

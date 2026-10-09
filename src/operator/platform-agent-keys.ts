@@ -26,10 +26,10 @@ import {
   agentOperatorScopes,
   PLATFORM_KEY_PREFIX,
   type PlatformAgentKeyVerifier,
-} from '../platform/agent-keys'
-import type { RequestApiKey } from '../platform/api-key-auth'
-import type { TangleSsoAccountStore } from '../platform/sso'
-import type { OperatorKeyStore } from './server'
+} from '../platform/agent-keys.js'
+import type { RequestApiKey } from '../platform/api-key-auth.js'
+import type { TangleSsoAccountStore } from '../platform/sso.js'
+import type { OperatorKeyStore } from './server.js'
 
 const OPERATOR_ACTIONS = ['read', 'write', 'run'] as const
 

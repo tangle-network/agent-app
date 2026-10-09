@@ -4,8 +4,8 @@
  * Web-standard Request/Response only.
  */
 
-export * from './contract'
-export * from './server'
-export * from './client'
-export * from './chat-adapter'
-export * from './platform-agent-keys'
+export * from './contract.js'
+export * from './server.js'
+export * from './client.js'
+export * from './chat-adapter.js'
+export * from './platform-agent-keys.js'
