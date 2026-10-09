@@ -4,7 +4,7 @@
 
 Source: `src/hub-approvals-react/index.tsx`
 
-16 exports.
+15 exports.
 
 ### `HubActionPreviewView`
 
@@ -116,14 +116,6 @@ interface HubApprovalRowProps
 
 ```ts
 interface HubApprovalsListProps
-```
-
-### `HubDiffSummary`
-
-`function` — The files a change writes with their +/− line counts, and totals once every count is known.
-
-```ts
-({ files }: { files: readonly HubActionFile[]; }) => Element | null
 ```
 
 ### `HubProviderMark`

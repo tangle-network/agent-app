@@ -8134,12 +8134,6 @@
           "doc": null
         },
         {
-          "name": "HubDiffSummary",
-          "kind": "function",
-          "signature": "({ files }: { files: readonly HubActionFile[]; }) => Element | null",
-          "doc": "The files a change writes with their +/− line counts, and totals once every count is known."
-        },
-        {
           "name": "HubProviderMark",
           "kind": "function",
           "signature": "({ providerId, name, size }: { providerId: string; name: string; size?: number | undefined; }) => Element",

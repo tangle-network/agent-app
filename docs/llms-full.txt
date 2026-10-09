@@ -10490,14 +10490,6 @@ interface HubApprovalRowProps
 interface HubApprovalsListProps
 ```
 
-### `HubDiffSummary`
-
-`function` — The files a change writes with their +/− line counts, and totals once every count is known.
-
-```ts
-({ files }: { files: readonly HubActionFile[]; }) => Element | null
-```
-
 ### `HubProviderMark`
 
 `function` — The integration's own logo on a neutral tile, so dark marks stay legible.
