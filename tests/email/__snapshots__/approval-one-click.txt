@@ -1,0 +1,25 @@
+Subject: Approve: create agent “Quinn” and 1 more — GTM Agent
+Preheader: The agent paused until you decide.
+
+Tangle GTM Agent
+
+2 approvals needed
+
+The agent paused until you decide. Nothing runs until you approve.
+
+- Create agent “Quinn”
+  ph0ny
+  Approve: https://gtm.tangle.tools/approval/act_a?t=sig_a
+  Deny: https://gtm.tangle.tools/approval/act_d?t=sig_d
+- Synthesize speech “Hello”
+  ph0ny
+  Approve: https://gtm.tangle.tools/approval/act_b?t=sig_b
+  Deny: https://gtm.tangle.tools/approval/act_e?t=sig_e
+
+Approve: https://gtm.tangle.tools/app/ws_1/chat/thr_1
+Review: https://gtm.tangle.tools/app/ws_1/review
+
+--
+Tangle Growth · GTM Agent
+You own this workspace.
+Manage notifications: https://gtm.tangle.tools/app/ws_1/settings
