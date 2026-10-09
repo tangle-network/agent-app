@@ -4,7 +4,7 @@
 
 Source: `src/operator/index.ts`
 
-44 exports.
+47 exports.
 
 ### `createOperatorApi`
 
@@ -342,6 +342,22 @@ interface OperatorWorkspace
 (workspaceId: string) => string
 ```
 
+### `PlatformAgentKeyAccess`
+
+`interface`
+
+```ts
+interface PlatformAgentKeyAccess
+```
+
+### `PlatformAgentOperatorKey`
+
+`interface` — An operator key that came from Platform agent signup.
+
+```ts
+interface PlatformAgentOperatorKey
+```
+
 ### `StartTurnInput`
 
 `interface`
@@ -356,4 +372,12 @@ interface StartTurnInput
 
 ```ts
 interface WaitForTurnOptions
+```
+
+### `withPlatformAgentKeys`
+
+`function`
+
+```ts
+<Key extends RequestApiKey, Identity>(appKeys: OperatorKeyStore<Key, Identity>, access: PlatformAgentKeyAccess<Identity…
 ```

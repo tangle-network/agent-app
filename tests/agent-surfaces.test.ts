@@ -25,7 +25,7 @@ const product: AgentSurfaceConfig = {
   origin: 'https://widget.tangle.tools/',
   summary: 'Widgets for agents.',
   useWhen: ['You need a widget.'],
-  signup: { kind: 'device', app: 'sandbox', budgetUsd: 10 },
+  signup: { kind: 'device', budgetUsd: 10 },
   apiKeyEnv: 'TANGLE_API_KEY',
   prerequisites: ['Node.js 20 or newer'],
   install: [{ title: 'Install', language: 'bash', code: 'npm install widget', expect: 'added 1 package' }],
@@ -66,7 +66,8 @@ describe('agent setup skill', () => {
     ].map((heading) => skill.indexOf(heading))
     expect(order.every((index) => index > 0)).toBe(true)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
-    expect(skill).toContain('node tangle-signup.mjs start --app sandbox')
+    expect(skill).toContain('node tangle-signup.mjs start --agent-name')
+    expect(skill).toContain('The same key works for every Tangle product the owner approves')
     expect(skill).toContain('node tangle-signup.mjs wait')
     expect(skill).toContain('--budget-usd 10')
     // A pipe inside a table cell is escaped so the row keeps three columns.
@@ -146,11 +147,11 @@ describe('agent signup script', () => {
         (error: { code: number; stdout: string; stderr: string }) => error,
       )
 
-    const started = await node(['start', '--app', 'sandbox', '--agent-name', 'bot', '--owner-email', 'owner@example.com', '--budget-usd', '10'])
+    const started = await node(['start', '--agent-name', 'bot', '--owner-email', 'owner@example.com', '--budget-usd', '10', '--products', 'sandbox, router'])
     expect(started.code).toBe(0)
     expect(calls[0]).toEqual({
       path: '/cross-site/device/start',
-      body: { app: 'sandbox', agent_name: 'bot', owner_email: 'owner@example.com', budget_usd: 10 },
+      body: { agent_name: 'bot', owner_email: 'owner@example.com', budget_usd: 10, products: ['sandbox', 'router'] },
     })
     expect(started.stdout).toContain('Approval email sent to owner@example.com.')
     expect(started.stdout).toContain('Confirmation code: ABCD-EFGH')
@@ -185,7 +186,7 @@ describe('agent signup script', () => {
       join(dir, 'tangle-signup.mjs'),
       agentSignupScript(`http://127.0.0.1:${(server.address() as AddressInfo).port}`),
     )
-    const failure = await run(process.execPath, ['tangle-signup.mjs', 'start', '--app', 'sandbox'], { cwd: dir }).catch(
+    const failure = await run(process.execPath, ['tangle-signup.mjs', 'start'], { cwd: dir }).catch(
       (error: { code: number; stderr: string }) => error,
     )
     expect(failure).toMatchObject({ code: 1 })
@@ -211,7 +212,7 @@ describe('agent surface handler', () => {
     expect(manifest).toMatchObject({
       agent_setup: 'https://widget.tangle.tools/agent-setup.md',
       safe_discovery_calls: ['GET /health'],
-      signup: { kind: 'device_authorization', app: 'sandbox' },
+      signup: { kind: 'device_authorization', contract: 'https://id.tangle.tools/.well-known/tangle-agent.json' },
       pricing: { quote: 'https://widget.tangle.tools/v1/pricing' },
     })
   })

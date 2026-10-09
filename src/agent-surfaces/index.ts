@@ -50,8 +50,11 @@ export interface AgentSurfaceLink {
 export type AgentSignup =
   | {
       kind: 'device'
-      /** Platform trusted-app id the key is minted for (`sandbox`, `router`). */
-      app: string
+      /**
+       * Products to ask for. Omitted, the one signup asks for every
+       * agent-ready product, so the same key works across Tangle.
+       */
+      products?: string[]
       /** Default lifetime spend cap the skill asks for, in USD. */
       budgetUsd?: number
     }
@@ -123,7 +126,7 @@ export function agentSignupScript(platformOrigin = TANGLE_PLATFORM_ORIGIN): stri
   // The specifier is interpolated so this module's own import scan (the
   // browser-safe subpath gate) does not read script text as an import.
   return `// Requests a scoped Tangle key for this agent. The owner approves once.
-//   node tangle-signup.mjs start --app <app> --agent-name <name> [--owner-email <email>] [--budget-usd <n>]
+//   node tangle-signup.mjs start --agent-name <name> [--owner-email <email>] [--budget-usd <n>] [--products a,b]
 //   node tangle-signup.mjs wait    (run again while it exits 3; exits 0 once approved)
 import { mkdirSync, readFileSync, writeFileSync } from ${JSON.stringify('node:fs')}
 
@@ -146,12 +149,8 @@ async function post(path, body) {
 }
 
 if (command === 'start') {
-  const app = flag('app')
-  if (!app) {
-    console.error('Pass --app (for example --app sandbox)')
-    process.exit(2)
-  }
-  const request = { app, agent_name: flag('agent-name') ?? 'coding-agent' }
+  const request = { agent_name: flag('agent-name') ?? 'coding-agent' }
+  if (flag('products')) request.products = flag('products').split(',').map((id) => id.trim()).filter(Boolean)
   if (flag('owner-email')) request.owner_email = flag('owner-email')
   if (flag('budget-usd')) request.budget_usd = Number(flag('budget-usd'))
   const started = await post('/cross-site/device/start', request)
@@ -161,7 +160,6 @@ if (command === 'start') {
   }
   const grant = started.body.data
   const saved = {
-    app,
     device_code: grant.device_code,
     interval: grant.interval,
     expires_at: Date.now() + grant.expires_in * 1000,
@@ -186,11 +184,11 @@ if (command === 'wait') {
   }
   const stopAt = Math.min(saved.expires_at, Date.now() + Number(flag('seconds') ?? 8) * 1000)
   for (;;) {
-    const polled = await post('/cross-site/device/poll', { app: saved.app, device_code: saved.device_code })
+    const polled = await post('/cross-site/device/poll', { device_code: saved.device_code })
     if (polled.status === 200) {
       const { api_key: apiKey, key, account } = polled.body.data
       writeFileSync('.tangle/api-key', \`\${apiKey}\\n\`, { mode: 0o600 })
-      console.log(\`Approved. Key "\${key?.name ?? saved.app}" saved to .tangle/api-key (spend cap $\${key?.budget_usd ?? 'none'}).\`)
+      console.log(\`Approved. Key "\${key?.name ?? 'agent'}" saved to .tangle/api-key for \${(key?.products ?? []).join(', ') || 'the approved products'} (spend cap $\${key?.budget_usd ?? 'none'}).\`)
       if (account && !account.funded) {
         console.log(\`The owner's account has no credit yet. Ask the owner to add credits: \${account.add_credits_url}\`)
       }
@@ -212,7 +210,7 @@ if (command === 'wait') {
   }
 }
 
-console.error('Usage: node tangle-signup.mjs start --app <app> --agent-name <name> [--owner-email <email>] | wait')
+console.error('Usage: node tangle-signup.mjs start --agent-name <name> [--owner-email <email>] [--budget-usd <n>] [--products a,b] | wait')
 process.exit(2)
 `
 }
@@ -234,7 +232,7 @@ function signupSection(config: AgentSurfaceConfig): string[] {
   return [
     '## 1. Get a scoped key (one owner approval)',
     '',
-    'Tangle issues each agent its own key, owned by a person who approves it once.',
+    'Tangle issues each agent one key, owned by a person who approves it once. The same key works for every Tangle product the owner approves: Tangle Sandbox, Tangle Router and the agent apps such as Tangle GTM Agent. If you already hold one from another Tangle product\'s setup, reuse it and skip to step 2.',
     `Ask your owner which email address their Tangle account uses (or should use). Nothing is charged by signing up, and there is no free credit: ${config.name} work is paid from the owner's prepaid balance.`,
     '',
     'Save this script as `tangle-signup.mjs` (Node.js 18 or newer, no dependencies):',
@@ -245,7 +243,7 @@ function signupSection(config: AgentSurfaceConfig): string[] {
     '',
     fence({
       language: 'bash',
-      code: `node tangle-signup.mjs start --app ${config.signup.app} --agent-name "<your agent name>" --owner-email "<owner email>" --budget-usd ${budget}`,
+      code: `node tangle-signup.mjs start --agent-name "<your agent name>" --owner-email "<owner email>" --budget-usd ${budget}${config.signup.products ? ` --products ${config.signup.products.join(',')}` : ''}`,
     }),
     '',
     'It prints the approval link and a confirmation code. Tangle emails the owner the same link; if you cannot give an email, omit `--owner-email` and send the owner the printed link yourself. Tell the owner the code if you can reach them.',
@@ -256,7 +254,7 @@ function signupSection(config: AgentSurfaceConfig): string[] {
     '',
     'What the owner does, once: sign in (or create an account and verify the email), check the confirmation code, and approve. That is the only human step.',
     '',
-    `The key in \`.tangle/api-key\` (mode 600) can only be used for ${config.name}, can spend at most the cap you requested, and the owner can revoke it under Keys at any time. If \`wait\` says the account has no credit, ask the owner to add credits at the printed link before your first paid call.`,
+    `The key in \`.tangle/api-key\` (mode 600) works only for the products the owner approved, can spend at most the cap you requested across all of them, and the owner can revoke it once under Keys to stop it everywhere. If \`wait\` says the account has no credit, ask the owner to add credits at the printed link before your first paid call.`,
     '',
     'Then load the key without printing it, and keep it out of version control:',
     '',
@@ -406,18 +404,18 @@ export function renderAgentManifest(config: AgentSurfaceConfig): Record<string, 
     config.signup.kind === 'device'
       ? {
           kind: 'device_authorization',
-          app: config.signup.app,
           start: `POST ${TANGLE_PLATFORM_ORIGIN}/cross-site/device/start`,
           poll: `POST ${TANGLE_PLATFORM_ORIGIN}/cross-site/device/poll`,
+          contract: `${TANGLE_PLATFORM_ORIGIN}/.well-known/tangle-agent.json`,
           request: {
-            app: config.signup.app,
             agent_name: 'string, 1-64 characters',
             owner_email: 'optional; Tangle emails this owner the approval link',
-            budget_usd: `optional lifetime spend cap, 1-1000, default ${config.signup.budgetUsd ?? 25}`,
+            budget_usd: `optional lifetime spend cap shared by every granted product, 1-1000, default ${config.signup.budgetUsd ?? 25}`,
+            products: config.signup.products ?? 'optional; default every agent-ready product, or ["*"]',
           },
           human_inputs: ['The owner approves the request once.'],
           key: {
-            scope: `${config.signup.app} only`,
+            scope: 'One key for every product the owner approved; use it as Bearer at each product.',
             revocable_at: `${TANGLE_PLATFORM_ORIGIN}/app/keys`,
           },
           payment: 'Prepaid credit on the owner account. No free credit; paid calls are refused until the owner adds credits.',

@@ -10415,6 +10415,18 @@
           "doc": null
         },
         {
+          "name": "PlatformAgentKeyAccess",
+          "kind": "interface",
+          "signature": "interface PlatformAgentKeyAccess",
+          "doc": null
+        },
+        {
+          "name": "PlatformAgentOperatorKey",
+          "kind": "interface",
+          "signature": "interface PlatformAgentOperatorKey",
+          "doc": "An operator key that came from Platform agent signup."
+        },
+        {
           "name": "StartTurnInput",
           "kind": "interface",
           "signature": "interface StartTurnInput",
@@ -10424,6 +10436,12 @@
           "name": "WaitForTurnOptions",
           "kind": "interface",
           "signature": "interface WaitForTurnOptions",
+          "doc": null
+        },
+        {
+          "name": "withPlatformAgentKeys",
+          "kind": "function",
+          "signature": "<Key extends RequestApiKey, Identity>(appKeys: OperatorKeyStore<Key, Identity>, access: PlatformAgentKeyAccess<Identity…",
           "doc": null
         }
       ]
@@ -10689,6 +10707,12 @@
           "doc": "Define options to resolve user session and control access based on allowed admin emails"
         },
         {
+          "name": "agentOperatorScopes",
+          "kind": "function",
+          "signature": "(scopes: readonly string[], product: string, actions: readonly string[]) => string[]",
+          "doc": "The operator scopes an agent key grants at `product`: each `<product>:operator:<action>` becomes `operator:<action>`, and `*` grants every action."
+        },
+        {
           "name": "ApiKeyRequestAuthOptions",
           "kind": "interface",
           "signature": "interface ApiKeyRequestAuthOptions",
@@ -10765,6 +10789,12 @@
           "kind": "function",
           "signature": "(ctx: HubSettingsContext) => HubSettingsRoutes",
           "doc": "Build the finite, application-authorized Hub settings server boundary."
+        },
+        {
+          "name": "createPlatformAgentKeyVerifier",
+          "kind": "function",
+          "signature": "(options: PlatformAgentKeyVerifierOptions) => PlatformAgentKeyVerifier",
+          "doc": null
         },
         {
           "name": "createPlatformBillingHttp",
@@ -10917,6 +10947,36 @@
           "doc": "Comma/whitespace separated → trimmed, lowercased, empties dropped."
         },
         {
+          "name": "PLATFORM_AGENT_KEY_PROVISIONER",
+          "kind": "const",
+          "signature": "\"agent-signup\"",
+          "doc": "`provisionedByService` of keys minted by Platform agent signup."
+        },
+        {
+          "name": "PLATFORM_KEY_PREFIX",
+          "kind": "const",
+          "signature": "\"sk-tan-\"",
+          "doc": "Platform agent keys at an agent app's own API."
+        },
+        {
+          "name": "PlatformAgentKeyVerification",
+          "kind": "type",
+          "signature": "type PlatformAgentKeyVerification",
+          "doc": null
+        },
+        {
+          "name": "PlatformAgentKeyVerifier",
+          "kind": "interface",
+          "signature": "interface PlatformAgentKeyVerifier",
+          "doc": null
+        },
+        {
+          "name": "PlatformAgentKeyVerifierOptions",
+          "kind": "interface",
+          "signature": "interface PlatformAgentKeyVerifierOptions",
+          "doc": null
+        },
+        {
           "name": "PlatformBalanceSnapshot",
           "kind": "interface",
           "signature": "interface PlatformBalanceSnapshot",
@@ -10945,6 +11005,12 @@
           "kind": "interface",
           "signature": "interface PlatformIdentityStore",
           "doc": "Define a contract for resolving platform identities based on user identifiers"
+        },
+        {
+          "name": "platformKeyRefusal",
+          "kind": "function",
+          "signature": "(reason: unknown) => { ok: false; status: 401 | 402 | 403; code: string; message: string; }",
+          "doc": "The typed refusal for a Platform rejection reason."
         },
         {
           "name": "PlatformSubscriptionInfo",
