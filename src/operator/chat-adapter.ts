@@ -21,7 +21,8 @@ export interface ChatOperatorMessage {
   id: string
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
-  parts: ReadonlyArray<Record<string, unknown>> | null
+  /** Typed chat parts, such as chat-store's, are read field by field. */
+  parts: ReadonlyArray<object> | null
   createdAt?: Date | string | number | null
   model?: string | null
   servedModel?: string | null
@@ -96,8 +97,12 @@ const iso = (value: Date | string | number | null | undefined): string | undefin
 
 const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value : null)
 
+function partsOf(message: ChatOperatorMessage): ReadonlyArray<Record<string, unknown>> {
+  return (message.parts ?? []) as ReadonlyArray<Record<string, unknown>>
+}
+
 function defaultFailure(message: ChatOperatorMessage): { code?: string; message: string } | null {
-  for (const part of message.parts ?? []) {
+  for (const part of partsOf(message)) {
     const notice = part.type === 'notice' && (part.noticeKind === 'turn-failure' || part.kind === 'turn-failure')
     if (!notice && part.type !== 'error') continue
     const detail = text(part.message) ?? text(part.text) ?? text(part.error) ?? 'The turn failed'
@@ -108,7 +113,7 @@ function defaultFailure(message: ChatOperatorMessage): { code?: string; message:
 
 function fileChanges(message: ChatOperatorMessage): OperatorFileChange[] {
   const files: OperatorFileChange[] = []
-  for (const part of message.parts ?? []) {
+  for (const part of partsOf(message)) {
     if (part.type !== 'session-artifact' || typeof part.path !== 'string') continue
     const action = part.action === 'created' || part.action === 'updated' || part.action === 'deleted' ? part.action : 'changed'
     if (!files.some((file) => file.path === part.path)) files.push({ path: part.path, action })
@@ -117,7 +122,7 @@ function fileChanges(message: ChatOperatorMessage): OperatorFileChange[] {
 }
 
 function turnIdOf(message: ChatOperatorMessage): string | null {
-  for (const part of message.parts ?? []) {
+  for (const part of partsOf(message)) {
     if (typeof part.turnId === 'string' && part.turnId) return part.turnId
   }
   return null
