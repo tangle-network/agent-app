@@ -187,7 +187,7 @@ number
 `function` — Settles still-pending interaction parts at persist time.
 
 ```ts
-(parts: JsonRecord[], outcome: "answered" | "expired") => JsonRecord[]
+(parts: JsonRecord[], outcome: "expired" | "answered") => JsonRecord[]
 ```
 
 ### `getPartKey`

@@ -2923,7 +2923,7 @@ type RecordGridWriteOutcome
 `function` — Marks one ask resolved locally (the card's `onResolved`).
 
 ```ts
-(list: ChatInteraction[], id: string, status: "cancelled" | "answered" | "declined" | "expired", answers?: InteractionA…
+(list: ChatInteraction[], id: string, status: "cancelled" | "expired" | "answered" | "declined", answers?: InteractionA…
 ```
 
 ### `resolveProvenanceStanding`
@@ -3331,7 +3331,7 @@ type SubmitInteractionAnswer
 `function` — Settles every still-pending ask when the turn ends: `answered` for a turn that completed cleanly, `expired` for one that failed.
 
 ```ts
-(list: ChatInteraction[], status: "answered" | "expired") => ChatInteraction[]
+(list: ChatInteraction[], status: "expired" | "answered") => ChatInteraction[]
 ```
 
 ### `ToolDetailRenderers`

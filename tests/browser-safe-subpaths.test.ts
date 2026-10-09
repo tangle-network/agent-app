@@ -57,6 +57,9 @@ const BROWSER_NONREACT = new Set([
   // Agent surfaces render strings and answer web-standard Requests; a docs
   // page imports the setup skill text from it.
   'agent-surfaces',
+  // Held Hub actions in an owner's words: pure presentation a chat imports
+  // beside its React surfaces.
+  'hub-approvals',
 ])
 
 /** Browser-intended when a client bundle imports it: the whole `*-react` family,

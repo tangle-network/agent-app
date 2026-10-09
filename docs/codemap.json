@@ -7890,6 +7890,264 @@
       "exports": []
     },
     {
+      "id": "./hub-approvals",
+      "source": "src/hub-approvals/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "formatMinorAmount",
+          "kind": "function",
+          "signature": "(amount: number, currency?: string) => string",
+          "doc": "A Stripe minor-unit amount in its currency: `4900` USD is `$49.00`."
+        },
+        {
+          "name": "formatWhen",
+          "kind": "function",
+          "signature": "(start: string, end?: string | undefined) => string",
+          "doc": "A start and optional end in the viewer's locale: `Tue, Oct 14, 3:00 – 3:30 PM`."
+        },
+        {
+          "name": "HUB_APPROVAL_ACTIVE_PHASES",
+          "kind": "const",
+          "signature": "ReadonlySet<HubApprovalPhase>",
+          "doc": "Phases between a decision and its result."
+        },
+        {
+          "name": "HUB_APPROVAL_OPEN_PHASES",
+          "kind": "const",
+          "signature": "ReadonlySet<HubApprovalPhase>",
+          "doc": "Phases that still need someone's decision."
+        },
+        {
+          "name": "HUB_APPROVAL_PHASE_LABELS",
+          "kind": "const",
+          "signature": "Record<HubApprovalPhase, string>",
+          "doc": "A phase as a status label."
+        },
+        {
+          "name": "HUB_APPROVAL_RESUME_PART",
+          "kind": "const",
+          "signature": "\"hub-approval-resume\"",
+          "doc": "The part type marking a user message that resumes the agent after a decision."
+        },
+        {
+          "name": "HubActionBundle",
+          "kind": "interface",
+          "signature": "interface HubActionBundle",
+          "doc": "The change a held call serves, when it is one step of a larger change such as a pull request."
+        },
+        {
+          "name": "HubActionField",
+          "kind": "interface",
+          "signature": "interface HubActionField",
+          "doc": "A labelled value on a preview or a receipt."
+        },
+        {
+          "name": "HubActionFile",
+          "kind": "interface",
+          "signature": "interface HubActionFile",
+          "doc": "A file a held write changes."
+        },
+        {
+          "name": "hubActionFiles",
+          "kind": "function",
+          "signature": "(actionPath: string, input: unknown) => HubActionFile[]",
+          "doc": "The files a call writes, as its input declares them."
+        },
+        {
+          "name": "HubActionPresentation",
+          "kind": "interface",
+          "signature": "interface HubActionPresentation",
+          "doc": "A held call in the owner's words."
+        },
+        {
+          "name": "HubActionPreview",
+          "kind": "type",
+          "signature": "type HubActionPreview",
+          "doc": "What a held call will do, shaped for its integration's renderer."
+        },
+        {
+          "name": "hubActionReceipt",
+          "kind": "function",
+          "signature": "(item: HubApprovalItem) => HubActionReceipt",
+          "doc": "What a decided call did: its past-tense title, key fields, link, media and files."
+        },
+        {
+          "name": "HubActionReceipt",
+          "kind": "interface",
+          "signature": "interface HubActionReceipt",
+          "doc": "What a decided call did, as its receipt shows it."
+        },
+        {
+          "name": "HubApprovalItem",
+          "kind": "interface",
+          "signature": "interface HubApprovalItem",
+          "doc": "One held Hub action and its decision, in the form every surface renders."
+        },
+        {
+          "name": "HubApprovalPhase",
+          "kind": "type",
+          "signature": "type HubApprovalPhase",
+          "doc": "Where one held action stands, as the dock, the list and the transcript show it."
+        },
+        {
+          "name": "hubApprovalResumePart",
+          "kind": "function",
+          "signature": "(parts: readonly Record<string, unknown>[] | null | undefined) => HubApprovalResumePart | null",
+          "doc": "The resume marker among a message's parts, if it carries one."
+        },
+        {
+          "name": "HubApprovalResumePart",
+          "kind": "interface",
+          "signature": "interface HubApprovalResumePart",
+          "doc": null
+        },
+        {
+          "name": "hubProviderName",
+          "kind": "function",
+          "signature": "(id: string) => string",
+          "doc": "A provider's display name: `github` is GitHub, `outlook-mail` is Outlook."
+        },
+        {
+          "name": "pastTense",
+          "kind": "function",
+          "signature": "(verb: string) => string",
+          "doc": "The past tense of an English verb this vocabulary uses."
+        },
+        {
+          "name": "presentHubAction",
+          "kind": "function",
+          "signature": "(item: Pick<HubApprovalItem, \"input\" | \"actionPath\" | \"providerId\" | \"files\" | \"bundle\">) => HubActionPresentation",
+          "doc": "A held call in the owner's words, with the preview its integration renders."
+        },
+        {
+          "name": "splitHubActionPath",
+          "kind": "function",
+          "signature": "(actionPath: string) => { provider: string; action: string; }",
+          "doc": "`provider.action` split at the first dot."
+        },
+        {
+          "name": "summarizeHubResult",
+          "kind": "function",
+          "signature": "(result: unknown) => unknown",
+          "doc": "A bounded copy of a Hub result for a host to store with the decision: the envelope removed, strings, arrays and nesting capped."
+        },
+        {
+          "name": "unwrapHubResult",
+          "kind": "function",
+          "signature": "(value: unknown) => unknown",
+          "doc": "The provider's own result inside Hub's envelopes."
+        }
+      ]
+    },
+    {
+      "id": "./hub-approvals-react",
+      "source": "src/hub-approvals-react/index.tsx",
+      "dependsOn": [
+        "hub-approvals"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "HubActionPreviewView",
+          "kind": "function",
+          "signature": "({ preview, account }: { preview: HubActionPreview; account?: string | null | undefined; }) => Element | null",
+          "doc": "What a held call will do, drawn the way its integration shows it: a pull request with its branch and file changes, an email, a post in the channel's style, a payment, a voice memo, a call or a calend…"
+        },
+        {
+          "name": "HubActionReceiptCard",
+          "kind": "function",
+          "signature": "({ item, className }: HubActionReceiptCardProps) => Element",
+          "doc": "What one decided Hub action did: the integration's logo, the result in plain words with its link, the key fields, a player or file changes when the result has them, and the exact call and result behi…"
+        },
+        {
+          "name": "HubActionReceiptCardProps",
+          "kind": "interface",
+          "signature": "interface HubActionReceiptCardProps",
+          "doc": null
+        },
+        {
+          "name": "HubApprovalDecision",
+          "kind": "type",
+          "signature": "type HubApprovalDecision",
+          "doc": "The owner's answer to one held call."
+        },
+        {
+          "name": "HubApprovalDock",
+          "kind": "function",
+          "signature": "({ items, onDecide, permissions, onOpen, focusId, className }: HubApprovalDockProps) => Element | null",
+          "doc": "The calls waiting on the owner, pinned above the composer so a held action never scrolls away."
+        },
+        {
+          "name": "HubApprovalDockProps",
+          "kind": "interface",
+          "signature": "interface HubApprovalDockProps",
+          "doc": null
+        },
+        {
+          "name": "HubApprovalPermissions",
+          "kind": "type",
+          "signature": "type HubApprovalPermissions",
+          "doc": "What a standing permission for one call may cover, or why none can."
+        },
+        {
+          "name": "HubApprovalPhasePill",
+          "kind": "function",
+          "signature": "({ phase, label }: { phase: HubApprovalPhase; label?: string | undefined; }) => Element",
+          "doc": "A phase as a toned pill: glyph, colour and label."
+        },
+        {
+          "name": "HubApprovalReceipts",
+          "kind": "function",
+          "signature": "({ items, message, at }: HubApprovalReceiptsProps) => Element",
+          "doc": "The receipts that stand in for the message resuming the agent after a decision."
+        },
+        {
+          "name": "HubApprovalReceiptsProps",
+          "kind": "interface",
+          "signature": "interface HubApprovalReceiptsProps",
+          "doc": null
+        },
+        {
+          "name": "HubApprovalRow",
+          "kind": "function",
+          "signature": "({ item, expanded: controlled, onExpandedChange, onReview, actions }: HubApprovalRowProps) => Element",
+          "doc": "A held call where the agent made it: one line with the integration, what the call does and where it stands, opening to its preview, result and the exact call."
+        },
+        {
+          "name": "HubApprovalRowProps",
+          "kind": "interface",
+          "signature": "interface HubApprovalRowProps",
+          "doc": null
+        },
+        {
+          "name": "HubApprovalsList",
+          "kind": "function",
+          "signature": "({ items, onSelect, selectedId, className }: HubApprovalsListProps) => Element",
+          "doc": "Every held call in the conversation, grouped by where it stands — waiting, running, failed, done, then denied or expired — and updated as the host's items change."
+        },
+        {
+          "name": "HubApprovalsListProps",
+          "kind": "interface",
+          "signature": "interface HubApprovalsListProps",
+          "doc": null
+        },
+        {
+          "name": "HubDiffSummary",
+          "kind": "function",
+          "signature": "({ files }: { files: readonly HubActionFile[]; }) => Element | null",
+          "doc": "The files a change writes with their +/− line counts, and totals once every count is known."
+        },
+        {
+          "name": "HubProviderMark",
+          "kind": "function",
+          "signature": "({ providerId, name, size }: { providerId: string; name: string; size?: number | undefined; }) => Element",
+          "doc": "The integration's own logo on a neutral tile, so dark marks stay legible."
+        }
+      ]
+    },
+    {
       "id": "./intakes",
       "source": "src/intakes/index.ts",
       "dependsOn": [],
@@ -17627,7 +17885,7 @@
         {
           "name": "finalizePendingInteractionParts",
           "kind": "function",
-          "signature": "(parts: JsonRecord[], outcome: \"answered\" | \"expired\") => JsonRecord[]",
+          "signature": "(parts: JsonRecord[], outcome: \"expired\" | \"answered\") => JsonRecord[]",
           "doc": "Settles still-pending interaction parts at persist time."
         },
         {
@@ -23104,7 +23362,7 @@
         {
           "name": "resolveChatInteraction",
           "kind": "function",
-          "signature": "(list: ChatInteraction[], id: string, status: \"cancelled\" | \"answered\" | \"declined\" | \"expired\", answers?: InteractionA…",
+          "signature": "(list: ChatInteraction[], id: string, status: \"cancelled\" | \"expired\" | \"answered\" | \"declined\", answers?: InteractionA…",
           "doc": "Marks one ask resolved locally (the card's `onResolved`)."
         },
         {
@@ -23410,7 +23668,7 @@
         {
           "name": "terminalizePendingChatInteractions",
           "kind": "function",
-          "signature": "(list: ChatInteraction[], status: \"answered\" | \"expired\") => ChatInteraction[]",
+          "signature": "(list: ChatInteraction[], status: \"expired\" | \"answered\") => ChatInteraction[]",
           "doc": "Settles every still-pending ask when the turn ends: `answered` for a turn that completed cleanly, `expired` for one that failed."
         },
         {
@@ -24814,8 +25072,8 @@
         {
           "name": "createAgentWorkspaceCompanionTabs",
           "kind": "function",
-          "signature": "(tools: Partial<Record<AgentWorkspaceCompanionTool, (state: { active: boolean; }) => ReactNode>>) => AgentWorkspaceComp…",
-          "doc": "Canonical order, labels, icons and lazy retention for companion tools."
+          "signature": "(tools: Partial<Record<AgentWorkspaceCompanionTool, (state: { active: boolean; }) => ReactNode>>, badges?: Partial<Reco…",
+          "doc": "Canonical order, labels, icons and lazy retention for companion tools; `badges` counts what waits on the person."
         },
         {
           "name": "DEFAULT_WORKSPACE_NOUN",

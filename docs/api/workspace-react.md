@@ -144,10 +144,10 @@ interface AgentWorkspaceSessionConfig
 
 ### `createAgentWorkspaceCompanionTabs`
 
-`function` — Canonical order, labels, icons and lazy retention for companion tools.
+`function` — Canonical order, labels, icons and lazy retention for companion tools; `badges` counts what waits on the person.
 
 ```ts
-(tools: Partial<Record<AgentWorkspaceCompanionTool, (state: { active: boolean; }) => ReactNode>>) => AgentWorkspaceComp…
+(tools: Partial<Record<AgentWorkspaceCompanionTool, (state: { active: boolean; }) => ReactNode>>, badges?: Partial<Reco…
 ```
 
 ### `DEFAULT_WORKSPACE_NOUN`

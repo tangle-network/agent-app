@@ -251,6 +251,16 @@
       "import": "./dist/integrations/index.js",
       "default": "./dist/integrations/index.js"
     },
+    "./hub-approvals": {
+      "types": "./dist/hub-approvals/index.d.ts",
+      "import": "./dist/hub-approvals/index.js",
+      "default": "./dist/hub-approvals/index.js"
+    },
+    "./hub-approvals-react": {
+      "types": "./dist/hub-approvals-react/index.d.ts",
+      "import": "./dist/hub-approvals-react/index.js",
+      "default": "./dist/hub-approvals-react/index.js"
+    },
     "./integrations-react": {
       "types": "./dist/integrations-react/index.d.ts",
       "import": "./dist/integrations-react/index.js",

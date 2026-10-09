@@ -43,6 +43,8 @@ export default defineConfig({
     'chatgpt-react/index': 'src/chatgpt-react/index.tsx',
     'chatgpt-react/styles': 'src/chatgpt-react/styles.ts',
     'integrations-react/index': 'src/integrations-react/index.ts',
+    'hub-approvals/index': 'src/hub-approvals/index.ts',
+    'hub-approvals-react/index': 'src/hub-approvals-react/index.tsx',
     'channels/index': 'src/channels/index.ts',
     'agent-enrollment/index': 'src/agent-enrollment/index.ts',
     'agent-enrollment/drizzle': 'src/agent-enrollment/drizzle.ts',
