@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.16
+
+- fix(operator): accept chat-store rows with typed parts in the chat adapter
+
 ## 0.60.15
 
 - fix(operator): give the chat adapter thread insert its caller (#908)
