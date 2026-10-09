@@ -17,6 +17,10 @@ import {
   readModelInput,
   renderAgentPrompt,
   renderOperatingContract,
+  defaultSystemPromptPlacement,
+  HARNESS_PROMPT_RECAST,
+  HARNESSES_WITH_OWN_PROMPT,
+  placedSystemPrompt,
   withDefaultQualitySkills,
   type AgentPromptInput,
   type ModelInputStore,
@@ -30,9 +34,11 @@ const CONTRACT_DIGESTS: Record<number, string> = {
   1: '3a99743a19b6f00af5f7946bfe8afdaf03cd22c3545ff54aa20d2305027a5565',
 }
 
+// Layout tests render standalone; placement has its own tests.
 const base: AgentPromptInput = {
   identity: 'You are the Example operator.',
   environment: '- **Vault**: the workspace files.',
+  placement: 'replace',
 }
 
 describe('operating contract', () => {
@@ -105,6 +111,21 @@ describe('renderAgentPrompt', () => {
     expect(fallback.sections.at(-1)?.text).toBe('## Domain guidance\n\n### Learned guidance\n\nBaseline rule.')
     const loaded = renderAgentPrompt({ ...base, learnedGuidance: '<!-- promoted 2026-10-07 -->\nPromoted rule.', learnedGuidanceBaseline: 'Baseline rule.' })
     expect(loaded.sections.at(-1)?.text).toBe('## Domain guidance\n\n### Learned guidance\n\nPromoted rule.')
+  })
+
+  it('follows a harness prompt by default and opens with the product hand-off', () => {
+    const { placement: _replace, ...unplaced } = base
+    const appended = renderAgentPrompt(unplaced)
+    expect(appended.placement).toBe('append')
+    expect(appended.sections.map((section) => section.id).slice(0, 2)).toEqual(['harness-recast', 'identity'])
+    expect(appended.prompt.startsWith(HARNESS_PROMPT_RECAST)).toBe(true)
+    expect(renderAgentPrompt({ ...unplaced, harness: 'claude-code' }).placement).toBe('append')
+    const codex = renderAgentPrompt({ ...unplaced, harness: 'codex' })
+    expect(codex.placement).toBe('replace')
+    expect(codex.prompt.startsWith('You are the Example operator.')).toBe(true)
+    expect(placedSystemPrompt(appended.prompt, appended.placement)).toEqual({ appendSystemPrompt: appended.prompt })
+    expect(placedSystemPrompt(codex.prompt, codex.placement)).toEqual({ systemPrompt: codex.prompt })
+    expect(HARNESSES_WITH_OWN_PROMPT.map(defaultSystemPromptPlacement)).toEqual(['append', 'append', 'append', 'append'])
   })
 
   it('heads a bare skill index', () => {

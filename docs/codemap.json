@@ -11250,6 +11250,12 @@
           "doc": "The quality skills mounted by default."
         },
         {
+          "name": "defaultSystemPromptPlacement",
+          "kind": "function",
+          "signature": "(harness: string | undefined) => SystemPromptPlacement",
+          "doc": "`append` for a harness with its own prompt, `replace` otherwise."
+        },
+        {
           "name": "diffProfileFingerprints",
           "kind": "function",
           "signature": "(a: ProfileFingerprint, b: ProfileFingerprint) => ProfileDrift",
@@ -11272,6 +11278,18 @@
           "kind": "type",
           "signature": "type GlobModules",
           "doc": "A Vite eager `?raw` glob result: glob key -> raw file body."
+        },
+        {
+          "name": "HARNESS_PROMPT_RECAST",
+          "kind": "const",
+          "signature": "\"# Product instructions\\n\\nThe instructions above come from the coding harness you run in. Keep its guidance on tools,…",
+          "doc": "Opens a product prompt that follows a harness prompt."
+        },
+        {
+          "name": "HARNESSES_WITH_OWN_PROMPT",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Harnesses that keep their own system prompt under an addition; the materializer binds `prompt.appendSystemPrompt` for exactly these."
         },
         {
           "name": "HUMAN_PROSE_SKILL_ID",
@@ -11454,6 +11472,12 @@
           "doc": "THE one `SKILL.md` frontmatter parser — hand-rolled, no YAML dependency."
         },
         {
+          "name": "placedSystemPrompt",
+          "kind": "function",
+          "signature": "(text: string, placement: SystemPromptPlacement) => AgentProfilePrompt",
+          "doc": "The profile prompt fields that carry `text` at `placement`."
+        },
+        {
           "name": "profile",
           "kind": "namespace",
           "signature": "namespace profile",
@@ -11596,6 +11620,12 @@
           "kind": "function",
           "signature": "(raw: string) => string",
           "doc": "Body of a loaded markdown file with HTML comments removed and whitespace trimmed, so an all-comment placeholder counts as empty."
+        },
+        {
+          "name": "SystemPromptPlacement",
+          "kind": "type",
+          "signature": "type SystemPromptPlacement",
+          "doc": null
         },
         {
           "name": "UserSkill",

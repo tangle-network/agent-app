@@ -4,7 +4,7 @@
 
 Source: `src/profile/index.ts`
 
-83 exports.
+88 exports.
 
 ### `AgentPromptInput`
 
@@ -174,6 +174,14 @@ interface CorpusLoadResult
 (options?: QualitySkillOptions) => SkillEntry[]
 ```
 
+### `defaultSystemPromptPlacement`
+
+`function` — `append` for a harness with its own prompt, `replace` otherwise.
+
+```ts
+(harness: string | undefined) => SystemPromptPlacement
+```
+
 ### `diffProfileFingerprints`
 
 `function` — Channel-by-channel comparison of two fingerprints.
@@ -204,6 +212,22 @@ interface CorpusLoadResult
 
 ```ts
 type GlobModules
+```
+
+### `HARNESS_PROMPT_RECAST`
+
+`const` — Opens a product prompt that follows a harness prompt.
+
+```ts
+"# Product instructions\n\nThe instructions above come from the coding harness you run in. Keep its guidance on tools,…
+```
+
+### `HARNESSES_WITH_OWN_PROMPT`
+
+`const` — Harnesses that keep their own system prompt under an addition; the materializer binds `prompt.appendSystemPrompt` for exactly these.
+
+```ts
+readonly string[]
 ```
 
 ### `HUMAN_PROSE_SKILL_ID`
@@ -446,6 +470,14 @@ interface ParsedSkill
 (raw: string) => ParsedSkill
 ```
 
+### `placedSystemPrompt`
+
+`function` — The profile prompt fields that carry `text` at `placement`.
+
+```ts
+(text: string, placement: SystemPromptPlacement) => AgentProfilePrompt
+```
+
 ### `profile`
 
 `namespace`
@@ -636,6 +668,14 @@ interface SkillFrontmatter
 
 ```ts
 (raw: string) => string
+```
+
+### `SystemPromptPlacement`
+
+`type`
+
+```ts
+type SystemPromptPlacement
 ```
 
 ### `UserSkill`
