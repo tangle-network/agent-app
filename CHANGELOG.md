@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.14
+
+- feat(operator): accept one Tangle agent key across every agent app (#906)
+- feat(operator): add a chat-stack operator adapter so apps mount the API without writing one (#907)
+
 ## 0.60.13
 
 - chore(deps): qualify published Integrations 0.70 cohort (#905)
