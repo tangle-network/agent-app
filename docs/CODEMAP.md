@@ -37,7 +37,7 @@ _114 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./design-canvas/drizzle`](api/design-canvas-drizzle.md) | 10 | `tools`, `web` |
 | [`./documents`](api/documents.md) | 37 | — |
 | [`./documents/pdf-inspector`](api/documents-pdf-inspector.md) | 4 | — |
-| [`./email`](api/email.md) | 19 | — |
+| [`./email`](api/email.md) | 20 | — |
 | [`./eval`](api/eval.md) | 21 | `tools` |
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
@@ -417,9 +417,9 @@ Source: `src/documents/pdf-inspector.ts` · 4 exports
 
 ## `./email`
 
-Source: `src/email/index.ts` · 19 exports
+Source: `src/email/index.ts` · 20 exports
 
-`approvalEmail`, `ApprovalEmailAction`, `ApprovalEmailInput`, `digestEmail`, `DigestEmailInput`, `EmailAction`, `EmailAttachment`, `EmailFooter`, `EmailItem`, `EmailLintIssue`, `EmailMessage`, `emailPreviewHtml`, `EmailProduct`, `emailSender`, `inviteEmail`, `InviteEmailInput`, `lintEmailHtml`, `noticeEmail`, `NoticeEmailInput`
+`approvalEmail`, `ApprovalEmailAction`, `ApprovalEmailInput`, `digestEmail`, `DigestEmailInput`, `EmailAction`, `EmailAttachment`, `EmailFooter`, `EmailItem`, `EmailLintIssue`, `EmailMessage`, `emailPreviewHtml`, `EmailProduct`, `EmailSection`, `emailSender`, `inviteEmail`, `InviteEmailInput`, `lintEmailHtml`, `noticeEmail`, `NoticeEmailInput`
 
 [Full API →](api/email.md)
 
