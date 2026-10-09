@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-188 exports.
+189 exports.
 
 ### `adaptSandboxStream`
 
@@ -417,6 +417,14 @@ interface InspectablePrewarmClaimStore
 ### `isSandboxApiSandboxMissingFailure`
 
 `function` — True when the sandbox API cannot find a sandbox resource or its backing container.
+
+```ts
+(diagnostics: SafeSandboxErrorDiagnostics) => boolean
+```
+
+### `isSandboxApiTransientFailure`
+
+`function` — True when the Sandbox API answered a control-plane call with a server error (500, 502, 503 or 504), such as `A sandbox backend did not answer` or `Failed to resume project: fetch failed`.
 
 ```ts
 (diagnostics: SafeSandboxErrorDiagnostics) => boolean
