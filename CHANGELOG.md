@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.34
+
+- feat(hub-approvals): say why an open call waits, and send waiting requests as one digest (#931)
+
 ## 0.60.33
 
 - fix(operator): report error notices as failed turns with a typed reason (#926)
