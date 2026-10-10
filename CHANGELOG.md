@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.41
+
+- feat(hub-approvals): list every waiting request in the dock above a compact open card (#938)
+
 ## 0.60.40
 
 - fix(sandbox): wait out a not-ready box and a refused dispatch under one policy (#936)
