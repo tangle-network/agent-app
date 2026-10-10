@@ -137,9 +137,11 @@ workspace page, and the server decides what to warm.
 // way your other routes do, and return the warm for the box they would use.
 import { createWorkspacePrewarmRoute } from '@tangle-network/agent-app/sandbox'
 
-const prewarm = createWorkspacePrewarmRoute({
-  authorize: async ({ request }) => {
-    const member = await requireMember(request)
+// Create it once per isolate: single-flight and the success memory live in it.
+const prewarm = createWorkspacePrewarmRoute<AppContext>({
+  authorize: async ({ request, context: c }) => {
+    if (!sameOrigin(request)) return { status: 'denied', response: Response.json({ error: 'Origin mismatch' }, { status: 403 }) }
+    const member = await requireMember(c.env, request)
     if (!member) return { status: 'denied', response: Response.json({ error: 'Authentication required' }, { status: 401 }) }
     return {
       status: 'allowed',
@@ -153,7 +155,7 @@ const prewarm = createWorkspacePrewarmRoute({
   },
   onEvent: (event) => console.log('[prewarm]', event),
 })
-app.post('/api/workspaces/:id/prewarm', (c) => prewarm(c.req.raw))
+app.post('/api/workspaces/:id/prewarm', (c) => prewarm(c.req.raw, c))
 ```
 
 ```tsx

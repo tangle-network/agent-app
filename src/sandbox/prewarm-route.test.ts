@@ -120,6 +120,18 @@ describe('createWorkspacePrewarmRoute', () => {
     expect(authorize).not.toHaveBeenCalled()
   })
 
+  it('hands the caller context to authorize', async () => {
+    const seen: string[] = []
+    const route = createWorkspacePrewarmRoute<{ env: string }>({
+      authorize: async ({ context }) => {
+        seen.push(context.env)
+        return { status: 'declined', reason: 'test' }
+      },
+    })
+    await route(post(), { env: 'production' })
+    expect(seen).toEqual(['production'])
+  })
+
   it('refuses methods other than POST', async () => {
     const route = createWorkspacePrewarmRoute({ authorize: allowed(async () => undefined) })
     const response = await route(new Request('https://app.test/x', { method: 'GET' }))

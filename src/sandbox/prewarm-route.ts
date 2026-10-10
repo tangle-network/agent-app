@@ -67,8 +67,10 @@ export type WorkspacePrewarmEvent =
   | { type: 'warmed'; key: string; ms: number; report?: WorkspacePrewarmReport }
   | { type: 'failed'; key: string; ms: number; error: string }
 
-export interface CreateWorkspacePrewarmRouteOptions {
-  authorize(input: { request: Request }): Promise<WorkspacePrewarmAuthorization>
+export interface CreateWorkspacePrewarmRouteOptions<Context = void> {
+  /** `context` is whatever the caller passed beside the request, such as a
+   *  Hono context carrying the Worker's bindings. */
+  authorize(input: { request: Request; context: Context }): Promise<WorkspacePrewarmAuthorization>
   /** After a successful warm, answer `recent` for this long. Default 30 000 ms. */
   recentMs?: number
   /** Observability for warms this route ran. Errors thrown here are ignored. */
@@ -95,9 +97,13 @@ function reply(body: WorkspacePrewarmResponse, status = 200): Response {
   return Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
 }
 
-export function createWorkspacePrewarmRoute(
-  options: CreateWorkspacePrewarmRouteOptions,
-): (request: Request) => Promise<Response> {
+/**
+ * Build the handler once per isolate, not per request: its single-flight and
+ * success memory live in the returned closure.
+ */
+export function createWorkspacePrewarmRoute<Context = void>(
+  options: CreateWorkspacePrewarmRouteOptions<Context>,
+): (request: Request, context: Context) => Promise<Response> {
   const recentMs = options.recentMs ?? 30_000
   const now = options.now ?? (() => Date.now())
   const inFlight = new Map<string, Promise<WorkspacePrewarmResponse>>()
@@ -136,7 +142,7 @@ export function createWorkspacePrewarmRoute(
     }
   }
 
-  return async function prewarm(request: Request): Promise<Response> {
+  return async function prewarm(request: Request, context: Context): Promise<Response> {
     const started = now()
     if (request.method !== 'POST') {
       return new Response(null, { status: 405, headers: { Allow: 'POST' } })
@@ -145,7 +151,7 @@ export function createWorkspacePrewarmRoute(
 
     let auth: WorkspacePrewarmAuthorization
     try {
-      auth = await options.authorize({ request })
+      auth = await options.authorize({ request, context })
     } catch (err) {
       // An authorization that cannot decide refuses; it never warms.
       emit({ type: 'failed', key: '', ms: now() - started, error: err instanceof Error ? err.message : String(err) })
