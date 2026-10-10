@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-485 exports.
+490 exports.
 
 ### `acceptRejectionReason`
 
@@ -2942,6 +2942,14 @@ type RecordGridWriteOutcome
 (files: File[], startIndex: number, stagedNames?: Iterable<string>) => { files: File[]; nextIndex: number; }
 ```
 
+### `requestWorkspacePrewarm`
+
+`function` — Send one prewarm request for `url` unless the tab is hidden, a request for it is in flight, or one was sent within `minIntervalMs`.
+
+```ts
+(url: string, options?: WorkspacePrewarmRequestOptions) => boolean
+```
+
 ### `resolveChatInteraction`
 
 `function` — Marks one ask resolved locally (the card's `onResolved`).
@@ -3710,6 +3718,22 @@ interface UseSessionHistoryOptions
 (active: boolean) => number
 ```
 
+### `useWorkspacePrewarm`
+
+`function` — Prewarm `url` when the page opens or becomes visible; `reassert` on composer focus.
+
+```ts
+(options: UseWorkspacePrewarmOptions) => WorkspacePrewarmHandle
+```
+
+### `UseWorkspacePrewarmOptions`
+
+`interface`
+
+```ts
+interface UseWorkspacePrewarmOptions
+```
+
 ### `validateRecordGridCell`
 
 `function` — Check one already-typed value against its column.
@@ -3860,6 +3884,22 @@ interface WorkProductCardProps
 
 ```ts
 ({ name, size }: { name: string; size?: "sm" | "lg" | undefined; }) => Element
+```
+
+### `WorkspacePrewarmHandle`
+
+`interface`
+
+```ts
+interface WorkspacePrewarmHandle
+```
+
+### `WorkspacePrewarmRequestOptions`
+
+`interface`
+
+```ts
+interface WorkspacePrewarmRequestOptions
 ```
 
 ### `WorkspaceSwitcher`

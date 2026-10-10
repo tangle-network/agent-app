@@ -14118,6 +14118,18 @@
           "doc": "Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token pinned to `scope: 'session-runtime'` (the ONLY scope the platform gran…"
         },
         {
+          "name": "createWorkspacePrewarmRoute",
+          "kind": "function",
+          "signature": "(options: CreateWorkspacePrewarmRouteOptions) => (request: Request) => Promise<Response>",
+          "doc": null
+        },
+        {
+          "name": "CreateWorkspacePrewarmRouteOptions",
+          "kind": "interface",
+          "signature": "interface CreateWorkspacePrewarmRouteOptions",
+          "doc": null
+        },
+        {
           "name": "createWorkspaceSandboxManager",
           "kind": "function",
           "signature": "<TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void>(opts: WorkspaceSandboxManagerOptions<TClien…",
@@ -14284,6 +14296,12 @@
           "kind": "interface",
           "signature": "interface InspectablePrewarmClaimStore",
           "doc": "A claim store that can distinguish a completed owner from a crashed owner."
+        },
+        {
+          "name": "isAutomatedPrewarmRequest",
+          "kind": "function",
+          "signature": "(request: Request) => boolean",
+          "doc": "True for crawler user agents and browser speculative prefetch or prerender."
         },
         {
           "name": "isEgressProxyRecoveryRequiredError",
@@ -15046,6 +15064,36 @@
           "kind": "const",
           "signature": "\"WORKSPACE_SANDBOX_UNRECOVERABLE\"",
           "doc": "The platform ran its own recovery, failed, and asked for a replacement."
+        },
+        {
+          "name": "WorkspacePrewarmAuthorization",
+          "kind": "type",
+          "signature": "type WorkspacePrewarmAuthorization",
+          "doc": "What the product decided for this request."
+        },
+        {
+          "name": "WorkspacePrewarmEvent",
+          "kind": "type",
+          "signature": "type WorkspacePrewarmEvent",
+          "doc": null
+        },
+        {
+          "name": "WorkspacePrewarmOutcome",
+          "kind": "type",
+          "signature": "type WorkspacePrewarmOutcome",
+          "doc": null
+        },
+        {
+          "name": "WorkspacePrewarmReport",
+          "kind": "type",
+          "signature": "type WorkspacePrewarmReport",
+          "doc": null
+        },
+        {
+          "name": "WorkspacePrewarmResponse",
+          "kind": "interface",
+          "signature": "interface WorkspacePrewarmResponse",
+          "doc": null
         },
         {
           "name": "WorkspaceSandboxEnsureContext",
@@ -23630,6 +23678,12 @@
           "doc": "Gives every generically-named clipboard image a distinct `pasted-image-<n>.<ext>` name."
         },
         {
+          "name": "requestWorkspacePrewarm",
+          "kind": "function",
+          "signature": "(url: string, options?: WorkspacePrewarmRequestOptions) => boolean",
+          "doc": "Send one prewarm request for `url` unless the tab is hidden, a request for it is in flight, or one was sent within `minIntervalMs`."
+        },
+        {
           "name": "resolveChatInteraction",
           "kind": "function",
           "signature": "(list: ChatInteraction[], id: string, status: \"cancelled\" | \"expired\" | \"answered\" | \"declined\", answers?: InteractionA…",
@@ -24206,6 +24260,18 @@
           "doc": "Whole seconds elapsed while `active`, ticking once a second."
         },
         {
+          "name": "useWorkspacePrewarm",
+          "kind": "function",
+          "signature": "(options: UseWorkspacePrewarmOptions) => WorkspacePrewarmHandle",
+          "doc": "Prewarm `url` when the page opens or becomes visible; `reassert` on composer focus."
+        },
+        {
+          "name": "UseWorkspacePrewarmOptions",
+          "kind": "interface",
+          "signature": "interface UseWorkspacePrewarmOptions",
+          "doc": null
+        },
+        {
           "name": "validateRecordGridCell",
           "kind": "function",
           "signature": "(column: RecordGridColumn, value: RecordGridValue) => RecordGridCellOutcome",
@@ -24318,6 +24384,18 @@
           "kind": "function",
           "signature": "({ name, size }: { name: string; size?: \"sm\" | \"lg\" | undefined; }) => Element",
           "doc": "The one workspace avatar: ui's IconTile with the workspace's initials on a categorical tone derived from its name."
+        },
+        {
+          "name": "WorkspacePrewarmHandle",
+          "kind": "interface",
+          "signature": "interface WorkspacePrewarmHandle",
+          "doc": null
+        },
+        {
+          "name": "WorkspacePrewarmRequestOptions",
+          "kind": "interface",
+          "signature": "interface WorkspacePrewarmRequestOptions",
+          "doc": null
         },
         {
           "name": "WorkspaceSwitcher",

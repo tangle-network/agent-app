@@ -18186,6 +18186,22 @@ interface BuildSandboxToolFileMountsOptions
 <TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…
 ```
 
+### `createWorkspacePrewarmRoute`
+
+`function`
+
+```ts
+(options: CreateWorkspacePrewarmRouteOptions) => (request: Request) => Promise<Response>
+```
+
+### `CreateWorkspacePrewarmRouteOptions`
+
+`interface`
+
+```ts
+interface CreateWorkspacePrewarmRouteOptions
+```
+
 ### `createWorkspaceSandboxManager`
 
 `function` — Create a generic name-keyed sandbox lifecycle manager for products that drive their own SDK or box types.
@@ -18408,6 +18424,14 @@ interface ForegroundSandboxSingleFlightOptions
 
 ```ts
 interface InspectablePrewarmClaimStore
+```
+
+### `isAutomatedPrewarmRequest`
+
+`function` — True for crawler user agents and browser speculative prefetch or prerender.
+
+```ts
+(request: Request) => boolean
 ```
 
 ### `isEgressProxyRecoveryRequiredError`
@@ -19424,6 +19448,46 @@ number
 
 ```ts
 "WORKSPACE_SANDBOX_UNRECOVERABLE"
+```
+
+### `WorkspacePrewarmAuthorization`
+
+`type` — What the product decided for this request.
+
+```ts
+type WorkspacePrewarmAuthorization
+```
+
+### `WorkspacePrewarmEvent`
+
+`type`
+
+```ts
+type WorkspacePrewarmEvent
+```
+
+### `WorkspacePrewarmOutcome`
+
+`type`
+
+```ts
+type WorkspacePrewarmOutcome
+```
+
+### `WorkspacePrewarmReport`
+
+`type`
+
+```ts
+type WorkspacePrewarmReport
+```
+
+### `WorkspacePrewarmResponse`
+
+`interface`
+
+```ts
+interface WorkspacePrewarmResponse
 ```
 
 ### `WorkspaceSandboxEnsureContext`
@@ -30607,6 +30671,14 @@ type RecordGridWriteOutcome
 (files: File[], startIndex: number, stagedNames?: Iterable<string>) => { files: File[]; nextIndex: number; }
 ```
 
+### `requestWorkspacePrewarm`
+
+`function` — Send one prewarm request for `url` unless the tab is hidden, a request for it is in flight, or one was sent within `minIntervalMs`.
+
+```ts
+(url: string, options?: WorkspacePrewarmRequestOptions) => boolean
+```
+
 ### `resolveChatInteraction`
 
 `function` — Marks one ask resolved locally (the card's `onResolved`).
@@ -31375,6 +31447,22 @@ interface UseSessionHistoryOptions
 (active: boolean) => number
 ```
 
+### `useWorkspacePrewarm`
+
+`function` — Prewarm `url` when the page opens or becomes visible; `reassert` on composer focus.
+
+```ts
+(options: UseWorkspacePrewarmOptions) => WorkspacePrewarmHandle
+```
+
+### `UseWorkspacePrewarmOptions`
+
+`interface`
+
+```ts
+interface UseWorkspacePrewarmOptions
+```
+
 ### `validateRecordGridCell`
 
 `function` — Check one already-typed value against its column.
@@ -31525,6 +31613,22 @@ interface WorkProductCardProps
 
 ```ts
 ({ name, size }: { name: string; size?: "sm" | "lg" | undefined; }) => Element
+```
+
+### `WorkspacePrewarmHandle`
+
+`interface`
+
+```ts
+interface WorkspacePrewarmHandle
+```
+
+### `WorkspacePrewarmRequestOptions`
+
+`interface`
+
+```ts
+interface WorkspacePrewarmRequestOptions
 ```
 
 ### `WorkspaceSwitcher`
