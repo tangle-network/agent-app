@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.54
+
+- feat(stream): settle an orphaned turn stream without moving it in time (#951)
+
 ## 0.60.53
 
 - fix(interactions): take a select answer as a plain string, and let a product decline an ask by its content (#950)
