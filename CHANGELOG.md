@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.37
+
+- chore(deps): admit Agent Eval 0.211, the line that prices gpt-6-luna (#932)
+
 ## 0.60.36
 
 - fix(native-completion): bound terminal observation and checkpoint the answer (#923)
