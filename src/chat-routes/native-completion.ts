@@ -264,7 +264,7 @@ export const TOOL_ABORTED_ERROR = 'The Sandbox aborted a tool call before the tu
  * marks a tool interrupted by a runtime restart with "Tool execution aborted";
  * an ordinary tool error (a missing file, an HTTP 403) does not end the turn.
  */
-export function abortedToolCall(parts: ReadonlyArray<Record<string, unknown>>): string | undefined {
+function abortedToolCall(parts: ReadonlyArray<Record<string, unknown>>): string | undefined {
   for (const part of parts) {
     if (part.type !== 'tool') continue
     const state = part.state as { status?: unknown; error?: unknown } | undefined
