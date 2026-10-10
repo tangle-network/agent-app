@@ -211,7 +211,8 @@ export async function checkShellAlignment(options: ShellAlignmentOptions): Promi
           findings.push(...found)
           if (found.length && options.screenshotDir) {
             const name = `${route.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '') || 'root'}-${width}-${theme}.png`
-            await page.screenshot({ path: `${options.screenshotDir}/${name}` })
+            // Evidence only: a screenshot that stalls must not lose the measurement.
+            await page.screenshot({ path: `${options.screenshotDir}/${name}`, timeout: 10_000, animations: 'disabled' }).catch(() => undefined)
           }
         }
         await context.close()
