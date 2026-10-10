@@ -65,6 +65,7 @@ function mount(
     kindLabel?: string
     timeoutNote?: React.ReactNode
     renderMarkdown?: (markdown: string) => React.ReactNode
+    declinable?: boolean
   } = {},
 ) {
   const submitAnswer = props.submitAnswer ?? okSubmitter()
@@ -78,6 +79,7 @@ function mount(
       kindLabel={props.kindLabel}
       timeoutNote={props.timeoutNote}
       renderMarkdown={props.renderMarkdown}
+      declinable={props.declinable}
     />,
   )
   return { ...utils, submitAnswer }
@@ -597,5 +599,40 @@ describe('InteractionQuestionCard arrival choreography', () => {
     // `data-motion="essential"` exempts a subtree from the reduced-motion
     // collapse. Only a live-status signal earns that; an entrance must collapse.
     expect(container.querySelector('[data-motion]')).toBeNull()
+  })
+})
+
+describe('decline', () => {
+  it('declines an open ask through submitAnswer with no answer data and settles the card', async () => {
+    const onResolved = vi.fn()
+    const { submitAnswer } = mount(SELECT_INTERACTION, { onResolved })
+    fireEvent.click(screen.getByRole('button', { name: 'Decline' }))
+    await flush()
+    expect(submitAnswer).toHaveBeenCalledWith({ id: 'int-1', outcome: 'declined' })
+    expect(onResolved).toHaveBeenCalledWith('int-1', 'declined')
+    expect(screen.getByText('Declined')).toBeTruthy()
+    expect(screen.getByText('You declined this question.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Decline' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Submit answer/ })).toBeNull()
+  })
+
+  it('keeps the ask open and says why when the decline is refused', async () => {
+    const submitAnswer = vi.fn(async (): Promise<InteractionSubmitResult> => ({ ok: false, expired: false, message: 'The run is busy.' }))
+    mount(SELECT_INTERACTION, { submitAnswer })
+    fireEvent.click(screen.getByRole('button', { name: 'Decline' }))
+    await flush()
+    expect(screen.getByRole('alert').textContent).toBe('The run is busy.')
+    expect((screen.getByRole('button', { name: 'Decline' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('offers no decline to a read-only viewer, a product that opts out, or a settled ask', () => {
+    mount(SELECT_INTERACTION, { canWrite: false })
+    expect(screen.queryByRole('button', { name: 'Decline' })).toBeNull()
+    cleanup()
+    mount(SELECT_INTERACTION, { declinable: false })
+    expect(screen.queryByRole('button', { name: 'Decline' })).toBeNull()
+    cleanup()
+    mount({ ...SELECT_INTERACTION, status: 'answered' })
+    expect(screen.queryByRole('button', { name: 'Decline' })).toBeNull()
   })
 })

@@ -256,7 +256,7 @@ export function WorkspaceList({
           ) : (
             <div className={`overflow-hidden rounded-xl border border-border bg-card ${items.length > SEARCH_THRESHOLD ? 'mt-3' : 'mt-6'}`}>
               {fields.length > 0 && (
-                <div aria-hidden className="hidden items-center gap-3 border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground md:flex">
+                <div aria-hidden className="hidden items-center gap-3 border-b border-border px-4 py-2 text-sm font-medium text-muted-foreground md:flex">
                   <span className="w-10 shrink-0" />
                   <span className="min-w-0 flex-1">Name</span>
                   {fields.map((field) => (
@@ -289,7 +289,7 @@ export function WorkspaceList({
             </>
           }
         >
-          <label htmlFor={`${headingId}-rename`} className="text-xs text-muted-foreground">Name</label>
+          <label htmlFor={`${headingId}-rename`} className="text-sm text-muted-foreground">Name</label>
           <input
             id={`${headingId}-rename`}
             value={renameValue}
@@ -319,7 +319,7 @@ export function WorkspaceList({
             </>
           }
         >
-          <label htmlFor={`${headingId}-create`} className="text-xs text-muted-foreground">Name</label>
+          <label htmlFor={`${headingId}-create`} className="text-sm text-muted-foreground">Name</label>
           <input
             id={`${headingId}-create`}
             value={createValue}
@@ -384,7 +384,7 @@ function UpdatedAt({ value, formatDate, className = 'shrink-0' }: { value: Works
   return (
     // Server and browser can format a date differently (zone, locale); the
     // browser's reading is the one the user should see.
-    <time dateTime={date.toISOString()} suppressHydrationWarning className={`${className} text-xs tabular-nums text-muted-foreground`}>
+    <time dateTime={date.toISOString()} suppressHydrationWarning className={`${className} text-sm tabular-nums text-muted-foreground`}>
       {formatDate(date)}
     </time>
   )
@@ -410,10 +410,10 @@ function ListRow({ item, fields, menu, reserveMenu, Link, formatDate }: ItemProp
         >
           {item.name}
         </Link>
-        {detail && <p className="truncate text-xs text-muted-foreground" title={detail}>{detail}</p>}
+        {detail && <p className="truncate text-sm text-muted-foreground" title={detail}>{detail}</p>}
         {/* Below md the columns are hidden, so their values ride under the name instead. */}
         {mobileFields.length > 0 && (
-          <p className="truncate text-xs text-muted-foreground md:hidden">
+          <p className="truncate text-sm text-muted-foreground md:hidden">
             {mobileFields.map((field, index) => (
               <span key={field.id}>
                 {index > 0 && ' · '}
@@ -453,13 +453,13 @@ function GridCard({ item, fields, menu, Link, formatDate }: ItemProps) {
           >
             {item.name}
           </Link>
-          {detail && <p className="mt-0.5 truncate text-xs text-muted-foreground" title={detail}>{detail}</p>}
+          {detail && <p className="mt-0.5 truncate text-sm text-muted-foreground" title={detail}>{detail}</p>}
         </div>
         {menu.length > 0 && <ItemMenu item={item} entries={menu} />}
       </div>
       <div className="mt-auto flex items-end justify-between gap-3 pt-4">
         {shownFields.length > 0 ? (
-          <dl className="flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-xs">
+          <dl className="flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-sm">
             {shownFields.map((field) => (
               <div key={field.id} className="flex min-w-0 gap-1">
                 <dt className="text-muted-foreground">{field.label}</dt>

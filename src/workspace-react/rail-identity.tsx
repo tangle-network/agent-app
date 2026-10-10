@@ -98,7 +98,7 @@ export function AgentRailIdentity({ product, workspace, hideBelow = 'lg', LinkCo
   const stack = (
     <span className="min-w-0 flex-1 text-left">
       <span className="block truncate text-sm font-semibold leading-5 text-foreground">{workspace.name}</span>
-      <span className="block truncate text-xs leading-4 text-muted-foreground">{product.name}</span>
+      <span className="block truncate text-sm leading-5 text-muted-foreground">{product.name}</span>
     </span>
   )
   const others = (workspace.options ?? []).filter((option) => option.id !== workspace.id)
