@@ -26,7 +26,7 @@ export interface WorkspaceExportOptions extends ExportEngineOptions {
   signingSecret: string
   /** Download link lifetime. Default 15 minutes. */
   linkTtlMs?: number
-  /** Finished exports are deleted after this long. Default 7 days. */
+  /** Exports are deleted after this long. They hold decrypted data, so keep it short. Default 24 hours. */
   retentionMs?: number
   /** Work per advance request. Default 20 seconds. */
   advanceBudgetMs?: number
@@ -53,7 +53,7 @@ function sameOrigin(request: Request): boolean {
 export function createWorkspaceExport(options: WorkspaceExportOptions) {
   const engine = createExportEngine(options)
   const linkTtlMs = options.linkTtlMs ?? 15 * 60_000
-  const retentionMs = options.retentionMs ?? 7 * 24 * 60 * 60_000
+  const retentionMs = options.retentionMs ?? 24 * 60 * 60_000
   const now = options.now ?? (() => Date.now())
 
   async function withProgress(job: ExportJob, mount: string): Promise<ExportProgress> {

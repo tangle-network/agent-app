@@ -1,0 +1,26 @@
+{
+  "operations": [
+    {
+      "name": "list_vendor_invoices",
+      "description": "List vendor invoices with a given status, newest first, at most 50.",
+      "access": "read",
+      "sql": "SELECT id, vendor_name, amount_cents, currency, hours, description, status, created_at FROM vendor_invoices WHERE status = $1 ORDER BY created_at DESC LIMIT 50",
+      "params": [
+        { "name": "status", "type": "string", "enum": ["pending", "approved", "paid"], "description": "Invoice status to list." }
+      ]
+    },
+    {
+      "name": "record_vendor_invoice",
+      "description": "Record an invoice a vendor sent, for finance to review. Never marks anything paid.",
+      "access": "write",
+      "sql": "INSERT INTO vendor_invoices (vendor_name, amount_cents, currency, hours, description) VALUES ($1, $2, $3, $4, $5) RETURNING id, status, created_at",
+      "params": [
+        { "name": "vendor_name", "type": "string", "maxLength": 200, "description": "Vendor's name as they gave it." },
+        { "name": "amount_cents", "type": "integer", "description": "Invoice total in minor units, e.g. 45000 for 450.00." },
+        { "name": "currency", "type": "string", "enum": ["USD", "CRC"], "description": "Invoice currency." },
+        { "name": "hours", "type": "number", "required": false, "description": "Hours worked, when the vendor gave them." },
+        { "name": "description", "type": "string", "maxLength": 1000, "description": "What the work was." }
+      ]
+    }
+  ]
+}

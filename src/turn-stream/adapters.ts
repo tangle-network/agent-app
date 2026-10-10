@@ -172,6 +172,25 @@ export async function acquireDurableTurnLock(
   return result.body
 }
 
+/**
+ * Read a channel's active turn lock without changing it.
+ *
+ * The first request to a Durable Object that has never been used creates it,
+ * which measured 1.3-2.4 s for a thread's first turn in GTM production
+ * (2026-10-10) against 0.05-0.33 s once it exists. A peek sent as soon as a
+ * turn is admitted lets that creation overlap the turn's other pre-lock work.
+ */
+export async function peekDurableTurnLock(
+  namespace: TurnStreamNamespaceLike,
+  input: { workspaceId: string; threadId: string; scope: TurnLockScope },
+  auth: TurnStreamAuth,
+): Promise<DurableTurnLock | null> {
+  const key = turnLockChannelKey(input.workspaceId, input.threadId, input.scope)
+  const result = await postJson<{ active?: DurableTurnLock | null }>(namespace, key, TURN_STREAM_PATHS.lockPeek, {}, auth)
+  if (result.status !== 200) throw new Error(`turn-stream lock peek failed with status ${result.status}`)
+  return result.body.active ?? null
+}
+
 /** Release a durable turn lock and indicate if the release was successful or deferred */
 export async function releaseDurableTurnLock(
   namespace: TurnStreamNamespaceLike,
@@ -336,8 +355,14 @@ function defaultRefusalResponse(
 export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOptions<TContext>): {
   acquire(args: TurnLockSeamArgs<TContext>): Promise<TurnLockSeamResult>
   release(handle: unknown): Promise<void>
+  warm(target: { tenantId: string; threadId: string }): Promise<void>
 } {
   return {
+    // The thread channel is the one a thread's first turn creates; the
+    // workspace channel is shared by every thread and its broadcasts keep it up.
+    async warm(target) {
+      await peekDurableTurnLock(options.namespace, { workspaceId: target.tenantId, threadId: target.threadId, scope: 'thread' }, options.auth)
+    },
     async acquire(args) {
       const workspaceId = args.identity.tenantId
       const threadId = args.identity.sessionId

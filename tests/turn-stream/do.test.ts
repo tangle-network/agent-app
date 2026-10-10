@@ -5,6 +5,8 @@ import {
   broadcastThreadCreated,
   broadcastWorkspaceActivity,
   createDurableObjectTurnEventStore,
+  createDurableTurnLock,
+  peekDurableTurnLock,
   releaseDurableTurnLock,
   releaseInterruptedDurableTurnLock,
   type TurnStreamAuth,
@@ -178,6 +180,33 @@ describe('capability-token gate (issue #746)', () => {
     await expect(verifyTurnStreamToken('ch', token, AUTH.secret)).resolves.toBe(true)
     await expect(verifyTurnStreamToken('ch', token, 'short')).resolves.toBe(false)
     await expect(mintTurnStreamToken('ch', 'short')).rejects.toThrow(/32 characters/)
+  })
+})
+
+describe('TurnStreamDO lock peek (warm-up)', () => {
+  it('reads the active lock without changing it, and null on a channel never used', async () => {
+    const { namespace } = harness()
+    const target = { workspaceId: WS, threadId: THREAD, scope: 'thread' as const }
+    expect(await peekDurableTurnLock(namespace, target, AUTH)).toBeNull()
+    const acquired = await acquireDurableTurnLock(namespace, { ...target, executionId: 'exec-1' }, AUTH)
+    expect(acquired.acquired).toBe(true)
+    const peeked = await peekDurableTurnLock(namespace, target, AUTH)
+    expect(peeked).toMatchObject({ executionId: 'exec-1', threadId: THREAD })
+    // A peek never takes or frees the lock.
+    const contended = await acquireDurableTurnLock(namespace, { ...target, executionId: 'exec-2' }, AUTH)
+    expect(contended.acquired).toBe(false)
+  })
+
+  it('createDurableTurnLock warms the thread channel its first acquire uses', async () => {
+    const { namespace } = harness()
+    const seen: string[] = []
+    const watched = {
+      idFromName: (name: string) => { seen.push(name); return namespace.idFromName(name) },
+      get: (id: unknown) => namespace.get(id as never),
+    } as typeof namespace
+    const lock = createDurableTurnLock<undefined>({ namespace: watched, auth: AUTH, scopeOf: () => 'thread' })
+    await lock.warm({ tenantId: WS, threadId: THREAD })
+    expect(seen).toEqual([threadChannelKey(WS, THREAD)])
   })
 })
 
