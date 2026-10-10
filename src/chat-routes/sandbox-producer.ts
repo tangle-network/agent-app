@@ -314,6 +314,11 @@ function sandboxStreamErrorMessage(data: unknown): string {
   }
 }
 
+/** The typed reason a sandbox `error` event carries, or a generic stream-error code. */
+function sandboxStreamErrorCode(data: unknown): string {
+  return asString(asRecord(data)?.code) ?? 'sandbox.stream_error'
+}
+
 function toProducerWireEvent(event: JsonRecord): ProducerWireEvent {
   return event as unknown as ProducerWireEvent
 }
@@ -536,11 +541,11 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   let errorNoticeCount = 0
   /** `errorNotice` mode: the terminal error as a persisted `error` notice part,
    *  so the durable row says "this turn failed" in a typed field. */
-  function* emitErrorNotice(text: string): Generator<ProducerWireEvent, void, unknown> {
+  function* emitErrorNotice(text: string, code: string): Generator<ProducerWireEvent, void, unknown> {
     errorNoticeCount += 1
-    const notice = noticePart('error', `error-${errorNoticeCount}`, text)
+    const notice = noticePart('error', `error-${errorNoticeCount}`, text, code)
     recordPersistedPart(notice, undefined, noticePartKey(notice.id))
-    yield { type: 'notice', id: notice.id, noticeKind: 'error', text }
+    yield { type: 'notice', id: notice.id, noticeKind: 'error', text, code }
   }
 
   async function* stream(): AsyncGenerator<ProducerWireEvent, void, unknown> {
@@ -833,7 +838,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             ? `The sandbox model stream stopped before a clean completion.\n\nError: ${message}`
             : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`
           if (options.errorNotice) {
-            yield* emitErrorNotice(errorContent)
+            yield* emitErrorNotice(errorContent, sandboxStreamErrorCode(event.data))
           } else if (options.includeErrorText !== false) {
             const errorDelta = fullText ? `\n\n---\n${errorContent}` : errorContent
             fullText += errorDelta
@@ -859,7 +864,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         error: streamErr instanceof Error ? streamErr.message : String(streamErr),
       })
       if (options.errorNotice) {
-        yield* emitErrorNotice(diagnostic.userMessage)
+        yield* emitErrorNotice(diagnostic.userMessage, diagnostic.code)
       } else if (options.includeErrorText !== false) {
         const errorDelta = fullText
           ? `\n\n---\n${diagnostic.userMessage}`

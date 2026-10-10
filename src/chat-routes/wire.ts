@@ -93,6 +93,8 @@ export interface ProducerNoticeEvent {
   /** Kept inline with `/interactions`' `NoticeKind` so this file stays import-free. */
   noticeKind: 'warning' | 'auto-declined' | 'error'
   text: string
+  /** Typed reason, on an `error` notice. */
+  code?: string
 }
 
 /** Represent an error event emitted by a producer containing message, code, and optional details */

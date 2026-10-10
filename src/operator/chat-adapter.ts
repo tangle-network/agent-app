@@ -27,6 +27,8 @@ export interface ChatOperatorMessage {
   model?: string | null
   servedModel?: string | null
   costUsd?: number | null
+  /** The row's product metadata, for a `failureOf` that reads a stamped turn status. */
+  metadata?: Record<string, unknown> | null
 }
 
 export interface ChatOperatorThread {
@@ -89,7 +91,10 @@ export interface ChatOperatorAdapterOptions<Identity> {
     read?(ctx: OperatorContext<Identity>, workspaceId: string, assetId: string): Promise<Response | null>
   }
   scorecard?(ctx: OperatorContext<Identity>, workspaceId: string, days: number): Promise<OperatorScorecard>
-  /** A reply's failure; defaults to a `turn-failure` notice or an `error` part. */
+  /**
+   * A reply's failure. Defaults to an `error` notice (the sandbox producer's
+   * `errorNotice` mode), a `turn-failure` notice or an `error` part.
+   */
   failureOf?(message: ChatOperatorMessage): { code?: string; message: string } | null
 }
 
@@ -107,10 +112,13 @@ function partsOf(message: ChatOperatorMessage): ReadonlyArray<Record<string, unk
 
 function defaultFailure(message: ChatOperatorMessage): { code?: string; message: string } | null {
   for (const part of partsOf(message)) {
-    const notice = part.type === 'notice' && (part.noticeKind === 'turn-failure' || part.kind === 'turn-failure')
+    const errorNotice = part.type === 'notice' && part.noticeKind === 'error'
+    const notice = errorNotice || (part.type === 'notice' && (part.noticeKind === 'turn-failure' || part.kind === 'turn-failure'))
     if (!notice && part.type !== 'error') continue
     const detail = text(part.message) ?? text(part.text) ?? text(part.error) ?? 'The turn failed'
-    return { ...(typeof part.code === 'string' ? { code: part.code } : {}), message: detail }
+    // An error notice always names a reason, so a caller can tell failures apart.
+    const code = typeof part.code === 'string' ? part.code : errorNotice ? 'turn.error' : undefined
+    return { ...(code ? { code } : {}), message: detail }
   }
   return null
 }

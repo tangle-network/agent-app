@@ -8997,7 +8997,7 @@
         {
           "name": "noticePart",
           "kind": "function",
-          "signature": "(noticeKind: NoticeKind, id: string, text: string) => NoticePersistedPart",
+          "signature": "(noticeKind: NoticeKind, id: string, text: string, code?: string | undefined) => NoticePersistedPart",
           "doc": "Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error)."
         },
         {
@@ -22828,7 +22828,7 @@
         {
           "name": "noticePart",
           "kind": "function",
-          "signature": "(noticeKind: NoticeKind, id: string, text: string) => NoticePersistedPart",
+          "signature": "(noticeKind: NoticeKind, id: string, text: string, code?: string | undefined) => NoticePersistedPart",
           "doc": "Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error)."
         },
         {
