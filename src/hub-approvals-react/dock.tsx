@@ -10,7 +10,7 @@ import {
   type HubApprovalItem,
   type HubApprovalPhase,
 } from '../hub-approvals'
-import { closesIn, HubProviderMark, HubRawDetails } from './parts'
+import { closesIn, distinctAccount, HubProviderMark, HubRawDetails } from './parts'
 import { HubActionPreviewView } from './preview'
 
 /** The owner's answer to one held call. `allow` also grants a standing permission. */
@@ -160,7 +160,8 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
   const busy = submitting?.id === active.id
   const decidable = active.phase === 'waiting' && !busy
   const closing = active.phase === 'waiting' ? closesIn(active.expiresAt, now) : null
-  const subtitle = [presentation.provider.name, active.account ? `as ${active.account}` : null, closing].filter(Boolean).join(' · ')
+  const account = distinctAccount(active.account, presentation.provider.name)
+  const subtitle = [presentation.provider.name, account ? `as ${account}` : null, closing].filter(Boolean).join(' · ')
 
   async function decide(decision: HubApprovalDecision, label: string) {
     if (!active || submitting) return

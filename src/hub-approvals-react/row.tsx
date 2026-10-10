@@ -51,11 +51,12 @@ export function HubApprovalRow({ item, expanded: controlled, onExpandedChange, o
         >
           <HubProviderMark providerId={presentation.provider.id} name={presentation.provider.name} size={24} />
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{title}</span>
-          <HubApprovalPhasePill phase={item.phase} />
+          <HubApprovalPhasePill phase={item.phase} label={item.phase === 'waiting' ? 'Waiting' : item.phase === 'blocked' ? 'Owner decides' : undefined} />
           <ChevronDown aria-hidden className={`size-4 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </Button>
         {item.phase === 'waiting' && onReview && (
-          <Button variant="outline" onClick={() => onReview(item)}>Review</Button>
+          // On a phone the dock sits just below; the row keeps its width for the title.
+          <Button variant="outline" className="hidden sm:inline-flex" onClick={() => onReview(item)}>Review</Button>
         )}
       </div>
       {expanded && (
