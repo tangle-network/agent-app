@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.33
+
+- fix(operator): report error notices as failed turns with a typed reason (#926)
+
 ## 0.60.32
 
 - fix(agent-surfaces): past the approval-email cap, show the owner link instead of failing (#930)
