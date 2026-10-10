@@ -166,7 +166,7 @@ describe('progress-first turn stream', () => {
     expect(settled.status).toBe(200)
     let text = ''
     const result = await consumeChatStream(settled.body!, { onText: (delta) => { text += delta } })
-    expect(phases).toEqual(['accepted'])
+    expect(phases).toEqual(['accepted', 'preparing'])
     expect(result.turnId).toEqual(expect.any(String))
     expect(text).toBe('hello there')
   })
