@@ -192,9 +192,12 @@ The product itself changes nothing and serves nothing to the conductor; this API
 | App | Before this API | Status |
 | --- | --- | --- |
 | gtm-agent | Private API with `gak_` keys and the ChatGPT agents surface | Mounts `/api/operator/v1`; first adopter |
-| legal-agent | Private API with `lak_` keys | Not yet mounted |
-| creative-agent | Private API and the ChatGPT agents surface | Not yet mounted |
-| tax-agent, insurance-agent, hospitality-agent, agent-builder | None | Not yet mounted |
+| legal-agent | Private API with `lak_` keys | Mounts `/api/operator/v1` (legal-agent#438) |
+| creative-agent | Private API and the ChatGPT agents surface | Mounts `/api/operator/v1` (creative-agent#558) |
+| insurance-agent | None | Mounts `/api/operator/v1` (insurance-agent#114) |
+| tax-agent | OpenAI-compatible gateway with `tak_` keys | Mounts `/api/operator/v1` (tax-agent#574); refuses agent-key turns until they bill the key's cap |
+| physim | OpenAI-compatible gateway with `sk_physim_` keys | Mounts `/api/operator/v1` (physim#170); refuses agent-key turns until they bill the key's cap |
+| hospitality-agent, agent-builder | None | Not yet mounted |
 
 An app mounts this API so outside agents, such as a Claude Code session, can operate its own workspaces.
 No app needs it so that GTM can market that app's product: GTM works from public inputs only.
