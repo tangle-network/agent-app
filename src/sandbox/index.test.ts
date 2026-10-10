@@ -2335,6 +2335,8 @@ describe('ensureWorkspaceSandbox — new seams', () => {
           execSettled = true
           reject(sdkTimeout)
         }, 5_200)))
+        // The longer probe before a restart also misses, so the box is restarted.
+        .mockRejectedValueOnce(sdkTimeout)
         .mockResolvedValue({ stdout: 'alive\n', stderr: '', exitCode: 0 })
       const running = fakeBox({ name: 'box-w1', exec, stop: vi.fn(async () => {
         expect(execSettled).toBe(true)
