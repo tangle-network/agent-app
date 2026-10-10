@@ -33,6 +33,8 @@ export default defineConfig({
     'alerting/index': 'src/alerting/index.ts',
     'preflight/index': 'src/preflight/index.ts',
     'object-store/index': 'src/object-store/index.ts',
+    'workspace-export/index': 'src/workspace-export/index.ts',
+    'workspace-export/react': 'src/workspace-export/react.tsx',
     'chat-store/index': 'src/chat-store/index.ts',
     'chat-routes/index': 'src/chat-routes/index.ts',
     'crypto/index': 'src/crypto/index.ts',

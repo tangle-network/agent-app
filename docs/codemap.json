@@ -18343,6 +18343,12 @@
           "kind": "type",
           "signature": "type TurnStatus",
           "doc": "Resumable chat turns — the router-path answer to \"streams resume on disconnect\" (issue #27)."
+        },
+        {
+          "name": "TurnStatusWriteOptions",
+          "kind": "interface",
+          "signature": "interface TurnStatusWriteOptions",
+          "doc": "Settling a stream nothing produces any more."
         }
       ]
     },
@@ -25296,6 +25302,272 @@
           "kind": "interface",
           "signature": "interface WorkspaceAppRecord",
           "doc": "A sandbox app registered in one product workspace."
+        }
+      ]
+    },
+    {
+      "id": "./workspace-export",
+      "source": "src/workspace-export/index.ts",
+      "dependsOn": [
+        "object-store"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "createExportEngine",
+          "kind": "function",
+          "signature": "(options: ExportEngineOptions) => { archiveKey: (workspaceId: string, id: string) => string; list(workspaceId: string):…",
+          "doc": null
+        },
+        {
+          "name": "createMemoryExportStorage",
+          "kind": "function",
+          "signature": "() => ExportStorage & { objects: Map<string, Uint8Array<ArrayBufferLike>>; }",
+          "doc": "An in-memory store for tests and local runs."
+        },
+        {
+          "name": "createR2ExportStorage",
+          "kind": "function",
+          "signature": "(bucket: R2ExportBucket) => ExportStorage",
+          "doc": null
+        },
+        {
+          "name": "createSecretScanner",
+          "kind": "function",
+          "signature": "(options?: { knownSecrets?: readonly string[] | undefined; }) => SecretScanner",
+          "doc": "Build the scanner for one export."
+        },
+        {
+          "name": "createWorkspaceExport",
+          "kind": "function",
+          "signature": "(options: WorkspaceExportOptions) => { route: (request: Request, args: { workspaceId: string; path: string; }) => Promi…",
+          "doc": null
+        },
+        {
+          "name": "D1ExportDatabase",
+          "kind": "interface",
+          "signature": "interface D1ExportDatabase",
+          "doc": "The slice of Cloudflare's `D1Database` used here."
+        },
+        {
+          "name": "D1TableCoverage",
+          "kind": "interface",
+          "signature": "interface D1TableCoverage",
+          "doc": null
+        },
+        {
+          "name": "d1WorkspaceTables",
+          "kind": "function",
+          "signature": "(options: D1WorkspaceTablesOptions) => Promise<{ sources: ExportRowsSource[]; coverage: D1TableCoverage[]; }>",
+          "doc": "Discover workspace tables."
+        },
+        {
+          "name": "D1WorkspaceTablesOptions",
+          "kind": "interface",
+          "signature": "interface D1WorkspaceTablesOptions",
+          "doc": null
+        },
+        {
+          "name": "ExportArchiveSource",
+          "kind": "interface",
+          "signature": "interface ExportArchiveSource",
+          "doc": "A gzip-compressed tar, normally a sandbox workspace read through the Sandbox SDK (`box.fs.openArchive(dir)`)."
+        },
+        {
+          "name": "ExportDataClass",
+          "kind": "type",
+          "signature": "type ExportDataClass",
+          "doc": "What kind of customer data a source holds."
+        },
+        {
+          "name": "ExportEngine",
+          "kind": "type",
+          "signature": "type ExportEngine",
+          "doc": null
+        },
+        {
+          "name": "ExportEngineOptions",
+          "kind": "interface",
+          "signature": "interface ExportEngineOptions",
+          "doc": null
+        },
+        {
+          "name": "ExportFile",
+          "kind": "interface",
+          "signature": "interface ExportFile",
+          "doc": null
+        },
+        {
+          "name": "ExportFilesSource",
+          "kind": "interface",
+          "signature": "interface ExportFilesSource",
+          "doc": "Individual files written under `files/<name>/`."
+        },
+        {
+          "name": "ExportJob",
+          "kind": "interface",
+          "signature": "interface ExportJob",
+          "doc": null
+        },
+        {
+          "name": "ExportJsonSource",
+          "kind": "interface",
+          "signature": "interface ExportJsonSource",
+          "doc": "One JSON document written to `data/<name>.json`."
+        },
+        {
+          "name": "ExportPlan",
+          "kind": "interface",
+          "signature": "interface ExportPlan",
+          "doc": null
+        },
+        {
+          "name": "ExportPrincipal",
+          "kind": "interface",
+          "signature": "interface ExportPrincipal",
+          "doc": "Who asked."
+        },
+        {
+          "name": "ExportProgress",
+          "kind": "interface",
+          "signature": "interface ExportProgress",
+          "doc": "What the progress endpoint returns."
+        },
+        {
+          "name": "ExportRow",
+          "kind": "type",
+          "signature": "type ExportRow",
+          "doc": null
+        },
+        {
+          "name": "ExportRowsSource",
+          "kind": "interface",
+          "signature": "interface ExportRowsSource",
+          "doc": "Rows written as NDJSON to `data/<name>.ndjson`."
+        },
+        {
+          "name": "ExportSource",
+          "kind": "type",
+          "signature": "type ExportSource",
+          "doc": null
+        },
+        {
+          "name": "ExportStatus",
+          "kind": "type",
+          "signature": "type ExportStatus",
+          "doc": null
+        },
+        {
+          "name": "ExportStorage",
+          "kind": "interface",
+          "signature": "interface ExportStorage",
+          "doc": "Where an export keeps its pieces until download."
+        },
+        {
+          "name": "ExportUnit",
+          "kind": "interface",
+          "signature": "interface ExportUnit",
+          "doc": null
+        },
+        {
+          "name": "isCredentialFile",
+          "kind": "function",
+          "signature": "(path: string) => boolean",
+          "doc": null
+        },
+        {
+          "name": "isSecretName",
+          "kind": "function",
+          "signature": "(name: string) => boolean",
+          "doc": "True when a column or JSON key named `name` holds a credential."
+        },
+        {
+          "name": "kvFiles",
+          "kind": "function",
+          "signature": "(args: { name: string; dataClass: ExportDataClass; kv: KVFilesNamespace; prefix: string; read?: ((key: string, body: Re…",
+          "doc": "Every KV value under a prefix, written as a file at the key minus the prefix."
+        },
+        {
+          "name": "KVFilesNamespace",
+          "kind": "interface",
+          "signature": "interface KVFilesNamespace",
+          "doc": "The slice of `KVNamespace` used to export values."
+        },
+        {
+          "name": "MANIFEST_SCHEMA",
+          "kind": "const",
+          "signature": "\"tangle.workspace-export/v1\"",
+          "doc": null
+        },
+        {
+          "name": "R2ExportBucket",
+          "kind": "interface",
+          "signature": "interface R2ExportBucket",
+          "doc": "The slice of Cloudflare's `R2Bucket` used here; a real binding satisfies it."
+        },
+        {
+          "name": "r2Files",
+          "kind": "function",
+          "signature": "(args: { name: string; dataClass: ExportDataClass; bucket: R2FilesBucket; prefixes: readonly string[]; read?: ((key: st…",
+          "doc": "Every object under the given prefixes."
+        },
+        {
+          "name": "R2FilesBucket",
+          "kind": "interface",
+          "signature": "interface R2FilesBucket",
+          "doc": "The slice of `R2Bucket` used to export objects."
+        },
+        {
+          "name": "REDACTED",
+          "kind": "const",
+          "signature": "\"[redacted]\"",
+          "doc": "Keeps credentials out of workspace exports."
+        },
+        {
+          "name": "SecretScanner",
+          "kind": "interface",
+          "signature": "interface SecretScanner",
+          "doc": null
+        },
+        {
+          "name": "StoredEntry",
+          "kind": "interface",
+          "signature": "interface StoredEntry",
+          "doc": null
+        },
+        {
+          "name": "UnitStatus",
+          "kind": "type",
+          "signature": "type UnitStatus",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceExportOptions",
+          "kind": "interface",
+          "signature": "interface WorkspaceExportOptions",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./workspace-export/react",
+      "source": "src/workspace-export/react.tsx",
+      "dependsOn": [
+        "object-store"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "WorkspaceExportPanel",
+          "kind": "function",
+          "signature": "({ endpoint, canExport, title, className, fetcher }: WorkspaceExportPanelProps) => Element | null",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceExportPanelProps",
+          "kind": "interface",
+          "signature": "interface WorkspaceExportPanelProps",
+          "doc": null
         }
       ]
     },

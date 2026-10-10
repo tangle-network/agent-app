@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-59 exports.
+60 exports.
 
 ### `asRecord`
 
@@ -476,4 +476,12 @@ interface TurnObservationUpdate
 
 ```ts
 type TurnStatus
+```
+
+### `TurnStatusWriteOptions`
+
+`interface` — Settling a stream nothing produces any more.
+
+```ts
+interface TurnStatusWriteOptions
 ```

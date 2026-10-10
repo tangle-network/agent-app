@@ -61,6 +61,8 @@ Approvals attach to an action's effects, such as spending or publishing, rather 
 - For document extraction or upload changes, read [documents-module.md](docs/documents-module.md) and [office-attachment-defaults.md](docs/office-attachment-defaults.md).
 - For llms.txt, the agent manifest, markdown negotiation, or a product's agent setup prompt, read [agent-surfaces.md](docs/agent-surfaces.md).
   Preserve explicit unreadable/OCR outcomes and limits on expanded untrusted content.
+- For workspace data export, read [workspace-export.md](docs/workspace-export.md).
+  Keep authorization owner-only and fail-closed, and keep credentials out of archives and logs.
 - For billing verification, read [spend-verification.md](docs/spend-verification.md).
   Preserve declared ownership, observation coverage, and uncertainty; missing observations cannot certify a clean bill.
 - For dependency provenance or peer checks, read [dependency-source-gate.md](docs/dependency-source-gate.md).

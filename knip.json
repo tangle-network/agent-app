@@ -62,6 +62,8 @@
     "src/missions/index.ts",
     "src/model-resolution/index.ts",
     "src/object-store/index.ts",
+    "src/workspace-export/index.ts",
+    "src/workspace-export/react.tsx",
     "src/openui-react/index.tsx",
     "src/openui/index.ts",
     "src/peer-floors/check.ts",
