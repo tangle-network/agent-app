@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.27
+
+- fix(web-react): treat an interaction field without a required flag as optional (#922)
+
 ## 0.60.26
 
 - feat(signoff): ship every agent-app Worker with traceable Cloudflare defaults (#920)

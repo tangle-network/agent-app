@@ -51,6 +51,14 @@ describe('fieldAnswer / buildAnswerData', () => {
     expect(buildAnswerData([SELECT, optionalText], {})).toBeNull()
     expect(buildAnswerData([SELECT, optionalText], { q0: { selected: ['a'] } })).toEqual({ q0: ['a'] })
   })
+
+  it('treats a field without a required flag as optional, as the protocol validates it', () => {
+    // permissionAnswerSpec: a required decision plus feedback with no required flag.
+    const feedback: ChatInteractionField = { type: 'text', name: 'feedback', label: 'Feedback (optional)', multiline: true }
+    expect(buildAnswerData([SELECT, feedback], { q0: { selected: ['a'] } })).toEqual({ q0: ['a'] })
+    expect(buildAnswerData([SELECT, feedback], { q0: { selected: ['a'] }, feedback: { text: 'Fine' } })).toEqual({ q0: ['a'], feedback: 'Fine' })
+    expect(buildAnswerData([SELECT, feedback], { feedback: { text: 'Fine' } })).toBeNull()
+  })
 })
 
 describe('late answers', () => {
