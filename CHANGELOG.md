@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.59
+
+- feat(customer-db-gateway): customer-hosted database gateway for agent MCP (#957)
+
 ## 0.60.58
 
 - fix(workspace-export): resume large files sources across requests; keep exports 24 hours (#955)
