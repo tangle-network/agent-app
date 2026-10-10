@@ -80,6 +80,56 @@ export function approvalEmail(product: EmailProduct, input: ApprovalEmailInput):
   })
 }
 
+/** Input for {@link approvalDigestEmail}. */
+export interface ApprovalDigestEmailInput {
+  /** Every request still waiting, in the order the agent asked; at least one. */
+  actions: ReadonlyArray<ApprovalEmailAction & {
+    /** The conversation it waits in; requests group under it. */
+    conversation?: string
+    /** Opens the request in that conversation. */
+    url?: string
+  }>
+  /** Opens every request waiting in the workspace. */
+  reviewUrl: string
+  footer: EmailFooter
+}
+
+/**
+ * One email with every request still waiting on the owner, grouped by
+ * conversation, each with its own Approve and Deny. Sent on a schedule in
+ * place of one email per request. As with {@link approvalEmail}, the links
+ * open confirmation pages; nothing decides when opened.
+ */
+export function approvalDigestEmail(product: EmailProduct, input: ApprovalDigestEmailInput): EmailMessage {
+  const count = input.actions.length
+  if (count === 0) throw new TypeError('approvalDigestEmail needs at least one action')
+  const groups = new Map<string, EmailItem[]>()
+  for (const action of input.actions) {
+    const key = action.conversation ?? ''
+    const items = groups.get(key) ?? []
+    items.push({
+      title: action.summary,
+      ...(action.detail ? { detail: action.detail } : {}),
+      ...(action.url ? { url: action.url } : {}),
+      ...(action.approveUrl || action.denyUrl ? { links: [
+        ...(action.approveUrl ? [{ label: 'Approve', url: action.approveUrl }] : []),
+        ...(action.denyUrl ? [{ label: 'Deny', url: action.denyUrl }] : []),
+      ] } : {}),
+    })
+    groups.set(key, items)
+  }
+  const waiting = count === 1 ? '1 request is waiting' : `${count} requests are waiting`
+  return renderEmail(product, {
+    subject: emailSubject(count === 1 ? 'Approve: 1 request is waiting' : `Approve: ${count} requests are waiting`, product),
+    preheader: `${waiting} for your decision.`,
+    title: count === 1 ? '1 approval waiting' : `${count} approvals waiting`,
+    paragraphs: [`${waiting} for your decision. Each one runs only when you approve it.`],
+    sections: [...groups].map(([conversation, items]) => ({ ...(conversation ? { heading: conversation } : {}), items })),
+    primary: { label: 'Review all', url: input.reviewUrl },
+    footer: input.footer,
+  })
+}
+
 /** Input for {@link inviteEmail}. */
 export interface InviteEmailInput {
   workspaceName: string

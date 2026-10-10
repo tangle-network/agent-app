@@ -38,10 +38,12 @@ export {
   type EmailSection,
 } from './layout'
 export {
+  approvalDigestEmail,
   approvalEmail,
   digestEmail,
   inviteEmail,
   noticeEmail,
+  type ApprovalDigestEmailInput,
   type ApprovalEmailAction,
   type ApprovalEmailInput,
   type DigestEmailInput,

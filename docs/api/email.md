@@ -4,7 +4,23 @@
 
 Source: `src/email/index.ts`
 
-20 exports.
+22 exports.
+
+### `approvalDigestEmail`
+
+`function` — One email with every request still waiting on the owner, grouped by conversation, each with its own Approve and Deny.
+
+```ts
+(product: EmailProduct, input: ApprovalDigestEmailInput) => EmailMessage
+```
+
+### `ApprovalDigestEmailInput`
+
+`interface` — Input for {@link approvalDigestEmail}.
+
+```ts
+interface ApprovalDigestEmailInput
+```
 
 ### `approvalEmail`
 

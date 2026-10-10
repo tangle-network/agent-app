@@ -4,7 +4,7 @@
 
 Source: `src/hub-approvals-react/index.tsx`
 
-15 exports.
+17 exports.
 
 ### `HubActionPreviewView`
 
@@ -118,10 +118,26 @@ interface HubApprovalRowProps
 interface HubApprovalsListProps
 ```
 
+### `HubApprovalWaitNote`
+
+`function` — Why an open call waits for the owner, or how it will run without them.
+
+```ts
+({ wait, className }: { wait: HubApprovalWait; className?: string | undefined; }) => Element
+```
+
 ### `HubProviderMark`
 
 `function` — The integration's own logo on a neutral tile, so dark marks stay legible.
 
 ```ts
 ({ providerId, name, size }: { providerId: string; name: string; size?: number | undefined; }) => Element
+```
+
+### `openPhaseLabel`
+
+`function` — The pill an open call shows: who it waits for, or that a permission runs it.
+
+```ts
+(item: Pick<HubApprovalItem, "phase" | "wait">, blocked?: string) => string | undefined
 ```

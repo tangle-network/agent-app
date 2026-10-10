@@ -1,6 +1,7 @@
 import { palettes } from '@tangle-network/brand'
 import { describe, expect, it } from 'vitest'
 import {
+  approvalDigestEmail,
   approvalEmail,
   digestEmail,
   emailPreviewHtml,
@@ -38,6 +39,15 @@ const samples: Record<string, EmailMessage> = {
       { summary: 'Synthesize speech “Hello”', detail: 'ph0ny', approveUrl: '/approval/act_b?t=sig_b', denyUrl: '/approval/act_e?t=sig_e' },
     ],
     approveUrl: '/app/ws_1/chat/thr_1',
+    reviewUrl: '/app/ws_1/review',
+    footer,
+  }),
+  'approval-digest': approvalDigestEmail(product, {
+    actions: [
+      { summary: 'Post on X “Ship notes”', detail: 'X · open until Oct 9, 3:40 PM UTC', conversation: 'Launch week', url: '/app/ws_1/chat/thr_1#msg-m1', approveUrl: '/approval/act_a?t=sig_a', denyUrl: '/approval/act_d?t=sig_d' },
+      { summary: 'Send email to ada@acme.com', detail: 'Gmail', conversation: 'Launch week', approveUrl: '/approval/act_b?t=sig_b', denyUrl: '/approval/act_e?t=sig_e' },
+      { summary: 'Start outbound call to +15555550100', detail: 'ph0ny', conversation: 'Follow-ups', approveUrl: '/approval/act_c?t=sig_c', denyUrl: '/approval/act_f?t=sig_f' },
+    ],
     reviewUrl: '/app/ws_1/review',
     footer,
   }),
@@ -93,6 +103,17 @@ describe('email templates', () => {
     }).subject).toBe('Approve: API key rotation — GTM Agent')
     expect(samples.invite!.subject).toBe('Join Tangle Growth — GTM Agent')
     expect(samples.digest!.subject).toBe('Tangle Growth: 1 approval waiting, 6 turns — GTM Agent')
+  })
+
+  it('collects every waiting request into one digest, grouped by conversation, each with its own decision', () => {
+    const { subject, html, text } = samples['approval-digest']!
+    expect(subject).toBe('Approve: 3 requests are waiting — GTM Agent')
+    expect(text).toContain('Launch week')
+    expect(text).toContain('Follow-ups')
+    expect(text.indexOf('Send email to ada@acme.com')).toBeLessThan(text.indexOf('Follow-ups'))
+    for (const id of ['act_a', 'act_b', 'act_c', 'act_d', 'act_e', 'act_f']) expect(html).toContain(`/approval/${id}?t=`)
+    expect(html).toContain('href="https://gtm.tangle.tools/app/ws_1/review"')
+    expect(() => approvalDigestEmail(product, { actions: [], reviewUrl: '/r', footer })).toThrow(TypeError)
   })
 
   it('gives each action its own Approve and Deny, and a lone action its Approve button', () => {

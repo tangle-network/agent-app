@@ -39,7 +39,7 @@ _119 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./design-canvas/drizzle`](api/design-canvas-drizzle.md) | 10 | `tools`, `web` |
 | [`./documents`](api/documents.md) | 37 | — |
 | [`./documents/pdf-inspector`](api/documents-pdf-inspector.md) | 4 | — |
-| [`./email`](api/email.md) | 20 | — |
+| [`./email`](api/email.md) | 22 | — |
 | [`./eval`](api/eval.md) | 21 | `tools` |
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
@@ -48,8 +48,8 @@ _119 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./hosted-agent/application`](api/hosted-agent-application.md) | 9 | `profile`, `web` |
 | [`./hosted-agent/react`](api/hosted-agent-react.md) | 29 | — |
 | [`./hosted-agent/react/styles`](api/hosted-agent-react-styles.md) | 0 | — |
-| [`./hub-approvals`](api/hub-approvals.md) | 24 | — |
-| [`./hub-approvals-react`](api/hub-approvals-react.md) | 15 | `hub-approvals` |
+| [`./hub-approvals`](api/hub-approvals.md) | 25 | — |
+| [`./hub-approvals-react`](api/hub-approvals-react.md) | 17 | `hub-approvals` |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `brand`, `intakes` |
 | [`./intakes-react/lazy`](api/intakes-react-lazy.md) | 2 | `brand`, `intakes` |
@@ -436,9 +436,9 @@ Source: `src/documents/pdf-inspector.ts` · 4 exports
 
 ## `./email`
 
-Source: `src/email/index.ts` · 20 exports
+Source: `src/email/index.ts` · 22 exports
 
-`approvalEmail`, `ApprovalEmailAction`, `ApprovalEmailInput`, `digestEmail`, `DigestEmailInput`, `EmailAction`, `EmailAttachment`, `EmailFooter`, `EmailItem`, `EmailLintIssue`, `EmailMessage`, `emailPreviewHtml`, `EmailProduct`, `EmailSection`, `emailSender`, `inviteEmail`, `InviteEmailInput`, `lintEmailHtml`, `noticeEmail`, `NoticeEmailInput`
+`approvalDigestEmail`, `ApprovalDigestEmailInput`, `approvalEmail`, `ApprovalEmailAction`, `ApprovalEmailInput`, `digestEmail`, `DigestEmailInput`, `EmailAction`, `EmailAttachment`, `EmailFooter`, `EmailItem`, `EmailLintIssue`, `EmailMessage`, `emailPreviewHtml`, `EmailProduct`, `EmailSection`, `emailSender`, `inviteEmail`, `InviteEmailInput`, `lintEmailHtml`, `noticeEmail`, `NoticeEmailInput`
 
 [Full API →](api/email.md)
 
@@ -512,19 +512,19 @@ _No public exports._
 
 ## `./hub-approvals`
 
-Source: `src/hub-approvals/index.ts` · 24 exports
+Source: `src/hub-approvals/index.ts` · 25 exports
 
-`formatMinorAmount`, `formatWhen`, `HUB_APPROVAL_ACTIVE_PHASES`, `HUB_APPROVAL_OPEN_PHASES`, `HUB_APPROVAL_PHASE_LABELS`, `HUB_APPROVAL_RESUME_PART`, `HubActionBundle`, `HubActionField`, `HubActionFile`, `hubActionFiles`, `HubActionPresentation`, `HubActionPreview`, `hubActionReceipt`, `HubActionReceipt`, `HubApprovalItem`, `HubApprovalPhase`, `hubApprovalResumePart`, `HubApprovalResumePart`, `hubProviderName`, `pastTense`, `presentHubAction`, `splitHubActionPath`, `summarizeHubResult`, `unwrapHubResult`
+`formatMinorAmount`, `formatWhen`, `HUB_APPROVAL_ACTIVE_PHASES`, `HUB_APPROVAL_OPEN_PHASES`, `HUB_APPROVAL_PHASE_LABELS`, `HUB_APPROVAL_RESUME_PART`, `HubActionBundle`, `HubActionField`, `HubActionFile`, `hubActionFiles`, `HubActionPresentation`, `HubActionPreview`, `hubActionReceipt`, `HubActionReceipt`, `HubApprovalItem`, `HubApprovalPhase`, `hubApprovalResumePart`, `HubApprovalResumePart`, `HubApprovalWait`, `hubProviderName`, `pastTense`, `presentHubAction`, `splitHubActionPath`, `summarizeHubResult`, `unwrapHubResult`
 
 [Full API →](api/hub-approvals.md)
 
 ## `./hub-approvals-react`
 
-Source: `src/hub-approvals-react/index.tsx` · 15 exports
+Source: `src/hub-approvals-react/index.tsx` · 17 exports
 
 Depends on: `hub-approvals`
 
-`HubActionPreviewView`, `HubActionReceiptCard`, `HubActionReceiptCardProps`, `HubApprovalDecision`, `HubApprovalDock`, `HubApprovalDockProps`, `HubApprovalPermissions`, `HubApprovalPhasePill`, `HubApprovalReceipts`, `HubApprovalReceiptsProps`, `HubApprovalRow`, `HubApprovalRowProps`, `HubApprovalsList`, `HubApprovalsListProps`, `HubProviderMark`
+`HubActionPreviewView`, `HubActionReceiptCard`, `HubActionReceiptCardProps`, `HubApprovalDecision`, `HubApprovalDock`, `HubApprovalDockProps`, `HubApprovalPermissions`, `HubApprovalPhasePill`, `HubApprovalReceipts`, `HubApprovalReceiptsProps`, `HubApprovalRow`, `HubApprovalRowProps`, `HubApprovalsList`, `HubApprovalsListProps`, `HubApprovalWaitNote`, `HubProviderMark`, `openPhaseLabel`
 
 [Full API →](api/hub-approvals-react.md)
 
