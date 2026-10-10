@@ -82,6 +82,14 @@ import {
 import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import { parseJsonObjectBody } from '../web/index'
 import {
+  buildTurnPhaseEvent,
+  TURN_PROGRESS_FIRST,
+  TURN_PROGRESS_HEADER,
+  TURN_ROUTE_PHASE_MESSAGES,
+  turnResponseEventFor,
+  type TurnRoutePhase,
+} from './turn-progress'
+import {
   assertPromptPartsWithinCap,
   ChatTurnInputError,
   parseChatTurnParts,
@@ -602,6 +610,9 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  `message.part.updated` events passes `coalesceChatStreamEvents`. */
   coalesceTurnEvents?: (events: unknown[]) => unknown[]
   replay?: { pollMs?: number; timeoutMs?: number }
+  /** Text for the route's own stages on a progress-first stream (`./turn-progress`).
+   *  Omitted stages keep `TURN_ROUTE_PHASE_MESSAGES`. */
+  progressMessages?: Partial<Record<TurnRoutePhase, string>>
   log?: (message: string, meta?: Record<string, unknown>) => void
 }
 
@@ -610,7 +621,9 @@ export interface ChatTurnRoutes {
   /** POST — run one turn, streaming NDJSON. First line is
    *  `{type:'turn', turnId}` (the replay handle); the rest is the engine's
    *  event protocol. Pass the platform's `waitUntil` so the turn keeps
-   *  running (and buffering) after a client disconnect. */
+   *  running (and buffering) after a client disconnect. A request with
+   *  `TURN_PROGRESS_HEADER` gets a progress-first stream instead
+   *  (`./turn-progress`). */
   turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response>
   /** GET — replay a buffered turn from `?fromSeq=` (0 = everything), then
    *  follow it live until it completes. */
@@ -787,7 +800,87 @@ export function createChatTurnRoutes<TContext = void>(
       ? null
       : (options.incrementalPersistence ?? {})
 
+  const progressMessages: Record<TurnRoutePhase, string> = { ...TURN_ROUTE_PHASE_MESSAGES, ...options.progressMessages }
+
   async function turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response> {
+    if (request.headers.get(TURN_PROGRESS_HEADER) === TURN_PROGRESS_FIRST) return progressFirstTurn(request, ctx)
+    return runTurn(request, ctx)
+  }
+
+  /**
+   * Open the response stream before any of the turn's own work, so the client
+   * shows a real stage within one round trip. The turn then runs exactly as
+   * {@link runTurn} does; its stream is piped through, and any other response
+   * it returns (a refusal, a gate's answer, a handoff) becomes one
+   * `turn.response` event that `settleTurnResponse` turns back into that
+   * response on the client.
+   */
+  function progressFirstTurn(request: Request, ctx?: ChatTurnRequestContext): Response {
+    const receivedAt = Date.now()
+    const encoder = new TextEncoder()
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
+    const writer = writable.getWriter()
+    let clientGone = false
+    const write = async (chunk: Uint8Array): Promise<void> => {
+      if (clientGone) return
+      try {
+        await writer.write(chunk)
+      } catch {
+        clientGone = true
+      }
+    }
+    const writeEvent = (event: ChatRouteEvent): Promise<void> => write(encoder.encode(`${JSON.stringify(event)}\n`))
+    const progress = (phase: TurnRoutePhase): void => {
+      void writeEvent(buildTurnPhaseEvent(phase, progressMessages[phase], { sinceRequestMs: Date.now() - receivedAt }))
+    }
+    progress('accepted')
+
+    const pump = (async () => {
+      let inner: Response
+      try {
+        inner = await runTurn(request, ctx, progress)
+      } catch (err) {
+        log('[chat-routes] turn failed before it streamed', { error: err instanceof Error ? err.message : String(err) })
+        inner = Response.json({ error: 'The turn failed before it started. Try again.' }, { status: 500 })
+      }
+      if (!inner.body || !inner.headers.get('x-turn-id')) {
+        await writeEvent(await turnResponseEventFor(inner))
+      } else {
+        const reader = inner.body.getReader()
+        try {
+          for (;;) {
+            const { done, value } = await reader.read()
+            if (done) break
+            await write(value)
+            if (clientGone) {
+              // The turn keeps running under its own drain; only this view stops.
+              await reader.cancel().catch(() => {})
+              break
+            }
+          }
+        } catch (err) {
+          log('[chat-routes] progress-first pipe failed', { error: err instanceof Error ? err.message : String(err) })
+        }
+      }
+      if (!clientGone) await writer.close().catch(() => {})
+    })()
+    if (ctx?.waitUntil) ctx.waitUntil(pump)
+    else void pump.catch(() => {})
+
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'application/x-ndjson',
+        'Cache-Control': 'no-cache',
+        [TURN_PROGRESS_HEADER]: TURN_PROGRESS_FIRST,
+      },
+    })
+  }
+
+  async function runTurn(
+    request: Request,
+    ctx?: ChatTurnRequestContext,
+    progress?: (phase: TurnRoutePhase) => void,
+  ): Promise<Response> {
     const [rawBody, badBody] = await parseJsonObjectBody(request)
     if (badBody) return badBody
 
@@ -930,6 +1023,7 @@ export function createChatTurnRoutes<TContext = void>(
       lockAcquired = true
       lockHandle = acquired.handle
     }
+    progress?.('preparing')
 
     // Turn state, hoisted so the pre-stream `catch` can settle the lifecycle
     // (fire `onTurnError`, close the span) even when a seam throws

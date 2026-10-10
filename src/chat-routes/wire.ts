@@ -1,4 +1,5 @@
 import { isWorkspaceFileExportable } from '../web/file-export'
+import { TURN_PROGRESS_FIRST, TURN_PROGRESS_HEADER } from './turn-progress'
 import type { ReasoningEffort } from '@tangle-network/agent-interface'
 
 /**
@@ -198,10 +199,17 @@ export interface ChatTurnRequestPayload {
 /** `fetch` init for the turn route — the one place the client wire shape is
  *  serialized, so composer glue and products never drift from the server's
  *  parser. */
-export function chatTurnRequestInit(payload: ChatTurnRequestPayload): RequestInit {
+export function chatTurnRequestInit(
+  payload: ChatTurnRequestPayload,
+  options: { progressFirst?: boolean } = {},
+): RequestInit {
   return {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      // Ask for a progress-first stream (`./turn-progress`); settle the response with `settleTurnResponse`.
+      ...(options.progressFirst ? { [TURN_PROGRESS_HEADER]: TURN_PROGRESS_FIRST } : {}),
+    },
     body: JSON.stringify(payload),
   }
 }

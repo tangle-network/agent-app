@@ -25,6 +25,12 @@ import {
   persistedPartToPlan,
   type ChatPlan,
 } from '../plans/index'
+import {
+  isTurnPhaseEvent,
+  settleTurnResponse,
+  TURN_PHASE_EVENT,
+  type TurnPhaseData,
+} from '../chat-routes/turn-progress'
 
 // The `/chat-routes` wire contract, re-exported for turn-body construction —
 // `./chat-routes/wire` and `./chat-routes/file-index`'s response types are
@@ -58,6 +64,21 @@ export {
   base64WireLen,
 } from '../chat-routes/wire'
 export {
+  buildTurnPhaseEvent,
+  isTurnPhaseEvent,
+  settleTurnResponse,
+  TURN_PHASE_EVENT,
+  TURN_PROGRESS_FIRST,
+  TURN_PROGRESS_HEADER,
+  TURN_RESPONSE_EVENT,
+  TURN_ROUTE_PHASE_MESSAGES,
+  TURN_STREAM_LOST_CODE,
+  type TurnPhaseData,
+  type TurnPhaseEvent,
+  type TurnResponseData,
+  type TurnRoutePhase,
+} from '../chat-routes/turn-progress'
+export {
   type FileIndexResponse,
   type FileIndexReadyResponse,
   type FileIndexWarmingResponse,
@@ -81,6 +102,8 @@ export interface ChatStreamToolResult {
 /** Define callbacks to handle events and data during a chat streaming session */
 export interface ChatStreamCallbacks {
   onTurnId?: (turnId: string) => void
+  /** The turn's current stage (`session.run.phase`), before its first output and between tool calls. */
+  onPhase?: (phase: TurnPhaseData) => void
   onText?: (delta: string) => void
   onReasoning?: (delta: string) => void
   onToolCall?: (call: ChatStreamToolCall) => void
@@ -149,6 +172,9 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
   switch (evt.type) {
     case 'turn':
       if (typeof evt.turnId === 'string') turnId = evt.turnId
+      break
+    case TURN_PHASE_EVENT:
+      if (isTurnPhaseEvent(evt)) cb.onPhase?.(evt.data)
       break
     case 'text':
       if (typeof evt.text === 'string') {
@@ -330,7 +356,8 @@ export interface StreamChatOptions {
  * turn. Server-side the turn keeps running either way (queued runner).
  */
 export async function streamChatTurn(opts: StreamChatOptions): Promise<ConsumeChatStreamResult> {
-  const res = await opts.start()
+  // A progress-first response answers refusals in-stream; settle it into the response it stands for.
+  const res = await settleTurnResponse(await opts.start(), (phase) => opts.callbacks.onPhase?.(phase))
   if (!res.ok || !res.body) {
     const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string }
     throw new Error(err.error ?? `HTTP ${res.status}`)
