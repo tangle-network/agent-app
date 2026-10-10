@@ -453,6 +453,10 @@ export interface ChatComposerProps {
 
   /** Cmd/Ctrl+L focuses the input and shows the hint. Default true. */
   focusShortcut?: boolean
+  /** Called when focus enters the composer: the input or any of its controls.
+   *  Pass `useWorkspacePrewarm().reassert` so a box that suspended while the
+   *  tab sat open starts resuming before the member sends. */
+  onFocusWithin?: () => void
   /** Float the card on a soft two-layer foreground-tinted shadow (opt-in).
    *  Elevation only — radius, ring, and control layout are unchanged. */
   floating?: boolean
@@ -556,6 +560,7 @@ export function ChatComposer({
   onDictateError,
 
   focusShortcut = true,
+  onFocusWithin,
   floating = false,
   sendLabel = 'Send',
   sendVariant = 'pill',
@@ -1104,6 +1109,7 @@ export function ChatComposer({
   return (
     <div
       className={`relative ${className ?? ''}`}
+      onFocus={onFocusWithin}
       onDragEnter={onAttach ? handleDragEnter : undefined}
       onDragLeave={onAttach ? handleDragLeave : undefined}
       onDragOver={onAttach ? handleDragOver : undefined}
