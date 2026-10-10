@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.43
+
+- feat(hub-approvals): the open request sits in its place in the dock's list, not twice (#939)
+
 ## 0.60.42
 
 - fix(sandbox): report the resume of a stopped box as a container-start step (#937)
