@@ -34,14 +34,17 @@ head_sampling_rate = 1
 ## Apps built with `@cloudflare/vite-plugin`
 
 The Vite plugin writes the deployed Wrangler config and copies `upload_source_maps` into it, but Wrangler can only upload maps the build emitted.
-Enable source maps for the Worker environment only, so browser assets do not publish their maps:
+Emit maps for the Worker environment only, so browser assets do not publish theirs, and leave embedded sources out:
 
 ```ts
-// vite.config.ts — "ssr" is the Worker environment under React Router's Cloudflare preset
+// vite.config.ts — "ssr" is the Worker environment when the plugin sets viteEnvironment: { name: 'ssr' }
 environments: { ssr: { build: { sourcemap: true } } },
+build: { rolldownOptions: { output: { sourcemapExcludeSources: true } } },
 ```
 
-Check the deploy output: `wrangler deploy` lists each uploaded `.map` module.
+Cloudflare caps a Worker's source maps at 15 MB gzipped.
+gtm-agent's server maps measured 13.3 MB with embedded sources and 2.6 MB without; mappings and names are all that symbolizing stack traces and profiles needs.
+After a build, `build/server` holds `.map` files and `build/client` holds none.
 
 ## Smart placement is not a default
 
