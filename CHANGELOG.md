@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.28
+
+- fix(hub-approvals): preserve uncertain action outcomes (#924)
+
 ## 0.60.27
 
 - fix(web-react): treat an interaction field without a required flag as optional (#922)
