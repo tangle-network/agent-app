@@ -138,7 +138,7 @@ describe('parseBrandKit — fixture HTML → BrandKit', () => {
     // A brace-free run before a rule with no font-family made the old single
     // regex restart its selector scan at every character: a 366 KB storefront
     // page took 74 s and its brand intake request exceeded the CPU limit.
-    const markup = '<p class="copy">Book trusted help for home projects.</p>'.repeat(6_000)
+    const markup = '<p class="copy">Book trusted help for home projects.</p>'.repeat(7_000)
     const html = `<html><body>${markup}<style>.card{color:#222}h1{font-family:"Brand Display",serif}p{font-family:Inter,sans-serif}</style></body></html>`
     expect(html.length).toBeGreaterThan(350_000)
 
