@@ -14120,8 +14120,8 @@
         {
           "name": "createWorkspacePrewarmRoute",
           "kind": "function",
-          "signature": "(options: CreateWorkspacePrewarmRouteOptions) => (request: Request) => Promise<Response>",
-          "doc": null
+          "signature": "<Context = void>(options: CreateWorkspacePrewarmRouteOptions<Context>) => (request: Request, context: Context) => Promi…",
+          "doc": "Build the handler once per isolate, not per request: its single-flight and success memory live in the returned closure."
         },
         {
           "name": "CreateWorkspacePrewarmRouteOptions",
