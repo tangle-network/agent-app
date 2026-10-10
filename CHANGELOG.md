@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.53
+
+- fix(interactions): take a select answer as a plain string, and let a product decline an ask by its content (#950)
+
 ## 0.60.52
 
 - test(chat-routes): wait for the turn's own drain before checking a disconnected turn (#949)
