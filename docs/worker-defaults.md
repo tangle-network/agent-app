@@ -4,7 +4,7 @@ Every agent-app Worker ships with these Cloudflare settings.
 `create-agent-app` writes them into new projects, and `agent-app-signoff` fails a repo whose Wrangler config, or any `[env.*]` in it, lacks them.
 
 ```toml
-compatibility_date = "2026-09-23"   # or later
+compatibility_date = "2026-09-01"   # or later
 compatibility_flags = ["nodejs_compat"]
 upload_source_maps = true
 
@@ -28,7 +28,8 @@ head_sampling_rate = 1
   Agent apps carry little traffic, so a 0.1 sample mostly drops the failing turn you need.
   `observability.enabled` turns on logs only while tracing is in beta, so traces are enabled explicitly.
 - **`upload_source_maps`.** Exceptions in Workers Logs and on-demand CPU and memory profiles then name source functions instead of minified bundle offsets.
-- **`nodejs_compat` and a current `compatibility_date`.** The floor is `WORKER_COMPATIBILITY_DATE_FLOOR` in `src/signoff/worker-defaults.ts`; raise it together with the templates.
+- **`nodejs_compat` and a current `compatibility_date`.** The floor is `WORKER_COMPATIBILITY_DATE_FLOOR` in `src/signoff/worker-defaults.ts`; raise it together with the templates and the Wrangler version they pin.
+  2026-09-01 is the newest date the templates' Wrangler 4.126 runtime accepts in `wrangler dev`; a newer date fails local startup with "the newest date supported by this server binary is …".
   Review the [compatibility flags](https://developers.cloudflare.com/workers/configuration/compatibility-flags/) that turn on between your old and new date before moving a live Worker.
 
 ## Apps built with `@cloudflare/vite-plugin`

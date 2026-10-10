@@ -187,7 +187,7 @@ type SignoffStepStatus
 `const` — Update together with the templates' `compatibility_date`.
 
 ```ts
-"2026-09-23"
+"2026-09-01"
 ```
 
 ### `WorkerDefaultsFinding`

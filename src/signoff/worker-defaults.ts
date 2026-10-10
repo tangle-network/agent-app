@@ -28,7 +28,7 @@ import { basename, dirname, join } from 'node:path'
  */
 
 /** Update together with the templates' `compatibility_date`. */
-export const WORKER_COMPATIBILITY_DATE_FLOOR = '2026-09-23'
+export const WORKER_COMPATIBILITY_DATE_FLOOR = '2026-09-01'
 
 const WRANGLER_CONFIG_NAMES = new Set(['wrangler.toml', 'wrangler.json', 'wrangler.jsonc'])
 

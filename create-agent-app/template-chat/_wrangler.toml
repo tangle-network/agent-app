@@ -1,6 +1,6 @@
 name = "__PACKAGE_NAME__"
 main = "src/worker.ts"
-compatibility_date = "2026-09-23"
+compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 # Shared agent-app Worker defaults. `agent-app-signoff` fails a Worker config
 # without them; docs/worker-defaults.md in @tangle-network/agent-app says why.
