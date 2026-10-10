@@ -198,6 +198,8 @@ export class TurnStreamDO {
           return this.handleBroadcast(request)
         case TURN_STREAM_PATHS.lockAcquire:
           return this.handleLockAcquire(request)
+        case TURN_STREAM_PATHS.lockPeek:
+          return jsonResponse({ active: await this.loadActiveLock() })
         case TURN_STREAM_PATHS.lockRelease:
           return this.handleLockRelease(request)
         case TURN_STREAM_PATHS.lockReleaseInterrupted:

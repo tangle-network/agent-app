@@ -350,3 +350,36 @@ describe('settleTurnResponse', () => {
     expect(text).toBe('ok')
   })
 })
+
+describe('turn lock warm-up', () => {
+  it('starts warming the lock at admission and never waits for it', async () => {
+    const calls: string[] = []
+    const { routes, ctx, pending, rows } = makeRoutes({
+      prepareTurn: async () => { calls.push('prepare'); return { ok: true } },
+      turnLock: {
+        warm: () => { calls.push('warm'); return new Promise<void>(() => {}) },
+        acquire: () => { calls.push('acquire'); return { acquired: true as const, handle: 'lock' } },
+        release: () => {},
+      },
+    })
+    const response = await routes.turn(turnRequest({ threadId: 't-1', content: 'hi' }, false), ctx)
+    await response.text()
+    await Promise.all(pending)
+    expect(calls).toEqual(['warm', 'prepare', 'acquire'])
+    expect(rows.map((row) => row.role)).toEqual(['user', 'assistant'])
+  })
+
+  it('a warm-up that throws does not fail the turn', async () => {
+    const { routes, ctx, pending, rows } = makeRoutes({
+      turnLock: {
+        warm: () => { throw new Error('object store down') },
+        acquire: () => ({ acquired: true as const, handle: 'lock' }),
+        release: () => {},
+      },
+    })
+    const response = await routes.turn(turnRequest({ threadId: 't-1', content: 'hi' }, false), ctx)
+    await response.text()
+    await Promise.all(pending)
+    expect(rows.map((row) => row.role)).toEqual(['user', 'assistant'])
+  })
+})
