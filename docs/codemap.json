@@ -11236,6 +11236,12 @@
           "doc": "Canonical `setSessionCookie` wiring for better-auth apps: mint the session Set-Cookie exactly as better-auth's own login flows do — name + attributes from `auth.$context.authCookies.sessionToken` (be…"
         },
         {
+          "name": "createD1TangleIdentityStore",
+          "kind": "function",
+          "signature": "(options: D1TangleIdentityStoreOptions) => TangleIdentitySsoAccountStore",
+          "doc": "Create the identity-protocol account store for one request."
+        },
+        {
           "name": "createHubSettingsRoutes",
           "kind": "function",
           "signature": "(ctx: HubSettingsContext) => HubSettingsRoutes",
@@ -11276,6 +11282,12 @@
           "kind": "function",
           "signature": "(opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions | TangleIdentitySsoHandlerOptions) => TangleSsoHandlers",
           "doc": "Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies"
+        },
+        {
+          "name": "D1TangleIdentityStoreOptions",
+          "kind": "interface",
+          "signature": "interface D1TangleIdentityStoreOptions",
+          "doc": null
         },
         {
           "name": "DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR",
@@ -11558,6 +11570,36 @@
           "kind": "interface",
           "signature": "interface SsoStateConfig",
           "doc": "Define configuration options for managing SSO state including secret, lifetime, and clock injection"
+        },
+        {
+          "name": "TANGLE_IDENTITY_ACCOUNT_INDEXES_SQL",
+          "kind": "const",
+          "signature": "readonly [\"CREATE UNIQUE INDEX IF NOT EXISTS account_tangle_platform_user ON account(accountId) WHERE providerId = 'tan…",
+          "doc": "Partial unique indexes the store requires on Better Auth's `account` table."
+        },
+        {
+          "name": "TANGLE_IDENTITY_PROVIDER_ID",
+          "kind": "const",
+          "signature": "\"tangle\"",
+          "doc": "Better Auth `account.providerId` for the Tangle platform link."
+        },
+        {
+          "name": "TangleIdentityD1Like",
+          "kind": "interface",
+          "signature": "interface TangleIdentityD1Like",
+          "doc": "The D1 surface the store needs."
+        },
+        {
+          "name": "TangleIdentityD1Statement",
+          "kind": "interface",
+          "signature": "interface TangleIdentityD1Statement",
+          "doc": "A prepared D1 statement; Cloudflare `D1PreparedStatement` satisfies it."
+        },
+        {
+          "name": "TangleIdentityLegacyLinkTable",
+          "kind": "interface",
+          "signature": "interface TangleIdentityLegacyLinkTable",
+          "doc": "A link table the product used before this store."
         },
         {
           "name": "TangleIdentitySsoAccountStore",
