@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.46
+
+- fix(native-completion): a run the runtime restarted under settles with its partial reply (#942)
+
 ## 0.60.45
 
 - fix(native-completion): a stale session no longer keeps its admission open (#941)
