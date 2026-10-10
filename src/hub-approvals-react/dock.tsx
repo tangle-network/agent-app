@@ -89,7 +89,9 @@ function Progress({ item }: { item: HubApprovalItem }) {
  */
 export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId, className = '' }: HubApprovalDockProps) {
   const now = useNow(30_000)
-  // Calls that finished while this dock watched them stay briefly with their result.
+  // Calls that finished while this dock watched them stay with their result: a
+  // success briefly, a failure until dismissed. One that failed before the dock
+  // mounted shows in the transcript row, the Approvals list and its receipt.
   const watched = useRef(new Map<string, HubApprovalPhase>())
   const [settled, setSettled] = useState<Record<string, number>>({})
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set())

@@ -20,12 +20,18 @@ export function asRecord(value: unknown): Record<string, unknown> {
 export function unwrapHubResult(value: unknown): unknown {
   let current: unknown = value
   if (typeof current === 'string') {
-    const start = current.indexOf('{')
-    if (start < 0) return current
+    const text = current
     try {
-      current = JSON.parse(current.slice(start))
+      current = JSON.parse(text)
     } catch {
-      return value
+      // An older host stored `Hub result: {…}`-style text with a JSON tail.
+      const start = text.indexOf('{')
+      if (start < 0) return value
+      try {
+        current = JSON.parse(text.slice(start))
+      } catch {
+        return value
+      }
     }
   }
   for (let depth = 0; depth < 3; depth++) {

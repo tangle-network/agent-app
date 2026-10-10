@@ -152,6 +152,18 @@ describe('hubActionReceipt', () => {
 })
 
 describe('results and vocabulary', () => {
+  it('reads a stored JSON array whole, and JSON after a text prefix', () => {
+    expect(unwrapHubResult('[{"id":"1"}]')).toEqual([{ id: '1' }])
+    expect(unwrapHubResult('Hub result: {"result":{"sha":"x"}}')).toEqual({ sha: 'x' })
+    expect(unwrapHubResult('not json')).toBe('not json')
+  })
+
+  it('names a calendar update as an update', () => {
+    const update = item('google-calendar.update_event', { summary: 'Demo', start: '2026-10-14T15:00:00Z' })
+    expect(presentHubAction(update).title).toBe('Update “Demo”')
+    expect(hubActionReceipt({ ...update, phase: 'done', result: {} }).title).toBe('Updated “Demo”')
+  })
+
   it('unwraps only thin envelopes', () => {
     expect(unwrapHubResult({ result: { data: { sha: 'x' } } })).toEqual({ sha: 'x' })
     expect(unwrapHubResult({ id: 1, data: { a: 1 }, name: 'kept', status: 'ok' })).toEqual({ id: 1, data: { a: 1 }, name: 'kept', status: 'ok' })

@@ -430,7 +430,11 @@ const PRESENTERS: Record<string, Presenter> = {
   },
   'google-calendar.create_event': calendarEvent,
   'google-calendar.book_slot': calendarEvent,
-  'google-calendar.update_event': (input, item) => ({ ...calendarEvent(input, item), action: 'Update event' }),
+  'google-calendar.update_event': (input, item) => {
+    const event = calendarEvent(input, item)
+    const title = event.preview.kind === 'event' ? event.preview.title : undefined
+    return { ...event, action: 'Update event', title: title ? `Update “${clipped(title, 60)}”` : 'Update an event' }
+  },
   'microsoft-calendar.book_slot': calendarEvent,
 }
 
@@ -509,7 +513,10 @@ function receiptTitle(item: HubApprovalItem, presentation: HubActionPresentation
   if (presentation.preview.kind === 'post') {
     return presentation.preview.channel === 'slack' ? `Posted in ${presentation.preview.where ?? 'Slack'}` : `Posted on ${presentation.target ?? presentation.provider.name}`
   }
-  if (presentation.preview.kind === 'event') return presentation.preview.title ? `Booked “${clipped(presentation.preview.title, 60)}”` : 'Booked event'
+  if (presentation.preview.kind === 'event') {
+    const verb = presentation.action === 'Update event' ? 'Updated' : 'Booked'
+    return presentation.preview.title ? `${verb} “${clipped(presentation.preview.title, 60)}”` : `${verb} event`
+  }
   if (presentation.preview.kind === 'call') return presentation.preview.to ? `Started call to ${presentation.preview.to}` : 'Started call'
   const [first = '', ...rest] = presentation.action.split(' ')
   return [pastTense(first), ...rest].join(' ')
