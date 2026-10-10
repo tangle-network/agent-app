@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_119 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_121 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -98,7 +98,7 @@ _119 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./spend`](api/spend.md) | 60 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
-| [`./stream`](api/stream.md) | 59 | `interactions`, `plans` |
+| [`./stream`](api/stream.md) | 60 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 68 | — |
 | [`./studio-react`](api/studio-react.md) | 47 | `studio`, `web-react` |
 | [`./teams`](api/teams.md) | 33 | — |
@@ -124,6 +124,8 @@ _119 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
 | [`./workspace-apps`](api/workspace-apps.md) | 17 | — |
+| [`./workspace-export`](api/workspace-export.md) | 39 | `object-store` |
+| [`./workspace-export/react`](api/workspace-export-react.md) | 2 | `object-store` |
 | [`./workspace-react`](api/workspace-react.md) | 28 | `session-shell`, `web-react`, `workspace-apps` |
 
 ---
@@ -966,11 +968,11 @@ Source: `src/store/index.ts` · 16 exports
 
 ## `./stream`
 
-Source: `src/stream/index.ts` · 59 exports
+Source: `src/stream/index.ts` · 60 exports
 
 Depends on: `interactions`, `plans`
 
-`asRecord`, `asString`, `attachmentPartKey`, `BufferedTurnEvent`, `BufferedTurnOptions`, `BufferedTurnTap`, `buildUserTextParts`, `coalesceChatStreamEvents`, `coalesceDeltas`, `collapseRedundantTextParts`, `consumeTurnStream`, `ConsumeTurnStreamOptions`, `createBufferedTurnTap`, `createD1TurnEventStore`, `createMemoryTurnEventStore`, `D1BoundForTurns`, `D1LikeForTurns`, `DEFAULT_RUNNING_TURN_LEASE_MS`, `DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS`, `draftAssistantParts`, `encodeEvent`, `finalizeAssistantParts`, `finalizePendingInteractionParts`, `getPartKey`, `isLiveProgressEvent`, `JsonRecord`, `mergePersistedPart`, `messageHasTurnId`, `MISSING_TOOL_TERMINAL_ERROR`, `MISSING_TOOL_TERMINAL_REASON`, `normalizeClientTurnId`, `normalizePersistedPart`, `normalizeTime`, `normalizeToolEvent`, `observeTurnEvent`, `parseTurnObservation`, `PersistedChatMessageForTurn`, `pumpBufferedTurn`, `PumpBufferedTurnOptions`, `replayTurnEvents`, `ReplayTurnEventsOptions`, `resolveChatTurn`, `ResolvedChatTurn`, `resolveToolId`, `resolveToolName`, `stampReplaySeq`, `StreamEvent`, `terminalizeDanglingAssistantToolUpdates`, `terminalizeDanglingToolPart`, `terminalizeDanglingToolParts`, `TURN_EVENTS_MIGRATION_SQL`, `TURN_STATUS_LEASE_MIGRATION_SQL`, `TURN_STATUS_RETENTION_MIGRATION_SQL`, `TURN_STATUS_SCOPE_MIGRATION_SQL`, `TurnEventStore`, `TurnEventStoreOptions`, `TurnObservation`, `TurnObservationUpdate`, `TurnStatus`
+`asRecord`, `asString`, `attachmentPartKey`, `BufferedTurnEvent`, `BufferedTurnOptions`, `BufferedTurnTap`, `buildUserTextParts`, `coalesceChatStreamEvents`, `coalesceDeltas`, `collapseRedundantTextParts`, `consumeTurnStream`, `ConsumeTurnStreamOptions`, `createBufferedTurnTap`, `createD1TurnEventStore`, `createMemoryTurnEventStore`, `D1BoundForTurns`, `D1LikeForTurns`, `DEFAULT_RUNNING_TURN_LEASE_MS`, `DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS`, `draftAssistantParts`, `encodeEvent`, `finalizeAssistantParts`, `finalizePendingInteractionParts`, `getPartKey`, `isLiveProgressEvent`, `JsonRecord`, `mergePersistedPart`, `messageHasTurnId`, `MISSING_TOOL_TERMINAL_ERROR`, `MISSING_TOOL_TERMINAL_REASON`, `normalizeClientTurnId`, `normalizePersistedPart`, `normalizeTime`, `normalizeToolEvent`, `observeTurnEvent`, `parseTurnObservation`, `PersistedChatMessageForTurn`, `pumpBufferedTurn`, `PumpBufferedTurnOptions`, `replayTurnEvents`, `ReplayTurnEventsOptions`, `resolveChatTurn`, `ResolvedChatTurn`, `resolveToolId`, `resolveToolName`, `stampReplaySeq`, `StreamEvent`, `terminalizeDanglingAssistantToolUpdates`, `terminalizeDanglingToolPart`, `terminalizeDanglingToolParts`, `TURN_EVENTS_MIGRATION_SQL`, `TURN_STATUS_LEASE_MIGRATION_SQL`, `TURN_STATUS_RETENTION_MIGRATION_SQL`, `TURN_STATUS_SCOPE_MIGRATION_SQL`, `TurnEventStore`, `TurnEventStoreOptions`, `TurnObservation`, `TurnObservationUpdate`, `TurnStatus`, `TurnStatusWriteOptions`
 
 [Full API →](api/stream.md)
 
@@ -1195,6 +1197,26 @@ Source: `src/workspace-apps/index.ts` · 17 exports
 `confirmWorkspaceAppReady`, `createWorkspaceAppDataClient`, `createWorkspaceAppDataHost`, `refreshWorkspaceAppPreview`, `workspaceAppBuilderInstructions`, `WorkspaceAppBuilderInstructionsOptions`, `WorkspaceAppDataClient`, `WorkspaceAppDataClientOptions`, `WorkspaceAppDataConflict`, `WorkspaceAppDataEntry`, `WorkspaceAppDataHost`, `WorkspaceAppDataHostOptions`, `workspaceAppFromPreviewLink`, `WorkspaceAppHttpProof`, `WorkspaceAppIdentity`, `WorkspaceAppPreviewLink`, `WorkspaceAppRecord`
 
 [Full API →](api/workspace-apps.md)
+
+## `./workspace-export`
+
+Source: `src/workspace-export/index.ts` · 39 exports
+
+Depends on: `object-store`
+
+`createExportEngine`, `createMemoryExportStorage`, `createR2ExportStorage`, `createSecretScanner`, `createWorkspaceExport`, `D1ExportDatabase`, `D1TableCoverage`, `d1WorkspaceTables`, `D1WorkspaceTablesOptions`, `ExportArchiveSource`, `ExportDataClass`, `ExportEngine`, `ExportEngineOptions`, `ExportFile`, `ExportFilesSource`, `ExportJob`, `ExportJsonSource`, `ExportPlan`, `ExportPrincipal`, `ExportProgress`, `ExportRow`, `ExportRowsSource`, `ExportSource`, `ExportStatus`, `ExportStorage`, `ExportUnit`, `isCredentialFile`, `isSecretName`, `kvFiles`, `KVFilesNamespace`, `MANIFEST_SCHEMA`, `R2ExportBucket`, `r2Files`, `R2FilesBucket`, `REDACTED`, `SecretScanner`, `StoredEntry`, `UnitStatus`, `WorkspaceExportOptions`
+
+[Full API →](api/workspace-export.md)
+
+## `./workspace-export/react`
+
+Source: `src/workspace-export/react.tsx` · 2 exports
+
+Depends on: `object-store`
+
+`WorkspaceExportPanel`, `WorkspaceExportPanelProps`
+
+[Full API →](api/workspace-export-react.md)
 
 ## `./workspace-react`
 

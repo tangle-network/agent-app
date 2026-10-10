@@ -211,6 +211,16 @@
       "import": "./dist/forms/index.js",
       "default": "./dist/forms/index.js"
     },
+    "./workspace-export": {
+      "types": "./dist/workspace-export/index.d.ts",
+      "import": "./dist/workspace-export/index.js",
+      "default": "./dist/workspace-export/index.js"
+    },
+    "./workspace-export/react": {
+      "types": "./dist/workspace-export/react.d.ts",
+      "import": "./dist/workspace-export/react.js",
+      "default": "./dist/workspace-export/react.js"
+    },
     "./object-store": {
       "types": "./dist/object-store/index.d.ts",
       "import": "./dist/object-store/index.js",
