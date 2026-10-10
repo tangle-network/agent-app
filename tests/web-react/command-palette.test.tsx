@@ -187,4 +187,29 @@ describe('CommandPalette', () => {
     renderPalette({ open: true, onOpenChange: () => {}, initialQuery: 'theme' })
     expect(optionList()).toHaveLength(1)
   })
+
+  it('reports the query so a host can search a larger source, and ranks the items it passes back', () => {
+    const onQueryChange = vi.fn()
+    const { rerender, onSelect } = renderPalette({ open: true, onOpenChange: () => {}, items: [], onQueryChange })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'invoice' } })
+    expect(onQueryChange).toHaveBeenLastCalledWith('invoice')
+    rerender(createElement(CommandPalette, {
+      open: true, onOpenChange: () => {}, onSelect, onQueryChange,
+      items: [
+        { id: 'r2', group: 'Marketplace', label: 'Receipt filer', keywords: ['invoice'] },
+        { id: 'r1', group: 'Marketplace', label: 'Invoice chaser' },
+      ],
+    }))
+    expect(optionList().map((option) => option.textContent)).toEqual([
+      expect.stringContaining('Invoice chaser'), expect.stringContaining('Receipt filer'),
+    ])
+  })
+
+  it('reports the reset query when it closes', () => {
+    const onQueryChange = vi.fn()
+    const { rerender, onSelect } = renderPalette({ open: true, onOpenChange: () => {}, onQueryChange })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'pricing' } })
+    rerender(createElement(CommandPalette, { items: ITEMS, onSelect, open: false, onOpenChange: () => {}, onQueryChange }))
+    expect(onQueryChange).toHaveBeenLastCalledWith('')
+  })
 })
