@@ -89,23 +89,76 @@ function deltaTypeOf(ev: unknown): 'text' | 'reasoning' | null {
   return null
 }
 
-/** Merge consecutive text/reasoning deltas of the same type into one event.
- *  Concatenation-preserving: replaying the coalesced stream produces the same
- *  accumulated text as the original. */
+function innerOf(ev: unknown): AnyRecord | null {
+  const e = ev as AnyRecord | null
+  if (!e || typeof e !== 'object') return null
+  const inner = (e.kind === 'event' ? e.event : e) as AnyRecord | undefined
+  return inner && typeof inner === 'object' ? inner : null
+}
+
+/**
+ * The key of a live-state event whose latest value supersedes earlier ones:
+ * the model-processing heartbeat, and a harness's raw update of a text or
+ * reasoning part (it carries the part's whole state, keyed by part id). Null
+ * for every other event.
+ */
+function liveStateKeyOf(ev: unknown): string | null {
+  const inner = innerOf(ev)
+  if (!inner) return null
+  if (inner.type === 'model-processing') return 'model-processing'
+  if (inner.type !== 'raw') return null
+  const raw = (inner.data as AnyRecord | undefined)?.event as AnyRecord | undefined
+  const part = raw?.part as AnyRecord | undefined
+  if ((raw?.type === 'text' || raw?.type === 'reasoning') && typeof part?.id === 'string') return `raw:${part.id}`
+  return null
+}
+
+/** Whether an event only projects live progress, so it may wait for the flush window and be coalesced. */
+export function isLiveProgressEvent(ev: unknown): boolean {
+  return deltaTypeOf(ev) !== null || liveStateKeyOf(ev) !== null
+}
+
+/**
+ * Merge text and reasoning deltas of the same type into one event, across the
+ * live-state events a harness interleaves with them, and keep only the latest
+ * of each live-state event. A reasoning model streams three events per token
+ * (its raw part update, a model-processing heartbeat and the delta); merging
+ * only adjacent deltas wrote all three as rows (2026-10-10: 1.63 M rows in a
+ * day, 59,659 in one turn). Any other event is a boundary nothing merges
+ * across. Concatenation-preserving: replaying the coalesced stream produces
+ * the same accumulated text, and the latest state of every part.
+ */
 export function coalesceDeltas(events: unknown[]): unknown[] {
   const out: unknown[] = []
+  let run: { type: 'text' | 'reasoning'; index: number } | null = null
+  let stateSlots = new Map<string, number>()
   for (const ev of events) {
     const type = deltaTypeOf(ev)
-    const prev = out[out.length - 1]
-    if (type && prev && deltaTypeOf(prev) === type) {
-      const read = (x: unknown): AnyRecord =>
-        ((x as AnyRecord).kind === 'event' ? (x as AnyRecord).event : x) as AnyRecord
-      const merged = JSON.parse(JSON.stringify(prev)) as AnyRecord
-      read(merged).text = String(read(prev).text) + String(read(ev).text)
-      out[out.length - 1] = merged
+    if (type) {
+      if (run && run.type === type) {
+        const merged = JSON.parse(JSON.stringify(out[run.index])) as AnyRecord
+        innerOf(merged)!.text = String(innerOf(out[run.index])!.text) + String(innerOf(ev)!.text)
+        out[run.index] = merged
+      } else {
+        out.push(ev)
+        run = { type, index: out.length - 1 }
+      }
+      continue
+    }
+    const key = liveStateKeyOf(ev)
+    if (key) {
+      const slot = stateSlots.get(key)
+      if (slot === undefined) {
+        out.push(ev)
+        stateSlots.set(key, out.length - 1)
+      } else {
+        out[slot] = ev
+      }
       continue
     }
     out.push(ev)
+    run = null
+    stateSlots = new Map()
   }
   return out
 }
@@ -164,6 +217,9 @@ export interface BufferedTurnOptions {
   write?: (line: string) => Promise<void> | void
   /** Flush buffered events to the store at most this often. Default 400ms. */
   flushIntervalMs?: number
+  /** Flush window once a durable owner has taken the turn ({@link BufferedTurnTap.detach}). Live-progress events
+   *  wait for it; any other event flushes at once, after them. Default 2000ms. */
+  detachedFlushIntervalMs?: number
   /** Per-flush coalescer. Default {@link coalesceDeltas} (tool-loop text/reasoning
    *  deltas). agent-runtime products streaming `ChatStreamEvent` pass
    *  {@link coalesceChatStreamEvents} so per-token deltas don't each persist as a
@@ -191,10 +247,13 @@ export interface BufferedTurnTap {
   /**
    * Give terminal-status ownership to an external durable runner. Stops this
    * tap's running-lease renewal and flushes its current projection, but keeps
-   * `onEvent` available as an append-only live-observation path. Events
-   * received after the handoff flush before this method's caller continues,
-   * so a durable owner cannot publish terminal status ahead of an observed
-   * event. Call it again when observation ends to flush any final event.
+   * `onEvent` available as an append-only live-observation path. After the
+   * handoff, an event that is not live progress (a marker, interaction, tool
+   * event, error or terminal event) flushes before `onEvent` returns, so a
+   * durable owner cannot publish terminal status ahead of it; live progress
+   * (deltas, heartbeats, raw part updates) is coalesced over
+   * `detachedFlushIntervalMs`. Call it again when observation ends to flush any
+   * final event.
    *
    * A caller MUST have registered that durable owner before detaching: this
    * method intentionally writes no replacement status.
@@ -213,8 +272,13 @@ export interface BufferedTurnTap {
  *     + the finished body). Durability stays here in the shell; the engine needs
  *     no `TurnEventStore` seam.
  */
+/** Serialized characters of pending events that force a flush before the window ends. */
+const MAX_PENDING_CHARS = 64 * 1024
+
 export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTap {
   const flushIntervalMs = opts.flushIntervalMs ?? 400
+  const detachedFlushIntervalMs = opts.detachedFlushIntervalMs ?? 2000
+  let pendingChars = 0
   const coalesce = opts.coalesce ?? coalesceDeltas
   const startedAt = Date.now()
   let seq = 0
@@ -268,6 +332,7 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
     if (pending.length === 0) return
     const batch = coalesce(pending)
     pending = []
+    pendingChars = 0
     const rows = batch.map((ev) => ({ seq: ++seq, event: JSON.stringify(ev) }))
     await opts.store.append(opts.turnId, rows)
     lastFlush = Date.now()
@@ -301,18 +366,26 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
       // Stamp ms-since-turn-start so any stored turn is replayable AND traceable
       // (see ../trace) from the same buffered rows.
       const ev = raw && typeof raw === 'object' ? { ...(raw as Record<string, unknown>), _t: Date.now() - startedAt } : raw
+      const line = JSON.stringify(ev)
       pending.push(ev)
+      pendingChars += line?.length ?? 0
       if (!clientGone && opts.write) {
         try {
           // Live delivery carries a provisional ordering hint, not the persisted
           // seq (coalescing changes seq assignment); clients resume with the
           // seqs from replay, or 0 for "everything".
-          await opts.write(JSON.stringify(ev))
+          await opts.write(line)
         } catch {
           clientGone = true
         }
       }
-      if (detached || Date.now() - lastFlush >= flushIntervalMs) await flush()
+      // Once detached, a turn marker, interaction, tool event, error or terminal event persists at once (with the
+      // progress before it), and live progress waits for the window, so a reasoning model's per-token events do
+      // not each become a row. An external owner's terminal status can fence at most the last window of progress.
+      const due = detached
+        ? !isLiveProgressEvent(ev) || Date.now() - lastFlush >= detachedFlushIntervalMs
+        : Date.now() - lastFlush >= flushIntervalMs
+      if (due || pendingChars >= MAX_PENDING_CHARS) await flush()
     },
     async done(status = 'complete') {
       await ensureStarted()

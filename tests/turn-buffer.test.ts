@@ -101,6 +101,56 @@ function partUpdate(id: string, delta: string, cumulative: string) {
   return { type: 'message.part.updated', data: { part: { id, type: 'text', text: cumulative }, delta } }
 }
 
+describe('a reasoning model\'s token stream', () => {
+  // 2026-10-10, GTM: per token, the harness's raw part update, a model-processing heartbeat and the delta. Once the
+  // turn was handed to its completion Workflow every event was its own row: 1.63 M rows that day, 59,659 in one turn.
+  const rawPart = (id: string, type: 'text' | 'reasoning', at: number) => ({ type: 'raw', data: { type: 'raw', backend: 'opencode', event: { type, timestamp: at, part: { id, type, metadata: { at } } } } })
+  const processing = (at: number) => ({ type: 'model-processing', data: { elapsedMs: at } })
+  const delta = (type: 'text' | 'reasoning', value: string) => ({ type, text: value })
+  const tokens = (count: number) => Array.from({ length: count }, (_, index) => [
+    rawPart('prt_reasoning', 'reasoning', index), processing(index), delta('reasoning', `r${index} `),
+  ]).flat()
+
+  it('coalesces each window to one delta per run and the latest of each part update and heartbeat', () => {
+    const toolCall = { type: 'tool_call', id: 'c1' }
+    const out = coalesceDeltas([...tokens(3), toolCall, rawPart('prt_text', 'text', 9), delta('text', 'Do'), rawPart('prt_text', 'text', 10), delta('text', 'ne')])
+
+    expect(out).toEqual([
+      rawPart('prt_reasoning', 'reasoning', 2), processing(2), delta('reasoning', 'r0 r1 r2 '),
+      toolCall,
+      rawPart('prt_text', 'text', 10), delta('text', 'Done'),
+    ])
+  })
+
+  it('persists a detached turn in windows, not a row per event, and replays the same text', async () => {
+    let clock = 0
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => clock)
+    try {
+      const store = createMemoryTurnEventStore()
+      const tap = createBufferedTurnTap({ store, turnId: 'reasoning' })
+      await tap.onEvent({ type: 'turn', turnId: 'reasoning' })
+      await tap.detach()
+      // 600 tokens over 60 s, a tool call in the middle, then the terminal event.
+      for (const [index, ev] of tokens(600).entries()) {
+        clock = Math.floor(index / 3) * 100
+        await tap.onEvent(ev)
+        if (index === 900) await tap.onEvent({ type: 'tool_call', id: 'c1' })
+      }
+      await tap.onEvent({ type: 'stream.terminal', status: 'completed' })
+      await tap.detach()
+
+      const rows = (await store.read('reasoning', 0)).map((row) => JSON.parse(row.event))
+      // 1,802 events become about three rows per 2 s window.
+      expect(rows.length).toBeLessThan(120)
+      expect(rows.filter((row) => row.type === 'reasoning').map((row) => row.text).join('')).toBe(Array.from({ length: 600 }, (_, index) => `r${index} `).join(''))
+      expect(rows.at(-1)).toMatchObject({ type: 'stream.terminal' })
+      expect(rows.findIndex((row) => row.type === 'tool_call')).toBeGreaterThan(0)
+    } finally {
+      now.mockRestore()
+    }
+  })
+})
+
 describe('coalesceChatStreamEvents', () => {
   it('merges consecutive deltas for the same part, summing delta and keeping the latest cumulative part', () => {
     const out = coalesceChatStreamEvents([
@@ -286,8 +336,11 @@ describe('pumpBufferedTurn + replayTurnEvents', () => {
     await tap.onEvent(text('before'))
     await tap.detach()
     await tap.onEvent(text('after'))
+    // Observation ends: the final detach flushes the live progress still inside the window.
+    await tap.detach()
     await store.setStatus('handoff-race', 'complete')
     await tap.onEvent(text('too late'))
+    await tap.detach()
 
     const rows = await collect(replayTurnEvents({ store, turnId: 'handoff-race', pollMs: 1 }))
     expect(rows.filter((row) => row.seq > 0).map((row) => JSON.parse(row.event).event.text)).toEqual(['before', 'after'])
