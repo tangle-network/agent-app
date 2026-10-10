@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-198 exports.
+206 exports.
 
 ### `adaptSandboxStream`
 
@@ -180,6 +180,22 @@ interface BuildSandboxToolFileMountsOptions
 
 ```ts
 <TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…
+```
+
+### `createWorkspacePrewarmRoute`
+
+`function` — Build the handler once per isolate, not per request: its single-flight and success memory live in the returned closure.
+
+```ts
+<Context = void>(options: CreateWorkspacePrewarmRouteOptions<Context>) => (request: Request, context: Context) => Promi…
+```
+
+### `CreateWorkspacePrewarmRouteOptions`
+
+`interface`
+
+```ts
+interface CreateWorkspacePrewarmRouteOptions
 ```
 
 ### `createWorkspaceSandboxManager`
@@ -404,6 +420,14 @@ interface ForegroundSandboxSingleFlightOptions
 
 ```ts
 interface InspectablePrewarmClaimStore
+```
+
+### `isAutomatedPrewarmRequest`
+
+`function` — True for crawler user agents and browser speculative prefetch or prerender.
+
+```ts
+(request: Request) => boolean
 ```
 
 ### `isEgressProxyRecoveryRequiredError`
@@ -1420,6 +1444,46 @@ number
 
 ```ts
 "WORKSPACE_SANDBOX_UNRECOVERABLE"
+```
+
+### `WorkspacePrewarmAuthorization`
+
+`type` — What the product decided for this request.
+
+```ts
+type WorkspacePrewarmAuthorization
+```
+
+### `WorkspacePrewarmEvent`
+
+`type`
+
+```ts
+type WorkspacePrewarmEvent
+```
+
+### `WorkspacePrewarmOutcome`
+
+`type`
+
+```ts
+type WorkspacePrewarmOutcome
+```
+
+### `WorkspacePrewarmReport`
+
+`type`
+
+```ts
+type WorkspacePrewarmReport
+```
+
+### `WorkspacePrewarmResponse`
+
+`interface`
+
+```ts
+interface WorkspacePrewarmResponse
 ```
 
 ### `WorkspaceSandboxEnsureContext`
