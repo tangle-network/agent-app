@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.35
+
+- docs(operator): record which agent apps mount the operator API (#914)
+
 ## 0.60.34
 
 - feat(hub-approvals): say why an open call waits, and send waiting requests as one digest (#931)
