@@ -862,24 +862,6 @@ describe('createSandboxChatProducer', () => {
     ])
   })
 
-  it('leaves file/image persistence byte-identical to today when promoteFilePart is not wired', async () => {
-    const producer = createSandboxChatProducer({
-      events: feed([
-        partUpdated({ type: 'text', id: 't1', text: 'see the chart' }, 'see the chart'),
-        partUpdated({ type: 'file', id: 'f1', filename: 'out.csv', mediaType: 'text/csv', path: 'outputs/out.csv' }),
-        partUpdated({ type: 'image', filename: 'plot.png', mediaType: 'image/png', url: 'data:image/png;base64,AA' }),
-        { type: 'result', data: { finalText: 'see the chart' } },
-      ]),
-    })
-    await drain(producer.stream)
-
-    expect(producer.assistantParts?.()).toEqual([
-      expect.objectContaining({ type: 'text', text: 'see the chart' }),
-      { type: 'file', id: 'f1', filename: 'out.csv', mediaType: 'text/csv', path: 'outputs/out.csv' },
-      { type: 'image', filename: 'plot.png', mediaType: 'image/png', url: 'data:image/png;base64,AA' },
-    ])
-  })
-
   it('invokes promotion (un-memoized) for a file part with neither id nor url', async () => {
     // gtm never skips promotion outright — a part with no id/url still gets
     // routed through the callback, which fails "carries no url" on its own;

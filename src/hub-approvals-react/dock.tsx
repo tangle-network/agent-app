@@ -196,14 +196,25 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
       data-hub-approval-dock={active.id}
       className={`overflow-hidden rounded-2xl border border-[var(--surface-warning-border)] bg-card shadow-md ${className}`}
     >
-      <div className="flex items-start gap-3 px-4 pt-3">
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 pt-3">
         <HubProviderMark providerId={presentation.provider.id} name={presentation.provider.name} size={32} />
         <div className="min-w-0 flex-1">
           <h3 className="line-clamp-2 break-words text-base font-semibold leading-6 text-foreground" title={presentation.title}>{presentation.title}</h3>
           <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {queue.length > 1 && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="sm:order-last"
+          aria-label={collapsed ? 'Show the request' : 'Hide the preview'}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((value) => !value)}
+        >
+          <ChevronDown className={`transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+        </Button>
+        {/* On a phone the pager takes its own row, so the title keeps the width. */}
+        {queue.length > 1 && (
+          <div className="flex w-full items-center justify-end gap-1 sm:w-auto">
             <>
               <Button variant="ghost" size="icon-sm" aria-label="Previous request" onClick={() => step(-1)}><ChevronLeft /></Button>
               <span className="min-w-14 text-center text-sm tabular-nums text-muted-foreground" aria-live="polite">
@@ -211,17 +222,8 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
               </span>
               <Button variant="ghost" size="icon-sm" aria-label="Next request" onClick={() => step(1)}><ChevronRight /></Button>
             </>
-          )}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={collapsed ? 'Show the request' : 'Hide the preview'}
-            aria-expanded={!collapsed}
-            onClick={() => setCollapsed((value) => !value)}
-          >
-            <ChevronDown className={`transition-transform ${collapsed ? '-rotate-90' : ''}`} />
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
 
       {!collapsed && (

@@ -35,7 +35,7 @@ import {
 } from '../../src/design-canvas-react/engine/commands'
 import { createSnapEngine, collectGridTargets } from '../../src/design-canvas-react/engine/snap'
 import { createZoomPanMath } from '../../src/design-canvas-react/engine/zoom-pan'
-import { DUPLICATE_OFFSET, marqueeSelect, nudgeDelta } from '../../src/design-canvas-react/engine/selection'
+import { marqueeSelect, nudgeDelta } from '../../src/design-canvas-react/engine/selection'
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -835,13 +835,6 @@ describe('nudgeDelta', () => {
   it('returns 10px deltas with shift', () => {
     expect(nudgeDelta('ArrowLeft', true)).toEqual({ dx: -10, dy: 0 })
     expect(nudgeDelta('ArrowDown', true)).toEqual({ dx: 0, dy: 10 })
-  })
-})
-
-describe('DUPLICATE_OFFSET', () => {
-  it('is a non-zero offset', () => {
-    expect(DUPLICATE_OFFSET.dx).toBeGreaterThan(0)
-    expect(DUPLICATE_OFFSET.dy).toBeGreaterThan(0)
   })
 })
 

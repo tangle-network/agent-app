@@ -170,8 +170,7 @@ describe('receipts and rows', () => {
     expect(screen.getByRole('link', { name: /Opened PR #7/ })).toBeTruthy()
     expect(screen.getByText('Denied: Send email to ada@acme.com')).toBeTruthy()
     expect(screen.queryByText(/I decided the Hub actions/)).toBeNull()
-    const details = screen.getAllByRole('button', { name: 'Details' })
-    fireEvent.click(details.at(-1)!)
+    fireEvent.click(screen.getByRole('button', { name: 'Message sent to the agent' }))
     expect(screen.getByText(/I decided the Hub actions/)).toBeTruthy()
   })
 

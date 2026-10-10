@@ -40,7 +40,7 @@ export function HubProviderMark({ providerId, name, size = 28 }: { providerId: s
 }
 
 /** Raw JSON behind a disclosure, for the person who wants the exact call. */
-export function HubRawDetails({ sections }: { sections: ReadonlyArray<{ label: string; value: unknown }> }) {
+export function HubRawDetails({ sections, label = 'Details' }: { sections: ReadonlyArray<{ label: string; value: unknown }>; label?: string }) {
   const [open, setOpen] = useState(false)
   const shown = sections.filter((section) => section.value !== undefined && section.value !== null && section.value !== '')
   if (shown.length === 0) return null
@@ -53,7 +53,7 @@ export function HubRawDetails({ sections }: { sections: ReadonlyArray<{ label: s
         className="inline-flex min-h-8 items-center gap-1 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground"
       >
         <ChevronRight aria-hidden className={`size-4 transition-transform ${open ? 'rotate-90' : ''}`} />
-        Details
+        {label}
       </Button>
       {open && (
         <div className="mt-2 space-y-3">

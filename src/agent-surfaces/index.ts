@@ -153,7 +153,15 @@ if (command === 'start') {
   if (flag('products')) request.products = flag('products').split(',').map((id) => id.trim()).filter(Boolean)
   if (flag('owner-email')) request.owner_email = flag('owner-email')
   if (flag('budget-usd')) request.budget_usd = Number(flag('budget-usd'))
-  const started = await post('/cross-site/device/start', request)
+  let started = await post('/cross-site/device/start', request)
+  // Tangle caps the approval emails one owner receives. Past the cap the
+  // owner approves from the link the agent hands them instead.
+  let emailCapped = false
+  if (started.status === 429 && started.body.error === 'owner_notification_throttled' && request.owner_email) {
+    emailCapped = true
+    delete request.owner_email
+    started = await post('/cross-site/device/start', request)
+  }
   if (started.status !== 200) {
     console.error(\`Signup refused (HTTP \${started.status}): \${JSON.stringify(started.body)}\`)
     process.exit(1)
@@ -165,6 +173,9 @@ if (command === 'start') {
     expires_at: Date.now() + grant.expires_in * 1000,
   }
   writeFileSync(statePath, JSON.stringify(saved), { mode: 0o600 })
+  if (emailCapped) {
+    console.log('Tangle has already sent this owner the most approval emails it allows for now, so none was sent.')
+  }
   console.log(grant.agent?.owner_notified
     ? \`Approval email sent to \${request.owner_email}.\`
     : 'Send your owner this approval link.')
@@ -246,7 +257,7 @@ function signupSection(config: AgentSurfaceConfig): string[] {
       code: `node tangle-signup.mjs start --agent-name "<your agent name>" --owner-email "<owner email>" --budget-usd ${budget}${config.signup.products ? ` --products ${config.signup.products.join(',')}` : ''}`,
     }),
     '',
-    'It prints the approval link and a confirmation code. Tangle emails the owner the same link; if you cannot give an email, omit `--owner-email` and send the owner the printed link yourself. Tell the owner the code if you can reach them.',
+    'It prints the approval link and a confirmation code. Tangle emails the owner the same link; if you cannot give an email, omit `--owner-email` and send the owner the printed link yourself. When Tangle has already sent that owner the most approval emails it allows, `start` says so and prints the link without emailing it: send it to the owner yourself. Tell the owner the code if you can reach them.',
     '',
     'Then wait for the approval. Each run returns within about 8 seconds: exit code 3 and `Still waiting` mean run it again; exit code 0 and `Approved` mean the key is saved. Keep each run short rather than wrapping it in one long blocking loop, since many agent tools stop long commands.',
     '',
