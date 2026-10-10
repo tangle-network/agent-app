@@ -31,6 +31,7 @@ export const HUB_APPROVAL_PHASE_LABELS: Record<HubApprovalPhase, string> = {
   running: 'Running',
   done: 'Done',
   failed: 'Failed',
+  unknown: 'May have run',
   denied: 'Denied',
   expired: 'Expired',
 }

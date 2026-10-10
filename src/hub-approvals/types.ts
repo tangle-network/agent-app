@@ -16,6 +16,8 @@ export type HubApprovalPhase =
   | 'done'
   /** Approved, but Hub could not run it. */
   | 'failed'
+  /** The provider may have acted; verify there before requesting it again. */
+  | 'unknown'
   | 'denied'
   | 'expired'
 
@@ -146,9 +148,11 @@ export interface HubActionReceipt {
   title: string
   /** The result's own page, when it has one: the pull request, the post, the event. */
   href?: string
-  status: 'done' | 'failed' | 'denied' | 'expired' | 'running' | 'waiting'
+  status: 'done' | 'unknown' | 'failed' | 'denied' | 'expired' | 'running' | 'waiting'
   fields: readonly HubActionField[]
   files?: readonly HubActionFile[]
   media?: { kind: 'audio'; src: string; seconds?: number }
   error?: string
+  /** Guidance for an uncertain outcome, separate from a confirmed failure. */
+  warning?: string
 }

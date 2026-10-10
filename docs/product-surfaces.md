@@ -277,7 +277,7 @@ Every one states three things: the **Rule** (what must be true), the **Anatomy**
 A pattern with no rejected example is unenforceable — a reviewer cannot tell whether a diff violates it — so every pattern below carries one.
 
 Two conventions for the evidence.
-An **in-repo citation** is a bare backticked path (`src/web-react/index.tsx`) and points at this package; the test in `tests/docs/legibility-contract.test.ts` fails if that file stops existing.
+An **in-repo citation** is a bare backticked path (`src/web-react/index.tsx`) and points at this package.
 A **cross-repo citation** names its repo first (`legal-agent src/routes.ts`) because those files are not on this repo's disk.
 Every measurement is dated, because a rejected example that has since been fixed is still the reason the rule exists.
 
@@ -472,11 +472,13 @@ Marketing density on a work surface is a defect, not a matter of taste.
 |---|---|---|
 | Rows above the fold at 1440×900 on the primary work surface | ≥ 20 | 6–8 cards |
 | Data row height | 32–40px | 96px card |
-| Body and data type size | 13–14px | 16–18px |
+| Body and data type size | 14px, never smaller | 16–18px |
 | Largest type on the page | ~20px page title | 32px+ hero |
 | Spacing scale | 4px base — 4/8/12/16 inside a group, 24/32 between groups | a uniform 24–32px everywhere |
 | Accent colour at rest | exactly one, on the single next action | every interactive element |
 | Numeric columns | tabular figures, right-aligned, fixed decimals | proportional, left-aligned, ragged |
+
+The 14px floor holds for supporting text too: badges, captions, dates, field hints and notes use `text-sm`, never `text-xs` or a literal size. The shared shell, workspace listing, API access panel and question card meet it, and `tests/web-react/shell-type-floor.test.ts` fails if one of them drops below.
 
 **When whitespace is wrong:**
 
@@ -537,11 +539,10 @@ Hiding the checkable part behind the unverifiable one inverts the entire trust a
 
 ## How Part II is enforced
 
-Four layers, because a doc alone is what produced the audit.
+Three layers, because a doc alone is what produced the audit.
 
 - **Per diff** — [`legibility-rubric.md`](./legibility-rubric.md): six fixed questions a person or an agent answers against the running UI. Fails on Q2, Q3, or Q5 block the diff.
 - **In the product's CI** — `agent-app-legibility-check` (`src/legibility/`): five static checks a vertical runs over its OWN source, each naming `file:line:column` plus the fix, exit 1 on any finding. This is the only layer that fails a diff without a person in it. Its measured behaviour on two real verticals — 84 findings, 82% of them true, and which historical defect each check does and does not catch — is [`legibility-calibration.md`](./legibility-calibration.md); the production shapes behind those numbers are pinned in `src/legibility/calibration.test.ts`.
-- **In this package's CI** — `tests/docs/legibility-contract.test.ts` fails a diff that adds a pattern without a rejected example, a rubric question without a fail condition, an in-repo citation whose file does not exist, or a measured count in this document that no longer matches this package's source.
 - **Structurally** — a pattern is only *structural* where the wrong shape stops compiling. Rounding this up is the failure this document is a response to, so the state of each is named rather than summarized:
 
 | Pattern | Structural guarantee | Where it lands | Still not structural |

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.60.30
+
+- feat(web-react): decline an ask, limit a key to a workspace, and a 14px shell floor (#927)
+
+## 0.60.29
+
+- fix(protected-home): reject stale writes and preserve scoped learning snapshots (#925)
+
+## 0.60.28
+
+- fix(hub-approvals): preserve uncertain action outcomes (#924)
+
 ## 0.60.27
 
 - fix(web-react): treat an interaction field without a required flag as optional (#922)
