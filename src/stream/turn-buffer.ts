@@ -46,7 +46,7 @@ export interface TurnEventStore {
   /** Record turn lifecycle. `scopeId` (a thread/session id) is optional and lets
    *  {@link TurnEventStore.listRunning} rediscover this turn after a client reload
    *  loses the turnId; stores that don't track scope ignore it. */
-  setStatus(turnId: string, status: TurnStatus, scopeId?: string): Promise<void>
+  setStatus(turnId: string, status: TurnStatus, scopeId?: string, options?: TurnStatusWriteOptions): Promise<void>
   getStatus(turnId: string): Promise<TurnStatus | null>
   /** Unexpired running turnIds for a scope, newest first — so a reloaded client
    *  (clientRunId lost) can find and resume the in-flight turn without reviving
@@ -64,6 +64,18 @@ export interface TurnEventStore {
   /** Remove terminal turns whose status was updated before `before` (Unix
    *  milliseconds or a Date). Running turns are never eligible. */
   pruneTerminalTurns?(before: number | Date): Promise<number>
+}
+
+/**
+ * Settling a stream nothing produces any more. A sweep that ends an orphaned
+ * stream must not move it in time, since reports place a stream by its update
+ * time, and must not end one whose producer came back meanwhile.
+ */
+export interface TurnStatusWriteOptions {
+  /** Keep the row's update time; a new row still takes the current time. */
+  preserveUpdatedAt?: boolean
+  /** Write only when the row is still `running` and was last updated before this time (Unix ms). */
+  onlyIfRunningBefore?: number
 }
 
 /** Configure running-turn lease evaluation. The clock is injectable so store
@@ -654,14 +666,25 @@ export function createD1TurnEventStore(
         .all<{ seq: number; event: string }>()
       return results
     },
-    async setStatus(turnId, status, scopeId) {
+    async setStatus(turnId, status, scopeId, options = {}) {
+      const at = new Date(now()).toISOString()
+      if (options.onlyIfRunningBefore !== undefined) {
+        // A guarded write never creates a row: it settles one that exists, is running and is stale.
+        await db
+          .prepare(
+            `UPDATE turn_status SET status = ?, scopeId = COALESCE(?, scopeId)${options.preserveUpdatedAt ? '' : ', updatedAt = ?'} WHERE turnId = ? AND status = 'running' AND updatedAt < ?`,
+          )
+          .bind(...[status, scopeId ?? null, ...(options.preserveUpdatedAt ? [] : [at]), turnId, new Date(options.onlyIfRunningBefore).toISOString()])
+          .run()
+        return
+      }
       // COALESCE preserves a scopeId set on the initial 'running' write when a
       // later 'complete'/'error' write passes none.
       await db
         .prepare(
-          'INSERT INTO turn_status (turnId, status, scopeId, updatedAt) VALUES (?, ?, ?, ?) ON CONFLICT(turnId) DO UPDATE SET status = excluded.status, scopeId = COALESCE(excluded.scopeId, turn_status.scopeId), updatedAt = excluded.updatedAt',
+          `INSERT INTO turn_status (turnId, status, scopeId, updatedAt) VALUES (?, ?, ?, ?) ON CONFLICT(turnId) DO UPDATE SET status = excluded.status, scopeId = COALESCE(excluded.scopeId, turn_status.scopeId)${options.preserveUpdatedAt ? '' : ', updatedAt = excluded.updatedAt'}`,
         )
-        .bind(turnId, status, scopeId ?? null, new Date(now()).toISOString())
+        .bind(turnId, status, scopeId ?? null, at)
         .run()
     },
     async getStatus(turnId) {
@@ -726,11 +749,16 @@ export function createMemoryTurnEventStore(
     async read(turnId, fromSeq) {
       return (events.get(turnId) ?? []).filter((e) => e.seq > fromSeq)
     },
-    async setStatus(turnId, s, scopeId) {
+    async setStatus(turnId, s, scopeId, options = {}) {
+      if (options.onlyIfRunningBefore !== undefined) {
+        const stale = status.get(turnId) === 'running' && (updatedAt.get(turnId) ?? Number.POSITIVE_INFINITY) < options.onlyIfRunningBefore
+        if (!stale) return
+      }
+      const existed = status.has(turnId)
       status.set(turnId, s)
       if (scopeId) scopes.set(turnId, scopeId)
       if (!order.includes(turnId)) order.push(turnId)
-      updatedAt.set(turnId, now())
+      if (!(options.preserveUpdatedAt && existed)) updatedAt.set(turnId, now())
     },
     async getStatus(turnId) {
       return status.get(turnId) ?? null

@@ -105,7 +105,11 @@ export function createDurableObjectTurnEventStore(
       )
       return body.events
     },
-    async setStatus(turnId, status, scopeId) {
+    async setStatus(turnId, status, scopeId, options) {
+      // This store keeps no update time to preserve or compare; refuse rather than write unguarded.
+      if (options?.preserveUpdatedAt || options?.onlyIfRunningBefore !== undefined) {
+        throw new Error('The turn-stream Durable Object store does not support guarded or time-preserving status writes')
+      }
       await postJsonOk(namespace, turnStorageChannelKey(turnId), TURN_STREAM_PATHS.turnStatusSet, { status }, auth)
       if (scopeId) {
         await postJsonOk(namespace, scopeIndexChannelKey(scopeId), TURN_STREAM_PATHS.scopeStatusSet, {

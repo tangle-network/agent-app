@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { createD1TurnEventStore, TURN_EVENTS_MIGRATION_SQL } from './turn-buffer'
+import { createD1TurnEventStore, createMemoryTurnEventStore, TURN_EVENTS_MIGRATION_SQL } from './turn-buffer'
 
 /**
  * A D1 statement takes at most 100 bound variables. The append used one
@@ -58,5 +58,46 @@ describe('createD1TurnEventStore.append', () => {
 
     expect(await store.read('terminal', 0)).toEqual([{ seq: 1, event: 'before' }])
     sqlite.close()
+  })
+})
+
+describe('settling an orphaned stream', () => {
+  // GTM ends a stream nothing has renewed for an hour. Its reliability report places a stream by its update time, so
+  // the settlement must keep that time, and must not end a stream whose producer came back meanwhile.
+  const stores = () => {
+    const { sqlite, db } = d1Like()
+    let clock = Date.parse('2026-10-10T20:00:00.000Z')
+    const d1 = createD1TurnEventStore(db as never, { now: () => clock })
+    const memory = createMemoryTurnEventStore({ now: () => clock })
+    const updatedAt = async (store: 'd1' | 'memory', turnId: string) => store === 'd1'
+      ? (sqlite.prepare('SELECT updatedAt FROM turn_status WHERE turnId = ?').get(turnId) as { updatedAt: string } | undefined)?.updatedAt
+      : undefined
+    return { d1, memory, advance: (ms: number) => { clock += ms }, at: () => clock, updatedAt }
+  }
+
+  it('ends a stale running stream and keeps its update time, in the D1 and memory stores', async () => {
+    const { d1, memory, advance, at, updatedAt } = stores()
+    for (const store of [d1, memory]) await store.setStatus('orphan', 'running', 'thread-1')
+    const startedAt = await updatedAt('d1', 'orphan')
+    advance(2 * 3_600_000)
+    for (const store of [d1, memory]) {
+      await store.setStatus('orphan', 'error', undefined, { preserveUpdatedAt: true, onlyIfRunningBefore: at() - 3_600_000 })
+      expect(await store.getStatus('orphan')).toBe('error')
+    }
+    expect(await updatedAt('d1', 'orphan')).toBe(startedAt)
+  })
+
+  it('leaves a stream whose producer renewed it, and never creates one', async () => {
+    const { d1, memory, advance, at } = stores()
+    for (const store of [d1, memory]) await store.setStatus('live', 'running', 'thread-1')
+    advance(2 * 3_600_000)
+    const cutoff = at() - 3_600_000
+    for (const store of [d1, memory]) {
+      await store.setStatus('live', 'running', 'thread-1')
+      await store.setStatus('live', 'error', undefined, { preserveUpdatedAt: true, onlyIfRunningBefore: cutoff })
+      expect(await store.getStatus('live')).toBe('running')
+      await store.setStatus('missing', 'error', undefined, { preserveUpdatedAt: true, onlyIfRunningBefore: cutoff })
+      expect(await store.getStatus('missing')).toBeNull()
+    }
   })
 })
