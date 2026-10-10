@@ -1,0 +1,62 @@
+# Agent app lessons
+
+Every agent app built on agent-app inherits these lessons.
+GTM learned each one in production on 2026-10-09 and 2026-10-10, mostly by fixing it by hand.
+Before you build or change an app, check the lessons that touch your change, and rely on the enforcing checks instead of copying their fixes.
+
+Each row gives the lesson, the incident that taught it, and the check that enforces it.
+Checks marked *launch kit* are invariants in agent-app's `src/launch-invariants/` (branch `feat/launch-invariants-20261010`, in review).
+They run against each app's own routes and jobs.
+Checks marked *planned* do not exist yet.
+Until they do, the lesson is a review rule.
+
+Repositories: [GTM](https://github.com/tangle-network/gtm-agent), [ADC](https://github.com/tangle-network/agent-dev-container) (agent-dev-container), [dotfiles](https://github.com/drewstone/dotfiles) (operator tooling).
+
+## Data and load
+
+| Lesson | Taught by | Enforced by |
+| --- | --- | --- |
+| **Bounded reads and memory budgets.** A request or job reads a bounded batch and stays inside a declared memory budget, whatever the table size. | Unbounded reads over 1.63M stream events overloaded D1 and broke sign-in at 18:01Z and 18:54Z. Worker memory limits were hit 6 times, by chat and hourly crons. | *launch kit* `bounded-reads`, `memory-budget`. Fixes: [`tests/turn-health/bounded-parts.test.ts`](../tests/turn-health/bounded-parts.test.ts) (#953), GTM `tests/reliability-scorecard.test.ts` ([#1484](https://github.com/tangle-network/gtm-agent/pull/1484)), [#1426](https://github.com/tangle-network/gtm-agent/pull/1426) (queue bounded by size), [#1465](https://github.com/tangle-network/gtm-agent/pull/1465) (Worker chunks). |
+| **Coalesced events.** Coalesce a model's token stream before it is persisted; never write one row per token. | A reasoning model's per-token events filled the turn-stream tables, whose 1.63M events then overloaded D1. | *launch kit* `coalesced-events`; [`tests/turn-buffer.test.ts`](../tests/turn-buffer.test.ts) (#946). |
+| **Isolated scheduled jobs.** Each cron sweep runs alone, with retries and its own budget, so one heavy sweep cannot starve or crash the others. | Hourly crons at 13:01, 14:01, 17:01, 21:00 and 22:00Z hit the Worker memory limit together; turn recovery ran only hourly. | *launch kit* `isolated-jobs`; GTM `tests/cron-triggers.test.ts` and `tests/orphaned-turn-streams.test.ts` ([#1496](https://github.com/tangle-network/gtm-agent/pull/1496), [#1500](https://github.com/tangle-network/gtm-agent/pull/1500), [#1504](https://github.com/tangle-network/gtm-agent/pull/1504)). |
+| **Limits alarm before they bind.** Every resource has a declared budget, a test, and an alarm at 80%. | 19 limit hits in one day: Worker memory, D1, sandbox disk, snapshot cap, operator-key rate, agent spend, Beelink disk. | *launch kit* `limit-alarms`. |
+
+## Turns
+
+| Lesson | Taught by | Enforced by |
+| --- | --- | --- |
+| **Honest settlement, with detection lag.** A turn that cannot finish settles as an honest failure with Retry, attributed to its request time. Report the lag from failure to notice as a metric of its own. Never re-run a turn automatically, and never move a settled turn in time. | A failure was dated by its 19:43Z notice instead of its 09:13Z request, a 10.5 h detection lag that no metric showed. | *launch kit* `honest-settlement`; [`src/stream/turn-buffer-d1.test.ts`](../src/stream/turn-buffer-d1.test.ts) (#951), native-completion #940, #941, #942; GTM `tests/reliability-scorecard.test.ts` ([#1501](https://github.com/tangle-network/gtm-agent/pull/1501), [#1481](https://github.com/tangle-network/gtm-agent/pull/1481), which reports a person's Stop apart from failures). |
+| **Restart-lossless deploys, with a canary.** An orchestrator restart or deploy never kills running work. Every deploy runs a canary turn and rolls back on failure. | The orchestrator's crash recovery stopped the b81b box with 6 running turns (`inc-20261010-idle-reaper-kill`). Two more turns were lost after the first fix. | ADC `orchestrator-lifecycle-live-work.test.ts` ([ADC #10047](https://github.com/tangle-network/agent-dev-container/pull/10047)); restart drill canary (PASS 22:15Z); GTM `scripts/ship.sh release`, which runs a startup canary, migrations, a served-revision check, a chat canary and automatic rollback. |
+
+## Auth and the edge
+
+| Lesson | Taught by | Enforced by |
+| --- | --- | --- |
+| **Auth survives a D1 stall.** A just-verified key or session keeps working for up to 60 s while D1 cannot answer, and revocation stays honored. | API-key lookup and email sign-in failed during the D1 overload, at 18:01Z and 18:54:56Z. | *launch kit* `auth-survives-d1-stall`; GTM `tests/auth-lookup-cache.test.ts` ([#1488](https://github.com/tangle-network/gtm-agent/pull/1488)). |
+| **Auth before stream.** Authorize a turn before its stream opens. A progress-first response must not run ahead of the access check. | Speeding up first visible progress opened turn streams before `authorize` had run. | *launch kit* `authorize-before-stream`; [`tests/chat-routes/authorize-before-stream.test.ts`](../tests/chat-routes/authorize-before-stream.test.ts) (#948, the gate over every route) and [`tests/chat-routes/turn-progress.test.ts`](../tests/chat-routes/turn-progress.test.ts) (#947). |
+| **An honest bot User-Agent.** Sandbox HTTP clients send an identifiable User-Agent. Never spoof a browser, and never weaken a zone to let a client through. | Brand intake from the box got HTTP 403 from router.tangle.tools, whose bot rules refuse default library User-Agents. Decision D10 chose an honest User-Agent over a zone change or a browser spoof. | GTM `tests/http-identity.test.ts` ([#1499](https://github.com/tangle-network/gtm-agent/pull/1499)). |
+| **Pasted code reaches chat.** The WAF's managed OWASP rules do not run on authenticated chat-message routes. Rate limiting and bot and DDoS protection stay on. | Code pasted into a chat message matched the managed OWASP signatures, and the edge refused the message (decision D23). | *planned*: a deploy canary that posts a fenced code block through the public zone to the chat-message route. |
+
+## Sandboxes
+
+| Lesson | Taught by | Enforced by |
+| --- | --- | --- |
+| **Sandbox disk budgets.** Everything the runtime writes per turn has a cap and a pruner, and shows up in the box's usage report. A full box names itself instead of asking for a retry. | The b81b box ran out of its 10 GB disk and every turn failed with ENOSPC. The causes were an OpenCode HOME copied per turn (65 MB) and a process-I/O spool about 5.6x turn output, both hidden from `/files/usage`. | ADC `opencode-idle-home-reclaim.test.ts` ([ADC #10088](https://github.com/tangle-network/agent-dev-container/pull/10088)), `native-settled-retention.test.ts` ([ADC #10068](https://github.com/tangle-network/agent-dev-container/pull/10068)); GTM `tests/box-storage-headroom.test.ts` ([#1458](https://github.com/tangle-network/gtm-agent/pull/1458)); a process-I/O ring buffer (64 MB per runtime folder, 1 GB per box), in progress in ADC. |
+| **Snapshot retention.** Platform snapshots have their own retention outside the customer's cap. A failed snapshot alarms. Recovery restores from the newest snapshot that exists, and a restore drill proves it. | b81b's newest snapshot was 3 days old, the error was recorded without a log line, and the restore pointer named a deleted snapshot. Retention also pruned customer snapshots inside a live session. | ADC `snapshot-deferred-delete.test.ts`, `restic-snapshot-count.test.ts` ([ADC #10082](https://github.com/tangle-network/agent-dev-container/pull/10082)); GTM `tests/snapshot-rotation.test.ts` ([#1463](https://github.com/tangle-network/gtm-agent/pull/1463)), `tests/snapshot-resolve.test.ts` and the restore drill ([#1469](https://github.com/tangle-network/gtm-agent/pull/1469), [#1476](https://github.com/tangle-network/gtm-agent/pull/1476)). |
+
+## Delivery
+
+| Lesson | Taught by | Enforced by |
+| --- | --- | --- |
+| **The gate is ship verify.** The pre-merge gate runs exactly the command the deploy runs, so nothing reaches master that the deploy will refuse. | 4 deploys failed on checks the gate never ran: lint at 14:13, 22:03 and 22:14Z, and agent-eval peer floors at 20:25Z ([#1445](https://github.com/tangle-network/gtm-agent/pull/1445), reverted in [#1448](https://github.com/tangle-network/gtm-agent/pull/1448)). | GTM `signoff.config.mjs` and `scripts/ship-verify.mjs`, through `bash scripts/ship.sh verify`; *planned* `beelink-gate auto <repo> <sha> --ship` in dotfiles, which runs that command on a free Beelink. |
+| **A docs-only merge must not skip a release.** A docs-only merge to a deploy branch mid-Verify skips the release, because the deploy's freshness check sees a newer master. So ledger rows ride with code PRs, and deploys filter out paths that do not touch the runtime. | Twice in one night, [#1509](https://github.com/tangle-network/gtm-agent/pull/1509) and [#1510](https://github.com/tangle-network/gtm-agent/pull/1510) (climb ledger rows) landed while a verified commit was in Verify, and its release was skipped. 38 verified runs released 3. | *planned*: `paths-ignore` for `.agent/**` and `docs/**` in GTM `.github/workflows/deploy.yml`, and release of any verified commit newer than the served one. |
+| **No single coordination host.** Unattended chains, gate entry points and lock holders each need a second home, and a lock dies with its holder. | gtr went offline at about 23:39Z, taking the gate entry point and the unattended chains with it. Earlier, gate lock waits reached 72 min. | *planned*: `beelink-gate auto` on any host, with a maximum hold, a watchdog for a dead launcher, and a receipt log, in dotfiles. |
+| **Run-origin tags on test traffic.** Every eval, canary and agent-test request carries its run origin. Test leads and test turns run every step but count in no customer metric and notify no one. | Agent test turns emailed Drew 42 approval requests. Test submissions counted as leads. | GTM `tests/inbound-leads.test.ts` ([#1450](https://github.com/tangle-network/gtm-agent/pull/1450)); hosted-runner origin header ([#1491](https://github.com/tangle-network/gtm-agent/pull/1491)). |
+| **No prompt-text tests.** Test behavior and safety, not the wording of a prompt, skill or page. Fix a habit-type failure with a runtime capability, not another prompt edit. | [#1436](https://github.com/tangle-network/gtm-agent/pull/1436) deleted copy and prompt-text tests that asserted wording, not behavior. After two prompt-edit rounds, only 3 of 30 research runs cut at 20 calls left a deliverable. | Review rule; *planned*: a lint that rejects assertions on prompt or skill text. |
+
+## Measurement
+
+| Lesson | Taught by | Enforced by |
+| --- | --- | --- |
+| **Every number names its sample.** A reported number states its selection rule, sample size and window. A per-release number also states one code version, with a window that starts after that version deployed. Durations select by start time. | 5 numbers were retracted in one day. "Coalescing p50 32,401" chose streams by finish time across two releases, a failure time was measured from its notice, and a ~7 GB disk reclaim was an estimate. | dotfiles `climb-log append` and `climb-log check`, which refuse a ledger row without that measurement block; process-guard refuses shell writes into a ledger. |
+| **Measure before naming a cause.** Name a cause only after a measurement separates it from the alternatives, such as a per-path usage diff or a replay that reproduces it. | 3 disk causes were named and retracted for one full box before a per-path measurement found the per-turn OpenCode HOME copy ([ADC #10088](https://github.com/tangle-network/agent-dev-container/pull/10088)). | The climb's mechanism and red-team passes (dotfiles `docs/processes/climb.md`); `climb-log hills` lists each hill whose instrument lacks a calibration check. |
