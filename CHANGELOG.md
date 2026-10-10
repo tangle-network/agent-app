@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.49
+
+- fix(chat-routes): read a progress-first turn's body before its stream opens (#945)
+
 ## 0.60.48
 
 - feat(chat-routes): progress-first turn stream and a live stage row (#944)
