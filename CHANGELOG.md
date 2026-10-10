@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.26
+
+- feat(signoff): ship every agent-app Worker with traceable Cloudflare defaults (#920)
+
 ## 0.60.25
 
 - fix(hub-approvals): fit the transcript row on a phone and drop an account that repeats the provider (#919)
