@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-228 exports.
+230 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -276,6 +276,14 @@ type AttachmentWriteResult
 
 ```ts
 (byteLen: number) => number
+```
+
+### `boundNativeCompletionReceipt`
+
+`function` — Fit a terminal receipt inside {@link NATIVE_COMPLETION_RECEIPT_MAX_BYTES}.
+
+```ts
+(receipt: NativeCompletionReceipt, maxBytes?: number) => NativeCompletionReceipt
 ```
 
 ### `buildDispatchParts`
@@ -1108,6 +1116,14 @@ class ModelFailoverTimeoutError
 
 ```ts
 interface ModelFallbackInfo
+```
+
+### `NATIVE_COMPLETION_RECEIPT_MAX_BYTES`
+
+`const` — Serialized UTF-8 budget for one terminal receipt.
+
+```ts
+number
 ```
 
 ### `NativeCompletionAdmission`
