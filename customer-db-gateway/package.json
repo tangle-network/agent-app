@@ -1,0 +1,16 @@
+{
+  "name": "customer-db-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Runs in your infrastructure so a Tangle agent can use your database without receiving its credential.",
+  "type": "module",
+  "engines": { "node": ">=22.18.0" },
+  "scripts": {
+    "start": "node src/server.ts",
+    "mint-token": "node src/server.ts mint-token",
+    "test": "node --test src/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": { "pg": "8.23.0" },
+  "devDependencies": { "@types/node": "24.19.0", "@types/pg": "8.23.1", "typescript": "5.9.3" }
+}
