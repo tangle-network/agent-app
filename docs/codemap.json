@@ -21664,7 +21664,7 @@
         {
           "name": "CommandPalette",
           "kind": "function",
-          "signature": "({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, loading, initialQuery, placeholder, emptyMessage, label…",
+          "signature": "({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, loading, initialQuery, onQueryChange, placeholder, empt…",
           "doc": null
         },
         {

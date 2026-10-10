@@ -121,6 +121,13 @@ describe('HubApprovalDock', () => {
     expect(screen.getByRole('heading', { name: 'Open PR: Fix the hero wrap on acme/site' })).toBeTruthy()
   })
 
+  it('names the account only when it adds to the provider', () => {
+    const { rerender } = render(<HubApprovalDock items={[{ ...PROPOSE, account: 'GitHub' }]} onDecide={vi.fn()} />)
+    expect(screen.getByText(/^GitHub · closes in/)).toBeTruthy()
+    rerender(<HubApprovalDock items={[PROPOSE]} onDecide={vi.fn()} />)
+    expect(screen.getByText(/^GitHub · as octocat · closes in/)).toBeTruthy()
+  })
+
   it('shows nothing when no call waits, and no buttons to someone who cannot decide', () => {
     const { container, rerender } = render(<HubApprovalDock items={[{ ...PROPOSE, phase: 'done' }]} onDecide={vi.fn()} />)
     expect(container.innerHTML).toBe('')
@@ -180,7 +187,7 @@ describe('receipts and rows', () => {
   it('marks a call where the agent made it and opens its detail', () => {
     const onReview = vi.fn()
     render(<HubApprovalRow item={PROPOSE} onReview={onReview} />)
-    expect(screen.getByText('Waiting for you')).toBeTruthy()
+    expect(screen.getByText('Waiting')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
     expect(onReview).toHaveBeenCalledWith(PROPOSE)
     expect(screen.queryByText('src/routes/_index.tsx')).toBeNull()

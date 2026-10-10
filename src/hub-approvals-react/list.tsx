@@ -3,7 +3,7 @@ import { ChevronRight, ShieldCheck } from 'lucide-react'
 import { Button } from '@tangle-network/ui/primitives'
 
 import { hubActionReceipt, presentHubAction, type HubApprovalItem, type HubApprovalPhase } from '../hub-approvals'
-import { closesIn, HubApprovalPhasePill, HubProviderMark, relativeTime } from './parts'
+import { closesIn, distinctAccount, HubApprovalPhasePill, HubProviderMark, relativeTime } from './parts'
 
 const GROUPS: ReadonlyArray<{ id: string; label: string; phases: readonly HubApprovalPhase[] }> = [
   { id: 'waiting', label: 'Waiting', phases: ['waiting', 'blocked'] },
@@ -63,7 +63,7 @@ export function HubApprovalsList({ items, onSelect, selectedId, className = '' }
                   const presentation = presentHubAction(item)
                   const title = item.phase === 'done' ? hubActionReceipt(item).title : presentation.title
                   const when = item.phase === 'waiting' ? closesIn(item.expiresAt, now) ?? relativeTime(item.requestedAt, now) : relativeTime(item.requestedAt, now)
-                  const detail = [presentation.provider.name, item.account, when].filter(Boolean).join(' · ')
+                  const detail = [presentation.provider.name, distinctAccount(item.account, presentation.provider.name), when].filter(Boolean).join(' · ')
                   const selected = selectedId === item.id
                   return (
                     <li key={item.id}>
