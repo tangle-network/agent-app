@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.51
+
+- feat(chat-routes): prepareTurn runs product work after admission, and a gate keeps every route behind authorize (#948)
+
 ## 0.60.50
 
 - fix(chat-routes): authorize a progress-first turn before its stream opens (#947)
