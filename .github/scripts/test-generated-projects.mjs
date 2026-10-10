@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -129,6 +130,21 @@ function assertGeneratedPeerFloors(project, env) {
   run(process.execPath, ['--input-type=module', '--eval', source], { cwd: project, env })
 }
 
+// The scaffold must pass the same Worker-defaults check `agent-app-signoff`
+// runs on a product, read through the project's own Wrangler, and the dry-run
+// bundle must carry the source map `upload_source_maps` uploads.
+function assertGeneratedWorkerDefaults(project, env) {
+  const source = [
+    "import { checkWorkerDefaults, formatWorkerDefaults } from '@tangle-network/agent-app/signoff'",
+    "const result = checkWorkerDefaults(process.cwd(), ['wrangler.toml'])",
+    'process.stdout.write(formatWorkerDefaults(result))',
+    'if (result.findings.length > 0) process.exit(1)',
+  ].join('\n')
+  run(process.execPath, ['--input-type=module', '--eval', source], { cwd: project, env })
+  const maps = readdirSync(join(project, '.wrangler-dry-run')).filter((file) => file.endsWith('.map'))
+  if (maps.length === 0) throw new Error('wrangler dry-run emitted no source map for upload_source_maps')
+}
+
 function assertToolVersions(env) {
   const npmPackage = JSON.parse(readFileSync(npmPackagePath, 'utf8'))
   assertEqual(npmPackage.version, NPM_VERSION, 'installed npm package version')
@@ -245,6 +261,7 @@ function installAndRunScaffolder({
     ['exec', 'wrangler', 'deploy', '--dry-run', '--outdir', '.wrangler-dry-run'],
     { cwd: project, env },
   )
+  assertGeneratedWorkerDefaults(project, env)
   if (variant === 'chat') {
     const html = readFileSync(join(project, 'dist/client/index.html'), 'utf8')
     if (html.includes('/main.tsx') || !/assets\/[^"']+\.js/.test(html) || !/assets\/[^"']+\.css/.test(html)) {

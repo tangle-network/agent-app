@@ -4,7 +4,15 @@
 
 Source: `src/signoff/index.ts`
 
-20 exports.
+25 exports.
+
+### `checkWorkerDefaults`
+
+`function` — Check each Worker config, and every environment it deploys, against the defaults.
+
+```ts
+(repoRoot: string, configs?: readonly string[] | undefined) => WorkerDefaultsResult
+```
 
 ### `formatSignoffReport`
 
@@ -12,6 +20,14 @@ Source: `src/signoff/index.ts`
 
 ```ts
 (report: SignoffReport) => string
+```
+
+### `formatWorkerDefaults`
+
+`function`
+
+```ts
+(result: WorkerDefaultsResult) => string
 ```
 
 ### `LoadedSignoffConfig`
@@ -164,4 +180,28 @@ interface SignoffStepSpec
 
 ```ts
 type SignoffStepStatus
+```
+
+### `WORKER_COMPATIBILITY_DATE_FLOOR`
+
+`const` — Update together with the templates' `compatibility_date`.
+
+```ts
+"2026-09-23"
+```
+
+### `WorkerDefaultsFinding`
+
+`interface`
+
+```ts
+interface WorkerDefaultsFinding
+```
+
+### `WorkerDefaultsResult`
+
+`interface`
+
+```ts
+interface WorkerDefaultsResult
 ```

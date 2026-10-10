@@ -16747,9 +16747,21 @@
       "error": null,
       "exports": [
         {
+          "name": "checkWorkerDefaults",
+          "kind": "function",
+          "signature": "(repoRoot: string, configs?: readonly string[] | undefined) => WorkerDefaultsResult",
+          "doc": "Check each Worker config, and every environment it deploys, against the defaults."
+        },
+        {
           "name": "formatSignoffReport",
           "kind": "function",
           "signature": "(report: SignoffReport) => string",
+          "doc": null
+        },
+        {
+          "name": "formatWorkerDefaults",
+          "kind": "function",
+          "signature": "(result: WorkerDefaultsResult) => string",
           "doc": null
         },
         {
@@ -16864,6 +16876,24 @@
           "name": "SignoffStepStatus",
           "kind": "type",
           "signature": "type SignoffStepStatus",
+          "doc": null
+        },
+        {
+          "name": "WORKER_COMPATIBILITY_DATE_FLOOR",
+          "kind": "const",
+          "signature": "\"2026-09-23\"",
+          "doc": "Update together with the templates' `compatibility_date`."
+        },
+        {
+          "name": "WorkerDefaultsFinding",
+          "kind": "interface",
+          "signature": "interface WorkerDefaultsFinding",
+          "doc": null
+        },
+        {
+          "name": "WorkerDefaultsResult",
+          "kind": "interface",
+          "signature": "interface WorkerDefaultsResult",
           "doc": null
         }
       ]

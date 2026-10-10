@@ -54,6 +54,13 @@
 export { runSignoff, type RunSignoffOptions } from './run'
 export { loadSignoffConfig, type LoadSignoffConfigOptions } from './config'
 export { formatSignoffReport } from './report'
+export {
+  checkWorkerDefaults,
+  formatWorkerDefaults,
+  WORKER_COMPATIBILITY_DATE_FLOOR,
+  type WorkerDefaultsFinding,
+  type WorkerDefaultsResult,
+} from './worker-defaults'
 export type {
   LoadedSignoffConfig,
   SignoffAttempt,

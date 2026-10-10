@@ -60,6 +60,7 @@ const configSchema = z.object({
   carryFiles: z.array(z.string()).optional(),
   cacheDir: z.string().optional(),
   storeGenerations: z.number().int().positive().optional(),
+  workerConfigs: z.array(z.string().min(1)).optional(),
 })
 
 function describeIssues(error: z.ZodError, where: string): string {

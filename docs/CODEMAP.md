@@ -89,7 +89,7 @@ _119 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
 | [`./sequences/drizzle`](api/sequences-drizzle.md) | 13 | `tools`, `web` |
 | [`./session-shell`](api/session-shell.md) | 58 | — |
-| [`./signoff`](api/signoff.md) | 20 | — |
+| [`./signoff`](api/signoff.md) | 25 | — |
 | [`./signoff/cli`](api/signoff-cli.md) | 2 | — |
 | [`./signoff/proof`](api/signoff-proof.md) | 22 | — |
 | [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | — |
@@ -892,9 +892,9 @@ Source: `src/session-shell/index.ts` · 58 exports
 
 ## `./signoff`
 
-Source: `src/signoff/index.ts` · 20 exports
+Source: `src/signoff/index.ts` · 25 exports
 
-`formatSignoffReport`, `LoadedSignoffConfig`, `loadSignoffConfig`, `LoadSignoffConfigOptions`, `runSignoff`, `RunSignoffOptions`, `SignoffAttempt`, `SignoffConfig`, `SignoffConfigOrigin`, `SignoffEvent`, `SignoffHostFacts`, `SignoffInstallResult`, `SignoffInstallSpec`, `SignoffRepoFacts`, `SignoffReport`, `SignoffShuffleSpec`, `SignoffSource`, `SignoffStepResult`, `SignoffStepSpec`, `SignoffStepStatus`
+`checkWorkerDefaults`, `formatSignoffReport`, `formatWorkerDefaults`, `LoadedSignoffConfig`, `loadSignoffConfig`, `LoadSignoffConfigOptions`, `runSignoff`, `RunSignoffOptions`, `SignoffAttempt`, `SignoffConfig`, `SignoffConfigOrigin`, `SignoffEvent`, `SignoffHostFacts`, `SignoffInstallResult`, `SignoffInstallSpec`, `SignoffRepoFacts`, `SignoffReport`, `SignoffShuffleSpec`, `SignoffSource`, `SignoffStepResult`, `SignoffStepSpec`, `SignoffStepStatus`, `WORKER_COMPATIBILITY_DATE_FLOOR`, `WorkerDefaultsFinding`, `WorkerDefaultsResult`
 
 [Full API →](api/signoff.md)
 
