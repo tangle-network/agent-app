@@ -55,6 +55,7 @@ function status(value: unknown): number | undefined {
 
 const FILESYSTEM_NOT_READY = /filesystem incarnation is not ready/i
 const RUN_DISPATCH_ENDPOINT = /\/runtime\/agents\/run\/stream(?:[?#]|$)/
+const RUN_DISPATCH_REFUSAL_MESSAGE = /\/runtime\/agents\/run\/stream: error code: (50[234])\b/
 
 /** The typed transient failure `error` carries anywhere in its cause chain, or null. */
 export function classifySandboxTransientFailure(error: unknown): SandboxTransientFailure | null {
@@ -65,8 +66,11 @@ export function classifySandboxTransientFailure(error: unknown): SandboxTransien
     }
     const code = status(cause.status)
     const endpoint = typeof cause.endpoint === 'string' ? cause.endpoint : ''
-    if ((code === 502 || code === 503 || code === 504) && RUN_DISPATCH_ENDPOINT.test(endpoint)) {
-      return { code: 'sandbox.dispatch_refused', message: `The sandbox gateway refused the run dispatch with ${code}` }
+    const refusal = (code === 502 || code === 503 || code === 504) && RUN_DISPATCH_ENDPOINT.test(endpoint)
+      ? code
+      : RUN_DISPATCH_REFUSAL_MESSAGE.exec(message)?.[1]
+    if (refusal) {
+      return { code: 'sandbox.dispatch_refused', message: `The sandbox gateway refused the run dispatch with ${refusal}` }
     }
   }
   if (isSandboxApiTransientFailure(serializeSandboxProvisioningError(error))) {

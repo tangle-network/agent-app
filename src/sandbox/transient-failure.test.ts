@@ -19,6 +19,8 @@ describe('classifySandboxTransientFailure', () => {
     expect(classifySandboxTransientFailure(Object.assign(new Error('error code: 503'), {
       status: 503, endpoint: '/v1/sandboxes/box-1/runtime/agents/run/stream', origin: 'sandbox-api',
     }))?.code).toBe('sandbox.dispatch_refused')
+    expect(classifySandboxTransientFailure(new Error('POST /v1/sandboxes/box-1/runtime/agents/run/stream: error code: 502'))?.code)
+      .toBe('sandbox.dispatch_refused')
     expect(classifySandboxTransientFailure(Object.assign(new Error('backend did not answer'), {
       status: 503, endpoint: '/v1/sandboxes/box-1/resume', origin: 'sandbox-api',
     }))?.code).toBe('sandbox.control_plane_transient')
