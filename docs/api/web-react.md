@@ -2179,7 +2179,7 @@ type NoticeKind
 `function` — Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error).
 
 ```ts
-(noticeKind: NoticeKind, id: string, text: string) => NoticePersistedPart
+(noticeKind: NoticeKind, id: string, text: string, code?: string | undefined) => NoticePersistedPart
 ```
 
 ### `noticePartKey`
