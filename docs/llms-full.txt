@@ -26822,6 +26822,14 @@ interface MemoryTurnStreamSocket
 (channelName: string, secret: string, now?: () => number, ttlMs?: number) => Promise<string>
 ```
 
+### `peekDurableTurnLock`
+
+`function` — Read a channel's active turn lock without changing it.
+
+```ts
+(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; scope: TurnLockScope; }, auth: Tur…
+```
+
 ### `pruneStaleThreads`
 
 `function` — Remove responding markers older than ttlMs; return their thread IDs.
@@ -26899,7 +26907,7 @@ number
 `const` — Provide constant paths for managing chat turn streams and locks
 
 ```ts
-{ readonly broadcast: "/broadcast"; readonly lockAcquire: "/chat-turn-lock/acquire"; readonly lockRelease: "/chat-turn-…
+{ readonly broadcast: "/broadcast"; readonly lockAcquire: "/chat-turn-lock/acquire"; readonly lockPeek: "/chat-turn-loc…
 ```
 
 ### `TURN_STREAM_STORAGE_KEYS`
