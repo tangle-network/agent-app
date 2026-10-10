@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.29
+
+- fix(protected-home): reject stale writes and preserve scoped learning snapshots (#925)
+
 ## 0.60.28
 
 - fix(hub-approvals): preserve uncertain action outcomes (#924)
