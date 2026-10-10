@@ -10,6 +10,7 @@ import {
   type HubApprovalItem,
   type HubApprovalPhase,
 } from '../hub-approvals'
+import { HUB_APPROVAL_UNKNOWN_WARNING } from '../hub-approvals/unknown'
 import { closesIn, distinctAccount, HubProviderMark, HubRawDetails } from './parts'
 import { HubActionPreviewView } from './preview'
 
@@ -25,7 +26,7 @@ export type HubApprovalPermissions =
   | { never: string }
 
 export interface HubApprovalDockProps {
-  /** Every held call in the conversation; the dock shows the open and running ones. */
+  /** Every held call; open, running and uncertain calls stay visible until resolved or dismissed. */
   items: readonly HubApprovalItem[]
   onDecide: (item: HubApprovalItem, decision: HubApprovalDecision) => Promise<void>
   /** Standing-permission choices for a call; omit when the host offers none. */
@@ -70,6 +71,13 @@ function Progress({ item }: { item: HubApprovalItem }) {
       </p>
     )
   }
+  if (item.phase === 'unknown') {
+    return (
+      <p role="alert" className="break-words text-sm text-[var(--surface-warning-text)]">
+        <span className="font-medium">May have run.</span> {HUB_APPROVAL_UNKNOWN_WARNING}
+      </p>
+    )
+  }
   if (item.phase === 'failed') {
     return (
       <p role="alert" className="break-words text-sm text-[var(--surface-danger-text)]">
@@ -90,8 +98,8 @@ function Progress({ item }: { item: HubApprovalItem }) {
 export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId, className = '' }: HubApprovalDockProps) {
   const now = useNow(30_000)
   // Calls that finished while this dock watched them stay with their result: a
-  // success briefly, a failure until dismissed. One that failed before the dock
-  // mounted shows in the transcript row, the Approvals list and its receipt.
+  // success briefly, a failure until dismissed. Uncertain outcomes also stay
+  // visible after remount or status reload, until dismissed in this session.
   const watched = useRef(new Map<string, HubApprovalPhase>())
   const [settled, setSettled] = useState<Record<string, number>>({})
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set())
@@ -107,7 +115,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
     for (const item of items) {
       const before = watched.current.get(item.id)
       const wasLive = before !== undefined && (HUB_APPROVAL_OPEN_PHASES.has(before) || HUB_APPROVAL_ACTIVE_PHASES.has(before))
-      if (wasLive && (item.phase === 'done' || item.phase === 'failed')) finishedNow[item.id] = Date.now()
+      if (wasLive && (item.phase === 'done' || item.phase === 'failed' || item.phase === 'unknown')) finishedNow[item.id] = Date.now()
       watched.current.set(item.id, item.phase)
     }
     if (Object.keys(finishedNow).length > 0) setSettled((current) => ({ ...current, ...finishedNow }))
@@ -127,6 +135,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
   const queue = useMemo(() => items.filter((item) => !dismissed.has(item.id) && (
     HUB_APPROVAL_OPEN_PHASES.has(item.phase)
     || HUB_APPROVAL_ACTIVE_PHASES.has(item.phase)
+    || item.phase === 'unknown'
     || item.id in settled
     || submitting?.id === item.id
   )), [items, dismissed, settled, submitting])
@@ -183,7 +192,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
 
   return (
     <section
-      aria-label="Waiting for your approval"
+      aria-label={active.phase === 'unknown' ? 'Action may have run' : 'Waiting for your approval'}
       data-hub-approval-dock={active.id}
       className={`overflow-hidden rounded-2xl border border-[var(--surface-warning-border)] bg-card shadow-md ${className}`}
     >
@@ -242,7 +251,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
           </p>
         )}
         <Progress item={active} />
-        {error?.id === active.id && <p role="alert" className="text-sm text-[var(--surface-danger-text)]">{error.message}</p>}
+        {error?.id === active.id && active.phase === 'waiting' && <p role="alert" className="text-sm text-[var(--surface-danger-text)]">{error.message}</p>}
         {active.phase === 'blocked' && <p className="text-sm text-muted-foreground">The workspace owner approves this request.</p>}
 
         {decidable && permissionsOpen && scopes.length > 0 && (
@@ -287,7 +296,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
               )}
             </>
           )}
-          {active.phase === 'failed' && (
+          {(active.phase === 'failed' || active.phase === 'unknown') && (
             <Button variant="outline" onClick={() => setDismissed((current) => new Set([...current, active.id]))}>
               <X aria-hidden /> Dismiss
             </Button>

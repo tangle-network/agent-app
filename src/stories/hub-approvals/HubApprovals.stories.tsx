@@ -89,6 +89,11 @@ const PR_DONE: HubApprovalItem = {
   },
 }
 
+const UNKNOWN: HubApprovalItem = {
+  ...EMAIL, id: 'm1:unknown', phase: 'unknown',
+  error: 'The connection ended before the provider confirmed the result.',
+}
+
 const SPEECH_DONE: HubApprovalItem = {
   ...SPEECH, id: 'm1:speech-done', phase: 'done',
   result: { audioUrl: 'https://upload.wikimedia.org/wikipedia/commons/c/c8/Example.ogg', durationSeconds: 5.6, format: 'mp3' },
@@ -150,6 +155,15 @@ export const CalendarDock: Story = { render: () => <Conversation items={[EVENT]}
 export const AnyProviderDock: Story = { render: () => <Conversation items={[GENERIC]} /> }
 export const SeveralWaiting: Story = { render: () => <Conversation items={[PULL_REQUEST, EMAIL, SPEECH]} /> }
 export const Running: Story = { render: () => <Conversation items={[{ ...PULL_REQUEST, phase: 'running' }]} /> }
+export const MayHaveRun: Story = {
+  render: () => (
+    <div className="mx-auto max-w-[820px] space-y-4 overflow-hidden bg-background px-5 py-6">
+      <HubApprovalRow item={UNKNOWN} actions={<button>Request again</button>} />
+      <HubApprovalDock items={[UNKNOWN]} onDecide={async () => undefined} />
+      <HubApprovalReceipts items={[UNKNOWN]} />
+    </div>
+  ),
+}
 export const Failed: Story = {
   render: () => <Conversation items={[{ ...PULL_REQUEST, phase: 'failed', error: 'Branch gtm-agent/hero-wrap already exists in tangle-network/tangle-website; name a new branch.' }]} />,
 }
@@ -157,7 +171,7 @@ export const Failed: Story = {
 export const ApprovalsList: Story = {
   render: () => (
     <div className="h-screen w-[420px] max-w-full border-r border-border bg-[var(--md3-surface-container-low,hsl(var(--card)))]">
-      <HubApprovalsList items={[PR_DONE, SPEECH_DONE, { ...EMAIL, phase: 'denied' }, { ...STRIPE, phase: 'failed', error: 'Card declined' }, { ...X_POST, phase: 'running' }, PULL_REQUEST, EVENT]} selectedId={PULL_REQUEST.id} />
+      <HubApprovalsList items={[PR_DONE, SPEECH_DONE, UNKNOWN, { ...EMAIL, phase: 'denied' }, { ...STRIPE, phase: 'failed', error: 'Card declined' }, { ...X_POST, phase: 'running' }, PULL_REQUEST, EVENT]} selectedId={PULL_REQUEST.id} />
     </div>
   ),
 }
@@ -165,7 +179,7 @@ export const ApprovalsList: Story = {
 export const Receipts: Story = {
   render: () => (
     <div className="mx-auto max-w-[820px] space-y-4 bg-background px-5 py-6">
-      <HubApprovalReceipts items={[PR_DONE, SPEECH_DONE, { ...EMAIL, phase: 'denied' }]} message={'I decided the Hub actions you requested:\n- github.pulls.propose: I approved it, and it ran. Hub result: {…}'} at={new Date().toISOString()} />
+      <HubApprovalReceipts items={[PR_DONE, SPEECH_DONE, UNKNOWN, { ...EMAIL, phase: 'denied' }]} message={'I decided the Hub actions you requested:\n- github.pulls.propose: I approved it, and it ran. Hub result: {…}'} at={new Date().toISOString()} />
     </div>
   ),
 }

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.60.30
+
+- feat(web-react): decline an ask, limit a key to a workspace, and a 14px shell floor (#927)
+
+## 0.60.29
+
+- fix(protected-home): reject stale writes and preserve scoped learning snapshots (#925)
+
+## 0.60.28
+
+- fix(hub-approvals): preserve uncertain action outcomes (#924)
+
+## 0.60.27
+
+- fix(web-react): treat an interaction field without a required flag as optional (#922)
+
+## 0.60.26
+
+- feat(signoff): ship every agent-app Worker with traceable Cloudflare defaults (#920)
+
 ## 0.60.25
 
 - fix(hub-approvals): fit the transcript row on a phone and drop an account that repeats the provider (#919)

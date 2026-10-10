@@ -21651,12 +21651,28 @@ interface SessionSummary
 
 Source: `src/signoff/index.ts`
 
+### `checkWorkerDefaults`
+
+`function` — Check each Worker config, and every environment it deploys, against the defaults.
+
+```ts
+(repoRoot: string, configs?: readonly string[] | undefined) => WorkerDefaultsResult
+```
+
 ### `formatSignoffReport`
 
 `function`
 
 ```ts
 (report: SignoffReport) => string
+```
+
+### `formatWorkerDefaults`
+
+`function`
+
+```ts
+(result: WorkerDefaultsResult) => string
 ```
 
 ### `LoadedSignoffConfig`
@@ -21809,6 +21825,30 @@ interface SignoffStepSpec
 
 ```ts
 type SignoffStepStatus
+```
+
+### `WORKER_COMPATIBILITY_DATE_FLOOR`
+
+`const` — Update together with the templates' `compatibility_date`.
+
+```ts
+"2026-09-01"
+```
+
+### `WorkerDefaultsFinding`
+
+`interface`
+
+```ts
+interface WorkerDefaultsFinding
+```
+
+### `WorkerDefaultsResult`
+
+`interface`
+
+```ts
+interface WorkerDefaultsResult
 ```
 
 
@@ -27596,7 +27636,7 @@ interface ApiAccessKey
 `function`
 
 ```ts
-({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, expiryDays, defaultExpiryDays, on…
+({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, expiryDays, defaultExpiryDays, wo…
 ```
 
 ### `ApiAccessPanelProps`
@@ -27613,6 +27653,14 @@ interface ApiAccessPanelProps
 
 ```ts
 interface ApiAccessScope
+```
+
+### `ApiAccessWorkspace`
+
+`interface` — A workspace a key can be limited to.
+
+```ts
+interface ApiAccessWorkspace
 ```
 
 ### `ATTACHMENT_ACCEPT`
@@ -29188,7 +29236,7 @@ interface InteractionPlanCardProps
 `function`
 
 ```ts
-({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, className, }:…
+({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, declinable, c…
 ```
 
 ### `InteractionQuestionCardProps`

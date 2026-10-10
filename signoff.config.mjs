@@ -37,6 +37,11 @@ export default {
   // in one process (`fileParallelism: false`). The graph never offers four here
   // anyway — the suite waits on the build.
   maxParallel: 4,
+  // This repo deploys no Worker. examples/hosted-agent is documentation outside
+  // the pnpm workspace, so no Wrangler is installed to read it; the template
+  // Workers are checked in `generated projects` against the scaffold's own
+  // Wrangler instead.
+  workerConfigs: [],
   steps: [
     {
       name: 'typecheck',

@@ -1,7 +1,23 @@
 name = "__PACKAGE_NAME__"
 main = "src/worker.ts"
-compatibility_date = "2025-01-01"
+compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
+# Shared agent-app Worker defaults. `agent-app-signoff` fails a Worker config
+# without them; docs/worker-defaults.md in @tangle-network/agent-app says why.
+upload_source_maps = true
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
 
 # The house Cloudflare stack the preset composes: D1 + KV.
 # Run `wrangler d1 create __PACKAGE_NAME__` and paste the database_id; create a

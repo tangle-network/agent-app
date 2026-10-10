@@ -98,13 +98,15 @@ export function fieldAnswer(field: ChatInteractionField, values: FieldValues): I
 }
 
 /** All required fields answered → the respond payload; else null (not
- *  submittable yet). Optional unanswered fields are omitted. */
+ *  submittable yet). Optional unanswered fields are omitted. A field is
+ *  required only when it says `required: true`, as the interaction protocol
+ *  validates it; an omitted flag is optional (a permission ask's feedback). */
 export function buildAnswerData(fields: ChatInteractionField[], values: FieldValues): InteractionAnswers | null {
   const data: InteractionAnswers = {}
   for (const field of fields) {
     const answer = fieldAnswer(field, values)
     if (answer === null) {
-      if (field.required === false) continue
+      if (field.required !== true) continue
       return null
     }
     data[field.name] = answer

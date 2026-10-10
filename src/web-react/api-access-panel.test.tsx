@@ -24,11 +24,48 @@ async function create() {
 }
 
 describe('ApiAccessPanel', () => {
+  it('limits a new key to one workspace inside the panel and says what each key reaches', async () => {
+    const callbacks = props()
+    const workspaces = [{ id: 'ws-a', name: 'Alpha' }, { id: 'ws-b', name: 'Beta' }]
+    render(<ApiAccessPanel {...callbacks} workspaces={workspaces} workspaceNoun={{ singular: 'project', plural: 'projects' }}
+      keys={[
+        { id: 'k-all', name: 'Everywhere', scopes: ['records:read'], expiresAt: null },
+        { id: 'k-one', name: 'Just Beta', scopes: ['records:read'], expiresAt: null, workspaceIds: ['ws-b'] },
+        { id: 'k-gone', name: 'Old', scopes: ['records:read'], expiresAt: null, workspaceIds: ['ws-removed'] },
+      ]} />)
+    const reach = screen.getByLabelText<HTMLSelectElement>('Reaches')
+    expect([...reach.options].map(option => option.textContent)).toEqual(['All projects, including new ones', 'Only Alpha', 'Only Beta'])
+    expect(screen.getByText('All projects', { selector: 'p' })).toBeTruthy()
+    expect(screen.getByText('Only Beta', { selector: 'p' })).toBeTruthy()
+    expect(screen.getByText('Only A removed project')).toBeTruthy()
+    fireEvent.change(reach, { target: { value: 'ws-a' } })
+    await create()
+    expect(vi.mocked(callbacks.onCreate).mock.calls[0]![0].workspaceIds).toEqual(['ws-a'])
+  })
+
+  it('offers no workspace limit when the product supplies no workspaces', async () => {
+    const callbacks = props()
+    render(<ApiAccessPanel {...callbacks} />)
+    expect(screen.queryByLabelText('Reaches')).toBeNull()
+    await create()
+    expect(vi.mocked(callbacks.onCreate).mock.calls[0]![0].workspaceIds).toEqual([])
+  })
+
+  it('falls back to every workspace when the chosen one is withdrawn before creation', async () => {
+    const callbacks = props()
+    const { rerender } = render(<ApiAccessPanel {...callbacks} workspaces={[{ id: 'ws-a', name: 'Alpha' }]} />)
+    fireEvent.change(screen.getByLabelText('Reaches'), { target: { value: 'ws-a' } })
+    rerender(<ApiAccessPanel {...callbacks} workspaces={[{ id: 'ws-b', name: 'Beta' }]} />)
+    expect(screen.getByLabelText<HTMLSelectElement>('Reaches').value).toBe('')
+    await create()
+    expect(vi.mocked(callbacks.onCreate).mock.calls[0]![0].workspaceIds).toEqual([])
+  })
+
   it('uses app scopes and finite expiry, masks the secret, and discards it after acknowledgement', async () => {
     const callbacks = props()
     render(<ApiAccessPanel {...callbacks} />)
     await create()
-    expect(callbacks.onCreate).toHaveBeenCalledWith({ name: 'My client', scopes: ['records:read'], expiresAt: expect.any(String) })
+    expect(callbacks.onCreate).toHaveBeenCalledWith({ name: 'My client', scopes: ['records:read'], expiresAt: expect.any(String), workspaceIds: [] })
     const input = vi.mocked(callbacks.onCreate).mock.calls[0]![0]
     expect(Date.parse(input.expiresAt) - Date.now()).toBeGreaterThan(6 * 86_400_000)
     expect(Date.parse(input.expiresAt) - Date.now()).toBeLessThanOrEqual(7 * 86_400_000)

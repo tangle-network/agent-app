@@ -53,7 +53,10 @@ ENV TANGLE_AGENT_HOME="/var/lib/tangle-agent/home"
 # Keep the base image entrypoint/CMD. The actual sidecar and its tools must run
 # as this UID with no ambient privilege/capability escalation. initializeHome
 # refuses a root/mismatched UID. The normal writable work area is separate from
-# the root-owned home and its root-private Git journal. Snapshot both directories
-# as part of the persistent sandbox filesystem, not an anonymous Docker volume.
+# the root-owned home and its root-private Git journal. This image has an unbound
+# local checkpoint, not proof of remote durability. Trusted per-instance setup
+# can bind both directories to its authenticated learning identity before start.
+# Snapshot/restore both directories and binding markers together and verify the
+# restored identity/checkpoint; a Docker image or matching st_dev is not proof.
 USER ${TANGLE_RUNTIME_USER}
 WORKDIR /home/${TANGLE_RUNTIME_USER}

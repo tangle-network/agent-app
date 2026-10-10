@@ -49,11 +49,16 @@ export function HubActionReceiptCard({ item, className = '' }: HubActionReceiptC
         </div>
         <HubApprovalPhasePill phase={phase} />
       </div>
-      {(receipt.fields.length > 0 || receipt.media || receipt.files || receipt.error) && (
+      {(receipt.fields.length > 0 || receipt.media || receipt.files || receipt.error || receipt.warning) && (
         <div className="mt-3 space-y-3">
           <HubFieldList fields={receipt.fields} />
           {receipt.media && <AudioPlayer src={receipt.media.src} />}
           {receipt.files && <ApprovalDiffSummary files={receipt.files} />}
+          {receipt.warning && (
+            <p className="break-words rounded-lg border border-[var(--surface-warning-border)] bg-[var(--surface-warning-bg)] px-3 py-2 text-sm text-[var(--surface-warning-text)]">
+              {receipt.warning}
+            </p>
+          )}
           {receipt.error && (
             <p className="break-words rounded-lg border border-[var(--surface-danger-border)] bg-[var(--surface-danger-bg)] px-3 py-2 text-sm text-[var(--surface-danger-text)]">
               {receipt.error}
@@ -93,7 +98,7 @@ export function HubApprovalReceipts({ items, message, at }: HubApprovalReceiptsP
   const decided = items.filter((item) => item.phase !== 'waiting' && item.phase !== 'blocked')
   const count = (phases: readonly HubApprovalPhase[]) => decided.filter((item) => phases.includes(item.phase)).length
   const actions = (n: number) => (n === 1 ? '1 action' : `${n} actions`)
-  const approved = count(['queued', 'running', 'done', 'failed'])
+  const approved = count(['queued', 'running', 'done', 'failed', 'unknown'])
   const denied = count(['denied'])
   const expired = count(['expired'])
   const verbs = [approved ? `approved ${actions(approved)}` : null, denied ? `denied ${actions(denied)}` : null].filter(Boolean)

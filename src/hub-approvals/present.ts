@@ -6,6 +6,7 @@
  */
 
 import { asRecord, readNumber, readText, resultLink, unwrapHubResult } from './result'
+import { HUB_APPROVAL_UNKNOWN_WARNING } from './unknown'
 import type {
   HubActionField,
   HubActionFile,
@@ -654,12 +655,13 @@ function receiptFiles(result: Record<string, unknown>): HubActionFile[] | undefi
 export function hubActionReceipt(item: HubApprovalItem): HubActionReceipt {
   const presentation = presentHubAction(item)
   const result = asRecord(unwrapHubResult(item.result))
-  const status: HubActionReceipt['status'] = item.phase === 'done' || item.phase === 'failed' || item.phase === 'denied' || item.phase === 'expired'
+  const status: HubActionReceipt['status'] = item.phase === 'done' || item.phase === 'unknown' || item.phase === 'failed' || item.phase === 'denied' || item.phase === 'expired'
     ? item.phase
     : item.phase === 'queued' || item.phase === 'running' ? 'running' : 'waiting'
   const base = { provider: presentation.provider, status }
   if (status === 'denied') return { ...base, title: `Denied: ${presentation.title}`, fields: [] }
   if (status === 'expired') return { ...base, title: `Expired: ${presentation.title}`, fields: [] }
+  if (status === 'unknown') return { ...base, title: `May have run: ${presentation.title}`, fields: [], warning: HUB_APPROVAL_UNKNOWN_WARNING }
   if (status === 'failed') return { ...base, title: `Could not ${presentation.action.charAt(0).toLowerCase()}${presentation.action.slice(1)}`, fields: [], ...(item.error ? { error: item.error } : {}) }
   if (status !== 'done') return { ...base, title: presentation.title, fields: [] }
   const title = receiptTitle(item, presentation, result)

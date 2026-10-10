@@ -43,6 +43,9 @@ Local source checks run in a clean `git worktree` with a `--frozen-lockfile` ins
 | generated projects | `pnpm run test:generated` (waits on `build` — the only real artifact edge) |
 | dead-surface (knip) | `pnpm run knip` |
 
+Every run also includes the built-in `worker defaults` step: after install, each Wrangler config the repo deploys must carry the shared Cloudflare defaults in [worker-defaults.md](./worker-defaults.md).
+This repo deploys no Worker, so its config sets `workerConfigs: []`; `generated projects` checks the template Workers instead.
+
 Four things it does that CI does not:
 
 - **the runtime is pinned and enforced.** `.nvmrc` says 24.18.0; a different major refuses the run rather than reporting a pass it did not earn.

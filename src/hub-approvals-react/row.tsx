@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { Button } from '@tangle-network/ui/primitives'
 
 import { hubActionReceipt, presentHubAction, type HubApprovalItem } from '../hub-approvals'
+import { HUB_APPROVAL_UNKNOWN_WARNING } from '../hub-approvals/unknown'
 import { HubApprovalPhasePill, HubProviderMark, HubRawDetails } from './parts'
 import { HubActionPreviewView } from './preview'
 import { HubActionReceiptCard } from './receipt'
@@ -14,7 +15,7 @@ export interface HubApprovalRowProps {
   onExpandedChange?: (expanded: boolean) => void
   /** Bring a waiting call to the front of the dock. */
   onReview?: (item: HubApprovalItem) => void
-  /** Extra controls for a call no one can decide any more, e.g. asking the agent again. */
+  /** Extra controls for settled calls; suppressed for unknown outcomes to prevent unsafe retries. */
   actions?: ReactNode
 }
 
@@ -59,9 +60,12 @@ export function HubApprovalRow({ item, expanded: controlled, onExpandedChange, o
           <Button variant="outline" className="hidden sm:inline-flex" onClick={() => onReview(item)}>Review</Button>
         )}
       </div>
+      {!expanded && item.phase === 'unknown' && (
+        <p className="px-3 pb-3 text-sm text-[var(--surface-warning-text)]">{HUB_APPROVAL_UNKNOWN_WARNING}</p>
+      )}
       {expanded && (
         <div className="space-y-3 border-t border-border px-3 pb-3 pt-3">
-          {item.phase === 'done' || item.phase === 'failed'
+          {item.phase === 'done' || item.phase === 'failed' || item.phase === 'unknown'
             ? <HubActionReceiptCard item={item} className="border-0 px-0 py-0 shadow-none" />
             : (
                 <>
@@ -69,7 +73,7 @@ export function HubApprovalRow({ item, expanded: controlled, onExpandedChange, o
                   <HubRawDetails sections={[{ label: 'Call', value: { action: item.actionPath, input: item.input } }]} />
                 </>
               )}
-          {actions}
+          {item.phase !== 'unknown' && actions}
         </div>
       )}
       {!expanded && actions && (item.phase === 'expired' || item.phase === 'failed') && (

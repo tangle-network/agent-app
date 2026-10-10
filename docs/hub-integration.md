@@ -274,3 +274,11 @@ Confirm that its durable history and approval interface preserve the outcome.
 Restore the consumer's prior package lockfile after verification when the candidate is not being retained.
 Attach exact acceptance receipts to the migration pull request.
 [PR #661](https://github.com/tangle-network/agent-app/pull/661) tracks this migration's source and live evidence.
+
+## Approval outcomes in shared surfaces
+
+Map an approved call with an uncertain provider outcome to `HubApprovalItem.phase: 'unknown'` in `./hub-approvals`. Keep that phase when restoring persisted actions or reloading status. A transport interruption or partial result is not a confirmed failure or success.
+
+The shared dock, transcript row, approvals list and receipts show **May have run** with **Check the provider before requesting it again**. The dock retains the warning until dismissed and restores it on remount. Unknown calls have no approval or retry action; a row also suppresses host-supplied `actions` in this phase. They count as approved decisions in the receipt summary, without claiming execution succeeded.
+
+Use `failed` for a definite failure, `done` for confirmed success, and keep denied or expired decisions distinct. The host owns provider reconciliation and may replace `unknown` only when it has evidence for the new outcome.
