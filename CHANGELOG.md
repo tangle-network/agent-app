@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.24
+
+- feat(hub-approvals): name ph0ny voice agents and voice clones in plain words (#917)
+
 ## 0.60.23
 
 - feat(web-react): report the CommandPalette query so a host can search a larger source (#918)
