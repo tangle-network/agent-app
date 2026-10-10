@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.60
+
+- perf(turn-stream): warm a thread's lock object as soon as its turn is admitted (#958)
+
 ## 0.60.59
 
 - feat(customer-db-gateway): customer-hosted database gateway for agent MCP (#957)
