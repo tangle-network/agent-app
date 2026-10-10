@@ -667,7 +667,7 @@ interface ChatUiMessage
 `function`
 
 ```ts
-({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, loading, initialQuery, placeholder, emptyMessage, label…
+({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, loading, initialQuery, onQueryChange, placeholder, empt…
 ```
 
 ### `CommandPaletteItem`

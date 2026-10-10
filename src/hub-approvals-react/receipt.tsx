@@ -3,7 +3,7 @@ import { ExternalLink } from 'lucide-react'
 import { ApprovalDiffSummary } from '@tangle-network/ui/run'
 
 import { hubActionReceipt, presentHubAction, type HubApprovalItem, type HubApprovalPhase } from '../hub-approvals'
-import { HubApprovalPhasePill, HubFieldList, HubProviderMark, HubRawDetails } from './parts'
+import { distinctAccount, HubApprovalPhasePill, HubFieldList, HubProviderMark, HubRawDetails } from './parts'
 
 function AudioPlayer({ src }: { src: string }) {
   const [failed, setFailed] = useState(false)
@@ -26,7 +26,8 @@ export interface HubActionReceiptCardProps {
 export function HubActionReceiptCard({ item, className = '' }: HubActionReceiptCardProps) {
   const receipt = hubActionReceipt(item)
   const presentation = presentHubAction(item)
-  const subtitle = [receipt.provider.name, item.account ? `as ${item.account}` : null, presentation.target && !receipt.title.includes(presentation.target) ? presentation.target : null]
+  const account = distinctAccount(item.account, receipt.provider.name)
+  const subtitle = [receipt.provider.name, account ? `as ${account}` : null, presentation.target && !receipt.title.includes(presentation.target) ? presentation.target : null]
     .filter(Boolean).join(' · ')
   const phase: HubApprovalPhase = item.phase
   return (

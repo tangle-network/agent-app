@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.60.25
+
+- fix(hub-approvals): fit the transcript row on a phone and drop an account that repeats the provider (#919)
+
+## 0.60.24
+
+- feat(hub-approvals): name ph0ny voice agents and voice clones in plain words (#917)
+
+## 0.60.23
+
+- feat(web-react): report the CommandPalette query so a host can search a larger source (#918)
+
 ## 0.60.22
 
 - feat(hub-approvals): a shared approval dock, Approvals list and receipts for held Hub actions (#915)

@@ -97,6 +97,12 @@ export function Chip({ children, mono }: { children: ReactNode; mono?: boolean }
   )
 }
 
+/** The account worth naming: none when it only repeats the provider's name. */
+export function distinctAccount(account: string | null | undefined, providerName: string): string | null {
+  const value = account?.trim()
+  return value && value.toLowerCase() !== providerName.toLowerCase() ? value : null
+}
+
 /** When a decision window closes, relative to now: `in 23 h`, `in 5 min`. */
 export function closesIn(expiresAt: string | null | undefined, now = Date.now()): string | null {
   if (!expiresAt) return null

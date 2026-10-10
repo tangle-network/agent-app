@@ -67,6 +67,10 @@ export interface CommandPaletteProps {
   loading?: boolean
   /** Seed for the query (uncontrolled). */
   initialQuery?: string
+  /** The query as it changes, including its reset on close. A host whose
+   *  source is too large to pass whole searches it here and passes the
+   *  matches back as `items`; the palette still ranks them against the query. */
+  onQueryChange?: (query: string) => void
   placeholder?: string
   /** Empty-state copy. Default names the query: `No results for “…”`. */
   emptyMessage?: string
@@ -82,6 +86,7 @@ export function CommandPalette({
   hotkey = true,
   loading = false,
   initialQuery,
+  onQueryChange,
   placeholder = 'Search sessions and commands…',
   emptyMessage,
   label = 'Command palette',
@@ -132,6 +137,7 @@ export function CommandPalette({
       return
     }
     setQuery(initialQuery ?? '')
+    onQueryChange?.(initialQuery ?? '')
     setActive(0)
     const restore = restoreFocusRef.current
     restoreFocusRef.current = null
@@ -208,6 +214,7 @@ export function CommandPalette({
             value={query}
             onChange={(e) => {
               setQuery(e.target.value)
+              onQueryChange?.(e.target.value)
               setActive(0)
             }}
             onKeyDown={handleKeyDown}
