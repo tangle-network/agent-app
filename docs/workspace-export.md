@@ -31,14 +31,14 @@ Pass the product's own keys as `knownSecrets` so they are masked even when they 
 
 ## How it runs
 
-Each source is a unit. `POST {mount}` creates the job; the panel calls `POST {mount}/:id/advance`, which runs pending units for about 20 seconds per call.
+Each source is a unit. A files source that has more than 200 files, or that runs past the request budget, continues in the next request from a saved cursor, so no request exceeds the Workers subrequest limit. `POST {mount}` creates the job; the panel calls `POST {mount}/:id/advance`, which runs pending units for about 20 seconds per call.
 A unit that starts always finishes, and the job record is updated with a compare-and-swap lease, so two tabs cannot run the same unit.
 A closed tab pauses the export; reopening the panel resumes it.
 A unit that fails three times fails the export, and the owner starts a new one.
 
 Every entry streams through the credential masks, records CRC-32, SHA-256 and sizes, and is stored as segments of at most 8 MiB.
 The download route stitches the segments into one zip with an exact `Content-Length`; nothing is buffered beyond one segment.
-Exports are deleted after seven days.
+Exports hold decrypted data, so they are deleted after 24 hours (`retentionMs`); the owner can delete one sooner, or export again.
 
 ## Secrets
 

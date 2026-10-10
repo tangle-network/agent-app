@@ -104,6 +104,8 @@ export interface ExportUnit {
   rows?: number
   expectedRows?: number
   files?: number
+  /** Files listed so far by a files unit that continues in the next request. */
+  cursor?: number
   /** Members and bytes inside a sandbox archive. */
   archive?: { files: number; bytes: number; blanked: string[] }
   redactions: number
