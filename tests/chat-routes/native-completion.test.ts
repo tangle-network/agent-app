@@ -4,6 +4,7 @@ import {
   boundNativeCompletionReceipt,
   NATIVE_COMPLETION_RECEIPT_MAX_BYTES,
   observeNativeCompletion,
+  TOOL_ABORTED_ERROR,
   type NativeCompletionAdmission,
   type NativeCompletionAdmissionStore,
   type NativeCompletionSessionSource,
@@ -162,6 +163,48 @@ describe('observeNativeCompletion', () => {
     expect(observed.receipt.parts).toEqual([
       expect.objectContaining({ type: 'text', text: 'completed answer' }),
     ])
+  })
+
+  describe('a completed run whose tool call the Sandbox aborted', () => {
+    // GTM f03 run 1, 2026-10-10 15:13Z: the ADC roll restarted the runtime during a bash call. The run
+    // reported completed, and GTM saved the half reply ("I'll make that access limit explicit…") as a
+    // completed turn.
+    const f03Run1Parts = (lastTool: Record<string, unknown>) => [
+      { type: 'text', text: 'I’ll inspect the live product pages first.' },
+      { type: 'tool', tool: 'read', callID: 'c1', state: { status: 'error', input: {}, error: 'File not found: /home/agent/vault/style-guides/anti-slop.md' } },
+      { type: 'tool', tool: 'webfetch', callID: 'c2', state: { status: 'error', input: {}, error: 'StatusCode: non 2xx status code (403 GET https://router.tangle.tools/)' } },
+      { type: 'tool', tool: 'bash', callID: 'c3', state: { status: 'completed', input: {}, output: 'saved research/sources/live-home-sandbox-2026-10-10.md' } },
+      { type: 'text', text: 'Router’s homepage remains blocked by HTTP 403; I’ll make that access limit explicit rather than inventing a page critique or screenshot.' },
+      lastTool,
+    ]
+    const observe = (parts: unknown[]) => observeNativeCompletion({
+      source: source({
+        status: { id: 'session-1', status: 'completed', latestExecutionId: 'turn-1' },
+        runs: [{ executionId: 'turn-1', sessionId: 'session-1', status: 'completed', startedAt: 1, completedAt: 2, eventCount: 3, lastEventId: '3' }],
+        messages: [{
+          id: 'assistant-1', role: 'assistant', timestamp: '2026-10-10T15:13:22.000Z',
+          metadata: { turnId: 'turn-1', status: 'completed', completed: true },
+          parts,
+        }],
+      }),
+      admissionStore: store(),
+      executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 0, now: 100,
+    })
+
+    it('settles as failed and keeps the partial reply', async () => {
+      const observed = await observe(f03Run1Parts({ type: 'tool', tool: 'bash', callID: 'c4', state: { status: 'error', input: {}, error: 'Tool execution aborted' } }))
+
+      expect(observed.state).toBe('failed')
+      if (observed.state === 'running') throw new Error('expected a terminal receipt')
+      expect(observed.receipt).toMatchObject({ state: 'failed', error: `${TOOL_ABORTED_ERROR} (bash)` })
+      expect(observed.receipt.text).toContain('I’ll make that access limit explicit')
+    })
+
+    it('stays completed when tool calls only failed on their own', async () => {
+      const observed = await observe(f03Run1Parts({ type: 'text', text: ' The pages are saved.' }))
+
+      expect(observed.state).toBe('completed')
+    })
   })
 
   it('retains partial tool and file parts from an exact interrupted turn without billing it', async () => {
