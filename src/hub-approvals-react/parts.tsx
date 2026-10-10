@@ -12,6 +12,7 @@ const PHASE_TONES: Record<HubApprovalPhase, StatusTone> = {
   running: 'running',
   done: 'success',
   failed: 'danger',
+  unknown: 'warning',
   denied: 'neutral',
   expired: 'neutral',
 }

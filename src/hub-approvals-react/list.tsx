@@ -3,11 +3,14 @@ import { ChevronRight, ShieldCheck } from 'lucide-react'
 import { Button } from '@tangle-network/ui/primitives'
 
 import { hubActionReceipt, presentHubAction, type HubApprovalItem, type HubApprovalPhase } from '../hub-approvals'
+import { HUB_APPROVAL_UNKNOWN_WARNING } from '../hub-approvals/unknown'
 import { closesIn, distinctAccount, HubApprovalPhasePill, HubProviderMark, relativeTime } from './parts'
 
 const GROUPS: ReadonlyArray<{ id: string; label: string; phases: readonly HubApprovalPhase[] }> = [
   { id: 'waiting', label: 'Waiting', phases: ['waiting', 'blocked'] },
   { id: 'running', label: 'Running', phases: ['queued', 'running'] },
+  // Uncertain effects need provider verification, separate from confirmed failures.
+  { id: 'unknown', label: 'May have run', phases: ['unknown'] },
   { id: 'failed', label: 'Failed', phases: ['failed'] },
   { id: 'done', label: 'Done', phases: ['done'] },
   { id: 'closed', label: 'Denied or expired', phases: ['denied', 'expired'] },
@@ -77,6 +80,7 @@ export function HubApprovalsList({ items, onSelect, selectedId, className = '' }
                         <span className="min-w-0 flex-1">
                           <span className="line-clamp-2 text-sm font-medium leading-5 text-foreground">{title}</span>
                           <span className="mt-0.5 block truncate text-sm text-muted-foreground">{detail}</span>
+                          {item.phase === 'unknown' && <span className="mt-1 block text-sm text-[var(--surface-warning-text)]">{HUB_APPROVAL_UNKNOWN_WARNING}</span>}
                         </span>
                         <span className="flex shrink-0 items-center gap-1">
                           <HubApprovalPhasePill phase={item.phase} label={item.phase === 'waiting' ? 'Waiting' : item.phase === 'blocked' ? 'Owner' : undefined} />
