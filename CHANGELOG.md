@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.45
+
+- fix(native-completion): a stale session no longer keeps its admission open (#941)
+
 ## 0.60.44
 
 - fix(native-completion): a completed run with an aborted tool call is a failed turn (#940)
