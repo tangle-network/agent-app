@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.31
+
+- fix(hub-approvals): name the resume message disclosure and give the dock title the width on a phone (#929)
+- test: run files in parallel and delete low-value tests (#928) [skip release]
+
 ## 0.60.30
 
 - feat(web-react): decline an ask, limit a key to a workspace, and a 14px shell floor (#927)
