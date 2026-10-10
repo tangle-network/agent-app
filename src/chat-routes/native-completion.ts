@@ -6,9 +6,12 @@
 
 import type { SandboxInstance, SessionInfo, SessionMessage } from '@tangle-network/sandbox'
 import type { ChatTurnUsage } from './turn-routes'
+import type { SessionExecutionInfo } from '@tangle-network/sandbox'
 import {
+  attributionFromResult,
   readCompletedSandboxTurn,
   recoverSandboxAssistantMessage,
+  usageFromResult,
 } from './completed-sandbox-turn'
 
 export interface NativeCompletionReceipt {
@@ -79,6 +82,18 @@ const DEFAULT_RECEIPT_DEADLINE_MS = 10 * 60_000
 /** Session messages are read from this long before registration, so clock
  *  skew between the product Worker and the Sandbox cannot hide the turn. */
 const MESSAGE_READ_SKEW_MS = 10 * 60_000
+
+/**
+ * Largest interrupted execution whose event stream is replayed for its
+ * terminal result. The replay parses every event and re-compares the growing
+ * response text on each token, so its CPU grows faster than the run; a longer
+ * run takes its receipt from the recorded message and failure reason alone.
+ */
+const INTERRUPTED_RESULT_REPLAY_MAX_EVENTS = 2_000
+
+function replayableExecution(run: Pick<SessionExecutionInfo, 'eventCount'>): boolean {
+  return typeof run.eventCount === 'number' && run.eventCount <= INTERRUPTED_RESULT_REPLAY_MAX_EVENTS
+}
 
 /**
  * Serialized UTF-8 budget for one terminal receipt. A Cloudflare Workflow
@@ -344,21 +359,20 @@ export async function observeNativeCompletion(
       ? interruptedMessages(messages ??= await exactSession.messages({ limit: 1_000, since }), turnId)
       : []
     if ((run.status === 'failed' || run.status === 'cancelled') && interrupted.length === 1) {
-      // The receipt is the interrupted message the Sandbox recorded. Replaying
-      // the execution's event stream instead costs CPU in proportion to the
-      // run's length, which a long turn's terminal step cannot afford within a
-      // Workflow step's CPU limit.
       const message = recoverSandboxAssistantMessage(interrupted[0]!)
-      const interruptReason = interrupted[0]!.metadata?.interruptReason
+      const result = replayableExecution(run)
+        ? await exactSession.result({ executionId: turnId }) as unknown as Record<string, unknown>
+        : undefined
       recovered.push({
         turnId,
         state: 'failed',
-        text: message.text ?? '',
+        text: message.text ?? (typeof result?.response === 'string' ? result.response : undefined) ?? '',
         parts: message.parts ?? [],
-        usage: message.usage ?? {},
-        error: (typeof interruptReason === 'string' && interruptReason)
-          || status.failureReason?.message
-          || `Native Sandbox execution ${run.status}`,
+        usage: { ...message.usage, ...usageFromResult(result) },
+        ...attributionFromResult(result),
+        error: (typeof result?.error === 'string' ? result.error : undefined)
+          ?? interrupted[0]!.metadata?.interruptReason
+          ?? status.failureReason?.message,
       })
       continue
     }

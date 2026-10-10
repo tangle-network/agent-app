@@ -230,7 +230,7 @@ describe('runNativeCompletionWorkflow', () => {
   it('keeps the observed answer when preparation and every later step fail', async () => {
     const { step } = workflowStep()
     const receipt = { state: 'completed' as const, text: 'the answer', parts: [{ type: 'text', text: 'the answer' }], usage: {}, completedTurnIds: ['turn-1'] }
-    const transcriptRows = new Map<string, typeof receipt>()
+    const transcriptRows = new Map<string, unknown>()
     const releaseLock = vi.fn(async () => {})
 
     await expect(runNativeCompletionWorkflow({

@@ -73,7 +73,7 @@ of being gated by another unconditional message read.
 
 Terminal observation costs follow the turn, not the run's history or the session.
 Message reads start ten minutes before registration, so a long session cannot push the turn past the 1,000-message page.
-An interrupted receipt comes from the recorded message and the session's failure reason; the observer never replays the execution's event stream, whose CPU cost grows with the run and can exceed a Workflow step's 30 s CPU limit.
+An interrupted execution's event stream is replayed for its terminal result only when it has at most 2,000 events: the replay's CPU cost grows faster than the run and can exceed a Workflow step's 30 s CPU limit, so a longer run's receipt comes from the recorded message and the session's failure reason.
 A terminal receipt is bounded at 900 KiB: over it, long strings in tool payloads and reasoning are clipped with a marker and `receiptTruncated: true`, so a Workflow step result (1 MiB) and a D1 row (2 MB) always hold it.
 The answer text is kept whole unless it alone exceeds the budget.
 

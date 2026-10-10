@@ -328,9 +328,10 @@ describe('observeNativeCompletion', () => {
     ]))
   })
 
-  it('builds an interrupted receipt from the recorded message without replaying the execution', async () => {
+  it('builds a long interrupted receipt from the recorded message without replaying the execution', async () => {
     const box = source({
       status: { id: 'session-1', status: 'failed', latestExecutionId: 'turn-1', failureReason: { message: 'runtime stopped' } },
+      runs: [{ executionId: 'turn-1', sessionId: 'session-1', status: 'failed', startedAt: 1, completedAt: 2, eventCount: 40_000, lastEventId: '40000' }],
       messages: [{
         id: 'assistant-1', role: 'assistant', timestamp: '2026-10-10T00:00:00.000Z',
         metadata: { turnId: 'turn-1', status: 'interrupted', interrupted: true },
