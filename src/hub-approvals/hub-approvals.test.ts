@@ -82,6 +82,13 @@ describe('presentHubAction', () => {
       .toMatchObject({ title: 'Book “Demo”', provider: { name: 'Google Calendar' }, preview: { kind: 'event', attendees: ['ada@acme.com'] } })
   })
 
+  it('names ph0ny voice agents and clones in its own words', () => {
+    expect(presentHubAction(item('phony.create_agent', { name: 'Quinn' })).title).toBe('Create voice agent “Quinn”')
+    expect(hubActionReceipt(item('phony.create_agent', { name: 'Quinn' }, { phase: 'done', result: { id: 'agent-1' } })).title).toBe('Created voice agent')
+    expect(presentHubAction(item('phony.update_agent', { agentId: 'a1' })).title).toBe('Update a voice agent')
+    expect(presentHubAction(item('phony.clone_voice', { name: 'Drew' })).title).toBe('Clone your voice as “Drew”')
+  })
+
   it('falls back to the action name and scalar fields for any Hub provider', () => {
     const shown = presentHubAction(item('notion.pages.create', { parentId: 'p1', title: 'Launch notes', archived: false, nested: { a: 1 } }))
     expect(shown.title).toBe('Create page “Launch notes”')

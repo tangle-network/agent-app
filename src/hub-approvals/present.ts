@@ -428,6 +428,27 @@ const PRESENTERS: Record<string, Presenter> = {
       },
     }
   },
+  'phony.create_agent': (input) => {
+    const name = text(input.name)
+    return {
+      action: 'Create voice agent',
+      title: `Create voice agent${name ? ` “${clipped(name, 60)}”` : ''}`,
+      preview: { kind: 'fields', fields: scalarFields(input) },
+    }
+  },
+  'phony.update_agent': (input) => ({
+    action: 'Update voice agent',
+    title: 'Update a voice agent',
+    preview: { kind: 'fields', fields: scalarFields(input) },
+  }),
+  'phony.clone_voice': (input) => {
+    const name = text(input.name)
+    return {
+      action: 'Clone voice',
+      title: `Clone your voice${name ? ` as “${clipped(name, 60)}”` : ''}`,
+      preview: { kind: 'fields', fields: scalarFields(input) },
+    }
+  },
   'google-calendar.create_event': calendarEvent,
   'google-calendar.book_slot': calendarEvent,
   'google-calendar.update_event': (input, item) => {
