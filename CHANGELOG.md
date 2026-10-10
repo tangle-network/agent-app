@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.44
+
+- fix(native-completion): a completed run with an aborted tool call is a failed turn (#940)
+
 ## 0.60.43
 
 - feat(hub-approvals): the open request sits in its place in the dock's list, not twice (#939)
