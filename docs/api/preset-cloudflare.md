@@ -4,7 +4,7 @@
 
 Source: `src/preset-cloudflare/index.ts`
 
-34 exports.
+36 exports.
 
 ### `CloudflareHeadersRule`
 
@@ -142,6 +142,14 @@ type DetachedTurnDriveState
 type DetachedTurnTerminalResult
 ```
 
+### `DetachedTurnTransientPolicy`
+
+`interface` — Which drive failures a tick waits out, and for how long.
+
+```ts
+interface DetachedTurnTransientPolicy
+```
+
 ### `DetachedTurnWorkflowIdentity`
 
 `interface` — The stable identity a Workflow reuses on every retry of one turn.
@@ -268,6 +276,14 @@ interface PresetToolHandlerOptions
 
 ```ts
 <TPayload extends NativeCompletionWorkflowPayload, TMessageId>(options: NativeCompletionWorkflowOptions<TPayload, TMess…
+```
+
+### `SANDBOX_TRANSIENT_TICK_POLICY`
+
+`const` — The shared Sandbox transient policy: 5 s doubling to 60 s, for at most 15 minutes.
+
+```ts
+DetachedTurnTransientPolicy
 ```
 
 ### `VaultKv`
