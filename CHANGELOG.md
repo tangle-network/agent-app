@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.36
+
+- fix(native-completion): bound terminal observation and checkpoint the answer (#923)
+
 ## 0.60.35
 
 - docs(operator): record which agent apps mount the operator API (#914)
