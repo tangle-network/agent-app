@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.55
+
+- feat(workspace-export): owner-only, complete, secret-free workspace export (#952)
+
 ## 0.60.54
 
 - feat(stream): settle an orphaned turn stream without moving it in time (#951)
