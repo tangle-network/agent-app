@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.56
+
+- fix(turn-health): read stored parts a bounded batch at a time (#953)
+
 ## 0.60.55
 
 - feat(workspace-export): owner-only, complete, secret-free workspace export (#952)
