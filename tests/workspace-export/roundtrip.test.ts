@@ -254,3 +254,46 @@ describe('workspace export round trip', () => {
     expect((await fetchLink(link)).status).toBe(200)
   })
 })
+
+describe('large files sources', () => {
+  it('continue across requests and keep every file exactly once', async () => {
+    const storage = createMemoryExportStorage()
+    let listings = 0
+    const exporter = createWorkspaceExport({
+      app: 'testapp',
+      storage,
+      signingSecret: SIGNING,
+      authorize: async () => ({ userId: 'u-owner', role: 'owner' }),
+      plan: async () => ({
+        sources: [{
+          kind: 'files',
+          name: 'many',
+          dataClass: 'files',
+          async *files() {
+            listings += 1
+            for (let i = 0; i < 450; i += 1) yield { path: `f/${String(i).padStart(3, '0')}.txt`, open: async () => `file ${i}` }
+          },
+        }],
+      }),
+    })
+    const call = (path: string, init: RequestInit = {}) =>
+      exporter.route(new Request(`https://app.test/api/workspaces/${WS}/exports${path ? `/${path}` : ''}`, init), { workspaceId: WS, path })
+    const { id } = (await (await call('', { method: 'POST' })).json()) as { id: string }
+    let progress: { status: string; downloadUrl?: string } = { status: 'running' }
+    let requests = 0
+    while (progress.status === 'running' && requests < 10) {
+      progress = (await (await call(`${id}/advance`, { method: 'POST' })).json()) as typeof progress
+      requests += 1
+    }
+    expect(progress.status).toBe('complete')
+    expect(requests).toBe(3)
+    expect(listings).toBe(3)
+    const zip = await exporter.route(new Request(`https://app.test${progress.downloadUrl}`), { workspaceId: WS, path: `${id}/download` })
+    const zipPath = join(scratch, 'many.zip')
+    writeFileSync(zipPath, new Uint8Array(await zip.arrayBuffer()))
+    const members = execFileSync('unzip', ['-Z1', zipPath]).toString().trim().split('\n').filter((m) => m.startsWith('files/many/'))
+    expect(members).toHaveLength(450)
+    expect(new Set(members).size).toBe(450)
+    expect(execFileSync('unzip', ['-p', zipPath, 'files/many/f/449.txt']).toString()).toBe('file 449')
+  })
+})

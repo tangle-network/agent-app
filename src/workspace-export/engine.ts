@@ -29,6 +29,9 @@ export const MANIFEST_SCHEMA = 'tangle.workspace-export/v1'
 const SEGMENT_BYTES = 8 * 1024 * 1024
 const LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
+/** Files written per request. Each read and segment write is a subrequest, and
+ *  Workers cap subrequests per request, so a large files source spans requests. */
+const FILES_PER_REQUEST = 200
 const SOURCE_NAME = /^[a-z0-9][a-z0-9_.-]{0,95}$/
 
 export interface ExportEngineOptions {
@@ -206,10 +209,19 @@ export function createExportEngine(options: ExportEngineOptions) {
     return { row: out, count }
   }
 
-  async function runUnit(job: ExportJob, unit: ExportUnit, index: number, source: ExportSource, scanner: SecretScanner) {
+  async function runUnit(
+    job: ExportJob,
+    unit: ExportUnit,
+    index: number,
+    source: ExportSource,
+    scanner: SecretScanner,
+    deadline: number,
+  ) {
     const keyBase = `${base(job.workspaceId, job.id)}/u/${index}`
-    unit.entries = []
-    unit.redactions = 0
+    if (unit.cursor === undefined) {
+      unit.entries = []
+      unit.redactions = 0
+    }
     const encoder = new TextEncoder()
 
     if (source.kind === 'rows') {
@@ -254,18 +266,35 @@ export function createExportEngine(options: ExportEngineOptions) {
     }
 
     if (source.kind === 'files') {
-      const used = new Set<string>()
-      let files = 0
+      // Resumable: `cursor` counts files already listed, so a later request
+      // skips them and keeps the entries they produced.
+      const folder = `files/${source.name}/`
+      const used = new Set(unit.entries.map((e) => e.path.slice(folder.length)))
+      const start = unit.cursor ?? 0
+      let seen = 0
+      let written = 0
       for await (const file of source.files()) {
+        if (seen < start) {
+          seen += 1
+          continue
+        }
+        if (written >= FILES_PER_REQUEST || now() > deadline) {
+          unit.cursor = seen
+          return
+        }
         const body = await file.open()
-        if (body === null) continue
-        const path = `files/${source.name}/${safePath(file.path, used)}`
-        const masked = toStream(body).pipeThrough(scanner.maskBytes((n) => (unit.redactions += n)))
-        unit.entries.push(await writeEntry(`${keyBase}/${files}`, path, masked, false))
-        files += 1
+        seen += 1
+        if (body !== null) {
+          const path = folder + safePath(file.path, used)
+          const masked = toStream(body).pipeThrough(scanner.maskBytes((n) => (unit.redactions += n)))
+          unit.entries.push(await writeEntry(`${keyBase}/${unit.entries.length}`, path, masked, false))
+          written += 1
+        }
+        unit.cursor = seen
       }
-      unit.files = files
-      unit.status = files ? 'done' : 'empty'
+      unit.cursor = undefined
+      unit.files = unit.entries.length
+      unit.status = unit.entries.length ? 'done' : 'empty'
       return
     }
 
@@ -446,11 +475,12 @@ export function createExportEngine(options: ExportEngineOptions) {
           unit.attempts += 1
           try {
             if (!source || source.kind !== unit.kind) throw new Error('source is no longer available')
-            await runUnit(job, unit, index, source, scanner)
+            await runUnit(job, unit, index, source, scanner, deadline)
             unit.error = undefined
           } catch (err) {
             unit.error = errorText(scanner, err)
-            unit.entries = []
+            // A files unit keeps what it already wrote and resumes at its cursor.
+            if (unit.cursor === undefined) unit.entries = []
             if (unit.attempts >= MAX_ATTEMPTS) {
               unit.status = 'failed'
               job.status = 'failed'
@@ -461,6 +491,12 @@ export function createExportEngine(options: ExportEngineOptions) {
             break
           }
           job.lease = { id: job.lease!.id, until: now() + LEASE_MS }
+          if (unit.status === 'pending') {
+            // Progress was made; continue this unit in the next request.
+            unit.attempts = 0
+            etag = await saveJob(job, etag)
+            break
+          }
           etag = await saveJob(job, etag)
         }
         if (job.status === 'running' && job.units.every((u) => u.status === 'done' || u.status === 'empty')) {
