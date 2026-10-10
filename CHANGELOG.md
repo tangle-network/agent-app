@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.32
+
+- fix(agent-surfaces): past the approval-email cap, show the owner link instead of failing (#930)
+
 ## 0.60.31
 
 - fix(hub-approvals): name the resume message disclosure and give the dock title the width on a phone (#929)
