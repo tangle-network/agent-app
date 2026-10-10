@@ -130,20 +130,21 @@ export async function serve() {
   // The root-owned writer validates the same JSON again before each mutation.
   const homePath = z.string().min(1).max(100)
   const homeContent = z.string().max(64000)
+  const homeHead = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)
   tool('home_status', 'Read the protected home file inventory and current Git commit. No file contents are included.',
     z.object({}).strict(), (_args, signal) => homeOperation({ action: 'status' }, signal))
-  tool('home_read', 'Read one protected home document. Use this for current memory and the commit needed by home_consolidate.',
+  tool('home_read', 'Read one protected home document. Use the returned commit as expectedHead for a replacement, deletion or consolidation. Reread after a conflict.',
     z.object({ path: homePath }).strict(), (args, signal) => homeOperation({ action: 'read', ...args }, signal))
-  tool('home_write', 'Write bounded personal memory or a skill and commit it. AGENTS.md is immutable. Tell the owner immediately when ownerNoticeRequired is returned for a SOUL.md change.',
-    z.object({ path: homePath, content: homeContent }).strict(), (args, signal) => homeOperation({ action: 'write', ...args }, signal))
-  tool('home_append', 'Append a bounded daily note or preference and commit it. Never store credentials or private third-party records.',
+  tool('home_write', 'Replace bounded personal memory or a skill using expectedHead from the document you read. A concurrent change requires rereading. AGENTS.md is immutable. Tell the owner immediately when ownerNoticeRequired is returned for a SOUL.md change.',
+    z.object({ path: homePath, content: homeContent, expectedHead: homeHead }).strict(), (args, signal) => homeOperation({ action: 'write', ...args }, signal))
+  tool('home_append', 'Atomically append a bounded daily note or preference and commit it. Read after an unconfirmed result before retrying: append is not idempotent. Never store credentials or private third-party records.',
     z.object({ path: homePath, content: homeContent }).strict(), (args, signal) => homeOperation({ action: 'append', ...args }, signal))
-  tool('home_delete', 'Delete a named mutable home document. Requires owner approval. AGENTS.md cannot be deleted.',
-    z.object({ path: homePath }).strict(), (args, signal) => homeOperation({ action: 'delete', ...args }, signal))
+  tool('home_delete', 'Delete a named mutable home document using expectedHead from the document you read. Requires owner approval. A concurrent change requires rereading. AGENTS.md cannot be deleted.',
+    z.object({ path: homePath, expectedHead: homeHead }).strict(), (args, signal) => homeOperation({ action: 'delete', ...args }, signal))
   tool('home_bootstrap', 'Finish first-run setup after IDENTITY.md is filled. Removes BOOTSTRAP.md and returns the Git commit.',
     z.object({}).strict(), (_args, signal) => homeOperation({ action: 'bootstrap' }, signal))
   tool('home_consolidate', 'Consolidate daily notes into USER.md and MEMORY.md and commit them together. Keep dated facts and source notes. Requires the current home commit; a concurrent change requires rereading first.',
-    z.object({ user: homeContent, memory: homeContent, expectedHead: z.string().regex(/^[a-f0-9]{40,64}$/) }).strict(),
+    z.object({ user: homeContent, memory: homeContent, expectedHead: homeHead }).strict(),
     (args, signal) => homeOperation({ action: 'consolidate', ...args }, signal))
   tool('home_checkpoint', 'Verify and checkpoint only the protected home allowlist, never the rest of the sandbox.',
     z.object({}).strict(), (_args, signal) => checkpointHome(home, signal))

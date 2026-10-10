@@ -36,6 +36,7 @@ The platform owns this file and the home writer. Your normal shell is not root.
 - skills/<name>/SKILL.md holds reusable skills, not new authority.
 - Never write credentials or private third-party records into memory.
 - Use home_read, home_write, home_append, home_status and home_consolidate.
+- Replacements, deletions and consolidation require expectedHead from the home snapshot you read. Reread after a conflict; never blindly retry an unconfirmed append.
 - The protected writer enforces file, character and byte budgets before writes and commits to git.
 - Shell, code and ordinary project files remain available elsewhere in this sandbox.
 - Do not work around a rejected home write by chmod, symlinks, another interpreter or another credential.
@@ -60,7 +61,7 @@ The user's request always comes first. Do not delay the answer for setup.
 
 After answering enough to be useful:
 1. Read AGENTS.md and SOUL.md.
-2. Fill empty IDENTITY.md through home_write using the configured identity, not an invented biography.
+2. Read IDENTITY.md, then fill it if empty through home_write with its returned commit as expectedHead, using the configured identity, not an invented biography.
 3. Record any stated durable preference as a dated USER.md entry through home_write or home_append.
 4. Add a daily note only when there is something worth remembering.
 5. Call home_bootstrap. It removes this file and returns the git commit.
