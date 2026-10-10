@@ -97,6 +97,32 @@ describe('chat operator adapter', () => {
     expect(started).toMatchObject({ succeeded: true, value: { state: 'failed', reply: null, failure: { code: 'sandbox_unavailable', message: 'The sandbox did not start' } } })
   })
 
+  it('reports an error notice from the sandbox producer as a failed turn with its typed reason', async () => {
+    const { client } = setup({ reply: () => ({ content: 'Partial answer', parts: [
+      { type: 'text', text: 'Partial answer' },
+      { type: 'notice', id: 'error-1', noticeKind: 'error', code: 'SECRET_PROFILE_PREPARATION_FAILED',
+        text: 'The sandbox model stream stopped before a clean completion.\n\nError: Secret profile preparation failed' },
+    ] }) })
+    const started = await client.startTurn('ws-a', { content: 'Draft the memo' })
+    expect(started).toMatchObject({ succeeded: true, value: { state: 'failed', reply: null, failure: {
+      code: 'SECRET_PROFILE_PREPARATION_FAILED', message: expect.stringContaining('Secret profile preparation failed'),
+    } } })
+  })
+
+  it('names a reason for an error notice that carries no code', async () => {
+    const { client } = setup({ reply: () => ({ content: '', parts: [{ type: 'notice', id: 'error-1', noticeKind: 'error', text: 'The turn failed upstream' }] }) })
+    const started = await client.startTurn('ws-a', { content: 'Draft the memo' })
+    expect(started).toMatchObject({ succeeded: true, value: { state: 'failed', failure: { code: 'turn.error', message: 'The turn failed upstream' } } })
+  })
+
+  it('keeps a warning notice beside an answer as a succeeded turn', async () => {
+    const { client } = setup({ reply: () => ({ content: 'Here is the memo', parts: [
+      { type: 'text', text: 'Here is the memo' }, { type: 'notice', id: 'w-1', noticeKind: 'warning', text: 'Model downgraded' },
+    ] }) })
+    const started = await client.startTurn('ws-a', { content: 'Draft the memo' })
+    expect(started).toMatchObject({ succeeded: true, value: { state: 'succeeded', reply: { content: 'Here is the memo' } } })
+  })
+
   it('reads a running turn as working even when a draft reply is persisted', async () => {
     let running: string[] = []
     const { client } = setup({ running: () => running })

@@ -1050,9 +1050,24 @@ describe('createSandboxChatProducer', () => {
     expect(noticeText).toMatch(source === 'raw' ? /model rejected/ : /.+/)
     expect(events.at(-1)).toMatchObject({ type: 'error' })
     expect(producer.finalText()).toBe(answer)
+    // The persisted notice carries a typed reason the operator reports.
+    const code = source === 'raw' ? 'sandbox.stream_error' : 'sandbox.stream_failed'
+    expect(notices[0]).toMatchObject({ code })
     expect(producer.assistantParts?.()).toEqual([
       expect.objectContaining({ type: 'text', text: answer }),
-      { type: 'notice', id: 'error-1', noticeKind: 'error', text: noticeText },
+      { type: 'notice', id: 'error-1', noticeKind: 'error', text: noticeText, code },
+    ])
+  })
+
+  it('errorNotice keeps the code a sandbox error event names', async () => {
+    const producer = createSandboxChatProducer({
+      errorNotice: true,
+      events: feed([{ type: 'error', data: { code: 'SECRET_PROFILE_PREPARATION_FAILED', message: 'Secret profile preparation failed' } }]),
+    })
+    await drain(producer.stream)
+    expect(producer.assistantParts?.()).toEqual([
+      expect.objectContaining({ type: 'notice', noticeKind: 'error', code: 'SECRET_PROFILE_PREPARATION_FAILED',
+        text: expect.stringContaining('Secret profile preparation failed') }),
     ])
   })
 
