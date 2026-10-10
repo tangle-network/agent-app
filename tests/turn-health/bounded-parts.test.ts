@@ -22,32 +22,34 @@ function messageDb(rows: Array<{ id: string; content: string; parts: string }>) 
       return {
         bind(...params: unknown[]) {
           return {
-            async all() {
-              if (sql.includes('FROM message') && sql.includes('partsSize')) {
-                listings.push(sql)
-                return {
-                  results: rows.map((row, i) => ({
-                    id: row.id,
-                    threadId: 't1',
-                    content: row.content,
-                    partsSize: row.parts.length,
-                    outputTokens: 10,
-                    model: 'm',
-                    createdAt: 1_800_000_000 - i,
-                  })),
-                }
-              }
-              if (sql.startsWith('SELECT id, parts FROM message')) {
-                const read = rows.filter((row) => params.includes(row.id))
-                partsReads.push(read.reduce((sum, row) => sum + row.parts.length, 0))
-                return { results: read.map((row) => ({ id: row.id, parts: row.parts })) }
-              }
-              return { results: [] }
+            async all<T>(): Promise<{ results: T[] }> {
+              return { results: answer(sql, params) as T[] }
             },
           }
         },
       }
     },
+  }
+
+  function answer(sql: string, params: unknown[]): unknown[] {
+    if (sql.includes('FROM message') && sql.includes('partsSize')) {
+      listings.push(sql)
+      return rows.map((row, i) => ({
+        id: row.id,
+        threadId: 't1',
+        content: row.content,
+        partsSize: row.parts.length,
+        outputTokens: 10,
+        model: 'm',
+        createdAt: 1_800_000_000 - i,
+      }))
+    }
+    if (sql.startsWith('SELECT id, parts FROM message')) {
+      const read = rows.filter((row) => params.includes(row.id))
+      partsReads.push(read.reduce((sum, row) => sum + row.parts.length, 0))
+      return read.map((row) => ({ id: row.id, parts: row.parts }))
+    }
+    return []
   }
 }
 
