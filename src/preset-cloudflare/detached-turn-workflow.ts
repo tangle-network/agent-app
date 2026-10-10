@@ -70,7 +70,10 @@ export interface DetachedTurnWorkflowTickOptions<
   drive: (payload: TPayload) => Promise<DetachedTurnDriveOutcome<TResult>>
   /** Must be idempotent: the Worker can stop after the write but before commit. */
   settle: (payload: TPayload, result: DetachedTurnTerminalResult<TResult>) => Promise<TSettled>
-  pollDelay?: CloudflareWorkflowSleepDuration
+  /** Wait between passes: one duration, or one per zero-based pass so a long
+   *  turn polls less often. It must depend only on the pass number, so a
+   *  replayed Workflow takes the same steps. Default: 5 seconds. */
+  pollDelay?: CloudflareWorkflowSleepDuration | ((attempt: number) => CloudflareWorkflowSleepDuration)
   stepName?: string
 }
 
@@ -124,7 +127,9 @@ export async function runDetachedTurnWorkflowTick<
   // Never allow a callback to change the admission identity for later passes.
   const payload = Object.freeze({ ...options.event.payload }) as TPayload
   const name = options.stepName ?? 'detached-turn'
-  const delay = options.pollDelay ?? '5 seconds'
+  const pollDelay = options.pollDelay ?? '5 seconds'
+  const delayFor = (attempt: number): CloudflareWorkflowSleepDuration =>
+    typeof pollDelay === 'function' ? pollDelay(attempt) : pollDelay
   let attempt = 0
   let terminalResult: DetachedTurnTerminalResult<TResult>
   while (true) {
@@ -138,7 +143,7 @@ export async function runDetachedTurnWorkflowTick<
       terminalResult = driveResult as DetachedTurnTerminalResult<TResult>
       break
     }
-    await options.step.sleep(`${name}:wait:${attempt}`, delay)
+    await options.step.sleep(`${name}:wait:${attempt}`, delayFor(attempt))
     attempt += 1
   }
   return options.step.do(`${name}:settle`, () => options.settle(payload, terminalResult))

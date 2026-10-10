@@ -37,7 +37,12 @@ export interface NativeCompletionWorkflowOptions<
    * product may use its own named steps without nesting `step.do`.
    */
   prepare?(payload: TPayload, receipt: NativeCompletionReceipt): Promise<NativeCompletionReceipt>
-  /** Durable transcript write. A supplied message id updates the existing row. */
+  /**
+   * Durable transcript write. Without a message id it must upsert the turn's
+   * one row: the terminal observation step checkpoints the observed receipt
+   * with it before preparation, and the transcript step writes the prepared
+   * receipt over that checkpoint. A supplied message id updates the existing row.
+   */
   persistTranscript(
     payload: TPayload,
     receipt: NativeCompletionReceipt,
@@ -56,8 +61,21 @@ export interface NativeCompletionWorkflowOptions<
   finalizeBuffer?(payload: TPayload, receipt: NativeCompletionReceipt, messageId: TMessageId): Promise<void>
   /** Release the product lock only after every terminal effect completed. */
   releaseLock(payload: TPayload): Promise<void>
-  pollDelay?: CloudflareWorkflowSleepDuration
+  /** Default: 5 s for the first two minutes, 15 s until thirty minutes, then 30 s. */
+  pollDelay?: CloudflareWorkflowSleepDuration | ((attempt: number) => CloudflareWorkflowSleepDuration)
   stepName?: string
+}
+
+/**
+ * Wait before observation pass `attempt + 1`: 5 s for the first two minutes,
+ * 15 s until thirty minutes, then 30 s. Each pass is two Workflow steps and a
+ * Workflow allows 10,000, so a fixed 5 s wait ends an instance after about
+ * seven hours; this schedule leaves room for more than forty.
+ */
+function nativeCompletionPollDelay(attempt: number): CloudflareWorkflowSleepDuration {
+  if (attempt < 24) return '5 seconds'
+  if (attempt < 136) return '15 seconds'
+  return '30 seconds'
 }
 
 function validObservation(value: NativeCompletionObservation): NativeCompletionDriveResult {
@@ -87,9 +105,15 @@ export async function runNativeCompletionWorkflow<
   >({
     event: options.event,
     step: options.step,
-    pollDelay: options.pollDelay,
+    pollDelay: options.pollDelay ?? nativeCompletionPollDelay,
     stepName: `${name}:observe`,
-    drive: async (payload) => ({ succeeded: true, value: validObservation(await options.observe(payload)) }),
+    drive: async (payload) => {
+      const observation = validObservation(await options.observe(payload))
+      // The observed answer is written in the same step that observed it, so
+      // a later preparation, settlement or Workflow failure cannot lose it.
+      if (observation.state !== 'running') await options.persistTranscript(payload, observation.receipt)
+      return { succeeded: true, value: observation }
+    },
     settle: async (_payload, result) => result.receipt,
   })
 

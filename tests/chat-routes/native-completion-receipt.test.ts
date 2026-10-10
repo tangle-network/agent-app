@@ -23,13 +23,16 @@ function fixture(options: {
   cache?: (call: number) => unknown
   messagesError?: Error
   result?: Record<string, unknown>
+  eventCount?: number
 } = {}) {
   const turns = options.turns ?? ['turn-1']
   const status = options.status ?? 'completed'
   const calls = { cache: 0, messages: 0, results: [] as string[] }
   const session = {
     status: async () => ({ id: 'session-1', status }),
-    runs: async () => turns.map(executionId => ({ executionId, sessionId: 'session-1', status })),
+    runs: async () => turns.map(executionId => ({
+      executionId, sessionId: 'session-1', status, eventCount: options.eventCount ?? 3, lastEventId: String(options.eventCount ?? 3),
+    })),
     messages: async () => {
       calls.messages++
       if (options.messagesError) throw options.messagesError
@@ -191,5 +194,14 @@ describe('native completion uses one validated terminal receipt', () => {
     const receipt = terminal(await test.observe())
     assert.deepEqual(receipt.completedTurnIds, ['turn-1', 'turn-2'])
     assert.deepEqual(test.calls, { cache: 0, messages: 1, results: ['turn-1', 'turn-2'] })
+  })
+
+  it('takes a long interrupted execution\'s receipt from its recorded message without replaying it', async () => {
+    const test = fixture({ status: 'failed', eventCount: 40_000 })
+    const receipt = terminal(await test.observe())
+    assert.equal(receipt.state, 'failed')
+    assert.equal(receipt.error, 'interrupted')
+    assert.deepEqual(receipt.completedTurnIds, ['turn-1'])
+    assert.deepEqual(test.calls, { cache: 0, messages: 1, results: [] })
   })
 })

@@ -890,10 +890,14 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   }, [selectedFile, port, refresh, commitPath, reportFailure])
 
   // A file counts as opened once it is on screen, not when it is requested.
+  // It is recorded in the commit that first shows it: `displayReadyPath` trails
+  // that commit by one render, so a pane closed right after showing a file
+  // (or a reader who navigates away at once) lost the record.
+  const shownPath = selectedFile?.path ?? null
   useEffect(() => {
-    if (!displayReadyPath || !treeStateKey) return
-    setRecentFiles({ key: treeStateKey, paths: recordRecentFile(treeStateKey, displayReadyPath) })
-  }, [displayReadyPath, treeStateKey])
+    if (!shownPath || !treeStateKey) return
+    setRecentFiles({ key: treeStateKey, paths: recordRecentFile(treeStateKey, shownPath) })
+  }, [shownPath, treeStateKey])
   const recentToOffer = recentFiles.paths
     .filter((path) => path !== selectedPath && treePaths.files.has(path))
     .slice(0, RECENT_SHOWN)

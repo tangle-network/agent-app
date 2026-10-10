@@ -2615,6 +2615,12 @@
           "doc": "Size a base64-encoded string occupies on the wire given the raw (pre-encoding) byte length: base64 packs 3 raw bytes into 4 output characters, rounded up to the next multiple of 4."
         },
         {
+          "name": "boundNativeCompletionReceipt",
+          "kind": "function",
+          "signature": "(receipt: NativeCompletionReceipt, maxBytes?: number) => NativeCompletionReceipt",
+          "doc": "Fit a terminal receipt inside {@link NATIVE_COMPLETION_RECEIPT_MAX_BYTES}."
+        },
+        {
           "name": "buildDispatchParts",
           "kind": "function",
           "signature": "(input: BuildDispatchPartsInput) => Promise<DispatchPartsOutcome>",
@@ -3237,6 +3243,12 @@
           "kind": "interface",
           "signature": "interface ModelFallbackInfo",
           "doc": "Fired when a model is abandoned and the next one is about to be tried."
+        },
+        {
+          "name": "NATIVE_COMPLETION_RECEIPT_MAX_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Serialized UTF-8 budget for one terminal receipt."
         },
         {
           "name": "NativeCompletionAdmission",

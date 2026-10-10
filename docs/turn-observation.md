@@ -71,6 +71,12 @@ message history is read only when needed and reused across failed continuations.
 Completed recovery retains its independent-cache-or-message fallback instead
 of being gated by another unconditional message read.
 
+Terminal observation costs follow the turn, not the run's history or the session.
+Message reads start ten minutes before registration, so a long session cannot push the turn past the 1,000-message page.
+An interrupted execution's event stream is replayed for its terminal result only when it has at most 2,000 events: the replay's CPU cost grows faster than the run and can exceed a Workflow step's 30 s CPU limit, so a longer run's receipt comes from the recorded message and the session's failure reason.
+A terminal receipt is bounded at 900 KiB: over it, long strings in tool payloads and reasoning are clipped with a marker and `receiptTruncated: true`, so a Workflow step result (1 MiB) and a D1 row (2 MB) always hold it.
+The answer text is kept whole unless it alone exceeds the budget.
+
 Register the Workflow before native dispatch, using stable session, execution, and replay identities.
 Then call `await args.handoffCompletion()` from the assembled route's producer.
 That handoff stops request-owned transcript writes, terminal hooks, replay status writes, and lock release.
@@ -105,6 +111,9 @@ Promote files before deciding whether an answer contains visible output.
 
 `prepare` and `settle` run outside enclosing Workflow steps so products can compose named steps without nesting `step.do`.
 Their effects must be idempotent.
+The step that observes a terminal state also writes that receipt with `persistTranscript`, so a failure in preparation, settlement or the Workflow itself cannot lose the answer.
+`persistTranscript` without a message id must therefore upsert the turn's one row; the transcript step later writes the prepared receipt over the checkpoint.
+Observation waits 5 s between passes for two minutes, 15 s until thirty minutes, then 30 s, so a turn can run for more than forty hours inside Cloudflare's 10,000-step instance limit.
 The helper checkpoints transcript persistence, replay completion, and lock release.
 Settlement may return a revised receipt when reconciliation discovers a terminal failure.
 That receipt updates the assistant row before replay completion.
