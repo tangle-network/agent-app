@@ -147,6 +147,32 @@ describe('progress-first turn stream', () => {
     expect(await settled.json()).toMatchObject({ error: expect.any(String) })
   })
 
+  it('reads the whole request body before it opens the stream', async () => {
+    // A Worker cannot read the request stream after its response is sent.
+    let bodyRead = false
+    const encoder = new TextEncoder()
+    const body = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        controller.enqueue(encoder.encode(JSON.stringify({ threadId: 't-1', content: 'hi' })))
+        controller.close()
+        bodyRead = true
+      },
+    })
+    const { routes, ctx, pending } = makeRoutes()
+    const request = new Request('http://app.test/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', [TURN_PROGRESS_HEADER]: TURN_PROGRESS_FIRST },
+      body,
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' })
+    const response = await routes.turn(request, ctx)
+    expect(bodyRead).toBe(true)
+    const all = await lines(response)
+    await Promise.all(pending)
+    expect(all.some((event) => event.type === 'text' && event.text === 'hello there')).toBe(true)
+  })
+
   it('keeps the old responses for a client that does not ask', async () => {
     const { routes, ctx } = makeRoutes({
       authorize: async () => ({ ok: false, response: Response.json({ error: 'Sign in' }, { status: 401 }) }),

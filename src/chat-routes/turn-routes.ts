@@ -803,8 +803,21 @@ export function createChatTurnRoutes<TContext = void>(
   const progressMessages: Record<TurnRoutePhase, string> = { ...TURN_ROUTE_PHASE_MESSAGES, ...options.progressMessages }
 
   async function turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response> {
-    if (request.headers.get(TURN_PROGRESS_HEADER) === TURN_PROGRESS_FIRST) return progressFirstTurn(request, ctx)
-    return runTurn(request, ctx)
+    if (request.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST) return runTurn(request, ctx)
+    // Read the body before the response opens: a Worker cannot read the
+    // request stream once its response has been sent.
+    let body: ArrayBuffer
+    try {
+      body = await request.arrayBuffer()
+    } catch {
+      return Response.json({ code: 'invalid_body', error: 'The request body could not be read' }, { status: 400 })
+    }
+    return progressFirstTurn(new Request(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body,
+      signal: request.signal,
+    }), ctx)
   }
 
   /**
