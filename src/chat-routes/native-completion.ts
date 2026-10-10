@@ -90,6 +90,13 @@ const MESSAGE_READ_SKEW_MS = 10 * 60_000
  * run takes its receipt from the recorded message and failure reason alone.
  */
 const INTERRUPTED_RESULT_REPLAY_MAX_EVENTS = 2_000
+/**
+ * The fixed id of the terminal the sidecar appends when it fails an execution
+ * whose runtime restarted before the run ended.
+ */
+const RUNTIME_RESTART_TERMINAL_EVENT_ID = 'interrupted-done'
+/** The sidecar's reason for that terminal, used when the replay is not read. */
+export const RUNTIME_RESTARTED_ERROR = 'Execution interrupted: the agent runtime restarted before the run produced a terminal event. The run cannot be resumed; retry it.'
 
 function replayableExecution(run: Pick<SessionExecutionInfo, 'eventCount'>): boolean {
   return typeof run.eventCount === 'number' && run.eventCount <= INTERRUPTED_RESULT_REPLAY_MAX_EVENTS
@@ -215,6 +222,10 @@ function interruptedMessages(messages: SessionMessage[], turnId: string): Sessio
     && message.metadata?.turnId === turnId
     && (message.metadata.interrupted === true || message.metadata.status === 'interrupted'),
   )
+}
+
+function turnAssistantMessages(messages: SessionMessage[], turnId: string): SessionMessage[] {
+  return messages.filter((message) => message.role === 'assistant' && message.metadata?.turnId === turnId)
 }
 
 function consistent<T>(values: Array<T | undefined>): T | undefined {
@@ -390,9 +401,18 @@ export async function observeNativeCompletion(
       })
       continue
     }
-    const interrupted = run.status === 'failed' || run.status === 'cancelled'
+    // The process that would stamp a turn interrupted is gone when its runtime
+    // restarts; the sidecar fails the execution on restart, and the turn's own
+    // assistant message holds whatever reply it had streamed.
+    const restarted = run.status === 'failed' && run.lastEventId === RUNTIME_RESTART_TERMINAL_EVENT_ID
+    let interrupted = run.status === 'failed' || run.status === 'cancelled'
       ? interruptedMessages(messages ??= await exactSession.messages({ limit: 1_000, since }), turnId)
       : []
+    if (restarted && interrupted.length === 0) interrupted = turnAssistantMessages(messages ?? [], turnId)
+    if (restarted && interrupted.length !== 1) {
+      recovered.push({ turnId, state: 'failed', text: '', parts: [], usage: {}, error: RUNTIME_RESTARTED_ERROR })
+      continue
+    }
     if ((run.status === 'failed' || run.status === 'cancelled') && interrupted.length === 1) {
       const message = recoverSandboxAssistantMessage(interrupted[0]!)
       const result = replayableExecution(run)
@@ -407,6 +427,7 @@ export async function observeNativeCompletion(
         ...attributionFromResult(result),
         error: (typeof result?.error === 'string' ? result.error : undefined)
           ?? interrupted[0]!.metadata?.interruptReason
+          ?? (restarted ? RUNTIME_RESTARTED_ERROR : undefined)
           ?? status.failureReason?.message,
       })
       continue
