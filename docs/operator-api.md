@@ -199,7 +199,7 @@ The product itself changes nothing and serves nothing to the conductor; this API
 
 An app mounts this API so outside agents, such as a Claude Code session, can operate its own workspaces.
 No app needs it so that GTM can market that app's product: GTM works from public inputs only.
-To adopt: mount the splat route, implement the adapter over the app's existing turn admission and storage, and build the API access page from `OPERATOR_ACCESS`.
+To adopt: mount the splat route, implement the adapter over the app's existing turn admission and storage, and build the API access page from `OPERATOR_ACCESS` with `/web-react`'s `ApiAccessPanel`. When keys can be bound to workspaces, pass the workspaces the person can open as `workspaces`: the panel's form offers all of them or one, `onCreate` receives the choice as `workspaceIds` (empty for all), and each key in `keys` says what it reaches through its own `workspaceIds`.
 Keep older private routes until their consumers move.
 
 ## Not in v1

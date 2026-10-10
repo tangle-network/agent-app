@@ -472,11 +472,13 @@ Marketing density on a work surface is a defect, not a matter of taste.
 |---|---|---|
 | Rows above the fold at 1440×900 on the primary work surface | ≥ 20 | 6–8 cards |
 | Data row height | 32–40px | 96px card |
-| Body and data type size | 13–14px | 16–18px |
+| Body and data type size | 14px, never smaller | 16–18px |
 | Largest type on the page | ~20px page title | 32px+ hero |
 | Spacing scale | 4px base — 4/8/12/16 inside a group, 24/32 between groups | a uniform 24–32px everywhere |
 | Accent colour at rest | exactly one, on the single next action | every interactive element |
 | Numeric columns | tabular figures, right-aligned, fixed decimals | proportional, left-aligned, ragged |
+
+The 14px floor holds for supporting text too: badges, captions, dates, field hints and notes use `text-sm`, never `text-xs` or a literal size. The shared shell, workspace listing, API access panel and question card meet it, and `tests/web-react/shell-type-floor.test.ts` fails if one of them drops below.
 
 **When whitespace is wrong:**
 

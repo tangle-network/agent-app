@@ -21400,7 +21400,7 @@
         {
           "name": "ApiAccessPanel",
           "kind": "function",
-          "signature": "({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, expiryDays, defaultExpiryDays, on…",
+          "signature": "({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, expiryDays, defaultExpiryDays, wo…",
           "doc": null
         },
         {
@@ -21414,6 +21414,12 @@
           "kind": "interface",
           "signature": "interface ApiAccessScope",
           "doc": null
+        },
+        {
+          "name": "ApiAccessWorkspace",
+          "kind": "interface",
+          "signature": "interface ApiAccessWorkspace",
+          "doc": "A workspace a key can be limited to."
         },
         {
           "name": "ATTACHMENT_ACCEPT",
@@ -22594,7 +22600,7 @@
         {
           "name": "InteractionQuestionCard",
           "kind": "function",
-          "signature": "({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, className, }:…",
+          "signature": "({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, declinable, c…",
           "doc": null
         },
         {

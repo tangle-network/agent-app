@@ -30,6 +30,17 @@ export const ExistingKeys: Story = {
     { id: 'expired', name: 'Old client', scopes: ['records:write'], expiresAt: '2020-01-01' },
   ] },
 }
+/** A product whose keys can be limited to one workspace: the limit sits in the form, and each key says what it reaches. */
+export const WorkspaceLimits: Story = {
+  args: {
+    workspaces: [{ id: 'ws-studio', name: 'Research studio' }, { id: 'ws-office', name: 'Home office' }],
+    workspaceNoun: { singular: 'project', plural: 'projects' },
+    keys: [
+      { id: 'everywhere', name: 'Claude Code', scopes: ['records:read', 'records:run'], expiresAt: '2030-01-01' },
+      { id: 'studio', name: 'Studio bot', scopes: ['records:read'], expiresAt: '2030-01-01', workspaceIds: ['ws-studio'] },
+    ],
+  },
+}
 export const CreationFailure: Story = {
   args: { onCreate: async () => { throw new Error('Key store unavailable') } },
 }

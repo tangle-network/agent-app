@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.30
+
+- feat(web-react): decline an ask, limit a key to a workspace, and a 14px shell floor (#927)
+
 ## 0.60.29
 
 - fix(protected-home): reject stale writes and preserve scoped learning snapshots (#925)

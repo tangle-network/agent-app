@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-469 exports.
+470 exports.
 
 ### `acceptRejectionReason`
 
@@ -275,7 +275,7 @@ interface ApiAccessKey
 `function`
 
 ```ts
-({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, expiryDays, defaultExpiryDays, on…
+({ keys, access, defaultScopes, baseUrl, accountHref, description, limitsDescription, expiryDays, defaultExpiryDays, wo…
 ```
 
 ### `ApiAccessPanelProps`
@@ -292,6 +292,14 @@ interface ApiAccessPanelProps
 
 ```ts
 interface ApiAccessScope
+```
+
+### `ApiAccessWorkspace`
+
+`interface` — A workspace a key can be limited to.
+
+```ts
+interface ApiAccessWorkspace
 ```
 
 ### `ATTACHMENT_ACCEPT`
@@ -1867,7 +1875,7 @@ interface InteractionPlanCardProps
 `function`
 
 ```ts
-({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, className, }:…
+({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, declinable, c…
 ```
 
 ### `InteractionQuestionCardProps`

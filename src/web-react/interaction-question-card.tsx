@@ -62,7 +62,7 @@ const BADGE_VARIANT_CLASSES: Record<InteractionBadgeVariant, string> = {
 
 export function InteractionBadge({ variant, children }: { variant: InteractionBadgeVariant; children: string }) {
   return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${BADGE_VARIANT_CLASSES[variant]}`}>
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-sm font-medium ${BADGE_VARIANT_CLASSES[variant]}`}>
       {children}
     </span>
   )
@@ -167,7 +167,7 @@ export function QuestionOptionList({
             />
             <span className="min-w-0 flex-1">
               <span id={`${inputId}-label`} className="block text-sm font-medium leading-5 text-foreground">{option.label}</span>
-              {option.description && <span id={`${inputId}-description`} className="mt-0.5 block text-xs leading-5 text-muted-foreground">{option.description}</span>}
+              {option.description && <span id={`${inputId}-description`} className="mt-0.5 block text-sm leading-5 text-muted-foreground">{option.description}</span>}
             </span>
             {highlighted && <CheckGlyph className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
           </label>
@@ -220,6 +220,13 @@ export interface InteractionQuestionCardProps {
    *  renderer that does is an XSS sink — so return React elements, and sanitize
    *  (DOMPurify or equivalent) if you must produce HTML. */
   renderMarkdown?: (markdown: string) => ReactNode
+  /**
+   * Offer Decline beside Submit while the ask is open. Declining resolves the
+   * ask with outcome `declined` through the same `submitAnswer`, so the run
+   * goes on without an answer. Defaults to true; set false for an ask the
+   * product cannot let a person refuse.
+   */
+  declinable?: boolean
   className?: string
 }
 
@@ -261,6 +268,7 @@ const STATUS_LABELS = interactionStatusLabels({
 const TERMINAL_NOTES = interactionTerminalNotes('question', {
   expired: 'The original run ended. Answer now to send a new message with this context.',
   cancelled: 'The agent withdrew this question. Answer now to send a new message with this context.',
+  declined: 'You declined this question.',
 })
 
 export function InteractionQuestionCard({
@@ -272,6 +280,7 @@ export function InteractionQuestionCard({
   kindLabel,
   timeoutNote,
   renderMarkdown,
+  declinable = true,
   className,
 }: InteractionQuestionCardProps) {
   const [values, setValues] = useState<FieldValues>(() =>
@@ -283,6 +292,7 @@ export function InteractionQuestionCard({
   const [lateAnswerSent, setLateAnswerSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const submitInFlightRef = useRef(false)
+  const [declining, setDeclining] = useState(false)
   // The ask this card's state currently belongs to. State, never a ref: it is
   // compared and written during render, and a ref would not be transactional
   // with the resets below. React may abandon a render — the discarded pass's
@@ -406,6 +416,34 @@ export function InteractionQuestionCard({
     }
   }
 
+  async function decline() {
+    if (submitInFlightRef.current || disabled || lateAnswerable) return
+    submitInFlightRef.current = true
+    setSubmitting(true)
+    setDeclining(true)
+    setError(null)
+    try {
+      const result = await settleInteractionSubmit(() =>
+        submitAnswer({ id: interaction.id, outcome: 'declined' }),
+      )
+      if (result.ok) {
+        setLocalStatus('declined')
+        onResolved?.(interaction.id, 'declined')
+        return
+      }
+      if (result.expired) {
+        setLocalStatus('expired')
+        onResolved?.(interaction.id, 'expired')
+        return
+      }
+      setError(result.message)
+    } finally {
+      submitInFlightRef.current = false
+      setSubmitting(false)
+      setDeclining(false)
+    }
+  }
+
   const terminalNote = secretLateAnswerBlocked
     ? 'This question asked for a secret, so it cannot be sent as a new chat message. Ask the agent to request it again.'
     : TERMINAL_NOTES[status]
@@ -419,9 +457,12 @@ export function InteractionQuestionCard({
   let submitLabel = 'Submit answer'
   if (lateAnswerable) {
     submitLabel = submitting ? 'Sending…' : 'Send as new message'
-  } else if (submitting) {
+  } else if (submitting && !declining) {
     submitLabel = 'Submitting…'
   }
+  // Declining is a different answer, not a way out of a failed one: it is offered
+  // only while the ask is open, never on the late-answer path.
+  const showDeclineButton = declinable && canWrite && status === 'pending'
 
   return (
     // The card LANDS. This is the moment the run stopped and handed the turn
@@ -537,13 +578,18 @@ export function InteractionQuestionCard({
 
       {/* Announced, not just shown: a submit that failed is the one thing on this
           card that changes without the reader having moved focus. */}
-      {error && <p role="alert" className="mt-3 text-xs text-destructive">{error}</p>}
-      {terminalNote && <p className="mt-3 text-xs text-muted-foreground">{terminalNote}</p>}
+      {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+      {terminalNote && <p className="mt-3 text-sm text-muted-foreground">{terminalNote}</p>}
 
       {(showSubmitButton || showTimeoutNote) && (
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
           {showTimeoutNote && (
-            <div className="mr-auto text-xs text-muted-foreground">{timeoutNote}</div>
+            <div className="mr-auto text-sm text-muted-foreground">{timeoutNote}</div>
+          )}
+          {showDeclineButton && (
+            <InteractionActionButton variant="outline" onClick={() => void decline()} disabled={disabled}>
+              {declining ? 'Declining…' : 'Decline'}
+            </InteractionActionButton>
           )}
           {showSubmitButton && (
             <InteractionActionButton onClick={() => void submit()} disabled={disabled || !answerData}>
@@ -554,12 +600,12 @@ export function InteractionQuestionCard({
       )}
       {answered && (
         <div className="mt-4 flex items-center justify-end">
-          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><CheckGlyph className="h-3 w-3" />Answered</span>
+          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground"><CheckGlyph className="h-3 w-3" />Answered</span>
         </div>
       )}
       {lateAnswerSent && (
         <div className="mt-4 flex items-center justify-end">
-          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><CheckGlyph className="h-3 w-3" />Sent as new message</span>
+          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground"><CheckGlyph className="h-3 w-3" />Sent as new message</span>
         </div>
       )}
     </div>
