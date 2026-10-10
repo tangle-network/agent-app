@@ -19,6 +19,12 @@
  * caller already handles. A client that does not send the header gets exactly
  * the responses it got before.
  *
+ * Product work that only an admitted turn may do (resolving its profile and
+ * model, any write) belongs in `prepareTurn`, which runs after admission and,
+ * on a progress-first stream, inside it with its own named stages.
+ * `tests/chat-routes/authorize-before-stream.test.ts` is the gate that keeps
+ * every shared route behind its `authorize`.
+ *
  * Browser-safe and import-free: the server route and the web client share it.
  */
 

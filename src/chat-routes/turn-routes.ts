@@ -39,6 +39,8 @@
  * `contextGate`, `beforeTurn`, `onRawEvent` and `insertUserMessage` each
  * cleared it with two product verticals reading them differently — and the
  * review found no leaked assumptions to fix, only `ChatRouteEvent` to export.
+ * `prepareTurn` (post-admission context work, run inside a progress-first
+ * stream) is provisional: one consumer so far.
  *
  * They stay FLAT top-level options (not grouped under a `hooks` object): that
  * grouping would break every shipped consumer's call for no mechanism gain, and
@@ -251,6 +253,24 @@ export interface ChatTurnAuthorizeArgs {
   /** The thread whose running turns are being discovered (running intent only). */
   threadId?: string
 }
+
+/** What `prepareTurn` receives: the admitted turn, before the conversation loads. */
+export interface ChatTurnPrepareArgs<TContext> {
+  request: Request
+  /** Parsed, validated POST body. */
+  body: ChatTurnRequestPayload
+  tenantId: string
+  userId: string
+  threadId: string
+  /** The context `authorize` returned; mutate it in place to finish it. */
+  context: TContext
+  /** Name the stage this work is in. On a progress-first stream it reaches the
+   *  client as a `session.run.phase` event; otherwise it is a no-op. */
+  progress(phase: string, message: string): void
+}
+
+/** `prepareTurn`'s verdict: proceed, or answer with the product's response. */
+export type ChatTurnPrepareResult = { ok: true } | { ok: false; response: Response }
 
 /** Trusted per-turn limits supplied by a server adapter, never by the body. */
 export interface ChatTurnExecutionLimits {
@@ -485,6 +505,16 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  product-supplied access step: session auth, thread/workspace access,
    *  seat/balance gates, rate limits all live here. */
   authorize(args: ChatTurnAuthorizeArgs): Promise<ChatTurnAuthorization<TContext>>
+  /** Finish the turn's context after `authorize` has admitted the caller and
+   *  before the conversation loads or the lock is taken: resolve the profile,
+   *  the model, anything that reads or writes product state. Keep `authorize`
+   *  to admission (identity, access, rate limits, input checks) so a refusal
+   *  stays fast and no write ever runs for a caller who is not admitted; on a
+   *  progress-first stream this work runs inside the stream and can name its
+   *  stages through `progress`. A refusal here is answered like a held lock:
+   *  a plain response without the progress header, a `turn.response` event
+   *  with it. Omit → nothing to prepare. */
+  prepareTurn?(args: ChatTurnPrepareArgs<TContext>): ChatTurnPrepareResult | Promise<ChatTurnPrepareResult>
   /** Thread/message persistence (`/chat-store`'s store or a product adapter). */
   store: ChatTurnMessageStore
   /** Turn-event buffer (`createD1TurnEventStore(env.DB)` or `/turn-stream`'s
@@ -804,6 +834,8 @@ export function createChatTurnRoutes<TContext = void>(
 
   /** A turn whose body parsed and whose caller `authorize` admitted. */
   type AdmittedTurn = { parsed: ParsedTurnBody; auth: Extract<ChatTurnAuthorization<TContext>, { ok: true }> }
+  /** Emits one stage on a progress-first stream. */
+  type TurnProgress = (phase: string, message: string) => void
 
   async function turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response> {
     // Parsing and authorization finish before any response opens, for both
@@ -855,10 +887,10 @@ export function createChatTurnRoutes<TContext = void>(
       }
     }
     const writeEvent = (event: ChatRouteEvent): Promise<void> => write(encoder.encode(`${JSON.stringify(event)}\n`))
-    const progress = (phase: TurnRoutePhase): void => {
-      void writeEvent(buildTurnPhaseEvent(phase, progressMessages[phase], { sinceRequestMs: Date.now() - receivedAt }))
+    const progress: TurnProgress = (phase, message) => {
+      void writeEvent(buildTurnPhaseEvent(phase, message, { sinceRequestMs: Date.now() - receivedAt }))
     }
-    progress('accepted')
+    progress('accepted', progressMessages.accepted)
 
     const pump = (async () => {
       let inner: Response
@@ -905,11 +937,24 @@ export function createChatTurnRoutes<TContext = void>(
     request: Request,
     ctx: ChatTurnRequestContext | undefined,
     admitted: AdmittedTurn,
-    progress?: (phase: TurnRoutePhase) => void,
+    progress?: TurnProgress,
   ): Promise<Response> {
     const { parsed, auth } = admitted
     const { payload, content, fileParts, mentions, turnId } = parsed
     const { tenantId, userId, context } = auth
+
+    if (options.prepareTurn) {
+      const prepared = await options.prepareTurn({
+        request,
+        body: payload,
+        tenantId,
+        userId,
+        threadId: payload.threadId,
+        context,
+        progress: (phase, message) => progress?.(phase, message),
+      })
+      if (!prepared.ok) return prepared.response
+    }
 
     // Turn identity: reuse the just-persisted user row on a retry (same
     // turnId or identical trailing content) instead of double-inserting.
@@ -1037,7 +1082,7 @@ export function createChatTurnRoutes<TContext = void>(
       lockAcquired = true
       lockHandle = acquired.handle
     }
-    progress?.('preparing')
+    progress?.('preparing', progressMessages.preparing)
 
     // Turn state, hoisted so the pre-stream `catch` can settle the lifecycle
     // (fire `onTurnError`, close the span) even when a seam throws
