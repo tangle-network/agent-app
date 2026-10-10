@@ -274,7 +274,7 @@ describe('incremental assistant persistence — write cadence', () => {
 
   it('an errored turn still settles as FAILED and unbilled, with its partial answer kept as an error row', async () => {
     const { store, threadId } = await freshStore()
-    const completions: Array<{ failed: boolean; failureReason?: string }> = []
+    const completions: Array<{ failed: boolean; failureReason?: string; failureCode?: string }> = []
     async function* events(): AsyncGenerator<unknown> {
       yield TURN_EVENTS[0]
       await waitUntil(
@@ -283,15 +283,15 @@ describe('incremental assistant persistence — write cadence', () => {
         'draft row before the failure',
       )
       // Terminal error EVENT (not a throw) — the 402 / rate-limit shape.
-      yield { type: 'error', data: { message: 'model quota exhausted' } }
+      yield { type: 'error', data: { code: 'provider_quota_exhausted', message: 'model quota exhausted' } }
     }
     const { routes, ctx, settle } = routesOver(
       store as unknown as ChatTurnMessageStore,
       () => createSandboxChatProducer({ events: events(), model: 'm' }),
       {
         incrementalPersistence: { intervalMs: 0 },
-        onTurnComplete: async (input: { failed: boolean; failureReason?: string }) => {
-          completions.push({ failed: input.failed, failureReason: input.failureReason })
+        onTurnComplete: async (input: { failed: boolean; failureReason?: string; failureCode?: string }) => {
+          completions.push({ failed: input.failed, failureReason: input.failureReason, failureCode: input.failureCode })
         },
       },
     )
@@ -299,7 +299,8 @@ describe('incremental assistant persistence — write cadence', () => {
     await settle()
 
     // Billing branches on this, and drafting must not have changed it.
-    expect(completions).toEqual([{ failed: true, failureReason: 'model quota exhausted' }])
+    // The typed reason rides along, so a product can record why it failed.
+    expect(completions).toEqual([{ failed: true, failureReason: 'model quota exhausted', failureCode: 'provider_quota_exhausted' }])
     // The partial answer is kept as ONE row carrying the visible error text —
     // not a second row, and not an empty one.
     const assistants = (await rows(store, threadId)).filter((row) => row.role === 'assistant')
