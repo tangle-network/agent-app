@@ -4,6 +4,7 @@ import {
   boundNativeCompletionReceipt,
   NATIVE_COMPLETION_RECEIPT_MAX_BYTES,
   observeNativeCompletion,
+  RUNTIME_RESTARTED_ERROR,
   TOOL_ABORTED_ERROR,
   type NativeCompletionAdmission,
   type NativeCompletionAdmissionStore,
@@ -241,6 +242,37 @@ describe('observeNativeCompletion', () => {
       expect(admissionStore.renew).not.toHaveBeenCalled()
       expect(admissionStore.closeExpired).toHaveBeenCalledWith('turn-1', new Date(700_000))
       expect(observed).toMatchObject({ state: 'failed', receipt: { state: 'failed', error: interrupted, text: 'I’ll pull the latest founder list first.' } })
+    })
+
+    it('settles a restarted run with the reply its turn had streamed, though nothing stamped it interrupted', async () => {
+      const box = source({
+        status: { id: 'session-1', status: 'running', activeExecutionId: 'turn-1', raw: { status: 'running', state: 'stale' } },
+        runs: [{ executionId: 'turn-1', sessionId: 'session-1', status: 'failed', startedAt: 1, completedAt: 2, eventCount: 6_327, lastEventId: 'interrupted-done' }],
+        messages: [
+          { id: 'assistant-0', role: 'assistant', timestamp: '2026-10-10T08:00:00.000Z', metadata: { turnId: 'turn-0', status: 'completed' }, parts: [{ type: 'text', text: 'An earlier answer.' }] },
+          { id: 'assistant-1', role: 'assistant', timestamp: '2026-10-10T09:03:00.000Z', metadata: { turnId: 'turn-1', status: 'streaming' }, parts: [{ type: 'text', text: 'Drafting the seven notes now.' }] },
+        ],
+      })
+      const observed = await observeNativeCompletion({
+        source: box, admissionStore: openAdmission(),
+        executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 0, now: 700_000,
+      })
+
+      expect(observed).toMatchObject({ state: 'failed', receipt: { error: RUNTIME_RESTARTED_ERROR, text: 'Drafting the seven notes now.' } })
+    })
+
+    it('settles a restarted run that streamed nothing at once, with the restart as its reason', async () => {
+      const box = source({
+        status: { id: 'session-1', status: 'running', raw: { status: 'running', state: 'stale' } },
+        runs: [{ executionId: 'turn-1', sessionId: 'session-1', status: 'failed', startedAt: 1, completedAt: 2, eventCount: 2, lastEventId: 'interrupted-done' }],
+        messages: [],
+      })
+      const observed = await observeNativeCompletion({
+        source: box, admissionStore: openAdmission(),
+        executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 0, now: 700_000,
+      })
+
+      expect(observed).toMatchObject({ state: 'failed', receipt: { state: 'failed', error: RUNTIME_RESTARTED_ERROR, text: '' } })
     })
 
     it('still renews a session whose run is live', async () => {
