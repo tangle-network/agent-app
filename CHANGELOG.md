@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.48
+
+- feat(chat-routes): progress-first turn stream and a live stage row (#944)
+
 ## 0.60.47
 
 - fix(native-completion): renew an admission only while the ledger shows its run live (#943)
