@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+
+import { SidebarLayout } from '@tangle-network/sandbox-ui/dashboard'
+import { DropdownMenuItem } from '@tangle-network/ui/primitives'
 
 import { CommandPalette, type CommandPaletteItem } from '../../web-react'
 import { buildCommandPaletteItems } from '../../session-shell/index'
@@ -118,4 +121,58 @@ export const Loading: Story = {
   render: () => (
     <CommandPalette items={[]} open onOpenChange={() => {}} onSelect={() => {}} loading />
   ),
+}
+
+/** Uses the real shared account dropdown and mobile drawer, not a mock modal.
+ * The menu item disappears on selection, so its stable trigger owns return focus.
+ */
+export function NestedNavigationExample() {
+  const [open, setOpen] = useState(false)
+  const [last, setLast] = useState<string | null>(null)
+  const returnTarget = useRef<HTMLElement | null>(null)
+  return (
+    <>
+      <SidebarLayout
+        navItems={[]}
+        logo={<span>Palette example</span>}
+        user={{ name: 'Example user', email: 'example@example.com' }}
+        hideBelow="md"
+        railLabels
+        settingsHref={null}
+        profileMenuItems={
+          <DropdownMenuItem onSelect={(event) => {
+            const menu = (event.currentTarget as HTMLElement).closest('[role="menu"]')
+            const triggerId = menu?.getAttribute('aria-labelledby')
+            returnTarget.current = triggerId ? document.getElementById(triggerId) : null
+            setOpen(true)
+          }}>
+            Search
+          </DropdownMenuItem>
+        }
+      >
+        <main className="p-6">
+          <h1>Search from the account menu</h1>
+          <p>On a phone, open navigation first. Escape returns to the account button without closing navigation.</p>
+          <button type="button">Outside control</button>
+          <p data-testid="last-selection">{last ?? 'Nothing selected'}</p>
+        </main>
+      </SidebarLayout>
+      <CommandPalette
+        items={items}
+        open={open}
+        onOpenChange={(next) => {
+          if (next) returnTarget.current = null
+          setOpen(next)
+        }}
+        onSelect={(item) => setLast(item.label)}
+        returnFocusTo={() => returnTarget.current}
+      />
+    </>
+  )
+}
+
+export const NestedNavigation: Story = {
+  name: 'Account menu and mobile navigation',
+  parameters: { layout: 'fullscreen' },
+  render: () => <NestedNavigationExample />,
 }

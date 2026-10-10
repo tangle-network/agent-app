@@ -13,7 +13,9 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+
+import userEvent from '@testing-library/user-event'
 
 import { CommandPalette, POPOVER_SURFACE_ATTR, type CommandPaletteItem } from '../../src/web-react/index'
 
@@ -62,11 +64,8 @@ describe('CommandPalette', () => {
     const dialog = screen.getByRole('dialog')
     expect(container.contains(dialog)).toBe(false)
     expect(dialog.getAttribute(POPOVER_SURFACE_ATTR)).toBeTruthy()
-    // `fixed` positioning lives on the click-transparent centering wrapper —
-    // the dialog itself must never carry `absolute` (the host-clip defect).
-    const wrapper = dialog.parentElement as HTMLElement
-    expect(wrapper.className).toContain('fixed')
-    expect(wrapper.className).not.toMatch(/\babsolute\b/)
+    // The shared dialog positions the surface in viewport coordinates.
+    expect(dialog.className).toContain('fixed')
     expect(dialog.className).not.toMatch(/\babsolute\b/)
   })
 
@@ -128,7 +127,7 @@ describe('CommandPalette', () => {
     expect(onSelect).toHaveBeenCalledWith(ITEMS[3])
   })
 
-  it('Escape closes and returns focus to the previously focused element', () => {
+  it('Escape closes and returns focus to the previously focused element', async () => {
     const trigger = document.createElement('button')
     document.body.appendChild(trigger)
     trigger.focus()
@@ -137,14 +136,17 @@ describe('CommandPalette', () => {
     expect(document.activeElement).toBe(screen.getByRole('combobox'))
     fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(document.activeElement).toBe(trigger)
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
     trigger.remove()
   })
 
-  it('the backdrop closes on mousedown', () => {
+  it('the shared backdrop closes on pointer interaction', async () => {
+    const user = userEvent.setup()
     renderPalette()
     openByHotkey('k', true)
-    fireEvent.mouseDown(screen.getByTestId('command-palette-backdrop'))
+    const backdrop = screen.getByRole('dialog').previousElementSibling as HTMLElement
+    expect(backdrop.className).toContain('fixed')
+    await user.click(backdrop)
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -212,4 +214,37 @@ describe('CommandPalette', () => {
     rerender(createElement(CommandPalette, { items: ITEMS, onSelect, open: false, onOpenChange: () => {}, onQueryChange }))
     expect(onQueryChange).toHaveBeenLastCalledWith('')
   })
+  it('keeps Tab and programmatic outside focus inside the modal', async () => {
+    const user = userEvent.setup()
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    renderPalette()
+    outside.focus()
+    openByHotkey()
+    const input = screen.getByRole('combobox')
+    await user.tab()
+    expect(document.activeElement).toBe(input)
+    await user.tab({ shift: true })
+    expect(document.activeElement).toBe(input)
+    outside.focus()
+    expect(document.activeElement).toBe(input)
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(document.activeElement).toBe(outside))
+    outside.remove()
+  })
+
+  it('restores a supplied stable target after the launching element unmounts', async () => {
+    const user = userEvent.setup()
+    const stable = document.createElement('button')
+    const transient = document.createElement('button')
+    document.body.append(stable, transient)
+    transient.focus()
+    renderPalette({ returnFocusTo: () => stable })
+    openByHotkey()
+    transient.remove()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(document.activeElement).toBe(stable))
+    stable.remove()
+  })
+
 })
