@@ -75,6 +75,18 @@ describe('agent setup skill', () => {
     expect(skill).toContain('https://widget.tangle.tools/agent-setup.md')
   })
 
+  it('numbers the sections a product has without gaps', () => {
+    const skill = renderAgentSetupSkill({ ...product, install: [] })
+    const headings = skill.split('\n').filter((line) => /^## \d+\. /.test(line))
+    expect(headings).toEqual([
+      '## 1. Get a scoped key (one owner approval)',
+      '## 2. Make the first call',
+      '## 3. Verify it worked',
+    ])
+    expect(skill).not.toContain('install the client')
+    expect(renderAgentSetupSkill(product)).toContain('install the client')
+  })
+
   it('lists the owner steps when a product has no agent signup', () => {
     const skill = renderAgentSetupSkill({
       ...product,

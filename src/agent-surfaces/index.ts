@@ -279,7 +279,15 @@ function stepsSection(heading: string, steps: AgentSurfaceStep[]): string[] {
 /** The agent setup skill: valid SKILL.md and a plain copy-paste prompt. */
 export function renderAgentSetupSkill(config: AgentSurfaceConfig): string {
   const origin = trimOrigin(config.origin)
-  const description = `Set up ${config.name} for this agent end to end: get a scoped API key with one owner approval, install the client, make the first successful call, and verify it.`
+  const install = config.install.length > 0 ? ', install the client' : ''
+  const description = `Set up ${config.name} for this agent end to end: get a scoped API key with one owner approval${install}, make the first successful call, and verify it.`
+  // Signup is step 1; the sections a product has are numbered on from there,
+  // so a product with nothing to install reads 1, 2, 3.
+  const sections = ([
+    ['Install', config.install],
+    ['Make the first call', config.firstCall],
+    ['Verify it worked', config.verify],
+  ] as const).filter(([, steps]) => steps.length > 0)
   const lines: string[] = [
     '---',
     `name: tangle-${config.id}-setup`,
@@ -299,9 +307,7 @@ export function renderAgentSetupSkill(config: AgentSurfaceConfig): string {
     '',
     ...signupSection(config),
     '',
-    ...stepsSection('## 2. Install', config.install),
-    ...stepsSection('## 3. Make the first call', config.firstCall),
-    ...stepsSection('## 4. Verify it worked', config.verify),
+    ...sections.flatMap(([title, steps], index) => stepsSection(`## ${index + 2}. ${title}`, steps)),
     '## Common errors',
     '',
     '| Symptom | Cause | Fix |',
