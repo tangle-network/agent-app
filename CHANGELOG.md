@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.38
+
+- fix(brand-extraction): read font declarations in one pass over the braces (#933)
+
 ## 0.60.37
 
 - chore(deps): admit Agent Eval 0.211, the line that prices gpt-6-luna (#932)
