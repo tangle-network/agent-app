@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.52
+
+- test(chat-routes): wait for the turn's own drain before checking a disconnected turn (#949)
+- fix(stream): coalesce a reasoning model's token stream before it is persisted (#946)
+
 ## 0.60.51
 
 - feat(chat-routes): prepareTurn runs product work after admission, and a gate keeps every route behind authorize (#948)
