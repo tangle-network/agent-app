@@ -256,6 +256,25 @@ export function aggregateNativeCompletionReceipts(turns: readonly NativeCompleti
   }
 }
 
+/** The failure a completed run with an aborted tool call settles with. */
+export const TOOL_ABORTED_ERROR = 'The Sandbox aborted a tool call before the turn finished, as when its runtime restarts mid-turn'
+
+/**
+ * The name of a tool whose call the Sandbox aborted, or undefined. OpenCode
+ * marks a tool interrupted by a runtime restart with "Tool execution aborted";
+ * an ordinary tool error (a missing file, an HTTP 403) does not end the turn.
+ */
+function abortedToolCall(parts: ReadonlyArray<Record<string, unknown>>): string | undefined {
+  for (const part of parts) {
+    if (part.type !== 'tool') continue
+    const state = part.state as { status?: unknown; error?: unknown } | undefined
+    if (state?.status === 'error' && /tool execution aborted/i.test(String(state.error ?? ''))) {
+      return typeof part.tool === 'string' ? part.tool : 'tool'
+    }
+  }
+  return undefined
+}
+
 function missingTurnReceipt(turnId: string, error: string): NativeCompletionTurnReceipt {
   // An execution ledger entry proves this turn reached a terminal state, but
   // not that its terminal transcript was retained. Keep any earlier exact
@@ -345,13 +364,17 @@ export async function observeNativeCompletion(
       ? await readCompletedSandboxTurn(source, { turnId, sessionId: options.sessionId, since })
       : null
     if (run.status === 'completed' && completed) {
+      const aborted = abortedToolCall(completed.parts ?? [])
       recovered.push({
         ...completed,
         turnId,
-        state: 'completed',
+        // A run the runtime ended while a tool was still running reports
+        // completed, but its reply stops mid-work. It is a failed turn.
+        state: aborted ? 'failed' : 'completed',
         text: completed.text ?? '',
         parts: completed.parts ?? [],
         usage: completed.usage ?? {},
+        ...(aborted ? { error: `${TOOL_ABORTED_ERROR} (${aborted})` } : {}),
       })
       continue
     }
