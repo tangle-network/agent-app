@@ -100,6 +100,10 @@ export interface SignoffConfig {
   /** Pristine store generations to keep. Default 4, so flipping between a
    *  branch and main stays warm on both. */
   readonly storeGenerations?: number
+  /** Repo-relative Wrangler configs whose Workers this repo deploys. Default:
+   *  every tracked `wrangler.{toml,json,jsonc}`. Each is checked against the
+   *  agent-app Worker defaults (`worker-defaults.ts`). */
+  readonly workerConfigs?: readonly string[]
 }
 
 /** Where a config came from. Printed in the proof — a run against a derived

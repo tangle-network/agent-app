@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
+import { WORKER_DEFAULTS_STEP } from './worker-defaults'
 import type { LoadedSignoffConfig, SignoffConfig, SignoffStepSpec } from './types'
 
 /**
@@ -60,6 +61,7 @@ const configSchema = z.object({
   carryFiles: z.array(z.string()).optional(),
   cacheDir: z.string().optional(),
   storeGenerations: z.number().int().positive().optional(),
+  workerConfigs: z.array(z.string().min(1)).optional(),
 })
 
 function describeIssues(error: z.ZodError, where: string): string {
@@ -70,6 +72,9 @@ function describeIssues(error: z.ZodError, where: string): string {
 export function parseSignoffConfig(value: unknown, where: string): SignoffConfig {
   const result = configSchema.safeParse(value)
   if (!result.success) throw new Error(describeIssues(result.error, where))
+  if (result.data.steps.some((step) => step.name === WORKER_DEFAULTS_STEP)) {
+    throw new Error(`signoff: ${where} declares a step named "${WORKER_DEFAULTS_STEP}", which the gate runs itself`)
+  }
   return result.data as SignoffConfig
 }
 

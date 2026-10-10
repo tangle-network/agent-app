@@ -4,7 +4,13 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true }
+  "upload_source_maps": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "invocation_logs": true },
+    "traces": { "enabled": true, "head_sampling_rate": 1 }
+  }
   // Hub keeps each person's box, thread, daily count and calls.
   // Secrets: wrangler secret put TANGLE_API_KEY | OWNER_ADDRESS | SETUP_SECRET
 }

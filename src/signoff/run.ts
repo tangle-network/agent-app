@@ -13,6 +13,7 @@ import { runCommand, type CommandResult } from './exec'
 import { runGraph, validateGraph, type TaskOutcome } from './schedule'
 import { assertShuffleArgsReachTheRunner, newSeedBase, planAttempts } from './seeds'
 import { resolveStore } from './store'
+import { checkWorkerDefaults, formatWorkerDefaults, WORKER_DEFAULTS_STEP } from './worker-defaults'
 import { materializeCleanTree, removeCleanTree, repoRootOf, type CleanTree } from './workspace'
 import type {
   SignoffAttempt,
@@ -203,9 +204,9 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
         origin,
         host,
         install,
-        steps: config.steps.map(
-          (step): SignoffStepResult => ({
-            name: step.name,
+        steps: [...config.steps.map((step) => step.name), WORKER_DEFAULTS_STEP].map(
+          (name): SignoffStepResult => ({
+            name,
             status: 'skipped',
             attempts: [],
             durationMs: 0,
@@ -222,6 +223,8 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
     }
 
     assertNodeTypesVersion(tree.path, nodeRequirement)
+
+    const workerDefaults = runWorkerDefaults(tree.path, config.workerConfigs, options)
 
     const treeRoot = tree.path
     const outcomes = await runGraph<SignoffStepSpec, readonly SignoffAttempt[]>({
@@ -253,7 +256,7 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
       },
     })
 
-    const steps = outcomes.map(toStepResult)
+    const steps = [...outcomes.map(toStepResult), workerDefaults]
     return finish({
       ok: steps.every((step) => step.status === 'passed'),
       startedAt,
@@ -272,6 +275,40 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
   } finally {
     if (tree && !options.keepWorkspace && existsSync(tree.path)) removeCleanTree(tree)
   }
+}
+
+/**
+ * Built in rather than declared: every repo that deploys an agent-app Worker
+ * must ship the shared Cloudflare defaults, and a step a repo can leave out of
+ * its config would let exactly the drift it exists to catch through. It runs
+ * after install because it reads each config through the repo's own Wrangler.
+ */
+function runWorkerDefaults(
+  treeRoot: string,
+  workerConfigs: readonly string[] | undefined,
+  options: RunSignoffOptions,
+): SignoffStepResult {
+  const command = `agent-app-signoff ${WORKER_DEFAULTS_STEP}`
+  options.onEvent?.({ kind: 'step-start', name: WORKER_DEFAULTS_STEP, command, seed: null })
+  const started = Date.now()
+  let output: string
+  let ok: boolean
+  try {
+    const result = checkWorkerDefaults(treeRoot, workerConfigs)
+    output = formatWorkerDefaults(result)
+    ok = result.findings.length === 0
+  } catch (error) {
+    output = `${error instanceof Error ? error.stack ?? error.message : String(error)}\n`
+    ok = false
+  }
+  const durationMs = Date.now() - started
+  const attempts: SignoffAttempt[] = [
+    { command, seed: null, exitCode: ok ? 0 : 1, signal: null, durationMs, timedOut: false, output, outputTruncated: false },
+  ]
+  emitStepEnd(options, WORKER_DEFAULTS_STEP, ok ? 'passed' : 'failed', attempts)
+  // It runs before the graph's clock starts, so it has no position on the
+  // graph timeline; giving it one would count it as overlapping the roots.
+  return { name: WORKER_DEFAULTS_STEP, status: ok ? 'passed' : 'failed', attempts, durationMs, startedAtMs: null, finishedAtMs: null }
 }
 
 /** Emitted from inside the step, so a watching CLI sees a completion when it
