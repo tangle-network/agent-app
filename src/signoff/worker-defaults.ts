@@ -79,7 +79,7 @@ export interface WorkerDefaultsResult {
  * directories) is gitignored, so `git ls-files` is the complete source list
  * without a hand-kept exclude list.
  */
-export function trackedWorkerConfigs(repoRoot: string): string[] {
+function trackedWorkerConfigs(repoRoot: string): string[] {
   const listed = spawnSync('git', ['ls-files', '-z'], { cwd: repoRoot, encoding: 'utf8' })
   if (listed.status !== 0) throw new Error(`signoff: git ls-files failed in ${repoRoot}: ${listed.stderr}`)
   return listed.stdout
