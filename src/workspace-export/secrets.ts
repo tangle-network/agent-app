@@ -149,12 +149,7 @@ export function createSecretScanner(options: { knownSecrets?: readonly string[] 
     let carry = new Uint8Array(0)
 
     function scan(buffer: Uint8Array, final: boolean): number {
-      // One UTF-16 code unit per byte, so string indexes are byte offsets.
-      // Decoded by hand: not every runtime's TextDecoder offers latin1.
-      let text = ''
-      for (let i = 0; i < buffer.length; i += 8192) {
-        text += String.fromCharCode(...buffer.subarray(i, i + 8192))
-      }
+      const text = decodeBytes(buffer)
       const regex = pattern()
       let emitEnd = final ? buffer.length : Math.max(0, buffer.length - window)
       let masked = 0
@@ -196,6 +191,27 @@ export function createSecretScanner(options: { knownSecrets?: readonly string[] 
   }
 
   return { maskText, redactValue, maskBytes }
+}
+
+/**
+ * One UTF-16 code unit per byte, so string indexes are byte offsets. A native
+ * windows-1252 decoder keeps that property and is several times faster; the
+ * manual decode covers runtimes whose TextDecoder lacks it.
+ */
+const nativeLatin1 = (() => {
+  try {
+    const decoder = new TextDecoder('latin1')
+    return decoder.decode(new Uint8Array([0x41, 0x80, 0xff])).length === 3 ? decoder : null
+  } catch {
+    return null
+  }
+})()
+
+function decodeBytes(buffer: Uint8Array): string {
+  if (nativeLatin1) return nativeLatin1.decode(buffer)
+  let text = ''
+  for (let i = 0; i < buffer.length; i += 8192) text += String.fromCharCode(...buffer.subarray(i, i + 8192))
+  return text
 }
 
 /** Credential stores that are blanked wholesale inside a sandbox archive. */
