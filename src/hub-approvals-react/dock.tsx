@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, X } from 'lucide-react'
+import { Check, ChevronDown, ExternalLink, Loader2, X } from 'lucide-react'
 import { Button, Label, RadioGroup, RadioGroupItem } from '@tangle-network/ui/primitives'
 
 import {
@@ -11,7 +11,7 @@ import {
   type HubApprovalPhase,
 } from '../hub-approvals'
 import { HUB_APPROVAL_UNKNOWN_WARNING } from '../hub-approvals/unknown'
-import { closesIn, distinctAccount, HubApprovalWaitNote, HubProviderMark, HubRawDetails } from './parts'
+import { closesIn, distinctAccount, HubApprovalPhasePill, HubApprovalWaitNote, HubProviderMark, HubRawDetails, openPhaseLabel } from './parts'
 import { HubActionPreviewView } from './preview'
 
 /** The owner's answer to one held call. `allow` also grants a standing permission. */
@@ -185,19 +185,46 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
     }
   }
 
-  const step = (delta: number) => {
-    const next = queue[(activeIndex + delta + queue.length) % queue.length]
-    if (next) setActiveId(next.id)
-  }
-
   return (
     <section
       aria-label={active.phase === 'unknown' ? 'Action may have run' : 'Waiting for your approval'}
       data-hub-approval-dock={active.id}
       className={`overflow-hidden rounded-2xl border border-[var(--surface-warning-border)] bg-card shadow-md ${className}`}
     >
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 pt-3">
-        <HubProviderMark providerId={presentation.provider.id} name={presentation.provider.name} size={32} />
+      {queue.length > 1 && (
+        <div className="border-b border-border bg-muted/40 px-1.5 pb-1.5 pt-2">
+          <p className="px-2 pb-1 text-sm font-medium text-muted-foreground" aria-live="polite">
+            {waitingCount === 0 ? `${queue.length} requests` : waitingCount === 1 ? '1 request waiting' : `${waitingCount} requests waiting`}
+          </p>
+          <ul aria-label="Requests in this conversation" className="max-h-32 space-y-0.5 overflow-y-auto sm:max-h-40">
+            {queue.map((item) => {
+              const shown = presentHubAction(item)
+              const current = item.id === active.id
+              return (
+                <li key={item.id}>
+                  <Button
+                    variant="bare"
+                    aria-current={current ? 'true' : undefined}
+                    onClick={() => {
+                      setActiveId(item.id)
+                      setCollapsed(false)
+                    }}
+                    className={`flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors ${current ? 'bg-card shadow-sm' : 'hover:bg-card/70'}`}
+                  >
+                    <HubProviderMark providerId={shown.provider.id} name={shown.provider.name} size={24} />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                      {item.phase === 'done' ? hubActionReceipt(item).title : shown.title}
+                    </span>
+                    <HubApprovalPhasePill phase={item.phase} label={openPhaseLabel(item)} />
+                  </Button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+      <div className="flex items-start gap-3 px-4 pt-3">
+        <HubProviderMark providerId={presentation.provider.id} name={presentation.provider.name} size={28} />
         <div className="min-w-0 flex-1">
           <h3 className="line-clamp-2 break-words text-base font-semibold leading-6 text-foreground" title={presentation.title}>{presentation.title}</h3>
           <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
@@ -205,29 +232,16 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
         <Button
           variant="ghost"
           size="icon-sm"
-          className="sm:order-last"
           aria-label={collapsed ? 'Show the request' : 'Hide the preview'}
           aria-expanded={!collapsed}
           onClick={() => setCollapsed((value) => !value)}
         >
           <ChevronDown className={`transition-transform ${collapsed ? '-rotate-90' : ''}`} />
         </Button>
-        {/* On a phone the pager takes its own row, so the title keeps the width. */}
-        {queue.length > 1 && (
-          <div className="flex w-full items-center justify-end gap-1 sm:w-auto">
-            <>
-              <Button variant="ghost" size="icon-sm" aria-label="Previous request" onClick={() => step(-1)}><ChevronLeft /></Button>
-              <span className="min-w-14 text-center text-sm tabular-nums text-muted-foreground" aria-live="polite">
-                {activeIndex + 1} of {queue.length}
-              </span>
-              <Button variant="ghost" size="icon-sm" aria-label="Next request" onClick={() => step(1)}><ChevronRight /></Button>
-            </>
-          </div>
-        )}
       </div>
 
       {!collapsed && (
-        <div className="max-h-64 space-y-3 overflow-y-auto px-4 pt-3 sm:max-h-96">
+        <div className="max-h-48 space-y-3 overflow-y-auto px-4 pt-3 sm:max-h-80">
           {active.bundle?.steps && active.bundle.steps.length > 0 && (
             <ol className="space-y-1 text-sm" aria-label="Steps this approval covers">
               {active.bundle.steps.map((stepItem, index) => (
@@ -312,9 +326,6 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
             <Button variant="ghost" onClick={() => onOpen(active)}>View in chat</Button>
           )}
         </div>
-        {waitingCount > 0 && queue.length > 1 && active.phase !== 'waiting' && (
-          <p className="text-sm text-muted-foreground">{waitingCount === 1 ? '1 more request is waiting.' : `${waitingCount} more requests are waiting.`}</p>
-        )}
       </div>
     </section>
   )
