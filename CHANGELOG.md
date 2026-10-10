@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.42
+
+- fix(sandbox): report the resume of a stopped box as a container-start step (#937)
+
 ## 0.60.41
 
 - feat(hub-approvals): list every waiting request in the dock above a compact open card (#938)
