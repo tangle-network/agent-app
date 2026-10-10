@@ -7,10 +7,8 @@
 import type { SandboxInstance, SessionInfo, SessionMessage } from '@tangle-network/sandbox'
 import type { ChatTurnUsage } from './turn-routes'
 import {
-  attributionFromResult,
   readCompletedSandboxTurn,
   recoverSandboxAssistantMessage,
-  usageFromResult,
 } from './completed-sandbox-turn'
 
 export interface NativeCompletionReceipt {
@@ -78,6 +76,107 @@ export interface NativeCompletionTurnReceipt {
 
 const DEFAULT_ABSENT_DISPATCH_DEADLINE_MS = 10 * 60_000
 const DEFAULT_RECEIPT_DEADLINE_MS = 10 * 60_000
+/** Session messages are read from this long before registration, so clock
+ *  skew between the product Worker and the Sandbox cannot hide the turn. */
+const MESSAGE_READ_SKEW_MS = 10 * 60_000
+
+/**
+ * Serialized UTF-8 budget for one terminal receipt. A Cloudflare Workflow
+ * refuses a step result over 1 MiB and D1 refuses a row over 2 MB, and a
+ * receipt approaches both as tool payloads accumulate over a long turn.
+ */
+export const NATIVE_COMPLETION_RECEIPT_MAX_BYTES = 900 * 1024
+
+/** Per-string caps tried in order until a receipt fits its budget. */
+// Status, ids and paths stay well under the smallest cap.
+const RECEIPT_STRING_CAPS = [16_384, 4_096, 1_024, 256] as const
+
+const encoder = new TextEncoder()
+
+function serializedBytes(value: unknown): number {
+  return encoder.encode(JSON.stringify(value)).length
+}
+
+function capString(value: string, cap: number): string {
+  if (value.length <= cap) return value
+  return `${value.slice(0, cap)}…[truncated ${value.length - cap} characters; the Sandbox session keeps the full value]`
+}
+
+function capStrings(value: unknown, cap: number): unknown {
+  if (typeof value === 'string') return capString(value, cap)
+  if (Array.isArray(value)) return value.map((item) => capStrings(item, cap))
+  const object = record(value)
+  if (!object) return value
+  return Object.fromEntries(Object.entries(object).map(([key, item]) => [key, capStrings(item, cap)]))
+}
+
+/** Tool payloads and reasoning shrink; the answer text, files and interactions do not. */
+function capReceiptPart(part: Record<string, unknown>, cap: number): Record<string, unknown> {
+  const type = String(part.type ?? '')
+  if (type === 'tool') {
+    const state = record(part.state)
+    if (!state) return part
+    const capped = capStrings(state, cap) as Record<string, unknown>
+    if (serializedBytes(capped) === serializedBytes(state)) return part
+    return { ...part, state: { ...capped, metadata: { ...record(capped.metadata), receiptTruncated: true } } }
+  }
+  if (type === 'reasoning' && typeof part.text === 'string' && part.text.length > cap) {
+    return { ...part, text: capString(part.text, cap), receiptTruncated: true }
+  }
+  return part
+}
+
+/** Last resort for a receipt whose part count alone exceeds the budget. */
+function skeletonPart(part: Record<string, unknown>): Record<string, unknown> | null {
+  const type = String(part.type ?? '')
+  if (type === 'reasoning') return null
+  if (type !== 'tool') return part
+  const state = record(part.state)
+  return {
+    type: 'tool',
+    ...(part.id !== undefined ? { id: part.id } : {}),
+    ...(part.tool !== undefined ? { tool: part.tool } : {}),
+    state: { status: state?.status ?? 'completed', metadata: { receiptTruncated: true } },
+  }
+}
+
+/**
+ * Fit a terminal receipt inside {@link NATIVE_COMPLETION_RECEIPT_MAX_BYTES}.
+ * A receipt under the budget is returned unchanged. Over it, the longest
+ * strings in tool payloads and reasoning are clipped with a marker, at
+ * successively smaller caps, so a long turn's answer is always persistable.
+ */
+export function boundNativeCompletionReceipt(
+  receipt: NativeCompletionReceipt,
+  maxBytes: number = NATIVE_COMPLETION_RECEIPT_MAX_BYTES,
+): NativeCompletionReceipt {
+  if (serializedBytes(receipt) <= maxBytes) return receipt
+  for (const cap of RECEIPT_STRING_CAPS) {
+    const bounded = { ...receipt, parts: receipt.parts.map((part) => capReceiptPart(part, cap)) }
+    if (serializedBytes(bounded) <= maxBytes) return bounded
+  }
+  const skeleton = {
+    ...receipt,
+    parts: receipt.parts.map(skeletonPart).filter((part): part is Record<string, unknown> => part !== null),
+  }
+  if (serializedBytes(skeleton) <= maxBytes) return skeleton
+  // Only the answer text is left to shrink.
+  const textBudget = Math.max(0, Math.floor(maxBytes / 4))
+  return {
+    ...skeleton,
+    text: capString(skeleton.text, textBudget),
+    parts: skeleton.parts.map((part) => (part.type === 'text' && typeof part.text === 'string'
+      ? { ...part, text: capString(part.text, textBudget) }
+      : part)),
+  }
+}
+
+function terminal(receipt: NativeCompletionReceipt): NativeCompletionObservation {
+  const bounded = boundNativeCompletionReceipt(receipt)
+  return bounded.state === 'completed'
+    ? { state: 'completed', receipt: bounded }
+    : { state: 'failed', receipt: bounded }
+}
 
 function timestamp(value: Date | number | null | undefined): number | undefined {
   if (value instanceof Date) return value.getTime()
@@ -184,12 +283,9 @@ export async function observeNativeCompletion(
     if (admission.state === 'open' || now - options.registeredAt < (options.absentDispatchDeadlineMs ?? DEFAULT_ABSENT_DISPATCH_DEADLINE_MS)) {
       return { state: 'running' }
     }
-    return {
-      state: 'failed',
-      receipt: aggregateNativeCompletionReceipts([
-        missingTurnReceipt(options.turnId, 'Native Sandbox dispatch was not observed before the admission deadline'),
-      ]),
-    }
+    return terminal(aggregateNativeCompletionReceipts([
+      missingTurnReceipt(options.turnId, 'Native Sandbox dispatch was not observed before the admission deadline'),
+    ]))
   }
   const exactSession = session
 
@@ -219,6 +315,9 @@ export async function observeNativeCompletion(
 
   // Completed recovery owns its message read. Load interrupted history only
   // when it is needed, and share that one read across failed continuations.
+  // Both reads start shortly before registration, so their size follows this
+  // turn rather than the whole session.
+  const since = Math.max(0, options.registeredAt - MESSAGE_READ_SKEW_MS)
   let messages: SessionMessage[] | undefined
   const recovered: NativeCompletionTurnReceipt[] = []
   for (const turnId of admittedTurnIds) {
@@ -228,7 +327,7 @@ export async function observeNativeCompletion(
       continue
     }
     const completed = run.status === 'completed'
-      ? await readCompletedSandboxTurn(source, { turnId, sessionId: options.sessionId })
+      ? await readCompletedSandboxTurn(source, { turnId, sessionId: options.sessionId, since })
       : null
     if (run.status === 'completed' && completed) {
       recovered.push({
@@ -242,19 +341,24 @@ export async function observeNativeCompletion(
       continue
     }
     const interrupted = run.status === 'failed' || run.status === 'cancelled'
-      ? interruptedMessages(messages ??= await exactSession.messages({ limit: 1_000 }), turnId)
+      ? interruptedMessages(messages ??= await exactSession.messages({ limit: 1_000, since }), turnId)
       : []
     if ((run.status === 'failed' || run.status === 'cancelled') && interrupted.length === 1) {
+      // The receipt is the interrupted message the Sandbox recorded. Replaying
+      // the execution's event stream instead costs CPU in proportion to the
+      // run's length, which a long turn's terminal step cannot afford within a
+      // Workflow step's CPU limit.
       const message = recoverSandboxAssistantMessage(interrupted[0]!)
-      const result = await exactSession.result({ executionId: turnId })
+      const interruptReason = interrupted[0]!.metadata?.interruptReason
       recovered.push({
         turnId,
         state: 'failed',
-        text: message.text ?? result.response ?? '',
+        text: message.text ?? '',
         parts: message.parts ?? [],
-        usage: { ...message.usage, ...usageFromResult(result as unknown as Record<string, unknown>) },
-        ...attributionFromResult(result as unknown as Record<string, unknown>),
-        error: result.error ?? interrupted[0]!.metadata?.interruptReason ?? status.failureReason?.message,
+        usage: message.usage ?? {},
+        error: (typeof interruptReason === 'string' && interruptReason)
+          || status.failureReason?.message
+          || `Native Sandbox execution ${run.status}`,
       })
       continue
     }
@@ -267,8 +371,5 @@ export async function observeNativeCompletion(
       `Admitted native execution did not produce an exact completion: ${turnId}`,
     ))
   }
-  const receipt = aggregateNativeCompletionReceipts(recovered)
-  return receipt.state === 'completed'
-    ? { state: 'completed', receipt }
-    : { state: 'failed', receipt }
+  return terminal(aggregateNativeCompletionReceipts(recovered))
 }

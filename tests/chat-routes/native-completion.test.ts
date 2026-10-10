@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   aggregateNativeCompletionReceipts,
+  boundNativeCompletionReceipt,
+  NATIVE_COMPLETION_RECEIPT_MAX_BYTES,
   observeNativeCompletion,
   type NativeCompletionAdmission,
   type NativeCompletionAdmissionStore,
@@ -324,5 +326,81 @@ describe('observeNativeCompletion', () => {
     expect(observed.receipt.parts).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'file', path: 'partial.md' }),
     ]))
+  })
+
+  it('builds an interrupted receipt from the recorded message without replaying the execution', async () => {
+    const box = source({
+      status: { id: 'session-1', status: 'failed', latestExecutionId: 'turn-1', failureReason: { message: 'runtime stopped' } },
+      messages: [{
+        id: 'assistant-1', role: 'assistant', timestamp: '2026-10-10T00:00:00.000Z',
+        metadata: { turnId: 'turn-1', status: 'interrupted', interrupted: true },
+        parts: [{ type: 'text', id: 'text-1', text: 'what I found so far' }],
+      }],
+    })
+
+    const observed = await observeNativeCompletion({
+      source: box,
+      admissionStore: store(),
+      executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 1_800_000, now: 2_000_000,
+    })
+
+    expect(observed).toMatchObject({
+      state: 'failed',
+      receipt: { text: 'what I found so far', error: 'runtime stopped', completedTurnIds: ['turn-1'] },
+    })
+    const sessions = (box.session as ReturnType<typeof vi.fn>).mock.results.map((result) => result.value)
+    // The execution's event stream grows with the run; only the turn's own messages are read.
+    for (const session of sessions) expect(session.result).not.toHaveBeenCalled()
+    expect(sessions.flatMap((session) => session.messages.mock.calls)).toEqual([[{ limit: 1_000, since: 1_200_000 }]])
+  })
+
+  it('reads a completed turn from messages since its registration', async () => {
+    const box = source({
+      status: { id: 'session-1', status: 'completed', latestExecutionId: 'turn-1' },
+      runs: [{ executionId: 'turn-1', sessionId: 'session-1', status: 'completed', startedAt: 1, completedAt: 2, eventCount: 3, lastEventId: '3' }],
+      completed: { turnId: 'turn-1', sessionId: 'session-1', result: { response: 'answer' } },
+    })
+
+    await observeNativeCompletion({
+      source: box,
+      admissionStore: store(),
+      executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 1_800_000, now: 2_000_000,
+    })
+
+    const sessions = (box.session as ReturnType<typeof vi.fn>).mock.results.map((result) => result.value)
+    expect(sessions.flatMap((session) => session.messages.mock.calls)).toEqual([[{ limit: 1_000, since: 1_200_000 }]])
+  })
+
+  it('fits a long turn inside the Workflow step and D1 row limits without touching the answer', () => {
+    const answer = 'The shortlist and four drafts are ready.'
+    const receipt = {
+      state: 'completed' as const,
+      text: answer,
+      usage: {},
+      completedTurnIds: ['turn-1'],
+      parts: [
+        ...Array.from({ length: 300 }, (_, index) => ({
+          type: 'tool', id: `tool-${index}`, tool: 'bash',
+          state: { status: 'completed', input: { command: `step ${index}` }, output: 'x'.repeat(10_000) },
+        })),
+        { type: 'reasoning', id: 'reasoning-1', text: 'r'.repeat(50_000) },
+        { type: 'text', id: 'text-1', text: answer },
+      ],
+    }
+
+    const bounded = boundNativeCompletionReceipt(receipt)
+
+    expect(new TextEncoder().encode(JSON.stringify(bounded)).length).toBeLessThanOrEqual(NATIVE_COMPLETION_RECEIPT_MAX_BYTES)
+    expect(bounded.text).toBe(answer)
+    expect(bounded.parts.at(-1)).toEqual({ type: 'text', id: 'text-1', text: answer })
+    expect(bounded.parts).toHaveLength(302)
+    const tool = bounded.parts[0] as { state: { status: string; input: unknown; output: string; metadata: Record<string, unknown> } }
+    expect(tool.state).toMatchObject({ status: 'completed', input: { command: 'step 0' }, metadata: { receiptTruncated: true } })
+    expect(tool.state.output).toContain('the Sandbox session keeps the full value')
+  })
+
+  it('returns a receipt under the budget unchanged', () => {
+    const receipt = { state: 'completed' as const, text: 'short', parts: [{ type: 'text', text: 'short' }], usage: {}, completedTurnIds: ['turn-1'] }
+    expect(boundNativeCompletionReceipt(receipt)).toBe(receipt)
   })
 })

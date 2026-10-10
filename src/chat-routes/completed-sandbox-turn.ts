@@ -33,6 +33,10 @@ export type CompletedSandboxTurnSource = Pick<
 export interface ReadCompletedSandboxTurnOptions {
   turnId: string
   sessionId: string
+  /** Read only session messages newer than this Unix-ms time. A long session
+   *  holds more than one page of messages, oldest first, so an unbounded read
+   *  both grows with the session and can miss the newest turn. */
+  since?: number
   log?: (message: string, meta?: Record<string, unknown>) => void
 }
 
@@ -209,7 +213,7 @@ export async function readCompletedSandboxTurn(
   const session = box.session(sessionId)
   const [cacheOutcome, messagesOutcome] = await Promise.allSettled([
     box.findCompletedTurn(turnId, { sessionId }),
-    session.messages({ limit: 1_000 }),
+    session.messages({ limit: 1_000, ...(options.since !== undefined ? { since: options.since } : {}) }),
   ])
 
   if (cacheOutcome.status === 'rejected') {

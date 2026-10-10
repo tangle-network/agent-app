@@ -72,7 +72,7 @@ describe('runNativeCompletionWorkflow', () => {
     })
 
     expect(prepare).toHaveBeenCalledWith(payload, receipt)
-    expect(order).toEqual(['prepare', 'persist', 'settle', 'finalize', 'release'])
+    expect(order).toEqual(['persist', 'prepare', 'persist', 'settle', 'finalize', 'release'])
     expect(calls).toEqual([
       'native-completion:observe:drive:0',
       'native-completion:observe:settle',
@@ -129,11 +129,13 @@ describe('runNativeCompletionWorkflow', () => {
     })).resolves.toEqual(settledReceipt)
 
     expect(persistTranscript).toHaveBeenNthCalledWith(1, payload, initialReceipt)
-    expect(persistTranscript).toHaveBeenNthCalledWith(2, payload, settledReceipt, 'assistant:turn-1')
+    expect(persistTranscript).toHaveBeenNthCalledWith(2, payload, initialReceipt)
+    expect(persistTranscript).toHaveBeenNthCalledWith(3, payload, settledReceipt, 'assistant:turn-1')
     expect(transcriptRows).toEqual(new Map([['assistant:turn-1', settledReceipt]]))
     expect(transcriptRows.size).toBe(1)
     expect(finalizeBuffer).toHaveBeenCalledWith(payload, settledReceipt, 'assistant:turn-1')
     expect(order).toEqual([
+      'persist:completed:assistant:turn-1',
       'persist:completed:assistant:turn-1',
       'settle',
       'persist:failed:assistant:turn-1',
@@ -187,14 +189,16 @@ describe('runNativeCompletionWorkflow', () => {
     await expect(runNativeCompletionWorkflow(options)).resolves.toEqual(settledReceipt)
 
     expect(options.observe).toHaveBeenCalledTimes(1)
-    expect(persistTranscript).toHaveBeenCalledTimes(2)
+    expect(persistTranscript).toHaveBeenCalledTimes(3)
     expect(persistTranscript).toHaveBeenNthCalledWith(1, payload, initialReceipt)
-    expect(persistTranscript).toHaveBeenNthCalledWith(2, payload, settledReceipt, 'assistant:turn-1')
+    expect(persistTranscript).toHaveBeenNthCalledWith(2, payload, initialReceipt)
+    expect(persistTranscript).toHaveBeenNthCalledWith(3, payload, settledReceipt, 'assistant:turn-1')
     expect(settle).toHaveBeenCalledTimes(2)
     expect(finalizeBuffer).toHaveBeenCalledTimes(1)
     expect(finalizeBuffer).toHaveBeenCalledWith(payload, settledReceipt, 'assistant:turn-1')
     expect(releaseLock).toHaveBeenCalledTimes(1)
     expect(order).toEqual([
+      'persist:completed:assistant:turn-1',
       'persist:completed:assistant:turn-1',
       'settle:1',
       'settle:2',
@@ -221,5 +225,79 @@ describe('runNativeCompletionWorkflow', () => {
       'native-completion:finalize-buffer',
       'native-completion:release-lock',
     ])
+  })
+
+  it('keeps the observed answer when preparation and every later step fail', async () => {
+    const { step } = workflowStep()
+    const receipt = { state: 'completed' as const, text: 'the answer', parts: [{ type: 'text', text: 'the answer' }], usage: {}, completedTurnIds: ['turn-1'] }
+    const transcriptRows = new Map<string, typeof receipt>()
+    const releaseLock = vi.fn(async () => {})
+
+    await expect(runNativeCompletionWorkflow({
+      event: { payload }, step,
+      observe: async () => ({ state: 'completed' as const, receipt }),
+      prepare: async () => { throw new Error('artifact promotion failed') },
+      persistTranscript: async (_payload, nextReceipt) => {
+        transcriptRows.set('assistant:turn-1', nextReceipt)
+        return 'assistant:turn-1'
+      },
+      settle: async () => {},
+      releaseLock,
+    })).rejects.toThrow('artifact promotion failed')
+
+    expect(transcriptRows.get('assistant:turn-1')).toEqual(receipt)
+    expect(releaseLock).not.toHaveBeenCalled()
+  })
+
+  it('checkpoints the answer inside the step that observed it', async () => {
+    const calls: string[] = []
+    const writesByStep: string[] = []
+    let currentStep = ''
+    const step: CloudflareWorkflowStepLike = {
+      do: async <T>(name: string, callback: (context: unknown) => Promise<T>) => {
+        calls.push(name)
+        currentStep = name
+        try { return await callback(undefined) } finally { currentStep = '' }
+      },
+      sleep: async (name: string) => { calls.push(name) },
+    }
+    let passes = 0
+    const receipt = { state: 'failed' as const, text: 'partial', parts: [], usage: {}, error: 'cancelled', completedTurnIds: ['turn-1'] }
+
+    await runNativeCompletionWorkflow({
+      event: { payload }, step,
+      observe: async () => (++passes < 3 ? { state: 'running' as const } : { state: 'failed' as const, receipt }),
+      persistTranscript: async () => { writesByStep.push(currentStep); return 'assistant:turn-1' },
+      settle: async () => {},
+      releaseLock: async () => {},
+    })
+
+    expect(writesByStep).toEqual(['native-completion:observe:drive:2', 'native-completion:persist-transcript'])
+  })
+
+  it('polls a long turn less often, so its step count stays far under the Workflow limit', async () => {
+    const seconds = (duration: string | number) => (typeof duration === 'number' ? duration / 1000 : Number(duration.split(' ')[0]))
+    const sleeps: number[] = []
+    let elapsedSeconds = 0
+    let steps = 0
+    const step: CloudflareWorkflowStepLike = {
+      do: async <T>(_name: string, callback: (context: unknown) => Promise<T>) => { steps += 1; return callback(undefined) },
+      sleep: async (_name: string, duration) => { steps += 1; sleeps.push(seconds(duration)); elapsedSeconds += seconds(duration) },
+    }
+    const done = { state: 'completed' as const, receipt: { state: 'completed' as const, text: 'done', parts: [], usage: {}, completedTurnIds: ['turn-1'] } }
+
+    // A turn that runs for six hours.
+    await runNativeCompletionWorkflow({
+      event: { payload }, step,
+      observe: async () => (elapsedSeconds < 6 * 3600 ? { state: 'running' as const } : done),
+      persistTranscript: async () => 'assistant:turn-1',
+      settle: async () => {},
+      releaseLock: async () => {},
+    })
+
+    expect(sleeps.slice(0, 24)).toEqual(Array(24).fill(5))
+    expect(sleeps.at(-1)).toBe(30)
+    // A fixed 5 s wait would take 8,640 steps here; Cloudflare allows 10,000.
+    expect(steps).toBeLessThan(1_700)
   })
 })
