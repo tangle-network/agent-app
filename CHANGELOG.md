@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.40
+
+- fix(sandbox): wait out a not-ready box and a refused dispatch under one policy (#936)
+
 ## 0.60.39
 
 - fix(sandbox): a reused box gets one longer liveness probe before a restart ends its sessions (#935)
