@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.25
+
+- fix(hub-approvals): fit the transcript row on a phone and drop an account that repeats the provider (#919)
+
 ## 0.60.24
 
 - feat(hub-approvals): name ph0ny voice agents and voice clones in plain words (#917)
