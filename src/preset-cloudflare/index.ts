@@ -60,6 +60,8 @@ export {
 
 export {
   runDetachedTurnWorkflowTick,
+  SANDBOX_TRANSIENT_TICK_POLICY,
+  type DetachedTurnTransientPolicy,
   type CloudflareWorkflowEventLike,
   type CloudflareWorkflowSleepDuration,
   type CloudflareWorkflowStepLike,

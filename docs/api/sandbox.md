@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-189 exports.
+198 exports.
 
 ### `adaptSandboxStream`
 
@@ -132,6 +132,14 @@ interface BuildSandboxToolFileMountsOptions
 
 ```ts
 (options: SandboxToolPathOptions) => string
+```
+
+### `classifySandboxTransientFailure`
+
+`function` — The typed transient failure `error` carries anywhere in its cause chain, or null.
+
+```ts
+(error: unknown) => SandboxTransientFailure | null
 ```
 
 ### `classifySeveredStream`
@@ -806,6 +814,14 @@ interface ResolveSandboxClientCredentialsOptions
 (shell: SandboxPromptConfig, options: StreamSandboxPromptOptions, operation?: string) => Promise<{ interactions?: { que…
 ```
 
+### `retrySandboxTransient`
+
+`function` — Run `attempt` until it succeeds, it fails with something this policy does not consider transient, or a transient failure outlasts the deadline.
+
+```ts
+<T>(attempt: () => Promise<T>, options?: SandboxTransientRetryOptions) => Promise<T>
+```
+
 ### `runForegroundSandboxSingleFlight`
 
 `function` — Run one foreground provision or adopt the ready result from its current owner.
@@ -852,6 +868,22 @@ interface SafeSandboxErrorDiagnostics
 
 ```ts
 "BACKING_CONTAINER_MISSING"
+```
+
+### `SANDBOX_DISPATCH_TRANSIENT_DEADLINE_MS`
+
+`const` — How long a refused dispatch is resent.
+
+```ts
+number
+```
+
+### `SANDBOX_TRANSIENT_DEADLINE_MS`
+
+`const` — How long a transient failure may last before the caller fails.
+
+```ts
+number
 ```
 
 ### `SandboxBuildContext`
@@ -1156,6 +1188,46 @@ interface SandboxToolPathOptions
 
 ```ts
 interface SandboxToolSpec
+```
+
+### `sandboxTransientBackoffMs`
+
+`function` — Wait before retry `attempt` (1-based): 5 s doubling to a 60 s ceiling.
+
+```ts
+(attempt: number) => number
+```
+
+### `SandboxTransientDeadlineError`
+
+`class` — The error a caller raises when a transient failure outlasted the deadline.
+
+```ts
+class SandboxTransientDeadlineError
+```
+
+### `SandboxTransientFailure`
+
+`interface`
+
+```ts
+interface SandboxTransientFailure
+```
+
+### `SandboxTransientFailureCode`
+
+`type`
+
+```ts
+type SandboxTransientFailureCode
+```
+
+### `SandboxTransientRetryOptions`
+
+`interface`
+
+```ts
+interface SandboxTransientRetryOptions
 ```
 
 ### `ScopedTokenResult`

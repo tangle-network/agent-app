@@ -1,5 +1,12 @@
 import type { TurnDriveResult } from '@tangle-network/sandbox'
 import type { Outcome } from '../sandbox/outcome'
+import {
+  SANDBOX_TRANSIENT_DEADLINE_MS,
+  SandboxTransientDeadlineError,
+  classifySandboxTransientFailure,
+  sandboxTransientBackoffMs,
+  type SandboxTransientFailure,
+} from '../sandbox/transient-failure'
 
 /** The stable identity a Workflow reuses on every retry of one turn. */
 export interface DetachedTurnWorkflowIdentity {
@@ -75,6 +82,41 @@ export interface DetachedTurnWorkflowTickOptions<
    *  replayed Workflow takes the same steps. Default: 5 seconds. */
   pollDelay?: CloudflareWorkflowSleepDuration | ((attempt: number) => CloudflareWorkflowSleepDuration)
   stepName?: string
+  /**
+   * Wait out transient Sandbox failures instead of failing the pass. A drive
+   * failure the policy classifies is checkpointed as a running pass, the next
+   * pass waits the policy's backoff, and the tick throws
+   * {@link SandboxTransientDeadlineError} once one transient stretch outlasts
+   * the deadline. Unclassified failures throw from the step as before.
+   * Default: the shared Sandbox transient policy.
+   */
+  transient?: DetachedTurnTransientPolicy | false
+}
+
+/** Which drive failures a tick waits out, and for how long. */
+export interface DetachedTurnTransientPolicy {
+  classify(error: unknown): SandboxTransientFailure | null
+  deadlineMs: number
+  /** Wait before pass `attempt` (1-based) of one transient stretch. */
+  backoffMs(attempt: number): number
+}
+
+/** The shared Sandbox transient policy: 5 s doubling to 60 s, for at most 15 minutes. */
+export const SANDBOX_TRANSIENT_TICK_POLICY: DetachedTurnTransientPolicy = {
+  classify: classifySandboxTransientFailure,
+  deadlineMs: SANDBOX_TRANSIENT_DEADLINE_MS,
+  backoffMs: sandboxTransientBackoffMs,
+}
+
+/** A pass that met a transient failure, as the step checkpoints it. */
+interface TransientPass {
+  state: 'running'
+  transient: SandboxTransientFailure & { at: number }
+}
+
+function transientPass(value: unknown): TransientPass['transient'] | undefined {
+  const transient = (value as Partial<TransientPass> | null)?.transient
+  return transient && typeof transient.at === 'number' && typeof transient.code === 'string' ? transient : undefined
 }
 
 function assertIdentity(payload: DetachedTurnWorkflowIdentity): void {
@@ -130,12 +172,26 @@ export async function runDetachedTurnWorkflowTick<
   const pollDelay = options.pollDelay ?? '5 seconds'
   const delayFor = (attempt: number): CloudflareWorkflowSleepDuration =>
     typeof pollDelay === 'function' ? pollDelay(attempt) : pollDelay
+  const transient = options.transient === false ? undefined : options.transient ?? SANDBOX_TRANSIENT_TICK_POLICY
   let attempt = 0
+  // One stretch of consecutive transient passes. Both come from checkpointed
+  // step results, so a replayed Workflow takes the same waits.
+  let transientSince: number | undefined
+  let transientAttempts = 0
   let terminalResult: DetachedTurnTerminalResult<TResult>
   while (true) {
     const driveResult = checkedDriveResult(await options.step.do<TResult>(`${name}:drive:${attempt}`, async () => {
-      const outcome = await options.drive(payload)
-      if (!outcome.succeeded) throw outcome.error
+      let outcome: DetachedTurnDriveOutcome<TResult>
+      try {
+        outcome = await options.drive(payload)
+      } catch (error) {
+        outcome = { succeeded: false, error: error instanceof Error ? error : new Error(String(error)) }
+      }
+      if (!outcome.succeeded) {
+        const failure = transient?.classify(outcome.error)
+        if (!failure) throw outcome.error
+        return { state: 'running', transient: { ...failure, at: Date.now() } } satisfies TransientPass as unknown as TResult
+      }
       return checkedDriveResult(outcome.value)
     }))
     // Validate replayed values as well, including checkpoints from older code.
@@ -143,7 +199,20 @@ export async function runDetachedTurnWorkflowTick<
       terminalResult = driveResult as DetachedTurnTerminalResult<TResult>
       break
     }
-    await options.step.sleep(`${name}:wait:${attempt}`, delayFor(attempt))
+    const pass = transient ? transientPass(driveResult) : undefined
+    if (pass && transient) {
+      transientSince ??= pass.at
+      transientAttempts += 1
+      const delayMs = transient.backoffMs(transientAttempts)
+      if (pass.at + delayMs - transientSince > transient.deadlineMs) {
+        throw new SandboxTransientDeadlineError(pass, transientSince, transientAttempts)
+      }
+      await options.step.sleep(`${name}:wait:${attempt}`, delayMs)
+    } else {
+      transientSince = undefined
+      transientAttempts = 0
+      await options.step.sleep(`${name}:wait:${attempt}`, delayFor(attempt))
+    }
     attempt += 1
   }
   return options.step.do(`${name}:settle`, () => options.settle(payload, terminalResult))

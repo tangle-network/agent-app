@@ -33,6 +33,11 @@ import {
   type TangleExecutionEnvironment,
 } from '../runtime/model'
 import { ok, fail, type Outcome } from './outcome'
+import {
+  SandboxTransientDeadlineError,
+  classifySandboxTransientFailure,
+  sandboxTransientBackoffMs,
+} from './transient-failure'
 import { fingerprintAgentProfile, type ProfileFingerprint } from '../profile/fingerprint'
 import {
   assertProfilePromptWithinBudget,
@@ -54,6 +59,7 @@ import {
 
 export type { Outcome } from './outcome'
 export * from './binary-read'
+export * from './transient-failure'
 export {
   resolveModel,
   resolveModelSelection,
@@ -3271,6 +3277,50 @@ export async function resolveSandboxPromptBackend(
   }
 }
 
+/**
+ * How long a refused dispatch is resent. Shorter than the completion
+ * Workflow's 10-minute wait for a dispatch to appear, so the request gives up
+ * before that Workflow reports the dispatch missing.
+ */
+export const SANDBOX_DISPATCH_TRANSIENT_DEADLINE_MS = 8 * 60_000
+
+/**
+ * Resend the same execution while the box refuses it with a transient
+ * failure and nothing has been delivered yet. The execution id makes a resend
+ * idempotent; after the first event a failure is the run's own.
+ */
+async function* resendRefusedDispatch(
+  dispatch: () => AsyncIterable<unknown>,
+  signal: AbortSignal | undefined,
+): AsyncGenerator<unknown> {
+  let delivered = false
+  let firstSeenAt: number | undefined
+  for (let attempts = 1; ; attempts += 1) {
+    try {
+      for await (const event of dispatch()) {
+        delivered = true
+        yield event
+      }
+      return
+    } catch (error) {
+      const failure = delivered ? null : classifySandboxTransientFailure(error)
+      if (!failure || failure.code === 'sandbox.control_plane_transient') throw error
+      const at = Date.now()
+      firstSeenAt ??= at
+      const delayMs = sandboxTransientBackoffMs(attempts)
+      if (at + delayMs - firstSeenAt > SANDBOX_DISPATCH_TRANSIENT_DEADLINE_MS) {
+        throw new SandboxTransientDeadlineError(failure, firstSeenAt, attempts, error)
+      }
+      console.warn('[sandbox] resending a dispatch the box refused', { code: failure.code, attempt: attempts, delayMs })
+      await new Promise<void>((resolve, reject) => {
+        if (signal?.aborted) return reject(signal.reason)
+        const timer = setTimeout(resolve, delayMs)
+        signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason) }, { once: true })
+      })
+    }
+  }
+}
+
 /** Resolve and stream AI-generated responses from a sandboxed environment based on input messages and options */
 export async function* streamSandboxPrompt(
   shell: SandboxRuntimeConfig,
@@ -3284,7 +3334,7 @@ export async function* streamSandboxPrompt(
       ? flattenHistory(message, options?.history)
       : mergeHistoryIntoParts(message, options?.history)
 
-  const stream = options?.detach
+  const dispatch = () => options?.detach
     ? detachedSandboxPromptEvents(box, prompt, options, backend)
     : box.streamPrompt(prompt, {
         sessionId: options?.sessionId,
@@ -3305,6 +3355,7 @@ export async function* streamSandboxPrompt(
           : {}),
         backend,
       } as StreamPromptOptions)
+  const stream = options?.lastEventId ? dispatch() : resendRefusedDispatch(dispatch, options?.signal)
 
   emitSandboxActivity(options?.spend, box)
   let severedFinishReason: string | null = null

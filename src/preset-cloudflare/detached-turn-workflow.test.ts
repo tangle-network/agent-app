@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SandboxTransientDeadlineError } from '../sandbox/transient-failure'
 import {
   runDetachedTurnWorkflowTick,
   type CloudflareWorkflowStepLike,
@@ -148,4 +149,104 @@ describe('runDetachedTurnWorkflowTick', () => {
     expect(workflow.doStep).not.toHaveBeenCalled()
     expect(drive).not.toHaveBeenCalled()
   })
+
+  describe('transient Sandbox failures', () => {
+    afterEach(() => { vi.useRealTimers() })
+
+    /** A step whose sleep moves the clock, so passes see the time a Workflow would. */
+    function clockStep() {
+      const workflow = step()
+      workflow.sleep.mockImplementation(async (_name: string, duration: string | number) => {
+        vi.setSystemTime(Date.now() + Number(duration))
+      })
+      return workflow
+    }
+    const notReady = () => Object.assign(new Error('Sandbox filesystem incarnation is not ready'), {
+      name: 'StateError', code: 'FILESYSTEM_INCARNATION_NOT_READY',
+    })
+
+    it('waits out an eight-minute not-ready window and settles the turn', async () => {
+      // GTM's busiest box answered not-ready from 10:37 to 10:45 UTC on
+      // 2026-10-10; two completion Workflows failed five minutes in.
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2026-10-10T10:37:04Z'))
+      const recoveredAt = Date.parse('2026-10-10T10:45:00Z')
+      const workflow = clockStep()
+      const drive = vi.fn(async (): Promise<DetachedTurnDriveOutcome> => {
+        if (Date.now() < recoveredAt) throw notReady()
+        return { succeeded: true, value: { state: 'completed', text: 'done', result: {} } }
+      })
+      const settle = vi.fn(async (_payload: unknown, result: DetachedTurnTerminalResult) => result.state)
+
+      await expect(runDetachedTurnWorkflowTick({
+        event: { payload: { sessionId: 'session-1', turnId: 'turn-1' } },
+        step: workflow.value,
+        drive,
+        settle,
+      })).resolves.toBe('completed')
+
+      const waits = workflow.sleep.mock.calls.map(([, duration]) => duration)
+      expect(waits.slice(0, 6)).toEqual([5_000, 10_000, 20_000, 40_000, 60_000, 60_000])
+      expect(waits.every((duration) => Number(duration) <= 60_000)).toBe(true)
+      expect(Date.now()).toBeGreaterThanOrEqual(recoveredAt)
+      expect(Date.now() - recoveredAt).toBeLessThanOrEqual(60_000)
+      expect(settle).toHaveBeenCalledTimes(1)
+    })
+
+    it('fails with a typed error once one not-ready stretch outlasts fifteen minutes', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      const startedAt = Date.parse('2026-10-10T10:37:04Z')
+      vi.setSystemTime(startedAt)
+      const workflow = clockStep()
+      const drive = vi.fn(async (): Promise<DetachedTurnDriveOutcome> => { throw notReady() })
+      const settle = vi.fn()
+
+      const failure = await runDetachedTurnWorkflowTick({
+        event: { payload: { sessionId: 'session-1', turnId: 'turn-1' } },
+        step: workflow.value,
+        drive,
+        settle,
+      }).catch((error: unknown) => error)
+
+      expect(failure).toBeInstanceOf(SandboxTransientDeadlineError)
+      expect(failure).toMatchObject({ code: 'sandbox.filesystem_not_ready', firstSeenAt: startedAt })
+      expect(Date.now() - startedAt).toBeGreaterThan(14 * 60_000)
+      expect(Date.now() - startedAt).toBeLessThanOrEqual(15 * 60_000)
+      expect(settle).not.toHaveBeenCalled()
+    })
+
+    it('starts a new stretch after a pass the Sandbox answers', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2026-10-10T10:37:04Z'))
+      const workflow = clockStep()
+      const passes: Array<'not-ready' | 'running' | 'completed'> = ['not-ready', 'not-ready', 'running', 'not-ready', 'completed']
+      const drive = vi.fn(async (): Promise<DetachedTurnDriveOutcome> => {
+        const next = passes.shift()!
+        if (next === 'not-ready') throw notReady()
+        return { succeeded: true, value: next === 'running' ? { state: 'running', elapsedMs: 1 } : { state: 'completed', text: 'done', result: {} } }
+      })
+
+      await runDetachedTurnWorkflowTick({
+        event: { payload: { sessionId: 'session-1', turnId: 'turn-1' } },
+        step: workflow.value,
+        drive,
+        settle: async () => 'settled',
+      })
+
+      expect(workflow.sleep.mock.calls.map(([, duration]) => duration)).toEqual([5_000, 10_000, '5 seconds', 5_000])
+    })
+
+    it('throws an unclassified failure from the step when the policy is off', async () => {
+      const workflow = step()
+      const error = notReady()
+      await expect(runDetachedTurnWorkflowTick({
+        event: { payload: { sessionId: 'session-1', turnId: 'turn-1' } },
+        step: workflow.value,
+        drive: async () => ({ succeeded: false as const, error }),
+        settle: vi.fn(),
+        transient: false,
+      })).rejects.toBe(error)
+    })
+  })
 })
+

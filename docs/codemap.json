@@ -11836,6 +11836,12 @@
           "doc": "The terminal result passed to product settlement."
         },
         {
+          "name": "DetachedTurnTransientPolicy",
+          "kind": "interface",
+          "signature": "interface DetachedTurnTransientPolicy",
+          "doc": "Which drive failures a tick waits out, and for how long."
+        },
+        {
           "name": "DetachedTurnWorkflowIdentity",
           "kind": "interface",
           "signature": "interface DetachedTurnWorkflowIdentity",
@@ -11930,6 +11936,12 @@
           "kind": "function",
           "signature": "<TPayload extends NativeCompletionWorkflowPayload, TMessageId>(options: NativeCompletionWorkflowOptions<TPayload, TMess…",
           "doc": "Drive exact observation through durable retry steps, then run the terminal sequence once."
+        },
+        {
+          "name": "SANDBOX_TRANSIENT_TICK_POLICY",
+          "kind": "const",
+          "signature": "DetachedTurnTransientPolicy",
+          "doc": "The shared Sandbox transient policy: 5 s doubling to 60 s, for at most 15 minutes."
         },
         {
           "name": "VaultKv",
@@ -13962,6 +13974,12 @@
           "doc": "Build a shell script that creates the sandbox tool binary directory."
         },
         {
+          "name": "classifySandboxTransientFailure",
+          "kind": "function",
+          "signature": "(error: unknown) => SandboxTransientFailure | null",
+          "doc": "The typed transient failure `error` carries anywhere in its cause chain, or null."
+        },
+        {
           "name": "classifySeveredStream",
           "kind": "function",
           "signature": "(event: unknown) => SandboxStepTransition | null",
@@ -14466,6 +14484,12 @@
           "doc": "Prepare one effective backend for SDK dispatch or product-specific transport."
         },
         {
+          "name": "retrySandboxTransient",
+          "kind": "function",
+          "signature": "<T>(attempt: () => Promise<T>, options?: SandboxTransientRetryOptions) => Promise<T>",
+          "doc": "Run `attempt` until it succeeds, it fails with something this policy does not consider transient, or a transient failure outlasts the deadline."
+        },
+        {
           "name": "runForegroundSandboxSingleFlight",
           "kind": "function",
           "signature": "<T>(options: ForegroundSandboxSingleFlightOptions<T>) => Promise<T>",
@@ -14500,6 +14524,18 @@
           "kind": "const",
           "signature": "\"BACKING_CONTAINER_MISSING\"",
           "doc": "Machine-readable code emitted when resume lost the physical box."
+        },
+        {
+          "name": "SANDBOX_DISPATCH_TRANSIENT_DEADLINE_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "How long a refused dispatch is resent."
+        },
+        {
+          "name": "SANDBOX_TRANSIENT_DEADLINE_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "How long a transient failure may last before the caller fails."
         },
         {
           "name": "SandboxBuildContext",
@@ -14728,6 +14764,36 @@
           "kind": "interface",
           "signature": "interface SandboxToolSpec",
           "doc": "Define the specification for a sandbox tool including its name, content, and optional executability"
+        },
+        {
+          "name": "sandboxTransientBackoffMs",
+          "kind": "function",
+          "signature": "(attempt: number) => number",
+          "doc": "Wait before retry `attempt` (1-based): 5 s doubling to a 60 s ceiling."
+        },
+        {
+          "name": "SandboxTransientDeadlineError",
+          "kind": "class",
+          "signature": "class SandboxTransientDeadlineError",
+          "doc": "The error a caller raises when a transient failure outlasted the deadline."
+        },
+        {
+          "name": "SandboxTransientFailure",
+          "kind": "interface",
+          "signature": "interface SandboxTransientFailure",
+          "doc": null
+        },
+        {
+          "name": "SandboxTransientFailureCode",
+          "kind": "type",
+          "signature": "type SandboxTransientFailureCode",
+          "doc": null
+        },
+        {
+          "name": "SandboxTransientRetryOptions",
+          "kind": "interface",
+          "signature": "interface SandboxTransientRetryOptions",
+          "doc": null
         },
         {
           "name": "ScopedTokenResult",
