@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.47
+
+- fix(native-completion): renew an admission only while the ledger shows its run live (#943)
+
 ## 0.60.46
 
 - fix(native-completion): a run the runtime restarted under settles with its partial reply (#942)
