@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.50
+
+- fix(chat-routes): authorize a progress-first turn before its stream opens (#947)
+
 ## 0.60.49
 
 - fix(chat-routes): read a progress-first turn's body before its stream opens (#945)
