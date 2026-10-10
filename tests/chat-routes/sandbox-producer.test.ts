@@ -649,6 +649,27 @@ describe('createSandboxChatProducer', () => {
     ])
   })
 
+  it('declines an ask by its content, with the product’s notice', async () => {
+    const declineInteraction = vi.fn(async () => {})
+    const approve = {
+      type: 'interaction',
+      data: { request: buildInteractionRequest({ id: 'q-2', kind: 'question', title: 'Approve the pending request?', answerSpec: { fields: [] } }) },
+    }
+    const producer = createSandboxChatProducer({
+      events: feed([interaction('q-1', 'question'), approve]),
+      isRenderableInteraction: (kind, request) => kind === 'question' && !/approve/i.test(request.title),
+      declinedNotice: (request) => `Skipped "${request.title}": the approval dock decides it.`,
+      declineInteraction,
+      log: () => {},
+    })
+    const events = await drain(producer.stream)
+    expect(events).toEqual([
+      interaction('q-1', 'question'),
+      { type: 'notice', id: 'auto-declined-q-2', noticeKind: 'auto-declined', text: 'Skipped "Approve the pending request?": the approval dock decides it.' },
+    ])
+    expect(declineInteraction).toHaveBeenCalledWith('q-2')
+  })
+
   it('persists and emits the failed auto-decline notice when decline throws', async () => {
     const producer = createSandboxChatProducer({
       events: feed([interaction('p-2', 'permission')]),

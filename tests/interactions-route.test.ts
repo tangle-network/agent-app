@@ -258,6 +258,14 @@ describe('createInteractionAnswerRoute answer', () => {
     expect(sidecar.calls.map((call) => call.method)).toEqual(['GET', 'POST', 'GET'])
   })
 
+  it('takes one choice of a select as a plain string, the way an operator sends it', async () => {
+    const sidecar = fakeSidecar([wireQuestion('ask-1')])
+    const route = routeFor(sidecar)
+    const response = await route.answer(answerRequest({ id: 'ask-1', outcome: 'accepted', data: { q0: 'Formal' } }))
+    expect(response.status).toBe(200)
+    expect(sidecar.calls.find((call) => call.method === 'POST')?.body).toEqual({ id: 'ask-1', outcome: 'accepted', data: { q0: ['Formal'] } })
+  })
+
   it('answers content-identical duplicate asks with the same answer', async () => {
     const sidecar = fakeSidecar([
       wireQuestion('ask-1'),

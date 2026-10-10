@@ -23,6 +23,7 @@ import {
   noticePartKey,
   parseInteractionCancel,
   parseInteractionRequest,
+  type InteractionRequestWire,
 } from '../interactions/contract'
 import {
   parsePlanSubmittedEvent,
@@ -154,8 +155,12 @@ export interface SandboxChatProducerOptions {
    *  auto-declined (see `declineInteraction`) so the run never hangs in the
    *  broker waiting on a card no client will show. Default: question/plan.
    *  Products with per-turn plan mode can close over it without another option:
-   *  `(kind) => kind === 'question' || (kind === 'plan' && planEnabled)`. */
-  isRenderableInteraction?: (kind: string) => boolean
+   *  `(kind) => kind === 'question' || (kind === 'plan' && planEnabled)`.
+   *  The parsed request lets a product decline an ask by its content, such
+   *  as a question that duplicates a decision the product already shows. */
+  isRenderableInteraction?: (kind: string, request: InteractionRequestWire) => boolean
+  /** The transcript notice for an auto-declined ask; defaults to a policy line naming its kind. */
+  declinedNotice?: (request: InteractionRequestWire, declineFailed: boolean) => string
   /** Resolve a non-renderable ask (wire `respondToSessionInteraction` with the
    *  session's sidecar connection). Without it, a failure notice is emitted and
    *  the run stays blocked until the broker times out. */
@@ -709,7 +714,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             log('[chat-routes] dropping malformed interaction event', { error: parsed.error })
             continue
           }
-          if (renderable(parsed.value.kind)) {
+          if (renderable(parsed.value.kind, parsed.value)) {
             recordPersistedPart(
               interactionToPersistedPart(parsed.value, 'pending'),
               undefined,
@@ -738,9 +743,9 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
               kind: parsed.value.kind,
             })
           }
-          const text = declineFailed
+          const text = options.declinedNotice?.(parsed.value, declineFailed) ?? (declineFailed
             ? `The agent requested ${parsed.value.kind} approval; declining it failed — it will expire on its own.`
-            : `The agent requested ${parsed.value.kind} approval — auto-declined by policy.`
+            : `The agent requested ${parsed.value.kind} approval — auto-declined by policy.`)
           const notice = noticePart('auto-declined', `auto-declined-${parsed.value.id}`, text)
           recordPersistedPart(notice, undefined, noticePartKey(notice.id))
           yield { type: 'notice', id: notice.id, noticeKind: 'auto-declined', text }

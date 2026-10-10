@@ -79,6 +79,13 @@ export function validateInteractionAnswerBody(body: Record<string, unknown>): In
   return { ok: true, id, outcome, data }
 }
 
+/** Wrap a plain-string answer to a select field as the one-choice array the sidecar accepts. */
+function selectAnswersAsArrays(request: InteractionRequestWire, data: InteractionData): InteractionData {
+  const selects = new Set(request.answerSpec.fields.filter((field) => field.type === 'select').map((field) => field.name))
+  return Object.fromEntries(Object.entries(data).map(([key, value]) =>
+    [key, selects.has(key) && typeof value === 'string' ? [value] : value])) as InteractionData
+}
+
 /** How big the POST body may be before the route refuses to parse it. An
  *  answer carries an interaction id, an outcome, and field values — 64 KiB is
  *  generous; refusing larger bodies before parsing bounds per-request memory
@@ -261,10 +268,6 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
       )
     }
     const connection = resolution.connection
-    const answerPayload = {
-      outcome: validation.outcome,
-      ...(validation.data ? { data: validation.data } : {}),
-    }
 
     // Snapshot the answered ask's content signature BEFORE resolving it, so any
     // content-identical duplicates still outstanding afterwards (the agent may
@@ -280,6 +283,13 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
         logger,
       )
     }
+    // A select answer is a string array on the wire; a caller that sends one
+    // choice as a plain string means that choice.
+    const data = validation.data && answeredRequest ? selectAnswersAsArrays(answeredRequest, validation.data) : validation.data
+    const answerPayload = {
+      outcome: validation.outcome,
+      ...(data ? { data } : {}),
+    }
     const answeredSignature = answeredRequest
       ? questionInteractionContentSignature(interactionFromWireRequest(answeredRequest))
       : null
@@ -292,7 +302,7 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
     const lifecycleArgs: BeforeInteractionAnswerArgs = {
       request,
       body,
-      answer: validation,
+      answer: { ...validation, ...(data ? { data } : {}) },
       connection,
       outstanding: before.succeeded ? before.value : [],
       ...(answeredRequest ? { answeredRequest } : {}),

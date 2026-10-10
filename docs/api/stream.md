@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-58 exports.
+59 exports.
 
 ### `asRecord`
 
@@ -72,7 +72,7 @@ interface BufferedTurnTap
 
 ### `coalesceDeltas`
 
-`function` — Merge consecutive text/reasoning deltas of the same type into one event.
+`function` — Merge text and reasoning deltas of the same type into one event, across the live-state events a harness interleaves with them, and keep only the latest of each live-state event.
 
 ```ts
 (events: unknown[]) => unknown[]
@@ -104,7 +104,7 @@ interface ConsumeTurnStreamOptions
 
 ### `createBufferedTurnTap`
 
-`function` — The buffering core.
+`function`
 
 ```ts
 (opts: BufferedTurnOptions) => BufferedTurnTap
@@ -196,6 +196,14 @@ number
 
 ```ts
 (part: JsonRecord) => string
+```
+
+### `isLiveProgressEvent`
+
+`function` — Whether an event only projects live progress, so it may wait for the flush window and be coalesced.
+
+```ts
+(ev: unknown) => boolean
 ```
 
 ### `JsonRecord`
