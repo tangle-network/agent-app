@@ -23,14 +23,12 @@ export default defineConfig({
     // vite stub the CSS import instead of node rejecting the extension (the
     // same fix every fleet app on sandbox-ui carries in ITS vitest config).
     server: { deps: { inline: [/@tangle-network\/sandbox-ui/] } },
-    // Run test FILES one at a time. Parallel forks each load the full module
-    // graph (React, TipTap, drizzle, better-sqlite3, konva) and accumulate heap
-    // across the files they own; serializing bounds peak RSS to a single file
-    // (~0.7GB vs ~3.5GB fanned out) and removes the CPU contention that
-    // intermittently failed real-timer tests. The suite is small, so the
-    // sequential wall-time cost is only a few seconds.
+    // Files run in 8 parallel forks. Each fork loads the full module
+    // graph (React, TipTap, drizzle, better-sqlite3, konva), about 0.7 GB, so the
+    // fork count bounds peak RSS; one fork at a time made the suite several
+    // times slower.
     pool: 'forks',
-    fileParallelism: false,
+    maxWorkers: 8,
     execArgv: ['--max-old-space-size=4096'],
   },
 })
