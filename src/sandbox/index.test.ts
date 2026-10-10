@@ -1016,6 +1016,26 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     }
   })
 
+  it('keeps a busy reused box that misses the short probe but answers a longer one, without a restart', async () => {
+    const exec = vi.fn()
+      .mockRejectedValueOnce(new Error('exec timed out'))
+      .mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
+    const busy = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, exec } as Partial<SandboxInstance>)
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([busy]) : Promise.resolve([]),
+    )
+    const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, { livenessProbe: {} })
+
+    const box = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
+
+    // A restart would have ended every session on the box.
+    expect(box).toBe(busy)
+    expect(busy.stop).not.toHaveBeenCalled()
+    expect(exec.mock.calls.slice(0, 2).map(([command, options]) => [command, (options as { timeoutMs: number }).timeoutMs]))
+      .toEqual([['echo alive', 5000], ['echo alive', 30000]])
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
   it('restarts (not deletes) a reused box whose liveness probe fails, and returns it once healthy', async () => {
     let restarted = false
     const del = vi.fn().mockResolvedValue(undefined)

@@ -1707,6 +1707,8 @@ async function isBoxAlive(
 }
 
 const DEFAULT_LIVENESS_CACHE_TTL_MS = 5_000
+/** The second, longer probe a reused box gets before a restart would end its sessions. */
+const PATIENT_LIVENESS_EXEC_TIMEOUT_MS = 30_000
 
 function hasRecentLivenessVerification(
   box: SandboxInstance,
@@ -2024,6 +2026,19 @@ async function recoverUnresponsiveBox(
   runtimeEnv: Record<string, string>,
   onProgress?: (event: ProvisionEvent) => void,
 ): Promise<SandboxInstance> {
+  // The stop below ends every session on the box, and a box that is busy with
+  // other sessions can miss a short probe while being healthy. A box whose
+  // runtime is reachable gets one longer probe first, and is kept if it answers.
+  if (probe && sandboxRuntimeUrl(box) && !sandboxEdgeFailed(box)) {
+    const patient = await isBoxAlive(box, {
+      ...probe,
+      execTimeoutMs: Math.max(PATIENT_LIVENESS_EXEC_TIMEOUT_MS, probe.execTimeoutMs ?? 0),
+    })
+    if (patient.succeeded) {
+      livenessVerifiedAt.set(box.id, Date.now())
+      return box
+    }
+  }
   try {
     await box.stop()
   } catch (err) {
