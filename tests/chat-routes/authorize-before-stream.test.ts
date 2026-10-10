@@ -74,6 +74,7 @@ function makeRoutes(
     turnStore: h.turnStore,
     incrementalPersistence: false,
     turnLock: {
+      warm: () => { h.touches.push('lock.warm') },
       acquire: () => { h.touches.push('lock.acquire'); return { acquired: true as const, handle: 'lock' } },
       release: () => { h.touches.push('lock.release') },
     },
@@ -144,7 +145,7 @@ describe.each([
     await response.text()
     await Promise.all(h.pending)
     const order = h.touches.filter((touch) => touch !== 'waitUntil' && !touch.startsWith('turnStore.'))
-    expect(order.slice(0, 3)).toEqual(['prepareTurn', 'store.listMessages', 'lock.acquire'])
+    expect(order.slice(0, 4)).toEqual(['lock.warm', 'prepareTurn', 'store.listMessages', 'lock.acquire'])
     expect(order).toContain('produce')
   })
 
@@ -159,7 +160,7 @@ describe.each([
     await Promise.all(h.pending)
     expect(settled.status).toBe(400)
     expect(await settled.json()).toEqual({ error: 'Unknown agent profile' })
-    expect(h.touches.filter((touch) => touch !== 'waitUntil')).toEqual(['prepareTurn'])
+    expect(h.touches.filter((touch) => touch !== 'waitUntil')).toEqual(['lock.warm', 'prepareTurn'])
   })
 })
 
