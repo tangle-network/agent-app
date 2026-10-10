@@ -244,6 +244,22 @@ describe('shared companion defaults', () => {
     expect(renderAgent).not.toHaveBeenCalled()
   })
 
+  it('puts Approvals first and counts what waits, hiding a zero count', () => {
+    const { rerender } = render(
+      <AgentWorkspaceCompanion tools={{ files: () => <p>Files</p>, approvals: () => <p>Approval list</p> }} toolBadges={{ approvals: 2 }} defaultOpen>
+        <p>Chat</p>
+      </AgentWorkspaceCompanion>,
+    )
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Approvals2 waiting', 'Files'])
+    expect(screen.getByText('Approval list')).toBeTruthy()
+    rerender(
+      <AgentWorkspaceCompanion tools={{ files: () => <p>Files</p>, approvals: () => <p>Approval list</p> }} toolBadges={{ approvals: 0 }} defaultOpen>
+        <p>Chat</p>
+      </AgentWorkspaceCompanion>,
+    )
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Approvals', 'Files'])
+  })
+
   it('keeps session navigation functional when no companion tools are available', async () => {
     const user = userEvent.setup()
     function NavigationOnly() {

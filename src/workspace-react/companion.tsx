@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@tangle-network/sandbox-ui/primitives'
 import { WorkspaceLayout } from '@tangle-network/sandbox-ui/workspace'
-import { FlaskConical, FolderOpen, GitCompare, Monitor, Terminal } from 'lucide-react'
+import { FlaskConical, FolderOpen, GitCompare, Monitor, ShieldCheck, Terminal } from 'lucide-react'
 
 export interface AgentWorkspaceCompanionTab {
   id: string
@@ -9,15 +9,18 @@ export interface AgentWorkspaceCompanionTab {
   icon?: ReactNode
   /** Retain a visited tab through tab switches, pane closure, and viewport changes. */
   keepMounted?: boolean
+  /** A count that needs the person, such as approvals waiting. Hidden at zero. */
+  badge?: number
   renderContent: (state: { active: boolean }) => ReactNode
 }
 
-export type AgentWorkspaceCompanionTool = 'files' | 'agent' | 'terminal' | 'changes' | 'preview'
+export type AgentWorkspaceCompanionTool = 'approvals' | 'files' | 'agent' | 'terminal' | 'changes' | 'preview'
 
 /** Supply only tools the product can actually serve. Content remains product-owned. */
 export type AgentWorkspaceCompanionTools = Partial<Record<AgentWorkspaceCompanionTool, AgentWorkspaceCompanionTab['renderContent']>>
 
 const companionTools = [
+  { id: 'approvals', label: 'Approvals', Icon: ShieldCheck },
   { id: 'files', label: 'Files', Icon: FolderOpen },
   { id: 'agent', label: 'Agent', Icon: FlaskConical },
   { id: 'terminal', label: 'Terminal', Icon: Terminal },
@@ -25,11 +28,17 @@ const companionTools = [
   { id: 'preview', label: 'Preview', Icon: Monitor },
 ] as const
 
-/** Canonical order, labels, icons and lazy retention for companion tools. */
-export function createAgentWorkspaceCompanionTabs(tools: AgentWorkspaceCompanionTools): AgentWorkspaceCompanionTab[] {
+/** Canonical order, labels, icons and lazy retention for companion tools; `badges` counts what waits on the person. */
+export function createAgentWorkspaceCompanionTabs(
+  tools: AgentWorkspaceCompanionTools,
+  badges: Partial<Record<AgentWorkspaceCompanionTool, number>> = {},
+): AgentWorkspaceCompanionTab[] {
   return companionTools.flatMap(({ id, label, Icon }) => {
     const renderContent = tools[id]
-    return renderContent ? [{ id, label, icon: <Icon className="h-3.5 w-3.5" aria-hidden />, keepMounted: true, renderContent }] : []
+    const badge = badges[id]
+    return renderContent
+      ? [{ id, label, icon: <Icon className="h-3.5 w-3.5" aria-hidden />, keepMounted: true, renderContent, ...(badge ? { badge } : {}) }]
+      : []
   })
 }
 
@@ -60,6 +69,8 @@ export interface AgentWorkspaceCompanionProps {
   /** Use tools for shared defaults; tabs overrides them for product-specific navigation. */
   tabs?: readonly AgentWorkspaceCompanionTab[]
   tools?: AgentWorkspaceCompanionTools
+  /** Counts on the shared tools' tabs, such as approvals waiting. */
+  toolBadges?: Partial<Record<AgentWorkspaceCompanionTool, number>>
   /** Optional session navigation, composed in the same responsive layout. */
   navigation?: AgentWorkspaceCompanionNavigation
   keyboardShortcuts?: boolean
@@ -82,6 +93,7 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
   header,
   tabs: customTabs,
   tools,
+  toolBadges,
   navigation,
   keyboardShortcuts,
   open: controlledOpen,
@@ -95,7 +107,7 @@ export const AgentWorkspaceCompanion = forwardRef<AgentWorkspaceCompanionHandle,
   defaultWidth = 420,
   className,
 }, ref) {
-  const tabs = customTabs ?? createAgentWorkspaceCompanionTabs(tools ?? {})
+  const tabs = customTabs ?? createAgentWorkspaceCompanionTabs(tools ?? {}, toolBadges)
   const [uncontrolledOpen, setOpen] = useState(defaultOpen)
   const open = controlledOpen ?? uncontrolledOpen
   const [selection, setSelection] = useState({ key: persistenceKey, id: defaultActiveTabId })
@@ -259,7 +271,7 @@ function CompanionTabList({ tabs, active, label }: { tabs: readonly AgentWorkspa
   const frameRef = useRef<HTMLDivElement>(null)
   const fullWidth = useRef(0)
   const [compact, setCompact] = useState(false)
-  const signature = tabs.map((tab) => `${tab.id}\u0000${tab.label}\u0000${tab.icon ? 1 : 0}`).join('\u0001')
+  const signature = tabs.map((tab) => `${tab.id}\u0000${tab.label}\u0000${tab.icon ? 1 : 0}\u0000${tab.badge ?? 0}`).join('\u0001')
 
   useLayoutEffect(() => {
     fullWidth.current = 0
@@ -304,6 +316,11 @@ function CompanionTabList({ tabs, active, label }: { tabs: readonly AgentWorkspa
               className={iconOnly ? 'gap-1.5 px-2 text-sm' : 'gap-1.5 px-2.5 text-sm'}
             >
               {tab.icon}<span className={iconOnly ? 'sr-only' : undefined}>{tab.label}</span>
+              {tab.badge ? (
+                <span className="min-w-5 rounded-full bg-[var(--surface-warning-bg)] px-1.5 text-center text-sm font-medium tabular-nums leading-5 text-[var(--surface-warning-text)]">
+                  {tab.badge}<span className="sr-only"> waiting</span>
+                </span>
+              ) : null}
             </TabsTrigger>
           )
         })}
