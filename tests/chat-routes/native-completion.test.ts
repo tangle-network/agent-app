@@ -115,16 +115,18 @@ describe('observeNativeCompletion', () => {
     }))
 
     const observed = await observeNativeCompletion({
-      source: source({ status: { id: 'session-1', status: 'running', latestExecutionId: 'turn-1' } }),
+      source: source({
+        status: { id: 'session-1', status: 'running', latestExecutionId: 'turn-1' },
+        runs: [{ executionId: 'turn-1', sessionId: 'session-1', status: 'active', startedAt: 1, eventCount: 3, lastEventId: '3' }],
+      }),
       admissionStore,
       executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 0, now: 700_000,
     })
 
     expect(admissionStore.renew).toHaveBeenCalledWith('turn-1', new Date(700_000))
-    expect(observed).toMatchObject({
-      state: 'failed',
-      receipt: { error: 'Admitted native execution did not produce an exact completion: turn-1' },
-    })
+    expect(admissionStore.closeExpired).not.toHaveBeenCalled()
+    // The returned admission is closed, so the observer reads the ledger, where the run is still active.
+    expect(observed).toEqual({ state: 'running' })
   })
 
   it('returns a completed receipt from the exact cached turn and assistant message', async () => {
@@ -213,13 +215,14 @@ describe('observeNativeCompletion', () => {
     // execution's event buffer ("Execution interrupted: the agent runtime restarted…") but the session kept
     // its persisted running status, so the observer renewed the admission on every pass from 16:01Z on.
     const interrupted = 'Execution interrupted: the agent runtime restarted before the run produced a terminal event. The run cannot be resumed; retry it.'
-    const observe = (state: string, admissionStore: NativeCompletionAdmissionStore) => observeNativeCompletion({
+    const failedRun = { executionId: 'turn-1', sessionId: 'session-1', status: 'failed', startedAt: 1, completedAt: 2, eventCount: 6_327, lastEventId: 'interrupted-done' }
+    const observe = (state: string, admissionStore: NativeCompletionAdmissionStore, run: Record<string, unknown> = failedRun) => observeNativeCompletion({
       source: source({
         status: {
           id: 'session-1', status: 'running', activeExecutionId: 'turn-1', latestExecutionId: 'turn-1',
           raw: { id: 'session-1', status: 'running', state, activeExecutionId: 'turn-1', hasActiveExecution: false },
         },
-        runs: [{ executionId: 'turn-1', sessionId: 'session-1', status: 'failed', startedAt: 1, completedAt: 2, eventCount: 6_327, lastEventId: 'interrupted-done' }],
+        runs: [run],
         messages: [{
           id: 'assistant-1', role: 'assistant', timestamp: '2026-10-10T09:03:00.000Z',
           metadata: { turnId: 'turn-1', status: 'interrupted', interrupted: true, interruptReason: interrupted },
@@ -275,10 +278,33 @@ describe('observeNativeCompletion', () => {
       expect(observed).toMatchObject({ state: 'failed', receipt: { state: 'failed', error: RUNTIME_RESTARTED_ERROR, text: '' } })
     })
 
+    it('settles failed when the session still says running but the ledger failed the run', async () => {
+      // On 2026-10-10 the restored b81b sessions kept status running without a stale recovery state, and
+      // 0.60.46 kept renewing them; only the execution ledger showed the runs had ended.
+      const admissionStore = openAdmission()
+      const observed = await observe('running', admissionStore)
+
+      expect(admissionStore.renew).not.toHaveBeenCalled()
+      expect(observed).toMatchObject({ state: 'failed', receipt: { error: interrupted, text: 'I’ll pull the latest founder list first.' } })
+    })
+
     it('still renews a session whose run is live', async () => {
       const admissionStore = openAdmission()
       admissionStore.renew = vi.fn(async () => ({ ...admission, state: 'open' as const, ownerLeaseUntil: 820_000 }))
-      const observed = await observe('running', admissionStore)
+      const observed = await observe('running', admissionStore, { ...failedRun, status: 'active', completedAt: undefined, lastEventId: '9' })
+
+      expect(admissionStore.renew).toHaveBeenCalled()
+      expect(observed).toEqual({ state: 'running' })
+    })
+
+    it('still renews while a just-admitted turn is not yet in the ledger', async () => {
+      const admissionStore = openAdmission()
+      admissionStore.renew = vi.fn(async () => ({ ...admission, state: 'open' as const, ownerLeaseUntil: 820_000 }))
+      const observed = await observeNativeCompletion({
+        source: source({ status: { id: 'session-1', status: 'queued' }, runs: [] }),
+        admissionStore,
+        executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 690_000, now: 700_000,
+      })
 
       expect(admissionStore.renew).toHaveBeenCalled()
       expect(observed).toEqual({ state: 'running' })

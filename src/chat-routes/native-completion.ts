@@ -287,15 +287,27 @@ function abortedToolCall(parts: ReadonlyArray<Record<string, unknown>>): string 
 }
 
 /**
- * Whether the session still runs work for its admission. A session keeps its
- * persisted `running` status when the runtime restarts under it; the sidecar
- * then reports its recovery state as `stale` (the active execution has no
- * process behind it) and has already failed that execution's event buffer.
- * Renewing the admission for such a session would observe it forever.
+ * Whether the session still runs this admission's work, so its lease should be
+ * renewed. The session's own status is not enough: it keeps a persisted
+ * `running` status when the runtime restarts under it (the sidecar may report
+ * that as recovery state `stale`, or not at all), while its execution ledger
+ * has already failed the interrupted run. Renewing on status alone observed
+ * GTM b81b's restarted completions forever on 2026-10-10. Live means an
+ * admitted turn's execution is active, or not yet recorded while its dispatch
+ * can still be on the way.
  */
-function sessionHoldsLiveWork(status: SessionInfo): boolean {
+function admittedWorkIsLive(
+  status: SessionInfo,
+  runsByTurnId: ReadonlyMap<string, SessionExecutionInfo>,
+  admittedTurnIds: readonly string[],
+  dispatchMayBePending: boolean,
+): boolean {
   if (status.status !== 'queued' && status.status !== 'running') return false
-  return status.raw?.state !== 'stale'
+  if (status.raw?.state === 'stale') return false
+  return admittedTurnIds.some((turnId) => {
+    const run = runsByTurnId.get(turnId)
+    return run ? run.status === 'active' : dispatchMayBePending
+  })
 }
 
 function missingTurnReceipt(turnId: string, error: string): NativeCompletionTurnReceipt {
@@ -345,9 +357,12 @@ export async function observeNativeCompletion(
     ]))
   }
   const exactSession = session
+  const dispatchMayBePending = now - options.registeredAt < (options.absentDispatchDeadlineMs ?? DEFAULT_ABSENT_DISPATCH_DEADLINE_MS)
+  let runsByTurnId: Map<string, SessionExecutionInfo> | undefined
+  const readRuns = async () => runsByTurnId ??= new Map((await exactSession.runs()).map((run) => [run.executionId, run]))
 
   if (admission.state === 'open') {
-    if (sessionHoldsLiveWork(status)) {
+    if (admittedWorkIsLive(status, await readRuns(), admission.admittedTurnIds, dispatchMayBePending)) {
       admission = await options.admissionStore.renew(options.executionId, new Date(now)) ?? admission
     } else if (leaseUntil <= now) {
       admission = await options.admissionStore.closeExpired(options.executionId, new Date(now)) ?? admission
@@ -362,13 +377,10 @@ export async function observeNativeCompletion(
     throw new Error('Native completion admission has an invalid turn sequence')
   }
 
-  const runs = await exactSession.runs()
-  const runsByTurnId = new Map(runs.map((run) => [run.executionId, run]))
-  const missingExecution = admittedTurnIds.find((turnId) => !runsByTurnId.has(turnId))
-  if (missingExecution && now - options.registeredAt < (options.absentDispatchDeadlineMs ?? DEFAULT_ABSENT_DISPATCH_DEADLINE_MS)) {
-    return { state: 'running' }
-  }
-  if (admittedTurnIds.some((turnId) => runsByTurnId.get(turnId)?.status === 'active')) return { state: 'running' }
+  const ledger = await readRuns()
+  const missingExecution = admittedTurnIds.find((turnId) => !ledger.has(turnId))
+  if (missingExecution && dispatchMayBePending) return { state: 'running' }
+  if (admittedTurnIds.some((turnId) => ledger.get(turnId)?.status === 'active')) return { state: 'running' }
 
   // Completed recovery owns its message read. Load interrupted history only
   // when it is needed, and share that one read across failed continuations.
@@ -378,7 +390,7 @@ export async function observeNativeCompletion(
   let messages: SessionMessage[] | undefined
   const recovered: NativeCompletionTurnReceipt[] = []
   for (const turnId of admittedTurnIds) {
-    const run = runsByTurnId.get(turnId)
+    const run = ledger.get(turnId)
     if (!run) {
       recovered.push(missingTurnReceipt(turnId, 'Native Sandbox execution ledger is missing the admitted turn'))
       continue
