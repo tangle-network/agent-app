@@ -4,7 +4,7 @@ import { Button } from '@tangle-network/ui/primitives'
 
 import { hubActionReceipt, presentHubAction, type HubApprovalItem, type HubApprovalPhase } from '../hub-approvals'
 import { HUB_APPROVAL_UNKNOWN_WARNING } from '../hub-approvals/unknown'
-import { closesIn, distinctAccount, HubApprovalPhasePill, HubProviderMark, relativeTime } from './parts'
+import { closesIn, distinctAccount, HubApprovalPhasePill, HubProviderMark, openPhaseLabel, relativeTime } from './parts'
 
 const GROUPS: ReadonlyArray<{ id: string; label: string; phases: readonly HubApprovalPhase[] }> = [
   { id: 'waiting', label: 'Waiting', phases: ['waiting', 'blocked'] },
@@ -81,9 +81,10 @@ export function HubApprovalsList({ items, onSelect, selectedId, className = '' }
                           <span className="line-clamp-2 text-sm font-medium leading-5 text-foreground">{title}</span>
                           <span className="mt-0.5 block truncate text-sm text-muted-foreground">{detail}</span>
                           {item.phase === 'unknown' && <span className="mt-1 block text-sm text-[var(--surface-warning-text)]">{HUB_APPROVAL_UNKNOWN_WARNING}</span>}
+                          {(item.phase === 'waiting' || item.phase === 'blocked') && item.wait && <span className="mt-1 line-clamp-2 block text-sm text-muted-foreground">{item.wait.reason}</span>}
                         </span>
                         <span className="flex shrink-0 items-center gap-1">
-                          <HubApprovalPhasePill phase={item.phase} label={item.phase === 'waiting' ? 'Waiting' : item.phase === 'blocked' ? 'Owner' : undefined} />
+                          <HubApprovalPhasePill phase={item.phase} label={openPhaseLabel(item, 'Owner')} />
                           <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
                         </span>
                       </Button>

@@ -11,7 +11,7 @@ import {
   type HubApprovalPhase,
 } from '../hub-approvals'
 import { HUB_APPROVAL_UNKNOWN_WARNING } from '../hub-approvals/unknown'
-import { closesIn, distinctAccount, HubProviderMark, HubRawDetails } from './parts'
+import { closesIn, distinctAccount, HubApprovalWaitNote, HubProviderMark, HubRawDetails } from './parts'
 import { HubActionPreviewView } from './preview'
 
 /** The owner's answer to one held call. `allow` also grants a standing permission. */
@@ -254,7 +254,8 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
         )}
         <Progress item={active} />
         {error?.id === active.id && active.phase === 'waiting' && <p role="alert" className="text-sm text-[var(--surface-danger-text)]">{error.message}</p>}
-        {active.phase === 'blocked' && <p className="text-sm text-muted-foreground">The workspace owner approves this request.</p>}
+        {HUB_APPROVAL_OPEN_PHASES.has(active.phase) && active.wait && <HubApprovalWaitNote wait={active.wait} />}
+        {active.phase === 'blocked' && !active.wait && <p className="text-sm text-muted-foreground">The workspace owner approves this request.</p>}
 
         {decidable && permissionsOpen && scopes.length > 0 && (
           <fieldset className="space-y-2 rounded-xl border border-border bg-muted/30 px-3 py-3">
@@ -304,7 +305,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
             </Button>
           )}
           <span className="flex-1" />
-          {decidable && choices && 'never' in choices && (
+          {decidable && choices && 'never' in choices && !active.wait && (
             <span className="text-sm text-muted-foreground">{choices.never}</span>
           )}
           {onOpen && (

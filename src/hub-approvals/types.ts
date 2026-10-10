@@ -45,6 +45,16 @@ export interface HubActionBundle {
   steps?: ReadonlyArray<{ label: string; state: 'done' | 'current' | 'upcoming' }>
 }
 
+/** Whether an open call waits for the owner, in the owner's words. */
+export interface HubApprovalWait {
+  /** True when nothing runs until the owner decides; false when a permission runs it. */
+  owner: boolean
+  /** One sentence: `Publishing always needs your approval.` or `Runs under this conversation’s auto-approve.` */
+  reason: string
+  /** A stable cause the host can test, e.g. `never_grantable`, `loop_guard`, `daily_cap`. */
+  code?: string
+}
+
 /** One held Hub action and its decision, in the form every surface renders. */
 export interface HubApprovalItem {
   /** Stable within a conversation, such as `<messageId>:<partId>`. */
@@ -67,6 +77,11 @@ export interface HubApprovalItem {
   grant?: { scope: string; expiresAt: string | null } | null
   /** Set when a permissions mode, not a person, approved it. */
   autoApproved?: string | null
+  /**
+   * For an open call, what happens next without the viewer: it waits for the
+   * owner, and why, or it runs on its own once the agent's reply finishes.
+   */
+  wait?: HubApprovalWait | null
   /** Files with line counts read by the host, replacing those the input declares. */
   files?: readonly HubActionFile[]
   bundle?: HubActionBundle | null

@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Clock, Zap } from 'lucide-react'
 import { ProviderIcon } from '@tangle-network/sandbox-ui/integrations'
 import { Button, StatusPill, type StatusTone } from '@tangle-network/ui/primitives'
 
-import { HUB_APPROVAL_PHASE_LABELS, type HubApprovalPhase } from '../hub-approvals'
+import { HUB_APPROVAL_PHASE_LABELS, type HubApprovalItem, type HubApprovalPhase, type HubApprovalWait } from '../hub-approvals'
 
 const PHASE_TONES: Record<HubApprovalPhase, StatusTone> = {
   waiting: 'warning',
@@ -23,6 +23,24 @@ export function HubApprovalPhasePill({ phase, label }: { phase: HubApprovalPhase
     <StatusPill tone={PHASE_TONES[phase]} size="md" className="shrink-0 whitespace-nowrap">
       {label ?? HUB_APPROVAL_PHASE_LABELS[phase]}
     </StatusPill>
+  )
+}
+
+/** The pill an open call shows: who it waits for, or that a permission runs it. */
+export function openPhaseLabel(item: Pick<HubApprovalItem, 'phase' | 'wait'>, blocked = 'Owner decides'): string | undefined {
+  if (item.phase === 'blocked') return blocked
+  if (item.phase !== 'waiting') return undefined
+  return item.wait?.owner === false ? 'Runs on its own' : 'Waiting'
+}
+
+/** Why an open call waits for the owner, or how it will run without them. */
+export function HubApprovalWaitNote({ wait, className = '' }: { wait: HubApprovalWait; className?: string }) {
+  const Icon = wait.owner ? Clock : Zap
+  return (
+    <p data-hub-approval-wait={wait.code ?? (wait.owner ? 'owner' : 'auto')} className={`flex items-start gap-2 text-sm ${wait.owner ? 'text-muted-foreground' : 'text-[var(--surface-info-text)]'} ${className}`}>
+      <Icon aria-hidden className="mt-0.5 size-4 shrink-0" />
+      <span className="min-w-0 break-words">{wait.reason}</span>
+    </p>
   )
 }
 
