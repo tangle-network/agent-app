@@ -82,6 +82,10 @@ addresses unless the product passes its own `urlProblem` policy. Public header v
 references are not resolved, so a server that needs them reports `auth-required`. Local command servers
 report `not-checkable`.
 
+For a customer who wants an agent to use their own database without handing over its credential, point
+them at [`customer-db-gateway`](../customer-db-gateway/README.md): they run it beside their database and add
+it as a remote server whose `Authorization` header is a secret reference.
+
 ## Keep on the product server
 
 The editor does not save. The product validates the final profile, decides which fields its runtime honors,
