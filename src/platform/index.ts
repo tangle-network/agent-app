@@ -5,6 +5,7 @@
  */
 
 export * from './sso.js'
+export * from './sso-identity-store.js'
 export * from './hub-settings.js'
 export * from './billing.js'
 export * from './guards.js'
