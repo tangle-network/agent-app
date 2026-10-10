@@ -110,6 +110,26 @@ export const ExpiredLateAnswer: Story = {
   },
 }
 
+/** Declined — the person chose not to answer; the card settles without an answer. */
+export const Declined: Story = {
+  args: {
+    interaction: { ...channelsQuestionInteraction, status: 'declined' as const },
+    canWrite: true,
+    submitAnswer: okSubmitAnswer,
+  },
+}
+
+/** An ask the product cannot let a person refuse: Submit only. */
+export const NotDeclinable: Story = {
+  name: 'Not declinable',
+  args: {
+    interaction: channelsQuestionInteraction,
+    canWrite: true,
+    submitAnswer: okSubmitAnswer,
+    declinable: false,
+  },
+}
+
 /** Viewer gate — options render, nothing is toggleable. */
 export const ReadOnlyViewer: Story = {
   name: 'Read-only viewer',

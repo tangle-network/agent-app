@@ -6,6 +6,14 @@ export interface ApiAccessKey {
   name: string
   scopes: string[]
   expiresAt: string | Date | null
+  /** Workspaces the key is limited to. Empty or absent: every workspace the account can open. */
+  workspaceIds?: readonly string[] | null
+}
+
+/** A workspace a key can be limited to. */
+export interface ApiAccessWorkspace {
+  id: string
+  name: string
 }
 
 export interface ApiAccessScope {
@@ -25,7 +33,16 @@ export interface ApiAccessPanelProps {
   accountHref?: string
   description?: string
   limitsDescription?: string
-  onCreate: (input: { name: string; scopes: string[]; expiresAt: string }) => Promise<{ id: string; key: string }>
+  /**
+   * Workspaces a new key may be limited to. Supply it when the backend can bind
+   * a key to workspaces; the form then offers "all" or one of them, and each
+   * key says which it reaches. Omit it and every key reaches every workspace.
+   */
+  workspaces?: readonly ApiAccessWorkspace[]
+  /** The product's words for one workspace and several. Defaults to workspace / workspaces. */
+  workspaceNoun?: { singular: string; plural: string }
+  /** `workspaceIds` is empty for a key that reaches every workspace. */
+  onCreate: (input: { name: string; scopes: string[]; expiresAt: string; workspaceIds: string[] }) => Promise<{ id: string; key: string }>
   onRevoke: (id: string) => Promise<void>
   onChanged: () => void
 }
@@ -73,8 +90,13 @@ function expandScopes(scopes: readonly string[], access: readonly ApiAccessScope
 
 export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHref, description,
   limitsDescription, expiryDays = defaultExpiryChoices, defaultExpiryDays = 7,
+  workspaces, workspaceNoun = { singular: 'workspace', plural: 'workspaces' },
   onCreate, onRevoke, onChanged }: ApiAccessPanelProps) {
   const [name, setName] = useState('')
+  const [reach, setReach] = useState('')
+  // A workspace that is no longer offered falls back to "all" rather than minting a key for it.
+  const selectedWorkspace = workspaces?.some(workspace => workspace.id === reach) ? reach : ''
+  const workspaceName = (id: string) => workspaces?.find(workspace => workspace.id === id)?.name ?? `A removed ${workspaceNoun.singular}`
   const allowedDays = [...new Set(expiryDays)].filter(days => days > 0
     && Number.isFinite(new Date(Date.now() + days * 86_400_000).getTime()))
   const fallbackDays = allowedDays.includes(defaultExpiryDays) ? defaultExpiryDays : allowedDays[0]
@@ -116,7 +138,8 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
     setError(null)
     try {
       const result = await onCreate({ name: name.trim(), scopes: requestedScopes,
-        expiresAt: new Date(Date.now() + selectedDays * 86_400_000).toISOString() })
+        expiresAt: new Date(Date.now() + selectedDays * 86_400_000).toISOString(),
+        workspaceIds: selectedWorkspace ? [selectedWorkspace] : [] })
       if (!result.id || !result.key) throw new Error('Could not create key')
       setCreated({ id: result.id, key: result.key })
       setName('')
@@ -194,6 +217,15 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
                 </select>
               </div>
             </div>
+            {workspaces && workspaces.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium" htmlFor="key-reach">Reaches</label>
+                <select id="key-reach" value={selectedWorkspace} onChange={event => setReach(event.target.value)} className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm">
+                  <option value="">All {workspaceNoun.plural}, including new ones</option>
+                  {workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>Only {workspace.name}</option>)}
+                </select>
+              </div>
+            )}
             <fieldset className="space-y-3">
               <legend className="mb-3 text-sm font-medium">Permissions</legend>
               {access.map(option => {
@@ -214,7 +246,7 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
                 )
               })}
             </fieldset>
-            {limitsDescription && <p className="text-xs text-muted-foreground">{limitsDescription}</p>}
+            {limitsDescription && <p className="text-sm text-muted-foreground">{limitsDescription}</p>}
             <button className={buttonClass} type="submit" disabled={creating || !name.trim() || !selectedScopes.length || selectedDays === undefined}>{creating ? 'Creating…' : 'Create key'}</button>
           </form>
         )}
@@ -227,10 +259,15 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
                 <li key={key.id} className="flex items-start justify-between gap-3 p-4">
                   <div className="min-w-0 space-y-1">
                     <p className="break-words text-sm font-medium">{key.name}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       {key.expiresAt ? `${new Date(key.expiresAt).getTime() <= Date.now() ? 'Expired' : 'Expires'} ${new Date(key.expiresAt).toLocaleDateString()}` : 'No expiry'}
                     </p>
-                    <p className="text-xs text-muted-foreground">{key.scopes.map(scope => access.find(access => access.scope === scope)?.label ?? scope).join(' · ')}</p>
+                    <p className="text-sm text-muted-foreground">{key.scopes.map(scope => access.find(access => access.scope === scope)?.label ?? scope).join(' · ')}</p>
+                    {workspaces && (
+                      <p className="text-sm text-muted-foreground">
+                        {key.workspaceIds?.length ? `Only ${key.workspaceIds.map(workspaceName).join(', ')}` : `All ${workspaceNoun.plural}`}
+                      </p>
+                    )}
                   </div>
                   <button className={outlineClass} disabled={revoking !== null} onClick={() => revokeKey(key.id)} aria-label={`Revoke ${key.name}`}>
                     {revoking === key.id ? 'Revoking…' : 'Revoke'}
@@ -242,7 +279,7 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
         </section>
 
         <p className="text-sm text-muted-foreground">
-          Use <code className="text-xs">{baseUrl}</code> as the API base and send the key as a Bearer credential.
+          Use <code className="text-sm">{baseUrl}</code> as the API base and send the key as a Bearer credential.
         </p>
       </div>
     </main>
