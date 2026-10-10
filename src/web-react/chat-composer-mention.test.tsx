@@ -21,6 +21,12 @@ const FILES: MentionItem[] = [
   { id: 'src/util.ts', label: 'util.ts', detail: 'src/util.ts', kind: 'file' },
 ]
 
+// The suite runs files in parallel forks, so a loaded gate host can hold a
+// render or the 100 ms suggestion debounce past the default one-second wait.
+// The waits below still require the same visible state; they only allow it
+// longer to arrive.
+const SETTLE = { timeout: 5_000 }
+
 function mentionProp(overrides: Partial<ComposerMentionProp> = {}): ComposerMentionProp {
   return {
     fetchItems: vi.fn(async () => FILES),
@@ -169,20 +175,24 @@ describe('ChatComposer — mention path', () => {
 
     editor.focus()
     await user.type(editor, '@a')
-    await screen.findAllByRole('option')
+    // Enter acts on the row the editor announces as highlighted, so wait for
+    // that row rather than for the first painted option.
+    const options = await screen.findAllByRole('option', {}, SETTLE)
+    await waitFor(() => expect(editor.getAttribute('aria-activedescendant')).toBe(options[0]!.id), SETTLE)
 
     await user.keyboard('{Enter}')
 
     // The pill was inserted, the message was not sent.
-    await waitFor(() => expect(latest).toContain('@src/app.tsx'))
+    await waitFor(() => expect(latest).toContain('@src/app.tsx'), SETTLE)
     expect(onSend).not.toHaveBeenCalled()
     expect(onMentionsChange).toHaveBeenLastCalledWith([
       { id: 'src/app.tsx', label: 'app.tsx', kind: 'file' },
     ])
 
     // Popover closed after selection; a following Enter now sends.
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull(), SETTLE)
     await user.keyboard('{Enter}')
-    expect(onSend).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1), SETTLE)
   })
 
   it('does not re-fire onMentionsChange while typing prose around an unchanged mention', async () => {
