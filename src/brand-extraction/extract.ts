@@ -143,6 +143,60 @@ function parseSizes(sizes: string | undefined): { width?: number; height?: numbe
   return { width: Number(m[1]), height: Number(m[2]) }
 }
 
+/** The site's own name in comparable form: its host label and its og:site_name, lower-case letters and digits only. */
+function siteNames(html: string, base: string): string[] {
+  const squash = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const names: string[] = []
+  try {
+    const labels = new URL(base).hostname.replace(/^www\./, '').split('.')
+    const label = labels.length > 1 ? labels[labels.length - 2] : labels[0]
+    if (label) names.push(squash(label))
+  } catch {
+    // An unparsable base names nothing.
+  }
+  const site = extractName(html)
+  if (site) names.push(squash(site.split(/\s+[|–—\-:·]\s+/)[0] ?? site))
+  return names.filter((name) => name.length >= 3)
+}
+
+/** Words that name a logo's form, not its owner ("Logo_White", "logo-dark"). */
+const LOGO_FORM_WORDS = new Set(['logo', 'logos', 'default', 'white', 'black', 'dark', 'light', 'color', 'colour', 'main', 'primary',
+  'header', 'footer', 'nav', 'site', 'brand', 'mark', 'wordmark', 'full', 'small', 'large', 'mobile', 'desktop', 'svg', 'png', 'icon', 'the', 'and', 'for', 'of',
+  'company', 'our', 'new', 'retina', 'horizontal', 'vertical', 'stacked', 'inverse', 'inverted', 'transparent', 'image', 'img'])
+
+/**
+ * The brand a logo image names when it is someone else's: "Logo for IKEA",
+ * "Logo_IKEA.png", "taskprotect_logo.svg" on taskrabbit.com. A partner,
+ * customer or sub-brand logo is not the site's own.
+ */
+function otherBrandNamed(text: string, own: string[]): string | null {
+  const squash = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const named = [
+    ...text.matchAll(/\blogo(?:s)?(?:[\s_-]+(?:for|of))?[\s_-]+([A-Za-z][A-Za-z0-9&]+)/gi),
+    ...text.matchAll(/([A-Za-z][A-Za-z0-9&]+)[\s_-]+logo\b/gi),
+  ].map((match) => squash(match[1] ?? '')).filter((name) => name.length >= 3 && !LOGO_FORM_WORDS.has(name))
+  if (named.length === 0) return null
+  const ours = (name: string) => own.some((site) => site.includes(name) || name.includes(site))
+  return named.some(ours) ? null : named[0]!
+}
+
+/** Whether `index` falls inside the page header, or inside a link to the site's home page. */
+function inHeaderOrHomeLink(html: string, index: number, base: string): boolean {
+  const before = html.slice(0, index)
+  const openHeader = before.lastIndexOf('<header')
+  if (openHeader >= 0 && before.indexOf('</header>', openHeader) < 0) return true
+  const openLink = Math.max(before.lastIndexOf('<a '), before.lastIndexOf('<a\n'), before.lastIndexOf('<a>'))
+  if (openLink < 0 || before.indexOf('</a>', openLink) >= 0) return false
+  const href = attr(/<a\b[^>]*>/i.exec(before.slice(openLink))?.[0] ?? '', 'href')
+  if (!href) return false
+  try {
+    const target = new URL(href, base)
+    return target.origin === new URL(base).origin && (target.pathname === '/' || target.pathname === '')
+  } catch {
+    return false
+  }
+}
+
 function extractLogos(html: string, base: string): BrandLogoCandidate[] {
   const out: BrandLogoCandidate[] = []
   const seen = new Set<string>()
@@ -177,8 +231,12 @@ function extractLogos(html: string, base: string): BrandLogoCandidate[] {
     }
   }
 
-  // <img> whose src/class/alt/id mentions "logo" — the strongest in-page signal
-  for (const tag of matchTags(html, 'img')) {
+  // <img> whose src/class/alt/id mentions "logo" — the strongest in-page signal.
+  // The site's own logo sits in its header or its home link; one that names
+  // another brand (a partner, customer or sub-brand) ranks below the icons.
+  const own = siteNames(html, base)
+  for (const found of html.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = found[0]
     const src = attr(tag, 'src') ?? attr(tag, 'data-src')
     if (!src) continue
     const alt = attr(tag, 'alt')
@@ -190,10 +248,13 @@ function extractLogos(html: string, base: string): BrandLogoCandidate[] {
     if (!url) continue
     const w = attr(tag, 'width')
     const h = attr(tag, 'height')
+    const filename = decodeURIComponent(new URL(url).pathname.split('/').pop() ?? '')
+    const partner = otherBrandNamed(`${alt ?? ''} ${filename}`, own)
+    const placed = inHeaderOrHomeLink(html, found.index ?? 0, base)
     push({
       url,
       source: 'img-logo',
-      confidence: 0.85,
+      confidence: partner && !placed ? 0.4 : placed ? 0.95 : 0.85,
       alt,
       width: w ? Number(w) || undefined : undefined,
       height: h ? Number(h) || undefined : undefined,
