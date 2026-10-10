@@ -156,6 +156,9 @@ importers:
       agent-eval-0204:
         specifier: npm:@tangle-network/agent-eval@0.204.0
         version: '@tangle-network/agent-eval@0.204.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))'
+      agent-eval-0211:
+        specifier: npm:@tangle-network/agent-eval@0.211.2
+        version: '@tangle-network/agent-eval@0.211.2(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))'
       autoprefixer:
         specifier: ^10.5.4
         version: 10.5.4(postcss@8.5.26)
@@ -2728,6 +2731,11 @@ packages:
     engines: {node: '>=20.19.0'}
     hasBin: true
 
+  '@tangle-network/agent-eval@0.211.2':
+    resolution: {integrity: sha512-breUvzaTyp0lqbp+oFk/LjWU4UVoqTRKxLTxKE4QMkPYVCdTsGbTYclUjh3PsZ+nSQFoo30UnUa9r4T64b+xEw==}
+    engines: {node: '>=20.19.0'}
+    hasBin: true
+
   '@tangle-network/agent-gateway@0.11.4':
     resolution: {integrity: sha512-ZoOpwcTF7wfvzu7ax1t0jtwY/6zBTwFv+hTn0LJI5sm+K1To1LFwhTdYHkhZMsyP138BAaw6Rvw8u1VTdHbQVw==}
     engines: {node: '>=22.13.0'}
@@ -2789,6 +2797,11 @@ packages:
       '@ai-sdk/anthropic': ^3.0.49
       '@ai-sdk/google': ^3.0.33
       playwright: ^1.40.0
+
+  '@tangle-network/harness-sessions@0.1.0':
+    resolution: {integrity: sha512-yIRqrZerxRFl4WByFsRHob9Pq5XXh6wmtQRpTHZCjw2U0GyLDUWN+n0ohhfblKQays1t4pXvbuXz/uMSa9jzhA==}
+    engines: {node: '>=22.13.0'}
+    hasBin: true
 
   '@tangle-network/hub-sdk@0.28.0':
     resolution: {integrity: sha512-lULLT7nPbbtXrZdNpRaPmZ8IIg3eZgWkprki4OGo/H3Y/OoPRlcc+aOGd9iaFrsNk3OQM8Eb889Du5WlAIZy3w==}
@@ -8512,6 +8525,22 @@ snapshots:
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
 
+  '@tangle-network/agent-eval@0.211.2(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))':
+    dependencies:
+      '@asteasolutions/zod-to-openapi': 9.1.0(zod@4.6.5)
+      '@hono/node-server': 2.1.1(hono@4.13.11)
+      '@tangle-network/agent-core': 0.10.3(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
+      '@tangle-network/agent-interface': 3.1.1
+      '@tangle-network/agent-trace-contract': 2.0.0
+      '@tangle-network/harness-sessions': 0.1.0
+      hono: 4.13.11
+      linear-sum-assignment: 1.0.9
+      re2js: 2.8.6
+      smol-toml: 1.9.0
+      zod: 4.6.5
+    transitivePeerDependencies:
+      - '@modelcontextprotocol/sdk'
+
   '@tangle-network/agent-gateway@0.11.4':
     dependencies:
       hono: 4.13.5
@@ -8623,6 +8652,10 @@ snapshots:
       - supports-color
       - ws
       - zod
+
+  '@tangle-network/harness-sessions@0.1.0':
+    dependencies:
+      '@tangle-network/agent-trace-contract': 2.0.0
 
   '@tangle-network/hub-sdk@0.28.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@opentelemetry/api@1.9.1)(@opentelemetry/semantic-conventions@1.43.0)':
     dependencies:
