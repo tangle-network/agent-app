@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.39
+
+- fix(sandbox): a reused box gets one longer liveness probe before a restart ends its sessions (#935)
+
 ## 0.60.38
 
 - fix(brand-extraction): read font declarations in one pass over the braces (#933)
