@@ -13,7 +13,7 @@ import { runCommand, type CommandResult } from './exec'
 import { runGraph, validateGraph, type TaskOutcome } from './schedule'
 import { assertShuffleArgsReachTheRunner, newSeedBase, planAttempts } from './seeds'
 import { resolveStore } from './store'
-import { checkWorkerDefaults, formatWorkerDefaults } from './worker-defaults'
+import { checkWorkerDefaults, formatWorkerDefaults, WORKER_DEFAULTS_STEP } from './worker-defaults'
 import { materializeCleanTree, removeCleanTree, repoRootOf, type CleanTree } from './workspace'
 import type {
   SignoffAttempt,
@@ -204,9 +204,9 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
         origin,
         host,
         install,
-        steps: config.steps.map(
-          (step): SignoffStepResult => ({
-            name: step.name,
+        steps: [...config.steps.map((step) => step.name), WORKER_DEFAULTS_STEP].map(
+          (name): SignoffStepResult => ({
+            name,
             status: 'skipped',
             attempts: [],
             durationMs: 0,
@@ -277,8 +277,6 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
   }
 }
 
-const WORKER_DEFAULTS_STEP = 'worker defaults'
-
 /**
  * Built in rather than declared: every repo that deploys an agent-app Worker
  * must ship the shared Cloudflare defaults, and a step a repo can leave out of
@@ -308,7 +306,9 @@ function runWorkerDefaults(
     { command, seed: null, exitCode: ok ? 0 : 1, signal: null, durationMs, timedOut: false, output, outputTruncated: false },
   ]
   emitStepEnd(options, WORKER_DEFAULTS_STEP, ok ? 'passed' : 'failed', attempts)
-  return { name: WORKER_DEFAULTS_STEP, status: ok ? 'passed' : 'failed', attempts, durationMs, startedAtMs: 0, finishedAtMs: durationMs }
+  // It runs before the graph's clock starts, so it has no position on the
+  // graph timeline; giving it one would count it as overlapping the roots.
+  return { name: WORKER_DEFAULTS_STEP, status: ok ? 'passed' : 'failed', attempts, durationMs, startedAtMs: null, finishedAtMs: null }
 }
 
 /** Emitted from inside the step, so a watching CLI sees a completion when it

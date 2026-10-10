@@ -23,14 +23,21 @@ import { basename, dirname, join } from 'node:path'
  * is in docs/worker-defaults.md.
  *
  * The values are read through the app's own installed `wrangler`, so the check
- * sees the config exactly as `wrangler deploy` resolves it, including the keys
- * each `[env.*]` inherits or overrides.
+ * resolves the source config as Wrangler does, including the keys each
+ * `[env.*]` inherits or overrides. Vite-plugin apps deploy a config generated
+ * at build time from this source; their Worker source maps also need the build
+ * to emit them (docs/worker-defaults.md).
  */
+
+/** The name the built-in step reports under; a repo cannot declare a step with it. */
+export const WORKER_DEFAULTS_STEP = 'worker defaults'
 
 /** Update together with the templates' `compatibility_date`. */
 export const WORKER_COMPATIBILITY_DATE_FLOOR = '2026-09-01'
 
-const WRANGLER_CONFIG_NAMES = new Set(['wrangler.toml', 'wrangler.json', 'wrangler.jsonc'])
+/** `wrangler.toml` and named variants such as `wrangler.health.toml` or
+ *  `wrangler-demo.toml`: products deploy secondary Workers from those. */
+const WRANGLER_CONFIG_NAME = /^wrangler[.-]?[\w.-]*\.(toml|json|jsonc)$/
 
 interface SamplingSettings {
   readonly enabled?: boolean
@@ -77,7 +84,7 @@ export function trackedWorkerConfigs(repoRoot: string): string[] {
   if (listed.status !== 0) throw new Error(`signoff: git ls-files failed in ${repoRoot}: ${listed.stderr}`)
   return listed.stdout
     .split('\0')
-    .filter((path) => path !== '' && WRANGLER_CONFIG_NAMES.has(basename(path)))
+    .filter((path) => path !== '' && WRANGLER_CONFIG_NAME.test(basename(path)))
     .sort()
 }
 
@@ -115,16 +122,21 @@ function problemsFor(config: ResolvedWorkerConfig): string[] {
 /**
  * Wrangler logs config warnings (unknown keys, missing secrets) to the console
  * while reading. They belong to the app's own `wrangler deploy`, not to this
- * verdict, so they are muted for the duration of the read.
+ * verdict, so they are muted for the duration of the read. `CLOUDFLARE_ENV`
+ * is cleared too: Wrangler reads it as the default environment, which would
+ * make the "top level" row check some other environment.
  */
 function quietly<T>(read: () => T): T {
-  const previous = process.env.WRANGLER_LOG
+  const saved = { WRANGLER_LOG: process.env.WRANGLER_LOG, CLOUDFLARE_ENV: process.env.CLOUDFLARE_ENV }
   process.env.WRANGLER_LOG = 'error'
+  delete process.env.CLOUDFLARE_ENV
   try {
     return read()
   } finally {
-    if (previous === undefined) delete process.env.WRANGLER_LOG
-    else process.env.WRANGLER_LOG = previous
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
   }
 }
 

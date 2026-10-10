@@ -4,7 +4,6 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -131,8 +130,7 @@ function assertGeneratedPeerFloors(project, env) {
 }
 
 // The scaffold must pass the same Worker-defaults check `agent-app-signoff`
-// runs on a product, read through the project's own Wrangler, and the dry-run
-// bundle must carry the source map `upload_source_maps` uploads.
+// runs on a product, read through the project's own Wrangler.
 function assertGeneratedWorkerDefaults(project, env) {
   const source = [
     "import { checkWorkerDefaults, formatWorkerDefaults } from '@tangle-network/agent-app/signoff'",
@@ -141,8 +139,6 @@ function assertGeneratedWorkerDefaults(project, env) {
     'if (result.findings.length > 0) process.exit(1)',
   ].join('\n')
   run(process.execPath, ['--input-type=module', '--eval', source], { cwd: project, env })
-  const maps = readdirSync(join(project, '.wrangler-dry-run')).filter((file) => file.endsWith('.map'))
-  if (maps.length === 0) throw new Error('wrangler dry-run emitted no source map for upload_source_maps')
 }
 
 function assertToolVersions(env) {

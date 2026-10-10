@@ -56,6 +56,7 @@ Enable `[placement] mode = "smart"` per app only after comparing request duratio
 
 ## Checking a repo
 
-`agent-app-signoff` runs the check as its `worker defaults` step after install, reading each config through the repo's own `wrangler` exactly as `wrangler deploy` resolves it.
-By default it checks every tracked `wrangler.toml`, `wrangler.json` and `wrangler.jsonc`; set `workerConfigs` in `signoff.config.mjs` to name the deployed configs explicitly.
+`agent-app-signoff` runs the check as its `worker defaults` step after install, reading each config through the repo's own `wrangler`, for the top level and every `[env.*]`.
+By default it checks every tracked `wrangler*.toml`, `wrangler*.json` and `wrangler*.jsonc`, including named variants such as `wrangler.health.toml`; set `workerConfigs` in `signoff.config.mjs` to name the deployed configs explicitly, for example to leave out a local-only config.
+For a Vite-plugin app the check reads the source config the build copies from; whether the build emitted maps is shown by `build/server/*.map`.
 The same check is exported as `checkWorkerDefaults` from `@tangle-network/agent-app/signoff`.
