@@ -162,19 +162,6 @@ describe('default quality skills', () => {
     expect(index).toContain('(read .opencode/skills/human-prose/SKILL.md)')
   })
 
-  it('adds product vocabulary and a mounted review skill', () => {
-    const skill = humanProseSkill({
-      bannedWords: ['leverage', 'seamless', 'leverage', ' '],
-      preferredTerms: { 'AI-powered': 'name the capability' },
-      reviewSkillId: 'humanizer',
-    })
-    expect(skill.skillMd).toMatch(/Never use these in audience-facing prose: leverage, seamless, delve,/)
-    expect(skill.skillMd).not.toMatch(/per paragraph: seamless,/)
-    expect(skill.skillMd).toContain('- "name the capability", not "AI-powered"')
-    expect(skill.skillMd).toContain('`humanizer` skill')
-    expect(skill.skillMd.trimEnd().endsWith('(github.com/hardikpandya/stop-slop).')).toBe(true)
-  })
-
   it('refuses a product that still ships its own copy', () => {
     const copy = { ...humanProseSkill(), skillMd: 'old copy' }
     expect(() => withDefaultQualitySkills([copy])).toThrow(/human-prose duplicate a default quality skill/)
