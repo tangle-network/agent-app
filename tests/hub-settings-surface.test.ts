@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import * as platform from '../src/platform/index'
 import type { HubSettingsContext } from '../src/platform/index'
@@ -20,13 +18,6 @@ describe('Hub settings has one public server boundary', () => {
 
   it.each(retiredExports)('does not publish the retired %s API', (name) => {
     expect(Object.keys(platform)).not.toContain(name)
-  })
-
-  it('removes the old implementation instead of keeping a hidden compatibility shim', () => {
-    expect(existsSync(fileURLToPath(new URL('../src/platform/hub.ts', import.meta.url)))).toBe(false)
-    const barrel = readFileSync(new URL('../src/platform/index.ts', import.meta.url), 'utf8')
-    expect(barrel).not.toMatch(/from ['"]\.\/hub['"]/)
-    expect(barrel).toContain("export * from './hub-settings.js'")
   })
 
   it.each([

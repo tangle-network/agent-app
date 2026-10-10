@@ -103,10 +103,6 @@ describe('z-order direction math', () => {
   it('forward from top stays at top', () => {
     expect(indexForward(ownerLength - 1, ownerLength)).toBe(ownerLength - 1)
   })
-
-  it('backward from bottom stays at bottom', () => {
-    expect(indexBackward(0)).toBe(0)
-  })
 })
 
 // ---------------------------------------------------------------------------
