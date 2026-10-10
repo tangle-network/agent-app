@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.57
+
+- perf(workspace-export): mask bytes with a native latin1 decoder (#954)
+
 ## 0.60.56
 
 - fix(turn-health): read stored parts a bounded batch at a time (#953)
