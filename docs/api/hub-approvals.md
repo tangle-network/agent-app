@@ -4,7 +4,7 @@
 
 Source: `src/hub-approvals/index.ts`
 
-24 exports.
+25 exports.
 
 ### `formatMinorAmount`
 
@@ -148,6 +148,14 @@ type HubApprovalPhase
 
 ```ts
 interface HubApprovalResumePart
+```
+
+### `HubApprovalWait`
+
+`interface` — Whether an open call waits for the owner, in the owner's words.
+
+```ts
+interface HubApprovalWait
 ```
 
 ### `hubProviderName`

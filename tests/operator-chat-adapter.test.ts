@@ -3,6 +3,7 @@ import {
   createChatOperatorAdapter,
   createOperatorApi,
   createOperatorClient,
+  type ChatOperatorAdapterOptions,
   type ChatOperatorMessage,
   type ChatOperatorThread,
 } from '../src/operator'
@@ -16,7 +17,11 @@ void _chatStoreRowsFit
 type Identity = { userId: string }
 const ORIGIN = 'https://app.example'
 
-function setup(options: { reply?: (content: string) => Record<string, unknown>; running?: () => string[] | null } = {}) {
+function setup(options: {
+  reply?: (content: string) => Record<string, unknown>
+  running?: () => string[] | null
+  failureOf?: ChatOperatorAdapterOptions<Identity>['failureOf']
+} = {}) {
   const threads = new Map<string, ChatOperatorThread>([
     ['thread-b', { id: 'thread-b', workspaceId: 'ws-b', title: 'Other' }],
     ['thread-colleague', { id: 'thread-colleague', workspaceId: 'ws-a', title: 'A colleague\'s conversation' }],
@@ -29,7 +34,8 @@ function setup(options: { reply?: (content: string) => Record<string, unknown>; 
     const list = messages.get(input.threadId) ?? []
     list.push({ id: `u-${input.turnId}`, role: 'user', content: input.content, parts: [{ type: 'text', text: input.content, turnId: input.turnId }], createdAt: ++clock })
     const reply = options.reply?.(input.content) ?? { content: `Done: ${input.content}`, parts: [{ type: 'session-artifact', path: 'notes/plan.md', action: 'created' }] }
-    list.push({ id: `a-${input.turnId}`, role: 'assistant', content: String(reply.content ?? ''), parts: (reply.parts as Array<Record<string, unknown>>) ?? [], createdAt: ++clock, servedModel: 'gpt-6-luna', costUsd: 0.12 })
+    list.push({ id: `a-${input.turnId}`, role: 'assistant', content: String(reply.content ?? ''), parts: (reply.parts as Array<Record<string, unknown>>) ?? [], createdAt: ++clock, servedModel: 'gpt-6-luna', costUsd: 0.12,
+      ...(reply.metadata ? { metadata: reply.metadata as Record<string, unknown> } : {}) })
     messages.set(input.threadId, list)
     return new Response('{"type":"text"}\n{"type":"done"}\n', { headers: { 'content-type': 'application/x-ndjson' } })
   })
@@ -54,6 +60,7 @@ function setup(options: { reply?: (content: string) => Record<string, unknown>; 
     },
     runTurn,
     runningTurns: async () => options.running?.() ?? [],
+    ...(options.failureOf ? { failureOf: options.failureOf } : {}),
   })
   const api = createOperatorApi<RequestApiKey, Identity>({
     app: { id: 'legal', name: 'Legal' },
@@ -95,6 +102,44 @@ describe('chat operator adapter', () => {
     const { client } = setup({ reply: () => ({ content: '', parts: [{ type: 'notice', noticeKind: 'turn-failure', code: 'sandbox_unavailable', text: 'The sandbox did not start' }] }) })
     const started = await client.startTurn('ws-a', { content: 'Draft the memo' })
     expect(started).toMatchObject({ succeeded: true, value: { state: 'failed', reply: null, failure: { code: 'sandbox_unavailable', message: 'The sandbox did not start' } } })
+  })
+
+  it('reports an error notice from the sandbox producer as a failed turn with its typed reason', async () => {
+    const { client } = setup({ reply: () => ({ content: 'Partial answer', parts: [
+      { type: 'text', text: 'Partial answer' },
+      { type: 'notice', id: 'error-1', noticeKind: 'error', code: 'SECRET_PROFILE_PREPARATION_FAILED',
+        text: 'The sandbox model stream stopped before a clean completion.\n\nError: Secret profile preparation failed' },
+    ] }) })
+    const started = await client.startTurn('ws-a', { content: 'Draft the memo' })
+    expect(started).toMatchObject({ succeeded: true, value: { state: 'failed', reply: null, failure: {
+      code: 'SECRET_PROFILE_PREPARATION_FAILED', message: expect.stringContaining('Secret profile preparation failed'),
+    } } })
+  })
+
+  it('names a reason for an error notice that carries no code', async () => {
+    const { client } = setup({ reply: () => ({ content: '', parts: [{ type: 'notice', id: 'error-1', noticeKind: 'error', text: 'The turn failed upstream' }] }) })
+    const started = await client.startTurn('ws-a', { content: 'Draft the memo' })
+    expect(started).toMatchObject({ succeeded: true, value: { state: 'failed', failure: { code: 'turn.error', message: 'The turn failed upstream' } } })
+  })
+
+  it('lets an app report a failure it stamps on the row through failureOf', async () => {
+    const { client } = setup({
+      reply: () => ({ content: 'The sandbox agent returned an error before producing a visible answer.', parts: [],
+        metadata: { responseStatus: 'failed', failureCode: 'sandbox.stream_failed', failureMessage: 'socket hung up' } }),
+      failureOf: (message) => message.metadata?.responseStatus === 'failed'
+        ? { code: String(message.metadata.failureCode), message: String(message.metadata.failureMessage) }
+        : null,
+    })
+    const started = await client.startTurn('ws-a', { content: 'Draft the memo' })
+    expect(started).toMatchObject({ succeeded: true, value: { state: 'failed', failure: { code: 'sandbox.stream_failed', message: 'socket hung up' } } })
+  })
+
+  it('keeps a warning notice beside an answer as a succeeded turn', async () => {
+    const { client } = setup({ reply: () => ({ content: 'Here is the memo', parts: [
+      { type: 'text', text: 'Here is the memo' }, { type: 'notice', id: 'w-1', noticeKind: 'warning', text: 'Model downgraded' },
+    ] }) })
+    const started = await client.startTurn('ws-a', { content: 'Draft the memo' })
+    expect(started).toMatchObject({ succeeded: true, value: { state: 'succeeded', reply: { content: 'Here is the memo' } } })
   })
 
   it('reads a running turn as working even when a draft reply is persisted', async () => {

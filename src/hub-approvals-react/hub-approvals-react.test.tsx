@@ -38,6 +38,29 @@ describe('HubApprovalDock', () => {
     expect(within(dock).getAllByText('+4').length).toBeGreaterThan(0)
   })
 
+  it('says why a call waits for the owner, and which calls run on their own', () => {
+    const post: HubApprovalItem = {
+      id: 'm1:call_3', actionPath: 'twitter.tweets.create', providerId: 'twitter', phase: 'waiting', input: { text: 'Ship it' },
+      wait: { owner: true, code: 'daily_cap', reason: 'Autopilot already published 3 posts today, its daily limit.' },
+    }
+    const speech: HubApprovalItem = {
+      id: 'm1:call_4', actionPath: 'phony.synthesize_speech', providerId: 'phony', phase: 'waiting', input: { text: 'Hi' },
+      wait: { owner: false, code: 'thread_auto', reason: 'Runs when the reply finishes, under this conversation’s auto-approve.' },
+    }
+    render(<HubApprovalDock items={[post, speech]} onDecide={vi.fn()} permissions={() => ({ never: 'Publishing always needs your approval.' })} />)
+    const dock = screen.getByRole('region', { name: 'Waiting for your approval' })
+    expect(within(dock).getByText('Autopilot already published 3 posts today, its daily limit.')).toBeTruthy()
+    // The host's reason replaces the generic never-grantable line.
+    expect(within(dock).queryByText('Publishing always needs your approval.')).toBeNull()
+    fireEvent.click(within(dock).getByRole('button', { name: 'Next request' }))
+    expect(within(dock).getByText('Runs when the reply finishes, under this conversation’s auto-approve.')).toBeTruthy()
+
+    render(<HubApprovalsList items={[post, speech]} />)
+    const list = screen.getByRole('region', { name: 'Waiting' })
+    expect(within(list).getByText('Runs on its own')).toBeTruthy()
+    expect(within(list).getByText('Autopilot already published 3 posts today, its daily limit.')).toBeTruthy()
+  })
+
   it('renders an HTML email as text, never markup', () => {
     render(<HubApprovalDock items={[EMAIL]} onDecide={vi.fn()} />)
     expect(screen.getByText('Hello Ada')).toBeTruthy()
@@ -170,8 +193,7 @@ describe('receipts and rows', () => {
     expect(screen.getByRole('link', { name: /Opened PR #7/ })).toBeTruthy()
     expect(screen.getByText('Denied: Send email to ada@acme.com')).toBeTruthy()
     expect(screen.queryByText(/I decided the Hub actions/)).toBeNull()
-    const details = screen.getAllByRole('button', { name: 'Details' })
-    fireEvent.click(details.at(-1)!)
+    fireEvent.click(screen.getByRole('button', { name: 'Message sent to the agent' }))
     expect(screen.getByText(/I decided the Hub actions/)).toBeTruthy()
   })
 

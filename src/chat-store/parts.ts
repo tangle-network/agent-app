@@ -224,6 +224,8 @@ export interface ChatNoticePart {
   id: string
   noticeKind: NoticeKind
   text: string
+  /** Typed reason for an `error` notice, e.g. the sandbox or upstream error code. */
+  code?: string
 }
 
 /**

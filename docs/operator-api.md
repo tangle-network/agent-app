@@ -28,6 +28,7 @@ An app built on agent-app's chat stack does not write an adapter: `createChatOpe
 The app supplies its workspace roles, a `runTurn` that calls its chat route as the caller, and, optionally, running-turn discovery, files, journal, approvals, assets, and a scorecard.
 Thread reads receive the caller too, so an app whose conversations belong to one user rather than the whole workspace returns null for anyone else's.
 Its turns are driven exactly as a browser drives them, so the start request returns once the turn settles; apps whose turns are owned by a durable worker, such as GTM's completion Workflow, return as soon as the turn is admitted.
+A failed turn must be recorded as a failure, not as prose: run the sandbox producer with `errorNotice: true`, whose `error` notice carries the sandbox or upstream error code, or persist a `turn-failure` notice. The adapter then reports `failed` with `failure: { code, message }`; a failure written only into the reply text reads as `succeeded`.
 
 `keys` uses the same callbacks as `createApiKeyRequestAuth`, so an app reuses its key store, revocation, expiry, and request limits.
 
@@ -192,9 +193,12 @@ The product itself changes nothing and serves nothing to the conductor; this API
 | App | Before this API | Status |
 | --- | --- | --- |
 | gtm-agent | Private API with `gak_` keys and the ChatGPT agents surface | Mounts `/api/operator/v1`; first adopter |
-| legal-agent | Private API with `lak_` keys | Not yet mounted |
-| creative-agent | Private API and the ChatGPT agents surface | Not yet mounted |
-| tax-agent, insurance-agent, hospitality-agent, agent-builder | None | Not yet mounted |
+| legal-agent | Private API with `lak_` keys | Mounts `/api/operator/v1` (legal-agent#438) |
+| creative-agent | Private API and the ChatGPT agents surface | Mounts `/api/operator/v1` (creative-agent#558) |
+| insurance-agent | None | Mounts `/api/operator/v1` (insurance-agent#114) |
+| tax-agent | OpenAI-compatible gateway with `tak_` keys | Mounts `/api/operator/v1` (tax-agent#574); refuses agent-key turns until they bill the key's cap |
+| physim | OpenAI-compatible gateway with `sk_physim_` keys | Mounts `/api/operator/v1` (physim#170); refuses agent-key turns until they bill the key's cap |
+| hospitality-agent, agent-builder | None | Not yet mounted |
 
 An app mounts this API so outside agents, such as a Claude Code session, can operate its own workspaces.
 No app needs it so that GTM can market that app's product: GTM works from public inputs only.

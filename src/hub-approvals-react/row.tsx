@@ -4,7 +4,7 @@ import { Button } from '@tangle-network/ui/primitives'
 
 import { hubActionReceipt, presentHubAction, type HubApprovalItem } from '../hub-approvals'
 import { HUB_APPROVAL_UNKNOWN_WARNING } from '../hub-approvals/unknown'
-import { HubApprovalPhasePill, HubProviderMark, HubRawDetails } from './parts'
+import { HubApprovalPhasePill, HubProviderMark, HubRawDetails, openPhaseLabel } from './parts'
 import { HubActionPreviewView } from './preview'
 import { HubActionReceiptCard } from './receipt'
 
@@ -52,7 +52,7 @@ export function HubApprovalRow({ item, expanded: controlled, onExpandedChange, o
         >
           <HubProviderMark providerId={presentation.provider.id} name={presentation.provider.name} size={24} />
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{title}</span>
-          <HubApprovalPhasePill phase={item.phase} label={item.phase === 'waiting' ? 'Waiting' : item.phase === 'blocked' ? 'Owner decides' : undefined} />
+          <HubApprovalPhasePill phase={item.phase} label={openPhaseLabel(item)} />
           <ChevronDown aria-hidden className={`size-4 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </Button>
         {item.phase === 'waiting' && onReview && (

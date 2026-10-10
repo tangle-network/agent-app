@@ -185,6 +185,45 @@ describe('agent signup script', () => {
     expect(statSync(keyPath).mode & 0o777).toBe(0o600)
   })
 
+  it('hands the owner the link itself when the approval-email cap is reached', async () => {
+    const starts: Array<Record<string, unknown>> = []
+    const server = createServer((request, response) => {
+      let body = ''
+      request.on('data', (chunk) => { body += chunk })
+      request.on('end', () => {
+        const parsed = JSON.parse(body) as Record<string, unknown>
+        starts.push(parsed)
+        response.setHeader('content-type', 'application/json')
+        if (parsed.owner_email) {
+          response.statusCode = 429
+          response.end(JSON.stringify({ error: 'owner_notification_throttled', retry_after: 2400 }))
+          return
+        }
+        response.end(JSON.stringify({ data: {
+          device_code: 'dvc_capped', user_code: 'CAPP-0001', interval: 1, expires_in: 900,
+          verification_uri_complete: 'https://id.example/cross-site/device?app=agent&user_code=CAPP-0001',
+          agent: { owner_notified: false },
+        } }))
+      })
+    })
+    servers.push(server)
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const dir = tempDir()
+    writeFileSync(
+      join(dir, 'tangle-signup.mjs'),
+      agentSignupScript(`http://127.0.0.1:${(server.address() as AddressInfo).port}`),
+    )
+    const started = await run(process.execPath, ['tangle-signup.mjs', 'start', '--agent-name', 'bot', '--owner-email', 'owner@example.com'], { cwd: dir })
+    expect(starts).toEqual([
+      { agent_name: 'bot', owner_email: 'owner@example.com' },
+      { agent_name: 'bot' },
+    ])
+    expect(started.stdout).toContain('most approval emails it allows')
+    expect(started.stdout).toContain('Send your owner this approval link.')
+    expect(started.stdout).toContain('Approval link: https://id.example/cross-site/device?app=agent&user_code=CAPP-0001')
+    expect(started.stdout).toContain('Confirmation code: CAPP-0001')
+  })
+
   it('exits non-zero with the server reason when signup is refused', async () => {
     const server = createServer((_request, response) => {
       response.statusCode = 429

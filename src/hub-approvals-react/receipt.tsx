@@ -115,7 +115,7 @@ export function HubApprovalReceipts({ items, message, at }: HubApprovalReceiptsP
         )}
       </p>
       {decided.map((item) => <HubActionReceiptCard key={item.id} item={item} />)}
-      {message && <HubRawDetails sections={[{ label: 'Message sent to the agent', value: message }]} />}
+      {message && <HubRawDetails label="Message sent to the agent" sections={[{ label: 'The agent received', value: message }]} />}
     </section>
   )
 }

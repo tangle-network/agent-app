@@ -8671,6 +8671,22 @@ type PdfInspectorWasm
 
 Source: `src/email/index.ts`
 
+### `approvalDigestEmail`
+
+`function` — One email with every request still waiting on the owner, grouped by conversation, each with its own Approve and Deny.
+
+```ts
+(product: EmailProduct, input: ApprovalDigestEmailInput) => EmailMessage
+```
+
+### `ApprovalDigestEmailInput`
+
+`interface` — Input for {@link approvalDigestEmail}.
+
+```ts
+interface ApprovalDigestEmailInput
+```
+
 ### `approvalEmail`
 
 `function` — An agent paused until someone approves what it wants to do.
@@ -10341,6 +10357,14 @@ type HubApprovalPhase
 interface HubApprovalResumePart
 ```
 
+### `HubApprovalWait`
+
+`interface` — Whether an open call waits for the owner, in the owner's words.
+
+```ts
+interface HubApprovalWait
+```
+
 ### `hubProviderName`
 
 `function` — A provider's display name: `github` is GitHub, `outlook-mail` is Outlook.
@@ -10506,12 +10530,28 @@ interface HubApprovalRowProps
 interface HubApprovalsListProps
 ```
 
+### `HubApprovalWaitNote`
+
+`function` — Why an open call waits for the owner, or how it will run without them.
+
+```ts
+({ wait, className }: { wait: HubApprovalWait; className?: string | undefined; }) => Element
+```
+
 ### `HubProviderMark`
 
 `function` — The integration's own logo on a neutral tile, so dark marks stay legible.
 
 ```ts
 ({ providerId, name, size }: { providerId: string; name: string; size?: number | undefined; }) => Element
+```
+
+### `openPhaseLabel`
+
+`function` — The pill an open call shows: who it waits for, or that a permission runs it.
+
+```ts
+(item: Pick<HubApprovalItem, "phase" | "wait">, blocked?: string) => string | undefined
 ```
 
 
@@ -11599,7 +11639,7 @@ type NoticeKind
 `function` — Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error).
 
 ```ts
-(noticeKind: NoticeKind, id: string, text: string) => NoticePersistedPart
+(noticeKind: NoticeKind, id: string, text: string, code?: string | undefined) => NoticePersistedPart
 ```
 
 ### `noticePartKey`
@@ -29556,7 +29596,7 @@ type NoticeKind
 `function` — Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error).
 
 ```ts
-(noticeKind: NoticeKind, id: string, text: string) => NoticePersistedPart
+(noticeKind: NoticeKind, id: string, text: string, code?: string | undefined) => NoticePersistedPart
 ```
 
 ### `noticePartKey`

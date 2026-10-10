@@ -6719,6 +6719,18 @@
       "error": null,
       "exports": [
         {
+          "name": "approvalDigestEmail",
+          "kind": "function",
+          "signature": "(product: EmailProduct, input: ApprovalDigestEmailInput) => EmailMessage",
+          "doc": "One email with every request still waiting on the owner, grouped by conversation, each with its own Approve and Deny."
+        },
+        {
+          "name": "ApprovalDigestEmailInput",
+          "kind": "interface",
+          "signature": "interface ApprovalDigestEmailInput",
+          "doc": "Input for {@link approvalDigestEmail}."
+        },
+        {
           "name": "approvalEmail",
           "kind": "function",
           "signature": "(product: EmailProduct, input: ApprovalEmailInput) => EmailMessage",
@@ -8016,6 +8028,12 @@
           "doc": null
         },
         {
+          "name": "HubApprovalWait",
+          "kind": "interface",
+          "signature": "interface HubApprovalWait",
+          "doc": "Whether an open call waits for the owner, in the owner's words."
+        },
+        {
           "name": "hubProviderName",
           "kind": "function",
           "signature": "(id: string) => string",
@@ -8146,10 +8164,22 @@
           "doc": null
         },
         {
+          "name": "HubApprovalWaitNote",
+          "kind": "function",
+          "signature": "({ wait, className }: { wait: HubApprovalWait; className?: string | undefined; }) => Element",
+          "doc": "Why an open call waits for the owner, or how it will run without them."
+        },
+        {
           "name": "HubProviderMark",
           "kind": "function",
           "signature": "({ providerId, name, size }: { providerId: string; name: string; size?: number | undefined; }) => Element",
           "doc": "The integration's own logo on a neutral tile, so dark marks stay legible."
+        },
+        {
+          "name": "openPhaseLabel",
+          "kind": "function",
+          "signature": "(item: Pick<HubApprovalItem, \"phase\" | \"wait\">, blocked?: string) => string | undefined",
+          "doc": "The pill an open call shows: who it waits for, or that a permission runs it."
         }
       ]
     },
@@ -9009,7 +9039,7 @@
         {
           "name": "noticePart",
           "kind": "function",
-          "signature": "(noticeKind: NoticeKind, id: string, text: string) => NoticePersistedPart",
+          "signature": "(noticeKind: NoticeKind, id: string, text: string, code?: string | undefined) => NoticePersistedPart",
           "doc": "Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error)."
         },
         {
@@ -22840,7 +22870,7 @@
         {
           "name": "noticePart",
           "kind": "function",
-          "signature": "(noticeKind: NoticeKind, id: string, text: string) => NoticePersistedPart",
+          "signature": "(noticeKind: NoticeKind, id: string, text: string, code?: string | undefined) => NoticePersistedPart",
           "doc": "Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error)."
         },
         {

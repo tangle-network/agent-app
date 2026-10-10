@@ -324,6 +324,13 @@ function failureReasonOf(data: Record<string, unknown> | undefined): string | un
   return undefined
 }
 
+/** The typed reason a terminal `error` / `session.run.failed` event's `data`
+ *  names, e.g. `sandbox.stream_failed` or an upstream code. */
+function failureCodeOf(data: Record<string, unknown> | undefined): string | undefined {
+  const code = data?.code
+  return typeof code === 'string' && code.length > 0 ? code : undefined
+}
+
 /** Keepalive emitted while the producer is quiet (long tool calls, first-token
  *  wait) so client watchdogs stay re-armed. One is emitted each time
  *  `intervalMs` elapses with no producer event; the window resets on every real
@@ -435,6 +442,8 @@ export interface ChatTurnCompleteInput<TContext> {
   context: TContext
   failed: boolean
   failureReason?: string
+  /** Typed reason of a failed turn, when its terminal error event names one. */
+  failureCode?: string
   /** The model that SERVED this turn. With failover wired it may differ from
    *  the requested one, so a product that bills or scores per model MUST read
    *  it here rather than assuming the model it asked for. */
@@ -1242,6 +1251,7 @@ export function createChatTurnRoutes<TContext = void>(
                     failed: runFailed,
                     assistantMessageId: assistantRowId(),
                     ...(runFailed ? { failureReason: failureReasonOf(lastFailureData) } : {}),
+                    ...(runFailed && failureCodeOf(lastFailureData) ? { failureCode: failureCodeOf(lastFailureData) } : {}),
                     ...(producer?.model ? { model: producer.model } : {}),
                     ...(attribution?.requestedModel ? { requestedModel: attribution.requestedModel } : {}),
                     ...(attribution?.servedModel ? { servedModel: attribution.servedModel } : {}),

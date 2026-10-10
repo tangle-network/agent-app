@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.60.35
+
+- docs(operator): record which agent apps mount the operator API (#914)
+
+## 0.60.34
+
+- feat(hub-approvals): say why an open call waits, and send waiting requests as one digest (#931)
+
+## 0.60.33
+
+- fix(operator): report error notices as failed turns with a typed reason (#926)
+
+## 0.60.32
+
+- fix(agent-surfaces): past the approval-email cap, show the owner link instead of failing (#930)
+
+## 0.60.31
+
+- fix(hub-approvals): name the resume message disclosure and give the dock title the width on a phone (#929)
+- test: run files in parallel and delete low-value tests (#928) [skip release]
+
 ## 0.60.30
 
 - feat(web-react): decline an ask, limit a key to a workspace, and a 14px shell floor (#927)
