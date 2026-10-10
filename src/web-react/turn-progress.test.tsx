@@ -23,6 +23,12 @@ describe('TurnProgress', () => {
     expect(screen.getByRole('status').textContent).toBe('Thinking…4s')
   })
 
+  it('hides the seconds when the product turns them off', () => {
+    render(<TurnProgress phase={{ message: 'Working…' }} showElapsed={false} />)
+    act(() => { vi.advanceTimersByTime(5000) })
+    expect(screen.getByRole('status').textContent).toBe('Working…')
+  })
+
   it('replaces the thinking row of a pending turn in ChatMessages', () => {
     render(
       <ChatMessages

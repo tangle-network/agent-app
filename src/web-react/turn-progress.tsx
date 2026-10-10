@@ -23,11 +23,13 @@ export interface TurnProgressProps {
   pendingMessage?: string
   /** When the turn was sent (epoch ms). Defaults to when this line mounted. */
   startedAt?: number
+  /** Show the elapsed seconds. Default true; a product turns it off once output is streaming. */
+  showElapsed?: boolean
   className?: string
 }
 
 /** Live stage and elapsed seconds for a turn that has not produced output yet. */
-export function TurnProgress({ phase, pendingMessage = 'Sending…', startedAt, className }: TurnProgressProps) {
+export function TurnProgress({ phase, pendingMessage = 'Sending…', startedAt, showElapsed = true, className }: TurnProgressProps) {
   const [mountedAt] = useState(() => Date.now())
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -43,7 +45,7 @@ export function TurnProgress({ phase, pendingMessage = 'Sending…', startedAt, 
       className={['flex min-w-0 items-center gap-2 text-sm text-muted-foreground', className].filter(Boolean).join(' ')}
     >
       <TextShimmer className="min-w-0 truncate">{message}</TextShimmer>
-      {seconds >= ELAPSED_VISIBLE_FROM_SECONDS && (
+      {showElapsed && seconds >= ELAPSED_VISIBLE_FROM_SECONDS && (
         <span aria-hidden className="shrink-0 tabular-nums">{seconds}s</span>
       )}
     </div>
