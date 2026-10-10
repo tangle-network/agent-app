@@ -27,6 +27,8 @@ export interface ChatOperatorMessage {
   model?: string | null
   servedModel?: string | null
   costUsd?: number | null
+  /** The row's product metadata, for a `failureOf` that reads a stamped turn status. */
+  metadata?: Record<string, unknown> | null
 }
 
 export interface ChatOperatorThread {
