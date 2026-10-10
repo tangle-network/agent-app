@@ -185,44 +185,8 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
     }
   }
 
-  return (
-    <section
-      aria-label={active.phase === 'unknown' ? 'Action may have run' : 'Waiting for your approval'}
-      data-hub-approval-dock={active.id}
-      className={`overflow-hidden rounded-2xl border border-[var(--surface-warning-border)] bg-card shadow-md ${className}`}
-    >
-      {queue.length > 1 && (
-        <div className="border-b border-border bg-muted/40 px-1.5 pb-1.5 pt-2">
-          <p className="px-2 pb-1 text-sm font-medium text-muted-foreground" aria-live="polite">
-            {waitingCount === 0 ? `${queue.length} requests` : waitingCount === 1 ? '1 request waiting' : `${waitingCount} requests waiting`}
-          </p>
-          <ul aria-label="Requests in this conversation" className="max-h-32 space-y-0.5 overflow-y-auto sm:max-h-40">
-            {queue.map((item) => {
-              const shown = presentHubAction(item)
-              const current = item.id === active.id
-              return (
-                <li key={item.id}>
-                  <Button
-                    variant="bare"
-                    aria-current={current ? 'true' : undefined}
-                    onClick={() => {
-                      setActiveId(item.id)
-                      setCollapsed(false)
-                    }}
-                    className={`flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors ${current ? 'bg-card shadow-sm' : 'hover:bg-card/70'}`}
-                  >
-                    <HubProviderMark providerId={shown.provider.id} name={shown.provider.name} size={24} />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                      {item.phase === 'done' ? hubActionReceipt(item).title : shown.title}
-                    </span>
-                    <HubApprovalPhasePill phase={item.phase} label={openPhaseLabel(item)} />
-                  </Button>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      )}
+  const card = (
+    <>
       <div className="flex items-start gap-3 px-4 pt-3">
         <HubProviderMark providerId={presentation.provider.id} name={presentation.provider.name} size={28} />
         <div className="min-w-0 flex-1">
@@ -327,6 +291,50 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
           )}
         </div>
       </div>
+    </>
+  )
+
+  return (
+    <section
+      aria-label={active.phase === 'unknown' ? 'Action may have run' : 'Waiting for your approval'}
+      data-hub-approval-dock={active.id}
+      className={`overflow-hidden rounded-2xl border border-[var(--surface-warning-border)] bg-card shadow-md ${className}`}
+    >
+      {queue.length > 1 ? (
+        <div className="max-h-[70vh] overflow-y-auto pt-2.5">
+          <p className="px-4 pb-1.5 text-sm font-medium text-muted-foreground" aria-live="polite">
+            {waitingCount === 0 ? `${queue.length} requests` : waitingCount === 1 ? '1 request waiting' : `${waitingCount} requests waiting`}
+          </p>
+          <ul aria-label="Requests in this conversation" className="divide-y divide-border border-t border-border">
+            {queue.map((item) => {
+              if (item.id === active.id) return <li key={item.id} aria-current="true">{card}</li>
+              const shown = presentHubAction(item)
+              return (
+                <li key={item.id}>
+                  <Button
+                    variant="bare"
+                    data-hub-approval-dock-row={item.id}
+                    onClick={() => {
+                      setActiveId(item.id)
+                      setCollapsed(false)
+                    }}
+                    className="flex min-h-11 w-full items-center gap-2.5 px-4 text-left transition-colors hover:bg-muted/60"
+                  >
+                    <HubProviderMark providerId={shown.provider.id} name={shown.provider.name} size={24} />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                      {item.phase === 'done' ? hubActionReceipt(item).title : shown.title}
+                    </span>
+                    {/* Every row here waits unless it says otherwise; on a phone the title keeps that width. */}
+                    <span className={item.phase === 'waiting' ? 'hidden sm:inline-flex' : 'inline-flex'}>
+                      <HubApprovalPhasePill phase={item.phase} label={openPhaseLabel(item)} />
+                    </span>
+                  </Button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ) : card}
     </section>
   )
 }

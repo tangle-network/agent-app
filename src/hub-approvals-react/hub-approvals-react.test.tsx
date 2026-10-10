@@ -135,16 +135,16 @@ describe('HubApprovalDock', () => {
     expect(screen.getByText('Sending email always asks.')).toBeTruthy()
   })
 
-  it('lists every waiting call above the open one, opens the one picked, and brings a focused one to the front', () => {
+  it('lists every waiting call with the open one in place, opens the one picked, and brings a focused one to the front', () => {
     const { rerender } = render(<HubApprovalDock items={[PROPOSE, EMAIL]} onDecide={vi.fn()} />)
     const list = screen.getByRole('list', { name: 'Requests in this conversation' })
-    expect(within(list).getAllByRole('button').map((row) => row.textContent)).toEqual([
-      'Open PR: Fix the hero wrap on acme/siteWaiting', 'Send email to ada@acme.comWaiting',
-    ])
     expect(screen.getByText('2 requests waiting')).toBeTruthy()
+    expect(within(list).getByRole('heading', { name: 'Open PR: Fix the hero wrap on acme/site' })).toBeTruthy()
+    // The open call is not listed twice.
+    expect(within(list).queryByRole('button', { name: /Open PR: Fix the hero wrap/ })).toBeNull()
     fireEvent.click(within(list).getByRole('button', { name: /Send email to ada@acme.com/ }))
     expect(screen.getByRole('heading', { name: 'Send email to ada@acme.com' })).toBeTruthy()
-    expect(within(list).getByRole('button', { name: /Send email/ }).getAttribute('aria-current')).toBe('true')
+    expect(within(list).getByRole('button', { name: /Open PR: Fix the hero wrap/ })).toBeTruthy()
     rerender(<HubApprovalDock items={[PROPOSE, EMAIL]} onDecide={vi.fn()} focusId={PROPOSE.id} />)
     expect(screen.getByRole('heading', { name: 'Open PR: Fix the hero wrap on acme/site' })).toBeTruthy()
   })
