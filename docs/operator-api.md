@@ -28,6 +28,7 @@ An app built on agent-app's chat stack does not write an adapter: `createChatOpe
 The app supplies its workspace roles, a `runTurn` that calls its chat route as the caller, and, optionally, running-turn discovery, files, journal, approvals, assets, and a scorecard.
 Thread reads receive the caller too, so an app whose conversations belong to one user rather than the whole workspace returns null for anyone else's.
 Its turns are driven exactly as a browser drives them, so the start request returns once the turn settles; apps whose turns are owned by a durable worker, such as GTM's completion Workflow, return as soon as the turn is admitted.
+A failed turn must be recorded as a failure, not as prose: run the sandbox producer with `errorNotice: true`, whose `error` notice carries the sandbox or upstream error code, or persist a `turn-failure` notice. The adapter then reports `failed` with `failure: { code, message }`; a failure written only into the reply text reads as `succeeded`.
 
 `keys` uses the same callbacks as `createApiKeyRequestAuth`, so an app reuses its key store, revocation, expiry, and request limits.
 
