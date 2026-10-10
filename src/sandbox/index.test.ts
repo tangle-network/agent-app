@@ -3,7 +3,7 @@ import { mkdtemp, readFile as readFsFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { agentProfileSchema } from '@tangle-network/agent-interface'
 import { materializeProfile } from '@tangle-network/agent-profile-materialize'
 
@@ -49,6 +49,8 @@ import {
   adaptSandboxStream,
   type SandboxStreamEvent,
   streamSandboxPrompt,
+  SANDBOX_DISPATCH_TRANSIENT_DEADLINE_MS,
+  SandboxTransientDeadlineError,
   runSandboxPrompt,
   collectSandboxPromptText,
   resolveModel,
@@ -1336,6 +1338,76 @@ describe('streamSandboxPrompt seam', () => {
     await expect(async () => {
       for await (const _ of adaptSandboxStream(malformedEvents())) void _
     }).rejects.toThrow('sandbox gateway event usage is invalid')
+  })
+
+  describe('a dispatch the box refuses', () => {
+    const gatewayRefusal = (status: number) => Object.assign(
+      new Error(`POST /v1/sandboxes/box-1/runtime/agents/run/stream: error code: ${status}`),
+      { name: 'ServerError', status, endpoint: '/v1/sandboxes/box-1/runtime/agents/run/stream', origin: 'sandbox-api' },
+    )
+    const notReady = () => Object.assign(new Error('Sandbox filesystem incarnation is not ready'), {
+      name: 'StateError', code: 'FILESYSTEM_INCARNATION_NOT_READY',
+    })
+    afterEach(() => { vi.useRealTimers() })
+
+    async function drain(box: SandboxInstance, options: Record<string, unknown> = {}) {
+      const out: unknown[] = []
+      for await (const event of streamSandboxPrompt(shell(), box, 'hello', { executionId: 'exec-1', sessionId: 'thread-1', ...options })) out.push(event)
+      return out
+    }
+
+    it('resends the same execution through refusals and not-ready answers until the box takes it', async () => {
+      vi.useFakeTimers()
+      const failures = [gatewayRefusal(502), notReady(), gatewayRefusal(503)]
+      const streamPrompt = vi.fn(async function* () {
+        const failure = failures.shift()
+        if (failure) throw failure
+        yield { type: 'execution.started', data: { executionId: 'exec-1' } }
+        yield { type: 'done', data: {} }
+      })
+      const box = fakeBox({ streamPrompt })
+
+      const drained = drain(box)
+      await vi.runAllTimersAsync()
+
+      expect((await drained).map((event) => (event as { type: string }).type)).toEqual(['execution.started', 'done'])
+      expect(streamPrompt).toHaveBeenCalledTimes(4)
+      expect(streamPrompt.mock.calls.map(([, options]) => (options as { executionId?: string }).executionId))
+        .toEqual(['exec-1', 'exec-1', 'exec-1', 'exec-1'])
+    })
+
+    it('fails with a typed error after eight minutes of refusals', async () => {
+      vi.useFakeTimers()
+      const startedAt = Date.now()
+      const streamPrompt = vi.fn(async function* (): AsyncGenerator<unknown> { throw gatewayRefusal(503) })
+      const drained = drain(fakeBox({ streamPrompt })).catch((error: unknown) => error)
+      await vi.runAllTimersAsync()
+
+      const failure = await drained
+      expect(failure).toBeInstanceOf(SandboxTransientDeadlineError)
+      expect(failure).toMatchObject({ code: 'sandbox.dispatch_refused' })
+      expect(Date.now() - startedAt).toBeLessThanOrEqual(SANDBOX_DISPATCH_TRANSIENT_DEADLINE_MS)
+      expect(Date.now() - startedAt).toBeGreaterThan(SANDBOX_DISPATCH_TRANSIENT_DEADLINE_MS - 60_000)
+    })
+
+    it('does not resend after the run delivered an event, on a replay, or for another failure', async () => {
+      const afterEvent = vi.fn(async function* () {
+        yield { type: 'execution.started', data: { executionId: 'exec-1' } }
+        throw gatewayRefusal(502)
+      })
+      await expect(drain(fakeBox({ streamPrompt: afterEvent }))).rejects.toThrow('error code: 502')
+      expect(afterEvent).toHaveBeenCalledTimes(1)
+
+      const replay = vi.fn(async function* (): AsyncGenerator<unknown> { throw gatewayRefusal(502) })
+      await expect(drain(fakeBox({ streamPrompt: replay }), { lastEventId: 'event-7' })).rejects.toThrow('error code: 502')
+      expect(replay).toHaveBeenCalledTimes(1)
+
+      const other = vi.fn(async function* (): AsyncGenerator<unknown> {
+        throw Object.assign(new Error('runtime exploded'), { status: 500, endpoint: '/v1/sandboxes/box-1/runtime/agents/run/stream', origin: 'sandbox-api' })
+      })
+      await expect(drain(fakeBox({ streamPrompt: other }))).rejects.toThrow('runtime exploded')
+      expect(other).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('flattens history, resolves the model, attaches effort, and forwards to box.streamPrompt', async () => {
