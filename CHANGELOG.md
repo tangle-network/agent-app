@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.21
+
+- fix(agent-surfaces): number setup skill sections without gaps (#916)
+
 ## 0.60.20
 
 - fix(operator): expose operator declarations to NodeNext consumers (#913)
