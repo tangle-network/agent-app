@@ -1970,12 +1970,24 @@ async function resumeStoppedBox(
   runtimeEnv: Record<string, string>,
   onProgress?: (event: ProvisionEvent) => void,
 ): Promise<Outcome<SandboxInstance>> {
+  // A resume is the lifecycle step callers label a turn by, and the waits
+  // below report no progress for a stopped box, so report it here.
+  const report = (status: ProvisionEvent['status'], message: string) => {
+    try {
+      onProgress?.({ step: 'container-start', status, message, timestamp: new Date().toISOString() })
+    } catch {
+      // A progress observer cannot interfere with the resume.
+    }
+  }
   try {
     livenessVerifiedAt.delete(box.id)
+    report('started', 'Resuming the stopped sandbox')
     await resumeWithRequiredRuntimeEnv(box, timeoutMs, runtimeEnv)
     await box.waitFor('running', { timeoutMs, ...(onProgress ? { onProgress } : {}) })
+    report('completed', 'The stopped sandbox is running again')
     return ok(box)
   } catch (cause) {
+    report('error', 'The stopped sandbox could not be resumed')
     return fail(stoppedBoxResumeError(box, cause))
   }
 }

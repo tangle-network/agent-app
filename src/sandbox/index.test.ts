@@ -2590,6 +2590,29 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(box).toBe(stopped)
   })
 
+  it('reports the resume of a stopped box as a container-start step', async () => {
+    const stopped = fakeBox({
+      name: 'box-w1',
+      resume: vi.fn().mockResolvedValue(undefined),
+      waitFor: vi.fn(),
+      exec: vi.fn().mockResolvedValue({ stdout: 'alive', exitCode: 0 }),
+    })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'stopped' ? [stopped] : []),
+    )
+    const events: Array<{ step: string; status: string }> = []
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: {} })
+
+    await ensureWorkspaceSandbox(shell, {
+      workspaceId: 'w1', harness: 'opencode', onProgress: (event) => { events.push({ step: event.step, status: event.status }) },
+    })
+
+    expect(events).toEqual([
+      { step: 'container-start', status: 'started' },
+      { step: 'container-start', status: 'completed' },
+    ])
+  })
+
   it('rejects an egress mismatch after resume without updating or deleting the box', async () => {
     const get = vi.fn().mockResolvedValue({
       policy: { mode: 'open' },
