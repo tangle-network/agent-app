@@ -207,6 +207,52 @@ describe('observeNativeCompletion', () => {
     })
   })
 
+  describe('a session whose runtime restarted under its run', () => {
+    // GTM b81b, 2026-10-10: the box ran out of disk mid-turn and was restored. The sidecar failed the
+    // execution's event buffer ("Execution interrupted: the agent runtime restarted…") but the session kept
+    // its persisted running status, so the observer renewed the admission on every pass from 16:01Z on.
+    const interrupted = 'Execution interrupted: the agent runtime restarted before the run produced a terminal event. The run cannot be resumed; retry it.'
+    const observe = (state: string, admissionStore: NativeCompletionAdmissionStore) => observeNativeCompletion({
+      source: source({
+        status: {
+          id: 'session-1', status: 'running', activeExecutionId: 'turn-1', latestExecutionId: 'turn-1',
+          raw: { id: 'session-1', status: 'running', state, activeExecutionId: 'turn-1', hasActiveExecution: false },
+        },
+        runs: [{ executionId: 'turn-1', sessionId: 'session-1', status: 'failed', startedAt: 1, completedAt: 2, eventCount: 6_327, lastEventId: 'interrupted-done' }],
+        messages: [{
+          id: 'assistant-1', role: 'assistant', timestamp: '2026-10-10T09:03:00.000Z',
+          metadata: { turnId: 'turn-1', status: 'interrupted', interrupted: true, interruptReason: interrupted },
+          parts: [{ type: 'text', text: 'I’ll pull the latest founder list first.' }],
+        }],
+      }),
+      admissionStore,
+      executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 0, now: 700_000,
+    })
+    const openAdmission = () => {
+      const admissionStore = store({ ...admission, state: 'open' as const, ownerLeaseUntil: 120_000, closedAt: undefined })
+      admissionStore.closeExpired = vi.fn(async () => ({ ...admission, state: 'closed' as const, closedAt: 700_000 }))
+      return admissionStore
+    }
+
+    it('settles failed with the partial reply instead of renewing the admission', async () => {
+      const admissionStore = openAdmission()
+      const observed = await observe('stale', admissionStore)
+
+      expect(admissionStore.renew).not.toHaveBeenCalled()
+      expect(admissionStore.closeExpired).toHaveBeenCalledWith('turn-1', new Date(700_000))
+      expect(observed).toMatchObject({ state: 'failed', receipt: { state: 'failed', error: interrupted, text: 'I’ll pull the latest founder list first.' } })
+    })
+
+    it('still renews a session whose run is live', async () => {
+      const admissionStore = openAdmission()
+      admissionStore.renew = vi.fn(async () => ({ ...admission, state: 'open' as const, ownerLeaseUntil: 820_000 }))
+      const observed = await observe('running', admissionStore)
+
+      expect(admissionStore.renew).toHaveBeenCalled()
+      expect(observed).toEqual({ state: 'running' })
+    })
+  })
+
   it('retains partial tool and file parts from an exact interrupted turn without billing it', async () => {
     const box = source({
       status: { id: 'session-1', status: 'cancelled', latestExecutionId: 'turn-1', failureReason: { message: 'cancelled' } },

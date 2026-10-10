@@ -275,6 +275,18 @@ function abortedToolCall(parts: ReadonlyArray<Record<string, unknown>>): string 
   return undefined
 }
 
+/**
+ * Whether the session still runs work for its admission. A session keeps its
+ * persisted `running` status when the runtime restarts under it; the sidecar
+ * then reports its recovery state as `stale` (the active execution has no
+ * process behind it) and has already failed that execution's event buffer.
+ * Renewing the admission for such a session would observe it forever.
+ */
+function sessionHoldsLiveWork(status: SessionInfo): boolean {
+  if (status.status !== 'queued' && status.status !== 'running') return false
+  return status.raw?.state !== 'stale'
+}
+
 function missingTurnReceipt(turnId: string, error: string): NativeCompletionTurnReceipt {
   // An execution ledger entry proves this turn reached a terminal state, but
   // not that its terminal transcript was retained. Keep any earlier exact
@@ -324,7 +336,7 @@ export async function observeNativeCompletion(
   const exactSession = session
 
   if (admission.state === 'open') {
-    if (status.status === 'queued' || status.status === 'running') {
+    if (sessionHoldsLiveWork(status)) {
       admission = await options.admissionStore.renew(options.executionId, new Date(now)) ?? admission
     } else if (leaseUntil <= now) {
       admission = await options.admissionStore.closeExpired(options.executionId, new Date(now)) ?? admission
