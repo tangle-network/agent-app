@@ -649,7 +649,7 @@ describe('createSandboxChatProducer', () => {
     ])
   })
 
-  it('declines an ask by its content, with the product's notice', async () => {
+  it('declines an ask by its content, with the product’s notice', async () => {
     const declineInteraction = vi.fn(async () => {})
     const approve = {
       type: 'interaction',
