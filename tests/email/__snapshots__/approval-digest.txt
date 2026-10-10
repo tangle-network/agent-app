@@ -1,0 +1,32 @@
+Subject: Approve: 3 requests are waiting — GTM Agent
+Preheader: 3 requests are waiting for your decision.
+
+Tangle GTM Agent
+
+3 approvals waiting
+
+3 requests are waiting for your decision. Each one runs only when you approve it.
+
+Launch week
+- Post on X “Ship notes”
+  X · open until Oct 9, 3:40 PM UTC
+  https://gtm.tangle.tools/app/ws_1/chat/thr_1#msg-m1
+  Approve: https://gtm.tangle.tools/approval/act_a?t=sig_a
+  Deny: https://gtm.tangle.tools/approval/act_d?t=sig_d
+- Send email to ada@acme.com
+  Gmail
+  Approve: https://gtm.tangle.tools/approval/act_b?t=sig_b
+  Deny: https://gtm.tangle.tools/approval/act_e?t=sig_e
+
+Follow-ups
+- Start outbound call to +15555550100
+  ph0ny
+  Approve: https://gtm.tangle.tools/approval/act_c?t=sig_c
+  Deny: https://gtm.tangle.tools/approval/act_f?t=sig_f
+
+Review all: https://gtm.tangle.tools/app/ws_1/review
+
+--
+Tangle Growth · GTM Agent
+You own this workspace.
+Manage notifications: https://gtm.tangle.tools/app/ws_1/settings
