@@ -298,8 +298,12 @@ describe('progress-first turn stream: an admitted turn', () => {
     await reader.read()
     await reader.cancel()
     releaseProducer()
-    for (let settledCount = 0; settledCount < pending.length; settledCount = pending.length) {
-      await Promise.all(pending)
+    // The turn's drain registers its own waitUntil once the producer starts,
+    // while the first one is still pending: keep waiting until no new one
+    // appears. (Recording the length after the wait skipped the drain.)
+    for (let awaited = 0; awaited < pending.length;) {
+      awaited = pending.length
+      await Promise.all(pending.slice(0, awaited))
     }
     expect(rows.map((row) => [row.role, row.content])).toEqual([['user', 'hi'], ['assistant', 'late answer']])
   })
