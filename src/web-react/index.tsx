@@ -36,8 +36,11 @@ import { attachmentPartsFromMessageParts, type ChatAttachmentPart } from './chat
 import { MessageAttachments } from './message-attachments'
 import { WorkProductCard, workProductPartsFromMessageParts } from './work-product'
 import type { WorkProductPersistedPart } from '../work-product/types'
+import type { TurnPhaseData } from '../chat-routes/turn-progress'
+import { TurnProgress } from './turn-progress'
 
 export * from './chat-stream'
+export { TurnProgress, type TurnProgressProps } from './turn-progress'
 export * from './chat-interactions'
 export * from './chat-composer'
 export { getChatFundingRecovery, type ChatFundingFailure, type ChatFundingRecovery } from './turn-funding-recovery'
@@ -320,6 +323,9 @@ export interface ChatMessagesProps {
   agentLabel?: string
   /** Render the trailing "agent is thinking" row. */
   loading?: boolean
+  /** The pending turn's latest stage from its `session.run.phase` events. The
+   *  trailing row shows it in place of "Thinking…" until the first output. */
+  turnPhase?: Pick<TurnPhaseData, 'message'> | null
   /** Approve/Reject handlers for proposals awaiting approval. When omitted the
    *  card still shows "awaiting approval" but without action buttons. */
   approval?: ProposalApprovalHandlers
@@ -1492,19 +1498,17 @@ export function useThinkingSeconds(active: boolean): number {
   return seconds
 }
 
-function ThinkingRow({ agentLabel, chrome = 'labeled' }: { agentLabel: string; chrome?: 'labeled' | 'quiet' }) {
-  const seconds = useThinkingSeconds(true)
+function ThinkingRow({ agentLabel, chrome = 'labeled', phase }: {
+  agentLabel: string
+  chrome?: 'labeled' | 'quiet'
+  phase?: Pick<TurnPhaseData, 'message'> | null
+}) {
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
       {chrome !== 'quiet' && (
         <p className="mb-1 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">{agentLabel}</p>
       )}
-      <div className="flex items-center gap-2 text-[15px] text-muted-foreground">
-        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-          <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
-        </svg>
-        Thinking{seconds >= 3 ? ` · ${seconds}s` : '...'}
-      </div>
+      <TurnProgress phase={phase} pendingMessage="Thinking…" className="text-[15px]" />
     </div>
   )
 }
@@ -1624,6 +1628,7 @@ export function ChatMessages({
   userLabel = 'User',
   agentLabel = 'Agent',
   loading,
+  turnPhase,
   approval,
   onToolCallClick,
   toolRenderers,
@@ -1726,7 +1731,7 @@ export function ChatMessages({
           />
         ),
       )}
-      {loading && lastIsUser && <ThinkingRow agentLabel={agentLabel} chrome={chrome} />}
+      {loading && lastIsUser && <ThinkingRow agentLabel={agentLabel} chrome={chrome} phase={turnPhase} />}
       {error && !loading && <StreamErrorRow message={error} onRetry={onRetry} />}
     </>
   )

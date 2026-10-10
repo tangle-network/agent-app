@@ -80,6 +80,16 @@ export const AgentThinking: Story = {
   },
 }
 
+/** Loading with the server's current stage: the row shows it in place of "Thinking…". */
+export const AgentPreparingWorkspace: Story = {
+  name: 'Agent Preparing Workspace',
+  args: {
+    messages: [{ id: 'u1', role: 'user', content: 'Render the launch poster and queue it for review.' }],
+    loading: true,
+    turnPhase: { message: 'Preparing your workspace…' },
+  },
+}
+
 /** Three turns: user bubble, assistant with reasoning + approval card, follow-up. */
 export const Short: Story = {
   args: { messages: shortThread, approval },
