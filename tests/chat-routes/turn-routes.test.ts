@@ -1390,7 +1390,8 @@ describe('createChatTurnRoutes — interactions composition', () => {
     )
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ok: true })
-    expect(posts).toEqual([{ id: 'ask-1', outcome: 'accepted', data: { q0: 'Yes' } }])
+    // A select answer is a string array on the wire; one choice sent as a string arrives as that one-item array.
+    expect(posts).toEqual([{ id: 'ask-1', outcome: 'accepted', data: { q0: ['Yes'] } }])
   })
 
   it('is null when the product wires no interactions channel', () => {
