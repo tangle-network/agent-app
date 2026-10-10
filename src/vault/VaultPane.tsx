@@ -42,6 +42,7 @@ import type {
   VaultRichParts,
   VaultTreeNode,
 } from './contracts'
+import { ShellHeader } from '@tangle-network/sandbox-ui/workspace'
 
 /** Narrowest pane that places a dock beside the document rather than in it. */
 const DOCK_SIDE_MIN_PX = 960
@@ -1075,7 +1076,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               className={`${showFiles || treeSpansPane ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden ${treeSpansPane ? '' : '@[45rem]/vault:flex'}`}
             >
               {selectedFile && (
-                <div className={`flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4 ${pathBarClassName ?? 'bg-card'}`}>
+                <ShellHeader className={`justify-between gap-2 px-4 ${pathBarClassName ?? 'bg-card'}`}>
                   <span data-vault-path className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{selectedFile.path}</span>
                   <div className="flex shrink-0 items-center gap-1">
                     {canWrite && isMarkdownCapable && (
@@ -1149,7 +1150,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                       </button>
                     )}
                   </div>
-                </div>
+                </ShellHeader>
               )}
               {selectedFile && saveError && (
                 <OperationErrorAlert

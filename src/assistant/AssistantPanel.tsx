@@ -53,6 +53,7 @@ import type { AssistantChat } from "./useAssistantChat";
 import { useAssistantModels } from "./useAssistantModels";
 import { useAssistantThreads } from "./useAssistantThreads";
 import { useStickToBottom } from "./use-stick-to-bottom";
+import { ShellHeader } from "@tangle-network/sandbox-ui/workspace";
 
 export interface AssistantPanelProps {
   chat: AssistantChat;
@@ -502,7 +503,7 @@ export function AssistantPanel({
       {/* History sits on the outer edge, under the floating toggle's spot: a
           second click right after opening toggles history, never resets the
           conversation. */}
-      <header className="flex h-[var(--assistant-header-height,3.5rem)] shrink-0 items-center gap-2 border-border border-b px-3">
+      <ShellHeader as="header" className="gap-2 bg-transparent">
         {layout === "docked" && (
           <AssistantPanelToggle open onToggle={onClose} buttonRef={toggleRef} />
         )}
@@ -564,7 +565,7 @@ export function AssistantPanel({
             <X aria-hidden="true" className="h-[18px] w-[18px]" />
           </button>
         )}
-      </header>
+      </ShellHeader>
 
       <div
         ref={logRef}

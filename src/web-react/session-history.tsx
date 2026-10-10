@@ -38,6 +38,7 @@ import { Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigg
 
 import { ActionDialog, ActionDialogButton } from './action-dialog'
 import { OVERLAY_SHADOW, PopoverSurface, usePopover } from './controls'
+import { ShellHeader } from '@tangle-network/sandbox-ui/workspace'
 
 // ---------------------------------------------------------------------------
 // useInfiniteScroll
@@ -719,8 +720,8 @@ export function SessionHistoryPanel({
 
   return (
     <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${className ?? ''}`}>
-      {/* 56px, matching the rail header the fleet aligned on. */}
-      <header className="flex h-14 shrink-0 items-center border-b border-border px-4 sm:px-6">
+      {/* A ShellHeader row, so its divider continues the rail's. */}
+      <ShellHeader as="header" className="bg-transparent px-4 sm:px-6">
         <div className={`flex items-center gap-3 px-3 ${column}`}>
         <h1 className="flex-1 truncate text-sm font-semibold text-foreground">{title}</h1>
         {newSessionHref && (
@@ -733,7 +734,7 @@ export function SessionHistoryPanel({
           </Link>
         )}
         </div>
-      </header>
+      </ShellHeader>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         {hasAnySessions && (
