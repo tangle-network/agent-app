@@ -146,13 +146,15 @@ export function createSecretScanner(options: { knownSecrets?: readonly string[] 
     // Keep a tail so a credential split across two chunks is seen whole.
     const window = 8192
     const maxCarry = 65536
-    const decoder = new TextDecoder('latin1')
     let carry = new Uint8Array(0)
 
     function scan(buffer: Uint8Array, final: boolean): number {
-      // latin1/windows-1252 decodes one code unit per byte, so string indexes
-      // are byte offsets.
-      const text = decoder.decode(buffer)
+      // One UTF-16 code unit per byte, so string indexes are byte offsets.
+      // Decoded by hand: not every runtime's TextDecoder offers latin1.
+      let text = ''
+      for (let i = 0; i < buffer.length; i += 8192) {
+        text += String.fromCharCode(...buffer.subarray(i, i + 8192))
+      }
       const regex = pattern()
       let emitEnd = final ? buffer.length : Math.max(0, buffer.length - window)
       let masked = 0
