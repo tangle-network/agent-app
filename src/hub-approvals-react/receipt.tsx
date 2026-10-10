@@ -98,7 +98,7 @@ export function HubApprovalReceipts({ items, message, at }: HubApprovalReceiptsP
   const verbs = [approved ? `approved ${actions(approved)}` : null, denied ? `denied ${actions(denied)}` : null].filter(Boolean)
   const summary = verbs.length
     ? `You ${verbs.join(' and ')}${expired ? `; ${actions(expired)} expired` : ''}`
-    : `${actions(expired)} expired`
+    : expired ? `${actions(expired)} expired` : 'Your decisions'
   const when = at ? new Date(at) : null
   return (
     <section aria-label="Approval results" className="space-y-2">

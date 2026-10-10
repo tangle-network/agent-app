@@ -55,7 +55,7 @@ function Progress({ item }: { item: HubApprovalItem }) {
     return (
       <p role="status" className="flex items-center gap-2 text-sm font-medium text-foreground">
         <Loader2 aria-hidden className="size-4 animate-spin text-[var(--surface-info-text)]" />
-        {item.phase === 'queued' ? 'Approved. Starting…' : `Running on ${provider}…`}
+        {item.phase === 'queued' ? 'Approved. It runs when the agent’s turn finishes…' : `Running on ${provider}…`}
       </p>
     )
   }
