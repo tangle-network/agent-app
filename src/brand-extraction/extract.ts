@@ -298,9 +298,46 @@ const GENERIC_FAMILIES = new Set([
   'ui-sans-serif', 'ui-serif', 'ui-monospace', 'ui-rounded', 'inherit', 'initial', 'unset',
 ])
 
-/** font-family declarations, with the selector chunk preceding them for role
- *  inference. Captures the selector text in group 1, the stack in group 2. */
-const FONT_DECL_RE = /([^{}]*)\{[^{}]*font-family\s*:\s*([^;}{]+)[;}]/gi
+/** The last terminated font-family declaration in one rule body. Applied to a
+ *  body that holds no brace except an optional closing one, so its
+ *  backtracking stays inside that body. */
+const BLOCK_FONT_DECL_RE = /^[^{}]*font-family\s*:\s*([^;}{]+)[;}]/i
+
+/**
+ * Each rule body's font-family stack, with the selector text before the body
+ * for role inference.
+ *
+ * One pass over the braces. A single unanchored `([^{}]*)\{[^{}]*font-family`
+ * pattern restarted its selector scan at every character of a brace-free run,
+ * so a long run of page markup before a rule without a font-family made it
+ * quadratic: a 366 KB page took 74 s and the brand intake request exceeded its
+ * CPU limit. This walk gives the same selectors and stacks: the selector is
+ * the text since the previous brace or the end of the previous declaration it
+ * found, whichever is later.
+ */
+function fontDeclarations(html: string): Array<{ selector: string; stack: string }> {
+  const declarations: Array<{ selector: string; stack: string }> = []
+  const braces = /[{}]/g
+  const nextBrace = /[{}]/g
+  let previousBrace = -1
+  let resumeAt = 0
+  for (let brace = braces.exec(html); brace; brace = braces.exec(html)) {
+    const at = brace.index
+    if (html[at] === '{') {
+      nextBrace.lastIndex = at + 1
+      const next = nextBrace.exec(html)
+      // The body runs to the next brace and keeps a closing one, which can end the declaration.
+      const end = next ? next.index + 1 : html.length
+      const match = BLOCK_FONT_DECL_RE.exec(html.slice(at + 1, end))
+      if (match) {
+        declarations.push({ selector: html.slice(Math.max(previousBrace + 1, resumeAt), at), stack: match[1]! })
+        resumeAt = at + 1 + match[0].length
+      }
+    }
+    previousBrace = at
+  }
+  return declarations
+}
 
 function parseFontStack(raw: string | undefined): string[] {
   if (!raw) return []
@@ -334,12 +371,11 @@ function extractFonts(html: string): BrandFont[] {
     }
   }
 
-  for (const m of html.matchAll(FONT_DECL_RE)) {
-    const selector = m[1] ?? ''
-    const stack = parseFontStack(m[2])
+  for (const declaration of fontDeclarations(html)) {
+    const stack = parseFontStack(declaration.stack)
     const primary = stack[0]
     if (!primary) continue
-    consider(primary, stack, roleFromSelector(selector))
+    consider(primary, stack, roleFromSelector(declaration.selector))
   }
 
   // Bare `font-family:` declarations inside inline style attributes and tokens.

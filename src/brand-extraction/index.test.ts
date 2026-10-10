@@ -134,6 +134,22 @@ describe('parseBrandKit — fixture HTML → BrandKit', () => {
     expect(hero?.source).toBe('img-hero')
   })
 
+  it('reads fonts from a page with long markup before its rules in linear time', () => {
+    // A brace-free run before a rule with no font-family made the old single
+    // regex restart its selector scan at every character: a 366 KB storefront
+    // page took 74 s and its brand intake request exceeded the CPU limit.
+    const markup = '<p class="copy">Book trusted help for home projects.</p>'.repeat(7_000)
+    const html = `<html><body>${markup}<style>.card{color:#222}h1{font-family:"Brand Display",serif}p{font-family:Inter,sans-serif}</style></body></html>`
+    expect(html.length).toBeGreaterThan(350_000)
+
+    const started = performance.now()
+    const fonts = parseBrandKit(html, BASE_URL).fonts
+    expect(performance.now() - started).toBeLessThan(2_000)
+
+    expect(fonts.find((f) => f.family === 'Brand Display')?.role).toBe('display')
+    expect(fonts.find((f) => f.family === 'Inter')?.role).toBe('body')
+  })
+
   it('records provenance', () => {
     expect(kit.extractedFrom).toEqual([BASE_URL])
     expect(kit.sourceUrl).toBe(BASE_URL)
