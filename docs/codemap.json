@@ -2639,6 +2639,12 @@
           "doc": "The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`."
         },
         {
+          "name": "buildTurnPhaseEvent",
+          "kind": "function",
+          "signature": "(phase: string, message: string, opts?: { heartbeat?: boolean | undefined; elapsedMs?: number | undefined; sinceRequest…",
+          "doc": "Build a {@link TURN_PHASE_EVENT}."
+        },
+        {
           "name": "bytesToBase64",
           "kind": "function",
           "signature": "(bytes: Uint8Array<ArrayBufferLike>) => string",
@@ -2807,6 +2813,18 @@
           "doc": "Resolve input as either a text part or a file part of a chat turn"
         },
         {
+          "name": "ChatTurnPrepareArgs",
+          "kind": "interface",
+          "signature": "interface ChatTurnPrepareArgs",
+          "doc": "What `prepareTurn` receives: the admitted turn, before the conversation loads."
+        },
+        {
+          "name": "ChatTurnPrepareResult",
+          "kind": "type",
+          "signature": "type ChatTurnPrepareResult",
+          "doc": "`prepareTurn`'s verdict: proceed, or answer with the product's response."
+        },
+        {
           "name": "ChatTurnProduceArgs",
           "kind": "interface",
           "signature": "interface ChatTurnProduceArgs",
@@ -2821,7 +2839,7 @@
         {
           "name": "chatTurnRequestInit",
           "kind": "function",
-          "signature": "(payload: ChatTurnRequestPayload) => RequestInit",
+          "signature": "(payload: ChatTurnRequestPayload, options?: { progressFirst?: boolean | undefined; }) => RequestInit",
           "doc": "`fetch` init for the turn route — the one place the client wire shape is serialized, so composer glue and products never drift from the server's parser."
         },
         {
@@ -3165,6 +3183,12 @@
           "kind": "function",
           "signature": "(event: unknown) => boolean",
           "doc": "Progress the consumer may see before the commit point: it names no model output and carries no billing receipt, so streaming it live cannot duplicate an answer or bill an abandoned attempt."
+        },
+        {
+          "name": "isTurnPhaseEvent",
+          "kind": "function",
+          "signature": "(event: unknown) => event is TurnPhaseEvent",
+          "doc": "True for a {@link TURN_PHASE_EVENT} with a usable `phase` and `message`."
         },
         {
           "name": "MACRO_ENABLED_OOXML_SNIFFED_MIMES",
@@ -3629,6 +3653,12 @@
           "doc": "Stream a detached turn into the live turn-event buffer, durably."
         },
         {
+          "name": "RUNTIME_RESTARTED_ERROR",
+          "kind": "const",
+          "signature": "\"Execution interrupted: the agent runtime restarted before the run produced a terminal event. The run cannot be resumed…",
+          "doc": "The sidecar's reason for that terminal, used when the replay is not read."
+        },
+        {
           "name": "SandboxChatProducerOptions",
           "kind": "interface",
           "signature": "interface SandboxChatProducerOptions",
@@ -3675,6 +3705,12 @@
           "kind": "function",
           "signature": "(name: string) => string",
           "doc": "Path-safe file name: basename only, conservative charset, length-capped."
+        },
+        {
+          "name": "settleTurnResponse",
+          "kind": "function",
+          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>",
+          "doc": "Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}."
         },
         {
           "name": "sniffBinary",
@@ -3741,6 +3777,78 @@
           "kind": "function",
           "signature": "(reason: string) => string",
           "doc": "Condense an abandoned attempt's raw failure text into something safe to show a customer in the transcript."
+        },
+        {
+          "name": "TOOL_ABORTED_ERROR",
+          "kind": "const",
+          "signature": "\"The Sandbox aborted a tool call before the turn finished, as when its runtime restarts mid-turn\"",
+          "doc": "The failure a completed run with an aborted tool call settles with."
+        },
+        {
+          "name": "TURN_PHASE_EVENT",
+          "kind": "const",
+          "signature": "\"session.run.phase\"",
+          "doc": "Stream event naming the turn's current stage."
+        },
+        {
+          "name": "TURN_PROGRESS_FIRST",
+          "kind": "const",
+          "signature": "\"first\"",
+          "doc": "The only value of {@link TURN_PROGRESS_HEADER}."
+        },
+        {
+          "name": "TURN_PROGRESS_HEADER",
+          "kind": "const",
+          "signature": "\"x-turn-progress\"",
+          "doc": "Request header that asks for a progress-first turn stream."
+        },
+        {
+          "name": "TURN_RESPONSE_EVENT",
+          "kind": "const",
+          "signature": "\"turn.response\"",
+          "doc": "Terminal event of a progress-first stream that ended without a turn: the response the route returned instead."
+        },
+        {
+          "name": "TURN_ROUTE_PHASE_MESSAGES",
+          "kind": "const",
+          "signature": "Record<TurnRoutePhase, string>",
+          "doc": "Default text for the route's own stages."
+        },
+        {
+          "name": "TURN_STREAM_LOST_CODE",
+          "kind": "const",
+          "signature": "\"turn_stream_lost\"",
+          "doc": "Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started."
+        },
+        {
+          "name": "TurnPhaseData",
+          "kind": "type",
+          "signature": "type TurnPhaseData",
+          "doc": "The data of a {@link TURN_PHASE_EVENT}."
+        },
+        {
+          "name": "TurnPhaseEvent",
+          "kind": "type",
+          "signature": "type TurnPhaseEvent",
+          "doc": "A {@link TURN_PHASE_EVENT} as it crosses the wire."
+        },
+        {
+          "name": "TurnResponseData",
+          "kind": "type",
+          "signature": "type TurnResponseData",
+          "doc": "The data of a {@link TURN_RESPONSE_EVENT}."
+        },
+        {
+          "name": "turnResponseEventFor",
+          "kind": "function",
+          "signature": "(response: Response) => Promise<{ type: \"turn.response\"; data: TurnResponseData; }>",
+          "doc": "Serialize a non-stream response for a {@link TURN_RESPONSE_EVENT}."
+        },
+        {
+          "name": "TurnRoutePhase",
+          "kind": "type",
+          "signature": "type TurnRoutePhase",
+          "doc": "Stages the shared route emits before the producer runs."
         },
         {
           "name": "unwrapSessionEventPayload",
@@ -9105,7 +9213,7 @@
         {
           "name": "respondToSessionInteraction",
           "kind": "function",
-          "signature": "(connection: SidecarInteractionsConnection, response: { id: string; outcome: \"cancelled\" | \"declined\" | \"accepted\"; dat…",
+          "signature": "(connection: SidecarInteractionsConnection, response: { id: string; outcome: \"cancelled\" | \"accepted\" | \"declined\"; dat…",
           "doc": "Resolves one interaction."
         },
         {
@@ -17934,7 +18042,7 @@
           "name": "coalesceDeltas",
           "kind": "function",
           "signature": "(events: unknown[]) => unknown[]",
-          "doc": "Merge consecutive text/reasoning deltas of the same type into one event."
+          "doc": "Merge text and reasoning deltas of the same type into one event, across the live-state events a harness interleaves with them, and keep only the latest of each live-state event."
         },
         {
           "name": "collapseRedundantTextParts",
@@ -17958,7 +18066,7 @@
           "name": "createBufferedTurnTap",
           "kind": "function",
           "signature": "(opts: BufferedTurnOptions) => BufferedTurnTap",
-          "doc": "The buffering core."
+          "doc": null
         },
         {
           "name": "createD1TurnEventStore",
@@ -18025,6 +18133,12 @@
           "kind": "function",
           "signature": "(part: JsonRecord) => string",
           "doc": "Resolve a unique key string for a part based on its type and identifying properties"
+        },
+        {
+          "name": "isLiveProgressEvent",
+          "kind": "function",
+          "signature": "(ev: unknown) => boolean",
+          "doc": "Whether an event only projects live progress, so it may wait for the flush window and be coalesced."
         },
         {
           "name": "JsonRecord",
@@ -21584,6 +21698,12 @@
           "doc": "The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`."
         },
         {
+          "name": "buildTurnPhaseEvent",
+          "kind": "function",
+          "signature": "(phase: string, message: string, opts?: { heartbeat?: boolean | undefined; elapsedMs?: number | undefined; sinceRequest…",
+          "doc": "Build a {@link TURN_PHASE_EVENT}."
+        },
+        {
           "name": "cancelChatInteraction",
           "kind": "function",
           "signature": "(list: ChatInteraction[], cancel: InteractionCancelData) => ChatInteraction[]",
@@ -21718,7 +21838,7 @@
         {
           "name": "ChatMessages",
           "kind": "function",
-          "signature": "({ messages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, a…",
+          "signature": "({ messages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, t…",
           "doc": "The message thread: one centered column; user messages are right-aligned bubbles with a User label; agent messages carry an Agent meta line with model id, tokens/sec, and cost, plus a collapsible thi…"
         },
         {
@@ -21790,7 +21910,7 @@
         {
           "name": "chatTurnRequestInit",
           "kind": "function",
-          "signature": "(payload: ChatTurnRequestPayload) => RequestInit",
+          "signature": "(payload: ChatTurnRequestPayload, options?: { progressFirst?: boolean | undefined; }) => RequestInit",
           "doc": "`fetch` init for the turn route — the one place the client wire shape is serialized, so composer glue and products never drift from the server's parser."
         },
         {
@@ -22802,6 +22922,12 @@
           "doc": "Resolve if the interaction status is a terminal state excluding pending"
         },
         {
+          "name": "isTurnPhaseEvent",
+          "kind": "function",
+          "signature": "(event: unknown) => event is TurnPhaseEvent",
+          "doc": "True for a {@link TURN_PHASE_EVENT} with a usable `phase` and `message`."
+        },
+        {
           "name": "lateAnswerMessage",
           "kind": "function",
           "signature": "(interaction: ChatInteraction, data: InteractionData) => string",
@@ -23684,6 +23810,12 @@
           "doc": "Runs a host-supplied submitter under the CARD's own deadline, and always resolves."
         },
         {
+          "name": "settleTurnResponse",
+          "kind": "function",
+          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>",
+          "doc": "Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}."
+        },
+        {
           "name": "SlashCommand",
           "kind": "interface",
           "signature": "interface SlashCommand",
@@ -23832,6 +23964,78 @@
           "kind": "function",
           "signature": "(name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }",
           "doc": "Drives an anchor-click download from an already-resolved blob."
+        },
+        {
+          "name": "TURN_PHASE_EVENT",
+          "kind": "const",
+          "signature": "\"session.run.phase\"",
+          "doc": "Stream event naming the turn's current stage."
+        },
+        {
+          "name": "TURN_PROGRESS_FIRST",
+          "kind": "const",
+          "signature": "\"first\"",
+          "doc": "The only value of {@link TURN_PROGRESS_HEADER}."
+        },
+        {
+          "name": "TURN_PROGRESS_HEADER",
+          "kind": "const",
+          "signature": "\"x-turn-progress\"",
+          "doc": "Request header that asks for a progress-first turn stream."
+        },
+        {
+          "name": "TURN_RESPONSE_EVENT",
+          "kind": "const",
+          "signature": "\"turn.response\"",
+          "doc": "Terminal event of a progress-first stream that ended without a turn: the response the route returned instead."
+        },
+        {
+          "name": "TURN_ROUTE_PHASE_MESSAGES",
+          "kind": "const",
+          "signature": "Record<TurnRoutePhase, string>",
+          "doc": "Default text for the route's own stages."
+        },
+        {
+          "name": "TURN_STREAM_LOST_CODE",
+          "kind": "const",
+          "signature": "\"turn_stream_lost\"",
+          "doc": "Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started."
+        },
+        {
+          "name": "TurnPhaseData",
+          "kind": "type",
+          "signature": "type TurnPhaseData",
+          "doc": "The data of a {@link TURN_PHASE_EVENT}."
+        },
+        {
+          "name": "TurnPhaseEvent",
+          "kind": "type",
+          "signature": "type TurnPhaseEvent",
+          "doc": "A {@link TURN_PHASE_EVENT} as it crosses the wire."
+        },
+        {
+          "name": "TurnProgress",
+          "kind": "function",
+          "signature": "({ phase, pendingMessage, startedAt, showElapsed, className }: TurnProgressProps) => Element",
+          "doc": "Live stage and elapsed seconds for a turn that has not produced output yet."
+        },
+        {
+          "name": "TurnProgressProps",
+          "kind": "interface",
+          "signature": "interface TurnProgressProps",
+          "doc": "Props for {@link TurnProgress}."
+        },
+        {
+          "name": "TurnResponseData",
+          "kind": "type",
+          "signature": "type TurnResponseData",
+          "doc": "The data of a {@link TURN_RESPONSE_EVENT}."
+        },
+        {
+          "name": "TurnRoutePhase",
+          "kind": "type",
+          "signature": "type TurnRoutePhase",
+          "doc": "Stages the shared route emits before the producer runs."
         },
         {
           "name": "upsertChatInteraction",

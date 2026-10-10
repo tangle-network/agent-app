@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-470 exports.
+485 exports.
 
 ### `acceptRejectionReason`
 
@@ -374,6 +374,14 @@ type AttachmentFileResult
 (mentions: readonly Pick<FileMention, "name" | "path">[]) => string
 ```
 
+### `buildTurnPhaseEvent`
+
+`function` — Build a {@link TURN_PHASE_EVENT}.
+
+```ts
+(phase: string, message: string, opts?: { heartbeat?: boolean | undefined; elapsedMs?: number | undefined; sinceRequest…
+```
+
 ### `cancelChatInteraction`
 
 `function` — Applies an `interaction.cancel` event: only a pending ask moves, to `expired` (reason:"timeout") or `cancelled`.
@@ -555,7 +563,7 @@ interface ChatMessageMetrics
 `function` — The message thread: one centered column; user messages are right-aligned bubbles with a User label; agent messages carry an Agent meta line with model id, tokens/sec, and cost, plus a collapsible thi…
 
 ```ts
-({ messages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, a…
+({ messages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, t…
 ```
 
 ### `ChatMessageSegment`
@@ -651,7 +659,7 @@ type ChatTurnPartInput
 `function` — `fetch` init for the turn route — the one place the client wire shape is serialized, so composer glue and products never drift from the server's parser.
 
 ```ts
-(payload: ChatTurnRequestPayload) => RequestInit
+(payload: ChatTurnRequestPayload, options?: { progressFirst?: boolean | undefined; }) => RequestInit
 ```
 
 ### `ChatTurnRequestPayload`
@@ -1998,6 +2006,14 @@ type InteractionSubmitResult
 (status: ChatInteractionStatus) => boolean
 ```
 
+### `isTurnPhaseEvent`
+
+`function` — True for a {@link TURN_PHASE_EVENT} with a usable `phase` and `message`.
+
+```ts
+(event: unknown) => event is TurnPhaseEvent
+```
+
 ### `lateAnswerMessage`
 
 `function` — Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s).
@@ -3174,6 +3190,14 @@ interface SessionPageQuery
 (run: () => Promise<InteractionSubmitResult>, timeoutMs?: number) => Promise<InteractionSubmitResult>
 ```
 
+### `settleTurnResponse`
+
+`function` — Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}.
+
+```ts
+(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>
+```
+
 ### `SlashCommand`
 
 `interface` — One `/` command the composer offers.
@@ -3372,6 +3396,102 @@ interface ToolRunStep
 
 ```ts
 (name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }
+```
+
+### `TURN_PHASE_EVENT`
+
+`const` — Stream event naming the turn's current stage.
+
+```ts
+"session.run.phase"
+```
+
+### `TURN_PROGRESS_FIRST`
+
+`const` — The only value of {@link TURN_PROGRESS_HEADER}.
+
+```ts
+"first"
+```
+
+### `TURN_PROGRESS_HEADER`
+
+`const` — Request header that asks for a progress-first turn stream.
+
+```ts
+"x-turn-progress"
+```
+
+### `TURN_RESPONSE_EVENT`
+
+`const` — Terminal event of a progress-first stream that ended without a turn: the response the route returned instead.
+
+```ts
+"turn.response"
+```
+
+### `TURN_ROUTE_PHASE_MESSAGES`
+
+`const` — Default text for the route's own stages.
+
+```ts
+Record<TurnRoutePhase, string>
+```
+
+### `TURN_STREAM_LOST_CODE`
+
+`const` — Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started.
+
+```ts
+"turn_stream_lost"
+```
+
+### `TurnPhaseData`
+
+`type` — The data of a {@link TURN_PHASE_EVENT}.
+
+```ts
+type TurnPhaseData
+```
+
+### `TurnPhaseEvent`
+
+`type` — A {@link TURN_PHASE_EVENT} as it crosses the wire.
+
+```ts
+type TurnPhaseEvent
+```
+
+### `TurnProgress`
+
+`function` — Live stage and elapsed seconds for a turn that has not produced output yet.
+
+```ts
+({ phase, pendingMessage, startedAt, showElapsed, className }: TurnProgressProps) => Element
+```
+
+### `TurnProgressProps`
+
+`interface` — Props for {@link TurnProgress}.
+
+```ts
+interface TurnProgressProps
+```
+
+### `TurnResponseData`
+
+`type` — The data of a {@link TURN_RESPONSE_EVENT}.
+
+```ts
+type TurnResponseData
+```
+
+### `TurnRoutePhase`
+
+`type` — Stages the shared route emits before the producer runs.
+
+```ts
+type TurnRoutePhase
 ```
 
 ### `upsertChatInteraction`

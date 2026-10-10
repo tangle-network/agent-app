@@ -459,7 +459,7 @@ interface ResolveInteractionConnectionArgs
 `function` — Resolves one interaction.
 
 ```ts
-(connection: SidecarInteractionsConnection, response: { id: string; outcome: "cancelled" | "declined" | "accepted"; dat…
+(connection: SidecarInteractionsConnection, response: { id: string; outcome: "cancelled" | "accepted" | "declined"; dat…
 ```
 
 ### `SidecarAbortResult`
