@@ -1359,20 +1359,20 @@ describe('streamSandboxPrompt seam', () => {
     it('resends the same execution through refusals and not-ready answers until the box takes it', async () => {
       vi.useFakeTimers()
       const failures = [gatewayRefusal(502), notReady(), gatewayRefusal(503)]
-      const streamPrompt = vi.fn(async function* () {
+      const streamPrompt = vi.fn(async function* (_prompt: unknown, _options: { executionId?: string }) {
         const failure = failures.shift()
         if (failure) throw failure
         yield { type: 'execution.started', data: { executionId: 'exec-1' } }
         yield { type: 'done', data: {} }
       })
-      const box = fakeBox({ streamPrompt })
+      const box = fakeBox({ streamPrompt: streamPrompt as never })
 
       const drained = drain(box)
       await vi.runAllTimersAsync()
 
       expect((await drained).map((event) => (event as { type: string }).type)).toEqual(['execution.started', 'done'])
       expect(streamPrompt).toHaveBeenCalledTimes(4)
-      expect(streamPrompt.mock.calls.map(([, options]) => (options as { executionId?: string }).executionId))
+      expect(streamPrompt.mock.calls.map(([, options]) => options.executionId))
         .toEqual(['exec-1', 'exec-1', 'exec-1', 'exec-1'])
     })
 
@@ -1380,7 +1380,7 @@ describe('streamSandboxPrompt seam', () => {
       vi.useFakeTimers()
       const startedAt = Date.now()
       const streamPrompt = vi.fn(async function* (): AsyncGenerator<unknown> { throw gatewayRefusal(503) })
-      const drained = drain(fakeBox({ streamPrompt })).catch((error: unknown) => error)
+      const drained = drain(fakeBox({ streamPrompt: streamPrompt as never })).catch((error: unknown) => error)
       await vi.runAllTimersAsync()
 
       const failure = await drained
@@ -1395,17 +1395,17 @@ describe('streamSandboxPrompt seam', () => {
         yield { type: 'execution.started', data: { executionId: 'exec-1' } }
         throw gatewayRefusal(502)
       })
-      await expect(drain(fakeBox({ streamPrompt: afterEvent }))).rejects.toThrow('error code: 502')
+      await expect(drain(fakeBox({ streamPrompt: afterEvent as never }))).rejects.toThrow('error code: 502')
       expect(afterEvent).toHaveBeenCalledTimes(1)
 
       const replay = vi.fn(async function* (): AsyncGenerator<unknown> { throw gatewayRefusal(502) })
-      await expect(drain(fakeBox({ streamPrompt: replay }), { lastEventId: 'event-7' })).rejects.toThrow('error code: 502')
+      await expect(drain(fakeBox({ streamPrompt: replay as never }), { lastEventId: 'event-7' })).rejects.toThrow('error code: 502')
       expect(replay).toHaveBeenCalledTimes(1)
 
       const other = vi.fn(async function* (): AsyncGenerator<unknown> {
         throw Object.assign(new Error('runtime exploded'), { status: 500, endpoint: '/v1/sandboxes/box-1/runtime/agents/run/stream', origin: 'sandbox-api' })
       })
-      await expect(drain(fakeBox({ streamPrompt: other }))).rejects.toThrow('runtime exploded')
+      await expect(drain(fakeBox({ streamPrompt: other as never }))).rejects.toThrow('runtime exploded')
       expect(other).toHaveBeenCalledTimes(1)
     })
   })
