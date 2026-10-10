@@ -52,7 +52,7 @@ describe('HubApprovalDock', () => {
     expect(within(dock).getByText('Autopilot already published 3 posts today, its daily limit.')).toBeTruthy()
     // The host's reason replaces the generic never-grantable line.
     expect(within(dock).queryByText('Publishing always needs your approval.')).toBeNull()
-    fireEvent.click(within(dock).getByRole('button', { name: 'Next request' }))
+    fireEvent.click(within(dock).getByRole('button', { name: /Create voice memo|synthesize/i }))
     expect(within(dock).getByText('Runs when the reply finishes, under this conversation’s auto-approve.')).toBeTruthy()
 
     render(<HubApprovalsList items={[post, speech]} />)
@@ -135,11 +135,16 @@ describe('HubApprovalDock', () => {
     expect(screen.getByText('Sending email always asks.')).toBeTruthy()
   })
 
-  it('pages through several waiting calls and brings a focused one to the front', () => {
+  it('lists every waiting call above the open one, opens the one picked, and brings a focused one to the front', () => {
     const { rerender } = render(<HubApprovalDock items={[PROPOSE, EMAIL]} onDecide={vi.fn()} />)
-    expect(screen.getByText('1 of 2')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Next request' }))
+    const list = screen.getByRole('list', { name: 'Requests in this conversation' })
+    expect(within(list).getAllByRole('button').map((row) => row.textContent)).toEqual([
+      'Open PR: Fix the hero wrap on acme/siteWaiting', 'Send email to ada@acme.comWaiting',
+    ])
+    expect(screen.getByText('2 requests waiting')).toBeTruthy()
+    fireEvent.click(within(list).getByRole('button', { name: /Send email to ada@acme.com/ }))
     expect(screen.getByRole('heading', { name: 'Send email to ada@acme.com' })).toBeTruthy()
+    expect(within(list).getByRole('button', { name: /Send email/ }).getAttribute('aria-current')).toBe('true')
     rerender(<HubApprovalDock items={[PROPOSE, EMAIL]} onDecide={vi.fn()} focusId={PROPOSE.id} />)
     expect(screen.getByRole('heading', { name: 'Open PR: Fix the hero wrap on acme/site' })).toBeTruthy()
   })
