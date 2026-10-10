@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.22
+
+- feat(hub-approvals): a shared approval dock, Approvals list and receipts for held Hub actions (#915)
+
 ## 0.60.21
 
 - fix(agent-surfaces): number setup skill sections without gaps (#916)
