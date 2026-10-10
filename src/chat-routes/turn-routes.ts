@@ -622,8 +622,8 @@ export interface ChatTurnRoutes {
    *  `{type:'turn', turnId}` (the replay handle); the rest is the engine's
    *  event protocol. Pass the platform's `waitUntil` so the turn keeps
    *  running (and buffering) after a client disconnect. A request with
-   *  `TURN_PROGRESS_HEADER` gets a progress-first stream instead
-   *  (`./turn-progress`). */
+   *  `TURN_PROGRESS_HEADER` gets a progress-first stream once it is
+   *  authorized (`./turn-progress`). */
   turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response>
   /** GET — replay a buffered turn from `?fromSeq=` (0 = everything), then
    *  follow it live until it completes. */
@@ -802,33 +802,45 @@ export function createChatTurnRoutes<TContext = void>(
 
   const progressMessages: Record<TurnRoutePhase, string> = { ...TURN_ROUTE_PHASE_MESSAGES, ...options.progressMessages }
 
+  /** A turn whose body parsed and whose caller `authorize` admitted. */
+  type AdmittedTurn = { parsed: ParsedTurnBody; auth: Extract<ChatTurnAuthorization<TContext>, { ok: true }> }
+
   async function turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response> {
-    if (request.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST) return runTurn(request, ctx)
-    // Read the body before the response opens: a Worker cannot read the
-    // request stream once its response has been sent.
-    let body: ArrayBuffer
+    // Parsing and authorization finish before any response opens, for both
+    // shapes: a refusal is always a plain HTTP response that reveals nothing
+    // beyond what it says, and nothing runs for a caller who is not admitted.
+    const admitted = await admitTurn(request)
+    if (!admitted.ok) return admitted.response
+    if (request.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST) return runTurn(request, ctx, admitted)
+    return progressFirstTurn(request, ctx, admitted)
+  }
+
+  /** Parse and validate the body, then authorize the caller. */
+  async function admitTurn(request: Request): Promise<({ ok: true } & AdmittedTurn) | { ok: false; response: Response }> {
+    const [rawBody, badBody] = await parseJsonObjectBody(request)
+    if (badBody) return { ok: false, response: badBody }
+    let parsed: ParsedTurnBody
     try {
-      body = await request.arrayBuffer()
-    } catch {
-      return Response.json({ code: 'invalid_body', error: 'The request body could not be read' }, { status: 400 })
+      parsed = validateTurnBody(rawBody, options.maxInlinePartBytes)
+    } catch (err) {
+      if (err instanceof ChatTurnInputError) return { ok: false, response: errorResponse(err) }
+      throw err
     }
-    return progressFirstTurn(new Request(request.url, {
-      method: request.method,
-      headers: request.headers,
-      body,
-      signal: request.signal,
-    }), ctx)
+    const auth = await options.authorize({ request, intent: 'turn', body: parsed.payload })
+    if (!auth.ok) return { ok: false, response: auth.response }
+    return { ok: true, parsed, auth }
   }
 
   /**
-   * Open the response stream before any of the turn's own work, so the client
-   * shows a real stage within one round trip. The turn then runs exactly as
+   * Open the response stream as soon as the caller is admitted, so the client
+   * shows the turn's real stage while the conversation loads, the lock is
+   * taken and the product's pre-turn work runs. The turn runs exactly as
    * {@link runTurn} does; its stream is piped through, and any other response
-   * it returns (a refusal, a gate's answer, a handoff) becomes one
-   * `turn.response` event that `settleTurnResponse` turns back into that
-   * response on the client.
+   * it returns after admission (a held lock, a gate's answer, a handoff, a
+   * failure) becomes one `turn.response` event that `settleTurnResponse` turns
+   * back into that response on the client.
    */
-  function progressFirstTurn(request: Request, ctx?: ChatTurnRequestContext): Response {
+  function progressFirstTurn(request: Request, ctx: ChatTurnRequestContext | undefined, admitted: AdmittedTurn): Response {
     const receivedAt = Date.now()
     const encoder = new TextEncoder()
     const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
@@ -851,7 +863,7 @@ export function createChatTurnRoutes<TContext = void>(
     const pump = (async () => {
       let inner: Response
       try {
-        inner = await runTurn(request, ctx, progress)
+        inner = await runTurn(request, ctx, admitted, progress)
       } catch (err) {
         log('[chat-routes] turn failed before it streamed', { error: err instanceof Error ? err.message : String(err) })
         inner = Response.json({ error: 'The turn failed before it started. Try again.' }, { status: 500 })
@@ -891,23 +903,12 @@ export function createChatTurnRoutes<TContext = void>(
 
   async function runTurn(
     request: Request,
-    ctx?: ChatTurnRequestContext,
+    ctx: ChatTurnRequestContext | undefined,
+    admitted: AdmittedTurn,
     progress?: (phase: TurnRoutePhase) => void,
   ): Promise<Response> {
-    const [rawBody, badBody] = await parseJsonObjectBody(request)
-    if (badBody) return badBody
-
-    let parsed: ParsedTurnBody
-    try {
-      parsed = validateTurnBody(rawBody, options.maxInlinePartBytes)
-    } catch (err) {
-      if (err instanceof ChatTurnInputError) return errorResponse(err)
-      throw err
-    }
+    const { parsed, auth } = admitted
     const { payload, content, fileParts, mentions, turnId } = parsed
-
-    const auth = await options.authorize({ request, intent: 'turn', body: payload })
-    if (!auth.ok) return auth.response
     const { tenantId, userId, context } = auth
 
     // Turn identity: reuse the just-persisted user row on a retry (same

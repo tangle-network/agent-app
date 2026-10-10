@@ -8,12 +8,16 @@
  * of a spinner.
  *
  * A client that sends {@link TURN_PROGRESS_HEADER} gets the response stream as
- * soon as the request is parsed, before authorization. Anything the route
- * would have answered with a non-stream response (a 401, 402, 409, 429, a
- * gate's own response) then arrives as one {@link TURN_RESPONSE_EVENT} carrying
- * that response's status, headers and body, and {@link settleTurnResponse}
- * turns it back into the `Response` the caller already handles. A client that
- * does not send the header gets exactly the responses it got before.
+ * soon as the route has parsed the body and `authorize` has admitted the
+ * caller. Authorization never runs inside the stream: every refusal it makes
+ * (400, 401, 402, 403, 404, 429) is a plain HTTP response, so an unadmitted
+ * caller sees no stage, holds no stream and starts no work. After admission,
+ * anything the route answers with a non-stream response (a held lock's 409, a
+ * gate's own response, a handoff, a failure) arrives as one
+ * {@link TURN_RESPONSE_EVENT} carrying that response's status, headers and
+ * body, and {@link settleTurnResponse} turns it back into the `Response` the
+ * caller already handles. A client that does not send the header gets exactly
+ * the responses it got before.
  *
  * Browser-safe and import-free: the server route and the web client share it.
  */
@@ -30,7 +34,7 @@ export const TURN_PHASE_EVENT = 'session.run.phase'
  * Stages the shared route emits before the producer runs. Products add their
  * own (a sandbox product emits `provisioning`, `starting`,
  * `awaiting-first-token`).
- * - `accepted`: the request is parsed; access and the conversation are loading.
+ * - `accepted`: the caller is admitted; the conversation and the lock are loading.
  * - `preparing`: the turn holds its lock; the product's pre-turn work is running.
  */
 export type TurnRoutePhase = 'accepted' | 'preparing'
