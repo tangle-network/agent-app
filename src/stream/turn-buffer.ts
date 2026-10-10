@@ -64,6 +64,19 @@ export interface TurnEventStore {
   /** Remove terminal turns whose status was updated before `before` (Unix
    *  milliseconds or a Date). Running turns are never eligible. */
   pruneTerminalTurns?(before: number | Date): Promise<number>
+  /** Running turns last renewed before `before` (Unix ms), oldest first, at most
+   *  `limit`: the candidates {@link settleOrphanedTurns} settles. */
+  listStaleRunning?(before: number, limit: number): Promise<StaleRunningTurn[]>
+  /** The last `count` events of a turn, newest first; a bounded read of the tail. */
+  readTail?(turnId: string, count: number): Promise<BufferedTurnEvent[]>
+}
+
+/** A running turn nothing has renewed since `updatedAt`. */
+export interface StaleRunningTurn {
+  turnId: string
+  scopeId: string | null
+  /** Unix ms of the last status write. */
+  updatedAt: number
 }
 
 /**
@@ -709,6 +722,20 @@ export function createD1TurnEventStore(
         db.prepare('DELETE FROM turn_status WHERE turnId = ?').bind(turnId),
       ])
     },
+    async listStaleRunning(before, limit) {
+      const { results } = await db
+        .prepare("SELECT turnId, scopeId, updatedAt FROM turn_status WHERE status = 'running' AND updatedAt < ? ORDER BY updatedAt ASC LIMIT ?")
+        .bind(new Date(before).toISOString(), Math.max(1, Math.floor(limit)))
+        .all<{ turnId: string; scopeId: string | null; updatedAt: string }>()
+      return results.map((row) => ({ turnId: row.turnId, scopeId: row.scopeId ?? null, updatedAt: Date.parse(row.updatedAt) }))
+    },
+    async readTail(turnId, count) {
+      const { results } = await db
+        .prepare('SELECT seq, event FROM turn_events WHERE turnId = ? ORDER BY seq DESC LIMIT ?')
+        .bind(turnId, Math.max(1, Math.floor(count)))
+        .all<{ seq: number; event: string }>()
+      return results
+    },
     async pruneTerminalTurns(before) {
       const cutoff = normalizeTurnCutoff(before)
       const terminalBefore = "status IN ('complete', 'error') AND updatedAt < ?"
@@ -787,6 +814,16 @@ export function createMemoryTurnEventStore(
       updatedAt.delete(turnId)
       const index = order.indexOf(turnId)
       if (index >= 0) order.splice(index, 1)
+    },
+    async listStaleRunning(before, limit) {
+      return order
+        .filter((turnId) => status.get(turnId) === 'running' && (updatedAt.get(turnId) ?? Number.POSITIVE_INFINITY) < before)
+        .sort((left, right) => (updatedAt.get(left) ?? 0) - (updatedAt.get(right) ?? 0))
+        .slice(0, Math.max(1, Math.floor(limit)))
+        .map((turnId) => ({ turnId, scopeId: scopes.get(turnId) ?? null, updatedAt: updatedAt.get(turnId)! }))
+    },
+    async readTail(turnId, count) {
+      return (events.get(turnId) ?? []).slice(-Math.max(1, Math.floor(count))).reverse()
     },
     async pruneTerminalTurns(before) {
       const cutoff = normalizeTurnCutoff(before).milliseconds

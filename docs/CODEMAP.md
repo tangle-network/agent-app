@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_121 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_124 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -60,6 +60,9 @@ _121 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./interactions`](api/interactions.md) | 64 | `web` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
+| [`./launch-invariants`](api/launch-invariants.md) | 56 | `signoff`, `turn-health` |
+| [`./launch-invariants/cli`](api/launch-invariants-cli.md) | 1 | `signoff`, `turn-health` |
+| [`./launch-invariants/testing`](api/launch-invariants-testing.md) | 25 | `signoff`, `turn-health` |
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
 | [`./legibility/cli`](api/legibility-cli.md) | 0 | `signoff` |
 | [`./missions`](api/missions.md) | 65 | — |
@@ -98,7 +101,7 @@ _121 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./spend`](api/spend.md) | 60 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
-| [`./stream`](api/stream.md) | 60 | `interactions`, `plans` |
+| [`./stream`](api/stream.md) | 66 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 68 | — |
 | [`./studio-react`](api/studio-react.md) | 47 | `studio`, `web-react` |
 | [`./teams`](api/teams.md) | 33 | — |
@@ -112,7 +115,7 @@ _121 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./theme/tailwind-preset`](api/theme-tailwind-preset.md) | 1 | — |
 | [`./tools`](api/tools.md) | 66 | `crypto`, `eval`, `openui` |
 | [`./trace`](api/trace.md) | 33 | `missions` |
-| [`./turn-health`](api/turn-health.md) | 32 | `alerting` |
+| [`./turn-health`](api/turn-health.md) | 32 | `alerting`, `launch-invariants` |
 | [`./turn-stream`](api/turn-stream.md) | 57 | `chat-routes`, `crypto`, `stream` |
 | [`./vault`](api/vault.md) | 21 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
@@ -620,6 +623,36 @@ Depends on: `config`
 
 [Full API →](api/knowledge-loop.md)
 
+## `./launch-invariants`
+
+Source: `src/launch-invariants/index.ts` · 56 exports
+
+Depends on: `signoff`, `turn-health`
+
+`AUTH_LOOKUP_DEADLINE_MS`, `AUTH_LOOKUP_TTL_MS`, `AuthLookupCache`, `AuthLookupCacheOptions`, `AuthLookupOptions`, `AuthLookupRefused`, `checkIsolatedJobs`, `checkSettlementScenarios`, `checkTurnSettlement`, `createAuthLookupCache`, `createLimitAlarms`, `createScheduledDispatch`, `credentialCacheKey`, `cronDailyFirings`, `D1_MAX_BOUND_PARAMETERS`, `describeVerdict`, `InvariantVerdict`, `IsolatedJobsInput`, `LAUNCH_BUDGETS`, `LAUNCH_INVARIANT_IDS`, `LAUNCH_INVARIANTS`, `LaunchInvariant`, `LaunchInvariantId`, `LIMIT_RESOURCES`, `LimitAlarmOptions`, `LimitAlarms`, `LimitBudgets`, `LimitLevel`, `LimitObservation`, `LimitResource`, `longestGapMinutes`, `ObservedSlot`, `parseWranglerCrons`, `readInSizedBatches`, `ScheduledDispatch`, `ScheduledDispatchOptions`, `ScheduledDispatchResult`, `ScheduledJob`, `ScheduledJobInput`, `ScheduledJobOutcome`, `ScheduleEntry`, `ScheduleSlot`, `SettledTurnRecord`, `SETTLEMENT_SCENARIOS`, `SettlementScenario`, `SIZED_READ_BYTES`, `SIZED_READ_COMPOSITE_ROWS`, `SIZED_READ_ROWS`, `sizedBatches`, `SizedBatchOptions`, `SizedRow`, `slotsOf`, `TurnSettlementCounts`, `TurnTerminalState`, `withD1LimitAlarms`, `WranglerCrons`
+
+[Full API →](api/launch-invariants.md)
+
+## `./launch-invariants/cli`
+
+Source: `src/launch-invariants/cli.ts` · 1 exports
+
+Depends on: `signoff`, `turn-health`
+
+`runConformance`
+
+[Full API →](api/launch-invariants-cli.md)
+
+## `./launch-invariants/testing`
+
+Source: `src/launch-invariants/testing.ts` · 25 exports
+
+Depends on: `signoff`, `turn-health`
+
+`AuthorizeBeforeStreamOptions`, `AuthStallOptions`, `BudgetedJob`, `checkAuthorizeBeforeStream`, `checkAuthSurvivesStall`, `checkCoalescedTurn`, `checkLimitAlarms`, `checkScheduledJobBudgets`, `CoalescedTurnOptions`, `D1Reads`, `describeVerdict`, `forceGc`, `INVARIANT_RESULTS_ENV`, `JobMeasurement`, `LimitAlarmCheckOptions`, `measureD1`, `measureJob`, `PLATFORM_LIMITS`, `recordedLongTurn`, `recordInvariant`, `recordInvariants`, `ScheduledJobBudgetOptions`, `stallingD1`, `StallMode`, `TimedTurnEvent`
+
+[Full API →](api/launch-invariants-testing.md)
+
 ## `./legibility`
 
 Source: `src/legibility/index.ts` · 33 exports
@@ -968,11 +1001,11 @@ Source: `src/store/index.ts` · 16 exports
 
 ## `./stream`
 
-Source: `src/stream/index.ts` · 60 exports
+Source: `src/stream/index.ts` · 66 exports
 
 Depends on: `interactions`, `plans`
 
-`asRecord`, `asString`, `attachmentPartKey`, `BufferedTurnEvent`, `BufferedTurnOptions`, `BufferedTurnTap`, `buildUserTextParts`, `coalesceChatStreamEvents`, `coalesceDeltas`, `collapseRedundantTextParts`, `consumeTurnStream`, `ConsumeTurnStreamOptions`, `createBufferedTurnTap`, `createD1TurnEventStore`, `createMemoryTurnEventStore`, `D1BoundForTurns`, `D1LikeForTurns`, `DEFAULT_RUNNING_TURN_LEASE_MS`, `DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS`, `draftAssistantParts`, `encodeEvent`, `finalizeAssistantParts`, `finalizePendingInteractionParts`, `getPartKey`, `isLiveProgressEvent`, `JsonRecord`, `mergePersistedPart`, `messageHasTurnId`, `MISSING_TOOL_TERMINAL_ERROR`, `MISSING_TOOL_TERMINAL_REASON`, `normalizeClientTurnId`, `normalizePersistedPart`, `normalizeTime`, `normalizeToolEvent`, `observeTurnEvent`, `parseTurnObservation`, `PersistedChatMessageForTurn`, `pumpBufferedTurn`, `PumpBufferedTurnOptions`, `replayTurnEvents`, `ReplayTurnEventsOptions`, `resolveChatTurn`, `ResolvedChatTurn`, `resolveToolId`, `resolveToolName`, `stampReplaySeq`, `StreamEvent`, `terminalizeDanglingAssistantToolUpdates`, `terminalizeDanglingToolPart`, `terminalizeDanglingToolParts`, `TURN_EVENTS_MIGRATION_SQL`, `TURN_STATUS_LEASE_MIGRATION_SQL`, `TURN_STATUS_RETENTION_MIGRATION_SQL`, `TURN_STATUS_SCOPE_MIGRATION_SQL`, `TurnEventStore`, `TurnEventStoreOptions`, `TurnObservation`, `TurnObservationUpdate`, `TurnStatus`, `TurnStatusWriteOptions`
+`asRecord`, `asString`, `attachmentPartKey`, `BufferedTurnEvent`, `BufferedTurnOptions`, `BufferedTurnTap`, `buildUserTextParts`, `coalesceChatStreamEvents`, `coalesceDeltas`, `collapseRedundantTextParts`, `consumeTurnStream`, `ConsumeTurnStreamOptions`, `createBufferedTurnTap`, `createD1TurnEventStore`, `createMemoryTurnEventStore`, `D1BoundForTurns`, `D1LikeForTurns`, `DEFAULT_RUNNING_TURN_LEASE_MS`, `DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS`, `draftAssistantParts`, `encodeEvent`, `finalizeAssistantParts`, `finalizePendingInteractionParts`, `getPartKey`, `isLiveProgressEvent`, `JsonRecord`, `mergePersistedPart`, `messageHasTurnId`, `MISSING_TOOL_TERMINAL_ERROR`, `MISSING_TOOL_TERMINAL_REASON`, `normalizeClientTurnId`, `normalizePersistedPart`, `normalizeTime`, `normalizeToolEvent`, `observeTurnEvent`, `ORPHANED_TURN_CODE`, `parseTurnObservation`, `PersistedChatMessageForTurn`, `pumpBufferedTurn`, `PumpBufferedTurnOptions`, `replayTurnEvents`, `ReplayTurnEventsOptions`, `resolveChatTurn`, `ResolvedChatTurn`, `resolveToolId`, `resolveToolName`, `SettledOrphanedTurn`, `settleOrphanedTurns`, `SettleOrphanedTurnsOptions`, `SettleOrphanedTurnsResult`, `StaleRunningTurn`, `stampReplaySeq`, `StreamEvent`, `terminalizeDanglingAssistantToolUpdates`, `terminalizeDanglingToolPart`, `terminalizeDanglingToolParts`, `TURN_EVENTS_MIGRATION_SQL`, `TURN_STATUS_LEASE_MIGRATION_SQL`, `TURN_STATUS_RETENTION_MIGRATION_SQL`, `TURN_STATUS_SCOPE_MIGRATION_SQL`, `TurnEventStore`, `TurnEventStoreOptions`, `TurnObservation`, `TurnObservationUpdate`, `TurnStatus`, `TurnStatusWriteOptions`
 
 [Full API →](api/stream.md)
 
@@ -1094,7 +1127,7 @@ Depends on: `missions`
 
 Source: `src/turn-health/index.ts` · 32 exports
 
-Depends on: `alerting`
+Depends on: `alerting`, `launch-invariants`
 
 `AlertSink`, `AlertThrottleStore`, `classifyTurnOutcome`, `createConsoleAlertSink`, `createD1TurnHealthSource`, `createGuardedAlertSink`, `createMemoryThrottleStore`, `createMultiAlertSink`, `createSlackBotAlertSink`, `createThrottledAlertSink`, `createTurnHealthLifecycle`, `createWebhookAlertSink`, `D1LikeForHealth`, `describeReason`, `FetchLike`, `PersistedTurnRow`, `SHELL_ERROR_REPLY_PREFIXES`, `SweepOptions`, `SweepResult`, `sweepSilentFailures`, `turnAlert`, `TurnHealthAlert`, `TurnHealthCompleteInfo`, `TurnHealthErrorInfo`, `TurnHealthLifecycle`, `TurnHealthLifecycleOptions`, `TurnHealthReason`, `TurnHealthSeverity`, `TurnHealthSource`, `TurnHealthVerdict`, `TurnOutcomeInput`, `UnansweredThread`
 

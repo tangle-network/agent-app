@@ -42,7 +42,8 @@
     "agent-app-signoff": "./dist/signoff/cli.js",
     "agent-app-agent-surfaces": "./dist/agent-surfaces/cli.js",
     "agent-app-verify-proof": "./dist/signoff/proof-cli.js",
-    "tangle-agent": "bin/tangle-agent.mjs"
+    "tangle-agent": "bin/tangle-agent.mjs",
+    "agent-app-invariants": "./dist/launch-invariants/cli.js"
   },
   "exports": {
     "./package.json": "./package.json",
@@ -255,6 +256,16 @@
       "types": "./dist/turn-health/index.d.ts",
       "import": "./dist/turn-health/index.js",
       "default": "./dist/turn-health/index.js"
+    },
+    "./launch-invariants": {
+      "types": "./dist/launch-invariants/index.d.ts",
+      "import": "./dist/launch-invariants/index.js",
+      "default": "./dist/launch-invariants/index.js"
+    },
+    "./launch-invariants/testing": {
+      "types": "./dist/launch-invariants/testing.d.ts",
+      "import": "./dist/launch-invariants/testing.js",
+      "default": "./dist/launch-invariants/testing.js"
     },
     "./integrations": {
       "types": "./dist/integrations/index.d.ts",

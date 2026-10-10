@@ -9381,6 +9381,531 @@
       ]
     },
     {
+      "id": "./launch-invariants",
+      "source": "src/launch-invariants/index.ts",
+      "dependsOn": [
+        "signoff",
+        "turn-health"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "AUTH_LOOKUP_DEADLINE_MS",
+          "kind": "const",
+          "signature": "2500",
+          "doc": "A store read slower than this is treated as unavailable; a healthy D1 lookup answers in tens of milliseconds."
+        },
+        {
+          "name": "AUTH_LOOKUP_TTL_MS",
+          "kind": "const",
+          "signature": "60000",
+          "doc": "Longest a verified result may be served while the store cannot answer."
+        },
+        {
+          "name": "AuthLookupCache",
+          "kind": "interface",
+          "signature": "interface AuthLookupCache",
+          "doc": null
+        },
+        {
+          "name": "AuthLookupCacheOptions",
+          "kind": "interface",
+          "signature": "interface AuthLookupCacheOptions",
+          "doc": null
+        },
+        {
+          "name": "AuthLookupOptions",
+          "kind": "interface",
+          "signature": "interface AuthLookupOptions",
+          "doc": null
+        },
+        {
+          "name": "AuthLookupRefused",
+          "kind": "class",
+          "signature": "class AuthLookupRefused",
+          "doc": "The store answered that the credential is not valid; never answered from the cache."
+        },
+        {
+          "name": "checkIsolatedJobs",
+          "kind": "function",
+          "signature": "(input: IsolatedJobsInput) => InvariantVerdict",
+          "doc": "One job per invocation, the table and the deployment agree, and recovery runs at least every 15 minutes."
+        },
+        {
+          "name": "checkSettlementScenarios",
+          "kind": "function",
+          "signature": "(records: Readonly<Record<string, SettledTurnRecord | undefined>>, options: { now: number; scenarios?: readonly Settlem…",
+          "doc": "Check a product's settlement of {@link SETTLEMENT_SCENARIOS}: each scenario's record ends in its expected state, and all of them settle honestly."
+        },
+        {
+          "name": "checkTurnSettlement",
+          "kind": "function",
+          "signature": "(turns: readonly SettledTurnRecord[], options: { now: number; settleWithinMs?: number | undefined; subject?: string | u…",
+          "doc": "Check turn records against honest settlement at `now`."
+        },
+        {
+          "name": "createAuthLookupCache",
+          "kind": "function",
+          "signature": "<V>(options: AuthLookupCacheOptions) => AuthLookupCache<V>",
+          "doc": null
+        },
+        {
+          "name": "createLimitAlarms",
+          "kind": "function",
+          "signature": "(options: LimitAlarmOptions) => LimitAlarms",
+          "doc": null
+        },
+        {
+          "name": "createScheduledDispatch",
+          "kind": "function",
+          "signature": "<Ctx>(options: ScheduledDispatchOptions<Ctx>) => ScheduledDispatch<Ctx>",
+          "doc": null
+        },
+        {
+          "name": "credentialCacheKey",
+          "kind": "function",
+          "signature": "(secret: string) => Promise<string>",
+          "doc": "A credential's cache key: its SHA-256 in hex, so the cache never holds the secret."
+        },
+        {
+          "name": "cronDailyFirings",
+          "kind": "function",
+          "signature": "(cron: string) => Set<number> | null",
+          "doc": "The minutes of the day (0–1439, UTC) a cron fires, or null when it does not fire every day (a day-of-month, month or weekday restriction) or cannot be read."
+        },
+        {
+          "name": "D1_MAX_BOUND_PARAMETERS",
+          "kind": "const",
+          "signature": "100",
+          "doc": "D1 binds at most 100 parameters to one query."
+        },
+        {
+          "name": "describeVerdict",
+          "kind": "function",
+          "signature": "(verdict: InvariantVerdict) => string",
+          "doc": "A verdict whose message names every finding, for a test runner's failure output."
+        },
+        {
+          "name": "InvariantVerdict",
+          "kind": "interface",
+          "signature": "interface InvariantVerdict",
+          "doc": "One checked outcome of one invariant, for one subject (a job, a route, a scenario)."
+        },
+        {
+          "name": "IsolatedJobsInput",
+          "kind": "interface",
+          "signature": "interface IsolatedJobsInput",
+          "doc": null
+        },
+        {
+          "name": "LAUNCH_BUDGETS",
+          "kind": "const",
+          "signature": "{ readonly queryBytes: number; readonly heapGrowthBytes: number; readonly sizedReadBytes: number; readonly turnEvents:…",
+          "doc": "Budgets the invariants are measured against."
+        },
+        {
+          "name": "LAUNCH_INVARIANT_IDS",
+          "kind": "const",
+          "signature": "readonly LaunchInvariantId[]",
+          "doc": "The invariant ids in report order."
+        },
+        {
+          "name": "LAUNCH_INVARIANTS",
+          "kind": "const",
+          "signature": "readonly LaunchInvariant[]",
+          "doc": null
+        },
+        {
+          "name": "LaunchInvariant",
+          "kind": "interface",
+          "signature": "interface LaunchInvariant",
+          "doc": null
+        },
+        {
+          "name": "LaunchInvariantId",
+          "kind": "type",
+          "signature": "type LaunchInvariantId",
+          "doc": null
+        },
+        {
+          "name": "LIMIT_RESOURCES",
+          "kind": "const",
+          "signature": "readonly LimitResource[]",
+          "doc": null
+        },
+        {
+          "name": "LimitAlarmOptions",
+          "kind": "interface",
+          "signature": "interface LimitAlarmOptions",
+          "doc": null
+        },
+        {
+          "name": "LimitAlarms",
+          "kind": "interface",
+          "signature": "interface LimitAlarms",
+          "doc": null
+        },
+        {
+          "name": "LimitBudgets",
+          "kind": "type",
+          "signature": "type LimitBudgets",
+          "doc": "The limit of each resource, in its own unit: bytes, rows, bytes, snapshots, requests per minute."
+        },
+        {
+          "name": "LimitLevel",
+          "kind": "type",
+          "signature": "type LimitLevel",
+          "doc": null
+        },
+        {
+          "name": "LimitObservation",
+          "kind": "interface",
+          "signature": "interface LimitObservation",
+          "doc": null
+        },
+        {
+          "name": "LimitResource",
+          "kind": "type",
+          "signature": "type LimitResource",
+          "doc": null
+        },
+        {
+          "name": "longestGapMinutes",
+          "kind": "function",
+          "signature": "(firings: Iterable<number>) => number | null",
+          "doc": "The longest wait, in minutes, between consecutive firings over a day, or null when they do not fire daily."
+        },
+        {
+          "name": "ObservedSlot",
+          "kind": "interface",
+          "signature": "interface ObservedSlot",
+          "doc": "What one scheduled invocation was observed to run."
+        },
+        {
+          "name": "parseWranglerCrons",
+          "kind": "function",
+          "signature": "(source: string, format: \"json\" | \"toml\") => WranglerCrons",
+          "doc": "Read `[triggers] crons` (and `[env.<name>.triggers]`) from wrangler.toml, or `triggers.crons` from wrangler.json(c)."
+        },
+        {
+          "name": "readInSizedBatches",
+          "kind": "function",
+          "signature": "<K, R>(rows: Iterable<SizedRow<K>>, read: (keys: K[]) => Promise<R>, options?: SizedBatchOptions) => AsyncGenerator<{ k…",
+          "doc": "Read listed rows one sized batch at a time."
+        },
+        {
+          "name": "ScheduledDispatch",
+          "kind": "interface",
+          "signature": "interface ScheduledDispatch",
+          "doc": null
+        },
+        {
+          "name": "ScheduledDispatchOptions",
+          "kind": "interface",
+          "signature": "interface ScheduledDispatchOptions",
+          "doc": null
+        },
+        {
+          "name": "ScheduledDispatchResult",
+          "kind": "interface",
+          "signature": "interface ScheduledDispatchResult",
+          "doc": null
+        },
+        {
+          "name": "ScheduledJob",
+          "kind": "type",
+          "signature": "type ScheduledJob",
+          "doc": null
+        },
+        {
+          "name": "ScheduledJobInput",
+          "kind": "interface",
+          "signature": "interface ScheduledJobInput",
+          "doc": null
+        },
+        {
+          "name": "ScheduledJobOutcome",
+          "kind": "interface",
+          "signature": "interface ScheduledJobOutcome",
+          "doc": null
+        },
+        {
+          "name": "ScheduleEntry",
+          "kind": "type",
+          "signature": "type ScheduleEntry",
+          "doc": "One cron expression and the job it runs, or one job per listed minute."
+        },
+        {
+          "name": "ScheduleSlot",
+          "kind": "interface",
+          "signature": "interface ScheduleSlot",
+          "doc": "One scheduled invocation: the cron, the minute for a minute-list entry, and the job it runs."
+        },
+        {
+          "name": "SettledTurnRecord",
+          "kind": "interface",
+          "signature": "interface SettledTurnRecord",
+          "doc": "One turn as its product records it, normalized."
+        },
+        {
+          "name": "SETTLEMENT_SCENARIOS",
+          "kind": "const",
+          "signature": "readonly SettlementScenario[]",
+          "doc": null
+        },
+        {
+          "name": "SettlementScenario",
+          "kind": "interface",
+          "signature": "interface SettlementScenario",
+          "doc": "The failure shapes GTM shipped on 2026-10-10, as scenarios a product seeds into its own storage, settles with its own scheduled jobs, and reads back as {@link SettledTurnRecord}s."
+        },
+        {
+          "name": "SIZED_READ_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Most bytes of a large column one read returns; a single larger row is read alone."
+        },
+        {
+          "name": "SIZED_READ_COMPOSITE_ROWS",
+          "kind": "const",
+          "signature": "40",
+          "doc": "Most two-column keys, such as (turnId, seq), one read binds: two parameters each."
+        },
+        {
+          "name": "SIZED_READ_ROWS",
+          "kind": "const",
+          "signature": "50",
+          "doc": "Most single-column keys one read binds, leaving room for the query's own parameters."
+        },
+        {
+          "name": "sizedBatches",
+          "kind": "function",
+          "signature": "<K>(rows: Iterable<SizedRow<K>>, options?: SizedBatchOptions) => K[][]",
+          "doc": "Consecutive keys whose stored sizes fit one read, in their listed order."
+        },
+        {
+          "name": "SizedBatchOptions",
+          "kind": "interface",
+          "signature": "interface SizedBatchOptions",
+          "doc": null
+        },
+        {
+          "name": "SizedRow",
+          "kind": "interface",
+          "signature": "interface SizedRow",
+          "doc": "A row's key and the stored size of its large column."
+        },
+        {
+          "name": "slotsOf",
+          "kind": "function",
+          "signature": "(entries: readonly ScheduleEntry[]) => ScheduleSlot[]",
+          "doc": "Every invocation a schedule table can make."
+        },
+        {
+          "name": "TurnSettlementCounts",
+          "kind": "interface",
+          "signature": "interface TurnSettlementCounts",
+          "doc": null
+        },
+        {
+          "name": "TurnTerminalState",
+          "kind": "type",
+          "signature": "type TurnTerminalState",
+          "doc": null
+        },
+        {
+          "name": "withD1LimitAlarms",
+          "kind": "function",
+          "signature": "<D extends D1Measurable>(d1: D, alarms: LimitAlarms, options?: { subject?: string | undefined; }) => D",
+          "doc": "The D1 binding with each query's rows read and response size observed."
+        },
+        {
+          "name": "WranglerCrons",
+          "kind": "interface",
+          "signature": "interface WranglerCrons",
+          "doc": "The cron expressions a wrangler config declares, top level and per environment."
+        }
+      ]
+    },
+    {
+      "id": "./launch-invariants/cli",
+      "source": "src/launch-invariants/cli.ts",
+      "dependsOn": [
+        "signoff",
+        "turn-health"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "runConformance",
+          "kind": "function",
+          "signature": "(args: CliArgs) => Promise<ConformanceReport>",
+          "doc": "Run the app's invariant tests and judge the result."
+        }
+      ]
+    },
+    {
+      "id": "./launch-invariants/testing",
+      "source": "src/launch-invariants/testing.ts",
+      "dependsOn": [
+        "signoff",
+        "turn-health"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "AuthorizeBeforeStreamOptions",
+          "kind": "interface",
+          "signature": "interface AuthorizeBeforeStreamOptions",
+          "doc": null
+        },
+        {
+          "name": "AuthStallOptions",
+          "kind": "interface",
+          "signature": "interface AuthStallOptions",
+          "doc": null
+        },
+        {
+          "name": "BudgetedJob",
+          "kind": "interface",
+          "signature": "interface BudgetedJob",
+          "doc": "One scheduled job (or report route) as the budget check runs it."
+        },
+        {
+          "name": "checkAuthorizeBeforeStream",
+          "kind": "function",
+          "signature": "(options: AuthorizeBeforeStreamOptions) => Promise<InvariantVerdict>",
+          "doc": "Each refused request gets a plain 4xx, opens no stream and touches nothing."
+        },
+        {
+          "name": "checkAuthSurvivesStall",
+          "kind": "function",
+          "signature": "(options: AuthStallOptions) => Promise<InvariantVerdict>",
+          "doc": "A verified credential keeps working while D1 errors or stalls; it is refused once revoked, and once its last verification is more than 60 s old; and the cache holds SHA-256 keys, not secrets."
+        },
+        {
+          "name": "checkCoalescedTurn",
+          "kind": "function",
+          "signature": "(options: CoalescedTurnOptions) => Promise<InvariantVerdict>",
+          "doc": "The recorded long turn stores at most 5,000 events, attached and after a handoff."
+        },
+        {
+          "name": "checkLimitAlarms",
+          "kind": "function",
+          "signature": "(options: LimitAlarmCheckOptions) => Promise<InvariantVerdict>",
+          "doc": "Every resource alarms at 80% and not below, escalates at the limit, and no budget exceeds the platform's."
+        },
+        {
+          "name": "checkScheduledJobBudgets",
+          "kind": "function",
+          "signature": "(options: ScheduledJobBudgetOptions) => Promise<InvariantVerdict[]>",
+          "doc": "Bounded reads and the memory budget for every scheduled job, on the app's day-sized fixture."
+        },
+        {
+          "name": "CoalescedTurnOptions",
+          "kind": "interface",
+          "signature": "interface CoalescedTurnOptions",
+          "doc": null
+        },
+        {
+          "name": "D1Reads",
+          "kind": "interface",
+          "signature": "interface D1Reads",
+          "doc": "What a measured binding saw while one job ran."
+        },
+        {
+          "name": "describeVerdict",
+          "kind": "function",
+          "signature": "(verdict: InvariantVerdict) => string",
+          "doc": "A verdict whose message names every finding, for a test runner's failure output."
+        },
+        {
+          "name": "forceGc",
+          "kind": "function",
+          "signature": "() => void",
+          "doc": "Run a full garbage collection, so a heap reading counts only live objects."
+        },
+        {
+          "name": "INVARIANT_RESULTS_ENV",
+          "kind": "const",
+          "signature": "\"AGENT_APP_INVARIANTS_RESULTS\"",
+          "doc": "Set by `agent-app-invariants` to the file it reads verdicts from."
+        },
+        {
+          "name": "JobMeasurement",
+          "kind": "interface",
+          "signature": "interface JobMeasurement",
+          "doc": null
+        },
+        {
+          "name": "LimitAlarmCheckOptions",
+          "kind": "interface",
+          "signature": "interface LimitAlarmCheckOptions",
+          "doc": null
+        },
+        {
+          "name": "measureD1",
+          "kind": "function",
+          "signature": "<D extends object>(d1: D, reads?: D1Reads, options?: { sampleHeap?: boolean | undefined; }) => { d1: D; reads: D1Reads;…",
+          "doc": "The D1 binding with every response measured (serialized bytes) and the live heap sampled after a collection before and after every query."
+        },
+        {
+          "name": "measureJob",
+          "kind": "function",
+          "signature": "(job: BudgetedJob, d1: object, install: (measured: object) => void, quiet?: boolean) => Promise<JobMeasurement>",
+          "doc": "Run one job against a measured binding."
+        },
+        {
+          "name": "PLATFORM_LIMITS",
+          "kind": "const",
+          "signature": "{ readonly 'worker-memory': number; readonly 'snapshot-count': 25; readonly 'key-rate': 60; }",
+          "doc": "Hard platform limits a declared budget may not exceed."
+        },
+        {
+          "name": "recordedLongTurn",
+          "kind": "function",
+          "signature": "(options?: { tokens?: number | undefined; toolCalls?: number | undefined; tokenMs?: number | undefined; }) => TimedTurn…",
+          "doc": "The long turn GTM recorded on 2026-10-10, reproduced in shape: a reasoning model streaming three events per token (the harness's raw part update, a model-processing heartbeat and the delta), with too…"
+        },
+        {
+          "name": "recordInvariant",
+          "kind": "function",
+          "signature": "(verdict: InvariantVerdict) => InvariantVerdict",
+          "doc": "Record a verdict for the conformance report and fail the caller when it did not pass."
+        },
+        {
+          "name": "recordInvariants",
+          "kind": "function",
+          "signature": "(verdicts: readonly InvariantVerdict[]) => InvariantVerdict[]",
+          "doc": "Record several verdicts; fails after recording all of them."
+        },
+        {
+          "name": "ScheduledJobBudgetOptions",
+          "kind": "interface",
+          "signature": "interface ScheduledJobBudgetOptions",
+          "doc": null
+        },
+        {
+          "name": "stallingD1",
+          "kind": "function",
+          "signature": "<D extends object>(d1: D) => { d1: D; stall(mode: StallMode): void; readonly mode: StallMode; }",
+          "doc": "The D1 binding with a switch that makes every query fail or never answer, as an overloaded D1 did."
+        },
+        {
+          "name": "StallMode",
+          "kind": "type",
+          "signature": "type StallMode",
+          "doc": null
+        },
+        {
+          "name": "TimedTurnEvent",
+          "kind": "interface",
+          "signature": "interface TimedTurnEvent",
+          "doc": "One event of the recorded long turn and the turn-relative time it arrived."
+        }
+      ]
+    },
+    {
       "id": "./legibility",
       "source": "src/legibility/index.ts",
       "dependsOn": [
@@ -18201,6 +18726,12 @@
           "doc": "Reduce an observed frame."
         },
         {
+          "name": "ORPHANED_TURN_CODE",
+          "kind": "const",
+          "signature": "\"turn.orphaned\"",
+          "doc": "The failure code carried by the terminal event of a settled orphan."
+        },
+        {
           "name": "parseTurnObservation",
           "kind": "function",
           "signature": "(value?: unknown) => TurnObservation",
@@ -18259,6 +18790,36 @@
           "kind": "function",
           "signature": "(part: JsonRecord) => string",
           "doc": "Resolve the tool name from a JSON record using tool, name, or a default value"
+        },
+        {
+          "name": "SettledOrphanedTurn",
+          "kind": "interface",
+          "signature": "interface SettledOrphanedTurn",
+          "doc": null
+        },
+        {
+          "name": "settleOrphanedTurns",
+          "kind": "function",
+          "signature": "(options: SettleOrphanedTurnsOptions) => Promise<SettleOrphanedTurnsResult>",
+          "doc": "End every running turn stream nothing has renewed past its lease."
+        },
+        {
+          "name": "SettleOrphanedTurnsOptions",
+          "kind": "interface",
+          "signature": "interface SettleOrphanedTurnsOptions",
+          "doc": null
+        },
+        {
+          "name": "SettleOrphanedTurnsResult",
+          "kind": "interface",
+          "signature": "interface SettleOrphanedTurnsResult",
+          "doc": null
+        },
+        {
+          "name": "StaleRunningTurn",
+          "kind": "interface",
+          "signature": "interface StaleRunningTurn",
+          "doc": "A running turn nothing has renewed since `updatedAt`."
         },
         {
           "name": "stampReplaySeq",
@@ -20373,7 +20934,8 @@
       "id": "./turn-health",
       "source": "src/turn-health/index.ts",
       "dependsOn": [
-        "alerting"
+        "alerting",
+        "launch-invariants"
       ],
       "error": null,
       "exports": [

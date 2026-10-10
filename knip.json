@@ -127,7 +127,10 @@
     "src/workspace-apps/index.ts",
     "src/workspace-react/index.tsx",
     "tests/**/*.test.{ts,tsx}",
-    "src/public-consultation/index.ts"
+    "src/public-consultation/index.ts",
+    "src/launch-invariants/index.ts",
+    "src/launch-invariants/testing.ts",
+    "src/launch-invariants/cli.ts"
   ],
   "project": [
     "src/**/*.{ts,tsx}",
