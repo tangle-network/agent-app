@@ -35,8 +35,13 @@ export interface PersistedTurnRow {
   threadId: string
   content: string
   /** Raw `parts` column. A JSON string or an already-parsed array; the sweep
-   *  accepts both because D1 drivers differ. */
+   *  accepts both because D1 drivers differ. Left undefined by a source that
+   *  lists rows by {@link partsSize} and serves parts through
+   *  {@link TurnHealthSource.readParts}. */
   parts: unknown
+  /** Stored length of `parts` (SQLite `length()`), set when the row was listed
+   *  without them. The sweep batches {@link TurnHealthSource.readParts} by it. */
+  partsSize?: number | null
   outputTokens?: number | null
   model?: string | null
   createdAt: number
@@ -54,6 +59,51 @@ export interface TurnHealthSource {
   listRecentAssistantTurns(input: { sinceMs: number; now: number; limit: number }): Promise<
     PersistedTurnRow[]
   >
+  /**
+   * The stored `parts` of these rows, by id, for a source that lists rows
+   * without them. The sweep asks for at most {@link TURN_HEALTH_PARTS_BATCH_SIZE}
+   * of parts at a time and judges each batch before it reads the next, so memory
+   * holds one batch rather than the whole window.
+   *
+   * On 2026-10-10 gtm-agent's 500 newest assistant rows carried 122 MB of
+   * parts (the largest 2.8 MB). Read in one query they exceeded the Worker's
+   * 128 MB, which stopped the hourly cron and every sweep queued after this one.
+   */
+  readParts?(ids: readonly string[]): Promise<Map<string, unknown>>
+}
+
+/** Most stored parts the sweep reads in one batch; a larger row is read alone. */
+export const TURN_HEALTH_PARTS_BATCH_SIZE = 4 * 1024 * 1024
+/** D1 binds at most 100 parameters to one query. */
+const TURN_HEALTH_PARTS_BATCH_ROWS = 50
+
+/** Consecutive rows whose listed parts size fits one read. */
+function partsBatches(rows: readonly PersistedTurnRow[]): PersistedTurnRow[][] {
+  const batches: PersistedTurnRow[][] = []
+  let batch: PersistedTurnRow[] = []
+  let size = 0
+  for (const row of rows) {
+    const rowSize = row.partsSize ?? 0
+    if (batch.length > 0 && (size + rowSize > TURN_HEALTH_PARTS_BATCH_SIZE || batch.length >= TURN_HEALTH_PARTS_BATCH_ROWS)) {
+      batches.push(batch)
+      batch = []
+      size = 0
+    }
+    batch.push(row)
+    size += rowSize
+  }
+  if (batch.length > 0) batches.push(batch)
+  return batches
+}
+
+/** The listed rows with their parts, read one batch at a time when the source listed them without. */
+async function* withParts(rows: readonly PersistedTurnRow[], source: TurnHealthSource): AsyncGenerator<PersistedTurnRow> {
+  for (const batch of partsBatches(rows)) {
+    const unread = batch.filter((row) => row.parts === undefined && (row.partsSize ?? 0) > 0).map((row) => row.id)
+    // A read failure propagates, like the listing's, so the caller retries the sweep.
+    const read = unread.length > 0 && source.readParts ? await source.readParts(unread) : null
+    for (const row of batch) yield read?.has(row.id) ? { ...row, parts: read.get(row.id) } : row
+  }
 }
 
 export interface SweepOptions {
@@ -299,7 +349,7 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
   const malformedSamples: TurnHealthReason[] = []
   const rejectedSamples: TurnHealthReason[] = []
 
-  for (const row of turns) {
+  for await (const row of withParts(turns, options.source)) {
     const verdict = classifyTurnOutcome({
       finalText: row.content,
       parts: parseParts(await decodeRowParts(options.decodeParts, row)),
@@ -637,7 +687,7 @@ export function createD1TurnHealthSource(
       const sinceSeconds = Math.floor(sinceMs / 1000)
       const { results } = await db
         .prepare(
-          `SELECT id, thread_id AS threadId, content, parts,
+          `SELECT id, thread_id AS threadId, content, length(parts) AS partsSize,
                   output_tokens AS outputTokens, model, created_at AS createdAt
              FROM ${message}
             WHERE role = 'assistant' AND created_at >= ?1
@@ -651,11 +701,21 @@ export function createD1TurnHealthSource(
         id: String(row.id),
         threadId: String(row.threadId),
         content: typeof row.content === 'string' ? row.content : '',
-        parts: row.parts,
+        parts: undefined,
+        partsSize: row.partsSize === null ? null : Number(row.partsSize),
         outputTokens: row.outputTokens === null ? null : Number(row.outputTokens),
         model: (row.model as string | null) ?? null,
         createdAt: Number(row.createdAt) * 1000,
       }))
+    },
+
+    async readParts(ids) {
+      if (ids.length === 0) return new Map()
+      const { results } = await db
+        .prepare(`SELECT id, parts FROM ${message} WHERE id IN (${ids.map((_, i) => `?${i + 1}`).join(', ')})`)
+        .bind(...ids)
+        .all<{ id: string; parts: unknown }>()
+      return new Map(results.map((row) => [String(row.id), row.parts]))
     },
   }
 
