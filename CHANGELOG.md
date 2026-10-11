@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.102
+
+- fix(sandbox): charge an unused warm only for the span no turn used (#1022)
+
 ## 0.60.101
 
 - fix(runtime): repeat a Router turn that answered nothing, and type a blank answer as a failure (#1021)
