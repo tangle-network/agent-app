@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.69
+
+- feat(sandbox): warm leases that resume ahead of need and budget the misses (#979)
+
 ## 0.60.68
 
 - docs(lessons): link the pasted-code, prompt-text and delivery checks; record the D10 revert (#978)
