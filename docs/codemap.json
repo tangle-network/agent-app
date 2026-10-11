@@ -2787,6 +2787,18 @@
           "doc": "Host-resolved metadata only."
         },
         {
+          "name": "ChatTurnIntentLine",
+          "kind": "interface",
+          "signature": "interface ChatTurnIntentLine",
+          "doc": "The intent line: one plain sentence, written by a fast model call the moment a turn is admitted, saying what the agent is about to do."
+        },
+        {
+          "name": "ChatTurnIntentLineArgs",
+          "kind": "interface",
+          "signature": "interface ChatTurnIntentLineArgs",
+          "doc": "What `intentLine.generate` receives: the admitted turn's message and the thread's last few turns."
+        },
+        {
           "name": "ChatTurnLifecycle",
           "kind": "interface",
           "signature": "interface ChatTurnLifecycle",
@@ -3207,6 +3219,24 @@
           "doc": "Define the maximum byte size allowed for inline parts in data processing"
         },
         {
+          "name": "INTENT_LINE_HISTORY_MESSAGES",
+          "kind": "const",
+          "signature": "6",
+          "doc": "Turns of the thread the line is written from."
+        },
+        {
+          "name": "INTENT_LINE_MAX_CHARS",
+          "kind": "const",
+          "signature": "240",
+          "doc": "Longest line kept; anything longer is cut."
+        },
+        {
+          "name": "INTENT_LINE_TIMEOUT_MS",
+          "kind": "const",
+          "signature": "1500",
+          "doc": "A line slower than this shows nothing."
+        },
+        {
           "name": "isCommittingSandboxEvent",
           "kind": "function",
           "signature": "(event: unknown) => boolean",
@@ -3223,6 +3253,12 @@
           "kind": "function",
           "signature": "(event: unknown) => boolean",
           "doc": "Progress the consumer may see before the commit point: it names no model output and carries no billing receipt, so streaming it live cannot duplicate an answer or bill an abandoned attempt."
+        },
+        {
+          "name": "isTurnIntentEvent",
+          "kind": "function",
+          "signature": "(event: unknown) => event is TurnIntentEvent",
+          "doc": "True for a {@link TURN_INTENT_EVENT} with non-empty text."
         },
         {
           "name": "isTurnPhaseEvent",
@@ -3755,7 +3791,7 @@
         {
           "name": "settleTurnResponse",
           "kind": "function",
-          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>",
+          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void, onIntent?: ((intent: TurnIntentData) => void) | undefined…",
           "doc": "Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}."
         },
         {
@@ -3831,6 +3867,12 @@
           "doc": "The failure a completed run with an aborted tool call settles with."
         },
         {
+          "name": "TURN_INTENT_EVENT",
+          "kind": "const",
+          "signature": "\"session.run.intent\"",
+          "doc": "Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do (\"Looking at your three competitors' pricing pages, t…"
+        },
+        {
           "name": "TURN_PHASE_EVENT",
           "kind": "const",
           "signature": "\"session.run.phase\"",
@@ -3865,6 +3907,18 @@
           "kind": "const",
           "signature": "\"turn_stream_lost\"",
           "doc": "Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started."
+        },
+        {
+          "name": "TurnIntentData",
+          "kind": "type",
+          "signature": "type TurnIntentData",
+          "doc": "The data of a {@link TURN_INTENT_EVENT}."
+        },
+        {
+          "name": "TurnIntentEvent",
+          "kind": "type",
+          "signature": "type TurnIntentEvent",
+          "doc": "A {@link TURN_INTENT_EVENT} as it crosses the wire."
         },
         {
           "name": "TurnPhaseData",
@@ -14284,6 +14338,162 @@
       ]
     },
     {
+      "id": "./rollout",
+      "source": "src/rollout/index.ts",
+      "dependsOn": [
+        "signoff"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "decideRollout",
+          "kind": "function",
+          "signature": "(input: { plan: RolloutPlan; fromValue: string; toValue: string; measure(stage: RolloutStage): Promise<StageMeasurement…",
+          "doc": "Decide one change of the list."
+        },
+        {
+          "name": "killLineBreaches",
+          "kind": "function",
+          "signature": "(stage: RolloutStage, measured: StageMeasurement | null) => string[]",
+          "doc": "Each kill line the measurement misses, as a reason."
+        },
+        {
+          "name": "normalizeRolloutValue",
+          "kind": "function",
+          "signature": "(value: string) => string",
+          "doc": "Canonical form for matching a value to a stage: entries trimmed and sorted."
+        },
+        {
+          "name": "ParsedRolloutList",
+          "kind": "interface",
+          "signature": "interface ParsedRolloutList",
+          "doc": null
+        },
+        {
+          "name": "parseRolloutList",
+          "kind": "function",
+          "signature": "(value: string | null | undefined) => ParsedRolloutList",
+          "doc": null
+        },
+        {
+          "name": "rolloutAdmits",
+          "kind": "function",
+          "signature": "(value: string | ParsedRolloutList, workspace: { id: string; createdAt?: number | undefined; }) => boolean",
+          "doc": "Whether a list admits one workspace."
+        },
+        {
+          "name": "RolloutDecision",
+          "kind": "interface",
+          "signature": "interface RolloutDecision",
+          "doc": null
+        },
+        {
+          "name": "RolloutKillLine",
+          "kind": "interface",
+          "signature": "interface RolloutKillLine",
+          "doc": "A kill line: the measured value must stay at or under `max` and at or over `min`."
+        },
+        {
+          "name": "RolloutPlan",
+          "kind": "interface",
+          "signature": "interface RolloutPlan",
+          "doc": null
+        },
+        {
+          "name": "RolloutStage",
+          "kind": "interface",
+          "signature": "interface RolloutStage",
+          "doc": null
+        },
+        {
+          "name": "rolloutWidens",
+          "kind": "function",
+          "signature": "(fromValue: string, toValue: string) => boolean",
+          "doc": "Whether `to` may admit a workspace `from` does not."
+        },
+        {
+          "name": "StageMeasurement",
+          "kind": "interface",
+          "signature": "interface StageMeasurement",
+          "doc": "Production numbers for one stage, from the product's own instrument."
+        },
+        {
+          "name": "validateRolloutPlan",
+          "kind": "function",
+          "signature": "(plan: RolloutPlan) => void",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./rollout/cli",
+      "source": "src/rollout/cli.ts",
+      "dependsOn": [
+        "signoff"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "readWranglerVar",
+          "kind": "function",
+          "signature": "(source: string, name: string) => string | null",
+          "doc": "A top-level `[vars]` string value from wrangler.toml source; environments are not read."
+        },
+        {
+          "name": "RolloutConfig",
+          "kind": "interface",
+          "signature": "interface RolloutConfig",
+          "doc": null
+        },
+        {
+          "name": "runRolloutCheck",
+          "kind": "function",
+          "signature": "(args: CliArgs) => Promise<RolloutDecision[]>",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./rollout/d1",
+      "source": "src/rollout/d1.ts",
+      "dependsOn": [
+        "signoff"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "createD1TurnTimingStore",
+          "kind": "function",
+          "signature": "(options: { db: D1LikeForRollout; now?: (() => number) | undefined; }) => { record(row: TurnTimingRow): Promise<void>;…",
+          "doc": null
+        },
+        {
+          "name": "D1LikeForRollout",
+          "kind": "interface",
+          "signature": "interface D1LikeForRollout",
+          "doc": "Minimal D1 surface (Cloudflare's `D1Database` satisfies it)."
+        },
+        {
+          "name": "ROLLOUT_TURN_TIMING_SCHEMA_SQL",
+          "kind": "const",
+          "signature": "\"\\nCREATE TABLE IF NOT EXISTS rollout_turn_timing (\\n turn_id TEXT PRIMARY KEY,\\n rollout TEXT NOT NULL,\\n workspace_id…",
+          "doc": null
+        },
+        {
+          "name": "stageMetrics",
+          "kind": "function",
+          "signature": "(rows: readonly Pick<TurnTimingRow, \"failed\" | \"firstTextMs\" | \"settledMs\">[]) => { first_words_p50_ms: number | null;…",
+          "doc": "Stage metrics from turn rows: first-words and settled percentiles in ms, and the failure rate."
+        },
+        {
+          "name": "TurnTimingRow",
+          "kind": "interface",
+          "signature": "interface TurnTimingRow",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./runtime",
       "source": "src/runtime/index.ts",
       "dependsOn": [
@@ -23882,6 +24092,12 @@
           "doc": "Splits a batch into what the `accept` list admits and what it refuses."
         },
         {
+          "name": "firstUnansweredRequiredField",
+          "kind": "function",
+          "signature": "(fields: ({ name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined;…",
+          "doc": "The first required field still without an answer, or null when every required field has one: the reason `buildAnswerData` returned null."
+        },
+        {
           "name": "FlowWaterfall",
           "kind": "function",
           "signature": "({ trace }: FlowWaterfallProps) => Element | null",
@@ -24308,6 +24524,12 @@
           "doc": "Resolve if the interaction status is a terminal state excluding pending"
         },
         {
+          "name": "isTurnIntentEvent",
+          "kind": "function",
+          "signature": "(event: unknown) => event is TurnIntentEvent",
+          "doc": "True for a {@link TURN_INTENT_EVENT} with non-empty text."
+        },
+        {
           "name": "isTurnPhaseEvent",
           "kind": "function",
           "signature": "(event: unknown) => event is TurnPhaseEvent",
@@ -24318,6 +24540,12 @@
           "kind": "function",
           "signature": "(interaction: ChatInteraction, data: InteractionData) => string",
           "doc": "Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s)."
+        },
+        {
+          "name": "LateAnswerResult",
+          "kind": "type",
+          "signature": "type LateAnswerResult",
+          "doc": "What a host did with a late answer: sent it (`true` or nothing returned), queued it behind the running turn, or refused it (`false`)."
         },
         {
           "name": "lazyRoute",
@@ -24420,6 +24648,12 @@
           "kind": "interface",
           "signature": "interface MessageAttachmentsProps",
           "doc": null
+        },
+        {
+          "name": "missingAnswerHint",
+          "kind": "function",
+          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
+          "doc": "What the reader still has to do before the card's action (`verb`: submit, send) is available, in plain words, for the line beside the disabled button."
         },
         {
           "name": "MissionActivityLane",
@@ -25222,7 +25456,7 @@
         {
           "name": "settleTurnResponse",
           "kind": "function",
-          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>",
+          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void, onIntent?: ((intent: TurnIntentData) => void) | undefined…",
           "doc": "Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}."
         },
         {
@@ -25376,6 +25610,12 @@
           "doc": "Drives an anchor-click download from an already-resolved blob."
         },
         {
+          "name": "TURN_INTENT_EVENT",
+          "kind": "const",
+          "signature": "\"session.run.intent\"",
+          "doc": "Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do (\"Looking at your three competitors' pricing pages, t…"
+        },
+        {
           "name": "TURN_PHASE_EVENT",
           "kind": "const",
           "signature": "\"session.run.phase\"",
@@ -25410,6 +25650,18 @@
           "kind": "const",
           "signature": "\"turn_stream_lost\"",
           "doc": "Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started."
+        },
+        {
+          "name": "TurnIntentData",
+          "kind": "type",
+          "signature": "type TurnIntentData",
+          "doc": "The data of a {@link TURN_INTENT_EVENT}."
+        },
+        {
+          "name": "TurnIntentEvent",
+          "kind": "type",
+          "signature": "type TurnIntentEvent",
+          "doc": "A {@link TURN_INTENT_EVENT} as it crosses the wire."
         },
         {
           "name": "TurnPhaseData",
