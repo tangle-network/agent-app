@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.82
+
+- docs(climb): smart-warm live outcome — warm hits 2/2, cold first reply 51.5 s (#996)
+
 ## 0.60.81
 
 - fix(workspace-export): the panel advances one export at a time (#994)
