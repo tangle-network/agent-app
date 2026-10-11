@@ -7,21 +7,20 @@ import type { CatalogModel } from '../../src/runtime/model-catalog'
 afterEach(cleanup)
 
 const base = { supportsTools: false, supportsReasoning: false, featured: true }
-const models: CatalogModel[] = [
-  { ...base, id: 'openai/gpt-x', name: 'GPT X', provider: 'openai', supportsTools: true, pricing: { prompt: '0.000003' } },
-  { ...base, id: 'fal/flux', name: 'Flux Pro', provider: 'fal', output: 'image', outputPrice: { usd: 0.04, unit: 'image' },
-    previewUrl: 'https://cdn.test/flux.webp', capability: 'Photoreal stills, strong typography' },
-  { ...base, id: 'google/veo', name: 'Veo 3', provider: 'google', output: 'video', outputPrice: { usd: 0.5, unit: 'second' },
-    previewUrl: 'https://cdn.test/veo.jpg', capability: 'Up to 8 s with native audio' },
-  { ...base, id: 'elevenlabs/v3', name: 'Eleven v3', provider: 'elevenlabs', output: 'speech', outputPrice: { usd: 0.3, unit: '1k_chars' } },
-]
+const gpt: CatalogModel = { ...base, id: 'openai/gpt-x', name: 'GPT X', provider: 'openai', supportsTools: true, pricing: { prompt: '0.000003' } }
+const flux: CatalogModel = { ...base, id: 'fal/flux', name: 'Flux Pro', provider: 'fal', output: 'image', outputPrice: { usd: 0.04, unit: 'image' },
+  previewUrl: 'https://cdn.test/flux.webp', capability: 'Photoreal stills, strong typography' }
+const veo: CatalogModel = { ...base, id: 'google/veo', name: 'Veo 3', provider: 'google', output: 'video', outputPrice: { usd: 0.5, unit: 'second' },
+  previewUrl: 'https://cdn.test/veo.jpg', capability: 'Up to 8 s with native audio' }
+const eleven: CatalogModel = { ...base, id: 'elevenlabs/v3', name: 'Eleven v3', provider: 'elevenlabs', output: 'speech', outputPrice: { usd: 0.3, unit: '1k_chars' } }
+const models: CatalogModel[] = [gpt, flux, veo, eleven]
 
 describe('formatModelPrice', () => {
   it('prices every model in the unit its output comes in', () => {
-    expect(formatModelPrice(models[0])).toBe('$3/M')
-    expect(formatModelPrice(models[1])).toBe('$0.04/image')
-    expect(formatModelPrice(models[2])).toBe('$0.5/sec')
-    expect(formatModelPrice(models[3])).toBe('$0.3/1K chars')
+    expect(formatModelPrice(gpt)).toBe('$3/M')
+    expect(formatModelPrice(flux)).toBe('$0.04/image')
+    expect(formatModelPrice(veo)).toBe('$0.5/sec')
+    expect(formatModelPrice(eleven)).toBe('$0.3/1K chars')
     expect(formatModelPrice({ outputPrice: { usd: 0, unit: 'image' } })).toBeUndefined()
     expect(formatModelPrice({})).toBeUndefined()
   })
