@@ -97,9 +97,14 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
       const started = Date.now()
       const signal = AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(options.signal ? [options.signal] : [])])
       if (options.warm) await options.warm.leases.turn(options.warm.key).catch(() => {})
+      // A product's box() may not honour the signal either (a hung provision); the cap still holds.
+      const capped = <T,>(work: Promise<T>) => Promise.race([work, new Promise<never>((_, reject) => {
+        if (signal.aborted) reject(signal.reason)
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })])
       let box: SandboxInstance
       try {
-        box = await options.box(signal)
+        box = await capped(options.box(signal))
       } catch (error) {
         if (error instanceof SandboxRunError) return fail(error.code, error.message, error.cause)
         return fail('sandbox_unavailable', 'The sandbox for this workspace could not start, so this work was not done.', error)
@@ -107,13 +112,7 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
       let answer: string
       try {
         // A product runner may not honour the signal; the call still ends at the cap.
-        answer = await Promise.race([
-          runTask(box, task, { signal, timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)) }),
-          new Promise<never>((_, reject) => {
-            if (signal.aborted) reject(signal.reason)
-            signal.addEventListener('abort', () => reject(signal.reason), { once: true })
-          }),
-        ])
+        answer = await capped(runTask(box, task, { signal, timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)) }))
       } catch (error) {
         const timedOut = signal.aborted && !options.signal?.aborted
         return fail('sandbox_failed', timedOut

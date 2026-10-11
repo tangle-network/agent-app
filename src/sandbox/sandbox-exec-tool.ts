@@ -32,7 +32,9 @@ export interface SandboxExecToolOptions {
   env?: Record<string, string>
   /** Cap for one command, box start and prepare included. Default 2 minutes. */
   timeoutMs?: number
-  /** Characters of stdout and of stderr returned to the model, each. Default 20 000 (the tail is kept). */
+  /** Characters of stdout and of stderr returned to the model, each; the tail is kept. Default 4 000, so
+   *  one result stays inside `runRouterTurn`'s default 12 000-character tool-result limit, which keeps the
+   *  head and would otherwise cut the tail, where errors are. Raise both together. */
   maxOutputChars?: number
   /** The product's command policy: a string refuses the command with that reason. */
   allow?(command: string): string | null
@@ -64,7 +66,7 @@ export interface SandboxExecTool {
 }
 
 const DEFAULT_TIMEOUT_MS = 2 * 60_000
-const DEFAULT_OUTPUT_CHARS = 20_000
+const DEFAULT_OUTPUT_CHARS = 4_000
 const COMMAND_LIMIT = 10_000
 
 export const SANDBOX_EXEC_DESCRIPTION =
@@ -134,9 +136,12 @@ export function createSandboxExecTool(options: SandboxExecToolOptions): SandboxE
       const signal = AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(options.signal ? [options.signal] : [])])
       if (options.warm) await options.warm.leases.turn(options.warm.key).catch(() => {})
       let box: SandboxInstance
+      const starting = place(signal)
       try {
-        box = await raceAbort(place(signal), signal)
+        box = await raceAbort(starting, signal)
       } catch (error) {
+        // A start that outlived this call's cap may never settle; the next call starts again.
+        if (ready === starting) ready = null
         if (error instanceof SandboxRunError) {
           options.onFailure?.(error)
           throw error

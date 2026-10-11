@@ -42,6 +42,15 @@ describe('createSandboxExecTool', () => {
   })
 
   it('caps a hung command, keeps the tail of long output, and applies the product policy', async () => {
+    let starts = 0
+    const stuck = createSandboxExecTool({ timeoutMs: 20, box: () => {
+      starts++
+      return starts === 1 ? new Promise(() => {}) : Promise.resolve(fakeBox(async () => ({ exitCode: 0, stdout: 'up', stderr: '' })) as never)
+    } })
+    await expect(stuck.run({ command: 'ls' })).rejects.toMatchObject({ code: 'sandbox_unavailable' })
+    // The hung first start is dropped, so the next call places the box again.
+    await expect(stuck.run({ command: 'ls' })).resolves.toMatchObject({ stdout: 'up' })
+
     const hung = createSandboxExecTool({ timeoutMs: 20, box: async () => fakeBox(() => new Promise(() => {})) as never })
     await expect(hung.run({ command: 'sleep 999' })).rejects.toMatchObject({ code: 'sandbox_failed', message: expect.stringContaining('did not finish') })
 
