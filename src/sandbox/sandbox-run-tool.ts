@@ -108,7 +108,14 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
       }
       let answer: string
       try {
-        answer = await runTask(box, task, { signal, timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)) })
+        // A product runner may not honour the signal; the call still ends at the cap.
+        answer = await Promise.race([
+          runTask(box, task, { signal, timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)) }),
+          new Promise<never>((_, reject) => {
+            if (signal.aborted) reject(signal.reason)
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+          }),
+        ])
       } catch (error) {
         const timedOut = signal.aborted && !options.signal?.aborted
         return fail('sandbox_failed', timedOut

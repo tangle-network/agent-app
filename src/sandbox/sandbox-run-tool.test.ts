@@ -54,6 +54,11 @@ describe('createSandboxRunTool', () => {
     expect(() => createSandboxRunTool({ box: async () => box })).toThrow(/shell or a runTask/)
   })
 
+  it('ends a call at its cap even when the product runner ignores the signal', async () => {
+    const tool = createSandboxRunTool({ box: async () => box, timeoutMs: 20, runTask: () => new Promise<string>(() => {}) })
+    await expect(tool.run({ task: 'x' })).rejects.toMatchObject({ code: 'sandbox_failed', message: expect.stringContaining('did not finish') })
+  })
+
   it('types a failed run and an empty answer instead of returning nothing', async () => {
     const tool = createSandboxRunTool({ shell, box: async () => box })
     runPrompt.mockRejectedValueOnce(new Error('stream severed'))
