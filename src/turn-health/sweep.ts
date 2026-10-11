@@ -19,6 +19,7 @@
 
 import { classifyTurnOutcome, describeReason, type TurnHealthReason } from './classify.js'
 import type { AlertSink, TurnHealthAlert } from './sink.js'
+import { SIZED_READ_BYTES, sizedBatches } from '../launch-invariants/sized-reads.js'
 
 /** A thread that has taken user messages with no reply since. */
 export interface UnansweredThread {
@@ -73,27 +74,11 @@ export interface TurnHealthSource {
 }
 
 /** Most stored parts the sweep reads in one batch; a larger row is read alone. */
-export const TURN_HEALTH_PARTS_BATCH_SIZE = 4 * 1024 * 1024
-/** D1 binds at most 100 parameters to one query. */
-const TURN_HEALTH_PARTS_BATCH_ROWS = 50
+export const TURN_HEALTH_PARTS_BATCH_SIZE = SIZED_READ_BYTES
 
 /** Consecutive rows whose listed parts size fits one read. */
 function partsBatches(rows: readonly PersistedTurnRow[]): PersistedTurnRow[][] {
-  const batches: PersistedTurnRow[][] = []
-  let batch: PersistedTurnRow[] = []
-  let size = 0
-  for (const row of rows) {
-    const rowSize = row.partsSize ?? 0
-    if (batch.length > 0 && (size + rowSize > TURN_HEALTH_PARTS_BATCH_SIZE || batch.length >= TURN_HEALTH_PARTS_BATCH_ROWS)) {
-      batches.push(batch)
-      batch = []
-      size = 0
-    }
-    batch.push(row)
-    size += rowSize
-  }
-  if (batch.length > 0) batches.push(batch)
-  return batches
+  return sizedBatches(rows.map((row) => ({ key: row, size: row.partsSize })), { bytes: TURN_HEALTH_PARTS_BATCH_SIZE })
 }
 
 /** The listed rows with their parts, read one batch at a time when the source listed them without. */

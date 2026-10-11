@@ -64,6 +64,8 @@ Approvals attach to an action's effects, such as spending or publishing, rather 
   Preserve explicit unreadable/OCR outcomes and limits on expanded untrusted content.
 - For workspace data export, read [workspace-export.md](docs/workspace-export.md).
   Keep authorization owner-only and fail-closed, and keep credentials out of archives and logs.
+- For scheduled jobs, report routes, auth lookups, turn settlement or platform-limit alarms, read [launch-invariants.md](docs/launch-invariants.md); every agent app proves them with `agent-app-invariants`.
+  For where a turn's lifecycle is decided, read [turn-lifecycle-owner.md](docs/turn-lifecycle-owner.md).
 - For billing verification, read [spend-verification.md](docs/spend-verification.md).
   Preserve declared ownership, observation coverage, and uncertainty; missing observations cannot certify a clean bill.
 - For dependency provenance or peer checks, read [dependency-source-gate.md](docs/dependency-source-gate.md).
