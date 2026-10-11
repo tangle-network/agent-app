@@ -46,6 +46,8 @@ export default defineConfig({
     'launch-invariants/index': 'src/launch-invariants/index.ts',
     'launch-invariants/testing': 'src/launch-invariants/testing.ts',
     'launch-invariants/cli': 'src/launch-invariants/cli.ts',
+    'journeys/index': 'src/journeys/index.ts',
+    'journeys/cli': 'src/journeys/cli.ts',
     'integrations/index': 'src/integrations/index.ts',
     'chatgpt-react/index': 'src/chatgpt-react/index.tsx',
     'chatgpt-react/styles': 'src/chatgpt-react/styles.ts',

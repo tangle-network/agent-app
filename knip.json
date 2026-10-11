@@ -132,7 +132,9 @@
     "src/public-consultation/index.ts",
     "src/launch-invariants/index.ts",
     "src/launch-invariants/testing.ts",
-    "src/launch-invariants/cli.ts"
+    "src/launch-invariants/cli.ts",
+    "src/journeys/cli.ts",
+    "src/journeys/index.ts"
   ],
   "project": [
     "src/**/*.{ts,tsx}",
