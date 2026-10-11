@@ -57,6 +57,37 @@ export interface VaultDataPort {
   createFile(path: string): Promise<string>
   /** Delete the file at `path`. */
   deleteFile(path: string): Promise<void>
+  /**
+   * Optional: files whose text contains `query` (case-insensitive), across the
+   * whole vault. The pane matches file names itself; this finds words inside
+   * files. Omit it and search covers names only.
+   */
+  searchContent?(query: string, options?: { signal?: AbortSignal }): Promise<VaultContentMatch[]>
+  /**
+   * Optional: the saved versions of `path`, newest first, the current one
+   * included. Supply it with `readRevision` to offer a History control.
+   */
+  listRevisions?(path: string): Promise<VaultRevision[]>
+  /** Optional: the full text of one saved version of `path`. */
+  readRevision?(path: string, revisionId: string): Promise<string>
+}
+
+/** A file whose text contains a search query. */
+export interface VaultContentMatch {
+  path: string
+  /** Plain-text excerpt around the first match. */
+  snippet: string
+}
+
+/** One saved version of a file. */
+export interface VaultRevision {
+  id: string
+  /** When the version was saved, as an ISO timestamp. */
+  savedAt: string
+  /** Who saved it, in the reader's words (for example "You" or "Agent"). */
+  author?: string
+  /** True for the version the file holds now. */
+  current?: boolean
 }
 
 /** The Vault operation that failed at the product-owned data-port seam. */
@@ -138,6 +169,8 @@ export interface VaultArtifactRenderProps {
   onRichChange: (parts: VaultRichParts) => void
   /** Persist the current draft through the data port. */
   onSave: () => void
+  /** True while a save is in flight. */
+  saving: boolean
 }
 
 /** Props the pane passes to the product's optional dock renderer (e.g. an agent dock). */

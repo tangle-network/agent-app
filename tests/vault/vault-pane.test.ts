@@ -1078,23 +1078,24 @@ describe('VaultPane — dock toggle + refreshKey + headerActions', () => {
 /**
  * A folder row used to be a dead target: `collectFilePaths` kept only files, so
  * a directory path resolved to nothing. Clicking a folder makes it the vault's
- * active folder — the search narrows to it, a new file lands in it, and
- * clicking it again clears it.
+ * active folder — a new file lands in it, and clicking it again clears it. The
+ * search keeps covering the whole vault: expanding a folder used to narrow it
+ * silently, and a founder's search for a word in another folder found nothing.
  */
 describe('VaultPane — folder clicks', () => {
-  it('makes a clicked folder the active folder and scopes the search to it', async () => {
+  it('makes a clicked folder the new-file target while search still covers the whole vault', async () => {
     mount()
     fireEvent.click(await screen.findByTestId('tree-folder'))
 
-    // Visible feedback: the folder is named in the pane.
+    // Visible feedback: the folder is named in the pane as where new files go.
     expect(screen.getByText('folder', { selector: '[data-vault-folder]' })).toBeTruthy()
+    expect(screen.getByText('New files go in')).toBeTruthy()
 
-    // "m" matches a.md, b.md AND folder/c.md across the whole vault; scoped to
-    // the folder it can only return the one inside it.
+    // "m" matches a.md, b.md AND folder/c.md; all three stay findable.
     fireEvent.change(screen.getByLabelText('Search vault'), { target: { value: 'm' } })
     expect(screen.getByTestId('tree-folder/c.md')).toBeTruthy()
-    expect(screen.queryByTestId('tree-a.md')).toBeNull()
-    expect(screen.queryByTestId('tree-b.md')).toBeNull()
+    expect(screen.getByTestId('tree-a.md')).toBeTruthy()
+    expect(screen.getByTestId('tree-b.md')).toBeTruthy()
   })
 
   it('clicking the same folder again clears it and restores the whole-vault search', async () => {
@@ -1365,5 +1366,185 @@ describe('VaultPane — dock placement by pane width', () => {
     } finally {
       restore()
     }
+  })
+})
+
+/**
+ * Saved work has to be findable by what it says, not only by its file name:
+ * a founder searched for a word inside a file the agent wrote and was told no
+ * file matched.
+ */
+describe('VaultPane — content search', () => {
+  function searchPort(searchContent: VaultDataPort['searchContent']) {
+    return fakePort({ searchContent })
+  }
+
+  it('lists files whose text contains the query, with the match marked, and opens one', async () => {
+    const searchContent = vi.fn(async () => [
+      { path: 'folder/c.md', snippet: 'pricing for beehiiv starts free' },
+    ])
+    const { port } = mount({ port: searchPort(searchContent) })
+    await screen.findByTestId('tree-a.md')
+
+    fireEvent.change(screen.getByLabelText('Search vault'), { target: { value: 'beehiiv' } })
+    // No file NAME matches, so the pane waits for contents instead of saying "no files".
+    expect(screen.queryByText('No files match “beehiiv”.')).toBeNull()
+    const results = await screen.findByRole('region', { name: 'In file contents' })
+    await waitFor(() => expect(results.textContent).toContain('pricing for beehiiv starts free'))
+    expect(results.querySelector('mark')?.textContent).toBe('beehiiv')
+    expect(searchContent).toHaveBeenCalledWith('beehiiv', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+
+    fireEvent.click(screen.getByRole('button', { name: /c\.md/ }))
+    await waitFor(() => expect(port.readFile).toHaveBeenCalledWith('folder/c.md'))
+  })
+
+  it('sends one search after the reader stops typing', async () => {
+    const searchContent = vi.fn(async () => [])
+    mount({ port: searchPort(searchContent) })
+    await screen.findByTestId('tree-a.md')
+    const box = screen.getByLabelText('Search vault')
+    fireEvent.change(box, { target: { value: 'bo' } })
+    fireEvent.change(box, { target: { value: 'bod' } })
+    fireEvent.change(box, { target: { value: 'body' } })
+    await waitFor(() => expect(searchContent).toHaveBeenCalledTimes(1))
+    expect(searchContent).toHaveBeenCalledWith('body', expect.anything())
+  })
+
+  it('says plainly when neither names nor contents match', async () => {
+    mount({ port: searchPort(vi.fn(async () => [])) })
+    await screen.findByTestId('tree-a.md')
+    fireEvent.change(screen.getByLabelText('Search vault'), { target: { value: 'zzz' } })
+    expect(await screen.findByText('No files match “zzz”.')).toBeTruthy()
+  })
+
+  it('keeps name matches on screen and reports a failed content search with a retry', async () => {
+    const searchContent = vi.fn()
+      .mockRejectedValueOnce(new Error('Search is unavailable right now.'))
+      .mockResolvedValueOnce([{ path: 'b.md', snippet: 'body B' }])
+    mount({ port: searchPort(searchContent) })
+    await screen.findByTestId('tree-a.md')
+    fireEvent.change(screen.getByLabelText('Search vault'), { target: { value: 'a.md' } })
+    expect(screen.getByTestId('tree-a.md')).toBeTruthy()
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain("Couldn't search file contents. Search is unavailable right now.")
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.getByRole('region', { name: 'In file contents' }).textContent).toContain('body B'))
+  })
+
+  it('names the search scope in the placeholder only when contents are searched', async () => {
+    mount({ port: searchPort(vi.fn(async () => [])) })
+    await screen.findByTestId('tree-a.md')
+    expect((screen.getByLabelText('Search vault') as HTMLInputElement).placeholder).toBe('Search vault names and text…')
+    cleanup()
+    mount()
+    await screen.findByTestId('tree-a.md')
+    expect((screen.getByLabelText('Search vault') as HTMLInputElement).placeholder).toBe('Search vault…')
+  })
+})
+
+/** The agent rewrites files in place; a founder needs to see and recover what was there before. */
+describe('VaultPane — history', () => {
+  function historyPort() {
+    const versions: Record<string, string> = { r2: '---\ntitle: A\n---\nbody A', r1: '---\ntitle: A\n---\nfirst draft of A' }
+    return fakePort({
+      listRevisions: vi.fn(async () => [
+        { id: 'r2', savedAt: '2026-10-11T12:56:00.000Z', author: 'Agent', current: true },
+        { id: 'r1', savedAt: '2026-10-11T09:10:00.000Z', author: 'You' },
+      ]),
+      readRevision: vi.fn(async (_path: string, id: string) => versions[id]),
+    })
+  }
+
+  it('lists saved versions, previews an older one read-only, and restores it as the newest', async () => {
+    const port = historyPort()
+    const seen: VaultArtifactRenderProps[] = []
+    mount({
+      port,
+      renderArtifact: (props: VaultArtifactRenderProps) => {
+        seen.push(props)
+        return renderArtifact(props)
+      },
+    })
+    await openFile('a.md')
+    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+
+    const versions = await screen.findByRole('navigation', { name: 'Saved versions' })
+    await waitFor(() => expect(versions.textContent).toContain('Current'))
+    expect(versions.textContent).toContain('Agent')
+    expect(versions.textContent).toContain('You')
+
+    fireEvent.click(screen.getByRole('button', { name: /You/ }))
+    await waitFor(() => expect(screen.getByTestId('artifact').textContent).toContain('first draft of A'))
+    expect(seen.at(-1)?.canWrite).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore this version' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore version' }))
+    await waitFor(() => expect(port.writeFile).toHaveBeenCalledWith('a.md', '---\ntitle: A\n---\nfirst draft of A'))
+    // Back on the document, re-read from the port.
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Saved versions' })).toBeNull())
+    await waitFor(() => expect(screen.getByTestId('artifact').textContent).toContain('first draft of A'))
+  })
+
+  it('offers no Restore for the current version or a read-only reader', async () => {
+    mount({ port: historyPort(), canWrite: false })
+    await openFile('a.md')
+    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+    await screen.findByRole('navigation', { name: 'Saved versions' })
+    fireEvent.click(await screen.findByRole('button', { name: /You/ }))
+    await waitFor(() => expect(screen.getByTestId('artifact').textContent).toContain('first draft of A'))
+    expect(screen.queryByRole('button', { name: 'Restore this version' })).toBeNull()
+  })
+
+  it('holds History while the open file has unsaved edits', async () => {
+    mount({ port: historyPort() })
+    await openFile('a.md')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit as source' }))
+    fireEvent.change(screen.getByLabelText('Source editor'), { target: { value: 'edited' } })
+    expect((screen.getByRole('button', { name: 'History' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('shows no History control when the port keeps no versions', async () => {
+    mount()
+    await openFile('a.md')
+    expect(screen.queryByRole('button', { name: 'History' })).toBeNull()
+  })
+})
+
+describe('VaultPane — save state for a host editor', () => {
+  it('tells the artifact renderer while a save is in flight', async () => {
+    let finish: () => void = () => {}
+    const writeFile = vi.fn(() => new Promise<void>((resolve) => { finish = resolve }))
+    const seen: boolean[] = []
+    mount({
+      port: fakePort({ writeFile }),
+      renderArtifact: (props: VaultArtifactRenderProps) => {
+        seen.push(props.saving)
+        return createElement(
+          'div',
+          { 'data-testid': 'artifact' },
+          createElement('button', { type: 'button', onClick: () => props.onRichChange({ fm: 'title: A', body: 'changed' }) }, 'edit'),
+          createElement('button', { type: 'button', onClick: () => props.onSave() }, 'host save'),
+        )
+      },
+    })
+    await openFile('a.md')
+    fireEvent.click(screen.getByRole('button', { name: 'edit' }))
+    fireEvent.click(screen.getByRole('button', { name: 'host save' }))
+    await waitFor(() => expect(seen.at(-1)).toBe(true))
+    await act(async () => { finish() })
+    await waitFor(() => expect(seen.at(-1)).toBe(false))
+  })
+
+  it('saves the source editor on Ctrl+S and shows one save state', async () => {
+    const { port } = mount()
+    await openFile('a.md')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit as source' }))
+    const editor = screen.getByLabelText('Source editor')
+    expect(screen.queryByRole('button', { name: /^Save/ })).toBeNull()
+    fireEvent.change(editor, { target: { value: 'edited' } })
+    expect(screen.getByText('Unsaved changes')).toBeTruthy()
+    fireEvent.keyDown(editor, { key: 's', ctrlKey: true })
+    await waitFor(() => expect(port.writeFile).toHaveBeenCalledWith('a.md', 'edited'))
+    await waitFor(() => expect(screen.getByText('Saved')).toBeTruthy())
   })
 })
