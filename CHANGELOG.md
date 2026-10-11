@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.65
+
+- fix(deps): align the chat template and peer-floor checks with #962's raised floors (#972)
+
 ## 0.60.64
 
 - fix(deps): take zod from the product as a peer, not a pinned copy (#971)
