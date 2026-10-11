@@ -1451,7 +1451,7 @@ describe('VaultPane — history', () => {
         { id: 'r2', savedAt: '2026-10-11T12:56:00.000Z', author: 'Agent', current: true },
         { id: 'r1', savedAt: '2026-10-11T09:10:00.000Z', author: 'You' },
       ]),
-      readRevision: vi.fn(async (_path: string, id: string) => versions[id]),
+      readRevision: vi.fn(async (_path: string, id: string) => versions[id] ?? ''),
     })
   }
 
