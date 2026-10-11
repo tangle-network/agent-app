@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.120
+
+- feat(router-turn): one Router engine; the protected producer runs runRouterTurn under its grant (#1046)
+- docs: name the renamed Physim repo tangle-network/hardware-agent (#1052)
+
 ## 0.60.119
 
 - feat(model-picker): media models show a preview, a capability line and the price per output (#1050)
