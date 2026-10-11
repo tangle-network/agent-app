@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.95
+
+- perf(workspace-export): copy a files source four files at a time (#1014)
+
 ## 0.60.94
 
 - feat(sandbox): warm leases back off after no box or a capacity refusal (#1012)
