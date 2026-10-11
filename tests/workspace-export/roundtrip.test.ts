@@ -51,6 +51,7 @@ function seed(): DatabaseSync {
     CREATE TABLE message (id INTEGER PRIMARY KEY, thread_id TEXT, content TEXT, input_tokens INTEGER, accessToken TEXT);
     CREATE TABLE session (id TEXT PRIMARY KEY, token TEXT, user_id TEXT);
     CREATE TABLE eval_global (id INTEGER PRIMARY KEY, score REAL);
+    CREATE TABLE _migrations_applied (name TEXT PRIMARY KEY, applied_at INTEGER);
   `)
   db.prepare('INSERT INTO workspace VALUES (?, ?, ?)').run(WS, 'Inn', JSON.stringify({ published: { remoteBearerToken: 'bearer-abcdefgh' }, theme: 'dark' }))
   db.prepare('INSERT INTO workspace VALUES (?, ?, ?)').run(OTHER, 'Other', '{}')
@@ -196,6 +197,7 @@ describe('workspace export round trip', () => {
     const coverage = new Map(manifest.notes.database.map((c: { table: string; status: string }) => [c.table, c.status]))
     expect(coverage.get('session')).toBe('excluded')
     expect(coverage.get('eval_global')).toBe('unscoped')
+    expect(coverage.has('_migrations_applied')).toBe(false)
     const lines = readFileSync(join(out, 'data/db.message.ndjson'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
     expect(lines).toHaveLength(1203)
     expect(lines.every((m) => m.thread_id === 't1')).toBe(true)
@@ -506,5 +508,26 @@ describe('background continuation', () => {
     expect((await engine.get(WS, job.id))!.status).toBe('complete')
     expect([...storage.objects.keys()].some((k) => k.includes('/_running/'))).toBe(false)
     expect(await engine.continueRunning()).toBe(0)
+  })
+})
+
+describe('background continuation of older exports', () => {
+  it('indexes an unindexed running export when a request touches it, so the sweep finishes it', async () => {
+    const storage = createMemoryExportStorage()
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage,
+      plan: async () => ({
+        sources: Array.from({ length: 3 }, (_, i) => ({ kind: 'json' as const, name: `d${i}`, dataClass: 'records' as const, value: async () => ({ i }) })),
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    // An export started before the index existed has no index entry.
+    for (const key of [...storage.objects.keys()]) if (key.includes('/_running/')) storage.objects.delete(key)
+    expect(await engine.continueRunning()).toBe(0)
+    // The owner reopens the panel once; one advance runs, then the tab closes.
+    await engine.advance(WS, job.id, 0)
+    for (let i = 0; i < 5 && (await engine.get(WS, job.id))!.status === 'running'; i += 1) await engine.continueRunning()
+    expect((await engine.get(WS, job.id))!.status).toBe('complete')
   })
 })
