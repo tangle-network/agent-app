@@ -423,9 +423,17 @@ export interface SwitchProfileInput {
   prepareAuthority: (revision: ProfileRevision, key: ProfileBindingKey) => Promise<{
     planDigest: string; healthy: true; conflicts: string[]
   }>
+  /** Receives the reason preparation failed; the person sees only a generic refusal.
+   *  Defaults to one structured `console.error` line so the reason reaches the host's logs. */
+  onPrepareFailure?: (error: unknown, profileId: string) => void
 }
 
 /** The picker and deterministic text command converge here. Models cannot call it. */
+function logPrepareFailure(error: unknown, profileId: string): void {
+  console.error(JSON.stringify({ event: 'profile-switch-prepare-failed', profileId,
+    error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) }))
+}
+
 export async function switchProfile(input: SwitchProfileInput): Promise<ProfileSwitchReceipt> {
   const inputHash = profileSwitchInputHash(input.content, input.identityContext)
   const previousReceipt = await input.store.getSwitchReceipt(input.key, input.messageId, inputHash)
@@ -458,9 +466,10 @@ export async function switchProfile(input: SwitchProfileInput): Promise<ProfileS
       }
       planDigest = prepared.planDigest
       conflicts = prepared.conflicts
-    } catch {
+    } catch (error) {
       revision = null
       message = `Could not prepare ${target.name}; your current agent is unchanged.`
+      ;(input.onPrepareFailure ?? logPrepareFailure)(error, target.id)
     }
     if (revision && planDigest) {
       outcome = 'switched'
