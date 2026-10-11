@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-248 exports.
+250 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -724,6 +724,14 @@ interface CreateLegacyAttachmentUploadRouteOptions
 
 ```ts
 (options: ProtectedRuntimeChatOptions) => ChatTurnRouteProducer
+```
+
+### `createRouterTurnProducer`
+
+`function`
+
+```ts
+(options: RouterTurnProducerOptions) => ChatTurnRouteProducer
 ```
 
 ### `createSandboxChatProducer`
@@ -1644,6 +1652,14 @@ type ResolveChatAttachmentsResult
 
 ```ts
 (input: { sessionId: string; planFollowUp: unknown; messages: readonly { role: string; parts?: unknown; }[]; }) => Plan…
+```
+
+### `RouterTurnProducerOptions`
+
+`type`
+
+```ts
+type RouterTurnProducerOptions
 ```
 
 ### `rowIdOf`

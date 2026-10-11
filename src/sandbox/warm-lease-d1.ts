@@ -36,12 +36,22 @@ export const WARM_LEASE_TABLE_DDL = `CREATE TABLE IF NOT EXISTS ${DEFAULT_WARM_L
   slots_at INTEGER NOT NULL DEFAULT 0,
   first_seen_at INTEGER NOT NULL DEFAULT 0,
   predicted_at INTEGER NOT NULL DEFAULT 0,
-  declined_until INTEGER NOT NULL DEFAULT 0
+  declined_until INTEGER NOT NULL DEFAULT 0,
+  pending_warm_at INTEGER NOT NULL DEFAULT 0,
+  pending_ms INTEGER NOT NULL DEFAULT 0,
+  pending_reason TEXT
 )`
 
 /** For a table created from an earlier \`WARM_LEASE_TABLE_DDL\`: paste into a migration. */
 export const WARM_LEASE_DECLINED_UNTIL_DDL =
   `ALTER TABLE ${DEFAULT_WARM_LEASE_TABLE} ADD COLUMN declined_until INTEGER NOT NULL DEFAULT 0`
+
+/** For a table created before pending charges: paste each into a migration. */
+export const WARM_LEASE_PENDING_DDL = [
+  `ALTER TABLE ${DEFAULT_WARM_LEASE_TABLE} ADD COLUMN pending_warm_at INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE ${DEFAULT_WARM_LEASE_TABLE} ADD COLUMN pending_ms INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE ${DEFAULT_WARM_LEASE_TABLE} ADD COLUMN pending_reason TEXT`,
+] as const
 
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
 
@@ -64,6 +74,9 @@ interface Row {
   first_seen_at: number
   predicted_at: number
   declined_until: number
+  pending_warm_at: number
+  pending_ms: number
+  pending_reason: string | null
 }
 
 /** The D1 surface this store uses: `prepare().bind()` with `first`, `run` and `all`. A real `D1Database` satisfies it. */
@@ -108,6 +121,9 @@ function toRow(row: Row): WarmLeaseRow {
     firstSeenAt: row.first_seen_at,
     predictedAt: row.predicted_at,
     declinedUntil: row.declined_until ?? 0,
+    pendingWarmAt: row.pending_warm_at ?? 0,
+    pendingMs: row.pending_ms ?? 0,
+    pendingReason: row.pending_reason ?? null,
   }
 }
 
@@ -199,6 +215,24 @@ WHERE key = ?1 AND lease_id = ?2`
     async markPinged(key, at) {
       await q(`UPDATE ${t} SET ping_at = ?2 WHERE key = ?1`, key, at).run()
     },
+
+    async markPending(key, warmAt, maxMs, reason) {
+      await q(`UPDATE ${t} SET pending_warm_at = ?2, pending_ms = ?3, pending_reason = ?4 WHERE key = ?1`,
+        key, warmAt, Math.max(0, Math.round(maxMs)), reason).run()
+    },
+
+    async settlePending(key, warmAt, day, chargeMs) {
+      // Fenced by the warm's start time, so a turn and a sweep cannot both settle it.
+      const settled = await q(`UPDATE ${t} SET
+  day_warm_ms = CASE WHEN day = ?3 THEN day_warm_ms + ?4 WHEN day < ?3 THEN ?4 ELSE day_warm_ms END,
+  day = CASE WHEN day < ?3 THEN ?3 ELSE day END,
+  pending_warm_at = 0, pending_ms = 0, pending_reason = NULL
+WHERE key = ?1 AND pending_warm_at = ?2 RETURNING key`, key, warmAt, day, Math.max(0, Math.round(chargeMs))).first<{ key: string }>()
+      return settled != null
+    },
+
+    listPendingDue: (now, limit) =>
+      list(`SELECT * FROM ${t} WHERE pending_warm_at > 0 AND pending_warm_at + pending_ms <= ?1 ORDER BY pending_warm_at LIMIT ?2`, now, limit),
 
     async markDeclined(key, until) {
       await q(`UPDATE ${t} SET declined_until = ?2 WHERE key = ?1`, key, until).run()
