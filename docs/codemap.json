@@ -14649,6 +14649,12 @@
           "doc": "Normalize raw sandbox events for shared agent-gateway consumers."
         },
         {
+          "name": "addColdArrival",
+          "kind": "function",
+          "signature": "(slots: readonly number[], slotsAt: number, at: number) => number[]",
+          "doc": "Record one cold arrival at `at`."
+        },
+        {
           "name": "applyPromptTokenLimits",
           "kind": "function",
           "signature": "(profile: AgentProfile, limits: SandboxPromptTokenLimits) => AgentProfile",
@@ -14763,6 +14769,12 @@
           "doc": "A fenced `PrewarmClaimStore` backed by one D1 table."
         },
         {
+          "name": "createD1WarmLeaseStore",
+          "kind": "function",
+          "signature": "(db: WarmLeaseD1Like, options?: { table?: string | undefined; }) => WarmLeaseStore",
+          "doc": null
+        },
+        {
           "name": "createSandboxPrewarmer",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer",
@@ -14773,6 +14785,12 @@
           "kind": "function",
           "signature": "<TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…",
           "doc": "Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token pinned to `scope: 'session-runtime'` (the ONLY scope the platform gran…"
+        },
+        {
+          "name": "createWarmLeases",
+          "kind": "function",
+          "signature": "(options: WarmLeasesOptions) => WarmLeases",
+          "doc": null
         },
         {
           "name": "createWorkspacePrewarmRoute",
@@ -14805,6 +14823,12 @@
           "doc": null
         },
         {
+          "name": "decaySlots",
+          "kind": "function",
+          "signature": "(slots: readonly number[], from: number, at: number) => number[]",
+          "doc": "Decay every slot to `at` with a 14-day half-life."
+        },
+        {
           "name": "DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS",
           "kind": "const",
           "signature": "180",
@@ -14833,6 +14857,12 @@
           "kind": "const",
           "signature": "SandboxResourceConfig",
           "doc": "Define default resource limits and settings for sandbox environments"
+        },
+        {
+          "name": "DEFAULT_WARM_LEASE_TABLE",
+          "kind": "const",
+          "signature": "\"sandbox_warm_lease\"",
+          "doc": "`createD1WarmLeaseStore`: the `WarmLeaseStore` every Workers product uses, one row per key in one table."
         },
         {
           "name": "deferredCorpusHash",
@@ -15103,6 +15133,12 @@
           "kind": "type",
           "signature": "type PeekWorkspaceSandboxOutcome",
           "doc": "What a peek can find."
+        },
+        {
+          "name": "predictColdArrival",
+          "kind": "function",
+          "signature": "(row: Pick<WarmLeaseRow, \"slots\" | \"slotsAt\" | \"firstSeenAt\">, at: number, windowMs: number) => number",
+          "doc": "Chance of at least one cold arrival in `[at, at + windowMs)`."
         },
         {
           "name": "preferredWorkspaceSandboxRecoveryBoxKey",
@@ -15685,6 +15721,108 @@
           "kind": "interface",
           "signature": "interface TerminalConnectionBoxLike",
           "doc": "The structural surface this route needs from an SDK sandbox box — no `@tangle-network/sandbox` class import (invariant 3)."
+        },
+        {
+          "name": "utcDay",
+          "kind": "function",
+          "signature": "(at: number) => string",
+          "doc": null
+        },
+        {
+          "name": "WARM_LEASE_TABLE_DDL",
+          "kind": "const",
+          "signature": "\"CREATE TABLE IF NOT EXISTS sandbox_warm_lease (\\n key TEXT PRIMARY KEY,\\n lease_id TEXT,\\n reason TEXT,\\n started_at I…",
+          "doc": "Paste into a migration."
+        },
+        {
+          "name": "WARM_SLOTS",
+          "kind": "const",
+          "signature": "151",
+          "doc": "144 ten-minute bins of the UTC day, then 7 weekday counts (Monday first)."
+        },
+        {
+          "name": "warmBinOf",
+          "kind": "function",
+          "signature": "(at: number) => number",
+          "doc": "UTC ten-minute bin of the day, 0..143."
+        },
+        {
+          "name": "WarmBoxOutcome",
+          "kind": "type",
+          "signature": "type WarmBoxOutcome",
+          "doc": "What the product's `warm` did to the box."
+        },
+        {
+          "name": "WarmLeaseD1Like",
+          "kind": "interface",
+          "signature": "interface WarmLeaseD1Like",
+          "doc": "The D1 surface this store uses: `prepare().bind()` with `first`, `run` and `all`."
+        },
+        {
+          "name": "WarmLeaseEvent",
+          "kind": "type",
+          "signature": "type WarmLeaseEvent",
+          "doc": null
+        },
+        {
+          "name": "WarmLeaseRow",
+          "kind": "interface",
+          "signature": "interface WarmLeaseRow",
+          "doc": "One key's row."
+        },
+        {
+          "name": "WarmLeases",
+          "kind": "interface",
+          "signature": "interface WarmLeases",
+          "doc": null
+        },
+        {
+          "name": "WarmLeasesOptions",
+          "kind": "interface",
+          "signature": "interface WarmLeasesOptions",
+          "doc": null
+        },
+        {
+          "name": "WarmLeaseStore",
+          "kind": "interface",
+          "signature": "interface WarmLeaseStore",
+          "doc": "Persistence for leases."
+        },
+        {
+          "name": "WarmReason",
+          "kind": "type",
+          "signature": "type WarmReason",
+          "doc": "Why a warm was requested."
+        },
+        {
+          "name": "WarmSignalOutcome",
+          "kind": "type",
+          "signature": "type WarmSignalOutcome",
+          "doc": null
+        },
+        {
+          "name": "WarmSignalResult",
+          "kind": "interface",
+          "signature": "interface WarmSignalResult",
+          "doc": null
+        },
+        {
+          "name": "WarmSweepReport",
+          "kind": "interface",
+          "signature": "interface WarmSweepReport",
+          "doc": null
+        },
+        {
+          "name": "WarmTurnResult",
+          "kind": "interface",
+          "signature": "interface WarmTurnResult",
+          "doc": null
+        },
+        {
+          "name": "warmWeekdayOf",
+          "kind": "function",
+          "signature": "(at: number) => number",
+          "doc": "UTC weekday, Monday = 0."
         },
         {
           "name": "WORKSPACE_SANDBOX_HOST_EXHAUSTED",
