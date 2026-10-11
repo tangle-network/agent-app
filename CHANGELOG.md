@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.87
+
+- fix(turn-health): page on threads that got nothing back, and only on calls rejected as completed (#1001)
+
 ## 0.60.86
 
 - fix(turn-health): read only the part fields the classifier judges, not the parts (#1000)
