@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_126 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_127 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -88,6 +88,7 @@ _126 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./record/drizzle`](api/record-drizzle.md) | 22 | — |
 | [`./redact`](api/redact.md) | 15 | — |
 | [`./runtime`](api/runtime.md) | 79 | `tools` |
+| [`./runtime/router-turn`](api/runtime-router-turn.md) | 8 | `tools` |
 | [`./sandbox`](api/sandbox.md) | 241 | `harness`, `profile`, `runtime`, `tools` |
 | [`./sequences`](api/sequences.md) | 111 | `tools`, `web` |
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
@@ -118,7 +119,7 @@ _126 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./trace`](api/trace.md) | 33 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting`, `launch-invariants` |
 | [`./turn-stream`](api/turn-stream.md) | 58 | `chat-routes`, `crypto`, `stream` |
-| [`./vault`](api/vault.md) | 21 | — |
+| [`./vault`](api/vault.md) | 23 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
 | [`./web`](api/web.md) | 43 | — |
@@ -889,6 +890,16 @@ Depends on: `tools`
 
 [Full API →](api/runtime.md)
 
+## `./runtime/router-turn`
+
+Source: `src/runtime/router-turn.ts` · 8 exports
+
+Depends on: `tools`
+
+`composeRouterTurnPrompt`, `routerFunctionName`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnTool`, `runRouterTurn`
+
+[Full API →](api/runtime-router-turn.md)
+
 ## `./sandbox`
 
 Source: `src/sandbox/index.ts` · 241 exports
@@ -1157,9 +1168,9 @@ Depends on: `chat-routes`, `crypto`, `stream`
 
 ## `./vault`
 
-Source: `src/vault/index.ts` · 21 exports
+Source: `src/vault/index.ts` · 23 exports
 
-`ConfirmDialog`, `ConfirmDialogProps`, `VAULT_TREE_CHILD_PAGE`, `VaultArtifactRenderProps`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneHandle`, `VaultPaneProps`, `VaultRichParts`, `VaultTree`, `VaultTreeNode`, `VaultTreeProps`, `VaultTreeRenderProps`
+`ConfirmDialog`, `ConfirmDialogProps`, `VAULT_TREE_CHILD_PAGE`, `VaultArtifactRenderProps`, `VaultContentMatch`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneHandle`, `VaultPaneProps`, `VaultRevision`, `VaultRichParts`, `VaultTree`, `VaultTreeNode`, `VaultTreeProps`, `VaultTreeRenderProps`
 
 [Full API →](api/vault.md)
 

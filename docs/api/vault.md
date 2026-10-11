@@ -4,7 +4,7 @@
 
 Source: `src/vault/index.ts`
 
-21 exports.
+23 exports.
 
 ### `ConfirmDialog`
 
@@ -36,6 +36,14 @@ interface ConfirmDialogProps
 
 ```ts
 interface VaultArtifactRenderProps
+```
+
+### `VaultContentMatch`
+
+`interface` — A file whose text contains a search query.
+
+```ts
+interface VaultContentMatch
 ```
 
 ### `VaultDataPort`
@@ -132,6 +140,14 @@ interface VaultPaneHandle
 
 ```ts
 interface VaultPaneProps
+```
+
+### `VaultRevision`
+
+`interface` — One saved version of a file.
+
+```ts
+interface VaultRevision
 ```
 
 ### `VaultRichParts`

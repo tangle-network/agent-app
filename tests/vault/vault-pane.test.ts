@@ -1522,7 +1522,7 @@ describe('VaultPane — save state for a host editor', () => {
         seen.push(props.saving)
         return createElement(
           'div',
-          { 'data-testid': 'artifact' },
+          { 'data-testid': 'artifact', 'data-path': props.file?.path ?? '' },
           createElement('button', { type: 'button', onClick: () => props.onRichChange({ fm: 'title: A', body: 'changed' }) }, 'edit'),
           createElement('button', { type: 'button', onClick: () => props.onSave() }, 'host save'),
         )

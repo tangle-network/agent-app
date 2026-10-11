@@ -14756,6 +14756,64 @@
       ]
     },
     {
+      "id": "./runtime/router-turn",
+      "source": "src/runtime/router-turn.ts",
+      "dependsOn": [
+        "tools"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "composeRouterTurnPrompt",
+          "kind": "function",
+          "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
+          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls."
+        },
+        {
+          "name": "routerFunctionName",
+          "kind": "function",
+          "signature": "(name: string) => string",
+          "doc": "OpenAI-compatible function names allow only `[A-Za-z0-9_-]{1,64}`; app tool names often use dots."
+        },
+        {
+          "name": "RouterTurnEvent",
+          "kind": "type",
+          "signature": "type RouterTurnEvent",
+          "doc": "What the turn is doing, in the order it happens, for a live view."
+        },
+        {
+          "name": "RouterTurnFailure",
+          "kind": "interface",
+          "signature": "interface RouterTurnFailure",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnOptions",
+          "kind": "interface",
+          "signature": "interface RouterTurnOptions",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnOutcome",
+          "kind": "interface",
+          "signature": "interface RouterTurnOutcome",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnTool",
+          "kind": "interface",
+          "signature": "interface RouterTurnTool",
+          "doc": "A tool the turn may call."
+        },
+        {
+          "name": "runRouterTurn",
+          "kind": "function",
+          "signature": "(options: RouterTurnOptions) => Promise<RouterTurnOutcome>",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./sandbox",
       "source": "src/sandbox/index.ts",
       "dependsOn": [
@@ -22266,6 +22324,12 @@
           "doc": "Props the pane passes to the product's artifact renderer (e.g."
         },
         {
+          "name": "VaultContentMatch",
+          "kind": "interface",
+          "signature": "interface VaultContentMatch",
+          "doc": "A file whose text contains a search query."
+        },
+        {
           "name": "VaultDataPort",
           "kind": "interface",
           "signature": "interface VaultDataPort",
@@ -22336,6 +22400,12 @@
           "kind": "interface",
           "signature": "interface VaultPaneProps",
           "doc": "Define the properties and render methods for the vault pane UI components"
+        },
+        {
+          "name": "VaultRevision",
+          "kind": "interface",
+          "signature": "interface VaultRevision",
+          "doc": "One saved version of a file."
         },
         {
           "name": "VaultRichParts",
