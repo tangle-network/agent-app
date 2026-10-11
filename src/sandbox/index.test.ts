@@ -5409,3 +5409,177 @@ describe('ensureWorkspaceSandbox — the spend seam', () => {
     expect(createMock).toHaveBeenCalledOnce()
   })
 })
+
+describe('warm reuse round trips', () => {
+  const scope = { workspaceId: 'w1', harness: 'opencode' as const }
+
+  function gatedProbe() {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const exec = vi.fn(async () => {
+      await gate
+      return { stdout: 'alive', stderr: '', exitCode: 0 }
+    })
+    return { exec, release }
+  }
+
+  it('renews an open-egress box while its liveness probe and egress read run, once', async () => {
+    const probe = gatedProbe()
+    let releaseEgress!: () => void
+    const egressGate = new Promise<void>((resolve) => { releaseEgress = resolve })
+    const get = vi.fn(async () => {
+      await egressGate
+      return { policy: { mode: 'open' as const }, source: 'sandbox' }
+    })
+    const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
+    const bootstrap = vi.fn(async () => ({ succeeded: true as const, value: undefined }))
+    const running = fakeBox({
+      exec: probe.exec,
+      setRuntimeEnv,
+      egress: { get, update: vi.fn() },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      egressPolicy: { mode: 'open' },
+      runtimeEnv: async () => ({ APP_TOKEN: 'renewed' }),
+      livenessProbe: { cacheTtlMs: 0 },
+      bootstrap,
+    })
+
+    const pending = ensureWorkspaceSandbox(shell, scope)
+    await vi.waitFor(() => expect(setRuntimeEnv).toHaveBeenCalledExactlyOnceWith({ APP_TOKEN: 'renewed' }))
+    expect(probe.exec).toHaveBeenCalledOnce()
+    expect(get).toHaveBeenCalledOnce()
+    expect(bootstrap).not.toHaveBeenCalled()
+    probe.release()
+    releaseEgress()
+    await expect(pending).resolves.toBe(running)
+    expect(setRuntimeEnv).toHaveBeenCalledOnce()
+    expect(bootstrap).toHaveBeenCalledOnce()
+  })
+
+  it('holds a strict-egress box renewal until its policy is asserted', async () => {
+    let releaseEgress!: () => void
+    const egressGate = new Promise<void>((resolve) => { releaseEgress = resolve })
+    const desired = { mode: 'strict' as const, allowDomains: ['a.example.com'] }
+    const get = vi.fn(async () => {
+      await egressGate
+      return { policy: desired, source: 'sandbox' }
+    })
+    const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
+    const exec = vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
+    const running = fakeBox({ exec, setRuntimeEnv, egress: { get, update: vi.fn() } } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      egressPolicy: desired,
+      runtimeEnv: async () => ({ APP_TOKEN: 'renewed' }),
+      livenessProbe: { cacheTtlMs: 0 },
+    })
+
+    const pending = ensureWorkspaceSandbox(shell, scope)
+    await vi.waitFor(() => expect(exec).toHaveBeenCalledOnce())
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(setRuntimeEnv).not.toHaveBeenCalled()
+    releaseEgress()
+    await expect(pending).resolves.toBe(running)
+    expect(setRuntimeEnv).toHaveBeenCalledExactlyOnceWith({ APP_TOKEN: 'renewed' })
+  })
+
+  it('does not renew a strict-egress box whose policy does not match', async () => {
+    const get = vi.fn().mockResolvedValue({ policy: { mode: 'open' }, source: 'sandbox' })
+    const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
+    const running = fakeBox({
+      exec: vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 }),
+      setRuntimeEnv,
+      egress: { get, update: vi.fn() },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      egressPolicy: { mode: 'blocked' },
+      runtimeEnv: async () => ({ APP_TOKEN: 'renewed' }),
+    })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).rejects.toMatchObject({ name: 'SandboxEgressPolicyMismatchError' })
+    expect(setRuntimeEnv).not.toHaveBeenCalled()
+  })
+
+  it('reads a box egress once per start: the next reuse of the same start skips it', async () => {
+    const startedAt = new Date('2026-10-11T12:00:00.000Z')
+    const get = vi.fn().mockResolvedValue({ policy: { mode: 'open' }, source: 'sandbox' })
+    const exec = vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
+    const running = fakeBox({ exec, startedAt, egress: { get, update: vi.fn() } } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy: { mode: 'open' }, livenessProbe: { cacheTtlMs: 0 } })
+
+    await ensureWorkspaceSandbox(shell, scope)
+    await ensureWorkspaceSandbox(shell, scope)
+    expect(get).toHaveBeenCalledOnce()
+
+    const restarted = fakeBox({
+      exec,
+      startedAt: new Date('2026-10-11T12:30:00.000Z'),
+      egress: { get, update: vi.fn() },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([restarted])
+    await ensureWorkspaceSandbox(shell, scope)
+    expect(get).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads a box egress again once the verified entry expires', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const get = vi.fn().mockResolvedValue({ policy: { mode: 'open' }, source: 'sandbox' })
+      const running = fakeBox({
+        exec: vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 }),
+        startedAt: new Date('2026-10-11T12:00:00.000Z'),
+        egress: { get, update: vi.fn() },
+      } as unknown as Partial<SandboxInstance>)
+      listMock.mockResolvedValue([running])
+      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy: { mode: 'open' }, livenessProbe: { cacheTtlMs: 0 } })
+      await ensureWorkspaceSandbox(shell, scope)
+      vi.setSystemTime(Date.now() + 11 * 60_000)
+      await ensureWorkspaceSandbox(shell, scope)
+      expect(get).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('never caches a strict policy verdict', async () => {
+    const desired = { mode: 'strict' as const, allowDomains: ['a.example.com'] }
+    const get = vi.fn().mockResolvedValue({ policy: desired, source: 'sandbox' })
+    const running = fakeBox({
+      exec: vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 }),
+      startedAt: new Date('2026-10-11T12:00:00.000Z'),
+      egress: { get, update: vi.fn() },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy: desired, livenessProbe: { cacheTtlMs: 0 } })
+    await ensureWorkspaceSandbox(shell, scope)
+    await ensureWorkspaceSandbox(shell, scope)
+    expect(get).toHaveBeenCalledTimes(2)
+  })
+
+  it('renews a recovered box itself when the probe found the reused box dead', async () => {
+    const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
+    const exec = vi.fn()
+      .mockResolvedValueOnce({ stdout: '', stderr: 'dead', exitCode: 1 })
+      .mockResolvedValueOnce({ stdout: '', stderr: 'dead', exitCode: 1 })
+      .mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
+    const running = fakeBox({ exec, setRuntimeEnv, sessions: vi.fn().mockResolvedValue([]) } as unknown as Partial<SandboxInstance>)
+    running.stop = vi.fn().mockResolvedValue(undefined) as never
+    running.resume = vi.fn().mockResolvedValue(undefined) as never
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([running]) : Promise.resolve([]))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      runtimeEnv: async () => ({ APP_TOKEN: 'renewed' }),
+      livenessProbe: { cacheTtlMs: 0 },
+    })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).resolves.toBe(running)
+    expect(running.stop).toHaveBeenCalledOnce()
+    // Once while the first probe ran, once on the recovered box.
+    expect(setRuntimeEnv).toHaveBeenCalledTimes(2)
+    expect(setRuntimeEnv).toHaveBeenLastCalledWith({ APP_TOKEN: 'renewed' })
+  })
+})

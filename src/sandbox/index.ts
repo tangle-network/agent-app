@@ -545,6 +545,8 @@ interface ClientCacheEntry {
 
 let _cached: ClientCacheEntry | null = null
 const livenessVerifiedAt = new Map<string, number>()
+/** Reused boxes whose `open` egress this isolate verified, by {@link verifiedEgressKey}. */
+const verifiedEgress = new Map<string, number>()
 
 function getClientFromCreds(creds: SandboxClientCredentials): Sandbox {
   const fingerprint = `${creds.apiKey} ${creds.baseUrl}`
@@ -572,6 +574,7 @@ export function getClient(shell: SandboxRuntimeConfig): Sandbox {
 export function resetClientCache(): void {
   _cached = null
   livenessVerifiedAt.clear()
+  verifiedEgress.clear()
 }
 
 /** Describe an application tool with its name, unique key, and description */
@@ -2223,29 +2226,103 @@ async function resolveWorkspaceRuntimeEnv(
 }
 
 /**
- * Reads of a reused box that do not depend on its liveness, started with the
- * liveness probe so their round trips overlap it. They are only reads: the
- * egress policy is still asserted (and migrated) before credentials reach the
- * box, and an unknown corpus marker means the corpus is written as before.
+ * Round trips of a reused box that do not depend on its liveness, started with
+ * the liveness probe so they overlap it. The egress read and the corpus marker
+ * are only reads: the policy is still asserted (and migrated) in finalize, and
+ * an unknown marker means the corpus is written as before. The runtime env is
+ * sent early only when the egress assertion cannot change where credentials
+ * may go (see {@link egressGatesCredentials}); otherwise it waits for it.
  */
 interface ExistingBoxPrefetch {
   egress?: Promise<Outcome<Awaited<ReturnType<SandboxInstance['egress']['get']>>>>
+  /** This isolate verified the box's egress since its last start (see {@link verifiedEgressKey}). */
+  egressVerified?: boolean
   corpusMarker?: Promise<string | null>
+  /** The renewal already sent to the box; finalize waits for it instead of sending another. */
+  runtimeEnv?: Promise<Outcome<void>>
 }
 
-function prefetchExistingBoxReads(shell: SandboxRuntimeConfig, box: SandboxInstance): ExistingBoxPrefetch {
+type ReuseMeasure = <T>(stage: string, operation: () => Promise<T>) => Promise<T>
+
+function prefetchExistingBoxReads(
+  shell: SandboxRuntimeConfig,
+  box: SandboxInstance,
+  runtimeEnv: Promise<Record<string, string>>,
+  measure: ReuseMeasure,
+): ExistingBoxPrefetch {
   const prefetch: ExistingBoxPrefetch = {}
-  if (shell.egressPolicy) {
-    prefetch.egress = (async () => {
+  if (shell.egressPolicy && hasVerifiedEgress(box, shell.egressPolicy)) {
+    prefetch.egressVerified = true
+  } else if (shell.egressPolicy) {
+    prefetch.egress = measure('egress', async () => {
       try {
         return ok(await box.egress.get())
       } catch (cause) {
         return fail(cause)
       }
-    })()
+    })
   }
   if (shell.deferProfileFiles) prefetch.corpusMarker = readDeferredCorpusMarker(box)
+  if (!egressGatesCredentials(shell.egressPolicy)) {
+    // A mint failure rejects `runtimeEnv` and the reuse stops before finalize,
+    // so nothing was sent; the renewal itself is settled here and never rejects.
+    prefetch.runtimeEnv = runtimeEnv.then(
+      (env) => Object.keys(env).length === 0
+        ? ok(undefined)
+        : measure('runtime_env_push', () => box.setRuntimeEnv(env)).then(() => ok(undefined), (cause: unknown) => fail(cause)),
+      () => ok(undefined),
+    )
+  }
   return prefetch
+}
+
+/**
+ * Whether the egress assertion must finish before credentials reach a reused
+ * box. `open` is the most permissive mode, so no policy the box can hold lets
+ * credentials go anywhere `open` would not; asserting it only restores the
+ * box's reach (a migration from a narrower policy). `strict` and `blocked`
+ * bound where credentials can be sent, so they are asserted first.
+ */
+function egressGatesCredentials(desired: EgressPolicy | undefined): boolean {
+  return desired !== undefined && desired.mode !== 'open'
+}
+
+/** How long a matching egress read stands for a box that has not restarted. */
+const VERIFIED_EGRESS_TTL_MS = 10 * 60_000
+const VERIFIED_EGRESS_MAX = 1_000
+
+/**
+ * The cache key for a box's verified egress, or null when it must be read.
+ * Only an `open` policy is cached: a stale `open` verdict can only cost the
+ * box its reach until the entry expires, never widen where credentials go.
+ * The key carries the box's start time, so a restarted box is read again.
+ */
+function verifiedEgressKey(box: SandboxInstance, desired: EgressPolicy): string | null {
+  if (desired.mode !== 'open' || !box.id) return null
+  const startedAt = box.startedAt instanceof Date ? box.startedAt.getTime() : Number.NaN
+  if (!Number.isFinite(startedAt)) return null
+  return `${box.id}|${startedAt}|${normalizedEgressPolicy(desired)}`
+}
+
+function hasVerifiedEgress(box: SandboxInstance, desired: EgressPolicy, now = Date.now()): boolean {
+  const key = verifiedEgressKey(box, desired)
+  if (!key) return false
+  const verifiedAt = verifiedEgress.get(key)
+  if (verifiedAt !== undefined && now - verifiedAt < VERIFIED_EGRESS_TTL_MS) return true
+  verifiedEgress.delete(key)
+  return false
+}
+
+function recordVerifiedEgress(box: SandboxInstance, desired: EgressPolicy): void {
+  const key = verifiedEgressKey(box, desired)
+  if (!key) return
+  verifiedEgress.delete(key)
+  verifiedEgress.set(key, Date.now())
+  while (verifiedEgress.size > VERIFIED_EGRESS_MAX) {
+    const oldest = verifiedEgress.keys().next().value
+    if (oldest === undefined) break
+    verifiedEgress.delete(oldest)
+  }
 }
 
 // All retained-box paths renew credentials before the product bootstrap.
@@ -2262,7 +2339,9 @@ async function finalizeExistingBox(
   runtimeEnv: Record<string, string>,
   prefetch: ExistingBoxPrefetch = {},
 ): Promise<SandboxInstance> {
-  await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name, prefetch.egress)
+  if (!prefetch.egressVerified) {
+    await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name, prefetch.egress)
+  }
   const written = await materializeDeferredFilesForExistingBox(
     shell,
     client,
@@ -2278,7 +2357,12 @@ async function finalizeExistingBox(
     throw deferredProfileWriteFailed(stage, name, written.error)
   }
   const finalBox = written.value
-  if (Object.keys(runtimeEnv).length > 0) {
+  if (prefetch.runtimeEnv) {
+    // The same renewal, sent while the probe ran; its failure fails the reuse
+    // exactly as a renewal sent here would.
+    const renewed = await prefetch.runtimeEnv
+    if (!renewed.succeeded) throw renewed.error
+  } else if (Object.keys(runtimeEnv).length > 0) {
     await finalBox.setRuntimeEnv(runtimeEnv)
   }
   if (shell.bootstrap) {
@@ -2365,14 +2449,20 @@ async function assertExistingBoxEgress(
   }
   const matchingPolicy = normalizedEgressPolicy(current.policy) === normalizedEgressPolicy(desired)
   const explicitSource = current.source !== 'platform'
-  if (matchingPolicy && explicitSource) return
+  if (matchingPolicy && explicitSource) {
+    recordVerifiedEgress(box, desired)
+    return
+  }
 
   if (migrate) {
     try {
       await box.egress.update(desired)
       const migrated = await box.egress.get()
       const migratedPolicy = normalizedEgressPolicy(migrated.policy) === normalizedEgressPolicy(desired)
-      if (migratedPolicy && migrated.source !== 'platform') return
+      if (migratedPolicy && migrated.source !== 'platform') {
+        recordVerifiedEgress(box, desired)
+        return
+      }
       current = migrated
     } catch (cause) {
       throw existingBoxEgressError('migration', box, stage, name, cause)
@@ -2550,9 +2640,10 @@ async function provisionWorkspaceSandbox(
       // Resolve app credentials before any restart so a mint failure leaves the
       // existing sandbox running and intact. Reading the runtime connection
       // restarts nothing, so it runs alongside the mint.
-      const prefetch = prefetchExistingBoxReads(shell, found)
+      const runtimeEnvMint = measure('runtime_env', () => resolveWorkspaceRuntimeEnv(shell, scope))
+      const prefetch = prefetchExistingBoxReads(shell, found, runtimeEnvMint, measure)
       const [envResult, readyResult] = await Promise.allSettled([
-        measure('runtime_env', () => resolveWorkspaceRuntimeEnv(shell, scope)),
+        runtimeEnvMint,
         measure('refresh', () => refreshRuntimeConnection(client, found)),
       ])
       if (envResult.status === 'rejected') throw envResult.reason
