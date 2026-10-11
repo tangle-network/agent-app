@@ -531,3 +531,26 @@ describe('background continuation of older exports', () => {
     expect((await engine.get(WS, job.id))!.status).toBe('complete')
   })
 })
+
+describe('a source removed while the export runs', () => {
+  it('becomes an empty unit with the reason, and the export still completes', async () => {
+    let boxes = ['box-a', 'box-b']
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      plan: async () => ({
+        sources: [
+          { kind: 'json', name: 'doc', dataClass: 'records', value: async () => ({ ok: true }) },
+          ...boxes.map((name) => ({ kind: 'json' as const, name, dataClass: 'sandbox' as const, value: async () => ({ name }) })),
+        ],
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    boxes = ['box-a'] // box-b is deleted after the export started
+    let current = job
+    for (let i = 0; i < 5 && current.status === 'running'; i += 1) current = (await engine.advance(WS, job.id))!
+    expect(current.status).toBe('complete')
+    const removed = current.units.find((u) => u.name === 'box-b')!
+    expect(removed).toMatchObject({ status: 'empty', error: 'removed from the workspace while the export ran' })
+  })
+})
