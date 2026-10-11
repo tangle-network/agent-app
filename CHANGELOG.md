@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.83
+
+- fix(sandbox): retry a warm killed with its request and count it as abandoned (#997)
+
 ## 0.60.82
 
 - docs(climb): smart-warm live outcome — warm hits 2/2, cold first reply 51.5 s (#996)
