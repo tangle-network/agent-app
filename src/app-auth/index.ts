@@ -438,9 +438,9 @@ export function createAppAuth(config: AppAuthConfig): AppAuth {
   // Sign-out and session revocation drop this isolate's remembered sessions for the app.
   const handler = auth.handler
   auth.handler = async (request: Request) => {
-    const response = await handler(request)
-    if (request.method !== 'GET') forgetSessions(memoScope)
-    return response
+    // In finally: a sign-out that fails after deleting the session must not leave it remembered.
+    try { return await handler(request) }
+    finally { if (request.method !== 'GET') forgetSessions(memoScope) }
   }
 
   const loginPath = config.loginPath ?? '/login'
