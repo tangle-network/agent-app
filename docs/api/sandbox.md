@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-231 exports.
+240 exports.
 
 ### `adaptSandboxStream`
 
@@ -182,6 +182,14 @@ interface BuildSandboxToolFileMountsOptions
 (db: WarmLeaseD1Like, options?: { table?: string | undefined; }) => WarmLeaseStore
 ```
 
+### `createEscalationSpeculator`
+
+`function` — One speculator per turn.
+
+```ts
+(options: EscalationSpeculatorOptions) => EscalationSpeculator
+```
+
 ### `createSandboxPrewarmer`
 
 `function`
@@ -252,6 +260,14 @@ interface D1PrewarmClaimStoreOptions
 
 ```ts
 (slots: readonly number[], from: number, at: number) => number[]
+```
+
+### `DEFAULT_ESCALATION_TOOLS`
+
+`const` — The tools that run in the box.
+
+```ts
+readonly ["sandbox_run", "sandbox_exec"]
 ```
 
 ### `DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS`
@@ -396,6 +412,46 @@ interface EnsureWorkspaceSandboxOptions
 
 ```ts
 120000
+```
+
+### `EscalationHint`
+
+`type` — Why a turn was judged likely to escalate.
+
+```ts
+type EscalationHint
+```
+
+### `escalationHints`
+
+`function` — Pure: the reasons this input suggests the turn will need the box, if any.
+
+```ts
+(input: EscalationInput) => EscalationHint[]
+```
+
+### `EscalationInput`
+
+`interface`
+
+```ts
+interface EscalationInput
+```
+
+### `EscalationSpeculator`
+
+`interface`
+
+```ts
+interface EscalationSpeculator
+```
+
+### `EscalationSpeculatorOptions`
+
+`interface`
+
+```ts
+interface EscalationSpeculatorOptions
 ```
 
 ### `FencedPrewarmClaimStore`
@@ -646,6 +702,14 @@ type ModelSelectionSource
 type Outcome
 ```
 
+### `parsePrewarmHint`
+
+`function`
+
+```ts
+(value: string | null | undefined) => PrewarmHintMode
+```
+
 ### `peekWorkspaceSandbox`
 
 `function` — Read-only twin of {@link ensureWorkspaceSandbox}: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything.
@@ -732,6 +796,14 @@ interface PrewarmDecision
 
 ```ts
 type PrewarmEvent
+```
+
+### `PrewarmHintMode`
+
+`type` — `SANDBOX_PREWARM_HINT`: `off` (default) or `deterministic`.
+
+```ts
+type PrewarmHintMode
 ```
 
 ### `PrewarmOutcome`
