@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     'tools/index': 'src/tools/index.ts',
     'runtime/index': 'src/runtime/index.ts',
+    'runtime/router-turn': 'src/runtime/router-turn.ts',
     'catalog/index': 'src/catalog/index.ts',
     'eval/index': 'src/eval/index.ts',
     'eval-campaign/index': 'src/eval-campaign/index.ts',
