@@ -62,7 +62,7 @@ _124 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
 | [`./launch-invariants`](api/launch-invariants.md) | 57 | `signoff`, `turn-health` |
 | [`./launch-invariants/cli`](api/launch-invariants-cli.md) | 1 | `signoff`, `turn-health` |
-| [`./launch-invariants/testing`](api/launch-invariants-testing.md) | 34 | `signoff`, `turn-health` |
+| [`./launch-invariants/testing`](api/launch-invariants-testing.md) | 35 | `signoff`, `turn-health` |
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
 | [`./legibility/cli`](api/legibility-cli.md) | 0 | `signoff` |
 | [`./missions`](api/missions.md) | 65 | — |
@@ -645,11 +645,11 @@ Depends on: `signoff`, `turn-health`
 
 ## `./launch-invariants/testing`
 
-Source: `src/launch-invariants/testing.ts` · 34 exports
+Source: `src/launch-invariants/testing.ts` · 35 exports
 
 Depends on: `signoff`, `turn-health`
 
-`AuthorizeBeforeStreamOptions`, `AuthStallOptions`, `BudgetedJob`, `buildConformanceReport`, `checkAuthorizeBeforeStream`, `checkAuthSurvivesStall`, `checkCoalescedTurn`, `checkLimitAlarms`, `checkScheduledJobBudgets`, `CoalescedTurnOptions`, `ConformanceReport`, `D1Reads`, `DeploymentFacts`, `describeVerdict`, `forceGc`, `formatConformanceReport`, `INVARIANT_RESULTS_ENV`, `InvariantReport`, `InvariantStatus`, `JobMeasurement`, `LaunchInvariantsConfig`, `LimitAlarmCheckOptions`, `measureD1`, `measureJob`, `PLATFORM_LIMITS`, `readDeploymentFacts`, `readVerdicts`, `recordedLongTurn`, `recordInvariant`, `recordInvariants`, `ScheduledJobBudgetOptions`, `stallingD1`, `StallMode`, `TimedTurnEvent`
+`AuthorizeBeforeStreamOptions`, `AuthStallOptions`, `BudgetedJob`, `buildConformanceReport`, `checkAuthorizeBeforeStream`, `checkAuthSurvivesStall`, `checkCoalescedTurn`, `checkLimitAlarms`, `checkScheduledJobBudgets`, `CoalescedTurnOptions`, `ConformanceReport`, `D1Reads`, `DeploymentFacts`, `describeVerdict`, `forceGc`, `formatConformanceReport`, `INVARIANT_RESULTS_ENV`, `InvariantReport`, `InvariantStatus`, `JobMeasurement`, `LaunchInvariantsConfig`, `LimitAlarmCheckOptions`, `measureD1`, `measureJob`, `PLATFORM_LIMITS`, `readDeploymentFacts`, `readVerdicts`, `recordedLongTurn`, `recordInvariant`, `RecordInvariantOptions`, `recordInvariants`, `ScheduledJobBudgetOptions`, `stallingD1`, `StallMode`, `TimedTurnEvent`
 
 [Full API →](api/launch-invariants-testing.md)
 

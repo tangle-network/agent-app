@@ -109,6 +109,11 @@ export interface InvariantVerdict {
   details: string[]
   /** Measurements behind the verdict, for the report. */
   data?: Record<string, unknown>
+  /**
+   * Set when the app recorded this failure as known, with why and who owns the
+   * fix. The report counts it as not holding; it does not fail the suite.
+   */
+  knownFailing?: string
 }
 
 /** A verdict whose message names every finding, for a test runner's failure output. */

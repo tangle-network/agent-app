@@ -23,23 +23,39 @@ export { describeVerdict } from './catalog.js'
 /** Set by `agent-app-invariants` to the file it reads verdicts from. */
 export const INVARIANT_RESULTS_ENV = 'AGENT_APP_INVARIANTS_RESULTS'
 
+export interface RecordInvariantOptions {
+  /**
+   * The app knows this check fails today: why, who owns the fix and the next
+   * check. The failure is recorded (the report counts the invariant as not
+   * holding) without failing the suite, so an app adopts the kit before every
+   * invariant holds. Once the check passes, this fails the caller until the
+   * marker is removed, so a fixed invariant cannot regress silently.
+   */
+  knownFailing?: string
+}
+
 /**
  * Record a verdict for the conformance report and fail the caller when it did
  * not pass. Returns the verdict on a pass.
  */
-export function recordInvariant(verdict: InvariantVerdict): InvariantVerdict {
+export function recordInvariant(verdict: InvariantVerdict, options: RecordInvariantOptions = {}): InvariantVerdict {
+  const known = options.knownFailing?.trim()
+  const recorded = known && !verdict.pass ? { ...verdict, knownFailing: known } : verdict
   const file = process.env[INVARIANT_RESULTS_ENV]
-  if (file) appendFileSync(file, `${JSON.stringify({ ...verdict, at: new Date().toISOString() })}\n`)
-  if (!verdict.pass) throw new Error(describeVerdict(verdict))
-  return verdict
+  if (file) appendFileSync(file, `${JSON.stringify({ ...recorded, at: new Date().toISOString() })}\n`)
+  if (known && verdict.pass) {
+    throw new Error(`${describeVerdict(verdict)}\n  this invariant now holds; remove its knownFailing marker ("${known}") so it cannot regress silently`)
+  }
+  if (!verdict.pass && !known) throw new Error(describeVerdict(verdict))
+  return recorded
 }
 
 /** Record several verdicts; fails after recording all of them. */
-export function recordInvariants(verdicts: readonly InvariantVerdict[]): InvariantVerdict[] {
+export function recordInvariants(verdicts: readonly InvariantVerdict[], options: RecordInvariantOptions = {}): InvariantVerdict[] {
   const failures: string[] = []
   for (const verdict of verdicts) {
     try {
-      recordInvariant(verdict)
+      recordInvariant(verdict, options)
     } catch (error) {
       failures.push(error instanceof Error ? error.message : String(error))
     }

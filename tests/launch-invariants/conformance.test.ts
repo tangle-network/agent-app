@@ -74,3 +74,21 @@ describe('agent-app-invariants', () => {
     expect([report.pass, report.passed, report.testExitCode]).toEqual([true, 8, 0])
   })
 })
+
+describe('known failures', () => {
+  it('records a known failure without failing the run, counts it as not holding, and fails once it passes', async () => {
+    const { recordInvariant } = await import('../../src/launch-invariants/testing')
+    const failing: InvariantVerdict = { invariant: 'honest-settlement', subject: 'scenarios', pass: false, details: ['scenario user-stop: no turn record was read back'] }
+    const recorded = recordInvariant(failing, { knownFailing: 'Workflow scenarios not driven yet (L4)' })
+    expect(recorded.knownFailing).toBe('Workflow scenarios not driven yet (L4)')
+    expect(() => recordInvariant({ ...failing, pass: true, details: ['7 scenarios settle'] }, { knownFailing: 'Workflow scenarios not driven yet (L4)' }))
+      .toThrow('this invariant now holds; remove its knownFailing marker')
+    expect(() => recordInvariant(failing)).toThrow('FAIL honest-settlement')
+
+    const verdicts = passing().map((verdict) => verdict.invariant === 'honest-settlement' ? recorded : verdict)
+    const report = buildConformanceReport({ config, facts, verdicts, testExitCode: 0 })
+    expect([report.pass, report.passed, report.knownFailing]).toEqual([true, 7, 1])
+    expect(formatConformanceReport(report)).toContain('launch invariants — probe: 7 of 8 hold, 1 known failing')
+    expect(formatConformanceReport(report)).toContain('RESULT: not launch-grade yet; 1 known failing, no regressions')
+  })
+})

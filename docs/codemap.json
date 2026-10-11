@@ -9930,13 +9930,19 @@
         {
           "name": "recordInvariant",
           "kind": "function",
-          "signature": "(verdict: InvariantVerdict) => InvariantVerdict",
+          "signature": "(verdict: InvariantVerdict, options?: RecordInvariantOptions) => InvariantVerdict",
           "doc": "Record a verdict for the conformance report and fail the caller when it did not pass."
+        },
+        {
+          "name": "RecordInvariantOptions",
+          "kind": "interface",
+          "signature": "interface RecordInvariantOptions",
+          "doc": null
         },
         {
           "name": "recordInvariants",
           "kind": "function",
-          "signature": "(verdicts: readonly InvariantVerdict[]) => InvariantVerdict[]",
+          "signature": "(verdicts: readonly InvariantVerdict[], options?: RecordInvariantOptions) => InvariantVerdict[]",
           "doc": "Record several verdicts; fails after recording all of them."
         },
         {
