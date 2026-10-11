@@ -473,6 +473,26 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
+  it('times each step of a warm reuse when the caller passes measure', async () => {
+    const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' } })
+    listMock.mockResolvedValue([running])
+    const stages: string[] = []
+    const box = await ensureWorkspaceSandbox(shell(), {
+      workspaceId: 'w1',
+      harness: 'opencode',
+      measure: async (stage, operation) => { stages.push(stage); return operation() },
+    })
+    expect(box).toBe(running)
+    expect(stages).toEqual([
+      'sandbox.ensure.credentials',
+      'sandbox.ensure.list_running',
+      'sandbox.ensure.runtime_env',
+      'sandbox.ensure.refresh',
+      'sandbox.ensure.liveness',
+      'sandbox.ensure.finalize',
+    ])
+  })
+
   it('refreshes a reused running box when the list shape has no runtime connection', async () => {
     const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, connection: undefined })
     const latest = fakeBox({

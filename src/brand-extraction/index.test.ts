@@ -83,6 +83,31 @@ describe('parseBrandKit — fixture HTML → BrandKit', () => {
     expect(kit.description).toBe('Acme builds autonomous warehouse robots.')
   })
 
+  it('ranks the site\'s own logo above a partner or sub-brand logo, as on taskrabbit.com', () => {
+    // An excerpt of https://www.taskrabbit.com/ (2026-10-10): the header logo is an inline SVG in the
+    // home link, and the first logo <img> on the page is IKEA's, for the assembly partnership.
+    const taskrabbit = `<!doctype html><html><head>
+      <title>Taskrabbit: Same Day Handyman, Moving &amp; Mounting Services</title>
+      <link href="/favicon.ico" rel="icon" sizes="any"/>
+    </head><body>
+      <header class="mui-1qazpq6"><div class="header__container"><a href="/"><svg role="img" viewBox="0 0 301 40"><title>Taskrabbit Home</title><path d="M0 0h1v1z"/></svg></a></div></header>
+      <img alt="Logo for IKEA showing Taskrabbit as the furniture assembly provider" decoding="async" data-nimg="fill" src="https://images.ctfassets.net/vwt5n1ljn95x/4DcDpxTyJZ2mQQi40pp4oQ/c5975f4d354af29127d0ed0265a448ea/Size_Default__Background_White__Language_en-US-CA__Logo_IKEA.png?w=3840&amp;q=75&amp;fm=webp"/>
+      <img alt="Taskprotect" loading="lazy" width="150" height="28" src="https://assets.taskrabbit.com/_next/static/media/taskprotect_logo.c5b32446.svg"/>
+    </body></html>`
+    const decided = decideBrandKit(parseBrandKit(taskrabbit, 'https://www.taskrabbit.com/'))
+    expect(decided.primaryLogoUrl).toBe('https://www.taskrabbit.com/favicon.ico')
+    expect(decided.logoUrls.slice(-2).map((url) => url.split('/').pop())).toEqual([
+      'Size_Default__Background_White__Language_en-US-CA__Logo_IKEA.png?w=3840&q=75&fm=webp', 'taskprotect_logo.c5b32446.svg',
+    ])
+
+    // A logo <img> in the header or the home link ranks first, even when its file names a form, not the brand.
+    const own = parseBrandKit(`<html><body><a href="/"><img src="/img/logo-white.svg" alt="Home"></a>
+      <img src="/partners/stripe-logo.svg" alt="Stripe logo"></body></html>`, 'https://acme.com')
+    expect(own.logos.map((logo) => [logo.url, logo.confidence])).toEqual([
+      ['https://acme.com/img/logo-white.svg', 0.95], ['https://acme.com/favicon.ico', 0.3], ['https://acme.com/partners/stripe-logo.svg', 0.4],
+    ].sort((a, b) => (b[1] as number) - (a[1] as number)))
+  })
+
   it('ranks the in-page logo <img> above icons and resolves it absolute', () => {
     const top = kit.logos[0]!
     expect(top.source).toBe('img-logo')

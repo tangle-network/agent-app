@@ -37,6 +37,54 @@ import {
 const DEFAULT_STATE_COOKIE = 'tangle_sso_state'
 const DEFAULT_SESSION_COOKIE_CACHE_SECONDS = 5 * 60
 
+/**
+ * A session read costs two serial database round trips (session, then user),
+ * and a request often resolves it more than once. Resolved sessions are reused
+ * within a request and, for at most SESSION_MEMO_MAX_MS, across requests in one
+ * isolate, keyed by the exact credentials sent. That stays inside the staleness
+ * the session cookie cache already accepts, and any non-GET auth call (sign-out,
+ * revocation) clears the app's entries in this isolate.
+ */
+const SESSION_MEMO_MAX_MS = 30_000
+const SESSION_MEMO_LIMIT = 500
+const requestSessions = new WeakMap<Request, Promise<AppAuthSession | null>>()
+const isolateSessions = new Map<string, { until: number; session: Promise<AppAuthSession | null> }>()
+
+function memoizedSession(scope: string, ttlMs: number, request: Request,
+  read: (request: Request) => Promise<AppAuthSession | null>): Promise<AppAuthSession | null> {
+  const known = requestSessions.get(request)
+  if (known) return known
+  const cookie = request.headers.get('cookie') ?? ''
+  const authorization = request.headers.get('authorization') ?? ''
+  if (!cookie && !authorization) return read(request)
+  const key = `${scope}\u0000${authorization}\u0000${cookie}`
+  const now = Date.now()
+  const hit = isolateSessions.get(key)
+  if (hit && hit.until > now) {
+    requestSessions.set(request, hit.session)
+    return hit.session
+  }
+  const session = read(request).then((value) => {
+    // Only a live session is reused; a miss or an expired session is read again next time.
+    const expiresAt = value ? new Date(value.session.expiresAt).getTime() : 0
+    if (!value || !(expiresAt > Date.now())) isolateSessions.delete(key)
+    else {
+      const entry = isolateSessions.get(key)
+      if (entry) entry.until = Math.min(entry.until, expiresAt)
+    }
+    return value
+  }, (error) => { isolateSessions.delete(key); throw error })
+  isolateSessions.delete(key)
+  isolateSessions.set(key, { until: now + ttlMs, session })
+  if (isolateSessions.size > SESSION_MEMO_LIMIT) isolateSessions.delete(isolateSessions.keys().next().value!)
+  requestSessions.set(request, session)
+  return session
+}
+
+function forgetSessions(scope: string): void {
+  for (const key of isolateSessions.keys()) if (key.startsWith(`${scope}\u0000`)) isolateSessions.delete(key)
+}
+
 /** Structural slice of a Resend-style client — no `resend` import. */
 export interface AppAuthEmailClient {
   emails: {
@@ -378,9 +426,21 @@ export function createAppAuth(config: AppAuthConfig): AppAuth {
 
   const auth: AppAuthInstance = betterAuth(options)
 
-  const getSession = async (request: Request): Promise<AppAuthSession | null> => {
+  const readSession = async (request: Request): Promise<AppAuthSession | null> => {
     const session = await auth.api.getSession({ headers: request.headers })
     return (session as AppAuthSession | null) ?? null
+  }
+  const memoMs = config.sessionCookieCacheSeconds === false ? 0
+    : Math.min(SESSION_MEMO_MAX_MS, (config.sessionCookieCacheSeconds ?? DEFAULT_SESSION_COOKIE_CACHE_SECONDS) * 1000)
+  const memoScope = `${config.baseURL}\u0000${cookiePrefix}`
+  const getSession = (request: Request): Promise<AppAuthSession | null> =>
+    memoMs > 0 ? memoizedSession(memoScope, memoMs, request, readSession) : readSession(request)
+  // Sign-out and session revocation drop this isolate's remembered sessions for the app.
+  const handler = auth.handler
+  auth.handler = async (request: Request) => {
+    // In finally: a sign-out that fails after deleting the session must not leave it remembered.
+    try { return await handler(request) }
+    finally { if (request.method !== 'GET') forgetSessions(memoScope) }
   }
 
   const loginPath = config.loginPath ?? '/login'

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.60.62
+
+- perf(app-auth): reuse a resolved session within a request and briefly per isolate (#966)
+- perf(sandbox): time each step of a warm reuse, and mint the runtime env alongside the connection refresh (#965)
+- docs(lessons): name the launch-kit checks behind each lesson (#963) (#964)
+
+## 0.60.61
+
+- fix(brand-extraction): rank the site's own logo above partner and sub-brand logos (#961)
+- fix(web-react): give command palette modal focus ownership (#921)
+- feat(prewarm): prewarm a workspace when a member opens it (#956)
+- docs: agent app lessons, each with its incident and enforcing check (#960)
+- feat(platform): Better Auth account store for first-party Tangle identity sign-in (#959)
+
 ## 0.60.60
 
 - perf(turn-stream): warm a thread's lock object as soon as its turn is admitted (#958)

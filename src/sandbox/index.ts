@@ -655,6 +655,10 @@ export interface EnsureWorkspaceSandboxOptions {
   // dependency on it — /spend composes /sandbox, and importing back the other
   // way would invert the layering.
   spend?: SandboxSpendHooks
+  /** Optional stage timing for the steps of an ensure (`sandbox.ensure.*`), so a
+   *  product can see which round trip a slow acquisition spent its time in.
+   *  Omitted, nothing is measured. */
+  measure?: <T>(stage: string, operation: () => Promise<T>) => Promise<T>
 }
 
 /** What `/sandbox` reports once a box is provisioned, reused, or resumed. */
@@ -2446,7 +2450,9 @@ async function provisionWorkspaceSandbox(
     throw new Error('livenessProbe.execTimeoutMs must be an integer between 100 and 600000')
   }
   const { workspaceId, userId, harness, forceNew, onProgress, billingOwnerId } = options
-  const resolved = await resolveWorkspaceSandboxClient(shell, workspaceId, userId)
+  const measure = <T>(stage: string, operation: () => Promise<T>): Promise<T> =>
+    options.measure ? options.measure(`sandbox.ensure.${stage}`, operation) : operation()
+  const resolved = await measure('credentials', () => resolveWorkspaceSandboxClient(shell, workspaceId, userId))
   const { scope, client } = resolved
   let name = resolved.name
   let recoveryRestore: SandboxRestoreSpec | null | undefined
@@ -2455,7 +2461,7 @@ async function provisionWorkspaceSandbox(
   const resumeTimeout = shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS
 
   // Stage 1 — running-box reuse (skipped on forceNew).
-  let existing = await listRunning(client, name)
+  let existing = await measure('list_running', () => listRunning(client, name))
   if (forceNew && existing.succeeded && !existing.value) {
     existing = await listStopped(client, name)
   }
@@ -2469,12 +2475,19 @@ async function provisionWorkspaceSandbox(
       }
     } else if (found.metadata?.harness === harness) {
       // Resolve app credentials before any restart so a mint failure leaves the
-      // existing sandbox running and intact.
-      const runtimeEnv = await resolveWorkspaceRuntimeEnv(shell, scope)
+      // existing sandbox running and intact. Reading the runtime connection
+      // restarts nothing, so it runs alongside the mint.
+      const [envResult, readyResult] = await Promise.allSettled([
+        measure('runtime_env', () => resolveWorkspaceRuntimeEnv(shell, scope)),
+        measure('refresh', () => refreshRuntimeConnection(client, found)),
+      ])
+      if (envResult.status === 'rejected') throw envResult.reason
+      const runtimeEnv = envResult.value
       try {
-        const ready = await refreshRuntimeConnection(client, found)
-        if ((await isReusableBox(ready, shell.livenessProbe)).succeeded) {
-          return await finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv)
+        if (readyResult.status === 'rejected') throw readyResult.reason
+        const ready = readyResult.value
+        if ((await measure('liveness', () => isReusableBox(ready, shell.livenessProbe))).succeeded) {
+          return await measure('finalize', () => finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv))
         }
         // Unresponsive (or never-connectable) box with the RIGHT harness: recover
         // in place — stop→resume preserves the workspace — and fail loud if the
@@ -3845,4 +3858,5 @@ export * from './terminal-connection'
 export * from './prewarm'
 
 export * from './prewarm-claim-d1'
+export * from './prewarm-route'
 export * from './foreground-single-flight'

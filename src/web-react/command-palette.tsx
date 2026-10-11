@@ -8,8 +8,8 @@
  * ownership"): the panel PORTALS to `document.body` and positions in viewport
  * coordinates (`fixed`), so no host markup — a scroll rail, a `transform`, a
  * stacking context — can clip or trap it. Unlike the pickers it is CENTERED,
- * not trigger-anchored: a palette has no trigger, so it does not reuse
- * `PopoverSurface` itself, but it carries the same grammar — `bg-popover`,
+ * not trigger-anchored: the shared Dialog owns focus, dismissal and nested
+ * modal layers, while the palette carries the same grammar — `bg-popover`,
  * `border-card-edge`, `OVERLAY_SHADOW`, the stamped surface attribute.
  *
  * The keyboard model is the ARIA combobox pattern: focus stays in the input,
@@ -27,7 +27,7 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react'
-import { createPortal } from 'react-dom'
+import { Dialog, DialogContent, DialogTitle } from '@tangle-network/ui/primitives'
 
 import {
   filterCommandPaletteItems,
@@ -61,6 +61,9 @@ export interface CommandPaletteProps {
   onOpenChange?: (open: boolean) => void
   /** Register the Cmd/Ctrl+K toggle. Default true. */
   hotkey?: boolean
+  /** Stable return target when opening from a transient surface such as a menu
+   *  item. Omit to restore the element focused before the palette opened. */
+  returnFocusTo?: () => HTMLElement | null
 
   /** Async source is still resolving — the input stays live, the list shows
    *  the loading row instead of a premature empty state. */
@@ -84,6 +87,7 @@ export function CommandPalette({
   open: controlledOpen,
   onOpenChange,
   hotkey = true,
+  returnFocusTo,
   loading = false,
   initialQuery,
   onQueryChange,
@@ -127,21 +131,14 @@ export function CommandPalette({
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [hotkey, open, setOpen])
 
-  // Opening: remember who had focus, take it for the input. Closing: give it
-  // back, reset the query, and drop the active row — a reopen starts clean.
+  // Focus belongs to Dialog's lifecycle, not this effect: an opening palette
+  // must join the same modal stack as the drawer/menu that launched it.
   const restoreFocusRef = useRef<Element | null>(null)
   useEffect(() => {
-    if (open) {
-      restoreFocusRef.current = document.activeElement
-      inputRef.current?.focus()
-      return
-    }
+    if (open) return
     setQuery(initialQuery ?? '')
     onQueryChange?.(initialQuery ?? '')
     setActive(0)
-    const restore = restoreFocusRef.current
-    restoreFocusRef.current = null
-    if (restore instanceof HTMLElement) restore.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initialQuery is a seed, not a subscription
   }, [open])
 
@@ -170,37 +167,30 @@ export function CommandPalette({
       e.preventDefault()
       const item = flat[activeIndex]
       if (item) choose(item)
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      setOpen(false)
     }
   }
 
-  if (!open || typeof document === 'undefined') return null
-
   let rowIndex = -1
-  return createPortal(
-    <>
-      <div
-        aria-hidden
-        data-testid="command-palette-backdrop"
-        onMouseDown={() => setOpen(false)}
-        className="fixed inset-0 z-[999] bg-background/80"
-      />
-      {/* Centering is a full-width flex wrapper, NOT a `-translate-x-1/2` on
-          the panel: `.agent-pop-in` animates `transform` with fill mode
-          `both`, and its settled `transform: none` would override a translate
-          utility and leave the panel half a width to the right. The wrapper
-          is click-transparent so the backdrop still receives outside
-          mousedowns; the panel opts back in. */}
-      <div className="pointer-events-none fixed inset-x-0 top-[15%] z-[1000] flex justify-center px-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={label}
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent
+        hideCloseButton
+        aria-describedby={undefined}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          restoreFocusRef.current = document.activeElement
+          inputRef.current?.focus()
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          const restore = returnFocusTo?.() ?? restoreFocusRef.current
+          restoreFocusRef.current = null
+          if (restore instanceof HTMLElement && restore.isConnected) restore.focus()
+        }}
         {...{ [POPOVER_SURFACE_ATTR]: surfaceId }}
-        className={`agent-pop-in pointer-events-auto flex max-h-[70vh] w-[560px] max-w-full flex-col overflow-hidden rounded-xl border border-card-edge bg-popover ${OVERLAY_SHADOW}`}
+        className={`top-[15%] z-[1000] flex max-h-[70vh] w-[560px] max-w-[calc(100vw-2rem)] translate-y-0 flex-col gap-0 overflow-hidden rounded-xl border-card-edge bg-popover p-0 ${OVERLAY_SHADOW}`}
       >
+        <DialogTitle className="sr-only">{label}</DialogTitle>
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
           <SearchGlyph className="h-4 w-4 shrink-0 text-muted-foreground" />
           <input
@@ -282,9 +272,7 @@ export function CommandPalette({
             <span>close</span>
           </span>
         </div>
-      </div>
-      </div>
-    </>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   )
 }
