@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.98
+
+- fix(workspace-react): show a long workspace name on two lines in the rail identity (#1018)
+
 ## 0.60.97
 
 - fix(ui): let composer, export and hub tiles use the brand surface ladder (#1006)
