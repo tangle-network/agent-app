@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.104
+
+- perf(sandbox): a warm reuse skips unchanged round trips and overlaps the rest (#1025)
+
 ## 0.60.103
 
 - feat(runtime): ./router-turn — a Worker-safe entry for the Router engine (#1023)
