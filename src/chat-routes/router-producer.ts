@@ -26,6 +26,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
   const toolParts = new Map<string, Record<string, unknown>>()
   let textPart: { type: 'text'; text: string } | null = null
   let textSegment = 0
+  let reasoningPart: { type: 'reasoning'; text: string } | null = null
 
   const push = (event: ProducerWireEvent) => {
     queue.push(event)
@@ -42,8 +43,18 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
           parts.push(textPart)
         }
         textPart.text += event.delta
+        reasoningPart = null
         push({ type: 'text', text: event.delta })
+      } else if (event.type === 'reasoning') {
+        // A reasoning run is one part until a word or a tool interrupts it.
+        if (!reasoningPart) {
+          reasoningPart = { type: 'reasoning', text: '' }
+          parts.push(reasoningPart)
+        }
+        reasoningPart.text += event.delta
+        push({ type: 'reasoning', text: event.delta })
       } else if (event.type === 'tool') {
+        reasoningPart = null
         if (event.status === 'running') {
           const part = { type: 'tool', id: event.callId, callID: event.callId, tool: event.toolName,
             state: { status: 'running', input: event.input, time: { start: event.startedAt } } }
@@ -57,7 +68,8 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
             : { status: 'error', error: event.error.message, time: { start: event.startedAt, end: event.endedAt } }
           if (part) part.state = { ...(part.state as Record<string, unknown>), ...state }
           push({ type: 'tool_result', toolCallId: event.callId, toolName: event.toolName,
-            outcome: event.status === 'completed' ? { ok: true, result: event.output } : { ok: false, message: event.error.message } })
+            outcome: event.status === 'completed' ? { ok: true, result: event.output }
+              : { ok: false, message: event.error.message, code: event.error.code } })
         }
       } else if (event.type === 'usage') {
         push({ type: 'usage', usage: { promptTokens: event.promptTokens, completionTokens: event.completionTokens } })

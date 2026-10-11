@@ -30,13 +30,16 @@ export interface RouterTurnTool {
 /** What the turn is doing, in the order it happens, for a live view. */
 export type RouterTurnEvent =
   | { type: 'text'; segment: number; delta: string }
+  /** Hidden reasoning the model streamed (`reasoning_content` / `thinking`), for a thinking view. */
+  | { type: 'reasoning'; delta: string }
   | { type: 'tool'; callId: string; toolName: string; status: 'running'; input: Record<string, unknown>; startedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'completed'; output: unknown; startedAt: number; endedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'error'; error: { code: string; message: string }; startedAt: number; endedAt: number }
   | { type: 'usage'; promptTokens: number; completionTokens: number }
 
 export interface RouterTurnFailure {
-  /** `model_http_<status>`, `model_unavailable`, `turn_<stopReason>` or `router_unconfigured`. */
+  /** `model_http_<status>`, `model_unavailable`, `model_empty`, `turn_<stopReason>`, `turn_aborted`
+   *  or `router_unconfigured`. */
   code: string
   status?: number
   message: string
@@ -78,10 +81,33 @@ export interface RouterTurnOptions {
   toolError?: (error: unknown) => { code: string; message: string; status?: number } | null
   /** Called for a tool failure the default mapping hides from the model, for the app's logs. */
   onToolFailure?: (toolName: string, error: unknown) => void
+  /** Cancels the turn: the model call in flight is aborted, no further tool starts, and the
+   *  outcome carries `turn_aborted`. Effects of tools that already ran are kept. */
+  signal?: AbortSignal
+  temperature?: number
+  /** Models tried in order when a model call fails before any word or tool, or answers blank.
+   *  Without it, that safe repeat uses `model` again. */
+  fallbackModels?: readonly string[]
+  /** Default true: one repeat of a model call that failed before any word or tool, and of a
+   *  blank answer, on the next model in the chain. Pass false when a second billable call
+   *  needs the caller's own decision; the failure is then returned as it happened. */
+  repeat?: boolean
+  /** Resend one model request that answered 408, 425, 429 or 5xx, or failed to connect, with
+   *  exponential backoff. Nothing has streamed yet, so a resend repeats no word and no tool.
+   *  `attempts` counts the first send (default 1, no resend); `timeoutMs` bounds each attempt,
+   *  stream included. */
+  retry?: { attempts?: number; timeoutMs?: number; baseDelayMs?: number }
+  /** Characters of one tool result the model reads. Default 12 000. */
+  toolResultLimit?: number
+  /** Replace the text the model reads for one tool result (the app's own wording for an
+   *  approval or refusal). `toolName` is the app's name, not the function name. */
+  renderToolResult?: (toolName: string, outcome: { ok: true; result: unknown } | { ok: false; code: string; message: string }) => string
 }
 
 const DEFAULT_BUDGET_MS = 90_000
 const TOOL_RESULT_LIMIT = 12_000
+const RETRY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
+const MAX_RETRY_DELAY_MS = 8_000
 
 /** OpenAI-compatible function names allow only `[A-Za-z0-9_-]{1,64}`; app tool names often use dots. */
 export function routerFunctionName(name: string): string {
@@ -114,12 +140,52 @@ function defaultToolError(error: unknown): { code: string; message: string; stat
   return null
 }
 
-function renderResult(outcome: { ok: true; result: unknown } | { ok: false; code: string; message: string }): string {
+function renderResult(outcome: { ok: true; result: unknown } | { ok: false; code: string; message: string }, limit: number): string {
   if (!outcome.ok) return `Error (${outcome.code}): ${outcome.message}`
   let text: string
   try { text = typeof outcome.result === 'string' ? outcome.result : JSON.stringify(outcome.result ?? null) }
   catch { text = String(outcome.result) }
-  return text.length > TOOL_RESULT_LIMIT ? `${text.slice(0, TOOL_RESULT_LIMIT)}…` : text
+  return text.length > limit ? `${text.slice(0, limit)}…` : text
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason)
+    const timer = setTimeout(resolve, ms)
+    signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason) }, { once: true })
+  })
+}
+
+/** The caller's fetch with the turn's abort signal, a per-attempt timeout and resends of a
+ *  request that failed before its stream began. */
+function turnFetch(options: RouterTurnOptions): typeof fetch {
+  const base = options.fetchImpl ?? fetch
+  const attempts = Math.max(1, Math.floor(options.retry?.attempts ?? 1))
+  const timeoutMs = options.retry?.timeoutMs
+  const baseDelayMs = options.retry?.baseDelayMs ?? 500
+  if (attempts === 1 && !timeoutMs && !options.signal) return base
+  return async (input, init) => {
+    for (let attempt = 1; ; attempt++) {
+      options.signal?.throwIfAborted()
+      const signals = [init?.signal, options.signal, timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined]
+        .filter((signal): signal is AbortSignal => Boolean(signal))
+      const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
+      const backoff = () => Math.min(MAX_RETRY_DELAY_MS, baseDelayMs * 2 ** (attempt - 1)) * (0.5 + Math.random() / 2)
+      let response: Response
+      try {
+        response = await base(input, { ...init, ...(signal ? { signal } : {}) })
+      } catch (error) {
+        if (options.signal?.aborted || attempt >= attempts) throw error
+        await sleep(backoff(), options.signal)
+        continue
+      }
+      if (attempt >= attempts || !RETRY_STATUS.has(response.status)) return response
+      const retryAfter = Number(response.headers.get('retry-after'))
+      await response.body?.cancel().catch(() => {})
+      await sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, MAX_RETRY_DELAY_MS) : backoff(),
+        options.signal)
+    }
+  }
 }
 
 export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterTurnOutcome> {
@@ -134,18 +200,26 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     if (!byFunction.has(fn)) byFunction.set(fn, tool)
   }
   let servedModel: string | null = null
-  const streamTurn = createOpenAICompatStreamTurn({
+  const fetchImpl = turnFetch(options)
+  const functions = [...byFunction.entries()].map(([name, tool]) => ({
+    type: 'function', function: { name, description: tool.description, parameters: tool.inputSchema },
+  }))
+  const streamTurnFor = (model: string) => createOpenAICompatStreamTurn({
     baseUrl: options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL,
     apiKey: options.apiKey,
-    model: options.model,
-    tools: [...byFunction.entries()].map(([name, tool]) => ({
-      type: 'function', function: { name, description: tool.description, parameters: tool.inputSchema },
-    })),
+    model,
+    tools: functions,
+    ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
     ...(options.maxTokens ? { extraBody: { max_tokens: options.maxTokens } } : {}),
     ...(options.traceId ? { headers: { 'x-tangle-trace-id': options.traceId } } : {}),
-    ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+    fetchImpl,
     onServedModel: served => { servedModel = served.servedModel },
   })
+  // The safe repeat walks this chain: the next fallback model, or the same model once.
+  const repeats = options.repeat === false ? []
+    : options.fallbackModels?.length ? [...options.fallbackModels] : [options.model]
+  const limit = options.toolResultLimit ?? TOOL_RESULT_LIMIT
+  const toolNameOf = (fn: string) => byFunction.get(fn)?.name ?? fn
   const segments: string[] = []
   const usage = { promptTokens: 0, completionTokens: 0, modelCalls: 0 }
   const toolCalls: RouterTurnOutcome['toolCalls'] = []
@@ -155,21 +229,25 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const deadline = Date.now() + (options.budgetMs ?? DEFAULT_BUDGET_MS)
   const callIdOf = (id: string | undefined, toolName: string) => id ?? `${toolName}-${started.size}`
 
-  const run = async (): Promise<ToolLoopStopReason> => {
+  const run = async (model: string): Promise<ToolLoopStopReason> => {
     for await (const step of streamAppToolLoop<LoopEvent>({
       systemPrompt: options.systemPrompt,
       userMessage: options.userMessage,
       priorMessages: (options.history ?? []) as LoopMessage[],
-      streamTurn,
+      streamTurn: streamTurnFor(model),
       extractText: event => event.type === 'text' ? event.text : '',
       extractToolCall: event => event.type === 'tool_call' ? event.call : null,
       isExecutableTool: name => byFunction.has(name),
       deadlineMs: deadline,
       maxToolTurns: options.maxToolTurns ?? 12,
-      renderResult: (_label, outcome) => renderResult(outcome),
+      labelFor: call => toolNameOf(call.toolName),
+      renderResult: (label, outcome) => options.renderToolResult
+        ? options.renderToolResult(label, outcome)
+        : renderResult(outcome, limit),
       executeToolCall: async (call: LoopToolCall) => {
         const tool = byFunction.get(call.toolName)
         if (!tool) return { ok: false, code: 'unknown_tool', message: `No tool named ${call.toolName}` }
+        if (options.signal?.aborted) return { ok: false, code: 'aborted', message: 'The turn was cancelled before this tool ran.' }
         toolsRan++
         try {
           return { ok: true, result: await tool.run(call.args) }
@@ -187,6 +265,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           if (!segmentOpen) { segments.push(''); segmentOpen = true }
           segments[segments.length - 1] += event.text
           emit({ type: 'text', segment: segments.length, delta: event.text })
+        } else if (event.type === 'reasoning' && event.text) {
+          emit({ type: 'reasoning', delta: event.text })
         } else if (event.type === 'usage') {
           usage.promptTokens += event.usage.promptTokens
           usage.completionTokens += event.usage.completionTokens
@@ -221,33 +301,38 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     text: segments.map(part => part.trim()).filter(Boolean).join('\n\n'),
     servedModel, toolCalls, usage: { ...usage }, ...(failure ? { failure } : {}),
   })
+  const aborted = () => outcome({ code: 'turn_aborted', message: 'The turn was cancelled.' })
+  const said = () => segments.some(part => part.trim())
   let stop: ToolLoopStopReason
   try {
     try {
-      stop = await run()
+      stop = await run(options.model)
     } catch (error) {
       // Safe to repeat only while nothing was said and no tool ran.
-      if (toolsRan > 0 || segments.length > 0) throw error
-      stop = await run()
+      const next = repeats.shift()
+      if (options.signal?.aborted || next === undefined || toolsRan > 0 || segments.length > 0) throw error
+      stop = await run(next)
     }
   } catch (error) {
+    if (options.signal?.aborted) return aborted()
     const status = (error as { status?: unknown }).status
     return outcome(typeof status === 'number'
       ? { code: `model_http_${status}`, status, message: 'The model service did not answer.' }
       : { code: 'model_unavailable', message: 'The model service did not answer.' })
   }
+  if (options.signal?.aborted) return aborted()
   if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
   // A model can end its turn with neither a word nor a tool call (gemini-2.5-flash did on 8 of
   // 53 "remember" turns, 2026-10-11). Nothing was said and nothing ran, so one repeat is safe;
   // an answer still blank is a typed failure, never a successful empty reply.
-  if (!segments.some(part => part.trim())) {
-    if (toolsRan === 0) {
-      try { stop = await run() } catch { stop = 'completed' }
+  if (!said()) {
+    const next = repeats.shift()
+    if (toolsRan === 0 && next !== undefined) {
+      try { stop = await run(next) } catch { stop = 'completed' }
+      if (options.signal?.aborted) return aborted()
       if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
     }
-    if (!segments.some(part => part.trim())) {
-      return outcome({ code: 'model_empty', message: 'The model finished without writing a reply.' })
-    }
+    if (!said()) return outcome({ code: 'model_empty', message: 'The model finished without writing a reply.' })
   }
   return outcome()
 }

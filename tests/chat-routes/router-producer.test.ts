@@ -45,6 +45,19 @@ describe('createRouterTurnProducer', () => {
     expect(producer.modelAttribution!()).toEqual({ requestedModel: 'requested/model', servedModel: 'served/model', echoReceived: true })
   })
 
+  it('forwards reasoning as its own wire event and part, and keeps a tool failure code on the wire', async () => {
+    const refusing = { ...lookup, run: async () => { throw Object.assign(new Error('Rooms are read by staff only'), { code: 'forbidden' }) } }
+    const producer = createRouterTurnProducer({ apiKey: 'k', model: 'm', systemPrompt: 's', userMessage: 'u', tools: [refusing],
+      fetchImpl: router(sse([{ choices: [{ delta: { reasoning_content: 'Need the count.' } }] }, toolCall('call-1', 'rooms_ready', '{}')]),
+        sse([text('I cannot read rooms.')])) })
+    const events: Array<Record<string, unknown>> = []
+    for await (const event of producer.stream) events.push(event as Record<string, unknown>)
+    expect(events[0]).toEqual({ type: 'reasoning', text: 'Need the count.' })
+    expect(events.find(event => event.type === 'tool_result')).toMatchObject({
+      outcome: { ok: false, message: 'Rooms are read by staff only', code: 'forbidden' } })
+    expect(producer.assistantParts!()[0]).toEqual({ type: 'reasoning', text: 'Need the count.' })
+  })
+
   it('ends a failed turn with a typed error event instead of throwing', async () => {
     const down = () => new Response('upstream down', { status: 502 })
     const producer = createRouterTurnProducer({ apiKey: 'k', model: 'm', systemPrompt: 's', userMessage: 'u',

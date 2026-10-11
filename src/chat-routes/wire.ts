@@ -69,6 +69,8 @@ export interface ProducerToolResultEvent {
     ok: boolean
     result?: unknown
     message?: string
+    /** Typed reason for a failed call, when the producer knows it. */
+    code?: string
   }
 }
 
