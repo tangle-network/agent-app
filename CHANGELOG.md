@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.66
+
+- feat(launch-invariants): known failures, so an app adopts the kit before every invariant holds and a fixed one cannot regress (#974)
+- fix(vault): one pane geometry for loading, empty and filled vaults (#973)
+
 ## 0.60.65
 
 - fix(deps): align the chat template and peer-floor checks with #962's raised floors (#972)
