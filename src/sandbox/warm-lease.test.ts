@@ -128,6 +128,22 @@ describe('warm leases', () => {
     expect((await h.leases.signal('ws-1', 'page-open')).outcome).toBe('started')
   })
 
+  it('charges the box idle window, not a hold that later signals stretched', async () => {
+    const h = harness({ boxIdleMs: 30 * MIN, dailyBudgetMs: 120 * MIN })
+    await h.leases.signal('ws-1', 'page-open')
+    // A page polled every 8 min keeps extending the 10 min hold to ~50 min.
+    for (let i = 0; i < 5; i++) {
+      h.clock.now += 8 * MIN
+      expect((await h.leases.signal('ws-1', 'page-open')).outcome).toBe('extended')
+    }
+    h.clock.now += 11 * MIN
+    await h.leases.sweep()
+    h.clock.now += 30 * MIN
+    await h.leases.sweep()
+    // The box suspended 30 min after its resume; that is all the warm cost.
+    expect((await h.store.read('ws-1'))?.dayWarmMs).toBe(30 * MIN)
+  })
+
   it('settles the full idle window when no turn comes', async () => {
     const h = harness({ boxIdleMs: 30 * MIN })
     await h.leases.signal('ws-1', 'page-open')

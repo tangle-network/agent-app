@@ -34,11 +34,16 @@ export interface OpenAIStreamChunk {
         index: number
         id?: string
         function?: { name?: string; arguments?: string }
+        /** Provider-specific call data the next request must echo back. Gemini 3
+         *  sends `{ google: { thought_signature } }` here and answers HTTP 400
+         *  when a later request's assistant `tool_calls` entry lacks it. */
+        extra_content?: unknown
       }>
     }
     finish_reason?: string | null
   }>
-  /** Final-chunk token accounting (requires `stream_options.include_usage`). */
+  /** Token accounting (requires `stream_options.include_usage`). Cumulative for
+   *  the call: the Tangle Router can send it on more than one chunk. */
   usage?: {
     prompt_tokens?: number
     completion_tokens?: number
@@ -49,6 +54,7 @@ interface PartialToolCall {
   id?: string
   name: string
   args: string
+  extraContent?: unknown
   announced: boolean
 }
 
@@ -59,22 +65,25 @@ interface PartialToolCall {
  * (arguments JSON-parsed; an empty/garbled args string yields `{}` rather than
  * throwing). Works for the Tangle Router, tcloud, or any OpenAI-compat source.
  *
+ * A call's `extra_content` is kept as `providerFields.extra_content`, which the
+ * tool loop echoes on the call's assistant `tool_calls` entry in the next request.
+ * Usage is cumulative per call and may arrive on several chunks, so it is
+ * yielded once, the last value, when the stream ends.
+ *
  * Each call also yields one `tool_call_start` as soon as its name arrives,
  * while its arguments are still streaming, so a caller can start work the call
  * will need. Providers send the whole name in the call's first delta.
  */
 export async function* toLoopEvents(chunks: AsyncIterable<OpenAIStreamChunk>): AsyncIterable<LoopEvent> {
   const calls = new Map<number, PartialToolCall>()
+  let usage: { promptTokens: number; completionTokens: number } | undefined
   for await (const chunk of chunks) {
-    // Usage rides the final chunk, which has an empty choices array — handle
-    // it before the choice guard.
+    // Usage can ride a chunk with an empty choices array — read it before the
+    // choice guard. Each report is cumulative, so the last one is the call's.
     if (chunk.usage?.prompt_tokens != null || chunk.usage?.completion_tokens != null) {
-      yield {
-        type: 'usage',
-        usage: {
-          promptTokens: chunk.usage.prompt_tokens ?? 0,
-          completionTokens: chunk.usage.completion_tokens ?? 0,
-        },
+      usage = {
+        promptTokens: chunk.usage.prompt_tokens ?? 0,
+        completionTokens: chunk.usage.completion_tokens ?? 0,
       }
     }
     const choice = chunk.choices?.[0]
@@ -88,6 +97,7 @@ export async function* toLoopEvents(chunks: AsyncIterable<OpenAIStreamChunk>): A
       if (tc.id) cur.id = tc.id
       if (tc.function?.name) cur.name += tc.function.name
       if (tc.function?.arguments) cur.args += tc.function.arguments
+      if (tc.extra_content !== undefined) cur.extraContent = tc.extra_content
       calls.set(tc.index, cur)
       if (!cur.announced && cur.name) {
         cur.announced = true
@@ -95,9 +105,18 @@ export async function* toLoopEvents(chunks: AsyncIterable<OpenAIStreamChunk>): A
       }
     }
   }
+  if (usage) yield { type: 'usage', usage }
   for (const [, c] of [...calls.entries()].sort((a, b) => a[0] - b[0])) {
     if (!c.name) continue
-    yield { type: 'tool_call', call: { toolCallId: c.id, toolName: c.name, args: safeParse(c.args) } satisfies LoopToolCall }
+    yield {
+      type: 'tool_call',
+      call: {
+        toolCallId: c.id,
+        toolName: c.name,
+        args: safeParse(c.args),
+        ...(c.extraContent !== undefined ? { providerFields: { extra_content: c.extraContent } } : {}),
+      } satisfies LoopToolCall,
+    }
   }
 }
 
