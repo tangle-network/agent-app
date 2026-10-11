@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.116
+
+- Train: land #1026 #1027 #1028 #1045 as one release (#1047)
+
 ## 0.60.115
 
 - feat(router-turn): every turn can carry its knowledge files: index, small-file text and the grounding rule (#1038)
