@@ -87,10 +87,18 @@ const openPill = async (label: string) => {
   return screen.findByRole('menu')
 }
 
-async function chooseModel(name: string) {
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** The shared ModelPicker's panel and its model rows (pressed = chosen). */
+async function openModelPicker() {
   fireEvent.click(modelPill())
-  const menu = await screen.findByRole('menu')
-  fireEvent.click(within(menu).getByRole('menuitemradio', { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }))
+  return screen.findByRole('dialog', { name: 'Choose a model' })
+}
+const modelRows = (picker: HTMLElement) => within(picker).getAllByRole('button').filter((row) => row.hasAttribute('aria-pressed'))
+
+async function chooseModel(name: string) {
+  const picker = await openModelPicker()
+  fireEvent.click(within(picker).getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}`) }))
 }
 
 async function submit(prompt: string) {
@@ -351,9 +359,8 @@ describe('StudioComposer — the reference image swaps the model', () => {
     await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
 
     // The i2v sibling is never offered in the menu — it is reached by attaching.
-    fireEvent.click(modelPill())
-    const menu = await screen.findByRole('menu')
-    expect(within(menu).queryByRole('menuitemradio', { name: new RegExp(SEEDANCE_I2V) })).toBeNull()
+    const picker = await openModelPicker()
+    expect(modelRows(picker).map((row) => row.textContent)).toEqual([SEEDANCE])
     fireEvent.keyDown(document, { key: 'Escape' })
 
     await attachReference()
@@ -545,15 +552,41 @@ describe('StudioComposer — model availability', () => {
     }, { video: 'live-video' }))
     fireEvent.click(screen.getByRole('button', { name: 'Video' }))
     await screen.findByRole('button', { name: 'Model: live-video' })
-    fireEvent.click(modelPill())
-    const menu = await screen.findByRole('menu')
-    const unavailableRow = within(menu).getByRole('menuitemradio', { name: /dead-videoUnavailable/ })
-    const limitedRow = within(menu).getByRole('menuitemradio', { name: /limited-videolimited/ })
+    const picker = await openModelPicker()
+    const unavailableRow = within(picker).getByRole('button', { name: /^dead-videoUnavailable/ })
+    const limitedRow = within(picker).getByRole('button', { name: /^limited-videoLimited/ })
 
     expect(unavailableRow.textContent).toContain('Unavailable')
     expect((unavailableRow as HTMLButtonElement).disabled).toBe(false)
-    expect(limitedRow.textContent).toContain('limited')
+    expect(limitedRow.textContent).toContain('Limited')
     expect((limitedRow as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('shows each media model in the shared picker with its logo, published price and preview', async () => {
+    mountWith(catalog({
+      video: [
+        model(SEEDANCE, 'video', {
+          provider: 'bytedance',
+          outputPrice: { usd: 0.3034, unit: 'second' },
+          previewUrl: 'https://example.com/seedance.webp',
+          capability: 'Text to video with audio',
+        }),
+        // No published price: the row shows none rather than a guess.
+        model('fal-ai/veo3.1', 'video', { provider: 'fal', outputPrice: { usd: 0, unit: 'second' } }),
+      ],
+    }, { video: SEEDANCE }))
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+
+    const picker = await openModelPicker()
+    const seedance = within(picker).getByRole('button', { name: new RegExp(`^${escapeRegExp(SEEDANCE)}`) })
+    expect(seedance.getAttribute('aria-pressed')).toBe('true')
+    expect(seedance.querySelector('[data-model-price]')?.textContent).toBe('$0.303/sec')
+    expect(seedance.querySelector('[data-model-preview]')?.getAttribute('src')).toBe('https://example.com/seedance.webp')
+    expect(seedance.querySelector('[data-model-capability]')?.textContent).toBe('Text to video with audio')
+    const veo = within(picker).getByRole('button', { name: /^fal-ai\/veo3\.1/ })
+    expect(veo.querySelector('[data-model-price]')).toBeNull()
+    expect(veo.querySelector('[data-model-preview]')).toBeNull()
   })
 
   it('keeps the unavailable Audio draft editable, blocks submission, and recovers', async () => {
@@ -607,9 +640,8 @@ describe('StudioComposer — image lane', () => {
     }, { image: 'gpt-image-2' }))
     await screen.findByRole('button', { name: 'Model: gpt-image-2' })
 
-    fireEvent.click(modelPill())
-    const menu = await screen.findByRole('menu')
-    expect(within(menu).getAllByRole('menuitemradio').map((row) => row.textContent)).toEqual(['gpt-image-2'])
+    const picker = await openModelPicker()
+    expect(modelRows(picker).map((row) => row.textContent)).toEqual(['gpt-image-2'])
     fireEvent.keyDown(document, { key: 'Escape' })
 
     await openPill('Size')
