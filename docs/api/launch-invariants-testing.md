@@ -4,7 +4,7 @@
 
 Source: `src/launch-invariants/testing.ts`
 
-35 exports.
+37 exports.
 
 ### `AuthorizeBeforeStreamOptions`
 
@@ -38,6 +38,14 @@ interface BudgetedJob
 (input: { config: LaunchInvariantsConfig; facts: DeploymentFacts; verdicts: readonly InvariantVerdict[]; testExitCode:…
 ```
 
+### `ChatAcceptsCodeOptions`
+
+`interface`
+
+```ts
+interface ChatAcceptsCodeOptions
+```
+
 ### `checkAuthorizeBeforeStream`
 
 `function` — Each refused request gets a plain 4xx, opens no stream and touches nothing.
@@ -52,6 +60,14 @@ interface BudgetedJob
 
 ```ts
 (options: AuthStallOptions) => Promise<InvariantVerdict>
+```
+
+### `checkChatAcceptsCode`
+
+`function` — Each pasted-code sample gets the route's normal response, never a refusal or an edge block.
+
+```ts
+(options: ChatAcceptsCodeOptions) => Promise<InvariantVerdict>
 ```
 
 ### `checkCoalescedTurn`

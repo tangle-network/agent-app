@@ -60,9 +60,9 @@ _124 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./interactions`](api/interactions.md) | 64 | `web` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
-| [`./launch-invariants`](api/launch-invariants.md) | 57 | `signoff`, `turn-health` |
+| [`./launch-invariants`](api/launch-invariants.md) | 59 | `signoff`, `turn-health` |
 | [`./launch-invariants/cli`](api/launch-invariants-cli.md) | 1 | `signoff`, `turn-health` |
-| [`./launch-invariants/testing`](api/launch-invariants-testing.md) | 35 | `signoff`, `turn-health` |
+| [`./launch-invariants/testing`](api/launch-invariants-testing.md) | 37 | `signoff`, `turn-health` |
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
 | [`./legibility/cli`](api/legibility-cli.md) | 0 | `signoff` |
 | [`./missions`](api/missions.md) | 65 | — |
@@ -625,11 +625,11 @@ Depends on: `config`
 
 ## `./launch-invariants`
 
-Source: `src/launch-invariants/index.ts` · 57 exports
+Source: `src/launch-invariants/index.ts` · 59 exports
 
 Depends on: `signoff`, `turn-health`
 
-`AUTH_LOOKUP_DEADLINE_MS`, `AUTH_LOOKUP_TTL_MS`, `AuthLookupCache`, `AuthLookupCacheOptions`, `AuthLookupOptions`, `AuthLookupRefused`, `checkIsolatedJobs`, `checkSettlementScenarios`, `checkTurnSettlement`, `createAuthLookupCache`, `createLimitAlarms`, `createScheduledDispatch`, `credentialCacheKey`, `cronDailyFirings`, `D1_MAX_BOUND_PARAMETERS`, `describeVerdict`, `estimatedBytes`, `InvariantVerdict`, `IsolatedJobsInput`, `LAUNCH_BUDGETS`, `LAUNCH_INVARIANT_IDS`, `LAUNCH_INVARIANTS`, `LaunchInvariant`, `LaunchInvariantId`, `LIMIT_RESOURCES`, `LimitAlarmOptions`, `LimitAlarms`, `LimitBudgets`, `LimitLevel`, `LimitObservation`, `LimitResource`, `longestGapMinutes`, `ObservedSlot`, `parseWranglerCrons`, `readInSizedBatches`, `ScheduledDispatch`, `ScheduledDispatchOptions`, `ScheduledDispatchResult`, `ScheduledJob`, `ScheduledJobInput`, `ScheduledJobOutcome`, `ScheduleEntry`, `ScheduleSlot`, `SettledTurnRecord`, `SETTLEMENT_SCENARIOS`, `SettlementScenario`, `SIZED_READ_BYTES`, `SIZED_READ_COMPOSITE_ROWS`, `SIZED_READ_ROWS`, `sizedBatches`, `SizedBatchOptions`, `SizedRow`, `slotsOf`, `TurnSettlementCounts`, `TurnTerminalState`, `withD1LimitAlarms`, `WranglerCrons`
+`AUTH_LOOKUP_DEADLINE_MS`, `AUTH_LOOKUP_TTL_MS`, `AuthLookupCache`, `AuthLookupCacheOptions`, `AuthLookupOptions`, `AuthLookupRefused`, `checkIsolatedJobs`, `checkSettlementScenarios`, `checkTurnSettlement`, `createAuthLookupCache`, `createLimitAlarms`, `createScheduledDispatch`, `credentialCacheKey`, `cronDailyFirings`, `D1_MAX_BOUND_PARAMETERS`, `describeVerdict`, `estimatedBytes`, `InvariantVerdict`, `isEdgeBlock`, `IsolatedJobsInput`, `LAUNCH_BUDGETS`, `LAUNCH_INVARIANT_IDS`, `LAUNCH_INVARIANTS`, `LaunchInvariant`, `LaunchInvariantId`, `LIMIT_RESOURCES`, `LimitAlarmOptions`, `LimitAlarms`, `LimitBudgets`, `LimitLevel`, `LimitObservation`, `LimitResource`, `longestGapMinutes`, `ObservedSlot`, `parseWranglerCrons`, `PASTED_CODE_SAMPLES`, `readInSizedBatches`, `ScheduledDispatch`, `ScheduledDispatchOptions`, `ScheduledDispatchResult`, `ScheduledJob`, `ScheduledJobInput`, `ScheduledJobOutcome`, `ScheduleEntry`, `ScheduleSlot`, `SettledTurnRecord`, `SETTLEMENT_SCENARIOS`, `SettlementScenario`, `SIZED_READ_BYTES`, `SIZED_READ_COMPOSITE_ROWS`, `SIZED_READ_ROWS`, `sizedBatches`, `SizedBatchOptions`, `SizedRow`, `slotsOf`, `TurnSettlementCounts`, `TurnTerminalState`, `withD1LimitAlarms`, `WranglerCrons`
 
 [Full API →](api/launch-invariants.md)
 
@@ -645,11 +645,11 @@ Depends on: `signoff`, `turn-health`
 
 ## `./launch-invariants/testing`
 
-Source: `src/launch-invariants/testing.ts` · 35 exports
+Source: `src/launch-invariants/testing.ts` · 37 exports
 
 Depends on: `signoff`, `turn-health`
 
-`AuthorizeBeforeStreamOptions`, `AuthStallOptions`, `BudgetedJob`, `buildConformanceReport`, `checkAuthorizeBeforeStream`, `checkAuthSurvivesStall`, `checkCoalescedTurn`, `checkLimitAlarms`, `checkScheduledJobBudgets`, `CoalescedTurnOptions`, `ConformanceReport`, `D1Reads`, `DeploymentFacts`, `describeVerdict`, `forceGc`, `formatConformanceReport`, `INVARIANT_RESULTS_ENV`, `InvariantReport`, `InvariantStatus`, `JobMeasurement`, `LaunchInvariantsConfig`, `LimitAlarmCheckOptions`, `measureD1`, `measureJob`, `PLATFORM_LIMITS`, `readDeploymentFacts`, `readVerdicts`, `recordedLongTurn`, `recordInvariant`, `RecordInvariantOptions`, `recordInvariants`, `ScheduledJobBudgetOptions`, `stallingD1`, `StallMode`, `TimedTurnEvent`
+`AuthorizeBeforeStreamOptions`, `AuthStallOptions`, `BudgetedJob`, `buildConformanceReport`, `ChatAcceptsCodeOptions`, `checkAuthorizeBeforeStream`, `checkAuthSurvivesStall`, `checkChatAcceptsCode`, `checkCoalescedTurn`, `checkLimitAlarms`, `checkScheduledJobBudgets`, `CoalescedTurnOptions`, `ConformanceReport`, `D1Reads`, `DeploymentFacts`, `describeVerdict`, `forceGc`, `formatConformanceReport`, `INVARIANT_RESULTS_ENV`, `InvariantReport`, `InvariantStatus`, `JobMeasurement`, `LaunchInvariantsConfig`, `LimitAlarmCheckOptions`, `measureD1`, `measureJob`, `PLATFORM_LIMITS`, `readDeploymentFacts`, `readVerdicts`, `recordedLongTurn`, `recordInvariant`, `RecordInvariantOptions`, `recordInvariants`, `ScheduledJobBudgetOptions`, `stallingD1`, `StallMode`, `TimedTurnEvent`
 
 [Full API →](api/launch-invariants-testing.md)
 

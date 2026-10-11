@@ -5,10 +5,11 @@
 import { describe, expect, it } from 'vitest'
 
 import { createChatTurnRoutes, type ChatTurnMessageStore } from '../../src/chat-routes/index'
-import { createAuthLookupCache, createLimitAlarms, credentialCacheKey, type LimitBudgets } from '../../src/launch-invariants/index'
+import { createAuthLookupCache, createLimitAlarms, credentialCacheKey, isEdgeBlock, type LimitBudgets } from '../../src/launch-invariants/index'
 import {
   checkAuthorizeBeforeStream,
   checkAuthSurvivesStall,
+  checkChatAcceptsCode,
   checkCoalescedTurn,
   checkLimitAlarms,
   checkScheduledJobBudgets,
@@ -206,5 +207,55 @@ describe('platform-limit alarms', () => {
     })
     expect(verdict.details).toContain('worker-memory: the declared limit 268435456 is above the platform\'s 134217728')
     expect(verdict.details).toContain('key-rate: did not warn at 80% of its limit')
+  })
+})
+
+describe('pasted code reaches the chat', () => {
+  const chatRequest = (text: string) => new Request('http://app.test/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: 'session=valid' },
+    body: JSON.stringify({ threadId: 't', content: text }),
+  })
+  const store: ChatTurnMessageStore = { async listMessages() { return [] }, async appendMessage() { return { id: 'm' } } }
+  const routes = (authorize: (content: string) => Response | null) => createChatTurnRoutes({
+    projectId: 'probe',
+    authorize: async ({ body }) => {
+      const refusal = authorize(String(body?.content ?? ''))
+      return refusal ? { ok: false as const, response: refusal } : { ok: true as const, tenantId: 'ws', userId: 'user', context: {} }
+    },
+    store,
+    turnStore: createMemoryTurnEventStore(),
+    incrementalPersistence: false,
+    produce: () => ({ stream: (async function* () { yield { type: 'text', text: 'ok' } as { type: string } })(), finalText: () => 'ok' }),
+    log: () => {},
+  })
+
+  it('passes a route that answers every sample normally', async () => {
+    const turns = routes(() => null)
+    const verdict = await checkChatAcceptsCode({ subject: 'POST /api/chat', handle: (request) => turns.turn(request, { waitUntil: () => {} }), request: chatRequest })
+    expect(verdict.pass, verdict.details.join('\n')).toBe(true)
+  })
+
+  it('fails an app filter that refuses shell text, and an edge block page', async () => {
+    const filtered = routes((content) => (/\/etc\//.test(content) ? Response.json({ error: 'Request blocked' }, { status: 400 }) : null))
+    const verdict = await checkChatAcceptsCode({ subject: 'POST /api/chat', handle: (request) => filtered.turn(request, { waitUntil: () => {} }), request: chatRequest })
+    expect(verdict.details).toEqual([
+      'file read: answered 400: {"error":"Request blocked"}',
+      'fenced bash block: answered 400: {"error":"Request blocked"}',
+      'path traversal: answered 400: {"error":"Request blocked"}',
+    ])
+    const blocked = await checkChatAcceptsCode({
+      subject: 'edge',
+      handle: async () => new Response('<title>Attention Required! | Cloudflare</title>', { status: 403, headers: { 'content-type': 'text/html', server: 'cloudflare' } }),
+      request: chatRequest,
+      samples: [{ name: 'file read', text: 'cat /etc/passwd' }],
+    })
+    expect(blocked.details).toEqual(['file read: an edge rule blocked it (403)'])
+  })
+
+  it('tells an edge block from the app\'s own refusal', async () => {
+    expect(await isEdgeBlock(new Response('x', { status: 403, headers: { 'cf-mitigated': 'challenge' } }))).toBe(true)
+    expect(await isEdgeBlock(new Response('<h1>Sorry, you have been blocked</h1>', { status: 403, headers: { 'content-type': 'text/html; charset=UTF-8', server: 'cloudflare' } }))).toBe(true)
+    expect(await isEdgeBlock(Response.json({ error: 'Unauthorized' }, { status: 401, headers: { server: 'cloudflare' } }))).toBe(false)
   })
 })

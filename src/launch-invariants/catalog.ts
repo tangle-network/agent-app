@@ -35,6 +35,7 @@ export type LaunchInvariantId =
   | 'auth-survives-d1-stall'
   | 'authorize-before-stream'
   | 'limit-alarms'
+  | 'pasted-code-reaches-chat'
 
 export interface LaunchInvariant {
   id: LaunchInvariantId
@@ -93,6 +94,12 @@ export const LAUNCH_INVARIANTS: readonly LaunchInvariant[] = [
     title: 'Platform-limit alarms at 80%',
     rule: 'Worker memory, D1 rows per query, sandbox disk, snapshot count and key rate each have a declared limit and an alarm that fires at 80%.',
     incident: '19 platform-limit events on 2026-10-10, each found after it failed a customer.',
+  },
+  {
+    id: 'pasted-code-reaches-chat',
+    title: 'Pasted code reaches the chat',
+    rule: 'An authenticated chat message carrying pasted code (shell, SQL, markup) gets the route\'s normal response; no app filter, sanitizer or edge rule refuses it.',
+    incident: 'On 2026-10-11 a chat message containing `cat /etc/passwd` got Cloudflare\'s 403 block page from gtm.tangle.tools instead of reaching the Worker.',
   },
 ]
 

@@ -4,7 +4,7 @@
 
 Source: `src/launch-invariants/index.ts`
 
-57 exports.
+59 exports.
 
 ### `AUTH_LOOKUP_DEADLINE_MS`
 
@@ -150,6 +150,14 @@ class AuthLookupRefused
 interface InvariantVerdict
 ```
 
+### `isEdgeBlock`
+
+`function` — Whether a response is an edge block rather than the app's own answer: a `cf-mitigated` header, or Cloudflare's HTML block page ("Attention Required", "Sorry, you have been blocked").
+
+```ts
+(response: Response) => Promise<boolean>
+```
+
 ### `IsolatedJobsInput`
 
 `interface`
@@ -276,6 +284,14 @@ interface ObservedSlot
 
 ```ts
 (source: string, format: "json" | "toml") => WranglerCrons
+```
+
+### `PASTED_CODE_SAMPLES`
+
+`const` — Text people paste into a chat with an agent, each of which a WAF rule may match.
+
+```ts
+readonly { name: string; text: string; }[]
 ```
 
 ### `readInSizedBatches`

@@ -1,6 +1,6 @@
 # Launch invariants
 
-Every agent app holds eight invariants before launch. Each is a failure GTM shipped on 2026-10-10 and fixed by hand. They live in `@tangle-network/agent-app/launch-invariants`, so every app checks the same rule with the same numbers and gets each fix once.
+Every agent app holds nine invariants before launch. Each is a failure GTM shipped on 2026-10-10 or 2026-10-11 and fixed by hand. They live in `@tangle-network/agent-app/launch-invariants`, so every app checks the same rule with the same numbers and gets each fix once.
 
 | Id | Rule | Runtime piece | Check |
 |---|---|---|---|
@@ -12,6 +12,7 @@ Every agent app holds eight invariants before launch. Each is a failure GTM ship
 | `auth-survives-d1-stall` | A key or session verified within 60 s keeps working while D1 errors or stalls; never past revoke or expiry; cache keys are SHA-256 | `createAuthLookupCache`, `credentialCacheKey` | `checkAuthSurvivesStall` |
 | `authorize-before-stream` | A refused request gets a plain 4xx; no stream opens and no state is touched first | `createChatTurnRoutes` (`/chat-routes`) | `checkAuthorizeBeforeStream` |
 | `limit-alarms` | Worker memory, D1 rows per query, sandbox disk, snapshot count and key rate alarm at 80% of a declared limit | `createLimitAlarms`, `withD1LimitAlarms` | `checkLimitAlarms` |
+| `pasted-code-reaches-chat` | An authenticated chat message carrying pasted code (shell, SQL, markup) gets the route's normal response; no app filter, sanitizer or edge rule refuses it | `PASTED_CODE_SAMPLES`, `isEdgeBlock` | `checkChatAcceptsCode` |
 
 The runtime pieces are server-safe. The checks are in `@tangle-network/agent-app/launch-invariants/testing`, which uses Node built-ins and belongs in tests only.
 
@@ -55,7 +56,7 @@ The runtime pieces are server-safe. The checks are in `@tangle-network/agent-app
    { "scripts": { "invariants": "agent-app-invariants" } }
    ```
 
-   `agent-app-invariants` runs the `test` command with `AGENT_APP_INVARIANTS_RESULTS` set, reads the recorded verdicts, and prints one line per invariant. It exits 0 when all eight hold and 1 otherwise; `--json <file>` writes the report.
+   `agent-app-invariants` runs the `test` command with `AGENT_APP_INVARIANTS_RESULTS` set, reads the recorded verdicts, and prints one line per invariant. It exits 0 when all nine hold and 1 otherwise; `--json <file>` writes the report.
 
 An invariant passes when at least one verdict was recorded for it and every recorded verdict passed. The CLI reads the wrangler configs itself: the cron check must have read every cron any environment configures, so a test cannot pass on a stale list.
 
@@ -67,7 +68,7 @@ recordInvariant(checkSettlementScenarios(records, { now }), {
 })
 ```
 
-The report counts a known failure as not holding (`7 of 8 hold, 1 known failing`) and exits 0, so the app's releases continue. A known-failing check that starts passing fails its test until the marker is removed, so a fixed invariant cannot regress silently.
+The report counts a known failure as not holding (`8 of 9 hold, 1 known failing`) and exits 0, so the app's releases continue. A known-failing check that starts passing fails its test until the marker is removed, so a fixed invariant cannot regress silently.
 
 Not applicable is accepted only where the deployment shows it:
 
@@ -76,7 +77,7 @@ Not applicable is accepted only where the deployment shows it:
 | `isolated-jobs`, `memory-budget` | No wrangler environment configures a cron |
 | `bounded-reads`, `auth-survives-d1-stall` | The app has no D1 binding |
 
-The other four apply to every agent app. Declare an accepted case in the config as `notApplicable: { 'isolated-jobs': 'no scheduled work' }`.
+The others apply to every agent app. Declare an accepted case in the config as `notApplicable: { 'isolated-jobs': 'no scheduled work' }`.
 
 ## Write the checks
 
@@ -129,3 +130,8 @@ Pass the app's mounted route handler and requests it must refuse (no session, an
 Declare a limit for each of the five resources and build alarms with `createLimitAlarms` over the app's alert sink, wrapped in `createThrottledAlertSink` from `/turn-health`. Wrap the Worker's D1 binding with `withD1LimitAlarms` to observe rows read and response size per query. Read sandbox disk and snapshot count from the Sandbox SDK on a schedule, and the per-key request rate where the operator API counts it. workerd exposes no heap reading, so Worker memory is observed through response sizes, plus a tail consumer reporting `exceededMemory` at the full limit.
 
 `checkLimitAlarms` builds the app's alarms over a capturing sink and checks each resource: silent at 79%, a warning at 80%, critical at the limit, and no declared limit above the platform's.
+
+### Pasted code reaches the chat
+
+Send each of `PASTED_CODE_SAMPLES` through the app's mounted chat route as an authenticated request (with a stubbed producer), and pass the handler to `checkChatAcceptsCode`. It expects the route's normal 2xx and cancels the stream. In process this catches an app filter or sanitizer; an edge rule only exists on the deployed route, so a live probe sends the same samples to the deployed route and judges the response with `isEdgeBlock`. On 2026-10-11 Cloudflare's managed WAF answered `cat /etc/passwd` on gtm.tangle.tools with its 403 block page.
+

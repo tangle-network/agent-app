@@ -17,6 +17,7 @@ import vm from 'node:vm'
 import type { AlertSink, TurnHealthAlert } from '../turn-health/sink.js'
 import { describeVerdict, LAUNCH_BUDGETS, type InvariantVerdict } from './catalog.js'
 import { LIMIT_RESOURCES, type LimitAlarms } from './limit-alarms.js'
+import { isEdgeBlock, PASTED_CODE_SAMPLES } from './pasted-code.js'
 
 export { describeVerdict } from './catalog.js'
 
@@ -455,6 +456,41 @@ export async function checkAuthorizeBeforeStream(options: AuthorizeBeforeStreamO
     details: findings.length ? findings : options.refused.length
       ? [`${options.refused.length} refused requests answered plainly with nothing touched`]
       : ['no refused requests were probed'],
+  }
+}
+
+// ── pasted code reaches the chat ─────────────────────────────────────────────
+
+export interface ChatAcceptsCodeOptions {
+  subject: string
+  /** The app's real chat route handler, as its router mounts it. */
+  handle: (request: Request) => Promise<Response>
+  /** An authenticated chat request carrying `text` as the message. */
+  request: (text: string) => Request
+  /** Statuses the route answers an accepted message with. Default any 2xx. */
+  accepted?: (status: number) => boolean
+  samples?: readonly { name: string; text: string }[]
+}
+
+/** Each pasted-code sample gets the route's normal response, never a refusal or an edge block. Cancels any stream it opens. */
+export async function checkChatAcceptsCode(options: ChatAcceptsCodeOptions): Promise<InvariantVerdict> {
+  const accepted = options.accepted ?? ((status: number) => status >= 200 && status < 300)
+  const samples = options.samples ?? PASTED_CODE_SAMPLES
+  const findings: string[] = []
+  for (const sample of samples) {
+    const response = await options.handle(options.request(sample.text))
+    if (await isEdgeBlock(response)) findings.push(`${sample.name}: an edge rule blocked it (${response.status})`)
+    else if (!accepted(response.status)) {
+      const body = (await response.clone().text().catch(() => '')).slice(0, 160)
+      findings.push(`${sample.name}: answered ${response.status}${body ? `: ${body}` : ''}`)
+    }
+    await response.body?.cancel().catch(() => undefined)
+  }
+  return {
+    invariant: 'pasted-code-reaches-chat',
+    subject: options.subject,
+    pass: findings.length === 0,
+    details: findings.length ? findings : [`${samples.length} pasted-code messages reached the chat and got its normal response`],
   }
 }
 
