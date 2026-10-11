@@ -4,7 +4,7 @@
 
 Source: `src/launch-invariants/index.ts`
 
-56 exports.
+57 exports.
 
 ### `AUTH_LOOKUP_DEADLINE_MS`
 
@@ -132,6 +132,14 @@ class AuthLookupRefused
 
 ```ts
 (verdict: InvariantVerdict) => string
+```
+
+### `estimatedBytes`
+
+`function` — The serialized size of a result set, from its first, middle and last rows.
+
+```ts
+(results: readonly unknown[]) => number
 ```
 
 ### `InvariantVerdict`

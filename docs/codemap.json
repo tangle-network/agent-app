@@ -9486,6 +9486,12 @@
           "doc": "A verdict whose message names every finding, for a test runner's failure output."
         },
         {
+          "name": "estimatedBytes",
+          "kind": "function",
+          "signature": "(results: readonly unknown[]) => number",
+          "doc": "The serialized size of a result set, from its first, middle and last rows."
+        },
+        {
           "name": "InvariantVerdict",
           "kind": "interface",
           "signature": "interface InvariantVerdict",

@@ -15,6 +15,7 @@ import {
   createLimitAlarms,
   createScheduledDispatch,
   credentialCacheKey,
+  estimatedBytes,
   cronDailyFirings,
   longestGapMinutes,
   parseWranglerCrons,
@@ -207,6 +208,12 @@ describe('platform-limit alarms', () => {
 
   it('refuses a resource without a limit', () => {
     expect(() => createLimitAlarms({ product: 'gtm', budgets: { ...budgets, 'sandbox-disk': 0 }, sink: { deliver: async () => {} } })).toThrow('sandbox-disk needs a positive limit')
+  })
+
+  it('estimates a response\'s size from sampled rows, without serializing all of it', () => {
+    const rows = Array.from({ length: 1_000 }, (_, n) => ({ n, parts: 'x'.repeat(1_000) }))
+    const exact = JSON.stringify(rows).length
+    expect(Math.abs(estimatedBytes(rows) - exact) / exact).toBeLessThan(0.01)
   })
 
   it('observes the rows each D1 query reads', async () => {

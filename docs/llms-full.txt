@@ -12209,6 +12209,14 @@ class AuthLookupRefused
 (verdict: InvariantVerdict) => string
 ```
 
+### `estimatedBytes`
+
+`function` — The serialized size of a result set, from its first, middle and last rows.
+
+```ts
+(results: readonly unknown[]) => number
+```
+
 ### `InvariantVerdict`
 
 `interface` — One checked outcome of one invariant, for one subject (a job, a route, a scenario).

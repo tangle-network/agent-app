@@ -61,6 +61,7 @@ export {
 } from './schedule.js'
 export {
   createLimitAlarms,
+  estimatedBytes,
   LIMIT_RESOURCES,
   withD1LimitAlarms,
   type LimitAlarmOptions,

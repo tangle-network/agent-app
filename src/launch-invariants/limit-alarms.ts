@@ -116,8 +116,9 @@ interface D1Measurable {
 /**
  * The D1 binding with each query's rows read and response size observed.
  * Rows read come from `meta.rows_read` (the rows D1 scanned, not only those
- * returned); the response size is measured only when it could matter, by the
- * serialized length of the results.
+ * returned). The response size is estimated from three sampled rows, so the
+ * wrapper never serializes a whole response: that copy would double the memory
+ * of the very read it watches.
  */
 export function withD1LimitAlarms<D extends D1Measurable>(d1: D, alarms: LimitAlarms, options: { subject?: string } = {}): D {
   const observe = (sql: string, result: unknown) => {
@@ -127,8 +128,7 @@ export function withD1LimitAlarms<D extends D1Measurable>(d1: D, alarms: LimitAl
     if (rowsRead !== null) pending.push(alarms.observe('d1-rows-per-query', rowsRead, { subject: options.subject, detail: sql }))
     const results = (result as { results?: unknown[] } | null)?.results ?? (Array.isArray(result) ? result : null)
     if (results && results.length > 0) {
-      const bytes = JSON.stringify(results).length
-      pending.push(alarms.observe('worker-memory', bytes, { subject: options.subject, detail: `one response: ${sql}` }))
+      pending.push(alarms.observe('worker-memory', estimatedBytes(results), { subject: options.subject, detail: `one response: ${sql}` }))
     }
     // An alarm delivery failure must not fail the query that triggered it.
     return Promise.all(pending).catch(() => undefined)
@@ -157,6 +157,13 @@ export function withD1LimitAlarms<D extends D1Measurable>(d1: D, alarms: LimitAl
       return typeof value === 'function' ? value.bind(binding) : value
     },
   })
+}
+
+/** The serialized size of a result set, from its first, middle and last rows. */
+export function estimatedBytes(results: readonly unknown[]): number {
+  const picks = [...new Set([0, Math.floor(results.length / 2), results.length - 1])]
+  const sampled = picks.reduce((sum, index) => sum + (JSON.stringify(results[index]) ?? '').length, 0)
+  return Math.round((sampled / picks.length) * results.length)
 }
 
 function rowsOf(result: unknown): number | null {
