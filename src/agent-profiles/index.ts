@@ -8,6 +8,8 @@ import {
   type AgentProfileDiff,
 } from '@tangle-network/agent-interface'
 import { z } from 'zod'
+import { normalizeProfileName, parseProfileSwitch } from './switch'
+export { normalizeProfileName, parseProfileSwitch }
 import type { McpToolDefinition } from '../tools'
 
 export type ProfileAuthorKind = 'person' | 'agent' | 'optimizer'
@@ -377,17 +379,6 @@ export async function promoteRevision(input: {
     throw new ProfileConflictError('The profile changed while promoting')
   }
   return revision
-}
-
-export function parseProfileSwitch(text: string): { name: string } | { invalid: true } | null {
-  const trimmed = text.trim()
-  if (!/^switch\s+to\b/i.test(trimmed)) return null
-  const match = /^switch[ \t]+to[ \t]+([^\r\n]+)$/i.exec(trimmed)
-  return match?.[1]?.trim() ? { name: match[1].trim() } : { invalid: true }
-}
-
-export function normalizeProfileName(name: string): string {
-  return name.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
 /** A source identity joins the command hash without entering the receipt row. */
