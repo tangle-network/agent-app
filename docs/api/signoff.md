@@ -4,7 +4,7 @@
 
 Source: `src/signoff/index.ts`
 
-37 exports.
+62 exports.
 
 ### `checkShellAlignment`
 
@@ -12,6 +12,14 @@ Source: `src/signoff/index.ts`
 
 ```ts
 (options: ShellAlignmentOptions) => Promise<ShellAlignmentReport>
+```
+
+### `checkSurfaceLadder`
+
+`function` — Drive Chromium over every route × width × theme and judge each page.
+
+```ts
+(options: SurfaceLadderOptions) => Promise<SurfaceLadderReport>
 ```
 
 ### `checkWorkerDefaults`
@@ -30,6 +38,38 @@ Source: `src/signoff/index.ts`
 () => Omit<ShellDividerSample, "width" | "route" | "theme">
 ```
 
+### `collectSurfaceLadder`
+
+`function` — Runs in the page (Playwright serializes it, so every helper lives inside).
+
+```ts
+() => Pick<SurfaceSample, "boxes" | "copy">
+```
+
+### `composite`
+
+`function` — Alpha-composite `top` over an opaque `bottom`.
+
+```ts
+(top: Rgba, bottom: Rgb) => Rgb
+```
+
+### `contrastRatio`
+
+`function` — WCAG 2 contrast ratio between two opaque sRGB colors.
+
+```ts
+(a: Rgb, b: Rgb) => number
+```
+
+### `CopyBlock`
+
+`interface`
+
+```ts
+interface CopyBlock
+```
+
 ### `formatShellAlignmentReport`
 
 `function`
@@ -46,6 +86,14 @@ Source: `src/signoff/index.ts`
 (report: SignoffReport) => string
 ```
 
+### `formatSurfaceLadderReport`
+
+`function`
+
+```ts
+(report: SurfaceLadderReport) => string
+```
+
 ### `formatWorkerDefaults`
 
 `function`
@@ -60,6 +108,14 @@ Source: `src/signoff/index.ts`
 
 ```ts
 (sample: ShellDividerSample, tolerancePx?: number) => ShellAlignmentFinding[]
+```
+
+### `judgeSurfaceLadder`
+
+`function`
+
+```ts
+(sample: SurfaceSample, limits?: SurfaceLadderLimits) => SurfaceFinding[]
 ```
 
 ### `LoadedSignoffConfig`
@@ -86,12 +142,44 @@ interface LoadedSignoffConfig
 interface LoadSignoffConfigOptions
 ```
 
+### `oklchL`
+
+`function` — OKLab lightness of an sRGB color, ×100 (0 black … 100 white).
+
+```ts
+(rgb: Rgb) => number
+```
+
 ### `parseShellAlignmentArgs`
 
 `function`
 
 ```ts
 (argv: readonly string[]) => ShellAlignmentOptions & { readonly jsonPath?: string | undefined; }
+```
+
+### `parseSurfaceLadderArgs`
+
+`function`
+
+```ts
+(argv: readonly string[]) => SurfaceLadderOptions & { readonly jsonPath?: string | undefined; }
+```
+
+### `Rgb`
+
+`type` — sRGB channels 0–255.
+
+```ts
+type Rgb
+```
+
+### `Rgba`
+
+`type` — sRGB channels 0–255 plus alpha 0–1.
+
+```ts
+type Rgba
 ```
 
 ### `runShellAlignmentCli`
@@ -116,6 +204,14 @@ interface LoadSignoffConfigOptions
 
 ```ts
 interface RunSignoffOptions
+```
+
+### `runSurfaceLadderCli`
+
+`function`
+
+```ts
+(argv: readonly string[]) => Promise<number>
 ```
 
 ### `SHELL_ALIGNMENT_TOLERANCE_PX`
@@ -276,6 +372,110 @@ interface SignoffStepSpec
 
 ```ts
 type SignoffStepStatus
+```
+
+### `summarizeSurfacePage`
+
+`function`
+
+```ts
+(sample: SurfaceSample, findings: readonly SurfaceFinding[]) => SurfacePageSummary
+```
+
+### `SURFACE_LADDER_MAX_WORDS`
+
+`const`
+
+```ts
+12
+```
+
+### `SURFACE_LADDER_MIN_BORDER_CONTRAST`
+
+`const`
+
+```ts
+3
+```
+
+### `SURFACE_LADDER_MIN_DELTA_L`
+
+`const`
+
+```ts
+3
+```
+
+### `SurfaceBox`
+
+`interface`
+
+```ts
+interface SurfaceBox
+```
+
+### `surfaceDeltaL`
+
+`function` — Signed ΔL of a box against its parent: positive when the box is lighter.
+
+```ts
+(box: Pick<SurfaceBox, "fill" | "parent">) => number
+```
+
+### `SurfaceFinding`
+
+`interface`
+
+```ts
+interface SurfaceFinding
+```
+
+### `SurfaceLadderLimits`
+
+`interface`
+
+```ts
+interface SurfaceLadderLimits
+```
+
+### `SurfaceLadderOptions`
+
+`interface`
+
+```ts
+interface SurfaceLadderOptions
+```
+
+### `SurfaceLadderReport`
+
+`interface`
+
+```ts
+interface SurfaceLadderReport
+```
+
+### `SurfacePageSummary`
+
+`interface`
+
+```ts
+interface SurfacePageSummary
+```
+
+### `SurfaceRule`
+
+`type`
+
+```ts
+type SurfaceRule
+```
+
+### `SurfaceSample`
+
+`interface`
+
+```ts
+interface SurfaceSample
 ```
 
 ### `WORKER_COMPATIBILITY_DATE_FLOOR`

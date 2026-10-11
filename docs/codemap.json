@@ -17830,6 +17830,12 @@
           "doc": "Drive Chromium over every route × width × theme and judge each page."
         },
         {
+          "name": "checkSurfaceLadder",
+          "kind": "function",
+          "signature": "(options: SurfaceLadderOptions) => Promise<SurfaceLadderReport>",
+          "doc": "Drive Chromium over every route × width × theme and judge each page."
+        },
+        {
           "name": "checkWorkerDefaults",
           "kind": "function",
           "signature": "(repoRoot: string, configs?: readonly string[] | undefined) => WorkerDefaultsResult",
@@ -17840,6 +17846,30 @@
           "kind": "function",
           "signature": "() => Omit<ShellDividerSample, \"width\" | \"route\" | \"theme\">",
           "doc": "Runs in the page (Playwright serializes it)."
+        },
+        {
+          "name": "collectSurfaceLadder",
+          "kind": "function",
+          "signature": "() => Pick<SurfaceSample, \"boxes\" | \"copy\">",
+          "doc": "Runs in the page (Playwright serializes it, so every helper lives inside)."
+        },
+        {
+          "name": "composite",
+          "kind": "function",
+          "signature": "(top: Rgba, bottom: Rgb) => Rgb",
+          "doc": "Alpha-composite `top` over an opaque `bottom`."
+        },
+        {
+          "name": "contrastRatio",
+          "kind": "function",
+          "signature": "(a: Rgb, b: Rgb) => number",
+          "doc": "WCAG 2 contrast ratio between two opaque sRGB colors."
+        },
+        {
+          "name": "CopyBlock",
+          "kind": "interface",
+          "signature": "interface CopyBlock",
+          "doc": null
         },
         {
           "name": "formatShellAlignmentReport",
@@ -17854,6 +17884,12 @@
           "doc": null
         },
         {
+          "name": "formatSurfaceLadderReport",
+          "kind": "function",
+          "signature": "(report: SurfaceLadderReport) => string",
+          "doc": null
+        },
+        {
           "name": "formatWorkerDefaults",
           "kind": "function",
           "signature": "(result: WorkerDefaultsResult) => string",
@@ -17864,6 +17900,12 @@
           "kind": "function",
           "signature": "(sample: ShellDividerSample, tolerancePx?: number) => ShellAlignmentFinding[]",
           "doc": "Desktop: every header divider lands on the rail's first divider."
+        },
+        {
+          "name": "judgeSurfaceLadder",
+          "kind": "function",
+          "signature": "(sample: SurfaceSample, limits?: SurfaceLadderLimits) => SurfaceFinding[]",
+          "doc": null
         },
         {
           "name": "LoadedSignoffConfig",
@@ -17884,10 +17926,34 @@
           "doc": null
         },
         {
+          "name": "oklchL",
+          "kind": "function",
+          "signature": "(rgb: Rgb) => number",
+          "doc": "OKLab lightness of an sRGB color, ×100 (0 black … 100 white)."
+        },
+        {
           "name": "parseShellAlignmentArgs",
           "kind": "function",
           "signature": "(argv: readonly string[]) => ShellAlignmentOptions & { readonly jsonPath?: string | undefined; }",
           "doc": null
+        },
+        {
+          "name": "parseSurfaceLadderArgs",
+          "kind": "function",
+          "signature": "(argv: readonly string[]) => SurfaceLadderOptions & { readonly jsonPath?: string | undefined; }",
+          "doc": null
+        },
+        {
+          "name": "Rgb",
+          "kind": "type",
+          "signature": "type Rgb",
+          "doc": "sRGB channels 0–255."
+        },
+        {
+          "name": "Rgba",
+          "kind": "type",
+          "signature": "type Rgba",
+          "doc": "sRGB channels 0–255 plus alpha 0–1."
         },
         {
           "name": "runShellAlignmentCli",
@@ -17906,6 +17972,12 @@
           "kind": "interface",
           "signature": "interface RunSignoffOptions",
           "doc": "The sign-off run: reproduce a clean CI environment, then go further."
+        },
+        {
+          "name": "runSurfaceLadderCli",
+          "kind": "function",
+          "signature": "(argv: readonly string[]) => Promise<number>",
+          "doc": null
         },
         {
           "name": "SHELL_ALIGNMENT_TOLERANCE_PX",
@@ -18025,6 +18097,84 @@
           "name": "SignoffStepStatus",
           "kind": "type",
           "signature": "type SignoffStepStatus",
+          "doc": null
+        },
+        {
+          "name": "summarizeSurfacePage",
+          "kind": "function",
+          "signature": "(sample: SurfaceSample, findings: readonly SurfaceFinding[]) => SurfacePageSummary",
+          "doc": null
+        },
+        {
+          "name": "SURFACE_LADDER_MAX_WORDS",
+          "kind": "const",
+          "signature": "12",
+          "doc": null
+        },
+        {
+          "name": "SURFACE_LADDER_MIN_BORDER_CONTRAST",
+          "kind": "const",
+          "signature": "3",
+          "doc": null
+        },
+        {
+          "name": "SURFACE_LADDER_MIN_DELTA_L",
+          "kind": "const",
+          "signature": "3",
+          "doc": null
+        },
+        {
+          "name": "SurfaceBox",
+          "kind": "interface",
+          "signature": "interface SurfaceBox",
+          "doc": null
+        },
+        {
+          "name": "surfaceDeltaL",
+          "kind": "function",
+          "signature": "(box: Pick<SurfaceBox, \"fill\" | \"parent\">) => number",
+          "doc": "Signed ΔL of a box against its parent: positive when the box is lighter."
+        },
+        {
+          "name": "SurfaceFinding",
+          "kind": "interface",
+          "signature": "interface SurfaceFinding",
+          "doc": null
+        },
+        {
+          "name": "SurfaceLadderLimits",
+          "kind": "interface",
+          "signature": "interface SurfaceLadderLimits",
+          "doc": null
+        },
+        {
+          "name": "SurfaceLadderOptions",
+          "kind": "interface",
+          "signature": "interface SurfaceLadderOptions",
+          "doc": null
+        },
+        {
+          "name": "SurfaceLadderReport",
+          "kind": "interface",
+          "signature": "interface SurfaceLadderReport",
+          "doc": null
+        },
+        {
+          "name": "SurfacePageSummary",
+          "kind": "interface",
+          "signature": "interface SurfacePageSummary",
+          "doc": null
+        },
+        {
+          "name": "SurfaceRule",
+          "kind": "type",
+          "signature": "type SurfaceRule",
+          "doc": null
+        },
+        {
+          "name": "SurfaceSample",
+          "kind": "interface",
+          "signature": "interface SurfaceSample",
           "doc": null
         },
         {
