@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.97
+
+- fix(ui): let composer, export and hub tiles use the brand surface ladder (#1006)
+
 ## 0.60.96
 
 - feat(agent-profiles): profile.remember appends one fact to agent knowledge (#1015)
