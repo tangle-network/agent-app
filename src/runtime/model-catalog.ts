@@ -57,6 +57,15 @@ export interface CatalogModel {
   releaseDate?: string
   contextLength?: number
   pricing?: { prompt?: string; completion?: string }
+  /** What one generation produces. Text when absent. */
+  output?: 'text' | 'image' | 'video' | 'audio' | 'speech'
+  /** USD for one unit of output, for media models: one image, one second of
+   *  video, one minute of audio, or 1,000 characters of speech. */
+  outputPrice?: { usd: number; unit: 'image' | 'second' | 'minute' | '1k_chars' }
+  /** An example of the model's output (an image, or a video poster frame). */
+  previewUrl?: string
+  /** One line on what the model is for, shown under its name. */
+  capability?: string
   supportsTools: boolean
   supportsReasoning: boolean
   featured: boolean
