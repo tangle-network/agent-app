@@ -443,8 +443,9 @@ export class Journey {
    * Time to first visible progress (a new status line or reply text), first
    * reply text, and the turn's end, polled every 300 ms. The turn has ended
    * when, for two reads in a row, {@link turnLooksActive} is false and, where
-   * the app lists running turns, the server lists none. Status lines already on the page before Send are not progress. The
-   * outcome comes from {@link scoreTurn}.
+   * the app lists running turns, the server lists none. Status lines already
+   * on the page before Send are not progress. The outcome comes from
+   * {@link scoreTurn}.
    */
   private async measureTurn(page: Page, prompt: string, sentAt: number, evidence: TurnEvidence, before: PageReading, baselineChars: number, opts: SendOptions): Promise<TurnRecord> {
     const t = this.blankTurn(page, prompt, sentAt)

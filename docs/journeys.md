@@ -22,9 +22,9 @@ This kit is that harness made app-agnostic, with the scoring rule fixed: see [Ho
        member: { emailEnv: 'PLATFORM_WORKFLOW_SMOKE_EMAIL', passwordEnv: 'PLATFORM_WORKFLOW_SMOKE_PASSWORD', signIn: 'tangle' },
      },
      chat: {
+       transcript: '#main-content',
        assistant: '.gtm-assistant-markdown',
-       status: '[role="status"]',
-       failureText: [/stopped before finishing/i, /unable to connect to the sandbox/i],
+       failureText: [/stopped before finishing/i, /unable to connect to the sandbox/i, /Chat responses require a running sandbox/i],
        stoppedText: [/You stopped this turn/i],
        threadPath: /^\/app\/(?<workspaceId>[^/]+)\/chat\/(?<threadId>[0-9a-f]{32})\/?$/,
        runningTurns: ({ workspaceId, threadId }) => `/api/chat/running?workspaceId=${workspaceId}&threadId=${threadId}`,
