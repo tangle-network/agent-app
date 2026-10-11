@@ -201,7 +201,7 @@ export function threadRouteIn(url: string, config: Pick<ResolvedJourneysConfig, 
   const match = config.chat.threadPath.exec(parsed.pathname)
   const threadId = match?.groups?.threadId
   if (!threadId) return null
-  const workspaceId = match.groups?.workspaceId
+  const workspaceId = match?.groups?.workspaceId
   return workspaceId ? { threadId, workspaceId } : { threadId }
 }
 
