@@ -1,5 +1,5 @@
 import { useId, useMemo, useState, type ComponentType, type ReactNode } from 'react'
-import { PageHeader } from '@tangle-network/ui/primitives'
+import { Input, PageHeader } from '@tangle-network/ui/primitives'
 
 import { ActionDialog, ActionDialogButton } from '../web-react/action-dialog'
 import { OVERLAY_SHADOW, PopoverSurface, usePopover } from '../web-react/controls'
@@ -230,13 +230,13 @@ export function WorkspaceList({
         <>
           {items.length > SEARCH_THRESHOLD && (
             <div className="mt-6">
-              <input
+              <Input
                 type="search"
                 aria-label={`Search ${noun.plural}`}
                 placeholder={`Search ${noun.plural}`}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                className="h-9 w-full max-w-sm rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
+                className="max-w-sm"
               />
             </div>
           )}
@@ -290,7 +290,7 @@ export function WorkspaceList({
           }
         >
           <label htmlFor={`${headingId}-rename`} className="text-sm text-muted-foreground">Name</label>
-          <input
+          <Input
             id={`${headingId}-rename`}
             value={renameValue}
             autoFocus
@@ -301,7 +301,7 @@ export function WorkspaceList({
                 submitRename()
               }
             }}
-            className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
+            className="mt-1.5"
           />
         </ActionDialog>
       )}
@@ -320,7 +320,7 @@ export function WorkspaceList({
           }
         >
           <label htmlFor={`${headingId}-create`} className="text-sm text-muted-foreground">Name</label>
-          <input
+          <Input
             id={`${headingId}-create`}
             value={createValue}
             autoFocus
@@ -332,7 +332,7 @@ export function WorkspaceList({
                 submitCreate()
               }
             }}
-            className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
+            className="mt-1.5"
           />
         </ActionDialog>
       )}
