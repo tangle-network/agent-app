@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.121
+
+- fix(eval): parity grading counts 'I do not have the pricing … like me to ask the owner?' as an admitted gap (#1053)
+
 ## 0.60.120
 
 - feat(router-turn): one Router engine; the protected producer runs runRouterTurn under its grant (#1046)
