@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.60.113
+
+- feat(chat-routes): an intent line streams what the agent is about to do while the turn boots (#1036)
+
+## 0.60.112
+
+- fix(teams-react): invite email field and Invite button use the shared Input and Button (#1035)
+
 ## 0.60.111
 
 - fix(workspace-export): exports owners can read, and a busy sandbox no longer fails them (#1037)
