@@ -273,22 +273,31 @@ export function stallingD1<D extends object>(d1: D): { d1: D; stall(mode: StallM
   const fail = (): Promise<never> => mode === 'hang'
     ? new Promise<never>(() => {})
     : Promise.reject(new Error('D1_ERROR: Network connection lost.'))
-  const statement = (target: object): object => new Proxy(target, {
-    get(stmt, key) {
-      const value = Reflect.get(stmt, key) as unknown
-      if (typeof value !== 'function') return value
-      if (key === 'bind') return (...params: unknown[]) => statement(value.apply(stmt, params) as object)
-      if (key === 'all' || key === 'raw' || key === 'first' || key === 'run') {
-        return (...args: unknown[]) => (mode === 'ok' ? value.apply(stmt, args) : fail())
-      }
-      return value.bind(stmt)
-    },
-  })
+  const unwrapped = new WeakMap<object, object>()
+  const statement = (target: object): object => {
+    const wrapped = new Proxy(target, {
+      get(stmt, key) {
+        const value = Reflect.get(stmt, key) as unknown
+        if (typeof value !== 'function') return value
+        if (key === 'bind') return (...params: unknown[]) => statement(value.apply(stmt, params) as object)
+        if (key === 'all' || key === 'raw' || key === 'first' || key === 'run') {
+          return (...args: unknown[]) => (mode === 'ok' ? value.apply(stmt, args) : fail())
+        }
+        return value.bind(stmt)
+      },
+    })
+    unwrapped.set(wrapped, target)
+    return wrapped
+  }
   const proxy = new Proxy(d1, {
     get(binding, key) {
       const value = Reflect.get(binding, key) as unknown
       if (key === 'prepare') return (sql: string) => statement((value as (sql: string) => object).call(binding, sql))
-      if (key === 'batch') return (...args: unknown[]) => (mode === 'ok' ? (value as (...a: unknown[]) => unknown).apply(binding, args) : fail())
+      if (key === 'batch') {
+        return (statements: object[]) => (mode === 'ok'
+          ? (value as (s: object[]) => unknown).call(binding, statements.map((stmt) => unwrapped.get(stmt) ?? stmt))
+          : fail())
+      }
       return typeof value === 'function' ? value.bind(binding) : value
     },
   })

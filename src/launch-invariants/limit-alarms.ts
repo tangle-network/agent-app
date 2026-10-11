@@ -133,26 +133,39 @@ export function withD1LimitAlarms<D extends D1Measurable>(d1: D, alarms: LimitAl
     // An alarm delivery failure must not fail the query that triggered it.
     return Promise.all(pending).catch(() => undefined)
   }
-  const statement = (target: object, sql: string): object => new Proxy(target, {
-    get(stmt, key) {
-      const value = Reflect.get(stmt, key) as unknown
-      if (typeof value !== 'function') return value
-      if (key === 'bind') return (...params: unknown[]) => statement(value.apply(stmt, params) as object, sql)
-      if (key === 'all' || key === 'raw' || key === 'run' || key === 'first') {
-        return async (...args: unknown[]) => {
-          const result: unknown = await value.apply(stmt, args)
-          if (key !== 'first') await observe(sql, result)
-          return result
+  // D1's batch() takes only its own statements, so a batch is given the unwrapped ones.
+  const unwrapped = new WeakMap<object, object>()
+  const statement = (target: object, sql: string): object => {
+    const wrapped = new Proxy(target, {
+      get(stmt, key) {
+        const value = Reflect.get(stmt, key) as unknown
+        if (typeof value !== 'function') return value
+        if (key === 'bind') return (...params: unknown[]) => statement(value.apply(stmt, params) as object, sql)
+        if (key === 'all' || key === 'raw' || key === 'run' || key === 'first') {
+          return async (...args: unknown[]) => {
+            const result: unknown = await value.apply(stmt, args)
+            if (key !== 'first') await observe(sql, result)
+            return result
+          }
         }
-      }
-      return value.bind(stmt)
-    },
-  })
+        return value.bind(stmt)
+      },
+    })
+    unwrapped.set(wrapped, target)
+    return wrapped
+  }
   return new Proxy(d1, {
     get(binding, key) {
       const value = Reflect.get(binding, key) as unknown
       if (key === 'prepare') {
         return (sql: string) => statement((value as (sql: string) => object).call(binding, sql), sql.replace(/\s+/g, ' ').slice(0, 160))
+      }
+      if (key === 'batch' && typeof value === 'function') {
+        return async (statements: object[]) => {
+          const results = await (value as (s: object[]) => Promise<unknown[]>).call(binding, statements.map((stmt) => unwrapped.get(stmt) ?? stmt))
+          for (const result of results ?? []) await observe('batch', result)
+          return results
+        }
       }
       return typeof value === 'function' ? value.bind(binding) : value
     },

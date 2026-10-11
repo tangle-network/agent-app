@@ -216,6 +216,29 @@ describe('platform-limit alarms', () => {
     expect(Math.abs(estimatedBytes(rows) - exact) / exact).toBeLessThan(0.01)
   })
 
+  it('hands D1 batch() its own statements, not the observed wrappers', async () => {
+    const { d1, sqlite } = sqliteD1('CREATE TABLE t (n INTEGER)')
+    // Like D1, accept only statements this binding prepared or bound, never a wrapper around one.
+    const issued = new WeakSet<object>()
+    const track = <S extends { bind(...values: unknown[]): S }>(stmt: S): S => {
+      issued.add(stmt)
+      const bind = stmt.bind.bind(stmt)
+      stmt.bind = (...values: unknown[]) => track(bind(...values))
+      return stmt
+    }
+    const binding = {
+      prepare: (sql: string) => track(d1.prepare(sql)),
+      batch: async (statements: object[]) => {
+        if (!statements.every((stmt) => issued.has(stmt))) throw new TypeError('D1_TYPE_ERROR: batch() received a statement it did not prepare')
+        return d1.batch(statements as never)
+      },
+    }
+    const alarms = createLimitAlarms({ product: 'gtm', budgets, sink: { deliver: async () => {} } })
+    const watched = withD1LimitAlarms(binding, alarms)
+    await watched.batch([watched.prepare('INSERT INTO t VALUES (?)').bind(1), watched.prepare('INSERT INTO t VALUES (?)').bind(2)] as never)
+    expect(sqlite.prepare('SELECT count(*) AS n FROM t').get()).toEqual({ n: 2 })
+  })
+
   it('observes the rows each D1 query reads', async () => {
     const delivered: TurnHealthAlert[] = []
     const alarms = createLimitAlarms({ product: 'gtm', budgets: { ...budgets, 'd1-rows-per-query': 10 }, sink: { deliver: async (alert) => { delivered.push(alert) } } })
