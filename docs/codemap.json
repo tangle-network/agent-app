@@ -22030,7 +22030,7 @@
         {
           "name": "CommandPalette",
           "kind": "function",
-          "signature": "({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, loading, initialQuery, onQueryChange, placeholder, empt…",
+          "signature": "({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, returnFocusTo, loading, initialQuery, onQueryChange, pl…",
           "doc": null
         },
         {
