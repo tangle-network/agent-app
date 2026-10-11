@@ -21,6 +21,7 @@
  */
 
 import { and, eq, isNull } from 'drizzle-orm'
+import { INVITATION_EMAIL_HINT, isInvitationEmail } from './invitations'
 import {
   type AssignableWorkspaceRole,
   type WorkspaceRole,
@@ -218,6 +219,7 @@ export function createMembersApi(opts: MembersApiOptions) {
     role?: string
   }): Promise<Response> {
     if (!input.email) return Response.json({ error: 'Missing email' }, { status: 400 })
+    if (!isInvitationEmail(input.email)) return Response.json({ error: INVITATION_EMAIL_HINT }, { status: 400 })
     const requestedRole = input.role ?? 'editor'
     if (!isAssignableWorkspaceRole(requestedRole)) {
       return Response.json({ error: 'Invalid role. Must be viewer, editor, or admin.' }, { status: 400 })
