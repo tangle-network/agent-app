@@ -95,12 +95,14 @@ describe('agent-app-rollout-check', () => {
 
   function repo(fromValue: string, toValue: string, p50: number) {
     dir = mkdtempSync(join(tmpdir(), 'rollout-check-'))
-    const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' })
+    // Plumbing only: a fixture commit through commit-tree runs none of the host's commit hooks.
+    const identity = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' }
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env: { ...process.env, ...identity } }).trim()
     const wrangler = (value: string) => `name = "app"\n\n[vars]\n# The routed lane.\nHOSPITALITY_ROUTED_BUSINESS_IDS = "${value}"\n\n[env.staging.vars]\nHOSPITALITY_ROUTED_BUSINESS_IDS = "*"\n`
     git('init', '-q', '-b', 'main')
     writeFileSync(join(dir, 'wrangler.toml'), wrangler(fromValue))
     git('add', '.')
-    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'base', '--no-gpg-sign')
+    git('update-ref', 'refs/heads/main', git('commit-tree', git('write-tree'), '-m', 'base'))
     writeFileSync(join(dir, 'wrangler.toml'), wrangler(toValue))
     writeFileSync(join(dir, 'rollout.config.mjs'), `export default {
       plans: ${JSON.stringify([plan])},
