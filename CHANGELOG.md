@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.67
+
+- fix(agent-profiles): report why a profile switch could not be prepared (#976)
+- feat(launch-invariants): pasted code reaches the chat — samples, an edge-block classifier and checkChatAcceptsCode (#975)
+
 ## 0.60.66
 
 - feat(launch-invariants): known failures, so an app adopts the kit before every invariant holds and a fixed one cannot regress (#974)
