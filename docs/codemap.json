@@ -2787,6 +2787,18 @@
           "doc": "Host-resolved metadata only."
         },
         {
+          "name": "ChatTurnIntentLine",
+          "kind": "interface",
+          "signature": "interface ChatTurnIntentLine",
+          "doc": "The intent line: one plain sentence, written by a fast model call the moment a turn is admitted, saying what the agent is about to do."
+        },
+        {
+          "name": "ChatTurnIntentLineArgs",
+          "kind": "interface",
+          "signature": "interface ChatTurnIntentLineArgs",
+          "doc": "What `intentLine.generate` receives: the admitted turn's message and the thread's last few turns."
+        },
+        {
           "name": "ChatTurnLifecycle",
           "kind": "interface",
           "signature": "interface ChatTurnLifecycle",
@@ -3207,6 +3219,24 @@
           "doc": "Define the maximum byte size allowed for inline parts in data processing"
         },
         {
+          "name": "INTENT_LINE_HISTORY_MESSAGES",
+          "kind": "const",
+          "signature": "6",
+          "doc": "Turns of the thread the line is written from."
+        },
+        {
+          "name": "INTENT_LINE_MAX_CHARS",
+          "kind": "const",
+          "signature": "240",
+          "doc": "Longest line kept; anything longer is cut."
+        },
+        {
+          "name": "INTENT_LINE_TIMEOUT_MS",
+          "kind": "const",
+          "signature": "1500",
+          "doc": "A line slower than this shows nothing."
+        },
+        {
           "name": "isCommittingSandboxEvent",
           "kind": "function",
           "signature": "(event: unknown) => boolean",
@@ -3223,6 +3253,12 @@
           "kind": "function",
           "signature": "(event: unknown) => boolean",
           "doc": "Progress the consumer may see before the commit point: it names no model output and carries no billing receipt, so streaming it live cannot duplicate an answer or bill an abandoned attempt."
+        },
+        {
+          "name": "isTurnIntentEvent",
+          "kind": "function",
+          "signature": "(event: unknown) => event is TurnIntentEvent",
+          "doc": "True for a {@link TURN_INTENT_EVENT} with non-empty text."
         },
         {
           "name": "isTurnPhaseEvent",
@@ -3755,7 +3791,7 @@
         {
           "name": "settleTurnResponse",
           "kind": "function",
-          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>",
+          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void, onIntent?: ((intent: TurnIntentData) => void) | undefined…",
           "doc": "Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}."
         },
         {
@@ -3831,6 +3867,12 @@
           "doc": "The failure a completed run with an aborted tool call settles with."
         },
         {
+          "name": "TURN_INTENT_EVENT",
+          "kind": "const",
+          "signature": "\"session.run.intent\"",
+          "doc": "Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do (\"Looking at your three competitors' pricing pages, t…"
+        },
+        {
           "name": "TURN_PHASE_EVENT",
           "kind": "const",
           "signature": "\"session.run.phase\"",
@@ -3865,6 +3907,18 @@
           "kind": "const",
           "signature": "\"turn_stream_lost\"",
           "doc": "Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started."
+        },
+        {
+          "name": "TurnIntentData",
+          "kind": "type",
+          "signature": "type TurnIntentData",
+          "doc": "The data of a {@link TURN_INTENT_EVENT}."
+        },
+        {
+          "name": "TurnIntentEvent",
+          "kind": "type",
+          "signature": "type TurnIntentEvent",
+          "doc": "A {@link TURN_INTENT_EVENT} as it crosses the wire."
         },
         {
           "name": "TurnPhaseData",
@@ -15369,9 +15423,21 @@
           "doc": "One speculator per turn."
         },
         {
+          "name": "createSandboxExecTool",
+          "kind": "function",
+          "signature": "(options: SandboxExecToolOptions) => SandboxExecTool",
+          "doc": null
+        },
+        {
           "name": "createSandboxPrewarmer",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer",
+          "doc": null
+        },
+        {
+          "name": "createSandboxRunTool",
+          "kind": "function",
+          "signature": "(options: SandboxRunToolOptions) => SandboxRunTool",
           "doc": null
         },
         {
@@ -15993,6 +16059,18 @@
           "doc": "How long a refused dispatch is resent."
         },
         {
+          "name": "SANDBOX_EXEC_DESCRIPTION",
+          "kind": "const",
+          "signature": "string",
+          "doc": null
+        },
+        {
+          "name": "SANDBOX_RUN_DESCRIPTION",
+          "kind": "const",
+          "signature": "string",
+          "doc": null
+        },
+        {
           "name": "SANDBOX_TRANSIENT_DEADLINE_MS",
           "kind": "const",
           "signature": "number",
@@ -16039,6 +16117,24 @@
           "kind": "interface",
           "signature": "interface SandboxExecOptions",
           "doc": "Define options to execute code within a sandbox environment with optional session control"
+        },
+        {
+          "name": "SandboxExecResult",
+          "kind": "interface",
+          "signature": "interface SandboxExecResult",
+          "doc": null
+        },
+        {
+          "name": "SandboxExecTool",
+          "kind": "interface",
+          "signature": "interface SandboxExecTool",
+          "doc": null
+        },
+        {
+          "name": "SandboxExecToolOptions",
+          "kind": "interface",
+          "signature": "interface SandboxExecToolOptions",
+          "doc": null
         },
         {
           "name": "SandboxExistingBoxStage",
@@ -16107,6 +16203,12 @@
           "doc": "Configuration needed to prepare a turn without provisioning a workspace."
         },
         {
+          "name": "sandboxPromptRunner",
+          "kind": "function",
+          "signature": "(shell: SandboxRuntimeConfig, prompt?: Omit<StreamSandboxPromptOptions, \"signal\" | \"history\">) => (box: SandboxInstance…",
+          "doc": "The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused)."
+        },
+        {
           "name": "SandboxPromptTokenLimits",
           "kind": "interface",
           "signature": "interface SandboxPromptTokenLimits",
@@ -16155,6 +16257,18 @@
           "doc": "Define the specification for restoring a sandbox from a snapshot or another sandbox ID"
         },
         {
+          "name": "SandboxRunError",
+          "kind": "class",
+          "signature": "class SandboxRunError",
+          "doc": "A typed `sandbox_run` failure."
+        },
+        {
+          "name": "SandboxRunFailureCode",
+          "kind": "type",
+          "signature": "type SandboxRunFailureCode",
+          "doc": null
+        },
+        {
           "name": "SandboxRuntimeAuthRefreshError",
           "kind": "class",
           "signature": "class SandboxRuntimeAuthRefreshError",
@@ -16165,6 +16279,18 @@
           "kind": "interface",
           "signature": "interface SandboxRuntimeConfig",
           "doc": "Define runtime configuration methods for sandbox environments including credentials, metadata, and permissions"
+        },
+        {
+          "name": "SandboxRunTool",
+          "kind": "interface",
+          "signature": "interface SandboxRunTool",
+          "doc": "The tool shape `runRouterTurn` takes (`RouterTurnTool`), kept structural so this module does not import the engine."
+        },
+        {
+          "name": "SandboxRunToolOptions",
+          "kind": "interface",
+          "signature": "interface SandboxRunToolOptions",
+          "doc": null
         },
         {
           "name": "SandboxScope",
@@ -24288,6 +24414,12 @@
           "doc": "Splits a batch into what the `accept` list admits and what it refuses."
         },
         {
+          "name": "firstUnansweredRequiredField",
+          "kind": "function",
+          "signature": "(fields: ({ name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined;…",
+          "doc": "The first required field still without an answer, or null when every required field has one: the reason `buildAnswerData` returned null."
+        },
+        {
           "name": "FlowWaterfall",
           "kind": "function",
           "signature": "({ trace }: FlowWaterfallProps) => Element | null",
@@ -24714,6 +24846,12 @@
           "doc": "Resolve if the interaction status is a terminal state excluding pending"
         },
         {
+          "name": "isTurnIntentEvent",
+          "kind": "function",
+          "signature": "(event: unknown) => event is TurnIntentEvent",
+          "doc": "True for a {@link TURN_INTENT_EVENT} with non-empty text."
+        },
+        {
           "name": "isTurnPhaseEvent",
           "kind": "function",
           "signature": "(event: unknown) => event is TurnPhaseEvent",
@@ -24724,6 +24862,12 @@
           "kind": "function",
           "signature": "(interaction: ChatInteraction, data: InteractionData) => string",
           "doc": "Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s)."
+        },
+        {
+          "name": "LateAnswerResult",
+          "kind": "type",
+          "signature": "type LateAnswerResult",
+          "doc": "What a host did with a late answer: sent it (`true` or nothing returned), queued it behind the running turn, or refused it (`false`)."
         },
         {
           "name": "lazyRoute",
@@ -24826,6 +24970,12 @@
           "kind": "interface",
           "signature": "interface MessageAttachmentsProps",
           "doc": null
+        },
+        {
+          "name": "missingAnswerHint",
+          "kind": "function",
+          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
+          "doc": "What the reader still has to do before the card's action (`verb`: submit, send) is available, in plain words, for the line beside the disabled button."
         },
         {
           "name": "MissionActivityLane",
@@ -25628,7 +25778,7 @@
         {
           "name": "settleTurnResponse",
           "kind": "function",
-          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>",
+          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void, onIntent?: ((intent: TurnIntentData) => void) | undefined…",
           "doc": "Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}."
         },
         {
@@ -25782,6 +25932,12 @@
           "doc": "Drives an anchor-click download from an already-resolved blob."
         },
         {
+          "name": "TURN_INTENT_EVENT",
+          "kind": "const",
+          "signature": "\"session.run.intent\"",
+          "doc": "Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do (\"Looking at your three competitors' pricing pages, t…"
+        },
+        {
           "name": "TURN_PHASE_EVENT",
           "kind": "const",
           "signature": "\"session.run.phase\"",
@@ -25816,6 +25972,18 @@
           "kind": "const",
           "signature": "\"turn_stream_lost\"",
           "doc": "Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started."
+        },
+        {
+          "name": "TurnIntentData",
+          "kind": "type",
+          "signature": "type TurnIntentData",
+          "doc": "The data of a {@link TURN_INTENT_EVENT}."
+        },
+        {
+          "name": "TurnIntentEvent",
+          "kind": "type",
+          "signature": "type TurnIntentEvent",
+          "doc": "A {@link TURN_INTENT_EVENT} as it crosses the wire."
         },
         {
           "name": "TurnPhaseData",
