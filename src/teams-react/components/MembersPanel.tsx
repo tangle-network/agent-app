@@ -11,11 +11,10 @@
  * admins/owners.
  */
 
-import { Button, Input } from '@tangle-network/ui/primitives'
-import { useState } from 'react'
 import type { WorkspaceRole } from '../../teams/roles'
 import { hasWorkspaceRole } from '../../teams/roles'
 import type { MemberView, MembersPanelProps } from '../contracts'
+import { InviteForm } from './InviteForm'
 import { RoleSelect } from './RoleSelect'
 
 export function MembersPanel({
@@ -27,32 +26,20 @@ export function MembersPanel({
   onNotice,
   showInviteForm = true,
 }: MembersPanelProps) {
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<WorkspaceRole>('editor')
-  const [inviting, setInviting] = useState(false)
-
   const canManage = hasWorkspaceRole(currentRole, 'admin')
 
   function notify(kind: 'success' | 'error', message: string) {
     onNotice?.({ kind, message })
   }
 
-  async function submitInvite() {
-    const email = inviteEmail.trim()
-    if (!email || inviting) return
-    setInviting(true)
+  async function invite(input: { email: string; role: WorkspaceRole }): Promise<boolean> {
     try {
-      const result = await onInvite({ email, role: inviteRole })
-      if (result && 'inviteUrl' in result && result.inviteUrl) {
-        notify('success', `Invite link ready for ${email}`)
-      } else {
-        notify('success', `Invited ${email}`)
-      }
-      setInviteEmail('')
+      const result = await onInvite(input)
+      notify('success', result && 'inviteUrl' in result && result.inviteUrl ? `Invite link ready for ${input.email}` : `Invited ${input.email}`)
+      return true
     } catch (err) {
       notify('error', err instanceof Error ? err.message : 'Failed to invite')
-    } finally {
-      setInviting(false)
+      return false
     }
   }
 
@@ -77,8 +64,8 @@ export function MembersPanel({
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-semibold text-[var(--text-primary)]">Members</h4>
-        <span className="text-xs text-[var(--text-muted)]">{members.length} total</span>
+        <h4 className="text-sm font-semibold text-[var(--text-primary)]">Members</h4>
+        <span className="text-sm text-[var(--text-muted)]">{members.length} total</span>
       </div>
       <div className="flex flex-col gap-2">
         {members.map((member) => (
@@ -96,31 +83,8 @@ export function MembersPanel({
       </div>
 
       {canManage && showInviteForm && (
-        <div className="flex flex-col gap-1.5 border-t border-[var(--border-default)] pt-3">
-          <label className="text-xs font-medium text-[var(--text-muted)]">Invite member</label>
-          <div className="flex gap-2">
-            <Input
-              type="email"
-              placeholder="Email address"
-              value={inviteEmail}
-              aria-label="Invite email address"
-              onChange={(event) => setInviteEmail(event.target.value)}
-              onKeyDown={(event) => { if (event.key === 'Enter') void submitInvite() }}
-              className="min-w-0 flex-1"
-            />
-            <RoleSelect
-              value={inviteRole}
-              ariaLabel="Invite role"
-              onChange={setInviteRole}
-            />
-            <Button
-              type="button"
-              onClick={() => void submitInvite()}
-              disabled={inviting || !inviteEmail.trim()}
-            >
-              {inviting ? 'Inviting…' : 'Invite'}
-            </Button>
-          </div>
+        <div className="border-t border-[var(--border-default)] pt-3">
+          <InviteForm label="Invite member" placeholder="Email address" onInvite={invite} />
         </div>
       )}
     </section>
@@ -142,29 +106,29 @@ function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps
   const editable = canManage && !isOwner && !member.inherited
 
   return (
-    <div className="flex items-center justify-between border-b border-[var(--border-default)] py-2 last:border-0">
-      <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bg-input)] text-xs font-semibold text-[var(--text-secondary)]">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--border-default)] py-2 last:border-0">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--bg-input)] text-sm font-semibold text-[var(--text-secondary)]">
           {initial}
         </div>
-        <div>
-          <p className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
-            {label}
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-center gap-x-2 text-sm font-medium text-[var(--text-primary)]">
+            <span className="min-w-0 [overflow-wrap:anywhere]">{label}</span>
             {pending && (
-              <span className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
+              <span className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-sm font-medium text-[var(--text-muted)]">
                 Pending
               </span>
             )}
           </p>
           {member.name && member.email && (
-            <p className="text-xs text-[var(--text-muted)]">{member.email}</p>
+            <p className="text-sm text-[var(--text-muted)] [overflow-wrap:anywhere]">{member.email}</p>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         {isOwner ? (
-          <span className="rounded border border-[var(--border-default)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+          <span className="rounded border border-[var(--border-default)] px-2 py-0.5 text-sm text-[var(--text-secondary)]">
             {member.inherited ? 'Org Admin' : 'Owner'}
           </span>
         ) : editable ? (
@@ -178,13 +142,13 @@ function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps
               type="button"
               aria-label={`Remove ${label}`}
               onClick={() => onRemove(member.id)}
-              className="rounded px-2 py-1 text-xs text-[var(--text-danger)] hover:bg-[var(--border-default)]"
+              className="rounded px-2 py-1 text-sm text-[var(--text-danger)] hover:bg-[var(--border-default)]"
             >
               Remove
             </button>
           </>
         ) : (
-          <span className="rounded border border-[var(--border-default)] px-2 py-0.5 text-xs capitalize text-[var(--text-secondary)]">
+          <span className="rounded border border-[var(--border-default)] px-2 py-0.5 text-sm capitalize text-[var(--text-secondary)]">
             {member.role}
           </span>
         )}

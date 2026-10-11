@@ -4,7 +4,7 @@
 
 Source: `src/teams/index.ts`
 
-33 exports.
+35 exports.
 
 ### `ASSIGNABLE_WORKSPACE_ROLES`
 
@@ -68,6 +68,14 @@ type AssignableWorkspaceRole
 
 ```ts
 (actual: "owner" | "viewer" | "editor" | "admin", minimum: "owner" | "viewer" | "editor" | "admin") => boolean
+```
+
+### `INVITATION_EMAIL_HINT`
+
+`const` — What to tell someone whose invite address cannot be delivered to.
+
+```ts
+"Enter a full email address, such as name@company.com."
 ```
 
 ### `INVITATION_EXPIRY_DAYS`
@@ -140,6 +148,14 @@ interface InviteValidationResult
 
 ```ts
 (value: unknown) => value is "viewer" | "editor" | "admin"
+```
+
+### `isInvitationEmail`
+
+`function` — Whether an address has the shape an invitation can be delivered to.
+
+```ts
+(email: string) => boolean
 ```
 
 ### `isInviteTokenShape`
