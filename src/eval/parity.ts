@@ -49,7 +49,7 @@ export interface ParityReport {
 }
 
 /** Says the fact is not available, or offers to find out. */
-const UNAVAILABLE = /(don'?t|do not|doesn'?t|does not) (have|see|find) (any )?(information|details|that|it listed|a listing|anything)|(don'?t|do not|couldn'?t|could not|can'?t|cannot|didn'?t|did not) (see|find)|not (sure|listed|mentioned|in (my|our|the) )|no information|isn'?t (listed|mentioned)|(can|could|I'?ll|let me|want me to) (ask|check with)/i
+const UNAVAILABLE = /(don'?t|do not|doesn'?t|does not) (have|see|find) (any |the )?(\w+ )?(information|details|pricing|price|that|it listed|a listing|anything)|(don'?t|do not|couldn'?t|could not|can'?t|cannot|didn'?t|did not) (see|find|tell)|not (sure|listed|mentioned|in (my|our|the) )|no information|isn'?t (listed|mentioned)|(can|could|I'?ll|let me|want me to|like me to) (ask|check with)/i
 /** States a price, a time, a flat yes/no, or an absence. */
 const ASSERTS = /\$\s?\d|\b\d{1,2}(:\d\d)?\s*(am|pm)\b|^\s*(yes|no)\b|\b(we|there) (do not|don'?t|does not|doesn'?t) have\b|\bthere (is|are) no\b/im
 

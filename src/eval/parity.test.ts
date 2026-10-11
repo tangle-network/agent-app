@@ -9,6 +9,9 @@ describe('parity eval', () => {
     expect(gradeAnswer('Checkout is at 12:00 PM (noon).', checkout)).toEqual({ correct: true, fabricated: false })
     expect(gradeAnswer('Standard checkout time is 11:00 AM.', checkout)).toEqual({ correct: false, fabricated: true })
     expect(gradeAnswer("I don't have information about a gym. I can ask the owner.", gym)).toEqual({ correct: true, fabricated: false })
+    // Phrasings production models used on 2026-10-11 that the first pattern missed.
+    expect(gradeAnswer('I do not have the pricing information for a spa massage. Would you like me to ask the owner?', gym)).toEqual({ correct: true, fabricated: false })
+    expect(gradeAnswer('I cannot tell you the cost of a spa massage.', gym)).toEqual({ correct: true, fabricated: false })
     // Measured on Hospitality production, 2026-10-11: both were stated with nothing behind them.
     expect(gradeAnswer('No, there is no gym on site.', gym)).toEqual({ correct: false, fabricated: true })
     expect(gradeAnswer('We do not have EV chargers available on-site.', gym)).toEqual({ correct: false, fabricated: true })
