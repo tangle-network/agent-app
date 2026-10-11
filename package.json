@@ -649,6 +649,7 @@
     "test:eval-compat": "vitest run --config vitest.eval-compat.config.ts && AGENT_EVAL_COMPAT=agent-eval-0211 vitest run --config vitest.eval-compat.config.ts"
   },
   "devDependencies": {
+    "zod": "4.4.3",
     "@better-auth/oauth-provider": "1.7.2",
     "@cloudflare/workers-types": "5.20260828.1",
     "@firecrawl/pdf-inspector-wasm": "^1.17.0",
@@ -762,7 +763,8 @@
     "@tangle-network/tcloud": "^0.5.2 || >=0.8.1 <0.9.0",
     "playwright": "^1.63.0",
     "@nanostores/react": ">=0.8.4 <2.0.0",
-    "nanostores": ">=0.11.3 <2.0.0"
+    "nanostores": ">=0.11.3 <2.0.0",
+    "zod": "^4.4.3"
   },
   "peerDependenciesMeta": {
     "@better-auth/oauth-provider": {
@@ -865,7 +867,5 @@
       "optional": true
     }
   },
-  "dependencies": {
-    "zod": "4.4.3"
-  }
+  "dependencies": {}
 }
