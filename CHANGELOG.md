@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.79
+
+- perf(workspace-export): read consecutive sandbox archives concurrently (#992)
+
 ## 0.60.78
 
 - fix(signoff): keep the shell-alignment usage text private to its CLI (#991)
