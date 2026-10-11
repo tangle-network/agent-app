@@ -237,5 +237,17 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       : { code: 'model_unavailable', message: 'The model service did not answer.' })
   }
   if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
+  // A model can end its turn with neither a word nor a tool call (gemini-2.5-flash did on 8 of
+  // 53 "remember" turns, 2026-10-11). Nothing was said and nothing ran, so one repeat is safe;
+  // an answer still blank is a typed failure, never a successful empty reply.
+  if (!segments.some(part => part.trim())) {
+    if (toolsRan === 0) {
+      try { stop = await run() } catch { stop = 'completed' }
+      if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
+    }
+    if (!segments.some(part => part.trim())) {
+      return outcome({ code: 'model_empty', message: 'The model finished without writing a reply.' })
+    }
+  }
   return outcome()
 }

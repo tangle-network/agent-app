@@ -78,6 +78,24 @@ describe('runRouterTurn', () => {
     expect(JSON.stringify(requests[1]!.body.messages)).not.toContain('secret detail')
   })
 
+  it('repeats a turn that ended with no word and no tool, and types a still-empty answer as a failure', async () => {
+    const empty = () => sse([{ model: 'served/model', choices: [{ delta: {}, finish_reason: 'stop' }] }])
+    const recovered = router(empty(), sse([text('Saved: the pool closes at 9pm on Sundays.')]))
+    const ok = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: recovered.fetchImpl, systemPrompt: 's', userMessage: 'u' })
+    expect(ok).toMatchObject({ text: 'Saved: the pool closes at 9pm on Sundays.' })
+    expect(ok.failure).toBeUndefined()
+    const blank = router(empty(), empty())
+    const failed = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: blank.fetchImpl, systemPrompt: 's', userMessage: 'u' })
+    expect(failed).toMatchObject({ text: '', failure: { code: 'model_empty' } })
+    expect(blank.calls).toHaveBeenCalledTimes(2)
+    // A tool already ran, so the turn is not repeated: the empty answer is reported, the effect kept.
+    const afterTool = router(sse([toolCall('call-1', 'staff_task_create', '{"title":"x"}')]), empty())
+    const reported = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: afterTool.fetchImpl, systemPrompt: 's',
+      userMessage: 'u', tools: [createTask] })
+    expect(reported).toMatchObject({ failure: { code: 'model_empty' }, toolCalls: [{ toolName: 'staff.task.create', ok: true }] })
+    expect(afterTool.calls).toHaveBeenCalledTimes(2)
+  })
+
   it('repeats one model call that failed before any word or tool, then returns a failure without throwing', async () => {
     const down = () => new Response('upstream down', { status: 502 })
     const twice = router(down, down)
