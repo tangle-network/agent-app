@@ -443,8 +443,10 @@ export interface SandboxRuntimeConfig {
   // BYOS3/R2 snapshot storage. Returns undefined => key omitted entirely
   // (fail-closed when creds absent). Product owns bucket/endpoint/credentials/prefix.
   storage?: (ctx: SandboxBuildContext) => StorageConfig | undefined
-  // Snapshot RESTORE-on-create. undefined => fresh box.
-  restore?: (ctx: SandboxBuildContext) => SandboxRestoreSpec | undefined
+  // Snapshot RESTORE-on-create. undefined => fresh box. Called only when a box
+  // is about to be created, so a product can resolve the restore point lazily
+  // (listing snapshots is a Sandbox API round trip a reused box never needs).
+  restore?: (ctx: SandboxBuildContext) => SandboxRestoreSpec | undefined | Promise<SandboxRestoreSpec | undefined>
   // Per-identity box NAME. Defaults to name(scope.workspaceId) when absent.
   boxKey?: (scope: SandboxScope) => string
   // Per-workspace child-key mint: overrides the resolved model apiKey before create.
@@ -1516,6 +1518,7 @@ async function materializeDeferredFilesForExistingBox(
   workspaceId: string,
   userId: string | undefined,
   harness: Harness,
+  corpusMarker?: Promise<string | null>,
 ): Promise<Outcome<SandboxInstance>> {
   if (!shell.deferProfileFiles) return ok(box)
   const connectedIntegrationIds = await shell.connectedIntegrationIds(workspaceId)
@@ -1536,9 +1539,44 @@ async function materializeDeferredFilesForExistingBox(
   // Fail-safe: a missing or mismatched hash (e.g. a redeploy with new skills, or
   // a box created before this optimization) WRITES — a stale skip is never
   // risked. Reads metadata only, so no extra exec/round-trip.
+  const corpusHash = deferredCorpusHash(deferredFiles)
   const stampedHash = (box.metadata as Record<string, unknown> | undefined)?.[DEFERRED_CORPUS_HASH_KEY]
-  if (typeof stampedHash === 'string' && stampedHash === deferredCorpusHash(deferredFiles)) return ok(box)
-  return writeDeferredFilesWithRuntimeAuthRefresh(client, box, deferredFiles, stage, name)
+  if (typeof stampedHash === 'string' && stampedHash === corpusHash) return ok(box)
+  // The create-time stamp goes stale on the first release that changes the
+  // corpus, and without this the box rewrote the whole corpus on every reuse
+  // after it (a ~0.7 s file batch per GTM turn, 2026-10-11). The marker is
+  // written only after a corpus write succeeds and lives on the same disk as
+  // the files, so a lost disk loses both and the corpus is written again.
+  if (corpusMarker && await corpusMarker === corpusHash) return ok(box)
+  const written = await writeDeferredFilesWithRuntimeAuthRefresh(client, box, deferredFiles, stage, name)
+  if (written.succeeded) await writeDeferredCorpusMarker(written.value, corpusHash)
+  return written
+}
+
+/** Where a reused box records the deferred corpus it last received in full,
+ *  relative to /home/agent like every file-API profile write. */
+const DEFERRED_CORPUS_MARKER_PATH = '.agent-app/deferred-corpus-hash'
+const DEFERRED_CORPUS_HASH_RE = /^[0-9a-f]{64}$/
+
+/** The corpus hash a box last recorded, or null when it is absent or unreadable. */
+async function readDeferredCorpusMarker(box: SandboxInstance): Promise<string | null> {
+  if (typeof box.read !== 'function') return null
+  try {
+    const value = (await box.read(`/home/agent/${DEFERRED_CORPUS_MARKER_PATH}`)).trim()
+    return DEFERRED_CORPUS_HASH_RE.test(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
+/** Best effort: a failed marker write only costs the next reuse a corpus rewrite. */
+async function writeDeferredCorpusMarker(box: SandboxInstance, corpusHash: string): Promise<void> {
+  if (typeof box.fs?.writeMany !== 'function') return
+  try {
+    await box.fs.writeMany([{ path: DEFERRED_CORPUS_MARKER_PATH, content: corpusHash }])
+  } catch {
+    // The corpus itself is on disk; the next reuse writes it and the marker again.
+  }
 }
 
 async function listRunning(
@@ -2184,6 +2222,32 @@ async function resolveWorkspaceRuntimeEnv(
   return env
 }
 
+/**
+ * Reads of a reused box that do not depend on its liveness, started with the
+ * liveness probe so their round trips overlap it. They are only reads: the
+ * egress policy is still asserted (and migrated) before credentials reach the
+ * box, and an unknown corpus marker means the corpus is written as before.
+ */
+interface ExistingBoxPrefetch {
+  egress?: Promise<Outcome<Awaited<ReturnType<SandboxInstance['egress']['get']>>>>
+  corpusMarker?: Promise<string | null>
+}
+
+function prefetchExistingBoxReads(shell: SandboxRuntimeConfig, box: SandboxInstance): ExistingBoxPrefetch {
+  const prefetch: ExistingBoxPrefetch = {}
+  if (shell.egressPolicy) {
+    prefetch.egress = (async () => {
+      try {
+        return ok(await box.egress.get())
+      } catch (cause) {
+        return fail(cause)
+      }
+    })()
+  }
+  if (shell.deferProfileFiles) prefetch.corpusMarker = readDeferredCorpusMarker(box)
+  return prefetch
+}
+
 // All retained-box paths renew credentials before the product bootstrap.
 async function finalizeExistingBox(
   shell: SandboxRuntimeConfig,
@@ -2196,8 +2260,9 @@ async function finalizeExistingBox(
   harness: Harness,
   scope: SandboxScope,
   runtimeEnv: Record<string, string>,
+  prefetch: ExistingBoxPrefetch = {},
 ): Promise<SandboxInstance> {
-  await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name)
+  await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name, prefetch.egress)
   const written = await materializeDeferredFilesForExistingBox(
     shell,
     client,
@@ -2207,6 +2272,7 @@ async function finalizeExistingBox(
     workspaceId,
     userId,
     harness,
+    prefetch.corpusMarker,
   )
   if (!written.succeeded) {
     throw deferredProfileWriteFailed(stage, name, written.error)
@@ -2282,13 +2348,20 @@ async function assertExistingBoxEgress(
   migrate: boolean | undefined,
   stage: SandboxExistingBoxStage,
   name: string,
+  prefetched?: Promise<Outcome<Awaited<ReturnType<SandboxInstance['egress']['get']>>>>,
 ): Promise<void> {
   if (!desired) return
   let current: Awaited<ReturnType<SandboxInstance['egress']['get']>>
-  try {
-    current = await box.egress.get()
-  } catch (cause) {
-    throw existingBoxEgressError('read', box, stage, name, cause)
+  if (prefetched) {
+    const read = await prefetched
+    if (!read.succeeded) throw existingBoxEgressError('read', box, stage, name, read.error)
+    current = read.value
+  } else {
+    try {
+      current = await box.egress.get()
+    } catch (cause) {
+      throw existingBoxEgressError('read', box, stage, name, cause)
+    }
   }
   const matchingPolicy = normalizedEgressPolicy(current.policy) === normalizedEgressPolicy(desired)
   const explicitSource = current.source !== 'platform'
@@ -2477,6 +2550,7 @@ async function provisionWorkspaceSandbox(
       // Resolve app credentials before any restart so a mint failure leaves the
       // existing sandbox running and intact. Reading the runtime connection
       // restarts nothing, so it runs alongside the mint.
+      const prefetch = prefetchExistingBoxReads(shell, found)
       const [envResult, readyResult] = await Promise.allSettled([
         measure('runtime_env', () => resolveWorkspaceRuntimeEnv(shell, scope)),
         measure('refresh', () => refreshRuntimeConnection(client, found)),
@@ -2487,8 +2561,9 @@ async function provisionWorkspaceSandbox(
         if (readyResult.status === 'rejected') throw readyResult.reason
         const ready = readyResult.value
         if ((await measure('liveness', () => isReusableBox(ready, shell.livenessProbe))).succeeded) {
-          return await measure('finalize', () => finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv))
+          return await measure('finalize', () => finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv, prefetch))
         }
+        // The prefetched reads never reject; a recovered box is read again in finalize.
         // Unresponsive (or never-connectable) box with the RIGHT harness: recover
         // in place — stop→resume preserves the workspace — and fail loud if the
         // box is still dead. Deleting here wiped user workspaces (#299); delete
@@ -2623,7 +2698,7 @@ async function provisionWorkspaceSandbox(
   }
 
   const storage = shell.storage?.(buildCtx)
-  const restore = recoveryRestore === undefined ? shell.restore?.(buildCtx) : recoveryRestore
+  const restore = recoveryRestore === undefined ? await shell.restore?.(buildCtx) : recoveryRestore
 
   const payload = {
     name,
