@@ -176,7 +176,7 @@ interface CreateTangleRouterModelConfigOptions
 
 ### `LoopAssistantToolCall`
 
-`interface` — One OpenAI-shaped tool-call entry carried on an assistant message.
+`interface` — One OpenAI-shaped tool-call entry carried on an assistant message, plus any provider-specific fields the model attached to the call (`ToolLoopCall.providerFields`).
 
 ```ts
 interface LoopAssistantToolCall
