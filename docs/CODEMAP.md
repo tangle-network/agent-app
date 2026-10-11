@@ -2,13 +2,13 @@
 
 # agent-app code map
 
-_127 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_128 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
 | [`./agent-enrollment`](api/agent-enrollment.md) | 15 | `hosted-agent` |
 | [`./agent-enrollment/drizzle`](api/agent-enrollment-drizzle.md) | 5 | `hosted-agent` |
-| [`./agent-profiles`](api/agent-profiles.md) | 47 | `tools` |
+| [`./agent-profiles`](api/agent-profiles.md) | 49 | `tools` |
 | [`./agent-profiles/d1`](api/agent-profiles-d1.md) | 8 | `tools` |
 | [`./agent-profiles/drizzle`](api/agent-profiles-drizzle.md) | 1 | `tools` |
 | [`./agent-profiles/reaper`](api/agent-profiles-reaper.md) | 5 | `tools` |
@@ -119,7 +119,7 @@ _127 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./trace`](api/trace.md) | 33 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting`, `launch-invariants` |
 | [`./turn-stream`](api/turn-stream.md) | 58 | `chat-routes`, `crypto`, `stream` |
-| [`./vault`](api/vault.md) | 23 | — |
+| [`./vault`](api/vault.md) | 21 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
 | [`./web`](api/web.md) | 43 | — |
@@ -133,6 +133,7 @@ _127 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./workspace-export`](api/workspace-export.md) | 41 | `object-store` |
 | [`./workspace-export/react`](api/workspace-export-react.md) | 2 | `object-store` |
 | [`./workspace-react`](api/workspace-react.md) | 28 | `session-shell`, `web-react`, `workspace-apps` |
+| [`./workspace-store/d1`](api/workspace-store-d1.md) | 6 | — |
 
 ---
 
@@ -158,11 +159,11 @@ Depends on: `hosted-agent`
 
 ## `./agent-profiles`
 
-Source: `src/agent-profiles/index.ts` · 47 exports
+Source: `src/agent-profiles/index.ts` · 49 exports
 
 Depends on: `tools`
 
-`addProfileKnowledgeDocument`, `admitProfileTurn`, `bindProfileText`, `createInMemorySelfMountStorage`, `createMountProfileChangeTool`, `createTextProfile`, `CreateTextProfileInput`, `handleProfileSwitchText`, `MountProfileChangeDeps`, `MountProfileChangeResult`, `normalizeProfileName`, `parseProfileRevisionDiff`, `parseProfileSwitch`, `PERMITTED_SELF_MOUNT_DIMENSIONS`, `PROFILE_CHANGE_POLICY`, `ProfileAccessError`, `profileAuthority`, `profileAuthorityDigest`, `ProfileAuthorKind`, `ProfileBinding`, `ProfileBindingKey`, `ProfileConflictError`, `ProfileKnowledgeDocument`, `ProfileKnowledgeEvent`, `ProfileRevision`, `ProfileRevisionState`, `ProfileRevisionStore`, `profileSwitchInputHash`, `profileSwitchInputHashFromContentHash`, `ProfileSwitchReceipt`, `profileTextChange`, `ProfileToolContext`, `profileTools`, `ProfileToolTurn`, `ProfileTurnPin`, `projectKnowledgeDocuments`, `promoteRevision`, `proposeRevision`, `ProposeRevisionInput`, `removeProfileKnowledgeDocument`, `rollbackProfileBinding`, `SelfMountSkillEntry`, `SelfMountStorage`, `serializeProfileRevisionDiff`, `SwitchableProfile`, `switchProfile`, `SwitchProfileInput`
+`addProfileKnowledgeDocument`, `admitProfileTurn`, `bindProfileText`, `createInMemorySelfMountStorage`, `createMountProfileChangeTool`, `createTextProfile`, `CreateTextProfileInput`, `handleProfileSwitchText`, `MountProfileChangeDeps`, `MountProfileChangeResult`, `normalizeProfileName`, `parseProfileRevisionDiff`, `parseProfileSwitch`, `PERMITTED_SELF_MOUNT_DIMENSIONS`, `PROFILE_CHANGE_POLICY`, `PROFILE_MEMORY_PREFIX`, `ProfileAccessError`, `profileAuthority`, `profileAuthorityDigest`, `ProfileAuthorKind`, `ProfileBinding`, `ProfileBindingKey`, `ProfileConflictError`, `ProfileKnowledgeDocument`, `ProfileKnowledgeEvent`, `ProfileMemoryStore`, `ProfileRevision`, `ProfileRevisionState`, `ProfileRevisionStore`, `profileSwitchInputHash`, `profileSwitchInputHashFromContentHash`, `ProfileSwitchReceipt`, `profileTextChange`, `ProfileToolContext`, `profileTools`, `ProfileToolTurn`, `ProfileTurnPin`, `projectKnowledgeDocuments`, `promoteRevision`, `proposeRevision`, `ProposeRevisionInput`, `removeProfileKnowledgeDocument`, `rollbackProfileBinding`, `SelfMountSkillEntry`, `SelfMountStorage`, `serializeProfileRevisionDiff`, `SwitchableProfile`, `switchProfile`, `SwitchProfileInput`
 
 [Full API →](api/agent-profiles.md)
 
@@ -1168,9 +1169,9 @@ Depends on: `chat-routes`, `crypto`, `stream`
 
 ## `./vault`
 
-Source: `src/vault/index.ts` · 23 exports
+Source: `src/vault/index.ts` · 21 exports
 
-`ConfirmDialog`, `ConfirmDialogProps`, `VAULT_TREE_CHILD_PAGE`, `VaultArtifactRenderProps`, `VaultContentMatch`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneHandle`, `VaultPaneProps`, `VaultRevision`, `VaultRichParts`, `VaultTree`, `VaultTreeNode`, `VaultTreeProps`, `VaultTreeRenderProps`
+`ConfirmDialog`, `ConfirmDialogProps`, `VAULT_TREE_CHILD_PAGE`, `VaultArtifactRenderProps`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneHandle`, `VaultPaneProps`, `VaultRichParts`, `VaultTree`, `VaultTreeNode`, `VaultTreeProps`, `VaultTreeRenderProps`
 
 [Full API →](api/vault.md)
 
@@ -1293,3 +1294,11 @@ Depends on: `session-shell`, `web-react`, `workspace-apps`
 `AgentProductIdentity`, `AgentRailIdentity`, `AgentRailIdentityProps`, `AgentWorkspaceActiveRoute`, `AgentWorkspaceAppsConfig`, `AgentWorkspaceCompanion`, `AgentWorkspaceCompanionHandle`, `AgentWorkspaceCompanionNavigation`, `AgentWorkspaceCompanionProps`, `AgentWorkspaceCompanionTab`, `AgentWorkspaceCompanionTool`, `AgentWorkspaceCompanionTools`, `AgentWorkspaceIdentity`, `AgentWorkspaceLayout`, `AgentWorkspaceLayoutProps`, `AgentWorkspaceNoun`, `AgentWorkspaceSessionConfig`, `createAgentWorkspaceCompanionTabs`, `DEFAULT_WORKSPACE_NOUN`, `WorkspaceInitial`, `WorkspaceList`, `WorkspaceListAction`, `WorkspaceListField`, `WorkspaceListItem`, `WorkspaceListProps`, `WorkspaceSwitcher`, `WorkspaceSwitcherItem`, `WorkspaceSwitcherProps`
 
 [Full API →](api/workspace-react.md)
+
+## `./workspace-store/d1`
+
+Source: `src/workspace-store/d1.ts` · 6 exports
+
+`createD1R2WorkspaceStore`, `D1R2WorkspaceStoreOptions`, `WORKSPACE_STORE_D1_SCHEMA_SQL`, `WorkspaceStoreD1Database`, `WorkspaceStoreD1Statement`, `WorkspaceStoreR2Bucket`
+
+[Full API →](api/workspace-store-d1.md)

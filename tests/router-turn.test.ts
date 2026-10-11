@@ -120,6 +120,37 @@ describe('runRouterTurn', () => {
     expect(calls).toHaveBeenCalledTimes(2)
   })
 
+  it('echoes the thought_signature Gemini 3 attached to a tool call on the next request', async () => {
+    // gemini-3.5-flash(-lite) answers HTTP 400 "Function call is missing a thought_signature"
+    // when the assistant tool_calls entry in the follow-up request lacks extra_content.
+    const extraContent = { google: { thought_signature: 'sig-abc' } }
+    const signedCall = { model: 'served/model', choices: [{ delta: { tool_calls: [{ index: 0, id: 'call-1',
+      function: { name: 'staff_task_create', arguments: '{"title":"Restock towels"}' }, extra_content: extraContent }] },
+      finish_reason: 'tool_calls' }] }
+    const { fetchImpl, requests } = router(sse([signedCall]), sse([text('Done.')]))
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'u', tools: [createTask] })
+    expect(outcome.failure).toBeUndefined()
+    const assistant = (requests[1]!.body.messages as Array<Record<string, unknown>>)
+      .find(message => message.role === 'assistant' && message.tool_calls) as { tool_calls: Array<Record<string, unknown>> }
+    expect(assistant.tool_calls[0]!.extra_content).toEqual(extraContent)
+    expect(assistant.tool_calls[0]).toMatchObject({ id: 'call-1', type: 'function', function: { name: 'staff_task_create' } })
+  })
+
+  it('counts a model call once when the Router reports its usage on more than one chunk', async () => {
+    // The Router repeats cumulative usage within one streamed call; summing each report
+    // over-counted a one-call turn about 3x in production.
+    const { fetchImpl } = router(sse([
+      { ...text('Hello'), usage: { prompt_tokens: 8000, completion_tokens: 1 } },
+      { ...text('!'), usage: { prompt_tokens: 8000, completion_tokens: 2 } },
+      { choices: [], usage: { prompt_tokens: 8000, completion_tokens: 3 } },
+    ]))
+    const events: RouterTurnEvent[] = []
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'hello',
+      onEvent: event => events.push(event) })
+    expect(outcome.usage).toEqual({ promptTokens: 8000, completionTokens: 3, modelCalls: 1 })
+    expect(events.filter(event => event.type === 'usage')).toEqual([{ type: 'usage', promptTokens: 8000, completionTokens: 3 }])
+  })
+
   it('refuses to run without a credential', async () => {
     const fetchImpl = vi.fn() as unknown as typeof fetch
     await expect(runRouterTurn({ apiKey: '', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'u' }))

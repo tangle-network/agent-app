@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.60.109
+
+- fix(workspace-list): search and name fields use ui's Input so they read as fields (#1034)
+
+## 0.60.108
+
+- fix(sandbox): charge an unused warm for box uptime, not for a stretched hold (#1029)
+
+## 0.60.107
+
+- fix(knip): derive entries from tsup.config.ts so a new subpath cannot turn main red (#1032)
+
+## 0.60.106
+
+- fix(router-turn): echo Gemini 3 thought signatures and count usage once per model call (#1033)
+
+## 0.60.105
+
+- fix(knip): name the ./router-turn entry so main's entry guard passes (#1031)
+- feat(workspace-store): D1 + R2 workspace store; profile.remember writes it when given (#1030)
+
+## 0.60.104
+
+- perf(sandbox): a warm reuse skips unchanged round trips and overlaps the rest (#1025)
+
 ## 0.60.103
 
 - feat(runtime): ./router-turn — a Worker-safe entry for the Router engine (#1023)
