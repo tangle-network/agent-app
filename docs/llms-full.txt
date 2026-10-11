@@ -3549,6 +3549,22 @@ interface ChatTurnInputPatch
 interface ChatTurnIntelligenceOptions
 ```
 
+### `ChatTurnIntentLine`
+
+`interface` — The intent line: one plain sentence, written by a fast model call the moment a turn is admitted, saying what the agent is about to do.
+
+```ts
+interface ChatTurnIntentLine
+```
+
+### `ChatTurnIntentLineArgs`
+
+`interface` — What `intentLine.generate` receives: the admitted turn's message and the thread's last few turns.
+
+```ts
+interface ChatTurnIntentLineArgs
+```
+
 ### `ChatTurnLifecycle`
 
 `interface` — Deterministic run telemetry: `onTurnStart` fires before the producer runs; exactly one of `onTurnComplete` / `onTurnError` fires after the turn settles, always after `onTurnStart`.
@@ -4109,6 +4125,30 @@ type FilePartPromotionOutcome
 950000
 ```
 
+### `INTENT_LINE_HISTORY_MESSAGES`
+
+`const` — Turns of the thread the line is written from.
+
+```ts
+6
+```
+
+### `INTENT_LINE_MAX_CHARS`
+
+`const` — Longest line kept; anything longer is cut.
+
+```ts
+240
+```
+
+### `INTENT_LINE_TIMEOUT_MS`
+
+`const` — A line slower than this shows nothing.
+
+```ts
+1500
+```
+
 ### `isCommittingSandboxEvent`
 
 `function` — True when `event` puts content in front of the user (or in the persisted transcript), making a restart on another model unsafe.
@@ -4131,6 +4171,14 @@ type FilePartPromotionOutcome
 
 ```ts
 (event: unknown) => boolean
+```
+
+### `isTurnIntentEvent`
+
+`function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
+
+```ts
+(event: unknown) => event is TurnIntentEvent
 ```
 
 ### `isTurnPhaseEvent`
@@ -4842,7 +4890,7 @@ interface SandboxUploadSink
 `function` — Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}.
 
 ```ts
-(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>
+(response: Response, onPhase: (phase: TurnPhaseData) => void, onIntent?: ((intent: TurnIntentData) => void) | undefined…
 ```
 
 ### `sniffBinary`
@@ -4941,6 +4989,14 @@ interface StreamChatRouteAsSandboxOptions
 "The Sandbox aborted a tool call before the turn finished, as when its runtime restarts mid-turn"
 ```
 
+### `TURN_INTENT_EVENT`
+
+`const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
+
+```ts
+"session.run.intent"
+```
+
 ### `TURN_PHASE_EVENT`
 
 `const` — Stream event naming the turn's current stage.
@@ -4987,6 +5043,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 "turn_stream_lost"
+```
+
+### `TurnIntentData`
+
+`type` — The data of a {@link TURN_INTENT_EVENT}.
+
+```ts
+type TurnIntentData
+```
+
+### `TurnIntentEvent`
+
+`type` — A {@link TURN_INTENT_EVENT} as it crosses the wire.
+
+```ts
+type TurnIntentEvent
 ```
 
 ### `TurnPhaseData`
@@ -19283,12 +19355,28 @@ interface BuildSandboxToolFileMountsOptions
 (options: EscalationSpeculatorOptions) => EscalationSpeculator
 ```
 
+### `createSandboxExecTool`
+
+`function`
+
+```ts
+(options: SandboxExecToolOptions) => SandboxExecTool
+```
+
 ### `createSandboxPrewarmer`
 
 `function`
 
 ```ts
 (shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer
+```
+
+### `createSandboxRunTool`
+
+`function`
+
+```ts
+(options: SandboxRunToolOptions) => SandboxRunTool
 ```
 
 ### `createSandboxTerminalConnectionRoute`
@@ -20115,6 +20203,22 @@ interface SafeSandboxErrorDiagnostics
 number
 ```
 
+### `SANDBOX_EXEC_DESCRIPTION`
+
+`const`
+
+```ts
+string
+```
+
+### `SANDBOX_RUN_DESCRIPTION`
+
+`const`
+
+```ts
+string
+```
+
 ### `SANDBOX_TRANSIENT_DEADLINE_MS`
 
 `const` — How long a transient failure may last before the caller fails.
@@ -20177,6 +20281,30 @@ interface SandboxExecChannel
 
 ```ts
 interface SandboxExecOptions
+```
+
+### `SandboxExecResult`
+
+`interface`
+
+```ts
+interface SandboxExecResult
+```
+
+### `SandboxExecTool`
+
+`interface`
+
+```ts
+interface SandboxExecTool
+```
+
+### `SandboxExecToolOptions`
+
+`interface`
+
+```ts
+interface SandboxExecToolOptions
 ```
 
 ### `SandboxExistingBoxStage`
@@ -20267,6 +20395,14 @@ interface SandboxPrewarmScope
 type SandboxPromptConfig
 ```
 
+### `sandboxPromptRunner`
+
+`function` — The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused).
+
+```ts
+(shell: SandboxRuntimeConfig, prompt?: Omit<StreamSandboxPromptOptions, "signal" | "history">) => (box: SandboxInstance…
+```
+
 ### `SandboxPromptTokenLimits`
 
 `interface`
@@ -20331,6 +20467,22 @@ interface SandboxResourceConfig
 interface SandboxRestoreSpec
 ```
 
+### `SandboxRunError`
+
+`class` — A typed `sandbox_run` failure.
+
+```ts
+class SandboxRunError
+```
+
+### `SandboxRunFailureCode`
+
+`type`
+
+```ts
+type SandboxRunFailureCode
+```
+
 ### `SandboxRuntimeAuthRefreshError`
 
 `class` — Represent an error thrown when sandbox runtime authentication refresh fails for a specific stage and name
@@ -20345,6 +20497,22 @@ class SandboxRuntimeAuthRefreshError
 
 ```ts
 interface SandboxRuntimeConfig
+```
+
+### `SandboxRunTool`
+
+`interface` — The tool shape `runRouterTurn` takes (`RouterTurnTool`), kept structural so this module does not import the engine.
+
+```ts
+interface SandboxRunTool
+```
+
+### `SandboxRunToolOptions`
+
+`interface`
+
+```ts
+interface SandboxRunToolOptions
 ```
 
 ### `SandboxScope`
@@ -30896,6 +31064,14 @@ interface FileMention
 (files: File[] | FileList, accept?: string | undefined) => { accepted: File[]; rejected: ComposerFileRejection[]; }
 ```
 
+### `firstUnansweredRequiredField`
+
+`function` — The first required field still without an answer, or null when every required field has one: the reason `buildAnswerData` returned null.
+
+```ts
+(fields: ({ name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined;…
+```
+
 ### `FlowWaterfall`
 
 `function` — Compact proportional waterfall over a FlowTrace — span name, bar, duration per row; total + cost in the footer.
@@ -31464,6 +31640,14 @@ type InteractionSubmitResult
 (status: ChatInteractionStatus) => boolean
 ```
 
+### `isTurnIntentEvent`
+
+`function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
+
+```ts
+(event: unknown) => event is TurnIntentEvent
+```
+
 ### `isTurnPhaseEvent`
 
 `function` — True for a {@link TURN_PHASE_EVENT} with a usable `phase` and `message`.
@@ -31478,6 +31662,14 @@ type InteractionSubmitResult
 
 ```ts
 (interaction: ChatInteraction, data: InteractionData) => string
+```
+
+### `LateAnswerResult`
+
+`type` — What a host did with a late answer: sent it (`true` or nothing returned), queued it behind the running turn, or refused it (`false`).
+
+```ts
+type LateAnswerResult
 ```
 
 ### `lazyRoute`
@@ -31614,6 +31806,14 @@ interface MentionTextSegment
 
 ```ts
 interface MessageAttachmentsProps
+```
+
+### `missingAnswerHint`
+
+`function` — What the reader still has to do before the card's action (`verb`: submit, send) is available, in plain words, for the line beside the disabled button.
+
+```ts
+(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
 ```
 
 ### `MissionActivityLane`
@@ -32685,7 +32885,7 @@ interface SessionPageQuery
 `function` — Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}.
 
 ```ts
-(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>
+(response: Response, onPhase: (phase: TurnPhaseData) => void, onIntent?: ((intent: TurnIntentData) => void) | undefined…
 ```
 
 ### `SlashCommand`
@@ -32888,6 +33088,14 @@ interface ToolRunStep
 (name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }
 ```
 
+### `TURN_INTENT_EVENT`
+
+`const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
+
+```ts
+"session.run.intent"
+```
+
 ### `TURN_PHASE_EVENT`
 
 `const` — Stream event naming the turn's current stage.
@@ -32934,6 +33142,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 "turn_stream_lost"
+```
+
+### `TurnIntentData`
+
+`type` — The data of a {@link TURN_INTENT_EVENT}.
+
+```ts
+type TurnIntentData
+```
+
+### `TurnIntentEvent`
+
+`type` — A {@link TURN_INTENT_EVENT} as it crosses the wire.
+
+```ts
+type TurnIntentEvent
 ```
 
 ### `TurnPhaseData`
