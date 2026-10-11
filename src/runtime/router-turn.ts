@@ -58,7 +58,7 @@ export interface RouterTurnOutcome {
    * Set instead of a failure when the turn reached its budget at a clean point
    * (every tool call answered). The turn is not over: persist this and call
    * `runRouterTurn` again with `continueFrom` in a durable process to finish it.
-   * `text` holds only what this hop wrote.
+   * `text` holds everything the turn has written so far, across hops.
    */
   continuation?: RouterTurnContinuation
 }
@@ -68,8 +68,8 @@ export interface RouterTurnContinuation {
   messages: LoopMessage[]
   /** Hops this turn has already run, including this one. */
   hops: number
-  /** Whether an earlier hop already wrote reply text, so a silent final hop is not an empty reply. */
-  wroteText: boolean
+  /** Reply text every hop so far wrote; the final hop's outcome `text` includes it. */
+  text: string
 }
 
 export interface RouterTurnOptions {
@@ -130,6 +130,8 @@ export function composeRouterTurnPrompt(
   return [...(options.toolNames ?? [])].sort((a, b) => b.length - a.length)
     .reduce((out, name) => out.split(name).join(routerFunctionName(name)), text)
 }
+
+const joinText = (parts: string[]) => parts.map(part => part.trim()).filter(Boolean).join('\n\n')
 
 function defaultToolError(error: unknown): { code: string; message: string; status?: number } | null {
   const value = error as { code?: unknown; status?: unknown; message?: unknown; issues?: unknown }
@@ -249,7 +251,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   }
 
   const outcome = (failure?: RouterTurnFailure): RouterTurnOutcome => ({
-    text: segments.map(part => part.trim()).filter(Boolean).join('\n\n'),
+    text: joinText([options.continueFrom?.text ?? '', ...segments]),
     servedModel, toolCalls, usage: { ...usage }, ...(failure ? { failure } : {}),
   })
   let stop: ToolLoopStopReason
@@ -270,13 +272,13 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   if (stop === 'deadline' && checkpoint) {
     return { ...outcome(), continuation: { messages: checkpoint,
       hops: (options.continueFrom?.hops ?? 0) + 1,
-      wroteText: Boolean(options.continueFrom?.wroteText) || segments.some(part => part.trim()) } }
+      text: joinText([options.continueFrom?.text ?? '', outcome().text]) } }
   }
   if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
   // A model can end its turn with neither a word nor a tool call (gemini-2.5-flash did on 8 of
   // 53 "remember" turns, 2026-10-11). Nothing was said and nothing ran, so one repeat is safe;
   // an answer still blank is a typed failure, never a successful empty reply.
-  if (!segments.some(part => part.trim()) && !options.continueFrom?.wroteText) {
+  if (!segments.some(part => part.trim()) && !options.continueFrom?.text.trim()) {
     if (toolsRan === 0) {
       try { stop = await run() } catch { stop = 'completed' }
       if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })

@@ -162,7 +162,7 @@ describe('runRouterTurn', () => {
         systemPrompt: 's', userMessage: 'Run the audit', tools: [slowTask] })
       expect(hop1.failure).toBeUndefined()
       expect(hop1.text).toBe('Working on it.')
-      expect(hop1.continuation).toMatchObject({ hops: 1, wroteText: true })
+      expect(hop1.continuation).toMatchObject({ hops: 1, text: 'Working on it.' })
       expect(hop1.continuation!.messages.map(message => message.role)).toEqual(['user', 'assistant', 'tool'])
       // Saved between hops in the workspace store, outside /files/.
       const workspace = createInMemoryWorkspaceStore()
@@ -177,6 +177,7 @@ describe('runRouterTurn', () => {
       expect(second.requests[0]!.body.messages).toEqual([{ role: 'system', content: 's' }, ...stored.messages])
       // The model ended silently after the tool; the turn already spoke in hop 1, so this is not an empty reply.
       expect(hop2.failure).toBeUndefined()
+      expect(hop2.text).toBe('Working on it.')
       expect(hop2.continuation).toBeUndefined()
       expect(slowTask.run).toHaveBeenCalledTimes(1)
       await checkpoints.clear('turn-1')
