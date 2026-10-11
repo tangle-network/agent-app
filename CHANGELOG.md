@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.77
+
+- docs(lessons): bump a shared package in every pin; the invariants report is each app's status (#989)
+
 ## 0.60.76
 
 - docs(lessons): ledgers merge by union on every branch through a global attributes file (#988)
