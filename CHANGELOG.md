@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.60.64
+
+- fix(deps): take zod from the product as a peer, not a pinned copy (#971)
+- test(chat-routes): the composed ask round-trip sends a select answer as the array the sidecar accepts (#970)
+- feat(web-react): lazyRoute renders a loaded route without suspending (#969)
+- fix(workspace-export): finish or fail exports that hit the Worker CPU limit (#967)
+- feat(signoff): shell-alignment browser check; shell rows and transcript adopt the shared owners (#962)
+- fix(launch-invariants): hand D1 batch() its own statements, not the observed wrappers (#968)
+
 ## 0.60.63
 
 - feat(launch-invariants): the eight launch invariants every agent app proves, and shared orphaned-turn settlement (#963)
