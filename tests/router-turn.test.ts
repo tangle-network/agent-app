@@ -202,6 +202,64 @@ describe('runRouterTurn', () => {
   })
 })
 
+/** One buffered Router chat completion. */
+const completion = (message: Record<string, unknown>) => Response.json({ model: 'served/model',
+  choices: [{ index: 0, message: { role: 'assistant', ...message }, finish_reason: message.tool_calls ? 'tool_calls' : 'stop' }],
+  usage: { prompt_tokens: 3, completion_tokens: 2 } })
+const calls = (...names: string[]) => names.map((name, index) => ({ id: `call-${index + 1}`, type: 'function',
+  function: { name, arguments: JSON.stringify({ title: `Task ${index + 1}` }) } }))
+
+describe('runRouterTurn bounded options', () => {
+  it('takes buffered completions, tool calls included, with the ceilings and reasoning effort it was given', async () => {
+    const { fetchImpl, requests } = router(completion({ content: null, tool_calls: calls('staff_task_create') }),
+      completion({ content: 'Created.' }))
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, stream: false, reasoningEffort: 'none',
+      maxTokens: 100, maxCompletionTokens: 200, systemPrompt: 's', userMessage: 'u', tools: [createTask] })
+    expect(outcome.failure).toBeUndefined()
+    expect(outcome).toMatchObject({ text: 'Created.', servedModel: 'served/model',
+      toolCalls: [{ callId: 'call-1', toolName: 'staff.task.create', ok: true }], usage: { promptTokens: 6, completionTokens: 4, modelCalls: 2 } })
+    expect(requests[0]!.body).not.toHaveProperty('stream')
+    expect(requests[0]!.body).toMatchObject({ reasoning_effort: 'none', max_tokens: 100, max_completion_tokens: 200 })
+  })
+
+  it('refuses the tool call past its cap before it runs and ends the turn there', async () => {
+    const run = vi.fn(async () => ({ ok: true }))
+    const { fetchImpl, calls: modelCalls } = router(completion({ content: null, tool_calls: calls('staff_task_create', 'staff_task_create') }))
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, stream: false, maxToolCalls: 1,
+      systemPrompt: 's', userMessage: 'u', tools: [{ ...createTask, run }] })
+    expect(run).toHaveBeenCalledOnce()
+    expect(modelCalls).toHaveBeenCalledOnce()
+    expect(outcome.failure?.code).toBe('turn_tool_limit')
+    expect(outcome.toolCalls.map(call => call.ok)).toEqual([true, false])
+  })
+
+  it('sends nothing more once cancelled, even when the injected fetch ignores the signal', async () => {
+    const controller = new AbortController()
+    const run = vi.fn(async () => { controller.abort(); throw new Error('cancelled') })
+    const { fetchImpl, calls: modelCalls } = router(completion({ content: null, tool_calls: calls('staff_task_create') }),
+      completion({ content: 'Never read.' }))
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, stream: false, signal: controller.signal,
+      systemPrompt: 's', userMessage: 'u', tools: [{ ...createTask, run }] })
+    expect(modelCalls).toHaveBeenCalledOnce()
+    expect(outcome.failure?.code).toBe('turn_aborted')
+  })
+
+  it('returns the first model failure as it happened when repeats are off', async () => {
+    const { fetchImpl, calls: modelCalls } = router(new Response('busy', { status: 503 }), completion({ content: 'Never read.' }))
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, stream: false, repeat: false, systemPrompt: 's', userMessage: 'u' })
+    expect(modelCalls).toHaveBeenCalledOnce()
+    expect(outcome.failure).toMatchObject({ code: 'model_http_503', status: 503 })
+  })
+
+  it('lets the app word what the model reads for a tool result', async () => {
+    const { fetchImpl, requests } = router(completion({ content: null, tool_calls: calls('staff_task_create') }), completion({ content: 'Done.' }))
+    await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, stream: false, systemPrompt: 's', userMessage: 'u', tools: [createTask],
+      renderToolResult: (toolName, outcome) => `${toolName}: ${outcome.ok ? 'saved' : outcome.message}` })
+    expect(requests[1]!.body.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: 'tool', tool_call_id: 'call-1', content: 'staff.task.create: saved' })]))
+  })
+})
+
 describe('composeRouterTurnPrompt', () => {
   it('joins the profile prompt, instructions and context, naming tools as the model calls them', () => {
     expect(routerFunctionName('workspace.member.language.read')).toBe('workspace_member_language_read')

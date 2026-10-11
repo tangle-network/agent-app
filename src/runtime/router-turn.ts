@@ -13,10 +13,14 @@
  * thrown errors, and a retry after a tool ran would repeat that tool's effect
  * ("never re-run a turn automatically", docs/agent-app-lessons.md). The only
  * automatic repeat is one model call that failed before any word or tool.
+ *
+ * Bounded paid lanes run this same engine inside a protected Router model grant
+ * (`runProtectedRouterTurn` in `./protected-router-turn`, outside this entry so a
+ * Worker bundle never pulls the grant client).
  */
 import { streamAppToolLoop, type LoopEvent, type LoopMessage, type LoopToolCall, type ToolLoopStopReason } from './loop'
 import { DEFAULT_TANGLE_ROUTER_BASE_URL } from './model'
-import { createOpenAICompatStreamTurn } from './openai-stream'
+import { createOpenAICompatCompletionTurn, createOpenAICompatStreamTurn } from './openai-stream'
 import { turnKnowledgeInstructions, type TurnKnowledgeFile } from './turn-knowledge'
 import { placeExecution, type PlacementRecord, type VacuousAxis } from '@tangle-network/agent-runtime/placement'
 export { budgetTurnKnowledge, turnKnowledgeInstructions, workspaceKnowledgeForTurn, type TurnKnowledgeBudget, type TurnKnowledgeFile } from './turn-knowledge'
@@ -59,7 +63,9 @@ export type RouterTurnEvent =
   | ({ type: 'tool_event' } & RouterTurnToolEvent)
 
 export interface RouterTurnFailure {
-  /** `model_http_<status>`, `model_unavailable`, `turn_<stopReason>` or `router_unconfigured`. */
+  /** `model_http_<status>`, `model_unavailable`, `model_empty`, `turn_<stopReason>`, `turn_aborted`,
+   *  `turn_tool_limit` or `router_unconfigured`; under a protected grant also the `grant_*` and
+   *  `settlement_*` codes of `./protected-router-turn`. */
   code: string
   status?: number
   message: string
@@ -114,6 +120,9 @@ export function placeRouterTurn(input: RouterTurnPlacementInput): PlacementRecor
   })
 }
 
+/** One tool call's result as the model reads it. */
+export type RouterTurnToolOutcome = { ok: true; result: unknown } | { ok: false; code: string; message: string }
+
 export interface RouterTurnOptions {
   apiKey: string
   model: string
@@ -139,6 +148,24 @@ export interface RouterTurnOptions {
   toolError?: (error: unknown) => { code: string; message: string; status?: number } | null
   /** Called for a tool failure the default mapping hides from the model, for the app's logs. */
   onToolFailure?: (toolName: string, error: unknown) => void
+  /** Cancels the turn: the model call in flight is aborted, no further tool starts, and the
+   *  outcome carries `turn_aborted`. Effects of tools that already ran are kept. */
+  signal?: AbortSignal
+  /** Default true: one repeat of a model call that failed before any word or tool, and of a blank
+   *  answer. Pass false when a second billable call needs the caller's own decision; the failure is
+   *  then returned as it happened. */
+  repeat?: boolean
+  /** Default true. False takes each model call as one buffered completion instead of a stream. */
+  stream?: boolean
+  /** Sent as `reasoning_effort`. */
+  reasoningEffort?: string
+  /** Sent as `max_completion_tokens`: one model call's visible and reasoning tokens together. */
+  maxCompletionTokens?: number
+  /** At most this many tool calls run. The next one is refused before it runs and the turn ends
+   *  with `turn_tool_limit`. */
+  maxToolCalls?: number
+  /** Replace the text the model reads for one tool result. `toolName` is the app's name. */
+  renderToolResult?: (toolName: string, outcome: RouterTurnToolOutcome) => string
   /**
    * Place the turn before any model call. A turn placed in the sandbox returns at once
    * with `placement` and failure `placement_sandbox`, so the app runs it there instead.
@@ -189,7 +216,7 @@ function defaultToolError(error: unknown): { code: string; message: string; stat
   return null
 }
 
-function renderResult(outcome: { ok: true; result: unknown } | { ok: false; code: string; message: string }): string {
+function renderResult(outcome: RouterTurnToolOutcome): string {
   if (!outcome.ok) return `Error (${outcome.code}): ${outcome.message}`
   let text: string
   try { text = typeof outcome.result === 'string' ? outcome.result : JSON.stringify(outcome.result ?? null) }
@@ -205,27 +232,41 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [], placement,
       failure: { code: 'placement_sandbox', message: placement.reason } }
   }
-  if (!options.apiKey) {
+  const { apiKey } = options
+  if (!apiKey) {
     return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [],
       failure: { code: 'router_unconfigured', message: 'The model credential is not configured.' } }
   }
   const emit = options.onEvent ?? (() => {})
+  const { signal } = options
+  // A cancelled turn sends nothing more, whatever the injected fetch does with the signal.
+  const fetchImpl: typeof fetch | undefined = signal
+    ? async (input, init) => {
+      signal.throwIfAborted()
+      return (options.fetchImpl ?? fetch)(input, { ...init, signal })
+    }
+    : options.fetchImpl
+  const extraBody = {
+    ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+    ...(options.maxCompletionTokens ? { max_completion_tokens: options.maxCompletionTokens } : {}),
+    ...(options.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
+  }
   const byFunction = new Map<string, RouterTurnTool>()
   for (const tool of options.tools ?? []) {
     const fn = routerFunctionName(tool.name)
     if (!byFunction.has(fn)) byFunction.set(fn, tool)
   }
   let servedModel: string | null = null
-  const streamTurn = createOpenAICompatStreamTurn({
+  const streamTurn = (options.stream === false ? createOpenAICompatCompletionTurn : createOpenAICompatStreamTurn)({
     baseUrl: options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL,
-    apiKey: options.apiKey,
+    apiKey,
     model: options.model,
     tools: [...byFunction.entries()].map(([name, tool]) => ({
       type: 'function', function: { name, description: tool.description, parameters: tool.inputSchema },
     })),
-    ...(options.maxTokens ? { extraBody: { max_tokens: options.maxTokens } } : {}),
+    ...(Object.keys(extraBody).length ? { extraBody } : {}),
     ...(options.traceId ? { headers: { 'x-tangle-trace-id': options.traceId } } : {}),
-    ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+    ...(fetchImpl ? { fetchImpl } : {}),
     onServedModel: served => { servedModel = served.servedModel },
   })
   const segments: string[] = []
@@ -235,10 +276,11 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const started = new Map<string, number>()
   let segmentOpen = false
   let toolsRan = 0
+  let toolLimitReached = false
   const deadline = Date.now() + (options.budgetMs ?? DEFAULT_BUDGET_MS)
   const callIdOf = (id: string | undefined, toolName: string) => id ?? `${toolName}-${started.size}`
 
-  const run = async (): Promise<ToolLoopStopReason> => {
+  const run = async (): Promise<ToolLoopStopReason | 'tool_limit'> => {
     for await (const step of streamAppToolLoop<LoopEvent>({
       systemPrompt: options.systemPrompt,
       userMessage: options.userMessage,
@@ -249,10 +291,16 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       isExecutableTool: name => byFunction.has(name),
       deadlineMs: deadline,
       maxToolTurns: options.maxToolTurns ?? 12,
-      renderResult: (_label, outcome) => renderResult(outcome),
+      labelFor: call => byFunction.get(call.toolName)?.name ?? call.toolName,
+      renderResult: (label, outcome) => options.renderToolResult ? options.renderToolResult(label, outcome) : renderResult(outcome),
       executeToolCall: async (call: LoopToolCall, context) => {
         const tool = byFunction.get(call.toolName)
         if (!tool) return { ok: false, code: 'unknown_tool', message: `No tool named ${call.toolName}` }
+        if (signal?.aborted) return { ok: false, code: 'aborted', message: 'The turn was cancelled before this tool ran.' }
+        if (options.maxToolCalls !== undefined && toolsRan >= options.maxToolCalls) {
+          toolLimitReached = true
+          return { ok: false, code: 'tool_limit', message: 'The turn reached its tool-call limit.' }
+        }
         toolsRan++
         // A tool's typed event rides the loop's progress channel, so it streams in order before the result.
         const emitEvent = (kind: string, data?: unknown) => context?.progress({ data: { [TOOL_EVENT]: kind, data } })
@@ -307,6 +355,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           ? { type: 'tool', callId, toolName, status: 'completed', output: step.outcome.result, startedAt, endedAt: Date.now() }
           : { type: 'tool', callId, toolName, status: 'error', startedAt, endedAt: Date.now(),
             error: { code: step.outcome.code, message: step.outcome.message } })
+        // The refused call never ran; the turn ends here rather than asking the model again.
+        if (toolLimitReached) return 'tool_limit'
       } else if (step.kind === 'capped') {
         return step.stopReason
       }
@@ -318,16 +368,18 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     text: segments.map(part => part.trim()).filter(Boolean).join('\n\n'),
     servedModel, toolCalls, usage: { ...usage }, toolEvents: [...toolEvents], ...(placement ? { placement } : {}), ...(failure ? { failure } : {}),
   })
-  let stop: ToolLoopStopReason
+  const repeat = options.repeat !== false
+  let stop: ToolLoopStopReason | 'tool_limit'
   try {
     try {
       stop = await run()
     } catch (error) {
       // Safe to repeat only while nothing was said and no tool ran.
-      if (toolsRan > 0 || segments.length > 0) throw error
+      if (!repeat || signal?.aborted || toolsRan > 0 || segments.length > 0) throw error
       stop = await run()
     }
   } catch (error) {
+    if (signal?.aborted) return outcome({ code: 'turn_aborted', message: 'The turn was cancelled.' })
     const status = (error as { status?: unknown }).status
     return outcome(typeof status === 'number'
       ? { code: `model_http_${status}`, status, message: 'The model service did not answer.' }
@@ -338,7 +390,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   // 53 "remember" turns, 2026-10-11). Nothing was said and nothing ran, so one repeat is safe;
   // an answer still blank is a typed failure, never a successful empty reply.
   if (!segments.some(part => part.trim())) {
-    if (toolsRan === 0) {
+    if (toolsRan === 0 && repeat) {
       try { stop = await run() } catch { stop = 'completed' }
       if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
     }
