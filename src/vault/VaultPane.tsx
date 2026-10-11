@@ -907,12 +907,10 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const dockButtonLabel = persistentDock ? dockLabel : dockToggleCfg.label
   const dockBlockedByDraft = !persistentDock && (dockToggleCfg.disabledWhenDirty ?? true) && isDirty
   const openCreate = () => { setCreateError(null); setNewPath(activeFolder ? `${activeFolder}/` : ''); setCreateOpen(true) }
-  // A loaded vault with nothing in it has no document to show beside the tree,
-  // so the tree pane takes the whole width and carries the empty state. A
-  // selected path still opens the document pane: a committed file can be
-  // readable before the tree lists it.
+  // Loading, empty and filled vaults share one geometry (tree column, search,
+  // document pane), so the pane never jumps when the first listing answers: an
+  // empty-vault layout measured CLS 0.38 on Hospitality's Files page.
   const vaultEmpty = treeLoaded && treePaths.files.size === 0 && treePaths.directories.size === 0
-  const treeSpansPane = vaultEmpty && !selectedPath
   const trimmedQuery = query.trim()
 
   let treeContent: ReactNode
@@ -996,7 +994,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
           </nav>
           )}
           <div className="flex min-h-0 min-w-0 flex-1">
-            <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col p-2 @[45rem]/vault:flex @[45rem]/vault:p-3 ${treeSpansPane ? '' : '@[45rem]/vault:w-[23rem] @[45rem]/vault:min-w-[23rem] @[45rem]/vault:flex-none'}`}>
+            <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col p-2 @[45rem]/vault:flex @[45rem]/vault:p-3 @[45rem]/vault:w-[23rem] @[45rem]/vault:min-w-[23rem] @[45rem]/vault:flex-none`}>
               {/* The tree is its own surface: a card on the page background,
                   so the file list reads as a finished panel rather than
                   text floating on the canvas. */}
@@ -1033,19 +1031,18 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                     )}
                   </div>
                 </div>
-                {!vaultEmpty && (
-                  <div className="shrink-0 px-3 pb-2">
-                    <input
-                      ref={searchRef}
-                      type="search"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder={activeFolder ? `Search ${activeFolder}…` : `Search ${noun}…`}
-                      aria-label={`Search ${noun}`}
-                      className="h-8 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:text-base"
-                    />
-                  </div>
-                )}
+                <div className="shrink-0 px-3 pb-2">
+                  <input
+                    ref={searchRef}
+                    type="search"
+                    disabled={vaultEmpty}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={activeFolder ? `Search ${activeFolder}…` : `Search ${noun}…`}
+                    aria-label={`Search ${noun}`}
+                    className="h-8 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:text-base"
+                  />
+                </div>
                 {activeFolder && (
                   <div className="mx-3 mb-2 flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs">
                     <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -1073,7 +1070,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               role="region"
               aria-label={`${label} document`}
               tabIndex={-1}
-              className={`${showFiles || treeSpansPane ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden ${treeSpansPane ? '' : '@[45rem]/vault:flex'}`}
+              className={`${showFiles ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden @[45rem]/vault:flex`}
             >
               {selectedFile && (
                 <ShellHeader className={`justify-between gap-2 px-4 ${pathBarClassName ?? 'bg-card'}`}>

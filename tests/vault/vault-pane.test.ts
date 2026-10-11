@@ -1268,16 +1268,17 @@ it('coalesces a refresh with a pending save into one read after both settle', as
 })
 
 describe('VaultPane — empty vault, empty search, pane switcher', () => {
-  it('replaces a blank tree with an empty state that offers New file, and drops the document pane', async () => {
+  it('replaces a blank tree with an empty state that offers New file, in the same geometry as a filled vault', async () => {
     const tree = vi.fn(renderTree)
     mount({ port: fakePort({ listTree: vi.fn(async () => []) }), renderTree: tree })
+    const loadingTree = document.querySelector('[data-vault-tree]')!.className
     expect(await screen.findByText('No files yet')).toBeTruthy()
     expect(tree).not.toHaveBeenCalled()
-    // Nothing to search and nothing to switch to.
-    expect(screen.queryByLabelText('Search vault')).toBeNull()
+    // The listing answering "empty" must not move the pane: same tree column, search kept but disabled.
+    expect(document.querySelector('[data-vault-tree]')!.className).toBe(loadingTree)
+    expect((screen.getByLabelText('Search vault') as HTMLInputElement).disabled).toBe(true)
     expect(screen.queryByRole('navigation')).toBeNull()
-    expect(screen.getByRole('region', { hidden: true, name: 'Vault document' }).className).toContain('hidden')
-    expect(screen.getByRole('region', { hidden: true, name: 'Vault document' }).className).not.toContain('@[45rem]/vault:flex')
+    expect(screen.getByRole('region', { hidden: true, name: 'Vault document' }).className).toContain('@[45rem]/vault:flex')
     fireEvent.click(screen.getAllByRole('button', { name: 'New file' })[0]!)
     expect(screen.getByLabelText('New file path')).toBeTruthy()
   })
