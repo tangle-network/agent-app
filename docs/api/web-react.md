@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-490 exports.
+493 exports.
 
 ### `acceptRejectionReason`
 
@@ -2022,6 +2022,22 @@ type InteractionSubmitResult
 (interaction: ChatInteraction, data: InteractionData) => string
 ```
 
+### `lazyRoute`
+
+`function`
+
+```ts
+<P extends object>(load: () => Promise<ComponentType<P>>) => LazyRoute<P>
+```
+
+### `LazyRoute`
+
+`type` — A lazily loaded route that renders synchronously once its module has loaded.
+
+```ts
+type LazyRoute
+```
+
 ### `LinkLikeComponent`
 
 `type`
@@ -2332,6 +2348,14 @@ type PickerVariant
 
 ```ts
 interface PopoverSurfaceProps
+```
+
+### `preloadWhenIdle`
+
+`function` — Load routes while the browser is idle (at most `timeoutMs` later), so a first visit waits only on its data.
+
+```ts
+(routes: readonly { preload: () => Promise<void>; }[], timeoutMs?: number) => () => void
 ```
 
 ### `ProducerErrorEvent`
