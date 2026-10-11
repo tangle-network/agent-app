@@ -261,6 +261,8 @@ export function interruptedReleaseApplies(
 export const TURN_STREAM_PATHS = {
   broadcast: '/broadcast',
   lockAcquire: '/chat-turn-lock/acquire',
+  /** Read the active lock without changing it; also brings the object up before a turn needs it. */
+  lockPeek: '/chat-turn-lock/peek',
   lockRelease: '/chat-turn-lock/release',
   lockReleaseInterrupted: '/chat-turn-lock/release-interrupted',
   turnEventsAppend: '/turn-events/append',

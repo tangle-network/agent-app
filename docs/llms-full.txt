@@ -15128,6 +15128,14 @@ interface BillableBalanceState
 (auth: BetterAuthSessionCookieSource, options?: BetterAuthSessionCookieMinterOptions) => (args: TangleSsoSessionCookieA…
 ```
 
+### `createD1TangleIdentityStore`
+
+`function` — Create the identity-protocol account store for one request.
+
+```ts
+(options: D1TangleIdentityStoreOptions) => TangleIdentitySsoAccountStore
+```
+
 ### `createHubSettingsRoutes`
 
 `function` — Build the finite, application-authorized Hub settings server boundary.
@@ -15182,6 +15190,14 @@ interface BillableBalanceState
 
 ```ts
 (opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions | TangleIdentitySsoHandlerOptions) => TangleSsoHandlers
+```
+
+### `D1TangleIdentityStoreOptions`
+
+`interface`
+
+```ts
+interface D1TangleIdentityStoreOptions
 ```
 
 ### `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`
@@ -15558,6 +15574,46 @@ type SeatStatus
 
 ```ts
 interface SsoStateConfig
+```
+
+### `TANGLE_IDENTITY_ACCOUNT_INDEXES_SQL`
+
+`const` — Partial unique indexes the store requires on Better Auth's `account` table.
+
+```ts
+readonly ["CREATE UNIQUE INDEX IF NOT EXISTS account_tangle_platform_user ON account(accountId) WHERE providerId = 'tan…
+```
+
+### `TANGLE_IDENTITY_PROVIDER_ID`
+
+`const` — Better Auth `account.providerId` for the Tangle platform link.
+
+```ts
+"tangle"
+```
+
+### `TangleIdentityD1Like`
+
+`interface` — The D1 surface the store needs.
+
+```ts
+interface TangleIdentityD1Like
+```
+
+### `TangleIdentityD1Statement`
+
+`interface` — A prepared D1 statement; Cloudflare `D1PreparedStatement` satisfies it.
+
+```ts
+interface TangleIdentityD1Statement
+```
+
+### `TangleIdentityLegacyLinkTable`
+
+`interface` — A link table the product used before this store.
+
+```ts
+interface TangleIdentityLegacyLinkTable
 ```
 
 ### `TangleIdentitySsoAccountStore`
@@ -18857,6 +18913,22 @@ interface BuildSandboxToolFileMountsOptions
 <TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…
 ```
 
+### `createWorkspacePrewarmRoute`
+
+`function` — Build the handler once per isolate, not per request: its single-flight and success memory live in the returned closure.
+
+```ts
+<Context = void>(options: CreateWorkspacePrewarmRouteOptions<Context>) => (request: Request, context: Context) => Promi…
+```
+
+### `CreateWorkspacePrewarmRouteOptions`
+
+`interface`
+
+```ts
+interface CreateWorkspacePrewarmRouteOptions
+```
+
 ### `createWorkspaceSandboxManager`
 
 `function` — Create a generic name-keyed sandbox lifecycle manager for products that drive their own SDK or box types.
@@ -19079,6 +19151,14 @@ interface ForegroundSandboxSingleFlightOptions
 
 ```ts
 interface InspectablePrewarmClaimStore
+```
+
+### `isAutomatedPrewarmRequest`
+
+`function` — True for crawler user agents and browser speculative prefetch or prerender.
+
+```ts
+(request: Request) => boolean
 ```
 
 ### `isEgressProxyRecoveryRequiredError`
@@ -20095,6 +20175,46 @@ number
 
 ```ts
 "WORKSPACE_SANDBOX_UNRECOVERABLE"
+```
+
+### `WorkspacePrewarmAuthorization`
+
+`type` — What the product decided for this request.
+
+```ts
+type WorkspacePrewarmAuthorization
+```
+
+### `WorkspacePrewarmEvent`
+
+`type`
+
+```ts
+type WorkspacePrewarmEvent
+```
+
+### `WorkspacePrewarmOutcome`
+
+`type`
+
+```ts
+type WorkspacePrewarmOutcome
+```
+
+### `WorkspacePrewarmReport`
+
+`type`
+
+```ts
+type WorkspacePrewarmReport
+```
+
+### `WorkspacePrewarmResponse`
+
+`interface`
+
+```ts
+interface WorkspacePrewarmResponse
 ```
 
 ### `WorkspaceSandboxEnsureContext`
@@ -27477,6 +27597,14 @@ interface MemoryTurnStreamSocket
 (channelName: string, secret: string, now?: () => number, ttlMs?: number) => Promise<string>
 ```
 
+### `peekDurableTurnLock`
+
+`function` — Read a channel's active turn lock without changing it.
+
+```ts
+(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; scope: TurnLockScope; }, auth: Tur…
+```
+
 ### `pruneStaleThreads`
 
 `function` — Remove responding markers older than ttlMs; return their thread IDs.
@@ -27554,7 +27682,7 @@ number
 `const` — Provide constant paths for managing chat turn streams and locks
 
 ```ts
-{ readonly broadcast: "/broadcast"; readonly lockAcquire: "/chat-turn-lock/acquire"; readonly lockRelease: "/chat-turn-…
+{ readonly broadcast: "/broadcast"; readonly lockAcquire: "/chat-turn-lock/acquire"; readonly lockPeek: "/chat-turn-loc…
 ```
 
 ### `TURN_STREAM_STORAGE_KEYS`
@@ -29067,7 +29195,7 @@ interface ChatUiMessage
 `function`
 
 ```ts
-({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, loading, initialQuery, onQueryChange, placeholder, empt…
+({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, returnFocusTo, loading, initialQuery, onQueryChange, pl…
 ```
 
 ### `CommandPaletteItem`
@@ -31326,6 +31454,14 @@ type RecordGridWriteOutcome
 (files: File[], startIndex: number, stagedNames?: Iterable<string>) => { files: File[]; nextIndex: number; }
 ```
 
+### `requestWorkspacePrewarm`
+
+`function` — Send one prewarm request for `url` unless the tab is hidden, a request for it is in flight, or one was sent within `minIntervalMs`.
+
+```ts
+(url: string, options?: WorkspacePrewarmRequestOptions) => boolean
+```
+
 ### `resolveChatInteraction`
 
 `function` — Marks one ask resolved locally (the card's `onResolved`).
@@ -32094,6 +32230,22 @@ interface UseSessionHistoryOptions
 (active: boolean) => number
 ```
 
+### `useWorkspacePrewarm`
+
+`function` — Prewarm `url` when the page opens or becomes visible; `reassert` on composer focus.
+
+```ts
+(options: UseWorkspacePrewarmOptions) => WorkspacePrewarmHandle
+```
+
+### `UseWorkspacePrewarmOptions`
+
+`interface`
+
+```ts
+interface UseWorkspacePrewarmOptions
+```
+
 ### `validateRecordGridCell`
 
 `function` — Check one already-typed value against its column.
@@ -32244,6 +32396,22 @@ interface WorkProductCardProps
 
 ```ts
 ({ name, size }: { name: string; size?: "sm" | "lg" | undefined; }) => Element
+```
+
+### `WorkspacePrewarmHandle`
+
+`interface`
+
+```ts
+interface WorkspacePrewarmHandle
+```
+
+### `WorkspacePrewarmRequestOptions`
+
+`interface`
+
+```ts
+interface WorkspacePrewarmRequestOptions
 ```
 
 ### `WorkspaceSwitcher`

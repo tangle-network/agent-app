@@ -37,6 +37,7 @@ Approvals attach to an action's effects, such as spending or publishing, rather 
 
 ## Read for the task
 
+- Before building or changing an app's routes, jobs, sandboxes, deploys or metrics, read [agent-app-lessons.md](docs/agent-app-lessons.md): the production failures every app inherits and the checks that enforce each.
 - For chat assembly, read [examples/chat-app.md](examples/chat-app.md) and the relevant chat and sandbox entries in the code map.
   Keep live event viewing, durable transcript history, and turn admission as separate responsibilities.
   A replay buffer does not replace history storage or a single-flight lock.

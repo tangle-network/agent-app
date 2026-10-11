@@ -126,3 +126,57 @@ rejecting, because an unhandled rejection handed to `waitUntil` can fail the
 request it rode in on. It is never silent: `onEvent({type:'failed'})` fires and
 `readiness()` reports `failed` with a `retryAfterMs`, so the UI can say so
 instead of spinning.
+
+## Prewarm on page open: the route and the hook
+
+Every product warms the same way: the browser asks when a member opens a
+workspace page, and the server decides what to warm.
+
+```ts
+// Server. `authorize` is the only product code: authenticate the member the
+// way your other routes do, and return the warm for the box they would use.
+import { createWorkspacePrewarmRoute } from '@tangle-network/agent-app/sandbox'
+
+// Create it once per isolate: single-flight and the success memory live in it.
+const prewarm = createWorkspacePrewarmRoute<AppContext>({
+  authorize: async ({ request, context: c }) => {
+    if (!sameOrigin(request)) return { status: 'denied', response: Response.json({ error: 'Origin mismatch' }, { status: 403 }) }
+    const member = await requireMember(c.env, request)
+    if (!member) return { status: 'denied', response: Response.json({ error: 'Authentication required' }, { status: 401 }) }
+    return {
+      status: 'allowed',
+      key: member.workspaceId,
+      warm: async () => {
+        const decision = await prewarmer.prewarm({ workspaceId: member.workspaceId, harness: 'opencode' })
+        await decision.completion
+        return { outcome: decision.outcome }
+      },
+    }
+  },
+  onEvent: (event) => console.log('[prewarm]', event),
+})
+app.post('/api/workspaces/:id/prewarm', (c) => prewarm(c.req.raw, c))
+```
+
+```tsx
+// Browser. Fires on open from a visible tab, at most once a minute per
+// workspace, and again when focus enters the composer.
+import { ChatComposer, useWorkspacePrewarm } from '@tangle-network/agent-app/web-react'
+
+const prewarm = useWorkspacePrewarm({ url: `/api/workspaces/${id}/prewarm`, enabled: signedIn })
+<ChatComposer onFocusWithin={prewarm.reassert} … />
+```
+
+The route awaits the warm inside the request rather than handing it to
+`waitUntil`: a suspended box can take longer to resume than the 30 s Cloudflare
+grants after a response. It collapses concurrent requests for one `key` in an
+isolate, answers `recent` for 30 s after a success, refuses crawler and
+prefetch requests before authorizing, and answers a failed warm with
+`{ outcome: 'failed' }` and no error text. Across isolates the warm itself must
+be idempotent, so resume an existing box or use a claim store for creation.
+
+What the warm does is product policy. Resume the box the next turn will use,
+and prepare only what that turn would prepare under the same authority checks.
+The in-box OpenCode server prewarm is a separate Sandbox platform switch
+(`SANDBOX_OPENCODE_PREWARM_ENABLED` with the warm-server cohort); a product
+route does not duplicate it.

@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-95 exports.
+102 exports.
 
 ### `AdminGuardOptions`
 
@@ -134,6 +134,14 @@ interface BillableBalanceState
 (auth: BetterAuthSessionCookieSource, options?: BetterAuthSessionCookieMinterOptions) => (args: TangleSsoSessionCookieA…
 ```
 
+### `createD1TangleIdentityStore`
+
+`function` — Create the identity-protocol account store for one request.
+
+```ts
+(options: D1TangleIdentityStoreOptions) => TangleIdentitySsoAccountStore
+```
+
 ### `createHubSettingsRoutes`
 
 `function` — Build the finite, application-authorized Hub settings server boundary.
@@ -188,6 +196,14 @@ interface BillableBalanceState
 
 ```ts
 (opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions | TangleIdentitySsoHandlerOptions) => TangleSsoHandlers
+```
+
+### `D1TangleIdentityStoreOptions`
+
+`interface`
+
+```ts
+interface D1TangleIdentityStoreOptions
 ```
 
 ### `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`
@@ -564,6 +580,46 @@ type SeatStatus
 
 ```ts
 interface SsoStateConfig
+```
+
+### `TANGLE_IDENTITY_ACCOUNT_INDEXES_SQL`
+
+`const` — Partial unique indexes the store requires on Better Auth's `account` table.
+
+```ts
+readonly ["CREATE UNIQUE INDEX IF NOT EXISTS account_tangle_platform_user ON account(accountId) WHERE providerId = 'tan…
+```
+
+### `TANGLE_IDENTITY_PROVIDER_ID`
+
+`const` — Better Auth `account.providerId` for the Tangle platform link.
+
+```ts
+"tangle"
+```
+
+### `TangleIdentityD1Like`
+
+`interface` — The D1 surface the store needs.
+
+```ts
+interface TangleIdentityD1Like
+```
+
+### `TangleIdentityD1Statement`
+
+`interface` — A prepared D1 statement; Cloudflare `D1PreparedStatement` satisfies it.
+
+```ts
+interface TangleIdentityD1Statement
+```
+
+### `TangleIdentityLegacyLinkTable`
+
+`interface` — A link table the product used before this store.
+
+```ts
+interface TangleIdentityLegacyLinkTable
 ```
 
 ### `TangleIdentitySsoAccountStore`

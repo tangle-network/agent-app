@@ -11761,6 +11761,12 @@
           "doc": "Canonical `setSessionCookie` wiring for better-auth apps: mint the session Set-Cookie exactly as better-auth's own login flows do — name + attributes from `auth.$context.authCookies.sessionToken` (be…"
         },
         {
+          "name": "createD1TangleIdentityStore",
+          "kind": "function",
+          "signature": "(options: D1TangleIdentityStoreOptions) => TangleIdentitySsoAccountStore",
+          "doc": "Create the identity-protocol account store for one request."
+        },
+        {
           "name": "createHubSettingsRoutes",
           "kind": "function",
           "signature": "(ctx: HubSettingsContext) => HubSettingsRoutes",
@@ -11801,6 +11807,12 @@
           "kind": "function",
           "signature": "(opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions | TangleIdentitySsoHandlerOptions) => TangleSsoHandlers",
           "doc": "Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies"
+        },
+        {
+          "name": "D1TangleIdentityStoreOptions",
+          "kind": "interface",
+          "signature": "interface D1TangleIdentityStoreOptions",
+          "doc": null
         },
         {
           "name": "DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR",
@@ -12083,6 +12095,36 @@
           "kind": "interface",
           "signature": "interface SsoStateConfig",
           "doc": "Define configuration options for managing SSO state including secret, lifetime, and clock injection"
+        },
+        {
+          "name": "TANGLE_IDENTITY_ACCOUNT_INDEXES_SQL",
+          "kind": "const",
+          "signature": "readonly [\"CREATE UNIQUE INDEX IF NOT EXISTS account_tangle_platform_user ON account(accountId) WHERE providerId = 'tan…",
+          "doc": "Partial unique indexes the store requires on Better Auth's `account` table."
+        },
+        {
+          "name": "TANGLE_IDENTITY_PROVIDER_ID",
+          "kind": "const",
+          "signature": "\"tangle\"",
+          "doc": "Better Auth `account.providerId` for the Tangle platform link."
+        },
+        {
+          "name": "TangleIdentityD1Like",
+          "kind": "interface",
+          "signature": "interface TangleIdentityD1Like",
+          "doc": "The D1 surface the store needs."
+        },
+        {
+          "name": "TangleIdentityD1Statement",
+          "kind": "interface",
+          "signature": "interface TangleIdentityD1Statement",
+          "doc": "A prepared D1 statement; Cloudflare `D1PreparedStatement` satisfies it."
+        },
+        {
+          "name": "TangleIdentityLegacyLinkTable",
+          "kind": "interface",
+          "signature": "interface TangleIdentityLegacyLinkTable",
+          "doc": "A link table the product used before this store."
         },
         {
           "name": "TangleIdentitySsoAccountStore",
@@ -14643,6 +14685,18 @@
           "doc": "Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token pinned to `scope: 'session-runtime'` (the ONLY scope the platform gran…"
         },
         {
+          "name": "createWorkspacePrewarmRoute",
+          "kind": "function",
+          "signature": "<Context = void>(options: CreateWorkspacePrewarmRouteOptions<Context>) => (request: Request, context: Context) => Promi…",
+          "doc": "Build the handler once per isolate, not per request: its single-flight and success memory live in the returned closure."
+        },
+        {
+          "name": "CreateWorkspacePrewarmRouteOptions",
+          "kind": "interface",
+          "signature": "interface CreateWorkspacePrewarmRouteOptions",
+          "doc": null
+        },
+        {
           "name": "createWorkspaceSandboxManager",
           "kind": "function",
           "signature": "<TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void>(opts: WorkspaceSandboxManagerOptions<TClien…",
@@ -14809,6 +14863,12 @@
           "kind": "interface",
           "signature": "interface InspectablePrewarmClaimStore",
           "doc": "A claim store that can distinguish a completed owner from a crashed owner."
+        },
+        {
+          "name": "isAutomatedPrewarmRequest",
+          "kind": "function",
+          "signature": "(request: Request) => boolean",
+          "doc": "True for crawler user agents and browser speculative prefetch or prerender."
         },
         {
           "name": "isEgressProxyRecoveryRequiredError",
@@ -15571,6 +15631,36 @@
           "kind": "const",
           "signature": "\"WORKSPACE_SANDBOX_UNRECOVERABLE\"",
           "doc": "The platform ran its own recovery, failed, and asked for a replacement."
+        },
+        {
+          "name": "WorkspacePrewarmAuthorization",
+          "kind": "type",
+          "signature": "type WorkspacePrewarmAuthorization",
+          "doc": "What the product decided for this request."
+        },
+        {
+          "name": "WorkspacePrewarmEvent",
+          "kind": "type",
+          "signature": "type WorkspacePrewarmEvent",
+          "doc": null
+        },
+        {
+          "name": "WorkspacePrewarmOutcome",
+          "kind": "type",
+          "signature": "type WorkspacePrewarmOutcome",
+          "doc": null
+        },
+        {
+          "name": "WorkspacePrewarmReport",
+          "kind": "type",
+          "signature": "type WorkspacePrewarmReport",
+          "doc": null
+        },
+        {
+          "name": "WorkspacePrewarmResponse",
+          "kind": "interface",
+          "signature": "interface WorkspacePrewarmResponse",
+          "doc": null
         },
         {
           "name": "WorkspaceSandboxEnsureContext",
@@ -21270,6 +21360,12 @@
           "doc": "`v1.<base64url-channel>.<exp-ms-36>.<base64url-mac>` — the expiry is inside the signed payload so it cannot be extended by editing the token."
         },
         {
+          "name": "peekDurableTurnLock",
+          "kind": "function",
+          "signature": "(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; scope: TurnLockScope; }, auth: Tur…",
+          "doc": "Read a channel's active turn lock without changing it."
+        },
+        {
           "name": "pruneStaleThreads",
           "kind": "function",
           "signature": "(active: Map<string, number>, now: number, ttlMs: number) => string[]",
@@ -21326,7 +21422,7 @@
         {
           "name": "TURN_STREAM_PATHS",
           "kind": "const",
-          "signature": "{ readonly broadcast: \"/broadcast\"; readonly lockAcquire: \"/chat-turn-lock/acquire\"; readonly lockRelease: \"/chat-turn-…",
+          "signature": "{ readonly broadcast: \"/broadcast\"; readonly lockAcquire: \"/chat-turn-lock/acquire\"; readonly lockPeek: \"/chat-turn-loc…",
           "doc": "Provide constant paths for managing chat turn streams and locks"
         },
         {
@@ -22496,7 +22592,7 @@
         {
           "name": "CommandPalette",
           "kind": "function",
-          "signature": "({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, loading, initialQuery, onQueryChange, placeholder, empt…",
+          "signature": "({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, returnFocusTo, loading, initialQuery, onQueryChange, pl…",
           "doc": null
         },
         {
@@ -24192,6 +24288,12 @@
           "doc": "Gives every generically-named clipboard image a distinct `pasted-image-<n>.<ext>` name."
         },
         {
+          "name": "requestWorkspacePrewarm",
+          "kind": "function",
+          "signature": "(url: string, options?: WorkspacePrewarmRequestOptions) => boolean",
+          "doc": "Send one prewarm request for `url` unless the tab is hidden, a request for it is in flight, or one was sent within `minIntervalMs`."
+        },
+        {
           "name": "resolveChatInteraction",
           "kind": "function",
           "signature": "(list: ChatInteraction[], id: string, status: \"cancelled\" | \"expired\" | \"answered\" | \"declined\", answers?: InteractionA…",
@@ -24768,6 +24870,18 @@
           "doc": "Whole seconds elapsed while `active`, ticking once a second."
         },
         {
+          "name": "useWorkspacePrewarm",
+          "kind": "function",
+          "signature": "(options: UseWorkspacePrewarmOptions) => WorkspacePrewarmHandle",
+          "doc": "Prewarm `url` when the page opens or becomes visible; `reassert` on composer focus."
+        },
+        {
+          "name": "UseWorkspacePrewarmOptions",
+          "kind": "interface",
+          "signature": "interface UseWorkspacePrewarmOptions",
+          "doc": null
+        },
+        {
           "name": "validateRecordGridCell",
           "kind": "function",
           "signature": "(column: RecordGridColumn, value: RecordGridValue) => RecordGridCellOutcome",
@@ -24880,6 +24994,18 @@
           "kind": "function",
           "signature": "({ name, size }: { name: string; size?: \"sm\" | \"lg\" | undefined; }) => Element",
           "doc": "The one workspace avatar: ui's IconTile with the workspace's initials on a categorical tone derived from its name."
+        },
+        {
+          "name": "WorkspacePrewarmHandle",
+          "kind": "interface",
+          "signature": "interface WorkspacePrewarmHandle",
+          "doc": null
+        },
+        {
+          "name": "WorkspacePrewarmRequestOptions",
+          "kind": "interface",
+          "signature": "interface WorkspacePrewarmRequestOptions",
+          "doc": null
         },
         {
           "name": "WorkspaceSwitcher",

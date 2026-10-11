@@ -400,6 +400,10 @@ export type ChatTurnLockResult =
 export interface ChatTurnLock<TContext> {
   acquire(args: ChatTurnProduceArgs<TContext>): ChatTurnLockResult | Promise<ChatTurnLockResult>
   release(handle: unknown): void | Promise<void>
+  /** Bring up whatever `acquire` will talk to, as soon as the turn is admitted
+   *  and while `prepareTurn` and the history read run. Never awaited; a failure
+   *  is logged and the turn goes on to `acquire` as usual. */
+  warm?(target: { tenantId: string; userId: string; threadId: string; context: TContext }): void | Promise<void>
 }
 
 interface ChatTurnLifecycleBase<TContext> {
@@ -942,6 +946,17 @@ export function createChatTurnRoutes<TContext = void>(
     const { parsed, auth } = admitted
     const { payload, content, fileParts, mentions, turnId } = parsed
     const { tenantId, userId, context } = auth
+
+    if (options.turnLock?.warm) {
+      // Overlaps the lock's first-use cost with prepareTurn and the history read.
+      try {
+        void Promise.resolve(options.turnLock.warm({ tenantId, userId, threadId: payload.threadId, context })).catch((err) => {
+          log('[chat-routes] turnLock.warm failed', { error: err instanceof Error ? err.message : String(err) })
+        })
+      } catch (err) {
+        log('[chat-routes] turnLock.warm failed', { error: err instanceof Error ? err.message : String(err) })
+      }
+    }
 
     if (options.prepareTurn) {
       const prepared = await options.prepareTurn({
