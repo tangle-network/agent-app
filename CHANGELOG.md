@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.76
+
+- docs(lessons): ledgers merge by union on every branch through a global attributes file (#988)
+
 ## 0.60.75
 
 - docs(lessons): one shared operator key, one request budget (dotfiles #331) (#987)
