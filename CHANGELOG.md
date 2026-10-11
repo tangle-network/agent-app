@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.81
+
+- fix(workspace-export): the panel advances one export at a time (#994)
+- fix(prewarm): never await another request's warm; send the warm reason (#995)
+
 ## 0.60.80
 
 - fix(app-auth): never share a session read in flight across requests (#993)
