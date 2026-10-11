@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.111
+
+- fix(workspace-export): exports owners can read, and a busy sandbox no longer fails them (#1037)
+
 ## 0.60.110
 
 - fix(web-react): the question card tells the truth about late answers (#1024)
