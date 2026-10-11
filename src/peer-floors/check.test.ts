@@ -263,7 +263,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('21.0.0', range!)).toBe(false)
   })
 
-  it('requires the Sandbox UI release that owns the inset workspace surface, without claiming the next minor', async () => {
+  it('requires the Sandbox UI release that owns ShellHeader and the inset workspace surface, without claiming the next minor', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -271,16 +271,17 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/sandbox-ui']
 
     expect(range).toBeDefined()
-    // AgentWorkspaceCompanion passes WorkspaceLayout `surface="inset"` and the right-pane
-    // control labels, first shipped in 0.132.0; earlier releases ignore them.
-    expect(satisfiesRange('0.130.4', range!)).toBe(false)
+    // The assistant panel, session history and Vault path bar render sandbox-ui's
+    // ShellHeader rows, first shipped in 0.133.0. AgentWorkspaceCompanion also passes
+    // WorkspaceLayout `surface="inset"` and the right-pane control labels (0.132.0).
     expect(satisfiesRange('0.131.5', range!)).toBe(false)
-    expect(satisfiesRange('0.132.0', range!)).toBe(true)
-    expect(satisfiesRange('0.132.3', range!)).toBe(true)
-    expect(satisfiesRange('0.133.0', range!)).toBe(false)
+    expect(satisfiesRange('0.132.3', range!)).toBe(false)
+    expect(satisfiesRange('0.133.0', range!)).toBe(true)
+    expect(satisfiesRange('0.133.4', range!)).toBe(true)
+    expect(satisfiesRange('0.134.0', range!)).toBe(false)
   })
 
-  it('requires the UI release that exports ApprovalDiffSummary', async () => {
+  it('requires the UI release that exports TRANSCRIPT_TEXT and ApprovalDiffSummary', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -288,12 +289,12 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/ui']
 
     expect(range).toBeDefined()
-    // 11.31.0 is the first UI release with ApprovalDiffSummary, which the
-    // approval dock and receipts render for a change's files. It also has
-    // MessageAuthor (11.25.0), which ChatMessages renders for a message's author.
-    expect(satisfiesRange('11.30.2', range!)).toBe(false)
-    expect(satisfiesRange('11.31.0', range!)).toBe(true)
-    expect(satisfiesRange('11.31.2', range!)).toBe(true)
+    // 11.32.0 is the first UI release with TRANSCRIPT_TEXT, which ChatMessages
+    // sets both message roles with. It also has ApprovalDiffSummary (11.31.0), which
+    // the approval dock and receipts render, and MessageAuthor (11.25.0).
+    expect(satisfiesRange('11.31.2', range!)).toBe(false)
+    expect(satisfiesRange('11.32.0', range!)).toBe(true)
+    expect(satisfiesRange('11.33.1', range!)).toBe(true)
     expect(satisfiesRange('12.0.0', range!)).toBe(false)
   })
 
