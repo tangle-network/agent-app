@@ -44,7 +44,7 @@
     "agent-app-verify-proof": "./dist/signoff/proof-cli.js",
     "tangle-agent": "bin/tangle-agent.mjs",
     "agent-app-invariants": "./dist/launch-invariants/cli.js",
-    "agent-app-rollout-check": "./dist/rollout/cli.js"
+    "agent-app-rollout-check": "./dist/rollout/cli.js",
     "agent-app-journeys": "./dist/journeys/cli.js"
   },
   "exports": {
