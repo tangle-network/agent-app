@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.74
+
+- docs(lessons): the delivery, coordination-host, pasted-code and prompt-text checks are merged (#986)
+
 ## 0.60.73
 
 - chore: merge append-only ledgers by union (#985)
