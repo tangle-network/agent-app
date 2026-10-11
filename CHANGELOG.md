@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.108
+
+- fix(sandbox): charge an unused warm for box uptime, not for a stretched hold (#1029)
+
 ## 0.60.107
 
 - fix(knip): derive entries from tsup.config.ts so a new subpath cannot turn main red (#1032)
