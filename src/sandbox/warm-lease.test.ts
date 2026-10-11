@@ -15,10 +15,15 @@ const MIN = 60_000
 // Wednesday 2026-10-07 12:00:00Z.
 const T0 = Date.UTC(2026, 9, 7, 12, 0, 0)
 
-/** Real SQLite behind the D1 shape, so the upserts' race semantics are the engine's, not a fake's. */
+/**
+ * Real SQLite behind the D1 shape, so the upserts' race semantics are the
+ * engine's, not a fake's. It refuses numbered `?NNN` placeholders the way
+ * better-sqlite3 does, because products wrap better-sqlite3 as D1 in tests.
+ */
 function d1(db: DatabaseSync): WarmLeaseD1Like {
   return {
     prepare(query: string) {
+      if (/\?\d/.test(query)) throw new RangeError('numbered placeholders are not portable')
       const stmt = db.prepare(query)
       return {
         bind(...values: unknown[]) {
