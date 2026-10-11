@@ -148,7 +148,9 @@
     "tests/theme/fixtures/**"
   ],
   "ignoreBinaries": [
-    "tsc"
+    "tsc",
+    "ffmpeg",
+    "ffprobe"
   ],
   "ignoreDependencies": [
     "@anthropic-ai/sdk",

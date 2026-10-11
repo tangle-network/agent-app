@@ -233,7 +233,8 @@ export class Journey {
   /** Type at a readable pace into an input or textarea. */
   async type(target: Locator, text: string, opts: { delay?: number } = {}): Promise<void> {
     await this.click(target, { pauseAfter: 200 })
-    await target.pressSequentially(text, { delay: opts.delay ?? 28 })
+    const delay = opts.delay ?? 28
+    await target.pressSequentially(text, { delay, timeout: 30_000 + text.length * (delay + 60) })
     await sleep(400)
   }
 
@@ -264,7 +265,9 @@ export class Journey {
       const lines = prompt.split('\n')
       for (let i = 0; i < lines.length; i += 1) {
         if (i > 0) await box.press('Shift+Enter')
-        if (lines[i]) await box.pressSequentially(lines[i]!, { delay: attempt === 0 ? delay : 0 })
+        // Sized by length: a loaded host types slower than the context's 20 s default allows.
+        const line = lines[i]!
+        if (line) await box.pressSequentially(line, { delay: attempt === 0 ? delay : 0, timeout: 30_000 + line.length * (delay + 60) })
       }
       const text = (await box.innerText().catch(() => '')).replace(/\s+/g, ' ').trim()
       if (text.includes(want)) return
