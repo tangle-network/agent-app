@@ -124,7 +124,7 @@ function renderResult(outcome: { ok: true; result: unknown } | { ok: false; code
 
 export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterTurnOutcome> {
   if (!options.apiKey) {
-    return { text: '', servedModel: null, toolCalls: [],
+    return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 },
       failure: { code: 'router_unconfigured', message: 'The model credential is not configured.' } }
   }
   const emit = options.onEvent ?? (() => {})

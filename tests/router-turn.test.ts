@@ -52,7 +52,7 @@ describe('runRouterTurn', () => {
     // The model reads its own call and the result back, keyed to the call.
     expect(requests[1]!.body.messages).toEqual(expect.arrayContaining([
       expect.objectContaining({ role: 'tool', tool_call_id: 'call-1', content: '{"taskId":"task-1","title":"Restock towels"}' })]))
-    expect(events.map(event => event.type === 'text' ? `text:${event.delta}` : `tool:${event.status}`))
+    expect(events.map(event => event.type === 'text' ? `text:${event.delta}` : event.type === 'tool' ? `tool:${event.status}` : 'usage'))
       .toEqual(['tool:running', 'tool:completed', 'text:Done: ', 'text:Restock towels is on the list.'])
   })
 
