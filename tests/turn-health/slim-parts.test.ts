@@ -2,7 +2,11 @@ import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
 import { createD1TurnHealthSource, sweepSilentFailures, type SweepResult } from '../../src/turn-health/sweep.js'
 
-/** better-sqlite3 behind the D1 statement surface the source uses, counting the bytes each read returns. */
+/**
+ * better-sqlite3 behind the D1 statement surface the source uses, counting the bytes each read returns.
+ * better-sqlite3 treats D1's numbered `?1` placeholders as named ones, so each becomes `?` with its value
+ * placed in the order it appears.
+ */
 function d1(db: Database.Database, bytes: number[]) {
   return {
     prepare(sql: string) {
@@ -10,7 +14,9 @@ function d1(db: Database.Database, bytes: number[]) {
         bind(...params: unknown[]) {
           return {
             async all<T>(): Promise<{ results: T[] }> {
-              const results = db.prepare(sql).all(...params) as T[]
+              const order: number[] = []
+              const positional = sql.replace(/\?(\d+)/g, (_, n: string) => (order.push(Number(n) - 1), '?'))
+              const results = db.prepare(positional).all(...order.map((i) => params[i])) as T[]
               if (sql.includes('json_each(CASE') || sql.startsWith('SELECT id, parts FROM')) bytes.push(Buffer.byteLength(JSON.stringify(results)))
               return { results }
             },
