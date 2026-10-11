@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.72
+
+- feat(workspace-export): sandboxArchive resumes a stopped box for the export (#984)
+- fix(sandbox): warm lease store binds plain placeholders so better-sqlite3 harnesses run it (#982)
+
 ## 0.60.71
 
 - fix(stream): settleOrphanedTurns leaves a plan follow-up claim to its gate until the claim's own staleness (#983)
