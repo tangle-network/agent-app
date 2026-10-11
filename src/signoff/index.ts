@@ -68,6 +68,32 @@ export {
 } from './shell-alignment'
 export { parseShellAlignmentArgs, runShellAlignmentCli } from './shell-alignment-cli'
 export {
+  checkSurfaceLadder,
+  collectSurfaceLadder,
+  composite,
+  contrastRatio,
+  formatSurfaceLadderReport,
+  judgeSurfaceLadder,
+  oklchL,
+  summarizeSurfacePage,
+  surfaceDeltaL,
+  SURFACE_LADDER_MAX_WORDS,
+  SURFACE_LADDER_MIN_BORDER_CONTRAST,
+  SURFACE_LADDER_MIN_DELTA_L,
+  type CopyBlock,
+  type Rgb,
+  type Rgba,
+  type SurfaceBox,
+  type SurfaceFinding,
+  type SurfaceLadderLimits,
+  type SurfaceLadderOptions,
+  type SurfaceLadderReport,
+  type SurfacePageSummary,
+  type SurfaceRule,
+  type SurfaceSample,
+} from './surface-ladder'
+export { parseSurfaceLadderArgs, runSurfaceLadderCli } from './surface-ladder-cli'
+export {
   checkWorkerDefaults,
   formatWorkerDefaults,
   WORKER_COMPATIBILITY_DATE_FLOOR,
