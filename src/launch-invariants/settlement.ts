@@ -36,7 +36,7 @@ export interface SettledTurnRecord {
     /** The time the failure is reported under; it must be the request time. */
     attributedTo?: number
   }>
-  /** When the turn's owner stopped producing: its last renewal or event. Null while an owner holds it. */
+  /** When the turn's owner stopped: for a leased stream, when its lease expired. Null while an owner holds it. */
   ownerEndedAt: number | null
   /** A completed run in which the Sandbox aborted a tool call. */
   abortedToolCall?: boolean
@@ -124,7 +124,11 @@ export interface SettlementScenario {
   story: string
   /** Minutes before the check's `now` that the request was accepted. */
   requestedMinutesAgo: number
-  /** Minutes before `now` that the owner stopped, or null for a live owner. */
+  /**
+   * Minutes before `now` that the owner stopped (for a stream, its lease
+   * expired), or null for a live owner. Every scenario that stopped did so 12
+   * minutes ago, so an app that settles within 15 minutes has settled it by `now`.
+   */
   ownerEndedMinutesAgo: number | null
   expect: TurnTerminalState | 'open'
 }
@@ -132,44 +136,44 @@ export interface SettlementScenario {
 export const SETTLEMENT_SCENARIOS: readonly SettlementScenario[] = [
   {
     id: 'orphaned-stream',
-    story: 'The Worker streaming the turn died; its stream row is still running, no admission or Workflow holds it, and nothing renewed it for two hours.',
-    requestedMinutesAgo: 125,
-    ownerEndedMinutesAgo: 120,
+    story: 'The Worker streaming the turn died; its stream row is still running, no admission or Workflow holds it, and its 5-minute lease expired 12 minutes ago.',
+    requestedMinutesAgo: 30,
+    ownerEndedMinutesAgo: 12,
     expect: 'failed',
   },
   {
     id: 'abandoned-before-admission',
-    story: 'The user message was saved, then the request died before any completion owner admitted the turn: no reply, no stream, no admission.',
-    requestedMinutesAgo: 30,
-    ownerEndedMinutesAgo: 30,
+    story: 'The user message was saved 12 minutes ago, then the request died before any completion owner admitted the turn: no reply, no stream, no admission.',
+    requestedMinutesAgo: 12,
+    ownerEndedMinutesAgo: 12,
     expect: 'failed',
   },
   {
     id: 'runtime-restarted',
-    story: 'The admitted run\'s runtime restarted mid-turn: the session still reports running while its execution ledger failed the run (terminal event interrupted-done).',
+    story: 'The admitted run\'s runtime restarted mid-turn 12 minutes ago: the session still reports running while its execution ledger failed the run (terminal event interrupted-done).',
     requestedMinutesAgo: 40,
-    ownerEndedMinutesAgo: 35,
+    ownerEndedMinutesAgo: 12,
     expect: 'failed',
   },
   {
     id: 'completed-with-aborted-tool',
-    story: 'The run reported completed, but a tool part ended with "Tool execution aborted".',
+    story: 'The run reported completed 12 minutes ago, but a tool part ended with "Tool execution aborted".',
     requestedMinutesAgo: 20,
-    ownerEndedMinutesAgo: 18,
+    ownerEndedMinutesAgo: 12,
     expect: 'failed',
   },
   {
     id: 'user-stop',
-    story: 'The person pressed Stop while the turn ran.',
-    requestedMinutesAgo: 25,
-    ownerEndedMinutesAgo: 24,
+    story: 'The person pressed Stop 12 minutes ago while the turn ran.',
+    requestedMinutesAgo: 20,
+    ownerEndedMinutesAgo: 12,
     expect: 'stopped',
   },
   {
     id: 'answered',
-    story: 'The turn answered normally.',
+    story: 'The turn answered normally 12 minutes ago.',
     requestedMinutesAgo: 20,
-    ownerEndedMinutesAgo: 19,
+    ownerEndedMinutesAgo: 12,
     expect: 'answered',
   },
   {

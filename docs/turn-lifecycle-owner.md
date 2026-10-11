@@ -36,17 +36,19 @@ Why this rather than reconciling the five: each extra place is another writer of
 
 ## Tests: today's failures
 
-`SETTLEMENT_SCENARIOS` in `/launch-invariants` is the acceptance set. Each product seeds them into its storage, runs its settlement, and `checkSettlementScenarios` checks the result:
+`SETTLEMENT_SCENARIOS` in `/launch-invariants` is the acceptance set. Each product seeds them into its storage, runs its settlement, and `checkSettlementScenarios` checks the result. Every stopped scenario stopped 12 minutes before the check, so a product that settles within 15 minutes of an owner stopping has already settled it:
 
 | Scenario | Honest end |
 |---|---|
-| `orphaned-stream`: running row, no owner, unrenewed for 2 h | failed, Retry, within 15 min of lease expiry |
+| `orphaned-stream`: running row, no owner, lease expired 12 min ago | failed, Retry |
 | `abandoned-before-admission`: saved request, no admission, no stream | failed, Retry |
 | `runtime-restarted`: session `running`, ledger failed with `interrupted-done` | failed |
 | `completed-with-aborted-tool`: completed run, a tool `Tool execution aborted` | failed |
 | `user-stop` | stopped, not counted as a failure |
 | `answered` | answered |
 | `live-long-turn`: owner renewing for 90 min | still open |
+
+With settlement at lease expiry and a 15-minute cadence, the worst case is 15 minutes from lease expiry. A product that waits longer (GTM's orphan sweep waited 60 minutes) fails `orphaned-stream`.
 
 `checkTurnSettlement` adds the cross-cutting rules: one terminal state, settlement within 15 minutes of the owner stopping, failures attributed to the request time, every failure typed and retryable.
 
