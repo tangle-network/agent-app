@@ -17,6 +17,7 @@
 
 import { signObjectUrl, verifyObjectUrl } from '../object-store'
 import { createExportEngine, type ExportEngineOptions } from './engine'
+import { createSecretScanner } from './secrets'
 import type { ExportJob, ExportPrincipal, ExportProgress } from './types'
 
 export interface WorkspaceExportOptions extends ExportEngineOptions {
@@ -155,8 +156,12 @@ export function createWorkspaceExport(options: WorkspaceExportOptions) {
         return job ? json(await withProgress(job, mount)) : refuse(404, 'not_found', 'Export not found')
       }
       return refuse(404, 'not_found', 'Not found')
-    } catch {
-      // Error text can carry data from a source; it is recorded, masked, on the job instead.
+    } catch (err) {
+      // Error text can carry data from a source, so the response stays generic and
+      // the operator log gets the text with credentials and known secrets masked.
+      const known = await Promise.resolve(options.knownSecrets?.({ workspaceId })).catch(() => undefined)
+      const text = err instanceof Error ? err.message : String(err)
+      console.error(`workspace-export: ${method} ${path || '/'} failed: ${createSecretScanner({ knownSecrets: known ?? [] }).maskText(text).text.slice(0, 300)}`)
       return refuse(500, 'export_error', 'The export request failed')
     }
   }

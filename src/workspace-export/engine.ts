@@ -572,6 +572,17 @@ export function createExportEngine(options: ExportEngineOptions) {
         return job
       } catch (err) {
         if (err instanceof LeaseLost) return (await loadJob(workspaceId, id))?.job ?? null
+        // A request that failed outside a unit (a storage or planning error) hands
+        // the lease back, so the panel's retry continues now instead of waiting it out.
+        // Only the stored job is touched, never this request's half-applied copy.
+        clearInterval(heartbeat)
+        await saving.catch(() => {})
+        const leaseId = job.lease?.id
+        const stored = leaseId ? await loadJob(workspaceId, id).catch(() => null) : null
+        if (stored && stored.job.lease?.id === leaseId) {
+          stored.job.lease = undefined
+          await saveJob(stored.job, stored.etag).catch(() => {})
+        }
         throw err
       } finally {
         clearInterval(heartbeat)
