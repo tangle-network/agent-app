@@ -45,10 +45,10 @@ describe('ChatMessages segmented turns', () => {
     )
 
     expect(getByText('User question').parentElement?.className).toContain(
-      'text-[17px]',
+      '[--transcript-font-size:1.0625rem]',
     )
     expect(getByText('Assistant answer').parentElement?.className).toContain(
-      'text-[17px]',
+      '[--transcript-font-size:1.0625rem]',
     )
     expect(
       getByText('Assistant answer').parentElement?.className,
