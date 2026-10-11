@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.114
+
+- fix(web-react): profile editor leads with additional instructions and drops emptied prompts (#1043)
+
 ## 0.60.113
 
 - feat(chat-routes): an intent line streams what the agent is about to do while the turn boots (#1036)
