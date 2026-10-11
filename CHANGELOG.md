@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.107
+
+- fix(knip): derive entries from tsup.config.ts so a new subpath cannot turn main red (#1032)
+
 ## 0.60.106
 
 - fix(router-turn): echo Gemini 3 thought signatures and count usage once per model call (#1033)
