@@ -283,6 +283,11 @@
       "import": "./dist/rollout/index.js",
       "default": "./dist/rollout/index.js"
     },
+    "./rollout/d1": {
+      "types": "./dist/rollout/d1.d.ts",
+      "import": "./dist/rollout/d1.js",
+      "default": "./dist/rollout/d1.js"
+    },
     "./launch-invariants/testing": {
       "types": "./dist/launch-invariants/testing.d.ts",
       "import": "./dist/launch-invariants/testing.js",
