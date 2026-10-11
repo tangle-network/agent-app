@@ -65,6 +65,17 @@ describe('settleOrphanedTurns', () => {
     expect(status('back').status).toBe('running')
   })
 
+  it('leaves a plan follow-up claim to its gate until the claim\'s own 60-minute staleness', async () => {
+    const { store, at, status, sqlite } = fixture()
+    sqlite.exec('ALTER TABLE turn_status ADD COLUMN leaseToken TEXT')
+    await at(NOW - 20 * MIN, () => store.setStatus('plan-followup-1', 'running', 'thread-1'))
+    await at(NOW - 70 * MIN, () => store.setStatus('plan-followup-2', 'running', 'thread-1'))
+    sqlite.prepare("UPDATE turn_status SET leaseToken = 'lease' WHERE turnId LIKE 'plan-followup-%'").run()
+    const result = await settleOrphanedTurns({ store, now: NOW })
+    expect([result.owned, result.settled.map((turn) => turn.turnId)]).toEqual([['plan-followup-1'], ['plan-followup-2']])
+    expect(status('plan-followup-1').status).toBe('running')
+  })
+
   it('settles a backlog a bounded run at a time', async () => {
     const { store, at } = fixture()
     for (let n = 0; n < 60; n += 1) await at(NOW - (60 + n) * MIN, () => store.setStatus(`t${n}`, 'running', 'thread'))
