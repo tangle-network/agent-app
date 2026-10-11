@@ -243,6 +243,12 @@
           "doc": "The decision table used by every write path; products may narrow access, never widen it."
         },
         {
+          "name": "PROFILE_MEMORY_PREFIX",
+          "kind": "const",
+          "signature": "\"/memories/workspace/\"",
+          "doc": "Workspace-shared memories live under this prefix in the workspace store."
+        },
+        {
           "name": "ProfileAccessError",
           "kind": "class",
           "signature": "class ProfileAccessError",
@@ -295,6 +301,12 @@
           "kind": "interface",
           "signature": "interface ProfileKnowledgeEvent",
           "doc": "Remove events name only adds they observed; a concurrent add survives."
+        },
+        {
+          "name": "ProfileMemoryStore",
+          "kind": "interface",
+          "signature": "interface ProfileMemoryStore",
+          "doc": "The subset of agent-runtime's `WorkspaceStore` that `profile.remember` uses."
         },
         {
           "name": "ProfileRevision",
@@ -14625,7 +14637,7 @@
           "name": "streamAppToolLoop",
           "kind": "function",
           "signature": "<Raw>(opts: StreamToolLoopOptions<Raw>) => AsyncGenerator<StreamToolLoopYield<Raw>, void, unknown>",
-          "doc": "Streaming bounded tool loop: yields each raw turn event (the caller maps + telemetries + re-emits it) and each executed `tool_result`; emits one `capped` if it stops for any non-completed reason with…"
+          "doc": "Streaming bounded tool loop: yields each raw turn event (the caller maps + telemetries + re-emits it), each `tool_progress` a running tool reports, and each executed `tool_result`; emits one `capped`…"
         },
         {
           "name": "StreamAppToolLoopOptions",
@@ -14752,6 +14764,64 @@
           "kind": "function",
           "signature": "(value: string | null | undefined) => string | null",
           "doc": "Resolve a string by trimming whitespace or returning null if empty or undefined"
+        }
+      ]
+    },
+    {
+      "id": "./runtime/router-turn",
+      "source": "src/runtime/router-turn.ts",
+      "dependsOn": [
+        "tools"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "composeRouterTurnPrompt",
+          "kind": "function",
+          "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
+          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls."
+        },
+        {
+          "name": "routerFunctionName",
+          "kind": "function",
+          "signature": "(name: string) => string",
+          "doc": "OpenAI-compatible function names allow only `[A-Za-z0-9_-]{1,64}`; app tool names often use dots."
+        },
+        {
+          "name": "RouterTurnEvent",
+          "kind": "type",
+          "signature": "type RouterTurnEvent",
+          "doc": "What the turn is doing, in the order it happens, for a live view."
+        },
+        {
+          "name": "RouterTurnFailure",
+          "kind": "interface",
+          "signature": "interface RouterTurnFailure",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnOptions",
+          "kind": "interface",
+          "signature": "interface RouterTurnOptions",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnOutcome",
+          "kind": "interface",
+          "signature": "interface RouterTurnOutcome",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnTool",
+          "kind": "interface",
+          "signature": "interface RouterTurnTool",
+          "doc": "A tool the turn may call."
+        },
+        {
+          "name": "runRouterTurn",
+          "kind": "function",
+          "signature": "(options: RouterTurnOptions) => Promise<RouterTurnOutcome>",
+          "doc": null
         }
       ]
     },
@@ -27188,6 +27258,50 @@
           "kind": "interface",
           "signature": "interface WorkspaceSwitcherProps",
           "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./workspace-store/d1",
+      "source": "src/workspace-store/d1.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "createD1R2WorkspaceStore",
+          "kind": "function",
+          "signature": "(options: D1R2WorkspaceStoreOptions) => WorkspaceStore",
+          "doc": null
+        },
+        {
+          "name": "D1R2WorkspaceStoreOptions",
+          "kind": "interface",
+          "signature": "interface D1R2WorkspaceStoreOptions",
+          "doc": null
+        },
+        {
+          "name": "WORKSPACE_STORE_D1_SCHEMA_SQL",
+          "kind": "const",
+          "signature": "\"\\nCREATE TABLE workspace_store_entry (\\n workspace_id TEXT NOT NULL,\\n path TEXT NOT NULL,\\n id TEXT NOT NULL,\\n kind…",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceStoreD1Database",
+          "kind": "interface",
+          "signature": "interface WorkspaceStoreD1Database",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceStoreD1Statement",
+          "kind": "interface",
+          "signature": "interface WorkspaceStoreD1Statement",
+          "doc": "Structural subset of Cloudflare D1; keeps the driver out of the public types."
+        },
+        {
+          "name": "WorkspaceStoreR2Bucket",
+          "kind": "interface",
+          "signature": "interface WorkspaceStoreR2Bucket",
+          "doc": "Only `delete` is needed: the host uploads bytes before it puts the entry."
         }
       ]
     }
