@@ -72,6 +72,8 @@ export interface TurnRecord {
   firstProgressS: number | null
   firstProgressText: string | null
   firstTextS: number | null
+  /** Seconds from Send to the first failure evidence on the page, if any appeared. */
+  firstFailureS: number | null
   completeS: number | null
   outcome: TurnOutcome
   /** Plain words for what went wrong, or null for a completed turn. */
@@ -394,7 +396,7 @@ export class Journey {
   private blankTurn(page: Page, prompt: string, sentAt: number): TurnRecord {
     return {
       label: this.recordedFor(page).label, prompt, threadId: threadRouteIn(page.url(), this.config)?.threadId ?? null,
-      sentAt: new Date(sentAt).toISOString(), firstProgressS: null, firstProgressText: null, firstTextS: null, completeS: null,
+      sentAt: new Date(sentAt).toISOString(), firstProgressS: null, firstProgressText: null, firstTextS: null, firstFailureS: null, completeS: null,
       outcome: 'timeout', error: null, failures: [], replyChars: 0, stages: [], stopPressedS: null, replyFile: null,
     }
   }
@@ -471,7 +473,11 @@ export class Journey {
       while (Date.now() - sentAt < timeoutMs) {
         const s = await this.read(page).catch(() => null)
         if (s) {
-          evidence.observe(s)
+          const shown = evidence.observe(s)
+          if (shown.length) {
+            t.firstFailureS ??= since()
+            this.mark(`Failure shown after ${since()} s: ${oneLine(shown[0]!, 90)}`, page)
+          }
           const status = s.status.filter((line) => !standingStatus.has(line))
           growthBase ??= s.transcriptChars
           const chars = s.assistantChars >= 0 ? s.assistantChars - baselineChars : s.transcriptChars - growthBase - status.join(' ').length

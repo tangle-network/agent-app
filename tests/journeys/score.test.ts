@@ -111,6 +111,21 @@ describe('TurnEvidence counts only what the turn added', () => {
     expect(v.outcome).toBe('failed')
   })
 
+  it('fails a turn whose early error the page later replaced, and reports each in the order shown', () => {
+    // GTM on 2026-10-11 15:58Z: an error box five minutes in, a different card six minutes later.
+    const early = "The sandbox model stream stopped before a clean completion. Error: POST /v1/sandboxes/sandbox-e538dad2a8cc/runtime/agents/run/stream: This sandbox's Hub credential source is revoked or expired, and the calling key cannot succeed it."
+    const ev = new TurnEvidence(GTM, PROMPT)
+    ev.begin(snap([PROMPT]))
+    expect(ev.observe(snap([PROMPT, 'Thinking…']))).toEqual([])
+    expect(ev.observe(snap([PROMPT, early]))).toEqual([early])
+    expect(ev.observe(snap([PROMPT, early]))).toEqual([])
+    ev.observe(snap([PROMPT, 'The agent stopped before finishing.', 'Retry'], { retryButtons: 1 }))
+    const v = scoreTurn({ timedOut: false, evidence: ev.added(), replyChars: 0, stopPressed: false })
+    expect(v.outcome).toBe('failed')
+    expect(v.error).toBe(early)
+    expect(v.failures).toEqual([early, 'The agent stopped before finishing.', 'a Retry control appeared in the transcript'])
+  })
+
   it('counts a new failure-marked element', () => {
     const v = judge(DEFAULTS, PROMPT, snap([], { failureNodes: ['Upload failed'] }), [
       snap([PROMPT, 'done'], { failureNodes: ['Upload failed', 'The model stream stopped before a clean completion.'] }),

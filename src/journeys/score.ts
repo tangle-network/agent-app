@@ -89,11 +89,15 @@ function evidenceKeys(snapshot: TranscriptSnapshot, patterns: FailurePatterns, i
  * `begin` takes the snapshot from just before Send. Every later `observe`
  * lowers each item's floor to the fewest copies seen so far: when Retry removes
  * the old card and a new failure renders the same words, the count dips to zero
- * and climbs back to one, and that one is new.
+ * and climbs back to one, and that one is new. Anything that rose above its
+ * floor at any point counts, even if the page later replaced it: on 2026-10-11
+ * GTM showed "The sandbox model stream stopped before a clean completion …
+ * Hub credential source is revoked or expired" five minutes into a turn, then
+ * swapped it for a different card six minutes later.
  */
 export class TurnEvidence {
   private floor = new Map<string, number>()
-  private last = new Map<string, number>()
+  private peak = new Map<string, number>()
   private readonly ignore: Set<string>
 
   constructor(private readonly patterns: FailurePatterns, prompt: string) {
@@ -105,31 +109,42 @@ export class TurnEvidence {
 
   begin(snapshot: TranscriptSnapshot): void {
     this.floor = evidenceKeys(snapshot, this.patterns, this.ignore)
-    this.last = new Map(this.floor)
+    this.peak = new Map()
   }
 
-  observe(snapshot: TranscriptSnapshot): void {
-    this.last = evidenceKeys(snapshot, this.patterns, this.ignore)
+  /** Read one snapshot. Returns the evidence that appeared for the first time, as display text. */
+  observe(snapshot: TranscriptSnapshot): string[] {
+    const now = evidenceKeys(snapshot, this.patterns, this.ignore)
     for (const [key, floor] of this.floor) {
-      const now = this.last.get(key) ?? 0
-      if (now < floor) this.floor.set(key, now)
+      const count = now.get(key) ?? 0
+      if (count < floor) this.floor.set(key, count)
     }
+    const fresh: string[] = []
+    for (const [key, count] of now) {
+      const extra = count - (this.floor.get(key) ?? 0)
+      if (extra <= (this.peak.get(key) ?? 0)) continue
+      if (!this.peak.has(key)) fresh.push(display(key))
+      this.peak.set(key, extra)
+    }
+    return fresh
   }
 
-  /** Items present now beyond their floor, each as the line or node text. */
+  /** Everything that rose above its floor during the turn, in the order it appeared. */
   added(): { failures: string[]; stopped: string[]; retryAppeared: boolean } {
     const failures: string[] = []
     const stopped: string[] = []
     let retryAppeared = false
-    for (const [key, count] of this.last) {
-      const extra = count - (this.floor.get(key) ?? 0)
-      if (extra <= 0) continue
+    for (const key of this.peak.keys()) {
       if (key === 'retry') retryAppeared = true
       else if (key.startsWith('stopped:')) stopped.push(key.slice('stopped:'.length))
       else failures.push(key.slice(key.indexOf(':') + 1))
     }
     return { failures, stopped, retryAppeared }
   }
+}
+
+function display(key: string): string {
+  return key === 'retry' ? 'a Retry control appeared in the transcript' : key.slice(key.indexOf(':') + 1)
 }
 
 /**
