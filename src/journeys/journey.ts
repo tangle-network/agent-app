@@ -442,10 +442,10 @@ export class Journey {
   /**
    * Time to first visible progress (a new status line or reply text), first
    * reply text, and the turn's end, polled every 300 ms. The turn has ended
-   * when no Stop control and no new status line show for two reads in a row
-   * and, where the app lists running turns, the server lists none. Status lines
-   * already on the page before Send are not progress. The outcome comes from
-   * {@link scoreTurn}.
+   * when, for two reads in a row, no Stop control shows and no status line has
+   * changed in 20 s, and, where the app lists running turns, the server lists
+   * none. Status lines already on the page before Send are not progress. The
+   * outcome comes from {@link scoreTurn}.
    */
   private async measureTurn(page: Page, prompt: string, sentAt: number, evidence: TurnEvidence, before: PageReading, baselineChars: number, opts: SendOptions): Promise<TurnRecord> {
     const t = this.blankTurn(page, prompt, sentAt)
@@ -464,6 +464,8 @@ export class Journey {
     let lastServerCheck = 0
     let serverRunning: string[] | null = null
     let lastStage = ''
+    let lastStatus = ''
+    let statusChangedAt = Date.now()
     let finished = false
     await this.wait('Waiting for the agent', async () => {
       while (Date.now() - sentAt < timeoutMs) {
@@ -478,6 +480,11 @@ export class Journey {
           if (stage && stage !== lastStage) {
             t.stages.push({ s: since(), text: status.join(' | ').slice(0, 160) })
             lastStage = stage
+          }
+          // Raw text, timers included: a ticking "Preparing your workspace… 31s" is changing.
+          if (status.join(' | ') !== lastStatus) {
+            lastStatus = status.join(' | ')
+            statusChangedAt = Date.now()
           }
           if (t.firstProgressS === null && (status.length || chars > 0)) {
             t.firstProgressS = since()
@@ -494,8 +501,12 @@ export class Journey {
             this.mark(`Presses Stop after ${t.stopPressedS} s`, page)
             await this.click(this.composerButton(page, this.config.chat.stopName), { pauseAfter: 200 }).catch((e) => console.warn(`Stop press failed: ${e}`))
           }
-          const active = s.stopVisible || status.length > 0
-          if (active) sawActive = true
+          // A status line is progress while it changes. One that sits unchanged for
+          // 20 s with no Stop control is a notice left behind ("Request was
+          // interrupted…"), not a running turn.
+          const statusLive = status.length > 0 && Date.now() - statusChangedAt < 20_000
+          if (status.length > 0) sawActive = true
+          const active = s.stopVisible || statusLive
           quiet = active ? 0 : quiet + 1
         }
         if (route && this.config.chat.runningTurns && Date.now() - lastServerCheck > 2_000) {
