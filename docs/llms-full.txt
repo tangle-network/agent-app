@@ -22810,12 +22810,36 @@ interface SessionSummary
 
 Source: `src/signoff/index.ts`
 
+### `checkShellAlignment`
+
+`function` — Drive Chromium over every route × width × theme and judge each page.
+
+```ts
+(options: ShellAlignmentOptions) => Promise<ShellAlignmentReport>
+```
+
 ### `checkWorkerDefaults`
 
 `function` — Check each Worker config, and every environment it deploys, against the defaults.
 
 ```ts
 (repoRoot: string, configs?: readonly string[] | undefined) => WorkerDefaultsResult
+```
+
+### `collectShellDividers`
+
+`function` — Runs in the page (Playwright serializes it).
+
+```ts
+() => Omit<ShellDividerSample, "width" | "route" | "theme">
+```
+
+### `formatShellAlignmentReport`
+
+`function`
+
+```ts
+(report: ShellAlignmentReport) => string
 ```
 
 ### `formatSignoffReport`
@@ -22832,6 +22856,14 @@ Source: `src/signoff/index.ts`
 
 ```ts
 (result: WorkerDefaultsResult) => string
+```
+
+### `judgeShellAlignment`
+
+`function` — Desktop: every header divider lands on the rail's first divider.
+
+```ts
+(sample: ShellDividerSample, tolerancePx?: number) => ShellAlignmentFinding[]
 ```
 
 ### `LoadedSignoffConfig`
@@ -22858,6 +22890,22 @@ interface LoadedSignoffConfig
 interface LoadSignoffConfigOptions
 ```
 
+### `parseShellAlignmentArgs`
+
+`function`
+
+```ts
+(argv: readonly string[]) => ShellAlignmentOptions & { readonly jsonPath?: string | undefined; }
+```
+
+### `runShellAlignmentCli`
+
+`function`
+
+```ts
+(argv: readonly string[]) => Promise<number>
+```
+
 ### `runSignoff`
 
 `function`
@@ -22872,6 +22920,54 @@ interface LoadSignoffConfigOptions
 
 ```ts
 interface RunSignoffOptions
+```
+
+### `SHELL_ALIGNMENT_TOLERANCE_PX`
+
+`const`
+
+```ts
+0.5
+```
+
+### `ShellAlignmentFinding`
+
+`interface`
+
+```ts
+interface ShellAlignmentFinding
+```
+
+### `ShellAlignmentOptions`
+
+`interface`
+
+```ts
+interface ShellAlignmentOptions
+```
+
+### `ShellAlignmentReport`
+
+`interface`
+
+```ts
+interface ShellAlignmentReport
+```
+
+### `ShellDivider`
+
+`interface` — A horizontal divider: the bottom border of a top-anchored row.
+
+```ts
+interface ShellDivider
+```
+
+### `ShellDividerSample`
+
+`interface`
+
+```ts
+interface ShellDividerSample
 ```
 
 ### `SignoffAttempt`
@@ -30614,6 +30710,22 @@ type InteractionSubmitResult
 (interaction: ChatInteraction, data: InteractionData) => string
 ```
 
+### `lazyRoute`
+
+`function`
+
+```ts
+<P extends object>(load: () => Promise<ComponentType<P>>) => LazyRoute<P>
+```
+
+### `LazyRoute`
+
+`type` — A lazily loaded route that renders synchronously once its module has loaded.
+
+```ts
+type LazyRoute
+```
+
 ### `LinkLikeComponent`
 
 `type`
@@ -30924,6 +31036,14 @@ type PickerVariant
 
 ```ts
 interface PopoverSurfaceProps
+```
+
+### `preloadWhenIdle`
+
+`function` — Load routes while the browser is idle (at most `timeoutMs` later), so a first visit waits only on its data.
+
+```ts
+(routes: readonly { preload: () => Promise<void>; }[], timeoutMs?: number) => () => void
 ```
 
 ### `ProducerErrorEvent`
