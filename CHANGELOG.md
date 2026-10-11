@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.96
+
+- feat(agent-profiles): profile.remember appends one fact to agent knowledge (#1015)
+
 ## 0.60.95
 
 - perf(workspace-export): copy a files source four files at a time (#1014)
