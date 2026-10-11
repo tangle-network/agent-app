@@ -48,15 +48,24 @@ async function openRunning(
   const box = await getBox()
   if (!box || GONE.has(box.status)) return null
   const wasStopped = box.status === 'stopped'
+  let resumed = false
+  let restoring: Promise<void> | undefined
+  const restore = () => (restoring ??= (async () => {
+    if (resumed && box.stop) {
+      // Best effort, without replacing the export's original failure.
+      try { await box.stop() } catch {}
+    }
+  })())
   try {
-    if (wasStopped) await box.resume()
+    if (wasStopped) {
+      await box.resume()
+      resumed = true
+    }
     if (box.status !== 'running' || wasStopped) await box.waitFor('running', { timeoutMs })
   } catch (err) {
+    await restore()
     if (isLifecycleBusy(err)) throw new ExportRetryLater('the sandbox is busy with another operation; retrying shortly')
     throw err
-  }
-  const restore = async () => {
-    if (wasStopped && box.stop) await box.stop().catch(() => {})
   }
   return { box, restore }
 }
@@ -86,8 +95,45 @@ export function sandboxArchive(args: {
     async open() {
       const opened = await openRunning(args.getBox, args.resumeTimeoutMs ?? 120_000)
       if (!opened) return null
-      const archive = await opened.box.fs.openArchive(args.dir ?? '.')
-      return archive.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ flush: () => opened.restore() }))
+      try {
+        const archive = await opened.box.fs.openArchive(args.dir ?? '.')
+        const reader = archive.getReader()
+        let ended = false
+        return new ReadableStream<Uint8Array>({
+          async pull(controller) {
+            try {
+              const { done, value } = await reader.read()
+              if (ended) return
+              if (!done) {
+                controller.enqueue(value)
+                return
+              }
+              ended = true
+              await opened.restore()
+              reader.releaseLock()
+              controller.close()
+            } catch (err) {
+              if (ended) return
+              ended = true
+              await opened.restore()
+              reader.releaseLock()
+              controller.error(err)
+            }
+          },
+          async cancel(reason) {
+            ended = true
+            try {
+              await reader.cancel(reason)
+            } finally {
+              await opened.restore()
+              reader.releaseLock()
+            }
+          },
+        })
+      } catch (err) {
+        await opened.restore()
+        throw err
+      }
     },
   }
 }
@@ -117,16 +163,28 @@ export function sandboxFiles(args: {
       if (!listed.length) return
       const opened = await openRunning(args.getBox, args.resumeTimeoutMs ?? 120_000)
       if (!opened) return
-      const read = opened.box.fs.read
-      if (!read) throw new Error('workspace-export: this sandbox client cannot read files')
+      const reading = new Set<Promise<string>>()
       try {
+        const read = opened.box.fs.read
+        if (!read) throw new Error('workspace-export: this sandbox client cannot read files')
         for (const file of listed) {
-          // Read here, not in `open`: the engine opens a chunk after the listing
-          // ends, by which time `finally` has stopped the box again.
-          const text = await read.call(opened.box.fs, file.boxPath)
-          yield { path: file.path, open: async () => text }
+          yield {
+            path: file.path,
+            async open() {
+              const pending = read.call(opened.box.fs, file.boxPath)
+              reading.add(pending)
+              try {
+                return await pending
+              } finally {
+                reading.delete(pending)
+              }
+            },
+          }
         }
       } finally {
+        // The engine starts opens before advancing the listing. Its final
+        // partial chunk may still be reading when iteration ends or is closed.
+        await Promise.allSettled(reading)
         await opened.restore()
       }
     },

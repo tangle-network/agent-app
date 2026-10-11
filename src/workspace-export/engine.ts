@@ -15,7 +15,6 @@ import { createSecretScanner, isSecretName, REDACTED, type SecretScanner } from 
 import type { ExportStorage } from './storage'
 import { createTarInspector } from './tar'
 import type {
-  ExportFile,
   ExportJob,
   ExportPlan,
   ExportProgress,
@@ -235,14 +234,21 @@ export function createExportEngine(options: ExportEngineOptions) {
       pendingLength = 0
     }
     const reader = stream.getReader()
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      pending.push(value)
-      pendingLength += value.length
-      if (pendingLength >= SEGMENT_BYTES) await flush()
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        pending.push(value)
+        pendingLength += value.length
+        if (pendingLength >= SEGMENT_BYTES) await flush()
+      }
+      await flush()
+    } catch (err) {
+      await reader.cancel(err).catch(() => {})
+      throw err
+    } finally {
+      reader.releaseLock()
     }
-    await flush()
     return {
       path,
       method: compress ? 8 : 0,
@@ -355,41 +361,55 @@ export function createExportEngine(options: ExportEngineOptions) {
       const used = new Set(unit.entries.map((e) => e.path.slice(folder.length)))
       const start = unit.cursor ?? 0
       let seen = 0
-      let written = 0
       // Files are copied FILES_IN_PARALLEL at a time: one at a time, each KV or R2
       // read plus segment write left a 1,000-file vault crawling. Paths are taken
       // in listing order, keys come from the listing position (unique across
       // resumes), and the cursor moves only past a fully written chunk.
-      let chunk: { file: ExportFile; position: number; path: string }[] = []
+      let chunk: { position: number; entry: Promise<StoredEntry | null> }[] = []
       const flush = async () => {
-        const written_ = await Promise.all(
-          chunk.map(async ({ file, position, path }) => {
+        const results = await Promise.allSettled(chunk.map(({ entry }) => entry))
+        for (const result of results) if (result.status === 'rejected') throw result.reason
+        for (const result of results) {
+          if (result.status === 'fulfilled' && result.value) {
+            unit.entries.push(result.value)
+          }
+        }
+        unit.cursor = chunk.at(-1)!.position + 1
+        chunk = []
+      }
+      try {
+        for await (const file of source.files()) {
+          if (seen < start) {
+            seen += 1
+            continue
+          }
+          if (seen - start >= FILES_PER_REQUEST || now() > deadline) {
+            if (chunk.length) await flush()
+            unit.cursor = seen
+            return
+          }
+          const position = seen
+          const path = folder + safePath(file.path, used)
+          // Start while the iterator still owns its resources, including the
+          // last partial chunk. Skipped files never open on a resumed request.
+          const entry = (async () => {
             const body = await file.open()
             if (body === null) return null
             const masked = toStream(body).pipeThrough(scanner.maskBytes((n) => (unit.redactions += n)))
             return writeEntry(`${keyBase}/p${position}`, path, masked, false)
-          }),
-        )
-        for (const entry of written_) if (entry) unit.entries.push(entry)
-        written += written_.filter(Boolean).length
-        unit.cursor = chunk.at(-1)!.position + 1
-        chunk = []
-      }
-      for await (const file of source.files()) {
-        if (seen < start) {
+          })()
+          // Observe errors immediately while the next listing may be pending;
+          // flush still reports the original failure after its siblings settle.
+          void entry.catch(() => {})
+          chunk.push({ position, entry })
           seen += 1
-          continue
+          if (chunk.length >= FILES_IN_PARALLEL) await flush()
         }
-        if (written + chunk.length >= FILES_PER_REQUEST || now() > deadline) {
-          if (chunk.length) await flush()
-          unit.cursor = seen
-          return
-        }
-        chunk.push({ file, position: seen, path: folder + safePath(file.path, used) })
-        seen += 1
-        if (chunk.length >= FILES_IN_PARALLEL) await flush()
+        if (chunk.length) await flush()
+      } finally {
+        // A failed listing must not leave copies running after the unit exits.
+        await Promise.allSettled(chunk.map(({ entry }) => entry))
       }
-      if (chunk.length) await flush()
       unit.cursor = undefined
       unit.files = unit.entries.length
       unit.status = unit.entries.length ? 'done' : 'empty'
@@ -402,12 +422,20 @@ export function createExportEngine(options: ExportEngineOptions) {
       return
     }
     const stats: { files: number; bytes: number; blanked: string[]; excluded?: number } = { files: 0, bytes: 0, blanked: [] }
-    const tarGz = archive
-      .pipeThrough(new DecompressionStream('gzip') as unknown as TransformStream<Uint8Array, Uint8Array>)
+    const decompressor = new DecompressionStream('gzip') as unknown as TransformStream<Uint8Array, Uint8Array>
+    // pipeThrough hides its pipeTo promise. Retain the source pump so errors
+    // wait for upstream cancellation (and box restoration) before settling.
+    const pumping = archive.pipeTo(decompressor.writable)
+    void pumping.catch(() => {})
+    const tarGz = decompressor.readable
       .pipeThrough(createTarInspector(stats, source.exclude))
       .pipeThrough(scanner.maskBytes((n) => (unit.redactions += n)))
       .pipeThrough(new CompressionStream('gzip') as unknown as TransformStream<Uint8Array, Uint8Array>)
-    unit.entries.push(await writeEntry(`${keyBase}/0`, `sandbox/${source.name}.tar.gz`, tarGz, false))
+    try {
+      unit.entries.push(await writeEntry(`${keyBase}/0`, `sandbox/${source.name}.tar.gz`, tarGz, false))
+    } finally {
+      await pumping.catch(() => {})
+    }
     unit.archive = stats
     unit.files = stats.files
     unit.status = 'done'
