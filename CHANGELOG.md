@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.73
+
+- chore: merge append-only ledgers by union (#985)
+
 ## 0.60.72
 
 - feat(workspace-export): sandboxArchive resumes a stopped box for the export (#984)
