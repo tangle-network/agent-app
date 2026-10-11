@@ -80,3 +80,4 @@ export {
   type TurnSettlementCounts,
   type TurnTerminalState,
 } from './settlement.js'
+export { isEdgeBlock, PASTED_CODE_SAMPLES } from './pasted-code.js'

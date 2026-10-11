@@ -26,8 +26,8 @@ const config = { product: 'probe', test: 'true' }
 describe('the conformance report', () => {
   it('holds when every invariant recorded a passing verdict and the tests exited 0', () => {
     const report = buildConformanceReport({ config, facts, verdicts: passing(), testExitCode: 0 })
-    expect([report.pass, report.passed, report.total]).toEqual([true, 8, 8])
-    expect(formatConformanceReport(report)).toContain('launch invariants — probe: 8 of 8 hold')
+    expect([report.pass, report.passed, report.total]).toEqual([true, 9, 9])
+    expect(formatConformanceReport(report)).toContain('launch invariants — probe: 9 of 9 hold')
   })
 
   it('fails an invariant no check recorded, one with a failing verdict, and a non-zero test exit', () => {
@@ -35,7 +35,7 @@ describe('the conformance report', () => {
     verdicts.push({ invariant: 'bounded-reads', subject: 'reliability', pass: false, details: ['one query returned 48.0 MB'] })
     const report = buildConformanceReport({ config, facts, verdicts, testExitCode: 1 })
     const status = Object.fromEntries(report.invariants.map((invariant) => [invariant.id, invariant.status]))
-    expect([status['limit-alarms'], status['bounded-reads'], report.pass, report.passed]).toEqual(['fail', 'fail', false, 6])
+    expect([status['limit-alarms'], status['bounded-reads'], report.pass, report.passed]).toEqual(['fail', 'fail', false, 7])
     expect(report.invariants.find((invariant) => invariant.id === 'bounded-reads')!.lines).toEqual(['reliability: one query returned 48.0 MB'])
   })
 
@@ -71,7 +71,7 @@ describe('agent-app-invariants', () => {
     writeFileSync(join(dir, 'launch-invariants.config.json'), JSON.stringify({ product: 'probe', test: `"${process.execPath}" record.mjs` }))
     expect(readDeploymentFacts(dir)).toEqual(facts)
     const report = await runConformance({ appDir: dir })
-    expect([report.pass, report.passed, report.testExitCode]).toEqual([true, 8, 0])
+    expect([report.pass, report.passed, report.testExitCode]).toEqual([true, 9, 0])
   })
 })
 
@@ -87,8 +87,8 @@ describe('known failures', () => {
 
     const verdicts = passing().map((verdict) => verdict.invariant === 'honest-settlement' ? recorded : verdict)
     const report = buildConformanceReport({ config, facts, verdicts, testExitCode: 0 })
-    expect([report.pass, report.passed, report.knownFailing]).toEqual([true, 7, 1])
-    expect(formatConformanceReport(report)).toContain('launch invariants — probe: 7 of 8 hold, 1 known failing')
+    expect([report.pass, report.passed, report.knownFailing]).toEqual([true, 8, 1])
+    expect(formatConformanceReport(report)).toContain('launch invariants — probe: 8 of 9 hold, 1 known failing')
     expect(formatConformanceReport(report)).toContain('RESULT: not launch-grade yet; 1 known failing, no regressions')
   })
 })

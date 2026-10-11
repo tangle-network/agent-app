@@ -12225,6 +12225,14 @@ class AuthLookupRefused
 interface InvariantVerdict
 ```
 
+### `isEdgeBlock`
+
+`function` — Whether a response is an edge block rather than the app's own answer: a `cf-mitigated` header, or Cloudflare's HTML block page ("Attention Required", "Sorry, you have been blocked").
+
+```ts
+(response: Response) => Promise<boolean>
+```
+
 ### `IsolatedJobsInput`
 
 `interface`
@@ -12351,6 +12359,14 @@ interface ObservedSlot
 
 ```ts
 (source: string, format: "json" | "toml") => WranglerCrons
+```
+
+### `PASTED_CODE_SAMPLES`
+
+`const` — Text people paste into a chat with an agent, each of which a WAF rule may match.
+
+```ts
+readonly { name: string; text: string; }[]
 ```
 
 ### `readInSizedBatches`
@@ -12587,6 +12603,14 @@ interface BudgetedJob
 (input: { config: LaunchInvariantsConfig; facts: DeploymentFacts; verdicts: readonly InvariantVerdict[]; testExitCode:…
 ```
 
+### `ChatAcceptsCodeOptions`
+
+`interface`
+
+```ts
+interface ChatAcceptsCodeOptions
+```
+
 ### `checkAuthorizeBeforeStream`
 
 `function` — Each refused request gets a plain 4xx, opens no stream and touches nothing.
@@ -12601,6 +12625,14 @@ interface BudgetedJob
 
 ```ts
 (options: AuthStallOptions) => Promise<InvariantVerdict>
+```
+
+### `checkChatAcceptsCode`
+
+`function` — Each pasted-code sample gets the route's normal response, never a refusal or an edge block.
+
+```ts
+(options: ChatAcceptsCodeOptions) => Promise<InvariantVerdict>
 ```
 
 ### `checkCoalescedTurn`

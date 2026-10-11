@@ -9498,6 +9498,12 @@
           "doc": "One checked outcome of one invariant, for one subject (a job, a route, a scenario)."
         },
         {
+          "name": "isEdgeBlock",
+          "kind": "function",
+          "signature": "(response: Response) => Promise<boolean>",
+          "doc": "Whether a response is an edge block rather than the app's own answer: a `cf-mitigated` header, or Cloudflare's HTML block page (\"Attention Required\", \"Sorry, you have been blocked\")."
+        },
+        {
           "name": "IsolatedJobsInput",
           "kind": "interface",
           "signature": "interface IsolatedJobsInput",
@@ -9592,6 +9598,12 @@
           "kind": "function",
           "signature": "(source: string, format: \"json\" | \"toml\") => WranglerCrons",
           "doc": "Read `[triggers] crons` (and `[env.<name>.triggers]`) from wrangler.toml, or `triggers.crons` from wrangler.json(c)."
+        },
+        {
+          "name": "PASTED_CODE_SAMPLES",
+          "kind": "const",
+          "signature": "readonly { name: string; text: string; }[]",
+          "doc": "Text people paste into a chat with an agent, each of which a WAF rule may match."
         },
         {
           "name": "readInSizedBatches",
@@ -9784,6 +9796,12 @@
           "doc": "Judge each invariant from the recorded verdicts and the deployment facts."
         },
         {
+          "name": "ChatAcceptsCodeOptions",
+          "kind": "interface",
+          "signature": "interface ChatAcceptsCodeOptions",
+          "doc": null
+        },
+        {
           "name": "checkAuthorizeBeforeStream",
           "kind": "function",
           "signature": "(options: AuthorizeBeforeStreamOptions) => Promise<InvariantVerdict>",
@@ -9794,6 +9812,12 @@
           "kind": "function",
           "signature": "(options: AuthStallOptions) => Promise<InvariantVerdict>",
           "doc": "A verified credential keeps working while D1 errors or stalls; it is refused once revoked, and once its last verification is more than 60 s old; and the cache holds SHA-256 keys, not secrets."
+        },
+        {
+          "name": "checkChatAcceptsCode",
+          "kind": "function",
+          "signature": "(options: ChatAcceptsCodeOptions) => Promise<InvariantVerdict>",
+          "doc": "Each pasted-code sample gets the route's normal response, never a refusal or an edge block."
         },
         {
           "name": "checkCoalescedTurn",
