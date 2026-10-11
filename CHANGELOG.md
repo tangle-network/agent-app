@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.105
+
+- fix(knip): name the ./router-turn entry so main's entry guard passes (#1031)
+- feat(workspace-store): D1 + R2 workspace store; profile.remember writes it when given (#1030)
+
 ## 0.60.104
 
 - perf(sandbox): a warm reuse skips unchanged round trips and overlaps the rest (#1025)
