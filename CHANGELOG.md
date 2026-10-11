@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.122
+
+- feat(model-picker): limited and unavailable models carry a warning StatusPill (#1055)
+- feat(studio): Studio's model control is the shared ModelPicker with logo, price and preview (#1054)
+
 ## 0.60.121
 
 - fix(eval): parity grading counts 'I do not have the pricing … like me to ask the owner?' as an admitted gap (#1053)
