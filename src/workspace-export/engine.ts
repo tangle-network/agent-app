@@ -538,7 +538,7 @@ export function createExportEngine(options: ExportEngineOptions) {
             etag = await saveJob(job, etag)
             break
           }
-          const [{ unit }] = batch
+          const { unit } = batch[0]!
           if (unit.status === 'pending') {
             // Progress was made; continue this unit in the next request.
             unit.attempts = 0
