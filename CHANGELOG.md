@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.85
+
+- fix(workspace-export): a failed advance hands its lease back and logs why (#999)
+
 ## 0.60.84
 
 - fix(workspace-export): a dropped request stalls an export for a minute, not five (#998)
