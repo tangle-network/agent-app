@@ -9331,6 +9331,400 @@
       ]
     },
     {
+      "id": "./journeys",
+      "source": "src/journeys/index.ts",
+      "dependsOn": [
+        "signoff",
+        "workspace-export"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "assertNoSecrets",
+          "kind": "function",
+          "signature": "(dir: string, needles: { hard: readonly string[]; soft: readonly string[]; }) => { softHits: string[]; }",
+          "doc": "Refuse to hand over a folder whose files hold a password or cookie value."
+        },
+        {
+          "name": "AuthPaths",
+          "kind": "interface",
+          "signature": "interface AuthPaths",
+          "doc": null
+        },
+        {
+          "name": "Chapter",
+          "kind": "interface",
+          "signature": "interface Chapter",
+          "doc": null
+        },
+        {
+          "name": "chapterCues",
+          "kind": "function",
+          "signature": "(chapters: readonly Chapter[], t0: number, duration: number) => Cue[]",
+          "doc": "Chapters on the video's own clock; each caption holds until the next."
+        },
+        {
+          "name": "ChatContract",
+          "kind": "interface",
+          "signature": "interface ChatContract",
+          "doc": "The chat DOM a turn is read from."
+        },
+        {
+          "name": "clickUntilSubmitted",
+          "kind": "function",
+          "signature": "(ops: SendDriveOps) => Promise<void>",
+          "doc": "Press until the page submits."
+        },
+        {
+          "name": "collectJourneyFiles",
+          "kind": "function",
+          "signature": "(root: string, probe: (file: string) => number | null) => JourneyFiles[]",
+          "doc": "Every journey folder under `root`: one that holds a `timings.json` or a `video/` folder, at any depth."
+        },
+        {
+          "name": "CONFIG_FILE_NAMES",
+          "kind": "const",
+          "signature": "readonly [\"journeys.config.mjs\", \"journeys.config.js\"]",
+          "doc": null
+        },
+        {
+          "name": "createSubmissionTracker",
+          "kind": "function",
+          "signature": "(routeUrl: string, sendPaths: readonly RegExp[]) => SubmissionTracker",
+          "doc": "Counts submissions from the page at `routeUrl`: a POST to that route (or its `.data` form), or to one of `sendPaths`, on the same origin."
+        },
+        {
+          "name": "credentialNames",
+          "kind": "function",
+          "signature": "(config: Pick<JourneysConfig, \"identities\">) => string[]",
+          "doc": "Environment variable names the config needs, for a vault loader."
+        },
+        {
+          "name": "CriticResult",
+          "kind": "interface",
+          "signature": "interface CriticResult",
+          "doc": "What the skeptical critic returns; the same shape the prove-journeys workflow asks for."
+        },
+        {
+          "name": "Cue",
+          "kind": "interface",
+          "signature": "interface Cue",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_AUTH_PATHS",
+          "kind": "const",
+          "signature": "AuthPaths",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_CHAT_CONTRACT",
+          "kind": "const",
+          "signature": "ChatContract",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_FAILURE_TEXT",
+          "kind": "const",
+          "signature": "readonly RegExp[]",
+          "doc": "Failure text any agent app can show: typed failure codes, provider errors and this package's own sandbox-stream copy."
+        },
+        {
+          "name": "DEFAULT_STOPPED_TEXT",
+          "kind": "const",
+          "signature": "readonly RegExp[]",
+          "doc": "Runtime wording for a turn the person stopped."
+        },
+        {
+          "name": "defineJourneys",
+          "kind": "function",
+          "signature": "(config: JourneysConfig) => JourneysConfig",
+          "doc": "Identity for a typed config; also validates it."
+        },
+        {
+          "name": "DESKTOP",
+          "kind": "const",
+          "signature": "{ width: number; height: number; }",
+          "doc": null
+        },
+        {
+          "name": "extractFrames",
+          "kind": "function",
+          "signature": "(video: string, srtFile: string | null, outDir: string, times: readonly number[], max?: number) => string[]",
+          "doc": "PNG frames of a video, named by label and timestamp, into `outDir`."
+        },
+        {
+          "name": "FailurePatterns",
+          "kind": "interface",
+          "signature": "interface FailurePatterns",
+          "doc": null
+        },
+        {
+          "name": "highlightPlan",
+          "kind": "function",
+          "signature": "(chapters: readonly Chapter[], t0: number, duration: number) => HighlightSegment[]",
+          "doc": "The highlights cut: which source ranges, at what speed, under which caption."
+        },
+        {
+          "name": "HighlightSegment",
+          "kind": "interface",
+          "signature": "interface HighlightSegment",
+          "doc": null
+        },
+        {
+          "name": "IndexInput",
+          "kind": "interface",
+          "signature": "interface IndexInput",
+          "doc": null
+        },
+        {
+          "name": "Journey",
+          "kind": "class",
+          "signature": "class Journey",
+          "doc": null
+        },
+        {
+          "name": "JourneyFiles",
+          "kind": "interface",
+          "signature": "interface JourneyFiles",
+          "doc": null
+        },
+        {
+          "name": "JourneyIdentity",
+          "kind": "interface",
+          "signature": "interface JourneyIdentity",
+          "doc": null
+        },
+        {
+          "name": "JourneysConfig",
+          "kind": "interface",
+          "signature": "interface JourneysConfig",
+          "doc": null
+        },
+        {
+          "name": "loadJourneysConfig",
+          "kind": "function",
+          "signature": "(dir?: any, env?: Record<string, string | undefined>) => Promise<ResolvedJourneysConfig>",
+          "doc": "`JOURNEYS_CONFIG`, else the first config file in `dir`."
+        },
+        {
+          "name": "MAX_HIGHLIGHTS_S",
+          "kind": "const",
+          "signature": "178",
+          "doc": null
+        },
+        {
+          "name": "oneLine",
+          "kind": "function",
+          "signature": "(text: string, max: number) => string",
+          "doc": null
+        },
+        {
+          "name": "PHONE",
+          "kind": "const",
+          "signature": "{ width: number; height: number; }",
+          "doc": null
+        },
+        {
+          "name": "postProcessVideo",
+          "kind": "function",
+          "signature": "(o: PostProcessInput) => string[]",
+          "doc": null
+        },
+        {
+          "name": "rebuildVideo",
+          "kind": "function",
+          "signature": "(rawLabelDir: string, videoDir: string, label: string, speedup2x: boolean) => string[]",
+          "doc": "Re-render from a raw folder after editing `<label>.chapters.json` by hand."
+        },
+        {
+          "name": "renderIndex",
+          "kind": "function",
+          "signature": "(input: IndexInput) => string",
+          "doc": null
+        },
+        {
+          "name": "ResolvedJourneysConfig",
+          "kind": "interface",
+          "signature": "interface ResolvedJourneysConfig",
+          "doc": null
+        },
+        {
+          "name": "resolveJourneysConfig",
+          "kind": "function",
+          "signature": "(config: JourneysConfig | ResolvedJourneysConfig, env?: Record<string, string | undefined>) => ResolvedJourneysConfig",
+          "doc": "Fill defaults and refuse a config that cannot drive a journey."
+        },
+        {
+          "name": "routeSubmitPaths",
+          "kind": "function",
+          "signature": "(routePath: string) => string[]",
+          "doc": "Paths a submission from `routePath` lands on: the route itself and its single-fetch `.data` form."
+        },
+        {
+          "name": "scoreTurn",
+          "kind": "function",
+          "signature": "(facts: TurnFacts) => TurnVerdict",
+          "doc": "The one place a turn's outcome is decided."
+        },
+        {
+          "name": "scrubTrace",
+          "kind": "function",
+          "signature": "(src: string, dst: string, needles: readonly string[]) => { entries: number; dropped: number; rewritten: number; }",
+          "doc": "Write a scrubbed copy of `src` to `dst`."
+        },
+        {
+          "name": "secretNeedles",
+          "kind": "function",
+          "signature": "(config: ResolvedJourneysConfig) => { hard: string[]; soft: string[]; }",
+          "doc": "Every value that must never leave the host."
+        },
+        {
+          "name": "SendDriveOps",
+          "kind": "interface",
+          "signature": "interface SendDriveOps",
+          "doc": null
+        },
+        {
+          "name": "SendOptions",
+          "kind": "interface",
+          "signature": "interface SendOptions",
+          "doc": null
+        },
+        {
+          "name": "sessionUser",
+          "kind": "function",
+          "signature": "(config: ResolvedJourneysConfig, state: string) => Promise<SessionUser | null>",
+          "doc": "The signed-in user behind a storage state, or null when it no longer signs in."
+        },
+        {
+          "name": "SessionUser",
+          "kind": "interface",
+          "signature": "interface SessionUser",
+          "doc": null
+        },
+        {
+          "name": "settleText",
+          "kind": "function",
+          "signature": "(read: () => Promise<string>, wait?: (ms: number) => Promise<void>, timeoutMs?: number) => Promise<string>",
+          "doc": "Read until the value stops changing: six identical reads 500 ms apart."
+        },
+        {
+          "name": "SignInMethod",
+          "kind": "type",
+          "signature": "type SignInMethod",
+          "doc": null
+        },
+        {
+          "name": "startJourney",
+          "kind": "function",
+          "signature": "(id: string, opts?: { config?: JourneysConfig | ResolvedJourneysConfig | undefined; cursor?: boolean | undefined; headl…",
+          "doc": "Open a journey."
+        },
+        {
+          "name": "STATUS_STALE_MS",
+          "kind": "const",
+          "signature": "20000",
+          "doc": "Whether a turn is still going, from what the page shows."
+        },
+        {
+          "name": "StepRecord",
+          "kind": "interface",
+          "signature": "interface StepRecord",
+          "doc": null
+        },
+        {
+          "name": "storageStateFor",
+          "kind": "function",
+          "signature": "(config: ResolvedJourneysConfig, name: string, opts?: { fresh?: boolean | undefined; }) => Promise<{ path: string; user…",
+          "doc": "Path to a storage state signed in as `identity`."
+        },
+        {
+          "name": "SubmissionTracker",
+          "kind": "interface",
+          "signature": "interface SubmissionTracker",
+          "doc": null
+        },
+        {
+          "name": "tallyTurns",
+          "kind": "function",
+          "signature": "(journeys: readonly JourneyFiles[]) => { total: number; byOutcome: Record<string, number>; }",
+          "doc": "Every recorded turn's outcome, counted."
+        },
+        {
+          "name": "ThreadRoute",
+          "kind": "interface",
+          "signature": "interface ThreadRoute",
+          "doc": "The ids a thread URL carries."
+        },
+        {
+          "name": "threadRouteIn",
+          "kind": "function",
+          "signature": "(url: string, config: Pick<ResolvedJourneysConfig, \"baseUrl\" | \"chat\">) => ThreadRoute | null",
+          "doc": "The ids in a thread URL, or null when the URL is not a thread on this origin."
+        },
+        {
+          "name": "TranscriptSnapshot",
+          "kind": "interface",
+          "signature": "interface TranscriptSnapshot",
+          "doc": "What one poll of the page returns."
+        },
+        {
+          "name": "TurnEvidence",
+          "kind": "class",
+          "signature": "class TurnEvidence",
+          "doc": "Failure evidence that appeared after the turn was sent."
+        },
+        {
+          "name": "TurnFacts",
+          "kind": "interface",
+          "signature": "interface TurnFacts",
+          "doc": null
+        },
+        {
+          "name": "turnLooksActive",
+          "kind": "function",
+          "signature": "(page: { stopVisible: boolean; statusLines: number; msSinceStatusChanged: number; }) => boolean",
+          "doc": null
+        },
+        {
+          "name": "TurnOutcome",
+          "kind": "type",
+          "signature": "type TurnOutcome",
+          "doc": null
+        },
+        {
+          "name": "TurnRecord",
+          "kind": "interface",
+          "signature": "interface TurnRecord",
+          "doc": null
+        },
+        {
+          "name": "TurnVerdict",
+          "kind": "interface",
+          "signature": "interface TurnVerdict",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./journeys/cli",
+      "source": "src/journeys/cli.ts",
+      "dependsOn": [
+        "signoff",
+        "workspace-export"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "main",
+          "kind": "function",
+          "signature": "(argv: readonly string[]) => Promise<number>",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./knowledge",
       "source": "src/knowledge/index.ts",
       "dependsOn": [],
@@ -14752,6 +15146,64 @@
           "kind": "function",
           "signature": "(value: string | null | undefined) => string | null",
           "doc": "Resolve a string by trimming whitespace or returning null if empty or undefined"
+        }
+      ]
+    },
+    {
+      "id": "./runtime/router-turn",
+      "source": "src/runtime/router-turn.ts",
+      "dependsOn": [
+        "tools"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "composeRouterTurnPrompt",
+          "kind": "function",
+          "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
+          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls."
+        },
+        {
+          "name": "routerFunctionName",
+          "kind": "function",
+          "signature": "(name: string) => string",
+          "doc": "OpenAI-compatible function names allow only `[A-Za-z0-9_-]{1,64}`; app tool names often use dots."
+        },
+        {
+          "name": "RouterTurnEvent",
+          "kind": "type",
+          "signature": "type RouterTurnEvent",
+          "doc": "What the turn is doing, in the order it happens, for a live view."
+        },
+        {
+          "name": "RouterTurnFailure",
+          "kind": "interface",
+          "signature": "interface RouterTurnFailure",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnOptions",
+          "kind": "interface",
+          "signature": "interface RouterTurnOptions",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnOutcome",
+          "kind": "interface",
+          "signature": "interface RouterTurnOutcome",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnTool",
+          "kind": "interface",
+          "signature": "interface RouterTurnTool",
+          "doc": "A tool the turn may call."
+        },
+        {
+          "name": "runRouterTurn",
+          "kind": "function",
+          "signature": "(options: RouterTurnOptions) => Promise<RouterTurnOutcome>",
+          "doc": null
         }
       ]
     },

@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_126 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_129 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -59,6 +59,8 @@ _126 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./integrations`](api/integrations.md) | 10 | — |
 | [`./integrations-react`](api/integrations-react.md) | 24 | `platform`, `web-react` |
 | [`./interactions`](api/interactions.md) | 64 | `web` |
+| [`./journeys`](api/journeys.md) | 61 | `signoff`, `workspace-export` |
+| [`./journeys/cli`](api/journeys-cli.md) | 1 | `signoff`, `workspace-export` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
 | [`./launch-invariants`](api/launch-invariants.md) | 59 | `signoff`, `turn-health` |
@@ -88,6 +90,7 @@ _126 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./record/drizzle`](api/record-drizzle.md) | 22 | — |
 | [`./redact`](api/redact.md) | 15 | — |
 | [`./runtime`](api/runtime.md) | 79 | `tools` |
+| [`./runtime/router-turn`](api/runtime-router-turn.md) | 8 | `tools` |
 | [`./sandbox`](api/sandbox.md) | 241 | `harness`, `profile`, `runtime`, `tools` |
 | [`./sequences`](api/sequences.md) | 111 | `tools`, `web` |
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
@@ -617,6 +620,26 @@ Depends on: `web`
 
 [Full API →](api/interactions.md)
 
+## `./journeys`
+
+Source: `src/journeys/index.ts` · 61 exports
+
+Depends on: `signoff`, `workspace-export`
+
+`assertNoSecrets`, `AuthPaths`, `Chapter`, `chapterCues`, `ChatContract`, `clickUntilSubmitted`, `collectJourneyFiles`, `CONFIG_FILE_NAMES`, `createSubmissionTracker`, `credentialNames`, `CriticResult`, `Cue`, `DEFAULT_AUTH_PATHS`, `DEFAULT_CHAT_CONTRACT`, `DEFAULT_FAILURE_TEXT`, `DEFAULT_STOPPED_TEXT`, `defineJourneys`, `DESKTOP`, `extractFrames`, `FailurePatterns`, `highlightPlan`, `HighlightSegment`, `IndexInput`, `Journey`, `JourneyFiles`, `JourneyIdentity`, `JourneysConfig`, `loadJourneysConfig`, `MAX_HIGHLIGHTS_S`, `oneLine`, `PHONE`, `postProcessVideo`, `rebuildVideo`, `renderIndex`, `ResolvedJourneysConfig`, `resolveJourneysConfig`, `routeSubmitPaths`, `scoreTurn`, `scrubTrace`, `secretNeedles`, `SendDriveOps`, `SendOptions`, `sessionUser`, `SessionUser`, `settleText`, `SignInMethod`, `startJourney`, `STATUS_STALE_MS`, `StepRecord`, `storageStateFor`, `SubmissionTracker`, `tallyTurns`, `ThreadRoute`, `threadRouteIn`, `TranscriptSnapshot`, `TurnEvidence`, `TurnFacts`, `turnLooksActive`, `TurnOutcome`, `TurnRecord`, `TurnVerdict`
+
+[Full API →](api/journeys.md)
+
+## `./journeys/cli`
+
+Source: `src/journeys/cli.ts` · 1 exports
+
+Depends on: `signoff`, `workspace-export`
+
+`main`
+
+[Full API →](api/journeys-cli.md)
+
 ## `./knowledge`
 
 Source: `src/knowledge/index.ts` · 6 exports
@@ -888,6 +911,16 @@ Depends on: `tools`
 `AnySurfaceKind`, `AppToolLoopOptions`, `buildCatalog`, `CatalogModel`, `catalogModelForId`, `CertifiedDelivery`, `CertifiedDeliveryConfig`, `composeRouterTurnPrompt`, `createCertifiedDelivery`, `createOpenAICompatStreamTurn`, `createRouterProtectedModelPort`, `createSurfaceRegistry`, `createTangleRouterModelConfig`, `CreateTangleRouterModelConfigOptions`, `DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR`, `DEFAULT_TANGLE_ROUTER_BASE_URL`, `defineSurfaceKind`, `fetchModelCatalog`, `isChatCapableModel`, `isTangleBillingEnforcementDisabled`, `isTangleExecutionKeyError`, `LoopAssistantToolCall`, `LoopEvent`, `LoopMessage`, `LoopToolCall`, `MAX_RECOMMENDED_MODELS`, `mergeSurfaceOverlay`, `ModelCatalog`, `normalizeModelId`, `OpenAICompatServedModel`, `OpenAICompatStreamTurnOptions`, `OpenAIStreamChunk`, `ProtectedModelSettlementError`, `resolveCatalogModelId`, `ResolvedAgentProfile`, `ResolvedTangleExecutionKey`, `ResolveModelOptions`, `resolveTangleDevOrUserKey`, `ResolveTangleDevOrUserKeyOptions`, `resolveTangleExecutionEnvironment`, `resolveTangleModelConfig`, `resolveUserTangleExecutionKey`, `resolveUserTangleExecutionKeyForUser`, `ResolveUserTangleExecutionKeyForUserOptions`, `ResolveUserTangleExecutionKeyOptions`, `routerFunctionName`, `RouterModel`, `RouterProtectedModelPortOptions`, `RouterProtectedModelSettlement`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnTool`, `runAppToolLoop`, `runRouterTurn`, `sortModelsByFreshness`, `streamAppToolLoop`, `StreamAppToolLoopOptions`, `StreamLoopYield`, `SurfaceKindDefinition`, `SurfaceMcpServer`, `SurfaceMergeBase`, `SurfaceOverlay`, `SurfacePermissionValue`, `SurfaceRegistry`, `TangleBillingEnforcementOptions`, `TangleExecutionEnvironment`, `TangleExecutionKeyError`, `TangleExecutionKeyErrorCode`, `tangleExecutionKeyHttpError`, `TangleExecutionKeyHttpError`, `TangleExecutionKeySource`, `TangleModelConfig`, `toLoopEvents`, `ToolLoopEvent`, `ToolLoopResult`, `ToolLoopStopReason`, `trimOrNull`
 
 [Full API →](api/runtime.md)
+
+## `./runtime/router-turn`
+
+Source: `src/runtime/router-turn.ts` · 8 exports
+
+Depends on: `tools`
+
+`composeRouterTurnPrompt`, `routerFunctionName`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnTool`, `runRouterTurn`
+
+[Full API →](api/runtime-router-turn.md)
 
 ## `./sandbox`
 
