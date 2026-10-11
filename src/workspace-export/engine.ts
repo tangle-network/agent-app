@@ -15,6 +15,7 @@ import { createSecretScanner, isSecretName, REDACTED, type SecretScanner } from 
 import type { ExportStorage } from './storage'
 import { createTarInspector } from './tar'
 import type {
+  ExportFile,
   ExportJob,
   ExportPlan,
   ExportProgress,
@@ -35,6 +36,8 @@ const MAX_ATTEMPTS = 3
 /** Files written per request. Each read and segment write is a subrequest, and
  *  Workers cap subrequests per request, so a large files source spans requests. */
 const FILES_PER_REQUEST = 200
+/** Files copied concurrently; four 8 MiB segments stay well inside a Worker's 128 MB. */
+const FILES_IN_PARALLEL = 4
 const SOURCE_NAME = /^[a-z0-9][a-z0-9_.-]{0,95}$/
 
 export interface ExportEngineOptions {
@@ -311,25 +314,40 @@ export function createExportEngine(options: ExportEngineOptions) {
       const start = unit.cursor ?? 0
       let seen = 0
       let written = 0
+      // Files are copied FILES_IN_PARALLEL at a time: one at a time, each KV or R2
+      // read plus segment write left a 1,000-file vault crawling. Paths are taken
+      // in listing order, keys come from the listing position (unique across
+      // resumes), and the cursor moves only past a fully written chunk.
+      let chunk: { file: ExportFile; position: number; path: string }[] = []
+      const flush = async () => {
+        const written_ = await Promise.all(
+          chunk.map(async ({ file, position, path }) => {
+            const body = await file.open()
+            if (body === null) return null
+            const masked = toStream(body).pipeThrough(scanner.maskBytes((n) => (unit.redactions += n)))
+            return writeEntry(`${keyBase}/p${position}`, path, masked, false)
+          }),
+        )
+        for (const entry of written_) if (entry) unit.entries.push(entry)
+        written += written_.filter(Boolean).length
+        unit.cursor = chunk.at(-1)!.position + 1
+        chunk = []
+      }
       for await (const file of source.files()) {
         if (seen < start) {
           seen += 1
           continue
         }
-        if (written >= FILES_PER_REQUEST || now() > deadline) {
+        if (written + chunk.length >= FILES_PER_REQUEST || now() > deadline) {
+          if (chunk.length) await flush()
           unit.cursor = seen
           return
         }
-        const body = await file.open()
+        chunk.push({ file, position: seen, path: folder + safePath(file.path, used) })
         seen += 1
-        if (body !== null) {
-          const path = folder + safePath(file.path, used)
-          const masked = toStream(body).pipeThrough(scanner.maskBytes((n) => (unit.redactions += n)))
-          unit.entries.push(await writeEntry(`${keyBase}/${unit.entries.length}`, path, masked, false))
-          written += 1
-        }
-        unit.cursor = seen
+        if (chunk.length >= FILES_IN_PARALLEL) await flush()
       }
+      if (chunk.length) await flush()
       unit.cursor = undefined
       unit.files = unit.entries.length
       unit.status = unit.entries.length ? 'done' : 'empty'

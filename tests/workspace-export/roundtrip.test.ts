@@ -554,3 +554,35 @@ describe('a source removed while the export runs', () => {
     expect(removed).toMatchObject({ status: 'empty', error: 'removed from the workspace while the export ran' })
   })
 })
+
+describe('files sources', () => {
+  it('copy files concurrently and keep each exactly once, in listing order', async () => {
+    const storage = createMemoryExportStorage()
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage,
+      plan: async () => ({
+        sources: [{
+          kind: 'files',
+          name: 'vault',
+          dataClass: 'knowledge',
+          async *files() {
+            for (let i = 0; i < 40; i += 1) {
+              yield { path: `n/${String(i).padStart(2, '0')}.md`, open: async () => { await new Promise((r) => setTimeout(r, 50)); return `note ${i}` } }
+            }
+          },
+        }],
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    const started = Date.now()
+    let current = job
+    for (let i = 0; i < 5 && current.status === 'running'; i += 1) current = (await engine.advance(WS, job.id))!
+    const elapsed = Date.now() - started
+    expect(current.status).toBe('complete')
+    const unit = current.units.find((u) => u.name === 'vault')!
+    expect(unit.entries.map((e) => e.path)).toEqual(Array.from({ length: 40 }, (_, i) => `files/vault/n/${String(i).padStart(2, '0')}.md`))
+    // 40 reads of 50 ms take at least 2000 ms one at a time.
+    expect(elapsed).toBeLessThan(1200)
+  })
+})
