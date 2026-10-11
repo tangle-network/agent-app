@@ -41,7 +41,7 @@ _130 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./documents`](api/documents.md) | 37 | — |
 | [`./documents/pdf-inspector`](api/documents-pdf-inspector.md) | 4 | — |
 | [`./email`](api/email.md) | 22 | — |
-| [`./eval`](api/eval.md) | 21 | `tools` |
+| [`./eval`](api/eval.md) | 29 | `tools` |
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
 | [`./harness`](api/harness.md) | 16 | — |
@@ -89,8 +89,8 @@ _130 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./record`](api/record.md) | 33 | — |
 | [`./record/drizzle`](api/record-drizzle.md) | 22 | — |
 | [`./redact`](api/redact.md) | 15 | — |
-| [`./runtime`](api/runtime.md) | 79 | `tools` |
-| [`./runtime/router-turn`](api/runtime-router-turn.md) | 8 | `tools` |
+| [`./runtime`](api/runtime.md) | 84 | `tools` |
+| [`./runtime/router-turn`](api/runtime-router-turn.md) | 13 | `tools` |
 | [`./sandbox`](api/sandbox.md) | 253 | `harness`, `profile`, `runtime`, `tools` |
 | [`./sequences`](api/sequences.md) | 111 | `tools`, `web` |
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
@@ -108,7 +108,7 @@ _130 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./stream`](api/stream.md) | 67 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 68 | — |
 | [`./studio-react`](api/studio-react.md) | 47 | `studio`, `web-react` |
-| [`./teams`](api/teams.md) | 33 | — |
+| [`./teams`](api/teams.md) | 35 | — |
 | [`./teams-react`](api/teams-react.md) | 10 | `brand`, `teams` |
 | [`./teams/drizzle`](api/teams-drizzle.md) | 26 | — |
 | [`./teams/invitations-api`](api/teams-invitations-api.md) | 13 | — |
@@ -121,7 +121,7 @@ _130 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./trace`](api/trace.md) | 33 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting`, `launch-invariants` |
 | [`./turn-stream`](api/turn-stream.md) | 58 | `chat-routes`, `crypto`, `stream` |
-| [`./vault`](api/vault.md) | 21 | — |
+| [`./vault`](api/vault.md) | 23 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
 | [`./web`](api/web.md) | 43 | — |
@@ -465,11 +465,11 @@ Source: `src/email/index.ts` · 22 exports
 
 ## `./eval`
 
-Source: `src/eval/index.ts` · 21 exports
+Source: `src/eval/index.ts` · 29 exports
 
 Depends on: `tools`
 
-`assertGateDiscriminates`, `calibrateGate`, `CalibrationCase`, `CalibrationOutcome`, `CalibrationReport`, `CompletionRequirement`, `CompletionVerdict`, `CorrectnessChecker`, `createLlmCorrectnessChecker`, `createTokenRecallChecker`, `extractProducedState`, `GateFn`, `measureWithControl`, `ProbeReport`, `producedFromToolEvents`, `ProducedState`, `RuntimeEventLike`, `SatisfiedBy`, `TaskGold`, `verifyCompletion`, `weightedComposite`
+`AskVerdict`, `assertGateDiscriminates`, `calibrateGate`, `CalibrationCase`, `CalibrationOutcome`, `CalibrationReport`, `CompletionRequirement`, `CompletionVerdict`, `CorrectnessChecker`, `createLlmCorrectnessChecker`, `createTokenRecallChecker`, `extractProducedState`, `GateFn`, `gradeAnswer`, `LaneAnswer`, `measureWithControl`, `ParityAsk`, `parityGate`, `ParityLane`, `ParityReport`, `ProbeReport`, `producedFromToolEvents`, `ProducedState`, `runParityEval`, `RuntimeEventLike`, `SatisfiedBy`, `TaskGold`, `verifyCompletion`, `weightedComposite`
 
 [Full API →](api/eval.md)
 
@@ -905,21 +905,21 @@ Source: `src/redact/index.ts` · 15 exports
 
 ## `./runtime`
 
-Source: `src/runtime/index.ts` · 79 exports
+Source: `src/runtime/index.ts` · 84 exports
 
 Depends on: `tools`
 
-`AnySurfaceKind`, `AppToolLoopOptions`, `buildCatalog`, `CatalogModel`, `catalogModelForId`, `CertifiedDelivery`, `CertifiedDeliveryConfig`, `composeRouterTurnPrompt`, `createCertifiedDelivery`, `createOpenAICompatStreamTurn`, `createRouterProtectedModelPort`, `createSurfaceRegistry`, `createTangleRouterModelConfig`, `CreateTangleRouterModelConfigOptions`, `DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR`, `DEFAULT_TANGLE_ROUTER_BASE_URL`, `defineSurfaceKind`, `fetchModelCatalog`, `isChatCapableModel`, `isTangleBillingEnforcementDisabled`, `isTangleExecutionKeyError`, `LoopAssistantToolCall`, `LoopEvent`, `LoopMessage`, `LoopToolCall`, `MAX_RECOMMENDED_MODELS`, `mergeSurfaceOverlay`, `ModelCatalog`, `normalizeModelId`, `OpenAICompatServedModel`, `OpenAICompatStreamTurnOptions`, `OpenAIStreamChunk`, `ProtectedModelSettlementError`, `resolveCatalogModelId`, `ResolvedAgentProfile`, `ResolvedTangleExecutionKey`, `ResolveModelOptions`, `resolveTangleDevOrUserKey`, `ResolveTangleDevOrUserKeyOptions`, `resolveTangleExecutionEnvironment`, `resolveTangleModelConfig`, `resolveUserTangleExecutionKey`, `resolveUserTangleExecutionKeyForUser`, `ResolveUserTangleExecutionKeyForUserOptions`, `ResolveUserTangleExecutionKeyOptions`, `routerFunctionName`, `RouterModel`, `RouterProtectedModelPortOptions`, `RouterProtectedModelSettlement`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnTool`, `runAppToolLoop`, `runRouterTurn`, `sortModelsByFreshness`, `streamAppToolLoop`, `StreamAppToolLoopOptions`, `StreamLoopYield`, `SurfaceKindDefinition`, `SurfaceMcpServer`, `SurfaceMergeBase`, `SurfaceOverlay`, `SurfacePermissionValue`, `SurfaceRegistry`, `TangleBillingEnforcementOptions`, `TangleExecutionEnvironment`, `TangleExecutionKeyError`, `TangleExecutionKeyErrorCode`, `tangleExecutionKeyHttpError`, `TangleExecutionKeyHttpError`, `TangleExecutionKeySource`, `TangleModelConfig`, `toLoopEvents`, `ToolLoopEvent`, `ToolLoopResult`, `ToolLoopStopReason`, `trimOrNull`
+`AnySurfaceKind`, `AppToolLoopOptions`, `budgetTurnKnowledge`, `buildCatalog`, `CatalogModel`, `catalogModelForId`, `CertifiedDelivery`, `CertifiedDeliveryConfig`, `composeRouterTurnPrompt`, `createCertifiedDelivery`, `createOpenAICompatStreamTurn`, `createRouterProtectedModelPort`, `createSurfaceRegistry`, `createTangleRouterModelConfig`, `CreateTangleRouterModelConfigOptions`, `DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR`, `DEFAULT_TANGLE_ROUTER_BASE_URL`, `defineSurfaceKind`, `fetchModelCatalog`, `isChatCapableModel`, `isTangleBillingEnforcementDisabled`, `isTangleExecutionKeyError`, `LoopAssistantToolCall`, `LoopEvent`, `LoopMessage`, `LoopToolCall`, `MAX_RECOMMENDED_MODELS`, `mergeSurfaceOverlay`, `ModelCatalog`, `normalizeModelId`, `OpenAICompatServedModel`, `OpenAICompatStreamTurnOptions`, `OpenAIStreamChunk`, `ProtectedModelSettlementError`, `resolveCatalogModelId`, `ResolvedAgentProfile`, `ResolvedTangleExecutionKey`, `ResolveModelOptions`, `resolveTangleDevOrUserKey`, `ResolveTangleDevOrUserKeyOptions`, `resolveTangleExecutionEnvironment`, `resolveTangleModelConfig`, `resolveUserTangleExecutionKey`, `resolveUserTangleExecutionKeyForUser`, `ResolveUserTangleExecutionKeyForUserOptions`, `ResolveUserTangleExecutionKeyOptions`, `routerFunctionName`, `RouterModel`, `RouterProtectedModelPortOptions`, `RouterProtectedModelSettlement`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnTool`, `runAppToolLoop`, `runRouterTurn`, `sortModelsByFreshness`, `streamAppToolLoop`, `StreamAppToolLoopOptions`, `StreamLoopYield`, `SurfaceKindDefinition`, `SurfaceMcpServer`, `SurfaceMergeBase`, `SurfaceOverlay`, `SurfacePermissionValue`, `SurfaceRegistry`, `TangleBillingEnforcementOptions`, `TangleExecutionEnvironment`, `TangleExecutionKeyError`, `TangleExecutionKeyErrorCode`, `tangleExecutionKeyHttpError`, `TangleExecutionKeyHttpError`, `TangleExecutionKeySource`, `TangleModelConfig`, `toLoopEvents`, `ToolLoopEvent`, `ToolLoopResult`, `ToolLoopStopReason`, `trimOrNull`, `TurnKnowledgeBudget`, `TurnKnowledgeFile`, `turnKnowledgeInstructions`, `workspaceKnowledgeForTurn`
 
 [Full API →](api/runtime.md)
 
 ## `./runtime/router-turn`
 
-Source: `src/runtime/router-turn.ts` · 8 exports
+Source: `src/runtime/router-turn.ts` · 13 exports
 
 Depends on: `tools`
 
-`composeRouterTurnPrompt`, `routerFunctionName`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnTool`, `runRouterTurn`
+`budgetTurnKnowledge`, `composeRouterTurnPrompt`, `routerFunctionName`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnTool`, `runRouterTurn`, `TurnKnowledgeBudget`, `TurnKnowledgeFile`, `turnKnowledgeInstructions`, `workspaceKnowledgeForTurn`
 
 [Full API →](api/runtime-router-turn.md)
 
@@ -1075,9 +1075,9 @@ Depends on: `studio`, `web-react`
 
 ## `./teams`
 
-Source: `src/teams/index.ts` · 33 exports
+Source: `src/teams/index.ts` · 35 exports
 
-`ASSIGNABLE_WORKSPACE_ROLES`, `AssignableWorkspaceRole`, `canManageWorkspaceMemberRole`, `generateInvitationToken`, `generateInviteToken`, `getInvitationExpiresAt`, `hasOrganizationRole`, `hasWorkspaceRole`, `INVITATION_EXPIRY_DAYS`, `InvitationEmailStatus`, `InvitationPermission`, `InvitationStatus`, `InviteRejectionReason`, `InviteTokenState`, `inviteUrlForToken`, `InviteValidationResult`, `isAssignableWorkspaceRole`, `isInviteTokenShape`, `normalizeInvitationEmail`, `ORGANIZATION_ROLE_RANK`, `ORGANIZATION_ROLES`, `OrganizationRole`, `organizationRoleGrantsWorkspaceOwner`, `parseInvitationPermission`, `resolveWorkspaceRole`, `SandboxWorkspaceRole`, `validateInviteToken`, `WORKSPACE_ROLE_RANK`, `WORKSPACE_ROLES`, `WorkspaceCollaborationAccess`, `WorkspaceRole`, `workspaceRoleToCollaborationAccess`, `workspaceRoleToSandboxRole`
+`ASSIGNABLE_WORKSPACE_ROLES`, `AssignableWorkspaceRole`, `canManageWorkspaceMemberRole`, `generateInvitationToken`, `generateInviteToken`, `getInvitationExpiresAt`, `hasOrganizationRole`, `hasWorkspaceRole`, `INVITATION_EMAIL_HINT`, `INVITATION_EXPIRY_DAYS`, `InvitationEmailStatus`, `InvitationPermission`, `InvitationStatus`, `InviteRejectionReason`, `InviteTokenState`, `inviteUrlForToken`, `InviteValidationResult`, `isAssignableWorkspaceRole`, `isInvitationEmail`, `isInviteTokenShape`, `normalizeInvitationEmail`, `ORGANIZATION_ROLE_RANK`, `ORGANIZATION_ROLES`, `OrganizationRole`, `organizationRoleGrantsWorkspaceOwner`, `parseInvitationPermission`, `resolveWorkspaceRole`, `SandboxWorkspaceRole`, `validateInviteToken`, `WORKSPACE_ROLE_RANK`, `WORKSPACE_ROLES`, `WorkspaceCollaborationAccess`, `WorkspaceRole`, `workspaceRoleToCollaborationAccess`, `workspaceRoleToSandboxRole`
 
 [Full API →](api/teams.md)
 
@@ -1191,9 +1191,9 @@ Depends on: `chat-routes`, `crypto`, `stream`
 
 ## `./vault`
 
-Source: `src/vault/index.ts` · 21 exports
+Source: `src/vault/index.ts` · 23 exports
 
-`ConfirmDialog`, `ConfirmDialogProps`, `VAULT_TREE_CHILD_PAGE`, `VaultArtifactRenderProps`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneHandle`, `VaultPaneProps`, `VaultRichParts`, `VaultTree`, `VaultTreeNode`, `VaultTreeProps`, `VaultTreeRenderProps`
+`ConfirmDialog`, `ConfirmDialogProps`, `VAULT_TREE_CHILD_PAGE`, `VaultArtifactRenderProps`, `VaultContentMatch`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneHandle`, `VaultPaneProps`, `VaultRevision`, `VaultRichParts`, `VaultTree`, `VaultTreeNode`, `VaultTreeProps`, `VaultTreeRenderProps`
 
 [Full API →](api/vault.md)
 

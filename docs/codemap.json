@@ -7069,6 +7069,12 @@
       "error": null,
       "exports": [
         {
+          "name": "AskVerdict",
+          "kind": "interface",
+          "signature": "interface AskVerdict",
+          "doc": null
+        },
+        {
           "name": "assertGateDiscriminates",
           "kind": "function",
           "signature": "<TInput>(name: string, gate: GateFn<TInput>, cases: readonly CalibrationCase<TInput>[]) => Promise<CalibrationReport>",
@@ -7141,10 +7147,46 @@
           "doc": "A gate under calibration."
         },
         {
+          "name": "gradeAnswer",
+          "kind": "function",
+          "signature": "(text: string, ask: ParityAsk) => AskVerdict",
+          "doc": null
+        },
+        {
+          "name": "LaneAnswer",
+          "kind": "interface",
+          "signature": "interface LaneAnswer",
+          "doc": "One lane's answer to one ask."
+        },
+        {
           "name": "measureWithControl",
           "kind": "function",
           "signature": "<TValue>(opts: { readonly measure: () => TValue | Promise<TValue>; readonly control: () => TValue | Promise<TValue>; re…",
           "doc": "Measure something, but only after proving the instrument can register a non-zero — because an absence is a claim about the measurement first."
+        },
+        {
+          "name": "ParityAsk",
+          "kind": "interface",
+          "signature": "interface ParityAsk",
+          "doc": "Parity eval: the same asks through two or more lanes of one app (for example the Router turn and the sandbox turn), graded the same way, so a lane change is judged by numbers rather than by feel."
+        },
+        {
+          "name": "parityGate",
+          "kind": "function",
+          "signature": "(report: ParityReport, bar: { minCorrectRatio: number; maxFabricated?: number | undefined; maxFailed?: number | undefin…",
+          "doc": "The release bar: every lane at or above `minCorrect` of its asks, with no fabrication and no failed turn."
+        },
+        {
+          "name": "ParityLane",
+          "kind": "type",
+          "signature": "type ParityLane",
+          "doc": null
+        },
+        {
+          "name": "ParityReport",
+          "kind": "interface",
+          "signature": "interface ParityReport",
+          "doc": null
         },
         {
           "name": "ProbeReport",
@@ -7163,6 +7205,12 @@
           "kind": "interface",
           "signature": "interface ProducedState",
           "doc": "Everything observable about what a run actually produced."
+        },
+        {
+          "name": "runParityEval",
+          "kind": "function",
+          "signature": "(options: { asks: readonly ParityAsk[]; lanes: Record<string, ParityLane>; style?: string | undefined; }) => Promise<Pa…",
+          "doc": "Ask every lane every question, one ask at a time per lane (lanes run in parallel), and grade each answer the same way."
         },
         {
           "name": "RuntimeEventLike",
@@ -14752,6 +14800,12 @@
           "doc": null
         },
         {
+          "name": "budgetTurnKnowledge",
+          "kind": "function",
+          "signature": "(files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]",
+          "doc": "Apply the byte budget in path order: small files keep their text until the total is spent."
+        },
+        {
           "name": "buildCatalog",
           "kind": "function",
           "signature": "(raw: RouterModel[], opts?: { preferredDefault?: string | undefined; } | undefined) => ModelCatalog",
@@ -14785,7 +14839,7 @@
           "name": "composeRouterTurnPrompt",
           "kind": "function",
           "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
-          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls."
+          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…"
         },
         {
           "name": "createCertifiedDelivery",
@@ -15212,6 +15266,30 @@
           "kind": "function",
           "signature": "(value: string | null | undefined) => string | null",
           "doc": "Resolve a string by trimming whitespace or returning null if empty or undefined"
+        },
+        {
+          "name": "TurnKnowledgeBudget",
+          "kind": "interface",
+          "signature": "interface TurnKnowledgeBudget",
+          "doc": null
+        },
+        {
+          "name": "TurnKnowledgeFile",
+          "kind": "interface",
+          "signature": "interface TurnKnowledgeFile",
+          "doc": "One knowledge file a turn carries; `text` is null when it is too large or not readable here."
+        },
+        {
+          "name": "turnKnowledgeInstructions",
+          "kind": "function",
+          "signature": "(files: readonly TurnKnowledgeFile[], options?: { readTool?: string | undefined; }) => string[]",
+          "doc": "The prompt lines for a turn's knowledge."
+        },
+        {
+          "name": "workspaceKnowledgeForTurn",
+          "kind": "function",
+          "signature": "(store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…",
+          "doc": "A workspace store's knowledge files (kind `file` under `prefix`) as turn knowledge, within the budget."
         }
       ]
     },
@@ -15224,10 +15302,16 @@
       "error": null,
       "exports": [
         {
+          "name": "budgetTurnKnowledge",
+          "kind": "function",
+          "signature": "(files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]",
+          "doc": "Apply the byte budget in path order: small files keep their text until the total is spent."
+        },
+        {
           "name": "composeRouterTurnPrompt",
           "kind": "function",
           "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
-          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls."
+          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…"
         },
         {
           "name": "routerFunctionName",
@@ -15270,6 +15354,30 @@
           "kind": "function",
           "signature": "(options: RouterTurnOptions) => Promise<RouterTurnOutcome>",
           "doc": null
+        },
+        {
+          "name": "TurnKnowledgeBudget",
+          "kind": "interface",
+          "signature": "interface TurnKnowledgeBudget",
+          "doc": null
+        },
+        {
+          "name": "TurnKnowledgeFile",
+          "kind": "interface",
+          "signature": "interface TurnKnowledgeFile",
+          "doc": "One knowledge file a turn carries; `text` is null when it is too large or not readable here."
+        },
+        {
+          "name": "turnKnowledgeInstructions",
+          "kind": "function",
+          "signature": "(files: readonly TurnKnowledgeFile[], options?: { readTool?: string | undefined; }) => string[]",
+          "doc": "The prompt lines for a turn's knowledge."
+        },
+        {
+          "name": "workspaceKnowledgeForTurn",
+          "kind": "function",
+          "signature": "(store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…",
+          "doc": "A workspace store's knowledge files (kind `file` under `prefix`) as turn knowledge, within the budget."
         }
       ]
     },
@@ -21009,6 +21117,12 @@
           "doc": "True when `actual` is at least `minimum` on the workspace ladder."
         },
         {
+          "name": "INVITATION_EMAIL_HINT",
+          "kind": "const",
+          "signature": "\"Enter a full email address, such as name@company.com.\"",
+          "doc": "What to tell someone whose invite address cannot be delivered to."
+        },
+        {
           "name": "INVITATION_EXPIRY_DAYS",
           "kind": "const",
           "signature": "7",
@@ -21061,6 +21175,12 @@
           "kind": "function",
           "signature": "(value: unknown) => value is \"viewer\" | \"editor\" | \"admin\"",
           "doc": "Determine if a value is a valid assignable workspace role among viewer, editor, or admin"
+        },
+        {
+          "name": "isInvitationEmail",
+          "kind": "function",
+          "signature": "(email: string) => boolean",
+          "doc": "Whether an address has the shape an invitation can be delivered to."
         },
         {
           "name": "isInviteTokenShape",
@@ -27806,7 +27926,7 @@
         {
           "name": "WorkspaceList",
           "kind": "function",
-          "signature": "({ items, noun, title, description, layout, fields, create, empty, rename, remove, removeConsequence, actions, children…",
+          "signature": "({ items, noun, title, description, layout, fields, create, empty, rename, remove, canRemove, removeConsequence, action…",
           "doc": "The listing every product opens on: one title, one primary action, the workspaces, and nothing that counts them."
         },
         {

@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-79 exports.
+84 exports.
 
 ### `AnySurfaceKind`
 
@@ -20,6 +20,14 @@ type AnySurfaceKind
 
 ```ts
 interface AppToolLoopOptions
+```
+
+### `budgetTurnKnowledge`
+
+`function` — Apply the byte budget in path order: small files keep their text until the total is spent.
+
+```ts
+(files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]
 ```
 
 ### `buildCatalog`
@@ -64,7 +72,7 @@ type CertifiedDeliveryConfig
 
 ### `composeRouterTurnPrompt`
 
-`function` — The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls.
+`function` — The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…
 
 ```ts
 (profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…
@@ -636,4 +644,36 @@ type ToolLoopStopReason
 
 ```ts
 (value: string | null | undefined) => string | null
+```
+
+### `TurnKnowledgeBudget`
+
+`interface`
+
+```ts
+interface TurnKnowledgeBudget
+```
+
+### `TurnKnowledgeFile`
+
+`interface` — One knowledge file a turn carries; `text` is null when it is too large or not readable here.
+
+```ts
+interface TurnKnowledgeFile
+```
+
+### `turnKnowledgeInstructions`
+
+`function` — The prompt lines for a turn's knowledge.
+
+```ts
+(files: readonly TurnKnowledgeFile[], options?: { readTool?: string | undefined; }) => string[]
+```
+
+### `workspaceKnowledgeForTurn`
+
+`function` — A workspace store's knowledge files (kind `file` under `prefix`) as turn knowledge, within the budget.
+
+```ts
+(store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…
 ```
