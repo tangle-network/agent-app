@@ -34,8 +34,9 @@ export type RouterTurnGrant = Omit<RunProtectedAgentCandidateModelGrantOptions<v
 
 type GrantSettlement = Awaited<ReturnType<RouterTurnGrant['port']['settleGrant']>>
 
-/** A turn under a grant. The grant supplies the key and base URL; one grant never repeats a turn. */
-export type ProtectedRouterTurnOptions = Omit<RouterTurnOptions, 'apiKey' | 'baseUrl' | 'repeat'> & {
+/** A turn under a grant. The grant supplies the key and base URL; one grant never repeats a turn.
+ *  Placement is decided before a grant is reserved, so it is not an option here. */
+export type ProtectedRouterTurnOptions = Omit<RouterTurnOptions, 'apiKey' | 'baseUrl' | 'repeat' | 'placement'> & {
   grant: RouterTurnGrant
 }
 

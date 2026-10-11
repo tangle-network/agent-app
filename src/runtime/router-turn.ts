@@ -22,6 +22,7 @@ import { streamAppToolLoop, type LoopEvent, type LoopMessage, type LoopToolCall,
 import { DEFAULT_TANGLE_ROUTER_BASE_URL } from './model'
 import { createOpenAICompatCompletionTurn, createOpenAICompatStreamTurn } from './openai-stream'
 import { turnKnowledgeInstructions, type TurnKnowledgeFile } from './turn-knowledge'
+import { placeExecution, type PlacementRecord, type VacuousAxis } from '@tangle-network/agent-runtime/placement'
 export { budgetTurnKnowledge, turnKnowledgeInstructions, workspaceKnowledgeForTurn, type TurnKnowledgeBudget, type TurnKnowledgeFile } from './turn-knowledge'
 
 /** A tool the turn may call. Structurally an `McpToolDefinition` whose env is already bound. */
@@ -81,6 +82,42 @@ export interface RouterTurnOutcome {
   /** Every side event the turn's tools reported, in order (at most 500). */
   toolEvents: RouterTurnToolEvent[]
   failure?: RouterTurnFailure
+  /** Where the turn was placed, when the caller asked for placement. */
+  placement?: PlacementRecord
+}
+
+/**
+ * What placement reads for a Router turn: the resolved profile, the tools the
+ * turn would hold, and a model the sender chose. Declared data only.
+ */
+export interface RouterTurnPlacementInput {
+  profile: object
+  toolNames?: readonly string[]
+  /** A model other than the profile's needs the sandbox to choose between them. */
+  requestedModel?: string
+  /** Deny-only permissions grant nothing a Router turn lacks. Default: ['permissions']. */
+  vacuousAxes?: readonly VacuousAxis[]
+  /** The app inlines the profile's skill text into the prompt. */
+  inlineSkills?: boolean
+}
+
+/**
+ * Where one conversational turn runs: `inference` or `loop` run here in
+ * `runRouterTurn`; `sandbox` means the profile or request needs a computer
+ * (a harness, files, MCP servers, skills that are not inlined, another model).
+ * Throws `PlacementRefusedError` when no tier can meet every requirement.
+ */
+export function placeRouterTurn(input: RouterTurnPlacementInput): PlacementRecord {
+  return placeExecution({
+    profile: input.profile,
+    requirements: {
+      ...(input.toolNames?.length ? { tools: [...input.toolNames] } : {}),
+      ...(input.requestedModel ? { model: input.requestedModel } : {}),
+    },
+    context: { interactive: false, inferenceAvailable: true, loopAvailable: true },
+    vacuousAxes: input.vacuousAxes ?? ['permissions'],
+    ...(input.inlineSkills ? { inlineSkills: true } : {}),
+  })
 }
 
 /** One tool call's result as the model reads it. */
@@ -129,6 +166,11 @@ export interface RouterTurnOptions {
   maxToolCalls?: number
   /** Replace the text the model reads for one tool result. `toolName` is the app's name. */
   renderToolResult?: (toolName: string, outcome: RouterTurnToolOutcome) => string
+  /**
+   * Place the turn before any model call. A turn placed in the sandbox returns at once
+   * with `placement` and failure `placement_sandbox`, so the app runs it there instead.
+   */
+  placement?: Omit<RouterTurnPlacementInput, 'toolNames'>
 }
 
 const DEFAULT_BUDGET_MS = 90_000
@@ -183,6 +225,13 @@ function renderResult(outcome: RouterTurnToolOutcome): string {
 }
 
 export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterTurnOutcome> {
+  const placement = options.placement
+    ? placeRouterTurn({ ...options.placement, toolNames: (options.tools ?? []).map(tool => tool.name) })
+    : undefined
+  if (placement?.chosen === 'sandbox') {
+    return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [], placement,
+      failure: { code: 'placement_sandbox', message: placement.reason } }
+  }
   const { apiKey } = options
   if (!apiKey) {
     return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [],
@@ -317,7 +366,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
 
   const outcome = (failure?: RouterTurnFailure): RouterTurnOutcome => ({
     text: segments.map(part => part.trim()).filter(Boolean).join('\n\n'),
-    servedModel, toolCalls, usage: { ...usage }, toolEvents: [...toolEvents], ...(failure ? { failure } : {}),
+    servedModel, toolCalls, usage: { ...usage }, toolEvents: [...toolEvents], ...(placement ? { placement } : {}), ...(failure ? { failure } : {}),
   })
   const repeat = options.repeat !== false
   let stop: ToolLoopStopReason | 'tool_limit'
