@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.71
+
+- fix(stream): settleOrphanedTurns leaves a plan follow-up claim to its gate until the claim's own staleness (#983)
+
 ## 0.60.70
 
 - perf(launch-invariants): sample the heap after large reads and every 50th query, not around every query (#980)
