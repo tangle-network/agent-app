@@ -92,7 +92,6 @@ describe('runProtectedRouterTurn', () => {
       const outcome = await runProtectedRouterTurn({ grant: value, model: 'openai/m', fetchImpl, stream: false, systemPrompt: 's',
         userMessage: 'u', tools: [slowTask] })
       expect(modelCalls).toHaveBeenCalledOnce()
-      expect(outcome.continuation).toBeUndefined()
       expect(outcome.failure?.code).toBe('turn_deadline')
       expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'failed' }))
     } finally { clock.mockRestore() }

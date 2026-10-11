@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { composeRouterTurnPrompt, routerFunctionName, runRouterTurn, workspaceTurnCheckpoints, type RouterTurnEvent, type RouterTurnTool } from '../src/runtime/router-turn'
-import { createInMemoryWorkspaceStore } from '@tangle-network/agent-runtime/workspace-store'
+import { composeRouterTurnPrompt, routerFunctionName, runRouterTurn, type RouterTurnEvent, type RouterTurnTool } from '../src/runtime/router-turn'
 
 /** One Router chat completion streamed as OpenAI server-sent events. */
 function sse(chunks: unknown[], headers: Record<string, string> = {}) {
@@ -150,39 +149,6 @@ describe('runRouterTurn', () => {
       onEvent: event => events.push(event) })
     expect(outcome.usage).toEqual({ promptTokens: 8000, completionTokens: 3, modelCalls: 1 })
     expect(events.filter(event => event.type === 'usage')).toEqual([{ type: 'usage', promptTokens: 8000, completionTokens: 3 }])
-  })
-
-  it('returns a continuation at the budget, and a later hop finishes the same turn from it', async () => {
-    let now = 0
-    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
-    try {
-      const slowTask: RouterTurnTool = { ...createTask, run: vi.fn(async () => { now = 60_000; return { taskId: 'task-1' } }) }
-      const first = router(sse([text('Working on it. '), toolCall('call-1', 'staff_task_create', '{"title":"Audit"}')]))
-      const hop1 = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: first.fetchImpl, budgetMs: 30_000,
-        systemPrompt: 's', userMessage: 'Run the audit', tools: [slowTask] })
-      expect(hop1.failure).toBeUndefined()
-      expect(hop1.text).toBe('Working on it.')
-      expect(hop1.continuation).toMatchObject({ hops: 1, text: 'Working on it.' })
-      expect(hop1.continuation!.messages.map(message => message.role)).toEqual(['user', 'assistant', 'tool'])
-      // Saved between hops in the workspace store, outside /files/.
-      const workspace = createInMemoryWorkspaceStore()
-      const checkpoints = workspaceTurnCheckpoints(workspace, 'ws', 'agent')
-      await checkpoints.save('turn-1', hop1.continuation!)
-      expect(await workspace.list('ws', '/files/')).toEqual([])
-      const stored = (await checkpoints.load('turn-1'))!
-
-      const second = router(sse([]))
-      const hop2 = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: second.fetchImpl, budgetMs: 30_000,
-        systemPrompt: 's', userMessage: 'ignored', continueFrom: stored, tools: [slowTask] })
-      expect(second.requests[0]!.body.messages).toEqual([{ role: 'system', content: 's' }, ...stored.messages])
-      // The model ended silently after the tool; the turn already spoke in hop 1, so this is not an empty reply.
-      expect(hop2.failure).toBeUndefined()
-      expect(hop2.text).toBe('Working on it.')
-      expect(hop2.continuation).toBeUndefined()
-      expect(slowTask.run).toHaveBeenCalledTimes(1)
-      await checkpoints.clear('turn-1')
-      expect(await checkpoints.load('turn-1')).toBeNull()
-    } finally { clock.mockRestore() }
   })
 
   it('refuses to run without a credential', async () => {

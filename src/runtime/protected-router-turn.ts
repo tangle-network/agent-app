@@ -34,8 +34,8 @@ export type RouterTurnGrant = Omit<RunProtectedAgentCandidateModelGrantOptions<v
 
 type GrantSettlement = Awaited<ReturnType<RouterTurnGrant['port']['settleGrant']>>
 
-/** A turn under a grant. The grant supplies the key and base URL; one grant never repeats or continues a turn. */
-export type ProtectedRouterTurnOptions = Omit<RouterTurnOptions, 'apiKey' | 'baseUrl' | 'continueFrom' | 'repeat'> & {
+/** A turn under a grant. The grant supplies the key and base URL; one grant never repeats a turn. */
+export type ProtectedRouterTurnOptions = Omit<RouterTurnOptions, 'apiKey' | 'baseUrl' | 'repeat'> & {
   grant: RouterTurnGrant
 }
 
@@ -89,8 +89,8 @@ export async function runProtectedRouterTurn(options: ProtectedRouterTurnOptions
   const result = (failure?: RouterTurnFailure): ProtectedRouterTurnOutcome => {
     const base: RouterTurnOutcome = turn
       ?? { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 } }
-    // The grant's verdict replaces the turn's own failure, and a grant turn never continues.
-    const { failure: _turnFailure, continuation: _continuation, ...rest } = base
+    // The grant's verdict replaces the turn's own failure.
+    const { failure: _turnFailure, ...rest } = base
     return { ...rest, ...(settlement ? { settlement } : {}), ...(failure ? { failure } : {}) }
   }
   if (options.signal?.aborted) return result({ code: 'turn_aborted', message: 'The turn was cancelled.' })
@@ -146,13 +146,13 @@ export async function runProtectedRouterTurn(options: ProtectedRouterTurnOptions
         // One grant is one bounded unit: no automatic second billable call, and the
         // grant's deadline ends the model call in flight.
         turn = await runRouterTurn({
-          // One grant is one turn: never a checkpoint from an earlier hop.
-          ...turnOptions, apiKey, baseUrl, repeat: false, continueFrom: undefined,
+          ...turnOptions, apiKey, baseUrl, repeat: false,
           budgetMs: Math.min(options.budgetMs ?? remainingMs, remainingMs),
           signal: AbortSignal.any([AbortSignal.timeout(remainingMs), ...(options.signal ? [options.signal] : [])]),
         })
-        // A continuation would need a second grant; this one ends at its deadline.
-        if (turn.continuation || (turn.failure?.code === 'turn_aborted' && Date.now() >= grant.deadlineAtMs)) {
+        // The grant's timeout aborts the call in flight; that is the deadline, not a cancellation.
+        // A turn past its deadline fails here: finishing it would need a second grant.
+        if (turn.failure?.code === 'turn_aborted' && Date.now() >= grant.deadlineAtMs) {
           throw refuse('turn_deadline', 'Protected execution deadline expired')
         }
         if (turn.failure) throw new GrantRefusal(turn.failure)
