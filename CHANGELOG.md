@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.70
+
+- perf(launch-invariants): sample the heap after large reads and every 50th query, not around every query (#980)
+- feat(integrations): let the host own connection for providers it provisions (#977)
+
 ## 0.60.69
 
 - feat(sandbox): warm leases that resume ahead of need and budget the misses (#979)
