@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.91
+
+- docs(lessons): never share a promise across requests on Workers (#1008)
+
 ## 0.60.90
 
 - feat(signoff): surface-ladder browser check for card and field steps, field borders and card copy (#1005)
