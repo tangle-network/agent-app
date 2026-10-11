@@ -12,7 +12,7 @@ import type { WorkspaceRole } from '../../teams/roles'
 import { INVITATION_EMAIL_HINT, isInvitationEmail } from '../../teams/invitations'
 import { RoleSelect } from './RoleSelect'
 
-export interface InviteFormProps {
+interface InviteFormProps {
   label: string
   placeholder: string
   /** Send the invite; resolve true to clear the field, false to keep it for a retry. */
