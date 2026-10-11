@@ -71,7 +71,8 @@ describe('the turn-health sweep reads parts a bounded batch at a time', () => {
 
     const result = await sweepSilentFailures({
       product: 'gtm-agent',
-      source: createD1TurnHealthSource(db),
+      // The whole-parts read, which a product with its own decodeParts still uses.
+      source: createD1TurnHealthSource(db, { fullParts: true }),
       sink: silentSink,
       now: 1_800_000_000_000,
     })

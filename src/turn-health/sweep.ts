@@ -73,6 +73,75 @@ export interface TurnHealthSource {
   readParts?(ids: readonly string[]): Promise<Map<string, unknown>>
 }
 
+/**
+ * The part fields classifyTurnOutcome reads, as SQL over one `json_each` row.
+ * Each string field is taken only when its JSON type is text, so a non-string
+ * value reads exactly as the classifier would see it in the full part.
+ */
+/** `expr` evaluated only on an object part: json_type and json_extract raise on a bare string element. */
+const onObject = (expr: string) => `CASE WHEN p.type = 'object' THEN ${expr} END`
+/** The value at `path` when it is a JSON string, else NULL. */
+const textAt = (path: string, take = `json_extract(p.value, '${path}')`) => onObject(`CASE WHEN json_type(p.value, '${path}') = 'text' THEN ${take} END`)
+const PART_PROJECTION = [
+  `p.type AS partKind`,
+  `${textAt('$.type')} AS type`,
+  `coalesce(${onObject(`CASE WHEN json_type(p.value, '$.text') = 'text' AND length(trim(json_extract(p.value, '$.text'), char(32, 9, 10, 13))) > 0 THEN 1 ELSE 0 END`)}, 0) AS hasText`,
+  `${textAt('$.tool')} AS tool`,
+  `${onObject(`json_type(p.value, '$.state')`)} AS stateKind`,
+  `${textAt('$.state.status')} AS status`,
+  `${textAt('$.state.error', `substr(json_extract(p.value, '$.state.error'), 1, 200)`)} AS stateError`,
+  `${onObject(`json_type(p.value, '$.state.input')`)} AS inputKind`,
+  `${textAt('$.state.input.error', `substr(json_extract(p.value, '$.state.input.error'), 1, 200)`)} AS inputError`,
+  `${textAt('$.state.input.tool')} AS inputTool`,
+  `${textAt('$.state.input', `json_valid(json_extract(p.value, '$.state.input'))`)} AS inputValid`,
+  `${textAt('$.state.input', `substr(json_extract(p.value, '$.state.input'), 1, 120)`)} AS inputSample`,
+].join(',\n  ')
+
+interface ProjectedPart {
+  partKind: string | null
+  type: string | null
+  hasText: number
+  tool: string | null
+  stateKind: string | null
+  status: string | null
+  stateError: string | null
+  inputKind: string | null
+  inputError: string | null
+  inputTool: string | null
+  inputValid: number | null
+  inputSample: string | null
+}
+
+/** A part rebuilt from its projection, judged by classifyTurnOutcome as the stored part would be. */
+function slimPart(row: ProjectedPart): unknown {
+  // classifyTurnOutcome treats an array part as a record with no type (an opaque part) and skips any other non-object.
+  if (row.partKind === 'array') return []
+  if (row.partKind !== 'object') return null
+  const part: Record<string, unknown> = {}
+  if (row.type !== null) part.type = row.type
+  if (row.hasText) part.text = 'x'
+  if (row.tool !== null) part.tool = row.tool
+  if (row.stateKind === 'object') {
+    const state: Record<string, unknown> = {}
+    if (row.status !== null) state.status = row.status
+    if (row.stateError !== null) state.error = row.stateError
+    if (row.inputKind === 'object') {
+      const input: Record<string, unknown> = {}
+      if (row.inputError !== null) input.error = row.inputError
+      if (row.inputTool !== null) input.tool = row.inputTool
+      state.input = input
+    } else if (row.inputKind === 'text') {
+      // A parseable string reads as parseable; an unparseable one keeps its sample and a NUL after it, so its prefix
+      // can never parse by accident.
+      state.input = row.inputValid ? '{}' : `${row.inputSample ?? ''}\u0000`
+    } else if (row.inputKind !== null) {
+      state.input = null
+    }
+    part.state = state
+  }
+  return part
+}
+
 /** Most stored parts the sweep reads in one batch; a larger row is read alone. */
 export const TURN_HEALTH_PARTS_BATCH_SIZE = SIZED_READ_BYTES
 
@@ -607,6 +676,12 @@ export function createD1TurnHealthSource(
      * Prefixes are bound as query parameters, never interpolated.
      */
     errorReplyPrefixes?: readonly string[]
+    /**
+     * Read each row's whole `parts` instead of the fields the classifier reads.
+     * Only a product whose `decodeParts` needs the stored bytes (an encrypted
+     * parts envelope) sets this; the default reads a small projection.
+     */
+    fullParts?: boolean
   } = {},
 ): TurnHealthSource {
   // Table names are identifiers and cannot be bound as parameters. They come
@@ -696,11 +771,27 @@ export function createD1TurnHealthSource(
 
     async readParts(ids) {
       if (ids.length === 0) return new Map()
+      const placeholders = ids.map((_, i) => `?${i + 1}`).join(', ')
+      if (options.fullParts) {
+        const { results } = await db
+          .prepare(`SELECT id, parts FROM ${message} WHERE id IN (${placeholders})`)
+          .bind(...ids)
+          .all<{ id: string; parts: unknown }>()
+        return new Map(results.map((row) => [String(row.id), row.parts]))
+      }
+      // One row per part with only what classifyTurnOutcome reads, so a day of
+      // tool output never leaves the database: on 2026-10-11 the full read
+      // returned 141.9 MB per run for 500 turns.
       const { results } = await db
-        .prepare(`SELECT id, parts FROM ${message} WHERE id IN (${ids.map((_, i) => `?${i + 1}`).join(', ')})`)
+        .prepare(`SELECT m.id AS id, CAST(p.key AS INTEGER) AS idx, ${PART_PROJECTION}
+             FROM ${message} m, json_each(CASE WHEN json_valid(m.parts) THEN CASE WHEN json_type(m.parts) = 'array' THEN m.parts ELSE '[]' END ELSE '[]' END) p
+            WHERE m.id IN (${placeholders})
+            ORDER BY m.id, idx`)
         .bind(...ids)
-        .all<{ id: string; parts: unknown }>()
-      return new Map(results.map((row) => [String(row.id), row.parts]))
+        .all<ProjectedPart & { id: string }>()
+      const parts = new Map<string, unknown[]>(ids.map((id) => [id, []]))
+      for (const row of results) parts.get(String(row.id))?.push(slimPart(row))
+      return parts
     },
   }
 
