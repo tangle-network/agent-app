@@ -4,7 +4,7 @@
 
 Source: `src/launch-invariants/testing.ts`
 
-25 exports.
+34 exports.
 
 ### `AuthorizeBeforeStreamOptions`
 
@@ -28,6 +28,14 @@ interface AuthStallOptions
 
 ```ts
 interface BudgetedJob
+```
+
+### `buildConformanceReport`
+
+`function` — Judge each invariant from the recorded verdicts and the deployment facts.
+
+```ts
+(input: { config: LaunchInvariantsConfig; facts: DeploymentFacts; verdicts: readonly InvariantVerdict[]; testExitCode:…
 ```
 
 ### `checkAuthorizeBeforeStream`
@@ -78,12 +86,28 @@ interface BudgetedJob
 interface CoalescedTurnOptions
 ```
 
+### `ConformanceReport`
+
+`interface`
+
+```ts
+interface ConformanceReport
+```
+
 ### `D1Reads`
 
 `interface` — What a measured binding saw while one job ran.
 
 ```ts
 interface D1Reads
+```
+
+### `DeploymentFacts`
+
+`interface` — What the deployment declares, read from its wrangler configs.
+
+```ts
+interface DeploymentFacts
 ```
 
 ### `describeVerdict`
@@ -102,6 +126,14 @@ interface D1Reads
 () => void
 ```
 
+### `formatConformanceReport`
+
+`function` — The report as the CLI prints it.
+
+```ts
+(report: ConformanceReport) => string
+```
+
 ### `INVARIANT_RESULTS_ENV`
 
 `const` — Set by `agent-app-invariants` to the file it reads verdicts from.
@@ -110,12 +142,36 @@ interface D1Reads
 "AGENT_APP_INVARIANTS_RESULTS"
 ```
 
+### `InvariantReport`
+
+`interface`
+
+```ts
+interface InvariantReport
+```
+
+### `InvariantStatus`
+
+`type`
+
+```ts
+type InvariantStatus
+```
+
 ### `JobMeasurement`
 
 `interface`
 
 ```ts
 interface JobMeasurement
+```
+
+### `LaunchInvariantsConfig`
+
+`interface` — `launch-invariants.config.mjs` (or `.json`) at the app root.
+
+```ts
+interface LaunchInvariantsConfig
 ```
 
 ### `LimitAlarmCheckOptions`
@@ -148,6 +204,22 @@ interface LimitAlarmCheckOptions
 
 ```ts
 { readonly 'worker-memory': number; readonly 'snapshot-count': 25; readonly 'key-rate': 60; }
+```
+
+### `readDeploymentFacts`
+
+`function` — Read the crons and D1 bindings the app's wrangler configs declare.
+
+```ts
+(appDir: string, files?: readonly string[] | undefined) => DeploymentFacts
+```
+
+### `readVerdicts`
+
+`function` — Parse the results file the invariant tests appended to.
+
+```ts
+(source: string) => InvariantVerdict[]
 ```
 
 ### `recordedLongTurn`

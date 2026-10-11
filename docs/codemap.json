@@ -9772,6 +9772,12 @@
           "doc": "One scheduled job (or report route) as the budget check runs it."
         },
         {
+          "name": "buildConformanceReport",
+          "kind": "function",
+          "signature": "(input: { config: LaunchInvariantsConfig; facts: DeploymentFacts; verdicts: readonly InvariantVerdict[]; testExitCode:…",
+          "doc": "Judge each invariant from the recorded verdicts and the deployment facts."
+        },
+        {
           "name": "checkAuthorizeBeforeStream",
           "kind": "function",
           "signature": "(options: AuthorizeBeforeStreamOptions) => Promise<InvariantVerdict>",
@@ -9808,10 +9814,22 @@
           "doc": null
         },
         {
+          "name": "ConformanceReport",
+          "kind": "interface",
+          "signature": "interface ConformanceReport",
+          "doc": null
+        },
+        {
           "name": "D1Reads",
           "kind": "interface",
           "signature": "interface D1Reads",
           "doc": "What a measured binding saw while one job ran."
+        },
+        {
+          "name": "DeploymentFacts",
+          "kind": "interface",
+          "signature": "interface DeploymentFacts",
+          "doc": "What the deployment declares, read from its wrangler configs."
         },
         {
           "name": "describeVerdict",
@@ -9826,16 +9844,40 @@
           "doc": "Run a full garbage collection, so a heap reading counts only live objects."
         },
         {
+          "name": "formatConformanceReport",
+          "kind": "function",
+          "signature": "(report: ConformanceReport) => string",
+          "doc": "The report as the CLI prints it."
+        },
+        {
           "name": "INVARIANT_RESULTS_ENV",
           "kind": "const",
           "signature": "\"AGENT_APP_INVARIANTS_RESULTS\"",
           "doc": "Set by `agent-app-invariants` to the file it reads verdicts from."
         },
         {
+          "name": "InvariantReport",
+          "kind": "interface",
+          "signature": "interface InvariantReport",
+          "doc": null
+        },
+        {
+          "name": "InvariantStatus",
+          "kind": "type",
+          "signature": "type InvariantStatus",
+          "doc": null
+        },
+        {
           "name": "JobMeasurement",
           "kind": "interface",
           "signature": "interface JobMeasurement",
           "doc": null
+        },
+        {
+          "name": "LaunchInvariantsConfig",
+          "kind": "interface",
+          "signature": "interface LaunchInvariantsConfig",
+          "doc": "`launch-invariants.config.mjs` (or `.json`) at the app root."
         },
         {
           "name": "LimitAlarmCheckOptions",
@@ -9860,6 +9902,18 @@
           "kind": "const",
           "signature": "{ readonly 'worker-memory': number; readonly 'snapshot-count': 25; readonly 'key-rate': 60; }",
           "doc": "Hard platform limits a declared budget may not exceed."
+        },
+        {
+          "name": "readDeploymentFacts",
+          "kind": "function",
+          "signature": "(appDir: string, files?: readonly string[] | undefined) => DeploymentFacts",
+          "doc": "Read the crons and D1 bindings the app's wrangler configs declare."
+        },
+        {
+          "name": "readVerdicts",
+          "kind": "function",
+          "signature": "(source: string) => InvariantVerdict[]",
+          "doc": "Parse the results file the invariant tests appended to."
         },
         {
           "name": "recordedLongTurn",

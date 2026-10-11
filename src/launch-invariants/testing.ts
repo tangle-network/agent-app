@@ -571,3 +571,15 @@ export async function checkLimitAlarms(options: LimitAlarmCheckOptions): Promise
     details: findings.length ? findings : [`${LIMIT_RESOURCES.join(', ')} warn at 80% and page at the limit`],
   }
 }
+
+export {
+  buildConformanceReport,
+  formatConformanceReport,
+  readDeploymentFacts,
+  readVerdicts,
+  type ConformanceReport,
+  type DeploymentFacts,
+  type InvariantReport,
+  type InvariantStatus,
+  type LaunchInvariantsConfig,
+} from './conformance.js'
