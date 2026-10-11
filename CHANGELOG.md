@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.68
+
+- docs(lessons): link the pasted-code, prompt-text and delivery checks; record the D10 revert (#978)
+
 ## 0.60.67
 
 - fix(agent-profiles): report why a profile switch could not be prepared (#976)
