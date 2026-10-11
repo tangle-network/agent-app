@@ -27,6 +27,17 @@ Search and nested menus escape overflow-clipped composers through PopoverSurface
 EntryComposer retains text and staged attachments until its existing send
 contract accepts them. Short viewports scroll rather than clipping its controls.
 
+## Shell header line
+
+Every header row in an agent app is a sandbox-ui `ShellHeader` at brand's `--shell-header-height` (56px). That covers the rail's top row, the companion's center and tools headers, `AssistantPanel`, session history, the Vault path bar, and any page header or tab strip at the top of the main pane. Their bottom dividers therefore continue the rail's first divider.
+
+- Put content in a `ShellHeader`; never give a header row its own `height`, `min-height` or padding-built height. The row sets its height inline, so a class cannot change it.
+- A tab strip at the top of a page is a `ShellHeader` whose tab track is the divider. A description or secondary toolbar goes under the row, not inside it.
+- Brand's `tangle-drift` counts header rows with a literal height (`header_height_literal`) and ratchets each surface to 0.
+- `agent-app-signoff shell-alignment` measures the rendered result. On each route, at 1440px and 390px, in both themes, the main header's bottom border must sit within 0.5px of the rail's first divider. On a phone, each row under the phone bar must be exactly one shell row tall. See [local sign-off](./local-signoff.md#shell-alignment).
+
+Transcript text is brand's one scale: user and agent messages share `TRANSCRIPT_TEXT` (16px, leading 1.6) and differ only by alignment and surface. `ChatMessages` `messageSize="large"` raises `--transcript-font-size` for both roles.
+
 ## Acceptance
 
 Exercise the actual installed consumer at desktop and phone widths, both themes,

@@ -24,7 +24,7 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState, memo, type ReactNode } from 'react'
-import { isViewerMessage, MessageAuthor } from '@tangle-network/ui/chat'
+import { isViewerMessage, MessageAuthor, TRANSCRIPT_TEXT } from '@tangle-network/ui/chat'
 import { InlineToolItem, RunRowShell } from '@tangle-network/ui/run'
 import type { ChatAuthor, ToolPart } from '@tangle-network/ui/types'
 import { useSmoothText } from './smooth-text'
@@ -1642,10 +1642,12 @@ export function ChatMessages({
   workProductCards,
   viewerId,
 }: ChatMessagesProps) {
+  // Brand's one transcript scale for both roles: they differ only by alignment
+  // and surface. `large` raises the shared size token, never one role's size.
   const messageClassName =
     messageSize === 'large'
-      ? 'agent-app-message-copy text-[17px] leading-[1.6]'
-      : 'agent-app-message-copy text-base leading-[1.6]'
+      ? `agent-app-message-copy ${TRANSCRIPT_TEXT} [--transcript-font-size:1.0625rem]`
+      : `agent-app-message-copy ${TRANSCRIPT_TEXT}`
   // Resolve role colors at the message, so nested host themes can override
   // the raw tokens without also redefining Tailwind's root color aliases.
   const assistantMessageClassName = `${messageClassName} bg-transparent text-[hsl(var(--foreground))]`

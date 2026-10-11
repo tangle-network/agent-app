@@ -11,12 +11,14 @@
  *   agent-app-signoff --seed 12345        # reproduce a previous run's orders
  *   agent-app-signoff --keep-going        # run every step, full picture
  *   agent-app-signoff --json proof.json   # machine-readable record
+ *   agent-app-signoff shell-alignment --base-url <url> --route <path>   # header dividers meet the rail
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { invokedAsScript } from './invoked-as-script'
 import { formatSignoffLine, formatSignoffReport } from './report'
 import { runSignoff, type RunSignoffOptions } from './run'
+import { runShellAlignmentCli } from './shell-alignment-cli'
 import type { SignoffEvent, SignoffSource } from './types'
 
 interface ParsedArgs extends RunSignoffOptions {
@@ -38,6 +40,9 @@ function usage(): string {
     '  --keep-workspace            leave the clean tree on disk to inspect',
     '  --json <path>               write the machine-readable report',
     '  --quiet                     verdict only; no per-step progress',
+    '',
+    'Subcommands:',
+    '  shell-alignment             measure header dividers against the rail in a browser (--help for options)',
   ].join('\n')
 }
 
@@ -131,6 +136,7 @@ function progressWriter(): (event: SignoffEvent) => void {
 }
 
 export async function runSignoffCli(argv: readonly string[]): Promise<number> {
+  if (argv[0] === 'shell-alignment') return runShellAlignmentCli(argv.slice(1))
   const args = parseArgs(argv)
   const report = await runSignoff({ ...args, onEvent: args.quiet ? undefined : progressWriter() })
 

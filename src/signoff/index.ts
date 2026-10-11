@@ -55,6 +55,19 @@ export { runSignoff, type RunSignoffOptions } from './run'
 export { loadSignoffConfig, type LoadSignoffConfigOptions } from './config'
 export { formatSignoffReport } from './report'
 export {
+  checkShellAlignment,
+  collectShellDividers,
+  formatShellAlignmentReport,
+  judgeShellAlignment,
+  SHELL_ALIGNMENT_TOLERANCE_PX,
+  type ShellAlignmentFinding,
+  type ShellAlignmentOptions,
+  type ShellAlignmentReport,
+  type ShellDivider,
+  type ShellDividerSample,
+} from './shell-alignment'
+export { parseShellAlignmentArgs, runShellAlignmentCli } from './shell-alignment-cli'
+export {
   checkWorkerDefaults,
   formatWorkerDefaults,
   WORKER_COMPATIBILITY_DATE_FLOOR,
