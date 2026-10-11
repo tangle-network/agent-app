@@ -4,7 +4,7 @@
 
 Source: `src/runtime/router-turn.ts`
 
-13 exports.
+18 exports.
 
 ### `budgetTurnKnowledge`
 
@@ -20,6 +20,14 @@ Source: `src/runtime/router-turn.ts`
 
 ```ts
 (profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…
+```
+
+### `placeRouterTurn`
+
+`function` — Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…
+
+```ts
+(input: RouterTurnPlacementInput) => PlacementRecord
 ```
 
 ### `routerFunctionName`
@@ -62,12 +70,44 @@ interface RouterTurnOptions
 interface RouterTurnOutcome
 ```
 
+### `RouterTurnPlacementInput`
+
+`interface` — What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose.
+
+```ts
+interface RouterTurnPlacementInput
+```
+
 ### `RouterTurnTool`
 
 `interface` — A tool the turn may call.
 
 ```ts
 interface RouterTurnTool
+```
+
+### `RouterTurnToolContext`
+
+`interface` — What a running tool gets besides its arguments.
+
+```ts
+interface RouterTurnToolContext
+```
+
+### `RouterTurnToolEvent`
+
+`interface` — One side event a tool reported while it ran.
+
+```ts
+interface RouterTurnToolEvent
+```
+
+### `RouterTurnToolOutcome`
+
+`type` — One tool call's result as the model reads it.
+
+```ts
+type RouterTurnToolOutcome
 ```
 
 ### `runRouterTurn`

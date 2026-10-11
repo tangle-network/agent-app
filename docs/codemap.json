@@ -2994,7 +2994,7 @@
           "name": "createProtectedRuntimeChatProducer",
           "kind": "function",
           "signature": "(options: ProtectedRuntimeChatOptions) => ChatTurnRouteProducer",
-          "doc": "Run a profile through the protected Router tool executor and the shared chat projection."
+          "doc": "Run a profile as one Router turn under a protected model grant (`runProtectedRouterTurn`), projected through the shared chat projection."
         },
         {
           "name": "createRouterTurnProducer",
@@ -15004,6 +15004,12 @@
           "doc": null
         },
         {
+          "name": "createOpenAICompatCompletionTurn",
+          "kind": "function",
+          "signature": "(opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>",
+          "doc": "The buffered sibling of {@link createOpenAICompatStreamTurn}: one `/chat/completions` request without `stream`, answered by one JSON completion, yielded as the same `LoopEvent`s (the same tool-call a…"
+        },
+        {
           "name": "createOpenAICompatStreamTurn",
           "kind": "function",
           "signature": "(opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>",
@@ -15142,10 +15148,28 @@
           "doc": "Minimal OpenAI Chat Completions streaming chunk (structural — no `openai` dep)."
         },
         {
+          "name": "placeRouterTurn",
+          "kind": "function",
+          "signature": "(input: RouterTurnPlacementInput) => PlacementRecord",
+          "doc": "Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…"
+        },
+        {
           "name": "ProtectedModelSettlementError",
           "kind": "class",
           "signature": "class ProtectedModelSettlementError",
           "doc": "A validated charge remains authoritative when the product cannot save its audit record."
+        },
+        {
+          "name": "ProtectedRouterTurnOptions",
+          "kind": "type",
+          "signature": "type ProtectedRouterTurnOptions",
+          "doc": "A turn under a grant."
+        },
+        {
+          "name": "ProtectedRouterTurnOutcome",
+          "kind": "interface",
+          "signature": "interface ProtectedRouterTurnOutcome",
+          "doc": null
         },
         {
           "name": "resolveCatalogModelId",
@@ -15256,6 +15280,12 @@
           "doc": null
         },
         {
+          "name": "RouterTurnGrant",
+          "kind": "type",
+          "signature": "type RouterTurnGrant",
+          "doc": "Runtime's grant inputs for one turn: the port, the model request, the reservation and its deadline."
+        },
+        {
           "name": "RouterTurnOptions",
           "kind": "interface",
           "signature": "interface RouterTurnOptions",
@@ -15268,16 +15298,52 @@
           "doc": null
         },
         {
+          "name": "RouterTurnPlacementInput",
+          "kind": "interface",
+          "signature": "interface RouterTurnPlacementInput",
+          "doc": "What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose."
+        },
+        {
+          "name": "RouterTurnSettlement",
+          "kind": "interface",
+          "signature": "interface RouterTurnSettlement",
+          "doc": "What the grant settled for the turn."
+        },
+        {
           "name": "RouterTurnTool",
           "kind": "interface",
           "signature": "interface RouterTurnTool",
           "doc": "A tool the turn may call."
         },
         {
+          "name": "RouterTurnToolContext",
+          "kind": "interface",
+          "signature": "interface RouterTurnToolContext",
+          "doc": "What a running tool gets besides its arguments."
+        },
+        {
+          "name": "RouterTurnToolEvent",
+          "kind": "interface",
+          "signature": "interface RouterTurnToolEvent",
+          "doc": "One side event a tool reported while it ran."
+        },
+        {
+          "name": "RouterTurnToolOutcome",
+          "kind": "type",
+          "signature": "type RouterTurnToolOutcome",
+          "doc": "One tool call's result as the model reads it."
+        },
+        {
           "name": "runAppToolLoop",
           "kind": "function",
           "signature": "(opts: RunToolLoopOptions) => Promise<ToolLoopResult>",
           "doc": "Run the bounded tool loop and return the final text + every executed tool outcome."
+        },
+        {
+          "name": "runProtectedRouterTurn",
+          "kind": "function",
+          "signature": "(options: ProtectedRouterTurnOptions) => Promise<ProtectedRouterTurnOutcome>",
+          "doc": "Run one `runRouterTurn` under `options.grant`."
         },
         {
           "name": "runRouterTurn",
@@ -15470,6 +15536,12 @@
           "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…"
         },
         {
+          "name": "placeRouterTurn",
+          "kind": "function",
+          "signature": "(input: RouterTurnPlacementInput) => PlacementRecord",
+          "doc": "Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…"
+        },
+        {
           "name": "routerFunctionName",
           "kind": "function",
           "signature": "(name: string) => string",
@@ -15500,10 +15572,34 @@
           "doc": null
         },
         {
+          "name": "RouterTurnPlacementInput",
+          "kind": "interface",
+          "signature": "interface RouterTurnPlacementInput",
+          "doc": "What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose."
+        },
+        {
           "name": "RouterTurnTool",
           "kind": "interface",
           "signature": "interface RouterTurnTool",
           "doc": "A tool the turn may call."
+        },
+        {
+          "name": "RouterTurnToolContext",
+          "kind": "interface",
+          "signature": "interface RouterTurnToolContext",
+          "doc": "What a running tool gets besides its arguments."
+        },
+        {
+          "name": "RouterTurnToolEvent",
+          "kind": "interface",
+          "signature": "interface RouterTurnToolEvent",
+          "doc": "One side event a tool reported while it ran."
+        },
+        {
+          "name": "RouterTurnToolOutcome",
+          "kind": "type",
+          "signature": "type RouterTurnToolOutcome",
+          "doc": "One tool call's result as the model reads it."
         },
         {
           "name": "runRouterTurn",
@@ -18874,6 +18970,12 @@
           "doc": "Check each Worker config, and every environment it deploys, against the defaults."
         },
         {
+          "name": "checkWorkspaceSurface",
+          "kind": "function",
+          "signature": "(options: WorkspaceSurfaceOptions) => Promise<WorkspaceSurfaceReport>",
+          "doc": "Drive Chromium over every route × width × theme."
+        },
+        {
           "name": "collectShellDividers",
           "kind": "function",
           "signature": "() => Omit<ShellDividerSample, \"width\" | \"route\" | \"theme\">",
@@ -18884,6 +18986,12 @@
           "kind": "function",
           "signature": "() => Pick<SurfaceSample, \"boxes\" | \"copy\">",
           "doc": "Runs in the page (Playwright serializes it, so every helper lives inside)."
+        },
+        {
+          "name": "collectWorkspaceSurface",
+          "kind": "function",
+          "signature": "() => Omit<WorkspaceSurfaceSample, \"width\" | \"route\" | \"theme\">",
+          "doc": "Runs in the page."
         },
         {
           "name": "composite",
@@ -18928,6 +19036,18 @@
           "doc": null
         },
         {
+          "name": "formatWorkspaceSurfaceReport",
+          "kind": "function",
+          "signature": "(report: WorkspaceSurfaceReport) => string",
+          "doc": null
+        },
+        {
+          "name": "HEADER_TOP_TOLERANCE_PX",
+          "kind": "const",
+          "signature": "2",
+          "doc": "A header within this distance of the panel top is its first row (a 1px border)."
+        },
+        {
           "name": "judgeShellAlignment",
           "kind": "function",
           "signature": "(sample: ShellDividerSample, tolerancePx?: number) => ShellAlignmentFinding[]",
@@ -18937,6 +19057,12 @@
           "name": "judgeSurfaceLadder",
           "kind": "function",
           "signature": "(sample: SurfaceSample, limits?: SurfaceLadderLimits) => SurfaceFinding[]",
+          "doc": null
+        },
+        {
+          "name": "judgeWorkspaceSurface",
+          "kind": "function",
+          "signature": "(sample: WorkspaceSurfaceSample) => WorkspaceSurfaceFinding[]",
           "doc": null
         },
         {
@@ -19007,6 +19133,12 @@
         },
         {
           "name": "runSurfaceLadderCli",
+          "kind": "function",
+          "signature": "(argv: readonly string[]) => Promise<number>",
+          "doc": null
+        },
+        {
+          "name": "runWorkspaceSurfaceCli",
           "kind": "function",
           "signature": "(argv: readonly string[]) => Promise<number>",
           "doc": null
@@ -19226,6 +19358,30 @@
           "kind": "interface",
           "signature": "interface WorkerDefaultsResult",
           "doc": null
+        },
+        {
+          "name": "WorkspaceSurfaceFinding",
+          "kind": "interface",
+          "signature": "interface WorkspaceSurfaceFinding",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSurfaceOptions",
+          "kind": "interface",
+          "signature": "interface WorkspaceSurfaceOptions",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSurfaceReport",
+          "kind": "interface",
+          "signature": "interface WorkspaceSurfaceReport",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSurfaceSample",
+          "kind": "interface",
+          "signature": "interface WorkspaceSurfaceSample",
+          "doc": "Workspace surface: every route of a workspace renders exactly one shared floating panel (sandbox-ui `WorkspaceSurface`, or `WorkspaceLayout` with `surface=\"inset\"`), and that panel's first row is an…"
         }
       ]
     },
@@ -20512,7 +20668,9 @@
     {
       "id": "./studio",
       "source": "src/studio/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "runtime"
+      ],
       "error": null,
       "exports": [
         {
@@ -20929,6 +21087,7 @@
       "id": "./studio-react",
       "source": "src/studio-react/index.tsx",
       "dependsOn": [
+        "runtime",
         "studio",
         "web-react"
       ],
@@ -21029,12 +21188,6 @@
           "kind": "function",
           "signature": "<T extends string>({ label, value, choices, onSelect, className, icon: Icon, trigger, }: { label: string; value: T; cho…",
           "doc": "A standalone enum picker using the studio composer's pill and menu grammar."
-        },
-        {
-          "name": "ModelPill",
-          "kind": "function",
-          "signature": "({ models, value, displayName, provider, unavailable, onSelect, bandRef, }: { models: readonly MediaModelOption[]; valu…",
-          "doc": "The model pill — first in the band on every lane, and the only pill that is always there."
         },
         {
           "name": "OptionChoice",
@@ -24736,6 +24889,12 @@
           "kind": "function",
           "signature": "(msg: ChatMessageMetrics, models: CatalogModel[]) => string | null",
           "doc": "\"$0.0042\" from token counts × catalogue per-token pricing; null when unknown."
+        },
+        {
+          "name": "formatModelPrice",
+          "kind": "function",
+          "signature": "(model: Pick<CatalogModel, \"pricing\" | \"outputPrice\">) => string | undefined",
+          "doc": "The price a person pays per output, in the unit that output comes in: per million prompt tokens for text, per image, per second of video, per minute of audio, per 1,000 characters of speech."
         },
         {
           "name": "formatRecordGridValue",

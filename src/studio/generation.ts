@@ -1,3 +1,4 @@
+import type { CatalogModel } from '../runtime/model-catalog'
 import type { ModelOptionsMetadata } from './model-options'
 
 /** Define generation categories for media including image, video, speech, avatar, and transcription */
@@ -30,6 +31,14 @@ export interface MediaModelOption {
   status: MediaModelStatus
   reason?: string
   options?: ModelOptionsMetadata
+  /** USD per unit of output as the catalog publishes it (one image, one second
+   *  of video, one minute of audio, 1,000 characters of speech). Absent when no
+   *  price is published; the picker then shows none rather than a guess. */
+  outputPrice?: CatalogModel['outputPrice']
+  /** An example output (an image, or a video poster frame) for the picker row. */
+  previewUrl?: string
+  /** One line on what the model is for, shown under its name in the picker. */
+  capability?: string
 }
 
 /** Represent media model catalog with default values, model options, and optional error message */

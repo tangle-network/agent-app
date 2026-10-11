@@ -4,7 +4,7 @@
 
 Source: `src/studio-react/index.tsx`
 
-47 exports.
+46 exports.
 
 ### `AudioTogglePill`
 
@@ -132,14 +132,6 @@ interface MediaViewerModalProps
 
 ```ts
 <T extends string>({ label, value, choices, onSelect, className, icon: Icon, trigger, }: { label: string; value: T; cho…
-```
-
-### `ModelPill`
-
-`function` — The model pill — first in the band on every lane, and the only pill that is always there.
-
-```ts
-({ models, value, displayName, provider, unavailable, onSelect, bandRef, }: { models: readonly MediaModelOption[]; valu…
 ```
 
 ### `OptionChoice`

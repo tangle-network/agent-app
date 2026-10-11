@@ -59,13 +59,15 @@ import {
   ComposerBand,
   CustomSizeForm,
   MediaTypeSegments,
-  ModelPill,
   OptionPill,
   ReferencePill,
   type MediaTypeSegment,
   type OptionChoice,
   optionValueLabel,
 } from './composer-option-controls'
+import { ModelPicker } from '../web-react/controls'
+import { ProviderLogo } from '../web-react/provider-logo'
+import type { CatalogModel } from '../runtime/model-catalog'
 import {
   loadComposerSelections,
   saveComposerSelections,
@@ -128,6 +130,45 @@ function choicesFor(param: string, meta: ModelOptionMetadata): readonly ModelOpt
     return SPEED_PRESETS.filter((speed) => speed >= min && speed <= max)
   }
   return optionChoices(meta)
+}
+
+const LANE_OUTPUT: Record<ComposerType, NonNullable<CatalogModel['output']>> = {
+  image: 'image',
+  video: 'video',
+  speech: 'speech',
+}
+
+function isPublishedPrice(price: MediaModelOption['outputPrice']): price is NonNullable<MediaModelOption['outputPrice']> {
+  return Boolean(price) && Number.isFinite(price?.usd) && (price?.usd ?? 0) > 0
+    && ['image', 'second', 'minute', '1k_chars'].includes(price?.unit ?? '')
+}
+
+/**
+ * A lane's catalog row as the shared {@link ModelPicker} reads it: the same
+ * picker chat uses, so a media model carries its logo, its published price per
+ * output and its preview the same way a chat model carries its token price. A
+ * row that cannot be sent says so on its capability line, which is the one
+ * place the shared row has for a status.
+ */
+function pickerModel(model: MediaModelOption, type: ComposerType): CatalogModel {
+  const reason = model.reason?.trim()
+  const capability = model.status === 'unavailable'
+    ? `Unavailable${reason ? ` · ${reason}` : ''}`
+    : model.status === 'limited'
+      ? `Limited${reason ? ` · ${reason}` : ''}`
+      : model.capability?.trim() || undefined
+  return {
+    id: model.id,
+    name: model.name || model.id,
+    provider: model.provider ?? '',
+    output: LANE_OUTPUT[type],
+    ...(isPublishedPrice(model.outputPrice) ? { outputPrice: model.outputPrice } : {}),
+    ...(model.previewUrl?.trim() ? { previewUrl: model.previewUrl.trim() } : {}),
+    ...(capability ? { capability } : {}),
+    supportsTools: false,
+    supportsReasoning: false,
+    featured: false,
+  }
 }
 
 /** The parameters a lane renders, in order, skipping unknown and unsupported
@@ -528,6 +569,12 @@ export function StudioComposer({
   const loadingModels = Boolean(workspaceId) && (catalogLoading || (!catalog && !catalogError))
   const modelStatus = loadingModels ? 'Loading media models…' : catalogError ?? (laneDown ? laneDownMessage : null)
   const showModelMenu = catalogReady && curatedModels.length > 0
+  const pickerModels = useMemo(() => curatedModels.map((model) => pickerModel(model, type)), [curatedModels, type])
+  // The trigger names none on a dead lane: a model name there reads as a
+  // working choice the user could send. A model the catalog does not list
+  // (an image-to-video sibling) reads as its id.
+  const modelDisplayName = laneDown ? 'Unavailable' : modelOption?.name || modelId || 'Select a model'
+  const modelUnavailable = laneDown || modelOption?.status === 'unavailable'
   const canReloadModels = Boolean(workspaceId) && !loadingModels && Boolean(catalogError || (catalogReady && curatedModels.length === 0))
 
   function reloadModels() {
@@ -574,19 +621,32 @@ export function StudioComposer({
         <MediaTypeSegments value={type} segments={SEGMENTS} onChange={setType} />
 
         <ComposerBand bandRef={bandRef} resetKey={type}>
-          {showModelMenu && <ModelPill
-            models={curatedModels}
-            // A dead lane has no sendable model, so nothing in the menu is marked
-            // chosen either — the resolved default is a placeholder, not a pick.
-            value={laneDown ? '' : modelId}
-            // The pill names none for the same reason: a model name there reads as a
-            // working choice the user could send.
-            displayName={laneDown ? 'Unavailable' : modelOption?.name || modelId || 'Select a model'}
-            provider={laneDown ? undefined : modelOption?.provider}
-            unavailable={laneDown || modelOption?.status === 'unavailable'}
-            onSelect={chooseModel}
-            bandRef={bandRef}
-          />}
+          {showModelMenu && (
+            <div className="flex-none">
+              <ModelPicker
+                // A dead lane has no sendable model, so nothing in the menu is
+                // marked chosen. An attached reference runs the unlisted
+                // image-to-video sibling; its listed parent is the row shown
+                // as chosen, and picking it again keeps the pairing.
+                value={laneDown ? '' : textToVideoSibling(modelId) ?? modelId}
+                onChange={chooseModel}
+                models={pickerModels}
+                // Every row of a lane is shown at once: a lane carries a
+                // handful of models, never the hundreds the chat catalog does.
+                priorityGroup={{ label: `${laneLabel} models`, match: () => true }}
+                aria-label={`Model: ${modelDisplayName}${modelUnavailable ? ' (unavailable)' : ''}`}
+                triggerContent={(
+                  <span className="contents">
+                    {modelUnavailable && <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />}
+                    {!laneDown && modelOption?.provider && (
+                      <span className="shrink-0" aria-hidden><ProviderLogo provider={modelOption.provider} size={16} /></span>
+                    )}
+                    <span className="max-w-[160px] truncate leading-normal">{modelDisplayName}</span>
+                  </span>
+                )}
+              />
+            </div>
+          )}
 
           {params.map((param) => (
             <div key={`${type}-${param}`} className="studio-pill-in flex-none">

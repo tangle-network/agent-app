@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-84 exports.
+95 exports.
 
 ### `AnySurfaceKind`
 
@@ -84,6 +84,14 @@ type CertifiedDeliveryConfig
 
 ```ts
 (config: CertifiedPromptSourceOptions) => CertifiedDelivery
+```
+
+### `createOpenAICompatCompletionTurn`
+
+`function` — The buffered sibling of {@link createOpenAICompatStreamTurn}: one `/chat/completions` request without `stream`, answered by one JSON completion, yielded as the same `LoopEvent`s (the same tool-call a…
+
+```ts
+(opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>
 ```
 
 ### `createOpenAICompatStreamTurn`
@@ -270,12 +278,36 @@ interface OpenAICompatStreamTurnOptions
 interface OpenAIStreamChunk
 ```
 
+### `placeRouterTurn`
+
+`function` — Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…
+
+```ts
+(input: RouterTurnPlacementInput) => PlacementRecord
+```
+
 ### `ProtectedModelSettlementError`
 
 `class` — A validated charge remains authoritative when the product cannot save its audit record.
 
 ```ts
 class ProtectedModelSettlementError
+```
+
+### `ProtectedRouterTurnOptions`
+
+`type` — A turn under a grant.
+
+```ts
+type ProtectedRouterTurnOptions
+```
+
+### `ProtectedRouterTurnOutcome`
+
+`interface`
+
+```ts
+interface ProtectedRouterTurnOutcome
 ```
 
 ### `resolveCatalogModelId`
@@ -422,6 +454,14 @@ type RouterTurnEvent
 interface RouterTurnFailure
 ```
 
+### `RouterTurnGrant`
+
+`type` — Runtime's grant inputs for one turn: the port, the model request, the reservation and its deadline.
+
+```ts
+type RouterTurnGrant
+```
+
 ### `RouterTurnOptions`
 
 `interface`
@@ -438,6 +478,22 @@ interface RouterTurnOptions
 interface RouterTurnOutcome
 ```
 
+### `RouterTurnPlacementInput`
+
+`interface` — What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose.
+
+```ts
+interface RouterTurnPlacementInput
+```
+
+### `RouterTurnSettlement`
+
+`interface` — What the grant settled for the turn.
+
+```ts
+interface RouterTurnSettlement
+```
+
 ### `RouterTurnTool`
 
 `interface` — A tool the turn may call.
@@ -446,12 +502,44 @@ interface RouterTurnOutcome
 interface RouterTurnTool
 ```
 
+### `RouterTurnToolContext`
+
+`interface` — What a running tool gets besides its arguments.
+
+```ts
+interface RouterTurnToolContext
+```
+
+### `RouterTurnToolEvent`
+
+`interface` — One side event a tool reported while it ran.
+
+```ts
+interface RouterTurnToolEvent
+```
+
+### `RouterTurnToolOutcome`
+
+`type` — One tool call's result as the model reads it.
+
+```ts
+type RouterTurnToolOutcome
+```
+
 ### `runAppToolLoop`
 
 `function` — Run the bounded tool loop and return the final text + every executed tool outcome.
 
 ```ts
 (opts: RunToolLoopOptions) => Promise<ToolLoopResult>
+```
+
+### `runProtectedRouterTurn`
+
+`function` — Run one `runRouterTurn` under `options.grant`.
+
+```ts
+(options: ProtectedRouterTurnOptions) => Promise<ProtectedRouterTurnOutcome>
 ```
 
 ### `runRouterTurn`

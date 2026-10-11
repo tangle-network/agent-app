@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-500 exports.
+501 exports.
 
 ### `acceptRejectionReason`
 
@@ -1500,6 +1500,14 @@ interface FlowWaterfallProps
 
 ```ts
 (msg: ChatMessageMetrics, models: CatalogModel[]) => string | null
+```
+
+### `formatModelPrice`
+
+`function` — The price a person pays per output, in the unit that output comes in: per million prompt tokens for text, per image, per second of video, per minute of audio, per 1,000 characters of speech.
+
+```ts
+(model: Pick<CatalogModel, "pricing" | "outputPrice">) => string | undefined
 ```
 
 ### `formatRecordGridValue`
