@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.84
+
+- fix(workspace-export): a dropped request stalls an export for a minute, not five (#998)
+
 ## 0.60.83
 
 - fix(sandbox): retry a warm killed with its request and count it as abandoned (#997)
