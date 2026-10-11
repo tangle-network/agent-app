@@ -58,17 +58,20 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
   }, [])
 
   const drive = useCallback(async (id: string) => {
+    // One driver at a time: starting another export retires the old loop, so a
+    // stale running job and a new one are never advanced together.
     if (driving.current === id) return
     driving.current = id
+    const retired = () => !mounted.current || driving.current !== id
     // A failed request is retried: the server records each attempt and fails
     // the export itself once a source cannot finish.
     let failures = 0
     try {
       for (;;) {
-        if (!mounted.current) return
+        if (retired()) return
         try {
           const next = await readJson<ExportProgress>(await doFetch(`${endpoint}/${id}/advance`, { method: 'POST', credentials: 'same-origin' }))
-          if (!mounted.current) return
+          if (retired()) return
           failures = 0
           setError(null)
           upsert(next)
@@ -84,7 +87,7 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
     } catch (err) {
       if (mounted.current) setError(err instanceof Error ? err.message : String(err))
     } finally {
-      driving.current = null
+      if (driving.current === id) driving.current = null
     }
   }, [doFetch, endpoint, upsert])
 
