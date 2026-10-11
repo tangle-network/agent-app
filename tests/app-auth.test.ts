@@ -509,6 +509,35 @@ describe('createAppAuth: session reads are remembered briefly', () => {
     expect(read).toHaveBeenCalledTimes(3)
   })
 
+  it('never shares a read in flight across requests, so a cancelled request cannot hang the others', async () => {
+    const { appAuth, cookie } = await signedIn()
+    const real = appAuth.auth.api.getSession
+    // The first request's read never settles, as when Workers cancels the request that started it.
+    const read = vi.spyOn(appAuth.auth.api, 'getSession')
+      .mockImplementationOnce(() => new Promise(() => {}) as ReturnType<typeof real>)
+    void appAuth.getSession(requestWithCookies('http://localhost:3000/cancelled', cookie))
+    const other = await appAuth.getSession(requestWithCookies('http://localhost:3000/other', cookie))
+    expect(other?.user.id).toBeTruthy()
+    expect(read).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not remember a session read that began before a sign-out', async () => {
+    const { appAuth, cookie } = await signedIn()
+    const real = appAuth.auth.api.getSession.bind(appAuth.auth.api)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const read = vi.spyOn(appAuth.auth.api, 'getSession')
+      .mockImplementationOnce(async (input) => { const value = await real(input); await gate; return value })
+    const pending = appAuth.getSession(requestWithCookies('http://localhost:3000/slow', cookie))
+    await appAuth.auth.handler(new Request('http://localhost:3000/api/auth/sign-out', {
+      method: 'POST', headers: { cookie, origin: 'http://localhost:3000', 'content-type': 'application/json' }, body: '{}',
+    }))
+    release()
+    await pending
+    await appAuth.getSession(requestWithCookies('http://localhost:3000/after', cookie))
+    expect(read).toHaveBeenCalledTimes(2)
+  })
+
   it('does not remember sessions when the session cookie cache is disabled', async () => {
     const { appAuth, cookie } = await signedIn({ sessionCookieCacheSeconds: false })
     const read = vi.spyOn(appAuth.auth.api, 'getSession')
