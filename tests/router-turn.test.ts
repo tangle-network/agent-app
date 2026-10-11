@@ -42,7 +42,7 @@ describe('runRouterTurn', () => {
     expect(outcome).toEqual({ text: 'Done: Restock towels is on the list.', servedModel: 'served/model',
       toolCalls: [{ callId: 'call-1', toolName: 'staff.task.create', ok: true }],
       usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [] })
-    expect(createTask.run).toHaveBeenCalledWith({ title: 'Restock towels' })
+    expect(createTask.run).toHaveBeenCalledWith({ title: 'Restock towels' }, { emit: expect.any(Function) })
     expect(requests[0]!.headers.get('x-tangle-trace-id')).toBe('trace-1')
     expect(requests[0]!.body).toMatchObject({ model: 'requested/model', stream: true,
       tools: [{ type: 'function', function: { name: 'staff_task_create' } }] })
