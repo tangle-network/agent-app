@@ -84,5 +84,7 @@ describe('useWorkspacePrewarm', () => {
     visibility = 'visible'
     fireEvent.focusIn(screen.getByLabelText('Message input'))
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(expect.any(String),
+      expect.objectContaining({ body: JSON.stringify({ reason: 'composer-focus' }) }))
   })
 })

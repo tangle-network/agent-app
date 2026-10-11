@@ -9,10 +9,11 @@ import {
 
 const BROWSER = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0 Safari/537.36'
 
-function post(headers: Record<string, string> = {}): Request {
+function post(headers: Record<string, string> = {}, body = '{}'): Request {
   return new Request('https://app.test/api/workspaces/w1/prewarm', {
     method: 'POST',
     headers: { 'user-agent': BROWSER, ...headers },
+    body,
   })
 }
 
@@ -35,18 +36,38 @@ describe('createWorkspacePrewarmRoute', () => {
     expect(warm).toHaveBeenCalledTimes(1)
   })
 
-  it('joins a warm already running for the same key instead of starting another', async () => {
-    let finish: () => void = () => {}
-    const warm = vi.fn(() => new Promise<void>((resolve) => { finish = resolve }))
+  it('answers joined at once for a warm already running for the same key, never awaiting it', async () => {
+    // The first warm never settles, as when Workers cancels the request that started it.
+    const warm = vi.fn(() => new Promise<void>(() => {}))
     const route = createWorkspacePrewarmRoute({ authorize: allowed(warm) })
-    const first = route(post())
-    const second = route(post())
+    void route(post())
     await vi.waitFor(() => expect(warm).toHaveBeenCalled())
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    finish()
-    const outcomes = (await Promise.all([first, second].map(async (r) => (await body(await r)).outcome))).sort()
-    expect(outcomes).toEqual(['joined', 'warmed'])
+    expect(await body(await route(post()))).toMatchObject({ outcome: 'joined' })
     expect(warm).toHaveBeenCalledTimes(1)
+  })
+
+  it('warms again once a running warm is older than staleMs', async () => {
+    let clock = 1_000
+    const warm = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>(() => {}))
+      .mockImplementation(async () => {})
+    const route = createWorkspacePrewarmRoute({ authorize: allowed(warm), staleMs: 150_000, now: () => clock })
+    void route(post())
+    await vi.waitFor(() => expect(warm).toHaveBeenCalledTimes(1))
+    clock += 150_001
+    expect(await body(await route(post()))).toMatchObject({ outcome: 'warmed' })
+    expect(warm).toHaveBeenCalledTimes(2)
+  })
+
+  it('passes the browser reason to authorize, defaulting to page-open', async () => {
+    const seen: string[] = []
+    const route = createWorkspacePrewarmRoute({
+      authorize: async ({ reason }) => { seen.push(reason); return { status: 'declined', reason: 'test' } },
+    })
+    await route(post({}, JSON.stringify({ reason: 'composer-focus' })))
+    await route(post({}, JSON.stringify({ reason: 'anything-else' })))
+    await route(post({}, 'not json'))
+    expect(seen).toEqual(['composer-focus', 'page-open', 'page-open'])
   })
 
   it('answers recent after a success and warms again once the window passes', async () => {
