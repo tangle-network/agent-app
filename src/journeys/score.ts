@@ -132,6 +132,20 @@ export class TurnEvidence {
   }
 }
 
+/**
+ * Whether a turn is still going, from what the page shows. A status line is
+ * progress while it changes; one left unchanged for {@link STATUS_STALE_MS}
+ * with no Stop control is a notice left behind (GTM's "Request was
+ * interrupted by the user. Send a new message to continue." is a lasting
+ * `role="status"`), and treating it as progress held a stopped turn open until
+ * its 15-minute timeout.
+ */
+export const STATUS_STALE_MS = 20_000
+
+export function turnLooksActive(page: { stopVisible: boolean; statusLines: number; msSinceStatusChanged: number }): boolean {
+  return page.stopVisible || (page.statusLines > 0 && page.msSinceStatusChanged < STATUS_STALE_MS)
+}
+
 export type TurnOutcome = 'completed' | 'failed' | 'stopped' | 'empty' | 'timeout' | 'not-sent'
 
 export interface TurnVerdict {

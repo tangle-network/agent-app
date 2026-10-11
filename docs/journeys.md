@@ -92,6 +92,7 @@ This kit is that harness made app-agnostic, with the scoring rule fixed: see [Ho
 | `empty` | The turn ended with no new reply text. |
 | `completed` | The turn ended with reply text and no failure evidence. |
 
+A turn has ended when, for two reads in a row, no Stop control shows and no status line has changed for 20 seconds, and the app's running-turns endpoint, when configured, lists none; a notice left on the page after a Stop (GTM's "Request was interrupted by the user") therefore does not hold the turn open.
 Evidence is read from the whole transcript region, not from the reply alone, and only evidence that appeared after Send counts: an earlier failure in the thread does not fail a later turn, and a Retry whose new failure repeats the old card's words still counts.
 Failure-marked elements are read with `textContent`, so a typed code inside a collapsed details panel counts.
 A turn that shows any failure is not a pass; read `failures` to tell a dead turn from a degraded one.

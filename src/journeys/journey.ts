@@ -21,7 +21,7 @@ import { hostname } from 'node:os'
 import { join } from 'node:path'
 import type { Browser, BrowserContext, Locator, Page } from 'playwright'
 import { loadJourneysConfig, resolveJourneysConfig, threadRouteIn, type JourneysConfig, type ResolvedJourneysConfig, type ThreadRoute } from './config.js'
-import { scoreTurn, TurnEvidence, type TranscriptSnapshot, type TurnOutcome } from './score.js'
+import { scoreTurn, turnLooksActive, TurnEvidence, type TranscriptSnapshot, type TurnOutcome } from './score.js'
 import { assertNoSecrets, scrubTrace } from './scrub.js'
 import { clickUntilSubmitted, createSubmissionTracker, settleText } from './send.js'
 import { secretNeedles, storageStateFor } from './session.js'
@@ -442,9 +442,8 @@ export class Journey {
   /**
    * Time to first visible progress (a new status line or reply text), first
    * reply text, and the turn's end, polled every 300 ms. The turn has ended
-   * when, for two reads in a row, no Stop control shows and no status line has
-   * changed in 20 s, and, where the app lists running turns, the server lists
-   * none. Status lines already on the page before Send are not progress. The
+   * when, for two reads in a row, {@link turnLooksActive} is false and, where
+   * the app lists running turns, the server lists none. Status lines already on the page before Send are not progress. The
    * outcome comes from {@link scoreTurn}.
    */
   private async measureTurn(page: Page, prompt: string, sentAt: number, evidence: TurnEvidence, before: PageReading, baselineChars: number, opts: SendOptions): Promise<TurnRecord> {
@@ -501,12 +500,8 @@ export class Journey {
             this.mark(`Presses Stop after ${t.stopPressedS} s`, page)
             await this.click(this.composerButton(page, this.config.chat.stopName), { pauseAfter: 200 }).catch((e) => console.warn(`Stop press failed: ${e}`))
           }
-          // A status line is progress while it changes. One that sits unchanged for
-          // 20 s with no Stop control is a notice left behind ("Request was
-          // interrupted…"), not a running turn.
-          const statusLive = status.length > 0 && Date.now() - statusChangedAt < 20_000
           if (status.length > 0) sawActive = true
-          const active = s.stopVisible || statusLive
+          const active = turnLooksActive({ stopVisible: s.stopVisible, statusLines: status.length, msSinceStatusChanged: Date.now() - statusChangedAt })
           quiet = active ? 0 : quiet + 1
         }
         if (route && this.config.chat.runningTurns && Date.now() - lastServerCheck > 2_000) {

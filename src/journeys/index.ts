@@ -39,6 +39,8 @@ export {
   DEFAULT_FAILURE_TEXT,
   DEFAULT_STOPPED_TEXT,
   scoreTurn,
+  STATUS_STALE_MS,
+  turnLooksActive,
   TurnEvidence,
   type FailurePatterns,
   type TranscriptSnapshot,

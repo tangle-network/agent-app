@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_FAILURE_TEXT, DEFAULT_STOPPED_TEXT, scoreTurn, TurnEvidence, type TranscriptSnapshot } from '../../src/journeys/score'
+import { DEFAULT_FAILURE_TEXT, DEFAULT_STOPPED_TEXT, scoreTurn, STATUS_STALE_MS, turnLooksActive, TurnEvidence, type TranscriptSnapshot } from '../../src/journeys/score'
 
 const DEFAULTS = { failure: DEFAULT_FAILURE_TEXT, stopped: DEFAULT_STOPPED_TEXT }
 /** GTM's own failure-card copy, as its journeys config adds it. */
@@ -125,5 +125,15 @@ describe('scoreTurn ordering', () => {
     const none = { failures: [], stopped: [], retryAppeared: false }
     expect(scoreTurn({ notSent: 'no chat request', timedOut: false, evidence: none, replyChars: 0, stopPressed: false }).outcome).toBe('not-sent')
     expect(scoreTurn({ timedOut: true, evidence: none, replyChars: 900, stopPressed: false }).outcome).toBe('timeout')
+  })
+})
+
+describe('turnLooksActive', () => {
+  it('lets a notice left after a Stop end the turn once it has sat unchanged for 20 s', () => {
+    // GTM after Stop: no Stop control, and a lasting role="status" line.
+    expect(turnLooksActive({ stopVisible: false, statusLines: 1, msSinceStatusChanged: 5_000 })).toBe(true)
+    expect(turnLooksActive({ stopVisible: false, statusLines: 1, msSinceStatusChanged: STATUS_STALE_MS })).toBe(false)
+    expect(turnLooksActive({ stopVisible: true, statusLines: 0, msSinceStatusChanged: 600_000 })).toBe(true)
+    expect(turnLooksActive({ stopVisible: false, statusLines: 0, msSinceStatusChanged: 0 })).toBe(false)
   })
 })
