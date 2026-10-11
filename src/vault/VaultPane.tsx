@@ -371,7 +371,9 @@ function DocumentEmptyState({ label, recent, onOpen }: { label: string; recent: 
 
 /**
  * Browse and edit files in the available pane width.
- * Below 45rem, Files and the selected document share one pane.
+ * Below 60rem, Files and the selected document share one pane, so an open
+ * document gets the whole width: beside a 23rem tree, a narrower pane left a
+ * GTM call sheet's table about 385px and hid its third column.
  * Switching panes keeps the editor mounted and preserves unsaved changes.
  */
 export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function VaultPane(props, ref) {
@@ -1034,7 +1036,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               to; with nothing selected the Files pane is already all there is,
               and a lone Files chip would be a control that does nothing. */}
           {selectedPath && (
-          <nav aria-label={`${label} navigation`} className="flex shrink-0 items-center gap-1 border-b border-border p-2 @[45rem]/vault:hidden">
+          <nav aria-label={`${label} navigation`} className="flex shrink-0 items-center gap-1 border-b border-border p-2 @[60rem]/vault:hidden">
             <button
               type="button"
               aria-pressed={showFiles}
@@ -1065,7 +1067,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
           </nav>
           )}
           <div className="flex min-h-0 min-w-0 flex-1">
-            <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col p-2 @[45rem]/vault:flex @[45rem]/vault:p-3 @[45rem]/vault:w-[23rem] @[45rem]/vault:min-w-[23rem] @[45rem]/vault:flex-none`}>
+            <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col p-2 @[60rem]/vault:flex @[60rem]/vault:p-3 @[60rem]/vault:w-[23rem] @[60rem]/vault:min-w-[23rem] @[60rem]/vault:flex-none`}>
               {/* The tree is its own surface: a card on the page background,
                   so the file list reads as a finished panel rather than
                   text floating on the canvas. */}
@@ -1142,7 +1144,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               role="region"
               aria-label={`${label} document`}
               tabIndex={-1}
-              className={`${showFiles ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden @[45rem]/vault:flex`}
+              className={`${showFiles ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden @[60rem]/vault:flex`}
             >
               {selectedFile && (
                 <ShellHeader className={`justify-between gap-2 px-4 ${pathBarClassName ?? 'bg-card'}`}>

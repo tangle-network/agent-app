@@ -104,10 +104,10 @@ export function VaultHistoryPanel({
   }
 
   return (
-    <div data-vault-history className="flex h-full min-h-0 flex-col @[45rem]/vault:flex-row">
+    <div data-vault-history className="flex h-full min-h-0 flex-col @[60rem]/vault:flex-row">
       <nav
         aria-labelledby={listId}
-        className="flex max-h-56 shrink-0 flex-col border-b border-border @[45rem]/vault:max-h-none @[45rem]/vault:w-64 @[45rem]/vault:border-b-0 @[45rem]/vault:border-r"
+        className="flex max-h-56 shrink-0 flex-col border-b border-border @[60rem]/vault:max-h-none @[60rem]/vault:w-64 @[60rem]/vault:border-b-0 @[60rem]/vault:border-r"
       >
         <h3 id={listId} className="flex items-center gap-2 px-4 pb-2 pt-3 text-sm font-semibold text-foreground">
           <History className="size-4 text-muted-foreground" aria-hidden="true" />

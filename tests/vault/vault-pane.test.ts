@@ -1279,7 +1279,7 @@ describe('VaultPane — empty vault, empty search, pane switcher', () => {
     expect(document.querySelector('[data-vault-tree]')!.className).toBe(loadingTree)
     expect((screen.getByLabelText('Search vault') as HTMLInputElement).disabled).toBe(true)
     expect(screen.queryByRole('navigation')).toBeNull()
-    expect(screen.getByRole('region', { hidden: true, name: 'Vault document' }).className).toContain('@[45rem]/vault:flex')
+    expect(screen.getByRole('region', { hidden: true, name: 'Vault document' }).className).toContain('@[60rem]/vault:flex')
     fireEvent.click(screen.getAllByRole('button', { name: 'New file' })[0]!)
     expect(screen.getByLabelText('New file path')).toBeTruthy()
   })
