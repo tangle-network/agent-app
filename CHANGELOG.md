@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.88
+
+- feat(workspace-export): exports finish after the owner closes the tab (#1002)
+
 ## 0.60.87
 
 - fix(turn-health): page on threads that got nothing back, and only on calls rejected as completed (#1001)
