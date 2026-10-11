@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.62
+
+- perf(app-auth): reuse a resolved session within a request and briefly per isolate (#966)
+- perf(sandbox): time each step of a warm reuse, and mint the runtime env alongside the connection refresh (#965)
+- docs(lessons): name the launch-kit checks behind each lesson (#963) (#964)
+
 ## 0.60.61
 
 - fix(brand-extraction): rank the site's own logo above partner and sub-brand logos (#961)
