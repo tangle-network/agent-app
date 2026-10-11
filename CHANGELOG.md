@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.106
+
+- fix(router-turn): echo Gemini 3 thought signatures and count usage once per model call (#1033)
+
 ## 0.60.105
 
 - fix(knip): name the ./router-turn entry so main's entry guard passes (#1031)
