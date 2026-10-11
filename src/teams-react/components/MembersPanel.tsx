@@ -11,6 +11,7 @@
  * admins/owners.
  */
 
+import { Button, Input } from '@tangle-network/ui/primitives'
 import { useState } from 'react'
 import type { WorkspaceRole } from '../../teams/roles'
 import { hasWorkspaceRole } from '../../teams/roles'
@@ -98,28 +99,27 @@ export function MembersPanel({
         <div className="flex flex-col gap-1.5 border-t border-[var(--border-default)] pt-3">
           <label className="text-xs font-medium text-[var(--text-muted)]">Invite member</label>
           <div className="flex gap-2">
-            <input
+            <Input
               type="email"
               placeholder="Email address"
               value={inviteEmail}
               aria-label="Invite email address"
               onChange={(event) => setInviteEmail(event.target.value)}
               onKeyDown={(event) => { if (event.key === 'Enter') void submitInvite() }}
-              className="flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+              className="min-w-0 flex-1"
             />
             <RoleSelect
               value={inviteRole}
               ariaLabel="Invite role"
               onChange={setInviteRole}
             />
-            <button
+            <Button
               type="button"
               onClick={() => void submitInvite()}
               disabled={inviting || !inviteEmail.trim()}
-              className="rounded bg-[var(--brand-primary)] px-3 py-1.5 text-sm text-[hsl(var(--primary-foreground))] disabled:opacity-50"
             >
               {inviting ? 'Inviting…' : 'Invite'}
-            </button>
+            </Button>
           </div>
         </div>
       )}

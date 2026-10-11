@@ -14421,7 +14421,7 @@
           "name": "LoopAssistantToolCall",
           "kind": "interface",
           "signature": "interface LoopAssistantToolCall",
-          "doc": "One OpenAI-shaped tool-call entry carried on an assistant message."
+          "doc": "One OpenAI-shaped tool-call entry carried on an assistant message, plus any provider-specific fields the model attached to the call (`ToolLoopCall.providerFields`)."
         },
         {
           "name": "LoopEvent",
@@ -26815,7 +26815,7 @@
           "name": "ArchivableBox",
           "kind": "interface",
           "signature": "interface ArchivableBox",
-          "doc": "The slice of the Sandbox SDK's `SandboxInstance` this source uses."
+          "doc": "The slice of the Sandbox SDK's `SandboxInstance` these sources use."
         },
         {
           "name": "createExportEngine",
@@ -26870,6 +26870,12 @@
           "kind": "interface",
           "signature": "interface D1WorkspaceTablesOptions",
           "doc": null
+        },
+        {
+          "name": "DEFAULT_SANDBOX_EXCLUDE",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Never customer data: installed packages and the platform's runtime state."
         },
         {
           "name": "ExportArchiveSource",
@@ -26938,6 +26944,12 @@
           "doc": "What the progress endpoint returns."
         },
         {
+          "name": "ExportRetryLater",
+          "kind": "class",
+          "signature": "class ExportRetryLater",
+          "doc": "Thrown by a source that cannot run yet for a reason that will pass, such as a sandbox busy with another lifecycle operation."
+        },
+        {
           "name": "ExportRow",
           "kind": "type",
           "signature": "type ExportRow",
@@ -26947,7 +26959,7 @@
           "name": "ExportRowsSource",
           "kind": "interface",
           "signature": "interface ExportRowsSource",
-          "doc": "Rows written as NDJSON to `data/<name>.ndjson`."
+          "doc": "Rows written as NDJSON to `data/<name>.ndjson`, or with `format: 'csv'` as a spreadsheet at `spreadsheets/<name>.csv`."
         },
         {
           "name": "ExportSource",
@@ -27030,8 +27042,14 @@
         {
           "name": "sandboxArchive",
           "kind": "function",
-          "signature": "(args: { name: string; getBox(): Promise<ArchivableBox | null>; dir?: string | undefined; dataClass?: ExportDataClass |…",
+          "signature": "(args: { name: string; getBox(): Promise<ArchivableBox | null>; dir?: string | undefined; exclude?: readonly string[] |…",
           "doc": "One sandbox's filesystem as `sandbox/<name>.tar.gz`."
+        },
+        {
+          "name": "sandboxFiles",
+          "kind": "function",
+          "signature": "(args: { name: string; getBox(): Promise<ArchivableBox | null>; list(): Promise<{ path: string; boxPath: string; }[]>;…",
+          "doc": "Named text files read from one sandbox, written under `files/<name>/<path>`."
         },
         {
           "name": "SecretScanner",
