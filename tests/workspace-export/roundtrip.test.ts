@@ -336,3 +336,51 @@ describe('sandboxArchive', () => {
     expect(await sandboxArchive({ name: 'c', getBox: async () => null }).open()).toBeNull()
   })
 })
+
+describe('many sandboxes', () => {
+  it('reads several boxes at once and retries a failed box on its own', async () => {
+    let inFlight = 0
+    let peak = 0
+    let flaky = 0
+    const box = tarGz()
+    const exporter = createWorkspaceExport({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      signingSecret: SIGNING,
+      authorize: async () => ({ userId: 'u-owner', role: 'owner' }),
+      archiveConcurrency: 3,
+      plan: async () => ({
+        sources: Array.from({ length: 7 }, (_, i) => ({
+          kind: 'archive' as const,
+          name: `box-${i}`,
+          dataClass: 'sandbox' as const,
+          async open() {
+            inFlight += 1
+            peak = Math.max(peak, inFlight)
+            // Each box waits on its runtime before streaming, as a resume does.
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            inFlight -= 1
+            if (i === 1 && flaky++ === 0) throw new Error('box was still starting')
+            return new Blob([box as BlobPart]).stream() as ReadableStream<Uint8Array>
+          },
+        })),
+      }),
+    })
+    const call = (path: string, init: RequestInit = {}) =>
+      exporter.route(new Request(`https://app.test/api/workspaces/${WS}/exports${path ? `/${path}` : ''}`, init), { workspaceId: WS, path })
+    const { id } = (await (await call('', { method: 'POST' })).json()) as { id: string }
+    let progress: { status: string; units: { name: string; status: string }[] } = { status: 'running', units: [] }
+    let requests = 0
+    while (progress.status === 'running' && requests < 10) {
+      progress = (await (await call(`${id}/advance`, { method: 'POST' })).json()) as typeof progress
+      requests += 1
+    }
+    expect(progress.status).toBe('complete')
+    expect(progress.units.every((u) => u.status === 'done')).toBe(true)
+    expect(peak).toBe(3)
+    // Request 1 fails box-1 inside the first batch and keeps boxes 0 and 2;
+    // request 2 retries box-1 alone, then runs the rest three at a time.
+    expect(flaky).toBe(2)
+    expect(requests).toBe(2)
+  })
+})
