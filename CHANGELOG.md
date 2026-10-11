@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.63
+
+- feat(launch-invariants): the eight launch invariants every agent app proves, and shared orphaned-turn settlement (#963)
+
 ## 0.60.62
 
 - perf(app-auth): reuse a resolved session within a request and briefly per isolate (#966)
