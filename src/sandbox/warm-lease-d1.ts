@@ -137,53 +137,62 @@ WHERE key = ?1 AND lease_id = ?2`
   const profileSql = `UPDATE ${t} SET slots = ?2, slots_at = ?3, first_seen_at = ?4 WHERE key = ?1`
   const readSql = `SELECT * FROM ${t} WHERE key = ?1`
 
+  // D1 accepts numbered `?NNN` placeholders; better-sqlite3, which product test
+  // harnesses commonly wrap as D1, rejects them. Statements stay numbered for
+  // readability and are expanded to plain `?` with their values in order.
+  const q = (sql: string, ...values: unknown[]) => {
+    const ordered: unknown[] = []
+    const text = sql.replace(/\?(\d+)/g, (_, n: string) => {
+      ordered.push(values[Number(n) - 1])
+      return '?'
+    })
+    return db.prepare(text).bind(...ordered)
+  }
+
   const read = async (key: string): Promise<WarmLeaseRow | null> => {
-    const row = await db.prepare(readSql).bind(key).first<Row>()
+    const row = await q(readSql, key).first<Row>()
     return row ? toRow(row) : null
   }
   const list = async (sql: string, ...values: unknown[]): Promise<WarmLeaseRow[]> =>
-    ((await db.prepare(sql).bind(...values).all<Row>()).results ?? []).map(toRow)
+    ((await q(sql, ...values).all<Row>()).results ?? []).map(toRow)
 
   return {
     read,
 
     async begin(key, leaseId, reason, now, holdUntil) {
-      const row = await db.prepare(beginSql).bind(key, leaseId, reason, now, holdUntil).first<{ lease_id: string }>()
+      const row = await q(beginSql, key, leaseId, reason, now, holdUntil).first<{ lease_id: string }>()
       if (!row) throw new Error('warm lease begin returned no row')
       return row.lease_id
     },
 
     async markWarm(key, leaseId, warmAt, resumed) {
-      await db.prepare(markWarmSql).bind(key, leaseId, warmAt, resumed ? 1 : 0).run()
+      await q(markWarmSql, key, leaseId, warmAt, resumed ? 1 : 0).run()
     },
 
     async markUsed(key, now, holdUntil) {
       const before = await read(key)
-      const claimed = await db.prepare(firstUseSql).bind(key, now).first<{ key: string }>()
-      await db.prepare(turnSql).bind(key, now, holdUntil).run()
+      const claimed = await q(firstUseSql, key, now).first<{ key: string }>()
+      await q(turnSql, key, now, holdUntil).run()
       // Another turn claimed the first use between the read and the claim: this one is not the hit.
       if (before && !claimed && before.usedAt <= 0) return { ...before, usedAt: now }
       return before
     },
 
     async end(key, leaseId, day, chargeMs, threshold) {
-      await db
-        .prepare(endSql)
-        .bind(key, leaseId, day, Math.max(0, Math.round(chargeMs)), threshold ?? null)
-        .run()
+      await q(endSql, key, leaseId, day, Math.max(0, Math.round(chargeMs)), threshold ?? null).run()
     },
 
     async writeProfile(key, slots, slotsAt, firstSeenAt) {
       const rounded = slots.map((v) => Math.round(v * 1000) / 1000)
-      await db.prepare(profileSql).bind(key, JSON.stringify(rounded), slotsAt, firstSeenAt).run()
+      await q(profileSql, key, JSON.stringify(rounded), slotsAt, firstSeenAt).run()
     },
 
     async markPinged(key, at) {
-      await db.prepare(`UPDATE ${t} SET ping_at = ?2 WHERE key = ?1`).bind(key, at).run()
+      await q(`UPDATE ${t} SET ping_at = ?2 WHERE key = ?1`, key, at).run()
     },
 
     async markPredicted(key, at) {
-      await db.prepare(`UPDATE ${t} SET predicted_at = ?2 WHERE key = ?1`).bind(key, at).run()
+      await q(`UPDATE ${t} SET predicted_at = ?2 WHERE key = ?1`, key, at).run()
     },
 
     listExpired: (now, limit) =>
