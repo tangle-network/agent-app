@@ -32,6 +32,8 @@ import {
   generateInvitationToken,
   getInvitationExpiresAt,
   inviteUrlForToken,
+  INVITATION_EMAIL_HINT,
+  isInvitationEmail,
   normalizeInvitationEmail,
   parseInvitationPermission,
 } from './invitations'
@@ -169,6 +171,7 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
 
     const email = normalizeInvitationEmail(input.email)
     if (!email) return { succeeded: false, status: 400, error: 'Missing email' }
+    if (!isInvitationEmail(email)) return { succeeded: false, status: 400, error: INVITATION_EMAIL_HINT }
 
     const organizationId = accessRow.organization.id
     const workspaceName = (accessRow.workspace as { name: string }).name

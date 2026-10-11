@@ -111,6 +111,33 @@ describe('AgentProfileEditor model and runtime', () => {
   })
 })
 
+describe('AgentProfileEditor instructions', () => {
+  it('shows saved additional instructions in the first box, which appends to the built-in prompt', () => {
+    render(<Harness initial={{ name: 'Pablo', prompt: { appendSystemPrompt: 'Always answer in one sentence.' } }} />)
+    const first = screen.getAllByRole('textbox').find(box => box.id.endsWith('-append')) as HTMLTextAreaElement
+    expect(first).toBe(screen.getByRole('textbox', { name: /Additional instructions/ }))
+    expect(first.value).toBe('Always answer in one sentence.')
+    expect(first.closest('details')).toBeNull()
+    expect(screen.queryByRole('textbox', { name: /^System prompt/ })).toBeNull()
+  })
+
+  it('removes an emptied prompt instead of storing an empty string', () => {
+    render(<Harness initial={{ name: 'Pablo', prompt: { appendSystemPrompt: 'Always answer in one sentence.' } }} />)
+    fireEvent.change(screen.getByRole('textbox', { name: /Additional instructions/ }), { target: { value: '' } })
+    expect(current()).toEqual({ name: 'Pablo' })
+  })
+
+  it('opens More instructions for a saved replacement prompt and says it replaces the built-in prompt', () => {
+    render(<Harness initial={{ prompt: { systemPrompt: 'You are terse.', appendSystemPrompt: 'Sign as Pablo.' } }} />)
+    const replacement = screen.getByRole('textbox', { name: /Replacement system prompt/ }) as HTMLTextAreaElement
+    expect(replacement.closest('details')?.open).toBe(true)
+    expect(screen.getByText(/The built-in prompt is replaced/)).toBeTruthy()
+    fireEvent.change(replacement, { target: { value: '' } })
+    expect(current()).toEqual({ prompt: { appendSystemPrompt: 'Sign as Pablo.' } })
+    expect(screen.queryByText(/The built-in prompt is replaced/)).toBeNull()
+  })
+})
+
 describe('AgentProfileEditor MCP servers', () => {
   const servers: AgentProfile['mcp'] = {
     research: { transport: 'http', url: 'https://mcp.example.com/research' },

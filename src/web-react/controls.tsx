@@ -535,6 +535,28 @@ function formatPrice(p?: string): string | undefined {
   return `$${amount}/M`
 }
 
+const OUTPUT_UNIT_LABEL: Record<NonNullable<CatalogModel['outputPrice']>['unit'], string> = {
+  image: 'image',
+  second: 'sec',
+  minute: 'min',
+  '1k_chars': '1K chars',
+}
+
+/**
+ * The price a person pays per output, in the unit that output comes in: per
+ * million prompt tokens for text, per image, per second of video, per minute of
+ * audio, per 1,000 characters of speech. Undefined when the catalogue has no
+ * price, so a row never shows a made-up number.
+ */
+export function formatModelPrice(model: Pick<CatalogModel, 'pricing' | 'outputPrice'>): string | undefined {
+  const media = model.outputPrice
+  if (media && Number.isFinite(media.usd) && media.usd > 0) {
+    const amount = media.usd >= 1 ? media.usd.toFixed(2) : media.usd >= 0.01 ? String(Number(media.usd.toFixed(3))) : media.usd.toPrecision(2)
+    return `$${amount}/${OUTPUT_UNIT_LABEL[media.unit]}`
+  }
+  return formatPrice(model.pricing?.prompt)
+}
+
 function formatContext(len?: number): string | undefined {
   if (!len) return undefined
   if (len >= 1_000_000) return `${(len / 1_000_000).toFixed(1)}M ctx`
@@ -561,8 +583,10 @@ function ModelRow({
   onSelect: () => void
   renderProviderBadge?: (provider: string) => ReactNode
 }) {
-  const price = formatPrice(model.pricing?.prompt)
+  const price = formatModelPrice(model)
   const ctx = formatContext(model.contextLength)
+  const media = model.output && model.output !== 'text'
+  const thumb = media && (model.output === 'image' || model.output === 'video') ? model.previewUrl : undefined
   return (
     <button
       type="button"
@@ -573,16 +597,32 @@ function ModelRow({
         selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
       }`}
     >
-      <span className="shrink-0" aria-hidden>
-        {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={16} />}
-      </span>
+      {thumb ? (
+        // A media model shows what it makes: a 40px example beside its name.
+        <img src={thumb} alt="" loading="lazy" decoding="async" data-model-preview
+          className="size-10 shrink-0 rounded-md border border-border object-cover" />
+      ) : (
+        <span className="shrink-0" aria-hidden>
+          {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={16} />}
+        </span>
+      )}
       <span className="min-w-0 flex-1">
-        <span className="block break-words [overflow-wrap:anywhere]">{model.name}</span>
-        {(ctx || price || !model.supportsTools) && (
+        <span className="flex min-w-0 items-center gap-1.5">
+          {thumb && (
+            <span className="shrink-0" aria-hidden>
+              {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={14} />}
+            </span>
+          )}
+          <span className="min-w-0 break-words [overflow-wrap:anywhere]">{model.name}</span>
+        </span>
+        {model.capability && (
+          <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground" data-model-capability>{model.capability}</span>
+        )}
+        {(ctx || price || (!media && !model.supportsTools)) && (
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-muted-foreground">
-            {!model.supportsTools && <span className="rounded bg-secondary px-1.5 py-0.5">no tools</span>}
-            {ctx && <span>{ctx}</span>}
-            {price && <span>{price}</span>}
+            {!media && !model.supportsTools && <span className="rounded bg-secondary px-1.5 py-0.5">no tools</span>}
+            {!media && ctx && <span>{ctx}</span>}
+            {price && <span data-model-price>{price}</span>}
           </span>
         )}
       </span>

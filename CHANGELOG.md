@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.60.121
+
+- fix(eval): parity grading counts 'I do not have the pricing … like me to ask the owner?' as an admitted gap (#1053)
+
+## 0.60.120
+
+- feat(router-turn): one Router engine; the protected producer runs runRouterTurn under its grant (#1046)
+- docs: name the renamed Physim repo tangle-network/hardware-agent (#1052)
+
+## 0.60.119
+
+- feat(model-picker): media models show a preview, a capability line and the price per output (#1050)
+
+## 0.60.118
+
+- feat(signoff): workspace-surface fails a page that is not on the shared panel (#1051)
+- feat(router-turn): placeRouterTurn and a placement option: a turn that needs a computer is placed in the sandbox before any model call (#1044)
+
+## 0.60.117
+
+- feat(router-turn): tools report typed side events through context.emit: streamed as tool_event, recorded with the turn (#1048)
+
+## 0.60.116
+
+- Train: land #1026 #1027 #1028 #1045 as one release (#1047)
+
+## 0.60.115
+
+- feat(router-turn): every turn can carry its knowledge files: index, small-file text and the grounding rule (#1038)
+- feat(eval): parity eval kit: the same asks through every lane, graded for correct and fabricated (#1042)
+
+## 0.60.114
+
+- fix(web-react): profile editor leads with additional instructions and drops emptied prompts (#1043)
+
 ## 0.60.113
 
 - feat(chat-routes): an intent line streams what the agent is about to do while the turn boots (#1036)

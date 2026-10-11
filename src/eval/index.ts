@@ -27,6 +27,10 @@ import type { AppToolProducedEvent } from '../tools/types'
 // Re-export the engine so consumers import completion + scoring from one place.
 export { verifyCompletion, extractProducedState, weightedComposite, createLlmCorrectnessChecker } from '@tangle-network/agent-eval'
 
+// Parity: the same asks through two or more lanes of one app, graded the same way.
+export { gradeAnswer, parityGate, runParityEval } from './parity'
+export type { AskVerdict, LaneAnswer, ParityAsk, ParityLane, ParityReport } from './parity'
+
 // Calibration: prove a gate can FAIL before believing it PASSED, and prove a
 // probe can SEE before believing the zero it reported. Domain-free, so it
 // calibrates a citation gate, a form audit, or a benchmark equally.

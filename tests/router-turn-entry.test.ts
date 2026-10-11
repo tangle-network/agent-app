@@ -7,9 +7,10 @@ import { describe, expect, it } from 'vitest'
  * intelligence and candidate-execution chunks, which import the full Sandbox
  * SDK and `viem`; a Worker bundle importing the barrel fails to build
  * (hospitality-agent #353, 2026-10-11: `Could not resolve "viem"`). This walks
- * the entry's import graph and allows only relative files and the tool loop.
+ * the entry's import graph and allows only relative files, the tool loop and placement
+ * (a pure decision module with no imports).
  */
-const ALLOWED_PACKAGES = new Set(['@tangle-network/agent-runtime/tool-loop'])
+const ALLOWED_PACKAGES = new Set(['@tangle-network/agent-runtime/tool-loop', '@tangle-network/agent-runtime/placement'])
 
 function imports(file: string): string[] {
   const source = readFileSync(new URL(`../src/runtime/${file}`, import.meta.url), 'utf8')
@@ -31,7 +32,7 @@ describe('./router-turn entry', () => {
         else packages.add(target)
       }
     }
-    expect([...seen].sort()).toEqual(['loop.ts', 'model-catalog.ts', 'model.ts', 'openai-stream.ts', 'router-turn.ts'])
+    expect([...seen].sort()).toEqual(['loop.ts', 'model-catalog.ts', 'model.ts', 'openai-stream.ts', 'router-turn.ts', 'turn-knowledge.ts'])
     expect([...packages].filter(name => !ALLOWED_PACKAGES.has(name))).toEqual([])
   })
 })

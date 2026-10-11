@@ -205,6 +205,11 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
   const [jsonDirty, setJsonDirty] = useState(false)
   useEffect(() => { if (!jsonDirty) setJson(JSON.stringify(value, null, 2)) }, [value, jsonDirty])
   const editingDisabled = disabled || jsonDirty
+  // More instructions holds the replacement prompt and project instructions; it is open whenever
+  // either has content, including content that arrives after the first render.
+  const hasMorePrompt = Boolean(value.prompt?.systemPrompt || value.prompt?.instructions?.length)
+  const [moreOpen, setMoreOpen] = useState(hasMorePrompt)
+  useEffect(() => { if (hasMorePrompt) setMoreOpen(true) }, [hasMorePrompt])
 
   const sectionAllowed = (section: AgentProfileEditorSection) => !config?.sections || config.sections.includes(section)
   const allowsResource = (kind: AgentProfileResourceKind) => !allowedResourceKinds || allowedResourceKinds.includes(kind)
@@ -270,7 +275,15 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     onChange(result.data)
     return true
   }
-  function prompt(next: NonNullable<AgentProfile['prompt']>) { emit({ ...value, prompt: next }) }
+  // An emptied prompt box removes its key: an empty replacement or appended prompt is not a prompt,
+  // and runtimes refuse it rather than guess whether it means "none" or "keep the built-in prompt".
+  function prompt(next: NonNullable<AgentProfile['prompt']>) {
+    const cleaned = { ...next }
+    if (cleaned.systemPrompt === '') delete cleaned.systemPrompt
+    if (cleaned.appendSystemPrompt === '') delete cleaned.appendSystemPrompt
+    const { prompt: _prompt, ...rest } = value
+    emit(Object.values(cleaned).some(item => item !== undefined) ? { ...rest, prompt: cleaned } : rest)
+  }
   function model(next: NonNullable<AgentProfile['model']>) {
     const cleaned = Object.fromEntries(Object.entries(next).filter(([, item]) => item !== undefined && item !== '')) as NonNullable<AgentProfile['model']>
     const { model: _model, ...rest } = value
@@ -535,22 +548,25 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
       </Section>}
 
       {show.prompts && <Section title="Instructions" description="What the agent is told before every conversation.">
-        <Field label="System prompt" htmlFor={`${id}-system`}
-          info="Replaces the harness's built-in system prompt. Leave it empty to keep the built-in prompt.">
-          <Textarea id={`${id}-system`} className="min-h-52 text-sm leading-6" disabled={editingDisabled} value={value.prompt?.systemPrompt ?? ''}
-            onChange={event => prompt({ ...value.prompt, systemPrompt: event.target.value })} />
+        <Field label="Additional instructions" htmlFor={`${id}-append`}
+          info="Added after the agent's built-in prompt, which stays in force. Leave it empty to add nothing.">
+          <Textarea id={`${id}-append`} className="min-h-40 text-sm leading-6" disabled={editingDisabled} value={value.prompt?.appendSystemPrompt ?? ''}
+            onChange={event => prompt({ ...value.prompt, appendSystemPrompt: event.target.value })} />
         </Field>
-        <details className="group/more" open={Boolean(value.prompt?.appendSystemPrompt || value.prompt?.instructions?.length) || undefined}>
+        <details className="group/more" open={moreOpen} onToggle={event => setMoreOpen(event.currentTarget.open)}>
           <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
             <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 transition-transform group-open/more:rotate-90" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
             More instructions
           </summary>
           <div className="mt-4 space-y-4">
-            <Field label="Appended prompt" htmlFor={`${id}-append`}
-              info="Added after the system prompt, or after the built-in prompt when the system prompt is empty.">
-              <Textarea id={`${id}-append`} size="compact" className="min-h-24 text-sm leading-6" disabled={editingDisabled} value={value.prompt?.appendSystemPrompt ?? ''}
-                onChange={event => prompt({ ...value.prompt, appendSystemPrompt: event.target.value })} />
+            <Field label="Replacement system prompt" htmlFor={`${id}-system`}
+              info="Replaces the agent's built-in prompt entirely. Leave it empty to keep the built-in prompt.">
+              <Textarea id={`${id}-system`} size="compact" className="min-h-24 text-sm leading-6" disabled={editingDisabled} value={value.prompt?.systemPrompt ?? ''}
+                aria-describedby={value.prompt?.systemPrompt ? `${id}-system-replaces` : undefined}
+                onChange={event => prompt({ ...value.prompt, systemPrompt: event.target.value })} />
             </Field>
+            {value.prompt?.systemPrompt && <StatusLine id={`${id}-system-replaces`} tone="warning">
+              The built-in prompt is replaced. The agent receives this text, then the additional instructions.</StatusLine>}
             <div role="group" aria-labelledby={`${id}-instructions-label`} className="space-y-2">
               <div className="flex items-center gap-1.5">
                 <span id={`${id}-instructions-label`} className={formText.label}>Project instructions</span>

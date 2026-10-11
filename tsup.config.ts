@@ -50,6 +50,8 @@ export default defineConfig({
     'rollout/index': 'src/rollout/index.ts',
     'rollout/d1': 'src/rollout/d1.ts',
     'rollout/cli': 'src/rollout/cli.ts',
+    'journeys/index': 'src/journeys/index.ts',
+    'journeys/cli': 'src/journeys/cli.ts',
     'integrations/index': 'src/integrations/index.ts',
     'chatgpt-react/index': 'src/chatgpt-react/index.tsx',
     'chatgpt-react/styles': 'src/chatgpt-react/styles.ts',
