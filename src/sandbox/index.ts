@@ -3860,3 +3860,6 @@ export * from './prewarm'
 export * from './prewarm-claim-d1'
 export * from './prewarm-route'
 export * from './foreground-single-flight'
+// Signal-driven warm leases: resume ahead of need, budget the misses, learn the daily ramp.
+export * from './warm-lease'
+export * from './warm-lease-d1'
