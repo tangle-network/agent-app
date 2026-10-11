@@ -14,6 +14,7 @@ import { join, relative } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
+  createExportEngine,
   createMemoryExportStorage,
   createWorkspaceExport,
   d1WorkspaceTables,
@@ -382,5 +383,43 @@ describe('many sandboxes', () => {
     // request 2 retries box-1 alone, then runs the rest three at a time.
     expect(flaky).toBe(2)
     expect(requests).toBe(2)
+  })
+})
+
+describe('job lease', () => {
+  it('lets the next request continue a minute after a request died holding it', async () => {
+    let clock = Date.parse('2026-10-11T00:00:00Z')
+    const storage = createMemoryExportStorage()
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage,
+      now: () => clock,
+      plan: async () => ({
+        sources: [{
+          kind: 'json',
+          name: 'doc',
+          dataClass: 'records',
+          value: async () => {
+            // The lease the engine stores while this unit runs.
+            const running = JSON.parse(new TextDecoder().decode(storage.objects.get(`workspace-exports/${WS}/${job.id}/job.json`)!))
+            leaseWhileRunning = running.lease.until - clock
+            return { ok: true }
+          },
+        }],
+      }),
+    })
+    let leaseWhileRunning = Number.POSITIVE_INFINITY
+    const job = await engine.start(WS, 'u-owner')
+    // A request that died mid-unit leaves its lease behind.
+    const key = `workspace-exports/${WS}/${job.id}/job.json`
+    const stored = JSON.parse(new TextDecoder().decode(storage.objects.get(key)!))
+    stored.lease = { id: 'dead-request', until: clock + 60_000 }
+    await storage.put(key, new TextEncoder().encode(JSON.stringify(stored)))
+
+    clock += 30_000
+    expect((await engine.advance(WS, job.id))!.status).toBe('running')
+    clock += 31_000
+    expect((await engine.advance(WS, job.id))!.status).toBe('complete')
+    expect(leaseWhileRunning).toBeLessThanOrEqual(60_000)
   })
 })

@@ -27,7 +27,10 @@ import { createZipStream, type ZipEntrySpec } from './zip'
 
 export const MANIFEST_SCHEMA = 'tangle.workspace-export/v1'
 const SEGMENT_BYTES = 8 * 1024 * 1024
-const LEASE_MS = 5 * 60_000
+// A short lease, renewed while a request works, so a request that dies (closed
+// tab, cancelled fetch) stalls the export for at most a minute.
+const LEASE_MS = 60_000
+const HEARTBEAT_MS = 20_000
 const MAX_ATTEMPTS = 3
 /** Files written per request. Each read and segment write is a subrequest, and
  *  Workers cap subrequests per request, so a large files source spans requests. */
@@ -484,9 +487,22 @@ export function createExportEngine(options: ExportEngineOptions) {
       if (job.lease && job.lease.until > now()) return job
       const deadline = now() + budgetMs
       let etag = loaded.etag
+      // Saves are serialized: the heartbeat and the unit loop share one etag.
+      let saving: Promise<void> = Promise.resolve()
+      const save = () => {
+        saving = saving.then(async () => {
+          if (job.lease) job.lease.until = now() + LEASE_MS
+          etag = await saveJob(job, etag)
+        })
+        return saving
+      }
+      let heartbeat: ReturnType<typeof setInterval> | undefined
       try {
         job.lease = { id: crypto.randomUUID(), until: now() + LEASE_MS }
-        etag = await saveJob(job, etag)
+        await save()
+        heartbeat = setInterval(() => {
+          save().catch(() => {})
+        }, HEARTBEAT_MS)
         const plan = await options.plan({ workspaceId })
         const scanner = createSecretScanner({ knownSecrets: (await options.knownSecrets?.({ workspaceId })) ?? [] })
         const sources = new Map(plan.sources.map((s) => [s.name, s]))
@@ -505,12 +521,12 @@ export function createExportEngine(options: ExportEngineOptions) {
             unit.error ??= 'the request exporting this source ended before it finished'
             job.status = 'failed'
             job.error = `${unit.name}: ${unit.error}`
-            etag = await saveJob(job, etag)
+            await save()
             break
           }
           // Recorded before running, so a request that dies mid-unit still counts.
           for (const { unit } of batch) unit.attempts += 1
-          etag = await saveJob(job, etag)
+          await save()
           const failed = await Promise.all(
             batch.map(async ({ unit, index }) => {
               const source = sources.get(unit.name)
@@ -533,29 +549,32 @@ export function createExportEngine(options: ExportEngineOptions) {
             job.status = 'failed'
             job.error = `${dead.unit.name}: ${dead.unit.error}`
           }
-          job.lease = { id: job.lease!.id, until: now() + LEASE_MS }
           if (failed.includes(true)) {
-            etag = await saveJob(job, etag)
+            await save()
             break
           }
           const { unit } = batch[0]!
           if (unit.status === 'pending') {
             // Progress was made; continue this unit in the next request.
             unit.attempts = 0
-            etag = await saveJob(job, etag)
+            await save()
             break
           }
-          etag = await saveJob(job, etag)
+          await save()
         }
         if (job.status === 'running' && job.units.every((u) => u.status === 'done' || u.status === 'empty')) {
           await finalize(job, plan, scanner)
         }
+        clearInterval(heartbeat)
+        await saving.catch(() => {})
         job.lease = undefined
         await saveJob(job, etag)
         return job
       } catch (err) {
         if (err instanceof LeaseLost) return (await loadJob(workspaceId, id))?.job ?? null
         throw err
+      } finally {
+        clearInterval(heartbeat)
       }
     },
 
