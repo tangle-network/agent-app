@@ -263,6 +263,21 @@ describe('integrations-react through the finite Hub settings server', () => {
     expect(onUnsupportedConnect).toHaveBeenCalledWith(custom)
   })
 
+  it.each(['api_key', 'oauth2'] as const)('lets the host own connection for a %s provider it provisions', async authKind => {
+    const f = fixture()
+    const owned: HubProvider = { ...provider, providerId: 'whatsapp', title: 'WhatsApp', authKind, configured: false }
+    const startOAuth = vi.fn()
+    const client: HubIntegrationsClient = { ...f.client, providers: async () => [owned], connections: async () => [],
+      startOAuth }
+    const onConnect = vi.fn()
+    render(<HubIntegrationsPanel identity={identity} client={client} can={() => false}
+      callbackPath="/integrations/callback" hostConnect={{ providerIds: ['whatsapp'], onConnect }} />)
+    fireEvent.click(await screen.findByTestId('integration-whatsapp'))
+    expect(onConnect).toHaveBeenCalledWith(owned)
+    expect(startOAuth).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   it('clears account search when the host switches workspace without remounting', async () => {
     const f = fixture()
     const client: HubIntegrationsClient = { ...f.client, providers: async () => [provider], connections: async () => [connection] }

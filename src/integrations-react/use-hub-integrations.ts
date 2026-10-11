@@ -17,6 +17,17 @@ export interface UseHubIntegrationsOptions {
   callbackPath: string
   /** Optional host handler for custom/native signup. No Platform redirect is assumed. */
   onUnsupportedConnect?: (provider: HubProvider) => void
+  /**
+   * App-owned connection for these providers, such as a number the app
+   * provisions itself. Their catalog rows stay visible and connectable, and
+   * choosing one calls `onConnect` instead of running a Hub flow.
+   */
+  hostConnect?: HubHostConnect
+}
+
+export interface HubHostConnect {
+  providerIds: readonly string[]
+  onConnect: (provider: HubProvider) => void
 }
 
 type WriteInput =
@@ -50,7 +61,7 @@ function updateUrl(providerId: string | null, connectionId: string | null): void
 }
 
 /** Identity-bound Hub settings controller; connection state is always server-read. */
-export function useHubIntegrations({ identity, client, can, callbackPath, onUnsupportedConnect }: UseHubIntegrationsOptions) {
+export function useHubIntegrations({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect }: UseHubIntegrationsOptions) {
   const scope = contextKey(identity)
   const activeScope = useRef(scope)
   activeScope.current = scope
@@ -188,6 +199,10 @@ export function useHubIntegrations({ identity, client, can, callbackPath, onUnsu
   }, [can, connections, client, identity, callbackPath, scope])
 
   const beginConnect = useCallback((target: HubProvider) => {
+    if (hostConnect?.providerIds.includes(target.providerId)) {
+      hostConnect.onConnect(target)
+      return
+    }
     if (target.authKind !== 'api_key' && target.authKind !== 'oauth2') {
       if (onUnsupportedConnect) onUnsupportedConnect(target)
       else setConnectStatus({ scope, status: 'failed', message: 'This provider needs an app-specific connection flow.' })
@@ -210,7 +225,7 @@ export function useHubIntegrations({ identity, client, can, callbackPath, onUnsu
       else void startOAuth(target)
       return
     }
-  }, [can, onUnsupportedConnect, scope, startOAuth])
+  }, [can, onUnsupportedConnect, hostConnect, scope, startOAuth])
 
   const cancelConnect = useCallback(() => {
     pendingPopup.current?.abort()
@@ -220,8 +235,9 @@ export function useHubIntegrations({ identity, client, can, callbackPath, onUnsu
   }, [scope])
 
   const rows = useMemo(() => catalogRows(providerList, connectionList, visibleSelection.providerId && visibleSelection.connectionId
-    ? { [visibleSelection.providerId]: visibleSelection.connectionId } : {}, can, !!onUnsupportedConnect),
-  [providerList, connectionList, visibleSelection.providerId, visibleSelection.connectionId, can, onUnsupportedConnect])
+    ? { [visibleSelection.providerId]: visibleSelection.connectionId } : {}, can, !!onUnsupportedConnect,
+    hostConnect?.providerIds),
+  [providerList, connectionList, visibleSelection.providerId, visibleSelection.connectionId, can, onUnsupportedConnect, hostConnect])
   const details = detail.status === 'ready' && connection
     ? permissionDetails(detail.value.tools, detail.value.policies, connection.id, can) : undefined
 
