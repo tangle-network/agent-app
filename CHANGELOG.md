@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.92
+
+- perf(agent-profiles): profile-switch parsing without the profile schemas (#1010)
+- fix(workspace-export): a source removed mid-export no longer fails the export (#1009)
+
 ## 0.60.91
 
 - docs(lessons): never share a promise across requests on Workers (#1008)
