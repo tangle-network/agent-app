@@ -13,7 +13,7 @@ import { Button, Card, Input, StatusPill, Tabs, TabsContent, TabsList, TabsTrigg
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { HubIntegrationsClient, HubIntegrationsIdentity } from './client'
 import { contextKey, displayProvider, type HubIntegrationCapabilities } from './projection'
-import { useHubIntegrations } from './use-hub-integrations'
+import { type HubHostConnect, useHubIntegrations } from './use-hub-integrations'
 
 /** Host-owned access state for one account, such as whether this agent can use it. */
 export interface HubAccountStatus {
@@ -49,6 +49,12 @@ export interface HubIntegrationsPanelProps {
   className?: string
   onRequestIntegration?: (prefill: string) => void
   onUnsupportedConnect?: (provider: HubProvider) => void
+  /**
+   * App-owned connection for these providers, such as a number the app
+   * provisions itself. Their catalog rows stay visible and connectable, and
+   * choosing one calls `onConnect` instead of running a Hub flow.
+   */
+  hostConnect?: HubHostConnect
   /** Host-owned context and actions; the host authorizes and confirms their effects. */
   getConnectionContext?: (connection: HubConnection) => string | undefined
   getConnectionActions?: (connection: HubConnection) => readonly IntegrationDisplayAction[]

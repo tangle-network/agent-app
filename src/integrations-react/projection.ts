@@ -31,6 +31,7 @@ export function catalogRows(
   selectedIds: Readonly<Record<string, string | null>>,
   can: HubIntegrationCapabilities,
   hasUnsupportedConnect = false,
+  hostConnectProviderIds: readonly string[] = [],
 ): IntegrationsProviderRow[] {
   return providers.map(provider => {
     const accounts = connections.filter(connection => connection.providerId === provider.providerId)
@@ -40,7 +41,7 @@ export function catalogRows(
       authKind: provider.authKind,
       selectedConnectionId: accounts.some(account => account.id === selectedIds[provider.providerId])
         ? selectedIds[provider.providerId] ?? null : null,
-      canConnect: provider.authKind === 'oauth2'
+      canConnect: hostConnectProviderIds.includes(provider.providerId) ? true : provider.authKind === 'oauth2'
         ? provider.configured && can({ operation: 'oauth.start', providerId: provider.providerId })
         : provider.authKind === 'api_key'
           ? provider.configured && can({ operation: 'api-key.connect', providerId: provider.providerId })
