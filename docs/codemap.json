@@ -14815,7 +14815,7 @@
           "name": "LoopAssistantToolCall",
           "kind": "interface",
           "signature": "interface LoopAssistantToolCall",
-          "doc": "One OpenAI-shaped tool-call entry carried on an assistant message."
+          "doc": "One OpenAI-shaped tool-call entry carried on an assistant message, plus any provider-specific fields the model attached to the call (`ToolLoopCall.providerFields`)."
         },
         {
           "name": "LoopEvent",

@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_128 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_130 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -59,6 +59,8 @@ _128 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./integrations`](api/integrations.md) | 10 | — |
 | [`./integrations-react`](api/integrations-react.md) | 24 | `platform`, `web-react` |
 | [`./interactions`](api/interactions.md) | 64 | `web` |
+| [`./journeys`](api/journeys.md) | 61 | `signoff`, `workspace-export` |
+| [`./journeys/cli`](api/journeys-cli.md) | 1 | `signoff`, `workspace-export` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
 | [`./launch-invariants`](api/launch-invariants.md) | 59 | `signoff`, `turn-health` |
@@ -618,6 +620,26 @@ Depends on: `web`
 `abortSession`, `BeforeInteractionAnswerArgs`, `cancelStatusFor`, `canTransitionInteractionStatus`, `ChatFreeTextField`, `ChatInteraction`, `ChatInteractionField`, `ChatInteractionStatus`, `ChatSelectField`, `composerAnswerData`, `composerAnswerDeliveries`, `ComposerAnswerDelivery`, `createInteractionAnswerRoute`, `dedupeQuestionInteractionsByContent`, `DurableInteractionRouteArgs`, `DurableInteractionRoutePersistence`, `fieldAcceptsFreeText`, `getSessionState`, `INTERACTION_CANCEL_EVENT`, `INTERACTION_EVENT`, `INTERACTION_RESOLVED_EVENT`, `InteractionAnswerBodyValidation`, `InteractionAnswerRoute`, `InteractionAnswerRouteOptions`, `InteractionAnswers`, `InteractionAnswerValue`, `InteractionCancelData`, `InteractionClientOutcome`, `InteractionConnectionResolution`, `InteractionData`, `interactionFromWireRequest`, `InteractionOutcome`, `interactionPartKey`, `InteractionPersistedPart`, `InteractionRequest`, `InteractionRequestWire`, `InteractionRouteLogger`, `interactionToPersistedPart`, `isRenderableInteractionKind`, `isSafeInteractionFieldKey`, `isTerminalInteractionStatus`, `isTerminalSidecarState`, `listSessionInteractions`, `mapInteractionRespondFailure`, `NoticeKind`, `noticePart`, `noticePartKey`, `NoticePersistedPart`, `parseInteractionAnswers`, `ParseInteractionAnswersResult`, `parseInteractionCancel`, `parseInteractionRequest`, `ParseInteractionResult`, `persistedPartToInteraction`, `questionInteractionContentSignature`, `ResolveInteractionConnectionArgs`, `respondToSessionInteraction`, `SidecarAbortResult`, `SidecarInteractionsConnection`, `SidecarInteractionsError`, `SidecarInteractionsResult`, `SidecarSessionState`, `stampInteractionAnswers`, `validateInteractionAnswerBody`
 
 [Full API →](api/interactions.md)
+
+## `./journeys`
+
+Source: `src/journeys/index.ts` · 61 exports
+
+Depends on: `signoff`, `workspace-export`
+
+`assertNoSecrets`, `AuthPaths`, `Chapter`, `chapterCues`, `ChatContract`, `clickUntilSubmitted`, `collectJourneyFiles`, `CONFIG_FILE_NAMES`, `createSubmissionTracker`, `credentialNames`, `CriticResult`, `Cue`, `DEFAULT_AUTH_PATHS`, `DEFAULT_CHAT_CONTRACT`, `DEFAULT_FAILURE_TEXT`, `DEFAULT_STOPPED_TEXT`, `defineJourneys`, `DESKTOP`, `extractFrames`, `FailurePatterns`, `highlightPlan`, `HighlightSegment`, `IndexInput`, `Journey`, `JourneyFiles`, `JourneyIdentity`, `JourneysConfig`, `loadJourneysConfig`, `MAX_HIGHLIGHTS_S`, `oneLine`, `PHONE`, `postProcessVideo`, `rebuildVideo`, `renderIndex`, `ResolvedJourneysConfig`, `resolveJourneysConfig`, `routeSubmitPaths`, `scoreTurn`, `scrubTrace`, `secretNeedles`, `SendDriveOps`, `SendOptions`, `sessionUser`, `SessionUser`, `settleText`, `SignInMethod`, `startJourney`, `STATUS_STALE_MS`, `StepRecord`, `storageStateFor`, `SubmissionTracker`, `tallyTurns`, `ThreadRoute`, `threadRouteIn`, `TranscriptSnapshot`, `TurnEvidence`, `TurnFacts`, `turnLooksActive`, `TurnOutcome`, `TurnRecord`, `TurnVerdict`
+
+[Full API →](api/journeys.md)
+
+## `./journeys/cli`
+
+Source: `src/journeys/cli.ts` · 1 exports
+
+Depends on: `signoff`, `workspace-export`
+
+`main`
+
+[Full API →](api/journeys-cli.md)
 
 ## `./knowledge`
 
