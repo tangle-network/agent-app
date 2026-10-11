@@ -12,6 +12,7 @@
  *   agent-app-signoff --keep-going        # run every step, full picture
  *   agent-app-signoff --json proof.json   # machine-readable record
  *   agent-app-signoff shell-alignment --base-url <url> --route <path>   # header dividers meet the rail
+ *   agent-app-signoff surface-ladder --base-url <url> --route <path>    # cards and fields step off their parent
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -19,6 +20,7 @@ import { invokedAsScript } from './invoked-as-script'
 import { formatSignoffLine, formatSignoffReport } from './report'
 import { runSignoff, type RunSignoffOptions } from './run'
 import { runShellAlignmentCli } from './shell-alignment-cli'
+import { runSurfaceLadderCli } from './surface-ladder-cli'
 import type { SignoffEvent, SignoffSource } from './types'
 
 interface ParsedArgs extends RunSignoffOptions {
@@ -43,6 +45,7 @@ function usage(): string {
     '',
     'Subcommands:',
     '  shell-alignment             measure header dividers against the rail in a browser (--help for options)',
+    '  surface-ladder              measure card and field steps, field borders and card copy in a browser (--help for options)',
   ].join('\n')
 }
 
@@ -137,6 +140,7 @@ function progressWriter(): (event: SignoffEvent) => void {
 
 export async function runSignoffCli(argv: readonly string[]): Promise<number> {
   if (argv[0] === 'shell-alignment') return runShellAlignmentCli(argv.slice(1))
+  if (argv[0] === 'surface-ladder') return runSurfaceLadderCli(argv.slice(1))
   const args = parseArgs(argv)
   const report = await runSignoff({ ...args, onEvent: args.quiet ? undefined : progressWriter() })
 

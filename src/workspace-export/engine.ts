@@ -15,6 +15,7 @@ import { createSecretScanner, isSecretName, REDACTED, type SecretScanner } from 
 import type { ExportStorage } from './storage'
 import { createTarInspector } from './tar'
 import type {
+  ExportFile,
   ExportJob,
   ExportPlan,
   ExportProgress,
@@ -35,6 +36,8 @@ const MAX_ATTEMPTS = 3
 /** Files written per request. Each read and segment write is a subrequest, and
  *  Workers cap subrequests per request, so a large files source spans requests. */
 const FILES_PER_REQUEST = 200
+/** Files copied concurrently; four 8 MiB segments stay well inside a Worker's 128 MB. */
+const FILES_IN_PARALLEL = 4
 const SOURCE_NAME = /^[a-z0-9][a-z0-9_.-]{0,95}$/
 
 export interface ExportEngineOptions {
@@ -48,6 +51,8 @@ export interface ExportEngineOptions {
   prefix?: string
   /** Sandbox archives read at once in one request. Default 4. */
   archiveConcurrency?: number
+  /** Table and JSON sources written at once in one request. Default 8. */
+  rowConcurrency?: number
   now?: () => number
 }
 
@@ -117,20 +122,28 @@ export function createExportEngine(options: ExportEngineOptions) {
   const now = options.now ?? (() => Date.now())
   const archiveConcurrency = Math.max(1, Math.floor(options.archiveConcurrency ?? 4))
 
+  const rowConcurrency = Math.max(1, Math.floor(options.rowConcurrency ?? 8))
+  const batchKind = (kind: ExportUnit['kind']) => (kind === 'archive' ? 'archive' : kind === 'rows' || kind === 'json' ? 'rows' : null)
+
   /**
    * The units the next step runs, starting at `pending[from]`. Consecutive
-   * archive units run together: each mostly waits on its box to resume and
-   * stream its tar, so a workspace with dozens of sandboxes would otherwise
-   * spend one box's wait per unit. A unit already attempted runs alone, so a
-   * batch that died at a Worker limit cannot keep taking its neighbours with it.
+   * units of one batchable kind run together under one job save. An archive
+   * mostly waits on its box to resume and stream its tar, and a table unit on
+   * two D1 queries and one storage write; run one at a time, a workspace with
+   * dozens of sandboxes or a hundred mostly empty tables spends minutes on
+   * those waits (a 97-table Builder export took 300 s). A unit already
+   * attempted runs alone, so a batch that died at a Worker limit cannot keep
+   * taking its neighbours with it. Files units run alone: they resume at a cursor.
    */
-  function archiveBatch<T extends { unit: ExportUnit }>(pending: T[], from: number): T[] {
+  function nextBatch<T extends { unit: ExportUnit }>(pending: T[], from: number): T[] {
     const first = pending[from]!
-    if (first.unit.kind !== 'archive' || first.unit.attempts > 0) return [first]
+    const kind = batchKind(first.unit.kind)
+    if (!kind || first.unit.attempts > 0) return [first]
+    const limit = kind === 'archive' ? archiveConcurrency : rowConcurrency
     const batch = [first]
-    for (let i = from + 1; i < pending.length && batch.length < archiveConcurrency; i += 1) {
+    for (let i = from + 1; i < pending.length && batch.length < limit; i += 1) {
       const candidate = pending[i]!
-      if (candidate.unit.kind !== 'archive' || candidate.unit.attempts > 0) break
+      if (batchKind(candidate.unit.kind) !== kind || candidate.unit.attempts > 0) break
       batch.push(candidate)
     }
     return batch
@@ -301,25 +314,40 @@ export function createExportEngine(options: ExportEngineOptions) {
       const start = unit.cursor ?? 0
       let seen = 0
       let written = 0
+      // Files are copied FILES_IN_PARALLEL at a time: one at a time, each KV or R2
+      // read plus segment write left a 1,000-file vault crawling. Paths are taken
+      // in listing order, keys come from the listing position (unique across
+      // resumes), and the cursor moves only past a fully written chunk.
+      let chunk: { file: ExportFile; position: number; path: string }[] = []
+      const flush = async () => {
+        const written_ = await Promise.all(
+          chunk.map(async ({ file, position, path }) => {
+            const body = await file.open()
+            if (body === null) return null
+            const masked = toStream(body).pipeThrough(scanner.maskBytes((n) => (unit.redactions += n)))
+            return writeEntry(`${keyBase}/p${position}`, path, masked, false)
+          }),
+        )
+        for (const entry of written_) if (entry) unit.entries.push(entry)
+        written += written_.filter(Boolean).length
+        unit.cursor = chunk.at(-1)!.position + 1
+        chunk = []
+      }
       for await (const file of source.files()) {
         if (seen < start) {
           seen += 1
           continue
         }
-        if (written >= FILES_PER_REQUEST || now() > deadline) {
+        if (written + chunk.length >= FILES_PER_REQUEST || now() > deadline) {
+          if (chunk.length) await flush()
           unit.cursor = seen
           return
         }
-        const body = await file.open()
+        chunk.push({ file, position: seen, path: folder + safePath(file.path, used) })
         seen += 1
-        if (body !== null) {
-          const path = folder + safePath(file.path, used)
-          const masked = toStream(body).pipeThrough(scanner.maskBytes((n) => (unit.redactions += n)))
-          unit.entries.push(await writeEntry(`${keyBase}/${unit.entries.length}`, path, masked, false))
-          written += 1
-        }
-        unit.cursor = seen
+        if (chunk.length >= FILES_IN_PARALLEL) await flush()
       }
+      if (chunk.length) await flush()
       unit.cursor = undefined
       unit.files = unit.entries.length
       unit.status = unit.entries.length ? 'done' : 'empty'
@@ -517,7 +545,7 @@ export function createExportEngine(options: ExportEngineOptions) {
         let next = 0
         while (next < pending.length) {
           if (now() > deadline) break
-          const batch = archiveBatch(pending, next)
+          const batch = nextBatch(pending, next)
           next += batch.length
           const exhausted = batch.find(({ unit }) => unit.attempts >= MAX_ATTEMPTS)
           if (exhausted) {
@@ -538,7 +566,14 @@ export function createExportEngine(options: ExportEngineOptions) {
             batch.map(async ({ unit, index }) => {
               const source = sources.get(unit.name)
               try {
-                if (!source || source.kind !== unit.kind) throw new Error('source is no longer available')
+                if (!source || source.kind !== unit.kind) {
+                  // Removed while the export ran (a deleted sandbox, a dropped table):
+                  // nothing is left to export, so record why instead of failing the export.
+                  unit.status = 'empty'
+                  unit.entries = []
+                  unit.error = 'removed from the workspace while the export ran'
+                  return false
+                }
                 await runUnit(job, unit, index, source, scanner, deadline)
                 unit.error = undefined
                 return false

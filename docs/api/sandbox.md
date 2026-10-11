@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-230 exports.
+231 exports.
 
 ### `adaptSandboxStream`
 
@@ -1452,6 +1452,14 @@ interface TerminalConnectionBoxLike
 
 ```ts
 (at: number) => string
+```
+
+### `WARM_LEASE_DECLINED_UNTIL_DDL`
+
+`const` — For a table created from an earlier \`WARM_LEASE_TABLE_DDL\`: paste into a migration.
+
+```ts
+"ALTER TABLE sandbox_warm_lease ADD COLUMN declined_until INTEGER NOT NULL DEFAULT 0"
 ```
 
 ### `WARM_LEASE_TABLE_DDL`

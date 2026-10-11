@@ -16,6 +16,7 @@ export default defineConfig({
     'profile-editor/index': 'src/profile-editor/index.ts',
     'profile-editor/server': 'src/profile-editor/server.ts',
     'agent-profiles/index': 'src/agent-profiles/index.ts',
+    'agent-profiles/switch': 'src/agent-profiles/switch.ts',
     'agent-profiles/d1': 'src/agent-profiles/d1.ts',
     'agent-profiles/drizzle': 'src/agent-profiles/drizzle.ts',
     'agent-profiles/reaper': 'src/agent-profiles/reaper.ts',
@@ -70,6 +71,8 @@ export default defineConfig({
     'agent-surfaces/cli': 'src/agent-surfaces/cli.ts',
     'session-shell/index': 'src/session-shell/index.ts',
     'web-react/index': 'src/web-react/index.tsx',
+    // Its own module, so an app whose first page uses only the composer does not load the profile schemas.
+    'web-react/agent-profile-editor': 'src/web-react/agent-profile-editor.tsx',
     'work-product/index': 'src/work-product/index.ts',
     'work-product-react/index': 'src/work-product-react/index.tsx',
     'chat-react/index': 'src/chat-react/index.tsx',

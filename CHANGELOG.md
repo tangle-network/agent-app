@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.60.96
+
+- feat(agent-profiles): profile.remember appends one fact to agent knowledge (#1015)
+
+## 0.60.95
+
+- perf(workspace-export): copy a files source four files at a time (#1014)
+
+## 0.60.94
+
+- feat(sandbox): warm leases back off after no box or a capacity refusal (#1012)
+- fix(knip): name the switch and profile-editor entries so main's entry guard passes (#1013)
+
+## 0.60.93
+
+- perf(web-react): build the profile editor as its own module (#1011)
+
+## 0.60.92
+
+- perf(agent-profiles): profile-switch parsing without the profile schemas (#1010)
+- fix(workspace-export): a source removed mid-export no longer fails the export (#1009)
+
+## 0.60.91
+
+- docs(lessons): never share a promise across requests on Workers (#1008)
+
+## 0.60.90
+
+- feat(signoff): surface-ladder browser check for card and field steps, field borders and card copy (#1005)
+- perf(workspace-export): write consecutive table sources together under one job save (#1007)
+
 ## 0.60.89
 
 - fix(workspace-export): migration-runner tables are internal, not unscoped (#1004)

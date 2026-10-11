@@ -38,6 +38,14 @@ Every header row in an agent app is a sandbox-ui `ShellHeader` at brand's `--she
 
 Transcript text is brand's one scale: user and agent messages share `TRANSCRIPT_TEXT` (16px, leading 1.6) and differ only by alignment and surface. `ChatMessages` `messageSize="large"` raises `--transcript-font-size` for both roles.
 
+## Surface ladder
+
+Every surface steps off the one it sits on. A card is at least 3 OKLCH L points from its parent, and a field is at least 3 points from the surface around it, with a border of at least 3:1 against that surface. A card's body copy is one short line of at most 12 words, and any detail goes behind help text or a disclosure.
+
+- Use the Card primitive and the brand's surface tokens. Never paint a nested card with the same `hsl(var(--card))` as the card around it.
+- A box that wraps a bare `bg-transparent` input (a search bar or the chat composer) uses `focusFieldWithin`, so the wrapper is the field.
+- `agent-app-signoff surface-ladder` measures the rendered result on each route, at 1440px and 390px, in both themes. See [local sign-off](./local-signoff.md#surface-ladder).
+
 ## Surfaces and fields
 
 Shared components draw surfaces through ui primitives so brand's surface ladder and interaction states apply; they paint no backgrounds of their own.

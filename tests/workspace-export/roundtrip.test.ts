@@ -388,6 +388,46 @@ describe('many sandboxes', () => {
   })
 })
 
+describe('many tables', () => {
+  it('writes several table sources at once and keeps each one exact', async () => {
+    let inFlight = 0
+    let peak = 0
+    const exporter = createWorkspaceExport({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      signingSecret: SIGNING,
+      authorize: async () => ({ userId: 'u-owner', role: 'owner' }),
+      rowConcurrency: 5,
+      plan: async () => ({
+        sources: Array.from({ length: 12 }, (_, i) => ({
+          kind: 'rows' as const,
+          name: `db.t${i}`,
+          dataClass: 'records' as const,
+          expectedCount: async () => i % 3,
+          async *rows() {
+            inFlight += 1
+            peak = Math.max(peak, inFlight)
+            // Each table waits on its database round trip, as D1 does.
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            inFlight -= 1
+            yield Array.from({ length: i % 3 }, (_, n) => ({ id: `${i}-${n}` }))
+          },
+        })),
+      }),
+    })
+    const call = (path: string, init: RequestInit = {}) =>
+      exporter.route(new Request(`https://app.test/api/workspaces/${WS}/exports${path ? `/${path}` : ''}`, init), { workspaceId: WS, path })
+    const { id } = (await (await call('', { method: 'POST' })).json()) as { id: string }
+    const progress = (await (await call(`${id}/advance`, { method: 'POST' })).json()) as {
+      status: string
+      units: { name: string; status: string; rows?: number }[]
+    }
+    expect(progress.status).toBe('complete')
+    expect(peak).toBe(5)
+    expect(progress.units.map((u) => u.rows)).toEqual(Array.from({ length: 12 }, (_, i) => i % 3))
+  })
+})
+
 describe('job lease', () => {
   it('lets the next request continue a minute after a request died holding it', async () => {
     let clock = Date.parse('2026-10-11T00:00:00Z')
@@ -489,5 +529,60 @@ describe('background continuation of older exports', () => {
     await engine.advance(WS, job.id, 0)
     for (let i = 0; i < 5 && (await engine.get(WS, job.id))!.status === 'running'; i += 1) await engine.continueRunning()
     expect((await engine.get(WS, job.id))!.status).toBe('complete')
+  })
+})
+
+describe('a source removed while the export runs', () => {
+  it('becomes an empty unit with the reason, and the export still completes', async () => {
+    let boxes = ['box-a', 'box-b']
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      plan: async () => ({
+        sources: [
+          { kind: 'json', name: 'doc', dataClass: 'records', value: async () => ({ ok: true }) },
+          ...boxes.map((name) => ({ kind: 'json' as const, name, dataClass: 'sandbox' as const, value: async () => ({ name }) })),
+        ],
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    boxes = ['box-a'] // box-b is deleted after the export started
+    let current = job
+    for (let i = 0; i < 5 && current.status === 'running'; i += 1) current = (await engine.advance(WS, job.id))!
+    expect(current.status).toBe('complete')
+    const removed = current.units.find((u) => u.name === 'box-b')!
+    expect(removed).toMatchObject({ status: 'empty', error: 'removed from the workspace while the export ran' })
+  })
+})
+
+describe('files sources', () => {
+  it('copy files concurrently and keep each exactly once, in listing order', async () => {
+    const storage = createMemoryExportStorage()
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage,
+      plan: async () => ({
+        sources: [{
+          kind: 'files',
+          name: 'vault',
+          dataClass: 'knowledge',
+          async *files() {
+            for (let i = 0; i < 40; i += 1) {
+              yield { path: `n/${String(i).padStart(2, '0')}.md`, open: async () => { await new Promise((r) => setTimeout(r, 50)); return `note ${i}` } }
+            }
+          },
+        }],
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    const started = Date.now()
+    let current = job
+    for (let i = 0; i < 5 && current.status === 'running'; i += 1) current = (await engine.advance(WS, job.id))!
+    const elapsed = Date.now() - started
+    expect(current.status).toBe('complete')
+    const unit = current.units.find((u) => u.name === 'vault')!
+    expect(unit.entries.map((e) => e.path)).toEqual(Array.from({ length: 40 }, (_, i) => `files/vault/n/${String(i).padStart(2, '0')}.md`))
+    // 40 reads of 50 ms take at least 2000 ms one at a time.
+    expect(elapsed).toBeLessThan(1200)
   })
 })

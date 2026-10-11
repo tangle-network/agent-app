@@ -104,7 +104,7 @@ interface MountProfileChangeResult
 
 ### `parseProfileSwitch`
 
-`function`
+`function` — Chat profile-switch parsing with no dependencies, so browser code can import it without the profile schemas: through the agent-profiles barrel it pulled zod and the schemas into Hospitality's first p…
 
 ```ts
 (text: string) => { name: string; } | { invalid: true; } | null
