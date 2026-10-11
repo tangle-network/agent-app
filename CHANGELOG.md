@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.118
+
+- feat(signoff): workspace-surface fails a page that is not on the shared panel (#1051)
+- feat(router-turn): placeRouterTurn and a placement option: a turn that needs a computer is placed in the sandbox before any model call (#1044)
+
 ## 0.60.117
 
 - feat(router-turn): tools report typed side events through context.emit: streamed as tool_event, recorded with the turn (#1048)
