@@ -43,6 +43,8 @@ export interface ExportEngineOptions {
   knownSecrets?(args: { workspaceId: string }): readonly string[] | Promise<readonly string[]>
   /** Storage key prefix. Default `workspace-exports`. */
   prefix?: string
+  /** Sandbox archives read at once in one request. Default 4. */
+  archiveConcurrency?: number
   now?: () => number
 }
 
@@ -110,8 +112,28 @@ export function createExportEngine(options: ExportEngineOptions) {
   const { storage } = options
   const prefix = options.prefix ?? 'workspace-exports'
   const now = options.now ?? (() => Date.now())
+  const archiveConcurrency = Math.max(1, Math.floor(options.archiveConcurrency ?? 4))
 
-  const base = (workspaceId: string, id: string) =>
+  /**
+   * The units the next step runs, starting at `pending[from]`. Consecutive
+   * archive units run together: each mostly waits on its box to resume and
+   * stream its tar, so a workspace with dozens of sandboxes would otherwise
+   * spend one box's wait per unit. A unit already attempted runs alone, so a
+   * batch that died at a Worker limit cannot keep taking its neighbours with it.
+   */
+  function archiveBatch<T extends { unit: ExportUnit }>(pending: T[], from: number): T[] {
+    const first = pending[from]!
+    if (first.unit.kind !== 'archive' || first.unit.attempts > 0) return [first]
+    const batch = [first]
+    for (let i = from + 1; i < pending.length && batch.length < archiveConcurrency; i += 1) {
+      const candidate = pending[i]!
+      if (candidate.unit.kind !== 'archive' || candidate.unit.attempts > 0) break
+      batch.push(candidate)
+    }
+    return batch
+  }
+
+  const base =(workspaceId: string, id: string) =>
     `${prefix}/${assertSafeKeySegment(workspaceId)}/${assertSafeKeySegment(id)}`
   const jobKey = (workspaceId: string, id: string) => `${base(workspaceId, id)}/job.json`
   /** The key a download signature covers. No object lives there; the zip is assembled per request. */
@@ -468,13 +490,17 @@ export function createExportEngine(options: ExportEngineOptions) {
         const plan = await options.plan({ workspaceId })
         const scanner = createSecretScanner({ knownSecrets: (await options.knownSecrets?.({ workspaceId })) ?? [] })
         const sources = new Map(plan.sources.map((s) => [s.name, s]))
-        for (const [index, unit] of job.units.entries()) {
-          if (unit.status !== 'pending') continue
+        const pending = job.units.flatMap((unit, index) => (unit.status === 'pending' ? [{ unit, index }] : []))
+        let next = 0
+        while (next < pending.length) {
           if (now() > deadline) break
-          const source = sources.get(unit.name)
-          if (unit.attempts >= MAX_ATTEMPTS) {
+          const batch = archiveBatch(pending, next)
+          next += batch.length
+          const exhausted = batch.find(({ unit }) => unit.attempts >= MAX_ATTEMPTS)
+          if (exhausted) {
             // Earlier requests died inside this unit without recording an outcome,
             // most often at the Worker CPU limit.
+            const { unit } = exhausted
             unit.status = 'failed'
             unit.error ??= 'the request exporting this source ended before it finished'
             job.status = 'failed'
@@ -483,26 +509,36 @@ export function createExportEngine(options: ExportEngineOptions) {
             break
           }
           // Recorded before running, so a request that dies mid-unit still counts.
-          unit.attempts += 1
+          for (const { unit } of batch) unit.attempts += 1
           etag = await saveJob(job, etag)
-          try {
-            if (!source || source.kind !== unit.kind) throw new Error('source is no longer available')
-            await runUnit(job, unit, index, source, scanner, deadline)
-            unit.error = undefined
-          } catch (err) {
-            unit.error = errorText(scanner, err)
-            // A files unit keeps what it already wrote and resumes at its cursor.
-            if (unit.cursor === undefined) unit.entries = []
-            if (unit.attempts >= MAX_ATTEMPTS) {
-              unit.status = 'failed'
-              job.status = 'failed'
-              job.error = `${unit.name}: ${unit.error}`
-            }
-            job.lease = { id: job.lease!.id, until: now() + LEASE_MS }
+          const failed = await Promise.all(
+            batch.map(async ({ unit, index }) => {
+              const source = sources.get(unit.name)
+              try {
+                if (!source || source.kind !== unit.kind) throw new Error('source is no longer available')
+                await runUnit(job, unit, index, source, scanner, deadline)
+                unit.error = undefined
+                return false
+              } catch (err) {
+                unit.error = errorText(scanner, err)
+                // A files unit keeps what it already wrote and resumes at its cursor.
+                if (unit.cursor === undefined) unit.entries = []
+                if (unit.attempts >= MAX_ATTEMPTS) unit.status = 'failed'
+                return true
+              }
+            }),
+          )
+          const dead = batch.find(({ unit }) => unit.status === 'failed')
+          if (dead) {
+            job.status = 'failed'
+            job.error = `${dead.unit.name}: ${dead.unit.error}`
+          }
+          job.lease = { id: job.lease!.id, until: now() + LEASE_MS }
+          if (failed.includes(true)) {
             etag = await saveJob(job, etag)
             break
           }
-          job.lease = { id: job.lease!.id, until: now() + LEASE_MS }
+          const [{ unit }] = batch
           if (unit.status === 'pending') {
             // Progress was made; continue this unit in the next request.
             unit.attempts = 0
