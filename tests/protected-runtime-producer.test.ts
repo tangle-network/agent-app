@@ -131,7 +131,8 @@ describe('protected Runtime chat producer', () => {
     options.tools = [{ name: 'read', description: 'Read.', inputSchema: { type: 'object' }, run: read }]
     options.profile.tools = { read: true }
     options.maxToolCalls = 15
-    options.grant.reserve.limits.maxModelCalls = 16
+    options.grant = { ...options.grant, reserve: { ...options.grant.reserve,
+      limits: { ...options.grant.reserve.limits, maxModelCalls: 16 } } }
     let call = 0
     vi.stubGlobal('fetch', vi.fn(async () => (++call <= 15
       ? response({ content: null, tool_calls: [{ id: `read-${call}`, type: 'function', function: { name: 'read', arguments: JSON.stringify({ n: call }) } }] })
@@ -145,7 +146,7 @@ describe('protected Runtime chat producer', () => {
   })
 
   it.each([
-    ['model metadata', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.model!.metadata = { temperature: 0.2 } }, 'metadata'],
+    ['model metadata', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.model = { ...profile.model!, metadata: { temperature: 0.2 } } }, 'metadata'],
     ['mounted resources', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.resources = { instructions: 'extra' } }, 'resources'],
     ['an undeclared tool', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.tools = {} }, 'is not enabled by AgentProfile.tools'],
   ])('refuses a profile with %s by name before reserving a grant', async (_label, change, named) => {
