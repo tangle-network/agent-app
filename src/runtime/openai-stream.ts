@@ -242,6 +242,121 @@ export function createOpenAICompatStreamTurn(
     )
 }
 
+/**
+ * The buffered sibling of {@link createOpenAICompatStreamTurn}: one
+ * `/chat/completions` request without `stream`, answered by one JSON
+ * completion, yielded as the same `LoopEvent`s (the same tool-call assembly and
+ * served-model attribution). For an endpoint or ledger that expects one buffered
+ * completion per model call.
+ */
+export function createOpenAICompatCompletionTurn(
+  opts: OpenAICompatStreamTurnOptions,
+): (messages: LoopMessage[]) => AsyncIterable<LoopEvent> {
+  const base = opts.baseUrl.replace(/\/+$/, '')
+  const doFetch = opts.fetchImpl ?? fetch
+  return (messages) =>
+    toLoopEvents(
+      completionAsChunk(doFetch, `${base}/chat/completions`, opts.apiKey, {
+        model: opts.model,
+        messages,
+        ...(opts.tools && opts.tools.length > 0 ? { tools: opts.tools } : {}),
+        ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
+        ...opts.extraBody,
+      }, opts.onServedModel ? { requestedModel: opts.model, report: opts.onServedModel } : undefined, opts.headers),
+    )
+}
+
+/** One buffered OpenAI-compat completion (structural — no `openai` dep). */
+interface OpenAICompletion {
+  model?: string
+  choices?: Array<{
+    message?: {
+      content?: string | null
+      reasoning_content?: string | null
+      tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string }; extra_content?: unknown }>
+    }
+    finish_reason?: string | null
+  }>
+  usage?: { prompt_tokens?: number; completion_tokens?: number } | null
+}
+
+async function* completionAsChunk(
+  doFetch: typeof fetch,
+  url: string,
+  apiKey: string,
+  body: Record<string, unknown>,
+  attribution?: { requestedModel: string; report: (served: OpenAICompatServedModel) => void },
+  headers?: Record<string, string>,
+): AsyncIterable<OpenAIStreamChunk> {
+  const res = await doFetch(url, {
+    method: 'POST',
+    headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw await httpFailure(res, 'completion')
+  const completion = await res.json() as OpenAICompletion
+  if (attribution) {
+    const served = servedFromHeader(res, attribution.requestedModel)
+      ?? (completion.model ? servedFromBody(completion.model, attribution.requestedModel) : undefined)
+    if (served) attribution.report(served)
+  }
+  const choice = completion.choices?.[0]
+  const message = choice?.message
+  // The whole completion as one chunk, so `toLoopEvents` assembles it exactly as a stream.
+  yield {
+    ...(completion.model ? { model: completion.model } : {}),
+    choices: [{
+      delta: {
+        content: message?.content ?? null,
+        reasoning_content: message?.reasoning_content ?? null,
+        tool_calls: (message?.tool_calls ?? []).map((call, index) => ({
+          index,
+          ...(call.id ? { id: call.id } : {}),
+          function: { name: call.function?.name ?? '', arguments: call.function?.arguments ?? '' },
+          ...(call.extra_content !== undefined ? { extra_content: call.extra_content } : {}),
+        })),
+      },
+      finish_reason: choice?.finish_reason ?? null,
+    }],
+    ...(completion.usage ? { usage: completion.usage } : {}),
+  }
+}
+
+async function httpFailure(res: Response, kind: 'stream' | 'completion'): Promise<Error> {
+  const text = res.body ? await res.text().catch(() => '') : ''
+  const error = new Error(`OpenAI-compat ${kind} failed (HTTP ${res.status})${text ? `: ${text.slice(0, 200)}` : ''}`)
+  // Stamp the NUMERIC status. `isUpstreamUnavailable` (`/model-resolution`)
+  // reads a numeric field first and prose only as a backstop, and a
+  // Cloudflare EDGE 502 gives it nothing else to read: `content-type:
+  // text/plain`, a body of `error code: 502`, and none of the router's own
+  // `x-tangle-*` headers, because the origin never ran. Carrying the status
+  // as data keeps THIS path — the browser/edge copilot lane, which calls the
+  // router directly — out of the string-matching business entirely.
+  Object.assign(error, { status: res.status })
+  return error
+}
+
+function servedFromHeader(res: Response, requestedModel: string): OpenAICompatServedModel | undefined {
+  const servedHeader = res.headers.get('x-tangle-served-model')
+  if (!servedHeader) return undefined
+  return {
+    requestedModel,
+    servedModel: servedHeader,
+    source: 'router_header',
+    substituted: normalizeModelId(servedHeader) !== normalizeModelId(requestedModel),
+    ...parseFailoverHeader(res.headers.get('x-tangle-failover')),
+  }
+}
+
+function servedFromBody(model: string, requestedModel: string): OpenAICompatServedModel {
+  return {
+    requestedModel,
+    servedModel: model,
+    source: 'response_body',
+    substituted: normalizeModelId(model) !== normalizeModelId(requestedModel),
+  }
+}
+
 /** Stream + parse an OpenAI-compat SSE response into chunks. Tolerates `data:`
  *  framing, multi-line buffers, and the terminal `[DONE]`. */
 async function* streamChatCompletions(
@@ -257,19 +372,7 @@ async function* streamChatCompletions(
     headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
     body: JSON.stringify(body),
   })
-  if (!res.ok || !res.body) {
-    const text = res.body ? await res.text().catch(() => '') : ''
-    const error = new Error(`OpenAI-compat stream failed (HTTP ${res.status})${text ? `: ${text.slice(0, 200)}` : ''}`)
-    // Stamp the NUMERIC status. `isUpstreamUnavailable` (`/model-resolution`)
-    // reads a numeric field first and prose only as a backstop, and a
-    // Cloudflare EDGE 502 gives it nothing else to read: `content-type:
-    // text/plain`, a body of `error code: 502`, and none of the router's own
-    // `x-tangle-*` headers, because the origin never ran. Carrying the status
-    // as data keeps THIS path — the browser/edge copilot lane, which calls the
-    // router directly — out of the string-matching business entirely.
-    Object.assign(error, { status: res.status })
-    throw error
-  }
+  if (!res.ok || !res.body) throw await httpFailure(res, 'stream')
   // Served-model attribution, fired at most once, as early as it is knowable.
   //
   // The header comes first because it is the router's OWN substitution signal:
@@ -292,16 +395,8 @@ async function* streamChatCompletions(
     attribution.report(served)
   }
   if (attribution) {
-    const servedHeader = res.headers.get('x-tangle-served-model')
-    if (servedHeader) {
-      report({
-        requestedModel: attribution.requestedModel,
-        servedModel: servedHeader,
-        source: 'router_header',
-        substituted: normalizeModelId(servedHeader) !== normalizeModelId(attribution.requestedModel),
-        ...parseFailoverHeader(res.headers.get('x-tangle-failover')),
-      })
-    }
+    const served = servedFromHeader(res, attribution.requestedModel)
+    if (served) report(served)
   }
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -327,14 +422,7 @@ async function* streamChatCompletions(
       // comparing — the router reports the dated upstream id (`gpt-5-2025-08-07`)
       // for a request of `openai/gpt-5` even with NO substitution, so a raw
       // `!==` would report a swap on literally every turn.
-      if (attribution && !reported && chunk.model) {
-        report({
-          requestedModel: attribution.requestedModel,
-          servedModel: chunk.model,
-          source: 'response_body',
-          substituted: normalizeModelId(chunk.model) !== normalizeModelId(attribution.requestedModel),
-        })
-      }
+      if (attribution && !reported && chunk.model) report(servedFromBody(chunk.model, attribution.requestedModel))
       yield chunk
     }
   }
