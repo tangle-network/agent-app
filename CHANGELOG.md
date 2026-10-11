@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.119
+
+- feat(model-picker): media models show a preview, a capability line and the price per output (#1050)
+
 ## 0.60.118
 
 - feat(signoff): workspace-surface fails a page that is not on the shared panel (#1051)
