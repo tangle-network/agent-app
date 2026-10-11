@@ -1,0 +1,119 @@
+import { describe, expect, it, vi } from 'vitest'
+import { composeRouterTurnPrompt, routerFunctionName, runRouterTurn, type RouterTurnEvent, type RouterTurnTool } from '../src/runtime/router-turn'
+
+/** One Router chat completion streamed as OpenAI server-sent events. */
+function sse(chunks: unknown[], headers: Record<string, string> = {}) {
+  const body = chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n'
+  return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream', ...headers } })
+}
+const text = (value: string) => ({ model: 'served/model', choices: [{ delta: { content: value } }] })
+const toolCall = (id: string, name: string, args: string) => ({ model: 'served/model',
+  choices: [{ delta: { tool_calls: [{ index: 0, id, function: { name, arguments: args } }] }, finish_reason: 'tool_calls' }] })
+
+function router(...responses: Array<Response | (() => Response)>) {
+  const requests: Array<{ headers: Headers; body: Record<string, unknown> }> = []
+  const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+    requests.push({ headers: new Headers(init?.headers), body: JSON.parse(String(init?.body)) })
+    const next = responses.shift()
+    if (!next) throw new Error('unexpected model call')
+    return typeof next === 'function' ? next() : next
+  })
+  return { fetchImpl: fetchImpl as unknown as typeof fetch, requests, calls: fetchImpl }
+}
+
+const createTask: RouterTurnTool = {
+  name: 'staff.task.create',
+  description: 'Create a task.',
+  inputSchema: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] },
+  run: vi.fn(async (args: Record<string, unknown>) => ({ taskId: 'task-1', title: args.title })),
+}
+
+describe('runRouterTurn', () => {
+  it('streams words, runs an app tool in-process, and returns the answer with the served model', async () => {
+    const { fetchImpl, requests } = router(
+      sse([toolCall('call-1', 'staff_task_create', '{"title":"Restock towels"}')]),
+      sse([text('Done: '), text('Restock towels is on the list.')]),
+    )
+    const events: RouterTurnEvent[] = []
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'requested/model', fetchImpl, traceId: 'trace-1',
+      systemPrompt: 'You are Pablo.', userMessage: 'Create a task to restock towels', tools: [createTask],
+      history: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'Hello!' }], onEvent: event => events.push(event) })
+
+    expect(outcome).toEqual({ text: 'Done: Restock towels is on the list.', servedModel: 'served/model',
+      toolCalls: [{ callId: 'call-1', toolName: 'staff.task.create', ok: true }] })
+    expect(createTask.run).toHaveBeenCalledWith({ title: 'Restock towels' })
+    expect(requests[0]!.headers.get('x-tangle-trace-id')).toBe('trace-1')
+    expect(requests[0]!.body).toMatchObject({ model: 'requested/model', stream: true,
+      tools: [{ type: 'function', function: { name: 'staff_task_create' } }] })
+    expect(requests[0]!.body.messages).toEqual([{ role: 'system', content: 'You are Pablo.' },
+      { role: 'user', content: 'hi' }, { role: 'assistant', content: 'Hello!' },
+      { role: 'user', content: 'Create a task to restock towels' }])
+    // The model reads its own call and the result back, keyed to the call.
+    expect(requests[1]!.body.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: 'tool', tool_call_id: 'call-1', content: '{"taskId":"task-1","title":"Restock towels"}' })]))
+    expect(events.map(event => event.type === 'text' ? `text:${event.delta}` : `tool:${event.status}`))
+      .toEqual(['tool:running', 'tool:completed', 'text:Done: ', 'text:Restock towels is on the list.'])
+  })
+
+  it('reports a domain refusal to the model and lets it answer', async () => {
+    const refused: RouterTurnTool = { ...createTask, run: async () => {
+      throw Object.assign(new Error('Only managers can create tasks'), { code: 'forbidden', status: 403 })
+    } }
+    const { fetchImpl, requests } = router(sse([toolCall('call-1', 'staff_task_create', '{"title":"x"}')]),
+      sse([text('Only a manager can create that task.')]))
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'u', tools: [refused] })
+    expect(outcome.failure).toBeUndefined()
+    expect(outcome.toolCalls).toEqual([{ callId: 'call-1', toolName: 'staff.task.create', ok: false }])
+    expect(requests[1]!.body.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: 'tool', content: 'Error (forbidden): Only managers can create tasks' })]))
+  })
+
+  it('hides an unexpected tool error from the model and hands it to the app', async () => {
+    const broken: RouterTurnTool = { ...createTask, run: async () => { throw new Error('D1 exploded: secret detail') } }
+    const onToolFailure = vi.fn()
+    const { fetchImpl, requests } = router(sse([toolCall('call-1', 'staff_task_create', '{}')]), sse([text('Sorry.')]))
+    await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'u', tools: [broken], onToolFailure })
+    expect(onToolFailure).toHaveBeenCalledWith('staff.task.create', expect.any(Error))
+    expect(JSON.stringify(requests[1]!.body.messages)).not.toContain('secret detail')
+  })
+
+  it('repeats one model call that failed before any word or tool, then returns a failure without throwing', async () => {
+    const down = () => new Response('upstream down', { status: 502 })
+    const twice = router(down, down)
+    await expect(runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: twice.fetchImpl, systemPrompt: 's', userMessage: 'u' }))
+      .resolves.toMatchObject({ failure: { code: 'model_http_502', status: 502 } })
+    expect(twice.calls).toHaveBeenCalledTimes(2)
+
+    const recovers = router(down, sse([text('Hello.')]))
+    await expect(runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: recovers.fetchImpl, systemPrompt: 's', userMessage: 'u' }))
+      .resolves.toEqual({ text: 'Hello.', servedModel: 'served/model', toolCalls: [] })
+  })
+
+  it('never repeats a turn after a tool ran', async () => {
+    const { fetchImpl, calls } = router(sse([toolCall('call-1', 'staff_task_create', '{"title":"x"}')]),
+      () => new Response('down', { status: 503 }))
+    const run = vi.fn(async () => ({ ok: true }))
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'u',
+      tools: [{ ...createTask, run }] })
+    expect(outcome.failure).toMatchObject({ code: 'model_http_503' })
+    expect(run).toHaveBeenCalledOnce()
+    expect(calls).toHaveBeenCalledTimes(2)
+  })
+
+  it('refuses to run without a credential', async () => {
+    const fetchImpl = vi.fn() as unknown as typeof fetch
+    await expect(runRouterTurn({ apiKey: '', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'u' }))
+      .resolves.toMatchObject({ failure: { code: 'router_unconfigured' } })
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+})
+
+describe('composeRouterTurnPrompt', () => {
+  it('joins the profile prompt, instructions and context, naming tools as the model calls them', () => {
+    expect(routerFunctionName('workspace.member.language.read')).toBe('workspace_member_language_read')
+    expect(composeRouterTurnPrompt(
+      { prompt: { systemPrompt: 'You are Pablo.', instructions: ['Use staff.task.create for tasks.', 'Use staff.tasks to read them.'] } },
+      { context: ['Current time: Sunday.'], toolNames: ['staff.tasks', 'staff.task.create'] },
+    )).toBe('You are Pablo.\n\nUse staff_task_create for tasks.\n\nUse staff_tasks to read them.\n\nCurrent time: Sunday.')
+  })
+})
