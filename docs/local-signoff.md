@@ -406,3 +406,24 @@ Nothing local replaces it. The step needs a real Cloudflare token and a real upl
 
 Local sign-off can replace CI as the **merge** gate for all three repos — legal-agent, tax-agent and agent-app — run as `--source head`, on the pinned Node, with `--ignore-scripts=false` on the install.
 For tax-agent it does not replace `wrangler versions upload`, which has to keep running somewhere with credentials; that check now runs post-merge, so a Worker that throws while initializing is caught after the merge rather than before it.
+
+## Shell alignment
+
+`agent-app-signoff shell-alignment` is the browser check for the shell header line. It drives Chromium (the optional `playwright` peer) over the routes you name, at 1440px and 390px, in light and dark. On each page it reads every visible bottom border of a wide row that starts at the pane top.
+
+```bash
+agent-app-signoff shell-alignment --base-url http://127.0.0.1:8787 \
+  --route /workspaces/w1/chat/s1 --route /workspaces/w1/overview \
+  --storage-state auth.json --theme-script theme.js --json alignment.json --screenshots alignment/
+```
+
+| Width | Rule | Fails when |
+| --- | --- | --- |
+| desktop | every main header divider's y equals the rail's first divider's y | the offset exceeds 0.5px |
+| phone | the phone bar and each row under it are one `--shell-header-height` tall | the offset exceeds 0.5px |
+| any | the route renders the shared shell | no rail divider or phone bar is found |
+
+The `--theme-script` file runs before the app loads with `theme` in scope, so it can use the app's own switch, for example `localStorage.setItem('theme', theme)`. Add the check as a sign-off step after the app's local server step, or run it against a preview. The judge (`judgeShellAlignment`) is a pure function. The geometry reader (`collectShellDividers`) skips inputs, cards and full-box surfaces, which draw a top border, and it skips dialogs and menus.
+
+Calibration, on 2026-10-10, against Hospitality `aed07b5` with ReCenter fixture data: see the PR that added this section for the before/after table.
+

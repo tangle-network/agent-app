@@ -4,7 +4,15 @@
 
 Source: `src/signoff/index.ts`
 
-25 exports.
+37 exports.
+
+### `checkShellAlignment`
+
+`function` — Drive Chromium over every route × width × theme and judge each page.
+
+```ts
+(options: ShellAlignmentOptions) => Promise<ShellAlignmentReport>
+```
 
 ### `checkWorkerDefaults`
 
@@ -12,6 +20,22 @@ Source: `src/signoff/index.ts`
 
 ```ts
 (repoRoot: string, configs?: readonly string[] | undefined) => WorkerDefaultsResult
+```
+
+### `collectShellDividers`
+
+`function` — Runs in the page (Playwright serializes it).
+
+```ts
+() => Omit<ShellDividerSample, "width" | "route" | "theme">
+```
+
+### `formatShellAlignmentReport`
+
+`function`
+
+```ts
+(report: ShellAlignmentReport) => string
 ```
 
 ### `formatSignoffReport`
@@ -28,6 +52,14 @@ Source: `src/signoff/index.ts`
 
 ```ts
 (result: WorkerDefaultsResult) => string
+```
+
+### `judgeShellAlignment`
+
+`function` — Desktop: every header divider lands on the rail's first divider.
+
+```ts
+(sample: ShellDividerSample, tolerancePx?: number) => ShellAlignmentFinding[]
 ```
 
 ### `LoadedSignoffConfig`
@@ -54,6 +86,22 @@ interface LoadedSignoffConfig
 interface LoadSignoffConfigOptions
 ```
 
+### `parseShellAlignmentArgs`
+
+`function`
+
+```ts
+(argv: readonly string[]) => ShellAlignmentOptions & { readonly jsonPath?: string | undefined; }
+```
+
+### `runShellAlignmentCli`
+
+`function`
+
+```ts
+(argv: readonly string[]) => Promise<number>
+```
+
 ### `runSignoff`
 
 `function`
@@ -68,6 +116,54 @@ interface LoadSignoffConfigOptions
 
 ```ts
 interface RunSignoffOptions
+```
+
+### `SHELL_ALIGNMENT_TOLERANCE_PX`
+
+`const`
+
+```ts
+0.5
+```
+
+### `ShellAlignmentFinding`
+
+`interface`
+
+```ts
+interface ShellAlignmentFinding
+```
+
+### `ShellAlignmentOptions`
+
+`interface`
+
+```ts
+interface ShellAlignmentOptions
+```
+
+### `ShellAlignmentReport`
+
+`interface`
+
+```ts
+interface ShellAlignmentReport
+```
+
+### `ShellDivider`
+
+`interface` — A horizontal divider: the bottom border of a top-anchored row.
+
+```ts
+interface ShellDivider
+```
+
+### `ShellDividerSample`
+
+`interface`
+
+```ts
+interface ShellDividerSample
 ```
 
 ### `SignoffAttempt`

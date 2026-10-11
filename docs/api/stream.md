@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-60 exports.
+67 exports.
 
 ### `asRecord`
 
@@ -190,6 +190,14 @@ number
 (parts: JsonRecord[], outcome: "expired" | "answered") => JsonRecord[]
 ```
 
+### `FOLLOW_UP_CLAIM_STALE_AFTER_MS`
+
+`const` — A plan follow-up claim's own staleness (`createD1PlanFollowUpGate`): it does not renew, and its gate re-admits it after this.
+
+```ts
+number
+```
+
 ### `getPartKey`
 
 `function` — Resolve a unique key string for a part based on its type and identifying properties
@@ -286,6 +294,14 @@ type JsonRecord
 (previous: TurnObservation, raw: unknown) => TurnObservationUpdate
 ```
 
+### `ORPHANED_TURN_CODE`
+
+`const` — The failure code carried by the terminal event of a settled orphan.
+
+```ts
+"turn.orphaned"
+```
+
 ### `parseTurnObservation`
 
 `function`
@@ -364,6 +380,46 @@ interface ResolvedChatTurn
 
 ```ts
 (part: JsonRecord) => string
+```
+
+### `SettledOrphanedTurn`
+
+`interface`
+
+```ts
+interface SettledOrphanedTurn
+```
+
+### `settleOrphanedTurns`
+
+`function` — End every running turn stream nothing has renewed past its lease.
+
+```ts
+(options: SettleOrphanedTurnsOptions) => Promise<SettleOrphanedTurnsResult>
+```
+
+### `SettleOrphanedTurnsOptions`
+
+`interface`
+
+```ts
+interface SettleOrphanedTurnsOptions
+```
+
+### `SettleOrphanedTurnsResult`
+
+`interface`
+
+```ts
+interface SettleOrphanedTurnsResult
+```
+
+### `StaleRunningTurn`
+
+`interface` — A running turn nothing has renewed since `updatedAt`.
+
+```ts
+interface StaleRunningTurn
 ```
 
 ### `stampReplaySeq`

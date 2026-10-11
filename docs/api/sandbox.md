@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-206 exports.
+229 exports.
 
 ### `adaptSandboxStream`
 
@@ -12,6 +12,14 @@ Source: `src/sandbox/index.ts`
 
 ```ts
 (events: AsyncIterable<unknown>) => AsyncGenerator<SandboxStreamEvent, any, any>
+```
+
+### `addColdArrival`
+
+`function` — Record one cold arrival at `at`.
+
+```ts
+(slots: readonly number[], slotsAt: number, at: number) => number[]
 ```
 
 ### `applyPromptTokenLimits`
@@ -166,6 +174,14 @@ interface BuildSandboxToolFileMountsOptions
 (db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => FencedPrewarmClaimStore
 ```
 
+### `createD1WarmLeaseStore`
+
+`function`
+
+```ts
+(db: WarmLeaseD1Like, options?: { table?: string | undefined; }) => WarmLeaseStore
+```
+
 ### `createSandboxPrewarmer`
 
 `function`
@@ -180,6 +196,14 @@ interface BuildSandboxToolFileMountsOptions
 
 ```ts
 <TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…
+```
+
+### `createWarmLeases`
+
+`function`
+
+```ts
+(options: WarmLeasesOptions) => WarmLeases
 ```
 
 ### `createWorkspacePrewarmRoute`
@@ -222,6 +246,14 @@ interface CreateWorkspacePrewarmRouteOptions
 interface D1PrewarmClaimStoreOptions
 ```
 
+### `decaySlots`
+
+`function` — Decay every slot to `at` with a 14-day half-life.
+
+```ts
+(slots: readonly number[], from: number, at: number) => number[]
+```
+
 ### `DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS`
 
 `const`
@@ -260,6 +292,14 @@ interface D1PrewarmClaimStoreOptions
 
 ```ts
 SandboxResourceConfig
+```
+
+### `DEFAULT_WARM_LEASE_TABLE`
+
+`const` — `createD1WarmLeaseStore`: the `WarmLeaseStore` every Workers product uses, one row per key in one table.
+
+```ts
+"sandbox_warm_lease"
 ```
 
 ### `deferredCorpusHash`
@@ -620,6 +660,14 @@ type Outcome
 
 ```ts
 type PeekWorkspaceSandboxOutcome
+```
+
+### `predictColdArrival`
+
+`function` — Chance of at least one cold arrival in `[at, at + windowMs)`.
+
+```ts
+(row: Pick<WarmLeaseRow, "slots" | "slotsAt" | "firstSeenAt">, at: number, windowMs: number) => number
 ```
 
 ### `preferredWorkspaceSandboxRecoveryBoxKey`
@@ -1396,6 +1444,142 @@ interface StreamSandboxPromptOptions
 
 ```ts
 interface TerminalConnectionBoxLike
+```
+
+### `utcDay`
+
+`function`
+
+```ts
+(at: number) => string
+```
+
+### `WARM_LEASE_TABLE_DDL`
+
+`const` — Paste into a migration.
+
+```ts
+"CREATE TABLE IF NOT EXISTS sandbox_warm_lease (\n key TEXT PRIMARY KEY,\n lease_id TEXT,\n reason TEXT,\n started_at I…
+```
+
+### `WARM_SLOTS`
+
+`const` — 144 ten-minute bins of the UTC day, then 7 weekday counts (Monday first).
+
+```ts
+151
+```
+
+### `warmBinOf`
+
+`function` — UTC ten-minute bin of the day, 0..143.
+
+```ts
+(at: number) => number
+```
+
+### `WarmBoxOutcome`
+
+`type` — What the product's `warm` did to the box.
+
+```ts
+type WarmBoxOutcome
+```
+
+### `WarmLeaseD1Like`
+
+`interface` — The D1 surface this store uses: `prepare().bind()` with `first`, `run` and `all`.
+
+```ts
+interface WarmLeaseD1Like
+```
+
+### `WarmLeaseEvent`
+
+`type`
+
+```ts
+type WarmLeaseEvent
+```
+
+### `WarmLeaseRow`
+
+`interface` — One key's row.
+
+```ts
+interface WarmLeaseRow
+```
+
+### `WarmLeases`
+
+`interface`
+
+```ts
+interface WarmLeases
+```
+
+### `WarmLeasesOptions`
+
+`interface`
+
+```ts
+interface WarmLeasesOptions
+```
+
+### `WarmLeaseStore`
+
+`interface` — Persistence for leases.
+
+```ts
+interface WarmLeaseStore
+```
+
+### `WarmReason`
+
+`type` — Why a warm was requested.
+
+```ts
+type WarmReason
+```
+
+### `WarmSignalOutcome`
+
+`type`
+
+```ts
+type WarmSignalOutcome
+```
+
+### `WarmSignalResult`
+
+`interface`
+
+```ts
+interface WarmSignalResult
+```
+
+### `WarmSweepReport`
+
+`interface`
+
+```ts
+interface WarmSweepReport
+```
+
+### `WarmTurnResult`
+
+`interface`
+
+```ts
+interface WarmTurnResult
+```
+
+### `warmWeekdayOf`
+
+`function` — UTC weekday, Monday = 0.
+
+```ts
+(at: number) => number
 ```
 
 ### `WORKSPACE_SANDBOX_HOST_EXHAUSTED`
