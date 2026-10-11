@@ -172,6 +172,8 @@ export interface OpenAICompatStreamTurnOptions {
   fetchImpl?: typeof fetch
   /** Extra body fields (e.g. `max_tokens`). */
   extraBody?: Record<string, unknown>
+  /** Extra request headers, e.g. a trace id the router records with the generation. */
+  headers?: Record<string, string>
   /**
    * Called at most ONCE per turn, as soon as the serving model is
    * determinable, with what actually answered. Never called when neither the
@@ -208,7 +210,7 @@ export function createOpenAICompatStreamTurn(
         ...(opts.tools && opts.tools.length > 0 ? { tools: opts.tools } : {}),
         ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
         ...opts.extraBody,
-      }, opts.onServedModel ? { requestedModel: opts.model, report: opts.onServedModel } : undefined),
+      }, opts.onServedModel ? { requestedModel: opts.model, report: opts.onServedModel } : undefined, opts.headers),
     )
 }
 
@@ -220,10 +222,11 @@ async function* streamChatCompletions(
   apiKey: string,
   body: Record<string, unknown>,
   attribution?: { requestedModel: string; report: (served: OpenAICompatServedModel) => void },
+  headers?: Record<string, string>,
 ): AsyncIterable<OpenAIStreamChunk> {
   const res = await doFetch(url, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+    headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
     body: JSON.stringify(body),
   })
   if (!res.ok || !res.body) {
