@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.100
+
+- feat(chat-routes): createRouterTurnProducer; runRouterTurn reports usage and accepts tool history (#1020)
+
 ## 0.60.99
 
 - feat(harness): select an app's harness from configuration (#1016)
