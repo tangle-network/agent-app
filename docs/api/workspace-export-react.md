@@ -11,7 +11,7 @@ Source: `src/workspace-export/react.tsx`
 `function`
 
 ```ts
-({ endpoint, canExport, title, className, fetcher }: WorkspaceExportPanelProps) => Element | null
+({ endpoint, canExport, title, className, fetcher, continuesInBackground }: WorkspaceExportPanelProps) => Element | null
 ```
 
 ### `WorkspaceExportPanelProps`
