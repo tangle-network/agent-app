@@ -548,7 +548,14 @@ export function createExportEngine(options: ExportEngineOptions) {
             batch.map(async ({ unit, index }) => {
               const source = sources.get(unit.name)
               try {
-                if (!source || source.kind !== unit.kind) throw new Error('source is no longer available')
+                if (!source || source.kind !== unit.kind) {
+                  // Removed while the export ran (a deleted sandbox, a dropped table):
+                  // nothing is left to export, so record why instead of failing the export.
+                  unit.status = 'empty'
+                  unit.entries = []
+                  unit.error = 'removed from the workspace while the export ran'
+                  return false
+                }
                 await runUnit(job, unit, index, source, scanner, deadline)
                 unit.error = undefined
                 return false

@@ -92,7 +92,7 @@ _124 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
 | [`./sequences/drizzle`](api/sequences-drizzle.md) | 13 | `tools`, `web` |
 | [`./session-shell`](api/session-shell.md) | 58 | — |
-| [`./signoff`](api/signoff.md) | 37 | — |
+| [`./signoff`](api/signoff.md) | 62 | — |
 | [`./signoff/cli`](api/signoff-cli.md) | 2 | — |
 | [`./signoff/proof`](api/signoff-proof.md) | 22 | — |
 | [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | — |
@@ -927,9 +927,9 @@ Source: `src/session-shell/index.ts` · 58 exports
 
 ## `./signoff`
 
-Source: `src/signoff/index.ts` · 37 exports
+Source: `src/signoff/index.ts` · 62 exports
 
-`checkShellAlignment`, `checkWorkerDefaults`, `collectShellDividers`, `formatShellAlignmentReport`, `formatSignoffReport`, `formatWorkerDefaults`, `judgeShellAlignment`, `LoadedSignoffConfig`, `loadSignoffConfig`, `LoadSignoffConfigOptions`, `parseShellAlignmentArgs`, `runShellAlignmentCli`, `runSignoff`, `RunSignoffOptions`, `SHELL_ALIGNMENT_TOLERANCE_PX`, `ShellAlignmentFinding`, `ShellAlignmentOptions`, `ShellAlignmentReport`, `ShellDivider`, `ShellDividerSample`, `SignoffAttempt`, `SignoffConfig`, `SignoffConfigOrigin`, `SignoffEvent`, `SignoffHostFacts`, `SignoffInstallResult`, `SignoffInstallSpec`, `SignoffRepoFacts`, `SignoffReport`, `SignoffShuffleSpec`, `SignoffSource`, `SignoffStepResult`, `SignoffStepSpec`, `SignoffStepStatus`, `WORKER_COMPATIBILITY_DATE_FLOOR`, `WorkerDefaultsFinding`, `WorkerDefaultsResult`
+`checkShellAlignment`, `checkSurfaceLadder`, `checkWorkerDefaults`, `collectShellDividers`, `collectSurfaceLadder`, `composite`, `contrastRatio`, `CopyBlock`, `formatShellAlignmentReport`, `formatSignoffReport`, `formatSurfaceLadderReport`, `formatWorkerDefaults`, `judgeShellAlignment`, `judgeSurfaceLadder`, `LoadedSignoffConfig`, `loadSignoffConfig`, `LoadSignoffConfigOptions`, `oklchL`, `parseShellAlignmentArgs`, `parseSurfaceLadderArgs`, `Rgb`, `Rgba`, `runShellAlignmentCli`, `runSignoff`, `RunSignoffOptions`, `runSurfaceLadderCli`, `SHELL_ALIGNMENT_TOLERANCE_PX`, `ShellAlignmentFinding`, `ShellAlignmentOptions`, `ShellAlignmentReport`, `ShellDivider`, `ShellDividerSample`, `SignoffAttempt`, `SignoffConfig`, `SignoffConfigOrigin`, `SignoffEvent`, `SignoffHostFacts`, `SignoffInstallResult`, `SignoffInstallSpec`, `SignoffRepoFacts`, `SignoffReport`, `SignoffShuffleSpec`, `SignoffSource`, `SignoffStepResult`, `SignoffStepSpec`, `SignoffStepStatus`, `summarizeSurfacePage`, `SURFACE_LADDER_MAX_WORDS`, `SURFACE_LADDER_MIN_BORDER_CONTRAST`, `SURFACE_LADDER_MIN_DELTA_L`, `SurfaceBox`, `surfaceDeltaL`, `SurfaceFinding`, `SurfaceLadderLimits`, `SurfaceLadderOptions`, `SurfaceLadderReport`, `SurfacePageSummary`, `SurfaceRule`, `SurfaceSample`, `WORKER_COMPATIBILITY_DATE_FLOOR`, `WorkerDefaultsFinding`, `WorkerDefaultsResult`
 
 [Full API →](api/signoff.md)
 
