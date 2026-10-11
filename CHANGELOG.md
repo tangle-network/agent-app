@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.75
+
+- docs(lessons): one shared operator key, one request budget (dotfiles #331) (#987)
+
 ## 0.60.74
 
 - docs(lessons): the delivery, coordination-host, pasted-code and prompt-text checks are merged (#986)
