@@ -27,6 +27,8 @@ import {
   type ReactNode,
 } from 'react'
 import { Download, FileText, Folder, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Card, Input } from '@tangle-network/ui/primitives'
+import { ixControl, ixControlSoft, ixRow } from '@tangle-network/ui/utils'
 import { ConfirmDialog } from './ConfirmDialog'
 import { readRecentFiles, recordRecentFile } from './recent-files'
 import { filterFileNodes, VaultTree } from '@tangle-network/sandbox-ui/vault-tree'
@@ -151,7 +153,7 @@ class EditorErrorBoundary extends Component<{ children: ReactNode; label: string
           <button
             type="button"
             onClick={() => { this.setState({ error: null }); this.props.onReset?.() }}
-            className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+            className={`inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-[border-color,box-shadow] ${ixControl}`}
           >
             Try again
           </button>
@@ -218,7 +220,7 @@ function ReadErrorState({ message, onRetry }: { message: string; onRetry: () => 
       <button
         type="button"
         onClick={onRetry}
-        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+        className={`inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-[border-color,box-shadow] ${ixControl}`}
       >
         Retry
       </button>
@@ -236,7 +238,7 @@ function TreeErrorState({ label, message, onRetry }: { label: string; message: s
       <button
         type="button"
         onClick={onRetry}
-        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+        className={`inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-[border-color,box-shadow] ${ixControl}`}
       >
         Retry
       </button>
@@ -262,7 +264,7 @@ function TreeEmptyState({ canCreate, onCreate }: { canCreate: boolean; onCreate:
         <button
           type="button"
           onClick={onCreate}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className={`inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 ${ixControl}`}
         >
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
           New file
@@ -279,7 +281,7 @@ function TreeNoMatchState({ query, onClear }: { query: string; onClear: () => vo
       <button
         type="button"
         onClick={onClear}
-        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+        className={`inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-[border-color,box-shadow] ${ixControl}`}
       >
         Clear search
       </button>
@@ -345,7 +347,7 @@ function DocumentEmptyState({ label, recent, onOpen }: { label: string; recent: 
                       type="button"
                       onClick={() => onOpen(path)}
                       title={path}
-                      className="flex min-h-10 w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      className={`flex min-h-10 w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${ixRow}`}
                     >
                       <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                       <span className="min-w-0 truncate font-medium">{path.slice(slash + 1)}</span>
@@ -976,7 +978,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                   }
                 })
               }}
-              className={`shrink-0 rounded-md px-3 py-2 text-sm ${showFiles ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+              className={`shrink-0 rounded-md px-3 py-2 text-sm ${showFiles ? 'bg-muted font-medium text-foreground' : `text-muted-foreground ${ixControlSoft}`}`}
             >
               Files
             </button>
@@ -986,7 +988,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                 aria-pressed={!showFiles}
                 onClick={showDocument}
                 title={selectedPath}
-                className={`min-w-0 truncate rounded-md px-3 py-2 text-sm ${!showFiles ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+                className={`min-w-0 truncate rounded-md px-3 py-2 text-sm ${!showFiles ? 'bg-muted font-medium text-foreground' : `text-muted-foreground ${ixControlSoft}`}`}
               >
                 {selectedPath.split('/').pop()}
               </button>
@@ -998,10 +1000,11 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               {/* The tree is its own surface: a card on the page background,
                   so the file list reads as a finished panel rather than
                   text floating on the canvas. */}
-              <section
+              <Card
+                role="region"
                 aria-labelledby={treeHeadingId}
                 data-vault-tree-surface
-                className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-raised"
+                className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl"
               >
                 <div className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-3">
                   <h2 id={treeHeadingId} className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
@@ -1014,7 +1017,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                       aria-label={`Refresh ${noun}`}
                       title="Refresh"
                       onClick={() => void refresh()}
-                      className={`${TREE_ICON_BUTTON} text-muted-foreground hover:bg-muted hover:text-foreground`}
+                      className={`${TREE_ICON_BUTTON} text-muted-foreground hover:text-foreground ${ixControlSoft}`}
                     >
                       <RefreshCw className="size-4" aria-hidden="true" />
                     </button>
@@ -1024,7 +1027,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                         title="New file"
                         aria-label={activeFolder ? `New file in ${activeFolder}` : 'New file'}
                         onClick={openCreate}
-                        className={`${TREE_ICON_BUTTON} bg-primary text-primary-foreground hover:bg-primary/90`}
+                        className={`${TREE_ICON_BUTTON} bg-primary text-primary-foreground hover:bg-primary/90 ${ixControl}`}
                       >
                         <Plus className="size-4" aria-hidden="true" />
                       </button>
@@ -1032,15 +1035,18 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                   </div>
                 </div>
                 <div className="shrink-0 px-3 pb-2">
-                  <input
+                  {/* ui's Input: the card's well and the 3:1 field border, never a
+                      hand-painted fill the colour of the card. */}
+                  <Input
                     ref={searchRef}
                     type="search"
+                    size="sm"
                     disabled={vaultEmpty}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={activeFolder ? `Search ${activeFolder}…` : `Search ${noun}…`}
                     aria-label={`Search ${noun}`}
-                    className="h-8 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:text-base"
+                    className="text-sm pointer-coarse:h-10"
                   />
                 </div>
                 {activeFolder && (
@@ -1062,7 +1068,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                 <div className="min-h-0 flex-1 overflow-y-auto border-t border-border px-1.5 py-1.5">
                   {treeContent}
                 </div>
-              </section>
+              </Card>
             </div>
 
             <div
@@ -1086,7 +1092,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                           className={`inline-flex h-7 items-center rounded px-2 text-xs transition-colors ${
                             editorMode === 'rich'
                               ? 'bg-primary text-primary-foreground'
-                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                              : `text-muted-foreground hover:text-foreground ${ixControlSoft}`
                           }`}
                         >
                           Rich
@@ -1099,7 +1105,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                           className={`inline-flex h-7 items-center rounded px-2 text-xs transition-colors ${
                             editorMode === 'source'
                               ? 'bg-primary text-primary-foreground'
-                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                              : `text-muted-foreground hover:text-foreground ${ixControlSoft}`
                           }`}
                         >
                           Source
@@ -1117,7 +1123,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                         className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs transition-colors disabled:pointer-events-none disabled:opacity-40 ${
                           dockOpen
                             ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                            : `text-muted-foreground hover:text-foreground ${ixControlSoft}`
                         }`}
                       >
                         {dockButtonLabel}
@@ -1130,7 +1136,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                         aria-label="Download this file"
                         title="Download file"
                         onClick={() => onDownloadFile(selectedFile)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground ${ixControlSoft}`}
                       >
                         <Download className="h-4 w-4" />
                       </button>
@@ -1288,7 +1294,7 @@ function SourceEditor({
             type="button"
             onClick={onSave}
             disabled={saving || !dirty}
-            className="inline-flex h-7 items-center rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+            className={`inline-flex h-7 items-center rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 ${ixControl}`}
           >
             {saving ? 'Saving…' : 'Save'}
           </button>

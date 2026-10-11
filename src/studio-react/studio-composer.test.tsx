@@ -16,6 +16,7 @@ import type {
   MediaModelOption,
   ModelOptionsMetadata,
 } from '../studio'
+import { focusFieldWithin } from '@tangle-network/ui/utils'
 import { StudioComposer } from './studio-composer'
 
 function model(id: string, type: GenerationType, extra: Partial<MediaModelOption> = {}): MediaModelOption {
@@ -112,6 +113,15 @@ afterEach(() => {
   cleanup()
   window.localStorage.clear()
   vi.unstubAllGlobals()
+})
+
+describe('StudioComposer — surface', () => {
+  it('is a field on the surface ladder: the well, the field border and the ring-hue hover', () => {
+    mountWith(catalog({}))
+    const card = screen.getByLabelText('Prompt').closest('section') as HTMLElement
+    expect(card.className).toContain(focusFieldWithin)
+    expect(card.className).not.toContain('bg-surface-container-high')
+  })
 })
 
 describe('StudioComposer — send tone', () => {

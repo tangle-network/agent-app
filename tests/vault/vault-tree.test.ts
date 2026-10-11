@@ -74,6 +74,13 @@ describe('VaultPane — built-in tree', () => {
     const first = render(createElement(VaultPane, { port: port(), renderArtifact, treeStateKey: 'u:w', label: 'Vault' }))
     const surface = await screen.findByRole('region', { name: 'Vault' })
     expect(surface.hasAttribute('data-vault-tree-surface')).toBe(true)
+    // A Card on the surface ladder: the search inside takes the card's well and
+    // the 3:1 field border (ui's Input), never a fill the colour of the card.
+    expect(surface.getAttribute('data-slot')).toBe('card')
+    const search = screen.getByLabelText('Search vault')
+    expect(search.className).toContain('border-[var(--field-border)]')
+    expect(search.className).toContain('bg-[var(--field-surface,var(--well))]')
+    expect(search.className).not.toContain('bg-input')
     await waitFor(() => expect(row('playbooks')).toBeTruthy())
     expect(queryRow('launch.md')).toBeNull()
     fireEvent.click(row('playbooks'))

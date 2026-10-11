@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { focusFieldWithin } from '@tangle-network/ui/utils'
 import {
   AudioLines,
   ArrowUp,
@@ -540,7 +541,10 @@ export function StudioComposer({
   return (
     <section
       data-variant={variant}
-      className={`studio-composer-card @container/studio-composer rounded-2xl border border-border bg-surface-container-high p-2.5 shadow-sm transition focus-within:border-primary/60 ${className ?? ''}`}
+      // The card is the field (ui's `focusFieldWithin`): the well of whatever it
+      // sits on, the 3:1 field border, the ring-hue hover and the focus ring while
+      // the prompt has the caret. The textarea inside stays transparent.
+      className={`studio-composer-card @container/studio-composer rounded-2xl border p-2.5 ${focusFieldWithin} ${className ?? ''}`}
     >
       <textarea
         value={prompt}
