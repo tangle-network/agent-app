@@ -13,7 +13,8 @@ const ALLOWED_PACKAGES = new Set(['@tangle-network/agent-runtime/tool-loop'])
 
 function imports(file: string): string[] {
   const source = readFileSync(new URL(`../src/runtime/${file}`, import.meta.url), 'utf8')
-  return [...source.matchAll(/^\s*(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]/gm)].map(match => match[1]!)
+  // `from 'x'` (static import/export), bare `import 'x'`, and dynamic `import('x')`.
+  return [...source.matchAll(/(?:\bfrom\s+|^\s*import\s+|\bimport\s*\(\s*)['"]([^'"]+)['"]/gm)].map(match => match[1]!)
 }
 
 describe('./router-turn entry', () => {
