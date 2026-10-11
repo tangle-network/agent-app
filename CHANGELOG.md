@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.80
+
+- fix(app-auth): never share a session read in flight across requests (#993)
+
 ## 0.60.79
 
 - perf(workspace-export): read consecutive sandbox archives concurrently (#992)
