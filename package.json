@@ -142,6 +142,11 @@
       "import": "./dist/agent-profiles/index.js",
       "default": "./dist/agent-profiles/index.js"
     },
+    "./agent-profiles/switch": {
+      "types": "./dist/agent-profiles/switch.d.ts",
+      "import": "./dist/agent-profiles/switch.js",
+      "default": "./dist/agent-profiles/switch.js"
+    },
     "./agent-profiles/d1": {
       "types": "./dist/agent-profiles/d1.d.ts",
       "import": "./dist/agent-profiles/d1.js",
