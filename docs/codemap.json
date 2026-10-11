@@ -9930,13 +9930,19 @@
         {
           "name": "recordInvariant",
           "kind": "function",
-          "signature": "(verdict: InvariantVerdict) => InvariantVerdict",
+          "signature": "(verdict: InvariantVerdict, options?: RecordInvariantOptions) => InvariantVerdict",
           "doc": "Record a verdict for the conformance report and fail the caller when it did not pass."
+        },
+        {
+          "name": "RecordInvariantOptions",
+          "kind": "interface",
+          "signature": "interface RecordInvariantOptions",
+          "doc": null
         },
         {
           "name": "recordInvariants",
           "kind": "function",
-          "signature": "(verdicts: readonly InvariantVerdict[]) => InvariantVerdict[]",
+          "signature": "(verdicts: readonly InvariantVerdict[], options?: RecordInvariantOptions) => InvariantVerdict[]",
           "doc": "Record several verdicts; fails after recording all of them."
         },
         {
@@ -17638,10 +17644,28 @@
       "error": null,
       "exports": [
         {
+          "name": "checkShellAlignment",
+          "kind": "function",
+          "signature": "(options: ShellAlignmentOptions) => Promise<ShellAlignmentReport>",
+          "doc": "Drive Chromium over every route × width × theme and judge each page."
+        },
+        {
           "name": "checkWorkerDefaults",
           "kind": "function",
           "signature": "(repoRoot: string, configs?: readonly string[] | undefined) => WorkerDefaultsResult",
           "doc": "Check each Worker config, and every environment it deploys, against the defaults."
+        },
+        {
+          "name": "collectShellDividers",
+          "kind": "function",
+          "signature": "() => Omit<ShellDividerSample, \"width\" | \"route\" | \"theme\">",
+          "doc": "Runs in the page (Playwright serializes it)."
+        },
+        {
+          "name": "formatShellAlignmentReport",
+          "kind": "function",
+          "signature": "(report: ShellAlignmentReport) => string",
+          "doc": null
         },
         {
           "name": "formatSignoffReport",
@@ -17654,6 +17678,12 @@
           "kind": "function",
           "signature": "(result: WorkerDefaultsResult) => string",
           "doc": null
+        },
+        {
+          "name": "judgeShellAlignment",
+          "kind": "function",
+          "signature": "(sample: ShellDividerSample, tolerancePx?: number) => ShellAlignmentFinding[]",
+          "doc": "Desktop: every header divider lands on the rail's first divider."
         },
         {
           "name": "LoadedSignoffConfig",
@@ -17674,6 +17704,18 @@
           "doc": null
         },
         {
+          "name": "parseShellAlignmentArgs",
+          "kind": "function",
+          "signature": "(argv: readonly string[]) => ShellAlignmentOptions & { readonly jsonPath?: string | undefined; }",
+          "doc": null
+        },
+        {
+          "name": "runShellAlignmentCli",
+          "kind": "function",
+          "signature": "(argv: readonly string[]) => Promise<number>",
+          "doc": null
+        },
+        {
           "name": "runSignoff",
           "kind": "function",
           "signature": "(options?: RunSignoffOptions) => Promise<SignoffReport>",
@@ -17684,6 +17726,42 @@
           "kind": "interface",
           "signature": "interface RunSignoffOptions",
           "doc": "The sign-off run: reproduce a clean CI environment, then go further."
+        },
+        {
+          "name": "SHELL_ALIGNMENT_TOLERANCE_PX",
+          "kind": "const",
+          "signature": "0.5",
+          "doc": null
+        },
+        {
+          "name": "ShellAlignmentFinding",
+          "kind": "interface",
+          "signature": "interface ShellAlignmentFinding",
+          "doc": null
+        },
+        {
+          "name": "ShellAlignmentOptions",
+          "kind": "interface",
+          "signature": "interface ShellAlignmentOptions",
+          "doc": null
+        },
+        {
+          "name": "ShellAlignmentReport",
+          "kind": "interface",
+          "signature": "interface ShellAlignmentReport",
+          "doc": null
+        },
+        {
+          "name": "ShellDivider",
+          "kind": "interface",
+          "signature": "interface ShellDivider",
+          "doc": "A horizontal divider: the bottom border of a top-anchored row."
+        },
+        {
+          "name": "ShellDividerSample",
+          "kind": "interface",
+          "signature": "interface ShellDividerSample",
+          "doc": null
         },
         {
           "name": "SignoffAttempt",
@@ -23658,6 +23736,18 @@
           "doc": "Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s)."
         },
         {
+          "name": "lazyRoute",
+          "kind": "function",
+          "signature": "<P extends object>(load: () => Promise<ComponentType<P>>) => LazyRoute<P>",
+          "doc": null
+        },
+        {
+          "name": "LazyRoute",
+          "kind": "type",
+          "signature": "type LazyRoute",
+          "doc": "A lazily loaded route that renders synchronously once its module has loaded."
+        },
+        {
           "name": "LinkLikeComponent",
           "kind": "type",
           "signature": "type LinkLikeComponent",
@@ -23890,6 +23980,12 @@
           "kind": "interface",
           "signature": "interface PopoverSurfaceProps",
           "doc": null
+        },
+        {
+          "name": "preloadWhenIdle",
+          "kind": "function",
+          "signature": "(routes: readonly { preload: () => Promise<void>; }[], timeoutMs?: number) => () => void",
+          "doc": "Load routes while the browser is idle (at most `timeoutMs` later), so a first visit waits only on its data."
         },
         {
           "name": "ProducerErrorEvent",

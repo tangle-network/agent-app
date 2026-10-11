@@ -4,7 +4,7 @@
 
 Source: `src/launch-invariants/testing.ts`
 
-34 exports.
+35 exports.
 
 ### `AuthorizeBeforeStreamOptions`
 
@@ -235,7 +235,15 @@ interface LimitAlarmCheckOptions
 `function` — Record a verdict for the conformance report and fail the caller when it did not pass.
 
 ```ts
-(verdict: InvariantVerdict) => InvariantVerdict
+(verdict: InvariantVerdict, options?: RecordInvariantOptions) => InvariantVerdict
+```
+
+### `RecordInvariantOptions`
+
+`interface`
+
+```ts
+interface RecordInvariantOptions
 ```
 
 ### `recordInvariants`
@@ -243,7 +251,7 @@ interface LimitAlarmCheckOptions
 `function` — Record several verdicts; fails after recording all of them.
 
 ```ts
-(verdicts: readonly InvariantVerdict[]) => InvariantVerdict[]
+(verdicts: readonly InvariantVerdict[], options?: RecordInvariantOptions) => InvariantVerdict[]
 ```
 
 ### `ScheduledJobBudgetOptions`

@@ -59,6 +59,16 @@ The runtime pieces are server-safe. The checks are in `@tangle-network/agent-app
 
 An invariant passes when at least one verdict was recorded for it and every recorded verdict passed. The CLI reads the wrangler configs itself: the cron check must have read every cron any environment configures, so a test cannot pass on a stale list.
 
+An app adopts the kit before every invariant holds. Mark a check that fails today with why it fails, who owns the fix and the next check:
+
+```ts
+recordInvariant(checkSettlementScenarios(records, { now }), {
+  knownFailing: 'runtime-restart, aborted-tool and Stop scenarios settle in the completion Workflow, not driven yet (L4, turn-lifecycle slice 3)',
+})
+```
+
+The report counts a known failure as not holding (`7 of 8 hold, 1 known failing`) and exits 0, so the app's releases continue. A known-failing check that starts passing fails its test until the marker is removed, so a fixed invariant cannot regress silently.
+
 Not applicable is accepted only where the deployment shows it:
 
 | Invariant | Accepted when |

@@ -33,7 +33,7 @@ export interface DeploymentFacts {
   hasD1: boolean
 }
 
-export type InvariantStatus = 'pass' | 'fail' | 'not-applicable'
+export type InvariantStatus = 'pass' | 'fail' | 'known-fail' | 'not-applicable'
 
 export interface InvariantReport {
   id: LaunchInvariantId
@@ -50,6 +50,8 @@ export interface ConformanceReport {
   passed: number
   total: number
   testExitCode: number | null
+  /** Invariants failing with a known-failing marker: not holding, but not failing the run. */
+  knownFailing: number
   invariants: InvariantReport[]
   facts: DeploymentFacts
 }
@@ -115,6 +117,17 @@ export function buildConformanceReport(input: {
       return { id: invariant.id, title: invariant.title, status: 'fail', lines: [`no check recorded a verdict; ${invariant.rule}`], verdicts: 0 }
     }
     const failed = verdicts.filter((verdict) => !verdict.pass)
+    const unknown = failed.filter((verdict) => !verdict.knownFailing)
+    if (failed.length > 0 && unknown.length === 0) {
+      const reasons = [...new Set(failed.map((verdict) => verdict.knownFailing!))]
+      return {
+        id: invariant.id,
+        title: invariant.title,
+        status: 'known-fail',
+        lines: [...reasons.map((reason) => `known failing: ${reason}`), ...failed.flatMap((verdict) => verdict.details.map((detail) => `${verdict.subject}: ${detail}`))],
+        verdicts: verdicts.length,
+      }
+    }
     const lines = failed.length
       ? failed.flatMap((verdict) => verdict.details.map((detail) => `${verdict.subject}: ${detail}`))
       : verdicts.map((verdict) => `${verdict.subject}: ${verdict.details[0] ?? 'passed'}`)
@@ -133,13 +146,15 @@ export function buildConformanceReport(input: {
     }
     return { id: invariant.id, title: invariant.title, status: failed.length ? 'fail' : 'pass', lines, verdicts: verdicts.length }
   })
-  const passed = invariants.filter((invariant) => invariant.status !== 'fail').length
+  const passed = invariants.filter((invariant) => invariant.status === 'pass' || invariant.status === 'not-applicable').length
+  const knownFailing = invariants.filter((invariant) => invariant.status === 'known-fail').length
   return {
     product: config.product,
-    pass: passed === invariants.length && input.testExitCode === 0,
+    pass: passed + knownFailing === invariants.length && input.testExitCode === 0,
     passed,
     total: invariants.length,
     testExitCode: input.testExitCode,
+    knownFailing,
     invariants,
     facts,
   }
@@ -147,15 +162,17 @@ export function buildConformanceReport(input: {
 
 /** The report as the CLI prints it. */
 export function formatConformanceReport(report: ConformanceReport): string {
-  const mark: Record<InvariantStatus, string> = { pass: 'PASS', fail: 'FAIL', 'not-applicable': 'N/A ' }
-  const lines = [`launch invariants — ${report.product}: ${report.passed} of ${report.total} hold`]
+  const mark: Record<InvariantStatus, string> = { pass: 'PASS', fail: 'FAIL', 'known-fail': 'KNOWN', 'not-applicable': 'N/A ' }
+  const lines = [`launch invariants — ${report.product}: ${report.passed} of ${report.total} hold${report.knownFailing ? `, ${report.knownFailing} known failing` : ''}`]
   for (const invariant of report.invariants) {
     lines.push(`  ${mark[invariant.status]} ${invariant.id} — ${invariant.title}`)
-    const shown = invariant.status === 'fail' ? invariant.lines : invariant.lines.slice(0, 3)
+    const shown = invariant.status === 'fail' || invariant.status === 'known-fail' ? invariant.lines : invariant.lines.slice(0, 3)
     for (const line of shown) lines.push(`         ${line}`)
     if (invariant.status !== 'fail' && invariant.lines.length > shown.length) lines.push(`         … ${invariant.lines.length - shown.length} more`)
   }
   if (report.testExitCode !== 0) lines.push(`  the invariant test command exited ${report.testExitCode ?? 'by signal'}`)
-  lines.push(report.pass ? 'RESULT: launch-grade' : 'RESULT: not launch-grade')
+  lines.push(report.passed === report.total && report.pass
+    ? 'RESULT: launch-grade'
+    : report.pass ? `RESULT: not launch-grade yet; ${report.knownFailing} known failing, no regressions` : 'RESULT: not launch-grade')
   return lines.join('\n')
 }
