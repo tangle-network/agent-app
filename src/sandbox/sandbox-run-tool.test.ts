@@ -34,6 +34,11 @@ describe('createSandboxRunTool', () => {
     expect(runTask).not.toHaveBeenCalled()
   })
 
+  it('ends a call at its cap when the product box() hangs', async () => {
+    const tool = createSandboxRunTool({ timeoutMs: 20, box: () => new Promise(() => {}), runTask: async () => 'never' })
+    await expect(tool.run({ task: 'x' })).rejects.toMatchObject({ code: 'sandbox_unavailable' })
+  })
+
   it('ends a call at its cap even when the product runner ignores the signal', async () => {
     const tool = createSandboxRunTool({ box: async () => box, timeoutMs: 20, runTask: () => new Promise<string>(() => {}) })
     await expect(tool.run({ task: 'x' })).rejects.toMatchObject({ code: 'sandbox_failed', message: expect.stringContaining('did not finish') })
