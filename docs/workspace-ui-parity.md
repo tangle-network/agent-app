@@ -38,6 +38,14 @@ Every header row in an agent app is a sandbox-ui `ShellHeader` at brand's `--she
 
 Transcript text is brand's one scale: user and agent messages share `TRANSCRIPT_TEXT` (16px, leading 1.6) and differ only by alignment and surface. `ChatMessages` `messageSize="large"` raises `--transcript-font-size` for both roles.
 
+## Surfaces and fields
+
+Shared components draw surfaces through ui primitives so brand's surface ladder and interaction states apply; they paint no backgrounds of their own.
+
+- `ChatComposer`'s box is a field: ui's `focusFieldWithin` gives it the well fill, field border, hover glow and focus ring. The inner textarea or editor stays transparent.
+- `HubIntegrationsPanel` account tiles and its empty state are ui `Card`s (`data-slot="card"`), so a tile inside a card steps to the raised level. Connection state is a `StatusPill` through `connectionTone()`: connected is success, not connected is neutral, error is danger, pending is warning. Amber never means "not connected".
+- `WorkspaceExportPanel` takes `description` (default "Everything in one zip. Credentials are never included."); pass `null` for none. Keep card body copy to one line of at most 12 words.
+
 ## Acceptance
 
 Exercise the actual installed consumer at desktop and phone widths, both themes,

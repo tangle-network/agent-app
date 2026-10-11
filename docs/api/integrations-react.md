@@ -4,7 +4,15 @@
 
 Source: `src/integrations-react/index.ts`
 
-21 exports.
+24 exports.
+
+### `connectionTone`
+
+`function` — The one mapping from connection state to StatusPill tone.
+
+```ts
+(state: HubConnectionState) => StatusTone
+```
 
 ### `createHubIntegrationsClient`
 
@@ -60,6 +68,22 @@ interface HubAccountStatus
 
 ```ts
 interface HubConnectCallbackPageProps
+```
+
+### `HubConnectionState`
+
+`type` — The connection states a tile shows, in the shared StatusPill vocabulary.
+
+```ts
+type HubConnectionState
+```
+
+### `hubConnectionStatus`
+
+`function` — The state and label a Hub connection's tile shows.
+
+```ts
+(connection: Pick<HubConnection, "status" | "health">) => { state: HubConnectionState; label: string; tone: StatusTone;…
 ```
 
 ### `HubHostConnect`

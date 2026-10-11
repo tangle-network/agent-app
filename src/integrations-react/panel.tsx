@@ -67,6 +67,34 @@ export interface HubIntegrationsPanelProps {
   }) => ReactNode
 }
 
+/** The connection states a tile shows, in the shared StatusPill vocabulary. */
+export type HubConnectionState = 'connected' | 'not_connected' | 'error' | 'pending'
+
+const CONNECTION_TONES: Record<HubConnectionState, StatusTone> = {
+  connected: 'success',
+  not_connected: 'neutral',
+  error: 'danger',
+  pending: 'warning',
+}
+
+/**
+ * The one mapping from connection state to StatusPill tone. Amber means
+ * pending only: "Not connected" is neutral, never warning.
+ */
+export function connectionTone(state: HubConnectionState): StatusTone {
+  return CONNECTION_TONES[state]
+}
+
+/** The state and label a Hub connection's tile shows. */
+export function hubConnectionStatus(connection: Pick<HubConnection, 'status' | 'health'>): { state: HubConnectionState; label: string; tone: StatusTone } {
+  const status = (state: HubConnectionState, label: string) => ({ state, label, tone: connectionTone(state) })
+  if (connection.status === 'revoked') return status('not_connected', 'Not connected')
+  if (connection.status === 'reconnect_required') return status('error', 'Reconnect required')
+  if (connection.status === 'unhealthy' || connection.health === 'unhealthy') return status('error', 'Needs attention')
+  if (connection.health === 'rate_limited') return status('pending', 'Rate limited')
+  return status('connected', 'Connected')
+}
+
 function catalogHref(): string {
   if (typeof window === 'undefined') return '/'
   const url = new URL(window.location.href)
@@ -115,23 +143,22 @@ function HubAccountList({ accounts, connections, providers, loading, error, busy
       {accounts.description ? <p className="text-sm text-muted-foreground">{accounts.description}</p> : null}
     </header>
     {rows.length > 0 && !error ? <Input type="search" aria-label="Search accounts" placeholder="Search accounts…" value={query} onChange={event => setQuery(event.target.value)} /> : null}
-    {error ? <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-destructive/40 bg-card p-4 text-sm text-destructive">
+    {error ? <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-destructive/40 p-4 text-sm text-destructive">
       <p className="min-w-0 flex-1 break-words">{error}</p>
       <Button type="button" variant="outline" size="sm" onClick={onRetry}>Retry</Button>
-    </div> : loading && rows.length === 0 ? <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">Loading connected accounts…</p>
-      : rows.length === 0 ? <div className="space-y-3 rounded-xl border border-border bg-card p-5"><p className="text-sm text-muted-foreground">{accounts.emptyLabel ?? 'No accounts connected yet.'}</p><Button type="button" variant="outline" onClick={onAdd}>Add integration</Button></div>
+    </div> : loading && rows.length === 0 ? <p role="status" className="py-4 text-sm text-muted-foreground">Loading connected accounts…</p>
+      : rows.length === 0 ? <Card data-slot="card" className="space-y-3 p-5"><p className="text-sm text-muted-foreground">{accounts.emptyLabel ?? 'No accounts connected yet.'}</p><Button type="button" variant="outline" onClick={onAdd}>Add integration</Button></Card>
         : matching.length === 0 ? <p role="status" className="py-6 text-sm text-muted-foreground">No accounts match your search.</p>
         : <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label={accounts.title}>
           {matching.map(({ connection, provider, name }) => {
-            const health = connection.status !== 'active' ? connection.status.replaceAll('_', ' ')
-              : connection.health === 'unhealthy' ? 'needs attention' : null
+            const state = hubConnectionStatus(connection)
             return <li key={connection.id} data-testid={`hub-account-${connection.id}`} className="min-w-0">
-              <Card className="flex h-full min-w-0 flex-col gap-4 p-4 shadow-none">
+              <Card data-slot="card" data-connection-state={state.state} className="flex h-full min-w-0 flex-col gap-4 p-4">
               <div className="flex min-w-0 items-center gap-4">
                 <div className="flex size-16 shrink-0 items-center justify-center rounded-xl bg-muted/50"><ProviderIcon id={connection.providerId} displayName={provider} size={48} className="shrink-0 rounded-lg" /></div>
                 <div className="min-w-0">
                   <p className="text-base font-semibold [overflow-wrap:anywhere]">{provider}</p>
-                  {health ? <p className="mt-1 text-sm text-muted-foreground">{health}</p> : null}
+                  <StatusPill tone={state.tone} size="sm" className="mt-1">{state.label}</StatusPill>
                 </div>
               </div>
               <p className="text-sm font-medium [overflow-wrap:anywhere]">{name}</p>

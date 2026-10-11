@@ -8745,6 +8745,12 @@
       "error": null,
       "exports": [
         {
+          "name": "connectionTone",
+          "kind": "function",
+          "signature": "(state: HubConnectionState) => StatusTone",
+          "doc": "The one mapping from connection state to StatusPill tone."
+        },
+        {
           "name": "createHubIntegrationsClient",
           "kind": "function",
           "signature": "(request: HubSettingsRequestFn, basePath?: string) => HubIntegrationsClient",
@@ -8785,6 +8791,18 @@
           "kind": "interface",
           "signature": "interface HubConnectCallbackPageProps",
           "doc": null
+        },
+        {
+          "name": "HubConnectionState",
+          "kind": "type",
+          "signature": "type HubConnectionState",
+          "doc": "The connection states a tile shows, in the shared StatusPill vocabulary."
+        },
+        {
+          "name": "hubConnectionStatus",
+          "kind": "function",
+          "signature": "(connection: Pick<HubConnection, \"status\" | \"health\">) => { state: HubConnectionState; label: string; tone: StatusTone;…",
+          "doc": "The state and label a Hub connection's tile shows."
         },
         {
           "name": "HubHostConnect",
@@ -26602,7 +26620,7 @@
         {
           "name": "WorkspaceExportPanel",
           "kind": "function",
-          "signature": "({ endpoint, canExport, title, className, fetcher, continuesInBackground }: WorkspaceExportPanelProps) => Element | null",
+          "signature": "({ endpoint, canExport, title, description, className, fetcher, continuesInBackground }: WorkspaceExportPanelProps) =>…",
           "doc": null
         },
         {
