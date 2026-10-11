@@ -104,8 +104,8 @@ export function renderIndex(input: IndexInput): string {
     out.push('## Ranked fixes (verified failures, customer impact first)', '')
     for (const f of fixes) {
       out.push(`${f.rank}. **${firstLine(f.what)}** (${f.severity}${f.journeys?.length ? `; ${f.journeys.join(', ')}` : ''})`)
-      const rest = f.what.split('\n').slice(1).join(' ').trim()
-      if (rest) out.push(`   ${rest}`)
+      // Later lines keep their breaks, so a list inside `what` nests under its rank.
+      for (const line of f.what.split('\n').slice(1)) if (line.trim()) out.push(`   ${line.trim()}`)
       out.push(`   - Evidence: ${cell(f.evidence)}`)
       if (f.likelyCause) out.push(`   - Likely cause: ${cell(f.likelyCause)}`)
       out.push(`   - Fix: ${cell(f.fix)}`, `   - Number to beat: ${cell(f.numberToBeat)}`, `   - Proving test: ${cell(f.test)}`)

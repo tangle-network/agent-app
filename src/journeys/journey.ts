@@ -528,7 +528,7 @@ export class Journey {
     this.mark(
       t.outcome === 'completed'
         ? `Turn complete after ${t.completeS} s (${t.replyChars} chars)`
-        : `Turn ${t.outcome.toUpperCase()} after ${since()} s${t.error ? `: ${oneLine(t.error, 80)}` : ''}`,
+        : `Turn ${t.outcome.toUpperCase()} after ${t.completeS ?? since()} s${t.error ? `: ${oneLine(t.error, 80)}` : ''}`,
       page,
     )
     return t
