@@ -19056,6 +19056,12 @@
           "doc": "Settles still-pending interaction parts at persist time."
         },
         {
+          "name": "FOLLOW_UP_CLAIM_STALE_AFTER_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "A plan follow-up claim's own staleness (`createD1PlanFollowUpGate`): it does not renew, and its gate re-admits it after this."
+        },
+        {
           "name": "getPartKey",
           "kind": "function",
           "signature": "(part: JsonRecord) => string",

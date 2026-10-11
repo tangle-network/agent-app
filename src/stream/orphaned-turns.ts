@@ -22,6 +22,9 @@ import { DEFAULT_RUNNING_TURN_LEASE_MS, type BufferedTurnEvent, type StaleRunnin
 /** The failure code carried by the terminal event of a settled orphan. */
 export const ORPHANED_TURN_CODE = 'turn.orphaned'
 
+/** A plan follow-up claim's own staleness (`createD1PlanFollowUpGate`): it does not renew, and its gate re-admits it after this. */
+export const FOLLOW_UP_CLAIM_STALE_AFTER_MS = 60 * 60_000
+
 /** How many tail events are read to name the phase a turn stopped in. */
 const TAIL_EVENTS = 50
 const DEFAULT_LIMIT = 50
@@ -72,6 +75,11 @@ export async function settleOrphanedTurns(options: SettleOrphanedTurnsOptions): 
   const settled: SettledOrphanedTurn[] = []
   const owned: string[] = []
   for (const turn of stale) {
+    // A follow-up claim does not renew its row; its gate owns it until its own staleness.
+    if (turn.leaseToken && now - turn.updatedAt < FOLLOW_UP_CLAIM_STALE_AFTER_MS) {
+      owned.push(turn.turnId)
+      continue
+    }
     if (options.isOwned && await options.isOwned(turn)) {
       owned.push(turn.turnId)
       continue
