@@ -58,6 +58,30 @@ export interface ExportEngineOptions {
 
 class LeaseLost extends Error {}
 
+/**
+ * Thrown by a source that cannot run yet for a reason that will pass, such as a
+ * sandbox busy with another lifecycle operation. The unit stays pending without
+ * spending an attempt, and the export moves on to other sources.
+ */
+export class ExportRetryLater extends Error {
+  readonly retryLater = true
+}
+
+/** Deferrals before a busy source fails the export: about ten minutes of cron sweeps. */
+const MAX_DEFERRALS = 20
+
+function isRetryLater(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { retryLater?: unknown }).retryLater === true
+}
+
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  const text = typeof value === 'string' ? value : typeof value === 'object' ? JSON.stringify(value) : String(value)
+  // Spreadsheet apps run cells that start with these as formulas.
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
+}
+
 function iso(ms: number): string {
   return new Date(ms).toISOString()
 }
@@ -268,21 +292,38 @@ export function createExportEngine(options: ExportEngineOptions) {
     if (source.kind === 'rows') {
       const omit = new Set(source.omitColumns ?? [])
       unit.expectedRows = source.expectedCount ? await source.expectedCount() : undefined
+      const csv = source.format === 'csv'
+      const columns = source.columns ?? []
+      if (csv && !columns.length) throw new Error(`workspace-export: csv source "${source.name}" needs columns`)
       let rows = 0
       const iterator = source.rows()[Symbol.asyncIterator]()
+      // Peek, so a table with no rows writes no file: most of a workspace's
+      // tables are empty, and a folder of empty files reads as a broken export.
+      let first = await iterator.next()
+      while (!first.done && Array.isArray(first.value) && first.value.length === 0) first = await iterator.next()
+      if (first.done) {
+        unit.rows = 0
+        unit.status = 'empty'
+        return
+      }
+      let header = csv ? `${columns.map(csvCell).join(',')}\r\n` : ''
       const body = new ReadableStream<Uint8Array>({
         async pull(controller) {
-          const { done, value } = await iterator.next()
+          const { done, value } = first.done ? await iterator.next() : first
+          first = { done: true, value: undefined }
           if (done) {
             controller.close()
             return
           }
           const page = Array.isArray(value) ? value : [value]
-          let text = ''
+          let text = header
+          header = ''
           for (const row of page) {
             const redacted = redactRow(row, omit, scanner)
             unit.redactions += redacted.count
-            text += `${JSON.stringify(redacted.row)}\n`
+            text += csv
+              ? `${columns.map((column) => csvCell(redacted.row[column])).join(',')}\r\n`
+              : `${JSON.stringify(redacted.row)}\n`
             rows += 1
           }
           if (text) controller.enqueue(encoder.encode(text))
@@ -291,7 +332,8 @@ export function createExportEngine(options: ExportEngineOptions) {
           await iterator.return?.()
         },
       })
-      unit.entries.push(await writeEntry(`${keyBase}/0`, `data/${source.name}.ndjson`, body, true))
+      const path = csv ? `spreadsheets/${source.name}.csv` : `data/${source.name}.ndjson`
+      unit.entries.push(await writeEntry(`${keyBase}/0`, path, body, true))
       unit.rows = rows
       unit.status = 'done'
       return
@@ -359,10 +401,10 @@ export function createExportEngine(options: ExportEngineOptions) {
       unit.status = 'empty'
       return
     }
-    const stats = { files: 0, bytes: 0, blanked: [] as string[] }
+    const stats: { files: number; bytes: number; blanked: string[]; excluded?: number } = { files: 0, bytes: 0, blanked: [] }
     const tarGz = archive
       .pipeThrough(new DecompressionStream('gzip') as unknown as TransformStream<Uint8Array, Uint8Array>)
-      .pipeThrough(createTarInspector(stats))
+      .pipeThrough(createTarInspector(stats, source.exclude))
       .pipeThrough(scanner.maskBytes((n) => (unit.redactions += n)))
       .pipeThrough(new CompressionStream('gzip') as unknown as TransformStream<Uint8Array, Uint8Array>)
     unit.entries.push(await writeEntry(`${keyBase}/0`, `sandbox/${source.name}.tar.gz`, tarGz, false))
@@ -413,24 +455,33 @@ export function createExportEngine(options: ExportEngineOptions) {
     }
   }
 
+  /** Describes what this archive actually holds, folder by folder. */
   function readme(job: ExportJob): string {
-    return [
-      `${options.app} workspace export`,
+    const entries = job.units.flatMap((u) => u.entries.map((e) => e.path))
+    const count = (folder: string) => entries.filter((path) => path.startsWith(folder)).length
+    const folders: [string, string][] = [
+      ['spreadsheets/', 'tables to open in a spreadsheet app, one row per record'],
+      ['files/', 'documents and uploads at their original names, one folder per source'],
+      ['data/', 'every database table that holds data, one JSON object per line (.ndjson) or one document (.json)'],
+      ['sandbox/', "the agent's working files; extract with `tar -xzf`"],
+    ]
+    const lines = [`${options.app} workspace export`, '', `Workspace: ${job.workspaceId}`, `Export: ${job.id}`, `Created: ${job.createdAt}`, '']
+    for (const [folder, what] of folders) {
+      const n = count(folder)
+      if (n) lines.push(`${folder.padEnd(14)}${n} file${n === 1 ? '' : 's'}: ${what}`)
+    }
+    const fileSources = [...new Set(entries.filter((p) => p.startsWith('files/')).map((p) => p.split('/')[1]))]
+    if (fileSources.length) lines.push('', `Files: ${fileSources.map((name) => `files/${name}/`).join(', ')}`)
+    const empty = job.units.filter((u) => u.status === 'empty').length
+    if (empty) lines.push('', `${empty} source${empty === 1 ? ' was' : 's were'} empty and wrote no file; manifest.json lists every source.`)
+    lines.push(
       '',
-      `Workspace: ${job.workspaceId}`,
-      `Export: ${job.id}`,
-      `Created: ${job.createdAt}`,
-      '',
-      'manifest.json   what this archive contains: every file with its size and SHA-256, row counts per source, and the redaction policy',
-      'data/*.ndjson   one JSON object per line, one file per table or record type',
-      'data/*.json     single documents',
-      'files/<source>/ uploaded and generated files, at their original paths',
-      'sandbox/*.tar.gz the agent workspace filesystem; extract with `tar -xzf`',
-      '',
+      'manifest.json lists every file with its size and SHA-256, row counts per source, and the redaction policy.',
       'Verify a file: `shasum -a 256 <path>` and compare with manifest.json.',
       'Secrets are never exported. Credential fields read "[redacted]".',
       '',
-    ].join('\n')
+    )
+    return lines.join('\n')
   }
 
   async function finalize(job: ExportJob, plan: ExportPlan, scanner: SecretScanner) {
@@ -579,6 +630,13 @@ export function createExportEngine(options: ExportEngineOptions) {
                 return false
               } catch (err) {
                 unit.error = errorText(scanner, err)
+                if (isRetryLater(err) && (unit.deferrals ?? 0) < MAX_DEFERRALS) {
+                  // Busy, not broken: give the attempt back and try again on a later request.
+                  unit.deferrals = (unit.deferrals ?? 0) + 1
+                  unit.attempts -= 1
+                  if (unit.cursor === undefined) unit.entries = []
+                  return 'deferred' as const
+                }
                 // A files unit keeps what it already wrote and resumes at its cursor.
                 if (unit.cursor === undefined) unit.entries = []
                 if (unit.attempts >= MAX_ATTEMPTS) unit.status = 'failed'
@@ -594,6 +652,11 @@ export function createExportEngine(options: ExportEngineOptions) {
           if (failed.includes(true)) {
             await save()
             break
+          }
+          if (failed.includes('deferred')) {
+            // The other sources keep going; the busy one runs again on the next request.
+            await save()
+            continue
           }
           const { unit } = batch[0]!
           if (unit.status === 'pending') {
@@ -641,7 +704,8 @@ export function createExportEngine(options: ExportEngineOptions) {
         completedAt: job.completedAt,
         error: job.error,
         unitsTotal: job.units.length,
-        unitsDone: job.units.filter((u) => u.status !== 'pending').length,
+        unitsDone: job.units.filter((u) => u.status === 'done' || u.status === 'empty').length,
+        unitsFailed: job.units.filter((u) => u.status === 'failed').length,
         current: job.status === 'running' ? job.units.find((u) => u.status === 'pending')?.name : undefined,
         bytes: job.units.reduce((n, u) => n + bytesOf(u), 0),
         units: job.units.map((u) => ({

@@ -9,11 +9,11 @@
  */
 
 export { createWorkspaceExport, type WorkspaceExportOptions } from './routes'
-export { createExportEngine, MANIFEST_SCHEMA, type ExportEngine, type ExportEngineOptions } from './engine'
+export { createExportEngine, ExportRetryLater, MANIFEST_SCHEMA, type ExportEngine, type ExportEngineOptions } from './engine'
 export { createR2ExportStorage, createMemoryExportStorage, type ExportStorage, type R2ExportBucket } from './storage'
 export { d1WorkspaceTables, type D1ExportDatabase, type D1TableCoverage, type D1WorkspaceTablesOptions } from './d1'
 export { r2Files, kvFiles, type R2FilesBucket, type KVFilesNamespace } from './sources'
-export { sandboxArchive, type ArchivableBox } from './sandbox'
+export { DEFAULT_SANDBOX_EXCLUDE, sandboxArchive, sandboxFiles, type ArchivableBox } from './sandbox'
 export { createSecretScanner, isSecretName, isCredentialFile, REDACTED, type SecretScanner } from './secrets'
 export type {
   ExportArchiveSource,
