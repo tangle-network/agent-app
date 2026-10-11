@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.117
+
+- feat(router-turn): tools report typed side events through context.emit: streamed as tool_event, recorded with the turn (#1048)
+
 ## 0.60.116
 
 - Train: land #1026 #1027 #1028 #1045 as one release (#1047)
