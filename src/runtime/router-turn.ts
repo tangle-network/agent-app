@@ -18,6 +18,7 @@ import { streamAppToolLoop, type LoopEvent, type LoopMessage, type LoopToolCall,
 import { DEFAULT_TANGLE_ROUTER_BASE_URL } from './model'
 import { createOpenAICompatStreamTurn } from './openai-stream'
 import { turnKnowledgeInstructions, type TurnKnowledgeFile } from './turn-knowledge'
+export { DURABLE_HOP_BUDGET_MS, turnCheckpointPath, workspaceTurnCheckpoints, type CheckpointWorkspaceStore, type TurnCheckpointStore } from './turn-continuation'
 export { budgetTurnKnowledge, turnKnowledgeInstructions, workspaceKnowledgeForTurn, type TurnKnowledgeBudget, type TurnKnowledgeFile } from './turn-knowledge'
 
 /** A tool the turn may call. Structurally an `McpToolDefinition` whose env is already bound. */
@@ -53,6 +54,22 @@ export interface RouterTurnOutcome {
   /** Token use summed over every model call in the turn, as the router reported it. */
   usage: { promptTokens: number; completionTokens: number; modelCalls: number }
   failure?: RouterTurnFailure
+  /**
+   * Set instead of a failure when the turn reached its budget at a clean point
+   * (every tool call answered). The turn is not over: persist this and call
+   * `runRouterTurn` again with `continueFrom` in a durable process to finish it.
+   * `text` holds only what this hop wrote.
+   */
+  continuation?: RouterTurnContinuation
+}
+
+/** A checkpointed Router turn: the conversation after the system prompt, ready to continue. JSON-safe. */
+export interface RouterTurnContinuation {
+  messages: LoopMessage[]
+  /** Hops this turn has already run, including this one. */
+  hops: number
+  /** Whether an earlier hop already wrote reply text, so a silent final hop is not an empty reply. */
+  wroteText: boolean
 }
 
 export interface RouterTurnOptions {
@@ -66,8 +83,11 @@ export interface RouterTurnOptions {
    *  carrying `tool_calls` and the `tool` messages answering them) so the model sees what it did. */
   history?: Array<{ role: 'user' | 'assistant'; content: string } | LoopMessage>
   tools?: RouterTurnTool[]
-  /** Wall-clock budget in ms. Default 90 s. A caller whose retry window is shorter passes less. */
+  /** Wall-clock budget in ms for this hop. Default 90 s. At the budget the outcome carries a
+   *  `continuation` instead of failing; the model call or tool already running finishes first. */
   budgetMs?: number
+  /** Continue a checkpointed turn; `userMessage` and `history` are ignored. */
+  continueFrom?: RouterTurnContinuation
   /** Runaway backstop on model turns. Default 12. */
   maxToolTurns?: number
   maxTokens?: number
@@ -160,14 +180,16 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const started = new Map<string, number>()
   let segmentOpen = false
   let toolsRan = 0
+  let checkpoint: LoopMessage[] | null = null
   const deadline = Date.now() + (options.budgetMs ?? DEFAULT_BUDGET_MS)
   const callIdOf = (id: string | undefined, toolName: string) => id ?? `${toolName}-${started.size}`
 
   const run = async (): Promise<ToolLoopStopReason> => {
     for await (const step of streamAppToolLoop<LoopEvent>({
       systemPrompt: options.systemPrompt,
-      userMessage: options.userMessage,
-      priorMessages: (options.history ?? []) as LoopMessage[],
+      ...(options.continueFrom
+        ? { priorMessages: options.continueFrom.messages }
+        : { userMessage: options.userMessage, priorMessages: (options.history ?? []) as LoopMessage[] }),
       streamTurn,
       extractText: event => event.type === 'text' ? event.text : '',
       extractToolCall: event => event.type === 'tool_call' ? event.call : null,
@@ -219,6 +241,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           : { type: 'tool', callId, toolName, status: 'error', startedAt, endedAt: Date.now(),
             error: { code: step.outcome.code, message: step.outcome.message } })
       } else if (step.kind === 'capped') {
+        if (step.stopReason === 'deadline' && step.messages) checkpoint = step.messages
         return step.stopReason
       }
     }
@@ -244,11 +267,16 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       ? { code: `model_http_${status}`, status, message: 'The model service did not answer.' }
       : { code: 'model_unavailable', message: 'The model service did not answer.' })
   }
+  if (stop === 'deadline' && checkpoint) {
+    return { ...outcome(), continuation: { messages: checkpoint,
+      hops: (options.continueFrom?.hops ?? 0) + 1,
+      wroteText: Boolean(options.continueFrom?.wroteText) || segments.some(part => part.trim()) } }
+  }
   if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
   // A model can end its turn with neither a word nor a tool call (gemini-2.5-flash did on 8 of
   // 53 "remember" turns, 2026-10-11). Nothing was said and nothing ran, so one repeat is safe;
   // an answer still blank is a typed failure, never a successful empty reply.
-  if (!segments.some(part => part.trim())) {
+  if (!segments.some(part => part.trim()) && !options.continueFrom?.wroteText) {
     if (toolsRan === 0) {
       try { stop = await run() } catch { stop = 'completed' }
       if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
