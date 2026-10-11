@@ -180,7 +180,8 @@ export async function storageStateFor(
     }
     const user = await sessionUser(config, file)
     if (!user) throw new Error(`${name} signed in but ${config.auth.session} has no user`)
-    if (!user.emailVerified) throw new Error(`${name} is not email-verified; the app will refuse its chat`)
+    // A read-only journey can still run; one that chats will be refused, so say so before it tries.
+    if (!user.emailVerified) console.warn(`${name} signed in but is not email-verified; an app that requires verification will refuse its chat`)
     return { path: file, user }
   })
 }
