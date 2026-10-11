@@ -58,12 +58,16 @@ export type WarmBoxOutcome =
   | 'running'
   /** No box exists for this key. Leases never create boxes. */
   | 'absent'
+  /** The platform refused the resume for capacity (HTTP 429: the org is at its
+   *  concurrent-box limit). A speculative warm must not compete with real work
+   *  for the last slots, so the key cools down instead of retrying. */
+  | 'capacity'
 
 export type WarmLeaseEvent =
   | { type: 'warm_started'; key: string; reason: WarmReason; outcome: WarmBoxOutcome; ms: number }
   | { type: 'warm_hit'; key: string; reason: WarmReason; leadMs: number }
   | { type: 'warm_wasted'; key: string; reason: WarmReason; minutes: number }
-  | { type: 'warm_declined'; key: string; reason: WarmReason; why: 'budget' | 'absent' }
+  | { type: 'warm_declined'; key: string; reason: WarmReason; why: 'budget' | 'absent' | 'capacity' }
   | { type: 'warm_failed'; key: string; reason: WarmReason; error: string }
   /** The lease ended without its warm ever reporting: the request running it was
    *  cancelled or the isolate died. Whether the box resumed is unknown, so it is
@@ -120,6 +124,9 @@ export interface WarmLeaseRow {
   slotsAt: number
   firstSeenAt: number
   predictedAt: number
+  /** Signals are refused without calling the product's warm until this time:
+   *  set after an 'absent' or 'capacity' outcome, cleared by a turn. */
+  declinedUntil: number
 }
 
 /** Persistence for leases. `begin` and `markUsed` must be atomic across isolates. */
@@ -151,6 +158,8 @@ export interface WarmLeaseStore {
   writeProfile(key: string, slots: number[], slotsAt: number, firstSeenAt: number): Promise<void>
   markPinged(key: string, at: number): Promise<void>
   markPredicted(key: string, at: number): Promise<void>
+  /** Refuse signals for `key` until `until` (cleared by the next turn). */
+  markDeclined(key: string, until: number): Promise<void>
   /** Bounded batches for `sweep`. */
   listExpired(now: number, limit: number): Promise<WarmLeaseRow[]>
   listHeld(now: number, limit: number): Promise<WarmLeaseRow[]>
@@ -180,6 +189,10 @@ export interface WarmLeasesOptions {
    * takes the lease over and warms again. Default 2 min, past a slow resume.
    */
   warmDeadlineMs?: number
+  /** After a warm finds no box, refuse that key's signals this long. Default 10 min. */
+  absentCooldownMs?: number
+  /** After a capacity refusal, refuse that key's signals this long. Default 5 min. */
+  capacityCooldownMs?: number
   /** Reasons subject to the budget. Default page-open, member-activity, predicted, scheduled. */
   budgetedReasons?: readonly string[]
   /** Starting predicted-warm threshold, a probability. Default 0.25. */
@@ -282,6 +295,8 @@ export function createWarmLeases(options: WarmLeasesOptions): WarmLeases {
   const boxIdleMs = options.boxIdleMs ?? 30 * 60_000
   const holdMs = options.holdMs ?? 10 * 60_000
   const warmDeadlineMs = options.warmDeadlineMs ?? 2 * 60_000
+  const absentCooldownMs = options.absentCooldownMs ?? 10 * 60_000
+  const capacityCooldownMs = options.capacityCooldownMs ?? 5 * 60_000
   const burstHoldMs = options.burstHoldMs ?? boxIdleMs
   const dailyBudgetMs = options.dailyBudgetMs ?? 30 * 60_000
   const budgeted = new Set<string>(options.budgetedReasons ?? DEFAULT_BUDGETED)
@@ -309,8 +324,12 @@ export function createWarmLeases(options: WarmLeasesOptions): WarmLeases {
 
   async function signal(key: string, reason: WarmReason): Promise<WarmSignalResult> {
     const at = now()
+    const row = await store.read(key)
+    // A recent 'absent' or 'capacity' answer stands until it expires or a turn
+    // clears it. Refused silently: on a busy page this fires every few seconds,
+    // and each event would be a duplicate of the decline that set it.
+    if (row && row.declinedUntil > at && !row.leaseId) return { outcome: 'declined' }
     if (budgeted.has(reason)) {
-      const row = await store.read(key)
       if (!(row?.leaseId) && spentToday(row, at) >= dailyBudgetMs) {
         emit({ type: 'warm_declined', key, reason, why: 'budget' })
         return { outcome: 'declined' }
@@ -329,9 +348,10 @@ export function createWarmLeases(options: WarmLeasesOptions): WarmLeases {
       return { outcome: 'failed' }
     }
     const warmAt = now()
-    if (box === 'absent') {
+    if (box === 'absent' || box === 'capacity') {
       await store.end(key, leaseId, utcDay(at), 0)
-      emit({ type: 'warm_declined', key, reason, why: 'absent' })
+      await store.markDeclined(key, warmAt + (box === 'absent' ? absentCooldownMs : capacityCooldownMs))
+      emit({ type: 'warm_declined', key, reason, why: box })
       return { outcome: 'declined', box }
     }
     await store.markWarm(key, leaseId, warmAt, box === 'resumed')

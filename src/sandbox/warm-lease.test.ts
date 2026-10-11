@@ -178,6 +178,29 @@ describe('warm leases', () => {
     expect(lost.events.at(-1)).toEqual({ type: 'warm_abandoned', key: 'ws-2', reason: 'page-open' })
   })
 
+  it('cools a key down after no box or a capacity refusal, and a turn clears it', async () => {
+    for (const [box, cooldown] of [['absent', 10 * MIN], ['capacity', 5 * MIN]] as const) {
+      const h = harness({}, box)
+      expect(await h.leases.signal('ws-1', 'page-open')).toEqual({ outcome: 'declined', box })
+      expect(h.events.at(-1)).toMatchObject({ type: 'warm_declined', why: box })
+      // Within the cool-down nothing calls the product's warm, and nothing is logged again.
+      h.clock.now += cooldown - MIN
+      expect(await h.leases.signal('ws-1', 'composer-focus')).toEqual({ outcome: 'declined' })
+      expect(h.warms).toHaveLength(1)
+      expect(h.events.filter((e) => e.type === 'warm_declined')).toHaveLength(1)
+      // After it, the next signal asks again.
+      h.clock.now += 2 * MIN
+      await h.leases.signal('ws-1', 'page-open')
+      expect(h.warms).toHaveLength(2)
+    }
+    // A turn means the box exists now: the cool-down ends at once.
+    const h = harness({}, 'absent')
+    await h.leases.signal('ws-1', 'page-open')
+    await h.leases.turn('ws-1')
+    await h.leases.signal('ws-1', 'page-open')
+    expect(h.warms).toHaveLength(2)
+  })
+
   it('pings a held box only when the burst hold outlasts its idle timeout', async () => {
     const h = harness({ burstHoldMs: 30 * MIN })
     await h.leases.turn('ws-1')
