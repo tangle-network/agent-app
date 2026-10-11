@@ -2,13 +2,13 @@
 
 # agent-app code map
 
-_129 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_128 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
 | [`./agent-enrollment`](api/agent-enrollment.md) | 15 | `hosted-agent` |
 | [`./agent-enrollment/drizzle`](api/agent-enrollment-drizzle.md) | 5 | `hosted-agent` |
-| [`./agent-profiles`](api/agent-profiles.md) | 47 | `tools` |
+| [`./agent-profiles`](api/agent-profiles.md) | 49 | `tools` |
 | [`./agent-profiles/d1`](api/agent-profiles-d1.md) | 8 | `tools` |
 | [`./agent-profiles/drizzle`](api/agent-profiles-drizzle.md) | 1 | `tools` |
 | [`./agent-profiles/reaper`](api/agent-profiles-reaper.md) | 5 | `tools` |
@@ -59,8 +59,6 @@ _129 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./integrations`](api/integrations.md) | 10 | — |
 | [`./integrations-react`](api/integrations-react.md) | 24 | `platform`, `web-react` |
 | [`./interactions`](api/interactions.md) | 64 | `web` |
-| [`./journeys`](api/journeys.md) | 61 | `signoff`, `workspace-export` |
-| [`./journeys/cli`](api/journeys-cli.md) | 1 | `signoff`, `workspace-export` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
 | [`./launch-invariants`](api/launch-invariants.md) | 59 | `signoff`, `turn-health` |
@@ -135,6 +133,7 @@ _129 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./workspace-export`](api/workspace-export.md) | 41 | `object-store` |
 | [`./workspace-export/react`](api/workspace-export-react.md) | 2 | `object-store` |
 | [`./workspace-react`](api/workspace-react.md) | 28 | `session-shell`, `web-react`, `workspace-apps` |
+| [`./workspace-store/d1`](api/workspace-store-d1.md) | 6 | — |
 
 ---
 
@@ -160,11 +159,11 @@ Depends on: `hosted-agent`
 
 ## `./agent-profiles`
 
-Source: `src/agent-profiles/index.ts` · 47 exports
+Source: `src/agent-profiles/index.ts` · 49 exports
 
 Depends on: `tools`
 
-`addProfileKnowledgeDocument`, `admitProfileTurn`, `bindProfileText`, `createInMemorySelfMountStorage`, `createMountProfileChangeTool`, `createTextProfile`, `CreateTextProfileInput`, `handleProfileSwitchText`, `MountProfileChangeDeps`, `MountProfileChangeResult`, `normalizeProfileName`, `parseProfileRevisionDiff`, `parseProfileSwitch`, `PERMITTED_SELF_MOUNT_DIMENSIONS`, `PROFILE_CHANGE_POLICY`, `ProfileAccessError`, `profileAuthority`, `profileAuthorityDigest`, `ProfileAuthorKind`, `ProfileBinding`, `ProfileBindingKey`, `ProfileConflictError`, `ProfileKnowledgeDocument`, `ProfileKnowledgeEvent`, `ProfileRevision`, `ProfileRevisionState`, `ProfileRevisionStore`, `profileSwitchInputHash`, `profileSwitchInputHashFromContentHash`, `ProfileSwitchReceipt`, `profileTextChange`, `ProfileToolContext`, `profileTools`, `ProfileToolTurn`, `ProfileTurnPin`, `projectKnowledgeDocuments`, `promoteRevision`, `proposeRevision`, `ProposeRevisionInput`, `removeProfileKnowledgeDocument`, `rollbackProfileBinding`, `SelfMountSkillEntry`, `SelfMountStorage`, `serializeProfileRevisionDiff`, `SwitchableProfile`, `switchProfile`, `SwitchProfileInput`
+`addProfileKnowledgeDocument`, `admitProfileTurn`, `bindProfileText`, `createInMemorySelfMountStorage`, `createMountProfileChangeTool`, `createTextProfile`, `CreateTextProfileInput`, `handleProfileSwitchText`, `MountProfileChangeDeps`, `MountProfileChangeResult`, `normalizeProfileName`, `parseProfileRevisionDiff`, `parseProfileSwitch`, `PERMITTED_SELF_MOUNT_DIMENSIONS`, `PROFILE_CHANGE_POLICY`, `PROFILE_MEMORY_PREFIX`, `ProfileAccessError`, `profileAuthority`, `profileAuthorityDigest`, `ProfileAuthorKind`, `ProfileBinding`, `ProfileBindingKey`, `ProfileConflictError`, `ProfileKnowledgeDocument`, `ProfileKnowledgeEvent`, `ProfileMemoryStore`, `ProfileRevision`, `ProfileRevisionState`, `ProfileRevisionStore`, `profileSwitchInputHash`, `profileSwitchInputHashFromContentHash`, `ProfileSwitchReceipt`, `profileTextChange`, `ProfileToolContext`, `profileTools`, `ProfileToolTurn`, `ProfileTurnPin`, `projectKnowledgeDocuments`, `promoteRevision`, `proposeRevision`, `ProposeRevisionInput`, `removeProfileKnowledgeDocument`, `rollbackProfileBinding`, `SelfMountSkillEntry`, `SelfMountStorage`, `serializeProfileRevisionDiff`, `SwitchableProfile`, `switchProfile`, `SwitchProfileInput`
 
 [Full API →](api/agent-profiles.md)
 
@@ -619,26 +618,6 @@ Depends on: `web`
 `abortSession`, `BeforeInteractionAnswerArgs`, `cancelStatusFor`, `canTransitionInteractionStatus`, `ChatFreeTextField`, `ChatInteraction`, `ChatInteractionField`, `ChatInteractionStatus`, `ChatSelectField`, `composerAnswerData`, `composerAnswerDeliveries`, `ComposerAnswerDelivery`, `createInteractionAnswerRoute`, `dedupeQuestionInteractionsByContent`, `DurableInteractionRouteArgs`, `DurableInteractionRoutePersistence`, `fieldAcceptsFreeText`, `getSessionState`, `INTERACTION_CANCEL_EVENT`, `INTERACTION_EVENT`, `INTERACTION_RESOLVED_EVENT`, `InteractionAnswerBodyValidation`, `InteractionAnswerRoute`, `InteractionAnswerRouteOptions`, `InteractionAnswers`, `InteractionAnswerValue`, `InteractionCancelData`, `InteractionClientOutcome`, `InteractionConnectionResolution`, `InteractionData`, `interactionFromWireRequest`, `InteractionOutcome`, `interactionPartKey`, `InteractionPersistedPart`, `InteractionRequest`, `InteractionRequestWire`, `InteractionRouteLogger`, `interactionToPersistedPart`, `isRenderableInteractionKind`, `isSafeInteractionFieldKey`, `isTerminalInteractionStatus`, `isTerminalSidecarState`, `listSessionInteractions`, `mapInteractionRespondFailure`, `NoticeKind`, `noticePart`, `noticePartKey`, `NoticePersistedPart`, `parseInteractionAnswers`, `ParseInteractionAnswersResult`, `parseInteractionCancel`, `parseInteractionRequest`, `ParseInteractionResult`, `persistedPartToInteraction`, `questionInteractionContentSignature`, `ResolveInteractionConnectionArgs`, `respondToSessionInteraction`, `SidecarAbortResult`, `SidecarInteractionsConnection`, `SidecarInteractionsError`, `SidecarInteractionsResult`, `SidecarSessionState`, `stampInteractionAnswers`, `validateInteractionAnswerBody`
 
 [Full API →](api/interactions.md)
-
-## `./journeys`
-
-Source: `src/journeys/index.ts` · 61 exports
-
-Depends on: `signoff`, `workspace-export`
-
-`assertNoSecrets`, `AuthPaths`, `Chapter`, `chapterCues`, `ChatContract`, `clickUntilSubmitted`, `collectJourneyFiles`, `CONFIG_FILE_NAMES`, `createSubmissionTracker`, `credentialNames`, `CriticResult`, `Cue`, `DEFAULT_AUTH_PATHS`, `DEFAULT_CHAT_CONTRACT`, `DEFAULT_FAILURE_TEXT`, `DEFAULT_STOPPED_TEXT`, `defineJourneys`, `DESKTOP`, `extractFrames`, `FailurePatterns`, `highlightPlan`, `HighlightSegment`, `IndexInput`, `Journey`, `JourneyFiles`, `JourneyIdentity`, `JourneysConfig`, `loadJourneysConfig`, `MAX_HIGHLIGHTS_S`, `oneLine`, `PHONE`, `postProcessVideo`, `rebuildVideo`, `renderIndex`, `ResolvedJourneysConfig`, `resolveJourneysConfig`, `routeSubmitPaths`, `scoreTurn`, `scrubTrace`, `secretNeedles`, `SendDriveOps`, `SendOptions`, `sessionUser`, `SessionUser`, `settleText`, `SignInMethod`, `startJourney`, `STATUS_STALE_MS`, `StepRecord`, `storageStateFor`, `SubmissionTracker`, `tallyTurns`, `ThreadRoute`, `threadRouteIn`, `TranscriptSnapshot`, `TurnEvidence`, `TurnFacts`, `turnLooksActive`, `TurnOutcome`, `TurnRecord`, `TurnVerdict`
-
-[Full API →](api/journeys.md)
-
-## `./journeys/cli`
-
-Source: `src/journeys/cli.ts` · 1 exports
-
-Depends on: `signoff`, `workspace-export`
-
-`main`
-
-[Full API →](api/journeys-cli.md)
 
 ## `./knowledge`
 
@@ -1315,3 +1294,11 @@ Depends on: `session-shell`, `web-react`, `workspace-apps`
 `AgentProductIdentity`, `AgentRailIdentity`, `AgentRailIdentityProps`, `AgentWorkspaceActiveRoute`, `AgentWorkspaceAppsConfig`, `AgentWorkspaceCompanion`, `AgentWorkspaceCompanionHandle`, `AgentWorkspaceCompanionNavigation`, `AgentWorkspaceCompanionProps`, `AgentWorkspaceCompanionTab`, `AgentWorkspaceCompanionTool`, `AgentWorkspaceCompanionTools`, `AgentWorkspaceIdentity`, `AgentWorkspaceLayout`, `AgentWorkspaceLayoutProps`, `AgentWorkspaceNoun`, `AgentWorkspaceSessionConfig`, `createAgentWorkspaceCompanionTabs`, `DEFAULT_WORKSPACE_NOUN`, `WorkspaceInitial`, `WorkspaceList`, `WorkspaceListAction`, `WorkspaceListField`, `WorkspaceListItem`, `WorkspaceListProps`, `WorkspaceSwitcher`, `WorkspaceSwitcherItem`, `WorkspaceSwitcherProps`
 
 [Full API →](api/workspace-react.md)
+
+## `./workspace-store/d1`
+
+Source: `src/workspace-store/d1.ts` · 6 exports
+
+`createD1R2WorkspaceStore`, `D1R2WorkspaceStoreOptions`, `WORKSPACE_STORE_D1_SCHEMA_SQL`, `WorkspaceStoreD1Database`, `WorkspaceStoreD1Statement`, `WorkspaceStoreR2Bucket`
+
+[Full API →](api/workspace-store-d1.md)

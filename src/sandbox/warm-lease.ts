@@ -337,11 +337,15 @@ export function createWarmLeases(options: WarmLeasesOptions): WarmLeases {
     (row && row.day === utcDay(at) ? row.dayWarmMs : 0) +
     (row && row.pendingWarmAt > 0 && utcDay(row.pendingWarmAt) === utcDay(at) ? row.pendingMs : 0)
 
-  /** The most box time an unused lease can have caused: until the box's idle timeout after its last warm activity. */
+  /**
+   * The most box time an unused lease can have caused: until the box's idle
+   * timeout after its last warm activity (the resume, or a keep-alive ping).
+   * Not the hold: later signals extend the hold, but the hold keeps no box up,
+   * so a page polled every few minutes once inflated one warm to 50 min.
+   */
   function chargeOf(row: WarmLeaseRow): number {
     if (!row.resumed || row.usedAt > 0 || row.warmAt <= 0) return 0
-    const lastActivity = Math.max(row.warmAt, row.pingAt)
-    return Math.max(row.holdUntil, lastActivity + boxIdleMs) - row.warmAt
+    return Math.max(row.warmAt, row.pingAt) + boxIdleMs - row.warmAt
   }
 
   async function signal(key: string, reason: WarmReason): Promise<WarmSignalResult> {

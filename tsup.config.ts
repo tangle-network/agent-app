@@ -19,6 +19,7 @@ export default defineConfig({
     'agent-profiles/index': 'src/agent-profiles/index.ts',
     'agent-profiles/switch': 'src/agent-profiles/switch.ts',
     'agent-profiles/d1': 'src/agent-profiles/d1.ts',
+    'workspace-store/d1': 'src/workspace-store/d1.ts',
     'agent-profiles/drizzle': 'src/agent-profiles/drizzle.ts',
     'agent-profiles/reaper': 'src/agent-profiles/reaper.ts',
     'prompt/index': 'src/prompt/index.ts',

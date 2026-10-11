@@ -1,6 +1,6 @@
 import { snapshotAgentProfile } from '@tangle-network/agent-interface'
 import { describe, expect, it } from 'vitest'
-import { ProfileAccessError, profileAuthorityDigest, profileTools, type ProfileRevision,
+import { PROFILE_MEMORY_PREFIX, ProfileAccessError, profileAuthorityDigest, profileTools, type ProfileRevision,
   type ProfileRevisionStore, type ProfileToolTurn } from './index'
 
 const profile = snapshotAgentProfile({ name: 'Pablo', harness: 'opencode', prompt: { systemPrompt: 'base' },
@@ -78,5 +78,25 @@ describe('profile.remember', () => {
     for (const role of ['member', 'viewer'] as const) {
       await expect(remember(memoryStore().store, role)('A fact')).rejects.toBeInstanceOf(ProfileAccessError)
     }
+  })
+})
+
+describe('profile.remember with a workspace memory store', () => {
+  it('writes the fact to the store and never appends a profile revision', async () => {
+    const { createInMemoryWorkspaceStore } = await import('@tangle-network/agent-runtime/workspace-store')
+    const memory = memoryStore('- Breakfast is served from 7am.')
+    const workspace = createInMemoryWorkspaceStore()
+    const tool = profileTools({
+      store: memory.store, planDigest: async () => planDigest, memory: workspace,
+      activeTurn: async () => ({ workspaceId: 'ws-1', profileId: 'p-1', revisionId: 'rev-0', memberId: 'm-1', role: 'owner' as const }),
+    }).find(candidate => candidate.name === 'profile.remember')!
+    const first = await tool.run({ fact: 'The sauna closes at 8pm on Sundays.' } as never, {} as never) as Record<string, unknown>
+    expect(first).toMatchObject({ saved: true, alreadyKnown: false })
+    expect(await tool.run({ fact: 'The sauna  closes at 8pm on Sundays.' } as never, {} as never))
+      .toMatchObject({ saved: true, alreadyKnown: true, memoryId: first.memoryId })
+    expect((await workspace.list('ws-1', PROFILE_MEMORY_PREFIX)).map(entry => entry.content))
+      .toEqual(['The sauna closes at 8pm on Sundays.'])
+    expect(memory.revisions).toHaveLength(1)
+    expect(memory.knowledge()).toBe('- Breakfast is served from 7am.')
   })
 })

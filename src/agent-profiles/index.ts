@@ -616,7 +616,24 @@ export interface ProfileToolContext<TTurn extends ProfileToolTurn = ProfileToolT
   store: ProfileRevisionStore
   /** Return a store whose revision append atomically rechecks product turn authority. */
   storeForTurn?(turn: TTurn): ProfileRevisionStore
+  /**
+   * When set, `profile.remember` writes to this workspace memory store instead
+   * of appending a profile revision, so remembered facts never change the
+   * hashed profile (or anything that pins its version, such as a phone line).
+   * Structurally matches agent-runtime's `WorkspaceStore`.
+   */
+  memory?: ProfileMemoryStore
 }
+
+/** The subset of agent-runtime's `WorkspaceStore` that `profile.remember` uses. */
+export interface ProfileMemoryStore {
+  list(workspaceId: string, prefix: string): Promise<Array<{ id: string; content?: string }>>
+  put(input: { workspaceId: string; path: string; kind: 'fact'; ifRevision: null; actor: string;
+    content: string; id?: string }): Promise<{ id: string; revision: number }>
+}
+
+/** Workspace-shared memories live under this prefix in the workspace store. */
+export const PROFILE_MEMORY_PREFIX = '/memories/workspace/'
 
 /** Shared self-edit tools; only the authenticated active turn can name the profile. */
 export function profileTools<TTurn extends ProfileToolTurn>(
@@ -666,6 +683,16 @@ export function profileTools<TTurn extends ProfileToolTurn>(
       const { fact } = rememberToolSchema.parse(args)
       const turn = await context.activeTurn()
       if (turn.role !== 'owner' && turn.role !== 'manager') throw new ProfileAccessError('Profile management is required')
+      if (context.memory) {
+        const text = fact.replace(/\s+/g, ' ')
+        const known = (await context.memory.list(turn.workspaceId, PROFILE_MEMORY_PREFIX))
+          .find(entry => entry.content?.trim() === text)
+        if (known) return { memoryId: known.id, saved: true, alreadyKnown: true, line: `- ${text}`, appliesTo: 'next_message' }
+        const id = crypto.randomUUID()
+        const saved = await context.memory.put({ workspaceId: turn.workspaceId, path: `${PROFILE_MEMORY_PREFIX}${id}`,
+          kind: 'fact', ifRevision: null, actor: turn.memberId, content: text, id })
+        return { memoryId: saved.id, saved: true, alreadyKnown: false, line: `- ${text}`, appliesTo: 'next_message' }
+      }
       const line = `- ${fact.replace(/\s+/g, ' ')}`
       // One retry covers a concurrent save between the read and the append; the
       // revision chain keeps every earlier line.
