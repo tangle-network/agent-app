@@ -446,3 +446,25 @@ describe('job lease', () => {
     expect((await engine.advance(WS, job.id))!.status).toBe('complete')
   })
 })
+
+describe('background continuation', () => {
+  it('finishes an export with nobody driving it, then forgets it', async () => {
+    const storage = createMemoryExportStorage()
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage,
+      plan: async () => ({
+        sources: [
+          { kind: 'json', name: 'a', dataClass: 'records', value: async () => ({ a: 1 }) },
+          { kind: 'json', name: 'b', dataClass: 'records', value: async () => ({ b: 2 }) },
+        ],
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    // The owner closed the tab right after clicking Export; only the cron runs.
+    for (let i = 0; i < 5 && (await engine.get(WS, job.id))!.status === 'running'; i += 1) await engine.continueRunning()
+    expect((await engine.get(WS, job.id))!.status).toBe('complete')
+    expect([...storage.objects.keys()].some((k) => k.includes('/_running/'))).toBe(false)
+    expect(await engine.continueRunning()).toBe(0)
+  })
+})

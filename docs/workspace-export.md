@@ -43,6 +43,19 @@ A sandbox archive is decompressed, checked and recompressed inside one request, 
 
 Exports hold decrypted data, so they are deleted after 24 hours (`retentionMs`); the owner can delete one sooner, or export again.
 
+## Finishing after the owner leaves
+
+An export advances while the panel is open. To let it finish after the owner closes the tab, call `continueRunning()` from the product's scheduled handler on a one-minute cron and pass `continuesInBackground` to the panel:
+
+```ts
+// wrangler.toml: [triggers] crons = ["* * * * *"]
+async scheduled(event, env, ctx) {
+  ctx.waitUntil(exporterFor(env).continueRunning(50_000))
+}
+```
+
+Running exports are indexed under `workspace-exports/_running/`, so the cron reads one small listing rather than every segment. It advances only exports whose lease has lapsed, so it never competes with an open panel.
+
 ## Secrets
 
 Credentials never enter an archive:

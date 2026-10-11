@@ -166,5 +166,8 @@ export function createWorkspaceExport(options: WorkspaceExportOptions) {
     }
   }
 
-  return { route, engine }
+  /** Advance exports whose owner closed the tab. Wire to a one-minute cron. */
+  const continueRunning = (budgetMs?: number) => engine.continueRunning(budgetMs)
+
+  return { route, engine, continueRunning }
 }
