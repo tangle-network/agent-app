@@ -130,7 +130,7 @@ _128 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
 | [`./workspace-apps`](api/workspace-apps.md) | 17 | — |
-| [`./workspace-export`](api/workspace-export.md) | 41 | `object-store` |
+| [`./workspace-export`](api/workspace-export.md) | 44 | `object-store` |
 | [`./workspace-export/react`](api/workspace-export-react.md) | 2 | `object-store` |
 | [`./workspace-react`](api/workspace-react.md) | 28 | `session-shell`, `web-react`, `workspace-apps` |
 | [`./workspace-store/d1`](api/workspace-store-d1.md) | 6 | — |
@@ -1267,11 +1267,11 @@ Source: `src/workspace-apps/index.ts` · 17 exports
 
 ## `./workspace-export`
 
-Source: `src/workspace-export/index.ts` · 41 exports
+Source: `src/workspace-export/index.ts` · 44 exports
 
 Depends on: `object-store`
 
-`ArchivableBox`, `createExportEngine`, `createMemoryExportStorage`, `createR2ExportStorage`, `createSecretScanner`, `createWorkspaceExport`, `D1ExportDatabase`, `D1TableCoverage`, `d1WorkspaceTables`, `D1WorkspaceTablesOptions`, `ExportArchiveSource`, `ExportDataClass`, `ExportEngine`, `ExportEngineOptions`, `ExportFile`, `ExportFilesSource`, `ExportJob`, `ExportJsonSource`, `ExportPlan`, `ExportPrincipal`, `ExportProgress`, `ExportRow`, `ExportRowsSource`, `ExportSource`, `ExportStatus`, `ExportStorage`, `ExportUnit`, `isCredentialFile`, `isSecretName`, `kvFiles`, `KVFilesNamespace`, `MANIFEST_SCHEMA`, `R2ExportBucket`, `r2Files`, `R2FilesBucket`, `REDACTED`, `sandboxArchive`, `SecretScanner`, `StoredEntry`, `UnitStatus`, `WorkspaceExportOptions`
+`ArchivableBox`, `createExportEngine`, `createMemoryExportStorage`, `createR2ExportStorage`, `createSecretScanner`, `createWorkspaceExport`, `D1ExportDatabase`, `D1TableCoverage`, `d1WorkspaceTables`, `D1WorkspaceTablesOptions`, `DEFAULT_SANDBOX_EXCLUDE`, `ExportArchiveSource`, `ExportDataClass`, `ExportEngine`, `ExportEngineOptions`, `ExportFile`, `ExportFilesSource`, `ExportJob`, `ExportJsonSource`, `ExportPlan`, `ExportPrincipal`, `ExportProgress`, `ExportRetryLater`, `ExportRow`, `ExportRowsSource`, `ExportSource`, `ExportStatus`, `ExportStorage`, `ExportUnit`, `isCredentialFile`, `isSecretName`, `kvFiles`, `KVFilesNamespace`, `MANIFEST_SCHEMA`, `R2ExportBucket`, `r2Files`, `R2FilesBucket`, `REDACTED`, `sandboxArchive`, `sandboxFiles`, `SecretScanner`, `StoredEntry`, `UnitStatus`, `WorkspaceExportOptions`
 
 [Full API →](api/workspace-export.md)
 
