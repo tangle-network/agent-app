@@ -22336,6 +22336,12 @@
           "doc": "Props the pane passes to the product's artifact renderer (e.g."
         },
         {
+          "name": "VaultContentMatch",
+          "kind": "interface",
+          "signature": "interface VaultContentMatch",
+          "doc": "A file whose text contains a search query."
+        },
+        {
           "name": "VaultDataPort",
           "kind": "interface",
           "signature": "interface VaultDataPort",
@@ -22406,6 +22412,12 @@
           "kind": "interface",
           "signature": "interface VaultPaneProps",
           "doc": "Define the properties and render methods for the vault pane UI components"
+        },
+        {
+          "name": "VaultRevision",
+          "kind": "interface",
+          "signature": "interface VaultRevision",
+          "doc": "One saved version of a file."
         },
         {
           "name": "VaultRichParts",

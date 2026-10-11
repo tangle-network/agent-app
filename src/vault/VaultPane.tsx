@@ -26,9 +26,11 @@ import {
   type ErrorInfo,
   type ReactNode,
 } from 'react'
-import { Download, FileText, Folder, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, FileText, Folder, History, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from './ConfirmDialog'
 import { readRecentFiles, recordRecentFile } from './recent-files'
+import { VaultContentResults, type ContentSearchState } from './VaultContentResults'
+import { VaultHistoryPanel } from './VaultHistoryPanel'
 import { filterFileNodes, VaultTree } from '@tangle-network/sandbox-ui/vault-tree'
 import type {
   VaultEditorMode,
@@ -46,6 +48,11 @@ import { ShellHeader } from '@tangle-network/sandbox-ui/workspace'
 
 /** Narrowest pane that places a dock beside the document rather than in it. */
 const DOCK_SIDE_MIN_PX = 960
+
+/** Characters a content search needs before it asks the port. */
+const CONTENT_SEARCH_MIN = 2
+/** Pause after the last keystroke before a content search is sent. */
+const CONTENT_SEARCH_DEBOUNCE_MS = 250
 
 /** Square header action on the control scale's small step, a touch target on coarse pointers. */
 const TREE_ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:size-10'
@@ -364,7 +371,9 @@ function DocumentEmptyState({ label, recent, onOpen }: { label: string; recent: 
 
 /**
  * Browse and edit files in the available pane width.
- * Below 45rem, Files and the selected document share one pane.
+ * Below 60rem, Files and the selected document share one pane, so an open
+ * document gets the whole width: beside a 23rem tree, a narrower pane left a
+ * GTM call sheet's table about 385px and hid its third column.
  * Switching panes keeps the editor mounted and preserves unsaved changes.
  */
 export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function VaultPane(props, ref) {
@@ -470,6 +479,9 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const [pendingNav, setPendingNav] = useState<PendingNav>(null)
   const [query, setQuery] = useState('')
   const [folderPath, setFolderPath] = useState<string | null>(null)
+  const [contentSearch, setContentSearch] = useState<ContentSearchState>({ status: 'idle' })
+  const [contentSearchNonce, setContentSearchNonce] = useState(0)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const dirtyRef = useRef(isDirty)
   dirtyRef.current = isDirty
@@ -529,16 +541,52 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     () => ({ name: label, path: '', type: 'directory', children: tree }),
     [tree, label],
   )
-  // With no query the whole vault stays on screen: the tree owns expansion, so
-  // re-rooting on a plain folder click would fight the expand the click already
-  // performs. The folder scopes the SEARCH, which is where a narrowed list is
-  // what the reader asked for.
+  // Search always covers the whole vault. Expanding a folder makes it the
+  // active folder, and a search silently narrowed to it hid files the reader
+  // was looking for; the active folder only decides where a new file goes.
   const visibleRoot = useMemo<VaultTreeNode>(() => {
     const q = query.trim().toLowerCase()
     if (!q) return treeRoot
-    const base = activeFolderNode ?? treeRoot
-    return { ...base, children: filterFileNodes(base.children ?? [], q) }
-  }, [treeRoot, activeFolderNode, query])
+    return { ...treeRoot, children: filterFileNodes(treeRoot.children ?? [], q) }
+  }, [treeRoot, query])
+
+  // Words inside files, from the port, a moment after the reader stops typing.
+  const searchQuery = query.trim()
+  const canSearchContent = typeof port.searchContent === 'function'
+  useEffect(() => {
+    if (!canSearchContent || searchQuery.length < CONTENT_SEARCH_MIN) {
+      setContentSearch({ status: 'idle' })
+      return
+    }
+    const controller = new AbortController()
+    setContentSearch((current) => ({
+      status: 'loading',
+      query: searchQuery,
+      matches: current.status !== 'idle' && current.status !== 'error' && current.query === searchQuery ? current.matches : [],
+    }))
+    const timer = setTimeout(() => {
+      port.searchContent!(searchQuery, { signal: controller.signal }).then(
+        (matches) => {
+          if (!controller.signal.aborted) setContentSearch({ status: 'done', query: searchQuery, matches })
+        },
+        (error) => {
+          if (!controller.signal.aborted) {
+            setContentSearch({ status: 'error', query: searchQuery, message: operationMessage(error, 'The search did not answer.') })
+          }
+        },
+      )
+    }, CONTENT_SEARCH_DEBOUNCE_MS)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [port, canSearchContent, searchQuery, contentSearchNonce])
+  // Until the effect catches up with a new query, its results are pending, not empty.
+  const contentResults: ContentSearchState = !canSearchContent || searchQuery.length < CONTENT_SEARCH_MIN
+    ? { status: 'idle' }
+    : contentSearch.status !== 'idle' && contentSearch.query === searchQuery
+      ? contentSearch
+      : { status: 'loading', query: searchQuery, matches: [] }
 
   const commitPath = useCallback(
     (next: string | null) => {
@@ -890,6 +938,20 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     }
   }, [selectedFile, port, refresh, commitPath, reportFailure])
 
+  // History belongs to the open file; another file starts with the document.
+  const historyPath = selectedFile?.path ?? null
+  useEffect(() => { setHistoryOpen(false) }, [historyPath])
+  const canShowHistory = typeof port.listRevisions === 'function' && typeof port.readRevision === 'function'
+  const listRevisions = useCallback((path: string) => port.listRevisions!(path), [port])
+  const readRevision = useCallback((path: string, id: string) => port.readRevision!(path, id), [port])
+  const restoreRevision = useCallback(async (content: string) => {
+    if (!selectedFile) return
+    await port.writeFile(selectedFile.path, content)
+    setHistoryOpen(false)
+    // Re-read, so the pane holds the server's copy and its new revision.
+    setReloadNonce((n) => n + 1)
+  }, [port, selectedFile])
+
   // A file counts as opened once it is on screen, not when it is requested.
   // It is recorded in the commit that first shows it: `displayReadyPath` trails
   // that commit by one render, so a pane closed right after showing a file
@@ -912,6 +974,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   // empty-vault layout measured CLS 0.38 on Hospitality's Files page.
   const vaultEmpty = treeLoaded && treePaths.files.size === 0 && treePaths.directories.size === 0
   const trimmedQuery = query.trim()
+  const nameMatches = (visibleRoot.children?.length ?? 0) > 0
 
   let treeContent: ReactNode
   if (!treeLoaded && (treeLoading || !treeError)) {
@@ -931,9 +994,11 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
         )}
         {vaultEmpty && !trimmedQuery
           ? (treeEmptyState !== undefined ? treeEmptyState : <TreeEmptyState canCreate={canCreate} onCreate={openCreate} />)
-          : trimmedQuery && (visibleRoot.children?.length ?? 0) === 0
+          : trimmedQuery && !nameMatches && (contentResults.status === 'idle' || (contentResults.status === 'done' && contentResults.matches.length === 0))
             ? <TreeNoMatchState query={trimmedQuery} onClear={() => setQuery('')} />
-            : renderTree
+            : trimmedQuery && !nameMatches
+              ? null
+              : renderTree
               ? renderTree({
                 root: visibleRoot,
                 selectedPath: resolvedSelectedPath ?? undefined,
@@ -951,6 +1016,14 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                   label={label}
                 />
               )}
+        {trimmedQuery && contentResults.status !== 'idle' && (
+          <VaultContentResults
+            state={contentResults}
+            selectedPath={resolvedSelectedPath}
+            onOpen={(path) => guardedOpen(path)}
+            onRetry={() => setContentSearchNonce((n) => n + 1)}
+          />
+        )}
       </>
     )
   }
@@ -963,7 +1036,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               to; with nothing selected the Files pane is already all there is,
               and a lone Files chip would be a control that does nothing. */}
           {selectedPath && (
-          <nav aria-label={`${label} navigation`} className="flex shrink-0 items-center gap-1 border-b border-border p-2 @[45rem]/vault:hidden">
+          <nav aria-label={`${label} navigation`} className="flex shrink-0 items-center gap-1 border-b border-border p-2 @[60rem]/vault:hidden">
             <button
               type="button"
               aria-pressed={showFiles}
@@ -994,7 +1067,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
           </nav>
           )}
           <div className="flex min-h-0 min-w-0 flex-1">
-            <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col p-2 @[45rem]/vault:flex @[45rem]/vault:p-3 @[45rem]/vault:w-[23rem] @[45rem]/vault:min-w-[23rem] @[45rem]/vault:flex-none`}>
+            <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col p-2 @[60rem]/vault:flex @[60rem]/vault:p-3 @[60rem]/vault:w-[23rem] @[60rem]/vault:min-w-[23rem] @[60rem]/vault:flex-none`}>
               {/* The tree is its own surface: a card on the page background,
                   so the file list reads as a finished panel rather than
                   text floating on the canvas. */}
@@ -1038,14 +1111,15 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                     disabled={vaultEmpty}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder={activeFolder ? `Search ${activeFolder}…` : `Search ${noun}…`}
+                    placeholder={canSearchContent ? `Search ${noun} names and text…` : `Search ${noun}…`}
                     aria-label={`Search ${noun}`}
                     className="h-8 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:text-base"
                   />
                 </div>
-                {activeFolder && (
-                  <div className="mx-3 mb-2 flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs">
-                    <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                {activeFolder && canCreate && (
+                  <div className="mx-3 mb-2 flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-sm">
+                    <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <span className="shrink-0 text-muted-foreground">New files go in</span>
                     <span data-vault-folder className="min-w-0 flex-1 truncate font-medium text-foreground" title={activeFolder}>
                       {activeFolder}
                     </span>
@@ -1070,11 +1144,11 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               role="region"
               aria-label={`${label} document`}
               tabIndex={-1}
-              className={`${showFiles ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden @[45rem]/vault:flex`}
+              className={`${showFiles ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden @[60rem]/vault:flex`}
             >
               {selectedFile && (
                 <ShellHeader className={`justify-between gap-2 px-4 ${pathBarClassName ?? 'bg-card'}`}>
-                  <span data-vault-path className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{selectedFile.path}</span>
+                  <span data-vault-path className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{selectedFile.path}</span>
                   <div className="flex shrink-0 items-center gap-1">
                     {canWrite && isMarkdownCapable && (
                       <div className="mr-1 flex items-center gap-1">
@@ -1083,7 +1157,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                           aria-label="Edit as rich text"
                           aria-pressed={editorMode === 'rich'}
                           onClick={showRichMode}
-                          className={`inline-flex h-7 items-center rounded px-2 text-xs transition-colors ${
+                          className={`inline-flex h-8 items-center rounded px-2.5 text-sm transition-colors ${
                             editorMode === 'rich'
                               ? 'bg-primary text-primary-foreground'
                               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -1096,7 +1170,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                           aria-label="Edit as source"
                           aria-pressed={editorMode === 'source'}
                           onClick={showSourceMode}
-                          className={`inline-flex h-7 items-center rounded px-2 text-xs transition-colors ${
+                          className={`inline-flex h-8 items-center rounded px-2.5 text-sm transition-colors ${
                             editorMode === 'source'
                               ? 'bg-primary text-primary-foreground'
                               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -1106,6 +1180,23 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                         </button>
                       </div>
                     )}
+                    {canShowHistory && (
+                      <button
+                        type="button"
+                        aria-pressed={historyOpen}
+                        disabled={isDirty && !historyOpen}
+                        title={isDirty && !historyOpen ? 'Save or discard your edits first' : 'Saved versions of this file'}
+                        onClick={() => setHistoryOpen((open) => !open)}
+                        className={`inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-sm transition-colors disabled:pointer-events-none disabled:opacity-40 ${
+                          historyOpen
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        }`}
+                      >
+                        <History className="size-4" aria-hidden="true" />
+                        History
+                      </button>
+                    )}
                     {renderDock && (!persistentDock || dockInline) && (
                       <button
                         type="button"
@@ -1114,7 +1205,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                         disabled={dockBlockedByDraft}
                         title={dockBlockedByDraft ? 'Save your changes first' : (persistentDock ? dockLabel : (dockToggleCfg.title ?? dockToggleCfg.label))}
                         onClick={() => setDockOpen((v) => !v)}
-                        className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs transition-colors disabled:pointer-events-none disabled:opacity-40 ${
+                        className={`inline-flex h-8 items-center gap-1 rounded px-2.5 text-sm transition-colors disabled:pointer-events-none disabled:opacity-40 ${
                           dockOpen
                             ? 'bg-primary text-primary-foreground'
                             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -1170,6 +1261,27 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                   <EditorSkeleton />
                 ) : readError && selectedFile?.path !== resolvedSelectedPath ? (
                   <ReadErrorState message={readError} onRetry={() => setReloadNonce((n) => n + 1)} />
+                ) : selectedFile && historyOpen && canShowHistory ? (
+                  <VaultHistoryPanel
+                    path={selectedFile.path}
+                    listRevisions={listRevisions}
+                    readRevision={readRevision}
+                    canRestore={canWrite}
+                    renderPreview={(content, revision) => renderArtifact({
+                      file: { ...selectedFile, content },
+                      loading: false,
+                      mode: 'rich',
+                      canWrite: false,
+                      richDraft: activeCodec.parse(content),
+                      dirty: false,
+                      onRichChange: () => {},
+                      onSave: () => {},
+                      saving: false,
+                      revision,
+                    })}
+                    onRestore={restoreRevision}
+                    onClose={() => setHistoryOpen(false)}
+                  />
                 ) : selectedFile && renderDock && dockInline && dockOpen ? (
                   <div data-vault-dock="inline" className="flex h-full min-h-0 flex-col overflow-y-auto">
                     {renderDock({ file: selectedFile, open: true, onClose: () => setDockOpen(false), placement: 'inline' })}
@@ -1193,6 +1305,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                     dirty: isDirty,
                     onRichChange,
                     onSave: () => void saveCurrent(),
+                    saving,
                   })
                 ) : emptyState !== undefined ? emptyState : (
                   <DocumentEmptyState label={label} recent={recentToOffer} onOpen={(path) => guardedOpen(path)} />
@@ -1279,24 +1392,42 @@ function SourceEditor({
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <p className="truncate font-mono text-xs text-muted-foreground">{path}</p>
+        <p className="truncate font-mono text-sm text-muted-foreground">{path}</p>
+        {/* One save state, as in the rich editor: Save exists only while there is something to save. */}
         <div className="flex shrink-0 items-center gap-2">
-          <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground">
-            {dirty ? 'Unsaved changes' : 'Saved'}
-          </span>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving || !dirty}
-            className="inline-flex h-7 items-center rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+          <span
+            role="status"
+            aria-live="polite"
+            className={`rounded-full border px-2.5 py-1 text-sm ${
+              dirty
+                ? 'border-[var(--surface-warning-border)] bg-[var(--surface-warning-bg)] text-[var(--surface-warning-text)]'
+                : 'border-border bg-background text-muted-foreground'
+            }`}
           >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+            {saving ? 'Saving…' : dirty ? 'Unsaved changes' : 'Saved'}
+          </span>
+          {(dirty || saving) && (
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              title="Save (Ctrl+S)"
+              className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+            >
+              Save
+            </button>
+          )}
         </div>
       </div>
       <textarea
         value={content}
         onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 's') {
+            event.preventDefault()
+            if (dirty && !saving) onSave()
+          }
+        }}
         spellCheck={false}
         aria-label="Source editor"
         // Full-bleed editor: keep the floor's ring but draw it inside the border
