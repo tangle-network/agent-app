@@ -11,7 +11,8 @@
  *     cancel event produces (never a raw error),
  *   - expired/withdrawn asks stay answerable: the answer is delivered as a NEW
  *     chat turn via `onLateAnswer` (secret-bearing asks are blocked from that
- *     path),
+ *     path), sent now or queued behind a run that is still working,
+ *   - a disabled submit says which answer it is waiting for,
  *   - one submit in flight at a time; a failed/timed-out submit stays
  *     retryable.
  *
@@ -32,11 +33,13 @@ import { staggerStyle } from './motion'
 import {
   buildAnswerData,
   fieldValuesFromAnswers,
+  firstUnansweredRequiredField,
   hasSecretField,
   interactionStatusLabels,
   interactionTerminalNotes,
   isLateAnswerableStatus,
   lateAnswerMessage,
+  missingAnswerHint,
   settleInteractionSubmit,
   type FieldValues,
   type SubmitInteractionAnswer,
@@ -179,6 +182,10 @@ export function QuestionOptionList({
 
 // ── card ────────────────────────────────────────────────────────────────────
 
+/** What a host did with a late answer: sent it (`true` or nothing returned),
+ *  queued it behind the running turn, or refused it (`false`). */
+export type LateAnswerResult = boolean | 'queued' | void
+
 export interface InteractionQuestionCardProps {
   interaction: ChatInteraction
   /** Viewer-vs-editor gate: false renders everything read-only. */
@@ -195,8 +202,10 @@ export interface InteractionQuestionCardProps {
   ) => void
   /** Delivers a late answer (the ask expired/was withdrawn) as a fresh chat
    *  turn. Return/resolve `false` when the send was rejected so the card stays
-   *  retryable. Omit to hide the late-answer affordance entirely. */
-  onLateAnswer?: (message: string) => boolean | void | Promise<boolean | void>
+   *  retryable, and `'queued'` when it will go out after a run that is still
+   *  working (an ask can time out while its run goes on). Omit to hide the
+   *  late-answer affordance entirely. */
+  onLateAnswer?: (message: string) => LateAnswerResult | Promise<LateAnswerResult>
   /** Overrides the kind badge ("Question"). */
   kindLabel?: string
   /** What happens if nobody answers, rendered beside the submit action.
@@ -265,9 +274,11 @@ const STATUS_LABELS = interactionStatusLabels({
   declined: 'Declined',
 })
 
+// An ask times out while its run may still be working, so the expiry note says
+// only what is certain: the agent stopped waiting for this answer.
 const TERMINAL_NOTES = interactionTerminalNotes('question', {
-  expired: 'The original run ended. Answer now to send a new message with this context.',
-  cancelled: 'The agent withdrew this question. Answer now to send a new message with this context.',
+  expired: 'This question timed out, so the agent went on without your answer. Answer here to send it as a new message.',
+  cancelled: 'The agent withdrew this question. Answer here to send it as a new message.',
   declined: 'You declined this question.',
 })
 
@@ -289,7 +300,8 @@ export function InteractionQuestionCard({
   // Terminal state this card learned locally (submit success / 410) before the
   // stream part catches up. A terminal stream status always wins.
   const [localStatus, setLocalStatus] = useState<Exclude<ChatInteractionStatus, 'pending'> | null>(null)
-  const [lateAnswerSent, setLateAnswerSent] = useState(false)
+  const [lateAnswerOutcome, setLateAnswerOutcome] = useState<'sent' | 'queued' | null>(null)
+  const lateAnswerSent = lateAnswerOutcome !== null
   const [error, setError] = useState<string | null>(null)
   const submitInFlightRef = useRef(false)
   const [declining, setDeclining] = useState(false)
@@ -334,7 +346,7 @@ export function InteractionQuestionCard({
     setAskId(interaction.id)
     setValues(fieldValuesFromAnswers(interaction.fields, interaction.answers))
     setLocalStatus(null)
-    setLateAnswerSent(false)
+    setLateAnswerOutcome(null)
     setError(null)
   }
 
@@ -368,7 +380,7 @@ export function InteractionQuestionCard({
     submitInFlightRef.current = true
     setSubmitting(true)
     setError(null)
-    let accepted: boolean | void
+    let accepted: LateAnswerResult
     try {
       accepted = await onLateAnswer(lateAnswerMessage(interaction, data))
     } catch {
@@ -381,7 +393,7 @@ export function InteractionQuestionCard({
       setError('The new message was not sent. Try again from this card.')
       return
     }
-    setLateAnswerSent(true)
+    setLateAnswerOutcome(accepted === 'queued' ? 'queued' : 'sent')
   }
 
   async function submit() {
@@ -463,6 +475,13 @@ export function InteractionQuestionCard({
   // Declining is a different answer, not a way out of a failed one: it is offered
   // only while the ask is open, never on the late-answer path.
   const showDeclineButton = declinable && canWrite && status === 'pending'
+  // A submit that cannot be pressed says which answer it is waiting for.
+  const unanswered = showSubmitButton && !disabled && !answerData
+    ? firstUnansweredRequiredField(interaction.fields, values)
+    : null
+  const missingHint = unanswered
+    ? missingAnswerHint(unanswered, interaction.fields.length, lateAnswerable ? 'send' : 'submit')
+    : null
 
   return (
     // The card LANDS. This is the moment the run stopped and handed the turn
@@ -586,6 +605,7 @@ export function InteractionQuestionCard({
           {showTimeoutNote && (
             <div className="mr-auto text-sm text-muted-foreground">{timeoutNote}</div>
           )}
+          {missingHint && <span aria-live="polite" className="text-sm text-muted-foreground">{missingHint}</span>}
           {showDeclineButton && (
             <InteractionActionButton variant="outline" onClick={() => void decline()} disabled={disabled}>
               {declining ? 'Declining…' : 'Decline'}
@@ -605,7 +625,10 @@ export function InteractionQuestionCard({
       )}
       {lateAnswerSent && (
         <div className="mt-4 flex items-center justify-end">
-          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground"><CheckGlyph className="h-3 w-3" />Sent as new message</span>
+          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+            <CheckGlyph className="h-3 w-3" />
+            {lateAnswerOutcome === 'queued' ? 'Queued. It sends when the agent finishes.' : 'Sent as new message'}
+          </span>
         </div>
       )}
     </div>

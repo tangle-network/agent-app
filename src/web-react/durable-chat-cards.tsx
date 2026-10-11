@@ -4,7 +4,7 @@ import { persistedPartToPlan, type ChatPlan } from '../plans/index'
 import type { DurablePlanDecision, DurablePlanDecisionResult } from './durable-plan-flow'
 import { DurablePlanCard } from './durable-plan-card'
 import { InteractionPlanCard } from './interaction-plan-card'
-import { InteractionQuestionCard } from './interaction-question-card'
+import { InteractionQuestionCard, type LateAnswerResult } from './interaction-question-card'
 import type { SubmitInteractionAnswer } from './interaction-card-support'
 
 export type DurableChatCard =
@@ -49,7 +49,7 @@ export interface DurableChatCardsProps {
   decidingPlan?: (plan: ChatPlan) => DurablePlanDecision | null
   planError?: (plan: ChatPlan) => string | null
   onInteractionResolved?: (id: string, status: Exclude<ChatInteraction['status'], 'pending'>, answers?: InteractionAnswers) => void
-  onLateAnswer?: (message: string) => boolean | void | Promise<boolean | void>
+  onLateAnswer?: (message: string) => LateAnswerResult | Promise<LateAnswerResult>
   /** Fired when the user asks the agent to re-submit an expired/withdrawn
    *  plan card as a new chat turn; receives that card's interaction. Omit to
    *  hide the affordance entirely. */

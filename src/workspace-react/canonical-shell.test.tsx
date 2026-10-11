@@ -174,6 +174,20 @@ describe('WorkspaceList', () => {
     expect(onCreate).toHaveBeenCalledTimes(2)
   })
 
+  it('paints search and name fields with the shared ui field, not the page colour', () => {
+    const items = Array.from({ length: 9 }, (_, i) => item(`c${i}`, `Client ${i}`))
+    render(<WorkspaceList items={items} noun={{ singular: 'client', plural: 'clients' }} create={{ onCreate: async () => {} }} />)
+    const search = screen.getByRole('searchbox', { name: 'Search clients' })
+    // bg-background sat at ΔL 0 on the page and border-border edged it at 1.26:1 (physim
+    // production, agent-app-signoff surface-ladder). ui's Input owns the well and its border.
+    expect(search.className).toContain('bg-[var(--field-surface,')
+    expect(search.className).not.toContain('bg-background')
+    fireEvent.click(screen.getByRole('button', { name: 'New client' }))
+    const name = within(screen.getByRole('dialog', { name: 'New client' })).getByLabelText('Name')
+    expect(name.className).toContain('bg-[var(--field-surface,')
+    expect(name.className).not.toContain('bg-background')
+  })
+
   it('offers search past eight items and says when nothing matches', () => {
     const items = Array.from({ length: 9 }, (_, i) => item(`c${i}`, `Client ${i}`))
     render(<WorkspaceList items={items} noun={{ singular: 'client', plural: 'clients' }} />)

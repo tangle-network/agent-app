@@ -25,9 +25,15 @@ interface SourceBase {
   description?: string
 }
 
-/** Rows written as NDJSON to `data/<name>.ndjson`. */
+/**
+ * Rows written as NDJSON to `data/<name>.ndjson`, or with `format: 'csv'` as a
+ * spreadsheet at `spreadsheets/<name>.csv`. A source with no rows writes no file.
+ */
 export interface ExportRowsSource extends SourceBase {
   kind: 'rows'
+  /** `csv` needs `columns`: the header row, in order. Default `ndjson`. */
+  format?: 'ndjson' | 'csv'
+  columns?: readonly string[]
   /** Yield rows or pages of rows. Products decrypt their own encrypted columns here. */
   rows(): AsyncIterable<ExportRow | ExportRow[]>
   /** The count the database reports, recorded beside the written count. */
@@ -58,6 +64,8 @@ export interface ExportArchiveSource extends SourceBase {
   kind: 'archive'
   /** `null` when there is nothing to archive (no sandbox for this workspace). */
   open(): Promise<ReadableStream<Uint8Array> | null>
+  /** Directory names whose contents are left out wherever they appear, e.g. `node_modules`. */
+  exclude?: readonly string[]
 }
 
 /** One JSON document written to `data/<name>.json`. */
@@ -106,8 +114,10 @@ export interface ExportUnit {
   files?: number
   /** Files listed so far by a files unit that continues in the next request. */
   cursor?: number
-  /** Members and bytes inside a sandbox archive. */
-  archive?: { files: number; bytes: number; blanked: string[] }
+  /** Members and bytes inside a sandbox archive, and members left out by `exclude`. */
+  archive?: { files: number; bytes: number; blanked: string[]; excluded?: number }
+  /** Times the source asked to be retried later (a busy sandbox) without spending an attempt. */
+  deferrals?: number
   redactions: number
   error?: string
 }
@@ -138,7 +148,9 @@ export interface ExportProgress {
   completedAt?: string
   error?: string
   unitsTotal: number
+  /** Sources finished, with or without data. Failed sources are counted in `unitsFailed`, never here. */
   unitsDone: number
+  unitsFailed: number
   current?: string
   bytes: number
   units: { name: string; dataClass: ExportDataClass; status: UnitStatus; rows?: number; files?: number; bytes: number; error?: string }[]
