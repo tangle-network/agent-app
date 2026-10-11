@@ -1,0 +1,7 @@
+# Append-only climb and experiment ledgers: a union merge keeps both branches' added rows, so two
+# branches that each append rows merge without a conflict. GitHub's own merge ignores this attribute: update a
+# conflicting PR branch locally (git merge origin/<base>) and push. `climb-log check` rejects what a union can get
+# wrong: a row split across lines, two rows interleaved, or a repeated row.
+.agent/climb.jsonl merge=union
+.agent/experiments.jsonl merge=union
+reports/climb/ledger.jsonl merge=union
