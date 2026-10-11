@@ -15,7 +15,12 @@ it('marks limited and unavailable models in the warning tone and keeps them sele
   const onChange = vi.fn()
   render(<ModelPicker value="fal/ok" onChange={onChange} models={[ok, limited, down]} />)
   fireEvent.click(screen.getByRole('button', { name: /Ready Model/ }))
-  const row = (name: RegExp) => screen.getByRole('button', { name })
+  // Option rows carry aria-pressed; the open trigger shares the selected row's name.
+  const row = (name: RegExp) => {
+    const match = screen.getAllByRole('button', { name }).find((el) => el.hasAttribute('aria-pressed'))
+    if (!match) throw new Error(`no option row named ${name}`)
+    return match
+  }
   expect(row(/Ready Model/).querySelector('[data-model-status]')).toBeNull()
   expect(row(/Limited Model/).querySelector('[data-model-status]')?.textContent).toBe('Limited')
   expect(row(/Down Model/).querySelector('[data-model-status]')?.textContent).toBe('Unavailable')
