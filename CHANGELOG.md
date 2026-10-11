@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.110
+
+- fix(web-react): the question card tells the truth about late answers (#1024)
+
 ## 0.60.109
 
 - fix(workspace-list): search and name fields use ui's Input so they read as fields (#1034)
