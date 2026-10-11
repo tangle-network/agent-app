@@ -68,9 +68,10 @@ function DefaultLink({ href, to, ...props }: { href?: string; to?: string; [key:
  * The top of every product's rail: which product, and which workspace.
  *
  * One line when no workspace is open (the listing), two when one is: the
- * workspace name, then the product beneath it. Both truncate inside the rail
- * and carry the full text as a tooltip, so a long name can never push into
- * the collapse button or the page beside the rail. It is a switcher only when
+ * workspace name, then the product beneath it. A name too long for one line
+ * takes both lines and the product moves to the tooltip, which carries the
+ * full text either way, so a long name can never push into the collapse
+ * button, the page beside the rail, or the height of the header row. It is a switcher only when
  * there is somewhere to switch to; a menu that lists one item is not offered.
  */
 export function AgentRailIdentity({ product, workspace, hideBelow = 'lg', LinkComponent }: AgentRailIdentityProps) {
@@ -95,9 +96,14 @@ export function AgentRailIdentity({ product, workspace, hideBelow = 'lg', LinkCo
     )
   }
 
+  // Two 20px lines, the height the header row already gives the stack. A
+  // name that fits one line leaves the product beneath it; a longer name
+  // wraps onto the second line and pushes the product out of the clipped
+  // box, so the name is read in full instead of cut at a dozen characters.
+  // Past two lines it ends in an ellipsis; the tooltip keeps the full name.
   const stack = (
-    <span className="min-w-0 flex-1 text-left">
-      <span className="block truncate text-sm font-semibold leading-5 text-foreground">{workspace.name}</span>
+    <span className="block max-h-10 min-w-0 flex-1 overflow-hidden text-left">
+      <span className="line-clamp-2 text-sm font-semibold leading-5 text-foreground [overflow-wrap:anywhere]">{workspace.name}</span>
       <span className="block truncate text-sm leading-5 text-muted-foreground">{product.name}</span>
     </span>
   )
