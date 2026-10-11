@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.94
+
+- feat(sandbox): warm leases back off after no box or a capacity refusal (#1012)
+- fix(knip): name the switch and profile-editor entries so main's entry guard passes (#1013)
+
 ## 0.60.93
 
 - perf(web-react): build the profile editor as its own module (#1011)
