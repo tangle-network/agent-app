@@ -34,6 +34,7 @@ describe('toLoopEvents', () => {
       ),
     )
     expect(evs).toEqual([
+      { type: 'tool_call_start', toolCallId: 'call_1', toolName: 'submit_proposal' },
       { type: 'tool_call', call: { toolCallId: 'call_1', toolName: 'submit_proposal', args: { type: 'recommend', title: 'X' } } },
     ])
   })
@@ -48,9 +49,42 @@ describe('toLoopEvents', () => {
         ),
       ),
     )
-    expect(evs[0]).toEqual({ type: 'text', text: 'ok ' })
-    expect(evs[1]).toEqual({ type: 'tool_call', call: { toolCallId: 'a', toolName: 'schedule_followup', args: {} } })
-    expect(evs[2]).toEqual({ type: 'tool_call', call: { toolCallId: 'b', toolName: 'render_ui', args: { title: 'v' } } })
+    expect(evs).toEqual([
+      { type: 'text', text: 'ok ' },
+      { type: 'tool_call_start', toolCallId: 'a', toolName: 'schedule_followup' },
+      { type: 'tool_call_start', toolCallId: 'b', toolName: 'render_ui' },
+      { type: 'tool_call', call: { toolCallId: 'a', toolName: 'schedule_followup', args: {} } },
+      { type: 'tool_call', call: { toolCallId: 'b', toolName: 'render_ui', args: { title: 'v' } } },
+    ])
+  })
+
+  it("keeps a call's extra_content as providerFields so the next request can echo it", async () => {
+    const extraContent = { google: { thought_signature: 'sig-abc' } }
+    const evs = await collect(
+      toLoopEvents(
+        chunks(
+          { choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: 'lookup' } }] } }] },
+          { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{}' }, extra_content: extraContent }] } }] },
+        ),
+      ),
+    )
+    expect(evs.at(-1)).toEqual({ type: 'tool_call',
+      call: { toolCallId: 'c1', toolName: 'lookup', args: {}, providerFields: { extra_content: extraContent } } })
+  })
+
+  it('emits usage reported on several chunks of one stream once, as the last value', async () => {
+    const evs = await collect(
+      toLoopEvents(
+        chunks(
+          { choices: [{ delta: { content: 'hi' } }], usage: { prompt_tokens: 12, completion_tokens: 1 } },
+          { choices: [], usage: { prompt_tokens: 12, completion_tokens: 34 } },
+        ),
+      ),
+    )
+    expect(evs).toEqual([
+      { type: 'text', text: 'hi' },
+      { type: 'usage', usage: { promptTokens: 12, completionTokens: 34 } },
+    ])
   })
 
   it('emits reasoning deltas (reasoning_content or thinking) as reasoning events', async () => {
@@ -114,6 +148,7 @@ describe('createOpenAICompatStreamTurn', () => {
     expect(body.tools).toHaveLength(1)
     expect(evs).toEqual([
       { type: 'text', text: 'Hi' },
+      { type: 'tool_call_start', toolCallId: 'c1', toolName: 'submit_proposal' },
       { type: 'tool_call', call: { toolCallId: 'c1', toolName: 'submit_proposal', args: { type: 'research', title: 't' } } },
     ])
   })
