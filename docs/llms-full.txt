@@ -11274,6 +11274,14 @@ interface ParsedIntegrationAction
 
 Source: `src/integrations-react/index.ts` · depends on `platform`, `web-react`
 
+### `connectionTone`
+
+`function` — The one mapping from connection state to StatusPill tone.
+
+```ts
+(state: HubConnectionState) => StatusTone
+```
+
 ### `createHubIntegrationsClient`
 
 `function` — Finite browser transport for the server-owned `createHubSettingsRoutes` API.
@@ -11328,6 +11336,22 @@ interface HubAccountStatus
 
 ```ts
 interface HubConnectCallbackPageProps
+```
+
+### `HubConnectionState`
+
+`type` — The connection states a tile shows, in the shared StatusPill vocabulary.
+
+```ts
+type HubConnectionState
+```
+
+### `hubConnectionStatus`
+
+`function` — The state and label a Hub connection's tile shows.
+
+```ts
+(connection: Pick<HubConnection, "status" | "health">) => { state: HubConnectionState; label: string; tone: StatusTone;…
 ```
 
 ### `HubHostConnect`
@@ -34768,7 +34792,7 @@ Source: `src/workspace-export/react.tsx` · depends on `object-store`
 `function`
 
 ```ts
-({ endpoint, canExport, title, className, fetcher, continuesInBackground }: WorkspaceExportPanelProps) => Element | null
+({ endpoint, canExport, title, description, className, fetcher, continuesInBackground }: WorkspaceExportPanelProps) =>…
 ```
 
 ### `WorkspaceExportPanelProps`

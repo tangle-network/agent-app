@@ -6,7 +6,7 @@
  */
 
 import { Button, Card, StatusPill, type StatusTone } from '@tangle-network/ui/primitives'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ExportProgress } from './types'
 
 export interface WorkspaceExportPanelProps {
@@ -15,11 +15,15 @@ export interface WorkspaceExportPanelProps {
   /** Hidden for non-owners; the server refuses them regardless. */
   canExport: boolean
   title?: string
+  /** One short muted line under the title. Pass `null` to render none. */
+  description?: ReactNode
   className?: string
   fetcher?: typeof fetch
   /** True when the product runs `continueRunning` on a cron, so the export finishes after the page closes. */
   continuesInBackground?: boolean
 }
+
+const DEFAULT_DESCRIPTION = 'Everything in one zip. Credentials are never included.'
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB']
 
@@ -42,7 +46,7 @@ async function readJson<T>(response: Response): Promise<T> {
   return body as T
 }
 
-export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export workspace data', className, fetcher, continuesInBackground = false }: WorkspaceExportPanelProps) {
+export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export workspace data', description = DEFAULT_DESCRIPTION, className, fetcher, continuesInBackground = false }: WorkspaceExportPanelProps) {
   const doFetch = fetcher ?? fetch
   const [exports, setExports] = useState<ExportProgress[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -136,9 +140,9 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-base font-semibold">{title}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            One zip with every conversation, record, file and the agent workspace, plus a manifest with checksums. Connection credentials are never included.
-          </p>
+          {description != null && description !== false ? (
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          ) : null}
         </div>
         <Button type="button" onClick={start} disabled={starting || running}>
           {running ? 'Exporting…' : starting ? 'Starting…' : 'Export'}

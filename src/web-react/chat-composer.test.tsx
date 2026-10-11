@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
+import { focusFieldWithin } from '@tangle-network/ui/utils'
 import { ChatComposer } from './chat-composer'
 import { ModelPicker } from './controls'
 import type { CatalogModel } from '../runtime/model-catalog'
@@ -680,7 +681,18 @@ describe('ChatComposer seed', () => {
     expect(elevated).toContain('shadow-raised')
     // Radius/ring are unchanged — elevation only.
     expect(elevated).toContain('rounded-2xl')
-    expect(elevated).toContain('focus-within:ring-2')
+    expect(elevated).toContain(focusFieldWithin)
+  })
+
+  it('draws the composer card as a ui field and keeps the textarea transparent', () => {
+    render(<ChatComposer onSend={vi.fn()} />)
+    const card = screen.getByTestId('composer-card')
+    // The shared field treatment (well fill, field border, hover glow, focus
+    // ring) comes from ui, not hand-written focus-within classes.
+    expect(card.className).toContain(focusFieldWithin)
+    expect(card.className).not.toMatch(/focus-within:/)
+    const input = screen.getByRole('textbox', { name: 'Message input' })
+    expect(input.className).toContain('bg-transparent')
   })
 
   it('ships the labeled pill send by default and the circular icon send on sendVariant="icon"', () => {
