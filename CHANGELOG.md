@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.93
+
+- perf(web-react): build the profile editor as its own module (#1011)
+
 ## 0.60.92
 
 - perf(agent-profiles): profile-switch parsing without the profile schemas (#1010)
