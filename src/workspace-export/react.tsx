@@ -60,15 +60,26 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
   const drive = useCallback(async (id: string) => {
     if (driving.current === id) return
     driving.current = id
+    // A failed request is retried: the server records each attempt and fails
+    // the export itself once a source cannot finish.
+    let failures = 0
     try {
       for (;;) {
         if (!mounted.current) return
-        const next = await readJson<ExportProgress>(await doFetch(`${endpoint}/${id}/advance`, { method: 'POST', credentials: 'same-origin' }))
-        if (!mounted.current) return
-        upsert(next)
-        if (next.status !== 'running') return
-        // Another tab may hold the lease; wait before asking again.
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+        try {
+          const next = await readJson<ExportProgress>(await doFetch(`${endpoint}/${id}/advance`, { method: 'POST', credentials: 'same-origin' }))
+          if (!mounted.current) return
+          failures = 0
+          setError(null)
+          upsert(next)
+          if (next.status !== 'running') return
+        } catch (err) {
+          failures += 1
+          if (failures >= 6) throw err
+          if (mounted.current) setError(`Still working; retrying (${failures})`)
+        }
+        // Another tab may hold the lease, or the last request failed; wait before asking again.
+        await new Promise((resolve) => setTimeout(resolve, failures ? 3000 * failures : 1500))
       }
     } catch (err) {
       if (mounted.current) setError(err instanceof Error ? err.message : String(err))
