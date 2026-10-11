@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-229 exports.
+230 exports.
 
 ### `adaptSandboxStream`
 
@@ -956,6 +956,14 @@ number
 
 ```ts
 number
+```
+
+### `SandboxBoxBusyError`
+
+`class` — Thrown instead of restarting a box that failed the reuse gate because it is not connectable (runtime URL missing or edge readiness failed) while its runtime reports running sessions.
+
+```ts
+class SandboxBoxBusyError
 ```
 
 ### `SandboxBuildContext`

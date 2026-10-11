@@ -426,7 +426,7 @@
           "name": "switchProfile",
           "kind": "function",
           "signature": "(input: SwitchProfileInput) => Promise<ProfileSwitchReceipt>",
-          "doc": "The picker and deterministic text command converge here."
+          "doc": null
         },
         {
           "name": "SwitchProfileInput",
@@ -8787,6 +8787,12 @@
           "doc": null
         },
         {
+          "name": "HubHostConnect",
+          "kind": "interface",
+          "signature": "interface HubHostConnect",
+          "doc": null
+        },
+        {
           "name": "HubIntegrationCapabilities",
           "kind": "type",
           "signature": "type HubIntegrationCapabilities",
@@ -8855,7 +8861,7 @@
         {
           "name": "useHubIntegrations",
           "kind": "function",
-          "signature": "({ identity, client, can, callbackPath, onUnsupportedConnect }: UseHubIntegrationsOptions) => { providers: AsyncResourc…",
+          "signature": "({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect }: UseHubIntegrationsOptions) => { providers:…",
           "doc": "Identity-bound Hub settings controller; connection state is always server-read."
         },
         {
@@ -15355,6 +15361,12 @@
           "kind": "const",
           "signature": "number",
           "doc": "How long a transient failure may last before the caller fails."
+        },
+        {
+          "name": "SandboxBoxBusyError",
+          "kind": "class",
+          "signature": "class SandboxBoxBusyError",
+          "doc": "Thrown instead of restarting a box that failed the reuse gate because it is not connectable (runtime URL missing or edge readiness failed) while its runtime reports running sessions."
         },
         {
           "name": "SandboxBuildContext",
