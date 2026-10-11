@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.103
+
+- feat(runtime): ./router-turn — a Worker-safe entry for the Router engine (#1023)
+
 ## 0.60.102
 
 - fix(sandbox): charge an unused warm only for the span no turn used (#1022)
