@@ -24,6 +24,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { ProviderLogo } from './provider-logo'
+import { StatusPill } from '@tangle-network/ui/primitives'
 import {
   MAX_RECOMMENDED_MODELS,
   sortModelsByFreshness,
@@ -587,6 +588,11 @@ function ModelRow({
   const ctx = formatContext(model.contextLength)
   const media = model.output && model.output !== 'text'
   const thumb = media && (model.output === 'image' || model.output === 'video') ? model.previewUrl : undefined
+  const unavailable = model.status === 'unavailable'
+  const flagged = unavailable || model.status === 'limited'
+  // A flagged model keeps its row and stays selectable; the warning tone, not a
+  // grey sentence, says it cannot run as asked.
+  const capability = model.capability ?? (flagged ? model.statusReason : undefined)
   return (
     <button
       type="button"
@@ -600,7 +606,7 @@ function ModelRow({
       {thumb ? (
         // A media model shows what it makes: a 40px example beside its name.
         <img src={thumb} alt="" loading="lazy" decoding="async" data-model-preview
-          className="size-10 shrink-0 rounded-md border border-border object-cover" />
+          className={`size-10 shrink-0 rounded-md border border-border object-cover${unavailable ? ' opacity-50' : ''}`} />
       ) : (
         <span className="shrink-0" aria-hidden>
           {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={16} />}
@@ -613,10 +619,15 @@ function ModelRow({
               {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={14} />}
             </span>
           )}
-          <span className="min-w-0 break-words [overflow-wrap:anywhere]">{model.name}</span>
+          <span className={`min-w-0 break-words [overflow-wrap:anywhere]${unavailable ? ' text-muted-foreground' : ''}`}>{model.name}</span>
+          {flagged && (
+            <StatusPill tone="warning" size="sm" className="shrink-0" title={model.statusReason} data-model-status={model.status}>
+              {unavailable ? 'Unavailable' : 'Limited'}
+            </StatusPill>
+          )}
         </span>
-        {model.capability && (
-          <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground" data-model-capability>{model.capability}</span>
+        {capability && (
+          <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground" data-model-capability>{capability}</span>
         )}
         {(ctx || price || (!media && !model.supportsTools)) && (
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-muted-foreground">

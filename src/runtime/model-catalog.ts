@@ -66,6 +66,11 @@ export interface CatalogModel {
   previewUrl?: string
   /** One line on what the model is for, shown under its name. */
   capability?: string
+  /** Whether the model can be sent now. Absent means available. A limited or
+   *  unavailable model stays selectable; the picker marks it in a warning tone. */
+  status?: 'available' | 'limited' | 'unavailable'
+  /** Why a limited or unavailable model is so, in words a person can act on. */
+  statusReason?: string
   supportsTools: boolean
   supportsReasoning: boolean
   featured: boolean
