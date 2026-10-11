@@ -272,7 +272,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   if (stop === 'deadline' && checkpoint) {
     return { ...outcome(), continuation: { messages: checkpoint,
       hops: (options.continueFrom?.hops ?? 0) + 1,
-      text: joinText([options.continueFrom?.text ?? '', outcome().text]) } }
+      text: outcome().text } }
   }
   if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
   // A model can end its turn with neither a word nor a tool call (gemini-2.5-flash did on 8 of
