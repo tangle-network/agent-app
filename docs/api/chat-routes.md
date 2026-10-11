@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-250 exports.
+259 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -460,6 +460,22 @@ interface ChatTurnInputPatch
 
 ```ts
 interface ChatTurnIntelligenceOptions
+```
+
+### `ChatTurnIntentLine`
+
+`interface` — The intent line: one plain sentence, written by a fast model call the moment a turn is admitted, saying what the agent is about to do.
+
+```ts
+interface ChatTurnIntentLine
+```
+
+### `ChatTurnIntentLineArgs`
+
+`interface` — What `intentLine.generate` receives: the admitted turn's message and the thread's last few turns.
+
+```ts
+interface ChatTurnIntentLineArgs
 ```
 
 ### `ChatTurnLifecycle`
@@ -1022,6 +1038,30 @@ type FilePartPromotionOutcome
 950000
 ```
 
+### `INTENT_LINE_HISTORY_MESSAGES`
+
+`const` — Turns of the thread the line is written from.
+
+```ts
+6
+```
+
+### `INTENT_LINE_MAX_CHARS`
+
+`const` — Longest line kept; anything longer is cut.
+
+```ts
+240
+```
+
+### `INTENT_LINE_TIMEOUT_MS`
+
+`const` — A line slower than this shows nothing.
+
+```ts
+1500
+```
+
 ### `isCommittingSandboxEvent`
 
 `function` — True when `event` puts content in front of the user (or in the persisted transcript), making a restart on another model unsafe.
@@ -1044,6 +1084,14 @@ type FilePartPromotionOutcome
 
 ```ts
 (event: unknown) => boolean
+```
+
+### `isTurnIntentEvent`
+
+`function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
+
+```ts
+(event: unknown) => event is TurnIntentEvent
 ```
 
 ### `isTurnPhaseEvent`
@@ -1755,7 +1803,7 @@ interface SandboxUploadSink
 `function` — Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}.
 
 ```ts
-(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>
+(response: Response, onPhase: (phase: TurnPhaseData) => void, onIntent?: ((intent: TurnIntentData) => void) | undefined…
 ```
 
 ### `sniffBinary`
@@ -1854,6 +1902,14 @@ interface StreamChatRouteAsSandboxOptions
 "The Sandbox aborted a tool call before the turn finished, as when its runtime restarts mid-turn"
 ```
 
+### `TURN_INTENT_EVENT`
+
+`const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
+
+```ts
+"session.run.intent"
+```
+
 ### `TURN_PHASE_EVENT`
 
 `const` — Stream event naming the turn's current stage.
@@ -1900,6 +1956,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 "turn_stream_lost"
+```
+
+### `TurnIntentData`
+
+`type` — The data of a {@link TURN_INTENT_EVENT}.
+
+```ts
+type TurnIntentData
+```
+
+### `TurnIntentEvent`
+
+`type` — A {@link TURN_INTENT_EVENT} as it crosses the wire.
+
+```ts
+type TurnIntentEvent
 ```
 
 ### `TurnPhaseData`

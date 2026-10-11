@@ -26,6 +26,19 @@ export function normalizeInvitationEmail(email: string): string {
   return email.trim().toLowerCase()
 }
 
+// One `@`, a local part, and a domain with a dot and a 2+ letter ending. It is
+// the shape a mail server can deliver to, not full RFC 5322: the invite email
+// itself is the real check, and this only stops `founder@` or `founder@example`.
+const DELIVERABLE_EMAIL = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[^\s@.]{2,}$/
+
+/** Whether an address has the shape an invitation can be delivered to. */
+export function isInvitationEmail(email: string): boolean {
+  return DELIVERABLE_EMAIL.test(email.trim())
+}
+
+/** What to tell someone whose invite address cannot be delivered to. */
+export const INVITATION_EMAIL_HINT = 'Enter a full email address, such as name@company.com.'
+
 /** Resolve invitation permission from a string or return null if invalid */
 export function parseInvitationPermission(value: string | undefined): InvitationPermission | null {
   return INVITATION_PERMISSIONS.includes(value as InvitationPermission) ? (value as InvitationPermission) : null

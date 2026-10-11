@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useRef, type ReactNode } from 'react'
+import { ixControl, ixControlSoft } from '@tangle-network/ui/utils'
 
 export interface ConfirmDialogProps {
   open: boolean
@@ -100,7 +101,7 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onCancel}
-            className="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className={`inline-flex h-8 items-center rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground ${ixControlSoft}`}
           >
             {cancelLabel}
           </button>
@@ -113,7 +114,7 @@ export function ConfirmDialog({
               destructive
                 ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
                 : 'bg-primary text-primary-foreground hover:bg-primary/90'
-            }`}
+            } ${ixControl}`}
           >
             {confirmLabel}
           </button>
