@@ -88,7 +88,7 @@ Test keyboard and pointer interaction in the rendered surface, including clippin
 
 Confirm shell ownership and place the module in the lowest applicable architecture layer.
 Expose product variation through typed configuration and callbacks.
-Update `tsup.config.ts`, `package.json` exports, and `knip.json` entries together.
+Update `tsup.config.ts` and `package.json` exports together; `knip.ts` reads its entries from `tsup.config.ts`.
 There is no root barrel; imports use subpaths.
 Preserve existing public contracts and optional-peer isolation.
 Exercise the real composed engine path and verify an applicable reference consumer.
