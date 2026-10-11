@@ -7,12 +7,13 @@
  * read "Turn complete after 159.6 s" over "The agent stopped before finishing".
  * This module is the replacement rule, pure so every case is a unit test:
  *
- * - failure evidence is read from the WHOLE transcript region (failure-marked
+ * - failure evidence is read from the transcript region (failure-marked
  *   elements, failure lines in plain text, and a Retry control that appeared),
- *   not from the reply alone;
+ *   not from the reply alone, and from after the turn's own prompt when the
+ *   page shows it (see page-reading.ts);
  * - only evidence that appeared during the turn counts, so an earlier failure in
- *   the same thread cannot fail a later turn, and a card that Retry replaced
- *   with a new failure still counts;
+ *   the same thread cannot fail a later turn, even one the page re-renders after
+ *   Send, and a card that Retry replaced with a new failure still counts;
  * - a turn that ends with no new reply text is `empty`, never `completed`;
  * - a turn the person stopped is `stopped`, not a success and not a crash.
  */
@@ -25,6 +26,11 @@ export interface TranscriptSnapshot {
   readonly failureNodes: readonly string[]
   /** Retry controls inside the transcript region. */
   readonly retryButtons: number
+  /**
+   * The fields above hold only what follows the turn's own prompt. Everything
+   * after the prompt is the turn's, so no earlier floor applies to it.
+   */
+  readonly anchored?: boolean
 }
 
 export interface FailurePatterns {
@@ -107,6 +113,7 @@ function evidenceKeys(snapshot: TranscriptSnapshot, patterns: FailurePatterns, i
 export class TurnEvidence {
   private floor = new Map<string, number>()
   private peak = new Map<string, number>()
+  private anchored = false
   private readonly ignore: Set<string>
 
   constructor(private readonly patterns: FailurePatterns, prompt: string) {
@@ -119,10 +126,16 @@ export class TurnEvidence {
   begin(snapshot: TranscriptSnapshot): void {
     this.floor = evidenceKeys(snapshot, this.patterns, this.ignore)
     this.peak = new Map()
+    this.anchored = snapshot.anchored === true
   }
 
   /** Read one snapshot. Returns the evidence that appeared for the first time, as display text. */
   observe(snapshot: TranscriptSnapshot): string[] {
+    if (snapshot.anchored && !this.anchored) {
+      // The first read that shows this turn's prompt: a floor taken from the whole transcript no longer applies.
+      this.floor = new Map()
+      this.anchored = true
+    }
     const now = evidenceKeys(snapshot, this.patterns, this.ignore)
     for (const [key, floor] of this.floor) {
       const count = now.get(key) ?? 0

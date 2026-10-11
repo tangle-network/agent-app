@@ -93,7 +93,8 @@ This kit is that harness made app-agnostic, with the scoring rule fixed: see [Ho
 | `completed` | The turn ended with reply text and no failure evidence. |
 
 A turn has ended when, for two reads in a row, no Stop control shows and no status line has changed for 20 seconds, and the app's running-turns endpoint, when configured, lists none; a notice left on the page after a Stop (GTM's "Request was interrupted by the user") therefore does not hold the turn open.
-Evidence is read from the whole transcript region, not from the reply alone, and only evidence that appeared after Send counts: an earlier failure in the thread does not fail a later turn, and a Retry whose new failure repeats the old card's words still counts.
+Evidence is read from the transcript region, not from the reply alone, and only what follows the turn's own message counts once the page shows it; the turn's `evidenceScope` records `after-prompt`, or `whole-transcript` when the page never showed the prompt and only evidence that appeared after Send counts.
+So an earlier failure in the thread does not fail a later turn, even when the page re-renders it after Send (GTM's stopped-turn card renders above the next message), and a Retry whose new failure repeats the old card's words still counts.
 Failure-marked elements are read with `textContent`, so a typed code inside a collapsed details panel counts.
 The default failure lines include agent-app's own sandbox failure copy, so an app adds only the copy it renders itself.
 A turn that shows any failure is not a pass; read `failures` to tell a dead turn from a degraded one.

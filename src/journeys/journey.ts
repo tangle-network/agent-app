@@ -21,6 +21,7 @@ import { hostname } from 'node:os'
 import { join } from 'node:path'
 import type { Browser, BrowserContext, Locator, Page } from 'playwright'
 import { loadJourneysConfig, resolveJourneysConfig, threadRouteIn, type JourneysConfig, type ResolvedJourneysConfig, type ThreadRoute } from './config.js'
+import { promptHead, readChatPage } from './page-reading.js'
 import { scoreTurn, turnLooksActive, TurnEvidence, type TranscriptSnapshot, type TurnOutcome } from './score.js'
 import { assertNoSecrets, scrubTrace } from './scrub.js'
 import { clickUntilSubmitted, createSubmissionTracker, settleText } from './send.js'
@@ -80,6 +81,8 @@ export interface TurnRecord {
   error: string | null
   /** Every piece of failure evidence the turn added. */
   failures: string[]
+  /** Where evidence was read: after the turn's own prompt, or the whole transcript when the page did not show the prompt. */
+  evidenceScope: 'after-prompt' | 'whole-transcript' | null
   replyChars: number
   /** Distinct status lines the transcript showed, with when they appeared. */
   stages: { s: number; text: string }[]
@@ -344,7 +347,7 @@ export class Journey {
     const box = await send.boundingBox()
     if (box) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 14 })
     await sleep(400)
-    const before = await this.read(page)
+    const before = await this.read(page, prompt)
     const evidence = new TurnEvidence(this.patterns(), prompt)
     evidence.begin(before)
     const tracker = createSubmissionTracker(page.url(), this.config.chat.sendPaths)
@@ -376,7 +379,7 @@ export class Journey {
     this.budgetTurn()
     await this.typePrompt(page, prompt, { delay: opts.delay })
     const send = this.composerButton(page, this.config.chat.sendName)
-    const before = await this.read(page)
+    const before = await this.read(page, prompt)
     const evidence = new TurnEvidence(this.patterns(), prompt)
     evidence.begin(before)
     const tracker = createSubmissionTracker(page.url(), this.config.chat.sendPaths)
@@ -397,7 +400,7 @@ export class Journey {
     return {
       label: this.recordedFor(page).label, prompt, threadId: threadRouteIn(page.url(), this.config)?.threadId ?? null,
       sentAt: new Date(sentAt).toISOString(), firstProgressS: null, firstProgressText: null, firstTextS: null, firstFailureS: null, completeS: null,
-      outcome: 'timeout', error: null, failures: [], replyChars: 0, stages: [], stopPressedS: null, replyFile: null,
+      outcome: 'timeout', error: null, failures: [], evidenceScope: null, replyChars: 0, stages: [], stopPressedS: null, replyFile: null,
     }
   }
 
@@ -408,27 +411,13 @@ export class Journey {
     return t
   }
 
-  /** One read of the transcript, composer and failure marks. */
-  private async read(page: Page): Promise<PageReading> {
+  /** One read of the transcript, composer and failure marks; with a prompt, the evidence that follows it. */
+  private async read(page: Page, prompt: string | null = null): Promise<PageReading> {
     const c = this.config.chat
-    const { assistant, ...reading } = await page.evaluate((c) => {
-      const clean = (e: Element) => (e.textContent ?? '').replace(/\s+/g, ' ').trim()
-      const region = document.querySelector<HTMLElement>(c.transcript)
-      const text = region?.innerText ?? ''
-      const within = (sel: string) => (region ? Array.from(region.querySelectorAll(sel)) : [])
-      const status = within(c.status).map(clean).filter(Boolean)
-      // textContent, not innerText: a failure's collapsed details (the code) count too.
-      const failureNodes = within(c.failureNodes).map(clean).filter(Boolean)
-      const retry = new RegExp(c.retrySource, c.retryFlags)
-      const retryButtons = within('button').filter((b) => retry.test((b.getAttribute('aria-label') ?? b.textContent ?? '').trim())).length
-      const assistant = c.assistant
-        ? Array.from(document.querySelectorAll<HTMLElement>(c.assistant)).map((e) => e.innerText).join('\n').trim().length
-        : -1
-      const composer = document.querySelector(c.composer)
-      const stopVisible = composer !== null && Array.from(composer.querySelectorAll('button')).some((b) =>
-        (b.getAttribute('aria-label') ?? b.textContent ?? '').trim() === c.stopName && b.getClientRects().length > 0)
-      return { lines: text.split('\n').map((l) => l.trim()).filter(Boolean), failureNodes, retryButtons, status, assistant, transcriptChars: text.trim().length, stopVisible }
-    }, { transcript: c.transcript, status: c.status, failureNodes: c.failureNodes, retrySource: c.retryName.source, retryFlags: c.retryName.flags, assistant: c.assistant, composer: c.composer, stopName: c.stopName })
+    const { assistant, ...reading } = await page.evaluate(readChatPage, {
+      transcript: c.transcript, status: c.status, failureNodes: c.failureNodes, retrySource: c.retryName.source, retryFlags: c.retryName.flags,
+      assistant: c.assistant, composer: c.composer, stopName: c.stopName, promptHead: prompt === null ? null : promptHead(prompt),
+    })
     return { ...reading, assistantChars: assistant }
   }
 
@@ -443,7 +432,8 @@ export class Journey {
 
   /**
    * Time to first visible progress (a new status line or reply text), first
-   * reply text, and the turn's end, polled every 300 ms. The turn has ended
+   * reply text, and the turn's end, polled every 300 ms. Failure evidence is
+   * read after the turn's own prompt when the page shows it. The turn has ended
    * when, for two reads in a row, {@link turnLooksActive} is false and, where
    * the app lists running turns, the server lists none. Status lines already
    * on the page before Send are not progress. The outcome comes from
@@ -471,8 +461,9 @@ export class Journey {
     let finished = false
     await this.wait('Waiting for the agent', async () => {
       while (Date.now() - sentAt < timeoutMs) {
-        const s = await this.read(page).catch(() => null)
+        const s = await this.read(page, prompt).catch(() => null)
         if (s) {
+          t.evidenceScope = s.anchored ? 'after-prompt' : 'whole-transcript'
           const shown = evidence.observe(s)
           if (shown.length) {
             t.firstFailureS ??= since()
@@ -528,8 +519,10 @@ export class Journey {
     }, page)
     t.completeS = finished ? since() : null
     // Render lag only: the turn has ended, so wait for the transcript to stop changing before judging it.
-    await settleText(() => this.read(page).then((r) => `${r.transcriptChars}:${r.failureNodes.length}:${r.retryButtons}`))
-    evidence.observe(await this.read(page))
+    await settleText(() => this.read(page, prompt).then((r) => `${r.transcriptChars}:${r.failureNodes.length}:${r.retryButtons}`))
+    const last = await this.read(page, prompt)
+    t.evidenceScope = last.anchored ? 'after-prompt' : 'whole-transcript'
+    evidence.observe(last)
     const finalText = this.config.chat.assistant ? await this.replyText(page) : ''
     t.replyChars = this.config.chat.assistant ? Math.max(0, finalText.length - baselineChars) : Math.max(0, growth)
     Object.assign(t, scoreTurn({ timedOut: !finished, evidence: evidence.added(), replyChars: t.replyChars, stopPressed: t.stopPressedS !== null }))
