@@ -1267,7 +1267,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                     listRevisions={listRevisions}
                     readRevision={readRevision}
                     canRestore={canWrite}
-                    renderPreview={(content) => renderArtifact({
+                    renderPreview={(content, revision) => renderArtifact({
                       file: { ...selectedFile, content },
                       loading: false,
                       mode: 'rich',
@@ -1277,6 +1277,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                       onRichChange: () => {},
                       onSave: () => {},
                       saving: false,
+                      revision,
                     })}
                     onRestore={restoreRevision}
                     onClose={() => setHistoryOpen(false)}

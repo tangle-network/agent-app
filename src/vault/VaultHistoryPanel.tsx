@@ -28,7 +28,7 @@ export interface VaultHistoryPanelProps {
   /** False hides Restore, for a reader who cannot write. */
   canRestore: boolean
   /** Renders a version's text read-only, the way the pane renders the file. */
-  renderPreview: (content: string) => ReactNode
+  renderPreview: (content: string, revision: VaultRevision) => ReactNode
   /** Writes `content` as the file's newest version. */
   onRestore: (content: string) => Promise<void>
   onClose: () => void
@@ -186,8 +186,8 @@ export function VaultHistoryPanel({
           </p>
         )}
         <div className="min-h-0 flex-1 overflow-hidden">
-          {content?.status === 'ready' ? (
-            renderPreview(content.value)
+          {content?.status === 'ready' && selected ? (
+            renderPreview(content.value, selected)
           ) : content?.status === 'error' ? (
             <div role="alert" className="space-y-2 p-6 text-sm text-[var(--surface-danger-text)]">
               <p>{content.message}</p>

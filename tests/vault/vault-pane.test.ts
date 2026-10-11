@@ -1476,6 +1476,7 @@ describe('VaultPane — history', () => {
     fireEvent.click(screen.getByRole('button', { name: /You/ }))
     await waitFor(() => expect(screen.getByTestId('artifact').textContent).toContain('first draft of A'))
     expect(seen.at(-1)?.canWrite).toBe(false)
+    expect(seen.at(-1)?.revision?.id).toBe('r1')
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore this version' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Restore version' }))

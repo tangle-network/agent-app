@@ -171,6 +171,11 @@ export interface VaultArtifactRenderProps {
   onSave: () => void
   /** True while a save is in flight. */
   saving: boolean
+  /**
+   * Set when the pane renders a saved version for History rather than the open
+   * file: render it read-only, and do not treat its content as the file's.
+   */
+  revision?: VaultRevision
 }
 
 /** Props the pane passes to the product's optional dock renderer (e.g. an agent dock). */
