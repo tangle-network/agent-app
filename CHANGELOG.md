@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.90
+
+- feat(signoff): surface-ladder browser check for card and field steps, field borders and card copy (#1005)
+- perf(workspace-export): write consecutive table sources together under one job save (#1007)
+
 ## 0.60.89
 
 - fix(workspace-export): migration-runner tables are internal, not unscoped (#1004)
