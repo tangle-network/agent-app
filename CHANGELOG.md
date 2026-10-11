@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.78
+
+- fix(signoff): keep the shell-alignment usage text private to its CLI (#991)
+
 ## 0.60.77
 
 - docs(lessons): bump a shared package in every pin; the invariants report is each app's status (#989)
