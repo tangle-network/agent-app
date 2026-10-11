@@ -149,6 +149,19 @@ describe('protected Runtime chat producer', () => {
     ['model metadata', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.model = { ...profile.model!, metadata: { temperature: 0.2 } } }, 'metadata'],
     ['mounted resources', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.resources = { instructions: 'extra' } }, 'resources'],
     ['an undeclared tool', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.tools = {} }, 'is not enabled by AgentProfile.tools'],
+    ['a reasoning-token cap', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.model = { ...profile.model!, maxReasoningTokens: 64 } }, 'maxReasoningTokens'],
+    // The axes agent-runtime's router-tools executor refused (routerTurnProfileMaterialization).
+    ['additional instructions', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.prompt = { ...profile.prompt, appendSystemPrompt: 'Cite every figure.' } }, 'appendSystemPrompt'],
+    ['a small model', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.model = { ...profile.model!, small: 'openai/gpt-4o-mini' } }, 'modelSmall'],
+    ['seats', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.seats = [] }, 'seats'],
+    ['permissions', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.permissions = { bash: 'deny' } }, 'permissions'],
+    ['MCP servers', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.mcp = {} }, 'mcp'],
+    ['connections', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.connections = [] }, 'connections'],
+    ['subagents', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.subagents = {} }, 'subagents'],
+    ['hooks', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.hooks = { PreToolUse: [] } }, 'hooks'],
+    ['modes', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.modes = {} }, 'modes'],
+    ['a confidential-compute requirement', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.confidential = { tee: 'any' } }, 'confidential'],
+    ['extensions', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.extensions = { app: { flag: true } } }, 'extensions'],
   ])('refuses a profile with %s by name before reserving a grant', async (_label, change, named) => {
     const { options, settle } = fixture()
     options.tools = [{ name: 'read', description: 'Read.', inputSchema: { type: 'object' }, run: async () => 'brief' }]

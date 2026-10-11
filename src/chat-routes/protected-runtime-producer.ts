@@ -1,4 +1,4 @@
-import type { AgentProfile } from '@tangle-network/agent-interface'
+import { profileMaterializationAxes, type AgentProfile } from '@tangle-network/agent-interface'
 import { runProtectedRouterTurn, type RouterTurnGrant } from '../runtime/protected-router-turn'
 import type { RouterTurnOptions } from '../runtime/router-turn'
 import type { McpToolDefinition } from '../tools/mcp-rpc'
@@ -18,6 +18,20 @@ export interface ProtectedRuntimeChatOptions {
 }
 
 /**
+ * The AgentProfile leaves (agent-interface's materialization axes) a protected turn
+ * carries. Identity, `harness` (cli-base only) and `metadata` are control fields;
+ * `modelMetadata` is accepted only when empty. A leaf outside this set, including one
+ * agent-interface adds later, is refused by name before a grant is reserved: running
+ * the turn without it would silently drop what the profile asked for.
+ */
+const PROTECTED_TURN_AXES: ReadonlySet<string> = new Set([
+  'name', 'description', 'version', 'tags', 'metadata', 'harness', 'tools',
+  'systemPrompt', 'instructions',
+  'modelDefault', 'modelProvider', 'modelReasoningEffort', 'modelMaxVisibleOutputTokens',
+  'modelMaxTotalOutputTokens', 'modelMetadata',
+])
+
+/**
  * The parts of a profile a protected turn applies: its prompt text, its model and
  * reasoning effort, and its completion ceilings. Anything else would change the
  * execution without the grant pricing it, so it is refused by name.
@@ -30,6 +44,10 @@ function protectedTurnSettings(profile: AgentProfile, toolNames: ReadonlySet<str
     throw new Error('Protected chat does not apply AgentProfile.model.metadata')
   }
   if (profile.model?.maxReasoningTokens !== undefined) throw new Error('Protected chat cannot enforce maxReasoningTokens')
+  const unsupported = profileMaterializationAxes(profile).filter(axis => !PROTECTED_TURN_AXES.has(axis))
+  if (unsupported.length > 0) {
+    throw new Error(`Protected chat does not apply AgentProfile ${unsupported.join(', ')}; run this profile in the Sandbox lane`)
+  }
   const declared = profile.model?.default?.trim()
   const provider = profile.model?.provider?.trim()
   const model = declared && provider && declared.startsWith(`${provider}/`) ? declared.slice(provider.length + 1) : declared
