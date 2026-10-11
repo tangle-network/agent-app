@@ -26338,6 +26338,12 @@
       "error": null,
       "exports": [
         {
+          "name": "ArchivableBox",
+          "kind": "interface",
+          "signature": "interface ArchivableBox",
+          "doc": "The slice of the Sandbox SDK's `SandboxInstance` this source uses."
+        },
+        {
           "name": "createExportEngine",
           "kind": "function",
           "signature": "(options: ExportEngineOptions) => { archiveKey: (workspaceId: string, id: string) => string; list(workspaceId: string):…",
@@ -26546,6 +26552,12 @@
           "kind": "const",
           "signature": "\"[redacted]\"",
           "doc": "Keeps credentials out of workspace exports."
+        },
+        {
+          "name": "sandboxArchive",
+          "kind": "function",
+          "signature": "(args: { name: string; getBox(): Promise<ArchivableBox | null>; dir?: string | undefined; dataClass?: ExportDataClass |…",
+          "doc": "One sandbox's filesystem as `sandbox/<name>.tar.gz`."
         },
         {
           "name": "SecretScanner",

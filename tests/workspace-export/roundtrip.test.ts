@@ -17,6 +17,7 @@ import {
   createMemoryExportStorage,
   createWorkspaceExport,
   d1WorkspaceTables,
+  sandboxArchive,
   type D1ExportDatabase,
   type ExportPrincipal,
 } from '../../src/workspace-export'
@@ -295,5 +296,43 @@ describe('large files sources', () => {
     expect(members).toHaveLength(450)
     expect(new Set(members).size).toBe(450)
     expect(execFileSync('unzip', ['-p', zipPath, 'files/many/f/449.txt']).toString()).toBe('file 449')
+  })
+})
+
+describe('sandboxArchive', () => {
+  function fakeBox(status: string) {
+    const calls: string[] = []
+    const box = {
+      status,
+      async resume() { calls.push('resume'); box.status = 'running' },
+      async stop() { calls.push('stop'); box.status = 'stopped' },
+      async waitFor() { calls.push('waitFor') },
+      fs: {
+        async openArchive(dir: string) {
+          calls.push(`open:${dir}`)
+          if (box.status !== 'running') throw new Error(`Sandbox is not running (status: ${box.status})`)
+          return new Blob([new Uint8Array([1, 2, 3])]).stream() as ReadableStream<Uint8Array>
+        },
+      },
+    }
+    return { box, calls }
+  }
+
+  it('resumes a stopped box, reads it, and stops it again', async () => {
+    const { box, calls } = fakeBox('stopped')
+    const source = sandboxArchive({ name: 'box', getBox: async () => box })
+    const stream = await source.open()
+    expect([...new Uint8Array(await new Response(stream).arrayBuffer())]).toEqual([1, 2, 3])
+    expect(calls).toEqual(['resume', 'waitFor', 'open:.', 'stop'])
+    expect(box.status).toBe('stopped')
+  })
+
+  it('reads a running box without touching its state, and skips a deleted one', async () => {
+    const running = fakeBox('running')
+    await new Response(await sandboxArchive({ name: 'a', getBox: async () => running.box }).open()).arrayBuffer()
+    expect(running.calls).toEqual(['open:.'])
+    const gone = fakeBox('deleted')
+    expect(await sandboxArchive({ name: 'b', getBox: async () => gone.box }).open()).toBeNull()
+    expect(await sandboxArchive({ name: 'c', getBox: async () => null }).open()).toBeNull()
   })
 })
