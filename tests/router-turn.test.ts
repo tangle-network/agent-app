@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { composeRouterTurnPrompt, routerFunctionName, runRouterTurn, type RouterTurnEvent, type RouterTurnTool } from '../src/runtime/router-turn'
+import { composeRouterTurnPrompt, placeRouterTurn, routerFunctionName, runRouterTurn, type RouterTurnEvent, type RouterTurnTool } from '../src/runtime/router-turn'
 
 /** One Router chat completion streamed as OpenAI server-sent events. */
 function sse(chunks: unknown[], headers: Record<string, string> = {}) {
@@ -149,6 +149,28 @@ describe('runRouterTurn', () => {
       onEvent: event => events.push(event) })
     expect(outcome.usage).toEqual({ promptTokens: 8000, completionTokens: 3, modelCalls: 1 })
     expect(events.filter(event => event.type === 'usage')).toEqual([{ type: 'usage', promptTokens: 8000, completionTokens: 3 }])
+  })
+
+  it('places the turn before any model call: tools stay in the loop, a computer need goes to the sandbox', async () => {
+    const plain = { name: 'Pablo', model: { default: 'm' }, prompt: { systemPrompt: 's' }, permissions: { bash: 'deny' } }
+    expect(placeRouterTurn({ profile: plain })).toMatchObject({ chosen: 'inference' })
+    expect(placeRouterTurn({ profile: plain, toolNames: ['staff.task.create'] })).toMatchObject({ chosen: 'loop' })
+    expect(placeRouterTurn({ profile: plain, requestedModel: 'other/model' }))
+      .toMatchObject({ chosen: 'sandbox', reason: expect.stringContaining('differs from the profile model') })
+    const withMcp = { ...plain, mcp: { crm: { type: 'remote', url: 'https://crm.example/mcp' } } }
+    expect(placeRouterTurn({ profile: withMcp }).chosen).toBe('sandbox')
+
+    const { fetchImpl, calls } = router()
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'u',
+      tools: [createTask], placement: { profile: withMcp } })
+    expect(calls).not.toHaveBeenCalled()
+    expect(outcome).toMatchObject({ text: '', placement: { chosen: 'sandbox' }, failure: { code: 'placement_sandbox' } })
+
+    const loop = router(sse([text('Hi.')]))
+    const placed = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: loop.fetchImpl, systemPrompt: 's', userMessage: 'u',
+      tools: [createTask], placement: { profile: plain } })
+    expect(placed).toMatchObject({ text: 'Hi.', placement: { chosen: 'loop' } })
+    expect(placed.failure).toBeUndefined()
   })
 
   it('refuses to run without a credential', async () => {
