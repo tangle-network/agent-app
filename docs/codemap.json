@@ -228,7 +228,7 @@
           "name": "parseProfileSwitch",
           "kind": "function",
           "signature": "(text: string) => { name: string; } | { invalid: true; } | null",
-          "doc": null
+          "doc": "Chat profile-switch parsing with no dependencies, so browser code can import it without the profile schemas: through the agent-profiles barrel it pulled zod and the schemas into Hospitality's first p…"
         },
         {
           "name": "PERMITTED_SELF_MOUNT_DIMENSIONS",
@@ -547,6 +547,28 @@
           "kind": "function",
           "signature": "(input: { port: ProfileReaperPort; now?: number | undefined; graceMs?: number | undefined; dryRun?: boolean | undefined…",
           "doc": "Defaults to a logged dry run; a destructive pass requires a prior dry-run receipt."
+        }
+      ]
+    },
+    {
+      "id": "./agent-profiles/switch",
+      "source": "src/agent-profiles/switch.ts",
+      "dependsOn": [
+        "tools"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "normalizeProfileName",
+          "kind": "function",
+          "signature": "(name: string) => string",
+          "doc": null
+        },
+        {
+          "name": "parseProfileSwitch",
+          "kind": "function",
+          "signature": "(text: string) => { name: string; } | { invalid: true; } | null",
+          "doc": "Chat profile-switch parsing with no dependencies, so browser code can import it without the profile schemas: through the agent-profiles barrel it pulled zod and the schemas into Hospitality's first p…"
         }
       ]
     },
@@ -15741,6 +15763,12 @@
           "doc": null
         },
         {
+          "name": "WARM_LEASE_DECLINED_UNTIL_DDL",
+          "kind": "const",
+          "signature": "\"ALTER TABLE sandbox_warm_lease ADD COLUMN declined_until INTEGER NOT NULL DEFAULT 0\"",
+          "doc": "For a table created from an earlier \\`WARM_LEASE_TABLE_DDL\\`: paste into a migration."
+        },
+        {
           "name": "WARM_LEASE_TABLE_DDL",
           "kind": "const",
           "signature": "\"CREATE TABLE IF NOT EXISTS sandbox_warm_lease (\\n key TEXT PRIMARY KEY,\\n lease_id TEXT,\\n reason TEXT,\\n started_at I…",
@@ -25515,6 +25543,76 @@
           "name": "WorkspaceSwitcherProps",
           "kind": "interface",
           "signature": "interface WorkspaceSwitcherProps",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./web-react/agent-profile-editor",
+      "source": "src/web-react/agent-profile-editor.tsx",
+      "dependsOn": [
+        "brand",
+        "chat-routes",
+        "chat-store",
+        "harness",
+        "interactions",
+        "missions",
+        "plans",
+        "platform",
+        "profile-editor",
+        "runtime",
+        "session-shell",
+        "trace",
+        "work-product"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "AGENT_PROFILE_EDITOR_SECTIONS",
+          "kind": "const",
+          "signature": "readonly AgentProfileEditorSection[]",
+          "doc": null
+        },
+        {
+          "name": "AgentProfileEditor",
+          "kind": "function",
+          "signature": "({ value, onChange, disabled, className, config, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGit…",
+          "doc": "Controlled editor for the canonical profile."
+        },
+        {
+          "name": "AgentProfileEditorConfig",
+          "kind": "interface",
+          "signature": "interface AgentProfileEditorConfig",
+          "doc": "What a product offers in the editor."
+        },
+        {
+          "name": "AgentProfileEditorModelCatalog",
+          "kind": "interface",
+          "signature": "interface AgentProfileEditorModelCatalog",
+          "doc": "The model catalog the selectors offer: the same list the product's chat composer uses."
+        },
+        {
+          "name": "AgentProfileEditorProps",
+          "kind": "interface",
+          "signature": "interface AgentProfileEditorProps",
+          "doc": null
+        },
+        {
+          "name": "AgentProfileEditorSaveState",
+          "kind": "interface",
+          "signature": "interface AgentProfileEditorSaveState",
+          "doc": null
+        },
+        {
+          "name": "AgentProfileEditorSection",
+          "kind": "type",
+          "signature": "type AgentProfileEditorSection",
+          "doc": "Editor sections a product can offer, in display order."
+        },
+        {
+          "name": "AgentProfileResourceKind",
+          "kind": "type",
+          "signature": "type AgentProfileResourceKind",
           "doc": null
         }
       ]

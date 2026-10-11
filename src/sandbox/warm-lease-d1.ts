@@ -35,8 +35,13 @@ export const WARM_LEASE_TABLE_DDL = `CREATE TABLE IF NOT EXISTS ${DEFAULT_WARM_L
   slots TEXT NOT NULL DEFAULT '',
   slots_at INTEGER NOT NULL DEFAULT 0,
   first_seen_at INTEGER NOT NULL DEFAULT 0,
-  predicted_at INTEGER NOT NULL DEFAULT 0
+  predicted_at INTEGER NOT NULL DEFAULT 0,
+  declined_until INTEGER NOT NULL DEFAULT 0
 )`
+
+/** For a table created from an earlier \`WARM_LEASE_TABLE_DDL\`: paste into a migration. */
+export const WARM_LEASE_DECLINED_UNTIL_DDL =
+  `ALTER TABLE ${DEFAULT_WARM_LEASE_TABLE} ADD COLUMN declined_until INTEGER NOT NULL DEFAULT 0`
 
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
 
@@ -58,6 +63,7 @@ interface Row {
   slots_at: number
   first_seen_at: number
   predicted_at: number
+  declined_until: number
 }
 
 /** The D1 surface this store uses: `prepare().bind()` with `first`, `run` and `all`. A real `D1Database` satisfies it. */
@@ -101,6 +107,7 @@ function toRow(row: Row): WarmLeaseRow {
     slotsAt: row.slots_at,
     firstSeenAt: row.first_seen_at,
     predictedAt: row.predicted_at,
+    declinedUntil: row.declined_until ?? 0,
   }
 }
 
@@ -128,7 +135,7 @@ RETURNING lease_id`
   const markWarmSql = `UPDATE ${t} SET warm_at = ?3, resumed = ?4 WHERE key = ?1 AND lease_id = ?2`
   const firstUseSql = `UPDATE ${t} SET used_at = ?2 WHERE key = ?1 AND lease_id IS NOT NULL AND used_at = 0 RETURNING key`
   const turnSql = `INSERT INTO ${t} (key, last_turn_at, hold_until) VALUES (?1, ?2, ?3)
-ON CONFLICT(key) DO UPDATE SET last_turn_at = ?2, hold_until = MAX(${t}.hold_until, ?3)`
+ON CONFLICT(key) DO UPDATE SET last_turn_at = ?2, hold_until = MAX(${t}.hold_until, ?3), declined_until = 0`
   // A charge for an older day than the row holds is dropped: that day's budget is already spent.
   const endSql = `UPDATE ${t} SET
   lease_id = NULL, reason = NULL, started_at = 0, warm_at = 0, used_at = 0, resumed = 0, ping_at = 0,
@@ -191,6 +198,10 @@ WHERE key = ?1 AND lease_id = ?2`
 
     async markPinged(key, at) {
       await q(`UPDATE ${t} SET ping_at = ?2 WHERE key = ?1`, key, at).run()
+    },
+
+    async markDeclined(key, until) {
+      await q(`UPDATE ${t} SET declined_until = ?2 WHERE key = ?1`, key, until).run()
     },
 
     async markPredicted(key, at) {
