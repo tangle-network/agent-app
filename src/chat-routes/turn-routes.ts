@@ -85,10 +85,12 @@ import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import { parseJsonObjectBody } from '../web/index'
 import {
   buildTurnPhaseEvent,
+  TURN_INTENT_EVENT,
   TURN_PROGRESS_FIRST,
   TURN_PROGRESS_HEADER,
   TURN_ROUTE_PHASE_MESSAGES,
   turnResponseEventFor,
+  type TurnIntentEvent,
   type TurnRoutePhase,
 } from './turn-progress'
 import {
@@ -305,6 +307,10 @@ export interface ChatTurnProduceArgs<TContext> {
   /** The turn-buffer id announced to the client for replay. */
   turnStreamId: string
   priorMessages: PersistedChatMessageForTurn[]
+  /** The turn's intent line (`intentLine`), or null when it was off, slow or
+   *  failed. Never rejects. A product puts it in the harness turn's context so
+   *  the agent knows what the founder was told it would do. */
+  intentLine?: Promise<string | null>
   /** Server-authenticated limits for this turn. Never copied from the body. */
   executionLimits?: ChatTurnExecutionLimits
   /** The durable `role:'user'` row this turn is anchored to — the row the
@@ -647,8 +653,44 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   /** Text for the route's own stages on a progress-first stream (`./turn-progress`).
    *  Omitted stages keep `TURN_ROUTE_PHASE_MESSAGES`. */
   progressMessages?: Partial<Record<TurnRoutePhase, string>>
+  /** Write and stream the turn's intent line ({@link ChatTurnIntentLine}). Omit → no line. */
+  intentLine?: ChatTurnIntentLine<TContext>
   log?: (message: string, meta?: Record<string, unknown>) => void
 }
+
+/** What `intentLine.generate` receives: the admitted turn's message and the thread's last few turns. */
+export interface ChatTurnIntentLineArgs<TContext> {
+  content: string
+  /** The thread's last turns before this one, oldest first (at most {@link INTENT_LINE_HISTORY_MESSAGES}). */
+  history: ReadonlyArray<{ role: 'user' | 'assistant' | 'system' | 'tool'; content: string }>
+  tenantId: string
+  userId: string
+  threadId: string
+  context: TContext
+  /** Aborted when the line is no longer wanted (its deadline passed). */
+  signal: AbortSignal
+}
+
+/**
+ * The intent line: one plain sentence, written by a fast model call the moment
+ * a turn is admitted, saying what the agent is about to do. It reaches a
+ * progress-first client as a {@link TURN_INTENT_EVENT} while the harness boots,
+ * and the turn's first answer text replaces it. It narrates intent and must
+ * never answer or act. It fails open: a line later than `timeoutMs`, an error,
+ * or an empty answer shows nothing.
+ */
+export interface ChatTurnIntentLine<TContext> {
+  generate(args: ChatTurnIntentLineArgs<TContext>): Promise<string | null>
+  /** Longest wait for the line. Default {@link INTENT_LINE_TIMEOUT_MS}. */
+  timeoutMs?: number
+}
+
+/** A line slower than this shows nothing. */
+export const INTENT_LINE_TIMEOUT_MS = 1_500
+/** Turns of the thread the line is written from. */
+export const INTENT_LINE_HISTORY_MESSAGES = 6
+/** Longest line kept; anything longer is cut. */
+export const INTENT_LINE_MAX_CHARS = 240
 
 /** Define routes to run, replay, and list running chat turns with streaming and reconnect support */
 export interface ChatTurnRoutes {
@@ -838,6 +880,44 @@ export function createChatTurnRoutes<TContext = void>(
 
   /** A turn whose body parsed and whose caller `authorize` admitted. */
   type AdmittedTurn = { parsed: ParsedTurnBody; auth: Extract<ChatTurnAuthorization<TContext>, { ok: true }> }
+
+  /** Start the admitted turn's intent line; resolves to the line, or null. Never rejects. */
+  function startIntentLine(admitted: AdmittedTurn): Promise<string | null> | undefined {
+    const intentLine = options.intentLine
+    if (!intentLine) return undefined
+    const { parsed, auth } = admitted
+    const threadId = parsed.payload.threadId
+    const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const deadline = new Promise<null>((resolve) => {
+      timer = setTimeout(() => {
+        controller.abort()
+        resolve(null)
+      }, intentLine.timeoutMs ?? INTENT_LINE_TIMEOUT_MS)
+    })
+    const generated = (async () => {
+      const history = (await options.store.listMessages(threadId))
+        .slice(-INTENT_LINE_HISTORY_MESSAGES)
+        .map((message) => ({ role: message.role, content: message.content }))
+      const text = await intentLine.generate({
+        content: parsed.content,
+        history,
+        tenantId: auth.tenantId,
+        userId: auth.userId,
+        threadId,
+        context: auth.context,
+        signal: controller.signal,
+      })
+      const line = typeof text === 'string' ? text.trim().replace(/\s+/g, ' ') : ''
+      return line ? line.slice(0, INTENT_LINE_MAX_CHARS) : null
+    })().catch((err) => {
+      if (!controller.signal.aborted) {
+        log('[chat-routes] intent line failed; showing none', { error: err instanceof Error ? err.message : String(err) })
+      }
+      return null
+    })
+    return Promise.race([generated, deadline]).finally(() => clearTimeout(timer))
+  }
   /** Emits one stage on a progress-first stream. */
   type TurnProgress = (phase: string, message: string) => void
 
@@ -896,10 +976,25 @@ export function createChatTurnRoutes<TContext = void>(
     }
     progress('accepted', progressMessages.accepted)
 
+    // The intent line reaches the client between whole NDJSON lines: before the
+    // turn's own stream, or at a line boundary of it (its chunks can split lines).
+    const intent = startIntentLine(admitted)
+    let piping = false
+    let atLineStart = true
+    let pendingIntent: TurnIntentEvent | null = null
+    if (intent) {
+      void intent.then((text) => {
+        if (!text || clientGone) return
+        const event: TurnIntentEvent = { type: TURN_INTENT_EVENT, data: { text, sinceRequestMs: Date.now() - receivedAt } }
+        if (!piping || atLineStart) void writeEvent(event)
+        else pendingIntent = event
+      })
+    }
+
     const pump = (async () => {
       let inner: Response
       try {
-        inner = await runTurn(request, ctx, admitted, progress)
+        inner = await runTurn(request, ctx, admitted, progress, intent)
       } catch (err) {
         log('[chat-routes] turn failed before it streamed', { error: err instanceof Error ? err.message : String(err) })
         inner = Response.json({ error: 'The turn failed before it started. Try again.' }, { status: 500 })
@@ -908,11 +1003,18 @@ export function createChatTurnRoutes<TContext = void>(
         await writeEvent(await turnResponseEventFor(inner))
       } else {
         const reader = inner.body.getReader()
+        piping = true
         try {
           for (;;) {
             const { done, value } = await reader.read()
             if (done) break
+            atLineStart = value.length > 0 && value[value.length - 1] === 0x0a
             await write(value)
+            if (atLineStart && pendingIntent) {
+              const event = pendingIntent
+              pendingIntent = null
+              await writeEvent(event)
+            }
             if (clientGone) {
               // The turn keeps running under its own drain; only this view stops.
               await reader.cancel().catch(() => {})
@@ -942,8 +1044,11 @@ export function createChatTurnRoutes<TContext = void>(
     ctx: ChatTurnRequestContext | undefined,
     admitted: AdmittedTurn,
     progress?: TurnProgress,
+    startedIntent?: Promise<string | null>,
   ): Promise<Response> {
     const { parsed, auth } = admitted
+    // A progress-first turn started its line at admission; any other starts it here.
+    const intentLine = startedIntent ?? startIntentLine(admitted)
     const { payload, content, fileParts, mentions, turnId } = parsed
     const { tenantId, userId, context } = auth
 
@@ -1067,6 +1172,7 @@ export function createChatTurnRoutes<TContext = void>(
       turnStreamId,
       priorMessages: chatTurn.priorMessages,
       handoffCompletion,
+      ...(intentLine ? { intentLine } : {}),
       ...(ctx?.executionLimits ? { executionLimits: ctx.executionLimits } : {}),
     }
 
