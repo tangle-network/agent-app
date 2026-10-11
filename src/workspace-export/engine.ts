@@ -472,7 +472,19 @@ export function createExportEngine(options: ExportEngineOptions) {
           if (unit.status !== 'pending') continue
           if (now() > deadline) break
           const source = sources.get(unit.name)
+          if (unit.attempts >= MAX_ATTEMPTS) {
+            // Earlier requests died inside this unit without recording an outcome,
+            // most often at the Worker CPU limit.
+            unit.status = 'failed'
+            unit.error ??= 'the request exporting this source ended before it finished'
+            job.status = 'failed'
+            job.error = `${unit.name}: ${unit.error}`
+            etag = await saveJob(job, etag)
+            break
+          }
+          // Recorded before running, so a request that dies mid-unit still counts.
           unit.attempts += 1
+          etag = await saveJob(job, etag)
           try {
             if (!source || source.kind !== unit.kind) throw new Error('source is no longer available')
             await runUnit(job, unit, index, source, scanner, deadline)

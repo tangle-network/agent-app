@@ -38,6 +38,8 @@ A unit that fails three times fails the export, and the owner starts a new one.
 
 Every entry streams through the credential masks, records CRC-32, SHA-256 and sizes, and is stored as segments of at most 8 MiB.
 The download route stitches the segments into one zip with an exact `Content-Length`; nothing is buffered beyond one segment.
+A sandbox archive is decompressed, checked and recompressed inside one request, which cost 32.5 s of CPU for a 224 MB box in production. Set `[limits] cpu_ms = 300000` in the app's `wrangler.toml` so large workspaces fit. A request that dies inside a unit still counts as an attempt, so an export fails visibly rather than stalling.
+
 Exports hold decrypted data, so they are deleted after 24 hours (`retentionMs`); the owner can delete one sooner, or export again.
 
 ## Secrets

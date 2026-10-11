@@ -173,19 +173,35 @@ export function createSecretScanner(options: { knownSecrets?: readonly string[] 
       return emitEnd
     }
 
+    // Decompressors emit small chunks. Scanning each one re-reads the carry
+    // window, which cost 4x on 4 KiB chunks, so input is gathered into blocks.
+    const block = 256 * 1024
+    let pending: Uint8Array[] = []
+    let pendingLength = 0
+
+    function drain(controller: TransformStreamDefaultController<Uint8Array>, final: boolean) {
+      const buffer = new Uint8Array(carry.length + pendingLength)
+      buffer.set(carry, 0)
+      let offset = carry.length
+      for (const part of pending) {
+        buffer.set(part, offset)
+        offset += part.length
+      }
+      pending = []
+      pendingLength = 0
+      const emitEnd = scan(buffer, final)
+      if (emitEnd > 0) controller.enqueue(buffer.slice(0, emitEnd))
+      carry = buffer.slice(emitEnd)
+    }
+
     return new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {
-        const buffer = new Uint8Array(carry.length + chunk.length)
-        buffer.set(carry, 0)
-        buffer.set(chunk, carry.length)
-        const emitEnd = scan(buffer, false)
-        if (emitEnd > 0) controller.enqueue(buffer.slice(0, emitEnd))
-        carry = buffer.slice(emitEnd)
+        pending.push(chunk)
+        pendingLength += chunk.length
+        if (pendingLength >= block) drain(controller, false)
       },
       flush(controller) {
-        if (!carry.length) return
-        scan(carry, true)
-        controller.enqueue(carry)
+        if (carry.length || pendingLength) drain(controller, true)
       },
     })
   }
