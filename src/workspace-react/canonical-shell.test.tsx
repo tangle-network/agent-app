@@ -14,14 +14,14 @@ function item(id: string, name: string, over: Partial<WorkspaceListItem> = {}): 
 }
 
 describe('canonical rail identity', () => {
-  it('names the open workspace and the product, truncating a long name with the full text on hover', () => {
+  it('names the open workspace and the product, clamping a long name to two lines with the full text on hover', () => {
     render(
       <AgentWorkspaceLayout product={product} workspace={{ id: 'w1', name: LONG }} navItems={[]}>
         <p>page</p>
       </AgentWorkspaceLayout>,
     )
     const name = screen.getAllByText(LONG)[0]!
-    expect(name.className).toContain('truncate')
+    expect(name.className).toContain('line-clamp-2')
     // Every ancestor up to the rail header must allow shrinking, or the name
     // overflows into the collapse button and the page (the Legal defect).
     const identity = name.closest('[title]')!
