@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.115
+
+- feat(router-turn): every turn can carry its knowledge files: index, small-file text and the grounding rule (#1038)
+- feat(eval): parity eval kit: the same asks through every lane, graded for correct and fabricated (#1042)
+
 ## 0.60.114
 
 - fix(web-react): profile editor leads with additional instructions and drops emptied prompts (#1043)
