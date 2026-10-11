@@ -163,7 +163,7 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
           <div className="flex flex-wrap items-center gap-3">
             <StatusPill tone={TONE[latest.status]} size="sm">{LABEL[latest.status]}</StatusPill>
             <span className="text-sm text-muted-foreground">
-              {latest.unitsDone} of {latest.unitsTotal} sources · {formatBytes(latest.bytes)}
+              {latest.unitsDone} of {latest.unitsTotal} sources{latest.unitsFailed ? ` · ${latest.unitsFailed} failed` : ''} · {formatBytes(latest.bytes)}
             </span>
             {latest.current ? <span className="min-w-0 truncate text-sm text-muted-foreground">Now: {latest.current}</span> : null}
           </div>
@@ -179,7 +179,7 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
             className="h-2 overflow-hidden rounded-full bg-muted"
           >
             <div
-              className="h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
+              className={`h-full rounded-full ${latest.status === 'failed' ? 'bg-destructive' : 'bg-primary'} transition-[width] duration-300 motion-reduce:transition-none`}
               style={{ width: `${latest.unitsTotal ? Math.round((latest.unitsDone / latest.unitsTotal) * 100) : 0}%` }}
             />
           </div>

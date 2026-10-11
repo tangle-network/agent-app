@@ -19,6 +19,7 @@ import {
   createWorkspaceExport,
   d1WorkspaceTables,
   sandboxArchive,
+  sandboxFiles,
   type D1ExportDatabase,
   type ExportPrincipal,
 } from '../../src/workspace-export'
@@ -584,5 +585,130 @@ describe('files sources', () => {
     expect(unit.entries.map((e) => e.path)).toEqual(Array.from({ length: 40 }, (_, i) => `files/vault/n/${String(i).padStart(2, '0')}.md`))
     // 40 reads of 50 ms take at least 2000 ms one at a time.
     expect(elapsed).toBeLessThan(1200)
+  })
+})
+
+describe('an export an owner can read', () => {
+  // Hospitality J5, 2026-10-11: 1 of 3 exports failed on a busy sandbox while the
+  // bar read 93 of 93; the zip was 42.6 MB of node_modules and empty tables,
+  // with knowledge only as content hashes.
+  function boxWithPackages(): Uint8Array {
+    const dir = mkdtempSync(join(tmpdir(), 'wx-pkg-'))
+    mkdirSync(join(dir, 'notes'), { recursive: true })
+    mkdirSync(join(dir, '.opencode/node_modules/left-pad'), { recursive: true })
+    mkdirSync(join(dir, '.sidecar/state'), { recursive: true })
+    writeFileSync(join(dir, 'notes', 'plan.md'), '# Plan\n')
+    writeFileSync(join(dir, '.opencode/node_modules/left-pad', `${'deep-name-'.repeat(12)}.js`), 'x'.repeat(5000))
+    writeFileSync(join(dir, '.sidecar/state', 'run.json'), '{}')
+    const out = join(tmpdir(), `wx-pkg-${Date.now()}.tar.gz`)
+    execFileSync('tar', ['--format=gnu', '-czf', out, '-C', dir, '.'])
+    const bytes = new Uint8Array(readFileSync(out))
+    rmSync(dir, { recursive: true, force: true })
+    rmSync(out, { force: true })
+    return bytes
+  }
+
+  it('drops packages, writes spreadsheets and named documents, and skips empty tables', async () => {
+    const tar = boxWithPackages()
+    const vault = {
+      status: 'stopped',
+      async resume() { vault.status = 'running' },
+      async stop() { vault.status = 'stopped' },
+      async waitFor() {},
+      fs: {
+        async openArchive() { return new Blob([tar as BlobPart]).stream() as ReadableStream<Uint8Array> },
+        async read(path: string) { return path === '.vault/objects/abc/1' ? '# House rules\nQuiet after 10pm\n' : 'missing' },
+      },
+    }
+    const exporter = createWorkspaceExport({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      signingSecret: SIGNING,
+      authorize: async () => ({ userId: 'u-owner', role: 'owner' }),
+      plan: async () => ({
+        sources: [
+          {
+            kind: 'rows', name: 'tasks', dataClass: 'records', format: 'csv', columns: ['title', 'due', 'notes'],
+            async *rows() { yield [{ title: 'Restock, towels', due: '2026-10-12', notes: '=HYPERLINK("x")' }, { title: 'Say "hi"', due: null, notes: { a: 1 } }] },
+          },
+          { kind: 'rows', name: 'db.empty_table', dataClass: 'records', async *rows() { yield [] } },
+          sandboxArchive({ name: 'box', getBox: async () => vault }),
+          sandboxFiles({ name: 'knowledge', getBox: async () => vault, list: async () => [{ path: 'house-rules.md', boxPath: '.vault/objects/abc/1' }] }),
+        ],
+      }),
+    })
+    const call = (path: string, init: RequestInit = {}) =>
+      exporter.route(new Request(`https://app.test/api/workspaces/${WS}/exports${path ? `/${path}` : ''}`, init), { workspaceId: WS, path })
+    const { id } = (await (await call('', { method: 'POST' })).json()) as { id: string }
+    let progress: { status: string; downloadUrl?: string } = { status: 'running' }
+    for (let i = 0; i < 5 && progress.status === 'running'; i += 1) progress = (await (await call(`${id}/advance`, { method: 'POST' })).json()) as typeof progress
+    expect(progress.status).toBe('complete')
+    const zip = new Uint8Array(await (await exporter.route(new Request(`https://app.test${progress.downloadUrl}`), { workspaceId: WS, path: `${id}/download` })).arrayBuffer())
+    const zipPath = join(scratch, 'readable.zip')
+    writeFileSync(zipPath, zip)
+    const members = execFileSync('unzip', ['-Z1', zipPath]).toString().trim().split('\n').sort()
+    expect(members).toEqual(['README.txt', 'files/knowledge/house-rules.md', 'manifest.json', 'sandbox/box.tar.gz', 'spreadsheets/tasks.csv'])
+    expect(execFileSync('unzip', ['-p', zipPath, 'files/knowledge/house-rules.md']).toString()).toContain('Quiet after 10pm')
+    expect(execFileSync('unzip', ['-p', zipPath, 'spreadsheets/tasks.csv']).toString()).toBe(
+      'title,due,notes\r\n"Restock, towels",2026-10-12,"\'=HYPERLINK(""x"")"\r\n"Say ""hi""",,"{""a"":1}"\r\n',
+    )
+    const box = join(scratch, 'readable-box')
+    mkdirSync(box)
+    const tarPath = join(scratch, 'readable-box.tar.gz')
+    writeFileSync(tarPath, execFileSync('unzip', ['-p', zipPath, 'sandbox/box.tar.gz']))
+    expect(execFileSync('tar', ['-tzf', tarPath]).toString().split('\n').filter((m) => /node_modules|sidecar/.test(m))).toEqual([])
+    execFileSync('tar', ['-xzf', tarPath, '-C', box])
+    expect(readFileSync(join(box, 'notes/plan.md'), 'utf8')).toBe('# Plan\n')
+    const readme = execFileSync('unzip', ['-p', zipPath, 'README.txt']).toString()
+    expect(readme).toContain('spreadsheets/ 1 file')
+    expect(readme).not.toContain('data/')
+    expect(readme).toContain('1 source was empty')
+    expect(vault.status).toBe('stopped')
+  })
+
+  it('waits out a busy sandbox without spending attempts, and never counts a failed source as done', async () => {
+    let busy = 4
+    const box = {
+      status: 'stopped',
+      async resume() {
+        if (busy-- > 0) throw Object.assign(new Error('A sandbox lifecycle operation is already in progress'), { status: 409, code: 'SANDBOX_LIFECYCLE_IN_PROGRESS' })
+        box.status = 'running'
+      },
+      async stop() { box.status = 'stopped' },
+      async waitFor() {},
+      fs: { async openArchive() { return new Blob([boxWithPackages() as BlobPart]).stream() as ReadableStream<Uint8Array> } },
+    }
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      plan: async () => ({
+        sources: [
+          sandboxArchive({ name: 'busy', getBox: async () => box }),
+          { kind: 'json', name: 'settings', dataClass: 'workspace', value: async () => ({ ok: true }) },
+        ],
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    let current = job
+    for (let i = 0; i < 8 && current.status === 'running'; i += 1) current = (await engine.advance(WS, job.id))!
+    expect(current.status).toBe('complete')
+    const unit = current.units.find((u) => u.name === 'busy')!
+    expect(unit).toMatchObject({ status: 'done', deferrals: 4, attempts: 1 })
+
+    const broken = createExportEngine({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      plan: async () => ({
+        sources: [
+          { kind: 'json', name: 'a', dataClass: 'workspace', value: async () => ({}) },
+          { kind: 'archive', name: 'b', dataClass: 'sandbox', open: async () => { throw new Error('disk gone') } },
+        ],
+      }),
+    })
+    const failing = await broken.start(WS, 'u-owner')
+    let failed = failing
+    for (let i = 0; i < 6 && failed.status === 'running'; i += 1) failed = (await broken.advance(WS, failing.id))!
+    expect(failed.status).toBe('failed')
+    expect(broken.progress(failed)).toMatchObject({ unitsTotal: 2, unitsDone: 1, unitsFailed: 1 })
   })
 })
