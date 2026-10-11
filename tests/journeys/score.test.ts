@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_FAILURE_TEXT, DEFAULT_STOPPED_TEXT, scoreTurn, STATUS_STALE_MS, turnLooksActive, TurnEvidence, type TranscriptSnapshot } from '../../src/journeys/score'
+import { formatSandboxProvisioningUserMessage } from '../../src/sandbox/diagnostics'
+import { EGRESS_PROXY_RECOVERY_REQUIRED } from '../../src/sandbox/recovery'
 
 const DEFAULTS = { failure: DEFAULT_FAILURE_TEXT, stopped: DEFAULT_STOPPED_TEXT }
 /** GTM's own failure-card copy, as its journeys config adds it. */
 const GTM = {
-  failure: [...DEFAULT_FAILURE_TEXT, /stopped before finishing/i, /unable to connect to the sandbox/i],
+  failure: [...DEFAULT_FAILURE_TEXT, /stopped before finishing/i],
   stopped: [...DEFAULT_STOPPED_TEXT, /You stopped this turn/i],
 }
 
@@ -132,6 +134,34 @@ describe('TurnEvidence counts only what the turn added', () => {
     ], { replyChars: 4 })
     expect(v.outcome).toBe('failed')
     expect(v.failures).toEqual(['The model stream stopped before a clean completion.'])
+  })
+})
+
+describe('agent-app sandbox failure copy fails a turn with no app config', () => {
+  // One diagnostics input per branch of formatSandboxProvisioningUserMessage, as an
+  // app renders its message where the reply belongs: no failure mark, no Retry.
+  const api = (status: number, endpoint: string) => ({ status, origin: 'sandbox-api', endpoint })
+  const branches = [
+    [],
+    [{ code: EGRESS_PROXY_RECOVERY_REQUIRED }],
+    [{ code: 'vault.hydration_incomplete' }],
+    [api(503, '/v1/sandboxes')],
+    [api(401, '/v1/sandboxes?status=stopped')],
+    [{ code: 'AUTH_ERROR' }],
+    [{ code: 'PAYLOAD_TOO_LARGE', message: 'writeProfileFilesToBox: /home/agent/brand.json' }],
+    [{ code: 'PAYLOAD_TOO_LARGE' }],
+    [{ code: 'UPLOAD_BUDGET_EXHAUSTED' }],
+  ]
+  const messages = branches.map((causes) => formatSandboxProvisioningUserMessage({ message: 'sandbox error', causes, truncated: false, cycle: false }))
+
+  it('reaches every branch of the formatter', () => {
+    expect(new Set(messages).size).toBe(branches.length)
+  })
+
+  it.each(messages)('fails a reply that reads: %s', (message) => {
+    const v = judge(DEFAULTS, PROMPT, snap([PROMPT]), [snap([PROMPT, message])], { replyChars: message.length })
+    expect(v.outcome).toBe('failed')
+    expect(v.error).toBe(message)
   })
 })
 

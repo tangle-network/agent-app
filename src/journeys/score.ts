@@ -52,6 +52,15 @@ export const DEFAULT_FAILURE_TEXT: readonly RegExp[] = [
   /Internal Server Error/,
   /\bECONNREFUSED\b/,
   /Something went wrong/i,
+  // agent-app's own sandbox failure copy (`formatSandboxProvisioningUserMessage`),
+  // which every app on the shared runtime can render as a reply. Tests drive the
+  // formatter's every branch through these, so the copy and the scorer cannot drift.
+  /unable to (?:re)?connect to the sandbox/i,
+  /sandbox service didn.t answer/i,
+  /Sandbox recovery is required before chat can continue/i,
+  /couldn.t (?:finish copying|copy) your Vault into the sandbox/i,
+  /too large (?:for the sandbox to accept|to copy into the sandbox)/i,
+  /attachment data is staged in the sandbox/i,
 ]
 
 /** Runtime wording for a turn the person stopped. Apps add their own copy. */
