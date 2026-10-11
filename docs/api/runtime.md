@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-71 exports.
+79 exports.
 
 ### `AnySurfaceKind`
 
@@ -60,6 +60,14 @@ interface CertifiedDelivery
 
 ```ts
 type CertifiedDeliveryConfig
+```
+
+### `composeRouterTurnPrompt`
+
+`function` — The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls.
+
+```ts
+(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…
 ```
 
 ### `createCertifiedDelivery`
@@ -358,6 +366,14 @@ interface ResolveUserTangleExecutionKeyForUserOptions
 interface ResolveUserTangleExecutionKeyOptions
 ```
 
+### `routerFunctionName`
+
+`function` — OpenAI-compatible function names allow only `[A-Za-z0-9_-]{1,64}`; app tool names often use dots.
+
+```ts
+(name: string) => string
+```
+
 ### `RouterModel`
 
 `interface` — Model catalogue — computed live from the Tangle Router, never hand-curated.
@@ -382,12 +398,60 @@ interface RouterProtectedModelPortOptions
 type RouterProtectedModelSettlement
 ```
 
+### `RouterTurnEvent`
+
+`type` — What the turn is doing, in the order it happens, for a live view.
+
+```ts
+type RouterTurnEvent
+```
+
+### `RouterTurnFailure`
+
+`interface`
+
+```ts
+interface RouterTurnFailure
+```
+
+### `RouterTurnOptions`
+
+`interface`
+
+```ts
+interface RouterTurnOptions
+```
+
+### `RouterTurnOutcome`
+
+`interface`
+
+```ts
+interface RouterTurnOutcome
+```
+
+### `RouterTurnTool`
+
+`interface` — A tool the turn may call.
+
+```ts
+interface RouterTurnTool
+```
+
 ### `runAppToolLoop`
 
 `function` — Run the bounded tool loop and return the final text + every executed tool outcome.
 
 ```ts
 (opts: RunToolLoopOptions) => Promise<ToolLoopResult>
+```
+
+### `runRouterTurn`
+
+`function`
+
+```ts
+(options: RouterTurnOptions) => Promise<RouterTurnOutcome>
 ```
 
 ### `sortModelsByFreshness`

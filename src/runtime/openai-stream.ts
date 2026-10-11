@@ -49,6 +49,7 @@ interface PartialToolCall {
   id?: string
   name: string
   args: string
+  announced: boolean
 }
 
 /**
@@ -57,6 +58,10 @@ interface PartialToolCall {
  * chunks and emitted as one complete `tool_call` event when the stream finishes
  * (arguments JSON-parsed; an empty/garbled args string yields `{}` rather than
  * throwing). Works for the Tangle Router, tcloud, or any OpenAI-compat source.
+ *
+ * Each call also yields one `tool_call_start` as soon as its name arrives,
+ * while its arguments are still streaming, so a caller can start work the call
+ * will need. Providers send the whole name in the call's first delta.
  */
 export async function* toLoopEvents(chunks: AsyncIterable<OpenAIStreamChunk>): AsyncIterable<LoopEvent> {
   const calls = new Map<number, PartialToolCall>()
@@ -79,11 +84,15 @@ export async function* toLoopEvents(chunks: AsyncIterable<OpenAIStreamChunk>): A
     const reasoning = choice.delta?.reasoning_content ?? choice.delta?.thinking
     if (reasoning) yield { type: 'reasoning', text: reasoning }
     for (const tc of choice.delta?.tool_calls ?? []) {
-      const cur = calls.get(tc.index) ?? { name: '', args: '' }
+      const cur = calls.get(tc.index) ?? { name: '', args: '', announced: false }
       if (tc.id) cur.id = tc.id
       if (tc.function?.name) cur.name += tc.function.name
       if (tc.function?.arguments) cur.args += tc.function.arguments
       calls.set(tc.index, cur)
+      if (!cur.announced && cur.name) {
+        cur.announced = true
+        yield { type: 'tool_call_start', ...(cur.id ? { toolCallId: cur.id } : {}), toolName: cur.name }
+      }
     }
   }
   for (const [, c] of [...calls.entries()].sort((a, b) => a[0] - b[0])) {

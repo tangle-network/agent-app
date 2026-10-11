@@ -55,6 +55,12 @@ export type {
 export type LoopEvent =
   | { type: 'text'; text: string }
   | { type: 'reasoning'; text: string }
+  /** The model has begun a tool call: its name is known, its arguments are
+   *  still streaming. Emitted once per call, before its `tool_call`. Lets a
+   *  caller start slow work the call will need (resuming a sandbox box for
+   *  `sandbox_run`) while the arguments arrive. Consumers that do not care
+   *  ignore it: it never drives the loop. */
+  | { type: 'tool_call_start'; toolCallId?: string; toolName: string }
   | {
       type: 'tool_call'
       call: import('@tangle-network/agent-runtime/tool-loop').ToolLoopCall

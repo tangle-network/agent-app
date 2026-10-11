@@ -48,6 +48,9 @@ export type WarmReason =
   | 'member-activity'
   | 'predicted'
   | 'scheduled'
+  /** A turn is likely to call a sandbox tool (deterministic input rules, or a
+   *  `sandbox_run` call starting to stream). See `createEscalationSpeculator`. */
+  | 'escalation-likely'
   | (string & {})
 
 /** What the product's `warm` did to the box. */
@@ -193,7 +196,7 @@ export interface WarmLeasesOptions {
   absentCooldownMs?: number
   /** After a capacity refusal, refuse that key's signals this long. Default 5 min. */
   capacityCooldownMs?: number
-  /** Reasons subject to the budget. Default page-open, member-activity, predicted, scheduled. */
+  /** Reasons subject to the budget. Default page-open, member-activity, predicted, scheduled, escalation-likely. */
   budgetedReasons?: readonly string[]
   /** Starting predicted-warm threshold, a probability. Default 0.25. */
   initialThreshold?: number
@@ -221,7 +224,7 @@ const SLOT_HALF_LIFE_MS = 14 * DAY_MS
 const PING_MARGIN_MS = 2 * 60_000
 const THRESHOLD_FLOOR = 0.05
 const THRESHOLD_CEILING = 0.95
-const DEFAULT_BUDGETED = ['page-open', 'member-activity', 'predicted', 'scheduled'] as const
+const DEFAULT_BUDGETED = ['page-open', 'member-activity', 'predicted', 'scheduled', 'escalation-likely'] as const
 
 /** UTC ten-minute bin of the day, 0..143. */
 export function warmBinOf(at: number): number {
