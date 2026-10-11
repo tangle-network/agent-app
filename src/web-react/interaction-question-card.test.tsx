@@ -3,7 +3,7 @@ import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
-import { InteractionQuestionCard } from './interaction-question-card'
+import { InteractionQuestionCard, type LateAnswerResult } from './interaction-question-card'
 import {
   createInteractionAnswerSubmitter,
   type InteractionSubmitResult,
@@ -61,7 +61,7 @@ function mount(
     canWrite?: boolean
     submitAnswer?: SubmitInteractionAnswer
     onResolved?: (id: string, status: string) => void
-    onLateAnswer?: (message: string) => boolean | void | Promise<boolean | void>
+    onLateAnswer?: (message: string) => LateAnswerResult | Promise<LateAnswerResult>
     kindLabel?: string
     timeoutNote?: React.ReactNode
     renderMarkdown?: (markdown: string) => React.ReactNode
@@ -307,6 +307,55 @@ describe('InteractionQuestionCard', () => {
     expect(container.textContent).not.toContain('Sent as new message')
   })
 
+  it('says an expired ask timed out, never that its run ended, since the run may still be working', () => {
+    const { container } = mount({ ...SELECT_INTERACTION, status: 'expired' }, { onLateAnswer: () => true })
+    expect(container.textContent).toContain('This question timed out, so the agent went on without your answer.')
+    expect(container.textContent).not.toMatch(/run ended/i)
+  })
+
+  it('says a late answer was queued, not sent, when the host queues it behind a running turn', async () => {
+    const onLateAnswer = vi.fn((): LateAnswerResult => 'queued')
+    const { container } = mount({ ...SELECT_INTERACTION, status: 'expired' }, { onLateAnswer })
+    fireEvent.click(screen.getByLabelText('Formal'))
+    fireEvent.click(lateAnswerButton())
+    await flush()
+
+    expect(onLateAnswer).toHaveBeenCalledTimes(1)
+    expect(container.textContent).toContain('Queued. It sends when the agent finishes.')
+    expect(container.textContent).not.toContain('Sent as new message')
+    expect(container.textContent).not.toContain('was not sent')
+    expect(screen.queryByRole('button', { name: /Send as new message/ })).toBeNull()
+  })
+
+  it('says which required answer a disabled submit is waiting for, and drops the line once it is given', () => {
+    const interaction: ChatInteraction = {
+      id: 'int-two',
+      kind: 'question',
+      title: 'Two questions',
+      fields: [
+        { type: 'text', name: 'q0', label: 'Are the 23 clinics paying today?', required: true },
+        {
+          type: 'select',
+          name: 'q1',
+          label: 'Capacity and next cohort: how many hours a week can you spend on new-clinic sales?',
+          required: true,
+          multi: false,
+          options: [{ value: 'calls', label: 'Colorado cold calls' }, { value: 'referrals', label: 'Keep referrals only' }],
+        },
+      ],
+      status: 'pending',
+    }
+    const { container } = mount(interaction)
+    fireEvent.change(textareaOf({ container }), { target: { value: 'Paying today' } })
+
+    expect(submitButton().disabled).toBe(true)
+    expect(container.textContent).toContain('Choose an option for “Capacity and next cohort: how many hours a week…” to submit.')
+
+    fireEvent.click(screen.getByLabelText('Colorado cold calls'))
+    expect(submitButton().disabled).toBe(false)
+    expect(container.textContent).not.toContain('to submit.')
+  })
+
   it('hides the late-answer affordance entirely when onLateAnswer is not wired', () => {
     const { container } = mount({ ...SELECT_INTERACTION, status: 'expired' })
     expect(screen.queryByRole('button', { name: /Send as new message/ })).toBeNull()
@@ -327,14 +376,14 @@ describe('InteractionQuestionCard', () => {
 
     expect(onResolved).toHaveBeenCalledWith('int-1', 'expired')
     expect(container.textContent).toContain('Expired')
-    expect(container.textContent).toContain('send a new message with this context')
+    expect(container.textContent).toContain('Answer here to send it as a new message.')
     expect(lateAnswerButton().disabled).toBe(false)
   })
 
   it('renders terminal statuses from the stream (cancel path) with the late-answer action', () => {
     const { container } = mount({ ...SELECT_INTERACTION, status: 'cancelled' }, { onLateAnswer: () => true })
     expect(container.textContent).toContain('Withdrawn')
-    expect(container.textContent).toContain('The agent withdrew this question. Answer now to send a new message with this context.')
+    expect(container.textContent).toContain('The agent withdrew this question. Answer here to send it as a new message.')
     // No option picked yet, so the late send has no answer data to carry.
     expect(lateAnswerButton().disabled).toBe(true)
   })

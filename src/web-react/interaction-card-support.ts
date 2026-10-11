@@ -114,6 +114,40 @@ export function buildAnswerData(fields: ChatInteractionField[], values: FieldVal
   return data
 }
 
+/** The first required field still without an answer, or null when every
+ *  required field has one: the reason `buildAnswerData` returned null. */
+export function firstUnansweredRequiredField(
+  fields: ChatInteractionField[],
+  values: FieldValues,
+): ChatInteractionField | null {
+  return fields.find((field) => field.required === true && fieldAnswer(field, values) === null) ?? null
+}
+
+function shortLabel(label: string, max = 48): string {
+  const text = label.trim().replace(/\s+/g, ' ')
+  if (text.length <= max) return text
+  const cut = text.slice(0, max)
+  const space = cut.lastIndexOf(' ')
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s,.:;?!]+$/, '')}…`
+}
+
+/** What the reader still has to do before the card's action (`verb`: submit,
+ *  send) is available, in plain words, for the line beside the disabled
+ *  button. It names the question only when the card asks more than one. */
+export function missingAnswerHint(field: ChatInteractionField, fieldCount: number, verb: string): string {
+  const select = field.type === 'select' ? field as ChatSelectField : null
+  const action = select
+    ? `${select.multi === true ? 'Choose at least one option' : 'Choose an option'}${select.allowCustom === true ? ' or write your own' : ''}`
+    : field.type === 'boolean'
+      ? 'Choose Yes or No'
+      : field.type === 'number'
+        ? 'Enter a number'
+        : 'Type an answer'
+  return fieldCount > 1
+    ? `${action} for “${shortLabel(field.label)}” to ${verb}.`
+    : `${action} to ${verb}.`
+}
+
 // ---------------------------------------------------------------------------
 // Late answers (question card): an expired/withdrawn ask can still be sent as
 // a NEW chat turn carrying the question context, so the user's typed answer is
