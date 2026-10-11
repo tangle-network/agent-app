@@ -504,6 +504,9 @@ export function createExportEngine(options: ExportEngineOptions) {
       try {
         job.lease = { id: crypto.randomUUID(), until: now() + LEASE_MS }
         await save()
+        // Index every job this request touches, including ones started before the
+        // index existed, so the background sweep can finish it if this tab closes.
+        await storage.put(runningKey(workspaceId, id), new Uint8Array(0))
         heartbeat = setInterval(() => {
           save().catch(() => {})
         }, HEARTBEAT_MS)
