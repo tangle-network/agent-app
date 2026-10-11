@@ -426,7 +426,7 @@
           "name": "switchProfile",
           "kind": "function",
           "signature": "(input: SwitchProfileInput) => Promise<ProfileSwitchReceipt>",
-          "doc": "The picker and deterministic text command converge here."
+          "doc": null
         },
         {
           "name": "SwitchProfileInput",
@@ -8787,6 +8787,12 @@
           "doc": null
         },
         {
+          "name": "HubHostConnect",
+          "kind": "interface",
+          "signature": "interface HubHostConnect",
+          "doc": null
+        },
+        {
           "name": "HubIntegrationCapabilities",
           "kind": "type",
           "signature": "type HubIntegrationCapabilities",
@@ -8855,7 +8861,7 @@
         {
           "name": "useHubIntegrations",
           "kind": "function",
-          "signature": "({ identity, client, can, callbackPath, onUnsupportedConnect }: UseHubIntegrationsOptions) => { providers: AsyncResourc…",
+          "signature": "({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect }: UseHubIntegrationsOptions) => { providers:…",
           "doc": "Identity-bound Hub settings controller; connection state is always server-read."
         },
         {
@@ -9918,8 +9924,14 @@
         {
           "name": "measureD1",
           "kind": "function",
-          "signature": "<D extends object>(d1: D, reads?: D1Reads, options?: { sampleHeap?: boolean | undefined; }) => { d1: D; reads: D1Reads;…",
-          "doc": "The D1 binding with every response measured (serialized bytes) and the live heap sampled after a collection before and after every query."
+          "signature": "<D extends object>(d1: D, reads?: D1Reads, options?: MeasureD1Options) => { d1: D; reads: D1Reads; }",
+          "doc": "The D1 binding with every response measured (serialized bytes) and the live heap sampled after a forced collection."
+        },
+        {
+          "name": "MeasureD1Options",
+          "kind": "interface",
+          "signature": "interface MeasureD1Options",
+          "doc": null
         },
         {
           "name": "measureJob",

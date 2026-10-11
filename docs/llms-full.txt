@@ -540,7 +540,7 @@ interface SwitchableProfile
 
 ### `switchProfile`
 
-`function` — The picker and deterministic text command converge here.
+`function`
 
 ```ts
 (input: SwitchProfileInput) => Promise<ProfileSwitchReceipt>
@@ -11309,6 +11309,14 @@ interface HubAccountStatus
 interface HubConnectCallbackPageProps
 ```
 
+### `HubHostConnect`
+
+`interface`
+
+```ts
+interface HubHostConnect
+```
+
 ### `HubIntegrationCapabilities`
 
 `type` — Display hints only.
@@ -11402,7 +11410,7 @@ number
 `function` — Identity-bound Hub settings controller; connection state is always server-read.
 
 ```ts
-({ identity, client, can, callbackPath, onUnsupportedConnect }: UseHubIntegrationsOptions) => { providers: AsyncResourc…
+({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect }: UseHubIntegrationsOptions) => { providers:…
 ```
 
 ### `UseHubIntegrationsOptions`
@@ -12765,10 +12773,18 @@ interface LimitAlarmCheckOptions
 
 ### `measureD1`
 
-`function` — The D1 binding with every response measured (serialized bytes) and the live heap sampled after a collection before and after every query.
+`function` — The D1 binding with every response measured (serialized bytes) and the live heap sampled after a forced collection.
 
 ```ts
-<D extends object>(d1: D, reads?: D1Reads, options?: { sampleHeap?: boolean | undefined; }) => { d1: D; reads: D1Reads;…
+<D extends object>(d1: D, reads?: D1Reads, options?: MeasureD1Options) => { d1: D; reads: D1Reads; }
+```
+
+### `MeasureD1Options`
+
+`interface`
+
+```ts
+interface MeasureD1Options
 ```
 
 ### `measureJob`
