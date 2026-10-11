@@ -141,6 +141,9 @@ export function createExportEngine(options: ExportEngineOptions) {
   const jobKey = (workspaceId: string, id: string) => `${base(workspaceId, id)}/job.json`
   /** The key a download signature covers. No object lives there; the zip is assembled per request. */
   const archiveKey = (workspaceId: string, id: string) => `${base(workspaceId, id)}/archive.zip`
+  /** One small object per running export, so a scheduled job can find them without listing every segment. */
+  const runningKey = (workspaceId: string, id: string) =>
+    `${prefix}/_running/${assertSafeKeySegment(workspaceId)}~${assertSafeKeySegment(id)}`
 
   async function loadJob(workspaceId: string, id: string): Promise<{ job: ExportJob; etag: string } | null> {
     if (!/^[a-z0-9-]{8,64}$/.test(id)) return null
@@ -471,6 +474,7 @@ export function createExportEngine(options: ExportEngineOptions) {
         })),
       }
       await saveJob(job)
+      await storage.put(runningKey(workspaceId, job.id), new Uint8Array(0))
       return job
     },
 
@@ -569,6 +573,7 @@ export function createExportEngine(options: ExportEngineOptions) {
         await saving.catch(() => {})
         job.lease = undefined
         await saveJob(job, etag)
+        if (job.status !== 'running') await storage.delete([runningKey(workspaceId, id)])
         return job
       } catch (err) {
         if (err instanceof LeaseLost) return (await loadJob(workspaceId, id))?.job ?? null
@@ -664,6 +669,40 @@ export function createExportEngine(options: ExportEngineOptions) {
     },
 
     /** Delete exports older than `retentionMs`, and any export by id when given. */
+    /**
+     * Advance every running export whose lease has lapsed, so an export keeps
+     * going after the owner closes the tab. Call it from the product's scheduled
+     * handler (a one-minute cron). Returns how many exports it advanced.
+     */
+    async continueRunning(budgetMs = 60_000): Promise<number> {
+      const deadline = now() + budgetMs
+      const keys: string[] = []
+      let cursor: string | undefined
+      do {
+        const page = await storage.list(`${prefix}/_running/`, cursor)
+        keys.push(...page.keys)
+        cursor = page.cursor
+      } while (cursor)
+      let advanced = 0
+      for (const key of keys) {
+        const remaining = deadline - now()
+        if (remaining <= 0) break
+        const name = key.split('/').at(-1) ?? ''
+        const workspaceId = name.slice(0, name.lastIndexOf('~'))
+        const id = name.slice(name.lastIndexOf('~') + 1)
+        if (!workspaceId || !id) continue
+        const loaded = await loadJob(workspaceId, id)
+        if (!loaded || loaded.job.status !== 'running') {
+          await storage.delete([key])
+          continue
+        }
+        if (loaded.job.lease && loaded.job.lease.until > now()) continue
+        await this.advance(workspaceId, id, Math.min(remaining, 20_000))
+        advanced += 1
+      }
+      return advanced
+    },
+
     async prune(workspaceId: string, retentionMs: number, onlyId?: string): Promise<number> {
       const cutoff = now() - retentionMs
       const doomed: string[] = []

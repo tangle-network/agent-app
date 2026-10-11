@@ -17,6 +17,8 @@ export interface WorkspaceExportPanelProps {
   title?: string
   className?: string
   fetcher?: typeof fetch
+  /** True when the product runs `continueRunning` on a cron, so the export finishes after the page closes. */
+  continuesInBackground?: boolean
 }
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -40,7 +42,7 @@ async function readJson<T>(response: Response): Promise<T> {
   return body as T
 }
 
-export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export workspace data', className, fetcher }: WorkspaceExportPanelProps) {
+export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export workspace data', className, fetcher, continuesInBackground = false }: WorkspaceExportPanelProps) {
   const doFetch = fetcher ?? fetch
   const [exports, setExports] = useState<ExportProgress[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -161,6 +163,9 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
             </span>
             {latest.current ? <span className="min-w-0 truncate text-sm text-muted-foreground">Now: {latest.current}</span> : null}
           </div>
+          {running && continuesInBackground ? (
+            <p className="text-xs text-muted-foreground">You can close this page. The export keeps going, and the download is here when you return.</p>
+          ) : null}
           <div
             role="progressbar"
             aria-label="Export progress"

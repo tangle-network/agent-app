@@ -26602,7 +26602,7 @@
         {
           "name": "WorkspaceExportPanel",
           "kind": "function",
-          "signature": "({ endpoint, canExport, title, className, fetcher }: WorkspaceExportPanelProps) => Element | null",
+          "signature": "({ endpoint, canExport, title, className, fetcher, continuesInBackground }: WorkspaceExportPanelProps) => Element | null",
           "doc": null
         },
         {
