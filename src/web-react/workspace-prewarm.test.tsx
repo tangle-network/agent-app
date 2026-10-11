@@ -33,7 +33,8 @@ describe('requestWorkspacePrewarm', () => {
   it('posts once and spaces repeats for the same workspace', async () => {
     const url = nextUrl()
     expect(requestWorkspacePrewarm(url)).toBe(true)
-    expect(fetchMock).toHaveBeenCalledWith(url, expect.objectContaining({ method: 'POST', credentials: 'same-origin' }))
+    expect(fetchMock).toHaveBeenCalledWith(url, expect.objectContaining({ method: 'POST', credentials: 'same-origin',
+      body: JSON.stringify({ reason: 'page-open' }) }))
     await act(async () => {})
     expect(requestWorkspacePrewarm(url)).toBe(false)
     expect(requestWorkspacePrewarm(url, { minIntervalMs: 0 })).toBe(true)

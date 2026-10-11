@@ -42,21 +42,43 @@ describe('createWorkspacePrewarmRoute', () => {
     const route = createWorkspacePrewarmRoute({ authorize: allowed(warm) })
     void route(post())
     await vi.waitFor(() => expect(warm).toHaveBeenCalled())
-    expect(await body(await route(post()))).toMatchObject({ outcome: 'joined' })
+    const second = await Promise.race([route(post()),
+      new Promise<'waited'>((resolve) => setTimeout(() => resolve('waited'), 100))])
+    expect(second).not.toBe('waited')
+    expect(await body(second as Response)).toMatchObject({ outcome: 'joined' })
     expect(warm).toHaveBeenCalledTimes(1)
   })
 
-  it('warms again once a running warm is older than staleMs', async () => {
+  it('warms again once a running warm is older than staleMs, and a late settle keeps the newer mark', async () => {
     let clock = 1_000
+    let finishFirst: () => void = () => {}
+    let finishSecond: () => void = () => {}
     const warm = vi.fn()
-      .mockImplementationOnce(() => new Promise<void>(() => {}))
-      .mockImplementation(async () => {})
-    const route = createWorkspacePrewarmRoute({ authorize: allowed(warm), staleMs: 150_000, now: () => clock })
-    void route(post())
+      .mockImplementationOnce(() => new Promise<void>((resolve) => { finishFirst = resolve }))
+      .mockImplementationOnce(() => new Promise<void>((resolve) => { finishSecond = resolve }))
+    const route = createWorkspacePrewarmRoute({ authorize: allowed(warm), now: () => clock })
+    const first = route(post())
     await vi.waitFor(() => expect(warm).toHaveBeenCalledTimes(1))
-    clock += 150_001
-    expect(await body(await route(post()))).toMatchObject({ outcome: 'warmed' })
-    expect(warm).toHaveBeenCalledTimes(2)
+    clock += 45_001
+    const second = route(post())
+    await vi.waitFor(() => expect(warm).toHaveBeenCalledTimes(2))
+    finishFirst()
+    await first
+    // The first request's finally must not clear the second request's mark.
+    expect(await body(await route(post()))).toMatchObject({ outcome: 'joined' })
+    finishSecond()
+    expect(await body(await second)).toMatchObject({ outcome: 'warmed' })
+  })
+
+  it('leaves the body readable for an authorize that parses it', async () => {
+    const route = createWorkspacePrewarmRoute({
+      authorize: async ({ request, reason }) => {
+        const parsed = (await request.json()) as { reason: string }
+        return { status: 'declined', reason: `${reason}:${parsed.reason}` }
+      },
+    })
+    expect(await body(await route(post({}, JSON.stringify({ reason: 'composer-focus' })))))
+      .toMatchObject({ outcome: 'declined', reason: 'composer-focus:composer-focus' })
   })
 
   it('passes the browser reason to authorize, defaulting to page-open', async () => {

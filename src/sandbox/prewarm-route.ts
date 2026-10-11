@@ -65,7 +65,7 @@ export type WorkspacePrewarmOutcome =
 
 export interface WorkspacePrewarmResponse {
   outcome: WorkspacePrewarmOutcome
-  /** Time this request spent, including any warm it ran or joined. */
+  /** Time this request spent, including any warm it ran. A `joined` answer never waits. */
   ms: number
   reason?: string
   report?: WorkspacePrewarmReport
@@ -81,8 +81,10 @@ export interface CreateWorkspacePrewarmRouteOptions<Context = void> {
   authorize(input: { request: Request; context: Context; reason: WorkspacePrewarmReason }): Promise<WorkspacePrewarmAuthorization>
   /** After a successful warm, answer `recent` for this long. Default 30 000 ms. */
   recentMs?: number
-  /** A warm started longer ago than this no longer blocks the key; its request
-   *  may have been cancelled. Default 150 000 ms (a 120 s resume plus margin). */
+  /** A warm started longer ago than this no longer blocks the key: its request
+   *  may have been cancelled, taking the warm with it. A longer warm still
+   *  running is repeated, which is safe because warms must be idempotent.
+   *  Default 45 000 ms (a suspended box resumes in ~31 s). */
   staleMs?: number
   /** Observability for warms this route ran. Errors thrown here are ignored. */
   onEvent?(event: WorkspacePrewarmEvent): void
@@ -105,8 +107,10 @@ export function isAutomatedPrewarmRequest(request: Request): boolean {
 const RECENT_LIMIT = 1_000
 
 async function requestReason(request: Request): Promise<WorkspacePrewarmReason> {
+  if (Number(request.headers.get('content-length') ?? 0) > 1_024) return 'page-open'
   try {
-    const body = (await request.json()) as { reason?: unknown } | null
+    // A clone, so a product's authorize can still read the body.
+    const body = (await request.clone().json()) as { reason?: unknown } | null
     return body?.reason === 'composer-focus' ? 'composer-focus' : 'page-open'
   } catch {
     return 'page-open'
@@ -126,9 +130,9 @@ export function createWorkspacePrewarmRoute<Context = void>(
 ): (request: Request, context: Context) => Promise<Response> {
   const recentMs = options.recentMs ?? 30_000
   const now = options.now ?? (() => Date.now())
-  const staleMs = options.staleMs ?? 150_000
+  const staleMs = options.staleMs ?? 45_000
   // Start times, never promises: no request may await I/O another request owns.
-  const inFlight = new Map<string, number>()
+  const inFlight = new Map<string, { at: number }>()
   const recent = new Map<string, number>()
 
   const emit = (event: WorkspacePrewarmEvent): void => {
@@ -183,15 +187,15 @@ export function createWorkspacePrewarmRoute<Context = void>(
     if (auth.status === 'declined') return reply({ outcome: 'declined', ms: now() - started, reason: auth.reason })
 
     const { key } = auth
-    const runningSince = inFlight.get(key)
-    if (runningSince !== undefined && now() - runningSince < staleMs) {
+    const running = inFlight.get(key)
+    if (running && now() - running.at < staleMs) {
       return reply({ outcome: 'joined', ms: now() - started })
     }
     const warmedAt = recent.get(key)
     if (warmedAt !== undefined && now() - warmedAt < recentMs) {
       return reply({ outcome: 'recent', ms: now() - started })
     }
-    const mark = now()
+    const mark = { at: now() }
     inFlight.set(key, mark)
     try {
       return reply({ ...(await run(key, auth.warm)), ms: now() - started })
