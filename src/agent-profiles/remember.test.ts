@@ -46,7 +46,7 @@ function remember(store: ProfileRevisionStore, role: ProfileToolTurn['role'] = '
     store, planDigest: async () => planDigest,
     activeTurn: async () => ({ workspaceId: 'ws-1', profileId: 'p-1', revisionId: 'rev-0', memberId: 'm-1', role }),
   }).find(candidate => candidate.name === 'profile.remember')!
-  return (fact: string) => tool.run({ fact } as never) as Promise<Record<string, unknown>>
+  return (fact: string) => tool.run({ fact } as never, {} as never) as Promise<Record<string, unknown>>
 }
 
 describe('profile.remember', () => {
