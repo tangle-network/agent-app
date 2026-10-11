@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.101
+
+- fix(runtime): repeat a Router turn that answered nothing, and type a blank answer as a failure (#1021)
+- feat(sandbox): speculative warm for turns likely to escalate (S8, off by default) (#1019)
+
 ## 0.60.100
 
 - feat(chat-routes): createRouterTurnProducer; runRouterTurn reports usage and accepts tool history (#1020)
