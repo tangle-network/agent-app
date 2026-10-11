@@ -31,7 +31,7 @@ describe('./router-turn entry', () => {
         else packages.add(target)
       }
     }
-    expect([...seen].sort()).toEqual(['loop.ts', 'model-catalog.ts', 'model.ts', 'openai-stream.ts', 'router-turn.ts'])
+    expect([...seen].sort()).toEqual(['loop.ts', 'model-catalog.ts', 'model.ts', 'openai-stream.ts', 'router-turn.ts', 'turn-knowledge.ts'])
     expect([...packages].filter(name => !ALLOWED_PACKAGES.has(name))).toEqual([])
   })
 })

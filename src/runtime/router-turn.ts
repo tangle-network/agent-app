@@ -17,6 +17,8 @@
 import { streamAppToolLoop, type LoopEvent, type LoopMessage, type LoopToolCall, type ToolLoopStopReason } from './loop'
 import { DEFAULT_TANGLE_ROUTER_BASE_URL } from './model'
 import { createOpenAICompatStreamTurn } from './openai-stream'
+import { turnKnowledgeInstructions, type TurnKnowledgeFile } from './turn-knowledge'
+export { budgetTurnKnowledge, turnKnowledgeInstructions, workspaceKnowledgeForTurn, type TurnKnowledgeBudget, type TurnKnowledgeFile } from './turn-knowledge'
 
 /** A tool the turn may call. Structurally an `McpToolDefinition` whose env is already bound. */
 export interface RouterTurnTool {
@@ -90,14 +92,20 @@ export function routerFunctionName(name: string): string {
 
 /**
  * The lean system prompt for a Router turn: the profile's system prompt and
- * instructions, then caller context, with tool names rewritten to the function
+ * instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function
  * names the model actually calls.
  */
 export function composeRouterTurnPrompt(
   profile: { prompt?: { systemPrompt?: string; instructions?: readonly string[] } },
-  options: { context?: readonly string[]; toolNames?: readonly string[] } = {},
+  options: {
+    context?: readonly string[]
+    toolNames?: readonly string[]
+    /** Knowledge files every turn carries; see {@link turnKnowledgeInstructions}. */
+    knowledge?: { files: readonly TurnKnowledgeFile[]; readTool?: string }
+  } = {},
 ): string {
-  const text = [profile.prompt?.systemPrompt ?? '', ...(profile.prompt?.instructions ?? []), ...(options.context ?? [])]
+  const knowledge = options.knowledge ? turnKnowledgeInstructions(options.knowledge.files, { readTool: options.knowledge.readTool }) : []
+  const text = [profile.prompt?.systemPrompt ?? '', ...(profile.prompt?.instructions ?? []), ...knowledge, ...(options.context ?? [])]
     .filter(part => part.trim()).join('\n\n')
   return [...(options.toolNames ?? [])].sort((a, b) => b.length - a.length)
     .reduce((out, name) => out.split(name).join(routerFunctionName(name)), text)
