@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.99
+
+- feat(harness): select an app's harness from configuration (#1016)
+- feat(runtime): runRouterTurn — the default Router turn engine with in-process app tools (#1017)
+
 ## 0.60.98
 
 - fix(workspace-react): show a long workspace name on two lines in the rail identity (#1018)
