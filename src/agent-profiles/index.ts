@@ -578,14 +578,16 @@ export async function admitProfileTurn(input: {
     authorityDigest: revision.authorityDigest, planDigest: input.observedManagedPlanDigest }, binding.version)
 }
 
+const KNOWLEDGE_TEXT_MAX = 32000
 const textChangeSchema = z.object({
   name: z.string().trim().min(1).max(160).optional(),
   description: z.string().max(2000).nullable().optional(),
   systemPrompt: z.string().max(32000).nullable().optional(),
   instructions: z.array(z.string().max(32000)).max(40).optional(),
-  knowledgeText: z.string().max(32000).optional(),
+  knowledgeText: z.string().max(KNOWLEDGE_TEXT_MAX).optional(),
 }).strict().refine(changes => Object.keys(changes).length > 0)
 const updateToolSchema = z.object({ expectedRevisionId: z.string().min(1), changes: textChangeSchema }).strict()
+const rememberToolSchema = z.object({ fact: z.string().trim().min(1).max(1000) }).strict()
 
 export function profileTextChange(revision: ProfileRevision, changes: z.infer<typeof textChangeSchema>): {
   profile: AgentProfile; knowledgeText: string
@@ -653,6 +655,44 @@ export function profileTools<TTurn extends ProfileToolTurn>(
         reason: 'Owner or manager requested a text change during chat' })
       return { profileId: turn.profileId, revisionId: revision.id, state: revision.state,
         canonicalSaved: revision.state === 'active', appliesTo: 'next_message', currentTurn: 'unchanged' }
+    },
+  }, {
+    name: 'profile.remember',
+    description: 'Save one durable fact or standing instruction an owner or manager tells you to keep '
+      + '("remember", "note that", "from now on", "always", "never"). Appends it as one line of the agent\'s '
+      + 'knowledge, which every later conversation reads. Applies on the next message.',
+    inputSchema: z.toJSONSchema(rememberToolSchema, { io: 'input' }) as Record<string, unknown>,
+    async run(args) {
+      const { fact } = rememberToolSchema.parse(args)
+      const turn = await context.activeTurn()
+      if (turn.role !== 'owner' && turn.role !== 'manager') throw new ProfileAccessError('Profile management is required')
+      const line = `- ${fact.replace(/\s+/g, ' ')}`
+      // One retry covers a concurrent save between the read and the append; the
+      // revision chain keeps every earlier line.
+      for (let attempt = 0; ; attempt++) {
+        const current = await context.store.getActiveRevision(turn.workspaceId, turn.profileId)
+        if (!current) throw new ProfileConflictError('Profile revision is unavailable')
+        if (current.knowledgeText.split('\n').some(existing => existing.trim() === line)) {
+          return { profileId: turn.profileId, revisionId: current.id, saved: true, alreadyKnown: true,
+            line, appliesTo: 'next_message' }
+        }
+        const knowledgeText = current.knowledgeText.trim() ? `${current.knowledgeText.trimEnd()}\n${line}` : line
+        if (knowledgeText.length > KNOWLEDGE_TEXT_MAX) {
+          throw new ProfileConflictError('Knowledge is full; ask the owner to edit it before saving more')
+        }
+        try {
+          const revision = await proposeRevision({ store: context.storeForTurn?.(turn) ?? context.store,
+            workspaceId: turn.workspaceId, profileId: turn.profileId, expectedRevisionId: current.id,
+            profile: current.profile, knowledgeText,
+            planDigest: await context.planDigest(current.profile, knowledgeText),
+            author: { kind: 'agent', id: turn.memberId }, actorRole: turn.role,
+            reason: 'Owner or manager asked the agent to remember a fact during chat' })
+          return { profileId: turn.profileId, revisionId: revision.id, saved: revision.state === 'active',
+            state: revision.state, alreadyKnown: false, line, appliesTo: 'next_message' }
+        } catch (error) {
+          if (!(error instanceof ProfileConflictError) || attempt > 0) throw error
+        }
+      }
     },
   }]
 }
