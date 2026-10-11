@@ -4,7 +4,7 @@
 
 Source: `src/launch-invariants/testing.ts`
 
-37 exports.
+38 exports.
 
 ### `AuthorizeBeforeStreamOptions`
 
@@ -200,10 +200,18 @@ interface LimitAlarmCheckOptions
 
 ### `measureD1`
 
-`function` — The D1 binding with every response measured (serialized bytes) and the live heap sampled after a collection before and after every query.
+`function` — The D1 binding with every response measured (serialized bytes) and the live heap sampled after a forced collection.
 
 ```ts
-<D extends object>(d1: D, reads?: D1Reads, options?: { sampleHeap?: boolean | undefined; }) => { d1: D; reads: D1Reads;…
+<D extends object>(d1: D, reads?: D1Reads, options?: MeasureD1Options) => { d1: D; reads: D1Reads; }
+```
+
+### `MeasureD1Options`
+
+`interface`
+
+```ts
+interface MeasureD1Options
 ```
 
 ### `measureJob`

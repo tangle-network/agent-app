@@ -56,13 +56,13 @@ _124 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./intakes/api`](api/intakes-api.md) | 3 | — |
 | [`./intakes/drizzle`](api/intakes-drizzle.md) | 18 | — |
 | [`./integrations`](api/integrations.md) | 10 | — |
-| [`./integrations-react`](api/integrations-react.md) | 20 | `platform`, `web-react` |
+| [`./integrations-react`](api/integrations-react.md) | 21 | `platform`, `web-react` |
 | [`./interactions`](api/interactions.md) | 64 | `web` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
 | [`./launch-invariants`](api/launch-invariants.md) | 59 | `signoff`, `turn-health` |
 | [`./launch-invariants/cli`](api/launch-invariants-cli.md) | 1 | `signoff`, `turn-health` |
-| [`./launch-invariants/testing`](api/launch-invariants-testing.md) | 37 | `signoff`, `turn-health` |
+| [`./launch-invariants/testing`](api/launch-invariants-testing.md) | 38 | `signoff`, `turn-health` |
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
 | [`./legibility/cli`](api/legibility-cli.md) | 0 | `signoff` |
 | [`./missions`](api/missions.md) | 65 | — |
@@ -587,11 +587,11 @@ Source: `src/integrations/index.ts` · 10 exports
 
 ## `./integrations-react`
 
-Source: `src/integrations-react/index.ts` · 20 exports
+Source: `src/integrations-react/index.ts` · 21 exports
 
 Depends on: `platform`, `web-react`
 
-`createHubIntegrationsClient`, `HUB_CONNECT_CHANNEL`, `HUB_CONNECT_FAILED_MESSAGE_TYPE`, `HUB_CONNECTED_MESSAGE_TYPE`, `HubAccountStatus`, `HubConnectCallbackPage`, `HubConnectCallbackPageProps`, `HubIntegrationCapabilities`, `HubIntegrationCapability`, `HubIntegrationsAccounts`, `HubIntegrationsClient`, `HubIntegrationsIdentity`, `HubIntegrationsPanel`, `HubIntegrationsPanelProps`, `HubSettingsRequest`, `HubSettingsRequestFn`, `HubWriteReceipt`, `POPUP_TIMEOUT_MS`, `useHubIntegrations`, `UseHubIntegrationsOptions`
+`createHubIntegrationsClient`, `HUB_CONNECT_CHANNEL`, `HUB_CONNECT_FAILED_MESSAGE_TYPE`, `HUB_CONNECTED_MESSAGE_TYPE`, `HubAccountStatus`, `HubConnectCallbackPage`, `HubConnectCallbackPageProps`, `HubHostConnect`, `HubIntegrationCapabilities`, `HubIntegrationCapability`, `HubIntegrationsAccounts`, `HubIntegrationsClient`, `HubIntegrationsIdentity`, `HubIntegrationsPanel`, `HubIntegrationsPanelProps`, `HubSettingsRequest`, `HubSettingsRequestFn`, `HubWriteReceipt`, `POPUP_TIMEOUT_MS`, `useHubIntegrations`, `UseHubIntegrationsOptions`
 
 [Full API →](api/integrations-react.md)
 
@@ -645,11 +645,11 @@ Depends on: `signoff`, `turn-health`
 
 ## `./launch-invariants/testing`
 
-Source: `src/launch-invariants/testing.ts` · 37 exports
+Source: `src/launch-invariants/testing.ts` · 38 exports
 
 Depends on: `signoff`, `turn-health`
 
-`AuthorizeBeforeStreamOptions`, `AuthStallOptions`, `BudgetedJob`, `buildConformanceReport`, `ChatAcceptsCodeOptions`, `checkAuthorizeBeforeStream`, `checkAuthSurvivesStall`, `checkChatAcceptsCode`, `checkCoalescedTurn`, `checkLimitAlarms`, `checkScheduledJobBudgets`, `CoalescedTurnOptions`, `ConformanceReport`, `D1Reads`, `DeploymentFacts`, `describeVerdict`, `forceGc`, `formatConformanceReport`, `INVARIANT_RESULTS_ENV`, `InvariantReport`, `InvariantStatus`, `JobMeasurement`, `LaunchInvariantsConfig`, `LimitAlarmCheckOptions`, `measureD1`, `measureJob`, `PLATFORM_LIMITS`, `readDeploymentFacts`, `readVerdicts`, `recordedLongTurn`, `recordInvariant`, `RecordInvariantOptions`, `recordInvariants`, `ScheduledJobBudgetOptions`, `stallingD1`, `StallMode`, `TimedTurnEvent`
+`AuthorizeBeforeStreamOptions`, `AuthStallOptions`, `BudgetedJob`, `buildConformanceReport`, `ChatAcceptsCodeOptions`, `checkAuthorizeBeforeStream`, `checkAuthSurvivesStall`, `checkChatAcceptsCode`, `checkCoalescedTurn`, `checkLimitAlarms`, `checkScheduledJobBudgets`, `CoalescedTurnOptions`, `ConformanceReport`, `D1Reads`, `DeploymentFacts`, `describeVerdict`, `forceGc`, `formatConformanceReport`, `INVARIANT_RESULTS_ENV`, `InvariantReport`, `InvariantStatus`, `JobMeasurement`, `LaunchInvariantsConfig`, `LimitAlarmCheckOptions`, `measureD1`, `MeasureD1Options`, `measureJob`, `PLATFORM_LIMITS`, `readDeploymentFacts`, `readVerdicts`, `recordedLongTurn`, `recordInvariant`, `RecordInvariantOptions`, `recordInvariants`, `ScheduledJobBudgetOptions`, `stallingD1`, `StallMode`, `TimedTurnEvent`
 
 [Full API →](api/launch-invariants-testing.md)
 

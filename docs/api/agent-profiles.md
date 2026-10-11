@@ -368,7 +368,7 @@ interface SwitchableProfile
 
 ### `switchProfile`
 
-`function` — The picker and deterministic text command converge here.
+`function`
 
 ```ts
 (input: SwitchProfileInput) => Promise<ProfileSwitchReceipt>
