@@ -360,7 +360,8 @@ describe('StudioComposer — the reference image swaps the model', () => {
 
     // The i2v sibling is never offered in the menu — it is reached by attaching.
     const picker = await openModelPicker()
-    expect(modelRows(picker).map((row) => row.textContent)).toEqual([SEEDANCE])
+    // Rows of a provider-less fixture lead with the unknown-provider monogram.
+    expect(modelRows(picker).map((row) => row.textContent?.replace(/^\?/, ''))).toEqual([SEEDANCE])
     fireEvent.keyDown(document, { key: 'Escape' })
 
     await attachReference()
@@ -641,7 +642,7 @@ describe('StudioComposer — image lane', () => {
     await screen.findByRole('button', { name: 'Model: gpt-image-2' })
 
     const picker = await openModelPicker()
-    expect(modelRows(picker).map((row) => row.textContent)).toEqual(['gpt-image-2'])
+    expect(modelRows(picker).map((row) => row.textContent?.replace(/^\?/, ''))).toEqual(['gpt-image-2'])
     fireEvent.keyDown(document, { key: 'Escape' })
 
     await openPill('Size')
@@ -783,7 +784,7 @@ describe('StudioComposer — submitting', () => {
       await screen.findByRole('button', { name: `Model: ${modelId}` })
 
       const optionPills = Array.from(document.querySelectorAll<HTMLButtonElement>(
-        '.studio-band button[title]:not([title="Model"]):not([title="Audio"])',
+        '.studio-band button[title]:not([aria-label^="Model:"]):not([title="Audio"])',
       ))
       for (const optionPill of optionPills) {
         const svgs = optionPill.querySelectorAll('svg')
