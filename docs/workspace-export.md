@@ -33,7 +33,7 @@ Pass the product's own keys as `knownSecrets` so they are masked even when they 
 
 Each source is a unit. A files source that has more than 200 files, or that runs past the request budget, continues in the next request from a saved cursor, so no request exceeds the Workers subrequest limit. `POST {mount}` creates the job; the panel calls `POST {mount}/:id/advance`, which runs pending units for about 20 seconds per call.
 A unit that starts always finishes, and the job record is updated with a compare-and-swap lease, so two tabs cannot run the same unit.
-Consecutive sandbox archives run up to `archiveConcurrency` (default 4) at a time, because each mostly waits on its box to resume and stream; a workspace with dozens of project boxes would otherwise spend one box's wait per unit. A box that was already attempted runs alone on its retry.
+Consecutive sandbox archives run up to `archiveConcurrency` (default 4) at a time, because each mostly waits on its box to resume and stream; a workspace with dozens of project boxes would otherwise spend one box's wait per unit. Consecutive table and JSON sources run up to `rowConcurrency` (default 8) at a time under one job save, because each mostly waits on D1 and one storage write; a Builder agent's 97 mostly empty tables otherwise took 300 s. A unit that was already attempted runs alone on its retry.
 A closed tab pauses the export; reopening the panel resumes it.
 A unit that fails three times fails the export, and the owner starts a new one.
 

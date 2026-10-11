@@ -48,6 +48,8 @@ export interface ExportEngineOptions {
   prefix?: string
   /** Sandbox archives read at once in one request. Default 4. */
   archiveConcurrency?: number
+  /** Table and JSON sources written at once in one request. Default 8. */
+  rowConcurrency?: number
   now?: () => number
 }
 
@@ -117,20 +119,28 @@ export function createExportEngine(options: ExportEngineOptions) {
   const now = options.now ?? (() => Date.now())
   const archiveConcurrency = Math.max(1, Math.floor(options.archiveConcurrency ?? 4))
 
+  const rowConcurrency = Math.max(1, Math.floor(options.rowConcurrency ?? 8))
+  const batchKind = (kind: ExportUnit['kind']) => (kind === 'archive' ? 'archive' : kind === 'rows' || kind === 'json' ? 'rows' : null)
+
   /**
    * The units the next step runs, starting at `pending[from]`. Consecutive
-   * archive units run together: each mostly waits on its box to resume and
-   * stream its tar, so a workspace with dozens of sandboxes would otherwise
-   * spend one box's wait per unit. A unit already attempted runs alone, so a
-   * batch that died at a Worker limit cannot keep taking its neighbours with it.
+   * units of one batchable kind run together under one job save. An archive
+   * mostly waits on its box to resume and stream its tar, and a table unit on
+   * two D1 queries and one storage write; run one at a time, a workspace with
+   * dozens of sandboxes or a hundred mostly empty tables spends minutes on
+   * those waits (a 97-table Builder export took 300 s). A unit already
+   * attempted runs alone, so a batch that died at a Worker limit cannot keep
+   * taking its neighbours with it. Files units run alone: they resume at a cursor.
    */
-  function archiveBatch<T extends { unit: ExportUnit }>(pending: T[], from: number): T[] {
+  function nextBatch<T extends { unit: ExportUnit }>(pending: T[], from: number): T[] {
     const first = pending[from]!
-    if (first.unit.kind !== 'archive' || first.unit.attempts > 0) return [first]
+    const kind = batchKind(first.unit.kind)
+    if (!kind || first.unit.attempts > 0) return [first]
+    const limit = kind === 'archive' ? archiveConcurrency : rowConcurrency
     const batch = [first]
-    for (let i = from + 1; i < pending.length && batch.length < archiveConcurrency; i += 1) {
+    for (let i = from + 1; i < pending.length && batch.length < limit; i += 1) {
       const candidate = pending[i]!
-      if (candidate.unit.kind !== 'archive' || candidate.unit.attempts > 0) break
+      if (batchKind(candidate.unit.kind) !== kind || candidate.unit.attempts > 0) break
       batch.push(candidate)
     }
     return batch
@@ -514,7 +524,7 @@ export function createExportEngine(options: ExportEngineOptions) {
         let next = 0
         while (next < pending.length) {
           if (now() > deadline) break
-          const batch = archiveBatch(pending, next)
+          const batch = nextBatch(pending, next)
           next += batch.length
           const exhausted = batch.find(({ unit }) => unit.attempts >= MAX_ATTEMPTS)
           if (exhausted) {

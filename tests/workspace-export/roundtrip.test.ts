@@ -386,6 +386,46 @@ describe('many sandboxes', () => {
   })
 })
 
+describe('many tables', () => {
+  it('writes several table sources at once and keeps each one exact', async () => {
+    let inFlight = 0
+    let peak = 0
+    const exporter = createWorkspaceExport({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      signingSecret: SIGNING,
+      authorize: async () => ({ userId: 'u-owner', role: 'owner' }),
+      rowConcurrency: 5,
+      plan: async () => ({
+        sources: Array.from({ length: 12 }, (_, i) => ({
+          kind: 'rows' as const,
+          name: `db.t${i}`,
+          dataClass: 'records' as const,
+          expectedCount: async () => i % 3,
+          async *rows() {
+            inFlight += 1
+            peak = Math.max(peak, inFlight)
+            // Each table waits on its database round trip, as D1 does.
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            inFlight -= 1
+            yield Array.from({ length: i % 3 }, (_, n) => ({ id: `${i}-${n}` }))
+          },
+        })),
+      }),
+    })
+    const call = (path: string, init: RequestInit = {}) =>
+      exporter.route(new Request(`https://app.test/api/workspaces/${WS}/exports${path ? `/${path}` : ''}`, init), { workspaceId: WS, path })
+    const { id } = (await (await call('', { method: 'POST' })).json()) as { id: string }
+    const progress = (await (await call(`${id}/advance`, { method: 'POST' })).json()) as {
+      status: string
+      units: { name: string; status: string; rows?: number }[]
+    }
+    expect(progress.status).toBe('complete')
+    expect(peak).toBe(5)
+    expect(progress.units.map((u) => u.rows)).toEqual(Array.from({ length: 12 }, (_, i) => i % 3))
+  })
+})
+
 describe('job lease', () => {
   it('lets the next request continue a minute after a request died holding it', async () => {
     let clock = Date.parse('2026-10-11T00:00:00Z')
