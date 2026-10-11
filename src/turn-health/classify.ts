@@ -250,9 +250,15 @@ function isUnparseableJson(value: string): boolean {
 
 /** Tool statuses that mean the call actually landed.
  *
- *  Anything else — `pending`, `running`, `error`, an unknown string — left no
- *  persisted effect by the time the turn settled. */
+ *  Anything else — `pending`, `running`, an unknown string — left no persisted
+ *  effect by the time the turn settled. */
 const SETTLED_TOOL_STATUSES = new Set(['completed', 'complete', 'success', 'done'])
+
+/** Tool statuses that ended the call by reporting its failure. The model and
+ *  the person saw the error, so the call is neither silently rejected nor left
+ *  without effect: on gtm-agent, 2,527 errored calls (HTTP statuses, missing
+ *  files, timeouts) in one day's 500 turns were all reported as REJECTED. */
+const FAILED_TOOL_STATUSES = new Set(['error', 'failed'])
 
 /**
  * Judge one settled turn.
@@ -321,7 +327,7 @@ export function classifyTurnOutcome(input: TurnOutcomeInput): TurnHealthVerdict 
     const inputRecord = asRecord(toolInput)
     const rejection =
       nonEmptyString(inputRecord?.error) ?? nonEmptyString((state as Record<string, unknown>)?.error)
-    if (rejection) {
+    if (rejection && SETTLED_TOOL_STATUSES.has(status)) {
       reasons.push({
         kind: 'tool_call_rejected',
         // The payload names the tool the model MEANT to call; the part's own
@@ -341,7 +347,7 @@ export function classifyTurnOutcome(input: TurnOutcomeInput): TurnHealthVerdict 
       continue
     }
 
-    if (!SETTLED_TOOL_STATUSES.has(status)) {
+    if (!SETTLED_TOOL_STATUSES.has(status) && !FAILED_TOOL_STATUSES.has(status)) {
       reasons.push({ kind: 'tool_call_no_effect', tool, status })
     }
   }
