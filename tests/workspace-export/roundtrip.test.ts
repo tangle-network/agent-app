@@ -422,4 +422,27 @@ describe('job lease', () => {
     expect((await engine.advance(WS, job.id))!.status).toBe('complete')
     expect(leaseWhileRunning).toBeLessThanOrEqual(60_000)
   })
+
+  it('hands the lease back when a request fails outside a unit, so a retry continues at once', async () => {
+    const clock = Date.parse('2026-10-11T00:00:00Z')
+    const storage = createMemoryExportStorage()
+    let planCalls = 0
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage,
+      now: () => clock,
+      plan: async () => {
+        planCalls += 1
+        // Every advance plans again; the second one meets a transient database error.
+        if (planCalls === 2) throw new Error('D1_ERROR: Network connection lost.')
+        return { sources: [{ kind: 'json', name: 'doc', dataClass: 'records', value: async () => ({ ok: true }) }] }
+      },
+    })
+    const job = await engine.start(WS, 'u-owner')
+    await expect(engine.advance(WS, job.id)).rejects.toThrow('Network connection lost')
+    const stored = JSON.parse(new TextDecoder().decode(storage.objects.get(`workspace-exports/${WS}/${job.id}/job.json`)!))
+    expect(stored.lease).toBeUndefined()
+    // Same instant: no lease to wait out.
+    expect((await engine.advance(WS, job.id))!.status).toBe('complete')
+  })
 })
