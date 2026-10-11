@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.109
+
+- fix(workspace-list): search and name fields use ui's Input so they read as fields (#1034)
+
 ## 0.60.108
 
 - fix(sandbox): charge an unused warm for box uptime, not for a stretched hold (#1029)
