@@ -1,4 +1,4 @@
-import { Component, useEffect, type ReactNode } from 'react'
+import { Component, createElement, lazy, useEffect, useState, type ComponentType, type ReactElement, type ReactNode } from 'react'
 
 interface LazyLoadBoundaryProps {
   children: ReactNode
@@ -87,4 +87,42 @@ export function RouteChunkBoundary({ children, autoReloadOnChunkError = false }:
       {children}
     </LazyLoadBoundary>
   )
+}
+
+/**
+ * A lazily loaded route that renders synchronously once its module has loaded.
+ *
+ * `React.lazy` calls its loader only on first render, so even an already
+ * downloaded chunk suspends once, and React holds that Suspense retry for its
+ * ~300 ms fallback throttle. Hospitality measured 305 ms before the first data
+ * read on every first visit to a lazy route, with the chunk already cached.
+ * Each mount decides once which component it renders, so a route mounted
+ * before its module arrived keeps its state when it re-renders later.
+ */
+export type LazyRoute<P extends object> = ((props: P) => ReactElement) & { preload: () => Promise<void> }
+
+export function lazyRoute<P extends object>(load: () => Promise<ComponentType<P>>): LazyRoute<P> {
+  let loaded: ComponentType<P> | null = null
+  let pending: Promise<ComponentType<P>> | null = null
+  const start = () => (pending ??= load().then(
+    (component) => (loaded = component),
+    (error: unknown) => { pending = null; throw error },
+  ))
+  const Lazy = lazy(() => start().then((component) => ({ default: component })))
+  function Route(props: P) {
+    const [Ready] = useState(() => loaded)
+    return Ready ? createElement(Ready, props) : createElement(Lazy as unknown as ComponentType<P>, props)
+  }
+  return Object.assign(Route, { preload: () => start().then(() => undefined) })
+}
+
+/** Load routes while the browser is idle (at most `timeoutMs` later), so a first visit waits only on its data. */
+export function preloadWhenIdle(routes: ReadonlyArray<{ preload: () => Promise<void> }>, timeoutMs = 3000): () => void {
+  const run = () => { for (const route of routes) void route.preload().catch(() => { /* The route's boundary reports a failed load when it renders. */ }) }
+  if (typeof requestIdleCallback === 'function') {
+    const handle = requestIdleCallback(run, { timeout: timeoutMs })
+    return () => cancelIdleCallback(handle)
+  }
+  const handle = setTimeout(run, Math.min(timeoutMs, 1000))
+  return () => clearTimeout(handle)
 }
