@@ -88,7 +88,7 @@ export async function runProtectedRouterTurn(options: ProtectedRouterTurnOptions
   let resolvedModel: string | undefined
   const result = (failure?: RouterTurnFailure): ProtectedRouterTurnOutcome => {
     const base: RouterTurnOutcome = turn
-      ?? { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 } }
+      ?? { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [] }
     // The grant's verdict replaces the turn's own failure.
     const { failure: _turnFailure, ...rest } = base
     return { ...rest, ...(settlement ? { settlement } : {}), ...(failure ? { failure } : {}) }
