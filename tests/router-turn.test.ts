@@ -41,8 +41,8 @@ describe('runRouterTurn', () => {
 
     expect(outcome).toEqual({ text: 'Done: Restock towels is on the list.', servedModel: 'served/model',
       toolCalls: [{ callId: 'call-1', toolName: 'staff.task.create', ok: true }],
-      usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 } })
-    expect(createTask.run).toHaveBeenCalledWith({ title: 'Restock towels' })
+      usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [] })
+    expect(createTask.run).toHaveBeenCalledWith({ title: 'Restock towels' }, { emit: expect.any(Function) })
     expect(requests[0]!.headers.get('x-tangle-trace-id')).toBe('trace-1')
     expect(requests[0]!.body).toMatchObject({ model: 'requested/model', stream: true,
       tools: [{ type: 'function', function: { name: 'staff_task_create' } }] })
@@ -106,7 +106,7 @@ describe('runRouterTurn', () => {
     const recovers = router(down, sse([text('Hello.')]))
     await expect(runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: recovers.fetchImpl, systemPrompt: 's', userMessage: 'u' }))
       .resolves.toEqual({ text: 'Hello.', servedModel: 'served/model', toolCalls: [],
-        usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 } })
+        usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [] })
   })
 
   it('never repeats a turn after a tool ran', async () => {
@@ -171,6 +171,27 @@ describe('runRouterTurn', () => {
       tools: [createTask], placement: { profile: plain } })
     expect(placed).toMatchObject({ text: 'Hi.', placement: { chosen: 'loop' } })
     expect(placed.failure).toBeUndefined()
+  })
+
+  it('streams a tool\'s typed side events in order before its result, and records them with the turn', async () => {
+    const graph: RouterTurnTool = {
+      name: 'graph.edit', description: 'Edit the system map.', inputSchema: { type: 'object', properties: {} },
+      run: async (_args, context) => {
+        context.emit('graph_op', { op: 'add_node', id: 'pump' })
+        context.emit('graph_op', { op: 'add_edge', from: 'pump', to: 'tank' })
+        return { ok: true }
+      },
+    }
+    const { fetchImpl } = router(sse([toolCall('call-1', 'graph_edit', '{}')]), sse([text('Added the pump.')]))
+    const events: RouterTurnEvent[] = []
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'add a pump',
+      tools: [graph], onEvent: event => events.push(event) })
+    expect(events.filter(event => event.type !== 'usage').map(event => event.type === 'tool' ? `tool:${event.status}` : event.type === 'tool_event' ? `event:${event.kind}` : event.type))
+      .toEqual(['tool:running', 'event:graph_op', 'event:graph_op', 'tool:completed', 'text'])
+    expect(outcome.toolEvents).toEqual([
+      { callId: 'call-1', toolName: 'graph.edit', kind: 'graph_op', data: { op: 'add_node', id: 'pump' }, at: expect.any(Number) },
+      { callId: 'call-1', toolName: 'graph.edit', kind: 'graph_op', data: { op: 'add_edge', from: 'pump', to: 'tank' }, at: expect.any(Number) },
+    ])
   })
 
   it('refuses to run without a credential', async () => {

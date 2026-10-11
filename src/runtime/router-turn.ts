@@ -27,7 +27,26 @@ export interface RouterTurnTool {
   description: string
   /** JSON Schema for the arguments object. */
   inputSchema: Record<string, unknown>
-  run(args: Record<string, unknown>): Promise<unknown>
+  run(args: Record<string, unknown>, context: RouterTurnToolContext): Promise<unknown>
+}
+
+/** What a running tool gets besides its arguments. */
+export interface RouterTurnToolContext {
+  /**
+   * Report a typed side event while the tool runs (a graph edit, a file written, a
+   * progress step). It streams at once as a `tool_event` and is recorded in the
+   * outcome's `toolEvents`. Events sent after the call settles are dropped.
+   */
+  emit(kind: string, data?: unknown): void
+}
+
+/** One side event a tool reported while it ran. */
+export interface RouterTurnToolEvent {
+  callId: string
+  toolName: string
+  kind: string
+  data: unknown
+  at: number
 }
 
 /** What the turn is doing, in the order it happens, for a live view. */
@@ -37,6 +56,7 @@ export type RouterTurnEvent =
   | { type: 'tool'; callId: string; toolName: string; status: 'completed'; output: unknown; startedAt: number; endedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'error'; error: { code: string; message: string }; startedAt: number; endedAt: number }
   | { type: 'usage'; promptTokens: number; completionTokens: number }
+  | ({ type: 'tool_event' } & RouterTurnToolEvent)
 
 export interface RouterTurnFailure {
   /** `model_http_<status>`, `model_unavailable`, `turn_<stopReason>` or `router_unconfigured`. */
@@ -53,6 +73,8 @@ export interface RouterTurnOutcome {
   toolCalls: Array<{ callId: string; toolName: string; ok: boolean }>
   /** Token use summed over every model call in the turn, as the router reported it. */
   usage: { promptTokens: number; completionTokens: number; modelCalls: number }
+  /** Every side event the turn's tools reported, in order (at most 500). */
+  toolEvents: RouterTurnToolEvent[]
   failure?: RouterTurnFailure
   /** Where the turn was placed, when the caller asked for placement. */
   placement?: PlacementRecord
@@ -125,6 +147,9 @@ export interface RouterTurnOptions {
 }
 
 const DEFAULT_BUDGET_MS = 90_000
+const TOOL_EVENT_LIMIT = 500
+/** Marks a tool's typed event inside a loop progress update. */
+const TOOL_EVENT = '__routerTurnToolEvent'
 const TOOL_RESULT_LIMIT = 12_000
 
 /** OpenAI-compatible function names allow only `[A-Za-z0-9_-]{1,64}`; app tool names often use dots. */
@@ -177,11 +202,11 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     ? placeRouterTurn({ ...options.placement, toolNames: (options.tools ?? []).map(tool => tool.name) })
     : undefined
   if (placement?.chosen === 'sandbox') {
-    return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, placement,
+    return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [], placement,
       failure: { code: 'placement_sandbox', message: placement.reason } }
   }
   if (!options.apiKey) {
-    return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 },
+    return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [],
       failure: { code: 'router_unconfigured', message: 'The model credential is not configured.' } }
   }
   const emit = options.onEvent ?? (() => {})
@@ -206,6 +231,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const segments: string[] = []
   const usage = { promptTokens: 0, completionTokens: 0, modelCalls: 0 }
   const toolCalls: RouterTurnOutcome['toolCalls'] = []
+  const toolEvents: RouterTurnToolEvent[] = []
   const started = new Map<string, number>()
   let segmentOpen = false
   let toolsRan = 0
@@ -224,12 +250,14 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       deadlineMs: deadline,
       maxToolTurns: options.maxToolTurns ?? 12,
       renderResult: (_label, outcome) => renderResult(outcome),
-      executeToolCall: async (call: LoopToolCall) => {
+      executeToolCall: async (call: LoopToolCall, context) => {
         const tool = byFunction.get(call.toolName)
         if (!tool) return { ok: false, code: 'unknown_tool', message: `No tool named ${call.toolName}` }
         toolsRan++
+        // A tool's typed event rides the loop's progress channel, so it streams in order before the result.
+        const emitEvent = (kind: string, data?: unknown) => context?.progress({ data: { [TOOL_EVENT]: kind, data } })
         try {
-          return { ok: true, result: await tool.run(call.args) }
+          return { ok: true, result: await tool.run(call.args, { emit: emitEvent }) }
         } catch (error) {
           const mapped = (options.toolError ?? defaultToolError)(error)
           if (mapped) return { ok: false, ...mapped }
@@ -257,6 +285,18 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           emit({ type: 'tool', callId, toolName: tool?.name ?? event.call.toolName, status: 'running',
             input: event.call.args, startedAt: started.get(callId)! })
         }
+      } else if (step.kind === 'tool_progress') {
+        const tool = byFunction.get(step.toolName)
+        const marked = step.update.data as { [TOOL_EVENT]?: unknown; data?: unknown } | undefined
+        // A tool's own emit carries its kind; plain loop progress (a step count, a message) is kind `progress`.
+        const typed = typeof marked?.[TOOL_EVENT] === 'string'
+        const event: RouterTurnToolEvent = {
+          callId: callIdOf(step.toolCallId, step.toolName), toolName: tool?.name ?? step.toolName,
+          kind: typed ? marked![TOOL_EVENT] as string : 'progress',
+          data: typed ? marked!.data ?? null : step.update, at: Date.now(),
+        }
+        if (toolEvents.length < TOOL_EVENT_LIMIT) toolEvents.push(event)
+        emit({ type: 'tool_event', ...event })
       } else if (step.kind === 'tool_result') {
         const tool = byFunction.get(step.toolName)
         const callId = callIdOf(step.toolCallId, step.toolName)
@@ -276,7 +316,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
 
   const outcome = (failure?: RouterTurnFailure): RouterTurnOutcome => ({
     text: segments.map(part => part.trim()).filter(Boolean).join('\n\n'),
-    servedModel, toolCalls, usage: { ...usage }, ...(placement ? { placement } : {}), ...(failure ? { failure } : {}),
+    servedModel, toolCalls, usage: { ...usage }, toolEvents: [...toolEvents], ...(placement ? { placement } : {}), ...(failure ? { failure } : {}),
   })
   let stop: ToolLoopStopReason
   try {
