@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.89
+
+- fix(workspace-export): migration-runner tables are internal, not unscoped (#1004)
+- fix(workspace-export): the sweep also finishes exports started before the index (#1003)
+
 ## 0.60.88
 
 - feat(workspace-export): exports finish after the owner closes the tab (#1002)
