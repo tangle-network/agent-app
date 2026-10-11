@@ -145,6 +145,39 @@ describe('warm leases', () => {
     expect((await h.leases.signal('ws-1', 'page-open')).outcome).toBe('started')
   })
 
+  it('retries a warm killed with its request, fences the dead one, and reports the lease abandoned', async () => {
+    const pending: Array<(box: WarmBoxOutcome) => void> = []
+    const h = harness({
+      warm: () => new Promise<WarmBoxOutcome>((resolve) => pending.push(resolve)),
+    })
+    // The page-open request is cancelled mid-resume: its warm never reports.
+    void h.leases.signal('ws-1', 'page-open')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(pending).toHaveLength(1)
+    // Within the deadline, a second signal extends the in-flight lease.
+    h.clock.now += 60_000
+    expect((await h.leases.signal('ws-1', 'composer-focus')).outcome).toBe('extended')
+    // Past it, the next signal takes the lease over and warms again.
+    h.clock.now += 61_000
+    const retry = h.leases.signal('ws-1', 'composer-focus')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(pending).toHaveLength(2)
+    pending[1]!('resumed')
+    expect(await retry).toEqual({ outcome: 'started', box: 'resumed' })
+    // The dead warm reporting late changes nothing: it no longer owns the lease.
+    pending[0]!('resumed')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect((await h.store.read('ws-1'))?.reason).toBe('composer-focus')
+
+    // A lease whose warm never reports is counted as abandoned, not charged.
+    const lost = harness({ warm: () => new Promise<WarmBoxOutcome>(() => {}) })
+    void lost.leases.signal('ws-2', 'page-open')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    lost.clock.now += 11 * MIN
+    expect(await lost.leases.sweep()).toMatchObject({ ended: 1, abandoned: 1, wasted: 0 })
+    expect(lost.events.at(-1)).toEqual({ type: 'warm_abandoned', key: 'ws-2', reason: 'page-open' })
+  })
+
   it('pings a held box only when the burst hold outlasts its idle timeout', async () => {
     const h = harness({ burstHoldMs: 30 * MIN })
     await h.leases.turn('ws-1')

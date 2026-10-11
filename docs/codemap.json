@@ -15891,6 +15891,12 @@
           "doc": null
         },
         {
+          "name": "WorkspacePrewarmReason",
+          "kind": "type",
+          "signature": "type WorkspacePrewarmReason",
+          "doc": "Why the browser asked: `useWorkspacePrewarm` sends `page-open` or `composer-focus`."
+        },
+        {
           "name": "WorkspacePrewarmReport",
           "kind": "type",
           "signature": "type WorkspacePrewarmReport",

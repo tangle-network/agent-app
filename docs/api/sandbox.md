@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-229 exports.
+230 exports.
 
 ### `adaptSandboxStream`
 
@@ -1652,6 +1652,14 @@ type WorkspacePrewarmEvent
 
 ```ts
 type WorkspacePrewarmOutcome
+```
+
+### `WorkspacePrewarmReason`
+
+`type` — Why the browser asked: `useWorkspacePrewarm` sends `page-open` or `composer-focus`.
+
+```ts
+type WorkspacePrewarmReason
 ```
 
 ### `WorkspacePrewarmReport`

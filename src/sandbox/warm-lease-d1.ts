@@ -111,16 +111,18 @@ export function createD1WarmLeaseStore(
   const t = options.table ?? DEFAULT_WARM_LEASE_TABLE
   if (!SAFE_IDENTIFIER.test(t)) throw new Error(`Invalid warm lease table name: ${JSON.stringify(t)}`)
 
-  // Every SET expression reads the old row, so `lease_id IS NULL` means "no live lease before this write".
+  // Every SET expression reads the old row. A lease is free when there is none,
+  // or when its warm has not reported by ?6 (the request running it was cancelled).
+  const free = `(${t}.lease_id IS NULL OR (${t}.warm_at = 0 AND ${t}.started_at <= ?6))`
   const beginSql = `INSERT INTO ${t} (key, lease_id, reason, started_at, hold_until) VALUES (?1, ?2, ?3, ?4, ?5)
 ON CONFLICT(key) DO UPDATE SET
-  lease_id = COALESCE(${t}.lease_id, ?2),
-  reason = CASE WHEN ${t}.lease_id IS NULL THEN ?3 ELSE ${t}.reason END,
-  started_at = CASE WHEN ${t}.lease_id IS NULL THEN ?4 ELSE ${t}.started_at END,
-  warm_at = CASE WHEN ${t}.lease_id IS NULL THEN 0 ELSE ${t}.warm_at END,
-  used_at = CASE WHEN ${t}.lease_id IS NULL THEN 0 ELSE ${t}.used_at END,
-  resumed = CASE WHEN ${t}.lease_id IS NULL THEN 0 ELSE ${t}.resumed END,
-  ping_at = CASE WHEN ${t}.lease_id IS NULL THEN 0 ELSE ${t}.ping_at END,
+  lease_id = CASE WHEN ${free} THEN ?2 ELSE ${t}.lease_id END,
+  reason = CASE WHEN ${free} THEN ?3 ELSE ${t}.reason END,
+  started_at = CASE WHEN ${free} THEN ?4 ELSE ${t}.started_at END,
+  warm_at = CASE WHEN ${free} THEN 0 ELSE ${t}.warm_at END,
+  used_at = CASE WHEN ${free} THEN 0 ELSE ${t}.used_at END,
+  resumed = CASE WHEN ${free} THEN 0 ELSE ${t}.resumed END,
+  ping_at = CASE WHEN ${free} THEN 0 ELSE ${t}.ping_at END,
   hold_until = MAX(${t}.hold_until, ?5)
 RETURNING lease_id`
   const markWarmSql = `UPDATE ${t} SET warm_at = ?3, resumed = ?4 WHERE key = ?1 AND lease_id = ?2`
@@ -159,8 +161,8 @@ WHERE key = ?1 AND lease_id = ?2`
   return {
     read,
 
-    async begin(key, leaseId, reason, now, holdUntil) {
-      const row = await q(beginSql, key, leaseId, reason, now, holdUntil).first<{ lease_id: string }>()
+    async begin(key, leaseId, reason, now, holdUntil, staleBefore) {
+      const row = await q(beginSql, key, leaseId, reason, now, holdUntil, staleBefore).first<{ lease_id: string }>()
       if (!row) throw new Error('warm lease begin returned no row')
       return row.lease_id
     },
