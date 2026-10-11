@@ -4,7 +4,7 @@
 
 Source: `src/agent-profiles/index.ts`
 
-47 exports.
+49 exports.
 
 ### `addProfileKnowledgeDocument`
 
@@ -126,6 +126,14 @@ readonly ["skills"]
 { readonly textEdit: { readonly admission: "automatic"; readonly conversation: "same"; readonly destructive: false; };…
 ```
 
+### `PROFILE_MEMORY_PREFIX`
+
+`const` — Workspace-shared memories live under this prefix in the workspace store.
+
+```ts
+"/memories/workspace/"
+```
+
 ### `ProfileAccessError`
 
 `class`
@@ -196,6 +204,14 @@ interface ProfileKnowledgeDocument
 
 ```ts
 interface ProfileKnowledgeEvent
+```
+
+### `ProfileMemoryStore`
+
+`interface` — The subset of agent-runtime's `WorkspaceStore` that `profile.remember` uses.
+
+```ts
+interface ProfileMemoryStore
 ```
 
 ### `ProfileRevision`

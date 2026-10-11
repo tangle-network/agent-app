@@ -464,7 +464,7 @@ interface RouterTurnTool
 
 ### `streamAppToolLoop`
 
-`function` — Streaming bounded tool loop: yields each raw turn event (the caller maps + telemetries + re-emits it) and each executed `tool_result`; emits one `capped` if it stops for any non-completed reason with…
+`function` — Streaming bounded tool loop: yields each raw turn event (the caller maps + telemetries + re-emits it), each `tool_progress` a running tool reports, and each executed `tool_result`; emits one `capped`…
 
 ```ts
 <Raw>(opts: StreamToolLoopOptions<Raw>) => AsyncGenerator<StreamToolLoopYield<Raw>, void, unknown>
