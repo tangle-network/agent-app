@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.86
+
+- fix(turn-health): read only the part fields the classifier judges, not the parts (#1000)
+
 ## 0.60.85
 
 - fix(workspace-export): a failed advance hands its lease back and logs why (#999)
