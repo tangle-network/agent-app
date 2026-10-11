@@ -4,6 +4,7 @@ import {
   generateInvitationToken,
   getInvitationExpiresAt,
   inviteUrlForToken,
+  isInvitationEmail,
   normalizeInvitationEmail,
   parseInvitationPermission,
 } from '../../src/teams/invitations'
@@ -11,6 +12,13 @@ import {
 describe('invitation pure helpers', () => {
   it('normalizes email (trim + lowercase)', () => {
     expect(normalizeInvitationEmail('  Foo@Bar.COM ')).toBe('foo@bar.com')
+  })
+
+  it('accepts only an address an invitation can be delivered to', () => {
+    for (const ok of ['name@company.com', ' First.Last@sub.example.co.uk ', 'a+tag@x.io']) expect(isInvitationEmail(ok)).toBe(true)
+    for (const bad of ['', 'founder', 'founder@', 'founder@example', '@company.com', 'a b@company.com', 'a@@company.com', 'a@company.c']) {
+      expect(isInvitationEmail(bad)).toBe(false)
+    }
   })
 
   it('parses only assignable permissions (never owner)', () => {

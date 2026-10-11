@@ -10,10 +10,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { WorkspaceRole } from '../../teams/roles'
 
-const ASSIGNABLE_ROLES: ReadonlyArray<{ value: WorkspaceRole; label: string }> = [
-  { value: 'viewer', label: 'Viewer' },
-  { value: 'editor', label: 'Editor' },
-  { value: 'admin', label: 'Admin' },
+// Each role says what it adds, so choosing one never needs a help page.
+const ASSIGNABLE_ROLES: ReadonlyArray<{ value: WorkspaceRole; label: string; description: string }> = [
+  { value: 'viewer', label: 'Viewer', description: 'Can read everything' },
+  { value: 'editor', label: 'Editor', description: 'Can also chat and edit' },
+  { value: 'admin', label: 'Admin', description: 'Can also manage settings and people' },
 ]
 
 function ChevronDownGlyph({ className }: { className?: string }) {
@@ -62,7 +63,7 @@ export function RoleSelect({ value, onChange, ariaLabel, disabled }: RoleSelectP
         aria-expanded={open}
         aria-label={ariaLabel}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-between gap-1.5 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-1.5 text-xs text-[var(--text-secondary)] hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
+        className="flex items-center justify-between gap-1.5 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-secondary)] hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
       >
         <span>{current?.label ?? value}</span>
         <ChevronDownGlyph className="h-3 w-3 text-[var(--text-muted)]" />
@@ -71,7 +72,7 @@ export function RoleSelect({ value, onChange, ariaLabel, disabled }: RoleSelectP
         <div
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute right-0 top-full z-50 mt-1 flex w-32 flex-col rounded border border-[var(--card-edge)] bg-[hsl(var(--popover))] py-1 shadow-[var(--shadow-overlay)]"
+          className="absolute right-0 top-full z-50 mt-1 flex w-64 flex-col rounded border border-[var(--card-edge)] bg-[hsl(var(--popover))] py-1 shadow-[var(--shadow-overlay)]"
         >
           {ASSIGNABLE_ROLES.map((option) => (
             <button
@@ -83,11 +84,12 @@ export function RoleSelect({ value, onChange, ariaLabel, disabled }: RoleSelectP
                 onChange(option.value)
                 setOpen(false)
               }}
-              className={`px-3 py-1.5 text-left text-xs hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] ${
+              className={`flex flex-col px-3 py-2 text-left text-sm hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] ${
                 option.value === value ? 'text-[var(--brand-primary)]' : 'text-[var(--text-primary)]'
               }`}
             >
-              {option.label}
+              <span className="font-medium">{option.label}</span>
+              <span className="text-[var(--text-muted)]">{option.description}</span>
             </button>
           ))}
         </div>

@@ -10,34 +10,49 @@
  * members panel shows accepted members, this owns the invite flow + pending list.
  */
 
-import { Button, Input } from '@tangle-network/ui/primitives'
 import { useState } from 'react'
-import type { WorkspaceRole } from '../../teams/roles'
-import { hasWorkspaceRole } from '../../teams/roles'
+import { hasWorkspaceRole, type WorkspaceRole } from '../../teams/roles'
 import type { InvitationView, InvitationsPanelProps } from '../contracts'
-import { RoleSelect } from './RoleSelect'
+import { InviteForm } from './InviteForm'
 
-const BADGE_BASE = 'inline-flex items-center rounded border px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.05em]'
+const BADGE_BASE = 'inline-flex items-center rounded border px-2 py-0.5 text-sm font-medium'
 
-// Lifecycle status: green = in, amber = awaiting, red = killed, muted = lapsed.
-const STATUS_BADGE: Record<InvitationView['status'], string> = {
-  accepted: 'border-[var(--surface-success-border)] bg-[var(--surface-success-bg)] text-[var(--surface-success-text)]',
-  pending: 'border-[var(--surface-warning-border)] bg-[var(--surface-warning-bg)] text-[var(--surface-warning-text)]',
-  revoked: 'border-[var(--surface-danger-border)] bg-[var(--surface-danger-bg)] text-[var(--surface-danger-text)]',
-  expired: 'border-[var(--border-default)] text-[var(--text-muted)]',
-}
-
-// Delivery status: red = bounced, amber = not yet attempted, muted = the normal happy path.
-const EMAIL_BADGE: Record<InvitationView['emailStatus'], string> = {
-  sent: 'border-[var(--border-default)] text-[var(--text-muted)]',
-  not_sent: 'border-[var(--surface-warning-border)] bg-[var(--surface-warning-bg)] text-[var(--surface-warning-text)]',
-  failed: 'border-[var(--surface-danger-border)] bg-[var(--surface-danger-bg)] text-[var(--surface-danger-text)]',
+// One badge per invitation, for where it stands: green = joined, amber =
+// waiting on the invitee, red = withdrawn, muted = lapsed. Email delivery is a
+// detail of a pending invitation, so it is said in words on the line below,
+// never as a second badge beside "Joined".
+const STATUS: Record<InvitationView['status'], { label: string; tone: string }> = {
+  accepted: { label: 'Joined', tone: 'border-[var(--surface-success-border)] bg-[var(--surface-success-bg)] text-[var(--surface-success-text)]' },
+  pending: { label: 'Pending', tone: 'border-[var(--surface-warning-border)] bg-[var(--surface-warning-bg)] text-[var(--surface-warning-text)]' },
+  revoked: { label: 'Revoked', tone: 'border-[var(--surface-danger-border)] bg-[var(--surface-danger-bg)] text-[var(--surface-danger-text)]' },
+  expired: { label: 'Expired', tone: 'border-[var(--border-default)] text-[var(--text-muted)]' },
 }
 
 /** Uppercase the role's first letter in JS (not CSS `capitalize`, which would
- *  also hit the lowercase "expires" in the same line). */
+ *  also hit the lowercase words that follow it on the same line). */
 function capitalize(text: string): string {
   return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1)
+}
+
+function shortDate(value: Date | number | string): string {
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+/** The line under the address: the role, then only what is true of this invitation now. */
+function invitationDetail(invitation: InvitationView): string {
+  const role = capitalize(invitation.permissions)
+  switch (invitation.status) {
+    case 'accepted':
+      return invitation.acceptedAt ? `${role} · joined ${shortDate(invitation.acceptedAt)}` : role
+    case 'pending': {
+      const delivery = invitation.emailStatus === 'sent' ? 'email sent' : invitation.emailStatus === 'not_sent' ? 'email not sent yet' : null
+      return [role, delivery, `expires ${shortDate(invitation.expiresAt)}`].filter(Boolean).join(' · ')
+    }
+    case 'expired':
+      return `${role} · expired ${shortDate(invitation.expiresAt)}`
+    case 'revoked':
+      return role
+  }
 }
 
 export function InvitationsPanel({
@@ -49,9 +64,6 @@ export function InvitationsPanel({
   onCopy,
   onNotice,
 }: InvitationsPanelProps) {
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<WorkspaceRole>('editor')
-  const [inviting, setInviting] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const canManage = hasWorkspaceRole(currentRole, 'admin')
@@ -60,18 +72,14 @@ export function InvitationsPanel({
     onNotice?.({ kind, message })
   }
 
-  async function submitInvite() {
-    const email = inviteEmail.trim()
-    if (!email || inviting) return
-    setInviting(true)
+  async function invite(input: { email: string; role: WorkspaceRole }): Promise<boolean> {
     try {
-      await onInvite({ email, role: inviteRole })
-      notify('success', `Invitation sent to ${email}`)
-      setInviteEmail('')
+      await onInvite(input)
+      notify('success', `Invitation sent to ${input.email}`)
+      return true
     } catch (err) {
       notify('error', err instanceof Error ? err.message : 'Failed to invite')
-    } finally {
-      setInviting(false)
+      return false
     }
   }
 
@@ -111,39 +119,12 @@ export function InvitationsPanel({
 
   return (
     <section className="flex flex-col gap-4">
-      {canManage && (
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-[var(--text-muted)]">Invite by email</label>
-          <div className="flex gap-2">
-            <Input
-              type="email"
-              placeholder="colleague@example.com"
-              value={inviteEmail}
-              aria-label="Invite email address"
-              onChange={(event) => setInviteEmail(event.target.value)}
-              onKeyDown={(event) => { if (event.key === 'Enter') void submitInvite() }}
-              className="min-w-0 flex-1"
-            />
-            <RoleSelect
-              value={inviteRole}
-              ariaLabel="Invite role"
-              onChange={setInviteRole}
-            />
-            <Button
-              type="button"
-              onClick={() => void submitInvite()}
-              disabled={inviting || !inviteEmail.trim()}
-            >
-              {inviting ? 'Inviting…' : 'Invite'}
-            </Button>
-          </div>
-        </div>
-      )}
+      {canManage && <InviteForm label="Invite by email" placeholder="colleague@example.com" onInvite={invite} />}
 
       <div className="flex flex-col gap-2 border-t border-[var(--border-default)] pt-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-xs font-semibold text-[var(--text-primary)]">Invitation history</h4>
-          <span className="text-xs text-[var(--text-muted)]">{invitations.length} total</span>
+          <h4 className="text-sm font-semibold text-[var(--text-primary)]">Invitation history</h4>
+          <span className="text-sm text-[var(--text-muted)]">{invitations.length} total</span>
         </div>
         {invitations.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)]">No invitations yet.</p>
@@ -176,41 +157,27 @@ interface InvitationRowProps {
 
 function InvitationRow({ invitation, canManage, busy, onCopy, onResend, onRevoke }: InvitationRowProps) {
   const isPending = invitation.status === 'pending'
-  const emailFailed = invitation.emailStatus === 'failed'
-  const expiry = new Date(invitation.expiresAt).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  const status = STATUS[invitation.status]
 
   return (
     <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-input)] p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-[var(--text-primary)]">{invitation.email}</p>
-          <p className="text-xs text-[var(--text-muted)]">
-            {capitalize(invitation.permissions)} · expires {expiry}
-          </p>
-          {emailFailed && (
-            <p className="mt-1 text-xs text-[var(--surface-danger-text)]">Email was not sent — copy the link to share it.</p>
+          <p className="truncate text-sm font-medium text-[var(--text-primary)]" title={invitation.email}>{invitation.email}</p>
+          <p className="text-sm text-[var(--text-muted)]">{invitationDetail(invitation)}</p>
+          {isPending && invitation.emailStatus === 'failed' && (
+            <p className="mt-1 text-sm text-[var(--surface-danger-text)]">The email was not delivered. Copy the link and send it yourself.</p>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className={`${BADGE_BASE} ${STATUS_BADGE[invitation.status]}`}>
-            {invitation.status}
-          </span>
-          <span className={`${BADGE_BASE} ${EMAIL_BADGE[invitation.emailStatus]}`}>
-            {invitation.emailStatus.replace('_', ' ')}
-          </span>
-        </div>
+        <span className={`${BADGE_BASE} ${status.tone} shrink-0`}>{status.label}</span>
       </div>
       {canManage && isPending && (
-        <div className="mt-3 flex items-center justify-end gap-2">
+        <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
             onClick={onCopy}
             disabled={busy}
-            className="rounded border border-[var(--border-default)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
+            className="rounded border border-[var(--border-default)] px-2.5 py-1 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
           >
             Copy link
           </button>
@@ -218,7 +185,7 @@ function InvitationRow({ invitation, canManage, busy, onCopy, onResend, onRevoke
             type="button"
             onClick={onResend}
             disabled={busy}
-            className="rounded border border-[var(--border-default)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
+            className="rounded border border-[var(--border-default)] px-2.5 py-1 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
           >
             {busy ? 'Working…' : 'Resend'}
           </button>
@@ -226,7 +193,7 @@ function InvitationRow({ invitation, canManage, busy, onCopy, onResend, onRevoke
             type="button"
             onClick={onRevoke}
             disabled={busy}
-            className="rounded px-2 py-1 text-xs text-[var(--text-danger)] hover:bg-[var(--border-default)] disabled:opacity-50"
+            className="rounded px-2.5 py-1 text-sm text-[var(--text-danger)] hover:bg-[var(--border-default)] disabled:opacity-50"
           >
             Revoke
           </button>
