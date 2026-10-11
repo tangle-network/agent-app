@@ -7,7 +7,7 @@
  * products actually deploy with.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { memoryAdapter } from 'better-auth/adapters/memory'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
@@ -467,5 +467,53 @@ describe('createAppAuth: drizzle db/schema path', () => {
     expect(() => createAppAuth({ appName: 'My App', baseURL: 'http://localhost:3000', secret: SECRET })).toThrow(
       /requires a database/,
     )
+  })
+})
+
+describe('createAppAuth: session reads are remembered briefly', () => {
+  async function signedIn(overrides: Partial<AppAuthConfig> = {}) {
+    const database = memoryDatabase()
+    const appAuth = makeAppAuth({ database, ...overrides })
+    const res = await signUp(appAuth, 'http://localhost:3000', `memo-${crypto.randomUUID()}@example.com`)
+    const cookie = cookieHeaderFrom(res)
+    return { appAuth, cookie, database }
+  }
+
+  it('reuses a resolved session within a request and across requests in this isolate', async () => {
+    const { appAuth, cookie } = await signedIn()
+    const read = vi.spyOn(appAuth.auth.api, 'getSession')
+    const request = requestWithCookies('http://localhost:3000/app', cookie)
+    const [first, second] = await Promise.all([appAuth.getSession(request), appAuth.getSession(request)])
+    expect(first?.user.id).toBe(second?.user.id)
+    expect((await appAuth.getSession(requestWithCookies('http://localhost:3000/other', cookie)))?.user.id).toBe(first?.user.id)
+    expect(read).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads again after the memo window and after sign-out', async () => {
+    const { appAuth, cookie } = await signedIn()
+    const read = vi.spyOn(appAuth.auth.api, 'getSession')
+    const now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+    try {
+      await appAuth.getSession(requestWithCookies('http://localhost:3000/a', cookie))
+      clock.mockReturnValue(now + 30_001)
+      await appAuth.getSession(requestWithCookies('http://localhost:3000/b', cookie))
+      expect(read).toHaveBeenCalledTimes(2)
+    } finally { clock.mockRestore() }
+    const out = await appAuth.auth.handler(new Request('http://localhost:3000/api/auth/sign-out', {
+      method: 'POST', headers: { cookie, origin: 'http://localhost:3000', 'content-type': 'application/json' }, body: '{}',
+    }))
+    expect(out.status).toBe(200)
+    // The next read goes back to better-auth (which answers from its own cookie cache for a replayed cookie).
+    await appAuth.getSession(requestWithCookies('http://localhost:3000/c', cookie))
+    expect(read).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not remember sessions when the session cookie cache is disabled', async () => {
+    const { appAuth, cookie } = await signedIn({ sessionCookieCacheSeconds: false })
+    const read = vi.spyOn(appAuth.auth.api, 'getSession')
+    await appAuth.getSession(requestWithCookies('http://localhost:3000/a', cookie))
+    await appAuth.getSession(requestWithCookies('http://localhost:3000/b', cookie))
+    expect(read).toHaveBeenCalledTimes(2)
   })
 })
