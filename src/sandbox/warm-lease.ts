@@ -130,6 +130,12 @@ export interface WarmLeaseRow {
   /** Signals are refused without calling the product's warm until this time:
    *  set after an 'absent' or 'capacity' outcome, cleared by a turn. */
   declinedUntil: number
+  /** An ended, unused warm whose box may still be up: settled at the span no
+   *  turn used, when a turn arrives or its idle window closes. 0 when none. */
+  pendingWarmAt: number
+  /** The most the pending warm can be charged: until the box's idle timeout. */
+  pendingMs: number
+  pendingReason: string | null
 }
 
 /** Persistence for leases. `begin` and `markUsed` must be atomic across isolates. */
@@ -163,6 +169,16 @@ export interface WarmLeaseStore {
   markPredicted(key: string, at: number): Promise<void>
   /** Refuse signals for `key` until `until` (cleared by the next turn). */
   markDeclined(key: string, until: number): Promise<void>
+  /** Record an ended, unused warm whose charge is settled later. */
+  markPending(key: string, warmAt: number, maxMs: number, reason: string): Promise<void>
+  /**
+   * Charge the pending warm that started at `warmAt` `chargeMs` to `day` and
+   * clear it. Only the first settler of a given warm succeeds (a turn and a
+   * sweep may race); returns whether this call settled it.
+   */
+  settlePending(key: string, warmAt: number, day: string, chargeMs: number): Promise<boolean>
+  /** Pending warms whose idle window has closed by `now`. */
+  listPendingDue(now: number, limit: number): Promise<WarmLeaseRow[]>
   /** Bounded batches for `sweep`. */
   listExpired(now: number, limit: number): Promise<WarmLeaseRow[]>
   listHeld(now: number, limit: number): Promise<WarmLeaseRow[]>
@@ -315,10 +331,13 @@ export function createWarmLeases(options: WarmLeasesOptions): WarmLeases {
     }
   }
 
+  // A pending warm counts in full until it settles: conservative, and while it
+  // is pending its box is still up, so another warm would buy nothing.
   const spentToday = (row: WarmLeaseRow | null, at: number): number =>
-    row && row.day === utcDay(at) ? row.dayWarmMs : 0
+    (row && row.day === utcDay(at) ? row.dayWarmMs : 0) +
+    (row && row.pendingWarmAt > 0 && utcDay(row.pendingWarmAt) === utcDay(at) ? row.pendingMs : 0)
 
-  /** Box time this lease caused: up until the box's idle timeout after its last warm activity. */
+  /** The most box time an unused lease can have caused: until the box's idle timeout after its last warm activity. */
   function chargeOf(row: WarmLeaseRow): number {
     if (!row.resumed || row.usedAt > 0 || row.warmAt <= 0) return 0
     const lastActivity = Math.max(row.warmAt, row.pingAt)
@@ -372,11 +391,23 @@ export function createWarmLeases(options: WarmLeasesOptions): WarmLeases {
     if (hit && before) {
       emit({ type: 'warm_hit', key, reason: before.reason ?? 'unknown', leadMs: at - before.startedAt })
     }
+    // A turn inside an ended warm's idle window landed on the box that warm
+    // resumed: a hit, and only the span before it was unused.
+    let lateHit = false
+    if (before && before.pendingWarmAt > 0 && at < before.pendingWarmAt + before.pendingMs) {
+      const unused = Math.max(0, at - before.pendingWarmAt)
+      if (await store.settlePending(key, before.pendingWarmAt, utcDay(before.pendingWarmAt), unused)) {
+        lateHit = true
+        const reason = before.pendingReason ?? 'unknown'
+        emit({ type: 'warm_hit', key, reason, leadMs: unused })
+        if (unused >= 60_000) emit({ type: 'warm_wasted', key, reason, minutes: Math.round(unused / 60_000) })
+      }
+    }
     if (coldArrival) {
       const slots = addColdArrival(before?.slots ?? [], before?.slotsAt ?? 0, at)
       await store.writeProfile(key, slots, at, before?.firstSeenAt || at)
     }
-    return { hit, coldArrival }
+    return { hit: hit || lateHit, coldArrival }
   }
 
   async function sweep(sweepOptions: { limit?: number } = {}): Promise<WarmSweepReport> {
@@ -392,14 +423,21 @@ export function createWarmLeases(options: WarmLeasesOptions): WarmLeases {
         const current = row.threshold > 0 ? row.threshold : initialThreshold
         threshold = Math.min(THRESHOLD_CEILING, Math.max(THRESHOLD_FLOOR, current * (row.usedAt > 0 ? 0.85 : 1.3)))
       }
-      await store.end(row.key, row.leaseId, utcDay(row.warmAt || row.startedAt), charge, threshold)
+      // An unused warm is not charged here: its box stays up until the idle
+      // timeout, and a turn in that window means only part of it was unused.
+      await store.end(row.key, row.leaseId, utcDay(row.warmAt || row.startedAt), 0, threshold)
+      if (charge > 0) await store.markPending(row.key, row.warmAt, charge, row.reason ?? 'unknown')
       report.ended += 1
       if (row.warmAt <= 0) {
         report.abandoned += 1
         emit({ type: 'warm_abandoned', key: row.key, reason: row.reason ?? 'unknown' })
-      } else if (charge > 0) {
+      }
+    }
+
+    for (const row of await store.listPendingDue(at, limit)) {
+      if (await store.settlePending(row.key, row.pendingWarmAt, utcDay(row.pendingWarmAt), row.pendingMs)) {
         report.wasted += 1
-        emit({ type: 'warm_wasted', key: row.key, reason: row.reason ?? 'unknown', minutes: Math.round(charge / 60_000) })
+        emit({ type: 'warm_wasted', key: row.key, reason: row.pendingReason ?? 'unknown', minutes: Math.round(row.pendingMs / 60_000) })
       }
     }
 

@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-240 exports.
+241 exports.
 
 ### `adaptSandboxStream`
 
@@ -1532,6 +1532,14 @@ interface TerminalConnectionBoxLike
 
 ```ts
 "ALTER TABLE sandbox_warm_lease ADD COLUMN declined_until INTEGER NOT NULL DEFAULT 0"
+```
+
+### `WARM_LEASE_PENDING_DDL`
+
+`const` — For a table created before pending charges: paste each into a migration.
+
+```ts
+readonly ["ALTER TABLE sandbox_warm_lease ADD COLUMN pending_warm_at INTEGER NOT NULL DEFAULT 0", "ALTER TABLE sandbox_…
 ```
 
 ### `WARM_LEASE_TABLE_DDL`

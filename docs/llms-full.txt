@@ -3797,6 +3797,14 @@ interface CreateLegacyAttachmentUploadRouteOptions
 (options: ProtectedRuntimeChatOptions) => ChatTurnRouteProducer
 ```
 
+### `createRouterTurnProducer`
+
+`function`
+
+```ts
+(options: RouterTurnProducerOptions) => ChatTurnRouteProducer
+```
+
 ### `createSandboxChatProducer`
 
 `function` — Create a sandbox chat producer that manages chat turn routing with logging and interaction rendering options
@@ -4715,6 +4723,14 @@ type ResolveChatAttachmentsResult
 
 ```ts
 (input: { sessionId: string; planFollowUp: unknown; messages: readonly { role: string; parts?: unknown; }[]; }) => Plan…
+```
+
+### `RouterTurnProducerOptions`
+
+`type`
+
+```ts
+type RouterTurnProducerOptions
 ```
 
 ### `rowIdOf`
@@ -20524,6 +20540,14 @@ interface TerminalConnectionBoxLike
 
 ```ts
 "ALTER TABLE sandbox_warm_lease ADD COLUMN declined_until INTEGER NOT NULL DEFAULT 0"
+```
+
+### `WARM_LEASE_PENDING_DDL`
+
+`const` — For a table created before pending charges: paste each into a migration.
+
+```ts
+readonly ["ALTER TABLE sandbox_warm_lease ADD COLUMN pending_warm_at INTEGER NOT NULL DEFAULT 0", "ALTER TABLE sandbox_…
 ```
 
 ### `WARM_LEASE_TABLE_DDL`

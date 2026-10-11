@@ -2973,6 +2973,12 @@
           "doc": "Run a profile through the protected Router tool executor and the shared chat projection."
         },
         {
+          "name": "createRouterTurnProducer",
+          "kind": "function",
+          "signature": "(options: RouterTurnProducerOptions) => ChatTurnRouteProducer",
+          "doc": null
+        },
+        {
           "name": "createSandboxChatProducer",
           "kind": "function",
           "signature": "(options: SandboxChatProducerOptions) => ChatTurnRouteProducer",
@@ -3661,6 +3667,12 @@
           "kind": "function",
           "signature": "(input: { sessionId: string; planFollowUp: unknown; messages: readonly { role: string; parts?: unknown; }[]; }) => Plan…",
           "doc": "Validate a follow-up request against what the session actually persisted: the plan must be in this session at this revision and must already carry the claimed decision."
+        },
+        {
+          "name": "RouterTurnProducerOptions",
+          "kind": "type",
+          "signature": "type RouterTurnProducerOptions",
+          "doc": null
         },
         {
           "name": "rowIdOf",
@@ -15899,6 +15911,12 @@
           "kind": "const",
           "signature": "\"ALTER TABLE sandbox_warm_lease ADD COLUMN declined_until INTEGER NOT NULL DEFAULT 0\"",
           "doc": "For a table created from an earlier \\`WARM_LEASE_TABLE_DDL\\`: paste into a migration."
+        },
+        {
+          "name": "WARM_LEASE_PENDING_DDL",
+          "kind": "const",
+          "signature": "readonly [\"ALTER TABLE sandbox_warm_lease ADD COLUMN pending_warm_at INTEGER NOT NULL DEFAULT 0\", \"ALTER TABLE sandbox_…",
+          "doc": "For a table created before pending charges: paste each into a migration."
         },
         {
           "name": "WARM_LEASE_TABLE_DDL",
