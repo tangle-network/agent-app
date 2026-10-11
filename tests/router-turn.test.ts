@@ -40,7 +40,8 @@ describe('runRouterTurn', () => {
       history: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'Hello!' }], onEvent: event => events.push(event) })
 
     expect(outcome).toEqual({ text: 'Done: Restock towels is on the list.', servedModel: 'served/model',
-      toolCalls: [{ callId: 'call-1', toolName: 'staff.task.create', ok: true }] })
+      toolCalls: [{ callId: 'call-1', toolName: 'staff.task.create', ok: true }],
+      usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 } })
     expect(createTask.run).toHaveBeenCalledWith({ title: 'Restock towels' })
     expect(requests[0]!.headers.get('x-tangle-trace-id')).toBe('trace-1')
     expect(requests[0]!.body).toMatchObject({ model: 'requested/model', stream: true,
@@ -86,7 +87,8 @@ describe('runRouterTurn', () => {
 
     const recovers = router(down, sse([text('Hello.')]))
     await expect(runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: recovers.fetchImpl, systemPrompt: 's', userMessage: 'u' }))
-      .resolves.toEqual({ text: 'Hello.', servedModel: 'served/model', toolCalls: [] })
+      .resolves.toEqual({ text: 'Hello.', servedModel: 'served/model', toolCalls: [],
+        usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 } })
   })
 
   it('never repeats a turn after a tool ran', async () => {
