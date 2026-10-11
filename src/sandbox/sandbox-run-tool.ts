@@ -31,13 +31,17 @@ export class SandboxRunError extends Error {
 }
 
 export interface SandboxRunToolOptions {
-  shell: SandboxRuntimeConfig
+  /** The shell the default runner (`runSandboxPrompt`) uses. Required unless `runTask` is given. */
+  shell?: SandboxRuntimeConfig
   /** The box this call runs in. The product provisions, binds and bills it; this module never
    *  creates one. A throw is reported to the model as `sandbox_unavailable`, unless it is a
    *  `SandboxRunError`, whose own code and message are kept (an unpaid account, for example). */
   box(signal: AbortSignal): Promise<SandboxInstance>
   /** Options for the box's agent run: session, profile, model and credentials. */
   prompt?: Omit<StreamSandboxPromptOptions, 'signal' | 'history'>
+  /** The product's own runner, when its box run needs more than `runSandboxPrompt` (skill
+   *  placement, app-tool MCP, a spend tap). Returns the box agent's final answer. */
+  runTask?(box: SandboxInstance, task: string, options: { signal: AbortSignal; timeoutMs: number }): Promise<string>
   /** Wall-clock cap for one call, box start included. Default 5 minutes. */
   timeoutMs?: number
   /** Cancels a call in flight, for example the turn's own signal. */
@@ -69,6 +73,10 @@ export const SANDBOX_RUN_DESCRIPTION =
 
 export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRunTool {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const shell = options.shell
+  if (!options.runTask && !shell) throw new Error('createSandboxRunTool needs a shell or a runTask')
+  const runTask = options.runTask ?? ((box: SandboxInstance, task: string, run: { signal: AbortSignal; timeoutMs: number }) =>
+    runSandboxPrompt(shell!, box, task, { ...options.prompt, ...run, disallowQuestions: true }))
   const fail = (code: SandboxRunFailureCode, message: string, cause?: unknown): never => {
     const error = new SandboxRunError(code, message, cause === undefined ? undefined : { cause })
     options.onFailure?.(error)
@@ -100,12 +108,7 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
       }
       let answer: string
       try {
-        answer = await runSandboxPrompt(options.shell, box, task, {
-          ...options.prompt,
-          signal,
-          timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)),
-          disallowQuestions: true,
-        })
+        answer = await runTask(box, task, { signal, timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)) })
       } catch (error) {
         const timedOut = signal.aborted && !options.signal?.aborted
         return fail('sandbox_failed', timedOut

@@ -45,6 +45,15 @@ describe('createSandboxRunTool', () => {
     expect(runPrompt).not.toHaveBeenCalled()
   })
 
+  it('uses the product runner when it brings one', async () => {
+    const runTask = vi.fn(async () => 'done in the GTM box')
+    const tool = createSandboxRunTool({ box: async () => box, runTask })
+    await expect(tool.run({ task: 'Export the leads sheet.' })).resolves.toMatchObject({ answer: 'done in the GTM box' })
+    expect(runTask).toHaveBeenCalledWith(box, 'Export the leads sheet.', { signal: expect.any(AbortSignal), timeoutMs: expect.any(Number) })
+    expect(runPrompt).not.toHaveBeenCalled()
+    expect(() => createSandboxRunTool({ box: async () => box })).toThrow(/shell or a runTask/)
+  })
+
   it('types a failed run and an empty answer instead of returning nothing', async () => {
     const tool = createSandboxRunTool({ shell, box: async () => box })
     runPrompt.mockRejectedValueOnce(new Error('stream severed'))
