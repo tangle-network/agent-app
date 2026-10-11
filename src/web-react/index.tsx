@@ -87,6 +87,7 @@ export {
   PopoverSurface,
   POPOVER_SURFACE_ATTR,
   ModelPicker,
+  formatModelPrice,
   EffortPicker,
   EffortMeter,
   effortMeterFill,
