@@ -3823,7 +3823,7 @@ interface CreateLegacyAttachmentUploadRouteOptions
 
 ### `createProtectedRuntimeChatProducer`
 
-`function` — Run a profile through the protected Router tool executor and the shared chat projection.
+`function` — Run a profile as one Router turn under a protected model grant (`runProtectedRouterTurn`), projected through the shared chat projection.
 
 ```ts
 (options: ProtectedRuntimeChatOptions) => ChatTurnRouteProducer
@@ -19115,6 +19115,14 @@ type CertifiedDeliveryConfig
 (config: CertifiedPromptSourceOptions) => CertifiedDelivery
 ```
 
+### `createOpenAICompatCompletionTurn`
+
+`function` — The buffered sibling of {@link createOpenAICompatStreamTurn}: one `/chat/completions` request without `stream`, answered by one JSON completion, yielded as the same `LoopEvent`s (the same tool-call a…
+
+```ts
+(opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>
+```
+
 ### `createOpenAICompatStreamTurn`
 
 `function` — Build a `streamTurn` that calls an OpenAI-compatible `/chat/completions` endpoint (Tangle Router / tcloud / any compat provider) with `stream: true` and yields `LoopEvent`s via {@link toLoopEvents}.
@@ -19299,12 +19307,36 @@ interface OpenAICompatStreamTurnOptions
 interface OpenAIStreamChunk
 ```
 
+### `placeRouterTurn`
+
+`function` — Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…
+
+```ts
+(input: RouterTurnPlacementInput) => PlacementRecord
+```
+
 ### `ProtectedModelSettlementError`
 
 `class` — A validated charge remains authoritative when the product cannot save its audit record.
 
 ```ts
 class ProtectedModelSettlementError
+```
+
+### `ProtectedRouterTurnOptions`
+
+`type` — A turn under a grant.
+
+```ts
+type ProtectedRouterTurnOptions
+```
+
+### `ProtectedRouterTurnOutcome`
+
+`interface`
+
+```ts
+interface ProtectedRouterTurnOutcome
 ```
 
 ### `resolveCatalogModelId`
@@ -19451,6 +19483,14 @@ type RouterTurnEvent
 interface RouterTurnFailure
 ```
 
+### `RouterTurnGrant`
+
+`type` — Runtime's grant inputs for one turn: the port, the model request, the reservation and its deadline.
+
+```ts
+type RouterTurnGrant
+```
+
 ### `RouterTurnOptions`
 
 `interface`
@@ -19467,6 +19507,22 @@ interface RouterTurnOptions
 interface RouterTurnOutcome
 ```
 
+### `RouterTurnPlacementInput`
+
+`interface` — What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose.
+
+```ts
+interface RouterTurnPlacementInput
+```
+
+### `RouterTurnSettlement`
+
+`interface` — What the grant settled for the turn.
+
+```ts
+interface RouterTurnSettlement
+```
+
 ### `RouterTurnTool`
 
 `interface` — A tool the turn may call.
@@ -19475,12 +19531,44 @@ interface RouterTurnOutcome
 interface RouterTurnTool
 ```
 
+### `RouterTurnToolContext`
+
+`interface` — What a running tool gets besides its arguments.
+
+```ts
+interface RouterTurnToolContext
+```
+
+### `RouterTurnToolEvent`
+
+`interface` — One side event a tool reported while it ran.
+
+```ts
+interface RouterTurnToolEvent
+```
+
+### `RouterTurnToolOutcome`
+
+`type` — One tool call's result as the model reads it.
+
+```ts
+type RouterTurnToolOutcome
+```
+
 ### `runAppToolLoop`
 
 `function` — Run the bounded tool loop and return the final text + every executed tool outcome.
 
 ```ts
 (opts: RunToolLoopOptions) => Promise<ToolLoopResult>
+```
+
+### `runProtectedRouterTurn`
+
+`function` — Run one `runRouterTurn` under `options.grant`.
+
+```ts
+(options: ProtectedRouterTurnOptions) => Promise<ProtectedRouterTurnOutcome>
 ```
 
 ### `runRouterTurn`
@@ -19728,6 +19816,14 @@ Source: `src/runtime/router-turn.ts` · depends on `tools`
 (profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…
 ```
 
+### `placeRouterTurn`
+
+`function` — Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…
+
+```ts
+(input: RouterTurnPlacementInput) => PlacementRecord
+```
+
 ### `routerFunctionName`
 
 `function` — OpenAI-compatible function names allow only `[A-Za-z0-9_-]{1,64}`; app tool names often use dots.
@@ -19768,12 +19864,44 @@ interface RouterTurnOptions
 interface RouterTurnOutcome
 ```
 
+### `RouterTurnPlacementInput`
+
+`interface` — What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose.
+
+```ts
+interface RouterTurnPlacementInput
+```
+
 ### `RouterTurnTool`
 
 `interface` — A tool the turn may call.
 
 ```ts
 interface RouterTurnTool
+```
+
+### `RouterTurnToolContext`
+
+`interface` — What a running tool gets besides its arguments.
+
+```ts
+interface RouterTurnToolContext
+```
+
+### `RouterTurnToolEvent`
+
+`interface` — One side event a tool reported while it ran.
+
+```ts
+interface RouterTurnToolEvent
+```
+
+### `RouterTurnToolOutcome`
+
+`type` — One tool call's result as the model reads it.
+
+```ts
+type RouterTurnToolOutcome
 ```
 
 ### `runRouterTurn`
@@ -24214,6 +24342,14 @@ Source: `src/signoff/index.ts`
 (repoRoot: string, configs?: readonly string[] | undefined) => WorkerDefaultsResult
 ```
 
+### `checkWorkspaceSurface`
+
+`function` — Drive Chromium over every route × width × theme.
+
+```ts
+(options: WorkspaceSurfaceOptions) => Promise<WorkspaceSurfaceReport>
+```
+
 ### `collectShellDividers`
 
 `function` — Runs in the page (Playwright serializes it).
@@ -24228,6 +24364,14 @@ Source: `src/signoff/index.ts`
 
 ```ts
 () => Pick<SurfaceSample, "boxes" | "copy">
+```
+
+### `collectWorkspaceSurface`
+
+`function` — Runs in the page.
+
+```ts
+() => Omit<WorkspaceSurfaceSample, "width" | "route" | "theme">
 ```
 
 ### `composite`
@@ -24286,6 +24430,22 @@ interface CopyBlock
 (result: WorkerDefaultsResult) => string
 ```
 
+### `formatWorkspaceSurfaceReport`
+
+`function`
+
+```ts
+(report: WorkspaceSurfaceReport) => string
+```
+
+### `HEADER_TOP_TOLERANCE_PX`
+
+`const` — A header within this distance of the panel top is its first row (a 1px border).
+
+```ts
+2
+```
+
 ### `judgeShellAlignment`
 
 `function` — Desktop: every header divider lands on the rail's first divider.
@@ -24300,6 +24460,14 @@ interface CopyBlock
 
 ```ts
 (sample: SurfaceSample, limits?: SurfaceLadderLimits) => SurfaceFinding[]
+```
+
+### `judgeWorkspaceSurface`
+
+`function`
+
+```ts
+(sample: WorkspaceSurfaceSample) => WorkspaceSurfaceFinding[]
 ```
 
 ### `LoadedSignoffConfig`
@@ -24391,6 +24559,14 @@ interface RunSignoffOptions
 ```
 
 ### `runSurfaceLadderCli`
+
+`function`
+
+```ts
+(argv: readonly string[]) => Promise<number>
+```
+
+### `runWorkspaceSurfaceCli`
 
 `function`
 
@@ -24684,6 +24860,38 @@ interface WorkerDefaultsFinding
 
 ```ts
 interface WorkerDefaultsResult
+```
+
+### `WorkspaceSurfaceFinding`
+
+`interface`
+
+```ts
+interface WorkspaceSurfaceFinding
+```
+
+### `WorkspaceSurfaceOptions`
+
+`interface`
+
+```ts
+interface WorkspaceSurfaceOptions
+```
+
+### `WorkspaceSurfaceReport`
+
+`interface`
+
+```ts
+interface WorkspaceSurfaceReport
+```
+
+### `WorkspaceSurfaceSample`
+
+`interface` — Workspace surface: every route of a workspace renders exactly one shared floating panel (sandbox-ui `WorkspaceSurface`, or `WorkspaceLayout` with `surface="inset"`), and that panel's first row is an…
+
+```ts
+interface WorkspaceSurfaceSample
 ```
 
 
@@ -26336,7 +26544,7 @@ interface TurnStatusWriteOptions
 
 ## `./studio`
 
-Source: `src/studio/index.ts`
+Source: `src/studio/index.ts` · depends on `runtime`
 
 ### `aspectRatioFromOptions`
 
@@ -26885,7 +27093,7 @@ interface WaveformBar
 
 ## `./studio-react`
 
-Source: `src/studio-react/index.tsx` · depends on `studio`, `web-react`
+Source: `src/studio-react/index.tsx` · depends on `runtime`, `studio`, `web-react`
 
 ### `AudioTogglePill`
 
@@ -27013,14 +27221,6 @@ interface MediaViewerModalProps
 
 ```ts
 <T extends string>({ label, value, choices, onSelect, className, icon: Icon, trigger, }: { label: string; value: T; cho…
-```
-
-### `ModelPill`
-
-`function` — The model pill — first in the band on every lane, and the only pill that is always there.
-
-```ts
-({ models, value, displayName, provider, unavailable, onSelect, bandRef, }: { models: readonly MediaModelOption[]; valu…
 ```
 
 ### `OptionChoice`
@@ -31808,6 +32008,14 @@ interface FlowWaterfallProps
 
 ```ts
 (msg: ChatMessageMetrics, models: CatalogModel[]) => string | null
+```
+
+### `formatModelPrice`
+
+`function` — The price a person pays per output, in the unit that output comes in: per million prompt tokens for text, per image, per second of video, per minute of audio, per 1,000 characters of speech.
+
+```ts
+(model: Pick<CatalogModel, "pricing" | "outputPrice">) => string | undefined
 ```
 
 ### `formatRecordGridValue`

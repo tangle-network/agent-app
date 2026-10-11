@@ -4,7 +4,7 @@
 
 Source: `src/signoff/index.ts`
 
-62 exports.
+72 exports.
 
 ### `checkShellAlignment`
 
@@ -30,6 +30,14 @@ Source: `src/signoff/index.ts`
 (repoRoot: string, configs?: readonly string[] | undefined) => WorkerDefaultsResult
 ```
 
+### `checkWorkspaceSurface`
+
+`function` — Drive Chromium over every route × width × theme.
+
+```ts
+(options: WorkspaceSurfaceOptions) => Promise<WorkspaceSurfaceReport>
+```
+
 ### `collectShellDividers`
 
 `function` — Runs in the page (Playwright serializes it).
@@ -44,6 +52,14 @@ Source: `src/signoff/index.ts`
 
 ```ts
 () => Pick<SurfaceSample, "boxes" | "copy">
+```
+
+### `collectWorkspaceSurface`
+
+`function` — Runs in the page.
+
+```ts
+() => Omit<WorkspaceSurfaceSample, "width" | "route" | "theme">
 ```
 
 ### `composite`
@@ -102,6 +118,22 @@ interface CopyBlock
 (result: WorkerDefaultsResult) => string
 ```
 
+### `formatWorkspaceSurfaceReport`
+
+`function`
+
+```ts
+(report: WorkspaceSurfaceReport) => string
+```
+
+### `HEADER_TOP_TOLERANCE_PX`
+
+`const` — A header within this distance of the panel top is its first row (a 1px border).
+
+```ts
+2
+```
+
 ### `judgeShellAlignment`
 
 `function` — Desktop: every header divider lands on the rail's first divider.
@@ -116,6 +148,14 @@ interface CopyBlock
 
 ```ts
 (sample: SurfaceSample, limits?: SurfaceLadderLimits) => SurfaceFinding[]
+```
+
+### `judgeWorkspaceSurface`
+
+`function`
+
+```ts
+(sample: WorkspaceSurfaceSample) => WorkspaceSurfaceFinding[]
 ```
 
 ### `LoadedSignoffConfig`
@@ -207,6 +247,14 @@ interface RunSignoffOptions
 ```
 
 ### `runSurfaceLadderCli`
+
+`function`
+
+```ts
+(argv: readonly string[]) => Promise<number>
+```
+
+### `runWorkspaceSurfaceCli`
 
 `function`
 
@@ -500,4 +548,36 @@ interface WorkerDefaultsFinding
 
 ```ts
 interface WorkerDefaultsResult
+```
+
+### `WorkspaceSurfaceFinding`
+
+`interface`
+
+```ts
+interface WorkspaceSurfaceFinding
+```
+
+### `WorkspaceSurfaceOptions`
+
+`interface`
+
+```ts
+interface WorkspaceSurfaceOptions
+```
+
+### `WorkspaceSurfaceReport`
+
+`interface`
+
+```ts
+interface WorkspaceSurfaceReport
+```
+
+### `WorkspaceSurfaceSample`
+
+`interface` — Workspace surface: every route of a workspace renders exactly one shared floating panel (sandbox-ui `WorkspaceSurface`, or `WorkspaceLayout` with `surface="inset"`), and that panel's first row is an…
+
+```ts
+interface WorkspaceSurfaceSample
 ```
