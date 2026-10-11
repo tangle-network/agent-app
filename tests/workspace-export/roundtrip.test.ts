@@ -51,6 +51,7 @@ function seed(): DatabaseSync {
     CREATE TABLE message (id INTEGER PRIMARY KEY, thread_id TEXT, content TEXT, input_tokens INTEGER, accessToken TEXT);
     CREATE TABLE session (id TEXT PRIMARY KEY, token TEXT, user_id TEXT);
     CREATE TABLE eval_global (id INTEGER PRIMARY KEY, score REAL);
+    CREATE TABLE _migrations_applied (name TEXT PRIMARY KEY, applied_at INTEGER);
   `)
   db.prepare('INSERT INTO workspace VALUES (?, ?, ?)').run(WS, 'Inn', JSON.stringify({ published: { remoteBearerToken: 'bearer-abcdefgh' }, theme: 'dark' }))
   db.prepare('INSERT INTO workspace VALUES (?, ?, ?)').run(OTHER, 'Other', '{}')
@@ -196,6 +197,7 @@ describe('workspace export round trip', () => {
     const coverage = new Map(manifest.notes.database.map((c: { table: string; status: string }) => [c.table, c.status]))
     expect(coverage.get('session')).toBe('excluded')
     expect(coverage.get('eval_global')).toBe('unscoped')
+    expect(coverage.has('_migrations_applied')).toBe(false)
     const lines = readFileSync(join(out, 'data/db.message.ndjson'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
     expect(lines).toHaveLength(1203)
     expect(lines.every((m) => m.thread_id === 't1')).toBe(true)

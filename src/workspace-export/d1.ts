@@ -50,7 +50,8 @@ export interface D1WorkspaceTablesOptions {
   pageSize?: number
 }
 
-const INTERNAL = /^(sqlite_|_cf_|d1_|__drizzle|_litestream)/
+// Bookkeeping tables of SQLite, D1 and migration runners (drizzle, custom _migrations*).
+const INTERNAL = /^(sqlite_|_cf_|d1_|__drizzle|_litestream|_migrations)/
 
 function quote(identifier: string): string {
   return `"${identifier.replace(/"/g, '""')}"`
