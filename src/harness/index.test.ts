@@ -2,6 +2,7 @@ import { harnessTypeSchema } from '@tangle-network/agent-interface'
 import { describe, expect, it } from 'vitest'
 import {
   coerceHarness,
+  configuredHarness,
   isHarness,
   resolveSessionHarness,
   DEFAULT_HARNESS,
@@ -143,5 +144,34 @@ describe('harness ↔ model compatibility (server-enforced)', () => {
       model: 'claude-sonnet-4-6',
       provider: 'anthropic',
     })).not.toThrow()
+  })
+})
+
+describe('configured harness', () => {
+  it('defaults to opencode when nothing is configured', () => {
+    expect(configuredHarness({})).toBe(DEFAULT_HARNESS)
+    expect(configuredHarness({ default: ' ', workspaces: '' }, 'ws-a')).toBe(DEFAULT_HARNESS)
+  })
+
+  it('applies the app default, then a workspace choice over it', () => {
+    const config = { default: 'pi', workspaces: JSON.stringify({ 'ws-a': 'opencode' }) }
+    expect(configuredHarness(config, 'ws-a')).toBe('opencode')
+    expect(configuredHarness(config, 'ws-b')).toBe('pi')
+    expect(configuredHarness(config)).toBe('pi')
+  })
+
+  it('feeds a fresh session but never moves a session that already ran', () => {
+    const workspaceDefault = configuredHarness({ workspaces: JSON.stringify({ 'ws-a': 'pi' }) }, 'ws-a')
+    expect(resolveSessionHarness({ workspaceDefault }).harness).toBe('pi')
+    expect(resolveSessionHarness({ sessionHarness: 'opencode', workspaceDefault }).harness).toBe('opencode')
+  })
+
+  it('refuses a configuration that names an unknown harness or is malformed', () => {
+    expect(() => configuredHarness({ default: 'pie' })).toThrow('unknown harness: pie')
+    // One bad entry fails every workspace, not only its own.
+    expect(() => configuredHarness({ workspaces: JSON.stringify({ 'ws-a': 'pi', 'ws-b': 'pie' }) }, 'ws-a'))
+      .toThrow('workspace ws-b')
+    expect(() => configuredHarness({ workspaces: '{' })).toThrow('not JSON')
+    expect(() => configuredHarness({ workspaces: '["pi"]' })).toThrow('must map workspace ids')
   })
 })
