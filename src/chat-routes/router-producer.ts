@@ -61,6 +61,14 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
         }
       } else if (event.type === 'usage') {
         push({ type: 'usage', usage: { promptTokens: event.promptTokens, completionTokens: event.completionTokens } })
+      } else if (event.type === 'tool_event') {
+        // Recorded on the tool's part, so a reload shows what the tool did, and streamed as it happens.
+        const part = toolParts.get(event.callId)
+        if (part) {
+          const state = part.state as Record<string, unknown>
+          part.state = { ...state, events: [...(state.events as unknown[] ?? []), { kind: event.kind, data: event.data, at: event.at }] }
+        }
+        push({ type: 'tool.event', data: { toolCallId: event.callId, toolName: event.toolName, kind: event.kind, data: event.data, at: event.at } })
       }
     },
   }).then(result => {
