@@ -28,6 +28,10 @@ export interface UnansweredThread {
   pendingMessages: number
   /** Age of the OLDEST unanswered user message, in ms. */
   oldestAgeMs: number
+  /** The newest of these messages was followed by a row that showed the person
+   *  something (a failure notice or error prose), so they know it failed. False
+   *  or absent: nothing came back at all. */
+  notified?: boolean
 }
 
 /** A persisted assistant row, as the sweep needs to judge it. */
@@ -228,8 +232,24 @@ export interface SweepOptions {
    * blindness this module now refuses to draw conclusions from.
    */
   decodeParts?: (raw: unknown, row: PersistedTurnRow) => Promise<unknown> | unknown
+  /**
+   * Which threads that got no reply at all should page (a `critical` alert);
+   * the rest are reported as a `warning`. A product passes its own rule, such
+   * as only its customers' and operators' threads, so internal and evaluation
+   * traffic stops paging. Default: threads silent for 24 hours or more.
+   */
+  pageSilentThreads?: (threads: UnansweredThread[]) => Promise<UnansweredThread[]> | UnansweredThread[]
+  /**
+   * Where a product already reports threads that ended on a failure the person
+   * saw, such as its reliability report. When set, those threads are counted
+   * but not alerted here. Unset, they are a `warning`, so a product whose every
+   * reply is an error message still shows up.
+   */
+  failureNoticesReportedBy?: string
   now?: number
 }
+
+const defaultPageSilentThreads = (threads: UnansweredThread[]) => threads.filter((thread) => thread.oldestAgeMs >= 24 * HOUR_MS)
 
 /** Apply the optional decoder, falling back to the stored value on any failure
  *  so a broken decoder degrades to blindness (reported) rather than to a fake
@@ -251,9 +271,17 @@ async function decodeRowParts(
  *  a test can assert on it. */
 export interface SweepResult {
   product: string
+  /** Threads whose user messages have no real answer: {@link silentThreads}
+   *  plus {@link notifiedThreads}. */
   unansweredThreads: number
   pendingUserMessages: number
   oldestUnansweredMs: number
+  /** Threads where nothing came back after the newest message. */
+  silentThreads: number
+  /** Of {@link silentThreads}, the ones `pageSilentThreads` selected. */
+  pagedSilentThreads: number
+  /** Threads that ended on a failure the person saw. */
+  notifiedThreads: number
   turnsJudged: number
   unhealthyTurns: number
   emptyCompletions: number
@@ -352,31 +380,42 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
   // ── silence: messages in, nothing out ──────────────────────────────────
   const pendingUserMessages = unanswered.reduce((sum, t) => sum + t.pendingMessages, 0)
   const oldestUnansweredMs = unanswered.reduce((max, t) => Math.max(max, t.oldestAgeMs), 0)
+  const silent = unanswered.filter((t) => !t.notified)
+  const notified = unanswered.filter((t) => t.notified)
+  const paged = new Set(
+    (await (options.pageSilentThreads ?? defaultPageSilentThreads)(silent)).map((t) => t.threadId),
+  )
+  const describeThread = (t: UnansweredThread) =>
+    `thread ${t.threadId}: ${t.pendingMessages} pending, oldest ${(t.oldestAgeMs / HOUR_MS).toFixed(1)}h`
 
-  if (unanswered.length > 0) {
-    const hours = (oldestUnansweredMs / HOUR_MS).toFixed(1)
+  if (silent.length > 0) {
+    const silentMessages = silent.reduce((sum, t) => sum + t.pendingMessages, 0)
+    const oldest = silent.reduce((max, t) => Math.max(max, t.oldestAgeMs), 0)
     alerts.push({
       product: options.product,
-      // A day of total silence is not a warning.
-      severity: oldestUnansweredMs >= 24 * HOUR_MS ? 'critical' : 'warning',
+      severity: paged.size > 0 ? 'critical' : 'warning',
       key: `sweep:${options.product}:unanswered_threads`,
-      title: `${options.product}: ${pendingUserMessages} user message(s) unanswered across ${unanswered.length} thread(s)`,
+      title: `${options.product}: ${silentMessages} user message(s) unanswered across ${silent.length} thread(s), with no reply at all`,
       details: [
-        `oldest unanswered message: ${hours}h`,
-        ...unanswered
+        `oldest unanswered message: ${(oldest / HOUR_MS).toFixed(1)}h; ${paged.size} of these thread(s) page`,
+        // The threads that page come first, so the alert names what to open.
+        ...[...silent.filter((t) => paged.has(t.threadId)), ...silent.filter((t) => !paged.has(t.threadId))]
           .slice(0, 5)
-          .map(
-            (t) =>
-              `thread ${t.threadId}: ${t.pendingMessages} pending, oldest ${(
-                t.oldestAgeMs / HOUR_MS
-              ).toFixed(1)}h`,
-          ),
+          .map((t) => `${describeThread(t)}${paged.has(t.threadId) ? ' (pages)' : ''}`),
       ],
-      data: {
-        unansweredThreads: unanswered.length,
-        pendingUserMessages,
-        oldestUnansweredMs,
-      },
+      data: { silentThreads: silent.length, pagedSilentThreads: paged.size, pendingUserMessages: silentMessages, oldestUnansweredMs: oldest },
+      at: now,
+    })
+  }
+  if (notified.length > 0 && !options.failureNoticesReportedBy) {
+    const notifiedMessages = notified.reduce((sum, t) => sum + t.pendingMessages, 0)
+    alerts.push({
+      product: options.product,
+      severity: 'warning',
+      key: `sweep:${options.product}:failed_threads`,
+      title: `${options.product}: ${notifiedMessages} user message(s) across ${notified.length} thread(s) ended on a failure the person saw`,
+      details: notified.slice(0, 5).map(describeThread),
+      data: { notifiedThreads: notified.length, pendingUserMessages: notifiedMessages },
       at: now,
     })
   }
@@ -598,6 +637,9 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
     unansweredThreads: unanswered.length,
     pendingUserMessages,
     oldestUnansweredMs,
+    silentThreads: silent.length,
+    pagedSilentThreads: paged.size,
+    notifiedThreads: notified.length,
     turnsJudged: turns.length,
     unhealthyTurns,
     emptyCompletions,
@@ -715,31 +757,47 @@ export function createD1TurnHealthSource(
       const errorClause = errorPrefixes
         .map((_, i) => ` AND a.content NOT LIKE ?${i + 3} || '%'`)
         .join('')
+      // A row after the newest pending message that showed something (error
+      // prose, or a notice part) means the person saw the failure. A blank row
+      // with no notice showed nothing, so its thread stays silent.
       const { results } = await db
         .prepare(
-          `SELECT m.thread_id AS threadId,
-                  COUNT(*) AS pendingMessages,
-                  MIN(m.created_at) AS oldestCreatedAt
-             FROM ${message} m
-            WHERE m.role = 'user'
-              AND m.created_at <= ?1
-              AND m.created_at >= ?2
-              AND m.created_at > COALESCE(
-                    (SELECT MAX(a.created_at)
-                       FROM ${message} a
-                      WHERE a.thread_id = m.thread_id
-                        AND a.role = 'assistant'
-                        AND length(trim(a.content)) > 0${errorClause}), 0)
-            GROUP BY m.thread_id
-            ORDER BY oldestCreatedAt ASC`,
+          `WITH pending AS (
+             SELECT m.thread_id AS threadId,
+                    COUNT(*) AS pendingMessages,
+                    MIN(m.created_at) AS oldestCreatedAt,
+                    MAX(m.created_at) AS newestCreatedAt
+               FROM ${message} m
+              WHERE m.role = 'user'
+                AND m.created_at <= ?1
+                AND m.created_at >= ?2
+                AND m.created_at > COALESCE(
+                      (SELECT MAX(a.created_at)
+                         FROM ${message} a
+                        WHERE a.thread_id = m.thread_id
+                          AND a.role = 'assistant'
+                          AND length(trim(a.content)) > 0${errorClause}), 0)
+              GROUP BY m.thread_id
+           )
+           SELECT p.threadId, p.pendingMessages, p.oldestCreatedAt,
+                  EXISTS (
+                    SELECT 1 FROM ${message} a
+                     WHERE a.thread_id = p.threadId AND a.role = 'assistant' AND a.created_at >= p.newestCreatedAt
+                       AND (length(trim(coalesce(a.content, ''))) > 0 OR EXISTS (
+                         SELECT 1 FROM json_each(CASE WHEN json_valid(a.parts) THEN CASE WHEN json_type(a.parts) = 'array' THEN a.parts ELSE '[]' END ELSE '[]' END) n
+                          WHERE CASE WHEN n.type = 'object' THEN json_extract(n.value, '$.type') END = 'notice'))
+                  ) AS notified
+             FROM pending p
+            ORDER BY p.oldestCreatedAt ASC`,
         )
         .bind(cutoffSeconds, floorSeconds, ...errorPrefixes)
-        .all<{ threadId: string; pendingMessages: number; oldestCreatedAt: number }>()
+        .all<{ threadId: string; pendingMessages: number; oldestCreatedAt: number; notified: number }>()
 
       return results.map((row) => ({
         threadId: row.threadId,
         pendingMessages: Number(row.pendingMessages),
         oldestAgeMs: now - Number(row.oldestCreatedAt) * 1000,
+        notified: Number(row.notified) === 1,
       }))
     },
 
