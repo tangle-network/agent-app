@@ -20521,6 +20521,14 @@ type WorkspacePrewarmEvent
 type WorkspacePrewarmOutcome
 ```
 
+### `WorkspacePrewarmReason`
+
+`type` — Why the browser asked: `useWorkspacePrewarm` sends `page-open` or `composer-focus`.
+
+```ts
+type WorkspacePrewarmReason
+```
+
 ### `WorkspacePrewarmReport`
 
 `type`

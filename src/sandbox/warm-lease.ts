@@ -35,8 +35,8 @@
  * hour, within the budget. The threshold tunes itself: a predicted warm that is used lowers it,
  * one that is wasted raises it.
  *
- * EVENTS. `warm_started`, `warm_hit`, `warm_wasted`, `warm_declined` and
- * `warm_failed` each carry the key and the reason, so a product can compute hit
+ * EVENTS. `warm_started`, `warm_hit`, `warm_wasted`, `warm_declined`,
+ * `warm_failed` and `warm_abandoned` each carry the key and the reason, so a product can compute hit
  * rate and wasted minutes per workspace from its logs alone.
  */
 
@@ -65,6 +65,10 @@ export type WarmLeaseEvent =
   | { type: 'warm_wasted'; key: string; reason: WarmReason; minutes: number }
   | { type: 'warm_declined'; key: string; reason: WarmReason; why: 'budget' | 'absent' }
   | { type: 'warm_failed'; key: string; reason: WarmReason; error: string }
+  /** The lease ended without its warm ever reporting: the request running it was
+   *  cancelled or the isolate died. Whether the box resumed is unknown, so it is
+   *  counted here rather than charged or dropped. */
+  | { type: 'warm_abandoned'; key: string; reason: WarmReason }
 
 export type WarmSignalOutcome =
   /** This call started a lease and ran the product's warm. */
@@ -89,6 +93,8 @@ export interface WarmTurnResult {
 export interface WarmSweepReport {
   ended: number
   wasted: number
+  /** Expired leases whose warm never reported an outcome. */
+  abandoned: number
   pinged: number
   predicted: number
   /** Keys whose ping or predicted warm threw; the rest of the batch still ran. */
@@ -121,10 +127,13 @@ export interface WarmLeaseStore {
   read(key: string): Promise<WarmLeaseRow | null>
   /**
    * Start a lease with `leaseId` when none is live, otherwise extend the live
-   * one's hold to at least `holdUntil`. Returns the live lease id after the
-   * write; the caller started the lease exactly when it equals `leaseId`.
+   * one's hold to at least `holdUntil`. A lease whose warm has not reported by
+   * `staleBefore` counts as not live and is taken over, so a warm killed with
+   * its request is retried instead of blocking every later signal. Returns the
+   * live lease id after the write; the caller started the lease exactly when
+   * it equals `leaseId`.
    */
-  begin(key: string, leaseId: string, reason: string, now: number, holdUntil: number): Promise<string>
+  begin(key: string, leaseId: string, reason: string, now: number, holdUntil: number, staleBefore: number): Promise<string>
   /** Record the result of this lease's warm. No-op for a superseded lease. */
   markWarm(key: string, leaseId: string, warmAt: number, resumed: boolean): Promise<void>
   /**
@@ -166,6 +175,11 @@ export interface WarmLeasesOptions {
   burstHoldMs?: number
   /** Unused-warm box time allowed per key per UTC day. Default 30 min. */
   dailyBudgetMs?: number
+  /**
+   * How long a started warm may go without reporting before the next signal
+   * takes the lease over and warms again. Default 2 min, past a slow resume.
+   */
+  warmDeadlineMs?: number
   /** Reasons subject to the budget. Default page-open, member-activity, predicted, scheduled. */
   budgetedReasons?: readonly string[]
   /** Starting predicted-warm threshold, a probability. Default 0.25. */
@@ -267,6 +281,7 @@ export function createWarmLeases(options: WarmLeasesOptions): WarmLeases {
   const { store } = options
   const boxIdleMs = options.boxIdleMs ?? 30 * 60_000
   const holdMs = options.holdMs ?? 10 * 60_000
+  const warmDeadlineMs = options.warmDeadlineMs ?? 2 * 60_000
   const burstHoldMs = options.burstHoldMs ?? boxIdleMs
   const dailyBudgetMs = options.dailyBudgetMs ?? 30 * 60_000
   const budgeted = new Set<string>(options.budgetedReasons ?? DEFAULT_BUDGETED)
@@ -302,7 +317,7 @@ export function createWarmLeases(options: WarmLeasesOptions): WarmLeases {
       }
     }
     const leaseId = newId()
-    const live = await store.begin(key, leaseId, reason, at, at + holdMs)
+    const live = await store.begin(key, leaseId, reason, at, at + holdMs, at - warmDeadlineMs)
     if (live !== leaseId) return { outcome: 'extended' }
 
     let box: WarmBoxOutcome
@@ -344,7 +359,7 @@ export function createWarmLeases(options: WarmLeasesOptions): WarmLeases {
   async function sweep(sweepOptions: { limit?: number } = {}): Promise<WarmSweepReport> {
     const limit = sweepOptions.limit ?? 50
     const at = now()
-    const report: WarmSweepReport = { ended: 0, wasted: 0, pinged: 0, predicted: 0, errors: 0 }
+    const report: WarmSweepReport = { ended: 0, wasted: 0, abandoned: 0, pinged: 0, predicted: 0, errors: 0 }
 
     for (const row of await store.listExpired(at, limit)) {
       if (!row.leaseId) continue
@@ -356,7 +371,10 @@ export function createWarmLeases(options: WarmLeasesOptions): WarmLeases {
       }
       await store.end(row.key, row.leaseId, utcDay(row.warmAt || row.startedAt), charge, threshold)
       report.ended += 1
-      if (charge > 0) {
+      if (row.warmAt <= 0) {
+        report.abandoned += 1
+        emit({ type: 'warm_abandoned', key: row.key, reason: row.reason ?? 'unknown' })
+      } else if (charge > 0) {
         report.wasted += 1
         emit({ type: 'warm_wasted', key: row.key, reason: row.reason ?? 'unknown', minutes: Math.round(charge / 60_000) })
       }
