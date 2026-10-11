@@ -4,7 +4,15 @@
 
 Source: `src/workspace-export/index.ts`
 
-39 exports.
+41 exports.
+
+### `ArchivableBox`
+
+`interface` — The slice of the Sandbox SDK's `SandboxInstance` this source uses.
+
+```ts
+interface ArchivableBox
+```
 
 ### `createExportEngine`
 
@@ -284,6 +292,14 @@ interface R2FilesBucket
 
 ```ts
 "[redacted]"
+```
+
+### `sandboxArchive`
+
+`function` — One sandbox's filesystem as `sandbox/<name>.tar.gz`.
+
+```ts
+(args: { name: string; getBox(): Promise<ArchivableBox | null>; dir?: string | undefined; dataClass?: ExportDataClass |…
 ```
 
 ### `SecretScanner`

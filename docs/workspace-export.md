@@ -19,7 +19,7 @@ sandbox/<source>.tar.gz  the agent's workspace filesystem
 1. Declare the sources for one workspace in `plan`.
    - `d1WorkspaceTables` discovers every table with a workspace column. Tables keyed through a parent take a `scoped` WHERE clause; tables left out on purpose go in `exclude` with a reason. Every other table appears in the coverage report as `unscoped`, so new migrations cannot silently drop out of the export.
    - `r2Files` and `kvFiles` export object and KV prefixes. A prefix must end at a workspace boundary (`ws-1/`).
-   - An `archive` source returns the sandbox workspace as a `.tar.gz` stream from the Sandbox SDK (`box.fs.openArchive(dir)`), or `null` when the workspace has no box.
+   - `sandboxArchive({ name, getBox: () => client.get(id) })` exports one sandbox as a `.tar.gz` through the Sandbox SDK's `fs.openArchive`. A stopped box is resumed for the export and stopped again afterwards; a deleted or expired box exports nothing. Do not hand-roll this in the product.
    - A `json` source returns one document, such as Hub connection metadata.
    - Decrypt product-encrypted columns in `transform` (or in a custom `rows()`); the owner receives plaintext of their own data.
 2. Mount `createWorkspaceExport(...).route` under one path, such as `/api/workspaces/:id/exports/*`, and pass the remainder as `path`.

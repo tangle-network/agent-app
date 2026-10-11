@@ -4,7 +4,7 @@
 
 Source: `src/integrations-react/index.ts`
 
-21 exports.
+20 exports.
 
 ### `createHubIntegrationsClient`
 
@@ -60,14 +60,6 @@ interface HubAccountStatus
 
 ```ts
 interface HubConnectCallbackPageProps
-```
-
-### `HubHostConnect`
-
-`interface`
-
-```ts
-interface HubHostConnect
 ```
 
 ### `HubIntegrationCapabilities`
@@ -163,7 +155,7 @@ number
 `function` — Identity-bound Hub settings controller; connection state is always server-read.
 
 ```ts
-({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect }: UseHubIntegrationsOptions) => { providers:…
+({ identity, client, can, callbackPath, onUnsupportedConnect }: UseHubIntegrationsOptions) => { providers: AsyncResourc…
 ```
 
 ### `UseHubIntegrationsOptions`
