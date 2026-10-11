@@ -109,6 +109,36 @@ describe('warm leases', () => {
     expect((await h.leases.signal('ws-1', 'composer-focus')).outcome).toBe('started')
   })
 
+  it('charges only the span before a later turn, and counts that turn as a hit', async () => {
+    const h = harness({ boxIdleMs: 30 * MIN, dailyBudgetMs: 30 * MIN })
+    await h.leases.signal('ws-1', 'page-open')
+    // The 10 min hold expires unused: the charge is pending, not booked.
+    h.clock.now += 11 * MIN
+    expect(await h.leases.sweep()).toMatchObject({ ended: 1, wasted: 0 })
+    // A turn 20 min after the warm lands on the box it resumed.
+    h.clock.now += 9 * MIN
+    expect((await h.leases.turn('ws-1')).hit).toBe(true)
+    const row = await h.store.read('ws-1')
+    expect(row?.dayWarmMs).toBe(20 * MIN)
+    expect(row?.pendingWarmAt).toBe(0)
+    expect(h.events.filter((e) => e.type === 'warm_hit')).toHaveLength(1)
+    expect(h.events.at(-1)).toMatchObject({ type: 'warm_wasted', minutes: 20 })
+    // 10 min of budget is left, so the next page open still warms.
+    h.clock.now += 40 * MIN
+    expect((await h.leases.signal('ws-1', 'page-open')).outcome).toBe('started')
+  })
+
+  it('settles the full idle window when no turn comes', async () => {
+    const h = harness({ boxIdleMs: 30 * MIN })
+    await h.leases.signal('ws-1', 'page-open')
+    h.clock.now += 11 * MIN
+    await h.leases.sweep()
+    h.clock.now += 20 * MIN
+    expect(await h.leases.sweep()).toMatchObject({ wasted: 1 })
+    expect((await h.store.read('ws-1'))?.dayWarmMs).toBe(30 * MIN)
+    expect(h.events.at(-1)).toMatchObject({ type: 'warm_wasted', minutes: 30 })
+  })
+
   it('resets the budget on a new UTC day', async () => {
     const h = harness({ dailyBudgetMs: 5 * MIN })
     await h.leases.signal('ws-1', 'page-open')

@@ -2973,6 +2973,12 @@
           "doc": "Run a profile through the protected Router tool executor and the shared chat projection."
         },
         {
+          "name": "createRouterTurnProducer",
+          "kind": "function",
+          "signature": "(options: RouterTurnProducerOptions) => ChatTurnRouteProducer",
+          "doc": null
+        },
+        {
           "name": "createSandboxChatProducer",
           "kind": "function",
           "signature": "(options: SandboxChatProducerOptions) => ChatTurnRouteProducer",
@@ -3661,6 +3667,12 @@
           "kind": "function",
           "signature": "(input: { sessionId: string; planFollowUp: unknown; messages: readonly { role: string; parts?: unknown; }[]; }) => Plan…",
           "doc": "Validate a follow-up request against what the session actually persisted: the plan must be in this session at this revision and must already carry the claimed decision."
+        },
+        {
+          "name": "RouterTurnProducerOptions",
+          "kind": "type",
+          "signature": "type RouterTurnProducerOptions",
+          "doc": null
         },
         {
           "name": "rowIdOf",
@@ -7549,6 +7561,12 @@
           "doc": "Coerce an arbitrary value to a known harness, falling back (default `opencode`)."
         },
         {
+          "name": "configuredHarness",
+          "kind": "function",
+          "signature": "(config: HarnessConfig, workspaceId?: string | undefined) => Harness",
+          "doc": "The harness a workspace's new sessions start on: its own choice, else the app default, else {@link DEFAULT_HARNESS}."
+        },
+        {
           "name": "DEFAULT_HARNESS",
           "kind": "const",
           "signature": "Harness",
@@ -7559,6 +7577,12 @@
           "kind": "type",
           "signature": "type Harness",
           "doc": "A coding-agent backend this shell can dispatch a session onto."
+        },
+        {
+          "name": "HarnessConfig",
+          "kind": "interface",
+          "signature": "interface HarnessConfig",
+          "doc": "An app's harness configuration, read from its deploy configuration (for example the env vars `AGENT_HARNESS` and `AGENT_HARNESS_WORKSPACES`), so no product hard-codes `backend.type`."
         },
         {
           "name": "HarnessModelSelection",
@@ -14298,6 +14322,12 @@
           "doc": "Pull coordinates, refresh cadence and timeout owned by the shared source."
         },
         {
+          "name": "composeRouterTurnPrompt",
+          "kind": "function",
+          "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
+          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls."
+        },
+        {
           "name": "createCertifiedDelivery",
           "kind": "function",
           "signature": "(config: CertifiedPromptSourceOptions) => CertifiedDelivery",
@@ -14520,6 +14550,12 @@
           "doc": "Resolve options for retrieving user API keys within a specific Tangle execution environment"
         },
         {
+          "name": "routerFunctionName",
+          "kind": "function",
+          "signature": "(name: string) => string",
+          "doc": "OpenAI-compatible function names allow only `[A-Za-z0-9_-]{1,64}`; app tool names often use dots."
+        },
+        {
           "name": "RouterModel",
           "kind": "interface",
           "signature": "interface RouterModel",
@@ -14538,10 +14574,46 @@
           "doc": "Router's settle response is Runtime's exact settlement ledger."
         },
         {
+          "name": "RouterTurnEvent",
+          "kind": "type",
+          "signature": "type RouterTurnEvent",
+          "doc": "What the turn is doing, in the order it happens, for a live view."
+        },
+        {
+          "name": "RouterTurnFailure",
+          "kind": "interface",
+          "signature": "interface RouterTurnFailure",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnOptions",
+          "kind": "interface",
+          "signature": "interface RouterTurnOptions",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnOutcome",
+          "kind": "interface",
+          "signature": "interface RouterTurnOutcome",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnTool",
+          "kind": "interface",
+          "signature": "interface RouterTurnTool",
+          "doc": "A tool the turn may call."
+        },
+        {
           "name": "runAppToolLoop",
           "kind": "function",
           "signature": "(opts: RunToolLoopOptions) => Promise<ToolLoopResult>",
           "doc": "Run the bounded tool loop and return the final text + every executed tool outcome."
+        },
+        {
+          "name": "runRouterTurn",
+          "kind": "function",
+          "signature": "(options: RouterTurnOptions) => Promise<RouterTurnOutcome>",
+          "doc": null
         },
         {
           "name": "sortModelsByFreshness",
@@ -14827,6 +14899,12 @@
           "doc": null
         },
         {
+          "name": "createEscalationSpeculator",
+          "kind": "function",
+          "signature": "(options: EscalationSpeculatorOptions) => EscalationSpeculator",
+          "doc": "One speculator per turn."
+        },
+        {
           "name": "createSandboxPrewarmer",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer",
@@ -14879,6 +14957,12 @@
           "kind": "function",
           "signature": "(slots: readonly number[], from: number, at: number) => number[]",
           "doc": "Decay every slot to `at` with a 14-day half-life."
+        },
+        {
+          "name": "DEFAULT_ESCALATION_TOOLS",
+          "kind": "const",
+          "signature": "readonly [\"sandbox_run\", \"sandbox_exec\"]",
+          "doc": "The tools that run in the box."
         },
         {
           "name": "DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS",
@@ -14987,6 +15071,36 @@
           "kind": "const",
           "signature": "120000",
           "doc": "Per-variable env gate: the kernel rejects any single `NAME=value` env entry over MAX_ARG_STRLEN (131072 bytes) with E2BIG, killing every exec inside the box."
+        },
+        {
+          "name": "EscalationHint",
+          "kind": "type",
+          "signature": "type EscalationHint",
+          "doc": "Why a turn was judged likely to escalate."
+        },
+        {
+          "name": "escalationHints",
+          "kind": "function",
+          "signature": "(input: EscalationInput) => EscalationHint[]",
+          "doc": "Pure: the reasons this input suggests the turn will need the box, if any."
+        },
+        {
+          "name": "EscalationInput",
+          "kind": "interface",
+          "signature": "interface EscalationInput",
+          "doc": null
+        },
+        {
+          "name": "EscalationSpeculator",
+          "kind": "interface",
+          "signature": "interface EscalationSpeculator",
+          "doc": null
+        },
+        {
+          "name": "EscalationSpeculatorOptions",
+          "kind": "interface",
+          "signature": "interface EscalationSpeculatorOptions",
+          "doc": null
         },
         {
           "name": "FencedPrewarmClaimStore",
@@ -15175,6 +15289,12 @@
           "doc": "Represent success or failure of an operation with corresponding value or error information"
         },
         {
+          "name": "parsePrewarmHint",
+          "kind": "function",
+          "signature": "(value: string | null | undefined) => PrewarmHintMode",
+          "doc": null
+        },
+        {
           "name": "peekWorkspaceSandbox",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; }) => Promise<PeekWorkspaceS…",
@@ -15239,6 +15359,12 @@
           "kind": "type",
           "signature": "type PrewarmEvent",
           "doc": null
+        },
+        {
+          "name": "PrewarmHintMode",
+          "kind": "type",
+          "signature": "type PrewarmHintMode",
+          "doc": "`SANDBOX_PREWARM_HINT`: `off` (default) or `deterministic`."
         },
         {
           "name": "PrewarmOutcome",
@@ -15785,6 +15911,12 @@
           "kind": "const",
           "signature": "\"ALTER TABLE sandbox_warm_lease ADD COLUMN declined_until INTEGER NOT NULL DEFAULT 0\"",
           "doc": "For a table created from an earlier \\`WARM_LEASE_TABLE_DDL\\`: paste into a migration."
+        },
+        {
+          "name": "WARM_LEASE_PENDING_DDL",
+          "kind": "const",
+          "signature": "readonly [\"ALTER TABLE sandbox_warm_lease ADD COLUMN pending_warm_at INTEGER NOT NULL DEFAULT 0\", \"ALTER TABLE sandbox_…",
+          "doc": "For a table created before pending charges: paste each into a migration."
         },
         {
           "name": "WARM_LEASE_TABLE_DDL",

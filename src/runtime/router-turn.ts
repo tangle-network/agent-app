@@ -33,6 +33,7 @@ export type RouterTurnEvent =
   | { type: 'tool'; callId: string; toolName: string; status: 'running'; input: Record<string, unknown>; startedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'completed'; output: unknown; startedAt: number; endedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'error'; error: { code: string; message: string }; startedAt: number; endedAt: number }
+  | { type: 'usage'; promptTokens: number; completionTokens: number }
 
 export interface RouterTurnFailure {
   /** `model_http_<status>`, `model_unavailable`, `turn_<stopReason>` or `router_unconfigured`. */
@@ -47,6 +48,8 @@ export interface RouterTurnOutcome {
   /** The model the router reports having served, when it said. */
   servedModel: string | null
   toolCalls: Array<{ callId: string; toolName: string; ok: boolean }>
+  /** Token use summed over every model call in the turn, as the router reported it. */
+  usage: { promptTokens: number; completionTokens: number; modelCalls: number }
   failure?: RouterTurnFailure
 }
 
@@ -57,7 +60,9 @@ export interface RouterTurnOptions {
   baseUrl?: string
   systemPrompt: string
   userMessage: string
-  history?: Array<{ role: 'user' | 'assistant'; content: string }>
+  /** Earlier turns. Plain text messages, or OpenAI function-calling history (an assistant message
+   *  carrying `tool_calls` and the `tool` messages answering them) so the model sees what it did. */
+  history?: Array<{ role: 'user' | 'assistant'; content: string } | LoopMessage>
   tools?: RouterTurnTool[]
   /** Wall-clock budget in ms. Default 90 s. A caller whose retry window is shorter passes less. */
   budgetMs?: number
@@ -119,7 +124,7 @@ function renderResult(outcome: { ok: true; result: unknown } | { ok: false; code
 
 export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterTurnOutcome> {
   if (!options.apiKey) {
-    return { text: '', servedModel: null, toolCalls: [],
+    return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 },
       failure: { code: 'router_unconfigured', message: 'The model credential is not configured.' } }
   }
   const emit = options.onEvent ?? (() => {})
@@ -142,6 +147,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     onServedModel: served => { servedModel = served.servedModel },
   })
   const segments: string[] = []
+  const usage = { promptTokens: 0, completionTokens: 0, modelCalls: 0 }
   const toolCalls: RouterTurnOutcome['toolCalls'] = []
   const started = new Map<string, number>()
   let segmentOpen = false
@@ -181,6 +187,11 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           if (!segmentOpen) { segments.push(''); segmentOpen = true }
           segments[segments.length - 1] += event.text
           emit({ type: 'text', segment: segments.length, delta: event.text })
+        } else if (event.type === 'usage') {
+          usage.promptTokens += event.usage.promptTokens
+          usage.completionTokens += event.usage.completionTokens
+          usage.modelCalls++
+          emit({ type: 'usage', ...event.usage })
         } else if (event.type === 'tool_call') {
           segmentOpen = false
           const tool = byFunction.get(event.call.toolName)
@@ -208,7 +219,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
 
   const outcome = (failure?: RouterTurnFailure): RouterTurnOutcome => ({
     text: segments.map(part => part.trim()).filter(Boolean).join('\n\n'),
-    servedModel, toolCalls, ...(failure ? { failure } : {}),
+    servedModel, toolCalls, usage: { ...usage }, ...(failure ? { failure } : {}),
   })
   let stop: ToolLoopStopReason
   try {
@@ -226,5 +237,17 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       : { code: 'model_unavailable', message: 'The model service did not answer.' })
   }
   if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
+  // A model can end its turn with neither a word nor a tool call (gemini-2.5-flash did on 8 of
+  // 53 "remember" turns, 2026-10-11). Nothing was said and nothing ran, so one repeat is safe;
+  // an answer still blank is a typed failure, never a successful empty reply.
+  if (!segments.some(part => part.trim())) {
+    if (toolsRan === 0) {
+      try { stop = await run() } catch { stop = 'completed' }
+      if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
+    }
+    if (!segments.some(part => part.trim())) {
+      return outcome({ code: 'model_empty', message: 'The model finished without writing a reply.' })
+    }
+  }
   return outcome()
 }

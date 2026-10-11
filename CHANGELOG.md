@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.60.103
+
+- feat(runtime): ./router-turn — a Worker-safe entry for the Router engine (#1023)
+
+## 0.60.102
+
+- fix(sandbox): charge an unused warm only for the span no turn used (#1022)
+
+## 0.60.101
+
+- fix(runtime): repeat a Router turn that answered nothing, and type a blank answer as a failure (#1021)
+- feat(sandbox): speculative warm for turns likely to escalate (S8, off by default) (#1019)
+
+## 0.60.100
+
+- feat(chat-routes): createRouterTurnProducer; runRouterTurn reports usage and accepts tool history (#1020)
+
+## 0.60.99
+
+- feat(harness): select an app's harness from configuration (#1016)
+- feat(runtime): runRouterTurn — the default Router turn engine with in-process app tools (#1017)
+
 ## 0.60.98
 
 - fix(workspace-react): show a long workspace name on two lines in the rail identity (#1018)
