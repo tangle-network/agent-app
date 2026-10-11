@@ -38,20 +38,29 @@ const DEFAULT_STATE_COOKIE = 'tangle_sso_state'
 const DEFAULT_SESSION_COOKIE_CACHE_SECONDS = 5 * 60
 
 /**
- * A session read costs two serial database round trips (session, then user),
- * and a request often resolves it more than once. Resolved sessions are reused
- * within a request and, for at most SESSION_MEMO_MAX_MS, across requests in one
- * isolate, keyed by the exact credentials sent. That stays inside the staleness
- * the session cookie cache already accepts, and any non-GET auth call (sign-out,
- * revocation) clears the app's entries in this isolate.
+ * A full session read costs two serial database round trips (session, then
+ * user), and a request often resolves it more than once. A resolved session is
+ * reused within a request, and for at most SESSION_MEMO_MAX_MS across requests
+ * in one isolate, keyed by the exact credentials sent. A reuse across requests
+ * is never trusted on its own: every one re-reads the session row by its token
+ * (one round trip instead of two), so a session revoked anywhere (sign-out,
+ * revocation, a password change deleting the other sessions) is refused on the
+ * next request in every isolate. Only when that row read fails is the
+ * remembered session served, so a database error does not sign everyone out.
+ * Any non-GET auth call in this isolate also clears the app's entries.
  */
 const SESSION_MEMO_MAX_MS = 30_000
 const SESSION_MEMO_LIMIT = 500
 const requestSessions = new WeakMap<Request, Promise<AppAuthSession | null>>()
 const isolateSessions = new Map<string, { until: number; session: Promise<AppAuthSession | null> }>()
 
+/** Whether a session row still exists and has not expired. Throws when the store cannot answer. */
+type SessionRowCheck = (token: string) => Promise<boolean>
+
 function memoizedSession(scope: string, ttlMs: number, request: Request,
-  read: (request: Request) => Promise<AppAuthSession | null>): Promise<AppAuthSession | null> {
+  read: (request: Request) => Promise<AppAuthSession | null>,
+  isLive: SessionRowCheck,
+  log: (message: string, meta: Record<string, unknown>) => void): Promise<AppAuthSession | null> {
   const known = requestSessions.get(request)
   if (known) return known
   const cookie = request.headers.get('cookie') ?? ''
@@ -61,8 +70,29 @@ function memoizedSession(scope: string, ttlMs: number, request: Request,
   const now = Date.now()
   const hit = isolateSessions.get(key)
   if (hit && hit.until > now) {
-    requestSessions.set(request, hit.session)
-    return hit.session
+    const checked = hit.session.then(async (remembered) => {
+      if (!remembered) return remembered
+      const token = remembered.session.token
+      if (!token) {
+        // Nothing to check it against: never reuse it.
+        if (isolateSessions.get(key) === hit) isolateSessions.delete(key)
+        return read(request)
+      }
+      try {
+        if (await isLive(token)) return remembered
+      } catch (error) {
+        // The store cannot answer: keep the session it verified moments ago.
+        log('[app-auth] session row check failed; serving the remembered session', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+        return remembered
+      }
+      // Revoked or expired since it was remembered.
+      if (isolateSessions.get(key) === hit) isolateSessions.delete(key)
+      return null
+    })
+    requestSessions.set(request, checked)
+    return checked
   }
   const session = read(request).then((value) => {
     // Only a live session is reused; a miss or an expired session is read again next time.
@@ -217,8 +247,10 @@ export interface AppAuthConfig {
   /** Reset/verification mail. Omit to disable password reset entirely. */
   email?: AppAuthEmailConfig
   social?: AppAuthSocialConfig
-  /** Session cookie-cache TTL in seconds; `false` disables the cache.
-   *  Default 300. */
+  /** How long, in seconds, one isolate reuses a verified session across
+   *  requests (capped at 30). Each reuse still re-reads the session row by its
+   *  token, so a revoked session is refused on the next request everywhere.
+   *  `false` reads the full session on every request. Default 300 (so 30). */
   sessionCookieCacheSeconds?: number | false
   /** Tangle cross-site SSO (start/callback handlers). */
   sso?: AppAuthSsoConfig | AppAuthOidcSsoConfig | AppAuthIdentitySsoConfig
@@ -411,20 +443,24 @@ export function createAppAuth(config: AppAuthConfig): AppAuth {
     ...(config.emailAndPassword === false ? {} : { emailAndPassword: emailAndPasswordOptions(config) }),
     ...(config.email?.verifyOnSignUp ? { emailVerification: emailVerificationOptions(config) } : {}),
     ...(socialProviders ? { socialProviders } : {}),
-    ...(config.sessionCookieCacheSeconds === false
-      ? {}
-      : {
-          session: {
-            cookieCache: {
-              enabled: true,
-              maxAge: config.sessionCookieCacheSeconds ?? DEFAULT_SESSION_COOKIE_CACHE_SECONDS,
-            },
-          },
-        }),
+    // better-auth's own session cookie cache answers from a signed cookie for
+    // its whole maxAge, so a revoked session kept working for up to five
+    // minutes on any client holding the cookie. It stays off; the per-isolate
+    // reuse above re-checks the session row on every request instead.
     advanced: { cookiePrefix, ...config.advanced },
   }
 
   const auth: AppAuthInstance = betterAuth(options)
+  // One indexed read of the session row by token: the revocation check for a
+  // remembered session.
+  const sessionRowIsLive: SessionRowCheck = async (token) => {
+    const ctx = await (auth.$context as unknown as PromiseLike<{
+      adapter: { findOne(args: { model: string; where: Array<{ field: string; value: unknown }> }): Promise<Record<string, unknown> | null> }
+    }>)
+    const row = await ctx.adapter.findOne({ model: 'session', where: [{ field: 'token', value: token }] })
+    const expiresAt = row ? new Date(row.expiresAt as string | number | Date).getTime() : 0
+    return expiresAt > Date.now()
+  }
 
   const readSession = async (request: Request): Promise<AppAuthSession | null> => {
     const session = await auth.api.getSession({ headers: request.headers })
@@ -433,8 +469,9 @@ export function createAppAuth(config: AppAuthConfig): AppAuth {
   const memoMs = config.sessionCookieCacheSeconds === false ? 0
     : Math.min(SESSION_MEMO_MAX_MS, (config.sessionCookieCacheSeconds ?? DEFAULT_SESSION_COOKIE_CACHE_SECONDS) * 1000)
   const memoScope = `${config.baseURL}\u0000${cookiePrefix}`
+  const logSession = (message: string, meta: Record<string, unknown>) => console.warn(message, meta)
   const getSession = (request: Request): Promise<AppAuthSession | null> =>
-    memoMs > 0 ? memoizedSession(memoScope, memoMs, request, readSession) : readSession(request)
+    memoMs > 0 ? memoizedSession(memoScope, memoMs, request, readSession, sessionRowIsLive, logSession) : readSession(request)
   // Sign-out and session revocation drop this isolate's remembered sessions for the app.
   const handler = auth.handler
   auth.handler = async (request: Request) => {
