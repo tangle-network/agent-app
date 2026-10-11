@@ -159,6 +159,30 @@ describe('WorkspaceList', () => {
     expect(remove.mock.calls[0]![0].id).toBe('a')
   })
 
+  it('never offers Delete on an item the viewer may not delete', () => {
+    render(
+      <WorkspaceList
+        items={[item('mine', 'Acme'), item('shared', 'Globex')]}
+        remove={async () => {}}
+        canRemove={(entry) => entry.id === 'mine'}
+        actions={(entry) => entry.id === 'shared' ? [{ id: 'open', label: 'Open', onSelect: () => {} }] : []}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Globex' }))
+    expect(screen.getByRole('menuitem', { name: 'Open' })).toBeTruthy()
+    expect(screen.queryAllByRole('menuitem', { name: 'Delete' })).toHaveLength(0)
+    cleanup()
+
+    render(<WorkspaceList items={[item('mine', 'Acme')]} remove={async () => {}} canRemove={(entry) => entry.id === 'mine'} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Acme' }))
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeTruthy()
+  })
+
+  it('shows no menu on an item whose only action is a Delete the viewer may not use', () => {
+    render(<WorkspaceList items={[item('shared', 'Globex')]} remove={async () => {}} canRemove={() => false} />)
+    expect(screen.queryByRole('button', { name: 'Actions for Globex' })).toBeNull()
+  })
+
   it('creates from a name in the shared dialog and keeps the dialog open on a refusal', async () => {
     const onCreate = vi.fn().mockRejectedValueOnce(new Error('That name is taken.')).mockResolvedValueOnce(undefined)
     render(<WorkspaceList items={[]} noun={{ singular: 'client', plural: 'clients' }} create={{ onCreate }} />)

@@ -1,0 +1,95 @@
+/**
+ * The invite-by-email row both team panels share: address, role, Invite. The
+ * address is checked with the same rule the invitations API enforces, so
+ * Invite stays disabled until the address could be delivered to, and the
+ * reason appears under the field once the person leaves it or tries to send.
+ * On a narrow card the role and Invite wrap below the field together instead
+ * of being pushed past the card's edge.
+ */
+
+import { useId, useState } from 'react'
+import type { WorkspaceRole } from '../../teams/roles'
+import { INVITATION_EMAIL_HINT, isInvitationEmail } from '../../teams/invitations'
+import { RoleSelect } from './RoleSelect'
+
+export interface InviteFormProps {
+  label: string
+  placeholder: string
+  /** Send the invite; resolve true to clear the field, false to keep it for a retry. */
+  onInvite(input: { email: string; role: WorkspaceRole }): Promise<boolean>
+}
+
+export function InviteForm({ label, placeholder, onInvite }: InviteFormProps) {
+  const id = useId()
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<WorkspaceRole>('editor')
+  const [inviting, setInviting] = useState(false)
+  // Reward early, flag late: the hint waits until the person leaves the field
+  // or tries to send, then follows every keystroke until the address is valid.
+  const [checked, setChecked] = useState(false)
+
+  const valid = isInvitationEmail(email)
+  const showHint = checked && email.trim() !== '' && !valid
+
+  async function submit() {
+    if (inviting) return
+    if (!valid) {
+      setChecked(true)
+      return
+    }
+    setInviting(true)
+    try {
+      if (await onInvite({ email: email.trim(), role })) {
+        setEmail('')
+        setChecked(false)
+      }
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={`${id}-email`} className="text-sm font-medium text-[var(--text-secondary)]">{label}</label>
+      <div className="flex flex-wrap gap-2">
+        <input
+          id={`${id}-email`}
+          type="email"
+          inputMode="email"
+          autoComplete="off"
+          placeholder={placeholder}
+          value={email}
+          aria-invalid={showHint || undefined}
+          aria-describedby={showHint ? `${id}-hint` : undefined}
+          onChange={(event) => setEmail(event.target.value)}
+          onBlur={() => setChecked(true)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              void submit()
+            }
+          }}
+          className={`min-w-[12rem] flex-1 rounded border bg-[var(--bg-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] ${
+            showHint ? 'border-[var(--surface-danger-border)]' : 'border-[var(--border-default)]'
+          }`}
+        />
+        <div className="ml-auto flex shrink-0 gap-2">
+          <RoleSelect value={role} ariaLabel="Invite role" onChange={setRole} />
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={inviting || !valid}
+            className="rounded bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-[hsl(var(--primary-foreground))] disabled:opacity-50"
+          >
+            {inviting ? 'Inviting…' : 'Invite'}
+          </button>
+        </div>
+      </div>
+      {showHint && (
+        <p id={`${id}-hint`} role="alert" className="text-sm text-[var(--surface-danger-text)]">
+          {INVITATION_EMAIL_HINT}
+        </p>
+      )}
+    </div>
+  )
+}

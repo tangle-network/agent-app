@@ -67,6 +67,12 @@ export interface WorkspaceListProps {
   rename?: (item: WorkspaceListItem, name: string) => Promise<void>
   /** Delete for good. Offered in the overflow menu, behind a confirmation. */
   remove?: (item: WorkspaceListItem) => Promise<void>
+  /**
+   * Whether this viewer may delete this item. Delete is left out of the menu
+   * when it returns false, so a member who does not own an item is never shown
+   * a destructive action the server would refuse. Defaults to every item.
+   */
+  canRemove?: (item: WorkspaceListItem) => boolean
   /** What deleting loses, for the confirmation. */
   removeConsequence?: (item: WorkspaceListItem) => string
   /** Extra overflow-menu actions. */
@@ -135,6 +141,7 @@ export function WorkspaceList({
   empty,
   rename,
   remove,
+  canRemove,
   removeConsequence,
   actions,
   children,
@@ -173,11 +180,12 @@ export function WorkspaceList({
   }
 
   const hasDates = items.some((item) => toDate(item.updatedAt) !== null)
-  const hasMenu = Boolean(rename) || Boolean(remove) || Boolean(actions)
+  const removable = (item: WorkspaceListItem) => Boolean(remove) && (canRemove?.(item) ?? true)
+  const hasMenu = Boolean(rename) || items.some(removable) || Boolean(actions)
   const menuFor = (item: WorkspaceListItem): MenuEntry[] => [
     ...(rename ? [{ id: 'rename', label: 'Rename', onSelect: () => { setError(null); setRenaming(item); setRenameValue(item.name) } }] : []),
     ...(actions?.(item) ?? []).map((action) => ({ id: action.id, label: action.label, onSelect: () => action.onSelect(item) })),
-    ...(remove ? [{ id: 'delete', label: 'Delete', destructive: true, onSelect: () => { setError(null); setRemoving(item) } }] : []),
+    ...(removable(item) ? [{ id: 'delete', label: 'Delete', destructive: true, onSelect: () => { setError(null); setRemoving(item) } }] : []),
   ]
 
   const run = async (work: () => Promise<void>, done: () => void) => {
