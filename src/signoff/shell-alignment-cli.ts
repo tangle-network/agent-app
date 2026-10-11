@@ -12,7 +12,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { checkShellAlignment, formatShellAlignmentReport, type ShellAlignmentOptions } from './shell-alignment'
 
-export function shellAlignmentUsage(): string {
+function shellAlignmentUsage(): string {
   return [
     'Usage: agent-app-signoff shell-alignment --base-url <url> --route <path> [--route <path> ...] [options]',
     '',
