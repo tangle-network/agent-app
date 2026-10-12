@@ -18,6 +18,11 @@
  * works without it, falling back to `inline` delivery.
  */
 
+import {
+  defineInlineResource,
+  type AgentProfile,
+  type AgentProfileFileMount,
+} from '@tangle-network/agent-interface'
 import { KNOWN_HARNESSES, type Harness } from '../harness/index'
 import { skillDirForHarness, type HarnessId } from '@tangle-network/agent-profile-materialize'
 import { composeSkills, renderInlineSkills, type ComposedSkills, type SkillEntry } from '../skills/index'
@@ -146,3 +151,90 @@ export function composeSkillsForHarness(input: ComposeSkillsForHarnessInput): Co
 }
 
 export type { ComposedSkills, SkillEntry } from '../skills/index'
+
+/** A file that rides BESIDE a skill entry (kit sources, references, pinned
+ *  requirements — anything the SKILL.md tells the agent to read or run).
+ *  `path` is skill-dir-relative (`kit/iso-kit.mjs`, `references/x.md`). */
+export interface SkillSupportFile {
+  path: string
+  content: string
+}
+
+/** Inline file mounts placing a skill's support files beside its entry on
+ *  `harness`: `<skillDir>/<skillId>/<path>`. Empty when the harness has no
+ *  cwd skill dir — the same posture as `resources.skills` itself (the
+ *  platform skips skills there too), so nothing orphan lands in a workspace
+ *  a harness will never read.
+ *
+ *  This is the placement primitive for kit-carrying skills (vendored
+ *  executable kits, reference trees). A growing program belongs in THESE
+ *  mounts — never in an env var: runtimeSecrets values are capped (8192
+ *  chars on the sandbox SDK) and a skill tree outgrew that cap in production
+ *  once, taking every isolated turn down with a secret-provider refusal. */
+export function skillSupportFileMounts(
+  harness: Harness,
+  skillId: string,
+  files: readonly SkillSupportFile[],
+): AgentProfileFileMount[] {
+  const skillDir = resolveSkillDir(harness)
+  if (!skillDir || files.length === 0) return []
+  return files.map((file) => ({
+    path: `${skillDir}/${skillId}/${file.path}`,
+    resource: defineInlineResource(`${skillId}/${file.path}`, file.content),
+  }))
+}
+
+/** Attach a skill's support files to `profile` for `harness`, idempotently.
+ *
+ *  Replacement is by EXACT CONTENT under the skill's own subtree (any path
+ *  ending `/<skillId>/<path>` whose bytes match a support file of THIS call):
+ *  re-deriving the same profile for another harness replaces this skill's
+ *  own mounts wherever they previously pointed, while pack-declared files
+ *  with similar paths stay untouched. With no skill dir the skill's own
+ *  mounts are dropped (and nothing added) — mirroring how the platform
+ *  treats the skill entry itself on that harness. */
+export function withSkillSupportFiles<
+  P extends { resources?: AgentProfile['resources'] },
+>(profile: P, harness: Harness, skillId: string, files: readonly SkillSupportFile[]): P {
+  const hasSkillDir = resolveSkillDir(harness) !== null
+  const desired = skillSupportFileMounts(harness, skillId, files)
+  const desiredByPath = new Map(
+    desired.map((mount) => [mount.path, mount.resource] as const),
+  )
+  const byRelPath = new Map(files.map((file) => [file.path, file.content] as const))
+  const suffix = `/${skillId}/`
+  const relUnderSkill = (path: string): string | null => {
+    const at = path.lastIndexOf(suffix)
+    return at < 0 ? null : path.slice(at + suffix.length)
+  }
+  // "Ours" = a mount under THIS skill's subtree whose bytes match a support
+  // file of this call. It is STALE when the harness has no skill dir (there
+  // is nowhere to place it — mirroring how the platform skips the skill
+  // entry itself) or when this call would place it at a different path
+  // (re-derivation for another harness). Exact-content identity only: a
+  // foreign mount at one of our paths keeps the location (pack-declared
+  // files win at their declared paths), and a mount already identical to
+  // what we would add is kept as-is, so re-deriving for the SAME harness
+  // returns the profile unchanged.
+  const isStaleOurs = (mount: AgentProfileFileMount): boolean => {
+    if (mount.resource.kind !== 'inline') return false
+    const rel = relUnderSkill(mount.path)
+    if (rel === null || byRelPath.get(rel) !== mount.resource.content) return false
+    const desiredHere = desiredByPath.get(mount.path)
+    return (
+      !hasSkillDir ||
+      desiredHere === undefined ||
+      desiredHere.kind !== 'inline' ||
+      desiredHere.content !== mount.resource.content
+    )
+  }
+  const existing = profile.resources?.files ?? []
+  const retained = existing.filter((mount) => !isStaleOurs(mount))
+  const taken = new Set(retained.map((mount) => mount.path))
+  const additions = desired.filter((mount) => !taken.has(mount.path))
+  if (retained.length === existing.length && additions.length === 0) return profile
+  return {
+    ...profile,
+    resources: { ...(profile.resources ?? {}), files: [...retained, ...additions] },
+  }
+}

@@ -15,6 +15,8 @@
  *   agent-app-journeys scrub <journey>                 re-scrub raw traces and re-check for secrets
  *   agent-app-journeys index <folder> [--critic <file>] [--title <text>] [--out <file>]
  *                                                      write INDEX.md: highlights, scorecard, ranked fixes, turns, videos
+ *   agent-app-journeys scoreboard <summary.json> --app <app> [--versions <file>] [--out <file>] [--legacy-ids]
+ *                                                      the shared readiness board's writes for one run (JSON batch)
  *
  * Exits 0 on success, 1 on a failed run or a refused folder, 2 on a usage error.
  */
@@ -24,6 +26,7 @@ import { isAbsolute, join, resolve } from 'node:path'
 import { invokedAsScript } from '../signoff/invoked-as-script.js'
 import { credentialNames, loadJourneysConfig, type ResolvedJourneysConfig } from './config.js'
 import { collectJourneyFiles, renderIndex, type CriticResult } from './report.js'
+import { scoreboardRows, type JourneySummary } from './scoreboard.js'
 import { assertNoSecrets, scrubTrace } from './scrub.js'
 import { secretNeedles, storageStateFor } from './session.js'
 import { extractFrames, probeSeconds, rebuildVideo } from './video.js'
@@ -36,6 +39,7 @@ const USAGE = [
   '       agent-app-journeys rebuild <journey> <label>',
   '       agent-app-journeys scrub <journey>',
   '       agent-app-journeys index <folder> [--critic <file>] [--title <text>] [--out <file>]',
+  '       agent-app-journeys scoreboard <summary.json> --app <app> [--versions <file>] [--out <file>] [--legacy-ids]',
 ].join('\n')
 
 class UsageError extends Error {}
@@ -148,6 +152,29 @@ export async function main(argv: readonly string[]): Promise<number> {
       const target = out ? resolve(out) : join(root, 'INDEX.md')
       writeFileSync(target, markdown)
       console.log(target)
+      return 0
+    }
+    case 'scoreboard': {
+      const app = option(args, '--app')
+      const versionsFile = option(args, '--versions')
+      const out = option(args, '--out')
+      const legacyAt = args.indexOf('--legacy-ids')
+      const legacyIds = legacyAt >= 0
+      if (legacyIds) args.splice(legacyAt, 1)
+      const [summaryFile] = args
+      if (!summaryFile || !app) throw new UsageError('scoreboard needs a summary.json and --app <app>')
+      const summary = JSON.parse(readFileSync(resolve(summaryFile), 'utf8')) as JourneySummary
+      // `versions` maps `collection/docId` to the version a read of the board's store returned.
+      const versions = versionsFile ? (JSON.parse(readFileSync(resolve(versionsFile), 'utf8')) as Record<string, number>) : undefined
+      let result
+      try {
+        result = scoreboardRows(summary, { app, legacyIds, ...(versions ? { versions } : {}) })
+      } catch (error) {
+        throw new UsageError(error instanceof Error ? error.message : String(error))
+      }
+      for (const warning of result.warnings) console.error(`scoreboard: ${warning}`)
+      const json = JSON.stringify(result.writes, null, 2) + '\n'
+      if (out) { writeFileSync(resolve(out), json); console.log(resolve(out)) } else process.stdout.write(json)
       return 0
     }
     case undefined:

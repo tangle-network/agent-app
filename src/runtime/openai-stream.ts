@@ -322,7 +322,7 @@ async function* completionAsChunk(
   }
 }
 
-async function httpFailure(res: Response, kind: 'stream' | 'completion'): Promise<Error> {
+async function httpFailure(res: Response, kind: 'stream' | 'completion' | 'responses'): Promise<Error> {
   const text = res.body ? await res.text().catch(() => '') : ''
   const error = new Error(`OpenAI-compat ${kind} failed (HTTP ${res.status})${text ? `: ${text.slice(0, 200)}` : ''}`)
   // Stamp the NUMERIC status. `isUpstreamUnavailable` (`/model-resolution`)
@@ -424,6 +424,181 @@ async function* streamChatCompletions(
       // `!==` would report a swap on literally every turn.
       if (attribution && !reported && chunk.model) report(servedFromBody(chunk.model, attribution.requestedModel))
       yield chunk
+    }
+  }
+}
+
+/** OpenAI models answer reasoning summaries only on the Responses API; chat completions carry none. */
+export function isOpenAIResponsesModel(model: string): boolean {
+  return /^(?:openai\/)?(?:gpt-|o\d|chatgpt-)/i.test(model.trim())
+}
+
+/** The chat-completions history the tool loop keeps, as Responses `instructions` and `input` items. */
+export function toResponsesInput(messages: LoopMessage[]): { instructions?: string; input: Array<Record<string, unknown>> } {
+  const instructions: string[] = []
+  const input: Array<Record<string, unknown>> = []
+  for (const message of messages) {
+    const content = typeof message.content === 'string' ? message.content : ''
+    if (message.role === 'system') {
+      if (content) instructions.push(content)
+    } else if (message.role === 'tool') {
+      input.push({ type: 'function_call_output', call_id: message.tool_call_id ?? '', output: content })
+    } else if (message.role === 'assistant' && message.tool_calls?.length) {
+      if (content.trim()) input.push({ role: 'assistant', content })
+      for (const call of message.tool_calls) {
+        input.push({ type: 'function_call', call_id: call.id, name: call.function.name, arguments: call.function.arguments })
+      }
+    } else if (message.role === 'user' || message.role === 'assistant') {
+      input.push({ role: message.role, content })
+    }
+  }
+  return { ...(instructions.length ? { instructions: instructions.join('\n\n') } : {}), input }
+}
+
+/** Chat-completions tool definitions as Responses function tools. */
+function toResponsesTools(tools: unknown[] | undefined): Array<Record<string, unknown>> {
+  return (tools ?? []).flatMap((tool) => {
+    const fn = (tool as { function?: { name?: string; description?: string; parameters?: unknown } }).function
+    return fn?.name ? [{ type: 'function', name: fn.name, ...(fn.description ? { description: fn.description } : {}),
+      parameters: fn.parameters ?? { type: 'object', properties: {} } }] : []
+  })
+}
+
+/**
+ * Build a `streamTurn` on the OpenAI Responses API (`POST /responses`, streamed),
+ * for OpenAI models whose reasoning reaches a caller only there, as
+ * `response.reasoning_summary_text.delta` events. Each Responses event is
+ * mapped onto the chat-completions chunk shape {@link toLoopEvents} reads, so
+ * text, reasoning, fragmented function calls, usage and served-model
+ * attribution behave exactly as on {@link createOpenAICompatStreamTurn}.
+ *
+ * `extraBody` keys from the chat path are translated: `max_tokens` and
+ * `max_completion_tokens` become `max_output_tokens`, and `reasoning_effort`
+ * becomes `reasoning.effort` with `summary: 'auto'`. Stateless: earlier tool
+ * calls are replayed as `function_call` / `function_call_output` items.
+ */
+export function createOpenAIResponsesTurn(
+  opts: OpenAICompatStreamTurnOptions,
+): (messages: LoopMessage[]) => AsyncIterable<LoopEvent> {
+  const base = opts.baseUrl.replace(/\/+$/, '')
+  const doFetch = opts.fetchImpl ?? fetch
+  const { max_tokens: maxTokens, max_completion_tokens: maxCompletion, reasoning_effort: effort, ...rest } = opts.extraBody ?? {}
+  const maxOutput = maxCompletion ?? maxTokens
+  return (messages) => {
+    const { instructions, input } = toResponsesInput(messages)
+    const tools = toResponsesTools(opts.tools)
+    return toLoopEvents(streamResponses(doFetch, `${base}/responses`, opts.apiKey, {
+      model: opts.model,
+      ...(instructions ? { instructions } : {}),
+      input,
+      stream: true,
+      store: false,
+      ...(tools.length ? { tools } : {}),
+      ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
+      ...(maxOutput !== undefined ? { max_output_tokens: maxOutput } : {}),
+      ...(effort !== undefined ? { reasoning: { effort, summary: 'auto' } } : {}),
+      ...rest,
+    }, opts.onServedModel ? { requestedModel: opts.model, report: opts.onServedModel } : undefined, opts.headers))
+  }
+}
+
+interface ResponsesEvent {
+  type?: string
+  delta?: string
+  output_index?: number
+  summary_index?: number
+  item?: { type?: string; call_id?: string; name?: string; arguments?: string }
+  response?: { model?: string; usage?: { input_tokens?: number; output_tokens?: number }; error?: { code?: string; message?: string } }
+  error?: { code?: string; message?: string }
+  message?: string
+}
+
+/** Stream a Responses API call as chat-completions chunks. A failed or errored response throws. */
+async function* streamResponses(
+  doFetch: typeof fetch,
+  url: string,
+  apiKey: string,
+  body: Record<string, unknown>,
+  attribution?: { requestedModel: string; report: (served: OpenAICompatServedModel) => void },
+  headers?: Record<string, string>,
+): AsyncIterable<OpenAIStreamChunk> {
+  const res = await doFetch(url, {
+    method: 'POST',
+    headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok || !res.body) throw await httpFailure(res, 'responses')
+  let reported = false
+  const report = (served: OpenAICompatServedModel) => {
+    if (reported || !attribution) return
+    reported = true
+    attribution.report(served)
+  }
+  if (attribution) {
+    const served = servedFromHeader(res, attribution.requestedModel)
+    if (served) report(served)
+  }
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let lastSummary: string | null = null
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+      const data = trimmed.slice(5).trim()
+      if (data === '[DONE]') return
+      let event: ResponsesEvent
+      try {
+        event = JSON.parse(data) as ResponsesEvent
+      } catch {
+        continue
+      }
+      switch (event.type) {
+        case 'response.output_text.delta':
+          if (event.delta) yield { choices: [{ delta: { content: event.delta } }] }
+          break
+        case 'response.reasoning_summary_text.delta': {
+          if (!event.delta) break
+          // Separate summary parts the way the model wrote them.
+          const part = `${event.output_index ?? 0}:${event.summary_index ?? 0}`
+          const lead = lastSummary !== null && lastSummary !== part ? '\n\n' : ''
+          lastSummary = part
+          yield { choices: [{ delta: { reasoning_content: lead + event.delta } }] }
+          break
+        }
+        case 'response.output_item.added':
+          if (event.item?.type === 'function_call' && event.item.name) {
+            yield { choices: [{ delta: { tool_calls: [{ index: event.output_index ?? 0,
+              ...(event.item.call_id ? { id: event.item.call_id } : {}),
+              function: { name: event.item.name, arguments: event.item.arguments ?? '' } }] } }] }
+          }
+          break
+        case 'response.function_call_arguments.delta':
+          if (event.delta) yield { choices: [{ delta: { tool_calls: [{ index: event.output_index ?? 0, function: { arguments: event.delta } }] } }] }
+          break
+        case 'response.completed':
+        case 'response.incomplete': {
+          const model = event.response?.model
+          if (attribution && !reported && model) report(servedFromBody(model, attribution.requestedModel))
+          const usage = event.response?.usage
+          yield { ...(model ? { model } : {}), choices: [],
+            ...(usage ? { usage: { prompt_tokens: usage.input_tokens ?? 0, completion_tokens: usage.output_tokens ?? 0 } } : {}) }
+          return
+        }
+        case 'response.failed':
+        case 'error': {
+          const failure = event.response?.error ?? event.error ?? { message: event.message }
+          throw new Error(`OpenAI-compat responses failed: ${(failure?.code ? `${failure.code}: ` : '') + (failure?.message ?? 'no detail')}`.slice(0, 300))
+        }
+        default:
+          break
+      }
     }
   }
 }

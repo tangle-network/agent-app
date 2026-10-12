@@ -593,13 +593,15 @@ describe('StudioComposer — model availability', () => {
   it('draws the maker’s logo for a model another host serves', async () => {
     mountWith(catalog({
       video: [
-        model(SEEDANCE, 'video'),
+        model(SEEDANCE, 'video', { provider: 'fal', maker: 'bytedance' }),
         model('fal-ai/veo3.1', 'video', { provider: 'fal', maker: 'google' }),
         model('fal-ai/other', 'video', { provider: 'fal' }),
       ],
     }, { video: SEEDANCE }))
     fireEvent.click(screen.getByRole('button', { name: 'Video' }))
-    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+    const trigger = await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+    // The closed trigger draws the selected model's maker, not its host.
+    expect(trigger.querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe('bytedance')
 
     const picker = await openModelPicker()
     const veo = within(picker).getByRole('button', { name: /^fal-ai\/veo3\.1/ })
