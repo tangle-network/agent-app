@@ -19,7 +19,7 @@
  * copy the session's documents in). `allow` is the product's command policy.
  */
 import type { SandboxInstance } from '@tangle-network/sandbox'
-import { SandboxRunError } from './sandbox-run-tool'
+import { SandboxRunError, type SandboxToolContext } from './sandbox-run-tool'
 
 export interface SandboxExecToolOptions {
   /** The box commands run in. The product provisions, binds and bills it. A throw is
@@ -62,7 +62,7 @@ export interface SandboxExecTool {
   name: string
   description: string
   inputSchema: Record<string, unknown>
-  run(args: Record<string, unknown>): Promise<SandboxExecResult>
+  run(args: Record<string, unknown>, context?: SandboxToolContext): Promise<SandboxExecResult>
 }
 
 const DEFAULT_TIMEOUT_MS = 2 * 60_000
@@ -126,7 +126,8 @@ export function createSandboxExecTool(options: SandboxExecToolOptions): SandboxE
       required: ['command'],
       additionalProperties: false,
     },
-    async run(args) {
+    async run(args, context) {
+      const emit = (kind: string, data?: unknown) => { try { context?.emit(kind, data) } catch { /* a view never fails the call */ } }
       const command = typeof args.command === 'string' ? args.command.trim() : ''
       if (!command || command.length > COMMAND_LIMIT) return fail('invalid_arguments', `command must be 1 to ${COMMAND_LIMIT} characters`)
       const refusal = options.allow?.(command)
@@ -148,6 +149,7 @@ export function createSandboxExecTool(options: SandboxExecToolOptions): SandboxE
         }
         return fail('sandbox_unavailable', 'The sandbox did not start in time, so the command did not run.', error)
       }
+      emit('box_ready', { ms: Date.now() - started })
       let result: { exitCode: number; stdout: string; stderr: string }
       try {
         result = await raceAbort(box.exec(command, {

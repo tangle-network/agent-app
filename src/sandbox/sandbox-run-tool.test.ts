@@ -13,7 +13,20 @@ describe('createSandboxRunTool', () => {
     expect(result.answer).toBe('Form 8949 filled: /home/agent/output/8949.pdf')
     expect(turn).toHaveBeenCalledWith('ws-1')
     expect(runTask).toHaveBeenCalledWith(box, 'Fill form 8949 from the uploaded CSV.',
-      { signal: expect.any(AbortSignal), timeoutMs: expect.any(Number) })
+      { signal: expect.any(AbortSignal), timeoutMs: expect.any(Number), emit: expect.any(Function) })
+  })
+
+  it('streams box_ready and the runner\'s own progress through the engine\'s tool context', async () => {
+    const events: Array<[string, unknown]> = []
+    const tool = createSandboxRunTool({ box: async () => box, runTask: async (_box, _task, { emit }) => {
+      emit('step', { name: 'reading 8949.csv' })
+      return 'done'
+    } })
+    await tool.run({ task: 'x' }, { emit: (kind, data) => { events.push([kind, data]) } })
+    expect(events.map(([kind]) => kind)).toEqual(['box_ready', 'step'])
+    expect(events[1]![1]).toEqual({ name: 'reading 8949.csv' })
+    // A view that throws never fails the call.
+    await expect(tool.run({ task: 'x' }, { emit: () => { throw new Error('view gone') } })).resolves.toMatchObject({ answer: 'done' })
   })
 
   it('reports a box that cannot start as sandbox_unavailable, keeping a product refusal as it was', async () => {

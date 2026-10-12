@@ -23,6 +23,13 @@ describe('createSandboxExecTool', () => {
     expect(box.exec).toHaveBeenCalledWith('tax-python fill_form.py --form 1040', expect.objectContaining({ cwd: '/home/agent' }))
   })
 
+  it('reports box_ready through the engine\'s tool context', async () => {
+    const events: string[] = []
+    const tool = createSandboxExecTool({ box: async () => fakeBox(async () => ({ exitCode: 0, stdout: 'ok', stderr: '' })) as never })
+    await tool.run({ command: 'ls' }, { emit: kind => { events.push(kind) } })
+    expect(events).toEqual(['box_ready'])
+  })
+
   it('types a box that cannot start or be prepared, and retries the start on the next call', async () => {
     let attempts = 0
     const onFailure = vi.fn()

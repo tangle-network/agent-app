@@ -30,6 +30,18 @@ export class SandboxRunError extends Error {
   }
 }
 
+/** The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine. */
+export interface SandboxToolContext {
+  emit(kind: string, data?: unknown): void
+}
+
+export interface SandboxTaskOptions {
+  signal: AbortSignal
+  timeoutMs: number
+  /** Streams a typed side event from the box run (a progress step, a file written) as the turn's `tool_event`. */
+  emit(kind: string, data?: unknown): void
+}
+
 export interface SandboxRunToolOptions {
   /** The box this call runs in. The product provisions, binds and bills it; this module never
    *  creates one. A throw is reported to the model as `sandbox_unavailable`, unless it is a
@@ -37,7 +49,7 @@ export interface SandboxRunToolOptions {
   box(signal: AbortSignal): Promise<SandboxInstance>
   /** Runs the task on the box and returns the box agent's final answer: {@link sandboxPromptRunner}
    *  for the shell's own prompt path, or the product's runner (skill placement, app-tool MCP, a spend tap). */
-  runTask(box: SandboxInstance, task: string, options: { signal: AbortSignal; timeoutMs: number }): Promise<string>
+  runTask(box: SandboxInstance, task: string, options: SandboxTaskOptions): Promise<string>
   /** Wall-clock cap for one call, box start included. Default 5 minutes. */
   timeoutMs?: number
   /** Cancels a call in flight, for example the turn's own signal. */
@@ -55,7 +67,7 @@ export interface SandboxRunTool {
   name: string
   description: string
   inputSchema: Record<string, unknown>
-  run(args: Record<string, unknown>): Promise<{ answer: string; ms: number }>
+  run(args: Record<string, unknown>, context?: SandboxToolContext): Promise<{ answer: string; ms: number }>
 }
 
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
@@ -69,7 +81,7 @@ export const SANDBOX_RUN_DESCRIPTION =
 
 /** The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused). */
 export function sandboxPromptRunner(shell: SandboxRuntimeConfig, prompt: Omit<StreamSandboxPromptOptions, 'signal' | 'history'> = {}): SandboxRunToolOptions['runTask'] {
-  return (box, task, run) => runSandboxPrompt(shell, box, task, { ...prompt, ...run, disallowQuestions: true })
+  return (box, task, { signal, timeoutMs }) => runSandboxPrompt(shell, box, task, { ...prompt, signal, timeoutMs, disallowQuestions: true })
 }
 
 export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRunTool {
@@ -89,7 +101,8 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
       required: ['task'],
       additionalProperties: false,
     },
-    async run(args) {
+    async run(args, context) {
+      const emit = (kind: string, data?: unknown) => { try { context?.emit(kind, data) } catch { /* a view never fails the call */ } }
       const task = typeof args.task === 'string' ? args.task.trim() : ''
       if (!task || task.length > TASK_LIMIT) {
         return fail('invalid_arguments', `task must be 1 to ${TASK_LIMIT} characters`)
@@ -109,10 +122,11 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
         if (error instanceof SandboxRunError) return fail(error.code, error.message, error.cause)
         return fail('sandbox_unavailable', 'The sandbox for this workspace could not start, so this work was not done.', error)
       }
+      emit('box_ready', { ms: Date.now() - started })
       let answer: string
       try {
         // A product runner may not honour the signal; the call still ends at the cap.
-        answer = await capped(runTask(box, task, { signal, timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)) }))
+        answer = await capped(runTask(box, task, { signal, timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)), emit }))
       } catch (error) {
         const timedOut = signal.aborted && !options.signal?.aborted
         return fail('sandbox_failed', timedOut
