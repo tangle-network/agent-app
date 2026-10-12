@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.154
+
+- feat(studio): group generation options in settings popover (#1091)
+
 ## 0.60.153
 
 - fix(app-auth): refuse a revoked session in every isolate on the next request (#990)
