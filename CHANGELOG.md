@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.138
+
+- feat(journeys): a scoreboard writer for the shared readiness board (#1075)
+
 ## 0.60.137
 
 - fix(rollout): read the base from the source checkout under signoff's clean tree (#1081)
