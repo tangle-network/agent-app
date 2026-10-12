@@ -12,6 +12,7 @@ import { createRouterTurnProducer, createSandboxChatProducer } from '../../src/c
 import {
   chatReasoningFromParts,
   consumeChatStream,
+  streamChatTurn,
   trackChatReasoning,
   type ChatReasoningState,
 } from '../../src/web-react/chat-stream'
@@ -43,6 +44,18 @@ function router(...responses: Response[]) {
 function ndjson(events: unknown[]): ReadableStream<Uint8Array> {
   const bytes = new TextEncoder().encode(events.map(event => JSON.stringify(event)).join('\n') + '\n')
   return new ReadableStream({ start(controller) { controller.enqueue(bytes); controller.close() } })
+}
+
+/** A body that delivers `events`, then drops the connection. */
+function droppingNdjson(events: unknown[]): ReadableStream<Uint8Array> {
+  const bytes = new TextEncoder().encode(events.map(event => JSON.stringify(event)).join('\n') + '\n')
+  let sent = false
+  return new ReadableStream({
+    pull(controller) {
+      if (sent) controller.error(new Error('network reset'))
+      else { controller.enqueue(bytes); sent = true }
+    },
+  })
 }
 
 async function drain<T>(stream: AsyncIterable<T>): Promise<T[]> {
@@ -150,6 +163,43 @@ describe('reasoning parts', () => {
     const none: ChatReasoningState[] = []
     await consumeChatStream(ndjson([{ kind: 'event', event: { type: 'text', text: 'Hi.' } }]), { onReasoningState: state => none.push(state) })
     expect(none).toEqual([])
+  })
+
+  it('keeps one reasoning state across a resume: the replay neither repeats the reasoning nor restarts its clock', async () => {
+    steppingClock()
+    const turn = [
+      { type: 'turn', turnId: 't-1' },
+      { kind: 'event', event: { type: 'reasoning', text: 'Need the ' } },
+      { kind: 'event', event: { type: 'reasoning', text: 'count.' } },
+    ]
+    const states: ChatReasoningState[] = []
+    await streamChatTurn({
+      start: async () => new Response(droppingNdjson(turn)),
+      // The resume route replays the whole turn from its first event, then the answer.
+      resume: async () => new Response(ndjson([...turn, { kind: 'event', event: { type: 'text', text: 'Four.' } }])),
+      callbacks: { onReasoningState: state => states.push(state) },
+    })
+    const first = states[0]!
+    const last = states.at(-1)!
+    expect(last.text).toBe('Need the count.')
+    expect(last.thinking).toBe(false)
+    expect(last.startedAt).toBe(first.startedAt)
+    expect(states.every(state => state.startedAt === first.startedAt)).toBe(true)
+  })
+
+  it('settles thinking when the stream fails for good after reasoning', async () => {
+    steppingClock()
+    const states: ChatReasoningState[] = []
+    await expect(consumeChatStream(droppingNdjson([{ kind: 'event', event: { type: 'reasoning', text: 'Checking.' } }]),
+      { onReasoningState: state => states.push(state) })).rejects.toThrow('network reset')
+    expect(states.at(-1)).toMatchObject({ text: 'Checking.', thinking: false, endedAt: expect.any(Number) })
+
+    const turnStates: ChatReasoningState[] = []
+    await expect(streamChatTurn({
+      start: async () => new Response(droppingNdjson([{ kind: 'event', event: { type: 'reasoning', text: 'Checking.' } }])),
+      callbacks: { onReasoningState: state => turnStates.push(state) },
+    })).rejects.toThrow('network reset')
+    expect(turnStates.at(-1)).toMatchObject({ thinking: false, endedAt: expect.any(Number) })
   })
 
   it('reads saved parts without times as settled reasoning with no duration, and no reasoning as none', () => {

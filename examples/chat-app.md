@@ -229,8 +229,13 @@ each reasoning run as `{ type: 'reasoning', text, time: { start, end } }`.
 starts; `chatReasoningFromParts(message.parts)` gives a saved message the same
 state, settled. `ChatMessages` renders it from `ChatUiMessage.reasoning`,
 `reasoningStartedAt` and `reasoningEndedAt`; anywhere else, spread the state
-onto `ReasoningRow`. A consumer that dispatches lines itself wraps its
-callbacks with `trackChatReasoning` and calls `end()` when the stream closes.
+onto `ReasoningRow`. `trackChatReasoning` takes callbacks, not a stream, so
+it is the entry point for any other transport: an app that dispatches lines
+itself, or reads its own frames (a Durable Object's live parts, server-side
+events), wraps its handlers with it, feeds `onReasoning`, `onText` and
+`onToolCall`, and calls `end()` when its stream closes. `streamChatTurn` keeps
+one state across a resume, so a reconnect neither repeats the reasoning nor
+restarts its clock.
 An engine turn on an OpenAI model streams reasoning only when its
 `reasoningEffort` is above `none`.
 

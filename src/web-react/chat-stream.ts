@@ -163,20 +163,37 @@ export interface ChatReasoningState {
   thinking: boolean
 }
 
-/** Callbacks that keep the turn's reasoning state, and `end()` to call once the turn's stream is over. */
-export type TrackedChatStreamCallbacks = ChatStreamCallbacks & { end: () => void }
+/** Callbacks that keep the turn's reasoning state, plus the two moments only the transport knows. */
+export type TrackedChatStreamCallbacks = ChatStreamCallbacks & {
+  /** The turn's stream is over, or failed for good: thinking that is still open ends now. */
+  end: () => void
+  /** The stream will replay the turn from its first event (a resume from 0): the text is rebuilt from the
+   *  replay, and the start time of the first delta is kept, so "Thought for N seconds" still counts from it. */
+  replay: () => void
+}
+
+/** Callbacks `trackChatReasoning` returned, so `consumeChatStream` uses their state instead of starting another. */
+const trackedCallbacks = new WeakSet<ChatStreamCallbacks>()
 
 /**
  * Keep one turn's reasoning state from its stream: the first reasoning delta
  * starts the clock, the answer's first text, an error or `end()` stops it, and
  * every change reaches `callbacks.onReasoningState`. Reasoning that resumes
  * after a tool call or an answer continues the same state as a new paragraph,
- * the way a reload joins the turn's saved reasoning parts. `consumeChatStream`
- * applies this itself; call it to dispatch lines one at a time.
+ * the way a reload joins the turn's saved reasoning parts.
+ *
+ * It takes callbacks, not a stream, so it is the entry point for any
+ * transport: `streamChatTurn` and `consumeChatStream` apply it themselves; an
+ * app that dispatches lines one at a time (`dispatchChatStreamLine`) or reads
+ * its own frames (a Durable Object's live parts, server-side events) wraps its
+ * handlers with it, feeds `onReasoning` / `onText` / `onToolCall`, and calls
+ * `end()` when its stream closes.
  */
 export function trackChatReasoning(callbacks: ChatStreamCallbacks, now: () => number = Date.now): TrackedChatStreamCallbacks {
   let state: ChatReasoningState | null = null
   let paragraph = false
+  // A replay rebuilds the text; the first delta's time survives it.
+  let replayedFrom: number | undefined
   const publish = (next: ChatReasoningState) => {
     state = next
     callbacks.onReasoningState?.(next)
@@ -184,13 +201,13 @@ export function trackChatReasoning(callbacks: ChatStreamCallbacks, now: () => nu
   const stop = () => {
     if (state?.thinking) publish({ ...state, endedAt: now(), thinking: false })
   }
-  return {
+  const tracked: TrackedChatStreamCallbacks = {
     ...callbacks,
     onReasoning: (delta) => {
       callbacks.onReasoning?.(delta)
       if (!delta) return
       if (!state) {
-        publish({ text: delta, startedAt: now(), thinking: true })
+        publish({ text: delta, startedAt: replayedFrom ?? now(), thinking: true })
       } else {
         const joined = (paragraph || !state.thinking) && state.text.trim()
           ? `${state.text.trimEnd()}\n\n${delta.trimStart()}`
@@ -213,7 +230,14 @@ export function trackChatReasoning(callbacks: ChatStreamCallbacks, now: () => nu
       callbacks.onErrorEventDetail?.(detail)
     },
     end: stop,
+    replay: () => {
+      replayedFrom = state?.startedAt ?? replayedFrom
+      state = null
+      paragraph = false
+    },
   }
+  trackedCallbacks.add(tracked)
+  return tracked
 }
 
 /**
@@ -425,8 +449,10 @@ export async function consumeChatStream(
   let buffer = ''
   let turnId: string | null = null
   let receivedContent = false
-  const tracked = cb.onReasoningState ? trackChatReasoning(cb) : null
-  const callbacks = tracked ?? cb
+  // Callbacks already tracked (by `streamChatTurn`, across a resume) keep their state; otherwise this
+  // stream owns one and settles it when the stream closes or fails.
+  const owned = !trackedCallbacks.has(cb) && cb.onReasoningState ? trackChatReasoning(cb) : null
+  const callbacks = owned ?? cb
 
   const handle = (line: string) => {
     const r = dispatchChatStreamLine(line, callbacks)
@@ -437,17 +463,20 @@ export async function consumeChatStream(
     if (r.receivedContent) receivedContent = true
   }
 
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) {
-      if (buffer.trim()) handle(buffer)
-      tracked?.end()
-      break
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) {
+        if (buffer.trim()) handle(buffer)
+        break
+      }
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) handle(line)
     }
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-    for (const line of lines) handle(line)
+  } finally {
+    owned?.end()
   }
   return { turnId, receivedContent }
 }
@@ -479,20 +508,29 @@ export async function streamChatTurn(opts: StreamChatOptions): Promise<ConsumeCh
   // Headers arrive before the body, so a reset before the marker still has a
   // replay id. The body marker remains authoritative when it arrives.
   let turnId: string | null = res.headers.get('x-turn-id')?.trim() || null
-  const cb: ChatStreamCallbacks = {
+  const withTurnId: ChatStreamCallbacks = {
     ...opts.callbacks,
     onTurnId: (id) => {
       turnId = id
       opts.callbacks.onTurnId?.(id)
     },
   }
+  // One reasoning state for the whole turn, across a resume, so a reconnect
+  // neither duplicates the reasoning nor restarts its clock.
+  const tracked = opts.callbacks.onReasoningState ? trackChatReasoning(withTurnId) : null
+  const cb = tracked ?? withTurnId
   try {
-    return await consumeChatStream(res.body, cb)
-  } catch (transportErr) {
-    if (!turnId || !opts.resume) throw transportErr
-    opts.onResetForResume?.()
-    const resumed = await opts.resume(turnId, 0)
-    if (!resumed.ok || !resumed.body) throw transportErr
-    return await consumeChatStream(resumed.body, cb)
+    try {
+      return await consumeChatStream(res.body, cb)
+    } catch (transportErr) {
+      if (!turnId || !opts.resume) throw transportErr
+      opts.onResetForResume?.()
+      tracked?.replay()
+      const resumed = await opts.resume(turnId, 0)
+      if (!resumed.ok || !resumed.body) throw transportErr
+      return await consumeChatStream(resumed.body, cb)
+    }
+  } finally {
+    tracked?.end()
   }
 }

@@ -1416,6 +1416,23 @@ function AssistantMessageImpl({
  */
 const AssistantMessage = memo(AssistantMessageImpl)
 
+/** Whole seconds elapsed while `active`, ticking once a second; counts from
+ *  when `active` first turns true and freezes when it clears. Kept for
+ *  existing consumers: `ReasoningRow` times reasoning from the stream's own
+ *  start instead. */
+export function useThinkingSeconds(active: boolean): number {
+  const [seconds, setSeconds] = useState(0)
+  useEffect(() => {
+    if (!active) return
+    // Reset on each (re)activation so a reused component resuming "thinking"
+    // counts from 0 rather than showing the prior phase's stale elapsed time.
+    setSeconds(0)
+    const id = setInterval(() => setSeconds((s) => s + 1), 1000)
+    return () => clearInterval(id)
+  }, [active])
+  return seconds
+}
+
 function ThinkingRow({ agentLabel, chrome = 'labeled', phase }: {
   agentLabel: string
   chrome?: 'labeled' | 'quiet'
