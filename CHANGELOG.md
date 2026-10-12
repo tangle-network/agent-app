@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.156
+
+- fix(router-turn): preserve actual model placement and complete profile prompts (#1093)
+
 ## 0.60.155
 
 - docs: record served Studio settings outcome (#1092)
