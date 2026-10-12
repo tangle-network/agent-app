@@ -504,9 +504,35 @@ describe('createAppAuth: session reads are remembered briefly', () => {
       method: 'POST', headers: { cookie, origin: 'http://localhost:3000', 'content-type': 'application/json' }, body: '{}',
     }))
     expect(out.status).toBe(200)
-    // The next read goes back to better-auth (which answers from its own cookie cache for a replayed cookie).
-    await appAuth.getSession(requestWithCookies('http://localhost:3000/c', cookie))
+    // The next read goes back to the store, which no longer has the session.
+    expect(await appAuth.getSession(requestWithCookies('http://localhost:3000/c', cookie))).toBeNull()
     expect(read).toHaveBeenCalledTimes(3)
+  })
+
+  it('re-checks the session row on every reuse: one row read, not a full read', async () => {
+    const { appAuth, cookie } = await signedIn()
+    const full = vi.spyOn(appAuth.auth.api, 'getSession')
+    const ctx = await (appAuth.auth.$context as unknown as Promise<{ adapter: { findOne: (...args: unknown[]) => Promise<unknown> } }>)
+    const rowReads = vi.spyOn(ctx.adapter, 'findOne')
+    await appAuth.getSession(requestWithCookies('http://localhost:3000/a', cookie))
+    rowReads.mockClear()
+    await appAuth.getSession(requestWithCookies('http://localhost:3000/b', cookie))
+    await appAuth.getSession(requestWithCookies('http://localhost:3000/c', cookie))
+    expect(full).toHaveBeenCalledTimes(1)
+    expect(rowReads).toHaveBeenCalledTimes(2)
+    expect(rowReads.mock.calls.every(([args]) => (args as { model: string }).model === 'session')).toBe(true)
+  })
+
+  it('serves the remembered session when the row check cannot reach the store', async () => {
+    const { appAuth, cookie } = await signedIn()
+    const first = await appAuth.getSession(requestWithCookies('http://localhost:3000/a', cookie))
+    const ctx = await (appAuth.auth.$context as unknown as Promise<{ adapter: { findOne: (...args: unknown[]) => Promise<unknown> } }>)
+    vi.spyOn(ctx.adapter, 'findOne').mockRejectedValueOnce(new Error('D1_ERROR: network connection lost'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const during = await appAuth.getSession(requestWithCookies('http://localhost:3000/b', cookie))
+    expect(during?.user.id).toBe(first?.user.id)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   it('never shares a read in flight across requests, so a cancelled request cannot hang the others', async () => {
@@ -544,5 +570,41 @@ describe('createAppAuth: session reads are remembered briefly', () => {
     await appAuth.getSession(requestWithCookies('http://localhost:3000/a', cookie))
     await appAuth.getSession(requestWithCookies('http://localhost:3000/b', cookie))
     expect(read).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('createAppAuth: a revoked session is refused in every isolate', () => {
+  it('refuses within one second in an isolate that had remembered it', async () => {
+    // Two isolates: two module instances (separate in-memory caches) over one database.
+    const database = memoryDatabase()
+    vi.resetModules()
+    const isolateA = (await import('../src/app-auth/index')).createAppAuth({
+      appName: 'My App', baseURL: 'http://localhost:3000', secret: SECRET, database,
+    })
+    vi.resetModules()
+    const isolateB = (await import('../src/app-auth/index')).createAppAuth({
+      appName: 'My App', baseURL: 'http://localhost:3000', secret: SECRET, database,
+    })
+    const res = await signUp(isolateA, 'http://localhost:3000', `revoke-${crypto.randomUUID()}@example.com`)
+    const cookie = cookieHeaderFrom(res)
+    expect((await isolateB.getSession(requestWithCookies('http://localhost:3000/a', cookie)))?.user.email).toMatch(/^revoke-/)
+
+    const out = await isolateA.auth.handler(new Request('http://localhost:3000/api/auth/sign-out', {
+      method: 'POST', headers: { cookie, origin: 'http://localhost:3000', 'content-type': 'application/json' }, body: '{}',
+    }))
+    expect(out.status).toBe(200)
+    const revokedAt = Date.now()
+
+    const refused = await isolateB.getSession(requestWithCookies('http://localhost:3000/b', cookie))
+    const refusedAfterMs = Date.now() - revokedAt
+    expect(refused).toBeNull()
+    expect(refusedAfterMs).toBeLessThan(1_000)
+
+    // A third isolate that never saw the session refuses it too: no cookie cache answers for it.
+    vi.resetModules()
+    const isolateC = (await import('../src/app-auth/index')).createAppAuth({
+      appName: 'My App', baseURL: 'http://localhost:3000', secret: SECRET, database,
+    })
+    expect(await isolateC.getSession(requestWithCookies('http://localhost:3000/c', cookie))).toBeNull()
   })
 })
