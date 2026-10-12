@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.150
+
+- chore(climb): record the signoff edge-budget result (#1087 on creative production) (#1088)
+
 ## 0.60.149
 
 - fix(signoff): the request meter counts only requests that reach the network (#1087)
