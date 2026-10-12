@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.60.138
+
+- feat(journeys): a scoreboard writer for the shared readiness board (#1075)
+
+## 0.60.137
+
+- fix(rollout): read the base from the source checkout under signoff's clean tree (#1081)
+- feat(router-turn): OpenAI reasoning turns stream their reasoning summaries through the Responses API (#1080)
+
+## 0.60.136
+
+- fix(workspace-export): retry a sandbox the platform failed to resume, 30 s apart (#1079)
+
+## 0.60.135
+
+- feat(router-turn): reasoning, temperature, fallback models, resends, a tool-result limit and the service's error detail (#1076)
+
+## 0.60.134
+
+- feat(skills-placement): support-file mounting for kit-carrying skills (#1077)
+
+## 0.60.133
+
+- feat(rollout): a staged rollout widens only after the stage it leaves met its kill lines (#1049)
+
+## 0.60.132
+
+- fix(journeys): read a textarea composer by its value, so the default ChatComposer passes typePrompt (#1060)
+- fix(sandbox): re-land #1045's review fixes and pass the engine's tool context to sandbox_run/sandbox_exec (#1056)
+- feat(platform): one delegated product key client and provisioner for every app (#1062)
+
+## 0.60.131
+
+- fix(studio): the closed model trigger draws the maker's logo like the rows (#1073)
+
+## 0.60.130
+
+- feat(router-turn): reply in the sender's language and name conflicting sources (#1061)
+
+## 0.60.129
+
+- fix(signoff): surface-ladder failure screenshots are viewport-sized so a tall page cannot stall the run (#1071)
+
 ## 0.60.128
 
 - feat(model-picker): draw the maker's logo for a model another host serves (#1068)

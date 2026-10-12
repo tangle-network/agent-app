@@ -402,7 +402,7 @@ export async function checkSurfaceLadder(options: SurfaceLadderOptions): Promise
           if (found.length && options.screenshotDir) {
             const name = `${route.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '') || 'root'}-${width}-${theme}.png`
             // Evidence only: a screenshot that stalls must not lose the measurement.
-            await page.screenshot({ path: `${options.screenshotDir}/${name}`, fullPage: true, timeout: 10_000, animations: 'disabled' }).catch(() => undefined)
+            await page.screenshot({ path: `${options.screenshotDir}/${name}`, timeout: 10_000, animations: 'disabled' }).catch(() => undefined)
           }
         }
         await context.close()

@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-253 exports.
+255 exports.
 
 ### `adaptSandboxStream`
 
@@ -1382,6 +1382,14 @@ type SandboxStepTransition
 interface SandboxStreamEvent
 ```
 
+### `SandboxTaskOptions`
+
+`interface`
+
+```ts
+interface SandboxTaskOptions
+```
+
 ### `SandboxTerminalConnectionRouteOptions`
 
 `interface` — Configuration for {@link createSandboxTerminalConnectionRoute}.
@@ -1396,6 +1404,14 @@ interface SandboxTerminalConnectionRouteOptions
 
 ```ts
 (options: SandboxToolPathOptions) => string
+```
+
+### `SandboxToolContext`
+
+`interface` — The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine.
+
+```ts
+interface SandboxToolContext
 ```
 
 ### `sandboxToolPath`

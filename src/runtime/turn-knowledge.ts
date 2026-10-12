@@ -53,7 +53,8 @@ export function turnKnowledgeInstructions(files: readonly TurnKnowledgeFile[], o
   return [
     'Answer questions about this business or its work (hours, times, policies, codes, passwords, prices, contacts, amenities, procedures) only from the knowledge in these instructions, the knowledge files below, or a tool result. Never give a typical or assumed value, and do not say something is absent unless a source says so.' +
       (read ? ` When a listed file without its text may cover the question, read it with ${read} before answering.` : '') +
-      ' When nothing covers it, say you do not have that information and offer to ask the owner.',
+      ' When nothing covers it, say you do not have that information and offer to ask the owner.' +
+      ' When two sources disagree, give each value with the source that states it and ask the owner which is current; never pick one silently.',
     ...files.map(file => file.text !== null ? `Knowledge file ${file.path}:\n${file.text}`
       : `Knowledge file ${file.path} (${file.size} bytes, text not shown)${read ? `: read it with ${read} when the question may be covered by it.` : '.'}`),
   ]
