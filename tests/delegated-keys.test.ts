@@ -1,17 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  createDelegatedKeyProvider,
+  canonicalDelegatedKeyName,
+  createDelegatedKeyProvisioner,
   createPlatformDelegatedKeyClient,
-  type DelegatedKeySlot,
+  DelegatedKeyMissingError,
+  DelegatedKeyRefusalError,
+  type DelegatedKeyRequest,
 } from '../src/platform/delegated-keys'
 
 const NOW = Date.parse('2026-10-12T01:00:00Z')
 const SOURCE = 'sk-tan-payer-linked-key-0001'
+const EXPIRES = new Date(NOW + 30 * 60_000)
 
 interface Call { url: string; method: string; headers: Headers; body: Record<string, unknown> | null }
+type Responder = (call: Call) => { status: number; body?: unknown }
 
-/** A fake Platform: answers each request with the next queued response. */
-function platform(...responses: Array<(call: Call) => { status: number; body?: unknown }>) {
+/** A fake Platform answering each request with the next queued responder. */
+function platform(...responses: Responder[]) {
   const calls: Call[] = []
   const fetchImpl = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
     const call: Call = { url: String(url), method: init?.method ?? 'GET', headers: new Headers(init?.headers),
@@ -27,117 +32,151 @@ function platform(...responses: Array<(call: Call) => { status: number; body?: u
   return { client, calls }
 }
 
-/** Platform's 201 for a delegate call, echoing the request unless overridden. */
-const minted = (n: number, override: Record<string, unknown> = {}) => (call: Call) => ({ status: 201, body: { success: true, data: {
-  id: `key_${n}`, key: `sk-tan-child-${n}-xxxxxxxx`, name: call.body!.name, product: call.body!.product,
-  allowedModels: call.body!.allowedModels, expiresAt: call.body!.expiresAt, ...override,
-} } })
-const gone = () => ({ status: 404, body: { success: false } })
+/**
+ * Platform's 201 for POST /v1/keys/delegate, in its real shape (agent-dev-container
+ * key-provisioning.ts delegate return + key-issuance-routes.ts envelope): the key row
+ * and its attribution; the granted expiry is attribution.expiresAt, never top-level.
+ */
+const minted = (n: number, change: (data: Record<string, any>) => void = () => {}): Responder => (call) => {
+  const body = call.body!
+  const data: Record<string, any> = {
+    id: `key_${n}`, key: `sk-tan-child${n}xxxxxxxxxxxx`, prefix: `sk-tan-child${n}`, name: body.name,
+    provisionedByService: 'tax-agent', product: body.product, scopes: null,
+    budgetUsd: body.budgetUsd ?? null, budgetRemaining: body.budgetUsd ?? null,
+    monthlyBudgetUsd: body.monthlyBudgetUsd ?? null, monthlyBudgetRemaining: body.monthlyBudgetUsd ?? null,
+    allowedModels: body.allowedModels ?? null, rpmLimit: null,
+    attribution: {
+      version: 1, issuerService: 'platform', targetService: body.product, originKind: 'app', originAppId: 'tax-agent',
+      mintActorType: 'service', mintActorId: 'tax-agent', delegatedFromKeyId: 'key_source', lineageId: 'lin_1',
+      delegationDepth: 1, budgetParentKeyId: 'key_source', payerType: 'user', payerId: 'usr_payer', actorUserId: 'usr_payer',
+      teamId: null, resourceType: body.resourceType ?? null, resourceId: body.resourceId ?? null,
+      issuedAt: new Date(NOW).toISOString(), expiresAt: body.expiresAt,
+    },
+  }
+  change(data)
+  return { status: 201, body: { success: true, data } }
+}
+const deleted: Responder = () => ({ status: 200, body: { success: true } })
 
-const slot: DelegatedKeySlot = { sourceKey: SOURCE, name: 'auto:tax-agent:router:turn-1', product: 'router',
-  allowedModels: ['gpt-6-luna', 'kimi-k2.7'], budget: { usd: 1, monthlyUsd: 1 }, ttlMs: 30 * 60_000 }
+const request: DelegatedKeyRequest = { sourceKey: SOURCE, name: 'turn:exec-1', product: 'router',
+  resource: { type: 'tax-turn', id: 'exec-1' }, allowedModels: ['gpt-6-luna', 'kimi-k2.7'],
+  budget: { usd: 1, monthlyUsd: 1 }, expiresAt: EXPIRES, expect: { payerId: 'usr_payer', sourceKeyId: 'key_source' } }
 
-describe('createPlatformDelegatedKeyClient', () => {
-  it('delegates a scoped child with no control-plane scopes and returns the expiry Platform granted', async () => {
+describe('canonicalDelegatedKeyName', () => {
+  it('qualifies Router and Sandbox names the way Platform stores them', () => {
+    expect(canonicalDelegatedKeyName({ serviceName: 'tax-agent', product: 'router', name: 'turn:1' })).toBe('auto:tax-agent:router:turn:1')
+    expect(canonicalDelegatedKeyName({ serviceName: 'tax-agent', product: 'router', name: 'auto:tax-agent:turn:1' })).toBe('auto:tax-agent:router:turn:1')
+    expect(canonicalDelegatedKeyName({ serviceName: 'tax-agent', product: 'router', name: 'auto:tax-agent:router:turn:1' })).toBe('auto:tax-agent:router:turn:1')
+  })
+})
+
+describe('createPlatformDelegatedKeyClient.delegate', () => {
+  it('mints a scoped child and returns the expiry Platform granted in its attribution', async () => {
     const granted = new Date(NOW + 20 * 60_000).toISOString()
-    const { client, calls } = platform(minted(1, { expiresAt: granted }))
-    const out = await client.delegate({ ...slot, resource: { type: 'tax-turn', id: 'exec-1' }, expiresAt: new Date(NOW + 30 * 60_000) })
-    expect(out).toMatchObject({ succeeded: true, value: { key: 'sk-tan-child-1-xxxxxxxx', id: 'key_1', product: 'router' } })
+    const { client, calls } = platform(minted(1, data => { data.attribution.expiresAt = granted }))
+    const out = await client.delegate(request)
+    expect(out).toMatchObject({ succeeded: true, value: { id: 'key_1', name: 'auto:tax-agent:router:turn:exec-1', product: 'router',
+      allowedModels: ['gpt-6-luna', 'kimi-k2.7'], budgetUsd: 1 } })
     expect(out.succeeded && out.value.expiresAt.toISOString()).toBe(granted)
     expect(calls[0]!.url).toBe('https://id.test/v1/keys/delegate')
     expect(calls[0]!.headers.get('authorization')).toBe('Bearer svc-token')
     expect(calls[0]!.headers.get('x-service-name')).toBe('tax-agent')
-    expect(calls[0]!.body).toEqual({ sourceKey: SOURCE, name: 'auto:tax-agent:router:turn-1', product: 'router',
+    expect(calls[0]!.body).toEqual({ sourceKey: SOURCE, name: 'auto:tax-agent:router:turn:exec-1', product: 'router',
       resourceType: 'tax-turn', resourceId: 'exec-1', budgetUsd: 1, monthlyBudgetUsd: 1,
-      allowedModels: ['gpt-6-luna', 'kimi-k2.7'], scopes: [], expiresAt: new Date(NOW + 30 * 60_000).toISOString() })
+      allowedModels: ['gpt-6-luna', 'kimi-k2.7'], expiresAt: EXPIRES.toISOString() })
   })
 
-  it('revokes and refuses a child that does not match the request, without leaking it', async () => {
-    const { client, calls } = platform(minted(2, { allowedModels: ['gpt-6-luna'] }), () => ({ status: 200, body: { success: true } }))
-    const out = await client.delegate({ ...slot, expiresAt: new Date(NOW + 60_000) })
-    expect(out).toEqual({ succeeded: false, error: { status: 502, code: 'delegated_key.response_invalid',
-      message: 'Platform returned a different model set.' } })
-    expect(JSON.stringify(out)).not.toContain('sk-tan-child')
+  it.each([
+    ['a different model set', (d: Record<string, any>) => { d.allowedModels = ['gpt-6-luna'] }],
+    ['a different name', (d: Record<string, any>) => { d.name = 'auto:tax-agent:router:other' }],
+    ['control-plane scopes', (d: Record<string, any>) => { d.scopes = ['keys:write'] }],
+    ['a budget larger than requested', (d: Record<string, any>) => { d.budgetUsd = 5 }],
+    ['attribution to another payer', (d: Record<string, any>) => { d.attribution.payerId = 'usr_someone_else' }],
+    ['attribution for another source key', (d: Record<string, any>) => { d.attribution.delegatedFromKeyId = 'key_other' }],
+    ['attribution for another resource', (d: Record<string, any>) => { d.attribution.resourceId = 'exec-2' }],
+    ['an expiry in the past or past the request', (d: Record<string, any>) => { d.attribution.expiresAt = new Date(EXPIRES.getTime() + 1).toISOString() }],
+    ['the source key itself', (d: Record<string, any>) => { d.key = SOURCE }],
+  ])('revokes and refuses a child with %s, without leaking either key', async (problem, change) => {
+    const { client, calls } = platform(minted(2, change), deleted)
+    const out = await client.delegate(request)
+    expect(out).toEqual({ succeeded: false, error: { status: 502, code: 'delegated_key.response_invalid', message: `Platform returned ${problem}.` } })
+    expect(JSON.stringify(out)).not.toMatch(/sk-tan-/)
     expect(calls[1]).toMatchObject({ method: 'DELETE', url: 'https://id.test/v1/keys/key_2' })
     expect(calls[1]!.headers.get('authorization')).toBe(`Bearer ${SOURCE}`)
+  })
+
+  it('names an untrusted child it could not revoke so the app can retire it', async () => {
+    const { client } = platform(minted(3, d => { d.allowedModels = [] }), () => ({ status: 503, body: {} }))
+    await expect(client.delegate(request)).resolves.toEqual({ succeeded: false, error: { status: 502,
+      code: 'delegated_key.response_invalid', message: 'Platform returned a different model set.', unrevokedKeyId: 'key_3' } })
   })
 
   it('types Platform refusals by code and never carries the response body', async () => {
     const { client } = platform(
       () => ({ status: 402, body: { success: false, error: { code: 'INSUFFICIENT_BALANCE', message: 'secret detail' } } }),
       () => ({ status: 503, body: {} }),
+      () => ({ status: 200, body: { success: true, data: {} } }),
     )
-    const poor = await client.delegate({ ...slot, expiresAt: new Date(NOW + 60_000) })
+    const poor = await client.delegate(request)
     expect(poor).toMatchObject({ succeeded: false, error: { status: 402, code: 'delegated_key.payment_required' } })
     expect(JSON.stringify(poor)).not.toContain('secret detail')
-    await expect(client.delegate({ ...slot, expiresAt: new Date(NOW + 60_000) }))
-      .resolves.toMatchObject({ succeeded: false, error: { code: 'delegated_key.unavailable' } })
-    await expect(client.delegate({ ...slot, sourceKey: 'app-shared-key', expiresAt: new Date(NOW + 60_000) }))
+    await expect(client.delegate(request)).resolves.toMatchObject({ succeeded: false, error: { code: 'delegated_key.unavailable' } })
+    // Only Platform's 201 is a mint.
+    await expect(client.delegate(request)).resolves.toMatchObject({ succeeded: false, error: { code: 'delegated_key.refused' } })
+    await expect(client.delegate({ ...request, sourceKey: 'app-shared-key' }))
       .resolves.toMatchObject({ succeeded: false, error: { code: 'delegated_key.invalid_request' } })
-  })
-
-  it('treats a key Platform no longer holds as revoked, and reads a revoked or expired key as not live', async () => {
-    const { client } = platform(gone,
-      () => ({ status: 200, body: { success: true, data: { expiresAt: new Date(NOW + 60_000).toISOString(), revokedAt: '2026-10-12T00:59:00Z' } } }),
-      () => ({ status: 200, body: { success: true, data: { expiresAt: new Date(NOW - 1).toISOString() } } }))
-    await expect(client.revoke({ sourceKey: SOURCE, keyId: 'key_9' })).resolves.toEqual({ succeeded: true, value: null })
-    await expect(client.status({ sourceKey: SOURCE, keyId: 'key_9' })).resolves.toMatchObject({ value: { live: false } })
-    await expect(client.status({ sourceKey: SOURCE, keyId: 'key_9' })).resolves.toMatchObject({ value: { live: false } })
   })
 })
 
-describe('createDelegatedKeyProvider', () => {
-  it('reuses a slot key while it has its minimum life left, then mints a fresh one', async () => {
-    let now = NOW
-    const { client, calls } = platform(minted(1), minted(2))
-    const provider = createDelegatedKeyProvider({ client, now: () => now, minRemainingMs: 5 * 60_000 })
-    const first = await provider.keyFor(slot)
-    expect((await provider.keyFor(slot))).toEqual(first)
-    now = NOW + 26 * 60_000 // 4 minutes left: under the 5-minute margin
-    const second = await provider.keyFor(slot)
-    expect(second.succeeded && second.value.id).toBe('key_2')
-    expect(calls).toHaveLength(2)
+describe('createPlatformDelegatedKeyClient.live and revoke', () => {
+  it("takes Platform's verify-by-id verdict, which refuses revoked, superseded and expired keys, and fails closed", async () => {
+    const { client, calls } = platform(
+      () => ({ status: 200, body: { valid: true, keyId: 'key_1' } }),
+      () => ({ status: 200, body: { valid: false, invalidReason: 'superseded' } }),
+      () => ({ status: 200, body: { success: false } }),
+      () => ({ status: 502, body: {} }),
+    )
+    await expect(client.live({ keyId: 'key_1', product: 'router' })).resolves.toEqual({ succeeded: true, value: true })
+    await expect(client.live({ keyId: 'key_1', product: 'router' })).resolves.toEqual({ succeeded: true, value: false })
+    await expect(client.live({ keyId: 'key_1', product: 'router' })).resolves.toMatchObject({ succeeded: false, error: { code: 'delegated_key.response_invalid' } })
+    await expect(client.live({ keyId: 'key_1', product: 'router' })).resolves.toMatchObject({ succeeded: false, error: { code: 'delegated_key.unavailable' } })
+    expect(calls[0]!.body).toEqual({ keyId: 'key_1', expectedProduct: 'router' })
+    expect(calls[0]!.headers.get('x-service-name')).toBe('tax-agent')
   })
 
-  it('refuses a revoked, rejected or expired key on its next use and never hands it out again', async () => {
-    let now = NOW
-    const { client, calls } = platform(minted(1), () => ({ status: 200, body: { success: true } }), minted(2), minted(3))
-    const provider = createDelegatedKeyProvider({ client, now: () => now })
-    const first = await provider.keyFor(slot)
-    if (!first.succeeded) throw new Error('mint failed')
-    expect(provider.assertUsable(first.value)).toMatchObject({ succeeded: true })
+  it('treats a key Platform no longer holds as revoked', async () => {
+    const { client } = platform(() => ({ status: 404, body: {} }), () => ({ status: 400, body: { success: false, error: { code: 'REVOKE_FAILED' } } }))
+    await expect(client.revoke({ sourceKey: SOURCE, keyId: 'key_9' })).resolves.toEqual({ succeeded: true, value: null })
+    await expect(client.revoke({ sourceKey: SOURCE, keyId: 'key_9' })).resolves.toMatchObject({ succeeded: false })
+  })
+})
 
-    await provider.revoke({ sourceKey: SOURCE, key: first.value })
-    expect(provider.assertUsable(first.value)).toMatchObject({ succeeded: false, error: { code: 'delegated_key.revoked' } })
-    const second = await provider.keyFor(slot)
-    expect(second.succeeded && second.value.id).toBe('key_2')
+describe('createDelegatedKeyProvisioner (for createIdentityBoundWorkspaceKeyManager)', () => {
+  const provisioner = (client: ReturnType<typeof platform>['client']) => createDelegatedKeyProvisioner({ client, sourceKey: SOURCE,
+    product: 'router', resource: { type: 'workspace', id: 'ws-1' }, monthlyBudgetUsd: 25, expect: { payerId: 'usr_payer' } })
 
-    // Router answered 401 for the second key: the app reports it and gets a fresh one.
-    provider.reject(second.succeeded ? second.value.key : '')
-    const third = await provider.keyFor(slot)
-    expect(third.succeeded && third.value.id).toBe('key_3')
-
-    now = NOW + 31 * 60_000
-    expect(third.succeeded && provider.assertUsable(third.value)).toMatchObject({ succeeded: false, error: { code: 'delegated_key.expired' } })
-    expect(calls.map(call => call.method)).toEqual(['POST', 'DELETE', 'POST', 'POST'])
+  it('mints through the client with the manager-chosen name, budget and expiry', async () => {
+    const { client, calls } = platform(minted(1))
+    const created = await provisioner(client).createKey({ name: 'ws-1:op-1', product: 'router', budgetUsd: 25,
+      expiresAt: EXPIRES.toISOString(), idempotencyKey: 'workspace-key:row-1' })
+    expect(created).toMatchObject({ id: 'key_1', budgetUsd: 25, expiresAt: EXPIRES.toISOString() })
+    expect(calls[0]!.body).toMatchObject({ name: 'auto:tax-agent:router:ws-1:op-1', budgetUsd: 25, monthlyBudgetUsd: 25,
+      resourceType: 'workspace', resourceId: 'ws-1' })
   })
 
-  it('with verifyOnReuse, a key revoked elsewhere is detected before it is handed out', async () => {
-    const { client, calls } = platform(minted(1), gone, minted(2))
-    const provider = createDelegatedKeyProvider({ client, now: () => NOW, verifyOnReuse: true })
-    await provider.keyFor(slot)
-    const next = await provider.keyFor(slot)
-    expect(next.succeeded && next.value.id).toBe('key_2')
-    expect(calls.map(call => `${call.method} ${new URL(call.url).pathname}`)).toEqual(
-      ['POST /v1/keys/delegate', 'GET /v1/keys/key_1', 'POST /v1/keys/delegate'])
+  it('reports a key Platform no longer accepts as missing, the error the manager turns into revoke-and-remint', async () => {
+    const { client } = platform(() => ({ status: 200, body: { valid: false } }), () => ({ status: 200, body: { valid: true } }))
+    const error = await provisioner(client).getKey('key_1').catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(DelegatedKeyMissingError)
+    expect(error).toMatchObject({ status: 404, code: 'not_found' })
+    await expect(provisioner(client).getKey('key_1')).resolves.toEqual({})
   })
 
-  it('keeps separate slots per payer, model set and budget', async () => {
-    const { client } = platform(minted(1), minted(2), minted(3))
-    const provider = createDelegatedKeyProvider({ client, now: () => NOW })
-    const a = await provider.keyFor(slot)
-    const b = await provider.keyFor({ ...slot, allowedModels: ['gpt-6-luna'] })
-    const c = await provider.keyFor({ ...slot, sourceKey: 'sk-tan-another-payer-0002' })
-    expect([a, b, c].map(out => out.succeeded && out.value.id)).toEqual(['key_1', 'key_2', 'key_3'])
+  it('surfaces a refused mint as a typed error without a key', async () => {
+    const { client } = platform(() => ({ status: 402, body: { success: false, error: { code: 'KEY_BUDGET_EXHAUSTED' } } }))
+    const error = await provisioner(client).createKey({ name: 'ws-1:op-2', product: 'router', budgetUsd: 25,
+      expiresAt: EXPIRES.toISOString(), idempotencyKey: 'k' }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(DelegatedKeyRefusalError)
+    expect((error as DelegatedKeyRefusalError).refusal.code).toBe('delegated_key.budget_exhausted')
   })
 })
