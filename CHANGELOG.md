@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.157
+
+- fix(sandbox): never restart a reused box that is serving running sessions (#981)
+
 ## 0.60.156
 
 - fix(router-turn): preserve actual model placement and complete profile prompts (#1093)
