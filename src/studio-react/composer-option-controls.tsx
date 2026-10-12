@@ -23,7 +23,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { ImagePlus, Volume2, VolumeX, X, type LucideIcon } from 'lucide-react'
+import { ImagePlus, SlidersHorizontal, Volume2, VolumeX, X, type LucideIcon } from 'lucide-react'
 import {
   CheckGlyph,
   ChevronDown,
@@ -398,6 +398,198 @@ export function OptionPill({
               )}
             </>
           )}
+      </PopoverSurface>
+    </div>
+  )
+}
+
+export interface GenerationSetting {
+  key: string
+  label: string
+  summary: string
+  value: ModelOptionValue | undefined
+  choices: readonly OptionChoice[]
+  onSelect: (value: ModelOptionValue) => void
+  icon?: LucideIcon
+  /** A binary setting acts immediately instead of opening a two-row menu. */
+  onToggle?: () => void
+  custom?: {
+    label: string
+    render: (args: { close: () => void }) => ReactNode
+  }
+}
+
+/** The model's current defaults and optional parameters in one compact menu.
+ * The value list opens inside the panel, so no nested portal can be clipped or
+ * mistaken for an outside click. A long duration or voice list scrolls within
+ * 16rem while the rest of the settings stay in place. */
+export function GenerationSettings({
+  settings,
+  bandRef,
+  resetKey,
+}: {
+  settings: readonly GenerationSetting[]
+  bandRef: RefObject<HTMLDivElement | null>
+  resetKey: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [more, setMore] = useState(false)
+  const [active, setActive] = useState<string | null>(null)
+  const [customOpen, setCustomOpen] = useState(false)
+  const [focusAfterSelect, setFocusAfterSelect] = useState<string | null>(null)
+  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
+  const panelId = useId()
+  useCloseWhenScrolledOut(open, setOpen, triggerRef, bandRef)
+
+  useEffect(() => {
+    setOpen(false)
+    setMore(false)
+    setActive(null)
+    setCustomOpen(false)
+    setFocusAfterSelect(null)
+  }, [resetKey])
+
+  useEffect(() => {
+    if (open) panelRef.current?.querySelector<HTMLButtonElement>('[data-setting-key]')?.focus()
+  }, [open, panelRef])
+
+  useEffect(() => {
+    if (!focusAfterSelect) return
+    const rows = panelRef.current?.querySelectorAll<HTMLButtonElement>('[data-setting-key]')
+    Array.from(rows ?? []).find((row) => row.dataset.settingKey === focusAfterSelect)?.focus()
+    setFocusAfterSelect(null)
+  }, [focusAfterSelect, panelRef])
+
+  const primary = settings.slice(0, 3)
+  const visible = more ? settings : primary
+  const summary = primary.map((setting) => setting.summary).join(' · ')
+  const fullSummary = settings.map((setting) => `${setting.label}: ${setting.summary}`).join(', ')
+
+  return (
+    <div ref={containerRef} className="relative inline-flex flex-none">
+      <button
+        type="button"
+        {...triggerProps}
+        aria-haspopup="dialog"
+        aria-controls={open ? panelId : undefined}
+        aria-label={`Generation settings: ${fullSummary}`}
+        title="Generation settings"
+        onClick={() => setOpen(!open)}
+        className={PILL}
+      >
+        <SlidersHorizontal aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+        <span className={PILL_LABEL}>Settings</span>
+        <span aria-hidden className="hidden max-w-[150px] truncate text-muted-foreground @[640px]/studio-composer:inline">{summary}</span>
+        <ChevronDown aria-hidden className="h-3 w-3 shrink-0 text-muted-foreground" />
+      </button>
+
+      <PopoverSurface
+        open={open}
+        id={panelId}
+        role="dialog"
+        aria-label="Generation settings"
+        triggerRef={triggerRef}
+        panelRef={panelRef}
+        contentKey={`${active}:${more}:${customOpen}`}
+        className={`${MENU_PANEL} w-[min(320px,calc(100vw-24px))] gap-0.5`}
+      >
+        <div className={MENU_HEADER}>Generation settings</div>
+        {visible.map((setting) => {
+          const Icon = setting.icon
+          const expanded = active === setting.key
+          return (
+            <div key={setting.key}>
+              {setting.onToggle ? (
+                <button
+                  type="button"
+                  role="switch"
+                  data-setting-key={setting.key}
+                  aria-checked={setting.value === true}
+                  aria-label={setting.label}
+                  onClick={setting.onToggle}
+                  className={menuRowClass(false)}
+                >
+                  {Icon && <Icon aria-hidden className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />}
+                  <span>{setting.label}</span>
+                  <span className="ml-auto text-muted-foreground">{setting.summary}</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    data-setting-key={setting.key}
+                    aria-expanded={expanded}
+                    aria-label={`${setting.label}: ${setting.summary}`}
+                    onClick={() => {
+                      setActive(expanded ? null : setting.key)
+                      setCustomOpen(false)
+                    }}
+                    className={menuRowClass(expanded)}
+                  >
+                    {Icon && <Icon aria-hidden className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />}
+                    <span>{setting.label}</span>
+                    <span className="ml-auto truncate text-muted-foreground">{setting.summary}</span>
+                    <ChevronDown aria-hidden className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  </button>
+                  {expanded && (
+                    <div role="group" aria-label={`${setting.label} choices`} className="ml-5 max-h-64 overflow-y-auto overscroll-contain border-l border-border pl-1">
+                      {customOpen && setting.custom
+                        ? setting.custom.render({ close: () => {
+                          setActive(null)
+                          setCustomOpen(false)
+                          setFocusAfterSelect(setting.key)
+                        } })
+                        : (
+                          <>
+                            {setting.choices.map((choice, index) => (
+                              <label
+                                key={`${String(choice.value)}-${index}`}
+                                className={`${menuRowClass(choice.value === setting.value)} relative focus-within:outline focus-within:outline-2 focus-within:outline-ring`}
+                              >
+                                <input
+                                  type="radio"
+                                  name={`${panelId}-${setting.key}`}
+                                  value={String(choice.value)}
+                                  checked={choice.value === setting.value}
+                                  onChange={() => {
+                                    setting.onSelect(choice.value)
+                                    setActive(null)
+                                    setFocusAfterSelect(setting.key)
+                                  }}
+                                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                />
+                                <span className="truncate">{choice.label}</span>
+                                {choice.value === setting.value && <CheckGlyph aria-hidden className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
+                              </label>
+                            ))}
+                            {setting.custom && (
+                              <button type="button" onClick={() => setCustomOpen(true)} className={`${menuRowClass(false)} text-muted-foreground`}>
+                                {setting.custom.label}
+                              </button>
+                            )}
+                          </>
+                        )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
+        {settings.length > 3 && (
+          <button
+            type="button"
+            aria-expanded={more}
+            onClick={() => {
+              setMore(!more)
+              setActive(null)
+              setCustomOpen(false)
+            }}
+            className={`${menuRowClass(false)} text-primary`}
+          >
+            {more ? 'Less' : `More settings (${settings.length - 3})`}
+          </button>
+        )}
       </PopoverSurface>
     </div>
   )

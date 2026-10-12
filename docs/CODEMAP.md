@@ -110,7 +110,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./store`](api/store.md) | 16 | — |
 | [`./stream`](api/stream.md) | 67 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 68 | `runtime` |
-| [`./studio-react`](api/studio-react.md) | 46 | `runtime`, `studio`, `web-react` |
+| [`./studio-react`](api/studio-react.md) | 48 | `runtime`, `studio`, `web-react` |
 | [`./teams`](api/teams.md) | 35 | — |
 | [`./teams-react`](api/teams-react.md) | 10 | `brand`, `teams` |
 | [`./teams/drizzle`](api/teams-drizzle.md) | 26 | — |
@@ -1100,11 +1100,11 @@ Depends on: `runtime`
 
 ## `./studio-react`
 
-Source: `src/studio-react/index.tsx` · 46 exports
+Source: `src/studio-react/index.tsx` · 48 exports
 
 Depends on: `runtime`, `studio`, `web-react`
 
-`AudioTogglePill`, `ComposerBand`, `ComposerType`, `CustomSizeForm`, `DeferredDelete`, `downloadGenerationsViaAnchor`, `formatClock`, `GenerationHistoryState`, `GenerationNoticeChip`, `MediaTile`, `MediaTileProps`, `MediaTypeSegment`, `MediaTypeSegments`, `MediaViewerModal`, `MediaViewerModalProps`, `MenuPill`, `OptionChoice`, `OptionPill`, `optionValueLabel`, `ReferencePill`, `StudioAudioElementLike`, `StudioComposer`, `StudioComposerProps`, `StudioConfirmDialog`, `StudioConfirmDialogProps`, `StudioGenerationScreen`, `StudioGenerationScreenProps`, `StudioHistoryScreen`, `StudioHistoryScreenProps`, `StudioHomeScreen`, `StudioHomeScreenProps`, `StudioPlayback`, `StudioPlaybackProvider`, `StudioToastInput`, `StudioToastProvider`, `useBatchNavigation`, `UseBatchNavigationOptions`, `useDeferredDelete`, `UseDeferredDeleteOptions`, `useGenerationHistory`, `UseGenerationHistoryOptions`, `useStudioGenerations`, `useStudioPlayback`, `useStudioToast`, `VaultPathPopover`, `VaultPathPopoverProps`
+`AudioTogglePill`, `ComposerBand`, `ComposerType`, `CustomSizeForm`, `DeferredDelete`, `downloadGenerationsViaAnchor`, `formatClock`, `GenerationHistoryState`, `GenerationNoticeChip`, `GenerationSetting`, `GenerationSettings`, `MediaTile`, `MediaTileProps`, `MediaTypeSegment`, `MediaTypeSegments`, `MediaViewerModal`, `MediaViewerModalProps`, `MenuPill`, `OptionChoice`, `OptionPill`, `optionValueLabel`, `ReferencePill`, `StudioAudioElementLike`, `StudioComposer`, `StudioComposerProps`, `StudioConfirmDialog`, `StudioConfirmDialogProps`, `StudioGenerationScreen`, `StudioGenerationScreenProps`, `StudioHistoryScreen`, `StudioHistoryScreenProps`, `StudioHomeScreen`, `StudioHomeScreenProps`, `StudioPlayback`, `StudioPlaybackProvider`, `StudioToastInput`, `StudioToastProvider`, `useBatchNavigation`, `UseBatchNavigationOptions`, `useDeferredDelete`, `UseDeferredDeleteOptions`, `useGenerationHistory`, `UseGenerationHistoryOptions`, `useStudioGenerations`, `useStudioPlayback`, `useStudioToast`, `VaultPathPopover`, `VaultPathPopoverProps`
 
 [Full API →](api/studio-react.md)
 

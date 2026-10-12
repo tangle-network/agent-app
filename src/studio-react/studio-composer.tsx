@@ -1,13 +1,14 @@
 /**
  * The studio composer: one chat-shaped card — prompt, media-type switch, and a
- * band of option pills — that replaces the stacked field panel.
+ * band with a model picker and compact generation settings — replacing the
+ * stacked field panel.
  *
- * The whole point of the rework is that the CONTROLS ARE THE MODEL'S OWN. A pill
- * renders only when the selected model publishes that parameter, its choices are
+ * The controls are the model's own. A setting renders only when the selected
+ * model publishes that parameter, its choices are
  * the published enum (or the published range), and the value goes onto the wire
  * exactly as published — seedance takes the string `'5'`, veo `'8s'`, kling the
  * number `5`, and coercing any of them is a 400 from the provider. A model that
- * publishes nothing (`ltx-video`) shows the model pill and nothing else: the
+ * publishes nothing (`ltx-video`) shows the model picker and nothing else: the
  * honest reading of "we do not know what this takes" is an absent control, not
  * an invented one and not a disabled one.
  */
@@ -56,12 +57,12 @@ import {
   userSafeGenerationMessage,
 } from '../studio'
 import {
-  AudioTogglePill,
   ComposerBand,
   CustomSizeForm,
+  GenerationSettings,
   MediaTypeSegments,
-  OptionPill,
   ReferencePill,
+  type GenerationSetting,
   type MediaTypeSegment,
   type OptionChoice,
   optionValueLabel,
@@ -85,9 +86,9 @@ const SEGMENTS: readonly MediaTypeSegment<ComposerType>[] = [
   { type: 'speech', label: 'Audio', icon: AudioLines },
 ]
 
-/** Pill order per lane. A parameter absent from the model's metadata, or marked
- *  `supported: false`, drops out of the row entirely. */
-const PILL_ORDER: Record<ComposerType, readonly string[]> = {
+/** Parameter order per lane. A parameter absent from the model's metadata, or
+ * marked `supported: false`, drops out of settings entirely. */
+const PARAM_ORDER: Record<ComposerType, readonly string[]> = {
   image: ['size', 'quality', 'n'],
   video: ['duration', 'resolution', 'aspect_ratio', 'mode'],
   speech: ['voice', 'speed'],
@@ -178,7 +179,7 @@ function pickerModel(model: MediaModelOption, type: ComposerType): CatalogModel 
  *  menu. */
 function visibleParams(type: ComposerType, options: ModelOptionsMetadata | undefined): string[] {
   if (!options) return []
-  return PILL_ORDER[type].filter((param) => {
+  return PARAM_ORDER[type].filter((param) => {
     const meta = options[param]
     return Boolean(meta) && meta?.supported !== false
   })
@@ -581,6 +582,55 @@ export function StudioComposer({
   const modelUnavailable = laneDown || modelOption?.status === 'unavailable'
   const canReloadModels = Boolean(workspaceId) && !loadingModels && Boolean(catalogError || (catalogReady && curatedModels.length === 0))
 
+  // Put the visible video defaults first; extra model parameters stay behind
+  // More. The model's own metadata supplies every choice and wire-typed value.
+  const settingParams = type === 'video'
+    ? ['aspect_ratio', 'duration', ...params.filter((param) => param !== 'aspect_ratio' && param !== 'duration')]
+      .filter((param) => params.includes(param))
+    : params
+  const settings: GenerationSetting[] = settingParams.map((param) => {
+    const value = values[param] ?? options?.[param]?.default
+    const choices = choicesForSetting(param, options?.[param], value)
+    const label = PARAM_LABELS[param] ?? param
+    return {
+      key: param,
+      label,
+      summary: choices.find((choice) => choice.value === value)?.label ?? '—',
+      value,
+      choices,
+      onSelect: (next) => setOption(param, next),
+      icon: PARAM_ICONS[param] ?? SlidersHorizontal,
+      ...(param === 'size' && supportsCustomImageSize(modelId) ? {
+        custom: {
+          label: 'Custom…',
+          render: ({ close }: { close: () => void }) => (
+            <CustomSizeForm
+              initial={asText(value)}
+              onApply={(size) => {
+                setOption('size', size)
+                close()
+              }}
+              onCancel={close}
+            />
+          ),
+        },
+      } : {}),
+    }
+  })
+  if (audioSupported) {
+    const audioOn = (values.audio ?? audioMeta?.default) === true
+    settings.splice(Math.min(2, settings.length), 0, {
+      key: 'audio',
+      label: 'Audio',
+      summary: audioOn ? 'Audio on' : 'Audio off',
+      value: audioOn,
+      choices: [],
+      onSelect: (next) => setOption('audio', next),
+      onToggle: () => setOption('audio', !audioOn),
+      icon: AudioLines,
+    })
+  }
+
   function reloadModels() {
     if (!workspaceId || catalogLoading || catalogPendingRef.current) return
     catalogPendingRef.current = true
@@ -654,40 +704,9 @@ export function StudioComposer({
             </div>
           )}
 
-          {params.map((param) => (
-            <div key={`${type}-${param}`} className="studio-pill-in flex-none">
-              <OptionPill
-                label={PARAM_LABELS[param] ?? param}
-                icon={PARAM_ICONS[param] ?? SlidersHorizontal}
-                value={values[param]}
-                choices={choicesForPill(param, options?.[param], values[param])}
-                onSelect={(value) => setOption(param, value)}
-                bandRef={bandRef}
-                custom={param === 'size' && supportsCustomImageSize(modelId)
-                  ? {
-                    label: 'Custom…',
-                    render: ({ close }) => (
-                      <CustomSizeForm
-                        initial={asText(values.size)}
-                        onApply={(size) => {
-                          setOption('size', size)
-                          close()
-                        }}
-                        onCancel={close}
-                      />
-                    ),
-                  }
-                  : undefined}
-              />
-            </div>
-          ))}
-
-          {audioSupported && (
-            <div key={`${type}-audio`} className="studio-pill-in flex-none">
-              <AudioTogglePill
-                on={values.audio === true}
-                onToggle={(on) => setOption('audio', on)}
-              />
+          {settings.length > 0 && (
+            <div className="studio-pill-in flex-none">
+              <GenerationSettings settings={settings} bandRef={bandRef} resetKey={`${type}:${modelId}`} />
             </div>
           )}
 
@@ -741,10 +760,10 @@ function asWireScalar(value: ModelOptionValue | undefined): string | number | un
   return typeof value === 'string' || typeof value === 'number' ? value : undefined
 }
 
-/** The pill's rows: the published choices, plus the current value when it is a
- *  legal off-enum one (a custom gpt-image-2 size), so the pill reports what is
+/** A setting's choices: the published values, plus the current value when it is a
+ *  legal off-enum one (a custom gpt-image-2 size), so the row reports what is
  *  actually selected instead of falling back to a dash. */
-function choicesForPill(
+function choicesForSetting(
   param: string,
   meta: ModelOptionMetadata | undefined,
   value: ModelOptionValue | undefined,

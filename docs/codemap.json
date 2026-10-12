@@ -21580,6 +21580,18 @@
           "doc": "The one thing a chat-shaped generator has to say about itself: each prompt is a fresh generation, and nothing carries over from the last one."
         },
         {
+          "name": "GenerationSetting",
+          "kind": "interface",
+          "signature": "interface GenerationSetting",
+          "doc": null
+        },
+        {
+          "name": "GenerationSettings",
+          "kind": "function",
+          "signature": "({ settings, bandRef, resetKey, }: { settings: readonly GenerationSetting[]; bandRef: RefObject<HTMLDivElement | null>;…",
+          "doc": "The model's current defaults and optional parameters in one compact menu."
+        },
+        {
           "name": "MediaTile",
           "kind": "function",
           "signature": "({ generation, context, onOpen, actions, aspectRatio, waveformBars, selectMode, selected, onToggleSelect, onRequestDele…",

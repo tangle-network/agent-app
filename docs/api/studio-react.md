@@ -4,7 +4,7 @@
 
 Source: `src/studio-react/index.tsx`
 
-46 exports.
+48 exports.
 
 ### `AudioTogglePill`
 
@@ -76,6 +76,22 @@ interface GenerationHistoryState
 
 ```ts
 ({ className }: { className?: string | undefined; }) => Element
+```
+
+### `GenerationSetting`
+
+`interface`
+
+```ts
+interface GenerationSetting
+```
+
+### `GenerationSettings`
+
+`function` — The model's current defaults and optional parameters in one compact menu.
+
+```ts
+({ settings, bandRef, resetKey, }: { settings: readonly GenerationSetting[]; bandRef: RefObject<HTMLDivElement | null>;…
 ```
 
 ### `MediaTile`
