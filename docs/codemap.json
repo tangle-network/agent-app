@@ -26112,7 +26112,7 @@
           "name": "ProviderLogo",
           "kind": "function",
           "signature": "({ provider, size }: ProviderLogoProps) => ReactNode",
-          "doc": "Real brand mark when we have one; tinted monogram otherwise."
+          "doc": "The shared brand mark when one is bundled; a tinted monogram otherwise."
         },
         {
           "name": "ProviderLogoProps",

@@ -2688,7 +2688,7 @@ interface ProvenanceValueProps
 
 ### `ProviderLogo`
 
-`function` — Real brand mark when we have one; tinted monogram otherwise.
+`function` — The shared brand mark when one is bundled; a tinted monogram otherwise.
 
 ```ts
 ({ provider, size }: ProviderLogoProps) => ReactNode
