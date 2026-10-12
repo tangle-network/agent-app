@@ -5539,14 +5539,25 @@ describe('warm reuse round trips', () => {
   })
 
   it('renews a recovered box itself when the probe found the reused box dead', async () => {
+    const lifecycle: string[] = []
+    let resumed = false
     const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
-    const exec = vi.fn()
-      .mockResolvedValueOnce({ stdout: '', stderr: 'dead', exitCode: 1 })
-      .mockResolvedValueOnce({ stdout: '', stderr: 'dead', exitCode: 1 })
-      .mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
-    const running = fakeBox({ exec, setRuntimeEnv, sessions: vi.fn().mockResolvedValue([]) } as unknown as Partial<SandboxInstance>)
-    running.stop = vi.fn().mockResolvedValue(undefined) as never
-    running.resume = vi.fn().mockResolvedValue(undefined) as never
+    const exec = vi.fn().mockImplementation(async () => {
+      lifecycle.push(resumed ? 'probe:alive' : 'probe:dead')
+      return resumed
+        ? { stdout: 'alive', stderr: '', exitCode: 0 }
+        : { stdout: '', stderr: 'dead', exitCode: 1 }
+    })
+    const sessions = vi.fn().mockImplementation(async () => {
+      lifecycle.push('sessions:idle')
+      return []
+    })
+    const running = fakeBox({ exec, setRuntimeEnv, sessions } as unknown as Partial<SandboxInstance>)
+    running.stop = vi.fn().mockImplementation(async () => { lifecycle.push('stop') }) as never
+    running.resume = vi.fn().mockImplementation(async () => {
+      lifecycle.push('resume')
+      resumed = true
+    }) as never
     listMock.mockImplementation(({ status }: { status: string }) =>
       status === 'running' ? Promise.resolve([running]) : Promise.resolve([]))
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
@@ -5555,7 +5566,10 @@ describe('warm reuse round trips', () => {
     })
 
     await expect(ensureWorkspaceSandbox(shell, scope)).resolves.toBe(running)
+    expect(lifecycle).toEqual(['probe:dead', 'sessions:idle', 'stop', 'resume', 'probe:alive'])
     expect(running.stop).toHaveBeenCalledOnce()
+    expect(running.resume).toHaveBeenCalledOnce()
+    expect(running.delete).not.toHaveBeenCalled()
     // Once while the first probe ran, once on the recovered box.
     expect(setRuntimeEnv).toHaveBeenCalledTimes(2)
     expect(setRuntimeEnv).toHaveBeenLastCalledWith({ APP_TOKEN: 'renewed' })
