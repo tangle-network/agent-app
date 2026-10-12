@@ -113,3 +113,17 @@ export async function settleText(
     await wait(500)
   }
 }
+
+/**
+ * The text a composer holds. A `<textarea>` or `<input>` (agent-app's own
+ * ChatComposer) keeps typed text in `.value` and leaves `innerText` empty; a
+ * contenteditable composer keeps it in `innerText`. Reading only `innerText`
+ * failed every first chat turn on the default composer (Casework C1/C5,
+ * 2026-10-12).
+ */
+export async function composerText(box: { evaluate<R>(fn: (el: Element) => R): Promise<R> }): Promise<string> {
+  return box.evaluate((el) => {
+    const field = el as Element & { value?: unknown; innerText?: string }
+    return typeof field.value === 'string' ? field.value : (field.innerText ?? el.textContent ?? '')
+  })
+}

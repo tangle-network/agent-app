@@ -24,7 +24,7 @@ import { loadJourneysConfig, resolveJourneysConfig, threadRouteIn, type Journeys
 import { promptHead, readChatPage } from './page-reading.js'
 import { scoreTurn, turnLooksActive, TurnEvidence, type TranscriptSnapshot, type TurnOutcome } from './score.js'
 import { assertNoSecrets, scrubTrace } from './scrub.js'
-import { clickUntilSubmitted, createSubmissionTracker, settleText } from './send.js'
+import { clickUntilSubmitted, composerText, createSubmissionTracker, settleText } from './send.js'
 import { secretNeedles, storageStateFor } from './session.js'
 import { postProcessVideo, type Chapter } from './video.js'
 
@@ -274,7 +274,7 @@ export class Journey {
         const line = lines[i]!
         if (line) await box.pressSequentially(line, { delay: attempt === 0 ? delay : 0, timeout: 30_000 + line.length * (delay + 60) })
       }
-      const text = (await box.innerText().catch(() => '')).replace(/\s+/g, ' ').trim()
+      const text = (await composerText(box).catch(() => '')).replace(/\s+/g, ' ').trim()
       if (text.includes(want)) return
       await sleep(1_000)
     }
