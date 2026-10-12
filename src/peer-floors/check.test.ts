@@ -156,7 +156,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('4.0.0', range!)).toBe(false)
   })
 
-  it('supports the verified Runtime 0.282, 0.283, 0.285, 0.289, 0.291, and 0.293 lines', async () => {
+  it('admits only the Runtime lines that export every subpath this package imports', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -164,29 +164,15 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    // The OIDC caller is verified against published Runtime 0.282.2 and 0.283.0.
-    expect(satisfiesRange('0.281.999', range!)).toBe(false)
-    expect(satisfiesRange('0.282.0', range!)).toBe(false)
-    expect(satisfiesRange('0.282.2', range!)).toBe(true)
-    expect(satisfiesRange('0.282.999', range!)).toBe(true)
-    expect(satisfiesRange('0.283.0', range!)).toBe(true)
-    expect(satisfiesRange('0.283.999', range!)).toBe(true)
-    expect(satisfiesRange('0.284.0', range!)).toBe(false)
-    expect(satisfiesRange('0.284.999', range!)).toBe(false)
-    expect(satisfiesRange('0.285.0', range!)).toBe(true)
-    expect(satisfiesRange('0.285.999', range!)).toBe(true)
-    expect(satisfiesRange('0.286.0', range!)).toBe(false)
-    expect(satisfiesRange('0.289.0', range!)).toBe(false)
-    expect(satisfiesRange('0.289.1', range!)).toBe(true)
-    expect(satisfiesRange('0.289.999', range!)).toBe(true)
-    expect(satisfiesRange('0.290.0', range!)).toBe(false)
-    expect(satisfiesRange('0.290.999', range!)).toBe(false)
-    expect(satisfiesRange('0.291.0', range!)).toBe(true)
-    expect(satisfiesRange('0.291.999', range!)).toBe(true)
-    expect(satisfiesRange('0.292.0', range!)).toBe(false)
-    expect(satisfiesRange('0.293.0', range!)).toBe(true)
-    expect(satisfiesRange('0.293.999', range!)).toBe(true)
-    expect(satisfiesRange('0.294.0', range!)).toBe(false)
+    // 0.282-0.313 were verified for the OIDC caller, but ./runtime/router-turn imports
+    // ./placement (0.315.0) and ./workspace-store/d1 imports ./workspace-store (0.316.0):
+    // an app on those lines installs and then fails at import (tests/runtime-peer-floor.test.ts).
+    expect(satisfiesRange('0.282.2', range!)).toBe(false)
+    expect(satisfiesRange('0.313.3', range!)).toBe(false)
+    expect(satisfiesRange('0.315.1', range!)).toBe(false)
+    expect(satisfiesRange('0.316.0', range!)).toBe(true)
+    expect(satisfiesRange('0.317.0', range!)).toBe(true)
+    expect(satisfiesRange('0.318.0', range!)).toBe(false)
   })
 
   it('admits the tcloud line used by the Sandbox 0.59 consumer', async () => {
