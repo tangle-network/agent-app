@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.125
+
+- fix: make agent-app main green (#1063)
+
 ## 0.60.124
 
 - perf(agent-profiles): admitProfileTurn takes a read handle instead of re-reading pin and binding (#1058)
