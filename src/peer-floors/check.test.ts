@@ -264,7 +264,10 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.132.3', range!)).toBe(false)
     expect(satisfiesRange('0.133.0', range!)).toBe(true)
     expect(satisfiesRange('0.133.4', range!)).toBe(true)
-    expect(satisfiesRange('0.134.0', range!)).toBe(false)
+    // 0.134.0 adds WorkspaceSurface and WorkspaceArtifactView without breaking a 0.133 export;
+    // this package builds and tests against it.
+    expect(satisfiesRange('0.134.0', range!)).toBe(true)
+    expect(satisfiesRange('0.135.0', range!)).toBe(false)
   })
 
   it('requires the UI release that exports TRANSCRIPT_TEXT and ApprovalDiffSummary', async () => {

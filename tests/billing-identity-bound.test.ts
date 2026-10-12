@@ -294,6 +294,23 @@ function makeHarness() {
 }
 
 describe('createIdentityBoundWorkspaceKeyManager', () => {
+  it('never returns a key that expired while its secret was being decrypted', async () => {
+    const h = makeHarness()
+    const first = await h.manager('router').ensureKey(h.identity())
+    expect(first.refreshed).toBe(true)
+    // The decrypt resolves after the key's expiry: the manager must mint again, not hand the stale key out.
+    const slow = h.manager('router', { crypto: {
+      async encrypt(secret: string) { return `encrypted:${secret}` },
+      async decrypt(secret: string) {
+        h.setNow(Date.parse(first.usage.expiresAt) + 1)
+        return secret.slice('encrypted:'.length)
+      },
+    } })
+    const second = await slow.ensureKey(h.identity())
+    expect(second.refreshed).toBe(true)
+    expect(second.key).not.toBe(first.key)
+  })
+
   it('serializes concurrent issuance and partitions products', async () => {
     const h = makeHarness()
     const router = h.manager('router')

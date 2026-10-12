@@ -118,6 +118,8 @@ export interface ExportUnit {
   archive?: { files: number; bytes: number; blanked: string[]; excluded?: number }
   /** Times the source asked to be retried later (a busy sandbox) without spending an attempt. */
   deferrals?: number
+  /** Epoch ms before which a deferred source is not tried again. */
+  retryAt?: number
   redactions: number
   error?: string
 }

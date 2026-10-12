@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.60.128",
+  "version": "0.60.139",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -44,6 +44,7 @@
     "agent-app-verify-proof": "./dist/signoff/proof-cli.js",
     "tangle-agent": "bin/tangle-agent.mjs",
     "agent-app-invariants": "./dist/launch-invariants/cli.js",
+    "agent-app-rollout-check": "./dist/rollout/cli.js",
     "agent-app-journeys": "./dist/journeys/cli.js"
   },
   "exports": {
@@ -277,6 +278,16 @@
       "types": "./dist/launch-invariants/index.d.ts",
       "import": "./dist/launch-invariants/index.js",
       "default": "./dist/launch-invariants/index.js"
+    },
+    "./rollout": {
+      "types": "./dist/rollout/index.d.ts",
+      "import": "./dist/rollout/index.js",
+      "default": "./dist/rollout/index.js"
+    },
+    "./rollout/d1": {
+      "types": "./dist/rollout/d1.d.ts",
+      "import": "./dist/rollout/d1.js",
+      "default": "./dist/rollout/d1.js"
     },
     "./launch-invariants/testing": {
       "types": "./dist/launch-invariants/testing.d.ts",
@@ -686,11 +697,11 @@
     "@tangle-network/agent-knowledge": "20.0.0",
     "@tangle-network/agent-profile-materialize": "0.22.0",
     "@tangle-network/agent-runtime": "0.318.0",
-    "@tangle-network/brand": "1.21.1",
+    "@tangle-network/brand": "1.24.2",
     "@tangle-network/hub-sdk": "0.28.0",
     "@tangle-network/sandbox": "0.60.22",
-    "@tangle-network/sandbox-ui": "0.133.0",
-    "@tangle-network/ui": "11.32.0",
+    "@tangle-network/sandbox-ui": "0.134.2",
+    "@tangle-network/ui": "11.33.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.6",
@@ -761,7 +772,7 @@
     "@tangle-network/brand": ">=1.21.1",
     "@tangle-network/hub-sdk": ">=0.19.3 <0.21.0 || >=0.21.0 <0.22.0 || >=0.22.1 <0.25.0 || >=0.27.0 <0.28.0 || >=0.28.0 <0.29.0",
     "@tangle-network/sandbox": ">=0.45.0 <0.48.0 || ^0.49.0 || ^0.50.0 || ^0.51.0 || ^0.52.0 || ^0.53.0 || ^0.54.0 || ^0.55.0 || >=0.58.1 <0.60.0 || >=0.60.3 <0.61.0",
-    "@tangle-network/sandbox-ui": ">=0.133.0 <0.134.0",
+    "@tangle-network/sandbox-ui": ">=0.133.0 <0.135.0",
     "@tangle-network/ui": ">=11.32.0 <12.0.0",
     "@tiptap/core": ">=3.28.0 <4.0.0",
     "@tiptap/extension-mention": ">=3.28.0 <4.0.0",

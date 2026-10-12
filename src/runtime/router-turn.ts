@@ -20,11 +20,13 @@
  */
 import { streamAppToolLoop, type LoopEvent, type LoopMessage, type LoopToolCall, type ToolLoopStopReason } from './loop'
 import { DEFAULT_TANGLE_ROUTER_BASE_URL } from './model'
-import { createOpenAICompatCompletionTurn, createOpenAICompatStreamTurn } from './openai-stream'
+import { createOpenAICompatCompletionTurn, createOpenAICompatStreamTurn, createOpenAIResponsesTurn, isOpenAIResponsesModel } from './openai-stream'
 import { turnKnowledgeInstructions, type TurnKnowledgeFile } from './turn-knowledge'
+import { replyLanguageInstruction } from './reply-language'
 import { placeExecution, type PlacementRecord, type VacuousAxis } from '@tangle-network/agent-runtime/placement'
 export { DURABLE_HOP_BUDGET_MS, turnCheckpointPath, workspaceTurnCheckpoints, type CheckpointWorkspaceStore, type TurnCheckpointStore } from './turn-continuation'
 export { budgetTurnKnowledge, turnKnowledgeInstructions, workspaceKnowledgeForTurn, type TurnKnowledgeBudget, type TurnKnowledgeFile } from './turn-knowledge'
+export { asksForLanguage, replyLanguageInstruction } from './reply-language'
 
 /** A tool the turn may call. Structurally an `McpToolDefinition` whose env is already bound. */
 export interface RouterTurnTool {
@@ -43,6 +45,8 @@ export interface RouterTurnToolContext {
    * outcome's `toolEvents`. Events sent after the call settles are dropped.
    */
   emit(kind: string, data?: unknown): void
+  /** The sender's message this turn answers, so a tool can act only on what was asked (see {@link asksForLanguage}). */
+  userMessage: string
 }
 
 /** One side event a tool reported while it ran. */
@@ -57,6 +61,8 @@ export interface RouterTurnToolEvent {
 /** What the turn is doing, in the order it happens, for a live view. */
 export type RouterTurnEvent =
   | { type: 'text'; segment: number; delta: string }
+  /** Hidden reasoning the model streamed (`reasoning_content` / `thinking`), for a thinking view. Never part of the answer. */
+  | { type: 'reasoning'; delta: string }
   | { type: 'tool'; callId: string; toolName: string; status: 'running'; input: Record<string, unknown>; startedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'completed'; output: unknown; startedAt: number; endedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'error'; error: { code: string; message: string }; startedAt: number; endedAt: number }
@@ -70,6 +76,9 @@ export interface RouterTurnFailure {
   code: string
   status?: number
   message: string
+  /** The model service's own error text, at most 200 characters (e.g. `key_budget_exhausted`), so an app can
+   *  tell a spend cap from a missing balance. Never a credential. */
+  detail?: string
 }
 
 export interface RouterTurnOutcome {
@@ -80,6 +89,8 @@ export interface RouterTurnOutcome {
   toolCalls: Array<{ callId: string; toolName: string; ok: boolean }>
   /** Token use summed over every model call in the turn, as the router reported it. */
   usage: { promptTokens: number; completionTokens: number; modelCalls: number }
+  /** Reasoning the turn streamed (deltas and characters). Zero when the model sent none; absent when no model was called. */
+  reasoning?: { deltas: number; chars: number }
   /** Every side event the turn's tools reported, in order (at most 500). */
   toolEvents: RouterTurnToolEvent[]
   failure?: RouterTurnFailure
@@ -191,9 +202,27 @@ export interface RouterTurnOptions {
    * with `placement` and failure `placement_sandbox`, so the app runs it there instead.
    */
   placement?: Omit<RouterTurnPlacementInput, 'toolNames'>
+  temperature?: number
+  /** Models tried in order when a model call fails before any word or tool, or answers blank. Without it,
+   *  that safe repeat uses `model` again. `repeat: false` turns both off. */
+  fallbackModels?: readonly string[]
+  /** Resend one model request that answered 408, 425, 429 or 5xx, or failed to connect, before its stream
+   *  began, with exponential backoff (a `retry-after` up to 8 s is honoured). `attempts` counts the first
+   *  send (default 1). `timeoutMs` bounds each attempt, stream included. */
+  retry?: { attempts?: number; timeoutMs?: number; baseDelayMs?: number }
+  /** Characters of one tool result the model reads when no `renderToolResult` is given. Default 12 000. */
+  toolResultLimit?: number
+  /**
+   * Which model API carries the turn. `auto` (default) uses the Responses API for an OpenAI model asked to
+   * reason (`reasoningEffort` other than `none`), since OpenAI returns reasoning summaries only there, and
+   * chat completions otherwise. A buffered turn (`stream: false`) always uses chat completions.
+   */
+  api?: 'auto' | 'chat' | 'responses'
 }
 
 const DEFAULT_BUDGET_MS = 90_000
+const RETRY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
+const MAX_RETRY_DELAY_MS = 8_000
 const TOOL_EVENT_LIMIT = 500
 /** Marks a tool's typed event inside a loop progress update. */
 const TOOL_EVENT = '__routerTurnToolEvent'
@@ -219,7 +248,8 @@ export function composeRouterTurnPrompt(
   } = {},
 ): string {
   const knowledge = options.knowledge ? turnKnowledgeInstructions(options.knowledge.files, { readTool: options.knowledge.readTool }) : []
-  const text = [profile.prompt?.systemPrompt ?? '', ...(profile.prompt?.instructions ?? []), ...knowledge, ...(options.context ?? [])]
+  const text = [profile.prompt?.systemPrompt ?? '', ...(profile.prompt?.instructions ?? []), ...knowledge,
+    replyLanguageInstruction(), ...(options.context ?? [])]
     .filter(part => part.trim()).join('\n\n')
   return [...(options.toolNames ?? [])].sort((a, b) => b.length - a.length)
     .reduce((out, name) => out.split(name).join(routerFunctionName(name)), text)
@@ -238,15 +268,18 @@ function defaultToolError(error: unknown): { code: string; message: string; stat
   return null
 }
 
-function renderResult(outcome: RouterTurnToolOutcome): string {
+function renderResult(outcome: RouterTurnToolOutcome, limit = TOOL_RESULT_LIMIT): string {
   if (!outcome.ok) return `Error (${outcome.code}): ${outcome.message}`
   let text: string
   try { text = typeof outcome.result === 'string' ? outcome.result : JSON.stringify(outcome.result ?? null) }
   catch { text = String(outcome.result) }
-  return text.length > TOOL_RESULT_LIMIT ? `${text.slice(0, TOOL_RESULT_LIMIT)}…` : text
+  return text.length > limit ? `${text.slice(0, limit)}…` : text
 }
 
 export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterTurnOutcome> {
+  // A continued turn answers the last user message in its checkpoint.
+  const lastUser = options.continueFrom?.messages.filter(message => message.role === 'user').at(-1)?.content
+  const currentUserMessage = options.continueFrom ? (typeof lastUser === 'string' ? lastUser : '') : options.userMessage
   const placement = options.placement
     ? placeRouterTurn({ ...options.placement, toolNames: (options.tools ?? []).map(tool => tool.name) })
     : undefined
@@ -262,10 +295,37 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const emit = options.onEvent ?? (() => {})
   const { signal } = options
   // A cancelled turn sends nothing more, whatever the injected fetch does with the signal.
-  const fetchImpl: typeof fetch | undefined = signal
+  const attempts = Math.max(1, Math.floor(options.retry?.attempts ?? 1))
+  const attemptTimeoutMs = options.retry?.timeoutMs
+  const baseDelayMs = options.retry?.baseDelayMs ?? 500
+  const pause = (ms: number) => new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason)
+    const timer = setTimeout(resolve, ms)
+    signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason) }, { once: true })
+  })
+  const fetchImpl: typeof fetch | undefined = signal || attempts > 1 || attemptTimeoutMs
     ? async (input, init) => {
-      signal.throwIfAborted()
-      return (options.fetchImpl ?? fetch)(input, { ...init, signal })
+      for (let attempt = 1; ; attempt++) {
+        signal?.throwIfAborted()
+        const signals = [signal, attemptTimeoutMs ? AbortSignal.timeout(attemptTimeoutMs) : undefined]
+          .filter((value): value is AbortSignal => Boolean(value))
+        const attemptSignal = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
+        const backoff = () => Math.min(MAX_RETRY_DELAY_MS, baseDelayMs * 2 ** (attempt - 1)) * (0.5 + Math.random() / 2)
+        let response: Response
+        try {
+          // A cancelled turn sends nothing more, whatever the injected fetch does with the signal.
+          response = await (options.fetchImpl ?? fetch)(input, { ...init, ...(attemptSignal ? { signal: attemptSignal } : {}) })
+        } catch (error) {
+          if (signal?.aborted || attempt >= attempts) throw error
+          await pause(backoff())
+          continue
+        }
+        // Nothing has streamed yet, so a resend repeats no word and no tool.
+        if (attempt >= attempts || !RETRY_STATUS.has(response.status)) return response
+        const retryAfter = Number(response.headers.get('retry-after'))
+        await response.body?.cancel().catch(() => {})
+        await pause(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, MAX_RETRY_DELAY_MS) : backoff())
+      }
     }
     : options.fetchImpl
   const extraBody = {
@@ -279,10 +339,15 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     if (!byFunction.has(fn)) byFunction.set(fn, tool)
   }
   let servedModel: string | null = null
-  const streamTurn = (options.stream === false ? createOpenAICompatCompletionTurn : createOpenAICompatStreamTurn)({
+  const reasoningAsked = Boolean(options.reasoningEffort) && options.reasoningEffort !== 'none'
+  const useResponses = (model: string) => options.stream !== false &&
+    (options.api === 'responses' || ((options.api ?? 'auto') === 'auto' && reasoningAsked && isOpenAIResponsesModel(model)))
+  const streamTurnFor = (model: string) => (options.stream === false ? createOpenAICompatCompletionTurn
+    : useResponses(model) ? createOpenAIResponsesTurn : createOpenAICompatStreamTurn)({
     baseUrl: options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL,
     apiKey,
-    model: options.model,
+    model,
+    ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
     tools: [...byFunction.entries()].map(([name, tool]) => ({
       type: 'function', function: { name, description: tool.description, parameters: tool.inputSchema },
     })),
@@ -293,6 +358,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   })
   const segments: string[] = []
   const usage = { promptTokens: 0, completionTokens: 0, modelCalls: 0 }
+  // How much reasoning the turn streamed: the number an app logs to measure reasoning coverage.
+  const reasoning = { deltas: 0, chars: 0 }
   const toolCalls: RouterTurnOutcome['toolCalls'] = []
   const toolEvents: RouterTurnToolEvent[] = []
   const started = new Map<string, number>()
@@ -303,7 +370,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const deadline = Date.now() + (options.budgetMs ?? DEFAULT_BUDGET_MS)
   const callIdOf = (id: string | undefined, toolName: string) => id ?? `${toolName}-${started.size}`
 
-  const run = async (): Promise<ToolLoopStopReason | 'tool_limit'> => {
+  const run = async (model: string): Promise<ToolLoopStopReason | 'tool_limit'> => {
+    const streamTurn = streamTurnFor(model)
     for await (const step of streamAppToolLoop<LoopEvent>({
       systemPrompt: options.systemPrompt,
       ...(options.continueFrom
@@ -316,7 +384,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       deadlineMs: deadline,
       maxToolTurns: options.maxToolTurns ?? 12,
       labelFor: call => byFunction.get(call.toolName)?.name ?? call.toolName,
-      renderResult: (label, outcome) => options.renderToolResult ? options.renderToolResult(label, outcome) : renderResult(outcome),
+      renderResult: (label, outcome) => options.renderToolResult ? options.renderToolResult(label, outcome) : renderResult(outcome, options.toolResultLimit),
       executeToolCall: async (call: LoopToolCall, context) => {
         const tool = byFunction.get(call.toolName)
         if (!tool) return { ok: false, code: 'unknown_tool', message: `No tool named ${call.toolName}` }
@@ -329,7 +397,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         // A tool's typed event rides the loop's progress channel, so it streams in order before the result.
         const emitEvent = (kind: string, data?: unknown) => context?.progress({ data: { [TOOL_EVENT]: kind, data } })
         try {
-          return { ok: true, result: await tool.run(call.args, { emit: emitEvent }) }
+          return { ok: true, result: await tool.run(call.args, { emit: emitEvent, userMessage: currentUserMessage }) }
         } catch (error) {
           const mapped = (options.toolError ?? defaultToolError)(error)
           if (mapped) return { ok: false, ...mapped }
@@ -344,6 +412,10 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           if (!segmentOpen) { segments.push(''); segmentOpen = true }
           segments[segments.length - 1] += event.text
           emit({ type: 'text', segment: segments.length, delta: event.text })
+        } else if (event.type === 'reasoning' && event.text) {
+          reasoning.deltas++
+          reasoning.chars += event.text.length
+          emit({ type: 'reasoning', delta: event.text })
         } else if (event.type === 'usage') {
           usage.promptTokens += event.usage.promptTokens
           usage.completionTokens += event.usage.completionTokens
@@ -391,23 +463,28 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
 
   const outcome = (failure?: RouterTurnFailure): RouterTurnOutcome => ({
     text: joinText([options.continueFrom?.text ?? '', ...segments]),
-    servedModel, toolCalls, usage: { ...usage }, toolEvents: [...toolEvents], ...(placement ? { placement } : {}), ...(failure ? { failure } : {}),
+    servedModel, toolCalls, usage: { ...usage }, reasoning: { ...reasoning }, toolEvents: [...toolEvents], ...(placement ? { placement } : {}), ...(failure ? { failure } : {}),
   })
   const repeat = options.repeat !== false
+  // The safe repeat walks this chain: the next fallback model, or the same model once.
+  const repeats = !repeat ? [] : options.fallbackModels?.length ? [...options.fallbackModels] : [options.model]
   let stop: ToolLoopStopReason | 'tool_limit'
   try {
     try {
-      stop = await run()
+      stop = await run(options.model)
     } catch (error) {
       // Safe to repeat only while nothing was said and no tool ran.
-      if (!repeat || signal?.aborted || toolsRan > 0 || segments.length > 0) throw error
-      stop = await run()
+      const next = repeats.shift()
+      if (next === undefined || signal?.aborted || toolsRan > 0 || segments.length > 0) throw error
+      stop = await run(next)
     }
   } catch (error) {
     if (signal?.aborted) return outcome({ code: 'turn_aborted', message: 'The turn was cancelled.' })
     const status = (error as { status?: unknown }).status
+    // The stream adapter puts the service's own text after the status; keep it, short, for the app's error categories.
+    const detail = error instanceof Error ? error.message.match(/\(HTTP \d+\): ([\s\S]*)$/)?.[1]?.slice(0, 200) : undefined
     return outcome(typeof status === 'number'
-      ? { code: `model_http_${status}`, status, message: 'The model service did not answer.' }
+      ? { code: `model_http_${status}`, status, message: 'The model service did not answer.', ...(detail ? { detail } : {}) }
       : { code: 'model_unavailable', message: 'The model service did not answer.' })
   }
   if (stop === 'deadline' && checkpoint) {
@@ -420,8 +497,9 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   // 53 "remember" turns, 2026-10-11). Nothing was said and nothing ran, so one repeat is safe;
   // an answer still blank is a typed failure, never a successful empty reply.
   if (!segments.some(part => part.trim()) && !options.continueFrom?.text.trim()) {
-    if (toolsRan === 0 && repeat) {
-      try { stop = await run() } catch { stop = 'completed' }
+    const next = repeats.shift()
+    if (toolsRan === 0 && next !== undefined) {
+      try { stop = await run(next) } catch { stop = 'completed' }
       if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
     }
     if (!segments.some(part => part.trim())) {

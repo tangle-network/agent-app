@@ -1074,6 +1074,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               <section
                 aria-labelledby={treeHeadingId}
                 data-vault-tree-surface
+                data-slot="card"
                 className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-raised"
               >
                 <div className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-3">
@@ -1113,7 +1114,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={canSearchContent ? `Search ${noun} names and text…` : `Search ${noun}…`}
                     aria-label={`Search ${noun}`}
-                    className="h-8 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:text-base"
+                    className="h-8 w-full rounded-md border border-[var(--field-border,var(--color-border))] bg-[var(--well,var(--color-input))] px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:text-base"
                   />
                 </div>
                 {activeFolder && canCreate && (

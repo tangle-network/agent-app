@@ -9640,6 +9640,24 @@
           "doc": null
         },
         {
+          "name": "JourneySummary",
+          "kind": "interface",
+          "signature": "interface JourneySummary",
+          "doc": "A run's summary, as an app's journey runner writes it."
+        },
+        {
+          "name": "JourneySummaryEntry",
+          "kind": "interface",
+          "signature": "interface JourneySummaryEntry",
+          "doc": "One journey in a run's `summary.json`."
+        },
+        {
+          "name": "LEGACY_SCOREBOARD_APP",
+          "kind": "const",
+          "signature": "\"hardware\"",
+          "doc": "Rows a store wrote before the board was shared, with no `app` field, belong to this app."
+        },
+        {
           "name": "loadJourneysConfig",
           "kind": "function",
           "signature": "(dir?: any, env?: Record<string, string | undefined>) => Promise<ResolvedJourneysConfig>",
@@ -9698,6 +9716,54 @@
           "kind": "function",
           "signature": "(routePath: string) => string[]",
           "doc": "Paths a submission from `routePath` lands on: the route itself and its single-fetch `.data` form."
+        },
+        {
+          "name": "SCOREBOARD_STATUSES",
+          "kind": "const",
+          "signature": "readonly [\"pass\", \"fail\", \"stall\", \"blocked-host\", \"blocked\", \"skipped\", \"unrecorded\"]",
+          "doc": "The readiness scoreboard writer: one run's journey summary as the writes that put it on the shared board, so every app's rows land in one schema."
+        },
+        {
+          "name": "scoreboardDocId",
+          "kind": "function",
+          "signature": "(app: string, flowId: string, legacyIds?: boolean) => string",
+          "doc": "The document id a flow row lives at."
+        },
+        {
+          "name": "scoreboardMetaId",
+          "kind": "function",
+          "signature": "(app: string, legacyIds?: boolean) => string",
+          "doc": "The `meta` document an app's run facts live at."
+        },
+        {
+          "name": "ScoreboardOptions",
+          "kind": "interface",
+          "signature": "interface ScoreboardOptions",
+          "doc": null
+        },
+        {
+          "name": "ScoreboardResult",
+          "kind": "interface",
+          "signature": "interface ScoreboardResult",
+          "doc": null
+        },
+        {
+          "name": "scoreboardRows",
+          "kind": "function",
+          "signature": "(summary: JourneySummary, options: ScoreboardOptions) => ScoreboardResult",
+          "doc": null
+        },
+        {
+          "name": "ScoreboardStatus",
+          "kind": "type",
+          "signature": "type ScoreboardStatus",
+          "doc": null
+        },
+        {
+          "name": "ScoreboardWrite",
+          "kind": "interface",
+          "signature": "interface ScoreboardWrite",
+          "doc": "One entry of an artifact store batch, in the shape the batch write takes."
         },
         {
           "name": "scoreTurn",
@@ -12435,6 +12501,12 @@
           "doc": "Describe the billable balance state including overage permission and remaining USD balance"
         },
         {
+          "name": "canonicalDelegatedKeyName",
+          "kind": "function",
+          "signature": "(input: { serviceName: string; product: string; name: string; }) => string",
+          "doc": "The name Platform stores for a slot: `auto:<service>:<product>:<logical>` for Router and Sandbox keys (Platform's `canonicalProvisionedKeyName`), so the echo can be checked exactly."
+        },
+        {
           "name": "createAdminGuard",
           "kind": "function",
           "signature": "<Session>(opts: AdminGuardOptions<Session>) => (request: Request) => Promise<Session>",
@@ -12465,6 +12537,12 @@
           "doc": "Create the identity-protocol account store for one request."
         },
         {
+          "name": "createDelegatedKeyProvisioner",
+          "kind": "function",
+          "signature": "(input: { client: PlatformDelegatedKeyClient; sourceKey: string; product: string; resource?: { type: string; id: string…",
+          "doc": "Plug the client into `createIdentityBoundWorkspaceKeyManager` for a workspace-held key."
+        },
+        {
           "name": "createHubSettingsRoutes",
           "kind": "function",
           "signature": "(ctx: HubSettingsContext) => HubSettingsRoutes",
@@ -12487,6 +12565,12 @@
           "kind": "function",
           "signature": "(opts: PlatformBillingHttpOptions) => PlatformBillingHttp",
           "doc": "Create a PlatformBillingHttp instance configured with given options and default behaviors"
+        },
+        {
+          "name": "createPlatformDelegatedKeyClient",
+          "kind": "function",
+          "signature": "(options: PlatformDelegatedKeyClientOptions) => PlatformDelegatedKeyClient",
+          "doc": null
         },
         {
           "name": "createSignedSsoState",
@@ -12523,6 +12607,72 @@
           "kind": "const",
           "signature": "Record<TanglePlanTier, TangleTierPolicy>",
           "doc": "Define default concurrency and overage policies for each TanglePlanTier level"
+        },
+        {
+          "name": "DelegatedKey",
+          "kind": "interface",
+          "signature": "interface DelegatedKey",
+          "doc": null
+        },
+        {
+          "name": "DelegatedKeyBudget",
+          "kind": "type",
+          "signature": "type DelegatedKeyBudget",
+          "doc": "How the child is paid for: its own budget, or spending the source's budget directly."
+        },
+        {
+          "name": "DelegatedKeyCode",
+          "kind": "type",
+          "signature": "type DelegatedKeyCode",
+          "doc": null
+        },
+        {
+          "name": "DelegatedKeyMissingError",
+          "kind": "class",
+          "signature": "class DelegatedKeyMissingError",
+          "doc": "A remote key the durable manager must treat as gone (it marks the row revoked and mints again)."
+        },
+        {
+          "name": "DelegatedKeyOutcome",
+          "kind": "type",
+          "signature": "type DelegatedKeyOutcome",
+          "doc": null
+        },
+        {
+          "name": "DelegatedKeyProvisioner",
+          "kind": "interface",
+          "signature": "interface DelegatedKeyProvisioner",
+          "doc": "The `DurableWorkspaceKeyProvisioner` shape (`./billing`), kept structural so this module stays standalone."
+        },
+        {
+          "name": "DelegatedKeyRefusal",
+          "kind": "interface",
+          "signature": "interface DelegatedKeyRefusal",
+          "doc": null
+        },
+        {
+          "name": "DelegatedKeyRefusalError",
+          "kind": "class",
+          "signature": "class DelegatedKeyRefusalError",
+          "doc": "A Platform refusal surfaced to the durable manager."
+        },
+        {
+          "name": "DelegatedKeyRequest",
+          "kind": "interface",
+          "signature": "interface DelegatedKeyRequest",
+          "doc": null
+        },
+        {
+          "name": "DelegatedKeySlotRef",
+          "kind": "interface",
+          "signature": "interface DelegatedKeySlotRef",
+          "doc": "Identifies a key's slot for Platform's service-authenticated `revoke-slot`."
+        },
+        {
+          "name": "DelegatedKeyVerdict",
+          "kind": "interface",
+          "signature": "interface DelegatedKeyVerdict",
+          "doc": "Platform's `verify-by-id` verdict on one key, secret-free."
         },
         {
           "name": "FREE_TIER_SPEND_CAP_USD",
@@ -12703,6 +12853,18 @@
           "kind": "interface",
           "signature": "interface PlatformBillingHttpOptions",
           "doc": "Define HTTP options for platform billing including base URL, service token, product slug, fetch implementation, and timeout"
+        },
+        {
+          "name": "PlatformDelegatedKeyClient",
+          "kind": "interface",
+          "signature": "interface PlatformDelegatedKeyClient",
+          "doc": null
+        },
+        {
+          "name": "PlatformDelegatedKeyClientOptions",
+          "kind": "interface",
+          "signature": "interface PlatformDelegatedKeyClientOptions",
+          "doc": null
         },
         {
           "name": "PlatformIdentityStore",
@@ -14804,6 +14966,162 @@
       ]
     },
     {
+      "id": "./rollout",
+      "source": "src/rollout/index.ts",
+      "dependsOn": [
+        "signoff"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "decideRollout",
+          "kind": "function",
+          "signature": "(input: { plan: RolloutPlan; fromValue: string; toValue: string; measure(stage: RolloutStage): Promise<StageMeasurement…",
+          "doc": "Decide one change of the list."
+        },
+        {
+          "name": "killLineBreaches",
+          "kind": "function",
+          "signature": "(stage: RolloutStage, measured: StageMeasurement | null) => string[]",
+          "doc": "Each kill line the measurement misses, as a reason."
+        },
+        {
+          "name": "normalizeRolloutValue",
+          "kind": "function",
+          "signature": "(value: string) => string",
+          "doc": "Canonical form for matching a value to a stage: entries trimmed and sorted."
+        },
+        {
+          "name": "ParsedRolloutList",
+          "kind": "interface",
+          "signature": "interface ParsedRolloutList",
+          "doc": null
+        },
+        {
+          "name": "parseRolloutList",
+          "kind": "function",
+          "signature": "(value: string | null | undefined) => ParsedRolloutList",
+          "doc": null
+        },
+        {
+          "name": "rolloutAdmits",
+          "kind": "function",
+          "signature": "(value: string | ParsedRolloutList, workspace: { id: string; createdAt?: number | undefined; }) => boolean",
+          "doc": "Whether a list admits one workspace."
+        },
+        {
+          "name": "RolloutDecision",
+          "kind": "interface",
+          "signature": "interface RolloutDecision",
+          "doc": null
+        },
+        {
+          "name": "RolloutKillLine",
+          "kind": "interface",
+          "signature": "interface RolloutKillLine",
+          "doc": "A kill line: the measured value must stay at or under `max` and at or over `min`."
+        },
+        {
+          "name": "RolloutPlan",
+          "kind": "interface",
+          "signature": "interface RolloutPlan",
+          "doc": null
+        },
+        {
+          "name": "RolloutStage",
+          "kind": "interface",
+          "signature": "interface RolloutStage",
+          "doc": null
+        },
+        {
+          "name": "rolloutWidens",
+          "kind": "function",
+          "signature": "(fromValue: string, toValue: string) => boolean",
+          "doc": "Whether `to` may admit a workspace `from` does not."
+        },
+        {
+          "name": "StageMeasurement",
+          "kind": "interface",
+          "signature": "interface StageMeasurement",
+          "doc": "Production numbers for one stage, from the product's own instrument."
+        },
+        {
+          "name": "validateRolloutPlan",
+          "kind": "function",
+          "signature": "(plan: RolloutPlan) => void",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./rollout/cli",
+      "source": "src/rollout/cli.ts",
+      "dependsOn": [
+        "signoff"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "readWranglerVar",
+          "kind": "function",
+          "signature": "(source: string, name: string) => string | null",
+          "doc": "A top-level `[vars]` string value from wrangler.toml source; environments are not read."
+        },
+        {
+          "name": "RolloutConfig",
+          "kind": "interface",
+          "signature": "interface RolloutConfig",
+          "doc": null
+        },
+        {
+          "name": "runRolloutCheck",
+          "kind": "function",
+          "signature": "(args: CliArgs) => Promise<RolloutDecision[]>",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./rollout/d1",
+      "source": "src/rollout/d1.ts",
+      "dependsOn": [
+        "signoff"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "createD1TurnTimingStore",
+          "kind": "function",
+          "signature": "(options: { db: D1LikeForRollout; now?: (() => number) | undefined; }) => { record(row: TurnTimingRow): Promise<void>;…",
+          "doc": null
+        },
+        {
+          "name": "D1LikeForRollout",
+          "kind": "interface",
+          "signature": "interface D1LikeForRollout",
+          "doc": "Minimal D1 surface (Cloudflare's `D1Database` satisfies it)."
+        },
+        {
+          "name": "ROLLOUT_TURN_TIMING_SCHEMA_SQL",
+          "kind": "const",
+          "signature": "\"\\nCREATE TABLE IF NOT EXISTS rollout_turn_timing (\\n turn_id TEXT PRIMARY KEY,\\n rollout TEXT NOT NULL,\\n workspace_id…",
+          "doc": null
+        },
+        {
+          "name": "stageMetrics",
+          "kind": "function",
+          "signature": "(rows: readonly Pick<TurnTimingRow, \"failed\" | \"firstTextMs\" | \"settledMs\">[]) => { first_words_p50_ms: number | null;…",
+          "doc": "Stage metrics from turn rows: first-words and settled percentiles in ms, and the failure rate."
+        },
+        {
+          "name": "TurnTimingRow",
+          "kind": "interface",
+          "signature": "interface TurnTimingRow",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./runtime",
       "source": "src/runtime/index.ts",
       "dependsOn": [
@@ -14822,6 +15140,12 @@
           "kind": "interface",
           "signature": "interface AppToolLoopOptions",
           "doc": null
+        },
+        {
+          "name": "asksForLanguage",
+          "kind": "function",
+          "signature": "(message: string | undefined) => boolean",
+          "doc": "True when the message names a language."
         },
         {
           "name": "budgetTurnKnowledge",
@@ -14890,6 +15214,12 @@
           "doc": "Build a `streamTurn` that calls an OpenAI-compatible `/chat/completions` endpoint (Tangle Router / tcloud / any compat provider) with `stream: true` and yields `LoopEvent`s via {@link toLoopEvents}."
         },
         {
+          "name": "createOpenAIResponsesTurn",
+          "kind": "function",
+          "signature": "(opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>",
+          "doc": "Build a `streamTurn` on the OpenAI Responses API (`POST /responses`, streamed), for OpenAI models whose reasoning reaches a caller only there, as `response.reasoning_summary_text.delta` events."
+        },
+        {
           "name": "createRouterProtectedModelPort",
           "kind": "function",
           "signature": "(options: RouterProtectedModelPortOptions) => AgentCandidateModelPort",
@@ -14948,6 +15278,12 @@
           "kind": "function",
           "signature": "(m: RouterModel) => boolean",
           "doc": "Can this router entry serve a text chat turn?"
+        },
+        {
+          "name": "isOpenAIResponsesModel",
+          "kind": "function",
+          "signature": "(model: string) => boolean",
+          "doc": "OpenAI models answer reasoning summaries only on the Responses API; chat completions carry none."
         },
         {
           "name": "isTangleBillingEnforcementDisabled",
@@ -15050,6 +15386,12 @@
           "kind": "interface",
           "signature": "interface ProtectedRouterTurnOutcome",
           "doc": "A grant turn's outcome."
+        },
+        {
+          "name": "replyLanguageInstruction",
+          "kind": "function",
+          "signature": "() => string",
+          "doc": "The language a Router turn replies in, for every agent app: the sender's current message decides, then the conversation's."
         },
         {
           "name": "resolveCatalogModelId",
@@ -15370,6 +15712,12 @@
           "doc": "Why the loop stopped."
         },
         {
+          "name": "toResponsesInput",
+          "kind": "function",
+          "signature": "(messages: ToolLoopMessage[]) => { instructions?: string | undefined; input: Record<string, unknown>[]; }",
+          "doc": "The chat-completions history the tool loop keeps, as Responses `instructions` and `input` items."
+        },
+        {
           "name": "trimOrNull",
           "kind": "function",
           "signature": "(value: string | null | undefined) => string | null",
@@ -15428,6 +15776,12 @@
       "error": null,
       "exports": [
         {
+          "name": "asksForLanguage",
+          "kind": "function",
+          "signature": "(message: string | undefined) => boolean",
+          "doc": "True when the message names a language."
+        },
+        {
           "name": "budgetTurnKnowledge",
           "kind": "function",
           "signature": "(files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]",
@@ -15456,6 +15810,12 @@
           "kind": "function",
           "signature": "(input: RouterTurnPlacementInput) => PlacementRecord",
           "doc": "Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…"
+        },
+        {
+          "name": "replyLanguageInstruction",
+          "kind": "function",
+          "signature": "() => string",
+          "doc": "The language a Router turn replies in, for every agent app: the sender's current message decides, then the conversation's."
         },
         {
           "name": "routerFunctionName",
@@ -16617,6 +16977,12 @@
           "doc": "The small event shape consumed by agent-gateway's streaming adapters."
         },
         {
+          "name": "SandboxTaskOptions",
+          "kind": "interface",
+          "signature": "interface SandboxTaskOptions",
+          "doc": null
+        },
+        {
           "name": "SandboxTerminalConnectionRouteOptions",
           "kind": "interface",
           "signature": "interface SandboxTerminalConnectionRouteOptions",
@@ -16627,6 +16993,12 @@
           "kind": "function",
           "signature": "(options: SandboxToolPathOptions) => string",
           "doc": "Resolve the binary directory path for a sandbox tool based on provided options"
+        },
+        {
+          "name": "SandboxToolContext",
+          "kind": "interface",
+          "signature": "interface SandboxToolContext",
+          "doc": "The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine."
         },
         {
           "name": "sandboxToolPath",
@@ -19702,10 +20074,28 @@
           "doc": "A hand-authored, tier-gated installable skill."
         },
         {
+          "name": "SkillSupportFile",
+          "kind": "interface",
+          "signature": "interface SkillSupportFile",
+          "doc": "A file that rides BESIDE a skill entry (kit sources, references, pinned requirements — anything the SKILL.md tells the agent to read or run)."
+        },
+        {
+          "name": "skillSupportFileMounts",
+          "kind": "function",
+          "signature": "(harness: Harness, skillId: string, files: readonly SkillSupportFile[]) => AgentProfileFileMount[]",
+          "doc": "Inline file mounts placing a skill's support files beside its entry on `harness`: `<skillDir>/<skillId>/<path>`."
+        },
+        {
           "name": "unsupportedSkillHarnesses",
           "kind": "function",
           "signature": "(harnesses: Iterable<Harness>) => Harness[]",
           "doc": "Filter `harnesses` down to those with no mounted skill dir (deduped, first-seen order preserved) — the set that must fall back to `inline` delivery, or that a caller should warn about before offering…"
+        },
+        {
+          "name": "withSkillSupportFiles",
+          "kind": "function",
+          "signature": "<P extends { resources?: AgentProfile[\"resources\"]; }>(profile: P, harness: Harness, skillId: string, files: readonly S…",
+          "doc": "Attach a skill's support files to `profile` for `harness`, idempotently."
         }
       ]
     },

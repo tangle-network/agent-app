@@ -23,6 +23,13 @@ describe('createSandboxExecTool', () => {
     expect(box.exec).toHaveBeenCalledWith('tax-python fill_form.py --form 1040', expect.objectContaining({ cwd: '/home/agent' }))
   })
 
+  it('reports box_ready through the engine\'s tool context', async () => {
+    const events: string[] = []
+    const tool = createSandboxExecTool({ box: async () => fakeBox(async () => ({ exitCode: 0, stdout: 'ok', stderr: '' })) as never })
+    await tool.run({ command: 'ls' }, { emit: kind => { events.push(kind) } })
+    expect(events).toEqual(['box_ready'])
+  })
+
   it('types a box that cannot start or be prepared, and retries the start on the next call', async () => {
     let attempts = 0
     const onFailure = vi.fn()
@@ -42,6 +49,15 @@ describe('createSandboxExecTool', () => {
   })
 
   it('caps a hung command, keeps the tail of long output, and applies the product policy', async () => {
+    let starts = 0
+    const stuck = createSandboxExecTool({ timeoutMs: 20, box: () => {
+      starts++
+      return starts === 1 ? new Promise(() => {}) : Promise.resolve(fakeBox(async () => ({ exitCode: 0, stdout: 'up', stderr: '' })) as never)
+    } })
+    await expect(stuck.run({ command: 'ls' })).rejects.toMatchObject({ code: 'sandbox_unavailable' })
+    // The hung first start is dropped, so the next call places the box again.
+    await expect(stuck.run({ command: 'ls' })).resolves.toMatchObject({ stdout: 'up' })
+
     const hung = createSandboxExecTool({ timeoutMs: 20, box: async () => fakeBox(() => new Promise(() => {})) as never })
     await expect(hung.run({ command: 'sleep 999' })).rejects.toMatchObject({ code: 'sandbox_failed', message: expect.stringContaining('did not finish') })
 

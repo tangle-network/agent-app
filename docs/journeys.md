@@ -103,3 +103,11 @@ A turn that shows any failure is not a pass; read `failures` to tell a dead turn
 
 `agent-app-journeys index <folder>` finds every journey folder under it (any folder with a `timings.json` or a `video/` folder) and writes INDEX.md: highlights first, the critic's scorecard, the ranked fixes (verified failures by rank, each with evidence, likely cause, fix, number to beat and the test that proves it), every recorded turn with its outcome, every video with its length, and what stayed unproven.
 `--critic` takes the skeptical reviewer's JSON (`CriticResult`); without it the index still lists the videos and the scored turns.
+
+## The readiness board
+
+Every app's flows share one board, [Agent App Readiness](https://claude.ai/artifact/KLbML9ey4e4LvU6F2BjmuL), and one row schema: a `flows` row carries `app`, `flowId`, `status` (`pass`, `fail`, `stall`, `blocked-host`, `blocked`, `skipped`, `unrecorded`), the blocker, the first-text and done times, video, trace and evidence links, and the commit the run served; `meta/<app>` carries the run's origin, commit and time. Rows written before the board was shared have no `app` and belong to Hardware, at their bare flow id and `meta/board`; Hardware's runner passes `--legacy-ids` to keep writing there.
+
+A run's runner writes a `summary.json` (`updatedAt`, `origin`, `sha`, and `journeys: [{ id, status, reason?, firstTextS?, completeS?, videoUrl?, traceUrl?, evidenceUrl? }]`), and `agent-app-journeys scoreboard summary.json --app <app> [--versions versions.json]` turns it into the batch of writes for the board's store. Pass the current version of every row that already exists (`{ "flows/casework-C3": 2, "meta/casework": 1 }`, read from the store first): those rows are merged, so the flow text and pass bar a person wrote survive, and anything the run no longer has, such as an old blocker, is cleared. A row with no version is created; the store refuses that write if the row exists after all, so nothing a person wrote is replaced. Only http(s) links are written; a host path is dropped with a warning.
+
+Classify before you write: `stall` is a click-stability timeout with no app error in the trace; `blocked-host` is a failure whose trace shows `net::ERR_NETWORK_CHANGED` or requests that never got a response; `fail` is a wrong outcome or an app error.
