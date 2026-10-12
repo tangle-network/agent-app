@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.148
+
+- feat(create-agent-app): chat template serves hashed bundles immutable (#1086)
+
 ## 0.60.147
 
 - fix(signoff): browser checks keep the HTTP cache and fail an over-budget run (#1085)
