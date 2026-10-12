@@ -229,6 +229,48 @@ describe('runRouterTurn', () => {
     ])
   })
 
+  it('streams reasoning as its own event and never counts it as the answer', async () => {
+    const { fetchImpl } = router(sse([{ choices: [{ delta: { reasoning_content: 'Checking the rota. ' } }] }, text('Ana is on.')]))
+    const events: RouterTurnEvent[] = []
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'u',
+      onEvent: event => events.push(event) })
+    expect(events.slice(0, 2)).toEqual([{ type: 'reasoning', delta: 'Checking the rota. ' }, { type: 'text', segment: 1, delta: 'Ana is on.' }])
+    expect(outcome.text).toBe('Ana is on.')
+  })
+
+  it('repeats a failed first call on the next fallback model, and keeps the service error text', async () => {
+    const down = () => new Response('key_budget_exhausted: the key has spent its budget', { status: 402 })
+    const chain = router(down, sse([text('From the fallback.')]))
+    const ok = await runRouterTurn({ apiKey: 'k', model: 'primary', fallbackModels: ['backup'], fetchImpl: chain.fetchImpl,
+      systemPrompt: 's', userMessage: 'u' })
+    expect(ok).toMatchObject({ text: 'From the fallback.' })
+    expect(chain.requests.map(request => request.body.model)).toEqual(['primary', 'backup'])
+
+    const once = router(down)
+    const failed = await runRouterTurn({ apiKey: 'k', model: 'm', repeat: false, fetchImpl: once.fetchImpl, systemPrompt: 's', userMessage: 'u' })
+    expect(failed.failure).toMatchObject({ code: 'model_http_402', detail: 'key_budget_exhausted: the key has spent its budget' })
+    expect(once.calls).toHaveBeenCalledTimes(1)
+  })
+
+  it('resends a request the Router refused before streaming, within its attempts', async () => {
+    const busy = () => new Response('slow down', { status: 429, headers: { 'retry-after': '0' } })
+    const { fetchImpl, calls } = router(busy, busy, sse([text('Hello.')]))
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', repeat: false, retry: { attempts: 3, baseDelayMs: 1 },
+      fetchImpl, systemPrompt: 's', userMessage: 'u' })
+    expect(outcome).toMatchObject({ text: 'Hello.' })
+    expect(outcome.failure).toBeUndefined()
+    expect(calls).toHaveBeenCalledTimes(3)
+  })
+
+  it('sends temperature and cuts tool results at the app limit', async () => {
+    const big: RouterTurnTool = { ...createTask, run: async () => 'x'.repeat(50) }
+    const { fetchImpl, requests } = router(sse([toolCall('call-1', 'staff_task_create', '{"title":"a"}')]), sse([text('ok')]))
+    await runRouterTurn({ apiKey: 'k', model: 'm', temperature: 0.7, toolResultLimit: 10, fetchImpl, systemPrompt: 's', userMessage: 'u', tools: [big] })
+    expect(requests[0]!.body.temperature).toBe(0.7)
+    expect(requests[1]!.body.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: 'tool', content: `${'x'.repeat(10)}…` })]))
+  })
+
   it('refuses to run without a credential', async () => {
     const fetchImpl = vi.fn() as unknown as typeof fetch
     await expect(runRouterTurn({ apiKey: '', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'u' }))
