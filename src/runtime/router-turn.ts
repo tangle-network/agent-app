@@ -220,13 +220,11 @@ export function composeRouterTurnPrompt(
     toolNames?: readonly string[]
     /** Knowledge files every turn carries; see {@link turnKnowledgeInstructions}. */
     knowledge?: { files: readonly TurnKnowledgeFile[]; readTool?: string }
-    /** The sender's saved language and the app's fallback, both by name (e.g. "Spanish"); see {@link replyLanguageInstruction}. */
-    language?: { saved?: string; fallback?: string }
   } = {},
 ): string {
   const knowledge = options.knowledge ? turnKnowledgeInstructions(options.knowledge.files, { readTool: options.knowledge.readTool }) : []
   const text = [profile.prompt?.systemPrompt ?? '', ...(profile.prompt?.instructions ?? []), ...knowledge,
-    replyLanguageInstruction(options.language), ...(options.context ?? [])]
+    replyLanguageInstruction(), ...(options.context ?? [])]
     .filter(part => part.trim()).join('\n\n')
   return [...(options.toolNames ?? [])].sort((a, b) => b.length - a.length)
     .reduce((out, name) => out.split(name).join(routerFunctionName(name)), text)
