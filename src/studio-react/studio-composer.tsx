@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { focusFieldWithin } from '@tangle-network/ui/utils'
 import {
   AudioLines,
   ArrowUp,
@@ -588,8 +589,10 @@ export function StudioComposer({
   return (
     <section
       data-variant={variant}
-      className={`studio-composer-card @container/studio-composer rounded-2xl border border-border bg-surface-container-high p-2.5 shadow-sm transition focus-within:border-primary/60 ${className ?? ''}`}
+      className={`studio-composer-card @container/studio-composer rounded-2xl border bg-[var(--well,var(--color-card))] p-2.5 shadow-raised transition ${focusFieldWithin} ${className ?? ''}`}
     >
+      {/* The textarea draws no outline of its own: the section is the field, and
+          its focusFieldWithin (focus-within: border and ring) is the indicator. */}
       <textarea
         value={prompt}
         onChange={(event) => setPrompt(event.target.value)}
