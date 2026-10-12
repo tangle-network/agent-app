@@ -52,6 +52,10 @@ export interface CatalogModel {
   id: string
   name: string
   provider: string
+  /** The brand that made the model when it differs from the host in
+   *  `provider` (fal serves Seedance, Kling and Veo). The picker draws this
+   *  brand's logo when present; `provider` still groups and searches. */
+  maker?: string
   description?: string
   /** Router-supplied or vendor-verified release date; never inferred from an id. */
   releaseDate?: string

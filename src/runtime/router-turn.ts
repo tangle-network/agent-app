@@ -22,9 +22,11 @@ import { streamAppToolLoop, type LoopEvent, type LoopMessage, type LoopToolCall,
 import { DEFAULT_TANGLE_ROUTER_BASE_URL } from './model'
 import { createOpenAICompatCompletionTurn, createOpenAICompatStreamTurn } from './openai-stream'
 import { turnKnowledgeInstructions, type TurnKnowledgeFile } from './turn-knowledge'
+import { replyLanguageInstruction } from './reply-language'
 import { placeExecution, type PlacementRecord, type VacuousAxis } from '@tangle-network/agent-runtime/placement'
 export { DURABLE_HOP_BUDGET_MS, turnCheckpointPath, workspaceTurnCheckpoints, type CheckpointWorkspaceStore, type TurnCheckpointStore } from './turn-continuation'
 export { budgetTurnKnowledge, turnKnowledgeInstructions, workspaceKnowledgeForTurn, type TurnKnowledgeBudget, type TurnKnowledgeFile } from './turn-knowledge'
+export { asksForLanguage, replyLanguageInstruction } from './reply-language'
 
 /** A tool the turn may call. Structurally an `McpToolDefinition` whose env is already bound. */
 export interface RouterTurnTool {
@@ -43,6 +45,8 @@ export interface RouterTurnToolContext {
    * outcome's `toolEvents`. Events sent after the call settles are dropped.
    */
   emit(kind: string, data?: unknown): void
+  /** The sender's message this turn answers, so a tool can act only on what was asked (see {@link asksForLanguage}). */
+  userMessage: string
 }
 
 /** One side event a tool reported while it ran. */
@@ -219,7 +223,8 @@ export function composeRouterTurnPrompt(
   } = {},
 ): string {
   const knowledge = options.knowledge ? turnKnowledgeInstructions(options.knowledge.files, { readTool: options.knowledge.readTool }) : []
-  const text = [profile.prompt?.systemPrompt ?? '', ...(profile.prompt?.instructions ?? []), ...knowledge, ...(options.context ?? [])]
+  const text = [profile.prompt?.systemPrompt ?? '', ...(profile.prompt?.instructions ?? []), ...knowledge,
+    replyLanguageInstruction(), ...(options.context ?? [])]
     .filter(part => part.trim()).join('\n\n')
   return [...(options.toolNames ?? [])].sort((a, b) => b.length - a.length)
     .reduce((out, name) => out.split(name).join(routerFunctionName(name)), text)
@@ -247,6 +252,9 @@ function renderResult(outcome: RouterTurnToolOutcome): string {
 }
 
 export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterTurnOutcome> {
+  // A continued turn answers the last user message in its checkpoint.
+  const lastUser = options.continueFrom?.messages.filter(message => message.role === 'user').at(-1)?.content
+  const currentUserMessage = options.continueFrom ? (typeof lastUser === 'string' ? lastUser : '') : options.userMessage
   const placement = options.placement
     ? placeRouterTurn({ ...options.placement, toolNames: (options.tools ?? []).map(tool => tool.name) })
     : undefined
@@ -329,7 +337,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         // A tool's typed event rides the loop's progress channel, so it streams in order before the result.
         const emitEvent = (kind: string, data?: unknown) => context?.progress({ data: { [TOOL_EVENT]: kind, data } })
         try {
-          return { ok: true, result: await tool.run(call.args, { emit: emitEvent }) }
+          return { ok: true, result: await tool.run(call.args, { emit: emitEvent, userMessage: currentUserMessage }) }
         } catch (error) {
           const mapped = (options.toolError ?? defaultToolError)(error)
           if (mapped) return { ok: false, ...mapped }
