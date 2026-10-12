@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-79 exports.
+106 exports.
 
 ### `AnySurfaceKind`
 
@@ -20,6 +20,22 @@ type AnySurfaceKind
 
 ```ts
 interface AppToolLoopOptions
+```
+
+### `asksForLanguage`
+
+`function` — True when the message names a language.
+
+```ts
+(message: string | undefined) => boolean
+```
+
+### `budgetTurnKnowledge`
+
+`function` — Apply the byte budget in path order: small files keep their text until the total is spent.
+
+```ts
+(files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]
 ```
 
 ### `buildCatalog`
@@ -62,9 +78,17 @@ interface CertifiedDelivery
 type CertifiedDeliveryConfig
 ```
 
+### `CheckpointWorkspaceStore`
+
+`interface` — The fields of an agent-runtime `WorkspaceStore` a checkpoint needs; structural so any adapter fits.
+
+```ts
+interface CheckpointWorkspaceStore
+```
+
 ### `composeRouterTurnPrompt`
 
-`function` — The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls.
+`function` — The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…
 
 ```ts
 (profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…
@@ -78,9 +102,25 @@ type CertifiedDeliveryConfig
 (config: CertifiedPromptSourceOptions) => CertifiedDelivery
 ```
 
+### `createOpenAICompatCompletionTurn`
+
+`function` — The buffered sibling of {@link createOpenAICompatStreamTurn}: one `/chat/completions` request without `stream`, answered by one JSON completion, yielded as the same `LoopEvent`s (the same tool-call a…
+
+```ts
+(opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>
+```
+
 ### `createOpenAICompatStreamTurn`
 
 `function` — Build a `streamTurn` that calls an OpenAI-compatible `/chat/completions` endpoint (Tangle Router / tcloud / any compat provider) with `stream: true` and yields `LoopEvent`s via {@link toLoopEvents}.
+
+```ts
+(opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>
+```
+
+### `createOpenAIResponsesTurn`
+
+`function` — Build a `streamTurn` on the OpenAI Responses API (`POST /responses`, streamed), for OpenAI models whose reasoning reaches a caller only there, as `response.reasoning_summary_text.delta` events.
 
 ```ts
 (opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>
@@ -142,6 +182,14 @@ interface CreateTangleRouterModelConfigOptions
 <TCtx>(opts: { kind: string; build: (ctx: TCtx) => SurfaceOverlay | Promise<SurfaceOverlay>; }) => SurfaceKindDefinitio…
 ```
 
+### `DURABLE_HOP_BUDGET_MS`
+
+`const` — Wall time a durable hop may plan for: a Durable Object alarm or Queue consumer gets 15 minutes.
+
+```ts
+number
+```
+
 ### `fetchModelCatalog`
 
 `function` — Fetch the router model list and build the catalogue, with an in-isolate cache (TTL 5 min).
@@ -156,6 +204,14 @@ interface CreateTangleRouterModelConfigOptions
 
 ```ts
 (m: RouterModel) => boolean
+```
+
+### `isOpenAIResponsesModel`
+
+`function` — OpenAI models answer reasoning summaries only on the Responses API; chat completions carry none.
+
+```ts
+(model: string) => boolean
 ```
 
 ### `isTangleBillingEnforcementDisabled`
@@ -262,12 +318,44 @@ interface OpenAICompatStreamTurnOptions
 interface OpenAIStreamChunk
 ```
 
+### `placeRouterTurn`
+
+`function` — Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…
+
+```ts
+(input: RouterTurnPlacementInput) => PlacementRecord
+```
+
 ### `ProtectedModelSettlementError`
 
 `class` — A validated charge remains authoritative when the product cannot save its audit record.
 
 ```ts
 class ProtectedModelSettlementError
+```
+
+### `ProtectedRouterTurnOptions`
+
+`type` — A turn under a grant.
+
+```ts
+type ProtectedRouterTurnOptions
+```
+
+### `ProtectedRouterTurnOutcome`
+
+`interface` — A grant turn's outcome.
+
+```ts
+interface ProtectedRouterTurnOutcome
+```
+
+### `replyLanguageInstruction`
+
+`function` — The language a Router turn replies in, for every agent app: the sender's current message decides, then the conversation's.
+
+```ts
+() => string
 ```
 
 ### `resolveCatalogModelId`
@@ -398,6 +486,14 @@ interface RouterProtectedModelPortOptions
 type RouterProtectedModelSettlement
 ```
 
+### `RouterTurnContinuation`
+
+`interface` — A checkpointed Router turn: the conversation after the system prompt, ready to continue.
+
+```ts
+interface RouterTurnContinuation
+```
+
 ### `RouterTurnEvent`
 
 `type` — What the turn is doing, in the order it happens, for a live view.
@@ -412,6 +508,14 @@ type RouterTurnEvent
 
 ```ts
 interface RouterTurnFailure
+```
+
+### `RouterTurnGrant`
+
+`type` — Runtime's grant inputs for one turn: the port, the model request, the reservation and its deadline.
+
+```ts
+type RouterTurnGrant
 ```
 
 ### `RouterTurnOptions`
@@ -430,6 +534,22 @@ interface RouterTurnOptions
 interface RouterTurnOutcome
 ```
 
+### `RouterTurnPlacementInput`
+
+`interface` — What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose.
+
+```ts
+interface RouterTurnPlacementInput
+```
+
+### `RouterTurnSettlement`
+
+`interface` — What the grant settled for the turn.
+
+```ts
+interface RouterTurnSettlement
+```
+
 ### `RouterTurnTool`
 
 `interface` — A tool the turn may call.
@@ -438,12 +558,44 @@ interface RouterTurnOutcome
 interface RouterTurnTool
 ```
 
+### `RouterTurnToolContext`
+
+`interface` — What a running tool gets besides its arguments.
+
+```ts
+interface RouterTurnToolContext
+```
+
+### `RouterTurnToolEvent`
+
+`interface` — One side event a tool reported while it ran.
+
+```ts
+interface RouterTurnToolEvent
+```
+
+### `RouterTurnToolOutcome`
+
+`type` — One tool call's result as the model reads it.
+
+```ts
+type RouterTurnToolOutcome
+```
+
 ### `runAppToolLoop`
 
 `function` — Run the bounded tool loop and return the final text + every executed tool outcome.
 
 ```ts
 (opts: RunToolLoopOptions) => Promise<ToolLoopResult>
+```
+
+### `runProtectedRouterTurn`
+
+`function` — Run one `runRouterTurn` under `options.grant`.
+
+```ts
+(options: ProtectedRouterTurnOptions) => Promise<ProtectedRouterTurnOutcome>
 ```
 
 ### `runRouterTurn`
@@ -630,10 +782,74 @@ interface ToolLoopResult
 type ToolLoopStopReason
 ```
 
+### `toResponsesInput`
+
+`function` — The chat-completions history the tool loop keeps, as Responses `instructions` and `input` items.
+
+```ts
+(messages: ToolLoopMessage[]) => { instructions?: string | undefined; input: Record<string, unknown>[]; }
+```
+
 ### `trimOrNull`
 
 `function` — Resolve a string by trimming whitespace or returning null if empty or undefined
 
 ```ts
 (value: string | null | undefined) => string | null
+```
+
+### `turnCheckpointPath`
+
+`function`
+
+```ts
+(turnId: string) => string
+```
+
+### `TurnCheckpointStore`
+
+`interface` — Where a turn's checkpoint waits between hops.
+
+```ts
+interface TurnCheckpointStore
+```
+
+### `TurnKnowledgeBudget`
+
+`interface`
+
+```ts
+interface TurnKnowledgeBudget
+```
+
+### `TurnKnowledgeFile`
+
+`interface` — One knowledge file a turn carries; `text` is null when it is too large or not readable here.
+
+```ts
+interface TurnKnowledgeFile
+```
+
+### `turnKnowledgeInstructions`
+
+`function` — The prompt lines for a turn's knowledge.
+
+```ts
+(files: readonly TurnKnowledgeFile[], options?: { readTool?: string | undefined; }) => string[]
+```
+
+### `workspaceKnowledgeForTurn`
+
+`function` — A workspace store's knowledge files (kind `file` under `prefix`) as turn knowledge, within the budget.
+
+```ts
+(store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…
+```
+
+### `workspaceTurnCheckpoints`
+
+`function` — Turn checkpoints in a workspace store, written as `actor`.
+
+```ts
+(store: CheckpointWorkspaceStore, workspaceId: string, actor: string) => TurnCheckpointStore
 ```

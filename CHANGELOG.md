@@ -1,5 +1,121 @@
 # Changelog
 
+## 0.60.139
+
+- fix(surfaces): Studio composer and Vault tree search step off their surface; SessionHistoryPanel showHeader (#1069)
+- fix(peers): accept sandbox-ui 0.134 so apps can adopt WorkspaceSurface (#1067)
+
+## 0.60.138
+
+- feat(journeys): a scoreboard writer for the shared readiness board (#1075)
+
+## 0.60.137
+
+- fix(rollout): read the base from the source checkout under signoff's clean tree (#1081)
+- feat(router-turn): OpenAI reasoning turns stream their reasoning summaries through the Responses API (#1080)
+
+## 0.60.136
+
+- fix(workspace-export): retry a sandbox the platform failed to resume, 30 s apart (#1079)
+
+## 0.60.135
+
+- feat(router-turn): reasoning, temperature, fallback models, resends, a tool-result limit and the service's error detail (#1076)
+
+## 0.60.134
+
+- feat(skills-placement): support-file mounting for kit-carrying skills (#1077)
+
+## 0.60.133
+
+- feat(rollout): a staged rollout widens only after the stage it leaves met its kill lines (#1049)
+
+## 0.60.132
+
+- fix(journeys): read a textarea composer by its value, so the default ChatComposer passes typePrompt (#1060)
+- fix(sandbox): re-land #1045's review fixes and pass the engine's tool context to sandbox_run/sandbox_exec (#1056)
+- feat(platform): one delegated product key client and provisioner for every app (#1062)
+
+## 0.60.131
+
+- fix(studio): the closed model trigger draws the maker's logo like the rows (#1073)
+
+## 0.60.130
+
+- feat(router-turn): reply in the sender's language and name conflicting sources (#1061)
+
+## 0.60.129
+
+- fix(signoff): surface-ladder failure screenshots are viewport-sized so a tall page cannot stall the run (#1071)
+
+## 0.60.128
+
+- feat(model-picker): draw the maker's logo for a model another host serves (#1068)
+
+## 0.60.127
+
+- fix(billing): revoke an expired workspace key before minting its renewal (#1066)
+
+## 0.60.126
+
+- fix(peers): agent-runtime floor is 0.316.0, the first release with every subpath src imports (#1065)
+
+## 0.60.125
+
+- fix: make agent-app main green (#1063)
+
+## 0.60.124
+
+- perf(agent-profiles): admitProfileTurn takes a read handle instead of re-reading pin and binding (#1058)
+
+## 0.60.123
+
+- feat(router-turn): a turn at its budget returns a continuation instead of failing (#1041)
+
+## 0.60.122
+
+- feat(model-picker): limited and unavailable models carry a warning StatusPill (#1055)
+- feat(studio): Studio's model control is the shared ModelPicker with logo, price and preview (#1054)
+
+## 0.60.121
+
+- fix(eval): parity grading counts 'I do not have the pricing … like me to ask the owner?' as an admitted gap (#1053)
+
+## 0.60.120
+
+- feat(router-turn): one Router engine; the protected producer runs runRouterTurn under its grant (#1046)
+- docs: name the renamed Physim repo tangle-network/hardware-agent (#1052)
+
+## 0.60.119
+
+- feat(model-picker): media models show a preview, a capability line and the price per output (#1050)
+
+## 0.60.118
+
+- feat(signoff): workspace-surface fails a page that is not on the shared panel (#1051)
+- feat(router-turn): placeRouterTurn and a placement option: a turn that needs a computer is placed in the sandbox before any model call (#1044)
+
+## 0.60.117
+
+- feat(router-turn): tools report typed side events through context.emit: streamed as tool_event, recorded with the turn (#1048)
+
+## 0.60.116
+
+- Train: land #1026 #1027 #1028 #1045 as one release (#1047)
+
+## 0.60.115
+
+- feat(router-turn): every turn can carry its knowledge files: index, small-file text and the grounding rule (#1038)
+- feat(eval): parity eval kit: the same asks through every lane, graded for correct and fabricated (#1042)
+
+## 0.60.114
+
+- fix(web-react): profile editor leads with additional instructions and drops emptied prompts (#1043)
+
+## 0.60.113
+
+- feat(chat-routes): an intent line streams what the agent is about to do while the turn boots (#1036)
+
 ## 0.60.112
 
 - fix(teams-react): invite email field and Invite button use the shared Input and Button (#1035)

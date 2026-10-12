@@ -242,6 +242,121 @@ export function createOpenAICompatStreamTurn(
     )
 }
 
+/**
+ * The buffered sibling of {@link createOpenAICompatStreamTurn}: one
+ * `/chat/completions` request without `stream`, answered by one JSON
+ * completion, yielded as the same `LoopEvent`s (the same tool-call assembly and
+ * served-model attribution). For an endpoint or ledger that expects one buffered
+ * completion per model call.
+ */
+export function createOpenAICompatCompletionTurn(
+  opts: OpenAICompatStreamTurnOptions,
+): (messages: LoopMessage[]) => AsyncIterable<LoopEvent> {
+  const base = opts.baseUrl.replace(/\/+$/, '')
+  const doFetch = opts.fetchImpl ?? fetch
+  return (messages) =>
+    toLoopEvents(
+      completionAsChunk(doFetch, `${base}/chat/completions`, opts.apiKey, {
+        model: opts.model,
+        messages,
+        ...(opts.tools && opts.tools.length > 0 ? { tools: opts.tools } : {}),
+        ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
+        ...opts.extraBody,
+      }, opts.onServedModel ? { requestedModel: opts.model, report: opts.onServedModel } : undefined, opts.headers),
+    )
+}
+
+/** One buffered OpenAI-compat completion (structural — no `openai` dep). */
+interface OpenAICompletion {
+  model?: string
+  choices?: Array<{
+    message?: {
+      content?: string | null
+      reasoning_content?: string | null
+      tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string }; extra_content?: unknown }>
+    }
+    finish_reason?: string | null
+  }>
+  usage?: { prompt_tokens?: number; completion_tokens?: number } | null
+}
+
+async function* completionAsChunk(
+  doFetch: typeof fetch,
+  url: string,
+  apiKey: string,
+  body: Record<string, unknown>,
+  attribution?: { requestedModel: string; report: (served: OpenAICompatServedModel) => void },
+  headers?: Record<string, string>,
+): AsyncIterable<OpenAIStreamChunk> {
+  const res = await doFetch(url, {
+    method: 'POST',
+    headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw await httpFailure(res, 'completion')
+  const completion = await res.json() as OpenAICompletion
+  if (attribution) {
+    const served = servedFromHeader(res, attribution.requestedModel)
+      ?? (completion.model ? servedFromBody(completion.model, attribution.requestedModel) : undefined)
+    if (served) attribution.report(served)
+  }
+  const choice = completion.choices?.[0]
+  const message = choice?.message
+  // The whole completion as one chunk, so `toLoopEvents` assembles it exactly as a stream.
+  yield {
+    ...(completion.model ? { model: completion.model } : {}),
+    choices: [{
+      delta: {
+        content: message?.content ?? null,
+        reasoning_content: message?.reasoning_content ?? null,
+        tool_calls: (message?.tool_calls ?? []).map((call, index) => ({
+          index,
+          ...(call.id ? { id: call.id } : {}),
+          function: { name: call.function?.name ?? '', arguments: call.function?.arguments ?? '' },
+          ...(call.extra_content !== undefined ? { extra_content: call.extra_content } : {}),
+        })),
+      },
+      finish_reason: choice?.finish_reason ?? null,
+    }],
+    ...(completion.usage ? { usage: completion.usage } : {}),
+  }
+}
+
+async function httpFailure(res: Response, kind: 'stream' | 'completion' | 'responses'): Promise<Error> {
+  const text = res.body ? await res.text().catch(() => '') : ''
+  const error = new Error(`OpenAI-compat ${kind} failed (HTTP ${res.status})${text ? `: ${text.slice(0, 200)}` : ''}`)
+  // Stamp the NUMERIC status. `isUpstreamUnavailable` (`/model-resolution`)
+  // reads a numeric field first and prose only as a backstop, and a
+  // Cloudflare EDGE 502 gives it nothing else to read: `content-type:
+  // text/plain`, a body of `error code: 502`, and none of the router's own
+  // `x-tangle-*` headers, because the origin never ran. Carrying the status
+  // as data keeps THIS path — the browser/edge copilot lane, which calls the
+  // router directly — out of the string-matching business entirely.
+  Object.assign(error, { status: res.status })
+  return error
+}
+
+function servedFromHeader(res: Response, requestedModel: string): OpenAICompatServedModel | undefined {
+  const servedHeader = res.headers.get('x-tangle-served-model')
+  if (!servedHeader) return undefined
+  return {
+    requestedModel,
+    servedModel: servedHeader,
+    source: 'router_header',
+    substituted: normalizeModelId(servedHeader) !== normalizeModelId(requestedModel),
+    ...parseFailoverHeader(res.headers.get('x-tangle-failover')),
+  }
+}
+
+function servedFromBody(model: string, requestedModel: string): OpenAICompatServedModel {
+  return {
+    requestedModel,
+    servedModel: model,
+    source: 'response_body',
+    substituted: normalizeModelId(model) !== normalizeModelId(requestedModel),
+  }
+}
+
 /** Stream + parse an OpenAI-compat SSE response into chunks. Tolerates `data:`
  *  framing, multi-line buffers, and the terminal `[DONE]`. */
 async function* streamChatCompletions(
@@ -257,19 +372,7 @@ async function* streamChatCompletions(
     headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
     body: JSON.stringify(body),
   })
-  if (!res.ok || !res.body) {
-    const text = res.body ? await res.text().catch(() => '') : ''
-    const error = new Error(`OpenAI-compat stream failed (HTTP ${res.status})${text ? `: ${text.slice(0, 200)}` : ''}`)
-    // Stamp the NUMERIC status. `isUpstreamUnavailable` (`/model-resolution`)
-    // reads a numeric field first and prose only as a backstop, and a
-    // Cloudflare EDGE 502 gives it nothing else to read: `content-type:
-    // text/plain`, a body of `error code: 502`, and none of the router's own
-    // `x-tangle-*` headers, because the origin never ran. Carrying the status
-    // as data keeps THIS path — the browser/edge copilot lane, which calls the
-    // router directly — out of the string-matching business entirely.
-    Object.assign(error, { status: res.status })
-    throw error
-  }
+  if (!res.ok || !res.body) throw await httpFailure(res, 'stream')
   // Served-model attribution, fired at most once, as early as it is knowable.
   //
   // The header comes first because it is the router's OWN substitution signal:
@@ -292,16 +395,8 @@ async function* streamChatCompletions(
     attribution.report(served)
   }
   if (attribution) {
-    const servedHeader = res.headers.get('x-tangle-served-model')
-    if (servedHeader) {
-      report({
-        requestedModel: attribution.requestedModel,
-        servedModel: servedHeader,
-        source: 'router_header',
-        substituted: normalizeModelId(servedHeader) !== normalizeModelId(attribution.requestedModel),
-        ...parseFailoverHeader(res.headers.get('x-tangle-failover')),
-      })
-    }
+    const served = servedFromHeader(res, attribution.requestedModel)
+    if (served) report(served)
   }
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -327,15 +422,183 @@ async function* streamChatCompletions(
       // comparing — the router reports the dated upstream id (`gpt-5-2025-08-07`)
       // for a request of `openai/gpt-5` even with NO substitution, so a raw
       // `!==` would report a swap on literally every turn.
-      if (attribution && !reported && chunk.model) {
-        report({
-          requestedModel: attribution.requestedModel,
-          servedModel: chunk.model,
-          source: 'response_body',
-          substituted: normalizeModelId(chunk.model) !== normalizeModelId(attribution.requestedModel),
-        })
-      }
+      if (attribution && !reported && chunk.model) report(servedFromBody(chunk.model, attribution.requestedModel))
       yield chunk
+    }
+  }
+}
+
+/** OpenAI models answer reasoning summaries only on the Responses API; chat completions carry none. */
+export function isOpenAIResponsesModel(model: string): boolean {
+  return /^(?:openai\/)?(?:gpt-|o\d|chatgpt-)/i.test(model.trim())
+}
+
+/** The chat-completions history the tool loop keeps, as Responses `instructions` and `input` items. */
+export function toResponsesInput(messages: LoopMessage[]): { instructions?: string; input: Array<Record<string, unknown>> } {
+  const instructions: string[] = []
+  const input: Array<Record<string, unknown>> = []
+  for (const message of messages) {
+    const content = typeof message.content === 'string' ? message.content : ''
+    if (message.role === 'system') {
+      if (content) instructions.push(content)
+    } else if (message.role === 'tool') {
+      input.push({ type: 'function_call_output', call_id: message.tool_call_id ?? '', output: content })
+    } else if (message.role === 'assistant' && message.tool_calls?.length) {
+      if (content.trim()) input.push({ role: 'assistant', content })
+      for (const call of message.tool_calls) {
+        input.push({ type: 'function_call', call_id: call.id, name: call.function.name, arguments: call.function.arguments })
+      }
+    } else if (message.role === 'user' || message.role === 'assistant') {
+      input.push({ role: message.role, content })
+    }
+  }
+  return { ...(instructions.length ? { instructions: instructions.join('\n\n') } : {}), input }
+}
+
+/** Chat-completions tool definitions as Responses function tools. */
+function toResponsesTools(tools: unknown[] | undefined): Array<Record<string, unknown>> {
+  return (tools ?? []).flatMap((tool) => {
+    const fn = (tool as { function?: { name?: string; description?: string; parameters?: unknown } }).function
+    return fn?.name ? [{ type: 'function', name: fn.name, ...(fn.description ? { description: fn.description } : {}),
+      parameters: fn.parameters ?? { type: 'object', properties: {} } }] : []
+  })
+}
+
+/**
+ * Build a `streamTurn` on the OpenAI Responses API (`POST /responses`, streamed),
+ * for OpenAI models whose reasoning reaches a caller only there, as
+ * `response.reasoning_summary_text.delta` events. Each Responses event is
+ * mapped onto the chat-completions chunk shape {@link toLoopEvents} reads, so
+ * text, reasoning, fragmented function calls, usage and served-model
+ * attribution behave exactly as on {@link createOpenAICompatStreamTurn}.
+ *
+ * `extraBody` keys from the chat path are translated: `max_tokens` and
+ * `max_completion_tokens` become `max_output_tokens`, and `reasoning_effort`
+ * becomes `reasoning.effort` with `summary: 'auto'`. Stateless: earlier tool
+ * calls are replayed as `function_call` / `function_call_output` items.
+ */
+export function createOpenAIResponsesTurn(
+  opts: OpenAICompatStreamTurnOptions,
+): (messages: LoopMessage[]) => AsyncIterable<LoopEvent> {
+  const base = opts.baseUrl.replace(/\/+$/, '')
+  const doFetch = opts.fetchImpl ?? fetch
+  const { max_tokens: maxTokens, max_completion_tokens: maxCompletion, reasoning_effort: effort, ...rest } = opts.extraBody ?? {}
+  const maxOutput = maxCompletion ?? maxTokens
+  return (messages) => {
+    const { instructions, input } = toResponsesInput(messages)
+    const tools = toResponsesTools(opts.tools)
+    return toLoopEvents(streamResponses(doFetch, `${base}/responses`, opts.apiKey, {
+      model: opts.model,
+      ...(instructions ? { instructions } : {}),
+      input,
+      stream: true,
+      store: false,
+      ...(tools.length ? { tools } : {}),
+      ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
+      ...(maxOutput !== undefined ? { max_output_tokens: maxOutput } : {}),
+      ...(effort !== undefined ? { reasoning: { effort, summary: 'auto' } } : {}),
+      ...rest,
+    }, opts.onServedModel ? { requestedModel: opts.model, report: opts.onServedModel } : undefined, opts.headers))
+  }
+}
+
+interface ResponsesEvent {
+  type?: string
+  delta?: string
+  output_index?: number
+  summary_index?: number
+  item?: { type?: string; call_id?: string; name?: string; arguments?: string }
+  response?: { model?: string; usage?: { input_tokens?: number; output_tokens?: number }; error?: { code?: string; message?: string } }
+  error?: { code?: string; message?: string }
+  message?: string
+}
+
+/** Stream a Responses API call as chat-completions chunks. A failed or errored response throws. */
+async function* streamResponses(
+  doFetch: typeof fetch,
+  url: string,
+  apiKey: string,
+  body: Record<string, unknown>,
+  attribution?: { requestedModel: string; report: (served: OpenAICompatServedModel) => void },
+  headers?: Record<string, string>,
+): AsyncIterable<OpenAIStreamChunk> {
+  const res = await doFetch(url, {
+    method: 'POST',
+    headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok || !res.body) throw await httpFailure(res, 'responses')
+  let reported = false
+  const report = (served: OpenAICompatServedModel) => {
+    if (reported || !attribution) return
+    reported = true
+    attribution.report(served)
+  }
+  if (attribution) {
+    const served = servedFromHeader(res, attribution.requestedModel)
+    if (served) report(served)
+  }
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let lastSummary: string | null = null
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+      const data = trimmed.slice(5).trim()
+      if (data === '[DONE]') return
+      let event: ResponsesEvent
+      try {
+        event = JSON.parse(data) as ResponsesEvent
+      } catch {
+        continue
+      }
+      switch (event.type) {
+        case 'response.output_text.delta':
+          if (event.delta) yield { choices: [{ delta: { content: event.delta } }] }
+          break
+        case 'response.reasoning_summary_text.delta': {
+          if (!event.delta) break
+          // Separate summary parts the way the model wrote them.
+          const part = `${event.output_index ?? 0}:${event.summary_index ?? 0}`
+          const lead = lastSummary !== null && lastSummary !== part ? '\n\n' : ''
+          lastSummary = part
+          yield { choices: [{ delta: { reasoning_content: lead + event.delta } }] }
+          break
+        }
+        case 'response.output_item.added':
+          if (event.item?.type === 'function_call' && event.item.name) {
+            yield { choices: [{ delta: { tool_calls: [{ index: event.output_index ?? 0,
+              ...(event.item.call_id ? { id: event.item.call_id } : {}),
+              function: { name: event.item.name, arguments: event.item.arguments ?? '' } }] } }] }
+          }
+          break
+        case 'response.function_call_arguments.delta':
+          if (event.delta) yield { choices: [{ delta: { tool_calls: [{ index: event.output_index ?? 0, function: { arguments: event.delta } }] } }] }
+          break
+        case 'response.completed':
+        case 'response.incomplete': {
+          const model = event.response?.model
+          if (attribution && !reported && model) report(servedFromBody(model, attribution.requestedModel))
+          const usage = event.response?.usage
+          yield { ...(model ? { model } : {}), choices: [],
+            ...(usage ? { usage: { prompt_tokens: usage.input_tokens ?? 0, completion_tokens: usage.output_tokens ?? 0 } } : {}) }
+          return
+        }
+        case 'response.failed':
+        case 'error': {
+          const failure = event.response?.error ?? event.error ?? { message: event.message }
+          throw new Error(`OpenAI-compat responses failed: ${(failure?.code ? `${failure.code}: ` : '') + (failure?.message ?? 'no detail')}`.slice(0, 300))
+        }
+        default:
+          break
+      }
     }
   }
 }

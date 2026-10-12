@@ -7,20 +7,6 @@ import type { AgentCandidateModelPort } from '@tangle-network/agent-runtime/cand
 import { createRouterProtectedModelPort } from '../src/runtime/protected-model'
 import { createProtectedRuntimeChatProducer, type ProtectedRuntimeChatOptions } from '../src/chat-routes/protected-runtime-producer'
 
-const streamContract = vi.hoisted(() => ({ precedingText: undefined as string | undefined, repeatFinal: false }))
-vi.mock('@tangle-network/agent-runtime/kernel', async importOriginal => {
-  const original = await importOriginal<typeof import('@tangle-network/agent-runtime/kernel')>()
-  return { ...original, streamAgentTurn: async function* (...args: Parameters<typeof original.streamAgentTurn>) {
-    for await (const event of original.streamAgentTurn(...args)) {
-      if (event.type === 'final' && streamContract.precedingText !== undefined) {
-        yield { type: 'text_delta', text: streamContract.precedingText }
-      }
-      yield event
-      if (event.type === 'final' && streamContract.repeatFinal) yield event
-    }
-  } }
-})
-
 const digest = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as const
 const model = 'anthropic/claude-haiku-4-5-20251001'
 
@@ -67,10 +53,10 @@ async function drain(producer: ReturnType<typeof createProtectedRuntimeChatProdu
   return events
 }
 
-afterEach(() => { streamContract.precedingText = undefined; streamContract.repeatFinal = false; vi.unstubAllGlobals(); vi.restoreAllMocks() })
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('protected Runtime chat producer', () => {
-  it('uses the real Runtime executor and publishes only settled usage', async () => {
+  it('runs on the Router turn engine with the scoped grant key and publishes only settled usage', async () => {
     const { options, settle } = fixture()
     const inference = vi.fn(async (url: string, init: RequestInit) => {
       expect(url).toBe('https://candidate-router.tangle.tools/v1/chat/completions')
@@ -110,7 +96,84 @@ describe('protected Runtime chat producer', () => {
     const events = await drain(createProtectedRuntimeChatProducer(options))
     expect(fetch).not.toHaveBeenCalled()
     expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'failed' }))
+    expect(JSON.stringify(events.find(event => event.type === 'error')))
+      .toContain('requires an Anthropic or OpenAI model without reasoning')
+  })
+
+  it('sends one buffered completion per model call with the profile ceilings and reasoning effort', async () => {
+    const { options } = fixture('openai')
+    options.profile.model = { ...options.profile.model!, maxVisibleOutputTokens: undefined, maxTotalOutputTokens: 64 }
+    const bodies: Array<Record<string, unknown>> = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)))
+      return response({ content: 'A useful finding.' })
+    }))
+    await drain(createProtectedRuntimeChatProducer(options))
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]).toMatchObject({ model, reasoning_effort: 'none', max_completion_tokens: 64 })
+    expect(bodies[0]).not.toHaveProperty('stream')
+    expect(bodies[0]).not.toHaveProperty('max_tokens')
+    expect(bodies[0]).not.toHaveProperty('temperature')
+  })
+
+  it('never repeats a failed model call under a grant', async () => {
+    const { options, settle } = fixture()
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code: 'candidate_grant_limit_exceeded' } }, { status: 429 })))
+    const events = await drain(createProtectedRuntimeChatProducer(options))
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'failed' }))
     expect(events.some(event => event.type === 'error')).toBe(true)
+  })
+
+  it('runs as many tool rounds as the grant allows, past the default turn backstop', async () => {
+    const { options, settle } = fixture()
+    const read = vi.fn(async () => 'brief')
+    options.tools = [{ name: 'read', description: 'Read.', inputSchema: { type: 'object' }, run: read }]
+    options.profile.tools = { read: true }
+    options.maxToolCalls = 15
+    options.grant = { ...options.grant, reserve: { ...options.grant.reserve,
+      limits: { ...options.grant.reserve.limits, maxModelCalls: 16 } } }
+    let call = 0
+    vi.stubGlobal('fetch', vi.fn(async () => (++call <= 15
+      ? response({ content: null, tool_calls: [{ id: `read-${call}`, type: 'function', function: { name: 'read', arguments: JSON.stringify({ n: call }) } }] })
+      : response({ content: 'Read all fifteen.' }))))
+    const producer = createProtectedRuntimeChatProducer(options)
+    const events = await drain(producer)
+    expect(events.some(event => event.type === 'error')).toBe(false)
+    expect(read).toHaveBeenCalledTimes(15)
+    expect(producer.finalText()).toBe('Read all fifteen.')
+    expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'completed' }))
+  })
+
+  it.each([
+    ['model metadata', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.model = { ...profile.model!, metadata: { temperature: 0.2 } } }, 'metadata'],
+    ['mounted resources', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.resources = { instructions: 'extra' } }, 'resources'],
+    ['an undeclared tool', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.tools = {} }, 'is not enabled by AgentProfile.tools'],
+    ['a reasoning-token cap', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.model = { ...profile.model!, maxReasoningTokens: 64 } }, 'maxReasoningTokens'],
+    // The axes agent-runtime's router-tools executor refused (routerTurnProfileMaterialization).
+    ['additional instructions', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.prompt = { ...profile.prompt, appendSystemPrompt: 'Cite every figure.' } }, 'appendSystemPrompt'],
+    ['a small model', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.model = { ...profile.model!, small: 'openai/gpt-4o-mini' } }, 'modelSmall'],
+    ['seats', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.seats = [] }, 'seats'],
+    ['permissions', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.permissions = { bash: 'deny' } }, 'permissions'],
+    ['MCP servers', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.mcp = {} }, 'mcp'],
+    ['connections', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.connections = [] }, 'connections'],
+    ['subagents', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.subagents = {} }, 'subagents'],
+    ['hooks', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.hooks = { PreToolUse: [] } }, 'hooks'],
+    ['modes', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.modes = {} }, 'modes'],
+    ['a confidential-compute requirement', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.confidential = { tee: 'any' } }, 'confidential'],
+    ['extensions', (profile: ProtectedRuntimeChatOptions['profile']) => { profile.extensions = { app: { flag: true } } }, 'extensions'],
+  ])('refuses a profile with %s by name before reserving a grant', async (_label, change, named) => {
+    const { options, settle } = fixture()
+    options.tools = [{ name: 'read', description: 'Read.', inputSchema: { type: 'object' }, run: async () => 'brief' }]
+    options.profile.tools = { read: true }
+    change(options.profile)
+    const reserve = vi.spyOn(options.grant.port, 'reserveGrant')
+    vi.stubGlobal('fetch', vi.fn())
+    const events = await drain(createProtectedRuntimeChatProducer(options))
+    expect(JSON.stringify(events.find(event => event.type === 'error'))).toContain(named)
+    expect(reserve).not.toHaveBeenCalled()
+    expect(settle).not.toHaveBeenCalled()
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('does not certify a disabled-reasoning budget when the provider reports reasoning', async () => {
@@ -144,19 +207,15 @@ describe('protected Runtime chat producer', () => {
     expect(history).toEqual([{ role: 'user', content: 'Earlier request' }, { role: 'assistant', content: 'Earlier answer' }])
   })
 
-  it.each([
-    { streamed: undefined, final: 'A useful finding.', status: 200 },
-    { streamed: 'A useful ', final: 'A useful finding.', status: 200 },
-    { streamed: 'A useful finding.', final: 'A useful finding.', status: 200 },
-    { streamed: undefined, final: 'A useful finding.', status: 200, repeatFinal: true },
-    { streamed: 'An obsolete draft.', final: 'A corrected finding.', status: 500 },
-  ])('delivers the authoritative answer once through chat and gateway ($streamed → $final)', async scenario => {
+  it('delivers the final answer once through chat and gateway, never the narration before a tool', async () => {
     const { options, settle } = fixture()
-    vi.stubGlobal('fetch', vi.fn(async () => response({ content: scenario.final })))
-    // Runtime's protected executor currently emits only a final snapshot. Inject
-    // preceding deltas to exercise the producer's supported stream contract too.
-    streamContract.precedingText = scenario.streamed
-    streamContract.repeatFinal = 'repeatFinal' in scenario && scenario.repeatFinal === true
+    options.tools = [{ name: 'read', description: 'Read a brief.', inputSchema: { type: 'object' }, run: async () => 'brief' }]
+    options.profile.tools = { read: true }
+    const replies = [
+      response({ content: 'Let me read the brief first.', tool_calls: [{ id: 'read-1', type: 'function', function: { name: 'read', arguments: '{}' } }] }),
+      response({ content: 'A useful finding.' }),
+    ]
+    vi.stubGlobal('fetch', vi.fn(async () => replies.shift()!))
     const rows: Array<Parameters<ChatTurnMessageStore['appendMessage']>[0] & { id: string }> = []
     const store: ChatTurnMessageStore = {
       listMessages: async threadId => rows.filter(row => row.threadId === threadId),
@@ -190,16 +249,11 @@ describe('protected Runtime chat producer', () => {
     })
     const body = await result.json()
     await Promise.all(pending)
-    expect(result.status, JSON.stringify(body)).toBe(scenario.status)
+    expect(result.status, JSON.stringify(body)).toBe(200)
     expect(settle).toHaveBeenCalledOnce()
-    if (scenario.status === 200) {
-      expect(body.choices[0].message.content).toBe(scenario.final)
-      expect(rows.find(row => row.role === 'assistant')?.content).toBe(scenario.final)
-      expect(body.usage).toMatchObject({ prompt_tokens: 3, completion_tokens: 2 })
-    } else {
-      expect(JSON.stringify(body)).toContain('revised already streamed text')
-      expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'failed' }))
-    }
+    expect(body.choices[0].message.content).toBe('A useful finding.')
+    expect(rows.find(row => row.role === 'assistant')?.content).toBe('A useful finding.')
+    expect(body.usage).toMatchObject({ prompt_tokens: 3, completion_tokens: 2 })
   })
 
   it('retains the validated charge when the real transport audit callback fails after settlement', async () => {

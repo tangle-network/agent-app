@@ -1,0 +1,5 @@
+---
+"@tangle-network/agent-app": minor
+---
+
+`./skills-placement` ships support-file mounting for kit-carrying skills: `skillSupportFileMounts(harness, skillId, files)` places a skill's executable companions (vendored kits, reference trees, pinned requirements) beside its entry in each harness's native tree (`.pi/skills/<id>/…`, `.opencode/skills/<id>/…`, …), and `withSkillSupportFiles(profile, harness, skillId, files)` attaches them idempotently — re-deriving for another harness replaces the skill's own mounts wherever they pointed (exact-content identity; pack-declared files at the same paths keep their locations), and a harness with no cwd skill dir drops them, mirroring how the platform skips the skill entry itself. Encodes the production lesson that a growing program belongs in file mounts, never env: runtimeSecrets values are capped (8192 chars on the sandbox SDK) and a skill kit that outgrew the cap took every secret-isolated turn down with a secret-provider refusal until it moved to files.

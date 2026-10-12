@@ -4,7 +4,7 @@
 
 Source: `src/agent-profiles/index.ts`
 
-49 exports.
+53 exports.
 
 ### `addProfileKnowledgeDocument`
 
@@ -140,6 +140,30 @@ readonly ["skills"]
 
 ```ts
 class ProfileAccessError
+```
+
+### `ProfileAdmissionRead`
+
+`interface` — An opaque token for what `readProfileAdmission` read for one message.
+
+```ts
+interface ProfileAdmissionRead
+```
+
+### `profileAdmissionValues`
+
+`function` — A deep copy of what a token stands for; changing the copy changes nothing the token admits.
+
+```ts
+(read: ProfileAdmissionRead) => ProfileAdmissionValues
+```
+
+### `ProfileAdmissionValues`
+
+`interface` — The values a token stands for, as the caller may inspect them.
+
+```ts
+interface ProfileAdmissionValues
 ```
 
 ### `profileAuthority`
@@ -332,6 +356,14 @@ interface ProfileTurnPin
 
 ```ts
 interface ProposeRevisionInput
+```
+
+### `readProfileAdmission`
+
+`function` — Read what admitting a message needs: its prior pin and the binding together, then a pinned revision.
+
+```ts
+(store: ProfileRevisionStore, key: ProfileBindingKey, messageId: string, content: string) => Promise<ProfileAdmissionRe…
 ```
 
 ### `removeProfileKnowledgeDocument`

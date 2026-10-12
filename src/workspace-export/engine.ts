@@ -66,7 +66,9 @@ export class ExportRetryLater extends Error {
   readonly retryLater = true
 }
 
-/** Deferrals before a busy source fails the export: about ten minutes of cron sweeps. */
+/** A deferred source waits this long before its next try, so a busy or restarting box gets real time to recover. */
+const DEFER_MS = 30_000
+/** Deferrals before the source fails the export: about ten minutes at DEFER_MS apart. */
 const MAX_DEFERRALS = 20
 
 function isRetryLater(err: unknown): boolean {
@@ -617,10 +619,14 @@ export function createExportEngine(options: ExportEngineOptions) {
         heartbeat = setInterval(() => {
           save().catch(() => {})
         }, HEARTBEAT_MS)
-        const plan = await options.plan({ workspaceId })
+        // Units waiting out a deferral are skipped until their time comes.
+        const pending = job.units.flatMap((unit, index) =>
+          unit.status === 'pending' && !(unit.retryAt && unit.retryAt > now()) ? [{ unit, index }] : [])
+        // The plan is read only when something can run or the export can finish (its notes go in the manifest).
+        const finishing = job.units.every((u) => u.status === 'done' || u.status === 'empty')
+        const plan: ExportPlan = pending.length || finishing ? await options.plan({ workspaceId }) : { sources: [] }
         const scanner = createSecretScanner({ knownSecrets: (await options.knownSecrets?.({ workspaceId })) ?? [] })
         const sources = new Map(plan.sources.map((s) => [s.name, s]))
-        const pending = job.units.flatMap((unit, index) => (unit.status === 'pending' ? [{ unit, index }] : []))
         let next = 0
         while (next < pending.length) {
           if (now() > deadline) break
@@ -655,12 +661,14 @@ export function createExportEngine(options: ExportEngineOptions) {
                 }
                 await runUnit(job, unit, index, source, scanner, deadline)
                 unit.error = undefined
+                unit.retryAt = undefined
                 return false
               } catch (err) {
                 unit.error = errorText(scanner, err)
                 if (isRetryLater(err) && (unit.deferrals ?? 0) < MAX_DEFERRALS) {
                   // Busy, not broken: give the attempt back and try again on a later request.
                   unit.deferrals = (unit.deferrals ?? 0) + 1
+                  unit.retryAt = now() + DEFER_MS
                   unit.attempts -= 1
                   if (unit.cursor === undefined) unit.entries = []
                   return 'deferred' as const

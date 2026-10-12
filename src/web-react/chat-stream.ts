@@ -26,9 +26,12 @@ import {
   type ChatPlan,
 } from '../plans/index'
 import {
+  isTurnIntentEvent,
   isTurnPhaseEvent,
   settleTurnResponse,
+  TURN_INTENT_EVENT,
   TURN_PHASE_EVENT,
+  type TurnIntentData,
   type TurnPhaseData,
 } from '../chat-routes/turn-progress'
 
@@ -65,14 +68,18 @@ export {
 } from '../chat-routes/wire'
 export {
   buildTurnPhaseEvent,
+  isTurnIntentEvent,
   isTurnPhaseEvent,
   settleTurnResponse,
+  TURN_INTENT_EVENT,
   TURN_PHASE_EVENT,
   TURN_PROGRESS_FIRST,
   TURN_PROGRESS_HEADER,
   TURN_RESPONSE_EVENT,
   TURN_ROUTE_PHASE_MESSAGES,
   TURN_STREAM_LOST_CODE,
+  type TurnIntentData,
+  type TurnIntentEvent,
   type TurnPhaseData,
   type TurnPhaseEvent,
   type TurnResponseData,
@@ -104,6 +111,8 @@ export interface ChatStreamCallbacks {
   onTurnId?: (turnId: string) => void
   /** The turn's current stage (`session.run.phase`), before its first output and between tool calls. */
   onPhase?: (phase: TurnPhaseData) => void
+  /** The turn's intent line (`session.run.intent`): show it as a labeled status line until the first `onText`. */
+  onIntent?: (intent: TurnIntentData) => void
   onText?: (delta: string) => void
   onReasoning?: (delta: string) => void
   onToolCall?: (call: ChatStreamToolCall) => void
@@ -175,6 +184,9 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
       break
     case TURN_PHASE_EVENT:
       if (isTurnPhaseEvent(evt)) cb.onPhase?.(evt.data)
+      break
+    case TURN_INTENT_EVENT:
+      if (isTurnIntentEvent(evt)) cb.onIntent?.(evt.data)
       break
     case 'text':
       if (typeof evt.text === 'string') {

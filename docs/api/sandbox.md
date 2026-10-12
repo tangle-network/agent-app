@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-241 exports.
+255 exports.
 
 ### `adaptSandboxStream`
 
@@ -190,12 +190,28 @@ interface BuildSandboxToolFileMountsOptions
 (options: EscalationSpeculatorOptions) => EscalationSpeculator
 ```
 
+### `createSandboxExecTool`
+
+`function`
+
+```ts
+(options: SandboxExecToolOptions) => SandboxExecTool
+```
+
 ### `createSandboxPrewarmer`
 
 `function`
 
 ```ts
 (shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer
+```
+
+### `createSandboxRunTool`
+
+`function`
+
+```ts
+(options: SandboxRunToolOptions) => SandboxRunTool
 ```
 
 ### `createSandboxTerminalConnectionRoute`
@@ -1022,6 +1038,22 @@ interface SafeSandboxErrorDiagnostics
 number
 ```
 
+### `SANDBOX_EXEC_DESCRIPTION`
+
+`const`
+
+```ts
+string
+```
+
+### `SANDBOX_RUN_DESCRIPTION`
+
+`const`
+
+```ts
+string
+```
+
 ### `SANDBOX_TRANSIENT_DEADLINE_MS`
 
 `const` — How long a transient failure may last before the caller fails.
@@ -1084,6 +1116,30 @@ interface SandboxExecChannel
 
 ```ts
 interface SandboxExecOptions
+```
+
+### `SandboxExecResult`
+
+`interface`
+
+```ts
+interface SandboxExecResult
+```
+
+### `SandboxExecTool`
+
+`interface`
+
+```ts
+interface SandboxExecTool
+```
+
+### `SandboxExecToolOptions`
+
+`interface`
+
+```ts
+interface SandboxExecToolOptions
 ```
 
 ### `SandboxExistingBoxStage`
@@ -1174,6 +1230,14 @@ interface SandboxPrewarmScope
 type SandboxPromptConfig
 ```
 
+### `sandboxPromptRunner`
+
+`function` — The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused).
+
+```ts
+(shell: SandboxRuntimeConfig, prompt?: Omit<StreamSandboxPromptOptions, "signal" | "history">) => (box: SandboxInstance…
+```
+
 ### `SandboxPromptTokenLimits`
 
 `interface`
@@ -1238,6 +1302,22 @@ interface SandboxResourceConfig
 interface SandboxRestoreSpec
 ```
 
+### `SandboxRunError`
+
+`class` — A typed `sandbox_run` failure.
+
+```ts
+class SandboxRunError
+```
+
+### `SandboxRunFailureCode`
+
+`type`
+
+```ts
+type SandboxRunFailureCode
+```
+
 ### `SandboxRuntimeAuthRefreshError`
 
 `class` — Represent an error thrown when sandbox runtime authentication refresh fails for a specific stage and name
@@ -1252,6 +1332,22 @@ class SandboxRuntimeAuthRefreshError
 
 ```ts
 interface SandboxRuntimeConfig
+```
+
+### `SandboxRunTool`
+
+`interface` — The tool shape `runRouterTurn` takes (`RouterTurnTool`), kept structural so this module does not import the engine.
+
+```ts
+interface SandboxRunTool
+```
+
+### `SandboxRunToolOptions`
+
+`interface`
+
+```ts
+interface SandboxRunToolOptions
 ```
 
 ### `SandboxScope`
@@ -1286,6 +1382,14 @@ type SandboxStepTransition
 interface SandboxStreamEvent
 ```
 
+### `SandboxTaskOptions`
+
+`interface`
+
+```ts
+interface SandboxTaskOptions
+```
+
 ### `SandboxTerminalConnectionRouteOptions`
 
 `interface` — Configuration for {@link createSandboxTerminalConnectionRoute}.
@@ -1300,6 +1404,14 @@ interface SandboxTerminalConnectionRouteOptions
 
 ```ts
 (options: SandboxToolPathOptions) => string
+```
+
+### `SandboxToolContext`
+
+`interface` — The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine.
+
+```ts
+interface SandboxToolContext
 ```
 
 ### `sandboxToolPath`
