@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.140
+
+- feat(turn-knowledge): check every file before answering when a turn carries several (#1072)
+
 ## 0.60.139
 
 - fix(surfaces): Studio composer and Vault tree search step off their surface; SessionHistoryPanel showHeader (#1069)
