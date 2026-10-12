@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.151
+
+- test: match the sandbox-ui 0.134.2 floor and ProviderMark labels raised by #1074 (#1089)
+
 ## 0.60.150
 
 - chore(climb): record the signoff edge-budget result (#1087 on creative production) (#1088)
