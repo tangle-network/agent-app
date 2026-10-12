@@ -66,7 +66,7 @@ describe('createRouterTurnProducer', () => {
       fetchImpl: router(sse([{ choices: [{ delta: { reasoning_content: 'Need the count.' } }] }, toolCall('call-1', 'rooms_ready', '{}')]),
         sse([text('I cannot read rooms.')])) })
     const events: Array<Record<string, unknown>> = []
-    for await (const event of producer.stream) events.push(event as Record<string, unknown>)
+    for await (const event of producer.stream) events.push(event as unknown as Record<string, unknown>)
     expect(events[0]).toEqual({ type: 'reasoning', text: 'Need the count.' })
     expect(events.find(event => event.type === 'tool_result')).toMatchObject({
       outcome: { ok: false, message: 'Rooms are read by staff only', code: 'forbidden' } })
