@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.129
+
+- fix(signoff): surface-ladder failure screenshots are viewport-sized so a tall page cannot stall the run (#1071)
+
 ## 0.60.128
 
 - feat(model-picker): draw the maker's logo for a model another host serves (#1068)
