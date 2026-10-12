@@ -42,3 +42,15 @@ describe('ModelPicker media rows', () => {
     expect(speech.querySelector('[data-model-price]')?.textContent).toBe('$0.3/1K chars')
   })
 })
+
+describe('ModelPicker maker logo', () => {
+  it('draws the maker for a hosted model and keeps the host for grouping and search', () => {
+    const hosted: CatalogModel = { ...base, id: 'fal-ai/veo3.1', name: 'Veo 3.1', provider: 'fal', maker: 'google', output: 'video' }
+    render(<ModelPicker value="fal-ai/veo3.1" onChange={() => {}} models={[gpt, hosted]} />)
+    const trigger = screen.getByRole('button', { name: /Veo 3\.1/ })
+    expect(trigger.querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe('google')
+    fireEvent.click(trigger)
+    fireEvent.change(screen.getByLabelText('Search all models'), { target: { value: 'google' } })
+    expect(screen.getAllByRole('button', { name: /Veo 3\.1/ }).length).toBeGreaterThan(0)
+  })
+})

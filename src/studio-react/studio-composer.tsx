@@ -161,6 +161,7 @@ function pickerModel(model: MediaModelOption, type: ComposerType): CatalogModel 
     id: model.id,
     name: model.name || model.id,
     provider: model.provider ?? '',
+    ...(model.maker?.trim() ? { maker: model.maker.trim() } : {}),
     output: LANE_OUTPUT[type],
     ...(isPublishedPrice(model.outputPrice) ? { outputPrice: model.outputPrice } : {}),
     ...(model.previewUrl?.trim() ? { previewUrl: model.previewUrl.trim() } : {}),
