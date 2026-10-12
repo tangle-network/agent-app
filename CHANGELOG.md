@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.132
+
+- fix(journeys): read a textarea composer by its value, so the default ChatComposer passes typePrompt (#1060)
+- fix(sandbox): re-land #1045's review fixes and pass the engine's tool context to sandbox_run/sandbox_exec (#1056)
+- feat(platform): one delegated product key client and provisioner for every app (#1062)
+
 ## 0.60.131
 
 - fix(studio): the closed model trigger draws the maker's logo like the rows (#1073)
