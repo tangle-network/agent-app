@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.159
+
+- test(peer-floors): allow stricter runtime behavioral contracts (#1095)
+
 ## 0.60.158
 
 - fix(peers): require Runtime 0.318 for lossless turn continuation (#1094)
