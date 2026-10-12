@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.158
+
+- fix(peers): require Runtime 0.318 for lossless turn continuation (#1094)
+
 ## 0.60.157
 
 - fix(sandbox): never restart a reused box that is serving running sessions (#981)
