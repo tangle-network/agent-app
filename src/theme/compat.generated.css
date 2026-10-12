@@ -1,5 +1,5 @@
 /* GENERATED from @tangle-network/brand/styles/legacy-light.css
- * SHA-256: 3e234bf78f67517f5541305f7657f577aef8fd53a0208154a7916d64951c299e
+ * SHA-256: f0c9b4afc71b5f847e88e901d7be6280865ef727bc58729f3fb59f9ec9b2aeef
  * Run node src/theme/build.mjs --write; do not edit colors or ratios here. */
 :where(:root),
 [data-sandbox-ui],
@@ -93,9 +93,19 @@
 }
 [data-theme="hospitality"]:where(:not(.dark)) {
     --agent-app-accent-hsl: 152.5 37.5% 25.098%;
-    --agent-app-accent-foreground-hsl: 0 0% 100%
+    --agent-app-accent-foreground-hsl: 0 0% 100%;
+    --agent-app-success-hsl: 141.6393 50.4132% 23.7255%;
+    --agent-app-success-foreground-hsl: 0 0% 100%;
+    --agent-app-danger-hsl: 359.0323 60.1942% 40.3922%;
+    --agent-app-danger-foreground-hsl: 0 0% 100%;
+    --agent-app-warning-text-hsl: 33.6207 82.8571% 27.451%
 }
 .dark[data-theme="hospitality"] {
-    --agent-app-accent-hsl: 144.4898 31.6129% 69.6078%;
-    --agent-app-accent-foreground-hsl: 0 0% 0%
+    --agent-app-accent-hsl: 143.4146 36.2832% 77.8431%;
+    --agent-app-accent-foreground-hsl: 0 0% 0%;
+    --agent-app-success-hsl: 136.3636 63.6364% 76.2745%;
+    --agent-app-success-foreground-hsl: 0 0% 0%;
+    --agent-app-danger-hsl: 2.5352 81.6092% 82.9412%;
+    --agent-app-danger-foreground-hsl: 0 0% 0%;
+    --agent-app-warning-text-hsl: 37.92 98.4252% 75.098%
 }
