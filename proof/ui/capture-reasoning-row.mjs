@@ -19,9 +19,13 @@ const url = (story, theme) => `${origin}/iframe.html?id=${story}&viewMode=story&
 const browser = await chromium.launch({ headless: true })
 const viewport = { width: 1100, height: 640 }
 const steps = []
+const consoleLines = []
+let page
 try {
   const context = await browser.newContext({ viewport, colorScheme: 'dark', recordVideo: { dir: output, size: viewport } })
-  const page = await context.newPage()
+  page = await context.newPage()
+  page.on('console', (message) => consoleLines.push(`${message.type()}: ${message.text()}`.slice(0, 400)))
+  page.on('pageerror', (error) => consoleLines.push(`pageerror: ${error.message}`.slice(0, 400)))
   const startedAt = Date.now()
   const step = (name, detail = {}) => steps.push({ name, atMs: Date.now() - startedAt, ...detail })
 
@@ -32,7 +36,7 @@ try {
   const live = page.locator('[data-reasoning="thinking"]')
   const firstChars = (await live.textContent()).length
   const firstLabel = (await thinking.textContent()).trim()
-  step('thinking', { label: firstLabel, chars: firstChars })
+  step('thinking', { label: firstLabel, chars: firstChars, html: (await live.innerHTML()).slice(0, 400) })
 
   await page.waitForTimeout(2_500)
   const laterChars = (await live.textContent()).length
@@ -71,6 +75,12 @@ try {
   await savedPage.screenshot({ path: `${output}/reasoning-row-saved-light.png` })
   step('saved-light')
   await light.close()
+} catch (error) {
+  // Keep what the page showed when a step failed, so the failure can be read without rerunning.
+  const region = page ? await page.locator('[data-run-row]').first().evaluate((el) => el.outerHTML.slice(0, 3000)).catch(() => null) : null
+  if (page) await page.screenshot({ path: `${output}/reasoning-row-failure.png` }).catch(() => {})
+  steps.push({ name: 'failed', error: String(error?.message ?? error), region, console: consoleLines.slice(-30) })
+  process.exitCode = 1
 } finally {
   await browser.close()
   writeFileSync(`${output}/reasoning-row-steps.json`, `${JSON.stringify({ origin, steps }, null, 2)}\n`)

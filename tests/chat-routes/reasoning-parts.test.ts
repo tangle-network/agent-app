@@ -109,6 +109,7 @@ describe('reasoning parts', () => {
   it('the client keeps one reasoning state: starts on the first delta, joins a run after a tool, ends on the answer', async () => {
     steppingClock()
     const states: ChatReasoningState[] = []
+    const order: string[] = []
     await consumeChatStream(ndjson([
       { kind: 'event', event: { type: 'reasoning', text: 'Need the ' } },
       { kind: 'event', event: { type: 'reasoning', text: 'count.' } },
@@ -116,7 +117,12 @@ describe('reasoning parts', () => {
       { kind: 'event', event: { type: 'reasoning', text: 'Four are ready.' } },
       { kind: 'event', event: { type: 'text', text: 'Four ' } },
       { kind: 'event', event: { type: 'text', text: 'rooms.' } },
-    ]), { onReasoningState: state => states.push(state) })
+    ]), {
+      onReasoningState: (state) => { states.push(state); order.push(state.thinking ? 'thinking' : 'ended') },
+      onText: (delta) => order.push(`text:${delta}`),
+    })
+    // Thinking ends the moment the answer's first word arrives, not when the stream closes.
+    expect(order.slice(-3)).toEqual(['ended', 'text:Four ', 'text:rooms.'])
     const startedAt = states[0]!.startedAt!
     expect(states.map(state => [state.text, state.thinking])).toEqual([
       ['Need the ', true],
