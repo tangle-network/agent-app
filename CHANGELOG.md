@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.131
+
+- fix(studio): the closed model trigger draws the maker's logo like the rows (#1073)
+
 ## 0.60.130
 
 - feat(router-turn): reply in the sender's language and name conflicting sources (#1061)
