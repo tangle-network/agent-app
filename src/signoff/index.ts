@@ -108,7 +108,10 @@ export { runWorkspaceSurfaceCli } from './workspace-surface-cli'
 export {
   createRequestMeter,
   formatNetworkCount,
+  isOverBudget,
   meterContext,
+  NETWORK_OVER_BUDGET_EXIT,
+  networkExitCode,
   QUIET_CHROMIUM_ARGS,
   REQUEST_BUDGET_PER_10S,
   type NetworkCount,

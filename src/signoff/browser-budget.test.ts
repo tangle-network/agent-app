@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createRequestMeter, formatNetworkCount, QUIET_CHROMIUM_ARGS } from './browser-budget'
+import { createRequestMeter, formatNetworkCount, meterContext, NETWORK_OVER_BUDGET_EXIT, networkExitCode, QUIET_CHROMIUM_ARGS, REQUEST_BUDGET_PER_10S } from './browser-budget'
 
 describe('browser check request budget', () => {
   it('counts requests and the busiest 10 s window', () => {
@@ -37,5 +37,23 @@ describe('browser check request budget', () => {
   it('turns off prerender and speculative prefetch', () => {
     expect(QUIET_CHROMIUM_ARGS.join(' ')).toMatch(/Prerender2/)
     expect(QUIET_CHROMIUM_ARGS.join(' ')).toMatch(/SpeculationRules/)
+  })
+  it('fails a run whose busiest 10 s went over the budget', () => {
+    expect(networkExitCode({ requests: 1900, peak10s: 373 })).toBe(NETWORK_OVER_BUDGET_EXIT)
+    expect(formatNetworkCount({ requests: 1900, peak10s: 373 })).toMatch(/^FAIL network: 1900 requests/)
+    expect(networkExitCode({ requests: 400, peak10s: REQUEST_BUDGET_PER_10S })).toBe(0)
+    expect(formatNetworkCount({ requests: 400, peak10s: 120 })).toMatch(/^network:/)
+    expect(networkExitCode(undefined)).toBe(0)
+  })
+
+  it('meters a context without a route, so the HTTP cache stays on', async () => {
+    const calls: string[] = []
+    const context = {
+      route: async () => { calls.push('route') },
+      on: (event: string) => { calls.push(`on:${event}`) },
+    }
+    const meter = createRequestMeter()
+    await meterContext(context as unknown as Parameters<typeof meterContext>[0], meter)
+    expect(calls).toEqual(['on:request'])
   })
 })

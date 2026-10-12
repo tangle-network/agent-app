@@ -6,9 +6,10 @@
  *   agent-app-signoff surface-ladder --base-url http://127.0.0.1:8787 \
  *     --route /workspaces/w1/connections --route /workspaces/w1/overview --storage-state auth.json
  *
- * Exit 0 when every route, width and theme passes; 1 on any failure; 2 on a usage error.
+ * Exit 0 when every route, width and theme passes; 1 on any failure; 2 on a usage error;
+ * 3 when the pages passed but the run went over the shared edge budget.
  */
-import { formatNetworkCount } from './browser-budget'
+import { formatNetworkCount, networkExitCode } from './browser-budget'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { checkSurfaceLadder, formatSurfaceLadderReport, type SurfaceLadderOptions } from './surface-ladder'
@@ -106,5 +107,5 @@ export async function runSurfaceLadderCli(argv: readonly string[]): Promise<numb
   }
   process.stdout.write(`${formatSurfaceLadderReport(report)}\n`)
   if (report.network) process.stdout.write(`${formatNetworkCount(report.network)}\n`)
-  return report.findings.length ? 1 : 0
+  return report.findings.length ? 1 : networkExitCode(report.network)
 }
