@@ -214,12 +214,19 @@ describe('createDelegatedKeyProvisioner (for createIdentityBoundWorkspaceKeyMana
     expect(lapse).not.toBeInstanceOf(DelegatedKeyMissingError)
   })
 
-  it('revokes a key it minted through revoke-slot when the SSO source may not DELETE it', async () => {
-    const { client, calls } = platform(minted(1), () => ({ status: 403, body: {} }), () => ({ status: 200, body: { success: true, data: { revoked: 1 } } }))
+  it('retires a key through revoke-slot when the SSO source may not DELETE it, even after a restart', async () => {
+    const { client, calls } = platform(
+      () => ({ status: 403, body: {} }),
+      () => ({ status: 200, body: { success: true, data: { id: 'key_7', name: 'auto:tax-agent:router:ws-1:op-1', product: 'router' } } }),
+      () => ({ status: 200, body: { success: true, data: { revoked: 1 } } }),
+    )
+    // A fresh provisioner: it never saw this key minted, so the slot name comes from Platform.
     const keys = createDelegatedKeyProvisioner({ client, sourceKey: SOURCE, product: 'router', payerId: 'usr_payer', expect: { sourceKeyId: 'key_source' } })
-    await keys.createKey({ name: 'ws-1:op-1', product: 'router', budgetUsd: 5, expiresAt: EXPIRES.toISOString(), idempotencyKey: 'k' })
-    await expect(keys.revokeKey('key_1')).resolves.toBeNull()
-    expect(calls[2]!.body).toMatchObject({ userId: 'usr_payer', name: 'auto:tax-agent:router:ws-1:op-1', childKeyId: 'key_1', sourceKeyId: 'key_source' })
+    await expect(keys.revokeKey('key_7')).resolves.toBeNull()
+    expect(calls.map(call => `${call.method} ${new URL(call.url).pathname}`)).toEqual(
+      ['DELETE /v1/keys/key_7', 'GET /v1/keys/key_7', 'POST /v1/keys/auto-provisioned/revoke-slot'])
+    expect(calls[2]!.body).toEqual({ userId: 'usr_payer', name: 'auto:tax-agent:router:ws-1:op-1', product: 'router',
+      childKeyId: 'key_7', sourceKeyId: 'key_source' })
   })
 
   it('surfaces a refused mint as a typed error without a key', async () => {

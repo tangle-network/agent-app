@@ -113,11 +113,17 @@ export interface DelegatedKeyVerdict {
   expiresAt?: string
 }
 
-/** Identifies a key's slot for Platform's service-authenticated `revoke-slot`. */
+/**
+ * Identifies a key's slot for Platform's service-authenticated `revoke-slot`. Without `name` and `product`,
+ * the client reads them from the key itself (`GET /v1/keys/:id`, which an SSO source may call), so a
+ * provisioner restarted since the mint can still retire the key. Tax and Legal need `sourceKeyId`; GTM
+ * and Builder admit `revoke-slot` only for their protected and preview keys, so their other keys keep
+ * the refused DELETE as a typed error.
+ */
 export interface DelegatedKeySlotRef {
   userId: string
-  name: string
-  product: string
+  name?: string
+  product?: string
   sourceKeyId?: string
 }
 
@@ -272,7 +278,11 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
       if (problem) {
         // A child Platform minted but this app cannot trust is retired, never returned.
         const id = typeof data.id === 'string' && data.id ? data.id : null
-        const revoked = id ? await client.revoke({ sourceKey: request.sourceKey, keyId: id }) : null
+        const owner = request.expect?.payerId
+          ? { userId: request.expect.payerId, name, product: request.product,
+              ...(request.expect.sourceKeyId ? { sourceKeyId: request.expect.sourceKeyId } : {}) }
+          : undefined
+        const revoked = id ? await client.revoke({ sourceKey: request.sourceKey, keyId: id, ...(owner ? { slot: owner } : {}) }) : null
         return failure(502, 'delegated_key.response_invalid', `Platform returned ${problem}.`,
           id && !revoked?.succeeded ? { unrevokedKeyId: id } : {})
       }
@@ -312,9 +322,22 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
         return { succeeded: true, value: null }
       }
       if (result.status === 403 && slot) {
+        let name = slot.name
+        let product = slot.product
+        if (!name || !product) {
+          const row = await call(`/v1/keys/${encodeURIComponent(keyId)}`, { method: 'GET', bearer: sourceKey, service: false })
+          const data = record(row?.body?.data)
+          if (row?.status === 404) return { succeeded: true, value: null }
+          if (!row || row.status !== 200 || typeof data?.name !== 'string' || typeof data.product !== 'string') {
+            return { succeeded: false, error: refusal(row?.status ?? 503, null) }
+          }
+          if (data.revokedAt) return { succeeded: true, value: null }
+          name = data.name
+          product = data.product
+        }
         const retired = await call('/v1/keys/auto-provisioned/revoke-slot', {
           method: 'POST', bearer: serviceToken(), service: true, body: {
-            userId: slot.userId, name: slot.name, product: slot.product, childKeyId: keyId,
+            userId: slot.userId, name, product, childKeyId: keyId,
             ...(slot.sourceKeyId ? { sourceKeyId: slot.sourceKeyId } : {}),
           },
         })
@@ -339,6 +362,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
           ? [{ id: value.id }] : []
       }) }
     },
+  }
   return client
 }
 
@@ -402,14 +426,10 @@ export function createDelegatedKeyProvisioner(input: {
   payerId?: string
 }): DelegatedKeyProvisioner {
   const product = input.product
-  // Slot names by key id, for the revoke-slot fallback; a key minted by an earlier process falls back to DELETE only.
-  const names = new Map<string, string>()
-  const slotFor = (keyId: string): DelegatedKeySlotRef | undefined => {
-    const name = names.get(keyId)
-    return name && input.payerId
-      ? { userId: input.payerId, name, product, ...(input.expect?.sourceKeyId ? { sourceKeyId: input.expect.sourceKeyId } : {}) }
-      : undefined
-  }
+  // The revoke-slot fallback needs the payer; the client reads each key's slot name itself.
+  const slotOwner: DelegatedKeySlotRef | undefined = input.payerId
+    ? { userId: input.payerId, ...(input.expect?.sourceKeyId ? { sourceKeyId: input.expect.sourceKeyId } : {}) }
+    : undefined
   return {
     async createKey(create) {
       const minted = await input.client.delegate({
@@ -422,7 +442,6 @@ export function createDelegatedKeyProvisioner(input: {
         ...(input.expect ? { expect: input.expect } : {}),
       })
       if (!minted.succeeded) throw new DelegatedKeyRefusalError(minted.error)
-      names.set(minted.value.id, minted.value.name)
       return { id: minted.value.id, key: minted.value.key, budgetUsd: minted.value.budgetUsd, expiresAt: minted.value.expiresAt.toISOString() }
     },
     async getKey(id) {
@@ -445,10 +464,8 @@ export function createDelegatedKeyProvisioner(input: {
         message: `Platform refused the key for now (${v.invalidReason ?? 'no reason'}).` })
     },
     async revokeKey(id) {
-      const slot = slotFor(id)
-      const revoked = await input.client.revoke({ sourceKey: input.sourceKey, keyId: id, ...(slot ? { slot } : {}) })
+      const revoked = await input.client.revoke({ sourceKey: input.sourceKey, keyId: id, ...(slotOwner ? { slot: slotOwner } : {}) })
       if (!revoked.succeeded) throw new DelegatedKeyRefusalError(revoked.error)
-      names.delete(id)
       return null
     },
     async findCreatedKeys(find) {
