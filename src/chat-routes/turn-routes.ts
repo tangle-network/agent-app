@@ -418,12 +418,16 @@ interface ChatTurnLifecycleBase<TContext> {
   turnStreamId: string
   context: TContext
 }
+/** When the turn's first visible word streamed, measured from `onTurnStart`. Absent when no word streamed. */
+interface ChatTurnLifecycleTiming {
+  firstTextMs?: number
+}
 /** Define lifecycle start event with context and timestamp for a chat turn */
 export interface ChatTurnLifecycleStart<TContext> extends ChatTurnLifecycleBase<TContext> {
   startedAt: number
 }
 /** Define the structure representing the completion state of a chat turn lifecycle with usage data */
-export interface ChatTurnLifecycleComplete<TContext> extends ChatTurnLifecycleBase<TContext> {
+export interface ChatTurnLifecycleComplete<TContext> extends ChatTurnLifecycleBase<TContext>, ChatTurnLifecycleTiming {
   finalText: string
   usage: ChatTurnUsage
   durationMs: number
@@ -455,7 +459,7 @@ export interface ChatTurnLifecycleComplete<TContext> extends ChatTurnLifecycleBa
   gated?: true
 }
 /** Represent an error occurring during a chat turn lifecycle with context and duration information */
-export interface ChatTurnLifecycleError<TContext> extends ChatTurnLifecycleBase<TContext> {
+export interface ChatTurnLifecycleError<TContext> extends ChatTurnLifecycleBase<TContext>, ChatTurnLifecycleTiming {
   error: unknown
   durationMs: number
 }
@@ -788,6 +792,16 @@ function userPartsWithFiles(
     ...fileParts.map((part) => ({ ...part })),
     ...mentions.map((mention) => ({ ...mentionInputToPart(mention) })),
   ])
+}
+
+/** A word the user sees: a producer `text` event, or a sandbox text part delta. */
+function isVisibleText(event: ChatRouteEvent): boolean {
+  const value = event as ChatRouteEvent & { text?: unknown }
+  if (event.type === 'text') return typeof value.text === 'string' ? value.text.trim().length > 0 : true
+  if (event.type !== 'message.part.updated') return false
+  const part = event.data?.part as { type?: unknown } | undefined
+  const delta = event.data?.delta
+  return part?.type === 'text' && typeof delta === 'string' && delta.trim().length > 0
 }
 
 // ── producer-stream wrappers (heartbeat + raw tap) ───────────────────────────
@@ -1221,6 +1235,8 @@ export function createChatTurnRoutes<TContext = void>(
     // when no drain throw supplies a richer cause.
     let lastFailureData: Record<string, unknown> | undefined
     let turnStartedAtMs = 0
+    // The first visible word, the number a rollout's first-words kill line reads.
+    let firstTextAtMs: number | undefined
     let turnStarted = false
     let lifecycleSettled = false
     // Set when `contextGate` answered the turn without running the producer.
@@ -1235,17 +1251,18 @@ export function createChatTurnRoutes<TContext = void>(
       const lifecycle = options.lifecycle
       if (!lifecycle) return
       const durationMs = Date.now() - turnStartedAtMs
+      const timing = firstTextAtMs === undefined ? {} : { firstTextMs: firstTextAtMs - turnStartedAtMs }
       try {
         if (failed) {
           await lifecycle.onTurnError?.({
-            identity, executionId, turnStreamId, context, durationMs,
+            identity, executionId, turnStreamId, context, durationMs, ...timing,
             error: terminalError ?? lastFailureData ?? new Error('chat turn failed'),
           })
         } else {
           const failoverInfo = producer?.modelFailover?.()
           const attribution = producer?.modelAttribution?.()
           await lifecycle.onTurnComplete?.({
-            identity, executionId, turnStreamId, context, durationMs,
+            identity, executionId, turnStreamId, context, durationMs, ...timing,
             finalText: producer?.finalText() ?? '',
             usage: producer?.usage?.() ?? {},
             assistantMessageId: assistantRowId(),
@@ -1424,6 +1441,7 @@ export function createChatTurnRoutes<TContext = void>(
             finalText: () => producer?.finalText() ?? '',
           }),
           onEvent: async (event) => {
+            if (firstTextAtMs === undefined && isVisibleText(event)) firstTextAtMs = Date.now()
             if (event.type === 'session.run.failed' || event.type === 'error') {
               runFailed = true
               lastFailureData = event.data

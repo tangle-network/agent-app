@@ -333,6 +333,29 @@ describe('SessionHistoryPanel', () => {
     expect(screen.getByText('Session a').closest('a')?.getAttribute('href')).toBe('/app/ws_1/chat/a')
   })
 
+  it('omits its own header row when the host supplies the page header', () => {
+    const { container, rerender } = renderPanel({ title: 'Chat history', newSessionHref: '/app/ws_1/chat' })
+    expect(container.querySelector('[data-shell-header]')).toBeTruthy()
+    expect(screen.getByText('Chat history')).toBeTruthy()
+    rerender(
+      <SessionHistoryPanel
+        history={panelState({ items: [session('a')] })}
+        hasAnySessions
+        query=""
+        onQueryChange={() => {}}
+        sort="newest"
+        onSortChange={() => {}}
+        hrefForSession={(id) => `/app/ws_1/chat/${id}`}
+        title="Chat history"
+        newSessionHref="/app/ws_1/chat"
+        showHeader={false}
+      />,
+    )
+    expect(container.querySelector('[data-shell-header]')).toBeNull()
+    expect(screen.queryByText('Chat history')).toBeNull()
+    expect(screen.getByText('Session a')).toBeTruthy()
+  })
+
   it('shows the first-run empty state, not a no-matches message', () => {
     renderPanel({ hasAnySessions: false, history: panelState() })
     expect(screen.getByText('No sessions yet')).toBeTruthy()

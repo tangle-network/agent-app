@@ -94,6 +94,18 @@ export {
 } from './surface-ladder'
 export { parseSurfaceLadderArgs, runSurfaceLadderCli } from './surface-ladder-cli'
 export {
+  checkWorkspaceSurface,
+  collectWorkspaceSurface,
+  formatWorkspaceSurfaceReport,
+  judgeWorkspaceSurface,
+  HEADER_TOP_TOLERANCE_PX,
+  type WorkspaceSurfaceFinding,
+  type WorkspaceSurfaceOptions,
+  type WorkspaceSurfaceReport,
+  type WorkspaceSurfaceSample,
+} from './workspace-surface'
+export { runWorkspaceSurfaceCli } from './workspace-surface-cli'
+export {
   checkWorkerDefaults,
   formatWorkerDefaults,
   WORKER_COMPATIBILITY_DATE_FLOOR,

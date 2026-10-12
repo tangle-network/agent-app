@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-493 exports.
+501 exports.
 
 ### `acceptRejectionReason`
 
@@ -1438,6 +1438,14 @@ interface FileMention
 (files: File[] | FileList, accept?: string | undefined) => { accepted: File[]; rejected: ComposerFileRejection[]; }
 ```
 
+### `firstUnansweredRequiredField`
+
+`function` — The first required field still without an answer, or null when every required field has one: the reason `buildAnswerData` returned null.
+
+```ts
+(fields: ({ name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined;…
+```
+
 ### `FlowWaterfall`
 
 `function` — Compact proportional waterfall over a FlowTrace — span name, bar, duration per row; total + cost in the footer.
@@ -1492,6 +1500,14 @@ interface FlowWaterfallProps
 
 ```ts
 (msg: ChatMessageMetrics, models: CatalogModel[]) => string | null
+```
+
+### `formatModelPrice`
+
+`function` — The price a person pays per output, in the unit that output comes in: per million prompt tokens for text, per image, per second of video, per minute of audio, per 1,000 characters of speech.
+
+```ts
+(model: Pick<CatalogModel, "pricing" | "outputPrice">) => string | undefined
 ```
 
 ### `formatRecordGridValue`
@@ -2006,6 +2022,14 @@ type InteractionSubmitResult
 (status: ChatInteractionStatus) => boolean
 ```
 
+### `isTurnIntentEvent`
+
+`function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
+
+```ts
+(event: unknown) => event is TurnIntentEvent
+```
+
 ### `isTurnPhaseEvent`
 
 `function` — True for a {@link TURN_PHASE_EVENT} with a usable `phase` and `message`.
@@ -2020,6 +2044,14 @@ type InteractionSubmitResult
 
 ```ts
 (interaction: ChatInteraction, data: InteractionData) => string
+```
+
+### `LateAnswerResult`
+
+`type` — What a host did with a late answer: sent it (`true` or nothing returned), queued it behind the running turn, or refused it (`false`).
+
+```ts
+type LateAnswerResult
 ```
 
 ### `lazyRoute`
@@ -2156,6 +2188,14 @@ interface MentionTextSegment
 
 ```ts
 interface MessageAttachmentsProps
+```
+
+### `missingAnswerHint`
+
+`function` — What the reader still has to do before the card's action (`verb`: submit, send) is available, in plain words, for the line beside the disabled button.
+
+```ts
+(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
 ```
 
 ### `MissionActivityLane`
@@ -3227,7 +3267,7 @@ interface SessionPageQuery
 `function` — Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}.
 
 ```ts
-(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>
+(response: Response, onPhase: (phase: TurnPhaseData) => void, onIntent?: ((intent: TurnIntentData) => void) | undefined…
 ```
 
 ### `SlashCommand`
@@ -3430,6 +3470,14 @@ interface ToolRunStep
 (name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }
 ```
 
+### `TURN_INTENT_EVENT`
+
+`const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
+
+```ts
+"session.run.intent"
+```
+
 ### `TURN_PHASE_EVENT`
 
 `const` — Stream event naming the turn's current stage.
@@ -3476,6 +3524,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 "turn_stream_lost"
+```
+
+### `TurnIntentData`
+
+`type` — The data of a {@link TURN_INTENT_EVENT}.
+
+```ts
+type TurnIntentData
+```
+
+### `TurnIntentEvent`
+
+`type` — A {@link TURN_INTENT_EVENT} as it crosses the wire.
+
+```ts
+type TurnIntentEvent
 ```
 
 ### `TurnPhaseData`
