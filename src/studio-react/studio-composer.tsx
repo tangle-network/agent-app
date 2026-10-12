@@ -570,6 +570,8 @@ export function StudioComposer({
   const loadingModels = Boolean(workspaceId) && (catalogLoading || (!catalog && !catalogError))
   const modelStatus = loadingModels ? 'Loading media models…' : catalogError ?? (laneDown ? laneDownMessage : null)
   const showModelMenu = catalogReady && curatedModels.length > 0
+  // The trigger draws the same brand the picker rows do: the maker, else the host.
+  const triggerBrand = modelOption?.maker?.trim() || modelOption?.provider
   const pickerModels = useMemo(() => curatedModels.map((model) => pickerModel(model, type)), [curatedModels, type])
   // The trigger names none on a dead lane: a model name there reads as a
   // working choice the user could send. A model the catalog does not list
@@ -639,8 +641,8 @@ export function StudioComposer({
                 triggerContent={(
                   <span className="contents">
                     {modelUnavailable && <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />}
-                    {!laneDown && modelOption?.provider && (
-                      <span className="shrink-0" aria-hidden><ProviderLogo provider={modelOption.provider} size={16} /></span>
+                    {!laneDown && triggerBrand && (
+                      <span className="shrink-0" aria-hidden><ProviderLogo provider={triggerBrand} size={16} /></span>
                     )}
                     <span className="max-w-[160px] truncate leading-normal">{modelDisplayName}</span>
                   </span>
