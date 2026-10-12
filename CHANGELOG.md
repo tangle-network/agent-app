@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.141
+
+- refactor(provider-logo): draw from sandbox-ui ProviderMark, keep the monogram fallback (#1074)
+
 ## 0.60.140
 
 - feat(turn-knowledge): check every file before answering when a turn carries several (#1072)
