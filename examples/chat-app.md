@@ -195,6 +195,7 @@ function Chat({ threadId }: { threadId: string }) {
       resume: (turnId, fromSeq) => fetch(`/api/chat/replay/${turnId}?fromSeq=${fromSeq}`),
       callbacks: {
         onText: appendDelta,
+        onReasoningState: setReasoning, // a ChatReasoningState: spread it onto <ReasoningRow>
         onToolCall: showToolChip,
         onInteraction: showQuestionCard,
         onNotice: ({ noticeKind, text }) => showTranscriptNotice(noticeKind, text),
@@ -220,6 +221,18 @@ structured `{ type: 'error', data: { message, code?, details? } }` lines.
 `onNotice` consumes visible warning/auto-decline notices;
 `onErrorEventDetail` receives the structured fields while the existing
 `onErrorEvent(message)` callback continues to fire unchanged.
+
+Reasoning has one path. Both producers stream `reasoning` deltas and persist
+each reasoning run as `{ type: 'reasoning', text, time: { start, end } }`.
+`onReasoningState` hands the client a `ChatReasoningState` (`text`,
+`startedAt`, `endedAt`, `thinking`) after every delta and once when the answer
+starts; `chatReasoningFromParts(message.parts)` gives a saved message the same
+state, settled. `ChatMessages` renders it from `ChatUiMessage.reasoning`,
+`reasoningStartedAt` and `reasoningEndedAt`; anywhere else, spread the state
+onto `ReasoningRow`. A consumer that dispatches lines itself wraps its
+callbacks with `trackChatReasoning` and calls `end()` when the stream closes.
+An engine turn on an OpenAI model streams reasoning only when its
+`reasoningEffort` is above `none`.
 
 ### Bounded server tools
 

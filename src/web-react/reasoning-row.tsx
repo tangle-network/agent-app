@@ -78,10 +78,11 @@ export function ReasoningRow({
   const body = useMemo(() => renderText(shown), [renderText, shown])
 
   // Without the stream's timestamps, time the run from what this row saw:
-  // the first render while thinking to the first render after.
+  // the first reasoning it showed while thinking to the first render after.
+  const visible = text.trim() !== ''
   const seenStart = useRef<number | null>(null)
   const seenEnd = useRef<number | null>(null)
-  if (thinking) {
+  if (thinking && visible) {
     if (seenStart.current === null) seenStart.current = Date.now()
     seenEnd.current = null
   } else if (seenStart.current !== null && seenEnd.current === null) {
@@ -103,7 +104,7 @@ export function ReasoningRow({
     if (el && thinking) el.scrollTop = el.scrollHeight
   }, [shown, thinking])
 
-  if (!text.trim()) return null
+  if (!visible) return null
 
   const elapsedSeconds = thinking && start !== undefined ? Math.max(0, Math.floor((Date.now() - start) / 1000)) : 0
   const durationMs = !thinking && start !== undefined && end !== undefined && end >= start ? end - start : undefined

@@ -66,6 +66,19 @@ describe('ReasoningRow', () => {
     expect(trigger(container).getAttribute('aria-expanded')).toBe('false')
   })
 
+  it('starts its own timer at the first reasoning, not when the turn began', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(80_000)
+    // A streaming message mounts the row before any reasoning arrives (a sandbox still starting).
+    const { container, rerender } = render(<ReasoningRow text="" thinking />)
+    act(() => { vi.advanceTimersByTime(5_000) })
+    rerender(<ReasoningRow text="First thought." thinking />)
+    act(() => { vi.advanceTimersByTime(2_000) })
+    expect(trigger(container).textContent).toContain('Thinking · 2s')
+    rerender(<ReasoningRow text="First thought." thinking={false} />)
+    expect(trigger(container).textContent).toContain('Thought for 2 seconds')
+  })
+
   it('shows a saved turn collapsed: with times it says how long, without them it still opens', () => {
     const timed = render(<ReasoningRow text="Saved reasoning." startedAt={1_000} endedAt={2_200} />)
     expect(trigger(timed.container).textContent).toContain('Thought for 1 second')
