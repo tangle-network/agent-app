@@ -937,7 +937,14 @@ export function createIdentityBoundWorkspaceKeyManager(
       if (active) {
         const key = await options.crypto.decrypt(active.row.keyEncrypted)
         if (!key.trim()) throw new Error('workspace child key secret is empty')
-        return { key, usage: active.usage, refreshed: false }
+        // The decrypt is awaited after the expiry check; a key that expired meanwhile is never handed out.
+        if (Date.parse(active.usage.expiresAt) > now().getTime()) return { key, usage: active.usage, refreshed: false }
+        await options.store.markRevocationPending({
+          id: active.row.id,
+          error: 'active child key expired while it was read',
+          nextAttemptAt: now(),
+          incrementAttempts: false,
+        })
       }
       const finalCleanup = await retryPendingRevocationsUnlocked(identity, identity)
       if (finalCleanup.pending > 0) throw new Error('a previous workspace child-key cleanup is pending; issuance is blocked until it completes')

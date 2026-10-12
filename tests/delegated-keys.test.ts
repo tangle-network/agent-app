@@ -83,7 +83,13 @@ describe('createPlatformDelegatedKeyClient.delegate', () => {
     expect(calls[0]!.headers.get('x-service-name')).toBe('tax-agent')
     expect(calls[0]!.body).toEqual({ sourceKey: SOURCE, name: 'auto:tax-agent:router:turn:exec-1', product: 'router',
       resourceType: 'tax-turn', resourceId: 'exec-1', budgetUsd: 1, monthlyBudgetUsd: 1,
-      allowedModels: ['gpt-6-luna', 'kimi-k2.7'], expiresAt: EXPIRES.toISOString() })
+      allowedModels: ['gpt-6-luna', 'kimi-k2.7'], scopes: [], expiresAt: EXPIRES.toISOString() })
+  })
+
+  it('accepts a child that inherits the source restrictions and a personal source with no origin app', async () => {
+    const { client } = platform(minted(4, d => { d.allowedModels = ['gpt-6-luna']; d.attribution.originAppId = null }))
+    const { allowedModels: _omitted, ...withoutModels } = request
+    await expect(client.delegate(withoutModels)).resolves.toMatchObject({ succeeded: true, value: { id: 'key_4' } })
   })
 
   it.each([
@@ -128,26 +134,52 @@ describe('createPlatformDelegatedKeyClient.delegate', () => {
   })
 })
 
-describe('createPlatformDelegatedKeyClient.live and revoke', () => {
-  it("takes Platform's verify-by-id verdict, which refuses revoked, superseded and expired keys, and fails closed", async () => {
+describe('createPlatformDelegatedKeyClient.verify, revoke and listChildren', () => {
+  it("returns Platform's verify-by-id verdict for this key and fails closed on anything else", async () => {
     const { client, calls } = platform(
-      () => ({ status: 200, body: { valid: true, keyId: 'key_1' } }),
-      () => ({ status: 200, body: { valid: false, invalidReason: 'superseded' } }),
+      () => ({ status: 200, body: { valid: true, keyId: 'key_1', budgetUsd: 10, budgetRemaining: 6, expiresAt: EXPIRES.toISOString() } }),
+      () => ({ status: 200, body: { valid: false, invalidReason: 'key_revoked', keyId: 'key_1' } }),
+      () => ({ status: 200, body: { valid: true } }),
       () => ({ status: 200, body: { success: false } }),
       () => ({ status: 502, body: {} }),
     )
-    await expect(client.live({ keyId: 'key_1', product: 'router' })).resolves.toEqual({ succeeded: true, value: true })
-    await expect(client.live({ keyId: 'key_1', product: 'router' })).resolves.toEqual({ succeeded: true, value: false })
-    await expect(client.live({ keyId: 'key_1', product: 'router' })).resolves.toMatchObject({ succeeded: false, error: { code: 'delegated_key.response_invalid' } })
-    await expect(client.live({ keyId: 'key_1', product: 'router' })).resolves.toMatchObject({ succeeded: false, error: { code: 'delegated_key.unavailable' } })
+    await expect(client.verify({ keyId: 'key_1', product: 'router' })).resolves.toEqual({ succeeded: true,
+      value: { valid: true, budgetUsd: 10, budgetRemaining: 6, expiresAt: EXPIRES.toISOString() } })
+    await expect(client.verify({ keyId: 'key_1', product: 'router' })).resolves.toEqual({ succeeded: true, value: { valid: false, invalidReason: 'key_revoked' } })
+    // A valid verdict that does not name this key is not evidence about it.
+    await expect(client.verify({ keyId: 'key_1', product: 'router' })).resolves.toMatchObject({ succeeded: false, error: { code: 'delegated_key.response_invalid' } })
+    await expect(client.verify({ keyId: 'key_1', product: 'router' })).resolves.toMatchObject({ succeeded: false, error: { code: 'delegated_key.response_invalid' } })
+    await expect(client.verify({ keyId: 'key_1', product: 'router' })).resolves.toMatchObject({ succeeded: false, error: { code: 'delegated_key.unavailable' } })
     expect(calls[0]!.body).toEqual({ keyId: 'key_1', expectedProduct: 'router' })
     expect(calls[0]!.headers.get('x-service-name')).toBe('tax-agent')
   })
 
-  it('treats a key Platform no longer holds as revoked', async () => {
-    const { client } = platform(() => ({ status: 404, body: {} }), () => ({ status: 400, body: { success: false, error: { code: 'REVOKE_FAILED' } } }))
+  it('treats a key Platform no longer holds as revoked, and retires an SSO-source child through revoke-slot', async () => {
+    const { client, calls } = platform(
+      () => ({ status: 404, body: {} }),
+      () => ({ status: 403, body: { success: false, error: { code: 'FORBIDDEN' } } }),
+      () => ({ status: 200, body: { success: true, data: { revoked: 1 } } }),
+      () => ({ status: 403, body: { success: false, error: { code: 'FORBIDDEN' } } }),
+    )
     await expect(client.revoke({ sourceKey: SOURCE, keyId: 'key_9' })).resolves.toEqual({ succeeded: true, value: null })
+    const slot = { userId: 'usr_payer', name: 'auto:tax-agent:router:ws-1:op-1', product: 'router', sourceKeyId: 'key_source' }
+    await expect(client.revoke({ sourceKey: SOURCE, keyId: 'key_9', slot })).resolves.toEqual({ succeeded: true, value: null })
+    expect(calls[2]).toMatchObject({ method: 'POST', url: 'https://id.test/v1/keys/auto-provisioned/revoke-slot' })
+    expect(calls[2]!.body).toEqual({ ...slot, childKeyId: 'key_9' })
+    expect(calls[2]!.headers.get('authorization')).toBe('Bearer svc-token')
+    // Without a slot, a refused DELETE is reported, never assumed done.
     await expect(client.revoke({ sourceKey: SOURCE, keyId: 'key_9' })).resolves.toMatchObject({ succeeded: false })
+  })
+
+  it('lists live children in one canonical slot', async () => {
+    const { client } = platform(() => ({ status: 200, body: { success: true, data: [
+      { id: 'key_1', name: 'auto:tax-agent:router:ws-1:op-1', product: 'router' },
+      { id: 'key_2', name: 'auto:tax-agent:router:ws-1:op-1', product: 'router', revokedAt: '2026-10-12T00:00:00Z' },
+      { id: 'key_3', name: 'auto:tax-agent:router:ws-1:op-2', product: 'router' },
+      { id: 'key_4', name: 'auto:tax-agent:sandbox:ws-1:op-1', product: 'sandbox' },
+    ] } }))
+    await expect(client.listChildren({ sourceKey: SOURCE, name: 'ws-1:op-1', product: 'router' }))
+      .resolves.toEqual({ succeeded: true, value: [{ id: 'key_1' }] })
   })
 })
 
@@ -164,12 +196,30 @@ describe('createDelegatedKeyProvisioner (for createIdentityBoundWorkspaceKeyMana
       resourceType: 'workspace', resourceId: 'ws-1' })
   })
 
-  it('reports a key Platform no longer accepts as missing, the error the manager turns into revoke-and-remint', async () => {
-    const { client } = platform(() => ({ status: 200, body: { valid: false } }), () => ({ status: 200, body: { valid: true } }))
-    const error = await provisioner(client).getKey('key_1').catch((e: unknown) => e)
-    expect(error).toBeInstanceOf(DelegatedKeyMissingError)
-    expect(error).toMatchObject({ status: 404, code: 'not_found' })
-    await expect(provisioner(client).getKey('key_1')).resolves.toEqual({})
+  it("maps Platform's verdict: gone is missing, spent is exhausted, a funding lapse is a temporary refusal", async () => {
+    const { client } = platform(
+      () => ({ status: 200, body: { valid: true, keyId: 'key_1', budgetUsd: 10, budgetRemaining: 6, expiresAt: EXPIRES.toISOString() } }),
+      () => ({ status: 200, body: { valid: false, invalidReason: 'key_revoked', keyId: 'key_1' } }),
+      () => ({ status: 200, body: { valid: false, invalidReason: 'budget_exhausted', keyId: 'key_1', budgetUsd: 10 } }),
+      () => ({ status: 200, body: { valid: false, invalidReason: 'paid_access_required', keyId: 'key_1' } }),
+    )
+    const keys = provisioner(client)
+    await expect(keys.getKey('key_1')).resolves.toEqual({ budgetUsd: 10, budgetSpent: 4, expiresAt: EXPIRES.toISOString() })
+    const gone = await keys.getKey('key_1').catch((e: unknown) => e)
+    expect(gone).toBeInstanceOf(DelegatedKeyMissingError)
+    expect(gone).toMatchObject({ status: 404, code: 'not_found' })
+    await expect(keys.getKey('key_1')).resolves.toEqual({ budgetUsd: 10, budgetSpent: 10 })
+    const lapse = await keys.getKey('key_1').catch((e: unknown) => e)
+    expect(lapse).toBeInstanceOf(DelegatedKeyRefusalError)
+    expect(lapse).not.toBeInstanceOf(DelegatedKeyMissingError)
+  })
+
+  it('revokes a key it minted through revoke-slot when the SSO source may not DELETE it', async () => {
+    const { client, calls } = platform(minted(1), () => ({ status: 403, body: {} }), () => ({ status: 200, body: { success: true, data: { revoked: 1 } } }))
+    const keys = createDelegatedKeyProvisioner({ client, sourceKey: SOURCE, product: 'router', payerId: 'usr_payer', expect: { sourceKeyId: 'key_source' } })
+    await keys.createKey({ name: 'ws-1:op-1', product: 'router', budgetUsd: 5, expiresAt: EXPIRES.toISOString(), idempotencyKey: 'k' })
+    await expect(keys.revokeKey('key_1')).resolves.toBeNull()
+    expect(calls[2]!.body).toMatchObject({ userId: 'usr_payer', name: 'auto:tax-agent:router:ws-1:op-1', childKeyId: 'key_1', sourceKeyId: 'key_source' })
   })
 
   it('surfaces a refused mint as a typed error without a key', async () => {

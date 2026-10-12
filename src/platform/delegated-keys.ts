@@ -76,8 +76,9 @@ export interface DelegatedKeyRequest {
   budget?: DelegatedKeyBudget
   rpmLimit?: number
   expiresAt: Date
-  /** Checked against the child's attribution when given: the payer's Platform user id and the source key's id. */
-  expect?: { payerId?: string; sourceKeyId?: string }
+  /** Checked against the child's attribution when given: the payer's Platform user id, the source key's id, and
+   *  the origin app Platform carries over from the source (an app's SSO key; a personal key has none). */
+  expect?: { payerId?: string; sourceKeyId?: string; originAppId?: string | null }
 }
 
 export interface DelegatedKey {
@@ -102,12 +103,36 @@ export interface PlatformDelegatedKeyClientOptions {
   now?: () => number
 }
 
+/** Platform's `verify-by-id` verdict on one key, secret-free. */
+export interface DelegatedKeyVerdict {
+  valid: boolean
+  /** Platform's reason when not valid, e.g. `key_revoked`, `budget_exhausted`. */
+  invalidReason?: string
+  budgetUsd?: number
+  budgetRemaining?: number
+  expiresAt?: string
+}
+
+/** Identifies a key's slot for Platform's service-authenticated `revoke-slot`. */
+export interface DelegatedKeySlotRef {
+  userId: string
+  name: string
+  product: string
+  sourceKeyId?: string
+}
+
 export interface PlatformDelegatedKeyClient {
   delegate(request: DelegatedKeyRequest): Promise<DelegatedKeyOutcome<DelegatedKey>>
-  /** Platform's authoritative answer (`verify-by-id`): false once the key is revoked, superseded, expired or spent. */
-  live(input: { keyId: string; product: string }): Promise<DelegatedKeyOutcome<boolean>>
-  /** `DELETE /v1/keys/:id` with the source key. A key already gone counts as revoked. */
-  revoke(input: { sourceKey: string; keyId: string }): Promise<DelegatedKeyOutcome<null>>
+  /** Platform's authoritative verdict (`verify-by-id`), including revoked, expired and spent keys. */
+  verify(input: { keyId: string; product: string }): Promise<DelegatedKeyOutcome<DelegatedKeyVerdict>>
+  /**
+   * `DELETE /v1/keys/:id` with the source key; a key already gone counts as revoked. Platform refuses key
+   * mutations from a service-provisioned source (an app's SSO key) with 403; given `slot`, the client then
+   * retires the slot through `revoke-slot` with the service token.
+   */
+  revoke(input: { sourceKey: string; keyId: string; slot?: DelegatedKeySlotRef }): Promise<DelegatedKeyOutcome<null>>
+  /** Children of the source key in one slot, from `GET /v1/keys` with the source key. */
+  listChildren(input: { sourceKey: string; name: string; product: string }): Promise<DelegatedKeyOutcome<Array<{ id: string }>>>
 }
 
 /**
@@ -164,7 +189,8 @@ function childProblem(data: Record<string, unknown>, request: DelegatedKeyReques
   if (data.product !== request.product) return 'a different product'
   if (data.provisionedByService !== serviceName) return 'a different provisioner'
   if (data.scopes !== null && !(Array.isArray(data.scopes) && data.scopes.length === 0)) return 'control-plane scopes'
-  if (request.allowedModels ? !sameSet(data.allowedModels, request.allowedModels) : data.allowedModels != null) return 'a different model set'
+  // Omitted, the child inherits the source's model restriction, which only narrows it.
+  if (request.allowedModels && !sameSet(data.allowedModels, request.allowedModels)) return 'a different model set'
   const budget = request.budget
   if (budget && 'usd' in budget && !(typeof data.budgetUsd === 'number' && data.budgetUsd <= budget.usd)) return 'a budget larger than requested'
   if (budget?.monthlyUsd !== undefined && !(typeof data.monthlyBudgetUsd === 'number' && data.monthlyBudgetUsd <= budget.monthlyUsd)) {
@@ -174,7 +200,9 @@ function childProblem(data: Record<string, unknown>, request: DelegatedKeyReques
   const attribution = record(data.attribution)
   if (!attribution) return 'no attribution'
   if (attribution.version !== 1 || attribution.targetService !== request.product) return 'attribution for another target'
-  if (attribution.originAppId !== serviceName) return 'attribution from another app'
+  if (request.expect?.originAppId !== undefined && (attribution.originAppId ?? null) !== request.expect.originAppId) {
+    return 'attribution from another app'
+  }
   const parent = attribution.delegatedFromKeyId
   if (typeof parent !== 'string' || !parent || parent === id) return 'attribution without its parent key'
   if (request.expect?.sourceKeyId !== undefined && parent !== request.expect.sourceKeyId) return 'attribution for another source key'
@@ -230,6 +258,8 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
           ...(budget?.monthlyUsd !== undefined ? { monthlyBudgetUsd: budget.monthlyUsd } : {}),
           ...(request.allowedModels ? { allowedModels: [...new Set(request.allowedModels)] } : {}),
           ...(request.rpmLimit !== undefined ? { rpmLimit: request.rpmLimit } : {}),
+          // Omitted, Platform copies the source's scopes onto the child; a product key carries none.
+          scopes: [],
           expiresAt: request.expiresAt.toISOString(),
         },
       })
@@ -255,27 +285,60 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
       } }
     },
 
-    async live({ keyId, product }) {
+    async verify({ keyId, product }) {
       const result = await call('/v1/keys/verify-by-id', {
         method: 'POST', bearer: serviceToken(), service: true, body: { keyId, expectedProduct: product },
       })
-      // Fail closed: anything but a well-formed answer is not evidence the key is live.
+      // Fail closed: anything but a well-formed verdict for this key is not evidence about it.
       if (!result || result.status >= 500 || result.status === 429) return { succeeded: false, error: refusal(503, null) }
-      if (result.status !== 200 || typeof result.body?.valid !== 'boolean') {
-        return failure(502, 'delegated_key.response_invalid', 'Platform returned no verification verdict.')
+      const body = result.body
+      if (result.status !== 200 || typeof body?.valid !== 'boolean' || (body.valid && body.keyId !== keyId)) {
+        return failure(502, 'delegated_key.response_invalid', 'Platform returned no verification verdict for this key.')
       }
-      return { succeeded: true, value: result.body.valid === true && (result.body.keyId === undefined || result.body.keyId === keyId) }
+      const number = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined
+      return { succeeded: true, value: {
+        valid: body.valid,
+        ...(typeof body.invalidReason === 'string' ? { invalidReason: body.invalidReason } : {}),
+        ...(number(body.budgetUsd) !== undefined ? { budgetUsd: number(body.budgetUsd) } : {}),
+        ...(number(body.budgetRemaining) !== undefined ? { budgetRemaining: number(body.budgetRemaining) } : {}),
+        ...(typeof body.expiresAt === 'string' ? { expiresAt: body.expiresAt } : {}),
+      } }
     },
 
-    async revoke({ sourceKey, keyId }) {
+    async revoke({ sourceKey, keyId, slot }) {
       const result = await call(`/v1/keys/${encodeURIComponent(keyId)}`, { method: 'DELETE', bearer: sourceKey, service: false })
       if (!result) return { succeeded: false, error: refusal(503, null) }
       if (result.status === 404 || (result.status >= 200 && result.status < 300 && result.body?.success === true)) {
         return { succeeded: true, value: null }
       }
+      if (result.status === 403 && slot) {
+        const retired = await call('/v1/keys/auto-provisioned/revoke-slot', {
+          method: 'POST', bearer: serviceToken(), service: true, body: {
+            userId: slot.userId, name: slot.name, product: slot.product, childKeyId: keyId,
+            ...(slot.sourceKeyId ? { sourceKeyId: slot.sourceKeyId } : {}),
+          },
+        })
+        if (!retired) return { succeeded: false, error: refusal(503, null) }
+        if (retired.status >= 200 && retired.status < 300 && retired.body?.success === true) return { succeeded: true, value: null }
+        return { succeeded: false, error: refusal(retired.status, record(retired.body?.error)?.code) }
+      }
       return { succeeded: false, error: refusal(result.status, record(result.body?.error)?.code) }
     },
-  }
+
+    async listChildren({ sourceKey, name, product }) {
+      const canonical = canonicalDelegatedKeyName({ serviceName: options.serviceName, product, name })
+      const result = await call('/v1/keys', { method: 'GET', bearer: sourceKey, service: false })
+      if (!result) return { succeeded: false, error: refusal(503, null) }
+      const rows = result.body?.data
+      if (result.status !== 200 || result.body?.success !== true || !Array.isArray(rows)) {
+        return { succeeded: false, error: refusal(result.status, record(result.body?.error)?.code) }
+      }
+      return { succeeded: true, value: rows.flatMap((row) => {
+        const value = record(row)
+        return value && typeof value.id === 'string' && value.name === canonical && value.product === product && !value.revokedAt
+          ? [{ id: value.id }] : []
+      }) }
+    },
   return client
 }
 
@@ -307,10 +370,24 @@ export class DelegatedKeyRefusalError extends Error {
   }
 }
 
+/** Platform reasons that mean the key will never work again: the manager revokes the row and mints a fresh key. */
+const GONE_REASONS = new Set([
+  'key_not_found', 'key_revoked', 'key_expired', 'key_lineage_revoked',
+  'parent_key_not_found', 'parent_key_revoked', 'parent_key_expired', 'parent_key_lineage_revoked',
+  'ancestor_key_not_found', 'ancestor_key_revoked', 'ancestor_key_expired', 'ancestor_key_lineage_revoked',
+])
+const SPENT_REASONS = new Set(['budget_exhausted', 'monthly_budget_exhausted'])
+
 /**
  * Plug the client into `createIdentityBoundWorkspaceKeyManager` for a
  * workspace-held key. Pass the manager `nameForIdentity` returning a logical
  * slot name (the client sends Platform's canonical `auto:` form).
+ *
+ * `getKey` reads Platform's verdict: a key gone for good is reported missing
+ * (the manager marks it revoked and mints again); a spent key is reported
+ * exhausted (the manager revokes it remotely and mints again); a funding or
+ * eligibility refusal is a typed error, so a lapse never retires a key that
+ * still works.
  */
 export function createDelegatedKeyProvisioner(input: {
   client: PlatformDelegatedKeyClient
@@ -320,9 +397,19 @@ export function createDelegatedKeyProvisioner(input: {
   allowedModels?: readonly string[]
   monthlyBudgetUsd?: number
   rpmLimit?: number
-  expect?: { payerId?: string; sourceKeyId?: string }
+  expect?: { payerId?: string; sourceKeyId?: string; originAppId?: string | null }
+  /** Enables the `revoke-slot` fallback when the source is an app's SSO key (Platform refuses its key mutations). */
+  payerId?: string
 }): DelegatedKeyProvisioner {
   const product = input.product
+  // Slot names by key id, for the revoke-slot fallback; a key minted by an earlier process falls back to DELETE only.
+  const names = new Map<string, string>()
+  const slotFor = (keyId: string): DelegatedKeySlotRef | undefined => {
+    const name = names.get(keyId)
+    return name && input.payerId
+      ? { userId: input.payerId, name, product, ...(input.expect?.sourceKeyId ? { sourceKeyId: input.expect.sourceKeyId } : {}) }
+      : undefined
+  }
   return {
     async createKey(create) {
       const minted = await input.client.delegate({
@@ -335,23 +422,39 @@ export function createDelegatedKeyProvisioner(input: {
         ...(input.expect ? { expect: input.expect } : {}),
       })
       if (!minted.succeeded) throw new DelegatedKeyRefusalError(minted.error)
+      names.set(minted.value.id, minted.value.name)
       return { id: minted.value.id, key: minted.value.key, budgetUsd: minted.value.budgetUsd, expiresAt: minted.value.expiresAt.toISOString() }
     },
     async getKey(id) {
-      const verdict = await input.client.live({ keyId: id, product })
+      const verdict = await input.client.verify({ keyId: id, product })
       if (!verdict.succeeded) throw new DelegatedKeyRefusalError(verdict.error)
-      if (!verdict.value) throw new DelegatedKeyMissingError(id)
-      return {}
+      const v = verdict.value
+      if (v.valid) {
+        return {
+          ...(v.budgetUsd !== undefined ? { budgetUsd: v.budgetUsd } : {}),
+          ...(v.budgetUsd !== undefined && v.budgetRemaining !== undefined ? { budgetSpent: Math.max(0, v.budgetUsd - v.budgetRemaining) } : {}),
+          ...(v.expiresAt ? { expiresAt: v.expiresAt } : {}),
+        }
+      }
+      if (v.invalidReason && GONE_REASONS.has(v.invalidReason)) throw new DelegatedKeyMissingError(id)
+      if (v.invalidReason && SPENT_REASONS.has(v.invalidReason)) {
+        // Spent: the manager sees no budget left and revokes the child before minting again.
+        return { budgetUsd: v.budgetUsd ?? 0, budgetSpent: v.budgetUsd ?? 0, ...(v.expiresAt ? { expiresAt: v.expiresAt } : {}) }
+      }
+      throw new DelegatedKeyRefusalError({ status: 403, code: 'delegated_key.refused',
+        message: `Platform refused the key for now (${v.invalidReason ?? 'no reason'}).` })
     },
     async revokeKey(id) {
-      const revoked = await input.client.revoke({ sourceKey: input.sourceKey, keyId: id })
+      const slot = slotFor(id)
+      const revoked = await input.client.revoke({ sourceKey: input.sourceKey, keyId: id, ...(slot ? { slot } : {}) })
       if (!revoked.succeeded) throw new DelegatedKeyRefusalError(revoked.error)
+      names.delete(id)
       return null
     },
-    async findCreatedKeys() {
-      // Recovery by name needs a key list this client does not read; the manager then treats the
-      // provisioning attempt as orphaned, which is safe: an unknown child expires on its own.
-      return []
+    async findCreatedKeys(find) {
+      const listed = await input.client.listChildren({ sourceKey: input.sourceKey, name: find.name, product: find.product })
+      if (!listed.succeeded) throw new DelegatedKeyRefusalError(listed.error)
+      return listed.value
     },
   }
 }
