@@ -8,6 +8,7 @@
  * Same options as `shell-alignment` (it ignores --tolerance). Exit 0 when every
  * page is on the panel, 1 on any page that is not, 2 on a usage error.
  */
+import { formatNetworkCount } from './browser-budget'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { parseShellAlignmentArgs, ShellAlignmentUsageError } from './shell-alignment-cli'
@@ -46,5 +47,6 @@ export async function runWorkspaceSurfaceCli(argv: readonly string[]): Promise<n
     writeFileSync(abs, `${JSON.stringify(report, null, 2)}\n`)
   }
   process.stdout.write(`${formatWorkspaceSurfaceReport(report)}\n`)
+  if (report.network) process.stdout.write(`${formatNetworkCount(report.network)}\n`)
   return report.findings.length ? 1 : 0
 }

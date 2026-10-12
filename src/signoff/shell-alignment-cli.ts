@@ -8,6 +8,7 @@
  * Exit 0 when every route, width and theme is within tolerance; 1 on any
  * misaligned divider; 2 on a usage error.
  */
+import { formatNetworkCount } from './browser-budget'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { checkShellAlignment, formatShellAlignmentReport, type ShellAlignmentOptions } from './shell-alignment'
@@ -93,5 +94,6 @@ export async function runShellAlignmentCli(argv: readonly string[]): Promise<num
     writeFileSync(abs, `${JSON.stringify(report, null, 2)}\n`)
   }
   process.stdout.write(`${formatShellAlignmentReport(report)}\n`)
+  if (report.network) process.stdout.write(`${formatNetworkCount(report.network)}\n`)
   return report.findings.length ? 1 : 0
 }

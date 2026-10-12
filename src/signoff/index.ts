@@ -106,6 +106,15 @@ export {
 } from './workspace-surface'
 export { runWorkspaceSurfaceCli } from './workspace-surface-cli'
 export {
+  createRequestMeter,
+  formatNetworkCount,
+  meterContext,
+  QUIET_CHROMIUM_ARGS,
+  REQUEST_BUDGET_PER_10S,
+  type NetworkCount,
+  type RequestMeter,
+} from './browser-budget'
+export {
   checkWorkerDefaults,
   formatWorkerDefaults,
   WORKER_COMPATIBILITY_DATE_FLOOR,

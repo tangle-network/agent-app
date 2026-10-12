@@ -11,6 +11,8 @@
  * pass it.
  */
 
+import { createRequestMeter, meterContext, QUIET_CHROMIUM_ARGS, type NetworkCount } from './browser-budget'
+
 export interface WorkspaceSurfaceSample {
   readonly route: string
   readonly width: number
@@ -82,6 +84,8 @@ export interface WorkspaceSurfaceOptions {
 }
 
 export interface WorkspaceSurfaceReport {
+  /** Requests the run sent and its busiest 10 s (see browser-budget.ts). */
+  readonly network?: NetworkCount
   readonly samples: readonly WorkspaceSurfaceSample[]
   readonly findings: readonly WorkspaceSurfaceFinding[]
 }
@@ -89,7 +93,8 @@ export interface WorkspaceSurfaceReport {
 /** Drive Chromium over every route × width × theme. Needs the optional `playwright` peer. */
 export async function checkWorkspaceSurface(options: WorkspaceSurfaceOptions): Promise<WorkspaceSurfaceReport> {
   const { chromium } = await import('playwright')
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ args: [...QUIET_CHROMIUM_ARGS] })
+  const meter = createRequestMeter()
   const samples: WorkspaceSurfaceSample[] = []
   const findings: WorkspaceSurfaceFinding[] = []
   try {
@@ -103,8 +108,10 @@ export async function checkWorkspaceSurface(options: WorkspaceSurfaceOptions): P
         if (options.themeScript) {
           await context.addInitScript({ content: `(() => { const theme = ${JSON.stringify(theme)}; ${options.themeScript} })()` })
         }
+        await meterContext(context, meter)
         const page = await context.newPage()
         for (const route of options.routes) {
+          await meter.pace()
           await page.goto(new URL(route, options.baseUrl).toString(), { waitUntil: 'domcontentloaded' })
           await page.waitForSelector(options.readySelector ?? '[data-shell-header]', { state: 'visible', timeout: 15_000 }).catch(() => undefined)
           await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => undefined)
@@ -123,7 +130,7 @@ export async function checkWorkspaceSurface(options: WorkspaceSurfaceOptions): P
   } finally {
     await browser.close()
   }
-  return { samples, findings }
+  return { samples, findings, network: meter.count() }
 }
 
 export function formatWorkspaceSurfaceReport(report: WorkspaceSurfaceReport): string {

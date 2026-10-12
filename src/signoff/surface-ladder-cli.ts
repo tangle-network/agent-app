@@ -8,6 +8,7 @@
  *
  * Exit 0 when every route, width and theme passes; 1 on any failure; 2 on a usage error.
  */
+import { formatNetworkCount } from './browser-budget'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { checkSurfaceLadder, formatSurfaceLadderReport, type SurfaceLadderOptions } from './surface-ladder'
@@ -104,5 +105,6 @@ export async function runSurfaceLadderCli(argv: readonly string[]): Promise<numb
     writeFileSync(abs, `${JSON.stringify(report, null, 2)}\n`)
   }
   process.stdout.write(`${formatSurfaceLadderReport(report)}\n`)
+  if (report.network) process.stdout.write(`${formatNetworkCount(report.network)}\n`)
   return report.findings.length ? 1 : 0
 }
