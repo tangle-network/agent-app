@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.127
+
+- fix(billing): revoke an expired workspace key before minting its renewal (#1066)
+
 ## 0.60.126
 
 - fix(peers): agent-runtime floor is 0.316.0, the first release with every subpath src imports (#1065)
