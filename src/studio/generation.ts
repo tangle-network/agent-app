@@ -26,7 +26,11 @@ export interface Generation {
 export interface MediaModelOption {
   id: string
   name: string
+  /** The host that serves the request (fal, runway). */
   provider?: string
+  /** The brand that made the model (bytedance, google), when the catalogue
+   *  names one; the picker shows its logo instead of the host's. */
+  maker?: string
   type: GenerationType
   status: MediaModelStatus
   reason?: string

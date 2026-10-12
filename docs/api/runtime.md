@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-95 exports.
+103 exports.
 
 ### `AnySurfaceKind`
 
@@ -20,6 +20,14 @@ type AnySurfaceKind
 
 ```ts
 interface AppToolLoopOptions
+```
+
+### `asksForLanguage`
+
+`function` — True when the message names a language.
+
+```ts
+(message: string | undefined) => boolean
 ```
 
 ### `budgetTurnKnowledge`
@@ -68,6 +76,14 @@ interface CertifiedDelivery
 
 ```ts
 type CertifiedDeliveryConfig
+```
+
+### `CheckpointWorkspaceStore`
+
+`interface` — The fields of an agent-runtime `WorkspaceStore` a checkpoint needs; structural so any adapter fits.
+
+```ts
+interface CheckpointWorkspaceStore
 ```
 
 ### `composeRouterTurnPrompt`
@@ -156,6 +172,14 @@ interface CreateTangleRouterModelConfigOptions
 
 ```ts
 <TCtx>(opts: { kind: string; build: (ctx: TCtx) => SurfaceOverlay | Promise<SurfaceOverlay>; }) => SurfaceKindDefinitio…
+```
+
+### `DURABLE_HOP_BUDGET_MS`
+
+`const` — Wall time a durable hop may plan for: a Durable Object alarm or Queue consumer gets 15 minutes.
+
+```ts
+number
 ```
 
 ### `fetchModelCatalog`
@@ -304,10 +328,18 @@ type ProtectedRouterTurnOptions
 
 ### `ProtectedRouterTurnOutcome`
 
-`interface`
+`interface` — A grant turn's outcome.
 
 ```ts
 interface ProtectedRouterTurnOutcome
+```
+
+### `replyLanguageInstruction`
+
+`function` — The language a Router turn replies in, for every agent app: the sender's current message decides, then the conversation's.
+
+```ts
+() => string
 ```
 
 ### `resolveCatalogModelId`
@@ -436,6 +468,14 @@ interface RouterProtectedModelPortOptions
 
 ```ts
 type RouterProtectedModelSettlement
+```
+
+### `RouterTurnContinuation`
+
+`interface` — A checkpointed Router turn: the conversation after the system prompt, ready to continue.
+
+```ts
+interface RouterTurnContinuation
 ```
 
 ### `RouterTurnEvent`
@@ -734,6 +774,22 @@ type ToolLoopStopReason
 (value: string | null | undefined) => string | null
 ```
 
+### `turnCheckpointPath`
+
+`function`
+
+```ts
+(turnId: string) => string
+```
+
+### `TurnCheckpointStore`
+
+`interface` — Where a turn's checkpoint waits between hops.
+
+```ts
+interface TurnCheckpointStore
+```
+
 ### `TurnKnowledgeBudget`
 
 `interface`
@@ -764,4 +820,12 @@ interface TurnKnowledgeFile
 
 ```ts
 (store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…
+```
+
+### `workspaceTurnCheckpoints`
+
+`function` — Turn checkpoints in a workspace store, written as `actor`.
+
+```ts
+(store: CheckpointWorkspaceStore, workspaceId: string, actor: string) => TurnCheckpointStore
 ```

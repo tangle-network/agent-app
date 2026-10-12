@@ -120,6 +120,52 @@ describe('createWorkspaceKeyManager', () => {
     expect(h.revoked).toContain('key-1')
   })
 
+  it('renews an expired key on a parent with room for only one child (revokes the expired reservation first)', async () => {
+    const h = harness()
+    // The platform reserves each child's budget on the parent until revoke,
+    // expired or not. A $100 parent holds exactly one $100 child.
+    const reserved = new Set<string>()
+    const provisioner: KeyProvisioner = {
+      ...h.provisioner,
+      async createKey(input) {
+        if ((reserved.size + 1) * input.budgetUsd > 100) throw new Error('Child key budget cannot exceed parent remaining budget')
+        const created = await h.provisioner.createKey(input)
+        reserved.add(created.id!)
+        return created
+      },
+      async revokeKey(keyId) {
+        reserved.delete(keyId)
+        await h.provisioner.revokeKey(keyId)
+      },
+    }
+    let now = T0
+    const mgr = createWorkspaceKeyManager({ ...h, provisioner, defaultBudgetUsd: 100, now: () => now })
+    await mgr.ensureKey('ws1') // key-1, expires 2026-07-01
+    now = new Date('2026-07-02T00:00:00Z')
+    expect(await mgr.ensureKey('ws1')).toBe('sk-tan-key-2')
+    expect(h.revoked).toEqual(['key-1'])
+    expect(h.rows().filter((r) => r.status === 'active').map((r) => r.keyId)).toEqual(['key-2'])
+  })
+
+  it('still renews when revoking the expired key fails (rotate retries the revoke after the mint)', async () => {
+    const h = harness()
+    let failRevoke = true
+    const provisioner: KeyProvisioner = {
+      ...h.provisioner,
+      async revokeKey(keyId) {
+        if (failRevoke) { failRevoke = false; throw new Error('platform revoke 503') }
+        await h.provisioner.revokeKey(keyId)
+      },
+    }
+    let now = T0
+    const mgr = createWorkspaceKeyManager({ ...h, provisioner, defaultBudgetUsd: 100, now: () => now })
+    await mgr.ensureKey('ws1')
+    now = new Date('2026-07-02T00:00:00Z')
+    expect(await mgr.ensureKey('ws1')).toBe('sk-tan-key-2')
+    expect(h.revoked).toEqual(['key-1'])
+    expect(h.rows().filter((r) => r.status === 'active').map((r) => r.keyId)).toEqual(['key-2'])
+  })
+
   it('revokes the just-minted key when encrypt throws after a successful mint (no orphan)', async () => {
     const h = harness()
     const boom = new Error('FIELD_ENCRYPTION_KEY invalid at encrypt time')
