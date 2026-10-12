@@ -52,13 +52,18 @@ describe('scoreboardRows', () => {
 
   it("keeps Hardware's rows where the board already has them", () => {
     const summary: JourneySummary = { updatedAt: RUN, journeys: [{ id: 'h1', status: 'blocked', reason: 'engine behind a flag' }] }
-    const { writes } = scoreboardRows(summary, { app: 'hardware', versions: { 'flows/H1': 4, 'meta/board': 2 } })
+    const { writes } = scoreboardRows(summary, { app: 'hardware', legacyIds: true, versions: { 'flows/H1': 4, 'meta/board': 2 } })
     // Bare flow id and meta/board: the documents Hardware wrote before the board was shared.
     expect(writes.map((w) => `${w.op} ${w.collection}/${w.doc_id} v${w.if_version}`)).toEqual(['update flows/H1 v4', 'update meta/board v2'])
     // A merge keeps the flow and pass-bar text a person wrote, and clears what this run does not have.
     expect(writes[0]!.data).not.toHaveProperty('flow')
     expect(writes[0]!.data.firstTextS).toEqual({ __delete__: true })
     expect(writes[0]!.data.app).toBe('hardware')
+  })
+
+  it('writes every app, Hardware included, at <app>-<flowId> unless legacy ids are asked for', () => {
+    const { writes } = scoreboardRows({ updatedAt: RUN, journeys: [{ id: 'h1', status: 'pass' }] }, { app: 'hardware' })
+    expect(writes.map((w) => `${w.collection}/${w.doc_id}`)).toEqual(['flows/hardware-H1', 'meta/hardware'])
   })
 
   it('clears an old blocker when a flow passes', () => {

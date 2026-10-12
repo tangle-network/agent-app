@@ -5,15 +5,18 @@
  * The board is an artifact page whose shared store holds three collections:
  * `flows` (one row per flow), `prs` and `meta` (one document per app; Hardware's
  * is `board`, written before the board was shared). A row carries `app` and
- * `flowId`; a row without `app` belongs to Hardware, and Hardware rows keep
- * their bare flow id as the document id so the rows it already has are updated
- * in place, never duplicated.
+ * `flowId`; a row without `app` belongs to Hardware. Hardware's rows predate the
+ * shared board and live at their bare flow id and `meta/board`; its runner
+ * passes `legacyIds` so those rows are updated in place, never duplicated.
  *
  * A document that already exists is merged (`update`) and pinned to the
  * version the caller read from the store (`versions`), so the text a person
  * wrote for a flow (what the customer does, its pass bar) survives every run,
  * and a field the run no longer has (an old blocker on a flow that now passes)
- * is deleted. A document with no known version is created with `set`.
+ * is deleted. A document with no known version is created with `set`; the
+ * store refuses a `set` without a version on a document that already exists
+ * (version_mismatch, nothing written; checked against the board's store on
+ * 2026-10-12), so a row a person wrote is never replaced.
  *
  * Pure: the same summary and options give the same writes, in the same order.
  */
@@ -21,7 +24,7 @@
 export const SCOREBOARD_STATUSES = ['pass', 'fail', 'stall', 'blocked-host', 'blocked', 'skipped', 'unrecorded'] as const
 export type ScoreboardStatus = (typeof SCOREBOARD_STATUSES)[number]
 
-/** Rows a store wrote before the board was shared belong to this app. */
+/** Rows a store wrote before the board was shared, with no `app` field, belong to this app. */
 export const LEGACY_SCOREBOARD_APP = 'hardware'
 
 /** One journey in a run's `summary.json`. */
@@ -56,6 +59,12 @@ export interface ScoreboardOptions {
   app: string
   /** Current version of each document that exists, by `collection/docId`. */
   versions?: Readonly<Record<string, number>>
+  /**
+   * Write at the ids the board used before it was shared: the bare flow id and
+   * `meta/board`. Only Hardware's runner sets this; every other app's rows are
+   * `<app>-<flowId>` and `meta/<app>`.
+   */
+  legacyIds?: boolean
 }
 
 /** One entry of an artifact store batch, in the shape the batch write takes. */
@@ -81,13 +90,13 @@ const url = (value: unknown): string | undefined => (typeof value === 'string' &
 const seconds = (value: unknown): number | undefined => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined)
 
 /** The document id a flow row lives at. */
-export function scoreboardDocId(app: string, flowId: string): string {
-  return app === LEGACY_SCOREBOARD_APP ? flowId : `${app}-${flowId}`
+export function scoreboardDocId(app: string, flowId: string, legacyIds = false): string {
+  return legacyIds ? flowId : `${app}-${flowId}`
 }
 
 /** The `meta` document an app's run facts live at. */
-export function scoreboardMetaId(app: string): string {
-  return app === LEGACY_SCOREBOARD_APP ? 'board' : app
+export function scoreboardMetaId(app: string, legacyIds = false): string {
+  return legacyIds ? 'board' : app
 }
 
 /** Keys in a fixed order, so the same input always serializes the same way. */
@@ -141,7 +150,7 @@ export function scoreboardRows(summary: JourneySummary, options: ScoreboardOptio
       sha: summary.sha ?? DELETE,
       recordedAt: summary.updatedAt,
     }
-    flows.set(flowId, { op: 'update', collection: 'flows', doc_id: scoreboardDocId(app, flowId), data: sorted(data) })
+    flows.set(flowId, { op: 'update', collection: 'flows', doc_id: scoreboardDocId(app, flowId, options.legacyIds), data: sorted(data) })
   }
 
   const writes = [...flows.values()]
@@ -154,6 +163,6 @@ export function scoreboardRows(summary: JourneySummary, options: ScoreboardOptio
     lane: summary.lane ?? DELETE,
     updatedAt: summary.updatedAt,
   }
-  writes.push(pinned({ op: 'update', collection: 'meta', doc_id: scoreboardMetaId(app), data: sorted(meta) }, options.versions))
+  writes.push(pinned({ op: 'update', collection: 'meta', doc_id: scoreboardMetaId(app, options.legacyIds), data: sorted(meta) }, options.versions))
   return { writes, warnings }
 }
