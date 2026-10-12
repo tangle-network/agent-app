@@ -1104,7 +1104,7 @@ export function ChatComposer({
       style={{ minHeight: inputMinHeight, maxHeight }}
       aria-label="Message input"
       data-composer-input
-      className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground focus:outline-none placeholder:text-muted-foreground disabled:opacity-50"
+      className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground placeholder:text-muted-foreground disabled:opacity-50"
     />
   )
 
@@ -1301,8 +1301,8 @@ export function ChatComposer({
           controls out of the card in the first place. */}
       {/* `focusFieldWithin` makes the card a field: with brand's interaction
           tokens it carries the well fill (`--well`), field border, hover glow
-          and focus ring. The background falls back to the card color until
-          the host's brand defines `--well`. */}
+          and focus ring. Under a brand without the ladder, tokens.css sets
+          `--well` to the card color. */}
       <div
         ref={cardRef}
         data-testid="composer-card"
@@ -1347,7 +1347,8 @@ export function ChatComposer({
           </LazyLoadBoundary>
         ) : (
           // The card is the field (`focusFieldWithin`: well fill, field border,
-          // hover glow, focus ring), so the transparent input draws no outline.
+          // hover glow, focus ring), so tokens.css clears the transparent
+          // input's own outline (`[data-composer-input]:focus-visible`).
           textareaInput
         )}
 
