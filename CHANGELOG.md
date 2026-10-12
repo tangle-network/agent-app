@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.124
+
+- perf(agent-profiles): admitProfileTurn takes a read handle instead of re-reading pin and binding (#1058)
+
 ## 0.60.123
 
 - feat(router-turn): a turn at its budget returns a continuation instead of failing (#1041)
