@@ -47,9 +47,12 @@ describe('agent-runtime peer range', () => {
     const unknown = [...imported].filter(subpath => !(subpath in FIRST_RELEASE))
     expect(unknown, 'record the first agent-runtime release that exports each new subpath').toEqual([])
     const floor = [...imported].map(subpath => FIRST_RELEASE[subpath]!).reduce((a, b) => (newer(b, a) ? b : a))
-    const range = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).peerDependencies['@tangle-network/agent-runtime'] as string
+    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+    const range = manifest.peerDependencies['@tangle-network/agent-runtime'] as string
     const lowest = [...range.matchAll(/>=\s*(\d+\.\d+\.\d+)/g)].map(m => m[1]!)
     expect(lowest.filter(version => newer(floor, version)), `every band starts at or above ${floor}`).toEqual([])
-    expect(satisfiesRange(floor, range)).toBe(true)
+    // Behavioral contracts may require a newer floor than the first available export.
+    // The version actually used to verify this package must still be admitted.
+    expect(satisfiesRange(manifest.devDependencies['@tangle-network/agent-runtime'], range)).toBe(true)
   })
 })
