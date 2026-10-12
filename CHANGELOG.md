@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.152
+
+- test(billing): give the durable-lease waiter a wall-clock budget above a loaded runner (#1090)
+
 ## 0.60.151
 
 - test: match the sandbox-ui 0.134.2 floor and ProviderMark labels raised by #1074 (#1089)
