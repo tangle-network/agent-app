@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.145
+
+- fix(router-turn): keep up to 1000 characters of the model service's error text (#1083)
+
 ## 0.60.144
 
 - fix(signoff): browser checks stay inside the shared edge limit (#1070)
