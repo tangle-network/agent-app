@@ -19324,6 +19324,18 @@
           "doc": null
         },
         {
+          "name": "createRequestMeter",
+          "kind": "function",
+          "signature": "(budget?: number, sleep?: (ms: number) => Promise<void>) => RequestMeter",
+          "doc": null
+        },
+        {
+          "name": "formatNetworkCount",
+          "kind": "function",
+          "signature": "(count: NetworkCount) => string",
+          "doc": null
+        },
+        {
           "name": "formatShellAlignmentReport",
           "kind": "function",
           "signature": "(report: ShellAlignmentReport) => string",
@@ -19396,6 +19408,18 @@
           "doc": null
         },
         {
+          "name": "meterContext",
+          "kind": "function",
+          "signature": "(context: BrowserContext, meter: RequestMeter) => Promise<void>",
+          "doc": "Abort the zone's speculation rules and count every request the context sends."
+        },
+        {
+          "name": "NetworkCount",
+          "kind": "interface",
+          "signature": "interface NetworkCount",
+          "doc": null
+        },
+        {
           "name": "oklchL",
           "kind": "function",
           "signature": "(rgb: Rgb) => number",
@@ -19411,6 +19435,24 @@
           "name": "parseSurfaceLadderArgs",
           "kind": "function",
           "signature": "(argv: readonly string[]) => SurfaceLadderOptions & { readonly jsonPath?: string | undefined; }",
+          "doc": null
+        },
+        {
+          "name": "QUIET_CHROMIUM_ARGS",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Chromium flags that stop prerender and speculative prefetch of linked pages."
+        },
+        {
+          "name": "REQUEST_BUDGET_PER_10S",
+          "kind": "const",
+          "signature": "250",
+          "doc": "Requests per 10 s a check may send; a quarter of the shared zone limit."
+        },
+        {
+          "name": "RequestMeter",
+          "kind": "interface",
+          "signature": "interface RequestMeter",
           "doc": null
         },
         {
@@ -19693,7 +19735,7 @@
           "name": "WorkspaceSurfaceSample",
           "kind": "interface",
           "signature": "interface WorkspaceSurfaceSample",
-          "doc": "Workspace surface: every route of a workspace renders exactly one shared floating panel (sandbox-ui `WorkspaceSurface`, or `WorkspaceLayout` with `surface=\"inset\"`), and that panel's first row is an…"
+          "doc": null
         }
       ]
     },
