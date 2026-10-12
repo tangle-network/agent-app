@@ -1253,6 +1253,29 @@ export class SandboxRecoveryFailedError extends Error {
   }
 }
 
+/**
+ * Thrown instead of restarting a box that failed the reuse gate because it is
+ * not connectable (runtime URL missing or edge readiness failed) while its
+ * runtime reports running sessions. A restart would end those sessions, so the
+ * box is left running and only the request that asked for it fails. The box is
+ * not replaced either; retry once its sessions finish.
+ */
+export class SandboxBoxBusyError extends Error {
+  readonly boxKey: string
+  readonly stage: SandboxExistingBoxStage
+  readonly runningSessions: number
+  constructor(stage: SandboxExistingBoxStage, boxKey: string, runningSessions: number, detail: string) {
+    super(
+      `${stage} sandbox ${boxKey} is not connectable (${detail}) but is serving ${runningSessions} running ` +
+        `session${runningSessions === 1 ? '' : 's'}, so it was not restarted. Retry when they finish.`,
+    )
+    this.name = 'SandboxBoxBusyError'
+    this.boxKey = boxKey
+    this.stage = stage
+    this.runningSessions = runningSessions
+  }
+}
+
 // Materialize inline profile files into a running box via `box.exec`. Uses a
 // base64 pipe so arbitrary content (scripts, unicode, special chars) lands
 // byte-exact, and writes to ANY absolute path (e.g. /usr/local/bin) or a
@@ -1758,8 +1781,6 @@ async function isBoxAlive(
 }
 
 const DEFAULT_LIVENESS_CACHE_TTL_MS = 5_000
-/** The second, longer probe a reused box gets before a restart would end its sessions. */
-const PATIENT_LIVENESS_EXEC_TIMEOUT_MS = 30_000
 
 function hasRecentLivenessVerification(
   box: SandboxInstance,
@@ -2069,6 +2090,26 @@ function resumeEnvRequiredKeys(cause: unknown): string[] | undefined {
   return missingEnvKeys.filter((key): key is string => typeof key === 'string')
 }
 
+// How many sessions a stop would end, from the runtime's own session list, or
+// undefined when the runtime does not answer. Listing sessions spawns nothing,
+// so a busy box answers it when it misses the exec probe. A session counts as
+// running on the same evidence the SDK uses to refuse a second dispatch:
+// running, an active execution, or queued with an admitted execution. The SDK
+// owns the request deadline; settlement is awaited so no stop is issued while
+// the answer is still in flight.
+async function runningSessionCount(box: SandboxInstance): Promise<number | undefined> {
+  try {
+    const sessions = await box.sessions()
+    return sessions.filter(({ info }) =>
+      info.status === 'running' ||
+      Boolean(info.activeExecutionId) ||
+      (info.status === 'queued' && Boolean(info.latestExecutionId)),
+    ).length
+  } catch {
+    return undefined
+  }
+}
+
 // State-preserving recovery for a box that failed the reuse gate: stop (keeps
 // the workspace — the platform's suspend path never scrubs storage), resume,
 // then re-probe. `box.delete()` is DEPROVISIONING — it wipes the persistent
@@ -2079,6 +2120,13 @@ function resumeEnvRequiredKeys(cause: unknown): string[] | undefined {
 // failure throws SandboxRecoveryFailedError with the workspace intact —
 // including on the `tangle` driver, where stop is unsupported and the throw
 // carries the platform's rejection as its cause.
+//
+// The stop also ends every session on the box, so it is only issued when the
+// runtime reports no running session. A box that misses the probe while busy
+// (a loaded 2-core box can miss it while healthy, #934) is returned as is when
+// it is connectable, and otherwise fails only this request with
+// SandboxBoxBusyError. A runtime that cannot list its sessions gives no such
+// evidence, and the box is restarted as before.
 async function recoverUnresponsiveBox(
   client: Sandbox,
   box: SandboxInstance,
@@ -2089,18 +2137,15 @@ async function recoverUnresponsiveBox(
   runtimeEnv: Record<string, string>,
   onProgress?: (event: ProvisionEvent) => void,
 ): Promise<SandboxInstance> {
-  // The stop below ends every session on the box, and a box that is busy with
-  // other sessions can miss a short probe while being healthy. A box whose
-  // runtime is reachable gets one longer probe first, and is kept if it answers.
-  if (probe && sandboxRuntimeUrl(box) && !sandboxEdgeFailed(box)) {
-    const patient = await isBoxAlive(box, {
-      ...probe,
-      execTimeoutMs: Math.max(PATIENT_LIVENESS_EXEC_TIMEOUT_MS, probe.execTimeoutMs ?? 0),
-    })
-    if (patient.succeeded) {
-      livenessVerifiedAt.set(box.id, Date.now())
-      return box
-    }
+  const running = await runningSessionCount(box)
+  if (running) {
+    if (sandboxRuntimeUrl(box) && !sandboxEdgeFailed(box)) return box
+    throw new SandboxBoxBusyError(
+      stage,
+      name,
+      running,
+      sandboxEdgeFailed(box) ? 'runtime edge readiness failed' : 'runtime URL is missing',
+    )
   }
   try {
     await box.stop()
