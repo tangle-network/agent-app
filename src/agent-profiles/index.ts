@@ -543,6 +543,56 @@ export async function rollbackProfileBinding(input: {
     message: `Now talking to ${parent.profile.name ?? 'this profile'}` }, binding.version)
 }
 
+/**
+ * An opaque token for what `readProfileAdmission` read for one message. It carries no data: the values
+ * live in this module, cloned when read, so a caller can neither build a token nor change what it stands
+ * for. `admitProfileTurn` accepts each token once. The active-revision pointer is never part of it;
+ * admission reads that live.
+ */
+export interface ProfileAdmissionRead { readonly [admissionReadBrand]: true }
+declare const admissionReadBrand: unique symbol
+
+/** The values a token stands for, as the caller may inspect them. */
+export interface ProfileAdmissionValues {
+  key: ProfileBindingKey
+  messageId: string
+  inputHash: string
+  /** The message's existing pin, when it was already admitted. */
+  prior: ProfileTurnPin | null
+  binding: ProfileBinding | null
+  /** The pinned revision by id (immutable), when the binding pins one. */
+  pinnedRevision: ProfileRevision | null
+}
+const admissionReads = new WeakMap<ProfileAdmissionRead, ProfileAdmissionValues>()
+/** Tokens already presented, so a second use is told apart from one this module never issued. */
+const spentAdmissionReads = new WeakSet<ProfileAdmissionRead>()
+
+/**
+ * Read what admitting a message needs: its prior pin and the binding together, then a pinned revision.
+ * Read it where the caller holds its conversation lock (after any switch it records), check the values
+ * with `profileAdmissionValues`, and pass the token to `admitProfileTurn`, which then skips re-reading
+ * the pin and binding. The pin is still written as a compare-and-set on the binding version, so a
+ * binding that moved after this read is refused.
+ */
+export async function readProfileAdmission(store: ProfileRevisionStore, key: ProfileBindingKey,
+  messageId: string, content: string): Promise<ProfileAdmissionRead> {
+  const inputHash = sha256Utf8(content)
+  const [prior, binding] = await Promise.all([store.getTurnPin(key, messageId, inputHash), store.getBinding(key)])
+  const pinnedRevision = !prior && binding?.pinnedRevisionId
+    ? await store.getRevision(key.workspaceId, binding.profileId, binding.pinnedRevisionId) : null
+  const read = Object.freeze(Object.create(null)) as ProfileAdmissionRead
+  admissionReads.set(read, structuredClone({ key: { workspaceId: key.workspaceId, memberId: key.memberId, channel: key.channel },
+    messageId, inputHash, prior, binding, pinnedRevision }))
+  return read
+}
+
+/** A deep copy of what a token stands for; changing the copy changes nothing the token admits. */
+export function profileAdmissionValues(read: ProfileAdmissionRead): ProfileAdmissionValues {
+  const values = admissionReads.get(read)
+  if (!values) throw new ProfileAccessError('Unknown or used profile admission read')
+  return structuredClone(values)
+}
+
 export async function admitProfileTurn(input: {
   store: ProfileRevisionStore
   key: ProfileBindingKey
@@ -553,14 +603,30 @@ export async function admitProfileTurn(input: {
   /** Required if trusted per-turn attachments change the public profile plan. */
   verifyEffectivePlan?: (revision: ProfileRevision, effectivePlanDigest: string,
     key: ProfileBindingKey) => Promise<boolean>
+  /** A token from `readProfileAdmission` for this message; its pin and binding are not read again.
+   *  Each token admits once: after a failed admit, read again before retrying. */
+  read?: ProfileAdmissionRead
 }): Promise<ProfileTurnPin> {
   const inputHash = sha256Utf8(input.content)
-  const prior = await input.store.getTurnPin(input.key, input.messageId, inputHash)
+  // A token is spent when presented, so it admits at most one turn even if this call fails;
+  // a retry reads again with `readProfileAdmission`.
+  const read = input.read ? admissionReads.get(input.read) : undefined
+  if (input.read && !read && spentAdmissionReads.has(input.read)) {
+    throw new ProfileConflictError('The admission read was already used; read again')
+  }
+  if (input.read) { admissionReads.delete(input.read); spentAdmissionReads.add(input.read) }
+  if (input.read && (!read || read.messageId !== input.messageId || read.inputHash !== inputHash ||
+      read.key.workspaceId !== input.key.workspaceId || read.key.memberId !== input.key.memberId ||
+      read.key.channel !== input.key.channel)) {
+    throw new ProfileAccessError('The admission read does not belong to this message')
+  }
+  const prior = read ? read.prior : await input.store.getTurnPin(input.key, input.messageId, inputHash)
   if (prior) return prior
-  const binding = await input.store.getBinding(input.key)
+  const binding = read ? read.binding : await input.store.getBinding(input.key)
   if (!binding) throw new ProfileAccessError('Choose a profile before sending a message')
+  // The active pointer can move without the binding version changing, so it is always read live.
   const revision = binding.pinnedRevisionId
-    ? await input.store.getRevision(input.key.workspaceId, binding.profileId, binding.pinnedRevisionId)
+    ? read?.pinnedRevision ?? await input.store.getRevision(input.key.workspaceId, binding.profileId, binding.pinnedRevisionId)
     : await input.store.getActiveRevision(input.key.workspaceId, binding.profileId)
   if (!revision) throw new ProfileConflictError('The bound profile revision is unavailable')
   if (revision.authorityDigest !== binding.authorityDigest ||

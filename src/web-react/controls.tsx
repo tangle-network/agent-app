@@ -565,6 +565,12 @@ function formatContext(len?: number): string | undefined {
   return `${len} ctx`
 }
 
+/** The brand whose logo a row shows: its maker when the catalogue names one,
+ *  else its host. A fal-hosted Veo row shows Google, not fal. */
+function logoBrand(model: Pick<CatalogModel, 'provider' | 'maker'>): string {
+  return model.maker?.trim() || model.provider
+}
+
 function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -609,14 +615,14 @@ function ModelRow({
           className={`size-10 shrink-0 rounded-md border border-border object-cover${unavailable ? ' opacity-50' : ''}`} />
       ) : (
         <span className="shrink-0" aria-hidden>
-          {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={16} />}
+          {renderProviderBadge ? renderProviderBadge(logoBrand(model)) : <ProviderLogo provider={logoBrand(model)} size={16} />}
         </span>
       )}
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-1.5">
           {thumb && (
             <span className="shrink-0" aria-hidden>
-              {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={14} />}
+              {renderProviderBadge ? renderProviderBadge(logoBrand(model)) : <ProviderLogo provider={logoBrand(model)} size={14} />}
             </span>
           )}
           <span className={`min-w-0 break-words [overflow-wrap:anywhere]${unavailable ? ' text-muted-foreground' : ''}`}>{model.name}</span>
@@ -736,7 +742,8 @@ export function ModelPicker({
         m.id.toLowerCase().includes(q) ||
         m.name.toLowerCase().includes(q) ||
         (m.description?.toLowerCase() ?? '').includes(q) ||
-        m.provider.toLowerCase().includes(q),
+        m.provider.toLowerCase().includes(q) ||
+        (m.maker?.toLowerCase() ?? '').includes(q),
     )
   }, [sortedModels, query])
 
@@ -798,7 +805,7 @@ export function ModelPicker({
       >
         {triggerContent ?? <span className={variant === 'field' ? 'flex min-w-0 flex-1 items-center gap-2' : 'contents'}>
           <span className="shrink-0" aria-hidden>
-            {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
+            {selected ? (renderProviderBadge ? renderProviderBadge(logoBrand(selected)) : <ProviderLogo provider={logoBrand(selected)} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
           </span>
           <span className={variant === 'field' ? `min-w-0 flex-1 truncate ${value ? '' : 'text-muted-foreground'}` : 'max-w-[160px] truncate'}>
             {selectedLabel || defaultOption?.label || 'Select model'}</span>
