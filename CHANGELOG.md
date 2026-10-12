@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.136
+
+- fix(workspace-export): retry a sandbox the platform failed to resume, 30 s apart (#1079)
+
 ## 0.60.135
 
 - feat(router-turn): reasoning, temperature, fallback models, resends, a tool-result limit and the service's error detail (#1076)
