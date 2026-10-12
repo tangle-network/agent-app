@@ -4,7 +4,15 @@
 
 Source: `src/signoff/index.ts`
 
-82 exports.
+84 exports.
+
+### `CdpResponseSource`
+
+`interface` — The fields of Chromium's `Network.responseReceived` that say where a response came from.
+
+```ts
+interface CdpResponseSource
+```
 
 ### `checkShellAlignment`
 
@@ -206,12 +214,12 @@ interface LoadedSignoffConfig
 interface LoadSignoffConfigOptions
 ```
 
-### `meterContext`
+### `meterPage`
 
-`function` — Count every request the context sends.
+`function` — Count the requests a page sends to the network (Chromium only).
 
 ```ts
-(context: BrowserContext, meter: RequestMeter) => Promise<void>
+(page: Page, meter: RequestMeter) => Promise<void>
 ```
 
 ### `NETWORK_OVER_BUDGET_EXIT`
@@ -268,6 +276,14 @@ interface NetworkCount
 
 ```ts
 readonly string[]
+```
+
+### `reachedNetwork`
+
+`function` — True when a response was fetched over the network, so the edge saw the request.
+
+```ts
+(response: CdpResponseSource) => boolean
 ```
 
 ### `REQUEST_BUDGET_PER_10S`
