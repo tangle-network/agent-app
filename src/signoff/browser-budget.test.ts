@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createRequestMeter, formatNetworkCount, meterContext, NETWORK_OVER_BUDGET_EXIT, networkExitCode, QUIET_CHROMIUM_ARGS, REQUEST_BUDGET_PER_10S } from './browser-budget'
+import { createRequestMeter, formatNetworkCount, NETWORK_OVER_BUDGET_EXIT, networkExitCode, QUIET_CHROMIUM_ARGS, reachedNetwork, REQUEST_BUDGET_PER_10S } from './browser-budget'
 
 describe('browser check request budget', () => {
   it('counts requests and the busiest 10 s window', () => {
@@ -46,14 +46,10 @@ describe('browser check request budget', () => {
     expect(networkExitCode(undefined)).toBe(0)
   })
 
-  it('meters a context without a route, so the HTTP cache stays on', async () => {
-    const calls: string[] = []
-    const context = {
-      route: async () => { calls.push('route') },
-      on: (event: string) => { calls.push(`on:${event}`) },
-    }
-    const meter = createRequestMeter()
-    await meterContext(context as unknown as Parameters<typeof meterContext>[0], meter)
-    expect(calls).toEqual(['on:request'])
+  it('counts a response only when it came over the network', () => {
+    expect(reachedNetwork({})).toBe(true)
+    expect(reachedNetwork({ fromDiskCache: true })).toBe(false)
+    expect(reachedNetwork({ fromPrefetchCache: true })).toBe(false)
+    expect(reachedNetwork({ fromServiceWorker: true })).toBe(false)
   })
 })

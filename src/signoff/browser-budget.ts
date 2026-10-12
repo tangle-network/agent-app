@@ -15,14 +15,21 @@
  *   turns the cache off for a context with any route. In 0.60.141 a route that
  *   aborted the speculation rules did that, and every page reload re-downloaded
  *   every asset (creative production smoke: 1900 requests, busiest 10 s 373);
- * - count every request a context makes and wait before a navigation whenever
- *   the last 10 s already holds `REQUEST_BUDGET_PER_10S`;
+ * - count only requests that reach the network: Playwright's `request` event
+ *   also fires for responses served from the browser's own cache, so 0.60.148
+ *   counted a cached bundle as an edge request and its totals never moved when
+ *   the cache worked (creative smoke: ~1900 before and after immutable assets).
+ *   `meterPage` reads Chromium's `Network.responseReceived` and skips
+ *   disk-cache, prefetch-cache and service-worker responses; a 304 still counts,
+ *   because a revalidation does reach the edge;
+ * - wait before a navigation whenever the last 10 s already holds
+ *   `REQUEST_BUDGET_PER_10S`;
  * - report the total and the busiest 10 s, and exit `NETWORK_OVER_BUDGET_EXIT`
  *   when the busiest 10 s went over the budget, so an over-budget run fails
  *   instead of passing with a note. One page load can't be paced from outside
  *   the page, so the exit code is the enforcement.
  */
-import type { BrowserContext } from 'playwright'
+import type { Page } from 'playwright'
 
 /** Chromium flags that stop prerender and speculative prefetch of linked pages. */
 export const QUIET_CHROMIUM_ARGS: readonly string[] = [
@@ -75,9 +82,35 @@ export function createRequestMeter(budget = REQUEST_BUDGET_PER_10S, sleep = (ms:
   }
 }
 
-/** Count every request the context sends. Never add a route here: it would turn off the HTTP cache. */
-export async function meterContext(context: BrowserContext, meter: RequestMeter): Promise<void> {
-  context.on('request', () => meter.record())
+/** The fields of Chromium's `Network.responseReceived` that say where a response came from. */
+export interface CdpResponseSource {
+  readonly fromDiskCache?: boolean
+  readonly fromPrefetchCache?: boolean
+  readonly fromServiceWorker?: boolean
+}
+
+/** True when a response was fetched over the network, so the edge saw the request. */
+export function reachedNetwork(response: CdpResponseSource): boolean {
+  return !response.fromDiskCache && !response.fromPrefetchCache && !response.fromServiceWorker
+}
+
+/**
+ * Count the requests a page sends to the network (Chromium only). Call it before
+ * the page's first navigation. Never add a route instead: Playwright turns the
+ * HTTP cache off for any context with a route.
+ */
+export async function meterPage(page: Page, meter: RequestMeter): Promise<void> {
+  const cdp = await page.context().newCDPSession(page)
+  // A memory-cache hit says so in its own event, before its response event.
+  const fromMemory = new Set<string>()
+  cdp.on('Network.requestServedFromCache', (event: { requestId: string }) => {
+    fromMemory.add(event.requestId)
+  })
+  cdp.on('Network.responseReceived', (event: { requestId: string; response: CdpResponseSource }) => {
+    if (fromMemory.delete(event.requestId)) return
+    if (reachedNetwork(event.response)) meter.record()
+  })
+  await cdp.send('Network.enable')
 }
 
 /** Exit code of a check whose pages passed but whose busiest 10 s went over the budget. */

@@ -19294,6 +19294,12 @@
       "error": null,
       "exports": [
         {
+          "name": "CdpResponseSource",
+          "kind": "interface",
+          "signature": "interface CdpResponseSource",
+          "doc": "The fields of Chromium's `Network.responseReceived` that say where a response came from."
+        },
+        {
           "name": "checkShellAlignment",
           "kind": "function",
           "signature": "(options: ShellAlignmentOptions) => Promise<ShellAlignmentReport>",
@@ -19444,10 +19450,10 @@
           "doc": null
         },
         {
-          "name": "meterContext",
+          "name": "meterPage",
           "kind": "function",
-          "signature": "(context: BrowserContext, meter: RequestMeter) => Promise<void>",
-          "doc": "Count every request the context sends."
+          "signature": "(page: Page, meter: RequestMeter) => Promise<void>",
+          "doc": "Count the requests a page sends to the network (Chromium only)."
         },
         {
           "name": "NETWORK_OVER_BUDGET_EXIT",
@@ -19490,6 +19496,12 @@
           "kind": "const",
           "signature": "readonly string[]",
           "doc": "Chromium flags that stop prerender and speculative prefetch of linked pages."
+        },
+        {
+          "name": "reachedNetwork",
+          "kind": "function",
+          "signature": "(response: CdpResponseSource) => boolean",
+          "doc": "True when a response was fetched over the network, so the edge saw the request."
         },
         {
           "name": "REQUEST_BUDGET_PER_10S",
