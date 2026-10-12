@@ -6,27 +6,37 @@
  * WHY ONE. Seven apps minted these by hand (Tax, Legal, GTM, Creative,
  * Builder, Hardware, workcomp; survey 2026-10-12) with different scope,
  * expiry and revocation rules, and four never noticed a key Platform had
- * revoked or expired. `createPlatformDelegatedKeyClient` is the wire;
- * `createDelegatedKeyProvider` is the per-slot cache every app configures.
+ * revoked, superseded or expired.
  *
- * THE CONTRACT (Platform `POST /v1/keys/delegate`, service-authenticated):
- * the child is checked field by field against the request (an `sk-tan-` key
- * that is not the source, the same name, product and model set, an expiry in
- * the future). A child that fails a check is revoked and refused, never
- * returned. Errors carry a code and status, never a response body or a key.
+ * TWO WAYS TO HOLD ONE.
+ * - Per turn: `client.delegate` before the turn, `client.revoke` after it.
+ *   Nothing is cached, so nothing stale can be handed out.
+ * - Per workspace: `createDelegatedKeyProvisioner` plugs this client into
+ *   `createIdentityBoundWorkspaceKeyManager` (`./billing`), which owns the
+ *   durable, lease-fenced slot. Its `getKey` asks Platform's
+ *   `verify-by-id`, which also refuses superseded generations, and reports
+ *   any key that is not valid as missing, so the manager marks it revoked
+ *   and mints a fresh one on the next use.
  *
- * NEXT USE. A key the provider has seen revoked, rejected by Router or
- * Sandbox, or expired is refused by `assertUsable` and never handed out again
- * by `keyFor`, which mints a fresh one instead.
+ * THE MINT CONTRACT (`POST /v1/keys/delegate`, service-authenticated; the
+ * response is the key row plus `attribution`, and the granted expiry is
+ * `attribution.expiresAt`). The child is checked field by field: an
+ * `sk-tan-` key that is not the source, the canonical name, this service as
+ * provisioner and attribution origin, the requested product, resource, model
+ * set and payer, a budget no larger than requested, and an expiry in the
+ * future and no later than requested. A child that fails is revoked and
+ * refused; if that revoke fails too, the refusal carries the child's id (never
+ * its key) so the app can retire it.
  *
- * NO SHARED IN-FLIGHT MINT. The cache holds resolved keys only. A Worker
- * isolate serves many requests, and a mint awaited by a cancelled request
- * never settles for the others (agent-app #966).
+ * Errors carry a code and status, never a response body, a source key or a
+ * child key.
  */
 
 const REQUEST_TIMEOUT_MS = 10_000
 const KEY_PREFIX = 'sk-tan-'
-const DEFAULT_MIN_REMAINING_MS = 5 * 60_000
+const AUTO_PREFIX = 'auto:'
+/** Products whose key names Platform qualifies as `auto:<service>:<product>:...` (key-provenance.ts). */
+const PRODUCT_QUALIFIED = new Set(['router', 'sandbox'])
 
 export type DelegatedKeyCode =
   | 'delegated_key.payment_required'
@@ -35,14 +45,14 @@ export type DelegatedKeyCode =
   | 'delegated_key.unavailable'
   | 'delegated_key.refused'
   | 'delegated_key.response_invalid'
-  | 'delegated_key.revoked'
-  | 'delegated_key.expired'
   | 'delegated_key.invalid_request'
 
 export interface DelegatedKeyRefusal {
   status: number
   code: DelegatedKeyCode
   message: string
+  /** Set when an untrusted child could not be revoked: the id (never the key) the app must retire. */
+  unrevokedKeyId?: string
 }
 
 export type DelegatedKeyOutcome<T> =
@@ -57,31 +67,35 @@ export type DelegatedKeyBudget =
 export interface DelegatedKeyRequest {
   /** The payer's linked `sk-tan-` key. Never a shared app key. */
   sourceKey: string
-  /** `auto:<service>:...`. A name Platform already holds replaces that key after a short grace. */
+  /** The logical slot, e.g. `turn:<id>`. Sent as Platform's canonical name; see {@link canonicalDelegatedKeyName}. */
   name: string
   product: 'router' | 'sandbox' | (string & {})
   resource?: { type: string; id: string }
-  /** The only models the child may call. Omit for none of Router's model restriction. */
+  /** The only models the child may call. */
   allowedModels?: readonly string[]
   budget?: DelegatedKeyBudget
   rpmLimit?: number
   expiresAt: Date
+  /** Checked against the child's attribution when given: the payer's Platform user id and the source key's id. */
+  expect?: { payerId?: string; sourceKeyId?: string }
 }
 
 export interface DelegatedKey {
   key: string
   id: string
+  /** The canonical name Platform stored. */
   name: string
   product: string
-  /** The expiry Platform granted, which may be earlier than requested. */
+  /** The expiry Platform granted (`attribution.expiresAt`), never later than requested. */
   expiresAt: Date
   allowedModels: readonly string[] | null
+  budgetUsd: number | null
 }
 
 export interface PlatformDelegatedKeyClientOptions {
   /** Platform origin, e.g. `https://id.tangle.tools`. */
   platformUrl: string
-  /** This app's Platform service name; Platform admits delegation per service. */
+  /** This app's Platform service name; Platform admits delegation per named service. */
   serviceName: string
   serviceToken: string | (() => string)
   fetch?: typeof fetch
@@ -90,10 +104,23 @@ export interface PlatformDelegatedKeyClientOptions {
 
 export interface PlatformDelegatedKeyClient {
   delegate(request: DelegatedKeyRequest): Promise<DelegatedKeyOutcome<DelegatedKey>>
-  /** `DELETE /v1/keys/:id` with the source key. A key that is already gone counts as revoked. */
+  /** Platform's authoritative answer (`verify-by-id`): false once the key is revoked, superseded, expired or spent. */
+  live(input: { keyId: string; product: string }): Promise<DelegatedKeyOutcome<boolean>>
+  /** `DELETE /v1/keys/:id` with the source key. A key already gone counts as revoked. */
   revoke(input: { sourceKey: string; keyId: string }): Promise<DelegatedKeyOutcome<null>>
-  /** Whether Platform still holds the key, and its expiry. */
-  status(input: { sourceKey: string; keyId: string }): Promise<DelegatedKeyOutcome<{ live: boolean; expiresAt: Date | null }>>
+}
+
+/**
+ * The name Platform stores for a slot: `auto:<service>:<product>:<logical>` for
+ * Router and Sandbox keys (Platform's `canonicalProvisionedKeyName`), so the
+ * echo can be checked exactly. A name already qualified is kept.
+ */
+export function canonicalDelegatedKeyName(input: { serviceName: string; product: string; name: string }): string {
+  const logical = input.name.startsWith(AUTO_PREFIX) ? input.name.slice(AUTO_PREFIX.length) : input.name
+  if (!PRODUCT_QUALIFIED.has(input.product)) return `${AUTO_PREFIX}${logical}`
+  if (logical.startsWith(`${input.serviceName}:${input.product}:`)) return `${AUTO_PREFIX}${logical}`
+  const withoutService = logical.startsWith(`${input.serviceName}:`) ? logical.slice(input.serviceName.length + 1) : logical
+  return `${AUTO_PREFIX}${input.serviceName}:${input.product}:${withoutService}`
 }
 
 function refusal(status: number, code: unknown): DelegatedKeyRefusal {
@@ -107,33 +134,67 @@ function refusal(status: number, code: unknown): DelegatedKeyRefusal {
     return { status: 403, code: 'delegated_key.owner_unverified', message: 'The payer must verify their Tangle email.' }
   }
   if (status >= 500 || status === 429 || code === 'PLATFORM_BUSY') {
-    return { status: 503, code: 'delegated_key.unavailable', message: 'Platform could not delegate a key; retry.' }
+    return { status: 503, code: 'delegated_key.unavailable', message: 'Platform could not answer; retry.' }
   }
   return { status: 403, code: 'delegated_key.refused', message: 'Platform refused to delegate this key.' }
 }
 
-const fail = <T,>(status: number, code: DelegatedKeyCode, message: string): DelegatedKeyOutcome<T> =>
-  ({ succeeded: false, error: { status, code, message } })
+const failure = <T,>(status: number, code: DelegatedKeyCode, message: string, extra: Partial<DelegatedKeyRefusal> = {}): DelegatedKeyOutcome<T> =>
+  ({ succeeded: false, error: { status, code, message, ...extra } })
 
-function sameModels(granted: unknown, requested: readonly string[] | undefined): boolean {
-  if (requested === undefined) return granted === undefined || granted === null
-  if (!Array.isArray(granted)) return false
-  const a = [...new Set(granted)].sort()
+const record = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+
+function sameSet(granted: unknown, requested: readonly string[]): boolean {
+  if (!Array.isArray(granted) || granted.some(model => typeof model !== 'string')) return false
+  const a = [...new Set(granted as string[])].sort()
   const b = [...new Set(requested)].sort()
-  return a.length === b.length && a.every((model, index) => model === b[index])
+  return granted.length === a.length && a.length === b.length && a.every((model, index) => model === b[index])
 }
 
-interface PlatformResponse {
-  status: number
-  body: { success?: unknown; data?: Record<string, unknown>; error?: { code?: unknown } }
+/** Why the minted child cannot be trusted, or null. Each check names its field, never its value. */
+function childProblem(data: Record<string, unknown>, request: DelegatedKeyRequest, name: string, serviceName: string, nowMs: number): string | null {
+  const key = data.key
+  const id = data.id
+  if (typeof id !== 'string' || !id) return 'no key id'
+  if (typeof key !== 'string' || !key.startsWith(KEY_PREFIX) || key.length <= KEY_PREFIX.length) return 'not an sk-tan child key'
+  if (key === request.sourceKey) return 'the source key itself'
+  if (typeof data.prefix === 'string' && !key.startsWith(data.prefix)) return 'a key that does not match its prefix'
+  if (data.name !== name) return 'a different name'
+  if (data.product !== request.product) return 'a different product'
+  if (data.provisionedByService !== serviceName) return 'a different provisioner'
+  if (data.scopes !== null && !(Array.isArray(data.scopes) && data.scopes.length === 0)) return 'control-plane scopes'
+  if (request.allowedModels ? !sameSet(data.allowedModels, request.allowedModels) : data.allowedModels != null) return 'a different model set'
+  const budget = request.budget
+  if (budget && 'usd' in budget && !(typeof data.budgetUsd === 'number' && data.budgetUsd <= budget.usd)) return 'a budget larger than requested'
+  if (budget?.monthlyUsd !== undefined && !(typeof data.monthlyBudgetUsd === 'number' && data.monthlyBudgetUsd <= budget.monthlyUsd)) {
+    return 'a monthly budget larger than requested'
+  }
+
+  const attribution = record(data.attribution)
+  if (!attribution) return 'no attribution'
+  if (attribution.version !== 1 || attribution.targetService !== request.product) return 'attribution for another target'
+  if (attribution.originAppId !== serviceName) return 'attribution from another app'
+  const parent = attribution.delegatedFromKeyId
+  if (typeof parent !== 'string' || !parent || parent === id) return 'attribution without its parent key'
+  if (request.expect?.sourceKeyId !== undefined && parent !== request.expect.sourceKeyId) return 'attribution for another source key'
+  if (attribution.payerType !== 'user') return 'attribution to a non-user payer'
+  if (request.expect?.payerId !== undefined && attribution.payerId !== request.expect.payerId) return 'attribution to another payer'
+  if ((attribution.resourceType ?? null) !== (request.resource?.type ?? null) || (attribution.resourceId ?? null) !== (request.resource?.id ?? null)) {
+    return 'attribution for another resource'
+  }
+  const expiresAt = typeof attribution.expiresAt === 'string' ? Date.parse(attribution.expiresAt) : NaN
+  if (!Number.isFinite(expiresAt) || expiresAt <= nowMs || expiresAt > request.expiresAt.getTime()) return 'an expiry in the past or past the request'
+  return null
 }
 
 export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyClientOptions): PlatformDelegatedKeyClient {
   const fetchImpl = options.fetch ?? fetch
   const now = options.now ?? Date.now
   const base = options.platformUrl.replace(/\/+$/, '')
+  const serviceToken = () => typeof options.serviceToken === 'function' ? options.serviceToken() : options.serviceToken
 
-  async function call(path: string, init: { method: string; bearer: string; service: boolean; body?: unknown }): Promise<PlatformResponse | null> {
+  async function call(path: string, init: { method: string; bearer: string; service: boolean; body?: unknown }) {
     try {
       const response = await fetchImpl(`${base}${path}`, {
         method: init.method,
@@ -146,7 +207,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
         redirect: 'manual',
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
-      return { status: response.status, body: (await response.json().catch(() => ({}))) as PlatformResponse['body'] }
+      return { status: response.status, body: record(await response.json().catch(() => null)) }
     } catch {
       return null
     }
@@ -154,15 +215,14 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
 
   const client: PlatformDelegatedKeyClient = {
     async delegate(request) {
-      if (!request.sourceKey.startsWith(KEY_PREFIX)) return fail(400, 'delegated_key.invalid_request', 'The source must be a linked sk-tan- key.')
-      if (!request.name.startsWith('auto:')) return fail(400, 'delegated_key.invalid_request', 'A delegated key name starts with auto:.')
-      if (request.expiresAt.getTime() <= now()) return fail(400, 'delegated_key.invalid_request', 'The expiry must be in the future.')
-      const token = typeof options.serviceToken === 'function' ? options.serviceToken() : options.serviceToken
+      if (!request.sourceKey.startsWith(KEY_PREFIX)) return failure(400, 'delegated_key.invalid_request', 'The source must be a linked sk-tan- key.')
+      if (request.expiresAt.getTime() <= now()) return failure(400, 'delegated_key.invalid_request', 'The expiry must be in the future.')
+      const name = canonicalDelegatedKeyName({ serviceName: options.serviceName, product: request.product, name: request.name })
       const budget = request.budget
       const result = await call('/v1/keys/delegate', {
-        method: 'POST', bearer: token, service: true, body: {
+        method: 'POST', bearer: serviceToken(), service: true, body: {
           sourceKey: request.sourceKey,
-          name: request.name,
+          name,
           product: request.product,
           ...(request.resource ? { resourceType: request.resource.type, resourceId: request.resource.id } : {}),
           ...(budget && 'usd' in budget ? { budgetUsd: budget.usd } : {}),
@@ -170,142 +230,128 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
           ...(budget?.monthlyUsd !== undefined ? { monthlyBudgetUsd: budget.monthlyUsd } : {}),
           ...(request.allowedModels ? { allowedModels: [...new Set(request.allowedModels)] } : {}),
           ...(request.rpmLimit !== undefined ? { rpmLimit: request.rpmLimit } : {}),
-          // A delegated product key never carries control-plane authority.
-          scopes: [],
           expiresAt: request.expiresAt.toISOString(),
         },
       })
       if (!result) return { succeeded: false, error: refusal(503, null) }
-      if ((result.status !== 200 && result.status !== 201) || result.body.success !== true || !result.body.data) {
-        return { succeeded: false, error: refusal(result.status, result.body.error?.code) }
+      const data = record(result.body?.data)
+      if (result.status !== 201 || result.body?.success !== true || !data) {
+        return { succeeded: false, error: refusal(result.status, record(result.body?.error)?.code) }
       }
-      const data = result.body.data
-      const key = data.key
-      const id = data.id
-      const expiresAt = typeof data.expiresAt === 'string' ? new Date(data.expiresAt) : null
-      const problem =
-        typeof key !== 'string' || !key.startsWith(KEY_PREFIX) || key.length <= KEY_PREFIX.length ? 'not an sk-tan child key'
-        : key === request.sourceKey ? 'the source key itself'
-        : typeof id !== 'string' || !id ? 'no key id'
-        : data.name !== request.name ? 'a different name'
-        : data.product !== request.product ? 'a different product'
-        : !sameModels(data.allowedModels, request.allowedModels) ? 'a different model set'
-        : !expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= now() ? 'no future expiry'
-        : null
+      const problem = childProblem(data, request, name, options.serviceName, now())
       if (problem) {
         // A child Platform minted but this app cannot trust is retired, never returned.
-        if (typeof id === 'string' && id) await client.revoke({ sourceKey: request.sourceKey, keyId: id })
-        return fail(502, 'delegated_key.response_invalid', `Platform returned ${problem}.`)
+        const id = typeof data.id === 'string' && data.id ? data.id : null
+        const revoked = id ? await client.revoke({ sourceKey: request.sourceKey, keyId: id }) : null
+        return failure(502, 'delegated_key.response_invalid', `Platform returned ${problem}.`,
+          id && !revoked?.succeeded ? { unrevokedKeyId: id } : {})
       }
+      const attribution = record(data.attribution)!
       return { succeeded: true, value: {
-        key: key as string, id: id as string, name: request.name, product: request.product,
-        expiresAt: expiresAt!, allowedModels: request.allowedModels ? [...new Set(request.allowedModels)] : null,
+        key: data.key as string, id: data.id as string, name, product: request.product,
+        expiresAt: new Date(attribution.expiresAt as string),
+        allowedModels: request.allowedModels ? [...new Set(request.allowedModels)] : null,
+        budgetUsd: typeof data.budgetUsd === 'number' ? data.budgetUsd : null,
       } }
+    },
+
+    async live({ keyId, product }) {
+      const result = await call('/v1/keys/verify-by-id', {
+        method: 'POST', bearer: serviceToken(), service: true, body: { keyId, expectedProduct: product },
+      })
+      // Fail closed: anything but a well-formed answer is not evidence the key is live.
+      if (!result || result.status >= 500 || result.status === 429) return { succeeded: false, error: refusal(503, null) }
+      if (result.status !== 200 || typeof result.body?.valid !== 'boolean') {
+        return failure(502, 'delegated_key.response_invalid', 'Platform returned no verification verdict.')
+      }
+      return { succeeded: true, value: result.body.valid === true && (result.body.keyId === undefined || result.body.keyId === keyId) }
     },
 
     async revoke({ sourceKey, keyId }) {
       const result = await call(`/v1/keys/${encodeURIComponent(keyId)}`, { method: 'DELETE', bearer: sourceKey, service: false })
       if (!result) return { succeeded: false, error: refusal(503, null) }
-      if (result.status === 404 || (result.status >= 200 && result.status < 300)) return { succeeded: true, value: null }
-      return { succeeded: false, error: refusal(result.status, result.body.error?.code) }
-    },
-
-    async status({ sourceKey, keyId }) {
-      const result = await call(`/v1/keys/${encodeURIComponent(keyId)}`, { method: 'GET', bearer: sourceKey, service: false })
-      if (!result) return { succeeded: false, error: refusal(503, null) }
-      if (result.status === 404) return { succeeded: true, value: { live: false, expiresAt: null } }
-      if (result.status < 200 || result.status >= 300) return { succeeded: false, error: refusal(result.status, result.body.error?.code) }
-      const data = result.body.data ?? {}
-      const expiresAt = typeof data.expiresAt === 'string' ? new Date(data.expiresAt) : null
-      const revoked = typeof data.revokedAt === 'string' && data.revokedAt.length > 0
-      const expired = expiresAt !== null && expiresAt.getTime() <= now()
-      return { succeeded: true, value: { live: !revoked && !expired, expiresAt } }
+      if (result.status === 404 || (result.status >= 200 && result.status < 300 && result.body?.success === true)) {
+        return { succeeded: true, value: null }
+      }
+      return { succeeded: false, error: refusal(result.status, record(result.body?.error)?.code) }
     },
   }
   return client
 }
 
-export interface DelegatedKeySlot extends Omit<DelegatedKeyRequest, 'expiresAt'> {
-  /** How long a freshly minted child lives. */
-  ttlMs: number
+/** The `DurableWorkspaceKeyProvisioner` shape (`./billing`), kept structural so this module stays standalone. */
+export interface DelegatedKeyProvisioner {
+  createKey(input: { name: string; product: string; budgetUsd: number; expiresAt: string; idempotencyKey: string }): Promise<{
+    id: string; key: string; budgetUsd?: number | null; expiresAt?: string | null
+  }>
+  getKey(id: string): Promise<{ budgetUsd?: number | null; expiresAt?: string | null }>
+  revokeKey(id: string): Promise<unknown>
+  findCreatedKeys(input: { name: string; product: string; sourceKeyId?: string | null }): Promise<Array<{ id: string }>>
 }
 
-export interface DelegatedKeyProviderOptions {
-  client: PlatformDelegatedKeyClient
-  /** A cached key is reused only while it has at least this long left. Default 5 minutes. */
-  minRemainingMs?: number
-  /** Check with Platform before reusing a cached key, so a key revoked elsewhere is never handed out. */
-  verifyOnReuse?: boolean
-  now?: () => number
-  /** Resolved keys per slot. Default: this isolate's memory, bounded to `maxEntries`. */
-  maxEntries?: number
-}
-
-export interface DelegatedKeyProvider {
-  /** A usable key for the slot: the cached one while it has `minRemainingMs` left, else a fresh mint. */
-  keyFor(slot: DelegatedKeySlot): Promise<DelegatedKeyOutcome<DelegatedKey>>
-  /** Router or Sandbox refused this key: it is never handed out again. */
-  reject(key: string): void
-  /** Revoke at Platform and stop handing the key out, even if the revoke call fails. */
-  revoke(input: { sourceKey: string; key: DelegatedKey }): Promise<DelegatedKeyOutcome<null>>
-  /** Refuses a key this provider has seen revoked, rejected or past its expiry. */
-  assertUsable(key: DelegatedKey): DelegatedKeyOutcome<DelegatedKey>
-}
-
-async function slotId(slot: DelegatedKeySlot): Promise<string> {
-  const material = JSON.stringify([
-    slot.sourceKey, slot.name, slot.product, slot.resource?.type ?? null, slot.resource?.id ?? null,
-    slot.allowedModels ? [...new Set(slot.allowedModels)].sort() : null, slot.budget ?? null, slot.rpmLimit ?? null,
-  ])
-  // The cache is keyed by a digest, so the payer's key is never a map key.
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(material))
-  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
-}
-
-export function createDelegatedKeyProvider(options: DelegatedKeyProviderOptions): DelegatedKeyProvider {
-  const now = options.now ?? Date.now
-  const minRemainingMs = options.minRemainingMs ?? DEFAULT_MIN_REMAINING_MS
-  const maxEntries = options.maxEntries ?? 512
-  const cache = new Map<string, DelegatedKey>()
-  // Keys never to hand out again: revoked, or refused by the product that received them.
-  const retired = new Set<string>()
-
-  const usable = (key: DelegatedKey, margin: number) =>
-    !retired.has(key.key) && key.expiresAt.getTime() - now() > margin
-  const reject = (key: string) => {
-    retired.add(key)
-    for (const [id, cached] of cache) if (cached.key === key) cache.delete(id)
+/** A remote key the durable manager must treat as gone (it marks the row revoked and mints again). */
+export class DelegatedKeyMissingError extends Error {
+  readonly status = 404
+  readonly code = 'not_found'
+  constructor(keyId: string) {
+    super(`Platform no longer accepts key ${keyId}`)
+    this.name = 'DelegatedKeyMissingError'
   }
+}
 
+/** A Platform refusal surfaced to the durable manager. Carries the typed refusal, never a key. */
+export class DelegatedKeyRefusalError extends Error {
+  constructor(readonly refusal: DelegatedKeyRefusal) {
+    super(refusal.message)
+    this.name = 'DelegatedKeyRefusalError'
+  }
+}
+
+/**
+ * Plug the client into `createIdentityBoundWorkspaceKeyManager` for a
+ * workspace-held key. Pass the manager `nameForIdentity` returning a logical
+ * slot name (the client sends Platform's canonical `auto:` form).
+ */
+export function createDelegatedKeyProvisioner(input: {
+  client: PlatformDelegatedKeyClient
+  sourceKey: string
+  product: string
+  resource?: { type: string; id: string }
+  allowedModels?: readonly string[]
+  monthlyBudgetUsd?: number
+  rpmLimit?: number
+  expect?: { payerId?: string; sourceKeyId?: string }
+}): DelegatedKeyProvisioner {
+  const product = input.product
   return {
-    async keyFor(slot) {
-      const id = await slotId(slot)
-      const cached = cache.get(id)
-      if (cached && usable(cached, minRemainingMs)) {
-        if (!options.verifyOnReuse) return { succeeded: true, value: cached }
-        const status = await options.client.status({ sourceKey: slot.sourceKey, keyId: cached.id })
-        if (status.succeeded && status.value.live) return { succeeded: true, value: cached }
-        if (status.succeeded) reject(cached.key)
-      }
-      cache.delete(id)
-      const minted = await options.client.delegate({ ...slot, expiresAt: new Date(now() + slot.ttlMs) })
-      if (!minted.succeeded) return minted
-      if (cache.size >= maxEntries) cache.delete(cache.keys().next().value!)
-      cache.set(id, minted.value)
-      return minted
+    async createKey(create) {
+      const minted = await input.client.delegate({
+        sourceKey: input.sourceKey, name: create.name, product,
+        ...(input.resource ? { resource: input.resource } : {}),
+        ...(input.allowedModels ? { allowedModels: input.allowedModels } : {}),
+        budget: { usd: create.budgetUsd, ...(input.monthlyBudgetUsd !== undefined ? { monthlyUsd: input.monthlyBudgetUsd } : {}) },
+        ...(input.rpmLimit !== undefined ? { rpmLimit: input.rpmLimit } : {}),
+        expiresAt: new Date(create.expiresAt),
+        ...(input.expect ? { expect: input.expect } : {}),
+      })
+      if (!minted.succeeded) throw new DelegatedKeyRefusalError(minted.error)
+      return { id: minted.value.id, key: minted.value.key, budgetUsd: minted.value.budgetUsd, expiresAt: minted.value.expiresAt.toISOString() }
     },
-
-    reject,
-
-    async revoke({ sourceKey, key }) {
-      reject(key.key)
-      return options.client.revoke({ sourceKey, keyId: key.id })
+    async getKey(id) {
+      const verdict = await input.client.live({ keyId: id, product })
+      if (!verdict.succeeded) throw new DelegatedKeyRefusalError(verdict.error)
+      if (!verdict.value) throw new DelegatedKeyMissingError(id)
+      return {}
     },
-
-    assertUsable(key) {
-      if (retired.has(key.key)) return fail(401, 'delegated_key.revoked', 'This key was revoked; request a new one.')
-      if (key.expiresAt.getTime() <= now()) return fail(401, 'delegated_key.expired', 'This key has expired; request a new one.')
-      return { succeeded: true, value: key }
+    async revokeKey(id) {
+      const revoked = await input.client.revoke({ sourceKey: input.sourceKey, keyId: id })
+      if (!revoked.succeeded) throw new DelegatedKeyRefusalError(revoked.error)
+      return null
+    },
+    async findCreatedKeys() {
+      // Recovery by name needs a key list this client does not read; the manager then treats the
+      // provisioning attempt as orphaned, which is safe: an unknown child expires on its own.
+      return []
     },
   }
 }
