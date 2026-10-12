@@ -34,6 +34,17 @@ const GONE = new Set(['deleted', 'expired', 'failed'])
  */
 export const DEFAULT_SANDBOX_EXCLUDE: readonly string[] = ['node_modules', '.sidecar']
 
+/**
+ * A resume the platform failed on its side (HTTP 5xx). The box stays suspended
+ * and a later resume usually works: on 2026-10-12 one Hospitality export failed
+ * on "Project sidecar could not be reprovisioned for resume" and the next export,
+ * six minutes later, resumed the same box.
+ */
+function isServerFailure(err: unknown): boolean {
+  const status = (err as { status?: unknown } | null)?.status
+  return typeof status === 'number' && status >= 500
+}
+
 /** The platform's typed refusal while another resume, stop or delete holds the box. */
 function isLifecycleBusy(err: unknown): boolean {
   const e = err as { status?: unknown; code?: unknown } | null
@@ -53,6 +64,7 @@ async function openRunning(
     if (box.status !== 'running' || wasStopped) await box.waitFor('running', { timeoutMs })
   } catch (err) {
     if (isLifecycleBusy(err)) throw new ExportRetryLater('the sandbox is busy with another operation; retrying shortly')
+    if (isServerFailure(err)) throw new ExportRetryLater('the sandbox could not be started; retrying shortly')
     throw err
   }
   const restore = async () => {

@@ -666,12 +666,17 @@ describe('an export an owner can read', () => {
     expect(vault.status).toBe('stopped')
   })
 
-  it('waits out a busy sandbox without spending attempts, and never counts a failed source as done', async () => {
-    let busy = 4
+  it('waits out a busy or failed-to-start sandbox without spending attempts, and never counts a failed source as done', async () => {
+    // Two lifecycle refusals, then two platform resume failures (HTTP 500, 2026-10-12:
+    // "Project sidecar could not be reprovisioned for resume"), then the box starts.
+    let refusals = 4
+    let clock = 1_000_000
     const box = {
       status: 'stopped',
       async resume() {
-        if (busy-- > 0) throw Object.assign(new Error('A sandbox lifecycle operation is already in progress'), { status: 409, code: 'SANDBOX_LIFECYCLE_IN_PROGRESS' })
+        refusals -= 1
+        if (refusals >= 2) throw Object.assign(new Error('A sandbox lifecycle operation is already in progress'), { status: 409, code: 'SANDBOX_LIFECYCLE_IN_PROGRESS' })
+        if (refusals >= 0) throw Object.assign(new Error('Failed to resume project'), { status: 500 })
         box.status = 'running'
       },
       async stop() { box.status = 'stopped' },
@@ -681,6 +686,7 @@ describe('an export an owner can read', () => {
     const engine = createExportEngine({
       app: 'testapp',
       storage: createMemoryExportStorage(),
+      now: () => clock,
       plan: async () => ({
         sources: [
           sandboxArchive({ name: 'busy', getBox: async () => box }),
@@ -689,8 +695,15 @@ describe('an export an owner can read', () => {
       }),
     })
     const job = await engine.start(WS, 'u-owner')
-    let current = job
-    for (let i = 0; i < 8 && current.status === 'running'; i += 1) current = (await engine.advance(WS, job.id))!
+    let current = (await engine.advance(WS, job.id))!
+    // A deferred source waits its turn: an immediate retry does not touch the box.
+    const triesAfterFirst = refusals
+    current = (await engine.advance(WS, job.id))!
+    expect(refusals).toBe(triesAfterFirst)
+    for (let i = 0; i < 8 && current.status === 'running'; i += 1) {
+      clock += 31_000
+      current = (await engine.advance(WS, job.id))!
+    }
     expect(current.status).toBe('complete')
     const unit = current.units.find((u) => u.name === 'busy')!
     expect(unit).toMatchObject({ status: 'done', deferrals: 4, attempts: 1 })

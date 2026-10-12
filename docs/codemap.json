@@ -19990,10 +19990,28 @@
           "doc": "A hand-authored, tier-gated installable skill."
         },
         {
+          "name": "SkillSupportFile",
+          "kind": "interface",
+          "signature": "interface SkillSupportFile",
+          "doc": "A file that rides BESIDE a skill entry (kit sources, references, pinned requirements — anything the SKILL.md tells the agent to read or run)."
+        },
+        {
+          "name": "skillSupportFileMounts",
+          "kind": "function",
+          "signature": "(harness: Harness, skillId: string, files: readonly SkillSupportFile[]) => AgentProfileFileMount[]",
+          "doc": "Inline file mounts placing a skill's support files beside its entry on `harness`: `<skillDir>/<skillId>/<path>`."
+        },
+        {
           "name": "unsupportedSkillHarnesses",
           "kind": "function",
           "signature": "(harnesses: Iterable<Harness>) => Harness[]",
           "doc": "Filter `harnesses` down to those with no mounted skill dir (deduped, first-seen order preserved) — the set that must fall back to `inline` delivery, or that a caller should warn about before offering…"
+        },
+        {
+          "name": "withSkillSupportFiles",
+          "kind": "function",
+          "signature": "<P extends { resources?: AgentProfile[\"resources\"]; }>(profile: P, harness: Harness, skillId: string, files: readonly S…",
+          "doc": "Attach a skill's support files to `profile` for `harness`, idempotently."
         }
       ]
     },
