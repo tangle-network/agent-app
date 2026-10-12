@@ -20,7 +20,7 @@ export function ApiAccess() {
   }, [])
   useEffect(() => { void refresh() }, [refresh])
   return <div className="h-full overflow-y-auto p-6">
-    <AgentSetupBlock productName={document.title} setupUrl={`${location.origin}/agent-setup.md`} />
+    <AgentSetupBlock productName={document.title} setupUrl={`${location.origin}/agent-setup.md`} description="Give your external agent the setup instructions. You sign in, issue or reuse an expiring key, and grant its scopes. The agent verifies access with that key; it cannot approve deployment spending for you." />
     {error && <p role="alert" className="text-destructive">{error}</p>}
     {!runEnabled && <p>External-agent execution is disabled until the deployment payer enables it. Read-only access remains available.</p>}
     <ApiAccessPanel keys={keys} access={access.filter(item => item.scope !== 'operator:run' || runEnabled)} defaultScopes={['operator:read']} baseUrl={`${location.origin}/api/operator/v1`}

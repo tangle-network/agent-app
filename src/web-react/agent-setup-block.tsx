@@ -6,6 +6,8 @@ export interface AgentSetupBlockProps {
   setupUrl: string
   /** The setup skill text. When given, the button copies it verbatim. */
   markdown?: string
+  /** Product-specific authority/setup copy; keep it aligned with the served skill. */
+  description?: string
   className?: string
 }
 
@@ -16,7 +18,7 @@ export interface AgentSetupBlockProps {
  * one-line instruction to fetch it when the text is not supplied. The skill is
  * the same file served at `/agent-setup.md`, so the page cannot drift from it.
  */
-export function AgentSetupBlock({ productName, setupUrl, markdown, className }: AgentSetupBlockProps) {
+export function AgentSetupBlock({ productName, setupUrl, markdown, description, className }: AgentSetupBlockProps) {
   const [notice, setNotice] = useState<string | null>(null)
   const prompt = markdown ?? `Set up ${productName} for me. Fetch ${setupUrl} and follow every step in it.`
 
@@ -47,8 +49,7 @@ export function AgentSetupBlock({ productName, setupUrl, markdown, className }: 
         </button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Your coding agent sets up {productName} end to end: it asks you to approve once, gets its own capped key, installs
-        the client, and verifies a first call.
+        {description ?? `Your coding agent sets up ${productName} end to end: it asks you to approve once, gets its own capped key, installs the client, and verifies a first call.`}
       </p>
       <p className="text-sm text-muted-foreground">
         Raw prompt:{' '}

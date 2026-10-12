@@ -24413,7 +24413,7 @@
         {
           "name": "AgentSetupBlock",
           "kind": "function",
-          "signature": "({ productName, setupUrl, markdown, className }: AgentSetupBlockProps) => Element",
+          "signature": "({ productName, setupUrl, markdown, description, className }: AgentSetupBlockProps) => Element",
           "doc": "The \"Hand this to your agent\" block for a product's docs page."
         },
         {

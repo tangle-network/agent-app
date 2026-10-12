@@ -251,7 +251,7 @@ interface AgentSettingsPopoverProps
 `function` — The "Hand this to your agent" block for a product's docs page.
 
 ```ts
-({ productName, setupUrl, markdown, className }: AgentSetupBlockProps) => Element
+({ productName, setupUrl, markdown, description, className }: AgentSetupBlockProps) => Element
 ```
 
 ### `AgentSetupBlockProps`

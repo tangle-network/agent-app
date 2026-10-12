@@ -131,6 +131,7 @@ try {
   assert.match(markdown.headers.get('vary') ?? '', /Accept/)
   await page.getByRole('link', { name: 'API access', exact: true }).click()
   await page.getByRole('heading', { name: 'API access', exact: true }).waitFor()
+  assert.ok(!(await page.locator('body').innerText()).includes('gets its own capped key'), 'Manual owner-key onboarding must not advertise self-issued capped keys')
   await page.getByLabel('Name', { exact: true }).fill('Fresh external client proof')
   await page.getByRole('button', { name: 'Create key', exact: true }).click()
   const keyField = page.getByLabel('New API key', { exact: true })
