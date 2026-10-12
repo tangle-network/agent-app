@@ -19402,6 +19402,12 @@
           "doc": "A header within this distance of the panel top is its first row (a 1px border)."
         },
         {
+          "name": "isOverBudget",
+          "kind": "function",
+          "signature": "(count: NetworkCount, budget?: number) => boolean",
+          "doc": null
+        },
+        {
           "name": "judgeShellAlignment",
           "kind": "function",
           "signature": "(sample: ShellDividerSample, tolerancePx?: number) => ShellAlignmentFinding[]",
@@ -19441,13 +19447,25 @@
           "name": "meterContext",
           "kind": "function",
           "signature": "(context: BrowserContext, meter: RequestMeter) => Promise<void>",
-          "doc": "Abort the zone's speculation rules and count every request the context sends."
+          "doc": "Count every request the context sends."
+        },
+        {
+          "name": "NETWORK_OVER_BUDGET_EXIT",
+          "kind": "const",
+          "signature": "3",
+          "doc": "Exit code of a check whose pages passed but whose busiest 10 s went over the budget."
         },
         {
           "name": "NetworkCount",
           "kind": "interface",
           "signature": "interface NetworkCount",
           "doc": null
+        },
+        {
+          "name": "networkExitCode",
+          "kind": "function",
+          "signature": "(count: NetworkCount | undefined) => number",
+          "doc": "0, or `NETWORK_OVER_BUDGET_EXIT` when the run went over the budget."
         },
         {
           "name": "oklchL",
