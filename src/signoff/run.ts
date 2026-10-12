@@ -164,6 +164,9 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
       // Parity with CI: a runner that behaves differently under `CI` (vitest's
       // reporter, wrangler's prompts) must behave that way here too.
       { CI: 'true' },
+      // A step that reads history (agent-app-rollout-check's base) finds the
+      // source checkout here; the clean tree has no .git.
+      { SIGNOFF_SOURCE_REPO: repoRoot, SIGNOFF_TREE: tree.path },
       config.env,
       storeEnvName === null ? undefined : { [storeEnvName]: store.storeDir },
     ])

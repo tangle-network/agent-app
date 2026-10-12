@@ -1,5 +1,5 @@
 /** GENERATED from @tangle-network/brand/styles/legacy-light.css
- * SHA-256: 3e234bf78f67517f5541305f7657f577aef8fd53a0208154a7916d64951c299e
+ * SHA-256: d58266ab858627d85e4d2782cc3b4d780936a685d63219e851ecfe410a42caf7
  * Run node src/theme/build.mjs --write; do not edit colors or ratios here. */
 export const brandThemes = {
   "light": {
@@ -71,7 +71,7 @@ export const brandThemes = {
     "warningForeground": "0 0% 0%",
     "warningStrong": "41.4545 88.2353% 63.3333%",
     "inputFill": "hsl(244 29% 9%)",
-    "canvasBackdrop": "#060610",
+    "canvasBackdrop": "#040408",
     "borderSoft": "rgba(255, 255, 255, 0.10)",
     "cardEdge": "rgba(255, 255, 255, 0.16)",
     "canvasRender": {

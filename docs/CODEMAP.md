@@ -59,7 +59,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./integrations`](api/integrations.md) | 10 | — |
 | [`./integrations-react`](api/integrations-react.md) | 24 | `platform`, `web-react` |
 | [`./interactions`](api/interactions.md) | 64 | `web` |
-| [`./journeys`](api/journeys.md) | 61 | `signoff`, `workspace-export` |
+| [`./journeys`](api/journeys.md) | 72 | `signoff`, `workspace-export` |
 | [`./journeys/cli`](api/journeys-cli.md) | 1 | `signoff`, `workspace-export` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
@@ -626,11 +626,11 @@ Depends on: `web`
 
 ## `./journeys`
 
-Source: `src/journeys/index.ts` · 61 exports
+Source: `src/journeys/index.ts` · 72 exports
 
 Depends on: `signoff`, `workspace-export`
 
-`assertNoSecrets`, `AuthPaths`, `Chapter`, `chapterCues`, `ChatContract`, `clickUntilSubmitted`, `collectJourneyFiles`, `CONFIG_FILE_NAMES`, `createSubmissionTracker`, `credentialNames`, `CriticResult`, `Cue`, `DEFAULT_AUTH_PATHS`, `DEFAULT_CHAT_CONTRACT`, `DEFAULT_FAILURE_TEXT`, `DEFAULT_STOPPED_TEXT`, `defineJourneys`, `DESKTOP`, `extractFrames`, `FailurePatterns`, `highlightPlan`, `HighlightSegment`, `IndexInput`, `Journey`, `JourneyFiles`, `JourneyIdentity`, `JourneysConfig`, `loadJourneysConfig`, `MAX_HIGHLIGHTS_S`, `oneLine`, `PHONE`, `postProcessVideo`, `rebuildVideo`, `renderIndex`, `ResolvedJourneysConfig`, `resolveJourneysConfig`, `routeSubmitPaths`, `scoreTurn`, `scrubTrace`, `secretNeedles`, `SendDriveOps`, `SendOptions`, `sessionUser`, `SessionUser`, `settleText`, `SignInMethod`, `startJourney`, `STATUS_STALE_MS`, `StepRecord`, `storageStateFor`, `SubmissionTracker`, `tallyTurns`, `ThreadRoute`, `threadRouteIn`, `TranscriptSnapshot`, `TurnEvidence`, `TurnFacts`, `turnLooksActive`, `TurnOutcome`, `TurnRecord`, `TurnVerdict`
+`assertNoSecrets`, `AuthPaths`, `Chapter`, `chapterCues`, `ChatContract`, `clickUntilSubmitted`, `collectJourneyFiles`, `CONFIG_FILE_NAMES`, `createSubmissionTracker`, `credentialNames`, `CriticResult`, `Cue`, `DEFAULT_AUTH_PATHS`, `DEFAULT_CHAT_CONTRACT`, `DEFAULT_FAILURE_TEXT`, `DEFAULT_STOPPED_TEXT`, `defineJourneys`, `DESKTOP`, `extractFrames`, `FailurePatterns`, `highlightPlan`, `HighlightSegment`, `IndexInput`, `Journey`, `JourneyFiles`, `JourneyIdentity`, `JourneysConfig`, `JourneySummary`, `JourneySummaryEntry`, `LEGACY_SCOREBOARD_APP`, `loadJourneysConfig`, `MAX_HIGHLIGHTS_S`, `oneLine`, `PHONE`, `postProcessVideo`, `rebuildVideo`, `renderIndex`, `ResolvedJourneysConfig`, `resolveJourneysConfig`, `routeSubmitPaths`, `SCOREBOARD_STATUSES`, `scoreboardDocId`, `scoreboardMetaId`, `ScoreboardOptions`, `ScoreboardResult`, `scoreboardRows`, `ScoreboardStatus`, `ScoreboardWrite`, `scoreTurn`, `scrubTrace`, `secretNeedles`, `SendDriveOps`, `SendOptions`, `sessionUser`, `SessionUser`, `settleText`, `SignInMethod`, `startJourney`, `STATUS_STALE_MS`, `StepRecord`, `storageStateFor`, `SubmissionTracker`, `tallyTurns`, `ThreadRoute`, `threadRouteIn`, `TranscriptSnapshot`, `TurnEvidence`, `TurnFacts`, `turnLooksActive`, `TurnOutcome`, `TurnRecord`, `TurnVerdict`
 
 [Full API →](api/journeys.md)
 
