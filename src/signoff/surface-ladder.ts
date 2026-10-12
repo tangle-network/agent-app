@@ -25,7 +25,7 @@
  * they are unit-tested without a browser.
  */
 
-import { createRequestMeter, meterContext, QUIET_CHROMIUM_ARGS, type NetworkCount } from './browser-budget'
+import { createRequestMeter, meterPage, QUIET_CHROMIUM_ARGS, type NetworkCount } from './browser-budget'
 
 /** sRGB channels 0–255. */
 export type Rgb = readonly [number, number, number]
@@ -383,8 +383,8 @@ export async function checkSurfaceLadder(options: SurfaceLadderOptions): Promise
         if (options.themeScript) {
           await context.addInitScript({ content: `(() => { const theme = ${JSON.stringify(theme)}; ${options.themeScript} })()` })
         }
-        await meterContext(context, meter)
         const page = await context.newPage()
+        await meterPage(page, meter)
         for (const route of options.routes) {
           await meter.pace()
           await page.goto(new URL(route, options.baseUrl).toString(), { waitUntil: 'domcontentloaded' })
