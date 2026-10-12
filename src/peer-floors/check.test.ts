@@ -156,7 +156,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('4.0.0', range!)).toBe(false)
   })
 
-  it('admits only Runtime lines that export every subpath src imports (0.316 to 0.318)', async () => {
+  it('requires Runtime 0.318 for checkpoint messages and omitted-user continuation', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -164,12 +164,12 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    // ./runtime re-exports router-turn, which imports ./placement (0.315.0) and ./workspace-store (0.316.0):
-    // an older Runtime fails at module load, so the old verified lines are no longer admitted.
-    for (const old of ['0.282.2', '0.283.0', '0.285.0', '0.289.1', '0.291.0', '0.293.0', '0.308.0', '0.313.1', '0.315.9']) {
+    // Export availability alone is insufficient: 0.317 loads, but loses deadline checkpoint
+    // messages and appends an undefined user message on continuation. Both contracts arrived in 0.318.
+    for (const old of ['0.282.2', '0.283.0', '0.285.0', '0.289.1', '0.291.0', '0.293.0', '0.308.0', '0.313.1', '0.315.9', '0.316.0', '0.316.99', '0.317.0', '0.317.99']) {
       expect(satisfiesRange(old, range!)).toBe(false)
     }
-    for (const current of ['0.316.0', '0.317.0', '0.318.0', '0.318.9']) {
+    for (const current of ['0.318.0', '0.318.9']) {
       expect(satisfiesRange(current, range!)).toBe(true)
     }
     expect(satisfiesRange('0.319.0', range!)).toBe(false)
