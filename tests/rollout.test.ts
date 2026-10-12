@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -93,22 +93,24 @@ describe('agent-app-rollout-check', () => {
   let dir: string | undefined
   afterEach(() => { if (dir) rmSync(dir, { recursive: true, force: true }) })
 
-  function repo(fromValue: string, toValue: string, p50: number) {
+  function repo(fromValue: string, toValue: string, p50: number, sub = '.') {
     dir = mkdtempSync(join(tmpdir(), 'rollout-check-'))
+    const app = join(dir, sub)
+    mkdirSync(app, { recursive: true })
     // Plumbing only: a fixture commit through commit-tree runs none of the host's commit hooks.
     const identity = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' }
     const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env: { ...process.env, ...identity } }).trim()
     const wrangler = (value: string) => `name = "app"\n\n[vars]\n# The routed lane.\nHOSPITALITY_ROUTED_BUSINESS_IDS = "${value}"\n\n[env.staging.vars]\nHOSPITALITY_ROUTED_BUSINESS_IDS = "*"\n`
     git('init', '-q', '-b', 'main')
-    writeFileSync(join(dir, 'wrangler.toml'), wrangler(fromValue))
+    writeFileSync(join(app, 'wrangler.toml'), wrangler(fromValue))
     git('add', '.')
     git('update-ref', 'refs/heads/main', git('commit-tree', git('write-tree'), '-m', 'base'))
-    writeFileSync(join(dir, 'wrangler.toml'), wrangler(toValue))
-    writeFileSync(join(dir, 'rollout.config.mjs'), `export default {
+    writeFileSync(join(app, 'wrangler.toml'), wrangler(toValue))
+    writeFileSync(join(app, 'rollout.config.mjs'), `export default {
       plans: ${JSON.stringify([plan])},
       async measure({ stage }) { return { stage: stage.name, samples: 30, metrics: { first_words_p50_ms: ${p50}, failure_rate: 0 } } },
     }`)
-    return dir
+    return sub === '.' ? dir : app
   }
 
   it('reads only the top-level [vars] value', () => {
@@ -122,6 +124,28 @@ describe('agent-app-rollout-check', () => {
     expect(decision).toMatchObject({ decision: 'refused', from: { value: QA }, to: { value: ALL_BUT_RECENTER } })
     const ledger = readFileSync(join(appDir, '.rollout/decisions.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line))
     expect(ledger).toEqual([expect.objectContaining({ decision: 'refused', reasons: ['first_words_p50_ms 3540 over kill line 2500'] })])
+  })
+
+  it('reads the base from the source checkout when signoff runs it in a clean tree without .git', async () => {
+    // Source repo with the app under apps/web; the clean tree is a plain copy.
+    repo(QA, ALL_BUT_RECENTER, 3540, 'apps/web')
+    const source = dir!
+    const tree = mkdtempSync(join(tmpdir(), 'rollout-tree-'))
+    try {
+      const appDir = join(tree, 'apps', 'web')
+      cpSync(join(source, 'apps', 'web'), appDir, { recursive: true })
+      delete process.env.SIGNOFF_SOURCE_REPO
+      delete process.env.SIGNOFF_TREE
+      await expect(runRolloutCheck({ appDir, base: 'main', record: '.rollout/decisions.jsonl' })).rejects.toThrow(/cannot read wrangler.toml at main/)
+      process.env.SIGNOFF_SOURCE_REPO = source
+      process.env.SIGNOFF_TREE = tree
+      await expect(runRolloutCheck({ appDir, base: 'main', record: '.rollout/decisions.jsonl' }))
+        .resolves.toEqual([expect.objectContaining({ decision: 'refused', from: expect.objectContaining({ value: QA }) })])
+    } finally {
+      delete process.env.SIGNOFF_SOURCE_REPO
+      delete process.env.SIGNOFF_TREE
+      rmSync(tree, { recursive: true, force: true })
+    }
   })
 
   it('allows it when the numbers meet the lines', async () => {
