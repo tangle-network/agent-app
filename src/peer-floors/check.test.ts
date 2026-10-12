@@ -172,7 +172,8 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.315.1', range!)).toBe(false)
     expect(satisfiesRange('0.316.0', range!)).toBe(true)
     expect(satisfiesRange('0.317.0', range!)).toBe(true)
-    expect(satisfiesRange('0.318.0', range!)).toBe(false)
+    expect(satisfiesRange('0.318.0', range!)).toBe(true)
+    expect(satisfiesRange('0.319.0', range!)).toBe(false)
   })
 
   it('admits the tcloud line used by the Sandbox 0.59 consumer', async () => {
