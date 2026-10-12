@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.155
+
+- docs: record served Studio settings outcome (#1092)
+
 ## 0.60.154
 
 - feat(studio): group generation options in settings popover (#1091)
