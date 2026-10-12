@@ -590,6 +590,25 @@ describe('StudioComposer — model availability', () => {
     expect(veo.querySelector('[data-model-preview]')).toBeNull()
   })
 
+  it('draws the maker’s logo for a model another host serves', async () => {
+    mountWith(catalog({
+      video: [
+        model(SEEDANCE, 'video'),
+        model('fal-ai/veo3.1', 'video', { provider: 'fal', maker: 'google' }),
+        model('fal-ai/other', 'video', { provider: 'fal' }),
+      ],
+    }, { video: SEEDANCE }))
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+
+    const picker = await openModelPicker()
+    const veo = within(picker).getByRole('button', { name: /^fal-ai\/veo3\.1/ })
+    expect(veo.querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe('google')
+    // Without a maker the host's mark stays.
+    const other = within(picker).getByRole('button', { name: /^fal-ai\/other/ })
+    expect(other.querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe('fal')
+  })
+
   it('keeps the unavailable Audio draft editable, blocks submission, and recovers', async () => {
     const first = catalog({
       image: [model('gpt-image-2', 'image')],
