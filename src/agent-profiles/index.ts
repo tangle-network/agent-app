@@ -544,29 +544,33 @@ export async function rollbackProfileBinding(input: {
 }
 
 /**
- * What `readProfileAdmission` read for one message: an opaque handle, not data a caller can build.
- * `admitProfileTurn` accepts only a handle this module issued, so a caller cannot pass a pin or binding
- * it never read. The active-revision pointer is never part of it; admission reads that live.
+ * An opaque token for what `readProfileAdmission` read for one message. It carries no data: the values
+ * live in this module, cloned when read, so a caller can neither build a token nor change what it stands
+ * for. `admitProfileTurn` accepts each token once. The active-revision pointer is never part of it;
+ * admission reads that live.
  */
-export interface ProfileAdmissionRead {
-  readonly key: ProfileBindingKey
-  readonly messageId: string
-  readonly inputHash: string
+export interface ProfileAdmissionRead { readonly [admissionReadBrand]: true }
+declare const admissionReadBrand: unique symbol
+
+/** The values a token stands for, as the caller may inspect them. */
+export interface ProfileAdmissionValues {
+  key: ProfileBindingKey
+  messageId: string
+  inputHash: string
   /** The message's existing pin, when it was already admitted. */
-  readonly prior: ProfileTurnPin | null
-  readonly binding: ProfileBinding | null
+  prior: ProfileTurnPin | null
+  binding: ProfileBinding | null
   /** The pinned revision by id (immutable), when the binding pins one. */
-  readonly pinnedRevision: ProfileRevision | null
-  readonly [admissionReadBrand]: true
+  pinnedRevision: ProfileRevision | null
 }
-export declare const admissionReadBrand: unique symbol
-const issuedAdmissionReads = new WeakSet<object>()
+const admissionReads = new WeakMap<ProfileAdmissionRead, ProfileAdmissionValues>()
 
 /**
  * Read what admitting a message needs: its prior pin and the binding together, then a pinned revision.
- * Read it where the caller holds its conversation lock and has checked these values; pass the handle to
- * `admitProfileTurn`, which then skips re-reading them. The pin is still written as a compare-and-set
- * on the binding version, so a binding that moved after this read is refused.
+ * Read it where the caller holds its conversation lock (after any switch it records), check the values
+ * with `profileAdmissionValues`, and pass the token to `admitProfileTurn`, which then skips re-reading
+ * the pin and binding. The pin is still written as a compare-and-set on the binding version, so a
+ * binding that moved after this read is refused.
  */
 export async function readProfileAdmission(store: ProfileRevisionStore, key: ProfileBindingKey,
   messageId: string, content: string): Promise<ProfileAdmissionRead> {
@@ -574,9 +578,17 @@ export async function readProfileAdmission(store: ProfileRevisionStore, key: Pro
   const [prior, binding] = await Promise.all([store.getTurnPin(key, messageId, inputHash), store.getBinding(key)])
   const pinnedRevision = !prior && binding?.pinnedRevisionId
     ? await store.getRevision(key.workspaceId, binding.profileId, binding.pinnedRevisionId) : null
-  const read = Object.freeze({ key: Object.freeze({ ...key }), messageId, inputHash, prior, binding, pinnedRevision }) as ProfileAdmissionRead
-  issuedAdmissionReads.add(read)
+  const read = Object.freeze(Object.create(null)) as ProfileAdmissionRead
+  admissionReads.set(read, structuredClone({ key: { workspaceId: key.workspaceId, memberId: key.memberId, channel: key.channel },
+    messageId, inputHash, prior, binding, pinnedRevision }))
   return read
+}
+
+/** A deep copy of what a token stands for; changing the copy changes nothing the token admits. */
+export function profileAdmissionValues(read: ProfileAdmissionRead): ProfileAdmissionValues {
+  const values = admissionReads.get(read)
+  if (!values) throw new ProfileAccessError('Unknown or used profile admission read')
+  return structuredClone(values)
 }
 
 export async function admitProfileTurn(input: {
@@ -593,8 +605,10 @@ export async function admitProfileTurn(input: {
   read?: ProfileAdmissionRead
 }): Promise<ProfileTurnPin> {
   const inputHash = sha256Utf8(input.content)
-  const read = input.read
-  if (read && (!issuedAdmissionReads.has(read) || read.messageId !== input.messageId || read.inputHash !== inputHash ||
+  // A token is spent when presented, so it admits at most one turn even if this call fails.
+  const read = input.read ? admissionReads.get(input.read) : undefined
+  if (input.read) admissionReads.delete(input.read)
+  if (input.read && (!read || read.messageId !== input.messageId || read.inputHash !== inputHash ||
       read.key.workspaceId !== input.key.workspaceId || read.key.memberId !== input.key.memberId ||
       read.key.channel !== input.key.channel)) {
     throw new ProfileAccessError('The admission read does not belong to this message')
