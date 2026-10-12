@@ -18,19 +18,31 @@ const LANGUAGE_CODES = ('aa ab af ak am an ar as av ay az ba be bg bi bm bn bo b
   'ks ku kv kw ky la lb lg li ln lo lt lu lv mg mh mi mk ml mn mr ms mt my na nb nd ne ng nl nn no nr nv ny oc oj om or os pa pi pl ps pt qu ' +
   'rm rn ro ru rw sa sc sd se sg si sk sl sm sn so sq sr ss st su sv sw ta te tg th ti tk tl tn to tr ts tt tw ty ug uk ur uz ve vi vo wa wo ' +
   'xh yi yo za zh zu').split(' ')
-// Generic words, plus common spellings Intl does not give (हिंदी beside its हिन्दी).
-const LANGUAGE_WORDS = ['language', 'languages', 'idioma', 'idiomas', 'langue', 'lingua', 'língua', 'sprache', 'हिंदी']
+// Always recognised, whatever the runtime's Intl data: generic words and the common
+// languages in English, Spanish and their own names (plus हिंदी beside हिन्दी).
+const CORE_NAMES = [
+  'language', 'languages', 'idioma', 'idiomas', 'langue', 'lingua', 'língua', 'sprache',
+  'english', 'inglés', 'ingles', 'spanish', 'español', 'espanol', 'castellano', 'french', 'français', 'francés',
+  'portuguese', 'português', 'portugués', 'german', 'deutsch', 'alemán', 'italian', 'italiano', 'japanese', '日本語',
+  'japonés', 'chinese', '中文', '汉语', 'chino', 'korean', '한국어', 'coreano', 'arabic', 'العربية', 'árabe', 'hindi',
+  'हिन्दी', 'हिंदी', 'russian', 'русский', 'ruso', 'dutch', 'nederlands', 'neerlandés', 'hebrew', 'עברית', 'hebreo',
+  'turkish', 'türkçe', 'turco', 'vietnamese', 'tiếng việt', 'vietnamita', 'catalan', 'català', 'catalán',
+]
+// Language names that are everyday words: "ya he ido", "él cree", "que me venda",
+// "odia", "from afar", "ewe", "Latin America", "shoe polish".
+const COMMON_WORDS = new Set(['ido', 'cree', 'venda', 'odia', 'afar', 'ewe', 'latin', 'polish'])
 
 let patterns: RegExp[] | undefined
 function languagePatterns(): RegExp[] {
   if (patterns) return patterns
-  const names = new Set(LANGUAGE_WORDS)
+  const names = new Set(CORE_NAMES)
   for (const locale of ['en', 'es', ...LANGUAGE_CODES]) {
     let display: Intl.DisplayNames
+    // A runtime without Intl language data still has CORE_NAMES.
     try { display = new Intl.DisplayNames([locale], { type: 'language' }) } catch { continue }
     for (const code of locale === 'en' || locale === 'es' ? LANGUAGE_CODES : [locale]) {
       const name = display.of(code)?.toLowerCase()
-      if (name && name !== code && name.length >= 3) names.add(name)
+      if (name && name !== code && name.length >= 3 && !COMMON_WORDS.has(name)) names.add(name)
     }
   }
   // Latin-script names need word edges ("pedido" must not match Ido); scripts written
