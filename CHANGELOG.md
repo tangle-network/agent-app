@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.133
+
+- feat(rollout): a staged rollout widens only after the stage it leaves met its kill lines (#1049)
+
 ## 0.60.132
 
 - fix(journeys): read a textarea composer by its value, so the default ChatComposer passes typePrompt (#1060)
