@@ -543,6 +543,42 @@ export async function rollbackProfileBinding(input: {
     message: `Now talking to ${parent.profile.name ?? 'this profile'}` }, binding.version)
 }
 
+/**
+ * What `readProfileAdmission` read for one message: an opaque handle, not data a caller can build.
+ * `admitProfileTurn` accepts only a handle this module issued, so a caller cannot pass a pin or binding
+ * it never read. The active-revision pointer is never part of it; admission reads that live.
+ */
+export interface ProfileAdmissionRead {
+  readonly key: ProfileBindingKey
+  readonly messageId: string
+  readonly inputHash: string
+  /** The message's existing pin, when it was already admitted. */
+  readonly prior: ProfileTurnPin | null
+  readonly binding: ProfileBinding | null
+  /** The pinned revision by id (immutable), when the binding pins one. */
+  readonly pinnedRevision: ProfileRevision | null
+  readonly [admissionReadBrand]: true
+}
+export declare const admissionReadBrand: unique symbol
+const issuedAdmissionReads = new WeakSet<object>()
+
+/**
+ * Read what admitting a message needs: its prior pin and the binding together, then a pinned revision.
+ * Read it where the caller holds its conversation lock and has checked these values; pass the handle to
+ * `admitProfileTurn`, which then skips re-reading them. The pin is still written as a compare-and-set
+ * on the binding version, so a binding that moved after this read is refused.
+ */
+export async function readProfileAdmission(store: ProfileRevisionStore, key: ProfileBindingKey,
+  messageId: string, content: string): Promise<ProfileAdmissionRead> {
+  const inputHash = sha256Utf8(content)
+  const [prior, binding] = await Promise.all([store.getTurnPin(key, messageId, inputHash), store.getBinding(key)])
+  const pinnedRevision = !prior && binding?.pinnedRevisionId
+    ? await store.getRevision(key.workspaceId, binding.profileId, binding.pinnedRevisionId) : null
+  const read = Object.freeze({ key: Object.freeze({ ...key }), messageId, inputHash, prior, binding, pinnedRevision }) as ProfileAdmissionRead
+  issuedAdmissionReads.add(read)
+  return read
+}
+
 export async function admitProfileTurn(input: {
   store: ProfileRevisionStore
   key: ProfileBindingKey
@@ -553,14 +589,23 @@ export async function admitProfileTurn(input: {
   /** Required if trusted per-turn attachments change the public profile plan. */
   verifyEffectivePlan?: (revision: ProfileRevision, effectivePlanDigest: string,
     key: ProfileBindingKey) => Promise<boolean>
+  /** A handle from `readProfileAdmission` for this message; its pin and binding are not read again. */
+  read?: ProfileAdmissionRead
 }): Promise<ProfileTurnPin> {
   const inputHash = sha256Utf8(input.content)
-  const prior = await input.store.getTurnPin(input.key, input.messageId, inputHash)
+  const read = input.read
+  if (read && (!issuedAdmissionReads.has(read) || read.messageId !== input.messageId || read.inputHash !== inputHash ||
+      read.key.workspaceId !== input.key.workspaceId || read.key.memberId !== input.key.memberId ||
+      read.key.channel !== input.key.channel)) {
+    throw new ProfileAccessError('The admission read does not belong to this message')
+  }
+  const prior = read ? read.prior : await input.store.getTurnPin(input.key, input.messageId, inputHash)
   if (prior) return prior
-  const binding = await input.store.getBinding(input.key)
+  const binding = read ? read.binding : await input.store.getBinding(input.key)
   if (!binding) throw new ProfileAccessError('Choose a profile before sending a message')
+  // The active pointer can move without the binding version changing, so it is always read live.
   const revision = binding.pinnedRevisionId
-    ? await input.store.getRevision(input.key.workspaceId, binding.profileId, binding.pinnedRevisionId)
+    ? read?.pinnedRevision ?? await input.store.getRevision(input.key.workspaceId, binding.profileId, binding.pinnedRevisionId)
     : await input.store.getActiveRevision(input.key.workspaceId, binding.profileId)
   if (!revision) throw new ProfileConflictError('The bound profile revision is unavailable')
   if (revision.authorityDigest !== binding.authorityDigest ||
