@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.161
+
+- feat(scaffold): ship safe external-agent onboarding and operator access (#1096)
+
 ## 0.60.160
 
 - test(sandbox): model recovered box health across resume (#1097)
