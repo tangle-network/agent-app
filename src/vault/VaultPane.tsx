@@ -487,6 +487,26 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   dirtyRef.current = isDirty
   const treeRequestRef = useRef(0)
   const savedContentRef = useRef('')
+  const draftContentRef = useRef('')
+  const savedResultRef = useRef<VaultFile | null>(null)
+  const saveRequestRef = useRef<object | null>(null)
+  const saveScopeKey = useMemo(() => ({}), [port, selectedPath, canWrite, historyOpen])
+  const saveScopeRef = useRef({ key: saveScopeKey, port, path: selectedPath, canWrite, historyOpen })
+  saveScopeRef.current = { key: saveScopeKey, port, path: selectedPath, canWrite, historyOpen }
+  const mountedRef = useRef(true)
+  const editorModeRef = useRef(editorMode)
+  editorModeRef.current = editorMode
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      saveRequestRef.current = null
+    }
+  }, [])
+  const savedRichDraft = useMemo(
+    () => selectedFile ? activeCodec.parse(selectedFile.content) : undefined,
+    [selectedFile?.content, activeCodec],
+  )
   const loadedPathRef = useRef<string | null>(null)
   const onOperationErrorRef = useRef(onOperationError)
   onOperationErrorRef.current = onOperationError
@@ -727,6 +747,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
       loadedPathRef.current = null
       setDisplayReadyPath(null)
       savedContentRef.current = ''
+      draftContentRef.current = ''
       setRichDraft('')
       setSourceDraft('')
       setEditorMode('rich')
@@ -734,10 +755,17 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
       setSaveError(null)
       return
     }
+    // A completed write advances the persisted baseline, but must not replace
+    // edits typed while that write was in flight with its older submitted text.
+    if (savedResultRef.current === selectedFile) {
+      savedResultRef.current = null
+      return
+    }
     const pathChanged = loadedPathRef.current !== selectedFile.path
     loadedPathRef.current = selectedFile.path
     setDisplayReadyPath(selectedFile.path)
     savedContentRef.current = selectedFile.content
+    draftContentRef.current = selectedFile.content
     setRichDraft(activeCodec.parse(selectedFile.content))
     setSourceDraft(selectedFile.content)
     if (pathChanged) setEditorMode('rich')
@@ -847,8 +875,13 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const showRichMode = useCallback(() => {
     setEditorMode((mode) => {
       if (mode === 'rich') return mode
-      setRichDraft(activeCodec.parse(sourceDraft))
-      setIsDirty(sourceDraft !== savedContentRef.current)
+      const rich = activeCodec.parse(sourceDraft)
+      const content = activeCodec.serialize(rich)
+      draftContentRef.current = content
+      dirtyRef.current = content !== savedContentRef.current
+      editorModeRef.current = 'rich'
+      setRichDraft(rich)
+      setIsDirty(dirtyRef.current)
       return 'rich'
     })
   }, [activeCodec, sourceDraft])
@@ -857,42 +890,81 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     setEditorMode((mode) => {
       if (mode === 'source') return mode
       const content = isDirty ? activeCodec.serialize(richDraft) : savedContentRef.current
+      draftContentRef.current = content
+      dirtyRef.current = content !== savedContentRef.current
+      editorModeRef.current = 'source'
       setSourceDraft(content)
-      setIsDirty(content !== savedContentRef.current)
+      setIsDirty(dirtyRef.current)
       return 'source'
     })
   }, [activeCodec, isDirty, richDraft])
 
   const onSourceChange = useCallback((next: string) => {
+    if (!mountedRef.current || editorModeRef.current !== 'source' || saveScopeRef.current.key !== saveScopeKey
+      || !saveScopeRef.current.canWrite || saveScopeRef.current.historyOpen) return
+    draftContentRef.current = next
     dirtyRef.current = next !== savedContentRef.current
     setSourceDraft(next)
     setIsDirty(dirtyRef.current)
-  }, [])
+  }, [saveScopeKey])
 
   const onRichChange = useCallback((next: VaultRichParts) => {
-    dirtyRef.current = activeCodec.serialize(next) !== savedContentRef.current
+    if (!mountedRef.current || editorModeRef.current !== 'rich' || saveScopeRef.current.key !== saveScopeKey
+      || !saveScopeRef.current.canWrite || saveScopeRef.current.historyOpen) return
+    draftContentRef.current = activeCodec.serialize(next)
+    dirtyRef.current = draftContentRef.current !== savedContentRef.current
     setRichDraft(next)
     setIsDirty(dirtyRef.current)
-  }, [activeCodec])
+  }, [activeCodec, saveScopeKey])
 
   const saveCurrent = useCallback(async () => {
-    if (!selectedFile) return
-    const content = editorMode === 'source' ? sourceDraft : activeCodec.serialize(richDraft)
+    const scope = saveScopeRef.current
+    if (!mountedRef.current || !selectedFile || !scope.canWrite || scope.historyOpen || !dirtyRef.current
+      || scope.key !== saveScopeKey || scope.port !== port
+      || scope.path !== selectedFile.path || saveRequestRef.current) return
+    const content = draftContentRef.current
+    const request = {}
+    // Set before React renders: even retained callbacks or two synchronous
+    // clicks share one write. Disabled buttons are presentation, not admission.
+    saveRequestRef.current = request
+    const isCurrent = () => mountedRef.current && saveRequestRef.current === request
+      && saveScopeRef.current.key === saveScopeKey
+      && saveScopeRef.current.port === port
+      && saveScopeRef.current.path === selectedFile.path
+      && saveScopeRef.current.canWrite
     setSaving(true)
     setSaveError(null)
     try {
       await port.writeFile(selectedFile.path, content)
+      if (!isCurrent()) return
       savedContentRef.current = content
-      setSelectedFile({ ...selectedFile, content })
-      setSourceDraft(content)
-      setRichDraft(activeCodec.parse(content))
-      setIsDirty(false)
+      const savedFile = { ...selectedFile, content }
+      savedResultRef.current = savedFile
+      setSelectedFile(savedFile)
+      // The current draft can have moved on while persistence was pending.
+      const dirty = draftContentRef.current !== content
+      dirtyRef.current = dirty
+      setIsDirty(dirty)
+      if (!dirty) {
+        setSourceDraft(content)
+        setRichDraft(activeCodec.parse(content))
+      }
     } catch (error) {
-      setSaveError(reportFailure('save', 'operation', error, 'Failed to save file', selectedFile.path))
+      if (isCurrent()) setSaveError(reportFailure('save', 'operation', error, 'Failed to save file', selectedFile.path))
     } finally {
-      setSaving(false)
+      if (saveRequestRef.current === request) {
+        saveRequestRef.current = null
+        // A controlled selection can replace this file while its write is
+        // pending. Release the old file's dirty barrier, never a newer draft.
+        if (saveScopeRef.current.path !== selectedFile.path
+          && loadedPathRef.current === selectedFile.path) {
+          dirtyRef.current = false
+          setIsDirty(false)
+        }
+        setSaving(false)
+      }
     }
-  }, [selectedFile, editorMode, sourceDraft, richDraft, activeCodec, port, reportFailure])
+  }, [selectedFile, activeCodec, port, reportFailure, saveScopeKey])
 
   const handleCreate = useCallback(async () => {
     const trimmed = newPath.trim()
@@ -945,12 +1017,28 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const listRevisions = useCallback((path: string) => port.listRevisions!(path), [port])
   const readRevision = useCallback((path: string, id: string) => port.readRevision!(path, id), [port])
   const restoreRevision = useCallback(async (content: string) => {
-    if (!selectedFile) return
-    await port.writeFile(selectedFile.path, content)
-    setHistoryOpen(false)
-    // Re-read, so the pane holds the server's copy and its new revision.
-    setReloadNonce((n) => n + 1)
-  }, [port, selectedFile])
+    const scope = saveScopeRef.current
+    if (!mountedRef.current || !selectedFile || !scope.canWrite || !scope.historyOpen
+      || scope.key !== saveScopeKey || scope.port !== port || scope.path !== selectedFile.path
+      || dirtyRef.current || saveRequestRef.current) {
+      throw new Error('This file is no longer available to restore.')
+    }
+    const request = {}
+    saveRequestRef.current = request
+    setSaving(true)
+    try {
+      await port.writeFile(selectedFile.path, content)
+      if (!mountedRef.current || saveRequestRef.current !== request
+        || saveScopeRef.current.key !== saveScopeKey) return
+      setHistoryOpen(false)
+      setReloadNonce((n) => n + 1)
+    } finally {
+      if (saveRequestRef.current === request) {
+        saveRequestRef.current = null
+        setSaving(false)
+      }
+    }
+  }, [port, selectedFile, saveScopeKey])
 
   // A file counts as opened once it is on screen, not when it is requested.
   // It is recorded in the commit that first shows it: `displayReadyPath` trails
@@ -1274,6 +1362,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                       mode: 'rich',
                       canWrite: false,
                       richDraft: activeCodec.parse(content),
+                      savedRichDraft: activeCodec.parse(content),
                       dirty: false,
                       onRichChange: () => {},
                       onSave: () => {},
@@ -1303,6 +1392,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
                     mode: editorMode,
                     canWrite,
                     richDraft,
+                    savedRichDraft,
                     dirty: isDirty,
                     onRichChange,
                     onSave: () => void saveCurrent(),

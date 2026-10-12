@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import { VaultPane } from '../../vault/VaultPane'
+import { FileArtifactPane } from '@tangle-network/sandbox-ui/files'
 import type { VaultDataPort, VaultPaneHandle, VaultTreeNode } from '../../vault/contracts'
 
 const files: VaultTreeNode[] = [{ name: 'brief.md', path: 'brief.md', type: 'file' }]
@@ -192,4 +193,68 @@ export const EmptyVault: StoryObj<typeof RefreshingVault> = {
 
 export const EmptyVaultNarrow: StoryObj<typeof RefreshingVault> = {
   render: () => <ResponsiveVault empty initialWidth={390} />,
+}
+
+
+/** Real shared editor with a controllable in-memory persistence boundary. */
+function SavingVault() {
+  const failNext = useRef(false)
+  const port = useMemo<VaultDataPort>(() => {
+    let saved = content
+    return {
+      async listTree() { return files },
+      async readFile(path) { return { path, content: saved } },
+      async createFile() { throw new Error('Fixture cannot create files') },
+      async deleteFile() { throw new Error('Fixture cannot delete files') },
+      async writeFile(_path, next) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 1500))
+        if (failNext.current) {
+          failNext.current = false
+          throw new Error('Fixture write failed. Your draft is kept; save again to retry.')
+        }
+        saved = next
+      },
+    }
+  }, [])
+  return (
+    <div className="flex h-[700px] flex-col gap-3 p-3">
+      <button type="button" className="self-start rounded border border-border px-3 py-2" onClick={() => { failNext.current = true }}>
+        Fail the next save
+      </button>
+      <VaultPane
+        port={port}
+        selectedPath="brief.md"
+        codec={codec}
+        canCreate={false}
+        canDelete={false}
+        renderArtifact={({ file, richDraft, savedRichDraft, saving, canWrite, revision, onRichChange, onSave }) => file && (
+          <FileArtifactPane
+            key={file.path}
+            filename={file.path}
+            content={String(richDraft ?? '')}
+            editor={{
+              enabled: canWrite && !revision,
+              defaultMode: 'edit',
+              backend: 'local',
+              savedContent: String(savedRichDraft ?? file.content),
+              saving,
+              onChange: onRichChange,
+              onSave,
+            }}
+          />
+        )}
+      />
+    </div>
+  )
+}
+
+export const PersistedDraftAndRetry: StoryObj<typeof RefreshingVault> = {
+  render: () => <SavingVault />,
+  parameters: {
+    docs: {
+      description: {
+        story: 'The maintained file editor compares live content to the saved baseline. Saves take 1.5 seconds; edit again while pending to preserve a newer draft, or fail one save and retry. This in-memory fixture does not prove backend persistence.',
+      },
+    },
+  },
 }
