@@ -82,7 +82,7 @@ const seconds = (value: unknown): number | undefined => (typeof value === 'numbe
 
 /** The document id a flow row lives at. */
 export function scoreboardDocId(app: string, flowId: string): string {
-  return app === LEGACY_SCOREBOARD_APP ? flowId : `${app}-${flowId}`
+  return `${app}-${flowId}`
 }
 
 /** The `meta` document an app's run facts live at. */
@@ -145,7 +145,6 @@ export function scoreboardRows(summary: JourneySummary, options: ScoreboardOptio
   }
 
   const writes = [...flows.values()]
-    .sort((a, b) => a.doc_id.localeCompare(b.doc_id, undefined, { numeric: true }))
     .map((write) => pinned(write, options.versions))
   const meta: Record<string, unknown> = {
     origin: summary.origin ?? DELETE,
