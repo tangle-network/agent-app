@@ -42,7 +42,7 @@ describe('runRouterTurn', () => {
 
     expect(outcome).toEqual({ text: 'Done: Restock towels is on the list.', servedModel: 'served/model',
       toolCalls: [{ callId: 'call-1', toolName: 'staff.task.create', ok: true }],
-      usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [] })
+      usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, reasoning: { deltas: 0, chars: 0 }, toolEvents: [] })
     expect(createTask.run).toHaveBeenCalledWith({ title: 'Restock towels' },
       { emit: expect.any(Function), userMessage: 'Create a task to restock towels' })
     expect(requests[0]!.headers.get('x-tangle-trace-id')).toBe('trace-1')
@@ -108,7 +108,7 @@ describe('runRouterTurn', () => {
     const recovers = router(down, sse([text('Hello.')]))
     await expect(runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: recovers.fetchImpl, systemPrompt: 's', userMessage: 'u' }))
       .resolves.toEqual({ text: 'Hello.', servedModel: 'served/model', toolCalls: [],
-        usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [] })
+        usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, reasoning: { deltas: 0, chars: 0 }, toolEvents: [] })
   })
 
   it('never repeats a turn after a tool ran', async () => {
@@ -269,6 +269,66 @@ describe('runRouterTurn', () => {
     expect(requests[0]!.body.temperature).toBe(0.7)
     expect(requests[1]!.body.messages).toEqual(expect.arrayContaining([
       expect.objectContaining({ role: 'tool', content: `${'x'.repeat(10)}…` })]))
+  })
+
+  it('runs an OpenAI reasoning turn on the Responses API and streams its reasoning summary', async () => {
+    // OpenAI's Responses stream: a reasoning summary, a function call in fragments, then the answer.
+    const responses = (events: unknown[]) => new Response(events.map(e => `data: ${JSON.stringify(e)}\n\n`).join(''),
+      { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    const first = responses([
+      { type: 'response.reasoning_summary_text.delta', output_index: 0, summary_index: 0, delta: 'Need the task list.' },
+      { type: 'response.output_item.added', output_index: 1, item: { type: 'function_call', call_id: 'call-1', name: 'staff_task_create', arguments: '' } },
+      { type: 'response.function_call_arguments.delta', output_index: 1, delta: '{"title":' },
+      { type: 'response.function_call_arguments.delta', output_index: 1, delta: '"Restock towels"}' },
+      { type: 'response.completed', response: { model: 'gpt-6-2026-09-01', usage: { input_tokens: 120, output_tokens: 30 } } },
+    ])
+    const second = responses([
+      { type: 'response.reasoning_summary_text.delta', output_index: 0, summary_index: 0, delta: 'Created it.' },
+      { type: 'response.output_text.delta', output_index: 1, delta: 'Done: restock towels is on the list.' },
+      { type: 'response.completed', response: { model: 'gpt-6-2026-09-01', usage: { input_tokens: 160, output_tokens: 12 } } },
+    ])
+    const urls: string[] = []
+    const bodies: Array<Record<string, any>> = []
+    const queue = [first, second]
+    const fetchImpl = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      urls.push(String(url)); bodies.push(JSON.parse(String(init?.body))); return queue.shift()!
+    }) as typeof fetch
+    const events: RouterTurnEvent[] = []
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'openai/gpt-6', reasoningEffort: 'medium', fetchImpl,
+      systemPrompt: 'You are Pablo.', userMessage: 'Create a task to restock towels', tools: [createTask], onEvent: e => events.push(e) })
+
+    expect(urls.every(url => url.endsWith('/responses'))).toBe(true)
+    expect(bodies[0]).toMatchObject({ model: 'openai/gpt-6', instructions: 'You are Pablo.', stream: true, store: false,
+      reasoning: { effort: 'medium', summary: 'auto' }, tools: [{ type: 'function', name: 'staff_task_create' }],
+      input: [{ role: 'user', content: 'Create a task to restock towels' }] })
+    // The second call replays the call and its result as Responses items.
+    expect(bodies[1]!.input).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'function_call', call_id: 'call-1', name: 'staff_task_create' }),
+      expect.objectContaining({ type: 'function_call_output', call_id: 'call-1' })]))
+    expect(events.filter(e => e.type === 'reasoning').map(e => (e as { delta: string }).delta)).toEqual(['Need the task list.', 'Created it.'])
+    expect(outcome).toMatchObject({ text: 'Done: restock towels is on the list.', servedModel: 'gpt-6-2026-09-01',
+      toolCalls: [{ callId: 'call-1', toolName: 'staff.task.create', ok: true }],
+      usage: { promptTokens: 280, completionTokens: 42, modelCalls: 2 }, reasoning: { deltas: 2, chars: 30 } })
+  })
+
+  it('keeps chat completions for a non-OpenAI model, an OpenAI model without reasoning, and api: chat', async () => {
+    for (const options of [{ model: 'gemini-3.5-flash', reasoningEffort: 'medium' }, { model: 'openai/gpt-6' },
+      { model: 'openai/gpt-6', reasoningEffort: 'none' }, { model: 'openai/gpt-6', reasoningEffort: 'high', api: 'chat' as const }]) {
+      const { fetchImpl } = router(sse([text('ok')]))
+      const urls: string[] = []
+      const spy = (async (url: RequestInfo | URL, init?: RequestInit) => { urls.push(String(url)); return fetchImpl(url, init) }) as typeof fetch
+      await runRouterTurn({ apiKey: 'k', fetchImpl: spy, systemPrompt: 's', userMessage: 'u', ...options })
+      expect(urls[0]).toMatch(/\/chat\/completions$/)
+    }
+  })
+
+  it('turns a failed Responses stream into a typed model failure', async () => {
+    const failed = () => new Response(`data: ${JSON.stringify({ type: 'response.failed', response: { error: { code: 'server_error', message: 'upstream' } } })}\n\n`,
+      { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    const queue = [failed(), failed()]
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'gpt-6', reasoningEffort: 'low', systemPrompt: 's', userMessage: 'u',
+      fetchImpl: (async () => queue.shift()!) as typeof fetch })
+    expect(outcome.failure).toMatchObject({ code: 'model_unavailable' })
   })
 
   it('refuses to run without a credential', async () => {
