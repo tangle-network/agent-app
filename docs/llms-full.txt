@@ -19083,6 +19083,14 @@ type AnySurfaceKind
 interface AppToolLoopOptions
 ```
 
+### `asksForLanguage`
+
+`function` — True when the message names a language.
+
+```ts
+(message: string | undefined) => boolean
+```
+
 ### `budgetTurnKnowledge`
 
 `function` — Apply the byte budget in path order: small files keep their text until the total is spent.
@@ -19385,6 +19393,14 @@ type ProtectedRouterTurnOptions
 
 ```ts
 interface ProtectedRouterTurnOutcome
+```
+
+### `replyLanguageInstruction`
+
+`function` — The language a Router turn replies in, for every agent app: the sender's current message decides, then the conversation's.
+
+```ts
+() => string
 ```
 
 ### `resolveCatalogModelId`
@@ -19880,6 +19896,14 @@ interface TurnKnowledgeFile
 
 Source: `src/runtime/router-turn.ts` · depends on `tools`
 
+### `asksForLanguage`
+
+`function` — True when the message names a language.
+
+```ts
+(message: string | undefined) => boolean
+```
+
 ### `budgetTurnKnowledge`
 
 `function` — Apply the byte budget in path order: small files keep their text until the total is spent.
@@ -19918,6 +19942,14 @@ number
 
 ```ts
 (input: RouterTurnPlacementInput) => PlacementRecord
+```
+
+### `replyLanguageInstruction`
+
+`function` — The language a Router turn replies in, for every agent app: the sender's current message decides, then the conversation's.
+
+```ts
+() => string
 ```
 
 ### `routerFunctionName`

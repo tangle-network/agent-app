@@ -14824,6 +14824,12 @@
           "doc": null
         },
         {
+          "name": "asksForLanguage",
+          "kind": "function",
+          "signature": "(message: string | undefined) => boolean",
+          "doc": "True when the message names a language."
+        },
+        {
           "name": "budgetTurnKnowledge",
           "kind": "function",
           "signature": "(files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]",
@@ -15050,6 +15056,12 @@
           "kind": "interface",
           "signature": "interface ProtectedRouterTurnOutcome",
           "doc": "A grant turn's outcome."
+        },
+        {
+          "name": "replyLanguageInstruction",
+          "kind": "function",
+          "signature": "() => string",
+          "doc": "The language a Router turn replies in, for every agent app: the sender's current message decides, then the conversation's."
         },
         {
           "name": "resolveCatalogModelId",
@@ -15428,6 +15440,12 @@
       "error": null,
       "exports": [
         {
+          "name": "asksForLanguage",
+          "kind": "function",
+          "signature": "(message: string | undefined) => boolean",
+          "doc": "True when the message names a language."
+        },
+        {
           "name": "budgetTurnKnowledge",
           "kind": "function",
           "signature": "(files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]",
@@ -15456,6 +15474,12 @@
           "kind": "function",
           "signature": "(input: RouterTurnPlacementInput) => PlacementRecord",
           "doc": "Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…"
+        },
+        {
+          "name": "replyLanguageInstruction",
+          "kind": "function",
+          "signature": "() => string",
+          "doc": "The language a Router turn replies in, for every agent app: the sender's current message decides, then the conversation's."
         },
         {
           "name": "routerFunctionName",

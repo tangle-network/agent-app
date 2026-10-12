@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-101 exports.
+103 exports.
 
 ### `AnySurfaceKind`
 
@@ -20,6 +20,14 @@ type AnySurfaceKind
 
 ```ts
 interface AppToolLoopOptions
+```
+
+### `asksForLanguage`
+
+`function` — True when the message names a language.
+
+```ts
+(message: string | undefined) => boolean
 ```
 
 ### `budgetTurnKnowledge`
@@ -324,6 +332,14 @@ type ProtectedRouterTurnOptions
 
 ```ts
 interface ProtectedRouterTurnOutcome
+```
+
+### `replyLanguageInstruction`
+
+`function` — The language a Router turn replies in, for every agent app: the sender's current message decides, then the conversation's.
+
+```ts
+() => string
 ```
 
 ### `resolveCatalogModelId`

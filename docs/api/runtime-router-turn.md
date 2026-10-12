@@ -4,7 +4,15 @@
 
 Source: `src/runtime/router-turn.ts`
 
-24 exports.
+26 exports.
+
+### `asksForLanguage`
+
+`function` — True when the message names a language.
+
+```ts
+(message: string | undefined) => boolean
+```
 
 ### `budgetTurnKnowledge`
 
@@ -44,6 +52,14 @@ number
 
 ```ts
 (input: RouterTurnPlacementInput) => PlacementRecord
+```
+
+### `replyLanguageInstruction`
+
+`function` — The language a Router turn replies in, for every agent app: the sender's current message decides, then the conversation's.
+
+```ts
+() => string
 ```
 
 ### `routerFunctionName`
