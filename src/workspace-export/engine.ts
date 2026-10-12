@@ -295,7 +295,7 @@ export function createExportEngine(options: ExportEngineOptions) {
       const omit = new Set(source.omitColumns ?? [])
       unit.expectedRows = source.expectedCount ? await source.expectedCount() : undefined
       const csv = source.format === 'csv'
-      const columns = source.columns ?? []
+      const columns = (source.columns ?? []).filter((column) => !omit.has(column))
       if (csv && !columns.length) throw new Error(`workspace-export: csv source "${source.name}" needs columns`)
       let rows = 0
       const iterator = source.rows()[Symbol.asyncIterator]()
