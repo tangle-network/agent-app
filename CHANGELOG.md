@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.123
+
+- feat(router-turn): a turn at its budget returns a continuation instead of failing (#1041)
+
 ## 0.60.122
 
 - feat(model-picker): limited and unavailable models carry a warning StatusPill (#1055)
