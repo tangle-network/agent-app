@@ -360,7 +360,10 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     const h = makeHarness()
     h.setCreateDelay(25)
     const firstManager = h.manager('router', { leaseMs: 100, leaseRenewIntervalMs: 10 })
-    const secondManager = h.manager('router', { leaseMs: 100, leaseWaitMs: 100, leasePollMs: 1 })
+    // The lease expires on the harness clock, but the wait budget is wall time.
+    // The second manager must outwait the first's whole issuance on a loaded
+    // runner, so its budget is far above the 25 ms create delay.
+    const secondManager = h.manager('router', { leaseMs: 100, leaseWaitMs: 5_000, leasePollMs: 1 })
 
     const [first, second] = await Promise.all([
       firstManager.ensureKey(h.identity()),
