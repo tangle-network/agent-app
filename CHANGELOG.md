@@ -1,5 +1,353 @@
 # Changelog
 
+## 0.60.151
+
+- test: match the sandbox-ui 0.134.2 floor and ProviderMark labels raised by #1074 (#1089)
+
+## 0.60.150
+
+- chore(climb): record the signoff edge-budget result (#1087 on creative production) (#1088)
+
+## 0.60.149
+
+- fix(signoff): the request meter counts only requests that reach the network (#1087)
+
+## 0.60.148
+
+- feat(create-agent-app): chat template serves hashed bundles immutable (#1086)
+
+## 0.60.147
+
+- fix(signoff): browser checks keep the HTTP cache and fail an over-budget run (#1085)
+
+## 0.60.146
+
+- fix(router-turn): go to the fallback model at once when the Router names a dead credential (#1084)
+
+## 0.60.145
+
+- fix(router-turn): keep up to 1000 characters of the model service's error text (#1083)
+
+## 0.60.144
+
+- fix(signoff): browser checks stay inside the shared edge limit (#1070)
+- feat(platform): record a person's sandbox billing consent for an app's service key (#1064)
+
+## 0.60.143
+
+- feat(web-react): one shared, live-streamed reasoning row, reasoning state and reasoning part for every app (#1082)
+
+## 0.60.142
+
+- fix(workspace-export): bound continuation reads and restore sandbox lifecycle (#1039)
+- fix(workspace-export): remove omitted columns from CSV schema (#1040)
+
+## 0.60.141
+
+- refactor(provider-logo): draw from sandbox-ui ProviderMark, keep the monogram fallback (#1074)
+
+## 0.60.140
+
+- feat(turn-knowledge): check every file before answering when a turn carries several (#1072)
+
+## 0.60.139
+
+- fix(surfaces): Studio composer and Vault tree search step off their surface; SessionHistoryPanel showHeader (#1069)
+- fix(peers): accept sandbox-ui 0.134 so apps can adopt WorkspaceSurface (#1067)
+
+## 0.60.138
+
+- feat(journeys): a scoreboard writer for the shared readiness board (#1075)
+
+## 0.60.137
+
+- fix(rollout): read the base from the source checkout under signoff's clean tree (#1081)
+- feat(router-turn): OpenAI reasoning turns stream their reasoning summaries through the Responses API (#1080)
+
+## 0.60.136
+
+- fix(workspace-export): retry a sandbox the platform failed to resume, 30 s apart (#1079)
+
+## 0.60.135
+
+- feat(router-turn): reasoning, temperature, fallback models, resends, a tool-result limit and the service's error detail (#1076)
+
+## 0.60.134
+
+- feat(skills-placement): support-file mounting for kit-carrying skills (#1077)
+
+## 0.60.133
+
+- feat(rollout): a staged rollout widens only after the stage it leaves met its kill lines (#1049)
+
+## 0.60.132
+
+- fix(journeys): read a textarea composer by its value, so the default ChatComposer passes typePrompt (#1060)
+- fix(sandbox): re-land #1045's review fixes and pass the engine's tool context to sandbox_run/sandbox_exec (#1056)
+- feat(platform): one delegated product key client and provisioner for every app (#1062)
+
+## 0.60.131
+
+- fix(studio): the closed model trigger draws the maker's logo like the rows (#1073)
+
+## 0.60.130
+
+- feat(router-turn): reply in the sender's language and name conflicting sources (#1061)
+
+## 0.60.129
+
+- fix(signoff): surface-ladder failure screenshots are viewport-sized so a tall page cannot stall the run (#1071)
+
+## 0.60.128
+
+- feat(model-picker): draw the maker's logo for a model another host serves (#1068)
+
+## 0.60.127
+
+- fix(billing): revoke an expired workspace key before minting its renewal (#1066)
+
+## 0.60.126
+
+- fix(peers): agent-runtime floor is 0.316.0, the first release with every subpath src imports (#1065)
+
+## 0.60.125
+
+- fix: make agent-app main green (#1063)
+
+## 0.60.124
+
+- perf(agent-profiles): admitProfileTurn takes a read handle instead of re-reading pin and binding (#1058)
+
+## 0.60.123
+
+- feat(router-turn): a turn at its budget returns a continuation instead of failing (#1041)
+
+## 0.60.122
+
+- feat(model-picker): limited and unavailable models carry a warning StatusPill (#1055)
+- feat(studio): Studio's model control is the shared ModelPicker with logo, price and preview (#1054)
+
+## 0.60.121
+
+- fix(eval): parity grading counts 'I do not have the pricing … like me to ask the owner?' as an admitted gap (#1053)
+
+## 0.60.120
+
+- feat(router-turn): one Router engine; the protected producer runs runRouterTurn under its grant (#1046)
+- docs: name the renamed Physim repo tangle-network/hardware-agent (#1052)
+
+## 0.60.119
+
+- feat(model-picker): media models show a preview, a capability line and the price per output (#1050)
+
+## 0.60.118
+
+- feat(signoff): workspace-surface fails a page that is not on the shared panel (#1051)
+- feat(router-turn): placeRouterTurn and a placement option: a turn that needs a computer is placed in the sandbox before any model call (#1044)
+
+## 0.60.117
+
+- feat(router-turn): tools report typed side events through context.emit: streamed as tool_event, recorded with the turn (#1048)
+
+## 0.60.116
+
+- Train: land #1026 #1027 #1028 #1045 as one release (#1047)
+
+## 0.60.115
+
+- feat(router-turn): every turn can carry its knowledge files: index, small-file text and the grounding rule (#1038)
+- feat(eval): parity eval kit: the same asks through every lane, graded for correct and fabricated (#1042)
+
+## 0.60.114
+
+- fix(web-react): profile editor leads with additional instructions and drops emptied prompts (#1043)
+
+## 0.60.113
+
+- feat(chat-routes): an intent line streams what the agent is about to do while the turn boots (#1036)
+
+## 0.60.112
+
+- fix(teams-react): invite email field and Invite button use the shared Input and Button (#1035)
+
+## 0.60.111
+
+- fix(workspace-export): exports owners can read, and a busy sandbox no longer fails them (#1037)
+
+## 0.60.110
+
+- fix(web-react): the question card tells the truth about late answers (#1024)
+
+## 0.60.109
+
+- fix(workspace-list): search and name fields use ui's Input so they read as fields (#1034)
+
+## 0.60.108
+
+- fix(sandbox): charge an unused warm for box uptime, not for a stretched hold (#1029)
+
+## 0.60.107
+
+- fix(knip): derive entries from tsup.config.ts so a new subpath cannot turn main red (#1032)
+
+## 0.60.106
+
+- fix(router-turn): echo Gemini 3 thought signatures and count usage once per model call (#1033)
+
+## 0.60.105
+
+- fix(knip): name the ./router-turn entry so main's entry guard passes (#1031)
+- feat(workspace-store): D1 + R2 workspace store; profile.remember writes it when given (#1030)
+
+## 0.60.104
+
+- perf(sandbox): a warm reuse skips unchanged round trips and overlaps the rest (#1025)
+
+## 0.60.103
+
+- feat(runtime): ./router-turn — a Worker-safe entry for the Router engine (#1023)
+
+## 0.60.102
+
+- fix(sandbox): charge an unused warm only for the span no turn used (#1022)
+
+## 0.60.101
+
+- fix(runtime): repeat a Router turn that answered nothing, and type a blank answer as a failure (#1021)
+- feat(sandbox): speculative warm for turns likely to escalate (S8, off by default) (#1019)
+
+## 0.60.100
+
+- feat(chat-routes): createRouterTurnProducer; runRouterTurn reports usage and accepts tool history (#1020)
+
+## 0.60.99
+
+- feat(harness): select an app's harness from configuration (#1016)
+- feat(runtime): runRouterTurn — the default Router turn engine with in-process app tools (#1017)
+
+## 0.60.98
+
+- fix(workspace-react): show a long workspace name on two lines in the rail identity (#1018)
+
+## 0.60.97
+
+- fix(ui): let composer, export and hub tiles use the brand surface ladder (#1006)
+
+## 0.60.96
+
+- feat(agent-profiles): profile.remember appends one fact to agent knowledge (#1015)
+
+## 0.60.95
+
+- perf(workspace-export): copy a files source four files at a time (#1014)
+
+## 0.60.94
+
+- feat(sandbox): warm leases back off after no box or a capacity refusal (#1012)
+- fix(knip): name the switch and profile-editor entries so main's entry guard passes (#1013)
+
+## 0.60.93
+
+- perf(web-react): build the profile editor as its own module (#1011)
+
+## 0.60.92
+
+- perf(agent-profiles): profile-switch parsing without the profile schemas (#1010)
+- fix(workspace-export): a source removed mid-export no longer fails the export (#1009)
+
+## 0.60.91
+
+- docs(lessons): never share a promise across requests on Workers (#1008)
+
+## 0.60.90
+
+- feat(signoff): surface-ladder browser check for card and field steps, field borders and card copy (#1005)
+- perf(workspace-export): write consecutive table sources together under one job save (#1007)
+
+## 0.60.89
+
+- fix(workspace-export): migration-runner tables are internal, not unscoped (#1004)
+- fix(workspace-export): the sweep also finishes exports started before the index (#1003)
+
+## 0.60.88
+
+- feat(workspace-export): exports finish after the owner closes the tab (#1002)
+
+## 0.60.87
+
+- fix(turn-health): page on threads that got nothing back, and only on calls rejected as completed (#1001)
+
+## 0.60.86
+
+- fix(turn-health): read only the part fields the classifier judges, not the parts (#1000)
+
+## 0.60.85
+
+- fix(workspace-export): a failed advance hands its lease back and logs why (#999)
+
+## 0.60.84
+
+- fix(workspace-export): a dropped request stalls an export for a minute, not five (#998)
+
+## 0.60.83
+
+- fix(sandbox): retry a warm killed with its request and count it as abandoned (#997)
+
+## 0.60.82
+
+- docs(climb): smart-warm live outcome — warm hits 2/2, cold first reply 51.5 s (#996)
+
+## 0.60.81
+
+- fix(workspace-export): the panel advances one export at a time (#994)
+- fix(prewarm): never await another request's warm; send the warm reason (#995)
+
+## 0.60.80
+
+- fix(app-auth): never share a session read in flight across requests (#993)
+
+## 0.60.79
+
+- perf(workspace-export): read consecutive sandbox archives concurrently (#992)
+
+## 0.60.78
+
+- fix(signoff): keep the shell-alignment usage text private to its CLI (#991)
+
+## 0.60.77
+
+- docs(lessons): bump a shared package in every pin; the invariants report is each app's status (#989)
+
+## 0.60.76
+
+- docs(lessons): ledgers merge by union on every branch through a global attributes file (#988)
+
+## 0.60.75
+
+- docs(lessons): one shared operator key, one request budget (dotfiles #331) (#987)
+
+## 0.60.74
+
+- docs(lessons): the delivery, coordination-host, pasted-code and prompt-text checks are merged (#986)
+
+## 0.60.73
+
+- chore: merge append-only ledgers by union (#985)
+
+## 0.60.72
+
+- feat(workspace-export): sandboxArchive resumes a stopped box for the export (#984)
+- fix(sandbox): warm lease store binds plain placeholders so better-sqlite3 harnesses run it (#982)
+
+## 0.60.71
+
+- fix(stream): settleOrphanedTurns leaves a plan follow-up claim to its gate until the claim's own staleness (#983)
+
+## 0.60.70
+
+- perf(launch-invariants): sample the heap after large reads and every 50th query, not around every query (#980)
+- feat(integrations): let the host own connection for providers it provisions (#977)
+
 ## 0.60.69
 
 - feat(sandbox): warm leases that resume ahead of need and budget the misses (#979)

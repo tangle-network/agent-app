@@ -95,6 +95,36 @@ export function isTurnPhaseEvent(event: unknown): event is TurnPhaseEvent {
     && typeof candidate.data?.message === 'string'
 }
 
+/**
+ * Stream event carrying the turn's intent line: one plain sentence, written by
+ * a fast model call at admission, saying what the agent is about to do ("Looking
+ * at your three competitors' pricing pages, then I'll draft the comparison.").
+ * A client shows it as a labeled status line, never as the answer, until the
+ * turn's first answer text replaces it. It narrates intent; it never answers
+ * or acts. Non-terminal and never turn content; at most one per turn.
+ */
+export const TURN_INTENT_EVENT = 'session.run.intent'
+
+/** The data of a {@link TURN_INTENT_EVENT}. */
+export type TurnIntentData = {
+  /** The sentence, shown verbatim. */
+  text: string
+  /** Milliseconds since the server received the request. */
+  sinceRequestMs?: number
+}
+
+/** A {@link TURN_INTENT_EVENT} as it crosses the wire. */
+export type TurnIntentEvent = { type: typeof TURN_INTENT_EVENT; data: TurnIntentData }
+
+/** True for a {@link TURN_INTENT_EVENT} with non-empty text. */
+export function isTurnIntentEvent(event: unknown): event is TurnIntentEvent {
+  if (!event || typeof event !== 'object') return false
+  const candidate = event as { type?: unknown; data?: { text?: unknown } }
+  return candidate.type === TURN_INTENT_EVENT
+    && typeof candidate.data?.text === 'string'
+    && candidate.data.text.trim().length > 0
+}
+
 /** Terminal event of a progress-first stream that ended without a turn: the response the route returned instead. */
 export const TURN_RESPONSE_EVENT = 'turn.response'
 
@@ -124,8 +154,9 @@ export async function turnResponseEventFor(response: Response): Promise<{ type: 
 /**
  * Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}.
  *
- * Reads the stream's leading progress events, handing each to `onPhase`, until
- * the first other event. A {@link TURN_RESPONSE_EVENT} resolves to a `Response`
+ * Reads the stream's leading progress events, handing each to `onPhase` (and an
+ * intent line to `onIntent`, or dropping it when there is none), until the
+ * first other event. A {@link TURN_RESPONSE_EVENT} resolves to a `Response`
  * with the original status, headers and body, so the caller's existing error
  * handling runs unchanged. Any other event resolves to a `Response` whose body
  * starts at that event and continues with the rest of the stream. A response
@@ -134,6 +165,7 @@ export async function turnResponseEventFor(response: Response): Promise<{ type: 
 export async function settleTurnResponse(
   response: Response,
   onPhase: (phase: TurnPhaseData) => void,
+  onIntent?: (intent: TurnIntentData) => void,
 ): Promise<Response> {
   if (response.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST || !response.body) return response
   const reader = response.body.getReader()
@@ -176,6 +208,13 @@ export async function settleTurnResponse(
     if (isTurnPhaseEvent(event)) {
       buffer = buffer.slice(newline + 1)
       onPhase(event.data)
+      continue
+    }
+    // An intent line is progress too: a response the route answers after it
+    // (a held lock's 409) still settles with its own status.
+    if (isTurnIntentEvent(event)) {
+      buffer = buffer.slice(newline + 1)
+      onIntent?.(event.data)
       continue
     }
     const answered = event as { type?: unknown; data?: Partial<TurnResponseData> } | null

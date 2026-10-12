@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-230 exports.
+255 exports.
 
 ### `adaptSandboxStream`
 
@@ -182,12 +182,36 @@ interface BuildSandboxToolFileMountsOptions
 (db: WarmLeaseD1Like, options?: { table?: string | undefined; }) => WarmLeaseStore
 ```
 
+### `createEscalationSpeculator`
+
+`function` — One speculator per turn.
+
+```ts
+(options: EscalationSpeculatorOptions) => EscalationSpeculator
+```
+
+### `createSandboxExecTool`
+
+`function`
+
+```ts
+(options: SandboxExecToolOptions) => SandboxExecTool
+```
+
 ### `createSandboxPrewarmer`
 
 `function`
 
 ```ts
 (shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer
+```
+
+### `createSandboxRunTool`
+
+`function`
+
+```ts
+(options: SandboxRunToolOptions) => SandboxRunTool
 ```
 
 ### `createSandboxTerminalConnectionRoute`
@@ -252,6 +276,14 @@ interface D1PrewarmClaimStoreOptions
 
 ```ts
 (slots: readonly number[], from: number, at: number) => number[]
+```
+
+### `DEFAULT_ESCALATION_TOOLS`
+
+`const` — The tools that run in the box.
+
+```ts
+readonly ["sandbox_run", "sandbox_exec"]
 ```
 
 ### `DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS`
@@ -396,6 +428,46 @@ interface EnsureWorkspaceSandboxOptions
 
 ```ts
 120000
+```
+
+### `EscalationHint`
+
+`type` — Why a turn was judged likely to escalate.
+
+```ts
+type EscalationHint
+```
+
+### `escalationHints`
+
+`function` — Pure: the reasons this input suggests the turn will need the box, if any.
+
+```ts
+(input: EscalationInput) => EscalationHint[]
+```
+
+### `EscalationInput`
+
+`interface`
+
+```ts
+interface EscalationInput
+```
+
+### `EscalationSpeculator`
+
+`interface`
+
+```ts
+interface EscalationSpeculator
+```
+
+### `EscalationSpeculatorOptions`
+
+`interface`
+
+```ts
+interface EscalationSpeculatorOptions
 ```
 
 ### `FencedPrewarmClaimStore`
@@ -646,6 +718,14 @@ type ModelSelectionSource
 type Outcome
 ```
 
+### `parsePrewarmHint`
+
+`function`
+
+```ts
+(value: string | null | undefined) => PrewarmHintMode
+```
+
 ### `peekWorkspaceSandbox`
 
 `function` — Read-only twin of {@link ensureWorkspaceSandbox}: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything.
@@ -732,6 +812,14 @@ interface PrewarmDecision
 
 ```ts
 type PrewarmEvent
+```
+
+### `PrewarmHintMode`
+
+`type` — `SANDBOX_PREWARM_HINT`: `off` (default) or `deterministic`.
+
+```ts
+type PrewarmHintMode
 ```
 
 ### `PrewarmOutcome`
@@ -950,20 +1038,28 @@ interface SafeSandboxErrorDiagnostics
 number
 ```
 
+### `SANDBOX_EXEC_DESCRIPTION`
+
+`const`
+
+```ts
+string
+```
+
+### `SANDBOX_RUN_DESCRIPTION`
+
+`const`
+
+```ts
+string
+```
+
 ### `SANDBOX_TRANSIENT_DEADLINE_MS`
 
 `const` — How long a transient failure may last before the caller fails.
 
 ```ts
 number
-```
-
-### `SandboxBoxBusyError`
-
-`class` — Thrown instead of restarting a box that failed the reuse gate because it is not connectable (runtime URL missing or edge readiness failed) while its runtime reports running sessions.
-
-```ts
-class SandboxBoxBusyError
 ```
 
 ### `SandboxBuildContext`
@@ -1020,6 +1116,30 @@ interface SandboxExecChannel
 
 ```ts
 interface SandboxExecOptions
+```
+
+### `SandboxExecResult`
+
+`interface`
+
+```ts
+interface SandboxExecResult
+```
+
+### `SandboxExecTool`
+
+`interface`
+
+```ts
+interface SandboxExecTool
+```
+
+### `SandboxExecToolOptions`
+
+`interface`
+
+```ts
+interface SandboxExecToolOptions
 ```
 
 ### `SandboxExistingBoxStage`
@@ -1110,6 +1230,14 @@ interface SandboxPrewarmScope
 type SandboxPromptConfig
 ```
 
+### `sandboxPromptRunner`
+
+`function` — The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused).
+
+```ts
+(shell: SandboxRuntimeConfig, prompt?: Omit<StreamSandboxPromptOptions, "signal" | "history">) => (box: SandboxInstance…
+```
+
 ### `SandboxPromptTokenLimits`
 
 `interface`
@@ -1174,6 +1302,22 @@ interface SandboxResourceConfig
 interface SandboxRestoreSpec
 ```
 
+### `SandboxRunError`
+
+`class` — A typed `sandbox_run` failure.
+
+```ts
+class SandboxRunError
+```
+
+### `SandboxRunFailureCode`
+
+`type`
+
+```ts
+type SandboxRunFailureCode
+```
+
 ### `SandboxRuntimeAuthRefreshError`
 
 `class` — Represent an error thrown when sandbox runtime authentication refresh fails for a specific stage and name
@@ -1188,6 +1332,22 @@ class SandboxRuntimeAuthRefreshError
 
 ```ts
 interface SandboxRuntimeConfig
+```
+
+### `SandboxRunTool`
+
+`interface` — The tool shape `runRouterTurn` takes (`RouterTurnTool`), kept structural so this module does not import the engine.
+
+```ts
+interface SandboxRunTool
+```
+
+### `SandboxRunToolOptions`
+
+`interface`
+
+```ts
+interface SandboxRunToolOptions
 ```
 
 ### `SandboxScope`
@@ -1222,6 +1382,14 @@ type SandboxStepTransition
 interface SandboxStreamEvent
 ```
 
+### `SandboxTaskOptions`
+
+`interface`
+
+```ts
+interface SandboxTaskOptions
+```
+
 ### `SandboxTerminalConnectionRouteOptions`
 
 `interface` — Configuration for {@link createSandboxTerminalConnectionRoute}.
@@ -1236,6 +1404,14 @@ interface SandboxTerminalConnectionRouteOptions
 
 ```ts
 (options: SandboxToolPathOptions) => string
+```
+
+### `SandboxToolContext`
+
+`interface` — The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine.
+
+```ts
+interface SandboxToolContext
 ```
 
 ### `sandboxToolPath`
@@ -1462,6 +1638,22 @@ interface TerminalConnectionBoxLike
 (at: number) => string
 ```
 
+### `WARM_LEASE_DECLINED_UNTIL_DDL`
+
+`const` — For a table created from an earlier \`WARM_LEASE_TABLE_DDL\`: paste into a migration.
+
+```ts
+"ALTER TABLE sandbox_warm_lease ADD COLUMN declined_until INTEGER NOT NULL DEFAULT 0"
+```
+
+### `WARM_LEASE_PENDING_DDL`
+
+`const` — For a table created before pending charges: paste each into a migration.
+
+```ts
+readonly ["ALTER TABLE sandbox_warm_lease ADD COLUMN pending_warm_at INTEGER NOT NULL DEFAULT 0", "ALTER TABLE sandbox_…
+```
+
 ### `WARM_LEASE_TABLE_DDL`
 
 `const` — Paste into a migration.
@@ -1660,6 +1852,14 @@ type WorkspacePrewarmEvent
 
 ```ts
 type WorkspacePrewarmOutcome
+```
+
+### `WorkspacePrewarmReason`
+
+`type` — Why the browser asked: `useWorkspacePrewarm` sends `page-open` or `composer-focus`.
+
+```ts
+type WorkspacePrewarmReason
 ```
 
 ### `WorkspacePrewarmReport`

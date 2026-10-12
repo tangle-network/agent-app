@@ -427,3 +427,45 @@ The `--theme-script` file runs before the app loads with `theme` in scope, so it
 
 Calibration, on 2026-10-10, against Hospitality `aed07b5` with ReCenter fixture data: see the PR that added this section for the before/after table.
 
+
+## Surface ladder
+
+`agent-app-signoff surface-ladder` is the browser check for surface hierarchy. A card or field must step off the surface it sits on, a field border must be visible, and a card's body copy must fit on one short line. Hospitality shipped cards painted the color of their parent card, a search field the color of the page, and cards with 20 to 40 words of copy. Drew rated it 0/10 for exactly that. The check takes the same options as `shell-alignment`.
+
+```bash
+agent-app-signoff surface-ladder --base-url http://127.0.0.1:8787 \
+  --route /workspaces/w1/connections --route /workspaces/w1/overview --route /workspaces/w1/chat/s1 \
+  --storage-state auth.json --theme-script theme.js --json ladder.json --screenshots ladder/
+```
+
+Lightness is OKLCH L ×100, the unit the brand ladder is specified in. A box's own background is composited over the nearest painted ancestor (background alpha ≥ 0.1), and the result is compared with that ancestor.
+
+| Rule | Covers | Fails when |
+| --- | --- | --- |
+| `card-step` | a painted box with a corner radius of at least 6px, taller than 80px and at least 120px wide | \|ΔL\| against the nearest painted ancestor is under 3 (`--tolerance`) |
+| `field-step` | `input`, `textarea`, `[role=combobox]`, `[role=searchbox]`, `.focus-field-within` | \|ΔL\| is under 3. A transparent field inside a `.focus-field-within` wrapper is skipped, because the wrapper is the field |
+| `field-border` | each field with a visible border | the border, composited over the field's parent, is under 3:1 against that parent (`--min-border-contrast`) |
+| `card-copy` | each `<p>` or `[data-slot=card-description]` inside a card. CardDescription renders a bare `<p>`, so every paragraph counts. Chat transcript text (`[data-timeline-step]`, `.prose`) is exempt | the element's own `textContent` is over 12 words (`--max-words`). A line clamp does not hide words from the count |
+
+Only `main` (or `[role=main]`) is measured. Dialogs, menus and popovers are skipped. The judge (`judgeSurfaceLadder`) and the color math (`oklchL`, `contrastRatio`, `composite`) are pure functions. The collector (`collectSurfaceLadder`) reads computed colors in the page; any CSS color format goes through a canvas to sRGB.
+
+`--inject-css <file>` is for calibration only. It adds a stylesheet to each page before the measurement, so you can test a proposed override before it lands.
+
+Calibration on 2026-10-11, against the local Hospitality harness (`3516232`, ReCenter fixture data). Routes: connections, overview and chat-conversation, at 1440 and 390, light and dark. Each cell lists failures as card-step / field-step / field-border / card-copy.
+
+| route | width | theme | today | with `final.css` | `final.css` + composer `focusFieldWithin` |
+| --- | --- | --- | --- | --- | --- |
+| connections | 1440 | light | 2 / 11 / 11 / 7 | 0 / 0 / 0 / 7 | 0 / 0 / 0 / 7 |
+| connections | 1440 | dark | 2 / 1 / 11 / 7 | 0 / 0 / 0 / 7 | 0 / 0 / 0 / 7 |
+| connections | 390 | light | 2 / 11 / 11 / 7 | 0 / 0 / 0 / 7 | 0 / 0 / 0 / 7 |
+| connections | 390 | dark | 2 / 1 / 11 / 7 | 0 / 0 / 0 / 7 | 0 / 0 / 0 / 7 |
+| overview | both | both | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 |
+| chat-conversation | 1440, 390 | light | 0 / 1 / 0 / 0 | 0 / 1 / 0 / 0 | 0 / 0 / 0 / 0 |
+| chat-conversation | 1440, 390 | dark | 1 / 1 / 0 / 0 | 0 / 1 / 0 / 0 | 0 / 0 / 0 / 0 |
+| **total** | | | **110** (10 / 28 / 44 / 28) | **32** (0 / 4 / 0 / 28) | **28** (0 / 0 / 0 / 28) |
+
+What the numbers show:
+- Today, connections at 1440 has 2 of 11 cards flat in both themes: the integrations error panel and the Export card sit at ΔL 0 inside a section card of the same color. The light fields are 1.7 under their card, and every field border is 1.22:1. The search wrapper is transparent, so it is ΔL 0 on the page in both themes. In dark, the chat's inset surface is 2.6 off the shell.
+- With `final.css`, the smallest card step is 4.4 in light and 5.9 in dark, and the smallest field step is 5.1 in light and 18.7 in dark. The 4 remaining field failures are the chat composer's transparent textarea. A stylesheet cannot add the `focus-field-within` class, so that waits for ROOT-SPEC section (e): "the chat composer uses `focusFieldWithin`". With that class added in the page, the card and field rules pass on every page.
+- The copy rule fails 7 paragraphs per connections page in every run (WhatsApp 19 words, Phone 14, Business phone 15, Daily summaries 18 and 19, guidebook help 25, Export 21). That is the expected state until the copy cuts in section (e) land.
+- Overview passes all four rules, but its cards hold a median of 92 words of innerText. That text is in list rows, not `<p>` body copy, so the copy rule as specified does not see it.

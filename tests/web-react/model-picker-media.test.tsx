@@ -1,0 +1,56 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { formatModelPrice, ModelPicker } from '../../src/web-react/controls'
+import type { CatalogModel } from '../../src/runtime/model-catalog'
+
+afterEach(cleanup)
+
+const base = { supportsTools: false, supportsReasoning: false, featured: true }
+const gpt: CatalogModel = { ...base, id: 'openai/gpt-x', name: 'GPT X', provider: 'openai', supportsTools: true, pricing: { prompt: '0.000003' } }
+const flux: CatalogModel = { ...base, id: 'fal/flux', name: 'Flux Pro', provider: 'fal', output: 'image', outputPrice: { usd: 0.04, unit: 'image' },
+  previewUrl: 'https://cdn.test/flux.webp', capability: 'Photoreal stills, strong typography' }
+const veo: CatalogModel = { ...base, id: 'google/veo', name: 'Veo 3', provider: 'google', output: 'video', outputPrice: { usd: 0.5, unit: 'second' },
+  previewUrl: 'https://cdn.test/veo.jpg', capability: 'Up to 8 s with native audio' }
+const eleven: CatalogModel = { ...base, id: 'elevenlabs/v3', name: 'Eleven v3', provider: 'elevenlabs', output: 'speech', outputPrice: { usd: 0.3, unit: '1k_chars' } }
+const models: CatalogModel[] = [gpt, flux, veo, eleven]
+
+describe('formatModelPrice', () => {
+  it('prices every model in the unit its output comes in', () => {
+    expect(formatModelPrice(gpt)).toBe('$3/M')
+    expect(formatModelPrice(flux)).toBe('$0.04/image')
+    expect(formatModelPrice(veo)).toBe('$0.5/sec')
+    expect(formatModelPrice(eleven)).toBe('$0.3/1K chars')
+    expect(formatModelPrice({ outputPrice: { usd: 0, unit: 'image' } })).toBeUndefined()
+    expect(formatModelPrice({})).toBeUndefined()
+  })
+})
+
+describe('ModelPicker media rows', () => {
+  it('shows a preview, the capability line and the per-output price for media models', () => {
+    render(<ModelPicker value="openai/gpt-x" onChange={() => {}} models={models} />)
+    fireEvent.click(screen.getByRole('button', { name: /GPT X/ }))
+    const flux = screen.getByRole('button', { name: /Flux Pro/ })
+    expect(flux.querySelector('[data-model-preview]')?.getAttribute('src')).toBe('https://cdn.test/flux.webp')
+    expect(flux.querySelector('[data-model-capability]')?.textContent).toBe('Photoreal stills, strong typography')
+    expect(flux.querySelector('[data-model-price]')?.textContent).toBe('$0.04/image')
+    // Media rows never claim a text-only limitation.
+    expect(flux.textContent).not.toContain('no tools')
+    // Speech has no visual preview: the provider logo stays.
+    const speech = screen.getByRole('button', { name: /Eleven v3/ })
+    expect(speech.querySelector('[data-model-preview]')).toBeNull()
+    expect(speech.querySelector('[data-model-price]')?.textContent).toBe('$0.3/1K chars')
+  })
+})
+
+describe('ModelPicker maker logo', () => {
+  it('draws the maker for a hosted model and keeps the host for grouping and search', () => {
+    const hosted: CatalogModel = { ...base, id: 'fal-ai/veo3.1', name: 'Veo 3.1', provider: 'fal', maker: 'google', output: 'video' }
+    render(<ModelPicker value="fal-ai/veo3.1" onChange={() => {}} models={[gpt, hosted]} />)
+    const trigger = screen.getByRole('button', { name: /Veo 3\.1/ })
+    expect(trigger.querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe('google')
+    fireEvent.click(trigger)
+    fireEvent.change(screen.getByLabelText('Search all models'), { target: { value: 'google' } })
+    expect(screen.getAllByRole('button', { name: /Veo 3\.1/ }).length).toBeGreaterThan(0)
+  })
+})

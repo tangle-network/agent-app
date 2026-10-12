@@ -15,10 +15,15 @@ const MIN = 60_000
 // Wednesday 2026-10-07 12:00:00Z.
 const T0 = Date.UTC(2026, 9, 7, 12, 0, 0)
 
-/** Real SQLite behind the D1 shape, so the upserts' race semantics are the engine's, not a fake's. */
+/**
+ * Real SQLite behind the D1 shape, so the upserts' race semantics are the
+ * engine's, not a fake's. It refuses numbered `?NNN` placeholders the way
+ * better-sqlite3 does, because products wrap better-sqlite3 as D1 in tests.
+ */
 function d1(db: DatabaseSync): WarmLeaseD1Like {
   return {
     prepare(query: string) {
+      if (/\?\d/.test(query)) throw new RangeError('numbered placeholders are not portable')
       const stmt = db.prepare(query)
       return {
         bind(...values: unknown[]) {
@@ -104,6 +109,52 @@ describe('warm leases', () => {
     expect((await h.leases.signal('ws-1', 'composer-focus')).outcome).toBe('started')
   })
 
+  it('charges only the span before a later turn, and counts that turn as a hit', async () => {
+    const h = harness({ boxIdleMs: 30 * MIN, dailyBudgetMs: 30 * MIN })
+    await h.leases.signal('ws-1', 'page-open')
+    // The 10 min hold expires unused: the charge is pending, not booked.
+    h.clock.now += 11 * MIN
+    expect(await h.leases.sweep()).toMatchObject({ ended: 1, wasted: 0 })
+    // A turn 20 min after the warm lands on the box it resumed.
+    h.clock.now += 9 * MIN
+    expect((await h.leases.turn('ws-1')).hit).toBe(true)
+    const row = await h.store.read('ws-1')
+    expect(row?.dayWarmMs).toBe(20 * MIN)
+    expect(row?.pendingWarmAt).toBe(0)
+    expect(h.events.filter((e) => e.type === 'warm_hit')).toHaveLength(1)
+    expect(h.events.at(-1)).toMatchObject({ type: 'warm_wasted', minutes: 20 })
+    // 10 min of budget is left, so the next page open still warms.
+    h.clock.now += 40 * MIN
+    expect((await h.leases.signal('ws-1', 'page-open')).outcome).toBe('started')
+  })
+
+  it('charges the box idle window, not a hold that later signals stretched', async () => {
+    const h = harness({ boxIdleMs: 30 * MIN, dailyBudgetMs: 120 * MIN })
+    await h.leases.signal('ws-1', 'page-open')
+    // A page polled every 8 min keeps extending the 10 min hold to ~50 min.
+    for (let i = 0; i < 5; i++) {
+      h.clock.now += 8 * MIN
+      expect((await h.leases.signal('ws-1', 'page-open')).outcome).toBe('extended')
+    }
+    h.clock.now += 11 * MIN
+    await h.leases.sweep()
+    h.clock.now += 30 * MIN
+    await h.leases.sweep()
+    // The box suspended 30 min after its resume; that is all the warm cost.
+    expect((await h.store.read('ws-1'))?.dayWarmMs).toBe(30 * MIN)
+  })
+
+  it('settles the full idle window when no turn comes', async () => {
+    const h = harness({ boxIdleMs: 30 * MIN })
+    await h.leases.signal('ws-1', 'page-open')
+    h.clock.now += 11 * MIN
+    await h.leases.sweep()
+    h.clock.now += 20 * MIN
+    expect(await h.leases.sweep()).toMatchObject({ wasted: 1 })
+    expect((await h.store.read('ws-1'))?.dayWarmMs).toBe(30 * MIN)
+    expect(h.events.at(-1)).toMatchObject({ type: 'warm_wasted', minutes: 30 })
+  })
+
   it('resets the budget on a new UTC day', async () => {
     const h = harness({ dailyBudgetMs: 5 * MIN })
     await h.leases.signal('ws-1', 'page-open')
@@ -138,6 +189,62 @@ describe('warm leases', () => {
     expect(h.events.at(-1)).toEqual({ type: 'warm_failed', key: 'ws-1', reason: 'page-open', error: 'resume refused' })
     fail = false
     expect((await h.leases.signal('ws-1', 'page-open')).outcome).toBe('started')
+  })
+
+  it('retries a warm killed with its request, fences the dead one, and reports the lease abandoned', async () => {
+    const pending: Array<(box: WarmBoxOutcome) => void> = []
+    const h = harness({
+      warm: () => new Promise<WarmBoxOutcome>((resolve) => pending.push(resolve)),
+    })
+    // The page-open request is cancelled mid-resume: its warm never reports.
+    void h.leases.signal('ws-1', 'page-open')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(pending).toHaveLength(1)
+    // Within the deadline, a second signal extends the in-flight lease.
+    h.clock.now += 60_000
+    expect((await h.leases.signal('ws-1', 'composer-focus')).outcome).toBe('extended')
+    // Past it, the next signal takes the lease over and warms again.
+    h.clock.now += 61_000
+    const retry = h.leases.signal('ws-1', 'composer-focus')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(pending).toHaveLength(2)
+    pending[1]!('resumed')
+    expect(await retry).toEqual({ outcome: 'started', box: 'resumed' })
+    // The dead warm reporting late changes nothing: it no longer owns the lease.
+    pending[0]!('resumed')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect((await h.store.read('ws-1'))?.reason).toBe('composer-focus')
+
+    // A lease whose warm never reports is counted as abandoned, not charged.
+    const lost = harness({ warm: () => new Promise<WarmBoxOutcome>(() => {}) })
+    void lost.leases.signal('ws-2', 'page-open')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    lost.clock.now += 11 * MIN
+    expect(await lost.leases.sweep()).toMatchObject({ ended: 1, abandoned: 1, wasted: 0 })
+    expect(lost.events.at(-1)).toEqual({ type: 'warm_abandoned', key: 'ws-2', reason: 'page-open' })
+  })
+
+  it('cools a key down after no box or a capacity refusal, and a turn clears it', async () => {
+    for (const [box, cooldown] of [['absent', 10 * MIN], ['capacity', 5 * MIN]] as const) {
+      const h = harness({}, box)
+      expect(await h.leases.signal('ws-1', 'page-open')).toEqual({ outcome: 'declined', box })
+      expect(h.events.at(-1)).toMatchObject({ type: 'warm_declined', why: box })
+      // Within the cool-down nothing calls the product's warm, and nothing is logged again.
+      h.clock.now += cooldown - MIN
+      expect(await h.leases.signal('ws-1', 'composer-focus')).toEqual({ outcome: 'declined' })
+      expect(h.warms).toHaveLength(1)
+      expect(h.events.filter((e) => e.type === 'warm_declined')).toHaveLength(1)
+      // After it, the next signal asks again.
+      h.clock.now += 2 * MIN
+      await h.leases.signal('ws-1', 'page-open')
+      expect(h.warms).toHaveLength(2)
+    }
+    // A turn means the box exists now: the cool-down ends at once.
+    const h = harness({}, 'absent')
+    await h.leases.signal('ws-1', 'page-open')
+    await h.leases.turn('ws-1')
+    await h.leases.signal('ws-1', 'page-open')
+    expect(h.warms).toHaveLength(2)
   })
 
   it('pings a held box only when the burst hold outlasts its idle timeout', async () => {

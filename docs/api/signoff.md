@@ -4,7 +4,15 @@
 
 Source: `src/signoff/index.ts`
 
-37 exports.
+84 exports.
+
+### `CdpResponseSource`
+
+`interface` — The fields of Chromium's `Network.responseReceived` that say where a response came from.
+
+```ts
+interface CdpResponseSource
+```
 
 ### `checkShellAlignment`
 
@@ -12,6 +20,14 @@ Source: `src/signoff/index.ts`
 
 ```ts
 (options: ShellAlignmentOptions) => Promise<ShellAlignmentReport>
+```
+
+### `checkSurfaceLadder`
+
+`function` — Drive Chromium over every route × width × theme and judge each page.
+
+```ts
+(options: SurfaceLadderOptions) => Promise<SurfaceLadderReport>
 ```
 
 ### `checkWorkerDefaults`
@@ -22,12 +38,76 @@ Source: `src/signoff/index.ts`
 (repoRoot: string, configs?: readonly string[] | undefined) => WorkerDefaultsResult
 ```
 
+### `checkWorkspaceSurface`
+
+`function` — Drive Chromium over every route × width × theme.
+
+```ts
+(options: WorkspaceSurfaceOptions) => Promise<WorkspaceSurfaceReport>
+```
+
 ### `collectShellDividers`
 
 `function` — Runs in the page (Playwright serializes it).
 
 ```ts
 () => Omit<ShellDividerSample, "width" | "route" | "theme">
+```
+
+### `collectSurfaceLadder`
+
+`function` — Runs in the page (Playwright serializes it, so every helper lives inside).
+
+```ts
+() => Pick<SurfaceSample, "boxes" | "copy">
+```
+
+### `collectWorkspaceSurface`
+
+`function` — Runs in the page.
+
+```ts
+() => Omit<WorkspaceSurfaceSample, "width" | "route" | "theme">
+```
+
+### `composite`
+
+`function` — Alpha-composite `top` over an opaque `bottom`.
+
+```ts
+(top: Rgba, bottom: Rgb) => Rgb
+```
+
+### `contrastRatio`
+
+`function` — WCAG 2 contrast ratio between two opaque sRGB colors.
+
+```ts
+(a: Rgb, b: Rgb) => number
+```
+
+### `CopyBlock`
+
+`interface`
+
+```ts
+interface CopyBlock
+```
+
+### `createRequestMeter`
+
+`function`
+
+```ts
+(budget?: number, sleep?: (ms: number) => Promise<void>) => RequestMeter
+```
+
+### `formatNetworkCount`
+
+`function`
+
+```ts
+(count: NetworkCount) => string
 ```
 
 ### `formatShellAlignmentReport`
@@ -46,6 +126,14 @@ Source: `src/signoff/index.ts`
 (report: SignoffReport) => string
 ```
 
+### `formatSurfaceLadderReport`
+
+`function`
+
+```ts
+(report: SurfaceLadderReport) => string
+```
+
 ### `formatWorkerDefaults`
 
 `function`
@@ -54,12 +142,52 @@ Source: `src/signoff/index.ts`
 (result: WorkerDefaultsResult) => string
 ```
 
+### `formatWorkspaceSurfaceReport`
+
+`function`
+
+```ts
+(report: WorkspaceSurfaceReport) => string
+```
+
+### `HEADER_TOP_TOLERANCE_PX`
+
+`const` — A header within this distance of the panel top is its first row (a 1px border).
+
+```ts
+2
+```
+
+### `isOverBudget`
+
+`function`
+
+```ts
+(count: NetworkCount, budget?: number) => boolean
+```
+
 ### `judgeShellAlignment`
 
 `function` — Desktop: every header divider lands on the rail's first divider.
 
 ```ts
 (sample: ShellDividerSample, tolerancePx?: number) => ShellAlignmentFinding[]
+```
+
+### `judgeSurfaceLadder`
+
+`function`
+
+```ts
+(sample: SurfaceSample, limits?: SurfaceLadderLimits) => SurfaceFinding[]
+```
+
+### `judgeWorkspaceSurface`
+
+`function`
+
+```ts
+(sample: WorkspaceSurfaceSample) => WorkspaceSurfaceFinding[]
 ```
 
 ### `LoadedSignoffConfig`
@@ -86,12 +214,108 @@ interface LoadedSignoffConfig
 interface LoadSignoffConfigOptions
 ```
 
+### `meterPage`
+
+`function` — Count the requests a page sends to the network (Chromium only).
+
+```ts
+(page: Page, meter: RequestMeter) => Promise<void>
+```
+
+### `NETWORK_OVER_BUDGET_EXIT`
+
+`const` — Exit code of a check whose pages passed but whose busiest 10 s went over the budget.
+
+```ts
+3
+```
+
+### `NetworkCount`
+
+`interface`
+
+```ts
+interface NetworkCount
+```
+
+### `networkExitCode`
+
+`function` — 0, or `NETWORK_OVER_BUDGET_EXIT` when the run went over the budget.
+
+```ts
+(count: NetworkCount | undefined) => number
+```
+
+### `oklchL`
+
+`function` — OKLab lightness of an sRGB color, ×100 (0 black … 100 white).
+
+```ts
+(rgb: Rgb) => number
+```
+
 ### `parseShellAlignmentArgs`
 
 `function`
 
 ```ts
 (argv: readonly string[]) => ShellAlignmentOptions & { readonly jsonPath?: string | undefined; }
+```
+
+### `parseSurfaceLadderArgs`
+
+`function`
+
+```ts
+(argv: readonly string[]) => SurfaceLadderOptions & { readonly jsonPath?: string | undefined; }
+```
+
+### `QUIET_CHROMIUM_ARGS`
+
+`const` — Chromium flags that stop prerender and speculative prefetch of linked pages.
+
+```ts
+readonly string[]
+```
+
+### `reachedNetwork`
+
+`function` — True when a response was fetched over the network, so the edge saw the request.
+
+```ts
+(response: CdpResponseSource) => boolean
+```
+
+### `REQUEST_BUDGET_PER_10S`
+
+`const` — Requests per 10 s a check may send; a quarter of the shared zone limit.
+
+```ts
+250
+```
+
+### `RequestMeter`
+
+`interface`
+
+```ts
+interface RequestMeter
+```
+
+### `Rgb`
+
+`type` — sRGB channels 0–255.
+
+```ts
+type Rgb
+```
+
+### `Rgba`
+
+`type` — sRGB channels 0–255 plus alpha 0–1.
+
+```ts
+type Rgba
 ```
 
 ### `runShellAlignmentCli`
@@ -116,6 +340,22 @@ interface LoadSignoffConfigOptions
 
 ```ts
 interface RunSignoffOptions
+```
+
+### `runSurfaceLadderCli`
+
+`function`
+
+```ts
+(argv: readonly string[]) => Promise<number>
+```
+
+### `runWorkspaceSurfaceCli`
+
+`function`
+
+```ts
+(argv: readonly string[]) => Promise<number>
 ```
 
 ### `SHELL_ALIGNMENT_TOLERANCE_PX`
@@ -278,6 +518,110 @@ interface SignoffStepSpec
 type SignoffStepStatus
 ```
 
+### `summarizeSurfacePage`
+
+`function`
+
+```ts
+(sample: SurfaceSample, findings: readonly SurfaceFinding[]) => SurfacePageSummary
+```
+
+### `SURFACE_LADDER_MAX_WORDS`
+
+`const`
+
+```ts
+12
+```
+
+### `SURFACE_LADDER_MIN_BORDER_CONTRAST`
+
+`const`
+
+```ts
+3
+```
+
+### `SURFACE_LADDER_MIN_DELTA_L`
+
+`const`
+
+```ts
+3
+```
+
+### `SurfaceBox`
+
+`interface`
+
+```ts
+interface SurfaceBox
+```
+
+### `surfaceDeltaL`
+
+`function` — Signed ΔL of a box against its parent: positive when the box is lighter.
+
+```ts
+(box: Pick<SurfaceBox, "fill" | "parent">) => number
+```
+
+### `SurfaceFinding`
+
+`interface`
+
+```ts
+interface SurfaceFinding
+```
+
+### `SurfaceLadderLimits`
+
+`interface`
+
+```ts
+interface SurfaceLadderLimits
+```
+
+### `SurfaceLadderOptions`
+
+`interface`
+
+```ts
+interface SurfaceLadderOptions
+```
+
+### `SurfaceLadderReport`
+
+`interface`
+
+```ts
+interface SurfaceLadderReport
+```
+
+### `SurfacePageSummary`
+
+`interface`
+
+```ts
+interface SurfacePageSummary
+```
+
+### `SurfaceRule`
+
+`type`
+
+```ts
+type SurfaceRule
+```
+
+### `SurfaceSample`
+
+`interface`
+
+```ts
+interface SurfaceSample
+```
+
 ### `WORKER_COMPATIBILITY_DATE_FLOOR`
 
 `const` — Update together with the templates' `compatibility_date`.
@@ -300,4 +644,36 @@ interface WorkerDefaultsFinding
 
 ```ts
 interface WorkerDefaultsResult
+```
+
+### `WorkspaceSurfaceFinding`
+
+`interface`
+
+```ts
+interface WorkspaceSurfaceFinding
+```
+
+### `WorkspaceSurfaceOptions`
+
+`interface`
+
+```ts
+interface WorkspaceSurfaceOptions
+```
+
+### `WorkspaceSurfaceReport`
+
+`interface`
+
+```ts
+interface WorkspaceSurfaceReport
+```
+
+### `WorkspaceSurfaceSample`
+
+`interface`
+
+```ts
+interface WorkspaceSurfaceSample
 ```

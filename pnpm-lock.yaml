@@ -69,11 +69,11 @@ importers:
         specifier: 0.22.0
         version: 0.22.0(@tangle-network/agent-interface@3.1.1)
       '@tangle-network/agent-runtime':
-        specifier: 0.313.1
-        version: 0.313.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)(@tangle-network/sandbox@0.60.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
+        specifier: 0.318.0
+        version: 0.318.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)(@tangle-network/sandbox@0.60.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
       '@tangle-network/brand':
-        specifier: 1.21.1
-        version: 1.21.1(react@19.2.8)
+        specifier: 1.24.2
+        version: 1.24.2(react@19.2.8)
       '@tangle-network/browser-agent-driver':
         specifier: ^0.36.1
         version: 0.36.1(@ai-sdk/anthropic@3.0.122(zod@4.4.3))(@ai-sdk/google@3.0.127(zod@4.4.3))(@anthropic-ai/sdk@0.93.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(playwright@1.63.0)(ws@8.21.3)(zod@4.4.3)
@@ -84,14 +84,14 @@ importers:
         specifier: 0.60.22
         version: 0.60.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       '@tangle-network/sandbox-ui':
-        specifier: 0.133.0
-        version: 0.133.0(3cbf356e8dc6ccae97627b3ba59bae3f)
+        specifier: 0.134.2
+        version: 0.134.2(f665abcdb8b629b3c0b355fe61606dea)
       '@tangle-network/tcloud':
         specifier: 0.8.1
         version: 0.8.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(typescript@7.0.2)(zod@4.4.3)
       '@tangle-network/ui':
-        specifier: 11.32.0
-        version: 11.32.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@nanostores/react@1.1.0(nanostores@1.5.4)(react@19.2.8))(@shikijs/themes@4.4.3)(@tangle-network/brand@1.21.1(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.4)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
+        specifier: 11.33.0
+        version: 11.33.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@nanostores/react@1.1.0(nanostores@1.5.4)(react@19.2.8))(@shikijs/themes@4.4.3)(@tangle-network/brand@1.24.2(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.4)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
       '@testing-library/dom':
         specifier: ^10.4.1
         version: 10.4.1
@@ -621,6 +621,10 @@ packages:
 
   '@duckdb/node-bindings@1.5.5-r.5':
     resolution: {integrity: sha512-sR7x91TfBunLqLbdvrcdiPCU+VGEQFPicxh1STZM402fuHW2ituPTAo2bY3IlntsvJShltrKF4R6B+JYPlAPZg==}
+
+  '@earendil-works/pi-codemode@1.0.4':
+    resolution: {integrity: sha512-e198pjBsdEQJ/RCjJ9ZeYIjRaQYWUgtoZbPCmJ57auuOsiRsBXeSZ1aiWtTah0/7gx97WIOD1XqHvgRU0gOXtg==}
+    engines: {node: '>=22.19.0'}
 
   '@emnapi/core@1.11.0':
     resolution: {integrity: sha512-l9Oo58x0HOP5znGzVhYW9U3e5wVuA4LAZU2AGezTmkhO1CgQRFDhDg4nneHsu/t3WniXg9QrG2nIXL/ZS8ln8Q==}
@@ -2757,9 +2761,12 @@ packages:
       '@tangle-network/agent-eval': '>=0.209.1 <0.210.0'
       '@tangle-network/agent-interface': ^3.0.0
 
-  '@tangle-network/agent-profile-materialize@0.21.0':
-    resolution: {integrity: sha512-jWUWBswQUDZQ+ukiAj1UROvTGvZbXWfpqKSyEiQsaHLhv1+aPzYg9jLLcoynyMm+OkbPm4IoLPkQqpa6KeGC9Q==}
+  '@tangle-network/agent-knowledge@20.0.1':
+    resolution: {integrity: sha512-Dcjn15fx4PWJVljFke5HhEnHHpzhj8K3DnnZY08/tY40kf5Z/ulgRt3RT22C2B0+wESaJXA18nQUBtzZUcBnTA==}
+    engines: {node: '>=22.12.0'}
+    hasBin: true
     peerDependencies:
+      '@tangle-network/agent-eval': '>=0.209.1 <0.212.0'
       '@tangle-network/agent-interface': ^3.0.0
 
   '@tangle-network/agent-profile-materialize@0.22.0':
@@ -2767,20 +2774,20 @@ packages:
     peerDependencies:
       '@tangle-network/agent-interface': ^3.0.0
 
-  '@tangle-network/agent-runtime@0.313.1':
-    resolution: {integrity: sha512-Aq4UBA/A47hWR9nhO8sLItULFp9uMtVi1kfQJVf/I1LX2ZYC5PFfznCrYa47zoZtBf7NbNbj8gNTK6ZpHF8VMg==}
-    engines: {node: '>=22.13.0'}
+  '@tangle-network/agent-runtime@0.318.0':
+    resolution: {integrity: sha512-BcrO+HY+/+et6g+XBhQQuDjSkdSPMET5RWHx6IqA7mqA/C1lecJ3+8UymOrxgJ3GwORBaiLzi6gHrqjANbFHXg==}
+    engines: {node: '>=22.19.0'}
     hasBin: true
     peerDependencies:
-      '@tangle-network/agent-eval': '>=0.209.1 <0.210.0'
+      '@tangle-network/agent-eval': '>=0.209.1 <0.212.0'
       '@tangle-network/agent-interface': ^3.1.1
       '@tangle-network/sandbox': '>=0.58.4 <0.61.0'
 
   '@tangle-network/agent-trace-contract@2.0.0':
     resolution: {integrity: sha512-lq2hp3gg8FsNVA3yZAyuj3NvL57pJTsI6sUF8cYwVsUXA8QZlrO78SqRPRslWxf/sMFHxXhusOuDQ3YxVv12bw==}
 
-  '@tangle-network/brand@1.21.1':
-    resolution: {integrity: sha512-LE9Uq2f5wbtDdmQJXwYditgzsic4Dbf6nYtr4gNwnP7krRrdwXGsWwDctO4CfFJVNN/MimkfN6+K+DwJCvxC8w==}
+  '@tangle-network/brand@1.24.2':
+    resolution: {integrity: sha512-vQZCufmOo/Tf+yOwTkrJP1TnAWfi7iaXio2jXDLMpSe1J/gAXu0+LQBWHElPdEmFXpVOpQuV/cczzyoH3nMWOg==}
     hasBin: true
     peerDependencies:
       react: '>=18'
@@ -2805,14 +2812,14 @@ packages:
   '@tangle-network/hub-sdk@0.28.0':
     resolution: {integrity: sha512-lULLT7nPbbtXrZdNpRaPmZ8IIg3eZgWkprki4OGo/H3Y/OoPRlcc+aOGd9iaFrsNk3OQM8Eb889Du5WlAIZy3w==}
 
-  '@tangle-network/sandbox-ui@0.133.0':
-    resolution: {integrity: sha512-R6R9NOPOEDIXx8iI8w8v9WyYGDmao7x0u3SPJl4PC4rhhpgevZsgp0nRVdOUMnRX5Z5e18BNwmTt1+QPMS3/Fw==}
+  '@tangle-network/sandbox-ui@0.134.2':
+    resolution: {integrity: sha512-CDycLldbtxgSfogbFzGZulKwYIPvSo64AXTiGmqFcB7/19oRtt/SlYhrBPp8qqYgm2fSWX/60vRx7GwgKp/+pg==}
     peerDependencies:
       '@hocuspocus/provider': '>=2.15.0 <5.0.0'
       '@nanostores/react': '>=0.8.4 <2.0.0'
       '@tangle-network/agent-interface': ^1.0.0 || ^2.0.0 || ^3.0.0
-      '@tangle-network/brand': ^1.21.0
-      '@tangle-network/ui': ^11.32.0
+      '@tangle-network/brand': ^1.23.0
+      '@tangle-network/ui': ^11.33.0
       '@tanstack/react-query': ^5.0.0
       '@tiptap/core': '>=3.20.4 <4.0.0'
       '@tiptap/extension-collaboration': '>=3.20.4 <4.0.0'
@@ -2932,12 +2939,12 @@ packages:
     engines: {node: '>=22.12.0'}
     hasBin: true
 
-  '@tangle-network/ui@11.32.0':
-    resolution: {integrity: sha512-yff5PNub1UNt1VVXTJwQPUhRR3bUAfAFEqxVef0Z+A2yu/mwTTL8ttld0Uz7BIDDziN8zk/ME0uvsOyHfum/9g==}
+  '@tangle-network/ui@11.33.0':
+    resolution: {integrity: sha512-RgrYjltRFQBUN2gOz5ofakNstxeoLHD5T1R0vYqVCx6sH8h+/6G/ryGz+gUPSQag7kcBqMMfkPAiq3GneOFDxg==}
     peerDependencies:
       '@hocuspocus/provider': '>=2.15.0 <5.0.0'
       '@nanostores/react': '>=0.8.4 <3.0.0'
-      '@tangle-network/brand': ^1.21.0
+      '@tangle-network/brand': ^1.23.0
       '@tiptap/core': '>=3.20.4 <4.0.0'
       '@tiptap/extension-collaboration': '>=3.20.4 <4.0.0'
       '@tiptap/extension-collaboration-caret': '>=3.7.0 <4.0.0'
@@ -5519,6 +5526,9 @@ packages:
     resolution: {integrity: sha512-h6fhOIaRrID2CbEY2fqs+7t+UXZo+MLAnU5gRIq85uFtdiUPCdsApMlHhXogKVM4HM2DVbIjGNTTYH2OcmP1vA==}
     engines: {node: '>=0.6'}
 
+  quickjs-wasi@3.6.2:
+    resolution: {integrity: sha512-FCqGtGOrMgzUiIrMNMA2YnsOxCNwo31dzqXvclXUC6xeT35NJLKXQJsvbeCTjvoFAwZgEAPg8U6+KAPDGXn8Mg==}
+
   range-parser@1.3.0:
     resolution: {integrity: sha512-hek2mFQpPuI4E1BBKrSto+BU3e3x4xuarsbiwr3+lf7p44juvFMV0XFWQAP3xUyqXA4RrXLIoaSUGbSt056ZMw==}
     engines: {node: '>= 0.6'}
@@ -6802,6 +6812,10 @@ snapshots:
       '@duckdb/node-bindings-linux-x64-musl': 1.5.5-r.5
       '@duckdb/node-bindings-win32-arm64': 1.5.5-r.5
       '@duckdb/node-bindings-win32-x64': 1.5.5-r.5
+
+  '@earendil-works/pi-codemode@1.0.4':
+    dependencies:
+      quickjs-wasi: 3.6.2
 
   '@emnapi/core@1.11.0':
     dependencies:
@@ -8596,21 +8610,26 @@ snapshots:
       proper-lockfile: 4.1.2
       zod: 4.6.5
 
-  '@tangle-network/agent-profile-materialize@0.21.0(@tangle-network/agent-interface@3.1.1)':
+  '@tangle-network/agent-knowledge@20.0.1(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)':
     dependencies:
+      '@tangle-network/agent-eval': 0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
       '@tangle-network/agent-interface': 3.1.1
+      '@types/proper-lockfile': 4.1.4
+      proper-lockfile: 4.1.2
+      zod: 4.6.5
 
   '@tangle-network/agent-profile-materialize@0.22.0(@tangle-network/agent-interface@3.1.1)':
     dependencies:
       '@tangle-network/agent-interface': 3.1.1
 
-  '@tangle-network/agent-runtime@0.313.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)(@tangle-network/sandbox@0.60.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
+  '@tangle-network/agent-runtime@0.318.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)(@tangle-network/sandbox@0.60.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
     dependencies:
+      '@earendil-works/pi-codemode': 1.0.4
       '@tangle-network/agent-core': 0.10.3(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
       '@tangle-network/agent-eval': 0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
       '@tangle-network/agent-interface': 3.1.1
-      '@tangle-network/agent-knowledge': 20.0.0(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)
-      '@tangle-network/agent-profile-materialize': 0.21.0(@tangle-network/agent-interface@3.1.1)
+      '@tangle-network/agent-knowledge': 20.0.1(@tangle-network/agent-eval@0.209.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@3.1.1)
+      '@tangle-network/agent-profile-materialize': 0.22.0(@tangle-network/agent-interface@3.1.1)
       '@tangle-network/agent-trace-contract': 2.0.0
       '@tangle-network/sandbox': 0.60.22(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       tar-stream: 3.2.1
@@ -8623,7 +8642,7 @@ snapshots:
 
   '@tangle-network/agent-trace-contract@2.0.0': {}
 
-  '@tangle-network/brand@1.21.1(react@19.2.8)':
+  '@tangle-network/brand@1.24.2(react@19.2.8)':
     optionalDependencies:
       react: 19.2.8
 
@@ -8668,7 +8687,7 @@ snapshots:
       - '@opentelemetry/semantic-conventions'
       - langfuse-node
 
-  '@tangle-network/sandbox-ui@0.133.0(3cbf356e8dc6ccae97627b3ba59bae3f)':
+  '@tangle-network/sandbox-ui@0.134.2(f665abcdb8b629b3c0b355fe61606dea)':
     dependencies:
       '@lobehub/icons-static-svg': 1.95.1
       '@pierre/diffs': 1.5.1(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -8676,8 +8695,8 @@ snapshots:
       '@radix-ui/react-dropdown-menu': 2.1.25(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-select': 2.3.8(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@tangle-network/agent-interface': 3.1.1
-      '@tangle-network/brand': 1.21.1(react@19.2.8)
-      '@tangle-network/ui': 11.32.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@nanostores/react@1.1.0(nanostores@1.5.4)(react@19.2.8))(@shikijs/themes@4.4.3)(@tangle-network/brand@1.21.1(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.4)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
+      '@tangle-network/brand': 1.24.2(react@19.2.8)
+      '@tangle-network/ui': 11.33.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@nanostores/react@1.1.0(nanostores@1.5.4)(react@19.2.8))(@shikijs/themes@4.4.3)(@tangle-network/brand@1.24.2(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.4)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
       diff: 9.0.0
       eventsource-parser: 4.1.1
       lucide-react: 1.48.0(react@19.2.8)
@@ -8758,7 +8777,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@tangle-network/ui@11.32.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@nanostores/react@1.1.0(nanostores@1.5.4)(react@19.2.8))(@shikijs/themes@4.4.3)(@tangle-network/brand@1.21.1(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.4)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)':
+  '@tangle-network/ui@11.33.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@nanostores/react@1.1.0(nanostores@1.5.4)(react@19.2.8))(@shikijs/themes@4.4.3)(@tangle-network/brand@1.24.2(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.4)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)':
     dependencies:
       '@pierre/theme': 1.1.0
       '@pierre/trees': 1.0.0-beta.6(@pierre/theme@1.1.0)(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(shiki@4.4.3)
@@ -8780,7 +8799,7 @@ snapshots:
       '@radix-ui/react-switch': 1.3.7(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-tabs': 1.1.21(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-tooltip': 1.2.16(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@tangle-network/brand': 1.21.1(react@19.2.8)
+      '@tangle-network/brand': 1.24.2(react@19.2.8)
       class-variance-authority: 0.7.1
       clsx: 2.1.1
       github-slugger: 2.0.0
@@ -11368,6 +11387,8 @@ snapshots:
     dependencies:
       es-define-property: 1.0.1
       side-channel: 1.1.1
+
+  quickjs-wasi@3.6.2: {}
 
   range-parser@1.3.0: {}
 

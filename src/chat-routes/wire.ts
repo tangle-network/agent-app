@@ -69,6 +69,8 @@ export interface ProducerToolResultEvent {
     ok: boolean
     result?: unknown
     message?: string
+    /** Typed reason for a failed call, when the producer knows it. */
+    code?: string
   }
 }
 
@@ -117,6 +119,8 @@ export type ProducerPassthroughEventType =
   | 'plan.submitted'
   | 'done'
   | 'warning'
+  /** A tool's typed side event while it runs (`data`: toolCallId, toolName, kind, data, at). */
+  | 'tool.event'
   | 'session.run.started'
   | 'session.run.completed'
   | 'session.run.failed'

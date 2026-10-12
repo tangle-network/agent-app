@@ -4,7 +4,15 @@
 
 Source: `src/workspace-export/index.ts`
 
-39 exports.
+44 exports.
+
+### `ArchivableBox`
+
+`interface` — The slice of the Sandbox SDK's `SandboxInstance` these sources use.
+
+```ts
+interface ArchivableBox
+```
 
 ### `createExportEngine`
 
@@ -76,6 +84,14 @@ interface D1TableCoverage
 
 ```ts
 interface D1WorkspaceTablesOptions
+```
+
+### `DEFAULT_SANDBOX_EXCLUDE`
+
+`const` — Never customer data: installed packages and the platform's runtime state.
+
+```ts
+readonly string[]
 ```
 
 ### `ExportArchiveSource`
@@ -166,6 +182,14 @@ interface ExportPrincipal
 interface ExportProgress
 ```
 
+### `ExportRetryLater`
+
+`class` — Thrown by a source that cannot run yet for a reason that will pass, such as a sandbox busy with another lifecycle operation.
+
+```ts
+class ExportRetryLater
+```
+
 ### `ExportRow`
 
 `type`
@@ -176,7 +200,7 @@ type ExportRow
 
 ### `ExportRowsSource`
 
-`interface` — Rows written as NDJSON to `data/<name>.ndjson`.
+`interface` — Rows written as NDJSON to `data/<name>.ndjson`, or with `format: 'csv'` as a spreadsheet at `spreadsheets/<name>.csv`.
 
 ```ts
 interface ExportRowsSource
@@ -284,6 +308,22 @@ interface R2FilesBucket
 
 ```ts
 "[redacted]"
+```
+
+### `sandboxArchive`
+
+`function` — One sandbox's filesystem as `sandbox/<name>.tar.gz`.
+
+```ts
+(args: { name: string; getBox(): Promise<ArchivableBox | null>; dir?: string | undefined; exclude?: readonly string[] |…
+```
+
+### `sandboxFiles`
+
+`function` — Named text files read from one sandbox, written under `files/<name>/<path>`.
+
+```ts
+(args: { name: string; getBox(): Promise<ArchivableBox | null>; list(): Promise<{ path: string; boxPath: string; }[]>;…
 ```
 
 ### `SecretScanner`

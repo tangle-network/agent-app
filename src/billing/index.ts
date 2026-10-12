@@ -393,6 +393,20 @@ export function createWorkspaceKeyManager(opts: WorkspaceKeyManagerOptions): Wor
     if (active && (!active.expiresAt || active.expiresAt.getTime() > now.getTime())) {
       return opts.crypto.decrypt(active.keyEncrypted)
     }
+    // An expired child can no longer spend, yet the platform keeps its budget
+    // reserved on the parent until it is revoked. Revoke it BEFORE minting the
+    // renewal: minting first needs a second child's budget of headroom, so a
+    // fully reserved parent could never renew and the expired key would hold
+    // its reservation forever. Best-effort: on failure the row stays active and
+    // rotateKey retries the revoke after its mint.
+    if (active) {
+      try {
+        await opts.provisioner.revokeKey(active.keyId)
+        await opts.store.markRevoked(active.id, now)
+      } catch {
+        /* rotateKey revokes remaining priors after the mint */
+      }
+    }
     return rotateKey(workspaceId, { budgetUsd: eopts?.budgetUsd })
   }
 

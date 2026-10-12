@@ -8,6 +8,8 @@ import {
   type AgentProfileDiff,
 } from '@tangle-network/agent-interface'
 import { z } from 'zod'
+import { normalizeProfileName, parseProfileSwitch } from './switch'
+export { normalizeProfileName, parseProfileSwitch }
 import type { McpToolDefinition } from '../tools'
 
 export type ProfileAuthorKind = 'person' | 'agent' | 'optimizer'
@@ -379,17 +381,6 @@ export async function promoteRevision(input: {
   return revision
 }
 
-export function parseProfileSwitch(text: string): { name: string } | { invalid: true } | null {
-  const trimmed = text.trim()
-  if (!/^switch\s+to\b/i.test(trimmed)) return null
-  const match = /^switch[ \t]+to[ \t]+([^\r\n]+)$/i.exec(trimmed)
-  return match?.[1]?.trim() ? { name: match[1].trim() } : { invalid: true }
-}
-
-export function normalizeProfileName(name: string): string {
-  return name.trim().replace(/\s+/g, ' ').toLowerCase()
-}
-
 /** A source identity joins the command hash without entering the receipt row. */
 export function profileSwitchInputHashFromContentHash(contentHash: string,
   identityContext?: string): string {
@@ -552,6 +543,56 @@ export async function rollbackProfileBinding(input: {
     message: `Now talking to ${parent.profile.name ?? 'this profile'}` }, binding.version)
 }
 
+/**
+ * An opaque token for what `readProfileAdmission` read for one message. It carries no data: the values
+ * live in this module, cloned when read, so a caller can neither build a token nor change what it stands
+ * for. `admitProfileTurn` accepts each token once. The active-revision pointer is never part of it;
+ * admission reads that live.
+ */
+export interface ProfileAdmissionRead { readonly [admissionReadBrand]: true }
+declare const admissionReadBrand: unique symbol
+
+/** The values a token stands for, as the caller may inspect them. */
+export interface ProfileAdmissionValues {
+  key: ProfileBindingKey
+  messageId: string
+  inputHash: string
+  /** The message's existing pin, when it was already admitted. */
+  prior: ProfileTurnPin | null
+  binding: ProfileBinding | null
+  /** The pinned revision by id (immutable), when the binding pins one. */
+  pinnedRevision: ProfileRevision | null
+}
+const admissionReads = new WeakMap<ProfileAdmissionRead, ProfileAdmissionValues>()
+/** Tokens already presented, so a second use is told apart from one this module never issued. */
+const spentAdmissionReads = new WeakSet<ProfileAdmissionRead>()
+
+/**
+ * Read what admitting a message needs: its prior pin and the binding together, then a pinned revision.
+ * Read it where the caller holds its conversation lock (after any switch it records), check the values
+ * with `profileAdmissionValues`, and pass the token to `admitProfileTurn`, which then skips re-reading
+ * the pin and binding. The pin is still written as a compare-and-set on the binding version, so a
+ * binding that moved after this read is refused.
+ */
+export async function readProfileAdmission(store: ProfileRevisionStore, key: ProfileBindingKey,
+  messageId: string, content: string): Promise<ProfileAdmissionRead> {
+  const inputHash = sha256Utf8(content)
+  const [prior, binding] = await Promise.all([store.getTurnPin(key, messageId, inputHash), store.getBinding(key)])
+  const pinnedRevision = !prior && binding?.pinnedRevisionId
+    ? await store.getRevision(key.workspaceId, binding.profileId, binding.pinnedRevisionId) : null
+  const read = Object.freeze(Object.create(null)) as ProfileAdmissionRead
+  admissionReads.set(read, structuredClone({ key: { workspaceId: key.workspaceId, memberId: key.memberId, channel: key.channel },
+    messageId, inputHash, prior, binding, pinnedRevision }))
+  return read
+}
+
+/** A deep copy of what a token stands for; changing the copy changes nothing the token admits. */
+export function profileAdmissionValues(read: ProfileAdmissionRead): ProfileAdmissionValues {
+  const values = admissionReads.get(read)
+  if (!values) throw new ProfileAccessError('Unknown or used profile admission read')
+  return structuredClone(values)
+}
+
 export async function admitProfileTurn(input: {
   store: ProfileRevisionStore
   key: ProfileBindingKey
@@ -562,14 +603,30 @@ export async function admitProfileTurn(input: {
   /** Required if trusted per-turn attachments change the public profile plan. */
   verifyEffectivePlan?: (revision: ProfileRevision, effectivePlanDigest: string,
     key: ProfileBindingKey) => Promise<boolean>
+  /** A token from `readProfileAdmission` for this message; its pin and binding are not read again.
+   *  Each token admits once: after a failed admit, read again before retrying. */
+  read?: ProfileAdmissionRead
 }): Promise<ProfileTurnPin> {
   const inputHash = sha256Utf8(input.content)
-  const prior = await input.store.getTurnPin(input.key, input.messageId, inputHash)
+  // A token is spent when presented, so it admits at most one turn even if this call fails;
+  // a retry reads again with `readProfileAdmission`.
+  const read = input.read ? admissionReads.get(input.read) : undefined
+  if (input.read && !read && spentAdmissionReads.has(input.read)) {
+    throw new ProfileConflictError('The admission read was already used; read again')
+  }
+  if (input.read) { admissionReads.delete(input.read); spentAdmissionReads.add(input.read) }
+  if (input.read && (!read || read.messageId !== input.messageId || read.inputHash !== inputHash ||
+      read.key.workspaceId !== input.key.workspaceId || read.key.memberId !== input.key.memberId ||
+      read.key.channel !== input.key.channel)) {
+    throw new ProfileAccessError('The admission read does not belong to this message')
+  }
+  const prior = read ? read.prior : await input.store.getTurnPin(input.key, input.messageId, inputHash)
   if (prior) return prior
-  const binding = await input.store.getBinding(input.key)
+  const binding = read ? read.binding : await input.store.getBinding(input.key)
   if (!binding) throw new ProfileAccessError('Choose a profile before sending a message')
+  // The active pointer can move without the binding version changing, so it is always read live.
   const revision = binding.pinnedRevisionId
-    ? await input.store.getRevision(input.key.workspaceId, binding.profileId, binding.pinnedRevisionId)
+    ? read?.pinnedRevision ?? await input.store.getRevision(input.key.workspaceId, binding.profileId, binding.pinnedRevisionId)
     : await input.store.getActiveRevision(input.key.workspaceId, binding.profileId)
   if (!revision) throw new ProfileConflictError('The bound profile revision is unavailable')
   if (revision.authorityDigest !== binding.authorityDigest ||
@@ -587,14 +644,16 @@ export async function admitProfileTurn(input: {
     authorityDigest: revision.authorityDigest, planDigest: input.observedManagedPlanDigest }, binding.version)
 }
 
+const KNOWLEDGE_TEXT_MAX = 32000
 const textChangeSchema = z.object({
   name: z.string().trim().min(1).max(160).optional(),
   description: z.string().max(2000).nullable().optional(),
   systemPrompt: z.string().max(32000).nullable().optional(),
   instructions: z.array(z.string().max(32000)).max(40).optional(),
-  knowledgeText: z.string().max(32000).optional(),
+  knowledgeText: z.string().max(KNOWLEDGE_TEXT_MAX).optional(),
 }).strict().refine(changes => Object.keys(changes).length > 0)
 const updateToolSchema = z.object({ expectedRevisionId: z.string().min(1), changes: textChangeSchema }).strict()
+const rememberToolSchema = z.object({ fact: z.string().trim().min(1).max(1000) }).strict()
 
 export function profileTextChange(revision: ProfileRevision, changes: z.infer<typeof textChangeSchema>): {
   profile: AgentProfile; knowledgeText: string
@@ -623,7 +682,24 @@ export interface ProfileToolContext<TTurn extends ProfileToolTurn = ProfileToolT
   store: ProfileRevisionStore
   /** Return a store whose revision append atomically rechecks product turn authority. */
   storeForTurn?(turn: TTurn): ProfileRevisionStore
+  /**
+   * When set, `profile.remember` writes to this workspace memory store instead
+   * of appending a profile revision, so remembered facts never change the
+   * hashed profile (or anything that pins its version, such as a phone line).
+   * Structurally matches agent-runtime's `WorkspaceStore`.
+   */
+  memory?: ProfileMemoryStore
 }
+
+/** The subset of agent-runtime's `WorkspaceStore` that `profile.remember` uses. */
+export interface ProfileMemoryStore {
+  list(workspaceId: string, prefix: string): Promise<Array<{ id: string; content?: string }>>
+  put(input: { workspaceId: string; path: string; kind: 'fact'; ifRevision: null; actor: string;
+    content: string; id?: string }): Promise<{ id: string; revision: number }>
+}
+
+/** Workspace-shared memories live under this prefix in the workspace store. */
+export const PROFILE_MEMORY_PREFIX = '/memories/workspace/'
 
 /** Shared self-edit tools; only the authenticated active turn can name the profile. */
 export function profileTools<TTurn extends ProfileToolTurn>(
@@ -662,6 +738,54 @@ export function profileTools<TTurn extends ProfileToolTurn>(
         reason: 'Owner or manager requested a text change during chat' })
       return { profileId: turn.profileId, revisionId: revision.id, state: revision.state,
         canonicalSaved: revision.state === 'active', appliesTo: 'next_message', currentTurn: 'unchanged' }
+    },
+  }, {
+    name: 'profile.remember',
+    description: 'Save one durable fact or standing instruction an owner or manager tells you to keep '
+      + '("remember", "note that", "from now on", "always", "never"). Appends it as one line of the agent\'s '
+      + 'knowledge, which every later conversation reads. Applies on the next message.',
+    inputSchema: z.toJSONSchema(rememberToolSchema, { io: 'input' }) as Record<string, unknown>,
+    async run(args) {
+      const { fact } = rememberToolSchema.parse(args)
+      const turn = await context.activeTurn()
+      if (turn.role !== 'owner' && turn.role !== 'manager') throw new ProfileAccessError('Profile management is required')
+      if (context.memory) {
+        const text = fact.replace(/\s+/g, ' ')
+        const known = (await context.memory.list(turn.workspaceId, PROFILE_MEMORY_PREFIX))
+          .find(entry => entry.content?.trim() === text)
+        if (known) return { memoryId: known.id, saved: true, alreadyKnown: true, line: `- ${text}`, appliesTo: 'next_message' }
+        const id = crypto.randomUUID()
+        const saved = await context.memory.put({ workspaceId: turn.workspaceId, path: `${PROFILE_MEMORY_PREFIX}${id}`,
+          kind: 'fact', ifRevision: null, actor: turn.memberId, content: text, id })
+        return { memoryId: saved.id, saved: true, alreadyKnown: false, line: `- ${text}`, appliesTo: 'next_message' }
+      }
+      const line = `- ${fact.replace(/\s+/g, ' ')}`
+      // One retry covers a concurrent save between the read and the append; the
+      // revision chain keeps every earlier line.
+      for (let attempt = 0; ; attempt++) {
+        const current = await context.store.getActiveRevision(turn.workspaceId, turn.profileId)
+        if (!current) throw new ProfileConflictError('Profile revision is unavailable')
+        if (current.knowledgeText.split('\n').some(existing => existing.trim() === line)) {
+          return { profileId: turn.profileId, revisionId: current.id, saved: true, alreadyKnown: true,
+            line, appliesTo: 'next_message' }
+        }
+        const knowledgeText = current.knowledgeText.trim() ? `${current.knowledgeText.trimEnd()}\n${line}` : line
+        if (knowledgeText.length > KNOWLEDGE_TEXT_MAX) {
+          throw new ProfileConflictError('Knowledge is full; ask the owner to edit it before saving more')
+        }
+        try {
+          const revision = await proposeRevision({ store: context.storeForTurn?.(turn) ?? context.store,
+            workspaceId: turn.workspaceId, profileId: turn.profileId, expectedRevisionId: current.id,
+            profile: current.profile, knowledgeText,
+            planDigest: await context.planDigest(current.profile, knowledgeText),
+            author: { kind: 'agent', id: turn.memberId }, actorRole: turn.role,
+            reason: 'Owner or manager asked the agent to remember a fact during chat' })
+          return { profileId: turn.profileId, revisionId: revision.id, saved: revision.state === 'active',
+            state: revision.state, alreadyKnown: false, line, appliesTo: 'next_message' }
+        } catch (error) {
+          if (!(error instanceof ProfileConflictError) || attempt > 0) throw error
+        }
+      }
     },
   }]
 }

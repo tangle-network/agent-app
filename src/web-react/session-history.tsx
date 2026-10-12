@@ -533,6 +533,12 @@ export interface SessionHistoryPanelProps {
   /** New-session destination for the header action. Omitted ⇒ no button. */
   newSessionHref?: string
   title?: string
+  /**
+   * Draw the panel's own ShellHeader row (title and New chat). `false` for a host
+   * that already gives the page its header, such as sandbox-ui `WorkspaceSurface`,
+   * so the page keeps one header row.
+   */
+  showHeader?: boolean
   untitledLabel?: string
   emptyTitle?: string
   emptyDescription?: string
@@ -641,6 +647,7 @@ export function SessionHistoryPanel({
   extraActions,
   newSessionHref,
   title = 'History',
+  showHeader = true,
   untitledLabel = UNTITLED_SESSION_LABEL,
   emptyTitle = 'No sessions yet',
   emptyDescription = 'Your chat sessions will show up here once you start one.',
@@ -721,6 +728,7 @@ export function SessionHistoryPanel({
   return (
     <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${className ?? ''}`}>
       {/* A ShellHeader row, so its divider continues the rail's. */}
+      {showHeader && (
       <ShellHeader as="header" className="bg-transparent px-4 sm:px-6">
         <div className={`flex items-center gap-3 px-3 ${column}`}>
         <h1 className="flex-1 truncate text-sm font-semibold text-foreground">{title}</h1>
@@ -735,6 +743,7 @@ export function SessionHistoryPanel({
         )}
         </div>
       </ShellHeader>
+      )}
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         {hasAnySessions && (

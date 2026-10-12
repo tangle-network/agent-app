@@ -91,6 +91,15 @@ describe('createInvitation', () => {
     expect(sent[0]!.inviterEmail).toBe('owner@x.com')
   })
 
+  it('refuses an address no invitation can reach, before sending anything', async () => {
+    const deps = await seed()
+    const { api, sent } = makeApi(deps)
+    const res = await api.createInvitation({ workspaceId: 'ws-1', email: 'founder@', permissions: 'editor', invitedByUserId: 'owner-1', origin: ORIGIN })
+    expect(res.succeeded).toBe(false)
+    if (!res.succeeded) expect([res.status, res.error]).toEqual([400, 'Enter a full email address, such as name@company.com.'])
+    expect(sent).toHaveLength(0)
+  })
+
   it('rejects an invalid (owner) permission → 400', async () => {
     const deps = await seed()
     const res = await makeApi(deps).api.createInvitation({ workspaceId: 'ws-1', email: 'x@x.com', permissions: 'owner', invitedByUserId: 'owner-1', origin: ORIGIN })

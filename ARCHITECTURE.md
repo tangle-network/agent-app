@@ -108,6 +108,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | A ChatGPT OAuth resource for a hosted agent | `app-oauth` — compose Better Auth's provider and resource client with host tables, a canonical issuer/resource, one live consent, and current client/session/user checks. A separate resource host can use one uncached authority snapshot after JWS verification; the verified claims include any host grant generation needed by that lookup. The host binds the verified subject to its own enrollment authority. This optional subpath requires `better-auth` and `@better-auth/oauth-provider` 1.7.2 or newer. |
 | Per-workspace key mint/rotate/budget | `billing` |
 | A scheduled job, report route, auth lookup or limit alarm every app must get right | `launch-invariants` — `sizedBatches`, `createScheduledDispatch`, `createAuthLookupCache`, `createLimitAlarms`; the checks in `launch-invariants/testing`; the `agent-app-invariants` report. See [docs/launch-invariants.md](./docs/launch-invariants.md) |
+| Proving a product flow as a person uses it: recorded browser journeys, scored chat turns, a reviewer's INDEX.md | `journeys` — `startJourney`, `scoreTurn`, `renderIndex`; the `agent-app-journeys` CLI. Node only, optional `playwright` peer. See [docs/journeys.md](./docs/journeys.md) |
 | Ending turn streams whose owner died | `stream` — `settleOrphanedTurns`, scheduled alone at least every 15 minutes. See [docs/turn-lifecycle-owner.md](./docs/turn-lifecycle-owner.md) |
 | Resumable chat turns (buffer/replay/coalesce) | `stream` — see [`examples/resumable-turns.md`](./examples/resumable-turns.md) |
 | The whole assembled chat turn route (auth → persist → stream → interactions) | `chat-routes` — `createChatTurnRoutes` (peer `agent-runtime`). Product seams — all STABLE, graduated in #227 once each had two independent consumers (`turnLock` · `contextGate` · `beforeTurn` · `onRawEvent` · `lifecycle` · `heartbeat`, plus the `authorize` result's `insertUserMessage`); kept FLAT top-level for back-compat — plus `transformFinalText` (pre-persist redaction over the final-text scalar AND every persisted TEXT part) and `onTurnComplete(failed, failureReason)` run-failure surfacing |
@@ -134,7 +135,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 
 Adding a module? Follow `CLAUDE.md` § "When you add a module": confirm it's
 shell not engine, domain-seam it, wire `tsup.config.ts` + `package.json`
-`exports` + `knip.json` `entry`, place it in the lowest layer it can live in.
+`exports` (knip derives its entries from tsup), place it in the lowest layer it can live in.
 There is no root barrel — `.` was removed in 0.44.0.
 
 ## If we ever split into packages

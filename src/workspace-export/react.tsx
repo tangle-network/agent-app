@@ -6,7 +6,7 @@
  */
 
 import { Button, Card, StatusPill, type StatusTone } from '@tangle-network/ui/primitives'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ExportProgress } from './types'
 
 export interface WorkspaceExportPanelProps {
@@ -15,9 +15,15 @@ export interface WorkspaceExportPanelProps {
   /** Hidden for non-owners; the server refuses them regardless. */
   canExport: boolean
   title?: string
+  /** One short muted line under the title. Pass `null` to render none. */
+  description?: ReactNode
   className?: string
   fetcher?: typeof fetch
+  /** True when the product runs `continueRunning` on a cron, so the export finishes after the page closes. */
+  continuesInBackground?: boolean
 }
+
+const DEFAULT_DESCRIPTION = 'Everything in one zip. Credentials are never included.'
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB']
 
@@ -40,7 +46,7 @@ async function readJson<T>(response: Response): Promise<T> {
   return body as T
 }
 
-export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export workspace data', className, fetcher }: WorkspaceExportPanelProps) {
+export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export workspace data', description = DEFAULT_DESCRIPTION, className, fetcher, continuesInBackground = false }: WorkspaceExportPanelProps) {
   const doFetch = fetcher ?? fetch
   const [exports, setExports] = useState<ExportProgress[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -58,17 +64,20 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
   }, [])
 
   const drive = useCallback(async (id: string) => {
+    // One driver at a time: starting another export retires the old loop, so a
+    // stale running job and a new one are never advanced together.
     if (driving.current === id) return
     driving.current = id
+    const retired = () => !mounted.current || driving.current !== id
     // A failed request is retried: the server records each attempt and fails
     // the export itself once a source cannot finish.
     let failures = 0
     try {
       for (;;) {
-        if (!mounted.current) return
+        if (retired()) return
         try {
           const next = await readJson<ExportProgress>(await doFetch(`${endpoint}/${id}/advance`, { method: 'POST', credentials: 'same-origin' }))
-          if (!mounted.current) return
+          if (retired()) return
           failures = 0
           setError(null)
           upsert(next)
@@ -84,7 +93,7 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
     } catch (err) {
       if (mounted.current) setError(err instanceof Error ? err.message : String(err))
     } finally {
-      driving.current = null
+      if (driving.current === id) driving.current = null
     }
   }, [doFetch, endpoint, upsert])
 
@@ -131,9 +140,9 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-base font-semibold">{title}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            One zip with every conversation, record, file and the agent workspace, plus a manifest with checksums. Connection credentials are never included.
-          </p>
+          {description != null && description !== false ? (
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          ) : null}
         </div>
         <Button type="button" onClick={start} disabled={starting || running}>
           {running ? 'Exporting…' : starting ? 'Starting…' : 'Export'}
@@ -154,10 +163,13 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
           <div className="flex flex-wrap items-center gap-3">
             <StatusPill tone={TONE[latest.status]} size="sm">{LABEL[latest.status]}</StatusPill>
             <span className="text-sm text-muted-foreground">
-              {latest.unitsDone} of {latest.unitsTotal} sources · {formatBytes(latest.bytes)}
+              {latest.unitsDone} of {latest.unitsTotal} sources{latest.unitsFailed ? ` · ${latest.unitsFailed} failed` : ''} · {formatBytes(latest.bytes)}
             </span>
             {latest.current ? <span className="min-w-0 truncate text-sm text-muted-foreground">Now: {latest.current}</span> : null}
           </div>
+          {running && continuesInBackground ? (
+            <p className="text-xs text-muted-foreground">You can close this page. The export keeps going, and the download is here when you return.</p>
+          ) : null}
           <div
             role="progressbar"
             aria-label="Export progress"
@@ -167,7 +179,7 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
             className="h-2 overflow-hidden rounded-full bg-muted"
           >
             <div
-              className="h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
+              className={`h-full rounded-full ${latest.status === 'failed' ? 'bg-destructive' : 'bg-primary'} transition-[width] duration-300 motion-reduce:transition-none`}
               style={{ width: `${latest.unitsTotal ? Math.round((latest.unitsDone / latest.unitsTotal) * 100) : 0}%` }}
             />
           </div>

@@ -14,6 +14,14 @@
     --radius-base: var(--agent-app-radius-lg);
   }
 
+  /* The field fill on Brand's surface ladder. A Brand with the ladder sets
+     `--well` per plane and wins, because :where() adds no specificity; under
+     one without it, a field sits on the card color. Declared on every scope
+     that re-resolves `--color-card`, so a nested theme gets its own card. */
+  :where(:root, .dark, .light, [data-sandbox-ui], [data-sandbox-theme], [data-theme]) {
+    --well: var(--color-card);
+  }
+
   :where(:root),
   .dark,
   .light,

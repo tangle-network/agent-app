@@ -1,29 +1,85 @@
-import type { AgentProfile } from '@tangle-network/agent-interface'
-import { createExecutor, streamAgentTurn } from '@tangle-network/agent-runtime/kernel'
-import {
-  runProtectedAgentCandidateModelGrant,
-  type RunProtectedAgentCandidateModelGrantOptions,
-} from '@tangle-network/agent-runtime/candidate-execution'
-import { ProtectedModelSettlementError } from '../runtime/protected-model'
+import { profileMaterializationAxes, type AgentProfile } from '@tangle-network/agent-interface'
+import { runProtectedRouterTurn, type RouterTurnGrant } from '../runtime/protected-router-turn'
+import type { RouterTurnOptions } from '../runtime/router-turn'
 import type { McpToolDefinition } from '../tools/mcp-rpc'
 import { createSandboxChatProducer } from './sandbox-producer'
 import type { ChatRouteEvent, ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
-
-const PROTECTED_CHAT_PROVIDERS: ReadonlySet<string> = new Set(['anthropic', 'openai'])
 
 export interface ProtectedRuntimeChatOptions {
   profile: AgentProfile
   prompt: string
   priorMessages?: ReadonlyArray<{ role: string; content: string }>
   /** Runtime owns reservation, activation, revocation and authoritative settlement. */
-  grant: Omit<RunProtectedAgentCandidateModelGrantOptions<void>, 'execute'>
+  grant: RouterTurnGrant
   /** Only tools authorized for this execution. Each tool validates its arguments and effects. */
   tools: readonly McpToolDefinition<{ signal: AbortSignal }>[]
   maxToolCalls: number
   signal?: AbortSignal
 }
 
-/** Run a profile through the protected Router tool executor and the shared chat projection. */
+/**
+ * The AgentProfile leaves (agent-interface's materialization axes) a protected turn
+ * carries. Identity, `harness` (cli-base only) and `metadata` are control fields;
+ * `modelMetadata` is accepted only when empty. A leaf outside this set, including one
+ * agent-interface adds later, is refused by name before a grant is reserved: running
+ * the turn without it would silently drop what the profile asked for.
+ */
+const PROTECTED_TURN_AXES: ReadonlySet<string> = new Set([
+  'name', 'description', 'version', 'tags', 'metadata', 'harness', 'tools',
+  'systemPrompt', 'instructions',
+  'modelDefault', 'modelProvider', 'modelReasoningEffort', 'modelMaxVisibleOutputTokens',
+  'modelMaxTotalOutputTokens', 'modelMetadata',
+])
+
+/**
+ * The parts of a profile a protected turn applies: its prompt text, its model and
+ * reasoning effort, and its completion ceilings. Anything else would change the
+ * execution without the grant pricing it, so it is refused by name.
+ */
+function protectedTurnSettings(profile: AgentProfile, toolNames: ReadonlySet<string>): Pick<RouterTurnOptions,
+  'model' | 'systemPrompt' | 'reasoningEffort' | 'maxTokens' | 'maxCompletionTokens'> {
+  if (profile.harness && profile.harness !== 'cli-base') throw new Error(`Protected chat runs only the cli-base harness, not ${profile.harness}`)
+  if (profile.resources) throw new Error('Protected chat applies prompt text only; run profile resources in the Sandbox lane')
+  if (profile.model?.metadata && Object.keys(profile.model.metadata).length > 0) {
+    throw new Error('Protected chat does not apply AgentProfile.model.metadata')
+  }
+  if (profile.model?.maxReasoningTokens !== undefined) throw new Error('Protected chat cannot enforce maxReasoningTokens')
+  const unsupported = profileMaterializationAxes(profile).filter(axis => !PROTECTED_TURN_AXES.has(axis))
+  if (unsupported.length > 0) {
+    throw new Error(`Protected chat does not apply AgentProfile ${unsupported.join(', ')}; run this profile in the Sandbox lane`)
+  }
+  const declared = profile.model?.default?.trim()
+  const provider = profile.model?.provider?.trim()
+  const model = declared && provider && declared.startsWith(`${provider}/`) ? declared.slice(provider.length + 1) : declared
+  if (!model) throw new Error('Protected chat requires AgentProfile.model.default')
+  for (const [name, enabled] of Object.entries(profile.tools ?? {})) {
+    if (enabled !== toolNames.has(name)) throw new Error(`Protected tool ${name} does not match AgentProfile.tools`)
+  }
+  for (const name of toolNames) {
+    if (profile.tools?.[name] !== true) throw new Error(`Protected tool ${name} is not enabled by AgentProfile.tools`)
+  }
+  const { visible, total } = { visible: profile.model?.maxVisibleOutputTokens, total: profile.model?.maxTotalOutputTokens }
+  return {
+    model,
+    systemPrompt: [profile.prompt?.systemPrompt, ...(profile.prompt?.instructions ?? [])]
+      .filter((part): part is string => typeof part === 'string' && part.trim().length > 0).join('\n'),
+    ...(profile.model?.reasoningEffort ? { reasoningEffort: profile.model.reasoningEffort } : {}),
+    ...(visible !== undefined ? { maxTokens: visible } : {}),
+    ...(total !== undefined ? { maxCompletionTokens: total } : {}),
+  }
+}
+
+/** The text a model reads for one tool result: the JSON of its value, or the tool's own error. */
+function protectedToolResultText(outcome: { ok: true; result: unknown } | { ok: false; message: string }): string {
+  if (!outcome.ok) return `error: ${outcome.message}`
+  return JSON.stringify(outcome.result) ?? 'null'
+}
+
+/**
+ * Run a profile as one Router turn under a protected model grant
+ * (`runProtectedRouterTurn`), projected through the shared chat projection. The
+ * usage is published only from the settled grant.
+ */
 export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChatOptions): ChatTurnRouteProducer {
   if (!Number.isSafeInteger(options.maxToolCalls) || options.maxToolCalls < 0) {
     throw new Error('maxToolCalls must be a non-negative integer')
@@ -48,9 +104,10 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
   async function* events(): AsyncGenerator<unknown> {
     if (started) throw new Error('A protected chat producer can only execute once')
     started = true
-    const controller = new AbortController()
     options.signal?.throwIfAborted()
     if (Date.now() >= options.grant.deadlineAtMs) throw new Error('Protected execution deadline expired')
+    const settings = protectedTurnSettings(profile, new Set(tools.keys()))
+    const controller = new AbortController()
     const signal = AbortSignal.any([
       controller.signal, AbortSignal.timeout(Math.max(1, options.grant.deadlineAtMs - Date.now())),
       ...(options.signal ? [options.signal] : []),
@@ -59,110 +116,55 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
     const writer = channel.writable.getWriter()
     const reader = channel.readable.getReader()
     const emit = (event: unknown) => writer.write(event)
-    const execution = runProtectedAgentCandidateModelGrant({
-      ...options.grant,
-      port: {
-        resolve: input => options.grant.port.resolve(input),
-        reserveGrant: input => options.grant.port.reserveGrant(input),
-        activateGrant: input => options.grant.port.activateGrant(input),
-        // Runtime settles failed executions before rethrowing. Retain that receipt too.
-        settleGrant: async input => {
-          let auditError: ProtectedModelSettlementError | undefined
-          const settlement = await options.grant.port.settleGrant(input).catch(error => {
-            if (!(error instanceof ProtectedModelSettlementError)) throw error
-            auditError = error
-            return error.settlement
-          })
-          usage = {
-            inputTokens: settlement.calls.reduce((sum, call) => sum + call.accountedInputTokens, 0),
-            outputTokens: settlement.calls.reduce((sum, call) => sum + call.outputTokens, 0),
-            reasoningTokens: settlement.calls.reduce((sum, call) => sum + call.reasoningTokens, 0),
-            costUsd: settlement.calls.reduce((sum, call) => sum + call.costUsdNanos, 0) / 1e9,
+    // Each model call's text, by segment. The answer is the last segment the model wrote.
+    const segments: string[] = []
+    const execution = runProtectedRouterTurn({
+      ...settings,
+      grant: options.grant,
+      userMessage: options.prompt,
+      history: [...(options.priorMessages ?? [])],
+      signal,
+      // The grant's ledger expects one buffered completion per model call.
+      stream: false,
+      maxToolCalls: options.maxToolCalls,
+      // The grant bounds model calls; the loop must not stop the turn earlier.
+      maxToolTurns: options.grant.reserve.limits.maxModelCalls,
+      tools: options.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema,
+        run: async (args: Record<string, unknown>) => {
+          signal.throwIfAborted()
+          toolCalls += 1
+          const id = `tool-${toolCalls}`
+          await emit({ type: 'tool_call', data: { id, name: tool.name, arguments: args } })
+          try {
+            const result = await tool.run(args, { signal })
+            await emit({ type: 'tool_result', data: { id, name: tool.name, output: result } })
+            return result
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Tool failed'
+            await emit({ type: 'tool_result', data: { id, name: tool.name, error: message } })
+            throw error
           }
-          // Execution limits carry no reasoning allowance, so a provider that
-          // reasons under a disabled-reasoning grant exceeded what was authorized.
-          const unauthorizedReasoning = usage.reasoningTokens! > 0 && options.grant.resolve.reasoningEffort === 'none'
-          budgetEnforced = settlement.usageWithinLimits && !unauthorizedReasoning
-          if (unauthorizedReasoning) throw new Error('Provider reported reasoning tokens although reasoning was disabled')
-          if (!budgetEnforced) throw new Error('Provider settlement exceeded execution limits')
-          if (auditError) throw auditError
-          return settlement
-        },
+        } })),
+      toolError: error => ({ code: 'tool_failed', message: error instanceof Error ? error.message : 'Tool failed' }),
+      renderToolResult: (_toolName, outcome) => protectedToolResultText(outcome),
+      onEvent: event => {
+        if (event.type === 'text') segments[event.segment - 1] = (segments[event.segment - 1] ?? '') + event.delta
       },
-      execute: async ({ activation, resolved }) => {
-        signal.throwIfAborted()
-        if (Date.now() >= options.grant.deadlineAtMs) throw new Error('Protected execution deadline expired')
-        model = resolved.model
-        // These providers serve client function tools over Chat Completions with
-        // reasoning disabled. Router refuses provider-hosted tools and cache
-        // markers on candidate grants, so tool-result text is billed as input and
-        // accounted input covers OpenAI's automatic cached prefix.
-        if (!PROTECTED_CHAT_PROVIDERS.has(resolved.provider) || resolved.reasoningEffort !== 'none') {
-          throw new Error('Protected chat currently requires an Anthropic or OpenAI model without reasoning')
-        }
+    }).then(async outcome => {
+      if (outcome.settlement) {
+        usage = { ...outcome.settlement.usage }
+        budgetEnforced = outcome.settlement.budgetEnforced
+        model = outcome.settlement.model
+        // Tool-result text is billed as input under a grant.
         toolTokens = 0
-        const apiKey = activation.env.OPENAI_API_KEY
-        const baseUrl = activation.env.OPENAI_BASE_URL
-        if (!apiKey || !baseUrl) throw new Error('Protected Router activation is missing')
-        const factory = createExecutor({
-          backend: 'router-tools', routerBaseUrl: baseUrl, routerKey: apiKey,
-          tools: options.tools.map(tool => ({ type: 'function' as const,
-            function: { name: tool.name, description: tool.description, parameters: tool.inputSchema } })),
-          ...(options.priorMessages?.length ? { initialMessages: options.priorMessages } : {}),
-          executeToolCall: async (name, args) => {
-            signal.throwIfAborted()
-            const tool = tools.get(name)
-            if (!tool) throw new Error('Tool is not authorized for this execution')
-            if (toolCalls >= options.maxToolCalls) {
-              controller.abort(new Error('Execution tool-call limit reached'))
-              signal.throwIfAborted()
-            }
-            toolCalls += 1
-            const id = `tool-${toolCalls}`
-            await emit({ type: 'tool_call', data: { id, name, arguments: args } })
-            try {
-              const result = await tool.run(args, { signal })
-              await emit({ type: 'tool_result', data: { id, name, output: result } })
-              return JSON.stringify(result)
-            } catch (error) {
-              const message = error instanceof Error ? error.message : 'Tool failed'
-              await emit({ type: 'tool_result', data: { id, name, error: message } })
-              throw error
-            }
-          },
-        })
-        let completed = false
-        let streamedText = ''
-        for await (const event of streamAgentTurn({ kind: 'executor', factory, profile },
-          { prompt: options.prompt }, { signal, callId: options.grant.reserve.executionId,
-            timeoutMs: Math.max(1, options.grant.deadlineAtMs - Date.now()) })) {
-          if (event.type === 'text_delta') streamedText += event.text
-          if (event.type === 'text_delta' || event.type === 'reasoning_delta') {
-            await emit({ type: 'message.part.updated', data: {
-              part: { id: event.type, type: event.type === 'text_delta' ? 'text' : 'reasoning' }, delta: event.text,
-            } })
-          }
-          if (event.type === 'final') {
-            if (event.status !== 'completed') throw new Error(`Protected execution ${event.status}`)
-            // Executor backends may emit only a final snapshot. The chat and
-            // gateway wire append text, so emit its missing suffix exactly once.
-            if (event.text !== undefined) {
-              if (!event.text.startsWith(streamedText)) {
-                throw new Error('Protected execution revised already streamed text')
-              }
-              const suffix = event.text.slice(streamedText.length)
-              if (suffix) await emit({ type: 'message.part.updated', data: {
-                part: { id: 'text_delta', type: 'text' }, delta: suffix,
-              } })
-              streamedText = event.text
-            }
-            completed = true
-            await emit({ type: 'result', data: { finalText: event.text } })
-          }
-        }
-        if (!completed) throw new Error('Protected execution ended without a terminal result')
-      },
-    }).then(async () => {
+      }
+      // A settlement check fails after the turn answered; the answer stands beside the failure.
+      if (!outcome.failure || outcome.failure.code.startsWith('settlement_')) {
+        const finalText = segments.filter(Boolean).at(-1) ?? ''
+        if (finalText) await emit({ type: 'message.part.updated', data: { part: { id: 'text_delta', type: 'text' }, delta: finalText } })
+        await emit({ type: 'result', data: { finalText } })
+      }
+      if (outcome.failure) throw new Error(outcome.failure.message)
       await writer.close()
     }).catch(error => writer.abort(error))
     try {

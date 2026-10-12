@@ -12,6 +12,8 @@
  * (`judgeShellAlignment`) is a pure function so it is unit-tested without a browser.
  */
 
+import { createRequestMeter, meterPage, QUIET_CHROMIUM_ARGS, type NetworkCount } from './browser-budget'
+
 /** A horizontal divider: the bottom border of a top-anchored row. Coordinates in CSS px. */
 export interface ShellDivider {
   readonly label: string
@@ -169,6 +171,8 @@ export interface ShellAlignmentOptions {
 }
 
 export interface ShellAlignmentReport {
+  /** Requests the run sent and its busiest 10 s (see browser-budget.ts). */
+  readonly network?: NetworkCount
   readonly samples: readonly ShellDividerSample[]
   readonly findings: readonly ShellAlignmentFinding[]
   readonly maxOffsetPx: number
@@ -182,7 +186,8 @@ export async function checkShellAlignment(options: ShellAlignmentOptions): Promi
   const { chromium } = await import('playwright')
   const widths = options.widths ?? [1440, 390]
   const themes = options.themes ?? ['light', 'dark']
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ args: [...QUIET_CHROMIUM_ARGS] })
+  const meter = createRequestMeter()
   const samples: ShellDividerSample[] = []
   const findings: ShellAlignmentFinding[] = []
   try {
@@ -197,9 +202,11 @@ export async function checkShellAlignment(options: ShellAlignmentOptions): Promi
           await context.addInitScript({ content: `(() => { const theme = ${JSON.stringify(theme)}; ${options.themeScript} })()` })
         }
         const page = await context.newPage()
+        await meterPage(page, meter)
         for (const route of options.routes) {
           // An app that polls never reaches network idle, so wait for the shell to
           // render and give in-flight data a short, capped settle.
+          await meter.pace()
           await page.goto(new URL(route, options.baseUrl).toString(), { waitUntil: 'domcontentloaded' })
           await page.waitForSelector(options.readySelector ?? '[data-shell-header]', { state: 'visible', timeout: 15_000 }).catch(() => undefined)
           await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => undefined)
@@ -222,7 +229,7 @@ export async function checkShellAlignment(options: ShellAlignmentOptions): Promi
     await browser.close()
   }
   const maxOffsetPx = findings.reduce((max, f) => (Number.isFinite(f.offsetPx) ? Math.max(max, Math.abs(f.offsetPx)) : max), 0)
-  return { samples, findings, maxOffsetPx }
+  return { samples, findings, maxOffsetPx, network: meter.count() }
 }
 
 export function formatShellAlignmentReport(report: ShellAlignmentReport): string {

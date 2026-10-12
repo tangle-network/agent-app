@@ -14,9 +14,12 @@ import { join, relative } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
+  createExportEngine,
   createMemoryExportStorage,
   createWorkspaceExport,
   d1WorkspaceTables,
+  sandboxArchive,
+  sandboxFiles,
   type D1ExportDatabase,
   type ExportPrincipal,
 } from '../../src/workspace-export'
@@ -49,6 +52,7 @@ function seed(): DatabaseSync {
     CREATE TABLE message (id INTEGER PRIMARY KEY, thread_id TEXT, content TEXT, input_tokens INTEGER, accessToken TEXT);
     CREATE TABLE session (id TEXT PRIMARY KEY, token TEXT, user_id TEXT);
     CREATE TABLE eval_global (id INTEGER PRIMARY KEY, score REAL);
+    CREATE TABLE _migrations_applied (name TEXT PRIMARY KEY, applied_at INTEGER);
   `)
   db.prepare('INSERT INTO workspace VALUES (?, ?, ?)').run(WS, 'Inn', JSON.stringify({ published: { remoteBearerToken: 'bearer-abcdefgh' }, theme: 'dark' }))
   db.prepare('INSERT INTO workspace VALUES (?, ?, ?)').run(OTHER, 'Other', '{}')
@@ -194,6 +198,7 @@ describe('workspace export round trip', () => {
     const coverage = new Map(manifest.notes.database.map((c: { table: string; status: string }) => [c.table, c.status]))
     expect(coverage.get('session')).toBe('excluded')
     expect(coverage.get('eval_global')).toBe('unscoped')
+    expect(coverage.has('_migrations_applied')).toBe(false)
     const lines = readFileSync(join(out, 'data/db.message.ndjson'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
     expect(lines).toHaveLength(1203)
     expect(lines.every((m) => m.thread_id === 't1')).toBe(true)
@@ -295,5 +300,428 @@ describe('large files sources', () => {
     expect(members).toHaveLength(450)
     expect(new Set(members).size).toBe(450)
     expect(execFileSync('unzip', ['-p', zipPath, 'files/many/f/449.txt']).toString()).toBe('file 449')
+  })
+})
+
+describe('sandboxArchive', () => {
+  function fakeBox(status: string) {
+    const calls: string[] = []
+    const box = {
+      status,
+      async resume() { calls.push('resume'); box.status = 'running' },
+      async stop() { calls.push('stop'); box.status = 'stopped' },
+      async waitFor() { calls.push('waitFor') },
+      fs: {
+        async openArchive(dir: string) {
+          calls.push(`open:${dir}`)
+          if (box.status !== 'running') throw new Error(`Sandbox is not running (status: ${box.status})`)
+          return new Blob([new Uint8Array([1, 2, 3])]).stream() as ReadableStream<Uint8Array>
+        },
+      },
+    }
+    return { box, calls }
+  }
+
+  it('resumes a stopped box, reads it, and stops it again', async () => {
+    const { box, calls } = fakeBox('stopped')
+    const source = sandboxArchive({ name: 'box', getBox: async () => box })
+    const stream = await source.open()
+    expect([...new Uint8Array(await new Response(stream).arrayBuffer())]).toEqual([1, 2, 3])
+    expect(calls).toEqual(['resume', 'waitFor', 'open:.', 'stop'])
+    expect(box.status).toBe('stopped')
+  })
+
+  it('reads a running box without touching its state, and skips a deleted one', async () => {
+    const running = fakeBox('running')
+    await new Response(await sandboxArchive({ name: 'a', getBox: async () => running.box }).open()).arrayBuffer()
+    expect(running.calls).toEqual(['open:.'])
+    const gone = fakeBox('deleted')
+    expect(await sandboxArchive({ name: 'b', getBox: async () => gone.box }).open()).toBeNull()
+    expect(await sandboxArchive({ name: 'c', getBox: async () => null }).open()).toBeNull()
+  })
+})
+
+describe('many sandboxes', () => {
+  it('reads several boxes at once and retries a failed box on its own', async () => {
+    let inFlight = 0
+    let peak = 0
+    let flaky = 0
+    const box = tarGz()
+    const exporter = createWorkspaceExport({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      signingSecret: SIGNING,
+      authorize: async () => ({ userId: 'u-owner', role: 'owner' }),
+      archiveConcurrency: 3,
+      plan: async () => ({
+        sources: Array.from({ length: 7 }, (_, i) => ({
+          kind: 'archive' as const,
+          name: `box-${i}`,
+          dataClass: 'sandbox' as const,
+          async open() {
+            inFlight += 1
+            peak = Math.max(peak, inFlight)
+            // Each box waits on its runtime before streaming, as a resume does.
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            inFlight -= 1
+            if (i === 1 && flaky++ === 0) throw new Error('box was still starting')
+            return new Blob([box as BlobPart]).stream() as ReadableStream<Uint8Array>
+          },
+        })),
+      }),
+    })
+    const call = (path: string, init: RequestInit = {}) =>
+      exporter.route(new Request(`https://app.test/api/workspaces/${WS}/exports${path ? `/${path}` : ''}`, init), { workspaceId: WS, path })
+    const { id } = (await (await call('', { method: 'POST' })).json()) as { id: string }
+    let progress: { status: string; units: { name: string; status: string }[] } = { status: 'running', units: [] }
+    let requests = 0
+    while (progress.status === 'running' && requests < 10) {
+      progress = (await (await call(`${id}/advance`, { method: 'POST' })).json()) as typeof progress
+      requests += 1
+    }
+    expect(progress.status).toBe('complete')
+    expect(progress.units.every((u) => u.status === 'done')).toBe(true)
+    expect(peak).toBe(3)
+    // Request 1 fails box-1 inside the first batch and keeps boxes 0 and 2;
+    // request 2 retries box-1 alone, then runs the rest three at a time.
+    expect(flaky).toBe(2)
+    expect(requests).toBe(2)
+  })
+})
+
+describe('many tables', () => {
+  it('writes several table sources at once and keeps each one exact', async () => {
+    let inFlight = 0
+    let peak = 0
+    const exporter = createWorkspaceExport({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      signingSecret: SIGNING,
+      authorize: async () => ({ userId: 'u-owner', role: 'owner' }),
+      rowConcurrency: 5,
+      plan: async () => ({
+        sources: Array.from({ length: 12 }, (_, i) => ({
+          kind: 'rows' as const,
+          name: `db.t${i}`,
+          dataClass: 'records' as const,
+          expectedCount: async () => i % 3,
+          async *rows() {
+            inFlight += 1
+            peak = Math.max(peak, inFlight)
+            // Each table waits on its database round trip, as D1 does.
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            inFlight -= 1
+            yield Array.from({ length: i % 3 }, (_, n) => ({ id: `${i}-${n}` }))
+          },
+        })),
+      }),
+    })
+    const call = (path: string, init: RequestInit = {}) =>
+      exporter.route(new Request(`https://app.test/api/workspaces/${WS}/exports${path ? `/${path}` : ''}`, init), { workspaceId: WS, path })
+    const { id } = (await (await call('', { method: 'POST' })).json()) as { id: string }
+    const progress = (await (await call(`${id}/advance`, { method: 'POST' })).json()) as {
+      status: string
+      units: { name: string; status: string; rows?: number }[]
+    }
+    expect(progress.status).toBe('complete')
+    expect(peak).toBe(5)
+    expect(progress.units.map((u) => u.rows)).toEqual(Array.from({ length: 12 }, (_, i) => i % 3))
+  })
+})
+
+describe('job lease', () => {
+  it('lets the next request continue a minute after a request died holding it', async () => {
+    let clock = Date.parse('2026-10-11T00:00:00Z')
+    const storage = createMemoryExportStorage()
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage,
+      now: () => clock,
+      plan: async () => ({
+        sources: [{
+          kind: 'json',
+          name: 'doc',
+          dataClass: 'records',
+          value: async () => {
+            // The lease the engine stores while this unit runs.
+            const running = JSON.parse(new TextDecoder().decode(storage.objects.get(`workspace-exports/${WS}/${job.id}/job.json`)!))
+            leaseWhileRunning = running.lease.until - clock
+            return { ok: true }
+          },
+        }],
+      }),
+    })
+    let leaseWhileRunning = Number.POSITIVE_INFINITY
+    const job = await engine.start(WS, 'u-owner')
+    // A request that died mid-unit leaves its lease behind.
+    const key = `workspace-exports/${WS}/${job.id}/job.json`
+    const stored = JSON.parse(new TextDecoder().decode(storage.objects.get(key)!))
+    stored.lease = { id: 'dead-request', until: clock + 60_000 }
+    await storage.put(key, new TextEncoder().encode(JSON.stringify(stored)))
+
+    clock += 30_000
+    expect((await engine.advance(WS, job.id))!.status).toBe('running')
+    clock += 31_000
+    expect((await engine.advance(WS, job.id))!.status).toBe('complete')
+    expect(leaseWhileRunning).toBeLessThanOrEqual(60_000)
+  })
+
+  it('hands the lease back when a request fails outside a unit, so a retry continues at once', async () => {
+    const clock = Date.parse('2026-10-11T00:00:00Z')
+    const storage = createMemoryExportStorage()
+    let planCalls = 0
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage,
+      now: () => clock,
+      plan: async () => {
+        planCalls += 1
+        // Every advance plans again; the second one meets a transient database error.
+        if (planCalls === 2) throw new Error('D1_ERROR: Network connection lost.')
+        return { sources: [{ kind: 'json', name: 'doc', dataClass: 'records', value: async () => ({ ok: true }) }] }
+      },
+    })
+    const job = await engine.start(WS, 'u-owner')
+    await expect(engine.advance(WS, job.id)).rejects.toThrow('Network connection lost')
+    const stored = JSON.parse(new TextDecoder().decode(storage.objects.get(`workspace-exports/${WS}/${job.id}/job.json`)!))
+    expect(stored.lease).toBeUndefined()
+    // Same instant: no lease to wait out.
+    expect((await engine.advance(WS, job.id))!.status).toBe('complete')
+  })
+})
+
+describe('background continuation', () => {
+  it('finishes an export with nobody driving it, then forgets it', async () => {
+    const storage = createMemoryExportStorage()
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage,
+      plan: async () => ({
+        sources: [
+          { kind: 'json', name: 'a', dataClass: 'records', value: async () => ({ a: 1 }) },
+          { kind: 'json', name: 'b', dataClass: 'records', value: async () => ({ b: 2 }) },
+        ],
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    // The owner closed the tab right after clicking Export; only the cron runs.
+    for (let i = 0; i < 5 && (await engine.get(WS, job.id))!.status === 'running'; i += 1) await engine.continueRunning()
+    expect((await engine.get(WS, job.id))!.status).toBe('complete')
+    expect([...storage.objects.keys()].some((k) => k.includes('/_running/'))).toBe(false)
+    expect(await engine.continueRunning()).toBe(0)
+  })
+})
+
+describe('background continuation of older exports', () => {
+  it('indexes an unindexed running export when a request touches it, so the sweep finishes it', async () => {
+    const storage = createMemoryExportStorage()
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage,
+      plan: async () => ({
+        sources: Array.from({ length: 3 }, (_, i) => ({ kind: 'json' as const, name: `d${i}`, dataClass: 'records' as const, value: async () => ({ i }) })),
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    // An export started before the index existed has no index entry.
+    for (const key of [...storage.objects.keys()]) if (key.includes('/_running/')) storage.objects.delete(key)
+    expect(await engine.continueRunning()).toBe(0)
+    // The owner reopens the panel once; one advance runs, then the tab closes.
+    await engine.advance(WS, job.id, 0)
+    for (let i = 0; i < 5 && (await engine.get(WS, job.id))!.status === 'running'; i += 1) await engine.continueRunning()
+    expect((await engine.get(WS, job.id))!.status).toBe('complete')
+  })
+})
+
+describe('a source removed while the export runs', () => {
+  it('becomes an empty unit with the reason, and the export still completes', async () => {
+    let boxes = ['box-a', 'box-b']
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      plan: async () => ({
+        sources: [
+          { kind: 'json', name: 'doc', dataClass: 'records', value: async () => ({ ok: true }) },
+          ...boxes.map((name) => ({ kind: 'json' as const, name, dataClass: 'sandbox' as const, value: async () => ({ name }) })),
+        ],
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    boxes = ['box-a'] // box-b is deleted after the export started
+    let current = job
+    for (let i = 0; i < 5 && current.status === 'running'; i += 1) current = (await engine.advance(WS, job.id))!
+    expect(current.status).toBe('complete')
+    const removed = current.units.find((u) => u.name === 'box-b')!
+    expect(removed).toMatchObject({ status: 'empty', error: 'removed from the workspace while the export ran' })
+  })
+})
+
+describe('files sources', () => {
+  it('copy files concurrently and keep each exactly once, in listing order', async () => {
+    const storage = createMemoryExportStorage()
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage,
+      plan: async () => ({
+        sources: [{
+          kind: 'files',
+          name: 'vault',
+          dataClass: 'knowledge',
+          async *files() {
+            for (let i = 0; i < 40; i += 1) {
+              yield { path: `n/${String(i).padStart(2, '0')}.md`, open: async () => { await new Promise((r) => setTimeout(r, 50)); return `note ${i}` } }
+            }
+          },
+        }],
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    const started = Date.now()
+    let current = job
+    for (let i = 0; i < 5 && current.status === 'running'; i += 1) current = (await engine.advance(WS, job.id))!
+    const elapsed = Date.now() - started
+    expect(current.status).toBe('complete')
+    const unit = current.units.find((u) => u.name === 'vault')!
+    expect(unit.entries.map((e) => e.path)).toEqual(Array.from({ length: 40 }, (_, i) => `files/vault/n/${String(i).padStart(2, '0')}.md`))
+    // 40 reads of 50 ms take at least 2000 ms one at a time.
+    expect(elapsed).toBeLessThan(1200)
+  })
+})
+
+describe('an export an owner can read', () => {
+  // Hospitality J5, 2026-10-11: 1 of 3 exports failed on a busy sandbox while the
+  // bar read 93 of 93; the zip was 42.6 MB of node_modules and empty tables,
+  // with knowledge only as content hashes.
+  function boxWithPackages(): Uint8Array {
+    const dir = mkdtempSync(join(tmpdir(), 'wx-pkg-'))
+    mkdirSync(join(dir, 'notes'), { recursive: true })
+    mkdirSync(join(dir, '.opencode/node_modules/left-pad'), { recursive: true })
+    mkdirSync(join(dir, '.sidecar/state'), { recursive: true })
+    writeFileSync(join(dir, 'notes', 'plan.md'), '# Plan\n')
+    writeFileSync(join(dir, '.opencode/node_modules/left-pad', `${'deep-name-'.repeat(12)}.js`), 'x'.repeat(5000))
+    writeFileSync(join(dir, '.sidecar/state', 'run.json'), '{}')
+    const out = join(tmpdir(), `wx-pkg-${Date.now()}.tar.gz`)
+    execFileSync('tar', ['--format=gnu', '-czf', out, '-C', dir, '.'])
+    const bytes = new Uint8Array(readFileSync(out))
+    rmSync(dir, { recursive: true, force: true })
+    rmSync(out, { force: true })
+    return bytes
+  }
+
+  it('drops packages, writes spreadsheets and named documents, and skips empty tables', async () => {
+    const tar = boxWithPackages()
+    const vault = {
+      status: 'stopped',
+      async resume() { vault.status = 'running' },
+      async stop() { vault.status = 'stopped' },
+      async waitFor() {},
+      fs: {
+        async openArchive() { return new Blob([tar as BlobPart]).stream() as ReadableStream<Uint8Array> },
+        async read(path: string) { return path === '.vault/objects/abc/1' ? '# House rules\nQuiet after 10pm\n' : 'missing' },
+      },
+    }
+    const exporter = createWorkspaceExport({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      signingSecret: SIGNING,
+      authorize: async () => ({ userId: 'u-owner', role: 'owner' }),
+      plan: async () => ({
+        sources: [
+          {
+            kind: 'rows', name: 'tasks', dataClass: 'records', format: 'csv', columns: ['title', 'due', 'notes'],
+            async *rows() { yield [{ title: 'Restock, towels', due: '2026-10-12', notes: '=HYPERLINK("x")' }, { title: 'Say "hi"', due: null, notes: { a: 1 } }] },
+          },
+          { kind: 'rows', name: 'db.empty_table', dataClass: 'records', async *rows() { yield [] } },
+          sandboxArchive({ name: 'box', getBox: async () => vault }),
+          sandboxFiles({ name: 'knowledge', getBox: async () => vault, list: async () => [{ path: 'house-rules.md', boxPath: '.vault/objects/abc/1' }] }),
+        ],
+      }),
+    })
+    const call = (path: string, init: RequestInit = {}) =>
+      exporter.route(new Request(`https://app.test/api/workspaces/${WS}/exports${path ? `/${path}` : ''}`, init), { workspaceId: WS, path })
+    const { id } = (await (await call('', { method: 'POST' })).json()) as { id: string }
+    let progress: { status: string; downloadUrl?: string } = { status: 'running' }
+    for (let i = 0; i < 5 && progress.status === 'running'; i += 1) progress = (await (await call(`${id}/advance`, { method: 'POST' })).json()) as typeof progress
+    expect(progress.status).toBe('complete')
+    const zip = new Uint8Array(await (await exporter.route(new Request(`https://app.test${progress.downloadUrl}`), { workspaceId: WS, path: `${id}/download` })).arrayBuffer())
+    const zipPath = join(scratch, 'readable.zip')
+    writeFileSync(zipPath, zip)
+    const members = execFileSync('unzip', ['-Z1', zipPath]).toString().trim().split('\n').sort()
+    expect(members).toEqual(['README.txt', 'files/knowledge/house-rules.md', 'manifest.json', 'sandbox/box.tar.gz', 'spreadsheets/tasks.csv'])
+    expect(execFileSync('unzip', ['-p', zipPath, 'files/knowledge/house-rules.md']).toString()).toContain('Quiet after 10pm')
+    expect(execFileSync('unzip', ['-p', zipPath, 'spreadsheets/tasks.csv']).toString()).toBe(
+      'title,due,notes\r\n"Restock, towels",2026-10-12,"\'=HYPERLINK(""x"")"\r\n"Say ""hi""",,"{""a"":1}"\r\n',
+    )
+    const box = join(scratch, 'readable-box')
+    mkdirSync(box)
+    const tarPath = join(scratch, 'readable-box.tar.gz')
+    writeFileSync(tarPath, execFileSync('unzip', ['-p', zipPath, 'sandbox/box.tar.gz']))
+    expect(execFileSync('tar', ['-tzf', tarPath]).toString().split('\n').filter((m) => /node_modules|sidecar/.test(m))).toEqual([])
+    execFileSync('tar', ['-xzf', tarPath, '-C', box])
+    expect(readFileSync(join(box, 'notes/plan.md'), 'utf8')).toBe('# Plan\n')
+    const readme = execFileSync('unzip', ['-p', zipPath, 'README.txt']).toString()
+    expect(readme).toContain('spreadsheets/ 1 file')
+    expect(readme).not.toContain('data/')
+    expect(readme).toContain('1 source was empty')
+    expect(vault.status).toBe('stopped')
+  })
+
+  it('waits out a busy or failed-to-start sandbox without spending attempts, and never counts a failed source as done', async () => {
+    // Two lifecycle refusals, then two platform resume failures (HTTP 500, 2026-10-12:
+    // "Project sidecar could not be reprovisioned for resume"), then the box starts.
+    let refusals = 4
+    let clock = 1_000_000
+    const box = {
+      status: 'stopped',
+      async resume() {
+        refusals -= 1
+        if (refusals >= 2) throw Object.assign(new Error('A sandbox lifecycle operation is already in progress'), { status: 409, code: 'SANDBOX_LIFECYCLE_IN_PROGRESS' })
+        if (refusals >= 0) throw Object.assign(new Error('Failed to resume project'), { status: 500 })
+        box.status = 'running'
+      },
+      async stop() { box.status = 'stopped' },
+      async waitFor() {},
+      fs: { async openArchive() { return new Blob([boxWithPackages() as BlobPart]).stream() as ReadableStream<Uint8Array> } },
+    }
+    const engine = createExportEngine({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      now: () => clock,
+      plan: async () => ({
+        sources: [
+          sandboxArchive({ name: 'busy', getBox: async () => box }),
+          { kind: 'json', name: 'settings', dataClass: 'workspace', value: async () => ({ ok: true }) },
+        ],
+      }),
+    })
+    const job = await engine.start(WS, 'u-owner')
+    let current = (await engine.advance(WS, job.id))!
+    // A deferred source waits its turn: an immediate retry does not touch the box.
+    const triesAfterFirst = refusals
+    current = (await engine.advance(WS, job.id))!
+    expect(refusals).toBe(triesAfterFirst)
+    for (let i = 0; i < 8 && current.status === 'running'; i += 1) {
+      clock += 31_000
+      current = (await engine.advance(WS, job.id))!
+    }
+    expect(current.status).toBe('complete')
+    const unit = current.units.find((u) => u.name === 'busy')!
+    expect(unit).toMatchObject({ status: 'done', deferrals: 4, attempts: 1 })
+
+    const broken = createExportEngine({
+      app: 'testapp',
+      storage: createMemoryExportStorage(),
+      plan: async () => ({
+        sources: [
+          { kind: 'json', name: 'a', dataClass: 'workspace', value: async () => ({}) },
+          { kind: 'archive', name: 'b', dataClass: 'sandbox', open: async () => { throw new Error('disk gone') } },
+        ],
+      }),
+    })
+    const failing = await broken.start(WS, 'u-owner')
+    let failed = failing
+    for (let i = 0; i < 6 && failed.status === 'running'; i += 1) failed = (await broken.advance(WS, failing.id))!
+    expect(failed.status).toBe('failed')
+    expect(broken.progress(failed)).toMatchObject({ unitsTotal: 2, unitsDone: 1, unitsFailed: 1 })
   })
 })

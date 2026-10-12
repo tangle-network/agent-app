@@ -3,7 +3,7 @@
  * every agent app's web UI hand-rolls: a model picker over the runtime's
  * model catalogue, a reasoning-effort selector, and a message thread with
  * User/Agent identity, per-message model + cost + tokens/sec metrics,
- * canonical tool rows, and a collapsible thinking section.
+ * canonical tool rows, and the shared reasoning row (`ReasoningRow`).
  *
  * Works for BOTH chat shapes: router-backed copilots (LoopEvents from
  * `runtime/openai-stream`) and sandbox-backed chats — the thread renders
@@ -25,11 +25,11 @@
 
 import { useEffect, useId, useMemo, useRef, useState, memo, type ReactNode } from 'react'
 import { isViewerMessage, MessageAuthor, TRANSCRIPT_TEXT } from '@tangle-network/ui/chat'
-import { InlineToolItem, RunRowShell } from '@tangle-network/ui/run'
+import { InlineToolItem } from '@tangle-network/ui/run'
 import type { ChatAuthor, ToolPart } from '@tangle-network/ui/types'
 import { useSmoothText } from './smooth-text'
 import { useArrivalStyle } from './motion'
-import { BrainGlyph, ChevronDown, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, usePending } from './controls'
+import { ChevronDown, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, usePending } from './controls'
 import { BrandMark } from './brand-mark'
 import { DurableChatCards, type DurableChatCardsProps } from './durable-chat-cards'
 import { attachmentPartsFromMessageParts, type ChatAttachmentPart } from './chat-attachments'
@@ -38,9 +38,11 @@ import { WorkProductCard, workProductPartsFromMessageParts } from './work-produc
 import type { WorkProductPersistedPart } from '../work-product/types'
 import type { TurnPhaseData } from '../chat-routes/turn-progress'
 import { TurnProgress } from './turn-progress'
+import { ReasoningRow } from './reasoning-row'
 
 export * from './chat-stream'
 export { TurnProgress, type TurnProgressProps } from './turn-progress'
+export { ReasoningRow, type ReasoningRowProps } from './reasoning-row'
 export * from './chat-interactions'
 export * from './chat-composer'
 export * from './workspace-prewarm'
@@ -87,6 +89,7 @@ export {
   PopoverSurface,
   POPOVER_SURFACE_ATTR,
   ModelPicker,
+  formatModelPrice,
   EffortPicker,
   EffortMeter,
   effortMeterFill,
@@ -134,14 +137,6 @@ export function formatModelCost(msg: ChatMessageMetrics, models: CatalogModel[])
     (msg.completionTokens ?? 0) * Number(pricing.completion ?? 0)
   if (!isFinite(cost) || cost <= 0) return null
   return cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(2)}`
-}
-
-/** One-line preview of a reasoning trace for the collapsed row's description
- *  slot: whitespace collapsed, hard-truncated with an ellipsis. */
-function reasoningPreview(reasoning: string): string | undefined {
-  const flat = reasoning.replace(/\s+/g, ' ').trim()
-  if (!flat) return undefined
-  return flat.length > 120 ? `${flat.slice(0, 119)}…` : flat
 }
 
 /** "38 tok/s" from completion tokens over first-token→end duration; null when unknown. */
@@ -280,7 +275,12 @@ export interface ChatUiMessage extends ChatMessageMetrics {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
+  /** The model's reasoning for this message, shown in a {@link ReasoningRow} above the answer. */
   reasoning?: string
+  /** When the model started reasoning (epoch ms): `ChatReasoningState.startedAt` from the stream or the saved parts. */
+  reasoningStartedAt?: number
+  /** When the reasoning ended (epoch ms). Set, the row reads "Thought for N seconds"; unset while streaming, it is still thinking. */
+  reasoningEndedAt?: number
   toolCalls?: ChatToolCallInfo[]
   /** Ordered text/tool sequence for true chronological interleaving. When
    *  present and non-empty it is rendered in place of `content` + `toolCalls`;
@@ -1288,11 +1288,9 @@ function AssistantMessageImpl({
   chrome: 'labeled' | 'quiet'
 }) {
   // Smooth reveal: chunky network slabs (model bursts, flush windows, replay
-  // polls) paint as a continuous typewriter. Reasoning often arrives as one
-  // burst right before the answer — smoothing makes it visibly type out in
-  // the open thinking box instead of popping in and collapsing.
+  // polls) paint as a continuous typewriter. The reasoning row smooths its own
+  // text the same way while the model thinks.
   const content = useSmoothText(msg.content, streaming)
-  const reasoning = useSmoothText(msg.reasoning ?? '', streaming)
   // The smooth reveal re-renders on every rAF frame while streaming, but the
   // FLOORED visible length only advances every few frames — re-parsing markdown
   // each frame is wasted work on the hot path. Memo on (renderBody, content) so
@@ -1302,44 +1300,14 @@ function AssistantMessageImpl({
   // otherwise fall back to the single content body + trailing tool group.
   const segments = msg.segments
   // "Has the answer started?" — true once any answer text exists, whether the
-  // producer puts it in `content` (legacy) or in a text `segment`. Drives the
-  // reasoning box (open while still thinking, the thinking timer, the summary
-  // label), so a segmented message with `content: ''` doesn't read as
-  // perpetually "Thinking…" after its answer segments are visible.
+  // producer puts it in `content` (legacy) or in a text `segment`. Ends the
+  // reasoning row's thinking state for a producer that sends no end time, so a
+  // segmented message with `content: ''` doesn't read as perpetually
+  // "Thinking…" after its answer segments are visible.
   const hasAnswerText =
     content !== '' ||
     (segments?.some((s) => (s.kind === 'text' || s.kind === 'notice') && s.content.trim() !== '') ??
       false)
-  const reasoningScrollRef = useRef<HTMLDivElement>(null)
-  // Measure visible thinking time: first reasoning reveal → first answer text.
-  const thinkStartRef = useRef<number | null>(null)
-  const thinkMsRef = useRef<number | null>(null)
-  if (streaming && reasoning && !hasAnswerText && thinkStartRef.current === null) {
-    thinkStartRef.current = performance.now()
-  }
-  if (
-    hasAnswerText &&
-    thinkStartRef.current !== null &&
-    thinkMsRef.current === null
-  ) {
-    thinkMsRef.current = performance.now() - thinkStartRef.current
-  }
-  useEffect(() => {
-    const el = reasoningScrollRef.current
-    if (el && streaming && !hasAnswerText) el.scrollTop = el.scrollHeight
-  }, [reasoning, streaming, hasAnswerText])
-  // Live seconds while the model is reasoning before its answer starts, so a
-  // long thinking gap shows progress rather than a static "Thinking…".
-  const thinkingSeconds = useThinkingSeconds(
-    streaming && !!reasoning && !hasAnswerText,
-  )
-  // Open while the model is still thinking, closed once the answer starts —
-  // and a click outranks that default from then on. `<details open={…}>` could
-  // not express the second half: React re-asserts the attribute on every
-  // render, so a reader who opened the box mid-stream had it shut again by the
-  // next frame of tokens.
-  const [reasoningToggled, setReasoningToggled] = useState<boolean | null>(null)
-  const reasoningOpen = reasoningToggled ?? !hasAnswerText
 
   const quiet = chrome === 'quiet'
   return (
@@ -1359,47 +1327,13 @@ function AssistantMessageImpl({
           {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
         </div>
       )}
-      {reasoning && (
-        // The canonical run-row grammar (RunRowShell — the same shell the tool
-        // rows compose): one family of rows instead of a bespoke disclosure per
-        // kind. The shimmer title is a NODE (ui widened `title` to ReactNode for
-        // exactly this): the sweep through the glyphs is the working-vs-stuck
-        // signal. Open while thinking, auto-collapse on the first answer token,
-        // and a click outranks the default from then on — the contract the old
-        // hand-rolled disclosure had, now enforced through the shell's
-        // controlled `open`.
-        <RunRowShell
-          className="mb-2"
-          icon={<BrainGlyph className="h-3.5 w-3.5" />}
-          title={
-            !hasAnswerText ? (
-              <span className="agent-shimmer" data-motion="essential">
-                Thinking{thinkingSeconds >= 1 ? ` · ${thinkingSeconds}s` : '…'}
-              </span>
-            ) : thinkMsRef.current != null ? (
-              // Words, not the abbreviated unit — "Thought for 4 seconds" reads
-              // like a sentence; "4s" reads like a log line.
-              `Thought for ${(() => { const s = Math.max(1, Math.round(thinkMsRef.current! / 1000)); return `${s} second${s === 1 ? '' : 's'}` })()}`
-            ) : (
-              'Thought process'
-            )
-          }
-          // A collapsed trace previews its own first line (the inline truncated
-          // description slot), so the closed row tells you what was considered,
-          // not just that thinking happened.
-          description={hasAnswerText ? reasoningPreview(reasoning) : undefined}
-          status={hasAnswerText ? 'idle' : 'running'}
-          open={reasoningOpen}
-          onOpenChange={(next) => setReasoningToggled(next)}
-        >
-          <div
-            ref={reasoningScrollRef}
-            className="max-h-48 overflow-y-auto whitespace-pre-wrap px-3 py-2.5 text-sm leading-relaxed text-muted-foreground"
-          >
-            {reasoning}
-          </div>
-        </RunRowShell>
-      )}
+      <ReasoningRow
+        className="mb-2"
+        text={msg.reasoning ?? ''}
+        startedAt={msg.reasoningStartedAt}
+        endedAt={msg.reasoningEndedAt}
+        thinking={streaming && !hasAnswerText && msg.reasoningEndedAt === undefined}
+      />
       {segments && segments.length > 0 ? (
         <SegmentedBody
           segments={segments}
@@ -1482,10 +1416,10 @@ function AssistantMessageImpl({
  */
 const AssistantMessage = memo(AssistantMessageImpl)
 
-/** Whole seconds elapsed while `active`, ticking once a second. Powers the live
- *  "thinking" timers (the pre-first-token row and the reasoning box) so a long
- *  thinking gap shows progress instead of a frozen label. Counts from when
- *  `active` first turns true; freezes when it clears. */
+/** Whole seconds elapsed while `active`, ticking once a second; counts from
+ *  when `active` first turns true and freezes when it clears. Kept for
+ *  existing consumers: `ReasoningRow` times reasoning from the stream's own
+ *  start instead. */
 export function useThinkingSeconds(active: boolean): number {
   const [seconds, setSeconds] = useState(0)
   useEffect(() => {

@@ -97,15 +97,28 @@ function emptyReads(): D1Reads {
   return { queries: 0, maxQueryBytes: 0, largestSql: '', peakHeapBytes: 0, peakSql: '' }
 }
 
+export interface MeasureD1Options {
+  /** Sample the live heap at all. Default true. */
+  sampleHeap?: boolean
+  /** Sample after every response at least this large. Default 64 KB. */
+  sampleAfterBytes?: number
+  /** Also sample every this-many queries, so what a job keeps from small reads still shows. Default 50. */
+  sampleEvery?: number
+}
+
 /**
  * The D1 binding with every response measured (serialized bytes) and the live
- * heap sampled after a collection before and after every query. Works over
- * Cloudflare D1 and the sqlite-backed D1 shims apps test with. A database
- * engine that keeps its pages off the JS heap (node:sqlite, better-sqlite3)
- * leaves heap growth to the job's own objects.
+ * heap sampled after a forced collection. A collection costs about 50 ms on a
+ * test heap and a job runs hundreds of small queries, so the heap is sampled
+ * after each large read and every 50th query (GTM's sweeps budget took 170 s
+ * sampling around every query). Works over Cloudflare D1 and the sqlite-backed
+ * D1 shims apps test with. A database engine that keeps its pages off the JS
+ * heap (node:sqlite, better-sqlite3) leaves heap growth to the job's own objects.
  */
-export function measureD1<D extends object>(d1: D, reads: D1Reads = emptyReads(), options: { sampleHeap?: boolean } = {}): { d1: D; reads: D1Reads } {
+export function measureD1<D extends object>(d1: D, reads: D1Reads = emptyReads(), options: MeasureD1Options = {}): { d1: D; reads: D1Reads } {
   const sampleHeap = options.sampleHeap ?? true
+  const sampleAfterBytes = options.sampleAfterBytes ?? 64 * 1024
+  const sampleEvery = Math.max(1, options.sampleEvery ?? 50)
   const sample = (sql: string) => {
     if (!sampleHeap) return
     forceGc()
@@ -122,6 +135,7 @@ export function measureD1<D extends object>(d1: D, reads: D1Reads = emptyReads()
       reads.maxQueryBytes = bytes
       reads.largestSql = sql
     }
+    if (bytes >= sampleAfterBytes || reads.queries % sampleEvery === 0) sample(sql)
   }
   const statement = (target: object, sql: string): object => new Proxy(target, {
     get(stmt, key) {
@@ -130,10 +144,8 @@ export function measureD1<D extends object>(d1: D, reads: D1Reads = emptyReads()
       if (key === 'bind') return (...params: unknown[]) => statement(value.apply(stmt, params) as object, sql)
       if (key === 'all' || key === 'raw' || key === 'first' || key === 'run') {
         return async (...args: unknown[]) => {
-          sample(sql)
           const result: unknown = await value.apply(stmt, args)
           measure(sql, result)
-          sample(sql)
           return result
         }
       }
@@ -154,10 +166,8 @@ export function measureD1<D extends object>(d1: D, reads: D1Reads = emptyReads()
       }
       if (key === 'batch') {
         return async (statements: object[]) => {
-          sample('batch')
           const result: unknown = await (value as (s: object[]) => Promise<unknown>).call(binding, statements.map((stmt) => unwrap.get(stmt) ?? stmt))
           measure('batch', result)
-          sample('batch')
           return result
         }
       }

@@ -19,6 +19,8 @@ import { useCallback, useEffect } from 'react'
 export interface WorkspacePrewarmRequestOptions {
   /** Minimum gap between requests for the same URL in this tab. Default 60 000 ms. */
   minIntervalMs?: number
+  /** Sent to the route so a product can budget page opens apart from composer focus. Default `page-open`. */
+  reason?: 'page-open' | 'composer-focus'
 }
 
 export interface UseWorkspacePrewarmOptions extends WorkspacePrewarmRequestOptions {
@@ -58,7 +60,7 @@ export function requestWorkspacePrewarm(url: string, options: WorkspacePrewarmRe
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'content-type': 'application/json' },
-    body: '{}',
+    body: JSON.stringify({ reason: options.reason ?? 'page-open' }),
   })
     .then((response) => response.body?.cancel())
     .catch(() => undefined)
@@ -82,7 +84,7 @@ export function useWorkspacePrewarm(options: UseWorkspacePrewarmOptions): Worksp
   }, [active, url, minIntervalMs])
 
   const reassert = useCallback(() => {
-    if (active && url) requestWorkspacePrewarm(url, { minIntervalMs })
+    if (active && url) requestWorkspacePrewarm(url, { minIntervalMs, reason: 'composer-focus' })
   }, [active, url, minIntervalMs])
 
   return { reassert }

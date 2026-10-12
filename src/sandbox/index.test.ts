@@ -3022,6 +3022,30 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(payload.idempotencyKey).toBe('box-w1')
   })
 
+  it('awaits an async restore only when a box is created, and never for a reused box', async () => {
+    const restore = vi.fn(async () => ({ fromSnapshot: 'snap-lazy', fromSandboxId: 'sb-lazy' }))
+    const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' } })
+    listMock.mockResolvedValue([running])
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, { restore }), { workspaceId: 'w1', harness: 'opencode' })
+    expect(restore).not.toHaveBeenCalled()
+
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, { restore, resumeStopped: false }), { workspaceId: 'w1', harness: 'opencode' })
+    expect(restore).toHaveBeenCalledOnce()
+    expect(createMock.mock.calls[0]![0]).toMatchObject({ fromSnapshot: 'snap-lazy', fromSandboxId: 'sb-lazy' })
+  })
+
+  it('does not create a box when an async restore refuses', async () => {
+    listMock.mockResolvedValue([])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      restore: async () => { throw new Error('restore point missing') },
+      resumeStopped: false,
+    })
+    await expect(ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })).rejects.toThrow('restore point missing')
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
   it('bakes resolved model + childKeyMint override into the backend model fields', async () => {
     listMock.mockResolvedValue([])
     createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
@@ -3854,6 +3878,102 @@ describe('deferred profile files', () => {
     expect(box).toBe(running)
     expect(createMock).not.toHaveBeenCalled()
     expect(writeMany).not.toHaveBeenCalled()
+  })
+
+  it('ensureWorkspaceSandbox: a reused box whose corpus marker matches skips the re-write despite a stale create stamp', async () => {
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO v2')] },
+    } as unknown as AgentProfile
+    const { deferredFiles } = splitDeferredProfileFiles(filesProfile)
+    const hash = deferredCorpusHash(deferredFiles)
+    const writeMany = vi.fn().mockResolvedValue(undefined)
+    const read = vi.fn().mockResolvedValue(`${hash}\n`)
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode', agentAppDeferredCorpusHash: 'a'.repeat(64) },
+      exec: vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 }),
+      read,
+      fs: { writeMany, supportsWriteMode: true } as never,
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { deferProfileFiles: true, profile: () => filesProfile })
+
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(read).toHaveBeenCalledWith('/home/agent/.agent-app/deferred-corpus-hash')
+    expect(writeMany).not.toHaveBeenCalled()
+  })
+
+  it('ensureWorkspaceSandbox: a reused box with a stale stamp and no marker writes the corpus, then the marker', async () => {
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO v2')] },
+    } as unknown as AgentProfile
+    const { deferredFiles } = splitDeferredProfileFiles(filesProfile)
+    const hash = deferredCorpusHash(deferredFiles)
+    const writeMany = vi.fn().mockResolvedValue(undefined)
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode', agentAppDeferredCorpusHash: 'a'.repeat(64) },
+      exec: vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 }),
+      read: vi.fn().mockRejectedValue(Object.assign(new Error('not found'), { status: 404 })),
+      fs: { writeMany, supportsWriteMode: true } as never,
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { deferProfileFiles: true, profile: () => filesProfile })
+
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(writeMany).toHaveBeenCalledTimes(2)
+    expect(writeMany.mock.calls[0]![0]).toEqual([{ path: 'skills/seo.md', content: '# SEO v2' }])
+    expect(writeMany.mock.calls[1]![0]).toEqual([{ path: '.agent-app/deferred-corpus-hash', content: hash }])
+  })
+
+  it('ensureWorkspaceSandbox: a failed marker write leaves the reused box usable', async () => {
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO v2')] },
+    } as unknown as AgentProfile
+    const writeMany = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('marker write refused'))
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      exec: vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 }),
+      read: vi.fn().mockResolvedValue('not-a-hash'),
+      fs: { writeMany, supportsWriteMode: true } as never,
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { deferProfileFiles: true, profile: () => filesProfile })
+
+    await expect(ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })).resolves.toBe(running)
+    expect(writeMany).toHaveBeenCalledTimes(2)
+  })
+
+  it('ensureWorkspaceSandbox: reads a reused box egress policy while its liveness probe runs', async () => {
+    let releaseProbe!: () => void
+    const probeGate = new Promise<void>((resolve) => { releaseProbe = resolve })
+    const exec = vi.fn(async () => {
+      await probeGate
+      return { stdout: 'alive', stderr: '', exitCode: 0 }
+    })
+    const get = vi.fn().mockResolvedValue({ policy: { mode: 'open' }, source: 'sandbox' })
+    const running = fakeBox({
+      name: 'box-w1',
+      exec,
+      egress: { get, update: vi.fn() },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy: { mode: 'open' }, livenessProbe: { cacheTtlMs: 0 } })
+
+    const pending = ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    await vi.waitFor(() => expect(exec).toHaveBeenCalledOnce())
+    expect(get).toHaveBeenCalledOnce()
+    releaseProbe()
+    await expect(pending).resolves.toBe(running)
+    expect(get).toHaveBeenCalledOnce()
   })
 
   it('ensureWorkspaceSandbox: retries deferred writes on a resumed box', async () => {
@@ -5265,5 +5385,179 @@ describe('ensureWorkspaceSandbox — the spend seam', () => {
       }),
     ).resolves.toBe(box)
     expect(createMock).toHaveBeenCalledOnce()
+  })
+})
+
+describe('warm reuse round trips', () => {
+  const scope = { workspaceId: 'w1', harness: 'opencode' as const }
+
+  function gatedProbe() {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const exec = vi.fn(async () => {
+      await gate
+      return { stdout: 'alive', stderr: '', exitCode: 0 }
+    })
+    return { exec, release }
+  }
+
+  it('renews an open-egress box while its liveness probe and egress read run, once', async () => {
+    const probe = gatedProbe()
+    let releaseEgress!: () => void
+    const egressGate = new Promise<void>((resolve) => { releaseEgress = resolve })
+    const get = vi.fn(async () => {
+      await egressGate
+      return { policy: { mode: 'open' as const }, source: 'sandbox' }
+    })
+    const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
+    const bootstrap = vi.fn(async () => ({ succeeded: true as const, value: undefined }))
+    const running = fakeBox({
+      exec: probe.exec,
+      setRuntimeEnv,
+      egress: { get, update: vi.fn() },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      egressPolicy: { mode: 'open' },
+      runtimeEnv: async () => ({ APP_TOKEN: 'renewed' }),
+      livenessProbe: { cacheTtlMs: 0 },
+      bootstrap,
+    })
+
+    const pending = ensureWorkspaceSandbox(shell, scope)
+    await vi.waitFor(() => expect(setRuntimeEnv).toHaveBeenCalledExactlyOnceWith({ APP_TOKEN: 'renewed' }))
+    expect(probe.exec).toHaveBeenCalledOnce()
+    expect(get).toHaveBeenCalledOnce()
+    expect(bootstrap).not.toHaveBeenCalled()
+    probe.release()
+    releaseEgress()
+    await expect(pending).resolves.toBe(running)
+    expect(setRuntimeEnv).toHaveBeenCalledOnce()
+    expect(bootstrap).toHaveBeenCalledOnce()
+  })
+
+  it('holds a strict-egress box renewal until its policy is asserted', async () => {
+    let releaseEgress!: () => void
+    const egressGate = new Promise<void>((resolve) => { releaseEgress = resolve })
+    const desired = { mode: 'strict' as const, allowDomains: ['a.example.com'] }
+    const get = vi.fn(async () => {
+      await egressGate
+      return { policy: desired, source: 'sandbox' }
+    })
+    const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
+    const exec = vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
+    const running = fakeBox({ exec, setRuntimeEnv, egress: { get, update: vi.fn() } } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      egressPolicy: desired,
+      runtimeEnv: async () => ({ APP_TOKEN: 'renewed' }),
+      livenessProbe: { cacheTtlMs: 0 },
+    })
+
+    const pending = ensureWorkspaceSandbox(shell, scope)
+    await vi.waitFor(() => expect(exec).toHaveBeenCalledOnce())
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(setRuntimeEnv).not.toHaveBeenCalled()
+    releaseEgress()
+    await expect(pending).resolves.toBe(running)
+    expect(setRuntimeEnv).toHaveBeenCalledExactlyOnceWith({ APP_TOKEN: 'renewed' })
+  })
+
+  it('does not renew a strict-egress box whose policy does not match', async () => {
+    const get = vi.fn().mockResolvedValue({ policy: { mode: 'open' }, source: 'sandbox' })
+    const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
+    const running = fakeBox({
+      exec: vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 }),
+      setRuntimeEnv,
+      egress: { get, update: vi.fn() },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      egressPolicy: { mode: 'blocked' },
+      runtimeEnv: async () => ({ APP_TOKEN: 'renewed' }),
+    })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).rejects.toMatchObject({ name: 'SandboxEgressPolicyMismatchError' })
+    expect(setRuntimeEnv).not.toHaveBeenCalled()
+  })
+
+  it('reads a box egress once per start: the next reuse of the same start skips it', async () => {
+    const startedAt = new Date('2026-10-11T12:00:00.000Z')
+    const get = vi.fn().mockResolvedValue({ policy: { mode: 'open' }, source: 'sandbox' })
+    const exec = vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
+    const running = fakeBox({ exec, startedAt, egress: { get, update: vi.fn() } } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy: { mode: 'open' }, livenessProbe: { cacheTtlMs: 0 } })
+
+    await ensureWorkspaceSandbox(shell, scope)
+    await ensureWorkspaceSandbox(shell, scope)
+    expect(get).toHaveBeenCalledOnce()
+
+    const restarted = fakeBox({
+      exec,
+      startedAt: new Date('2026-10-11T12:30:00.000Z'),
+      egress: { get, update: vi.fn() },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([restarted])
+    await ensureWorkspaceSandbox(shell, scope)
+    expect(get).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads a box egress again once the verified entry expires', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const get = vi.fn().mockResolvedValue({ policy: { mode: 'open' }, source: 'sandbox' })
+      const running = fakeBox({
+        exec: vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 }),
+        startedAt: new Date('2026-10-11T12:00:00.000Z'),
+        egress: { get, update: vi.fn() },
+      } as unknown as Partial<SandboxInstance>)
+      listMock.mockResolvedValue([running])
+      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy: { mode: 'open' }, livenessProbe: { cacheTtlMs: 0 } })
+      await ensureWorkspaceSandbox(shell, scope)
+      vi.setSystemTime(Date.now() + 11 * 60_000)
+      await ensureWorkspaceSandbox(shell, scope)
+      expect(get).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('never caches a strict policy verdict', async () => {
+    const desired = { mode: 'strict' as const, allowDomains: ['a.example.com'] }
+    const get = vi.fn().mockResolvedValue({ policy: desired, source: 'sandbox' })
+    const running = fakeBox({
+      exec: vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 }),
+      startedAt: new Date('2026-10-11T12:00:00.000Z'),
+      egress: { get, update: vi.fn() },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy: desired, livenessProbe: { cacheTtlMs: 0 } })
+    await ensureWorkspaceSandbox(shell, scope)
+    await ensureWorkspaceSandbox(shell, scope)
+    expect(get).toHaveBeenCalledTimes(2)
+  })
+
+  it('renews a recovered box itself when the probe found the reused box dead', async () => {
+    const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
+    const exec = vi.fn()
+      .mockResolvedValueOnce({ stdout: '', stderr: 'dead', exitCode: 1 })
+      .mockResolvedValueOnce({ stdout: '', stderr: 'dead', exitCode: 1 })
+      .mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
+    const running = fakeBox({ exec, setRuntimeEnv, sessions: vi.fn().mockResolvedValue([]) } as unknown as Partial<SandboxInstance>)
+    running.stop = vi.fn().mockResolvedValue(undefined) as never
+    running.resume = vi.fn().mockResolvedValue(undefined) as never
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([running]) : Promise.resolve([]))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      runtimeEnv: async () => ({ APP_TOKEN: 'renewed' }),
+      livenessProbe: { cacheTtlMs: 0 },
+    })
+
+    await expect(ensureWorkspaceSandbox(shell, scope)).resolves.toBe(running)
+    expect(running.stop).toHaveBeenCalledOnce()
+    // Once while the first probe ran, once on the recovered box.
+    expect(setRuntimeEnv).toHaveBeenCalledTimes(2)
+    expect(setRuntimeEnv).toHaveBeenLastCalledWith({ APP_TOKEN: 'renewed' })
   })
 })

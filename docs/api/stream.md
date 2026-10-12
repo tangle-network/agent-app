@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-66 exports.
+67 exports.
 
 ### `asRecord`
 
@@ -188,6 +188,14 @@ number
 
 ```ts
 (parts: JsonRecord[], outcome: "expired" | "answered") => JsonRecord[]
+```
+
+### `FOLLOW_UP_CLAIM_STALE_AFTER_MS`
+
+`const` — A plan follow-up claim's own staleness (`createD1PlanFollowUpGate`): it does not renew, and its gate re-admits it after this.
+
+```ts
+number
 ```
 
 ### `getPartKey`

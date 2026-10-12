@@ -77,6 +77,8 @@ export interface StaleRunningTurn {
   scopeId: string | null
   /** Unix ms of the last status write. */
   updatedAt: number
+  /** Set on a plan follow-up claim (`createD1PlanFollowUpGate`), which keeps its own staleness and does not renew. */
+  leaseToken?: string | null
 }
 
 /**
@@ -724,10 +726,16 @@ export function createD1TurnEventStore(
     },
     async listStaleRunning(before, limit) {
       const { results } = await db
-        .prepare("SELECT turnId, scopeId, updatedAt FROM turn_status WHERE status = 'running' AND updatedAt < ? ORDER BY updatedAt ASC LIMIT ?")
+        // `*` so a deployment that applied TURN_STATUS_LEASE_MIGRATION_SQL also returns its follow-up claims' leaseToken.
+        .prepare("SELECT * FROM turn_status WHERE status = 'running' AND updatedAt < ? ORDER BY updatedAt ASC LIMIT ?")
         .bind(new Date(before).toISOString(), Math.max(1, Math.floor(limit)))
-        .all<{ turnId: string; scopeId: string | null; updatedAt: string }>()
-      return results.map((row) => ({ turnId: row.turnId, scopeId: row.scopeId ?? null, updatedAt: Date.parse(row.updatedAt) }))
+        .all<{ turnId: string; scopeId: string | null; updatedAt: string; leaseToken?: string | null }>()
+      return results.map((row) => ({
+        turnId: row.turnId,
+        scopeId: row.scopeId ?? null,
+        updatedAt: Date.parse(row.updatedAt),
+        ...(row.leaseToken ? { leaseToken: row.leaseToken } : {}),
+      }))
     },
     async readTail(turnId, count) {
       const { results } = await db

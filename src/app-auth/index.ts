@@ -48,7 +48,9 @@ const DEFAULT_SESSION_COOKIE_CACHE_SECONDS = 5 * 60
 const SESSION_MEMO_MAX_MS = 30_000
 const SESSION_MEMO_LIMIT = 500
 const requestSessions = new WeakMap<Request, Promise<AppAuthSession | null>>()
-const isolateSessions = new Map<string, { until: number; session: Promise<AppAuthSession | null> }>()
+const isolateSessions = new Map<string, { until: number; session: AppAuthSession }>()
+// Bumped by forgetSessions, so a read that began before a sign-out cannot remember its result.
+const scopeGenerations = new Map<string, number>()
 
 function memoizedSession(scope: string, ttlMs: number, request: Request,
   read: (request: Request) => Promise<AppAuthSession | null>): Promise<AppAuthSession | null> {
@@ -58,30 +60,35 @@ function memoizedSession(scope: string, ttlMs: number, request: Request,
   const authorization = request.headers.get('authorization') ?? ''
   if (!cookie && !authorization) return read(request)
   const key = `${scope}\u0000${authorization}\u0000${cookie}`
-  const now = Date.now()
+  const startedAt = Date.now()
   const hit = isolateSessions.get(key)
-  if (hit && hit.until > now) {
-    requestSessions.set(request, hit.session)
-    return hit.session
+  if (hit && hit.until > startedAt) {
+    const session = Promise.resolve(hit.session)
+    requestSessions.set(request, session)
+    return session
   }
+  // Only a resolved session is shared across requests, never a read in flight.
+  // Workers ties a read's I/O to the request that started it: when that request
+  // is cancelled (a navigation), the read never settles, and every other request
+  // awaiting it hung until its client gave up (Hospitality production, 20.4-21.0 s,
+  // 2026-10-11).
+  const generation = scopeGenerations.get(scope) ?? 0
   const session = read(request).then((value) => {
-    // Only a live session is reused; a miss or an expired session is read again next time.
     const expiresAt = value ? new Date(value.session.expiresAt).getTime() : 0
-    if (!value || !(expiresAt > Date.now())) isolateSessions.delete(key)
-    else {
-      const entry = isolateSessions.get(key)
-      if (entry) entry.until = Math.min(entry.until, expiresAt)
+    isolateSessions.delete(key)
+    // Only a live session is reused; a miss or an expired session is read again next time.
+    if (value && expiresAt > Date.now() && (scopeGenerations.get(scope) ?? 0) === generation) {
+      isolateSessions.set(key, { until: Math.min(startedAt + ttlMs, expiresAt), session: value })
+      if (isolateSessions.size > SESSION_MEMO_LIMIT) isolateSessions.delete(isolateSessions.keys().next().value!)
     }
     return value
-  }, (error) => { isolateSessions.delete(key); throw error })
-  isolateSessions.delete(key)
-  isolateSessions.set(key, { until: now + ttlMs, session })
-  if (isolateSessions.size > SESSION_MEMO_LIMIT) isolateSessions.delete(isolateSessions.keys().next().value!)
+  })
   requestSessions.set(request, session)
   return session
 }
 
 function forgetSessions(scope: string): void {
+  scopeGenerations.set(scope, (scopeGenerations.get(scope) ?? 0) + 1)
   for (const key of isolateSessions.keys()) if (key.startsWith(`${scope}\u0000`)) isolateSessions.delete(key)
 }
 

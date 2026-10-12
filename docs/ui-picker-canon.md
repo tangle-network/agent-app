@@ -20,7 +20,9 @@ path for any product still holding the old nested selection shape.
   composer controls, pickers, assistant.
 - **`@tangle-network/ui` owns the run-row grammar** — `RunRowShell`,
   `InlineToolItem`, `InlineThinkingItem` (tool calls, reasoning, status rows).
-  Compose it; never re-fork a row type locally. agent-app's `ChatMessages`
+  Compose it; never re-fork a row type locally. agent-app's `ReasoningRow`
+  (`/web-react`) is the reasoning row every chat surface renders, built on
+  `RunRowShell`. agent-app's `ChatMessages`
   renders the agent-chat WIRE surface (proposals, approvals, missions,
   interactions, quiet chrome) — a different data model from ui's
   session-transcript (`MessageList`/`AgentTimeline`), so the transcript shell

@@ -4,7 +4,7 @@
 
 Source: `src/harness/index.ts`
 
-14 exports.
+16 exports.
 
 ### `assertHarnessModelCompatible`
 
@@ -22,6 +22,14 @@ Source: `src/harness/index.ts`
 (value: unknown, fallback?: Harness) => Harness
 ```
 
+### `configuredHarness`
+
+`function` — The harness a workspace's new sessions start on: its own choice, else the app default, else {@link DEFAULT_HARNESS}.
+
+```ts
+(config: HarnessConfig, workspaceId?: string | undefined) => Harness
+```
+
 ### `DEFAULT_HARNESS`
 
 `const` — Define the default harness to use for code execution and testing environments
@@ -36,6 +44,14 @@ Harness
 
 ```ts
 type Harness
+```
+
+### `HarnessConfig`
+
+`interface` — An app's harness configuration, read from its deploy configuration (for example the env vars `AGENT_HARNESS` and `AGENT_HARNESS_WORKSPACES`), so no product hard-codes `backend.type`.
+
+```ts
+interface HarnessConfig
 ```
 
 ### `HarnessModelSelection`

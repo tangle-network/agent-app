@@ -7,11 +7,18 @@ The product declares where the data lives; the module runs the export, keeps cre
 
 ```
 manifest.json            schema, counts per source, every file with size and SHA-256, the redaction policy, table coverage
-README.txt               how to read and verify the archive
-data/<source>.ndjson     one JSON object per line, one file per table or record type
+README.txt               the folders this archive actually holds, and how to verify it
+spreadsheets/<source>.csv the tables an owner opens first, with names instead of ids
+data/<source>.ndjson     one JSON object per line, one file per table that holds rows
 data/<source>.json       single documents, such as connection metadata
-files/<source>/...       uploaded and generated files at their original paths
-sandbox/<source>.tar.gz  the agent's workspace filesystem
+files/<source>/...       uploaded files and documents at their original names
+sandbox/<source>.tar.gz  the agent's working files, without installed packages
+```
+
+A source with no rows writes no file; the manifest still lists it with `status: "empty"`.
+Owners judge an export by opening it, so give them readable copies: a `format: 'csv'` rows source with `columns` for each table they would open in a spreadsheet, and `sandboxFiles` for documents a box stores under internal names.
+
+```
 ```
 
 ## Wiring it into a product
@@ -19,7 +26,8 @@ sandbox/<source>.tar.gz  the agent's workspace filesystem
 1. Declare the sources for one workspace in `plan`.
    - `d1WorkspaceTables` discovers every table with a workspace column. Tables keyed through a parent take a `scoped` WHERE clause; tables left out on purpose go in `exclude` with a reason. Every other table appears in the coverage report as `unscoped`, so new migrations cannot silently drop out of the export.
    - `r2Files` and `kvFiles` export object and KV prefixes. A prefix must end at a workspace boundary (`ws-1/`).
-   - An `archive` source returns the sandbox workspace as a `.tar.gz` stream from the Sandbox SDK (`box.fs.openArchive(dir)`), or `null` when the workspace has no box.
+   - `sandboxArchive({ name, getBox: () => client.get(id) })` exports one sandbox as a `.tar.gz` through the Sandbox SDK's `fs.openArchive`. A stopped box is resumed for the export and restoration is attempted once after completion, failure or cancellation, including a readiness failure after a successful resume. An already-running box is left running; a deleted or expired box exports nothing. `node_modules` and `.sidecar` are left out by default (`exclude`), because in a Hospitality box they were 98% of the archive. Do not hand-roll this in the product.
+   - `sandboxFiles({ name, getBox, list })` writes named text files read from a box under `files/<name>/`, for documents the product stores under content hashes. `list` reads the product's own records, so the box is resumed only when there is something to read. Only files admitted in this request are read; continuation skips already-exported entries without opening them. Outstanding reads finish before the box is restored, including the final partial chunk and error or cancellation paths.
    - A `json` source returns one document, such as Hub connection metadata.
    - Decrypt product-encrypted columns in `transform` (or in a custom `rows()`); the owner receives plaintext of their own data.
 2. Mount `createWorkspaceExport(...).route` under one path, such as `/api/workspaces/:id/exports/*`, and pass the remainder as `path`.
@@ -31,16 +39,31 @@ Pass the product's own keys as `knownSecrets` so they are masked even when they 
 
 ## How it runs
 
-Each source is a unit. A files source that has more than 200 files, or that runs past the request budget, continues in the next request from a saved cursor, so no request exceeds the Workers subrequest limit. `POST {mount}` creates the job; the panel calls `POST {mount}/:id/advance`, which runs pending units for about 20 seconds per call.
+Each source is a unit. A files source that has more than 200 files, or that runs past the request budget, continues in the next request from a saved cursor. At most 200 files are opened per request, including missing files whose `open` returns `null`; reads and writes run in chunks of four. A chunk's cursor is committed only after all its copies succeed. `POST {mount}` creates the job; the panel calls `POST {mount}/:id/advance`, which runs pending units for about 20 seconds per call.
 A unit that starts always finishes, and the job record is updated with a compare-and-swap lease, so two tabs cannot run the same unit.
+Consecutive sandbox archives run up to `archiveConcurrency` (default 4) at a time, because each mostly waits on its box to resume and stream; a workspace with dozens of project boxes would otherwise spend one box's wait per unit. Consecutive table and JSON sources run up to `rowConcurrency` (default 8) at a time under one job save, because each mostly waits on D1 and one storage write; a Builder agent's 97 mostly empty tables otherwise took 300 s. A unit that was already attempted runs alone on its retry.
 A closed tab pauses the export; reopening the panel resumes it.
 A unit that fails three times fails the export, and the owner starts a new one.
+A sandbox busy with another lifecycle operation (the typed `409 SANDBOX_LIFECYCLE_IN_PROGRESS`, for example a page-open warm or the previous export's stop) is not a failure: the source throws `ExportRetryLater`, keeps its attempt, and runs again at least 30 seconds later while the other sources continue, up to 20 times (about ten minutes). A resume the platform fails on its side (HTTP 5xx, such as "Project sidecar could not be reprovisioned for resume") is retried the same way: the box stays suspended and a later resume usually works. The panel never counts a failed source as done, and its bar turns red when the export fails.
 
 Every entry streams through the credential masks, records CRC-32, SHA-256 and sizes, and is stored as segments of at most 8 MiB.
 The download route stitches the segments into one zip with an exact `Content-Length`; nothing is buffered beyond one segment.
-A sandbox archive is decompressed, checked and recompressed inside one request, which cost 32.5 s of CPU for a 224 MB box in production. Set `[limits] cpu_ms = 300000` in the app's `wrangler.toml` so large workspaces fit. A request that dies inside a unit still counts as an attempt, so an export fails visibly rather than stalling.
+A sandbox archive is decompressed, checked and recompressed inside one request, which cost 32.5 s of CPU for a 224 MB box in production. Set `[limits] cpu_ms = 300000` in the app's `wrangler.toml` so large workspaces fit; concurrent archives share one request's CPU budget. A request that dies inside a unit still counts as an attempt, so an export fails visibly rather than stalling.
 
 Exports hold decrypted data, so they are deleted after 24 hours (`retentionMs`); the owner can delete one sooner, or export again.
+
+## Finishing after the owner leaves
+
+An export advances while the panel is open. To let it finish after the owner closes the tab, call `continueRunning()` from the product's scheduled handler on a one-minute cron and pass `continuesInBackground` to the panel:
+
+```ts
+// wrangler.toml: [triggers] crons = ["* * * * *"]
+async scheduled(event, env, ctx) {
+  ctx.waitUntil(exporterFor(env).continueRunning(50_000))
+}
+```
+
+Running exports are indexed under `workspace-exports/_running/`, so the cron reads one small listing rather than every segment. It advances only exports whose lease has lapsed, so it never competes with an open panel.
 
 ## Secrets
 
