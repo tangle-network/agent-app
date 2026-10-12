@@ -4,7 +4,7 @@ import { GenerationNoticeChip, StudioComposer } from '../../studio-react'
 import type { GenerationType, MediaModelCatalogResponse, MediaModelOption } from '../../studio'
 
 /**
- * The chat-shaped composer. Its whole subject is the pill set the SELECTED
+ * The chat-shaped composer. Its controls follow what the SELECTED
  * MODEL publishes, so these stories serve `/api/media-models` from a fixture
  * catalog rather than mounting without a workspace: a composer with no catalog
  * can only ever show the empty state, which is one story, not six.
@@ -52,7 +52,7 @@ const CATALOG: MediaModelCatalogResponse = {
       model('tts-1', 'speech', 'openai', 'TTS 1'),
       model('gpt-4o-mini-tts', 'speech', 'openai', 'GPT-4o mini TTS'),
       model('gemini-2.5-flash-preview-tts', 'speech', 'google', 'Gemini 2.5 Flash TTS'),
-      // No publicly enumerable voice list: no Voice pill, provider default used.
+      // No publicly enumerable voice list: no Voice setting, provider default used.
       model('voxtral-mini', 'speech', 'mistral', 'Voxtral Mini'),
     ],
     avatar: [],
@@ -206,8 +206,8 @@ export const PrimarySendTone: Story = {
   args: { sendTone: 'primary' },
 }
 
-/** Video lane on Seedance 2.0 — Duration, Resolution, Aspect, the audio toggle,
- *  and the Reference pill that swaps the model to the image-to-video sibling. */
+/** Video lane on Seedance 2.0 — compact settings for Aspect, Duration, Audio,
+ *  and Resolution; the Reference pill swaps to the image-to-video sibling. */
 export const VideoLane: Story = {
   name: 'Video lane',
   render: (args) => (
@@ -218,7 +218,7 @@ export const VideoLane: Story = {
 }
 
 /** Audio lane on TTS 1 — nine published voices and a speed preset list. Switch
- *  to Voxtral to see the honest empty case: no Voice pill at all. */
+ *  to Voxtral to see the honest empty case: no Voice setting at all. */
 export const AudioLane: Story = {
   name: 'Audio lane',
   render: (args) => (

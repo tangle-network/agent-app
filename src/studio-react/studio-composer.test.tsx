@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The composer's contract is that the CONTROLS ARE THE MODEL'S OWN: a pill
+ * The composer's contract is that the CONTROLS ARE THE MODEL'S OWN: a setting
  * exists only when the selected model publishes that parameter, and the value
  * reaches the wire exactly as published. Both halves are asserted here against
  * real catalog rows, because both have a silent failure mode — an invented
@@ -9,7 +9,6 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { readFileSync } from 'node:fs'
 import type {
   GenerationType,
   MediaModelCatalogResponse,
@@ -36,8 +35,8 @@ function catalog(
   }
 }
 
-/** Publish the declared options plus a sentinel for any future PILL_ORDER key.
- *  That makes the wire-coverage test below render a newly added pill even before
+/** Publish the declared options plus a sentinel for any future PARAM_ORDER key.
+ *  That makes the wire-coverage test below render a newly added setting even before
  *  this fixture knows its name, so a missing request-body mapping fails loudly. */
 function allPillOptions(options: ModelOptionsMetadata): ModelOptionsMetadata {
   return new Proxy(options, {
@@ -81,10 +80,31 @@ function mountWith(
 }
 
 const modelPill = () => screen.getByRole('button', { name: /^Model:/ })
-const pill = (label: string) => screen.queryByRole('button', { name: new RegExp(`^${label}:`) })
-const openPill = async (label: string) => {
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${label}:`) }))
-  return screen.findByRole('menu')
+function openSettings(): HTMLElement {
+  const existing = screen.queryByRole('dialog', { name: 'Generation settings' })
+  if (existing) return existing
+  fireEvent.click(screen.getByRole('button', { name: /^Generation settings:/ }))
+  return screen.getByRole('dialog', { name: 'Generation settings' })
+}
+function setting(label: string): HTMLElement | null {
+  if (!screen.queryByRole('button', { name: /^Generation settings:/ })) return null
+  const panel = openSettings()
+  const name = new RegExp(`^${label}:`)
+  let row = within(panel).queryByRole('button', { name })
+  if (!row) {
+    const more = within(panel).queryByRole('button', { name: /^More settings/ })
+    if (more) {
+      fireEvent.click(more)
+      row = within(panel).queryByRole('button', { name })
+    }
+  }
+  return row
+}
+async function openSetting(label: string): Promise<HTMLElement> {
+  const row = setting(label)
+  if (!row) throw new Error(`${label} is not a published setting`)
+  fireEvent.click(row)
+  return within(openSettings()).findByRole('group', { name: `${label} choices` })
 }
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -168,10 +188,8 @@ describe('StudioComposer — persisted selections', () => {
     await screen.findByRole('button', { name: `Model: ${imageDefault}` })
     await chooseModel(imageAlternate)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Size: Auto' }))
-    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: '1536×1024' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Count: ×1' }))
-    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: '×4' }))
+    fireEvent.click(within(await openSetting('Size')).getByRole('radio', { name: '1536×1024' }))
+    fireEvent.click(within(await openSetting('Count')).getByRole('radio', { name: '×4' }))
     fireEvent.click(screen.getByRole('button', { name: 'Video' }))
 
     expect(JSON.parse(window.localStorage.getItem('studio-composer:ws-1') ?? '{}')).toMatchObject({
@@ -187,8 +205,8 @@ describe('StudioComposer — persisted selections', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Image' }))
     await screen.findByRole('button', { name: `Model: ${imageAlternate}` })
-    expect(screen.getByRole('button', { name: 'Size: 1536×1024' })).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'Count: ×4' })).not.toBeNull()
+    expect(setting('Size')?.getAttribute('aria-label')).toBe('Size: 1536×1024')
+    expect(setting('Count')?.getAttribute('aria-label')).toBe('Count: ×4')
   })
 
   it('isolates selections by workspace', async () => {
@@ -202,8 +220,8 @@ describe('StudioComposer — persisted selections', () => {
     mountWith(persistenceCatalog, { workspaceId: 'ws-2' })
     await screen.findByRole('button', { name: `Model: ${imageDefault}` })
     expect(screen.getByRole('button', { name: 'Image' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Size: Auto' })).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'Count: ×1' })).not.toBeNull()
+    expect(setting('Size')?.getAttribute('aria-label')).toBe('Size: Auto')
+    expect(setting('Count')?.getAttribute('aria-label')).toBe('Count: ×1')
   })
 
   it('falls back from a stale model and reconciles stale options to catalog defaults', async () => {
@@ -227,8 +245,8 @@ describe('StudioComposer — persisted selections', () => {
 
     mountWith(currentCatalog)
     await screen.findByRole('button', { name: `Model: ${imageDefault}` })
-    expect(screen.getByRole('button', { name: 'Size: 1024×1024' })).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'Count: ×1' })).not.toBeNull()
+    expect(setting('Size')?.getAttribute('aria-label')).toBe('Size: 1024×1024')
+    expect(setting('Count')?.getAttribute('aria-label')).toBe('Count: ×1')
     await waitFor(() => {
       const stored = JSON.parse(window.localStorage.getItem('studio-composer:ws-1') ?? '{}')
       expect(stored.optionsByModel[imageDefault]).toEqual({ size: '1024x1024', n: 1 })
@@ -255,25 +273,47 @@ describe('StudioComposer — persisted selections', () => {
 
     await screen.findByRole('button', { name: `Model: ${imageDefault}` })
     expect(screen.getByRole('button', { name: 'Image' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Size: Auto' })).not.toBeNull()
+    expect(setting('Size')?.getAttribute('aria-label')).toBe('Size: Auto')
   })
 })
 
-describe('StudioComposer — the pills are the model’s own parameters', () => {
-  it('keeps a fallback trigger icon for future option parameters', () => {
-    const source = readFileSync('src/studio-react/studio-composer.tsx', 'utf8')
-    expect(source).toContain('icon={PARAM_ICONS[param] ?? SlidersHorizontal}')
+describe('StudioComposer — settings are the model’s own parameters', () => {
+  it('keeps common video defaults visible, puts extra controls behind More, and returns focus on Escape', async () => {
+    mountWith(catalog({ video: [model(SEEDANCE, 'video')] }, { video: SEEDANCE }))
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+
+    const trigger = screen.getByRole('button', { name: /^Generation settings:/ })
+    expect(trigger.textContent).toContain('Auto · Auto · Audio on')
+    const panel = openSettings()
+    expect(document.activeElement).toBe(within(panel).getByRole('button', { name: 'Aspect: Auto' }))
+    expect(within(panel).queryByRole('button', { name: /^Resolution:/ })).toBeNull()
+    expect(within(panel).getByRole('button', { name: 'More settings (1)' })).not.toBeNull()
+
+    const duration = await openSetting('Duration')
+    expect(within(duration).getAllByRole('radio')).toHaveLength(13)
+    fireEvent.click(within(duration).getByRole('radio', { name: '10s' }))
+    expect(trigger.textContent).toContain('10s')
+    expect(document.activeElement).toBe(within(panel).getByRole('button', { name: 'Duration: 10s' }))
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'More settings (1)' }))
+    expect(setting('Resolution')).not.toBeNull()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Generation settings' })).toBeNull()
+    expect(document.activeElement).toBe(trigger)
   })
 
-  it('optically centers option pill labels; the truncating model label keeps a normal line box', async () => {
+  it('shows published defaults on one trigger and keeps the model name readable', async () => {
     mountWith(catalog({
       video: [model(SEEDANCE, 'video')],
     }, { video: SEEDANCE }))
     fireEvent.click(screen.getByRole('button', { name: 'Video' }))
     await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
 
-    const trimClass = '[text-box:trim-both_cap_alphabetic]'
-    expect(within(screen.getByRole('button', { name: 'Duration: Auto' })).getByText('Auto').className).toContain(trimClass)
+    const trigger = screen.getByRole('button', { name: /^Generation settings:/ })
+    expect(trigger.textContent).toContain('Settings')
+    expect(trigger.textContent).toContain('Auto')
+    expect(screen.getAllByRole('button', { name: /^Generation settings:/ })).toHaveLength(1)
 
     // The model label is the one pill label that truncates, and text-box trim
     // ends the box at the alphabetic baseline — under truncate's
@@ -281,38 +321,38 @@ describe('StudioComposer — the pills are the model’s own parameters', () => 
     // tails; measured 18.75px → 9.09px, see #467/#468). So it must carry a
     // normal line box instead of PILL_LABEL.
     const modelLabel = within(modelPill()).getByText(SEEDANCE).className
-    expect(modelLabel).not.toContain(trimClass)
+    expect(modelLabel).not.toContain('[text-box:trim-both_cap_alphabetic]')
     expect(modelLabel).toContain('truncate')
     expect(modelLabel).toContain('leading-normal')
   })
 
-  it('renders one pill per published parameter and nothing for an unknown model', async () => {
+  it('shows only published parameters and no settings for an unknown model', async () => {
     mountWith(catalog({
       video: [model(SEEDANCE, 'video'), model('kling/kling-v2-master', 'video'), model('ltx-video', 'video')],
     }, { video: SEEDANCE }))
     fireEvent.click(screen.getByRole('button', { name: 'Video' }))
     await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
 
-    expect(pill('Duration')).not.toBeNull()
-    expect(pill('Resolution')).not.toBeNull()
-    expect(pill('Aspect')).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'Audio on' })).not.toBeNull()
+    expect(setting('Duration')).not.toBeNull()
+    expect(setting('Resolution')).not.toBeNull()
+    expect(setting('Aspect')).not.toBeNull()
+    expect(within(openSettings()).getByRole('switch', { name: 'Audio' }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('button', { name: 'Add reference image' })).not.toBeNull()
 
     // kling v2-master publishes `resolution`, `audio` and `mode` as
     // `supported: false` — three controls that must disappear, not grey out.
     await chooseModel('kling/kling-v2-master')
-    expect(pill('Duration')).not.toBeNull()
-    expect(pill('Aspect')).not.toBeNull()
-    expect(pill('Resolution')).toBeNull()
-    expect(pill('Mode')).toBeNull()
-    expect(screen.queryByRole('button', { name: /^Audio (on|off)$/ })).toBeNull()
+    expect(setting('Duration')).not.toBeNull()
+    expect(setting('Aspect')).not.toBeNull()
+    expect(setting('Resolution')).toBeNull()
+    expect(setting('Mode')).toBeNull()
+    expect(within(openSettings()).queryByRole('switch', { name: 'Audio' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add reference image' })).toBeNull()
 
     // ltx-video publishes nothing at all: the model pill and no other control.
     await chooseModel('ltx-video')
     expect(screen.getByRole('button', { name: 'Model: ltx-video' })).not.toBeNull()
-    for (const label of ['Duration', 'Resolution', 'Aspect', 'Mode']) expect(pill(label)).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Generation settings:/ })).toBeNull()
   })
 
   it('lets the catalog’s live options beat the built-in fallback table', async () => {
@@ -331,8 +371,8 @@ describe('StudioComposer — the pills are the model’s own parameters', () => 
     fireEvent.click(screen.getByRole('button', { name: 'Video' }))
     await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
 
-    expect(pill('Duration')).not.toBeNull()
-    expect(pill('Resolution')).toBeNull()
+    expect(setting('Duration')).not.toBeNull()
+    expect(setting('Resolution')).toBeNull()
   })
 
   it('reconciles selected values onto the new model’s vocabulary', async () => {
@@ -340,13 +380,14 @@ describe('StudioComposer — the pills are the model’s own parameters', () => 
       video: [model(SEEDANCE, 'video'), model('fal-ai/veo3.1', 'video')],
     }, { video: SEEDANCE }))
     fireEvent.click(screen.getByRole('button', { name: 'Video' }))
-    await screen.findByRole('button', { name: 'Duration: Auto' })
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+    expect(setting('Duration')?.getAttribute('aria-label')).toBe('Duration: Auto')
 
     // 'auto' is not a veo duration, so it resets to veo's own default — never
     // carried over as a value the next provider would reject.
     await chooseModel('fal-ai/veo3.1')
-    await screen.findByRole('button', { name: 'Duration: 8s' })
-    expect(screen.getByRole('button', { name: 'Aspect: 16:9' })).not.toBeNull()
+    expect(setting('Duration')?.getAttribute('aria-label')).toBe('Duration: 8s')
+    expect(setting('Aspect')?.getAttribute('aria-label')).toBe('Aspect: 16:9')
   })
 })
 
@@ -667,7 +708,7 @@ describe('StudioComposer — image lane', () => {
     expect(modelRows(picker).map((row) => row.textContent?.replace(/^\?/, ''))).toEqual(['gpt-image-2'])
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    await openPill('Size')
+    await openSetting('Size')
     fireEvent.click(screen.getByRole('button', { name: 'Custom…' }))
     fireEvent.change(screen.getByLabelText('Custom width'), { target: { value: '1000' } })
     fireEvent.change(screen.getByLabelText('Custom height'), { target: { value: '1000' } })
@@ -677,7 +718,7 @@ describe('StudioComposer — image lane', () => {
     fireEvent.change(screen.getByLabelText('Custom width'), { target: { value: '1920' } })
     fireEvent.change(screen.getByLabelText('Custom height'), { target: { value: '1088' } })
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
-    await screen.findByRole('button', { name: 'Size: 1920×1088 · custom' })
+    expect(setting('Size')?.getAttribute('aria-label')).toBe('Size: 1920×1088 · custom')
   })
 })
 
@@ -689,21 +730,21 @@ describe('StudioComposer — audio lane', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Audio' }))
     await screen.findByRole('button', { name: 'Model: tts-1' })
 
-    expect(within(await openPill('Voice')).getAllByRole('menuitemradio')).toHaveLength(9)
+    expect(within(await openSetting('Voice')).getAllByRole('radio')).toHaveLength(9)
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(pill('Speed')).not.toBeNull()
+    expect(setting('Speed')).not.toBeNull()
 
     // Google's TTS takes six router-translated aliases and no speed at all.
     await chooseModel('gemini-2.5-flash-preview-tts')
-    expect(within(await openPill('Voice')).getAllByRole('menuitemradio')).toHaveLength(6)
+    expect(within(await openSetting('Voice')).getAllByRole('radio')).toHaveLength(6)
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(pill('Speed')).toBeNull()
+    expect(setting('Speed')).toBeNull()
 
     // Mistral publishes no enumerable voice list, so nothing is offered — the
     // provider's own default applies rather than an invented one.
     await chooseModel('voxtral-mini')
-    expect(pill('Voice')).toBeNull()
-    expect(pill('Speed')).toBeNull()
+    expect(setting('Voice')).toBeNull()
+    expect(setting('Speed')).toBeNull()
   })
 })
 
@@ -728,14 +769,14 @@ describe('StudioComposer — submitting', () => {
 
     // veo publishes the 's' suffix as part of the value.
     await chooseModel('fal-ai/veo3.1')
-    await screen.findByRole('button', { name: 'Duration: 8s' })
+    expect(setting('Duration')?.getAttribute('aria-label')).toBe('Duration: 8s')
     await submit('a launch teaser')
     await waitFor(() => expect(posted).toHaveLength(2))
     expect(posted[1]?.duration).toBe('8s')
 
     // fal's kling v3 publishes the same seconds as STRINGS.
     await chooseModel('fal-ai/kling-video/v3/pro/text-to-video')
-    await screen.findByRole('button', { name: 'Duration: 5s' })
+    expect(setting('Duration')?.getAttribute('aria-label')).toBe('Duration: 5s')
     await submit('a launch teaser')
     await waitFor(() => expect(posted).toHaveLength(3))
     expect(posted[2]?.duration).toBe('5')
@@ -759,7 +800,7 @@ describe('StudioComposer — submitting', () => {
     expect(screen.getAllByRole('textbox')).toHaveLength(1)
   })
 
-  it('puts every PILL_ORDER parameter rendered for every lane onto the wire', async () => {
+  it('puts every published setting rendered for every lane onto the wire', async () => {
     const image = model('gpt-image-2', 'image', {
       options: allPillOptions({
         size: { values: ['1024x1024'], default: '1024x1024' },
@@ -785,7 +826,7 @@ describe('StudioComposer — submitting', () => {
       { image: [image], video: [video], speech: [speech] },
       { image: image.id, video: video.id, speech: speech.id },
     ))
-    const wireFieldByPill: Record<string, string> = {
+    const wireFieldBySetting: Record<string, string> = {
       Size: 'size',
       Quality: 'quality',
       Count: 'n',
@@ -805,25 +846,20 @@ describe('StudioComposer — submitting', () => {
       if (lane !== 'Image') fireEvent.click(screen.getByRole('button', { name: lane }))
       await screen.findByRole('button', { name: `Model: ${modelId}` })
 
-      const optionPills = Array.from(document.querySelectorAll<HTMLButtonElement>(
-        '.studio-band button[title]:not([aria-label^="Model:"]):not([title="Audio"])',
-      ))
-      for (const optionPill of optionPills) {
-        const svgs = optionPill.querySelectorAll('svg')
-        const label = optionPill.querySelector('span')
-        expect(svgs).toHaveLength(2)
-        const leadingIcon = svgs.item(0)
-        if (!leadingIcon || !label) throw new Error(`${optionPill.title} trigger is missing its icon or label`)
-        expect(leadingIcon.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
-      }
+      const panel = openSettings()
+      const more = within(panel).queryByRole('button', { name: /^More settings/ })
+      if (more) fireEvent.click(more)
+      const settingRows = within(panel).getAllByRole('button').filter((row) =>
+        /^[^:]+: /.test(row.getAttribute('aria-label') ?? ''),
+      )
 
       await submit(`all ${lane.toLowerCase()} parameters`)
       await waitFor(() => expect(posted).toHaveLength(lane === 'Image' ? 1 : lane === 'Video' ? 2 : 3))
 
       const body = posted.at(-1) ?? {}
-      for (const optionPill of optionPills) {
-        const label = optionPill.title
-        const wireField = wireFieldByPill[label]
+      for (const row of settingRows) {
+        const label = row.getAttribute('aria-label')?.split(': ')[0] ?? ''
+        const wireField = wireFieldBySetting[label]
         if (!wireField) throw new Error(`${label} has no request-body mapping`)
         expect(body, `${label} did not reach ${wireField}`).toHaveProperty(wireField)
       }

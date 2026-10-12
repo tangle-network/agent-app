@@ -27926,6 +27926,22 @@ interface GenerationHistoryState
 ({ className }: { className?: string | undefined; }) => Element
 ```
 
+### `GenerationSetting`
+
+`interface`
+
+```ts
+interface GenerationSetting
+```
+
+### `GenerationSettings`
+
+`function` — The model's current defaults and optional parameters in one compact menu.
+
+```ts
+({ settings, bandRef, resetKey, }: { settings: readonly GenerationSetting[]; bandRef: RefObject<HTMLDivElement | null>;…
+```
+
 ### `MediaTile`
 
 `function`
