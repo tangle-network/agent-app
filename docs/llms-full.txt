@@ -19490,6 +19490,14 @@ interface CheckpointWorkspaceStore
 (opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>
 ```
 
+### `createOpenAIResponsesTurn`
+
+`function` — Build a `streamTurn` on the OpenAI Responses API (`POST /responses`, streamed), for OpenAI models whose reasoning reaches a caller only there, as `response.reasoning_summary_text.delta` events.
+
+```ts
+(opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>
+```
+
 ### `createRouterProtectedModelPort`
 
 `function` — Bind one turn to Router's atomic grant ledger without exposing its parent key.
@@ -19568,6 +19576,14 @@ number
 
 ```ts
 (m: RouterModel) => boolean
+```
+
+### `isOpenAIResponsesModel`
+
+`function` — OpenAI models answer reasoning summaries only on the Responses API; chat completions carry none.
+
+```ts
+(model: string) => boolean
 ```
 
 ### `isTangleBillingEnforcementDisabled`
@@ -20136,6 +20152,14 @@ interface ToolLoopResult
 
 ```ts
 type ToolLoopStopReason
+```
+
+### `toResponsesInput`
+
+`function` — The chat-completions history the tool loop keeps, as Responses `instructions` and `input` items.
+
+```ts
+(messages: ToolLoopMessage[]) => { instructions?: string | undefined; input: Record<string, unknown>[]; }
 ```
 
 ### `trimOrNull`
@@ -25855,12 +25879,36 @@ interface ComposeSkillsForHarnessInput
 interface SkillEntry
 ```
 
+### `SkillSupportFile`
+
+`interface` — A file that rides BESIDE a skill entry (kit sources, references, pinned requirements — anything the SKILL.md tells the agent to read or run).
+
+```ts
+interface SkillSupportFile
+```
+
+### `skillSupportFileMounts`
+
+`function` — Inline file mounts placing a skill's support files beside its entry on `harness`: `<skillDir>/<skillId>/<path>`.
+
+```ts
+(harness: Harness, skillId: string, files: readonly SkillSupportFile[]) => AgentProfileFileMount[]
+```
+
 ### `unsupportedSkillHarnesses`
 
 `function` — Filter `harnesses` down to those with no mounted skill dir (deduped, first-seen order preserved) — the set that must fall back to `inline` delivery, or that a caller should warn about before offering…
 
 ```ts
 (harnesses: Iterable<Harness>) => Harness[]
+```
+
+### `withSkillSupportFiles`
+
+`function` — Attach a skill's support files to `profile` for `harness`, idempotently.
+
+```ts
+<P extends { resources?: AgentProfile["resources"]; }>(profile: P, harness: Harness, skillId: string, files: readonly S…
 ```
 
 

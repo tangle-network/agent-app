@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-103 exports.
+106 exports.
 
 ### `AnySurfaceKind`
 
@@ -118,6 +118,14 @@ interface CheckpointWorkspaceStore
 (opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>
 ```
 
+### `createOpenAIResponsesTurn`
+
+`function` — Build a `streamTurn` on the OpenAI Responses API (`POST /responses`, streamed), for OpenAI models whose reasoning reaches a caller only there, as `response.reasoning_summary_text.delta` events.
+
+```ts
+(opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>
+```
+
 ### `createRouterProtectedModelPort`
 
 `function` — Bind one turn to Router's atomic grant ledger without exposing its parent key.
@@ -196,6 +204,14 @@ number
 
 ```ts
 (m: RouterModel) => boolean
+```
+
+### `isOpenAIResponsesModel`
+
+`function` — OpenAI models answer reasoning summaries only on the Responses API; chat completions carry none.
+
+```ts
+(model: string) => boolean
 ```
 
 ### `isTangleBillingEnforcementDisabled`
@@ -764,6 +780,14 @@ interface ToolLoopResult
 
 ```ts
 type ToolLoopStopReason
+```
+
+### `toResponsesInput`
+
+`function` — The chat-completions history the tool loop keeps, as Responses `instructions` and `input` items.
+
+```ts
+(messages: ToolLoopMessage[]) => { instructions?: string | undefined; input: Record<string, unknown>[]; }
 ```
 
 ### `trimOrNull`

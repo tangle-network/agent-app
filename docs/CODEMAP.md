@@ -92,7 +92,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./rollout`](api/rollout.md) | 13 | `signoff` |
 | [`./rollout/cli`](api/rollout-cli.md) | 3 | `signoff` |
 | [`./rollout/d1`](api/rollout-d1.md) | 5 | `signoff` |
-| [`./runtime`](api/runtime.md) | 103 | `tools` |
+| [`./runtime`](api/runtime.md) | 106 | `tools` |
 | [`./runtime/router-turn`](api/runtime-router-turn.md) | 26 | `tools` |
 | [`./sandbox`](api/sandbox.md) | 255 | `harness`, `profile`, `runtime`, `tools` |
 | [`./sequences`](api/sequences.md) | 111 | `tools`, `web` |
@@ -104,7 +104,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./signoff/proof`](api/signoff-proof.md) | 22 | — |
 | [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | — |
 | [`./skills`](api/skills.md) | 27 | — |
-| [`./skills-placement`](api/skills-placement.md) | 6 | `harness`, `skills` |
+| [`./skills-placement`](api/skills-placement.md) | 9 | `harness`, `skills` |
 | [`./spend`](api/spend.md) | 60 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
@@ -938,11 +938,11 @@ Depends on: `signoff`
 
 ## `./runtime`
 
-Source: `src/runtime/index.ts` · 103 exports
+Source: `src/runtime/index.ts` · 106 exports
 
 Depends on: `tools`
 
-`AnySurfaceKind`, `AppToolLoopOptions`, `asksForLanguage`, `budgetTurnKnowledge`, `buildCatalog`, `CatalogModel`, `catalogModelForId`, `CertifiedDelivery`, `CertifiedDeliveryConfig`, `CheckpointWorkspaceStore`, `composeRouterTurnPrompt`, `createCertifiedDelivery`, `createOpenAICompatCompletionTurn`, `createOpenAICompatStreamTurn`, `createRouterProtectedModelPort`, `createSurfaceRegistry`, `createTangleRouterModelConfig`, `CreateTangleRouterModelConfigOptions`, `DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR`, `DEFAULT_TANGLE_ROUTER_BASE_URL`, `defineSurfaceKind`, `DURABLE_HOP_BUDGET_MS`, `fetchModelCatalog`, `isChatCapableModel`, `isTangleBillingEnforcementDisabled`, `isTangleExecutionKeyError`, `LoopAssistantToolCall`, `LoopEvent`, `LoopMessage`, `LoopToolCall`, `MAX_RECOMMENDED_MODELS`, `mergeSurfaceOverlay`, `ModelCatalog`, `normalizeModelId`, `OpenAICompatServedModel`, `OpenAICompatStreamTurnOptions`, `OpenAIStreamChunk`, `placeRouterTurn`, `ProtectedModelSettlementError`, `ProtectedRouterTurnOptions`, `ProtectedRouterTurnOutcome`, `replyLanguageInstruction`, `resolveCatalogModelId`, `ResolvedAgentProfile`, `ResolvedTangleExecutionKey`, `ResolveModelOptions`, `resolveTangleDevOrUserKey`, `ResolveTangleDevOrUserKeyOptions`, `resolveTangleExecutionEnvironment`, `resolveTangleModelConfig`, `resolveUserTangleExecutionKey`, `resolveUserTangleExecutionKeyForUser`, `ResolveUserTangleExecutionKeyForUserOptions`, `ResolveUserTangleExecutionKeyOptions`, `routerFunctionName`, `RouterModel`, `RouterProtectedModelPortOptions`, `RouterProtectedModelSettlement`, `RouterTurnContinuation`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnGrant`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnPlacementInput`, `RouterTurnSettlement`, `RouterTurnTool`, `RouterTurnToolContext`, `RouterTurnToolEvent`, `RouterTurnToolOutcome`, `runAppToolLoop`, `runProtectedRouterTurn`, `runRouterTurn`, `sortModelsByFreshness`, `streamAppToolLoop`, `StreamAppToolLoopOptions`, `StreamLoopYield`, `SurfaceKindDefinition`, `SurfaceMcpServer`, `SurfaceMergeBase`, `SurfaceOverlay`, `SurfacePermissionValue`, `SurfaceRegistry`, `TangleBillingEnforcementOptions`, `TangleExecutionEnvironment`, `TangleExecutionKeyError`, `TangleExecutionKeyErrorCode`, `tangleExecutionKeyHttpError`, `TangleExecutionKeyHttpError`, `TangleExecutionKeySource`, `TangleModelConfig`, `toLoopEvents`, `ToolLoopEvent`, `ToolLoopResult`, `ToolLoopStopReason`, `trimOrNull`, `turnCheckpointPath`, `TurnCheckpointStore`, `TurnKnowledgeBudget`, `TurnKnowledgeFile`, `turnKnowledgeInstructions`, `workspaceKnowledgeForTurn`, `workspaceTurnCheckpoints`
+`AnySurfaceKind`, `AppToolLoopOptions`, `asksForLanguage`, `budgetTurnKnowledge`, `buildCatalog`, `CatalogModel`, `catalogModelForId`, `CertifiedDelivery`, `CertifiedDeliveryConfig`, `CheckpointWorkspaceStore`, `composeRouterTurnPrompt`, `createCertifiedDelivery`, `createOpenAICompatCompletionTurn`, `createOpenAICompatStreamTurn`, `createOpenAIResponsesTurn`, `createRouterProtectedModelPort`, `createSurfaceRegistry`, `createTangleRouterModelConfig`, `CreateTangleRouterModelConfigOptions`, `DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR`, `DEFAULT_TANGLE_ROUTER_BASE_URL`, `defineSurfaceKind`, `DURABLE_HOP_BUDGET_MS`, `fetchModelCatalog`, `isChatCapableModel`, `isOpenAIResponsesModel`, `isTangleBillingEnforcementDisabled`, `isTangleExecutionKeyError`, `LoopAssistantToolCall`, `LoopEvent`, `LoopMessage`, `LoopToolCall`, `MAX_RECOMMENDED_MODELS`, `mergeSurfaceOverlay`, `ModelCatalog`, `normalizeModelId`, `OpenAICompatServedModel`, `OpenAICompatStreamTurnOptions`, `OpenAIStreamChunk`, `placeRouterTurn`, `ProtectedModelSettlementError`, `ProtectedRouterTurnOptions`, `ProtectedRouterTurnOutcome`, `replyLanguageInstruction`, `resolveCatalogModelId`, `ResolvedAgentProfile`, `ResolvedTangleExecutionKey`, `ResolveModelOptions`, `resolveTangleDevOrUserKey`, `ResolveTangleDevOrUserKeyOptions`, `resolveTangleExecutionEnvironment`, `resolveTangleModelConfig`, `resolveUserTangleExecutionKey`, `resolveUserTangleExecutionKeyForUser`, `ResolveUserTangleExecutionKeyForUserOptions`, `ResolveUserTangleExecutionKeyOptions`, `routerFunctionName`, `RouterModel`, `RouterProtectedModelPortOptions`, `RouterProtectedModelSettlement`, `RouterTurnContinuation`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnGrant`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnPlacementInput`, `RouterTurnSettlement`, `RouterTurnTool`, `RouterTurnToolContext`, `RouterTurnToolEvent`, `RouterTurnToolOutcome`, `runAppToolLoop`, `runProtectedRouterTurn`, `runRouterTurn`, `sortModelsByFreshness`, `streamAppToolLoop`, `StreamAppToolLoopOptions`, `StreamLoopYield`, `SurfaceKindDefinition`, `SurfaceMcpServer`, `SurfaceMergeBase`, `SurfaceOverlay`, `SurfacePermissionValue`, `SurfaceRegistry`, `TangleBillingEnforcementOptions`, `TangleExecutionEnvironment`, `TangleExecutionKeyError`, `TangleExecutionKeyErrorCode`, `tangleExecutionKeyHttpError`, `TangleExecutionKeyHttpError`, `TangleExecutionKeySource`, `TangleModelConfig`, `toLoopEvents`, `ToolLoopEvent`, `ToolLoopResult`, `ToolLoopStopReason`, `toResponsesInput`, `trimOrNull`, `turnCheckpointPath`, `TurnCheckpointStore`, `TurnKnowledgeBudget`, `TurnKnowledgeFile`, `turnKnowledgeInstructions`, `workspaceKnowledgeForTurn`, `workspaceTurnCheckpoints`
 
 [Full API →](api/runtime.md)
 
@@ -1044,11 +1044,11 @@ Source: `src/skills/index.ts` · 27 exports
 
 ## `./skills-placement`
 
-Source: `src/skills-placement/index.ts` · 6 exports
+Source: `src/skills-placement/index.ts` · 9 exports
 
 Depends on: `harness`, `skills`
 
-`ComposedSkills`, `composeSkillsForHarness`, `ComposeSkillsForHarnessInput`, `resolveSkillDir`, `SkillEntry`, `unsupportedSkillHarnesses`
+`ComposedSkills`, `composeSkillsForHarness`, `ComposeSkillsForHarnessInput`, `resolveSkillDir`, `SkillEntry`, `SkillSupportFile`, `skillSupportFileMounts`, `unsupportedSkillHarnesses`, `withSkillSupportFiles`
 
 [Full API →](api/skills-placement.md)
 

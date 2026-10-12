@@ -15148,6 +15148,12 @@
           "doc": "Build a `streamTurn` that calls an OpenAI-compatible `/chat/completions` endpoint (Tangle Router / tcloud / any compat provider) with `stream: true` and yields `LoopEvent`s via {@link toLoopEvents}."
         },
         {
+          "name": "createOpenAIResponsesTurn",
+          "kind": "function",
+          "signature": "(opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>",
+          "doc": "Build a `streamTurn` on the OpenAI Responses API (`POST /responses`, streamed), for OpenAI models whose reasoning reaches a caller only there, as `response.reasoning_summary_text.delta` events."
+        },
+        {
           "name": "createRouterProtectedModelPort",
           "kind": "function",
           "signature": "(options: RouterProtectedModelPortOptions) => AgentCandidateModelPort",
@@ -15206,6 +15212,12 @@
           "kind": "function",
           "signature": "(m: RouterModel) => boolean",
           "doc": "Can this router entry serve a text chat turn?"
+        },
+        {
+          "name": "isOpenAIResponsesModel",
+          "kind": "function",
+          "signature": "(model: string) => boolean",
+          "doc": "OpenAI models answer reasoning summaries only on the Responses API; chat completions carry none."
         },
         {
           "name": "isTangleBillingEnforcementDisabled",
@@ -15632,6 +15644,12 @@
           "kind": "type",
           "signature": "type ToolLoopStopReason",
           "doc": "Why the loop stopped."
+        },
+        {
+          "name": "toResponsesInput",
+          "kind": "function",
+          "signature": "(messages: ToolLoopMessage[]) => { instructions?: string | undefined; input: Record<string, unknown>[]; }",
+          "doc": "The chat-completions history the tool loop keeps, as Responses `instructions` and `input` items."
         },
         {
           "name": "trimOrNull",
@@ -19990,10 +20008,28 @@
           "doc": "A hand-authored, tier-gated installable skill."
         },
         {
+          "name": "SkillSupportFile",
+          "kind": "interface",
+          "signature": "interface SkillSupportFile",
+          "doc": "A file that rides BESIDE a skill entry (kit sources, references, pinned requirements — anything the SKILL.md tells the agent to read or run)."
+        },
+        {
+          "name": "skillSupportFileMounts",
+          "kind": "function",
+          "signature": "(harness: Harness, skillId: string, files: readonly SkillSupportFile[]) => AgentProfileFileMount[]",
+          "doc": "Inline file mounts placing a skill's support files beside its entry on `harness`: `<skillDir>/<skillId>/<path>`."
+        },
+        {
           "name": "unsupportedSkillHarnesses",
           "kind": "function",
           "signature": "(harnesses: Iterable<Harness>) => Harness[]",
           "doc": "Filter `harnesses` down to those with no mounted skill dir (deduped, first-seen order preserved) — the set that must fall back to `inline` delivery, or that a caller should warn about before offering…"
+        },
+        {
+          "name": "withSkillSupportFiles",
+          "kind": "function",
+          "signature": "<P extends { resources?: AgentProfile[\"resources\"]; }>(profile: P, harness: Harness, skillId: string, files: readonly S…",
+          "doc": "Attach a skill's support files to `profile` for `harness`, idempotently."
         }
       ]
     },
