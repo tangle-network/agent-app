@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.162
+
+- fix(vault): preserve persisted baselines and guard saves (#1098)
+
 ## 0.60.161
 
 - feat(scaffold): ship safe external-agent onboarding and operator access (#1096)
