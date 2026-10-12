@@ -208,6 +208,54 @@ describe('runRouterTurn', () => {
     expect(placed.failure).toBeUndefined()
   })
 
+  it('places the model actually sent, even when the optional placement hint is absent or stale', async () => {
+    const profile = { name: 'Support', model: { default: 'profile/model' } }
+    for (const requestedModel of [undefined, 'profile/model']) {
+      const { fetchImpl, calls } = router()
+      const outcome = await runRouterTurn({ apiKey: 'k', model: 'other/model', fetchImpl,
+        systemPrompt: 's', userMessage: 'u', placement: { profile, requestedModel } })
+      expect(calls).not.toHaveBeenCalled()
+      expect(outcome).toMatchObject({ placement: { chosen: 'sandbox' }, failure: { code: 'placement_sandbox' } })
+    }
+  })
+
+  it('refuses a fallback that needs another placement after an HTTP failure or blank reply', async () => {
+    for (const first of [new Response('unavailable', { status: 503 }), sse([])]) {
+      const { fetchImpl, requests } = router(first, sse([text('Must not run.')]))
+      const outcome = await runRouterTurn({ apiKey: 'k', model: 'primary/model', fetchImpl,
+        systemPrompt: 's', userMessage: 'u', fallbackModels: ['other/model'],
+        placement: { profile: { name: 'Support', model: { default: 'primary/model' } } } })
+      expect(requests.map(request => request.body.model)).toEqual(['primary/model'])
+      expect(outcome).toMatchObject({ placement: { chosen: 'inference' },
+        failure: { code: 'placement_fallback_refused' } })
+    }
+  })
+
+  it('keeps permitted same-model retries and ignores disabled fallback models', async () => {
+    const placement = { profile: { name: 'Support', model: { default: 'm' } } }
+    const same = router(new Response('down', { status: 503 }), sse([text('Recovered.')]))
+    expect(await runRouterTurn({ apiKey: 'k', model: 'm', placement, fetchImpl: same.fetchImpl,
+      systemPrompt: 's', userMessage: 'u', fallbackModels: ['m'] }))
+      .toMatchObject({ text: 'Recovered.', placement: { chosen: 'inference' } })
+    expect(same.requests.map(request => request.body.model)).toEqual(['m', 'm'])
+    const disabled = router(new Response('down', { status: 503 }))
+    expect(await runRouterTurn({ apiKey: 'k', model: 'm', placement, fetchImpl: disabled.fetchImpl,
+      systemPrompt: 's', userMessage: 'u', repeat: false, fallbackModels: ['other/model'] }))
+      .toMatchObject({ placement: { chosen: 'inference' }, failure: { code: 'model_http_503' } })
+    expect(disabled.requests).toHaveLength(1)
+  })
+
+  it('retains the chosen placement when its model credential is missing', async () => {
+    for (const tools of [[], [createTask]]) {
+      const { fetchImpl, calls } = router()
+      const outcome = await runRouterTurn({ apiKey: '', model: 'm', fetchImpl,
+        systemPrompt: 's', userMessage: 'u', tools, placement: { profile: { name: 'Support', model: { default: 'm' } } } })
+      expect(calls).not.toHaveBeenCalled()
+      expect(outcome).toMatchObject({ placement: { chosen: tools.length ? 'loop' : 'inference' },
+        failure: { code: 'router_unconfigured' } })
+    }
+  })
+
   it('streams a tool\'s typed side events in order before its result, and records them with the turn', async () => {
     const graph: RouterTurnTool = {
       name: 'graph.edit', description: 'Edit the system map.', inputSchema: { type: 'object', properties: {} },
@@ -428,8 +476,8 @@ describe('composeRouterTurnPrompt', () => {
   it('joins the profile prompt, instructions and context, naming tools as the model calls them', () => {
     expect(routerFunctionName('workspace.member.language.read')).toBe('workspace_member_language_read')
     expect(composeRouterTurnPrompt(
-      { prompt: { systemPrompt: 'You are Pablo.', instructions: ['Use staff.task.create for tasks.', 'Use staff.tasks to read them.'] } },
+      { prompt: { systemPrompt: 'You are Pablo.', appendSystemPrompt: 'Keep staff.tasks private.', instructions: ['Use staff.task.create for tasks.', 'Use staff.tasks to read them.'] } },
       { context: ['Current time: Sunday.'], toolNames: ['staff.tasks', 'staff.task.create'] },
-    )).toBe(`You are Pablo.\n\nUse staff_task_create for tasks.\n\nUse staff_tasks to read them.\n\n${replyLanguageInstruction()}\n\nCurrent time: Sunday.`)
+    )).toBe(`You are Pablo.\n\nKeep staff_tasks private.\n\nUse staff_task_create for tasks.\n\nUse staff_tasks to read them.\n\n${replyLanguageInstruction()}\n\nCurrent time: Sunday.`)
   })
 })

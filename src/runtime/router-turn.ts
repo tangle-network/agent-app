@@ -71,7 +71,7 @@ export type RouterTurnEvent =
 
 export interface RouterTurnFailure {
   /** `model_http_<status>`, `model_unavailable`, `model_empty`, `turn_<stopReason>`, `turn_aborted`,
-   *  `turn_tool_limit` or `router_unconfigured`; under a protected grant also the `grant_*` and
+   *  `turn_tool_limit`, `router_unconfigured` or `placement_fallback_refused`; under a protected grant also the `grant_*` and
    *  `settlement_*` codes of `./protected-router-turn`. */
   code: string
   status?: number
@@ -198,7 +198,8 @@ export interface RouterTurnOptions {
   /** Replace the text the model reads for one tool result. `toolName` is the app's name. */
   renderToolResult?: (toolName: string, outcome: RouterTurnToolOutcome) => string
   /**
-   * Place the turn before any model call. A turn placed in the sandbox returns at once
+   * Place the turn before any model call, using `model` as the executed model rather than
+   * the optional `requestedModel` hint. A turn placed in the sandbox returns at once
    * with `placement` and failure `placement_sandbox`, so the app runs it there instead.
    */
   placement?: Omit<RouterTurnPlacementInput, 'toolNames'>
@@ -238,12 +239,12 @@ export function routerFunctionName(name: string): string {
 }
 
 /**
- * The lean system prompt for a Router turn: the profile's system prompt and
+ * The lean system prompt for a Router turn: the profile's system prompt, appended prompt and
  * instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function
  * names the model actually calls.
  */
 export function composeRouterTurnPrompt(
-  profile: { prompt?: { systemPrompt?: string; instructions?: readonly string[] } },
+  profile: { prompt?: { systemPrompt?: string; appendSystemPrompt?: string; instructions?: readonly string[] } },
   options: {
     context?: readonly string[]
     toolNames?: readonly string[]
@@ -252,7 +253,7 @@ export function composeRouterTurnPrompt(
   } = {},
 ): string {
   const knowledge = options.knowledge ? turnKnowledgeInstructions(options.knowledge.files, { readTool: options.knowledge.readTool }) : []
-  const text = [profile.prompt?.systemPrompt ?? '', ...(profile.prompt?.instructions ?? []), ...knowledge,
+  const text = [profile.prompt?.systemPrompt ?? '', profile.prompt?.appendSystemPrompt ?? '', ...(profile.prompt?.instructions ?? []), ...knowledge,
     replyLanguageInstruction(), ...(options.context ?? [])]
     .filter(part => part.trim()).join('\n\n')
   return [...(options.toolNames ?? [])].sort((a, b) => b.length - a.length)
@@ -285,7 +286,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const lastUser = options.continueFrom?.messages.filter(message => message.role === 'user').at(-1)?.content
   const currentUserMessage = options.continueFrom ? (typeof lastUser === 'string' ? lastUser : '') : options.userMessage
   const placement = options.placement
-    ? placeRouterTurn({ ...options.placement, toolNames: (options.tools ?? []).map(tool => tool.name) })
+    ? placeRouterTurn({ ...options.placement, requestedModel: options.model, toolNames: (options.tools ?? []).map(tool => tool.name) })
     : undefined
   if (placement?.chosen === 'sandbox') {
     return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [], placement,
@@ -294,6 +295,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const { apiKey } = options
   if (!apiKey) {
     return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [],
+      ...(placement ? { placement } : {}),
       failure: { code: 'router_unconfigured', message: 'The model credential is not configured.' } }
   }
   const emit = options.onEvent ?? (() => {})
@@ -375,7 +377,17 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const deadline = Date.now() + (options.budgetMs ?? DEFAULT_BUDGET_MS)
   const callIdOf = (id: string | undefined, toolName: string) => id ?? `${toolName}-${started.size}`
 
-  const run = async (model: string): Promise<ToolLoopStopReason | 'tool_limit'> => {
+  let placementFailure: RouterTurnFailure | undefined
+  const run = async (model: string): Promise<ToolLoopStopReason | 'tool_limit' | 'placement_refused'> => {
+    // A safe model retry still cannot change execution tier after this turn began.
+    if (placement && options.placement && model !== options.model) {
+      const next = placeRouterTurn({ ...options.placement, requestedModel: model,
+        toolNames: (options.tools ?? []).map(tool => tool.name) })
+      if (next.chosen !== placement.chosen) {
+        placementFailure = { code: 'placement_fallback_refused', message: `The fallback model cannot run in this turn's placement: ${next.reason}` }
+        return 'placement_refused'
+      }
+    }
     const streamTurn = streamTurnFor(model)
     for await (const step of streamAppToolLoop<LoopEvent>({
       systemPrompt: options.systemPrompt,
@@ -473,7 +485,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const repeat = options.repeat !== false
   // The safe repeat walks this chain: the next fallback model, or the same model once.
   const repeats = !repeat ? [] : options.fallbackModels?.length ? [...options.fallbackModels] : [options.model]
-  let stop: ToolLoopStopReason | 'tool_limit'
+  let stop: ToolLoopStopReason | 'tool_limit' | 'placement_refused'
   try {
     try {
       stop = await run(options.model)
@@ -492,6 +504,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       ? { code: `model_http_${status}`, status, message: 'The model service did not answer.', ...(detail ? { detail } : {}) }
       : { code: 'model_unavailable', message: 'The model service did not answer.' })
   }
+  if (placementFailure) return outcome(placementFailure)
   if (stop === 'deadline' && checkpoint) {
     return { ...outcome(), continuation: { messages: checkpoint,
       hops: (options.continueFrom?.hops ?? 0) + 1,
@@ -505,6 +518,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     const next = repeats.shift()
     if (toolsRan === 0 && next !== undefined) {
       try { stop = await run(next) } catch { stop = 'completed' }
+      if (placementFailure) return outcome(placementFailure)
       if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
     }
     if (!segments.some(part => part.trim())) {

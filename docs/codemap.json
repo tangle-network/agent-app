@@ -15222,8 +15222,8 @@
         {
           "name": "composeRouterTurnPrompt",
           "kind": "function",
-          "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
-          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…"
+          "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; appendSystemPrompt?: string | undefined; instructions?: reado…",
+          "doc": "The lean system prompt for a Router turn: the profile's system prompt, appended prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function nam…"
         },
         {
           "name": "createCertifiedDelivery",
@@ -15826,8 +15826,8 @@
         {
           "name": "composeRouterTurnPrompt",
           "kind": "function",
-          "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
-          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…"
+          "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; appendSystemPrompt?: string | undefined; instructions?: reado…",
+          "doc": "The lean system prompt for a Router turn: the profile's system prompt, appended prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function nam…"
         },
         {
           "name": "DURABLE_HOP_BUDGET_MS",
