@@ -4,7 +4,7 @@
 
 Source: `src/signoff/index.ts`
 
-72 exports.
+79 exports.
 
 ### `checkShellAlignment`
 
@@ -84,6 +84,22 @@ Source: `src/signoff/index.ts`
 
 ```ts
 interface CopyBlock
+```
+
+### `createRequestMeter`
+
+`function`
+
+```ts
+(budget?: number, sleep?: (ms: number) => Promise<void>) => RequestMeter
+```
+
+### `formatNetworkCount`
+
+`function`
+
+```ts
+(count: NetworkCount) => string
 ```
 
 ### `formatShellAlignmentReport`
@@ -182,6 +198,22 @@ interface LoadedSignoffConfig
 interface LoadSignoffConfigOptions
 ```
 
+### `meterContext`
+
+`function` — Abort the zone's speculation rules and count every request the context sends.
+
+```ts
+(context: BrowserContext, meter: RequestMeter) => Promise<void>
+```
+
+### `NetworkCount`
+
+`interface`
+
+```ts
+interface NetworkCount
+```
+
 ### `oklchL`
 
 `function` — OKLab lightness of an sRGB color, ×100 (0 black … 100 white).
@@ -204,6 +236,30 @@ interface LoadSignoffConfigOptions
 
 ```ts
 (argv: readonly string[]) => SurfaceLadderOptions & { readonly jsonPath?: string | undefined; }
+```
+
+### `QUIET_CHROMIUM_ARGS`
+
+`const` — Chromium flags that stop prerender and speculative prefetch of linked pages.
+
+```ts
+readonly string[]
+```
+
+### `REQUEST_BUDGET_PER_10S`
+
+`const` — Requests per 10 s a check may send; a quarter of the shared zone limit.
+
+```ts
+250
+```
+
+### `RequestMeter`
+
+`interface`
+
+```ts
+interface RequestMeter
 ```
 
 ### `Rgb`
@@ -576,7 +632,7 @@ interface WorkspaceSurfaceReport
 
 ### `WorkspaceSurfaceSample`
 
-`interface` — Workspace surface: every route of a workspace renders exactly one shared floating panel (sandbox-ui `WorkspaceSurface`, or `WorkspaceLayout` with `surface="inset"`), and that panel's first row is an…
+`interface`
 
 ```ts
 interface WorkspaceSurfaceSample

@@ -25,6 +25,8 @@
  * they are unit-tested without a browser.
  */
 
+import { createRequestMeter, meterContext, QUIET_CHROMIUM_ARGS, type NetworkCount } from './browser-budget'
+
 /** sRGB channels 0–255. */
 export type Rgb = readonly [number, number, number]
 /** sRGB channels 0–255 plus alpha 0–1. */
@@ -332,6 +334,8 @@ export interface SurfacePageSummary {
 }
 
 export interface SurfaceLadderReport {
+  /** Requests the run sent and its busiest 10 s (see browser-budget.ts). */
+  readonly network?: NetworkCount
   readonly samples: readonly SurfaceSample[]
   readonly pages: readonly SurfacePageSummary[]
   readonly findings: readonly SurfaceFinding[]
@@ -363,7 +367,8 @@ export async function checkSurfaceLadder(options: SurfaceLadderOptions): Promise
   const { chromium } = await import('playwright')
   const widths = options.widths ?? [1440, 390]
   const themes = options.themes ?? ['light', 'dark']
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ args: [...QUIET_CHROMIUM_ARGS] })
+  const meter = createRequestMeter()
   const samples: SurfaceSample[] = []
   const findings: SurfaceFinding[] = []
   try {
@@ -378,8 +383,10 @@ export async function checkSurfaceLadder(options: SurfaceLadderOptions): Promise
         if (options.themeScript) {
           await context.addInitScript({ content: `(() => { const theme = ${JSON.stringify(theme)}; ${options.themeScript} })()` })
         }
+        await meterContext(context, meter)
         const page = await context.newPage()
         for (const route of options.routes) {
+          await meter.pace()
           await page.goto(new URL(route, options.baseUrl).toString(), { waitUntil: 'domcontentloaded' })
           await page.waitForSelector(options.readySelector ?? '[data-shell-header]', { state: 'visible', timeout: 15_000 }).catch(() => undefined)
           await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => undefined)
@@ -406,7 +413,7 @@ export async function checkSurfaceLadder(options: SurfaceLadderOptions): Promise
   }
   const countsByRule: Record<SurfaceRule, number> = { 'card-step': 0, 'field-step': 0, 'field-border': 0, 'card-copy': 0 }
   for (const f of findings) countsByRule[f.rule] += 1
-  return { samples, pages: samples.map((s) => summarizeSurfacePage(s, findings)), findings, countsByRule }
+  return { samples, pages: samples.map((s) => summarizeSurfacePage(s, findings)), findings, countsByRule, network: meter.count() }
 }
 
 export function formatSurfaceLadderReport(report: SurfaceLadderReport): string {
