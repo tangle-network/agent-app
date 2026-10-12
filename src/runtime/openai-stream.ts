@@ -324,7 +324,7 @@ async function* completionAsChunk(
 
 async function httpFailure(res: Response, kind: 'stream' | 'completion' | 'responses'): Promise<Error> {
   const text = res.body ? await res.text().catch(() => '') : ''
-  const error = new Error(`OpenAI-compat ${kind} failed (HTTP ${res.status})${text ? `: ${text.slice(0, 200)}` : ''}`)
+  const error = new Error(`OpenAI-compat ${kind} failed (HTTP ${res.status})${text ? `: ${text.slice(0, 1000)}` : ''}`)
   // Stamp the NUMERIC status. `isUpstreamUnavailable` (`/model-resolution`)
   // reads a numeric field first and prose only as a backstop, and a
   // Cloudflare EDGE 502 gives it nothing else to read: `content-type:
