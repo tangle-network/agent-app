@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_130 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -89,6 +89,9 @@ _130 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./record`](api/record.md) | 33 | — |
 | [`./record/drizzle`](api/record-drizzle.md) | 22 | — |
 | [`./redact`](api/redact.md) | 15 | — |
+| [`./rollout`](api/rollout.md) | 13 | `signoff` |
+| [`./rollout/cli`](api/rollout-cli.md) | 3 | `signoff` |
+| [`./rollout/d1`](api/rollout-d1.md) | 5 | `signoff` |
 | [`./runtime`](api/runtime.md) | 103 | `tools` |
 | [`./runtime/router-turn`](api/runtime-router-turn.md) | 26 | `tools` |
 | [`./sandbox`](api/sandbox.md) | 255 | `harness`, `profile`, `runtime`, `tools` |
@@ -902,6 +905,36 @@ Source: `src/redact/index.ts` · 15 exports
 `buildRedactedDocument`, `BuildRedactedDocumentOptions`, `DEFAULT_REDACTION_PATTERNS`, `detectSpans`, `maskSpans`, `RedactedDocSegment`, `RedactedDocument`, `redactErrorMessage`, `redactForIngestion`, `RedactForIngestionOptions`, `RedactionPattern`, `RedactionSpan`, `RevealResult`, `revealSpan`, `RevealSpanOptions`
 
 [Full API →](api/redact.md)
+
+## `./rollout`
+
+Source: `src/rollout/index.ts` · 13 exports
+
+Depends on: `signoff`
+
+`decideRollout`, `killLineBreaches`, `normalizeRolloutValue`, `ParsedRolloutList`, `parseRolloutList`, `rolloutAdmits`, `RolloutDecision`, `RolloutKillLine`, `RolloutPlan`, `RolloutStage`, `rolloutWidens`, `StageMeasurement`, `validateRolloutPlan`
+
+[Full API →](api/rollout.md)
+
+## `./rollout/cli`
+
+Source: `src/rollout/cli.ts` · 3 exports
+
+Depends on: `signoff`
+
+`readWranglerVar`, `RolloutConfig`, `runRolloutCheck`
+
+[Full API →](api/rollout-cli.md)
+
+## `./rollout/d1`
+
+Source: `src/rollout/d1.ts` · 5 exports
+
+Depends on: `signoff`
+
+`createD1TurnTimingStore`, `D1LikeForRollout`, `ROLLOUT_TURN_TIMING_SCHEMA_SQL`, `stageMetrics`, `TurnTimingRow`
+
+[Full API →](api/rollout-d1.md)
 
 ## `./runtime`
 
