@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.137
+
+- fix(rollout): read the base from the source checkout under signoff's clean tree (#1081)
+- feat(router-turn): OpenAI reasoning turns stream their reasoning summaries through the Responses API (#1080)
+
 ## 0.60.136
 
 - fix(workspace-export): retry a sandbox the platform failed to resume, 30 s apart (#1079)
