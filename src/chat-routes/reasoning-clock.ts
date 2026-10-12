@@ -24,8 +24,8 @@ export interface ReasoningRunTime {
 export interface ReasoningClock<K> {
   /** A reasoning delta for `run` streamed. Starts its clock on the first; ends any other open run. */
   reasoning(run: K): void
-  /** Something other than reasoning streamed, or the turn ended: the open run is over. */
-  settle(): void
+  /** Something other than reasoning streamed, or the turn ended: the open run is over, at `at` (default now). */
+  settle(at?: number): void
   /** The run's time, the part's own `start` and `end` winning where it has them. */
   time(run: K, own?: ReasoningRunTime): ReasoningRunTime | undefined
 }
@@ -34,10 +34,10 @@ export interface ReasoningClock<K> {
 export function createReasoningClock<K>(now: () => number = Date.now): ReasoningClock<K> {
   const runs = new Map<K, ReasoningRunTime>()
   let open: { run: K } | null = null
-  const settle = () => {
+  const settle = (at?: number) => {
     if (!open) return
     const time = runs.get(open.run)
-    if (time && time.end === undefined) time.end = now()
+    if (time && time.end === undefined) time.end = Math.max(time.start ?? 0, at ?? now())
     open = null
   }
   return {

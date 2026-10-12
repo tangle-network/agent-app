@@ -60,7 +60,8 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
         push({ type: 'reasoning', text: event.delta })
       } else if (event.type === 'tool') {
         reasoningPart = null
-        reasoningClock.settle()
+        // The model stopped reasoning when it called the tool.
+        reasoningClock.settle(event.startedAt)
         if (event.status === 'running') {
           const part = { type: 'tool', id: event.callId, callID: event.callId, tool: event.toolName,
             state: { status: 'running', input: event.input, time: { start: event.startedAt } } }
