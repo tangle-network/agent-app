@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.143
+
+- feat(web-react): one shared, live-streamed reasoning row, reasoning state and reasoning part for every app (#1082)
+
 ## 0.60.142
 
 - fix(workspace-export): bound continuation reads and restore sandbox lifecycle (#1039)
