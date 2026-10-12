@@ -4,7 +4,7 @@
 
 Source: `src/journeys/index.ts`
 
-61 exports.
+72 exports.
 
 ### `assertNoSecrets`
 
@@ -222,6 +222,30 @@ interface JourneyIdentity
 interface JourneysConfig
 ```
 
+### `JourneySummary`
+
+`interface` — A run's summary, as an app's journey runner writes it.
+
+```ts
+interface JourneySummary
+```
+
+### `JourneySummaryEntry`
+
+`interface` — One journey in a run's `summary.json`.
+
+```ts
+interface JourneySummaryEntry
+```
+
+### `LEGACY_SCOREBOARD_APP`
+
+`const` — Rows a store wrote before the board was shared, with no `app` field, belong to this app.
+
+```ts
+"hardware"
+```
+
 ### `loadJourneysConfig`
 
 `function` — `JOURNEYS_CONFIG`, else the first config file in `dir`.
@@ -300,6 +324,70 @@ interface ResolvedJourneysConfig
 
 ```ts
 (routePath: string) => string[]
+```
+
+### `SCOREBOARD_STATUSES`
+
+`const` — The readiness scoreboard writer: one run's journey summary as the writes that put it on the shared board, so every app's rows land in one schema.
+
+```ts
+readonly ["pass", "fail", "stall", "blocked-host", "blocked", "skipped", "unrecorded"]
+```
+
+### `scoreboardDocId`
+
+`function` — The document id a flow row lives at.
+
+```ts
+(app: string, flowId: string, legacyIds?: boolean) => string
+```
+
+### `scoreboardMetaId`
+
+`function` — The `meta` document an app's run facts live at.
+
+```ts
+(app: string, legacyIds?: boolean) => string
+```
+
+### `ScoreboardOptions`
+
+`interface`
+
+```ts
+interface ScoreboardOptions
+```
+
+### `ScoreboardResult`
+
+`interface`
+
+```ts
+interface ScoreboardResult
+```
+
+### `scoreboardRows`
+
+`function`
+
+```ts
+(summary: JourneySummary, options: ScoreboardOptions) => ScoreboardResult
+```
+
+### `ScoreboardStatus`
+
+`type`
+
+```ts
+type ScoreboardStatus
+```
+
+### `ScoreboardWrite`
+
+`interface` — One entry of an artifact store batch, in the shape the batch write takes.
+
+```ts
+interface ScoreboardWrite
 ```
 
 ### `scoreTurn`
