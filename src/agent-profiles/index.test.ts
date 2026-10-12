@@ -149,7 +149,8 @@ describe('admitProfileTurn with an admission read', () => {
     const f = fixture()
     const read = await readProfileAdmission(f.store, key, 'msg-1', 'hello')
     await admit(f, read)
-    await expect(admit(f, read)).rejects.toThrow('does not belong to this message')
+    // A retry is a conflict to read again, not a permission refusal.
+    await expect(admit(f, read)).rejects.toMatchObject({ name: 'ProfileConflictError', message: 'The admission read was already used; read again' })
     expect(() => profileAdmissionValues(read)).toThrow('Unknown or used')
     expect(f.pins).toHaveLength(1)
   })

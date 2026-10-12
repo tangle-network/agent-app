@@ -564,6 +564,8 @@ export interface ProfileAdmissionValues {
   pinnedRevision: ProfileRevision | null
 }
 const admissionReads = new WeakMap<ProfileAdmissionRead, ProfileAdmissionValues>()
+/** Tokens already presented, so a second use is told apart from one this module never issued. */
+const spentAdmissionReads = new WeakSet<ProfileAdmissionRead>()
 
 /**
  * Read what admitting a message needs: its prior pin and the binding together, then a pinned revision.
@@ -601,13 +603,18 @@ export async function admitProfileTurn(input: {
   /** Required if trusted per-turn attachments change the public profile plan. */
   verifyEffectivePlan?: (revision: ProfileRevision, effectivePlanDigest: string,
     key: ProfileBindingKey) => Promise<boolean>
-  /** A handle from `readProfileAdmission` for this message; its pin and binding are not read again. */
+  /** A token from `readProfileAdmission` for this message; its pin and binding are not read again.
+   *  Each token admits once: after a failed admit, read again before retrying. */
   read?: ProfileAdmissionRead
 }): Promise<ProfileTurnPin> {
   const inputHash = sha256Utf8(input.content)
-  // A token is spent when presented, so it admits at most one turn even if this call fails.
+  // A token is spent when presented, so it admits at most one turn even if this call fails;
+  // a retry reads again with `readProfileAdmission`.
   const read = input.read ? admissionReads.get(input.read) : undefined
-  if (input.read) admissionReads.delete(input.read)
+  if (input.read && !read && spentAdmissionReads.has(input.read)) {
+    throw new ProfileConflictError('The admission read was already used; read again')
+  }
+  if (input.read) { admissionReads.delete(input.read); spentAdmissionReads.add(input.read) }
   if (input.read && (!read || read.messageId !== input.messageId || read.inputHash !== inputHash ||
       read.key.workspaceId !== input.key.workspaceId || read.key.memberId !== input.key.memberId ||
       read.key.channel !== input.key.channel)) {
