@@ -18,7 +18,8 @@
  * - `settlement_over_limit`, `settlement_unauthorized_reasoning`,
  *   `settlement_audit_failed`: the turn answered, but its settled ledger failed
  *   a check; the answer stands and the turn still fails.
- * - `turn_deadline`: the grant's deadline ended the turn.
+ * - `turn_deadline`: the turn reached the grant's deadline or its own budget.
+ *   A grant turn never continues: finishing it would need a second grant.
  * - Anything else is the turn's own failure (`turn_aborted`, `turn_tool_limit`,
  *   `model_http_<status>`, ...), settled as `failed`.
  */
@@ -34,13 +35,14 @@ export type RouterTurnGrant = Omit<RunProtectedAgentCandidateModelGrantOptions<v
 
 type GrantSettlement = Awaited<ReturnType<RouterTurnGrant['port']['settleGrant']>>
 
-/** A turn under a grant. The grant supplies the key and base URL; one grant never repeats a turn.
+/** A turn under a grant. The grant supplies the key and base URL; one grant never repeats or continues a turn.
  *  Placement is decided before a grant is reserved, so it is not an option here. */
-export type ProtectedRouterTurnOptions = Omit<RouterTurnOptions, 'apiKey' | 'baseUrl' | 'repeat' | 'placement'> & {
+export type ProtectedRouterTurnOptions = Omit<RouterTurnOptions, 'apiKey' | 'baseUrl' | 'repeat' | 'placement' | 'continueFrom'> & {
   grant: RouterTurnGrant
 }
 
-export interface ProtectedRouterTurnOutcome extends RouterTurnOutcome {
+/** A grant turn's outcome. It carries no `continuation`: a turn at its deadline fails as `turn_deadline`. */
+export interface ProtectedRouterTurnOutcome extends Omit<RouterTurnOutcome, 'continuation'> {
   /** What the grant settled, present whenever it settled, including for a failed turn. */
   settlement?: RouterTurnSettlement
 }
@@ -90,8 +92,8 @@ export async function runProtectedRouterTurn(options: ProtectedRouterTurnOptions
   const result = (failure?: RouterTurnFailure): ProtectedRouterTurnOutcome => {
     const base: RouterTurnOutcome = turn
       ?? { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [] }
-    // The grant's verdict replaces the turn's own failure.
-    const { failure: _turnFailure, ...rest } = base
+    // The grant's verdict replaces the turn's own failure, and a grant turn never continues.
+    const { failure: _turnFailure, continuation: _continuation, ...rest } = base
     return { ...rest, ...(settlement ? { settlement } : {}), ...(failure ? { failure } : {}) }
   }
   if (options.signal?.aborted) return result({ code: 'turn_aborted', message: 'The turn was cancelled.' })
@@ -151,9 +153,10 @@ export async function runProtectedRouterTurn(options: ProtectedRouterTurnOptions
           budgetMs: Math.min(options.budgetMs ?? remainingMs, remainingMs),
           signal: AbortSignal.any([AbortSignal.timeout(remainingMs), ...(options.signal ? [options.signal] : [])]),
         })
-        // The grant's timeout aborts the call in flight; that is the deadline, not a cancellation.
         // A turn past its deadline fails here: finishing it would need a second grant.
-        if (turn.failure?.code === 'turn_aborted' && Date.now() >= grant.deadlineAtMs) {
+        // At its budget the turn returns a continuation; under a grant that is the deadline.
+        // The grant's timeout aborts the call in flight; that is the deadline too, not a cancellation.
+        if (turn.continuation || (turn.failure?.code === 'turn_aborted' && Date.now() >= grant.deadlineAtMs)) {
           throw refuse('turn_deadline', 'Protected execution deadline expired')
         }
         if (turn.failure) throw new GrantRefusal(turn.failure)
