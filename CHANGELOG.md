@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.128
+
+- feat(model-picker): draw the maker's logo for a model another host serves (#1068)
+
 ## 0.60.127
 
 - fix(billing): revoke an expired workspace key before minting its renewal (#1066)
