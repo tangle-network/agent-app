@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-118 exports.
+123 exports.
 
 ### `AdminGuardOptions`
 
@@ -102,6 +102,22 @@ interface BetterAuthSessionCookieSource
 interface BillableBalanceState
 ```
 
+### `BillingConsentOutcome`
+
+`type`
+
+```ts
+type BillingConsentOutcome
+```
+
+### `BillingConsentRefusal`
+
+`interface` — Record a person's consent that this app's Sandbox service key may bill them.
+
+```ts
+interface BillingConsentRefusal
+```
+
 ### `canonicalDelegatedKeyName`
 
 `function` — The name Platform stores for a slot: `auto:<service>:<product>:<logical>` for Router and Sandbox keys (Platform's `canonicalProvisionedKeyName`), so the echo can be checked exactly.
@@ -180,6 +196,14 @@ interface BillableBalanceState
 
 ```ts
 (options: PlatformAgentSpendOptions) => PlatformAgentSpend
+```
+
+### `createPlatformBillingConsent`
+
+`function`
+
+```ts
+(options: PlatformBillingConsentOptions) => PlatformBillingConsent
 ```
 
 ### `createPlatformBillingHttp`
@@ -548,6 +572,22 @@ interface PlatformAgentSpendOptions
 
 ```ts
 interface PlatformBalanceSnapshot
+```
+
+### `PlatformBillingConsent`
+
+`interface`
+
+```ts
+interface PlatformBillingConsent
+```
+
+### `PlatformBillingConsentOptions`
+
+`interface`
+
+```ts
+interface PlatformBillingConsentOptions
 ```
 
 ### `PlatformBillingHttp`

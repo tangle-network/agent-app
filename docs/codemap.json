@@ -12501,6 +12501,18 @@
           "doc": "Describe the billable balance state including overage permission and remaining USD balance"
         },
         {
+          "name": "BillingConsentOutcome",
+          "kind": "type",
+          "signature": "type BillingConsentOutcome",
+          "doc": null
+        },
+        {
+          "name": "BillingConsentRefusal",
+          "kind": "interface",
+          "signature": "interface BillingConsentRefusal",
+          "doc": "Record a person's consent that this app's Sandbox service key may bill them."
+        },
+        {
           "name": "canonicalDelegatedKeyName",
           "kind": "function",
           "signature": "(input: { serviceName: string; product: string; name: string; }) => string",
@@ -12558,6 +12570,12 @@
           "name": "createPlatformAgentSpend",
           "kind": "function",
           "signature": "(options: PlatformAgentSpendOptions) => PlatformAgentSpend",
+          "doc": null
+        },
+        {
+          "name": "createPlatformBillingConsent",
+          "kind": "function",
+          "signature": "(options: PlatformBillingConsentOptions) => PlatformBillingConsent",
           "doc": null
         },
         {
@@ -12835,6 +12853,18 @@
           "kind": "interface",
           "signature": "interface PlatformBalanceSnapshot",
           "doc": "Describe the platform balance and lifetime spending with an optional update timestamp"
+        },
+        {
+          "name": "PlatformBillingConsent",
+          "kind": "interface",
+          "signature": "interface PlatformBillingConsent",
+          "doc": null
+        },
+        {
+          "name": "PlatformBillingConsentOptions",
+          "kind": "interface",
+          "signature": "interface PlatformBillingConsentOptions",
+          "doc": null
         },
         {
           "name": "PlatformBillingHttp",
