@@ -68,9 +68,11 @@ describe.skipIf(!LIVE)('live: gpt-6 reasoning streams through the engine', () =>
       if (process.env.LIVE_PROOF_OUT) writeFileSync(process.env.LIVE_PROOF_OUT, `${JSON.stringify(records, null, 2)}\n`)
 
       expect(arrivals.find(event => event.type === 'error')).toBeUndefined()
-      // Streamed: several deltas, arriving at different moments, all before the answer's first word.
-      expect(reasoning.length).toBeGreaterThan(1)
-      expect(record.distinctReasoningArrivalMs).toBeGreaterThan(1)
+      // Streamed: several deltas, arriving at different moments spread over the model's thinking (not one
+      // buffered burst), all before the answer's first word.
+      expect(reasoning.length).toBeGreaterThan(2)
+      expect(record.distinctReasoningArrivalMs).toBeGreaterThan(2)
+      expect(record.lastReasoningMs! - record.firstReasoningMs!).toBeGreaterThanOrEqual(200)
       expect(firstText).toBeDefined()
       expect(record.lastReasoningMs!).toBeLessThanOrEqual(firstText!.atMs)
       // Persisted in the shared shape, read back settled with how long the model thought.

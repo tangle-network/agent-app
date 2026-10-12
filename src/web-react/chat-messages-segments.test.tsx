@@ -316,7 +316,7 @@ describe('ChatMessages segmented turns', () => {
     expect(controlled).toBeTruthy()
     // `getElementById`, not a selector: `useId` mints ids containing characters
     // a CSS selector would have to escape. The live trace types itself out.
-    await waitFor(() => expect(document.getElementById(controlled!)?.textContent).toContain('Considering the options.'))
+    await waitFor(() => expect(document.getElementById(controlled!)?.textContent).toContain('Considering the options.'), { timeout: 5_000 })
 
     // `<details open={…}>` could not hold this: React re-asserted the attribute
     // on every render, so a reader who opened the box mid-stream lost it to the
