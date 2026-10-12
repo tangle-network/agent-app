@@ -76,7 +76,7 @@ export interface RouterTurnFailure {
   code: string
   status?: number
   message: string
-  /** The model service's own error text, at most 200 characters (e.g. `key_budget_exhausted`), so an app can
+  /** The model service's own error text, at most 1000 characters (e.g. `key_budget_exhausted`), so an app can
    *  tell a spend cap from a missing balance. Never a credential. */
   detail?: string
 }
@@ -482,7 +482,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     if (signal?.aborted) return outcome({ code: 'turn_aborted', message: 'The turn was cancelled.' })
     const status = (error as { status?: unknown }).status
     // The stream adapter puts the service's own text after the status; keep it, short, for the app's error categories.
-    const detail = error instanceof Error ? error.message.match(/\(HTTP \d+\): ([\s\S]*)$/)?.[1]?.slice(0, 200) : undefined
+    const detail = error instanceof Error ? error.message.match(/\(HTTP \d+\): ([\s\S]*)$/)?.[1]?.slice(0, 1000) : undefined
     return outcome(typeof status === 'number'
       ? { code: `model_http_${status}`, status, message: 'The model service did not answer.', ...(detail ? { detail } : {}) }
       : { code: 'model_unavailable', message: 'The model service did not answer.' })

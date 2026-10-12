@@ -252,6 +252,15 @@ describe('runRouterTurn', () => {
     expect(once.calls).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps the cause at the end of a long service error', async () => {
+    // Tax 2026-10-12: the Router's breaker message put its reason past 200 characters.
+    const body = JSON.stringify({ error: { message: `No provider served model "gpt-6-luna" (provider_quota_exhausted). Refused by breaker without calling: every candidate credential is held open after an earlier refusal (${'provider_quota_exhausted, '.repeat(6)}cause_at_the_end).` } })
+    const once = router(() => new Response(body, { status: 503 }))
+    const failed = await runRouterTurn({ apiKey: 'k', model: 'm', repeat: false, fetchImpl: once.fetchImpl, systemPrompt: 's', userMessage: 'u' })
+    expect(body.length).toBeGreaterThan(200)
+    expect(failed.failure?.detail).toContain('cause_at_the_end')
+  })
+
   it('resends a request the Router refused before streaming, within its attempts', async () => {
     const busy = () => new Response('slow down', { status: 429, headers: { 'retry-after': '0' } })
     const { fetchImpl, calls } = router(busy, busy, sse([text('Hello.')]))
