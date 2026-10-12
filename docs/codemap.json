@@ -24537,6 +24537,18 @@
           "doc": "Status tone of a {@link ChatMessageSegment} notice."
         },
         {
+          "name": "chatReasoningFromParts",
+          "kind": "function",
+          "signature": "(parts: readonly unknown[] | null | undefined) => ChatReasoningState | undefined",
+          "doc": "A saved message's reasoning, settled, from its persisted parts: every `{ type: 'reasoning', text, time }` part joined in order, from the first part's start to the last part's end."
+        },
+        {
+          "name": "ChatReasoningState",
+          "kind": "interface",
+          "signature": "interface ChatReasoningState",
+          "doc": "One message's reasoning as the stream delivers it: the text so far, when the model started reasoning and when it stopped."
+        },
+        {
           "name": "ChatSelectField",
           "kind": "type",
           "signature": "type ChatSelectField",
@@ -26100,7 +26112,7 @@
           "name": "ProviderLogo",
           "kind": "function",
           "signature": "({ provider, size }: ProviderLogoProps) => ReactNode",
-          "doc": "Real brand mark when we have one; tinted monogram otherwise."
+          "doc": "The shared brand mark when one is bundled; a tinted monogram otherwise."
         },
         {
           "name": "ProviderLogoProps",
@@ -26155,6 +26167,18 @@
           "kind": "function",
           "signature": "(column: RecordGridColumn, raw: string) => RecordGridCellOutcome",
           "doc": "Parse editor text and validate it in one step — what a committing cell editor calls."
+        },
+        {
+          "name": "ReasoningRow",
+          "kind": "function",
+          "signature": "({ text, startedAt, endedAt, thinking: thinkingProp, defaultOpen, renderText, className, }: ReasoningRowProps) => Eleme…",
+          "doc": "The model's reasoning for one message: live while it thinks, collapsed once it answers."
+        },
+        {
+          "name": "ReasoningRowProps",
+          "kind": "interface",
+          "signature": "interface ReasoningRowProps",
+          "doc": "Props for {@link ReasoningRow}: the fields of a `ChatReasoningState`, plus presentation."
         },
         {
           "name": "reconcileEffortLevels",
@@ -26691,6 +26715,18 @@
           "doc": "One step of a retained tool run (e.g."
         },
         {
+          "name": "trackChatReasoning",
+          "kind": "function",
+          "signature": "(callbacks: ChatStreamCallbacks, now?: () => number) => TrackedChatStreamCallbacks",
+          "doc": "Keep one turn's reasoning state from its stream: the first reasoning delta starts the clock, the answer's first text, an error or `end()` stops it, and every change reaches `callbacks.onReasoningStat…"
+        },
+        {
+          "name": "TrackedChatStreamCallbacks",
+          "kind": "type",
+          "signature": "type TrackedChatStreamCallbacks",
+          "doc": "Callbacks that keep the turn's reasoning state, plus the two moments only the transport knows."
+        },
+        {
           "name": "triggerAttachmentDownload",
           "kind": "function",
           "signature": "(name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }",
@@ -26946,7 +26982,7 @@
           "name": "useThinkingSeconds",
           "kind": "function",
           "signature": "(active: boolean) => number",
-          "doc": "Whole seconds elapsed while `active`, ticking once a second."
+          "doc": "Whole seconds elapsed while `active`, ticking once a second; counts from when `active` first turns true and freezes when it clears."
         },
         {
           "name": "useWorkspacePrewarm",

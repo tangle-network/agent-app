@@ -9,6 +9,7 @@
  * and the engine never waits on the consumer.
  */
 import { runRouterTurn, type RouterTurnOptions, type RouterTurnOutcome } from '../runtime/router-turn'
+import { createReasoningClock } from './reasoning-clock'
 import type { ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
 import type { ProducerWireEvent } from './wire'
 
@@ -27,6 +28,8 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
   let textPart: { type: 'text'; text: string } | null = null
   let textSegment = 0
   let reasoningPart: { type: 'reasoning'; text: string } | null = null
+  // Each reasoning part's start and end, the same timing the sandbox producer persists.
+  const reasoningClock = createReasoningClock<Record<string, unknown>>()
 
   const push = (event: ProducerWireEvent) => {
     queue.push(event)
@@ -44,6 +47,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
         }
         textPart.text += event.delta
         reasoningPart = null
+        reasoningClock.settle()
         push({ type: 'text', text: event.delta })
       } else if (event.type === 'reasoning') {
         // A reasoning run is one part until a word or a tool interrupts it.
@@ -52,9 +56,12 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
           parts.push(reasoningPart)
         }
         reasoningPart.text += event.delta
+        reasoningClock.reasoning(reasoningPart)
         push({ type: 'reasoning', text: event.delta })
       } else if (event.type === 'tool') {
         reasoningPart = null
+        // The model stopped reasoning when it called the tool.
+        reasoningClock.settle(event.startedAt)
         if (event.status === 'running') {
           const part = { type: 'tool', id: event.callId, callID: event.callId, tool: event.toolName,
             state: { status: 'running', input: event.input, time: { start: event.startedAt } } }
@@ -89,6 +96,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
       push({ type: 'error', data: { message: result.failure.message, code: result.failure.code } })
     }
   }).finally(() => {
+    reasoningClock.settle()
     done = true
     wake?.()
   })
@@ -103,6 +111,11 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
     await run
   }
 
+  // A reasoning part carries its run's time; a run still open in a mid-turn draft has a start and no end.
+  const snapshot = () => parts.map(part => part.type === 'reasoning'
+    ? { ...part, time: reasoningClock.time(part) }
+    : { ...part })
+
   const usage = (): ChatTurnUsage => ({
     inputTokens: outcome?.usage.promptTokens ?? 0,
     outputTokens: outcome?.usage.completionTokens ?? 0,
@@ -111,8 +124,8 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
   return {
     stream: stream() as ChatTurnRouteProducer['stream'],
     finalText: () => outcome?.text ?? '',
-    assistantParts: () => parts.map(part => ({ ...part })),
-    draftParts: () => parts.map(part => ({ ...part })),
+    assistantParts: snapshot,
+    draftParts: snapshot,
     usage,
     get model() { return outcome?.servedModel ?? options.model },
     modelAttribution: () => ({

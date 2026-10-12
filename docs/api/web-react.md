@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-501 exports.
+507 exports.
 
 ### `acceptRejectionReason`
 
@@ -588,6 +588,22 @@ interface ChatMessagesProps
 
 ```ts
 type ChatNoticeTone
+```
+
+### `chatReasoningFromParts`
+
+`function` — A saved message's reasoning, settled, from its persisted parts: every `{ type: 'reasoning', text, time }` part joined in order, from the first part's start to the last part's end.
+
+```ts
+(parts: readonly unknown[] | null | undefined) => ChatReasoningState | undefined
+```
+
+### `ChatReasoningState`
+
+`interface` — One message's reasoning as the stream delivers it: the text so far, when the model started reasoning and when it stopped.
+
+```ts
+interface ChatReasoningState
 ```
 
 ### `ChatSelectField`
@@ -2672,7 +2688,7 @@ interface ProvenanceValueProps
 
 ### `ProviderLogo`
 
-`function` — Real brand mark when we have one; tinted monogram otherwise.
+`function` — The shared brand mark when one is bundled; a tinted monogram otherwise.
 
 ```ts
 ({ provider, size }: ProviderLogoProps) => ReactNode
@@ -2748,6 +2764,22 @@ interface QuestionOptionListProps
 
 ```ts
 (column: RecordGridColumn, raw: string) => RecordGridCellOutcome
+```
+
+### `ReasoningRow`
+
+`function` — The model's reasoning for one message: live while it thinks, collapsed once it answers.
+
+```ts
+({ text, startedAt, endedAt, thinking: thinkingProp, defaultOpen, renderText, className, }: ReasoningRowProps) => Eleme…
+```
+
+### `ReasoningRowProps`
+
+`interface` — Props for {@link ReasoningRow}: the fields of a `ChatReasoningState`, plus presentation.
+
+```ts
+interface ReasoningRowProps
 ```
 
 ### `reconcileEffortLevels`
@@ -3462,6 +3494,22 @@ interface ToolRunRecord
 interface ToolRunStep
 ```
 
+### `trackChatReasoning`
+
+`function` — Keep one turn's reasoning state from its stream: the first reasoning delta starts the clock, the answer's first text, an error or `end()` stops it, and every change reaches `callbacks.onReasoningStat…
+
+```ts
+(callbacks: ChatStreamCallbacks, now?: () => number) => TrackedChatStreamCallbacks
+```
+
+### `TrackedChatStreamCallbacks`
+
+`type` — Callbacks that keep the turn's reasoning state, plus the two moments only the transport knows.
+
+```ts
+type TrackedChatStreamCallbacks
+```
+
 ### `triggerAttachmentDownload`
 
 `function` — Drives an anchor-click download from an already-resolved blob.
@@ -3800,7 +3848,7 @@ interface UseSessionHistoryOptions
 
 ### `useThinkingSeconds`
 
-`function` — Whole seconds elapsed while `active`, ticking once a second.
+`function` — Whole seconds elapsed while `active`, ticking once a second; counts from when `active` first turns true and freezes when it clears.
 
 ```ts
 (active: boolean) => number
