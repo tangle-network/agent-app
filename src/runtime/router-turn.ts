@@ -20,7 +20,7 @@
  */
 import { streamAppToolLoop, type LoopEvent, type LoopMessage, type LoopToolCall, type ToolLoopStopReason } from './loop'
 import { DEFAULT_TANGLE_ROUTER_BASE_URL } from './model'
-import { createOpenAICompatCompletionTurn, createOpenAICompatStreamTurn } from './openai-stream'
+import { createOpenAICompatCompletionTurn, createOpenAICompatStreamTurn, createOpenAIResponsesTurn, isOpenAIResponsesModel } from './openai-stream'
 import { turnKnowledgeInstructions, type TurnKnowledgeFile } from './turn-knowledge'
 import { replyLanguageInstruction } from './reply-language'
 import { placeExecution, type PlacementRecord, type VacuousAxis } from '@tangle-network/agent-runtime/placement'
@@ -89,6 +89,8 @@ export interface RouterTurnOutcome {
   toolCalls: Array<{ callId: string; toolName: string; ok: boolean }>
   /** Token use summed over every model call in the turn, as the router reported it. */
   usage: { promptTokens: number; completionTokens: number; modelCalls: number }
+  /** Reasoning the turn streamed (deltas and characters). Zero when the model sent none; absent when no model was called. */
+  reasoning?: { deltas: number; chars: number }
   /** Every side event the turn's tools reported, in order (at most 500). */
   toolEvents: RouterTurnToolEvent[]
   failure?: RouterTurnFailure
@@ -210,6 +212,12 @@ export interface RouterTurnOptions {
   retry?: { attempts?: number; timeoutMs?: number; baseDelayMs?: number }
   /** Characters of one tool result the model reads when no `renderToolResult` is given. Default 12 000. */
   toolResultLimit?: number
+  /**
+   * Which model API carries the turn. `auto` (default) uses the Responses API for an OpenAI model asked to
+   * reason (`reasoningEffort` other than `none`), since OpenAI returns reasoning summaries only there, and
+   * chat completions otherwise. A buffered turn (`stream: false`) always uses chat completions.
+   */
+  api?: 'auto' | 'chat' | 'responses'
 }
 
 const DEFAULT_BUDGET_MS = 90_000
@@ -331,7 +339,11 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     if (!byFunction.has(fn)) byFunction.set(fn, tool)
   }
   let servedModel: string | null = null
-  const streamTurnFor = (model: string) => (options.stream === false ? createOpenAICompatCompletionTurn : createOpenAICompatStreamTurn)({
+  const reasoningAsked = Boolean(options.reasoningEffort) && options.reasoningEffort !== 'none'
+  const useResponses = (model: string) => options.stream !== false &&
+    (options.api === 'responses' || ((options.api ?? 'auto') === 'auto' && reasoningAsked && isOpenAIResponsesModel(model)))
+  const streamTurnFor = (model: string) => (options.stream === false ? createOpenAICompatCompletionTurn
+    : useResponses(model) ? createOpenAIResponsesTurn : createOpenAICompatStreamTurn)({
     baseUrl: options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL,
     apiKey,
     model,
@@ -346,6 +358,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   })
   const segments: string[] = []
   const usage = { promptTokens: 0, completionTokens: 0, modelCalls: 0 }
+  // How much reasoning the turn streamed: the number an app logs to measure reasoning coverage.
+  const reasoning = { deltas: 0, chars: 0 }
   const toolCalls: RouterTurnOutcome['toolCalls'] = []
   const toolEvents: RouterTurnToolEvent[] = []
   const started = new Map<string, number>()
@@ -399,6 +413,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           segments[segments.length - 1] += event.text
           emit({ type: 'text', segment: segments.length, delta: event.text })
         } else if (event.type === 'reasoning' && event.text) {
+          reasoning.deltas++
+          reasoning.chars += event.text.length
           emit({ type: 'reasoning', delta: event.text })
         } else if (event.type === 'usage') {
           usage.promptTokens += event.usage.promptTokens
@@ -447,7 +463,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
 
   const outcome = (failure?: RouterTurnFailure): RouterTurnOutcome => ({
     text: joinText([options.continueFrom?.text ?? '', ...segments]),
-    servedModel, toolCalls, usage: { ...usage }, toolEvents: [...toolEvents], ...(placement ? { placement } : {}), ...(failure ? { failure } : {}),
+    servedModel, toolCalls, usage: { ...usage }, reasoning: { ...reasoning }, toolEvents: [...toolEvents], ...(placement ? { placement } : {}), ...(failure ? { failure } : {}),
   })
   const repeat = options.repeat !== false
   // The safe repeat walks this chain: the next fallback model, or the same model once.
