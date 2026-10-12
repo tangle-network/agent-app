@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.149
+
+- fix(signoff): the request meter counts only requests that reach the network (#1087)
+
 ## 0.60.148
 
 - feat(create-agent-app): chat template serves hashed bundles immutable (#1086)
