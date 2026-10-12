@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.153
+
+- fix(app-auth): refuse a revoked session in every isolate on the next request (#990)
+
 ## 0.60.152
 
 - test(billing): give the durable-lease waiter a wall-clock budget above a loaded runner (#1090)
