@@ -263,6 +263,11 @@ function installAndRunScaffolder({
     if (html.includes('/main.tsx') || !/assets\/[^"']+\.js/.test(html) || !/assets\/[^"']+\.css/.test(html)) {
       throw new Error('Chat build did not emit compiled JavaScript and standalone CSS')
     }
+    // Workers Static Assets reads _headers from the assets root: hashed bundles must ship immutable.
+    const headers = readFileSync(join(project, 'dist/client/_headers'), 'utf8')
+    if (!/^\/assets\/\*\n\s+Cache-Control: public, max-age=31536000, immutable$/m.test(headers)) {
+      throw new Error('Chat build did not emit dist/client/_headers with immutable /assets/*')
+    }
     // Playwright is the repository's proof driver, not a dependency available
     // to the fresh generated browser build. The child shares the scrubbed HOME.
     run('pnpm', ['exec', 'playwright', 'install', 'chromium'], { env })
@@ -361,6 +366,7 @@ function main(scratch) {
     'template-chat/src/worker.ts',
     'template-chat/tests/chat-turn.e2e.test.ts',
     'template-chat/web/index.html',
+    'template-chat/web/public/_headers',
     'template-chat/web/main.tsx',
     'template-chat/web/App.tsx',
     'template-chat/web/Conversation.tsx',

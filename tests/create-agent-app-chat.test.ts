@@ -113,6 +113,7 @@ describe('create-agent-app --chat scaffolder', () => {
       'web/tsconfig.json',
       'web/env.d.ts',
       'vite.config.mjs',
+      'web/public/_headers',
       'tailwind.config.mjs',
       'tests/chat-turn.e2e.test.ts',
       'tests/sandbox-fence.test.ts',
@@ -131,6 +132,14 @@ describe('create-agent-app --chat scaffolder', () => {
       expect(existsSync(join(projectDir, f)), `missing ${f}`).toBe(true)
     }
     expect(existsSync(join(projectDir, 'public/index.html'))).toBe(false)
+  })
+
+  it('serves content-hashed bundles as immutable and leaves index.html revalidating', () => {
+    const headers = readFileSync(join(projectDir, 'web/public/_headers'), 'utf8')
+    const rules = headers.split('\n').filter((l) => l.trim() && !l.startsWith('#'))
+    expect(rules).toEqual(['/assets/*', '  Cache-Control: public, max-age=31536000, immutable'])
+    const vite = readFileSync(join(projectDir, 'vite.config.mjs'), 'utf8')
+    expect(vite).toContain("publicDir: 'public'")
   })
 
   it('substitutes tokens across package.json, agent.config.ts, wrangler.toml, and the browser entry', () => {
