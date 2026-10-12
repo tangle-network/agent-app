@@ -4,7 +4,7 @@
 
 Source: `src/runtime/router-turn.ts`
 
-18 exports.
+24 exports.
 
 ### `budgetTurnKnowledge`
 
@@ -14,12 +14,28 @@ Source: `src/runtime/router-turn.ts`
 (files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]
 ```
 
+### `CheckpointWorkspaceStore`
+
+`interface` — The fields of an agent-runtime `WorkspaceStore` a checkpoint needs; structural so any adapter fits.
+
+```ts
+interface CheckpointWorkspaceStore
+```
+
 ### `composeRouterTurnPrompt`
 
 `function` — The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…
 
 ```ts
 (profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…
+```
+
+### `DURABLE_HOP_BUDGET_MS`
+
+`const` — Wall time a durable hop may plan for: a Durable Object alarm or Queue consumer gets 15 minutes.
+
+```ts
+number
 ```
 
 ### `placeRouterTurn`
@@ -36,6 +52,14 @@ Source: `src/runtime/router-turn.ts`
 
 ```ts
 (name: string) => string
+```
+
+### `RouterTurnContinuation`
+
+`interface` — A checkpointed Router turn: the conversation after the system prompt, ready to continue.
+
+```ts
+interface RouterTurnContinuation
 ```
 
 ### `RouterTurnEvent`
@@ -118,6 +142,22 @@ type RouterTurnToolOutcome
 (options: RouterTurnOptions) => Promise<RouterTurnOutcome>
 ```
 
+### `turnCheckpointPath`
+
+`function`
+
+```ts
+(turnId: string) => string
+```
+
+### `TurnCheckpointStore`
+
+`interface` — Where a turn's checkpoint waits between hops.
+
+```ts
+interface TurnCheckpointStore
+```
+
 ### `TurnKnowledgeBudget`
 
 `interface`
@@ -148,4 +188,12 @@ interface TurnKnowledgeFile
 
 ```ts
 (store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…
+```
+
+### `workspaceTurnCheckpoints`
+
+`function` — Turn checkpoints in a workspace store, written as `actor`.
+
+```ts
+(store: CheckpointWorkspaceStore, workspaceId: string, actor: string) => TurnCheckpointStore
 ```

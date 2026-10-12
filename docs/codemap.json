@@ -255,6 +255,24 @@
           "doc": null
         },
         {
+          "name": "ProfileAdmissionRead",
+          "kind": "interface",
+          "signature": "interface ProfileAdmissionRead",
+          "doc": "An opaque token for what `readProfileAdmission` read for one message."
+        },
+        {
+          "name": "profileAdmissionValues",
+          "kind": "function",
+          "signature": "(read: ProfileAdmissionRead) => ProfileAdmissionValues",
+          "doc": "A deep copy of what a token stands for; changing the copy changes nothing the token admits."
+        },
+        {
+          "name": "ProfileAdmissionValues",
+          "kind": "interface",
+          "signature": "interface ProfileAdmissionValues",
+          "doc": "The values a token stands for, as the caller may inspect them."
+        },
+        {
           "name": "profileAuthority",
           "kind": "function",
           "signature": "(profile: AgentProfile) => AgentProfile",
@@ -397,6 +415,12 @@
           "kind": "interface",
           "signature": "interface ProposeRevisionInput",
           "doc": null
+        },
+        {
+          "name": "readProfileAdmission",
+          "kind": "function",
+          "signature": "(store: ProfileRevisionStore, key: ProfileBindingKey, messageId: string, content: string) => Promise<ProfileAdmissionRe…",
+          "doc": "Read what admitting a message needs: its prior pin and the binding together, then a pinned revision."
         },
         {
           "name": "removeProfileKnowledgeDocument",
@@ -14836,6 +14860,12 @@
           "doc": "Pull coordinates, refresh cadence and timeout owned by the shared source."
         },
         {
+          "name": "CheckpointWorkspaceStore",
+          "kind": "interface",
+          "signature": "interface CheckpointWorkspaceStore",
+          "doc": "The fields of an agent-runtime `WorkspaceStore` a checkpoint needs; structural so any adapter fits."
+        },
+        {
           "name": "composeRouterTurnPrompt",
           "kind": "function",
           "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
@@ -14900,6 +14930,12 @@
           "kind": "function",
           "signature": "<TCtx>(opts: { kind: string; build: (ctx: TCtx) => SurfaceOverlay | Promise<SurfaceOverlay>; }) => SurfaceKindDefinitio…",
           "doc": "Declare one surface kind."
+        },
+        {
+          "name": "DURABLE_HOP_BUDGET_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Wall time a durable hop may plan for: a Durable Object alarm or Queue consumer gets 15 minutes."
         },
         {
           "name": "fetchModelCatalog",
@@ -15013,7 +15049,7 @@
           "name": "ProtectedRouterTurnOutcome",
           "kind": "interface",
           "signature": "interface ProtectedRouterTurnOutcome",
-          "doc": null
+          "doc": "A grant turn's outcome."
         },
         {
           "name": "resolveCatalogModelId",
@@ -15110,6 +15146,12 @@
           "kind": "type",
           "signature": "type RouterProtectedModelSettlement",
           "doc": "Router's settle response is Runtime's exact settlement ledger."
+        },
+        {
+          "name": "RouterTurnContinuation",
+          "kind": "interface",
+          "signature": "interface RouterTurnContinuation",
+          "doc": "A checkpointed Router turn: the conversation after the system prompt, ready to continue."
         },
         {
           "name": "RouterTurnEvent",
@@ -15334,6 +15376,18 @@
           "doc": "Resolve a string by trimming whitespace or returning null if empty or undefined"
         },
         {
+          "name": "turnCheckpointPath",
+          "kind": "function",
+          "signature": "(turnId: string) => string",
+          "doc": null
+        },
+        {
+          "name": "TurnCheckpointStore",
+          "kind": "interface",
+          "signature": "interface TurnCheckpointStore",
+          "doc": "Where a turn's checkpoint waits between hops."
+        },
+        {
           "name": "TurnKnowledgeBudget",
           "kind": "interface",
           "signature": "interface TurnKnowledgeBudget",
@@ -15356,6 +15410,12 @@
           "kind": "function",
           "signature": "(store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…",
           "doc": "A workspace store's knowledge files (kind `file` under `prefix`) as turn knowledge, within the budget."
+        },
+        {
+          "name": "workspaceTurnCheckpoints",
+          "kind": "function",
+          "signature": "(store: CheckpointWorkspaceStore, workspaceId: string, actor: string) => TurnCheckpointStore",
+          "doc": "Turn checkpoints in a workspace store, written as `actor`."
         }
       ]
     },
@@ -15374,10 +15434,22 @@
           "doc": "Apply the byte budget in path order: small files keep their text until the total is spent."
         },
         {
+          "name": "CheckpointWorkspaceStore",
+          "kind": "interface",
+          "signature": "interface CheckpointWorkspaceStore",
+          "doc": "The fields of an agent-runtime `WorkspaceStore` a checkpoint needs; structural so any adapter fits."
+        },
+        {
           "name": "composeRouterTurnPrompt",
           "kind": "function",
           "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
           "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…"
+        },
+        {
+          "name": "DURABLE_HOP_BUDGET_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Wall time a durable hop may plan for: a Durable Object alarm or Queue consumer gets 15 minutes."
         },
         {
           "name": "placeRouterTurn",
@@ -15390,6 +15462,12 @@
           "kind": "function",
           "signature": "(name: string) => string",
           "doc": "OpenAI-compatible function names allow only `[A-Za-z0-9_-]{1,64}`; app tool names often use dots."
+        },
+        {
+          "name": "RouterTurnContinuation",
+          "kind": "interface",
+          "signature": "interface RouterTurnContinuation",
+          "doc": "A checkpointed Router turn: the conversation after the system prompt, ready to continue."
         },
         {
           "name": "RouterTurnEvent",
@@ -15452,6 +15530,18 @@
           "doc": null
         },
         {
+          "name": "turnCheckpointPath",
+          "kind": "function",
+          "signature": "(turnId: string) => string",
+          "doc": null
+        },
+        {
+          "name": "TurnCheckpointStore",
+          "kind": "interface",
+          "signature": "interface TurnCheckpointStore",
+          "doc": "Where a turn's checkpoint waits between hops."
+        },
+        {
           "name": "TurnKnowledgeBudget",
           "kind": "interface",
           "signature": "interface TurnKnowledgeBudget",
@@ -15474,6 +15564,12 @@
           "kind": "function",
           "signature": "(store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…",
           "doc": "A workspace store's knowledge files (kind `file` under `prefix`) as turn knowledge, within the budget."
+        },
+        {
+          "name": "workspaceTurnCheckpoints",
+          "kind": "function",
+          "signature": "(store: CheckpointWorkspaceStore, workspaceId: string, actor: string) => TurnCheckpointStore",
+          "doc": "Turn checkpoints in a workspace store, written as `actor`."
         }
       ]
     },
