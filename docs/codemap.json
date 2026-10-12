@@ -16767,6 +16767,12 @@
           "doc": "How long a transient failure may last before the caller fails."
         },
         {
+          "name": "SandboxBoxBusyError",
+          "kind": "class",
+          "signature": "class SandboxBoxBusyError",
+          "doc": "Thrown instead of restarting a box that failed the reuse gate because it is not connectable (runtime URL missing or edge readiness failed) while its runtime reports running sessions."
+        },
+        {
           "name": "SandboxBuildContext",
           "kind": "interface",
           "signature": "interface SandboxBuildContext",
