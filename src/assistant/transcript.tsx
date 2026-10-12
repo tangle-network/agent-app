@@ -16,12 +16,13 @@ import {
   AgentTimeline,
   type AgentTimelineItem,
 } from "@tangle-network/ui/chat";
-import { InlineThinkingItem, InlineToolItem } from "@tangle-network/ui/run";
+import { InlineToolItem } from "@tangle-network/ui/run";
 import { type ReactNode, useMemo } from "react";
 import {
   type ChatToolCallInfo,
   type ChatUiMessage,
   chatToolCallPart,
+  ReasoningRow,
   type ToolDetailRenderers,
 } from "../web-react";
 import type { AssistantState } from "./reducer";
@@ -124,12 +125,9 @@ export function buildAssistantTimeline(
         items.push({
           id: `${message.id}-reasoning`,
           kind: "custom",
-          content: (
-            <InlineThinkingItem
-              part={{ type: "reasoning", text: view.reasoning }}
-              defaultOpen={view.isStreaming}
-            />
-          ),
+          // The shared reasoning row: live while the model thinks, "Thought
+          // for N seconds" once its answer starts.
+          content: <ReasoningRow text={view.reasoning} thinking={view.isThinking} />,
         });
       }
       return;

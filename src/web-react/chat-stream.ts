@@ -115,6 +115,10 @@ export interface ChatStreamCallbacks {
   onIntent?: (intent: TurnIntentData) => void
   onText?: (delta: string) => void
   onReasoning?: (delta: string) => void
+  /** The message's reasoning so far, when it started and when it ended, after every reasoning delta and once
+   *  when thinking ends. Spread it onto `ReasoningRow`. `consumeChatStream` and `streamChatTurn` keep it;
+   *  a consumer that calls `dispatchChatStreamLine` itself wraps its callbacks with `trackChatReasoning`. */
+  onReasoningState?: (state: ChatReasoningState) => void
   onToolCall?: (call: ChatStreamToolCall) => void
   onToolResult?: (result: ChatStreamToolResult) => void
   onUsage?: (usage: { promptTokens: number; completionTokens: number }) => void
@@ -141,6 +145,101 @@ export interface ChatStreamCallbacks {
   onInteractionCancel?: (cancel: InteractionCancelData) => void
   /** A durable-plan snapshot from any plan lifecycle event. */
   onPlan?: (plan: ChatPlan) => void
+}
+
+/**
+ * One message's reasoning as the stream delivers it: the text so far, when the
+ * model started reasoning and when it stopped. Its fields are `ReasoningRow`'s
+ * props. Live state comes from `onReasoningState`; a saved message's comes from
+ * `chatReasoningFromParts`.
+ */
+export interface ChatReasoningState {
+  text: string
+  /** Epoch ms of the first reasoning delta. Absent only on history saved without times. */
+  startedAt?: number
+  /** Epoch ms the reasoning ended: the answer's first text, an error, or the end of the turn. */
+  endedAt?: number
+  /** Reasoning deltas are still arriving and nothing has ended them yet. */
+  thinking: boolean
+}
+
+/** Callbacks that keep the turn's reasoning state, and `end()` to call once the turn's stream is over. */
+export type TrackedChatStreamCallbacks = ChatStreamCallbacks & { end: () => void }
+
+/**
+ * Keep one turn's reasoning state from its stream: the first reasoning delta
+ * starts the clock, the answer's first text, an error or `end()` stops it, and
+ * every change reaches `callbacks.onReasoningState`. Reasoning that resumes
+ * after a tool call or an answer continues the same state as a new paragraph,
+ * the way a reload joins the turn's saved reasoning parts. `consumeChatStream`
+ * applies this itself; call it to dispatch lines one at a time.
+ */
+export function trackChatReasoning(callbacks: ChatStreamCallbacks, now: () => number = Date.now): TrackedChatStreamCallbacks {
+  let state: ChatReasoningState | null = null
+  let paragraph = false
+  const publish = (next: ChatReasoningState) => {
+    state = next
+    callbacks.onReasoningState?.(next)
+  }
+  const stop = () => {
+    if (state?.thinking) publish({ ...state, endedAt: now(), thinking: false })
+  }
+  return {
+    ...callbacks,
+    onReasoning: (delta) => {
+      callbacks.onReasoning?.(delta)
+      if (!delta) return
+      if (!state) {
+        publish({ text: delta, startedAt: now(), thinking: true })
+      } else {
+        const joined = (paragraph || !state.thinking) && state.text.trim()
+          ? `${state.text.trimEnd()}\n\n${delta.trimStart()}`
+          : state.text + delta
+        publish({ text: joined, ...(state.startedAt !== undefined ? { startedAt: state.startedAt } : {}), thinking: true })
+      }
+      paragraph = false
+    },
+    onText: (delta) => {
+      if (delta) stop()
+      callbacks.onText?.(delta)
+    },
+    onToolCall: (call) => {
+      // The model acted; any reasoning after this is its next thought.
+      if (state) paragraph = true
+      callbacks.onToolCall?.(call)
+    },
+    onErrorEventDetail: (detail) => {
+      stop()
+      callbacks.onErrorEventDetail?.(detail)
+    },
+    end: stop,
+  }
+}
+
+/**
+ * A saved message's reasoning, settled, from its persisted parts: every
+ * `{ type: 'reasoning', text, time }` part joined in order, from the first
+ * part's start to the last part's end. A reload shows it collapsed with how
+ * long the model thought. Undefined when the message has no reasoning text.
+ */
+export function chatReasoningFromParts(parts: ReadonlyArray<unknown> | null | undefined): ChatReasoningState | undefined {
+  const runs = (parts ?? []).filter((part): part is { text: string; time?: unknown } => {
+    const record = part as Record<string, unknown> | null
+    return record?.type === 'reasoning' && typeof record.text === 'string' && record.text.trim() !== ''
+  })
+  if (runs.length === 0) return undefined
+  const times = runs.map((run) => (run.time && typeof run.time === 'object' ? run.time : {}) as { start?: unknown; end?: unknown })
+  const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+  const starts = times.map((time) => time.start).filter(finite)
+  const ends = times.map((time) => time.end).filter(finite)
+  const startedAt = starts.length > 0 ? Math.min(...starts) : undefined
+  const endedAt = ends.length > 0 ? Math.max(...ends) : undefined
+  return {
+    text: runs.map((run) => run.text.trim()).join('\n\n'),
+    ...(startedAt !== undefined ? { startedAt } : {}),
+    ...(startedAt !== undefined && endedAt !== undefined && endedAt >= startedAt ? { endedAt } : {}),
+    thinking: false,
+  }
 }
 
 /** Represent the result of consuming a chat stream including turn ID and content reception status */
@@ -326,9 +425,11 @@ export async function consumeChatStream(
   let buffer = ''
   let turnId: string | null = null
   let receivedContent = false
+  const tracked = cb.onReasoningState ? trackChatReasoning(cb) : null
+  const callbacks = tracked ?? cb
 
   const handle = (line: string) => {
-    const r = dispatchChatStreamLine(line, cb)
+    const r = dispatchChatStreamLine(line, callbacks)
     if (r.turnId) {
       turnId = r.turnId
       cb.onTurnId?.(r.turnId)
@@ -340,6 +441,7 @@ export async function consumeChatStream(
     const { done, value } = await reader.read()
     if (done) {
       if (buffer.trim()) handle(buffer)
+      tracked?.end()
       break
     }
     buffer += decoder.decode(value, { stream: true })

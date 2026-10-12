@@ -58,6 +58,7 @@ import {
   type ModelFailoverStreamHandle,
   type OpenModelStream,
 } from './model-failover-stream'
+import { createReasoningClock, type ReasoningRunTime } from './reasoning-clock'
 import type {
   ChatTurnModelAttribution,
   ChatTurnRouteProducer,
@@ -467,6 +468,8 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   const partOrder: string[] = []
   const partMap = new Map<string, JsonRecord>()
   const tracker: TextTracker = { seen: new Map() }
+  /** Each reasoning part's start and end where the harness sent none: the same timing the engine's producer persists. */
+  const reasoningClock = createReasoningClock<string>()
   const usage: ChatTurnUsage = {}
   /** Whether each announced tool_call carried populated arguments. */
   const announcedToolArgs = new Map<string, boolean>()
@@ -579,6 +582,8 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             const delta = textDelta(tracker, key, part, rawDelta)
             recordPersistedPart(part, delta || undefined)
             if (delta) {
+              if (partType === 'reasoning') reasoningClock.reasoning(key)
+              else reasoningClock.settle()
               if (partType === 'text') fullText += delta
               yield { type: partType, text: delta }
             }
@@ -586,6 +591,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           }
 
           if (partType === 'tool') {
+            reasoningClock.settle()
             recordPersistedPart(part, undefined)
             const persisted = partMap.get(getPartKey(part))
             const state = asRecord(persisted?.state)
@@ -887,14 +893,27 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           details: { failureNote: diagnostic.failureNote },
         },
       }
+    } finally {
+      reasoningClock.settle()
     }
+  }
+
+  /** The persisted parts with each reasoning part's time: the harness's own, else the clock's. */
+  const timedParts = (): Map<string, JsonRecord> => {
+    const timed = new Map(partMap)
+    for (const [key, part] of partMap) {
+      if (part.type !== 'reasoning') continue
+      const time = reasoningClock.time(key, asRecord(part.time) as ReasoningRunTime | undefined)
+      if (time) timed.set(key, { ...part, time })
+    }
+    return timed
   }
 
   return {
     stream: stream(),
     finalText: () => fullText,
     assistantParts: () => finalizePendingInteractionParts(
-      finalizeAssistantParts(partOrder, partMap, fullText),
+      finalizeAssistantParts(partOrder, timedParts(), fullText),
       interactionOutcome,
     ),
     // Mid-stream snapshot for incremental persistence: the same accumulators,
@@ -902,7 +921,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
     // and `finalizePendingInteractionParts`). A running tool and an unanswered
     // ask are the correct live state; settling them early would persist
     // phantom failures the final write then reverses.
-    draftParts: () => draftAssistantParts(partOrder, partMap, fullText),
+    draftParts: () => draftAssistantParts(partOrder, timedParts(), fullText),
     usage: () => usage,
     // A GETTER, not a captured value: `turn-routes` reads `producer.model` at
     // draft-snapshot and persist time, both of which happen after the stream

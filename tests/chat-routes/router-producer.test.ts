@@ -70,7 +70,8 @@ describe('createRouterTurnProducer', () => {
     expect(events[0]).toEqual({ type: 'reasoning', text: 'Need the count.' })
     expect(events.find(event => event.type === 'tool_result')).toMatchObject({
       outcome: { ok: false, message: 'Rooms are read by staff only', code: 'forbidden' } })
-    expect(producer.assistantParts!()[0]).toEqual({ type: 'reasoning', text: 'Need the count.' })
+    expect(producer.assistantParts!()[0]).toEqual({ type: 'reasoning', text: 'Need the count.',
+      time: { start: expect.any(Number), end: expect.any(Number) } })
   })
 
   it('ends a failed turn with a typed error event instead of throwing', async () => {

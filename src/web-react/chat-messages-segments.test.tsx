@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 
 // No `../brand` mock: web-react reaches the Tangle mark through `./brand-mark`,
 // a lazy boundary that degrades to reserved space when the sandbox-ui brand
@@ -240,7 +240,8 @@ describe('ChatMessages segmented turns', () => {
       content: '',
       reasoning: 'Considering the options.',
     }
-    const { container } = render(<ChatMessages messages={[message]} />)
+    // `loading`: the message is the turn still streaming.
+    const { container } = render(<ChatMessages messages={[message]} loading />)
     // Reasoning but no answer — the turn is still thinking, so the trace is
     // open and its label sweeps rather than sitting static.
     expect(container.querySelector('div[data-state]')?.getAttribute('data-state')).toBe('open')
@@ -256,7 +257,7 @@ describe('ChatMessages segmented turns', () => {
       content: '',
       reasoning: 'Considering the options.',
     }
-    const { container } = render(<ChatMessages messages={[message]} />)
+    const { container } = render(<ChatMessages messages={[message]} loading />)
     const region = () => container.querySelector('div[data-state]')!
     // Open: the region is present and not hidden.
     expect(region().hasAttribute('hidden')).toBe(false)
@@ -300,22 +301,22 @@ describe('ChatMessages segmented turns', () => {
     expect(arrivedRow()).toBe(first)
   })
 
-  it('names the reasoning trace it controls, and keeps a click from being undone by the next frame', () => {
+  it('names the reasoning trace it controls, and keeps a click from being undone by the next frame', async () => {
     const message: ChatUiMessage = {
       id: 'm1',
       role: 'assistant',
       content: '',
       reasoning: 'Considering the options.',
     }
-    const { container, rerender } = render(<ChatMessages messages={[message]} />)
+    const { container, rerender } = render(<ChatMessages messages={[message]} loading />)
     const toggle = reasoningToggle(container)
     // The button names the region, which is what `<summary>` got from the
     // browser and a button has to state.
     const controlled = toggle.getAttribute('aria-controls')
     expect(controlled).toBeTruthy()
     // `getElementById`, not a selector: `useId` mints ids containing characters
-    // a CSS selector would have to escape.
-    expect(document.getElementById(controlled!)?.textContent).toContain('Considering the options.')
+    // a CSS selector would have to escape. The live trace types itself out.
+    await waitFor(() => expect(document.getElementById(controlled!)?.textContent).toContain('Considering the options.'))
 
     // `<details open={…}>` could not hold this: React re-asserted the attribute
     // on every render, so a reader who opened the box mid-stream lost it to the
@@ -324,7 +325,7 @@ describe('ChatMessages segmented turns', () => {
     fireEvent.click(toggle)
     expect(container.querySelector('div[data-state]')?.getAttribute('data-state')).toBe('closed')
     rerender(
-      <ChatMessages messages={[{ ...message, reasoning: 'Considering the options. Still going.' }]} />,
+      <ChatMessages messages={[{ ...message, reasoning: 'Considering the options. Still going.' }]} loading />,
     )
     expect(container.querySelector('div[data-state]')?.getAttribute('data-state')).toBe('closed')
   })
