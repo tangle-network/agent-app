@@ -104,7 +104,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./signoff/proof`](api/signoff-proof.md) | 22 | — |
 | [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | — |
 | [`./skills`](api/skills.md) | 27 | — |
-| [`./skills-placement`](api/skills-placement.md) | 6 | `harness`, `skills` |
+| [`./skills-placement`](api/skills-placement.md) | 9 | `harness`, `skills` |
 | [`./spend`](api/spend.md) | 60 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
@@ -1044,11 +1044,11 @@ Source: `src/skills/index.ts` · 27 exports
 
 ## `./skills-placement`
 
-Source: `src/skills-placement/index.ts` · 6 exports
+Source: `src/skills-placement/index.ts` · 9 exports
 
 Depends on: `harness`, `skills`
 
-`ComposedSkills`, `composeSkillsForHarness`, `ComposeSkillsForHarnessInput`, `resolveSkillDir`, `SkillEntry`, `unsupportedSkillHarnesses`
+`ComposedSkills`, `composeSkillsForHarness`, `ComposeSkillsForHarnessInput`, `resolveSkillDir`, `SkillEntry`, `SkillSupportFile`, `skillSupportFileMounts`, `unsupportedSkillHarnesses`, `withSkillSupportFiles`
 
 [Full API →](api/skills-placement.md)
 
