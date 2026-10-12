@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.142
+
+- fix(workspace-export): bound continuation reads and restore sandbox lifecycle (#1039)
+- fix(workspace-export): remove omitted columns from CSV schema (#1040)
+
 ## 0.60.141
 
 - refactor(provider-logo): draw from sandbox-ui ProviderMark, keep the monogram fallback (#1074)
