@@ -12435,6 +12435,12 @@
           "doc": "Describe the billable balance state including overage permission and remaining USD balance"
         },
         {
+          "name": "canonicalDelegatedKeyName",
+          "kind": "function",
+          "signature": "(input: { serviceName: string; product: string; name: string; }) => string",
+          "doc": "The name Platform stores for a slot: `auto:<service>:<product>:<logical>` for Router and Sandbox keys (Platform's `canonicalProvisionedKeyName`), so the echo can be checked exactly."
+        },
+        {
           "name": "createAdminGuard",
           "kind": "function",
           "signature": "<Session>(opts: AdminGuardOptions<Session>) => (request: Request) => Promise<Session>",
@@ -12465,6 +12471,12 @@
           "doc": "Create the identity-protocol account store for one request."
         },
         {
+          "name": "createDelegatedKeyProvisioner",
+          "kind": "function",
+          "signature": "(input: { client: PlatformDelegatedKeyClient; sourceKey: string; product: string; resource?: { type: string; id: string…",
+          "doc": "Plug the client into `createIdentityBoundWorkspaceKeyManager` for a workspace-held key."
+        },
+        {
           "name": "createHubSettingsRoutes",
           "kind": "function",
           "signature": "(ctx: HubSettingsContext) => HubSettingsRoutes",
@@ -12487,6 +12499,12 @@
           "kind": "function",
           "signature": "(opts: PlatformBillingHttpOptions) => PlatformBillingHttp",
           "doc": "Create a PlatformBillingHttp instance configured with given options and default behaviors"
+        },
+        {
+          "name": "createPlatformDelegatedKeyClient",
+          "kind": "function",
+          "signature": "(options: PlatformDelegatedKeyClientOptions) => PlatformDelegatedKeyClient",
+          "doc": null
         },
         {
           "name": "createSignedSsoState",
@@ -12523,6 +12541,72 @@
           "kind": "const",
           "signature": "Record<TanglePlanTier, TangleTierPolicy>",
           "doc": "Define default concurrency and overage policies for each TanglePlanTier level"
+        },
+        {
+          "name": "DelegatedKey",
+          "kind": "interface",
+          "signature": "interface DelegatedKey",
+          "doc": null
+        },
+        {
+          "name": "DelegatedKeyBudget",
+          "kind": "type",
+          "signature": "type DelegatedKeyBudget",
+          "doc": "How the child is paid for: its own budget, or spending the source's budget directly."
+        },
+        {
+          "name": "DelegatedKeyCode",
+          "kind": "type",
+          "signature": "type DelegatedKeyCode",
+          "doc": null
+        },
+        {
+          "name": "DelegatedKeyMissingError",
+          "kind": "class",
+          "signature": "class DelegatedKeyMissingError",
+          "doc": "A remote key the durable manager must treat as gone (it marks the row revoked and mints again)."
+        },
+        {
+          "name": "DelegatedKeyOutcome",
+          "kind": "type",
+          "signature": "type DelegatedKeyOutcome",
+          "doc": null
+        },
+        {
+          "name": "DelegatedKeyProvisioner",
+          "kind": "interface",
+          "signature": "interface DelegatedKeyProvisioner",
+          "doc": "The `DurableWorkspaceKeyProvisioner` shape (`./billing`), kept structural so this module stays standalone."
+        },
+        {
+          "name": "DelegatedKeyRefusal",
+          "kind": "interface",
+          "signature": "interface DelegatedKeyRefusal",
+          "doc": null
+        },
+        {
+          "name": "DelegatedKeyRefusalError",
+          "kind": "class",
+          "signature": "class DelegatedKeyRefusalError",
+          "doc": "A Platform refusal surfaced to the durable manager."
+        },
+        {
+          "name": "DelegatedKeyRequest",
+          "kind": "interface",
+          "signature": "interface DelegatedKeyRequest",
+          "doc": null
+        },
+        {
+          "name": "DelegatedKeySlotRef",
+          "kind": "interface",
+          "signature": "interface DelegatedKeySlotRef",
+          "doc": "Identifies a key's slot for Platform's service-authenticated `revoke-slot`."
+        },
+        {
+          "name": "DelegatedKeyVerdict",
+          "kind": "interface",
+          "signature": "interface DelegatedKeyVerdict",
+          "doc": "Platform's `verify-by-id` verdict on one key, secret-free."
         },
         {
           "name": "FREE_TIER_SPEND_CAP_USD",
@@ -12703,6 +12787,18 @@
           "kind": "interface",
           "signature": "interface PlatformBillingHttpOptions",
           "doc": "Define HTTP options for platform billing including base URL, service token, product slug, fetch implementation, and timeout"
+        },
+        {
+          "name": "PlatformDelegatedKeyClient",
+          "kind": "interface",
+          "signature": "interface PlatformDelegatedKeyClient",
+          "doc": null
+        },
+        {
+          "name": "PlatformDelegatedKeyClientOptions",
+          "kind": "interface",
+          "signature": "interface PlatformDelegatedKeyClientOptions",
+          "doc": null
         },
         {
           "name": "PlatformIdentityStore",
@@ -16797,6 +16893,12 @@
           "doc": "The small event shape consumed by agent-gateway's streaming adapters."
         },
         {
+          "name": "SandboxTaskOptions",
+          "kind": "interface",
+          "signature": "interface SandboxTaskOptions",
+          "doc": null
+        },
+        {
           "name": "SandboxTerminalConnectionRouteOptions",
           "kind": "interface",
           "signature": "interface SandboxTerminalConnectionRouteOptions",
@@ -16807,6 +16909,12 @@
           "kind": "function",
           "signature": "(options: SandboxToolPathOptions) => string",
           "doc": "Resolve the binary directory path for a sandbox tool based on provided options"
+        },
+        {
+          "name": "SandboxToolContext",
+          "kind": "interface",
+          "signature": "interface SandboxToolContext",
+          "doc": "The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine."
         },
         {
           "name": "sandboxToolPath",

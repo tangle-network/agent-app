@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CHAT_CONTRACT } from '../../src/journeys/config'
-import { clickUntilSubmitted, createSubmissionTracker, routeSubmitPaths, settleText } from '../../src/journeys/send'
+import { clickUntilSubmitted, composerText, createSubmissionTracker, routeSubmitPaths, settleText } from '../../src/journeys/send'
 
 describe('createSubmissionTracker', () => {
   const tracker = () => createSubmissionTracker('https://app.example.com/app/ws/chat/new', DEFAULT_CHAT_CONTRACT.sendPaths)
@@ -70,5 +70,17 @@ describe('settleText', () => {
     let i = 0
     expect(await settleText(async () => reads[i++]!, async () => {})).toBe('abc')
     expect(i).toBe(8)
+  })
+})
+
+describe('composerText', () => {
+  const box = (el: Record<string, unknown>) => ({ evaluate: async <R,>(fn: (el: Element) => R) => fn(el as unknown as Element) })
+
+  it('reads a textarea or input by its value, which innerText never holds', async () => {
+    await expect(composerText(box({ value: 'Summarize the claim file', innerText: '' }))).resolves.toBe('Summarize the claim file')
+  })
+
+  it('reads a contenteditable composer by its innerText', async () => {
+    await expect(composerText(box({ innerText: 'Draft the reply', textContent: 'Draft the reply' }))).resolves.toBe('Draft the reply')
   })
 })
