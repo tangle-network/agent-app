@@ -19,6 +19,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createServer } from 'node:http'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { describe, expect, it, vi } from 'vitest'
@@ -41,10 +42,13 @@ import {
   type SqlAdapter,
 } from '@tangle-network/agent-gateway'
 
+import { createMemoryTurnStreamHarness, MEMORY_TURN_STREAM_AUTH_SECRET } from '@tangle-network/agent-app/turn-stream'
+import type { OperatorTurn } from '@tangle-network/agent-app/operator'
+import { TurnStreamDO } from '../src/turn-lock'
 import { config } from '../agent.config'
-import { buildChatApp, type ChatApp } from '../src/chat'
+import { buildChatApp, type ChatApp, type ChatAppOverrides } from '../src/chat'
 import type { AppEnv } from '../src/env'
-import { buildGatewayApp } from '../src/gateway'
+import { buildGatewayApp, type GatewayAppOptions } from '../src/gateway'
 import { appSlug } from '../src/sandbox'
 import { ARTIFACT_ROOT } from '../src/files'
 import { createWorker, type WorkerAssembly } from '../src/worker'
@@ -122,6 +126,7 @@ interface Harness {
   sql: SqlAdapter
   cookie: string
   gatewayBuilds(): number
+  setOperatorRunEnabled(enabled: boolean): void
   settle(): Promise<unknown>
 }
 
@@ -129,26 +134,31 @@ async function createHarness(
   produce: (args: ChatTurnProduceArgs<void>) => ChatTurnRouteProducer = () =>
     createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MODEL }),
   peekWorkspace?: WorkerAssembly['peekWorkspace'],
+  origin = BASE,
+  operatorStorage: Pick<GatewayAppOptions, 'files' | 'assets'> = {},
+  sidecarConnection?: ChatAppOverrides['sidecarConnection'],
 ): Promise<Harness> {
+  const localEnv: AppEnv = { ...env, BETTER_AUTH_URL: origin, TURN_STREAM: createMemoryTurnStreamHarness((state, secret) => new TurnStreamDO(state, { TURN_STREAM_AUTH_SECRET: secret })).namespace, TURN_STREAM_AUTH_SECRET: MEMORY_TURN_STREAM_AUTH_SECRET }
   const database = openMigratedDb()
   const pending: Promise<unknown>[] = []
   let gatewayBuildCount = 0
   const chatOverrides = {
+    ...(sidecarConnection ? { sidecarConnection } : {}),
     db: database.db,
     turnStore: createMemoryTurnEventStore(),
     produce,
     uploadSink: async () => null,
   }
-  const app = buildChatApp(env, {
+  const app = buildChatApp(localEnv, {
     ...chatOverrides,
     uploadSink: async () => null, // inline uploads only; no box in tests
   })
   // Real sign-up through better-auth; the returned cookie is what a browser
   // would replay on every API call.
   const res = await app.auth.auth.handler(
-    new Request(`${BASE}/api/auth/sign-up/email`, {
+    new Request(`${origin}/api/auth/sign-up/email`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', origin: BASE },
+      headers: { 'content-type': 'application/json', origin },
       body: JSON.stringify({ email: 'e2e@example.com', password: 'correct-horse-battery', name: 'e2e' }),
     }),
   )
@@ -166,10 +176,11 @@ async function createHarness(
     buildChatApp: () => app,
     buildGatewayApp: (_env, chatApp, options) => {
       gatewayBuildCount += 1
-      return buildGatewayApp(env, chatApp, {
+      return buildGatewayApp(localEnv, chatApp, {
         ...options,
+        ...operatorStorage,
         sql: database.sql,
-        createTrustedChatApp: (ownerId) => buildChatApp(env, {
+        createTrustedChatApp: (ownerId) => buildChatApp(localEnv, {
           ...chatOverrides,
           trustedUserId: ownerId,
         }),
@@ -187,12 +198,13 @@ async function createHarness(
     app,
     workerFetch: async (request) => workerHandler(
       request as Parameters<typeof workerHandler>[0],
-      env,
+      localEnv,
       executionContext,
     ),
     sql: database.sql,
     cookie,
     gatewayBuilds: () => gatewayBuildCount,
+    setOperatorRunEnabled: enabled => { localEnv.OPERATOR_RUN_ENABLED = enabled ? 'true' : 'false' },
     settle: () => Promise.all(pending),
   }
 }
@@ -766,4 +778,171 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
     expect(config.systemPrompt.length).toBeGreaterThan(0)
     expect(config.name.length).toBeGreaterThan(0)
   })
+})
+
+/** A fresh HTTP client crosses an actual socket, real signup/key issuance,
+ * migrated SQLite, Worker routing and the shared operator adapter. Only the
+ * model/sandbox event source and explicitly configured owned artifact storage
+ * are deterministic fixtures. No credential or paid call is used.
+ */
+describe('external-agent HTTP customer journey', () => {
+  it('discovers, signs up, scopes, runs once, reads owned bytes and revokes', async () => {
+    let h: Harness
+    let executions = 0
+    let finishSlow = () => {}
+    let signalSlow = () => {}
+    const slowStarted = new Promise<void>(resolve => { signalSlow = resolve })
+    const slowRelease = new Promise<void>(resolve => { finishSlow = resolve })
+    const artifact = 'artifact bytes produced by the deterministic backend\n'
+    const ownedArtifacts = new Map<string, string>()
+    const server = createServer(async (incoming, outgoing) => {
+      try {
+        const chunks: Buffer[] = []
+        for await (const chunk of incoming) chunks.push(Buffer.from(chunk))
+        const headers = new Headers()
+        for (const [name, value] of Object.entries(incoming.headers)) {
+          if (Array.isArray(value)) for (const item of value) headers.append(name, item)
+          else if (value !== undefined) headers.set(name, value)
+        }
+        const request = new Request(`${origin}${incoming.url}`, { method: incoming.method, headers,
+          ...(['GET', 'HEAD'].includes(incoming.method ?? 'GET') ? {} : { body: Buffer.concat(chunks) }) })
+        const response = await h.workerFetch(request)
+        outgoing.statusCode = response.status
+        for (const [name, value] of response.headers) if (name !== 'set-cookie') outgoing.setHeader(name, value)
+        const cookies = response.headers.getSetCookie()
+        if (cookies.length) outgoing.setHeader('set-cookie', cookies)
+        outgoing.end(Buffer.from(await response.arrayBuffer()))
+      } catch (error) { outgoing.statusCode = 500; outgoing.end(String(error)) }
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('No local server address')
+    const origin = `http://127.0.0.1:${address.port}`
+    try {
+      h = await createHarness(args => {
+        executions++
+        ownedArtifacts.set(`${args.identity.userId}/proof.txt`, artifact)
+        if (args.body.content === 'Lose detached observation') return createSandboxChatProducer({ errorNotice: true, model: MODEL, events: (async function* () { yield RAW_TURN_EVENTS[0]!; throw new Error('Replay lost while deterministic backend remains active') })() })
+        if (args.body.content === 'Hold the workspace lock') {
+          signalSlow()
+          return createSandboxChatProducer({ events: (async function* () { await slowRelease; yield* feed(RAW_TURN_EVENTS) })(), model: MODEL, errorNotice: true })
+        }
+        return createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MODEL, errorNotice: true })
+      }, undefined, origin, {
+        files: {
+          list: async ctx => ownedArtifacts.has(`${ctx.identity.userId}/proof.txt`) ? [{ path: 'proof.txt', bytes: new TextEncoder().encode(artifact).length }] : [],
+          read: async (ctx, _workspace, path) => {
+            const content = ownedArtifacts.get(`${ctx.identity.userId}/${path}`)
+            return content === undefined ? null : { path, content, mediaType: 'text/plain', revision: 'fixture-v1' }
+          },
+        },
+      }, async (_env, scope) => ({ runtimeUrl: 'http://sidecar.fixture.test', sessionId: scope.threadId,
+        fetchImpl: async () => Response.json({ data: { interactions: [{ id: 'owner-decision', kind: 'permission', title: 'Publish the draft?' }] } }) }))
+      const call = (path: string, init?: RequestInit) => fetch(origin + path, { ...init, redirect: 'error' })
+      for (const path of ['/llms.txt', '/llms-full.txt', '/agent-setup.md', '/agent-api.md', '/.well-known/tangle-agent.json']) {
+        const response = await call(path)
+        expect(response.status, path).toBe(200)
+        expect(response.headers.get('content-type')).not.toMatch(/text\/html/)
+        if (path.endsWith('.json')) expect(((await response.json()) as { operator_api: string }).operator_api).toBe(`${origin}/api/operator/v1`)
+      }
+      const schema = await (await call('/openapi.json')).json() as { paths: Record<string, unknown> }
+      expect(schema.paths).not.toHaveProperty('/api/operator/v1/workspaces/{workspaceId}/assets/{assetId}')
+      const markdown = await call('/', { headers: { accept: 'text/markdown' } })
+      expect(markdown.headers.get('vary')).toContain('Accept')
+      expect(markdown.headers.get('content-type')).toContain('text/markdown')
+      const signup = await call('/api/auth/sign-up/email', { method: 'POST', headers: { 'content-type': 'application/json', origin },
+        body: JSON.stringify({ name: 'External client owner', email: 'external-client@example.test', password: 'fixture-only-password' }) })
+      expect(signup.status).toBe(200)
+      const ownerCookie = signup.headers.getSetCookie().map(value => value.split(';')[0]).join('; ')
+      const issue = async (scopes: string[], extra: Record<string, unknown> = {}) => {
+        const response = await call('/api/keys', { method: 'POST', headers: { cookie: ownerCookie, 'content-type': 'application/json' },
+          body: JSON.stringify({ name: 'external client', scopes, expiresAt: new Date(Date.now() + 60_000).toISOString(), ...extra }) })
+        expect(response.status).toBe(201)
+        return await response.json() as { key: string; id: string }
+      }
+      const read = await issue(['operator:read'])
+      const deniedIssue = await call('/api/keys', { method: 'POST', headers: { cookie: ownerCookie, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'No payer authority', scopes: ['operator:read', 'operator:run'], expiresAt: new Date(Date.now() + 60_000).toISOString() }) })
+      expect(deniedIssue.status).toBe(403)
+      expect(schema.paths).not.toHaveProperty('/api/operator/v1/workspaces/{workspaceId}/turns')
+      expect(await (await call('/api/keys/access', { headers: { cookie: ownerCookie } })).json()).toEqual({ operatorRunEnabled: false })
+      h.setOperatorRunEnabled(true) // Explicit deployment-payer opt-in for the deterministic fixture.
+      const run = await issue(['operator:read', 'operator:run'])
+      const authorized = (key: string, path: string, body?: unknown) => call(`/api/operator/v1${path}`, { method: body === undefined ? 'GET' : 'POST',
+        headers: { authorization: `Bearer ${key}`, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
+      expect((await call('/api/operator/v1', { headers: { cookie: ownerCookie } })).status).toBe(401)
+      const discovery = await (await authorized(read.key, '')).json() as { app: { capabilities: string[] } }
+      expect(discovery.app.capabilities).toContain('files.read')
+      expect(discovery.app.capabilities).not.toContain('workspaces.create')
+      const { workspaces } = await (await authorized(read.key, '/workspaces')).json() as { workspaces: Array<{ id: string }> }
+      expect(workspaces).toHaveLength(1)
+      const workspace = workspaces[0]!.id
+      const input = { turnId: crypto.randomUUID(), content: 'Produce the deterministic proof result' }
+      expect((await authorized(read.key, `/workspaces/${workspace}/turns`, input)).status).toBe(403)
+      h.setOperatorRunEnabled(false)
+      expect((await authorized(run.key, `/workspaces/${workspace}/turns`, input)).status).toBe(403)
+      expect(executions).toBe(0)
+      expect(await h.sql.query('SELECT turn_id FROM operator_turn_admissions')).toHaveLength(0)
+      expect((await h.app.store.listThreads({ workspaceId: workspace })).total).toBe(0)
+      h.setOperatorRunEnabled(true)
+      expect((await authorized(run.key, '/workspaces/another-owner/turns', input)).status).toBe(404)
+      const capped = await issue(['operator:read', 'operator:run'], { spendingLimitCents: 100 })
+      expect((await authorized(capped.key, `/workspaces/${workspace}/turns`, input)).status).toBe(402)
+      expect(executions).toBe(0)
+      expect((await authorized(read.key, `/workspaces/${workspace}/file?path=proof.txt`)).status).toBe(404)
+      const [start, raced] = await Promise.all([authorized(run.key, `/workspaces/${workspace}/turns`, input), authorized(run.key, `/workspaces/${workspace}/turns`, input)])
+      expect(raced.status).toBe(202)
+      expect(start.status).toBe(202)
+      const outcomes = await Promise.all([start.json(), raced.json()]) as Array<{ turn: OperatorTurn }>
+      const turn = outcomes.find(result => result.turn.state === 'succeeded')!.turn
+      expect(turn.state).toBe('succeeded')
+      expect(turn.reply!.content).toContain('Filed')
+      const retry = await authorized(run.key, `/workspaces/${workspace}/turns`, input)
+      expect(retry.status).toBe(202)
+      expect(((await retry.json()) as { turn: OperatorTurn }).turn.turnId).toBe(input.turnId)
+      expect(executions).toBe(1)
+      const polled = await authorized(read.key, `/workspaces/${workspace}/threads/${turn.threadId}/turns/${input.turnId}?wait=1`)
+      expect(((await polled.json()) as { turn: OperatorTurn }).turn.state).toBe('succeeded')
+      // A new HTTP request builds a new operator adapter over the same database:
+      // simulate retained claim state from a process that died before transcript insertion.
+      const interruptedId = crypto.randomUUID()
+      await h.sql.exec('INSERT INTO operator_turn_admissions (owner_id, turn_id, thread_id, created_at) VALUES (?, ?, ?, ?)', [workspace, interruptedId, turn.threadId, Date.now()])
+      const interrupted = await authorized(run.key, `/workspaces/${workspace}/turns`, { turnId: interruptedId, threadId: turn.threadId, content: 'Do not repeat uncertain effects' })
+      expect(((await interrupted.json()) as { turn: OperatorTurn }).turn.state).toBe('unknown')
+      expect(executions).toBe(1)
+      const slow = authorized(run.key, `/workspaces/${workspace}/turns`, { turnId: crypto.randomUUID(), threadId: turn.threadId, content: 'Hold the workspace lock' })
+      await slowStarted
+      const browserContender = await call('/api/chat', { method: 'POST', headers: { cookie: ownerCookie, 'content-type': 'application/json' }, body: JSON.stringify({ threadId: turn.threadId, turnId: crypto.randomUUID(), content: 'Browser contender' }) })
+      expect(browserContender.status).toBe(409)
+      const contender = await authorized(run.key, `/workspaces/${workspace}/turns`, { turnId: crypto.randomUUID(), threadId: turn.threadId, content: 'Operator contender' })
+      expect(await contender.json()).toMatchObject({ turn: { state: 'failed', failure: { code: 'workspace_turn_in_flight' } } })
+      expect(executions).toBe(2)
+      const during = await h.app.store.listMessages(turn.threadId)
+      expect(during.filter(row => row.role === 'user').map(row => row.content)).toEqual([input.content, 'Hold the workspace lock'])
+      finishSlow()
+      expect(await (await slow).json()).toMatchObject({ turn: { state: 'succeeded', reply: { content: expect.stringContaining('Filed') } } })
+      const approvals = await authorized(read.key, `/workspaces/${workspace}/approvals`)
+      expect(approvals.status).toBe(200)
+      const held = await approvals.json() as { approvals: Array<{ decidedBy: string; url: string }> }
+      expect(held.approvals[0]?.decidedBy).toBe('owner')
+      expect(held.approvals.map(item => item.url)).toContain(`${origin}/?threadId=${encodeURIComponent(turn.threadId)}`)
+      const file = await (await authorized(read.key, `/workspaces/${workspace}/file?path=proof.txt`)).json() as { file: { content: string } }
+      expect(file.file.content).toBe(artifact)
+      expect((await authorized(read.key, '/workspaces/another-owner/file?path=proof.txt')).status).toBe(404)
+      expect((await authorized(read.key, `/workspaces/${workspace}/file?path=..%2Fsecret`)).status).toBe(400)
+      expect((await authorized(run.key, `/workspaces/${workspace}/approvals`, { id: 'decision', outcome: 'accepted' })).status).toBe(404)
+      const lostId = crypto.randomUUID()
+      const lost = await authorized(run.key, `/workspaces/${workspace}/turns`, { turnId: lostId, threadId: turn.threadId, content: 'Lose detached observation' })
+      expect(lost.status).toBe(202)
+      await h.settle()
+      const uncertain = await authorized(read.key, `/workspaces/${workspace}/threads/${turn.threadId}/turns/${lostId}`)
+      expect(await uncertain.json()).toMatchObject({ turn: { state: 'unknown', reply: null } })
+      const forbiddenRestart = await authorized(run.key, `/workspaces/${workspace}/turns`, { turnId: crypto.randomUUID(), threadId: turn.threadId, content: 'Must not overlap detached backend' })
+      expect(await forbiddenRestart.json()).toMatchObject({ turn: { state: 'failed', failure: { code: 'workspace_turn_in_flight' } } })
+      expect(executions).toBe(3)
+      expect((await call(`/api/keys/${run.id}`, { method: 'DELETE', headers: { cookie: ownerCookie } })).status).toBe(200)
+      expect((await authorized(run.key, '')).status).toBe(401)
+      await h.settle()
+    } finally { finishSlow(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
+  }, 30_000)
 })

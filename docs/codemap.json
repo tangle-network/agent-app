@@ -11861,6 +11861,18 @@
           "doc": null
         },
         {
+          "name": "ChatOperatorAdmission",
+          "kind": "interface",
+          "signature": "interface ChatOperatorAdmission",
+          "doc": "A durable execution claim, separate from the chat transcript that owns results."
+        },
+        {
+          "name": "ChatOperatorAdmissionStore",
+          "kind": "interface",
+          "signature": "interface ChatOperatorAdmissionStore",
+          "doc": "Product-owned atomic storage for duplicate suppression across processes."
+        },
+        {
           "name": "ChatOperatorMessage",
           "kind": "interface",
           "signature": "interface ChatOperatorMessage",
@@ -24401,7 +24413,7 @@
         {
           "name": "AgentSetupBlock",
           "kind": "function",
-          "signature": "({ productName, setupUrl, markdown, className }: AgentSetupBlockProps) => Element",
+          "signature": "({ productName, setupUrl, markdown, description, className }: AgentSetupBlockProps) => Element",
           "doc": "The \"Hand this to your agent\" block for a product's docs page."
         },
         {

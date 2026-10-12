@@ -4,6 +4,8 @@ import {
   createOperatorApi,
   createOperatorClient,
   type ChatOperatorAdapterOptions,
+  type ChatOperatorAdmission,
+  type ChatOperatorAdmissionStore,
   type ChatOperatorMessage,
   type ChatOperatorThread,
 } from '../src/operator'
@@ -18,17 +20,21 @@ type Identity = { userId: string }
 const ORIGIN = 'https://app.example'
 
 function setup(options: {
+  turnStatus?: ChatOperatorAdapterOptions<Identity>['turnStatus']
+  admissions?: ChatOperatorAdmissionStore<Identity>
+  threads?: Map<string, ChatOperatorThread>
+  messages?: Map<string, ChatOperatorMessage[]>
   reply?: (content: string) => Record<string, unknown>
   running?: () => string[] | null
   failureOf?: ChatOperatorAdapterOptions<Identity>['failureOf']
 } = {}) {
-  const threads = new Map<string, ChatOperatorThread>([
+  const threads = options.threads ?? new Map<string, ChatOperatorThread>([
     ['thread-b', { id: 'thread-b', workspaceId: 'ws-b', title: 'Other' }],
     ['thread-colleague', { id: 'thread-colleague', workspaceId: 'ws-a', title: 'A colleague\'s conversation' }],
   ])
   // Conversations that belong to one user, as in an app whose threads are per user.
   const owners = new Map([['thread-colleague', 'colleague']])
-  const messages = new Map<string, ChatOperatorMessage[]>()
+  const messages = options.messages ?? new Map<string, ChatOperatorMessage[]>()
   let clock = 0
   const runTurn = vi.fn(async (_ctx: unknown, input: { threadId: string; turnId: string; content: string }) => {
     const list = messages.get(input.threadId) ?? []
@@ -41,6 +47,8 @@ function setup(options: {
   })
   const adapter = createChatOperatorAdapter<Identity>({
     origin: ORIGIN,
+    ...(options.admissions ? { admissions: options.admissions } : {}),
+    ...(options.turnStatus ? { turnStatus: options.turnStatus } : {}),
     workspaces: {
       authorize: async (_ctx, workspaceId) => (workspaceId === 'ws-a' ? { id: 'ws-a', name: 'Firm', role: 'owner' } : null),
       list: async () => [{ id: 'ws-a', name: 'Firm', role: 'owner' }],
@@ -167,5 +175,87 @@ describe('chat operator adapter', () => {
     expect(await client.getThread('ws-a', 'thread-colleague')).toMatchObject({ succeeded: false, status: 404 })
     expect(await client.startTurn('ws-a', { content: 'x', threadId: 'thread-colleague' })).toMatchObject({ succeeded: false, status: 404, code: 'operator.thread_not_found' })
     expect(runTurn).not.toHaveBeenCalled()
+  })
+})
+
+function durableAdmissionFixture(): ChatOperatorAdmissionStore<Identity> {
+  const rows = new Map<string, ChatOperatorAdmission>()
+  const key = (owner: string, workspace: string, turn: string) => `${owner}:${workspace}:${turn}`
+  return {
+    async get(ctx, workspace, turn) { return rows.get(key(ctx.identity.userId, workspace, turn)) ?? null },
+    async claim(ctx, input) {
+      const id = key(ctx.identity.userId, input.workspaceId, input.turnId)
+      if (rows.has(id)) return false
+      rows.set(id, { threadId: input.threadId })
+      return true
+    },
+    async recordRefusal(ctx, input, refusal) { rows.set(key(ctx.identity.userId, input.workspaceId, input.turnId), { threadId: input.threadId, refusal }) },
+  }
+}
+
+describe('durable operator admission seam', () => {
+  it('suppresses concurrent starts without making the claim the completion owner', async () => {
+    const h = setup({ admissions: durableAdmissionFixture() })
+    const input = { content: 'Only once', turnId: crypto.randomUUID() }
+    const results = await Promise.all([h.client.startTurn('ws-a', input), h.client.startTurn('ws-a', input)])
+    expect(results.every(result => result.succeeded)).toBe(true)
+    expect(h.runTurn).toHaveBeenCalledTimes(1)
+    const again = await h.client.startTurn('ws-a', input)
+    expect(again).toMatchObject({ succeeded: true, value: { state: 'succeeded', reply: { content: 'Done: Only once' } } })
+    expect(await h.client.startTurn('ws-a', { ...input, content: 'Changed payload' })).toMatchObject({ succeeded: true, value: { reply: { content: 'Done: Only once' } } })
+    expect(await h.client.startTurn('ws-a', { ...input, threadId: 'thread-colleague' })).toMatchObject({ succeeded: false, status: 409 })
+    expect(h.runTurn).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns unknown after a claim-before-transcript crash and reconciles from retained chat rows', async () => {
+    const admissions = durableAdmissionFixture()
+    const first = setup({ admissions })
+    first.runTurn.mockRejectedValueOnce(new Error('simulated process loss after claim'))
+    const input = { content: 'Recover the existing work', turnId: crypto.randomUUID() }
+    expect(await first.client.startTurn('ws-a', input)).toMatchObject({ succeeded: false, status: 500 })
+    const restarted = setup({ admissions, threads: first.threads, messages: first.messages })
+    const recovered = await restarted.client.startTurn('ws-a', input)
+    expect(recovered).toMatchObject({ succeeded: true, value: { state: 'unknown', reply: null } })
+    expect(restarted.runTurn).not.toHaveBeenCalled()
+    if (!recovered.succeeded) throw new Error('Missing recovered identity')
+    const id = recovered.value.threadId
+    expect(await restarted.client.getTurn('ws-a', id, input.turnId)).toMatchObject({ succeeded: true, value: { state: 'unknown' } })
+    first.messages.set(id, [
+      { id: 'u', role: 'user', content: input.content, parts: [{ type: 'text', text: input.content, turnId: input.turnId }] },
+      { id: 'a', role: 'assistant', content: 'Recovered actual output', parts: [] },
+    ])
+    expect(await restarted.client.getTurn('ws-a', id, input.turnId)).toMatchObject({ succeeded: true, value: { state: 'succeeded', reply: { content: 'Recovered actual output' } } })
+    expect(restarted.runTurn).not.toHaveBeenCalled()
+  })
+
+  it('persists an explicit pre-start refusal as failed; only a new authorized UUID tries again', async () => {
+    const h = setup({ admissions: durableAdmissionFixture() })
+    h.runTurn.mockResolvedValueOnce(Response.json({ error: 'Model not configured', code: 'model.not_configured' }, { status: 503 }))
+    const input = { content: 'Do the work', turnId: crypto.randomUUID() }
+    for (let i = 0; i < 2; i++) expect(await h.client.startTurn('ws-a', input)).toMatchObject({ succeeded: true, value: { state: 'failed', failure: { code: 'model.not_configured' } } })
+    expect(h.runTurn).toHaveBeenCalledTimes(1)
+    expect(await h.client.startTurn('ws-a', { ...input, turnId: crypto.randomUUID() })).toMatchObject({ succeeded: true, value: { state: 'succeeded' } })
+  })
+})
+
+
+describe('authoritative turn completion', () => {
+  it('never promotes an abandoned partial reply after its running lease disappears', async () => {
+    let status: 'running' | 'complete' | 'error' | null = 'running'
+    let running: string[] = ['stream-id']
+    const h = setup({ turnStatus: async () => status, running: () => running })
+    const input = { turnId: crypto.randomUUID(), content: 'Partial report' }
+    const started = await h.client.startTurn('ws-a', input)
+    expect(started).toMatchObject({ succeeded: true, value: { state: 'working', reply: null } })
+    if (!started.succeeded) throw new Error('Missing turn')
+    const read = () => h.client.getTurn('ws-a', started.value.threadId, input.turnId)
+    running = []
+    expect(await read()).toMatchObject({ succeeded: true, value: { state: 'unknown', reply: null } })
+    status = null
+    expect(await read()).toMatchObject({ succeeded: true, value: { state: 'unknown', reply: null } })
+    status = 'error'
+    expect(await read()).toMatchObject({ succeeded: true, value: { state: 'failed', reply: null, failure: { code: 'turn.error' } } })
+    status = 'complete'
+    expect(await read()).toMatchObject({ succeeded: true, value: { state: 'succeeded', reply: { content: 'Done: Partial report' } } })
   })
 })

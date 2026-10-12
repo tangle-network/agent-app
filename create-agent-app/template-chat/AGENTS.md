@@ -46,3 +46,15 @@ That proof checks real auth and thread persistence across a Worker restart, but 
 For deployment, complete environment configuration, apply the required database migrations, and exercise the actual page and turn flow.
 Record hosted/model/disconnect proofs separately; do not claim them from compilation or an injected producer.
 Fix failures without weakening the protected behavior.
+
+Customer agents discover `/agent-setup.md` and `/api/operator/v1`; this file is
+only the coding-agent contract. Keep the public docs, key scopes and actual
+operator capabilities aligned. Never advertise Platform signup, durable async
+admission, safe artifact bytes, MCP, or A2A unless their implementations exist.
+Capped keys must not bypass spending enforcement through the operator adapter.
+
+External-agent execution is disabled by default (`OPERATOR_RUN_ENABLED="false"`).
+Account signup and an account owner selecting a scope do not authorize spending
+the deployment payer’s funds. Before explicitly enabling `"true"`, the deployment
+payer must review signup/access controls, funding and admission policy. Read-only
+keys continue to work. Previously issued run keys are denied while disabled.

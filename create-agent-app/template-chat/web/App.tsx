@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { CirclePlus, History } from 'lucide-react'
+import { CirclePlus, History, KeyRound } from 'lucide-react'
 import { AgentWorkspaceCompanion, AgentWorkspaceLayout } from '@tangle-network/agent-app/workspace-react'
 import { SessionHistoryPanel, useSessionHistory, type FetchSessionPage } from '@tangle-network/agent-app/web-react'
 import type { SessionSort } from '@tangle-network/agent-app/session-shell'
+import { ApiAccess } from './ApiAccess'
 import { Conversation } from './Conversation'
 import { workspaceTools } from './workspace-tools'
 import { historyHref, json, listThreads, post, threadHref, type Session, type Thread } from './api'
 
 const productName = document.title
 const initialThreadId = new URL(location.href).searchParams.get('threadId')
+const showApiAccess = !initialThreadId && new URL(location.href).searchParams.get('view') === 'api-access'
 const showHistory = !initialThreadId && new URL(location.href).searchParams.get('view') === 'history'
 
 function Auth({ onAuthenticated }: { onAuthenticated: () => Promise<void> }) {
@@ -77,15 +79,15 @@ function Workspace({ session }: { session: Session }) {
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
   }
   return <AgentWorkspaceLayout
-    navItems={[{ id: 'new', label: 'New thread', icon: CirclePlus, href: '/', variant: 'primary' }]}
+    navItems={[{ id: 'new', label: 'New thread', icon: CirclePlus, href: '/', variant: 'primary' }, { id: 'api-access', label: 'API access', icon: KeyRound, href: '/?view=api-access' }]}
     sessions={{ icon: History, href: historyHref, hrefForSession: threadHref, sessions: threads,
       totalCount: threads.length, activeSessionId: activeId }}
-    activeId={showHistory ? 'history' : activeId ? undefined : 'new'}
+    activeId={showApiAccess ? 'api-access' : showHistory ? 'history' : activeId ? undefined : 'new'}
     logo={<span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground" title={productName}>{productName.slice(0, 1)}</span>}
     logoHref="/" user={session.user} settingsHref={null} onLogout={() => void logout()}
     contentClassName="h-dvh min-h-0 overflow-hidden" defaultRailCollapsed={false}>
     {error && <div role="alert" className="p-4 text-sm text-destructive">{error} <button className="underline" onClick={() => location.reload()}>Reload</button></div>}
-    {showHistory ? loaded ? <HistoryPage threads={threads} /> : <p role="status" className="p-6">Loading History…</p>
+    {showApiAccess ? <ApiAccess /> : showHistory ? loaded ? <HistoryPage threads={threads} /> : <p role="status" className="p-6">Loading History…</p>
       : <AgentWorkspaceCompanion tabs={workspaceTools} persistenceKey={`workspace:${session.user.id}:tools`}><Conversation initialThreadId={initialThreadId} onThread={setActiveId} onChanged={refreshThreads} /></AgentWorkspaceCompanion>}
   </AgentWorkspaceLayout>
 }

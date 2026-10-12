@@ -12,6 +12,12 @@ function stubClipboard(writeText: (text: string) => Promise<void>) {
 }
 
 describe('AgentSetupBlock', () => {
+  it('lets a manual-key product state its actual setup authority', () => {
+    render(<AgentSetupBlock productName="Workspace" setupUrl="https://app.example/agent-setup.md" description="The owner issues a scoped key; the agent cannot authorize spending." />)
+    expect(screen.getByText('The owner issues a scoped key; the agent cannot authorize spending.')).toBeTruthy()
+    expect(screen.queryByText(/gets its own capped key/)).toBeNull()
+  })
+
   it('copies the exact setup skill it is given and links the raw prompt', async () => {
     const writeText = vi.fn(async () => {})
     stubClipboard(writeText)

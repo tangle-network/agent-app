@@ -69,4 +69,4 @@ export const verifications = sqliteTable('verifications', {
 
 // ── chat tables (shell-owned columns) ───────────────────────────────────────
 
-export const { threads, messages } = createChatTables()
+export const { threads, messages } = createChatTables({ messageExtraColumns: { turnStreamId: text('turn_stream_id'), backendTerminal: integer('backend_terminal', { mode: 'boolean' }).notNull().default(false) } })

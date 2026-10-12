@@ -120,6 +120,35 @@ try {
   browser = await chromium.launch({ headless: true })
   let { context, page } = await pageInNewContext()
   await signIn(page, true)
+  // Customer discovery and owner key issuance on the real generated Worker.
+  for (const path of ['/llms.txt', '/llms-full.txt', '/agent-setup.md', '/agent-api.md', '/.well-known/tangle-agent.json']) {
+    const response = await fetch(origin + path)
+    assert.equal(response.status, 200, path)
+    assert.ok(!response.headers.get('content-type')?.includes('text/html'), path)
+  }
+  const markdown = await fetch(origin, { headers: { accept: 'text/markdown' } })
+  assert.match(markdown.headers.get('content-type') ?? '', /text\/markdown/)
+  assert.match(markdown.headers.get('vary') ?? '', /Accept/)
+  await page.getByRole('link', { name: 'API access', exact: true }).click()
+  await page.getByRole('heading', { name: 'API access', exact: true }).waitFor()
+  assert.ok(!(await page.locator('body').innerText()).includes('gets its own capped key'), 'Manual owner-key onboarding must not advertise self-issued capped keys')
+  await page.getByLabel('Name', { exact: true }).fill('Fresh external client proof')
+  await page.getByRole('button', { name: 'Create key', exact: true }).click()
+  const keyField = page.getByLabel('New API key', { exact: true })
+  await keyField.waitFor()
+  const localKey = await keyField.inputValue()
+  const operator = await fetch(`${origin}/api/operator/v1`, { headers: { authorization: `Bearer ${localKey}` } })
+  assert.equal(operator.status, 200)
+  const contract = await operator.json()
+  assert.deepEqual(contract.principal.scopes, ['operator:read'])
+  assert.ok(!contract.app.capabilities.includes('files.read'), 'Unconfigured bytes must not be advertised')
+  await page.getByRole('button', { name: 'I’ve saved it', exact: true }).click()
+  await page.screenshot({ path: join(evidence, 'workspace-api-access.png'), fullPage: true })
+  await page.getByRole('button', { name: 'Revoke Fresh external client proof', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Key revoked' }).waitFor()
+  assert.equal((await fetch(`${origin}/api/operator/v1`, { headers: { authorization: `Bearer ${localKey}` } })).status, 401)
+  await page.getByRole('link', { name: 'New thread', exact: true }).click()
+
   await page.getByRole('heading', { name: 'What can we work on?', exact: true }).waitFor()
   const entryDesktop = await assertStyled(page)
   await page.screenshot({ path: join(evidence, 'workspace-entry-desktop.png'), fullPage: true })
@@ -185,8 +214,10 @@ try {
   assert.equal(turnRequests, 0, 'Local persistence proof must make no model turn requests')
   const result = {
     node: process.version,
+    browser: browser.version(),
+    browserDriver: "repository-pinned Playwright Chromium, one browser",
     package: pkg.name,
-    checks: ['real signup', 'real cookie session', 'HTTP thread create', 'History navigation', 'thread URL reload', 'shared mobile drawer navigation', 'shared profile menu signout', 'fresh Worker process and browser login reopen the same D1 thread'],
+    checks: ['public agent discovery', 'owner read-only key issuance', 'fresh bearer client discovery', 'key revocation', 'real signup', 'real cookie session', 'HTTP thread create', 'History navigation', 'thread URL reload', 'shared mobile drawer navigation', 'shared profile menu signout', 'fresh Worker process and browser login reopen the same D1 thread'],
     entryDesktop, entryMobile, desktop, mobile, modelTurnRequests: turnRequests,
     unrun: ['hosted deployment', 'live model/sandbox turn', 'live mid-turn disconnect'],
     messagePersistence: 'Covered separately by the generated app e2e suite with its explicitly fake sandbox producer, not by this no-model browser proof.',

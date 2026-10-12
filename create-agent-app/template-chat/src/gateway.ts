@@ -5,6 +5,8 @@
  * the sandbox turn, transcript, replay buffer, and failure handling.
  */
 
+import { OPERATOR_API_SCOPES, OPERATOR_SCOPE_DEPENDENCIES } from '@tangle-network/agent-app/operator'
+import { buildOperatorApi, type OperatorAppOptions } from './operator'
 import { config } from '../agent.config'
 import { streamChatRouteAsSandboxEvents } from '@tangle-network/agent-app/chat-routes'
 import {
@@ -23,7 +25,7 @@ import { buildChatApp, type ChatApp } from './chat'
 import type { AppEnv } from './env'
 import { appSlug } from './sandbox'
 
-export interface GatewayAppOptions {
+export interface GatewayAppOptions extends Pick<OperatorAppOptions, 'files' | 'assets'> {
   /** Keep the persisted chat turn alive after an API client disconnects. */
   waitUntil?: (promise: Promise<unknown>) => void
   /** Test override. Production uses the D1 adapter from agent-gateway. */
@@ -153,11 +155,28 @@ export function buildGatewayApp(
   })
 
   const app = new Hono()
+  app.use('/api/keys', async (c, next) => {
+    if (c.req.method === 'POST' && env.OPERATOR_RUN_ENABLED !== 'true') {
+      const body = await c.req.raw.clone().json().catch(() => null) as { scopes?: unknown } | null
+      if (Array.isArray(body?.scopes) && body.scopes.includes('operator:run')) return c.json({ error: 'The deployment payer has not enabled operator execution', code: 'operator.execution_disabled' }, 403)
+    }
+    await next()
+  })
+  app.get('/api/keys/access', async c => {
+    if (!await sessionUserId(chatApp, c.req.raw)) return c.json({ error: 'Unauthorized' }, 401)
+    return c.json({ operatorRunEnabled: env.OPERATOR_RUN_ENABLED === 'true' })
+  })
   app.route('/api/keys', createApiKeyRoutes({
     store: apiKeys,
     prefix: 'ak_',
+    validScopes: ['chat', ...OPERATOR_API_SCOPES.filter(scope => scope !== 'operator:run' || env.OPERATOR_RUN_ENABLED === 'true')],
+    scopeDependencies: env.OPERATOR_RUN_ENABLED === 'true' ? OPERATOR_SCOPE_DEPENDENCIES : {},
+    requireExpiryForScopes: OPERATOR_API_SCOPES.filter(scope => scope !== 'operator:run' || env.OPERATOR_RUN_ENABLED === 'true'),
     getAuthUserId: (request) => sessionUserId(chatApp, request),
   }))
   app.route('/v1/agents', gateway)
+  const operator = buildOperatorApi(env, chatApp, options)
+  app.all('/api/operator/v1', c => operator.handle(c.req.raw))
+  app.all('/api/operator/v1/*', c => operator.handle(c.req.raw))
   return app
 }

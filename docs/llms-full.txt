@@ -15267,6 +15267,22 @@ Source: `src/operator/index.ts` · depends on `platform`, `stream`, `web`
 interface ChatOperatorAdapterOptions
 ```
 
+### `ChatOperatorAdmission`
+
+`interface` — A durable execution claim, separate from the chat transcript that owns results.
+
+```ts
+interface ChatOperatorAdmission
+```
+
+### `ChatOperatorAdmissionStore`
+
+`interface` — Product-owned atomic storage for duplicate suppression across processes.
+
+```ts
+interface ChatOperatorAdmissionStore
+```
+
 ### `ChatOperatorMessage`
 
 `interface` — The message fields the adapter reads; agent-app's chat-store rows satisfy it.
@@ -31542,7 +31558,7 @@ interface AgentSettingsPopoverProps
 `function` — The "Hand this to your agent" block for a product's docs page.
 
 ```ts
-({ productName, setupUrl, markdown, className }: AgentSetupBlockProps) => Element
+({ productName, setupUrl, markdown, description, className }: AgentSetupBlockProps) => Element
 ```
 
 ### `AgentSetupBlockProps`

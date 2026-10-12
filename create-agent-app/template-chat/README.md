@@ -103,3 +103,52 @@ implied by a local build or no-model browser proof.
 workspace. It returns metadata or `warming`, never provisions a sandbox, and
 has no file-download behavior. Reopening saved bytes requires a product-owned,
 authorized file reader. Preserve the server access checks and storage semantics.
+
+## External agents
+
+This product serves `/agent-setup.md`, `/llms.txt`, `/llms-full.txt`,
+`/agent-api.md` and `/.well-known/tangle-agent.json` without login. These are
+customer-facing instructions; `AGENTS.md` is for agents developing this repo.
+
+Sign in to `/?view=api-access` to create an expiring key. Existing accounts and
+keys are reused. Read-only access is available by default. Only after the deployment
+payer enables execution may an account owner grant `operator:run`
+when the agent may use the deployment's paid model/sandbox credentials
+and modify workspace files. Keys are scoped and revocable. This template does
+not automatically accept Tangle Platform keys or register a Platform product.
+
+`/api/operator/v1` exposes the shared operator contract over the existing
+personal workspace and transcript. It reports actual optional capabilities,
+returns persisted terminal results, and keeps owner decisions in the browser.
+The chat-backed start request normally runs until settlement; it does not
+promise durable asynchronous admission. Capped keys are refused for execution,
+rather than bypassing their caps through the browser path.
+
+There is no default safe artifact-byte reader. `/api/files` is metadata only.
+Products can supply the typed `files`/`assets` adapters to `buildOperatorApi`
+for owned, bounded storage. Only configured capabilities are advertised.
+Never implement root confinement with a separate symlink check and file read.
+
+External-agent execution is disabled by default (`OPERATOR_RUN_ENABLED="false"`).
+Account signup and an account owner selecting a scope do not authorize spending
+the deployment payer’s funds. Before explicitly enabling `"true"`, the deployment
+payer must review signup/access controls, funding and admission policy. Read-only
+keys continue to work. Previously issued run keys are denied while disabled.
+
+All browser and API turns use the shared `TurnStreamDO` workspace lock. Configure
+`TURN_STREAM_AUTH_SECRET` in local development and production; missing lock
+configuration fails closed before model work. Apply the Wrangler Durable Object
+migration when upgrading. A stuck lock needs reconciliation of the existing turn,
+not an automatic retry of uncertain effects. Draft text is not terminal evidence.
+
+Historical turns without a retained stream-status identity intentionally report
+`unknown`; transcript text alone cannot establish completion. Inspect/reconcile
+the original execution rather than rerunning uncertain effects. Workspace locks
+do not auto-expire: a crashed detached run stays blocked until cooperative release
+or operator reconciliation establishes that the backend has stopped.
+
+Detached execution disables automatic model failover: losing observation before
+visible output does not prove the previous backend refused its work. A real
+backend result/done is required to release the workspace lock and interpret the
+stream status as terminal. Transport loss or EOF retains unknown state and the
+lock until an operator reconciles the exact backend execution.

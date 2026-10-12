@@ -74,3 +74,15 @@ describe('sandbox foreground provisioning', () => {
     expect(sandboxMocks.peekWorkspace).not.toHaveBeenCalled()
   })
 })
+
+it('listing decisions never provisions or resumes paid compute', async () => {
+  const { resolveSidecarConnection } = await import('../src/sandbox')
+  sandboxMocks.ensureWorkspace.mockClear()
+  sandboxMocks.peekWorkspace.mockResolvedValue({ status: 'absent' })
+  const result = await resolveSidecarConnection({ DB: {} as D1Database,
+    BETTER_AUTH_URL: 'http://localhost:8787', BETTER_AUTH_SECRET: 'fixture',
+    SANDBOX_API_KEY: 'fixture', SANDBOX_GATEWAY_URL: 'https://sandbox.example.test',
+  }, { workspaceId: 'owner', userId: 'owner', threadId: 'thread' }, { readOnly: true })
+  expect(result).toBeNull()
+  expect(sandboxMocks.ensureWorkspace).not.toHaveBeenCalled()
+})

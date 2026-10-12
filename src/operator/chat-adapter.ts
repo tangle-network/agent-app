@@ -45,7 +45,26 @@ export interface ChatOperatorWorkspace {
   createdAt?: Date | string | number | null
 }
 
+/** A durable execution claim, separate from the chat transcript that owns results. */
+export interface ChatOperatorAdmission {
+  threadId: string
+  /** Only an explicit refusal before a usable stream opened is recorded here. */
+  refusal?: { code?: string; message: string }
+}
+
+/** Product-owned atomic storage for duplicate suppression across processes.
+ * A claim with no transcript stays unknown after a crash; it never licenses a
+ * second execution. This is not a completion ledger or an automatic retry queue.
+ */
+export interface ChatOperatorAdmissionStore<Identity> {
+  get(ctx: OperatorContext<Identity>, workspaceId: string, turnId: string): Promise<ChatOperatorAdmission | null>
+  claim(ctx: OperatorContext<Identity>, input: { workspaceId: string; threadId: string; turnId: string }): Promise<boolean>
+  recordRefusal(ctx: OperatorContext<Identity>, input: { workspaceId: string; threadId: string; turnId: string }, refusal: { code?: string; message: string }): Promise<void>
+}
+
 export interface ChatOperatorAdapterOptions<Identity> {
+  /** Optional durable claims; without one, transcript retry detection is not an atomic admission lock. */
+  admissions?: ChatOperatorAdmissionStore<Identity>
   /** The app's public origin, the base of every browser link. */
   origin: string
   /** Browser path of a conversation; defaults to `/app/<workspace>/chat/<thread>`. */
@@ -76,6 +95,9 @@ export interface ChatOperatorAdapterOptions<Identity> {
    * holding its stream drives it, and the start request returns once it settles.
    */
   runTurn(ctx: OperatorContext<Identity>, input: { workspaceId: string; threadId: string; turnId: string; content: string; model?: string }): Promise<Response>
+  /** Optional authoritative status of this user-turn anchor. When supplied,
+   *  missing/running status without a live lease never promotes a partial reply to success. */
+  turnStatus?(ctx: OperatorContext<Identity>, workspaceId: string, threadId: string, user: ChatOperatorMessage): Promise<'running' | 'complete' | 'error' | null>
   /** Turn ids still running on a thread, or null when the app cannot tell. */
   runningTurns?(ctx: OperatorContext<Identity>, workspaceId: string, threadId: string): Promise<string[] | null>
   /** Decisions open in the workspace, or on one conversation when `threadId` is set. */
@@ -195,6 +217,8 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
     const assistant = [...window].reverse().find((message) => message.role === 'assistant') ?? null
     const latest = nextUser < 0
     const running = latest && options.runningTurns ? await options.runningTurns(ctx, workspaceId, threadId) : []
+    const status = options.turnStatus ? await options.turnStatus(ctx, workspaceId, threadId, messages[userIndex]!) : undefined
+    const terminal = status === undefined || status === 'complete' || status === 'error'
     const turn: OperatorTurn = {
       workspaceId, threadId, turnId, state: 'unknown', url: threadUrl(workspaceId, threadId),
       reply: null, failure: null, assets: [], files: [], approvals: [],
@@ -206,8 +230,8 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       const model = assistant.servedModel ?? assistant.model
       if (model) turn.model = model
       if (typeof assistant.costUsd === 'number') turn.costUsd = assistant.costUsd
-      if (state !== 'working') {
-        const failure = (options.failureOf ?? defaultFailure)(assistant)
+      if (state !== 'working' && terminal) {
+        const failure = (options.failureOf ?? defaultFailure)(assistant) ?? (status === 'error' ? { code: 'turn.error', message: 'The turn failed; retained text may be partial' } : null)
         if (failure) {
           state = 'failed'
           turn.failure = failure
@@ -218,15 +242,26 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
         const completedAt = iso(assistant.createdAt)
         if (completedAt && (state === 'succeeded' || state === 'failed')) turn.completedAt = completedAt
       }
-    } else if (state !== 'working' && !latest) {
+    } else if (state !== 'working' && terminal && (!latest || status === 'error' || status === 'complete')) {
       state = 'failed'
-      turn.failure = { message: 'The turn ended without a reply' }
+      turn.failure = { code: status === 'error' ? 'turn.error' : 'turn.no_reply', message: 'The turn ended without a reply' }
     }
     turn.state = state
     if (state !== 'succeeded' && state !== 'failed' && options.approvals) {
       turn.approvals = await options.approvals(ctx, workspaceId, threadId)
     }
     return turn
+  }
+
+  async function admittedTurn(ctx: OperatorContext<Identity>, workspaceId: string, turnId: string, admission: ChatOperatorAdmission): Promise<OperatorTurn> {
+    if (!(await threadIn(ctx, workspaceId, admission.threadId))) throw new OperatorError('operator.turn_identity_conflict', 409)
+    const persisted = await turnOf(ctx, workspaceId, admission.threadId, turnId)
+    if (persisted) return persisted
+    return {
+      workspaceId, threadId: admission.threadId, turnId, state: admission.refusal ? 'failed' : 'unknown',
+      url: threadUrl(workspaceId, admission.threadId), reply: null, failure: admission.refusal ?? null,
+      assets: [], files: [], approvals: [],
+    }
   }
 
   async function ensureThread(ctx: OperatorContext<Identity>, workspaceId: string, input: StartTurnInput): Promise<string> {
@@ -255,6 +290,11 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       return (await options.workspaces.list(ctx)).map(workspaceView)
     },
     async startTurn(ctx, workspace, input) {
+      const priorAdmission = await options.admissions?.get(ctx, workspace.id, input.turnId)
+      if (priorAdmission) {
+        if (input.threadId && input.threadId !== priorAdmission.threadId) throw new OperatorError('operator.turn_identity_conflict', 409)
+        return admittedTurn(ctx, workspace.id, input.turnId, priorAdmission)
+      }
       let threadId = input.threadId
       if (threadId === undefined) {
         threadId = await ensureThread(ctx, workspace.id, input)
@@ -264,6 +304,13 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       // A retried start whose turn is already recorded reads it instead of running again.
       const existing = await turnOf(ctx, workspace.id, threadId, input.turnId)
       if (existing) return existing
+      const target = { workspaceId: workspace.id, threadId, turnId: input.turnId }
+      if (options.admissions && !(await options.admissions.claim(ctx, target))) {
+        const raced = await options.admissions.get(ctx, workspace.id, input.turnId)
+        if (!raced) throw new OperatorError('operator.admission_unavailable', 503, 'Admission state is unavailable', true)
+        if (raced.threadId !== threadId) throw new OperatorError('operator.turn_identity_conflict', 409)
+        return admittedTurn(ctx, workspace.id, input.turnId, raced)
+      }
       const response = await options.runTurn(ctx, {
         workspaceId: workspace.id, threadId, turnId: input.turnId, content: input.content,
         ...(input.model === undefined ? {} : { model: input.model }),
@@ -272,12 +319,15 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
         const body = await response.json().catch(() => ({})) as { error?: unknown; code?: unknown }
         // Apps answer `{ error, code }` or `{ error: { code, message } }`.
         const nested = body.error && typeof body.error === 'object' ? body.error as { code?: unknown; message?: unknown } : {}
-        throw new OperatorError(
-          typeof body.code === 'string' ? body.code : typeof nested.code === 'string' ? nested.code : `operator.chat_${response.status}`,
-          response.status,
-          typeof body.error === 'string' ? body.error : typeof nested.message === 'string' ? nested.message : 'The app refused the turn',
-          response.status === 429 || response.status >= 500,
-        )
+        const failure = {
+          code: typeof body.code === 'string' ? body.code : typeof nested.code === 'string' ? nested.code : `operator.chat_${response.status}`,
+          message: typeof body.error === 'string' ? body.error : typeof nested.message === 'string' ? nested.message : 'The app refused the turn',
+        }
+        if (options.admissions) {
+          await options.admissions.recordRefusal(ctx, target, failure)
+          return admittedTurn(ctx, workspace.id, input.turnId, { threadId, refusal: failure })
+        }
+        throw new OperatorError(failure.code, response.status, failure.message, response.status === 429 || response.status >= 500)
       }
       await drain(response, ctx.request.signal)
       return await turnOf(ctx, workspace.id, threadId, input.turnId) ?? {
@@ -287,7 +337,10 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
     },
     async getTurn(ctx, workspace, target) {
       if (!(await threadIn(ctx, workspace.id, target.threadId))) return null
-      return turnOf(ctx, workspace.id, target.threadId, target.turnId)
+      const persisted = await turnOf(ctx, workspace.id, target.threadId, target.turnId)
+      if (persisted) return persisted
+      const admission = await options.admissions?.get(ctx, workspace.id, target.turnId)
+      return admission?.threadId === target.threadId ? admittedTurn(ctx, workspace.id, target.turnId, admission) : null
     },
     async getThread(ctx, workspace, threadId) {
       const thread = await threadIn(ctx, workspace.id, threadId)

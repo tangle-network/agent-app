@@ -5,6 +5,10 @@
 # The scaffolder replaces this placeholder only in the new local .dev.vars.
 BETTER_AUTH_SECRET=REPLACE_WITH_RANDOM_SECRET
 
+# Required for authenticated durable turn locking. Set a separate random secret
+# locally and with wrangler secret put TURN_STREAM_AUTH_SECRET in production.
+TURN_STREAM_AUTH_SECRET=
+
 # Tangle Router key the harness bills model calls against.
 TANGLE_API_KEY=
 # Optional router override; omit for the platform default.

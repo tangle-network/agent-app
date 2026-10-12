@@ -465,6 +465,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   }
 
   let fullText = ''
+  let terminalObserved = false
   const partOrder: string[] = []
   const partMap = new Map<string, JsonRecord>()
   const tracker: TextTracker = { seen: new Map() }
@@ -812,6 +813,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         }
 
         if (event.type === 'result') {
+          terminalObserved = true
           const finalText = asString(event.data?.finalText)
           if (finalText) fullText = finalText
           const reported = extractReportedTurnUsage(asRecord(event.data))
@@ -833,6 +835,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         }
 
         if (event.type === 'done') {
+          terminalObserved = true
           const reported = extractReportedTurnUsage(asRecord(event.data))
           if (reported) {
             applyTerminalUsage(reported, usage)
@@ -912,6 +915,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   return {
     stream: stream(),
     finalText: () => fullText,
+    terminalObserved: () => terminalObserved,
     assistantParts: () => finalizePendingInteractionParts(
       finalizeAssistantParts(partOrder, timedParts(), fullText),
       interactionOutcome,

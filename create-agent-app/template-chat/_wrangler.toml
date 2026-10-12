@@ -29,7 +29,16 @@ watch_dir = ["web", "vite.config.mjs", "tailwind.config.mjs"]
 # Never let an asset or HTML fallback swallow an API/gateway request.
 [assets]
 directory = "dist/client"
-run_worker_first = ["/api/*", "/v1/*"]
+binding = "ASSETS"
+run_worker_first = ["/", "/api/*", "/v1/*"]
+
+[[durable_objects.bindings]]
+name = "TURN_STREAM"
+class_name = "TurnStreamDO"
+
+[[migrations]]
+tag = "v1-turn-lock"
+new_sqlite_classes = ["TurnStreamDO"]
 
 # D1 holds everything durable: auth, threads/messages, the turn buffer.
 # Setup: `wrangler d1 create __PACKAGE_NAME__`, paste the database_id, then
@@ -57,5 +66,7 @@ fallthrough = true
 # BETTER_AUTH_SECRET, TANGLE_API_KEY, SANDBOX_API_KEY, SANDBOX_GATEWAY_URL.
 # See .dev.vars.example for the full list.
 [vars]
+# Enable only after the deployment payer reviews signup, funding and run policy.
+OPERATOR_RUN_ENABLED = "false"
 BETTER_AUTH_URL = "http://localhost:8787"
 # MODEL_NAME = "REPLACE_WITH_MODEL"   # overrides config.model.default

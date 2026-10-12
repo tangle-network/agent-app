@@ -155,7 +155,7 @@ describe('create-agent-app --chat scaffolder', () => {
     const wrangler = readFileSync(join(projectDir, 'wrangler.toml'), 'utf8')
     expect(wrangler).toContain('migrations_dir = "migrations"')
     expect(wrangler).toContain('directory = "dist/client"')
-    expect(wrangler).toContain('run_worker_first = ["/api/*", "/v1/*"]')
+    expect(wrangler).toContain('run_worker_first = ["/", "/api/*", "/v1/*"]')
   })
 
   it('template engine pins satisfy agent-app peerDependencies (drift gate)', () => {
