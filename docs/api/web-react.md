@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-506 exports.
+507 exports.
 
 ### `acceptRejectionReason`
 
@@ -3504,7 +3504,7 @@ interface ToolRunStep
 
 ### `TrackedChatStreamCallbacks`
 
-`type` — Callbacks that keep the turn's reasoning state, and `end()` to call once the turn's stream is over.
+`type` — Callbacks that keep the turn's reasoning state, plus the two moments only the transport knows.
 
 ```ts
 type TrackedChatStreamCallbacks
@@ -3844,6 +3844,14 @@ interface UseSessionHistoryOptions
 
 ```ts
 (target: string, enabled: boolean, opts?: SmoothRevealOptions | undefined) => string
+```
+
+### `useThinkingSeconds`
+
+`function` — Whole seconds elapsed while `active`, ticking once a second; counts from when `active` first turns true and freezes when it clears.
+
+```ts
+(active: boolean) => number
 ```
 
 ### `useWorkspacePrewarm`

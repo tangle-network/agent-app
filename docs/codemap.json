@@ -26724,7 +26724,7 @@
           "name": "TrackedChatStreamCallbacks",
           "kind": "type",
           "signature": "type TrackedChatStreamCallbacks",
-          "doc": "Callbacks that keep the turn's reasoning state, and `end()` to call once the turn's stream is over."
+          "doc": "Callbacks that keep the turn's reasoning state, plus the two moments only the transport knows."
         },
         {
           "name": "triggerAttachmentDownload",
@@ -26977,6 +26977,12 @@
           "kind": "function",
           "signature": "(target: string, enabled: boolean, opts?: SmoothRevealOptions | undefined) => string",
           "doc": "Animate `target` text into view."
+        },
+        {
+          "name": "useThinkingSeconds",
+          "kind": "function",
+          "signature": "(active: boolean) => number",
+          "doc": "Whole seconds elapsed while `active`, ticking once a second; counts from when `active` first turns true and freezes when it clears."
         },
         {
           "name": "useWorkspacePrewarm",
