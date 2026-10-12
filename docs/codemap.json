@@ -9640,6 +9640,24 @@
           "doc": null
         },
         {
+          "name": "JourneySummary",
+          "kind": "interface",
+          "signature": "interface JourneySummary",
+          "doc": "A run's summary, as an app's journey runner writes it."
+        },
+        {
+          "name": "JourneySummaryEntry",
+          "kind": "interface",
+          "signature": "interface JourneySummaryEntry",
+          "doc": "One journey in a run's `summary.json`."
+        },
+        {
+          "name": "LEGACY_SCOREBOARD_APP",
+          "kind": "const",
+          "signature": "\"hardware\"",
+          "doc": "Rows a store wrote before the board was shared, with no `app` field, belong to this app."
+        },
+        {
           "name": "loadJourneysConfig",
           "kind": "function",
           "signature": "(dir?: any, env?: Record<string, string | undefined>) => Promise<ResolvedJourneysConfig>",
@@ -9698,6 +9716,54 @@
           "kind": "function",
           "signature": "(routePath: string) => string[]",
           "doc": "Paths a submission from `routePath` lands on: the route itself and its single-fetch `.data` form."
+        },
+        {
+          "name": "SCOREBOARD_STATUSES",
+          "kind": "const",
+          "signature": "readonly [\"pass\", \"fail\", \"stall\", \"blocked-host\", \"blocked\", \"skipped\", \"unrecorded\"]",
+          "doc": "The readiness scoreboard writer: one run's journey summary as the writes that put it on the shared board, so every app's rows land in one schema."
+        },
+        {
+          "name": "scoreboardDocId",
+          "kind": "function",
+          "signature": "(app: string, flowId: string, legacyIds?: boolean) => string",
+          "doc": "The document id a flow row lives at."
+        },
+        {
+          "name": "scoreboardMetaId",
+          "kind": "function",
+          "signature": "(app: string, legacyIds?: boolean) => string",
+          "doc": "The `meta` document an app's run facts live at."
+        },
+        {
+          "name": "ScoreboardOptions",
+          "kind": "interface",
+          "signature": "interface ScoreboardOptions",
+          "doc": null
+        },
+        {
+          "name": "ScoreboardResult",
+          "kind": "interface",
+          "signature": "interface ScoreboardResult",
+          "doc": null
+        },
+        {
+          "name": "scoreboardRows",
+          "kind": "function",
+          "signature": "(summary: JourneySummary, options: ScoreboardOptions) => ScoreboardResult",
+          "doc": null
+        },
+        {
+          "name": "ScoreboardStatus",
+          "kind": "type",
+          "signature": "type ScoreboardStatus",
+          "doc": null
+        },
+        {
+          "name": "ScoreboardWrite",
+          "kind": "interface",
+          "signature": "interface ScoreboardWrite",
+          "doc": "One entry of an artifact store batch, in the shape the batch write takes."
         },
         {
           "name": "scoreTurn",
