@@ -82,7 +82,7 @@ describe('admitProfileTurn with an admission read', () => {
     active: revision('rev-1', 'sha256:auth-1'), pinnedRev: revision('rev-pinned', 'sha256:auth-1'),
     prior: null as unknown }
     const pins: Array<Record<string, unknown>> = []
-    const store = {
+    const fns = {
       getTurnPin: vi.fn(async () => state.prior),
       getBinding: vi.fn(async () => ({ ...state.binding })),
       getRevision: vi.fn(async () => ({ ...state.pinnedRev })),
@@ -92,8 +92,8 @@ describe('admitProfileTurn with an admission read', () => {
         pins.push(pin)
         return pin
       }),
-    } as unknown as ProfileRevisionStore & Record<string, ReturnType<typeof vi.fn>>
-    return { state, pins, store }
+    }
+    return { state, pins, fns, store: fns as unknown as ProfileRevisionStore }
   }
   const admit = (f: ReturnType<typeof fixture>, read: Parameters<typeof admitProfileTurn>[0]['read'], over: Partial<Parameters<typeof admitProfileTurn>[0]> = {}) =>
     admitProfileTurn({ store: f.store, key, messageId: 'msg-1', content: 'hello', observedManagedPlanDigest: plan, read, ...over })
@@ -101,14 +101,14 @@ describe('admitProfileTurn with an admission read', () => {
   it('admits from the read without reading the pin or binding again, and reads the active pointer live', async () => {
     const f = fixture()
     await admit(f, await readProfileAdmission(f.store, key, 'msg-1', 'hello'))
-    expect([f.store.getTurnPin.mock.calls.length, f.store.getBinding.mock.calls.length, f.store.getActiveRevision.mock.calls.length]).toEqual([1, 1, 1])
+    expect([f.fns.getTurnPin.mock.calls.length, f.fns.getBinding.mock.calls.length, f.fns.getActiveRevision.mock.calls.length]).toEqual([1, 1, 1])
     expect(f.pins).toHaveLength(1)
   })
 
   it('uses the pinned revision it read, by id, without reading it again', async () => {
     const f = fixture(true)
     await admit(f, await readProfileAdmission(f.store, key, 'msg-1', 'hello'))
-    expect([f.store.getRevision.mock.calls.length, f.store.getActiveRevision.mock.calls.length]).toEqual([1, 0])
+    expect([f.fns.getRevision.mock.calls.length, f.fns.getActiveRevision.mock.calls.length]).toEqual([1, 0])
     expect(f.pins[0]).toMatchObject({ revisionId: 'rev-pinned' })
   })
 
