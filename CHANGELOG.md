@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.135
+
+- feat(router-turn): reasoning, temperature, fallback models, resends, a tool-result limit and the service's error detail (#1076)
+
 ## 0.60.134
 
 - feat(skills-placement): support-file mounting for kit-carrying skills (#1077)
