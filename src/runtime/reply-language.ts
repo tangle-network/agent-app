@@ -11,7 +11,35 @@ export function replyLanguageInstruction(): string {
     'Change a saved language only when the sender asks for it in this message; a message written in another language is not that request.'
 }
 
-const LANGUAGE_REQUEST = /\b(languages?|idiomas?|langues?|l[ií]nguas?|sprachen?|english|ingl[eé]s|anglais|englisch|spanish|espa[nñ]ol|castellano|espagnol|spanisch|french|franc[eé]s|fran[cç]ais|franz[oö]sisch|portuguese|portugu[eê]s|german|alem[aã]n|deutsch|allemand|italian|italiano|italien)\b/i
+// ISO 639-1. Names come from Intl, in English, Spanish and the language's own name,
+// so a request for any language is recognised without a hand-kept list.
+const LANGUAGE_CODES = ('aa ab af ak am an ar as av ay az ba be bg bi bm bn bo br bs ca ce ch co cr cs cu cv cy da de dv dz ee el en eo es ' +
+  'et eu fa ff fi fj fo fr fy ga gd gl gn gu gv ha he hi ho hr ht hu hy hz ia id ie ig ii ik io is it iu ja jv ka kg ki kj kk kl km kn ko kr ' +
+  'ks ku kv kw ky la lb lg li ln lo lt lu lv mg mh mi mk ml mn mr ms mt my na nb nd ne ng nl nn no nr nv ny oc oj om or os pa pi pl ps pt qu ' +
+  'rm rn ro ru rw sa sc sd se sg si sk sl sm sn so sq sr ss st su sv sw ta te tg th ti tk tl tn to tr ts tt tw ty ug uk ur uz ve vi vo wa wo ' +
+  'xh yi yo za zh zu').split(' ')
+// Generic words, plus common spellings Intl does not give (हिंदी beside its हिन्दी).
+const LANGUAGE_WORDS = ['language', 'languages', 'idioma', 'idiomas', 'langue', 'lingua', 'língua', 'sprache', 'हिंदी']
+
+let patterns: RegExp[] | undefined
+function languagePatterns(): RegExp[] {
+  if (patterns) return patterns
+  const names = new Set(LANGUAGE_WORDS)
+  for (const locale of ['en', 'es', ...LANGUAGE_CODES]) {
+    let display: Intl.DisplayNames
+    try { display = new Intl.DisplayNames([locale], { type: 'language' }) } catch { continue }
+    for (const code of locale === 'en' || locale === 'es' ? LANGUAGE_CODES : [locale]) {
+      const name = display.of(code)?.toLowerCase()
+      if (name && name !== code && name.length >= 3) names.add(name)
+    }
+  }
+  // Latin-script names need word edges ("pedido" must not match Ido); scripts written
+  // without spaces, such as 日本語, match anywhere.
+  return patterns = [...names].map(name => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return /^[\p{Script=Latin}\s'-]+$/u.test(name) ? new RegExp(`(?<!\\p{L})${escaped}(?!\\p{L})`, 'iu') : new RegExp(escaped, 'iu')
+  })
+}
 
 /**
  * True when the message names a language. A tool that saves a reply-language
@@ -19,5 +47,5 @@ const LANGUAGE_REQUEST = /\b(languages?|idiomas?|langues?|l[ií]nguas?|sprachen?
  * save a language the sender never asked for.
  */
 export function asksForLanguage(message: string | undefined): boolean {
-  return typeof message === 'string' && LANGUAGE_REQUEST.test(message)
+  return typeof message === 'string' && languagePatterns().some(pattern => pattern.test(message))
 }
