@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.134
+
+- feat(skills-placement): support-file mounting for kit-carrying skills (#1077)
+
 ## 0.60.133
 
 - feat(rollout): a staged rollout widens only after the stage it leaves met its kill lines (#1049)
