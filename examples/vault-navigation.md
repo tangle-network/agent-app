@@ -50,3 +50,44 @@ Known directory rows retain their existing folder behavior.
 This handle guards file selection within the mounted pane.
 The host product must guard page navigation through its router.
 Use the artifact renderer's `dirty` flag to track unsaved work.
+
+## Connect a document editor to persistence
+
+`VaultPane` owns the saved baseline, dirty state, and write admission. A rich
+artifact renderer must keep its live draft separate from that baseline. With the
+identity codec, forward `richDraft` as `FileArtifactPane.content` and
+`savedRichDraft` as `editor.savedContent`; also forward `saving`:
+
+```tsx
+renderArtifact={({ file, richDraft, savedRichDraft, canWrite, revision, saving, onRichChange, onSave }) => file && (
+  <FileArtifactPane
+    key={file.path}
+    filename={file.path}
+    content={String(richDraft ?? '')}
+    editor={{
+      enabled: canWrite && !revision,
+      savedContent: String(savedRichDraft ?? file.content),
+      saving,
+      backend: 'local',
+      onChange: onRichChange,
+      onSave,
+    }}
+  />
+)}
+```
+
+Import `FileArtifactPane` from `@tangle-network/sandbox-ui/files`. For a codec
+that separates frontmatter from the body, extract the body from **both**
+`richDraft` and `savedRichDraft`; both have been parsed by the same codec. Do not
+compare a rendered body to raw frontmatter or use the live draft as the saved
+baseline. `savedRichDraft` is optional in the structural type for compatibility
+with existing test doubles; `VaultPane` supplies it whenever a file is loaded.
+
+A custom editor may use `dirty` and `saving` directly. Disable its Save control
+when clean, saving, read-only, or viewing a revision. `onSave` remains a void
+notification: observe `saving`, `dirty`, and the pane's error presentation rather
+than assuming a returned promise means persistence succeeded. The pane admits
+only one write at a time, retains failed drafts for retry, and preserves edits
+made while an older save is pending. It also rejects callbacks retained after
+unmount, file/permission changes, or switching away from their editor mode.
+The product's data port still owns server-side authorization and conflict checks.

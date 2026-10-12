@@ -163,6 +163,10 @@ export interface VaultArtifactRenderProps {
   /** The live rich draft (the codec's parsed form). The product's rich editor
    *  edits this; reverting to the saved content clears dirtiness. */
   richDraft: VaultRichParts
+  /** Codec-parsed persisted baseline, independent of `richDraft`. Pass its body
+   *  to an editor's saved-content prop when the live draft drives its content.
+   *  Optional for structural compatibility with existing custom renderers. */
+  savedRichDraft?: VaultRichParts
   /** Whether the draft has unsaved edits. */
   dirty: boolean
   /** The product's rich editor reports edits here (updates draft + dirtiness). */

@@ -88,8 +88,10 @@ export function VaultHistoryPanel({
   const content = selectedId ? contents[selectedId] : undefined
   const restorable = canRestore && selected !== null && !selected.current && content?.status === 'ready'
 
+  useEffect(() => { if (!restorable) setConfirming(false) }, [restorable])
+
   const restore = async () => {
-    if (content?.status !== 'ready') return
+    if (!restorable || restoring || content?.status !== 'ready') return
     setRestoring(true)
     setRestoreError(null)
     try {
@@ -202,11 +204,11 @@ export function VaultHistoryPanel({
       </div>
 
       <ConfirmDialog
-        open={confirming}
+        open={confirming && restorable}
         title="Restore this version?"
         description={`${path} goes back to the version saved ${selected ? savedAtLabel(selected.savedAt) : ''}. The version it holds now stays in this list.`}
         confirmLabel={restoring ? 'Restoring…' : 'Restore version'}
-        confirmDisabled={restoring}
+        confirmDisabled={restoring || !restorable}
         onConfirm={() => void restore()}
         onCancel={() => setConfirming(false)}
       />
