@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.160
+
+- test(sandbox): model recovered box health across resume (#1097)
+
 ## 0.60.159
 
 - test(peer-floors): allow stricter runtime behavioral contracts (#1095)
