@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.130
+
+- feat(router-turn): reply in the sender's language and name conflicting sources (#1061)
+
 ## 0.60.129
 
 - fix(signoff): surface-ladder failure screenshots are viewport-sized so a tall page cannot stall the run (#1071)
