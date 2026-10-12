@@ -18,12 +18,31 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verify the exact source head with the maintained signoff gate
+        env:
+          VITEST_MAX_WORKERS: '2'
+          TMPDIR: ${{ runner.temp }}
+          VERIFICATION_DIR: ${{ runner.temp }}/agent-app-signoff-evidence
+        run: pnpm signoff --source head --max-parallel 1 --keep-going --json "$RUNNER_TEMP/agent-app-signoff.json"
+      - name: Retain the maintained receipt and intentional browser proof outputs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: agent-app-signoff-${{ github.event.pull_request.head.sha || github.sha }}
+          # Never archive generated projects, local databases or .dev.vars.
+          path: |
+            ${{ runner.temp }}/agent-app-signoff.json
+            ${{ runner.temp }}/agent-app-signoff-evidence/*.png
+            ${{ runner.temp }}/agent-app-signoff-evidence/workspace-proof.json
+          if-no-files-found: warn
+          retention-days: 14
       - run: pnpm build-storybook
       - name: Read the shared catalog attestor at an immutable revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
