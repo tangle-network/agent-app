@@ -33,7 +33,7 @@
  */
 import { execFileSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { invokedAsScript } from '../signoff/invoked-as-script.js'
 import { decideRollout, type RolloutDecision, type RolloutPlan, type RolloutStage, type StageMeasurement } from './index.js'
@@ -105,12 +105,32 @@ async function loadConfig(appDir: string, explicit?: string): Promise<RolloutCon
   return config
 }
 
-function wranglerAt(appDir: string, file: string, ref: string): string {
+function gitShow(cwd: string, spec: string): string | null {
   try {
-    return execFileSync('git', ['show', `${ref}:${file}`], { cwd: appDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    return execFileSync('git', ['show', spec], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   } catch {
-    throw new Error(`cannot read ${file} at ${ref}; fetch it or pass --from`)
+    return null
   }
+}
+
+/**
+ * The file at `ref`. Under agent-app-signoff the app runs in a clean copy with
+ * no `.git`; signoff names the source checkout and the copy's root, so the
+ * base is read from the source at the same repo-relative path.
+ */
+function wranglerAt(appDir: string, file: string, ref: string, env: NodeJS.ProcessEnv = process.env): string {
+  const local = gitShow(appDir, `${ref}:./${file}`)
+  if (local !== null) return local
+  const source = env.SIGNOFF_SOURCE_REPO
+  const tree = env.SIGNOFF_TREE
+  if (source && tree) {
+    const path = relative(resolve(tree), resolve(appDir, file))
+    if (!path.startsWith('..') && !isAbsolute(path)) {
+      const fromSource = gitShow(source, `${ref}:${path.split(sep).join('/')}`)
+      if (fromSource !== null) return fromSource
+    }
+  }
+  throw new Error(`cannot read ${file} at ${ref}; fetch it or pass --from`)
 }
 
 export async function runRolloutCheck(args: CliArgs): Promise<RolloutDecision[]> {
