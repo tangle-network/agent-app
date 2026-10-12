@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { composeRouterTurnPrompt, placeRouterTurn, routerFunctionName, runRouterTurn, workspaceTurnCheckpoints, type RouterTurnEvent, type RouterTurnTool } from '../src/runtime/router-turn'
+import { composeRouterTurnPrompt, placeRouterTurn, replyLanguageInstruction, routerFunctionName, runRouterTurn, workspaceTurnCheckpoints, type RouterTurnEvent, type RouterTurnTool } from '../src/runtime/router-turn'
 import { createInMemoryWorkspaceStore } from '@tangle-network/agent-runtime/workspace-store'
 
 /** One Router chat completion streamed as OpenAI server-sent events. */
@@ -43,7 +43,8 @@ describe('runRouterTurn', () => {
     expect(outcome).toEqual({ text: 'Done: Restock towels is on the list.', servedModel: 'served/model',
       toolCalls: [{ callId: 'call-1', toolName: 'staff.task.create', ok: true }],
       usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [] })
-    expect(createTask.run).toHaveBeenCalledWith({ title: 'Restock towels' }, { emit: expect.any(Function) })
+    expect(createTask.run).toHaveBeenCalledWith({ title: 'Restock towels' },
+      { emit: expect.any(Function), userMessage: 'Create a task to restock towels' })
     expect(requests[0]!.headers.get('x-tangle-trace-id')).toBe('trace-1')
     expect(requests[0]!.body).toMatchObject({ model: 'requested/model', stream: true,
       tools: [{ type: 'function', function: { name: 'staff_task_create' } }] })
@@ -300,6 +301,6 @@ describe('composeRouterTurnPrompt', () => {
     expect(composeRouterTurnPrompt(
       { prompt: { systemPrompt: 'You are Pablo.', instructions: ['Use staff.task.create for tasks.', 'Use staff.tasks to read them.'] } },
       { context: ['Current time: Sunday.'], toolNames: ['staff.tasks', 'staff.task.create'] },
-    )).toBe('You are Pablo.\n\nUse staff_task_create for tasks.\n\nUse staff_tasks to read them.\n\nCurrent time: Sunday.')
+    )).toBe(`You are Pablo.\n\nUse staff_task_create for tasks.\n\nUse staff_tasks to read them.\n\n${replyLanguageInstruction()}\n\nCurrent time: Sunday.`)
   })
 })

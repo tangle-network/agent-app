@@ -4,7 +4,15 @@
 
 Source: `src/runtime/router-turn.ts`
 
-18 exports.
+26 exports.
+
+### `asksForLanguage`
+
+`function` — True when the message names a language.
+
+```ts
+(message: string | undefined) => boolean
+```
 
 ### `budgetTurnKnowledge`
 
@@ -12,6 +20,14 @@ Source: `src/runtime/router-turn.ts`
 
 ```ts
 (files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]
+```
+
+### `CheckpointWorkspaceStore`
+
+`interface` — The fields of an agent-runtime `WorkspaceStore` a checkpoint needs; structural so any adapter fits.
+
+```ts
+interface CheckpointWorkspaceStore
 ```
 
 ### `composeRouterTurnPrompt`
@@ -22,6 +38,14 @@ Source: `src/runtime/router-turn.ts`
 (profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…
 ```
 
+### `DURABLE_HOP_BUDGET_MS`
+
+`const` — Wall time a durable hop may plan for: a Durable Object alarm or Queue consumer gets 15 minutes.
+
+```ts
+number
+```
+
 ### `placeRouterTurn`
 
 `function` — Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…
@@ -30,12 +54,28 @@ Source: `src/runtime/router-turn.ts`
 (input: RouterTurnPlacementInput) => PlacementRecord
 ```
 
+### `replyLanguageInstruction`
+
+`function` — The language a Router turn replies in, for every agent app: the sender's current message decides, then the conversation's.
+
+```ts
+() => string
+```
+
 ### `routerFunctionName`
 
 `function` — OpenAI-compatible function names allow only `[A-Za-z0-9_-]{1,64}`; app tool names often use dots.
 
 ```ts
 (name: string) => string
+```
+
+### `RouterTurnContinuation`
+
+`interface` — A checkpointed Router turn: the conversation after the system prompt, ready to continue.
+
+```ts
+interface RouterTurnContinuation
 ```
 
 ### `RouterTurnEvent`
@@ -118,6 +158,22 @@ type RouterTurnToolOutcome
 (options: RouterTurnOptions) => Promise<RouterTurnOutcome>
 ```
 
+### `turnCheckpointPath`
+
+`function`
+
+```ts
+(turnId: string) => string
+```
+
+### `TurnCheckpointStore`
+
+`interface` — Where a turn's checkpoint waits between hops.
+
+```ts
+interface TurnCheckpointStore
+```
+
 ### `TurnKnowledgeBudget`
 
 `interface`
@@ -148,4 +204,12 @@ interface TurnKnowledgeFile
 
 ```ts
 (store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…
+```
+
+### `workspaceTurnCheckpoints`
+
+`function` — Turn checkpoints in a workspace store, written as `actor`.
+
+```ts
+(store: CheckpointWorkspaceStore, workspaceId: string, actor: string) => TurnCheckpointStore
 ```

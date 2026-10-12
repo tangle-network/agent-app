@@ -8,7 +8,7 @@ _130 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 |---|---|---|
 | [`./agent-enrollment`](api/agent-enrollment.md) | 15 | `hosted-agent` |
 | [`./agent-enrollment/drizzle`](api/agent-enrollment-drizzle.md) | 5 | `hosted-agent` |
-| [`./agent-profiles`](api/agent-profiles.md) | 49 | `tools` |
+| [`./agent-profiles`](api/agent-profiles.md) | 53 | `tools` |
 | [`./agent-profiles/d1`](api/agent-profiles-d1.md) | 8 | `tools` |
 | [`./agent-profiles/drizzle`](api/agent-profiles-drizzle.md) | 1 | `tools` |
 | [`./agent-profiles/reaper`](api/agent-profiles-reaper.md) | 5 | `tools` |
@@ -89,8 +89,8 @@ _130 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./record`](api/record.md) | 33 | — |
 | [`./record/drizzle`](api/record-drizzle.md) | 22 | — |
 | [`./redact`](api/redact.md) | 15 | — |
-| [`./runtime`](api/runtime.md) | 95 | `tools` |
-| [`./runtime/router-turn`](api/runtime-router-turn.md) | 18 | `tools` |
+| [`./runtime`](api/runtime.md) | 103 | `tools` |
+| [`./runtime/router-turn`](api/runtime-router-turn.md) | 26 | `tools` |
 | [`./sandbox`](api/sandbox.md) | 253 | `harness`, `profile`, `runtime`, `tools` |
 | [`./sequences`](api/sequences.md) | 111 | `tools`, `web` |
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
@@ -161,11 +161,11 @@ Depends on: `hosted-agent`
 
 ## `./agent-profiles`
 
-Source: `src/agent-profiles/index.ts` · 49 exports
+Source: `src/agent-profiles/index.ts` · 53 exports
 
 Depends on: `tools`
 
-`addProfileKnowledgeDocument`, `admitProfileTurn`, `bindProfileText`, `createInMemorySelfMountStorage`, `createMountProfileChangeTool`, `createTextProfile`, `CreateTextProfileInput`, `handleProfileSwitchText`, `MountProfileChangeDeps`, `MountProfileChangeResult`, `normalizeProfileName`, `parseProfileRevisionDiff`, `parseProfileSwitch`, `PERMITTED_SELF_MOUNT_DIMENSIONS`, `PROFILE_CHANGE_POLICY`, `PROFILE_MEMORY_PREFIX`, `ProfileAccessError`, `profileAuthority`, `profileAuthorityDigest`, `ProfileAuthorKind`, `ProfileBinding`, `ProfileBindingKey`, `ProfileConflictError`, `ProfileKnowledgeDocument`, `ProfileKnowledgeEvent`, `ProfileMemoryStore`, `ProfileRevision`, `ProfileRevisionState`, `ProfileRevisionStore`, `profileSwitchInputHash`, `profileSwitchInputHashFromContentHash`, `ProfileSwitchReceipt`, `profileTextChange`, `ProfileToolContext`, `profileTools`, `ProfileToolTurn`, `ProfileTurnPin`, `projectKnowledgeDocuments`, `promoteRevision`, `proposeRevision`, `ProposeRevisionInput`, `removeProfileKnowledgeDocument`, `rollbackProfileBinding`, `SelfMountSkillEntry`, `SelfMountStorage`, `serializeProfileRevisionDiff`, `SwitchableProfile`, `switchProfile`, `SwitchProfileInput`
+`addProfileKnowledgeDocument`, `admitProfileTurn`, `bindProfileText`, `createInMemorySelfMountStorage`, `createMountProfileChangeTool`, `createTextProfile`, `CreateTextProfileInput`, `handleProfileSwitchText`, `MountProfileChangeDeps`, `MountProfileChangeResult`, `normalizeProfileName`, `parseProfileRevisionDiff`, `parseProfileSwitch`, `PERMITTED_SELF_MOUNT_DIMENSIONS`, `PROFILE_CHANGE_POLICY`, `PROFILE_MEMORY_PREFIX`, `ProfileAccessError`, `ProfileAdmissionRead`, `profileAdmissionValues`, `ProfileAdmissionValues`, `profileAuthority`, `profileAuthorityDigest`, `ProfileAuthorKind`, `ProfileBinding`, `ProfileBindingKey`, `ProfileConflictError`, `ProfileKnowledgeDocument`, `ProfileKnowledgeEvent`, `ProfileMemoryStore`, `ProfileRevision`, `ProfileRevisionState`, `ProfileRevisionStore`, `profileSwitchInputHash`, `profileSwitchInputHashFromContentHash`, `ProfileSwitchReceipt`, `profileTextChange`, `ProfileToolContext`, `profileTools`, `ProfileToolTurn`, `ProfileTurnPin`, `projectKnowledgeDocuments`, `promoteRevision`, `proposeRevision`, `ProposeRevisionInput`, `readProfileAdmission`, `removeProfileKnowledgeDocument`, `rollbackProfileBinding`, `SelfMountSkillEntry`, `SelfMountStorage`, `serializeProfileRevisionDiff`, `SwitchableProfile`, `switchProfile`, `SwitchProfileInput`
 
 [Full API →](api/agent-profiles.md)
 
@@ -905,21 +905,21 @@ Source: `src/redact/index.ts` · 15 exports
 
 ## `./runtime`
 
-Source: `src/runtime/index.ts` · 95 exports
+Source: `src/runtime/index.ts` · 103 exports
 
 Depends on: `tools`
 
-`AnySurfaceKind`, `AppToolLoopOptions`, `budgetTurnKnowledge`, `buildCatalog`, `CatalogModel`, `catalogModelForId`, `CertifiedDelivery`, `CertifiedDeliveryConfig`, `composeRouterTurnPrompt`, `createCertifiedDelivery`, `createOpenAICompatCompletionTurn`, `createOpenAICompatStreamTurn`, `createRouterProtectedModelPort`, `createSurfaceRegistry`, `createTangleRouterModelConfig`, `CreateTangleRouterModelConfigOptions`, `DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR`, `DEFAULT_TANGLE_ROUTER_BASE_URL`, `defineSurfaceKind`, `fetchModelCatalog`, `isChatCapableModel`, `isTangleBillingEnforcementDisabled`, `isTangleExecutionKeyError`, `LoopAssistantToolCall`, `LoopEvent`, `LoopMessage`, `LoopToolCall`, `MAX_RECOMMENDED_MODELS`, `mergeSurfaceOverlay`, `ModelCatalog`, `normalizeModelId`, `OpenAICompatServedModel`, `OpenAICompatStreamTurnOptions`, `OpenAIStreamChunk`, `placeRouterTurn`, `ProtectedModelSettlementError`, `ProtectedRouterTurnOptions`, `ProtectedRouterTurnOutcome`, `resolveCatalogModelId`, `ResolvedAgentProfile`, `ResolvedTangleExecutionKey`, `ResolveModelOptions`, `resolveTangleDevOrUserKey`, `ResolveTangleDevOrUserKeyOptions`, `resolveTangleExecutionEnvironment`, `resolveTangleModelConfig`, `resolveUserTangleExecutionKey`, `resolveUserTangleExecutionKeyForUser`, `ResolveUserTangleExecutionKeyForUserOptions`, `ResolveUserTangleExecutionKeyOptions`, `routerFunctionName`, `RouterModel`, `RouterProtectedModelPortOptions`, `RouterProtectedModelSettlement`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnGrant`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnPlacementInput`, `RouterTurnSettlement`, `RouterTurnTool`, `RouterTurnToolContext`, `RouterTurnToolEvent`, `RouterTurnToolOutcome`, `runAppToolLoop`, `runProtectedRouterTurn`, `runRouterTurn`, `sortModelsByFreshness`, `streamAppToolLoop`, `StreamAppToolLoopOptions`, `StreamLoopYield`, `SurfaceKindDefinition`, `SurfaceMcpServer`, `SurfaceMergeBase`, `SurfaceOverlay`, `SurfacePermissionValue`, `SurfaceRegistry`, `TangleBillingEnforcementOptions`, `TangleExecutionEnvironment`, `TangleExecutionKeyError`, `TangleExecutionKeyErrorCode`, `tangleExecutionKeyHttpError`, `TangleExecutionKeyHttpError`, `TangleExecutionKeySource`, `TangleModelConfig`, `toLoopEvents`, `ToolLoopEvent`, `ToolLoopResult`, `ToolLoopStopReason`, `trimOrNull`, `TurnKnowledgeBudget`, `TurnKnowledgeFile`, `turnKnowledgeInstructions`, `workspaceKnowledgeForTurn`
+`AnySurfaceKind`, `AppToolLoopOptions`, `asksForLanguage`, `budgetTurnKnowledge`, `buildCatalog`, `CatalogModel`, `catalogModelForId`, `CertifiedDelivery`, `CertifiedDeliveryConfig`, `CheckpointWorkspaceStore`, `composeRouterTurnPrompt`, `createCertifiedDelivery`, `createOpenAICompatCompletionTurn`, `createOpenAICompatStreamTurn`, `createRouterProtectedModelPort`, `createSurfaceRegistry`, `createTangleRouterModelConfig`, `CreateTangleRouterModelConfigOptions`, `DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR`, `DEFAULT_TANGLE_ROUTER_BASE_URL`, `defineSurfaceKind`, `DURABLE_HOP_BUDGET_MS`, `fetchModelCatalog`, `isChatCapableModel`, `isTangleBillingEnforcementDisabled`, `isTangleExecutionKeyError`, `LoopAssistantToolCall`, `LoopEvent`, `LoopMessage`, `LoopToolCall`, `MAX_RECOMMENDED_MODELS`, `mergeSurfaceOverlay`, `ModelCatalog`, `normalizeModelId`, `OpenAICompatServedModel`, `OpenAICompatStreamTurnOptions`, `OpenAIStreamChunk`, `placeRouterTurn`, `ProtectedModelSettlementError`, `ProtectedRouterTurnOptions`, `ProtectedRouterTurnOutcome`, `replyLanguageInstruction`, `resolveCatalogModelId`, `ResolvedAgentProfile`, `ResolvedTangleExecutionKey`, `ResolveModelOptions`, `resolveTangleDevOrUserKey`, `ResolveTangleDevOrUserKeyOptions`, `resolveTangleExecutionEnvironment`, `resolveTangleModelConfig`, `resolveUserTangleExecutionKey`, `resolveUserTangleExecutionKeyForUser`, `ResolveUserTangleExecutionKeyForUserOptions`, `ResolveUserTangleExecutionKeyOptions`, `routerFunctionName`, `RouterModel`, `RouterProtectedModelPortOptions`, `RouterProtectedModelSettlement`, `RouterTurnContinuation`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnGrant`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnPlacementInput`, `RouterTurnSettlement`, `RouterTurnTool`, `RouterTurnToolContext`, `RouterTurnToolEvent`, `RouterTurnToolOutcome`, `runAppToolLoop`, `runProtectedRouterTurn`, `runRouterTurn`, `sortModelsByFreshness`, `streamAppToolLoop`, `StreamAppToolLoopOptions`, `StreamLoopYield`, `SurfaceKindDefinition`, `SurfaceMcpServer`, `SurfaceMergeBase`, `SurfaceOverlay`, `SurfacePermissionValue`, `SurfaceRegistry`, `TangleBillingEnforcementOptions`, `TangleExecutionEnvironment`, `TangleExecutionKeyError`, `TangleExecutionKeyErrorCode`, `tangleExecutionKeyHttpError`, `TangleExecutionKeyHttpError`, `TangleExecutionKeySource`, `TangleModelConfig`, `toLoopEvents`, `ToolLoopEvent`, `ToolLoopResult`, `ToolLoopStopReason`, `trimOrNull`, `turnCheckpointPath`, `TurnCheckpointStore`, `TurnKnowledgeBudget`, `TurnKnowledgeFile`, `turnKnowledgeInstructions`, `workspaceKnowledgeForTurn`, `workspaceTurnCheckpoints`
 
 [Full API →](api/runtime.md)
 
 ## `./runtime/router-turn`
 
-Source: `src/runtime/router-turn.ts` · 18 exports
+Source: `src/runtime/router-turn.ts` · 26 exports
 
 Depends on: `tools`
 
-`budgetTurnKnowledge`, `composeRouterTurnPrompt`, `placeRouterTurn`, `routerFunctionName`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnPlacementInput`, `RouterTurnTool`, `RouterTurnToolContext`, `RouterTurnToolEvent`, `RouterTurnToolOutcome`, `runRouterTurn`, `TurnKnowledgeBudget`, `TurnKnowledgeFile`, `turnKnowledgeInstructions`, `workspaceKnowledgeForTurn`
+`asksForLanguage`, `budgetTurnKnowledge`, `CheckpointWorkspaceStore`, `composeRouterTurnPrompt`, `DURABLE_HOP_BUDGET_MS`, `placeRouterTurn`, `replyLanguageInstruction`, `routerFunctionName`, `RouterTurnContinuation`, `RouterTurnEvent`, `RouterTurnFailure`, `RouterTurnOptions`, `RouterTurnOutcome`, `RouterTurnPlacementInput`, `RouterTurnTool`, `RouterTurnToolContext`, `RouterTurnToolEvent`, `RouterTurnToolOutcome`, `runRouterTurn`, `turnCheckpointPath`, `TurnCheckpointStore`, `TurnKnowledgeBudget`, `TurnKnowledgeFile`, `turnKnowledgeInstructions`, `workspaceKnowledgeForTurn`, `workspaceTurnCheckpoints`
 
 [Full API →](api/runtime-router-turn.md)
 

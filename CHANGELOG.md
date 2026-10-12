@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.60.131
+
+- fix(studio): the closed model trigger draws the maker's logo like the rows (#1073)
+
+## 0.60.130
+
+- feat(router-turn): reply in the sender's language and name conflicting sources (#1061)
+
+## 0.60.129
+
+- fix(signoff): surface-ladder failure screenshots are viewport-sized so a tall page cannot stall the run (#1071)
+
+## 0.60.128
+
+- feat(model-picker): draw the maker's logo for a model another host serves (#1068)
+
+## 0.60.127
+
+- fix(billing): revoke an expired workspace key before minting its renewal (#1066)
+
+## 0.60.126
+
+- fix(peers): agent-runtime floor is 0.316.0, the first release with every subpath src imports (#1065)
+
+## 0.60.125
+
+- fix: make agent-app main green (#1063)
+
 ## 0.60.124
 
 - perf(agent-profiles): admitProfileTurn takes a read handle instead of re-reading pin and binding (#1058)
