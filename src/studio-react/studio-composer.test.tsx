@@ -600,15 +600,16 @@ describe('StudioComposer — model availability', () => {
     }, { video: SEEDANCE }))
     fireEvent.click(screen.getByRole('button', { name: 'Video' }))
     const trigger = await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
-    // The closed trigger draws the selected model's maker, not its host.
-    expect(trigger.querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe('bytedance')
+    // The closed trigger draws the selected model's maker, not its host. The
+    // mark is sandbox-ui's ProviderMark, labelled with the brand's display name.
+    expect(trigger.querySelector('[aria-label]')?.getAttribute('aria-label')).toBe('ByteDance')
 
     const picker = await openModelPicker()
     const veo = within(picker).getByRole('button', { name: /^fal-ai\/veo3\.1/ })
-    expect(veo.querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe('google')
+    expect(veo.querySelector('[aria-label]')?.getAttribute('aria-label')).toBe('Google')
     // Without a maker the host's mark stays.
     const other = within(picker).getByRole('button', { name: /^fal-ai\/other/ })
-    expect(other.querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe('fal')
+    expect(other.querySelector('[aria-label]')?.getAttribute('aria-label')).toBe('Fal')
   })
 
   it('keeps the unavailable Audio draft editable, blocks submission, and recovers', async () => {

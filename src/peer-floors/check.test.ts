@@ -249,7 +249,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('21.0.0', range!)).toBe(false)
   })
 
-  it('requires the Sandbox UI release that owns ShellHeader and the inset workspace surface, without claiming the next minor', async () => {
+  it('requires the Sandbox UI release whose ProviderMark renders a fallback, without claiming the next minor', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -258,15 +258,15 @@ describe('this package audits itself', () => {
 
     expect(range).toBeDefined()
     // The assistant panel, session history and Vault path bar render sandbox-ui's
-    // ShellHeader rows, first shipped in 0.133.0. AgentWorkspaceCompanion also passes
-    // WorkspaceLayout `surface="inset"` and the right-pane control labels (0.132.0).
-    expect(satisfiesRange('0.131.5', range!)).toBe(false)
+    // ShellHeader rows (0.133.0); AgentWorkspaceCompanion passes WorkspaceLayout
+    // `surface="inset"` (0.132.0). ProviderLogo draws sandbox-ui's ProviderMark,
+    // first exported in 0.134.1; 0.134.2 is the first release that renders the
+    // caller's monogram fallback for a provider with no bundled mark.
     expect(satisfiesRange('0.132.3', range!)).toBe(false)
-    expect(satisfiesRange('0.133.0', range!)).toBe(true)
-    expect(satisfiesRange('0.133.4', range!)).toBe(true)
-    // 0.134.0 adds WorkspaceSurface and WorkspaceArtifactView without breaking a 0.133 export;
-    // this package builds and tests against it.
-    expect(satisfiesRange('0.134.0', range!)).toBe(true)
+    expect(satisfiesRange('0.133.4', range!)).toBe(false)
+    expect(satisfiesRange('0.134.1', range!)).toBe(false)
+    expect(satisfiesRange('0.134.2', range!)).toBe(true)
+    expect(satisfiesRange('0.134.3', range!)).toBe(true)
     expect(satisfiesRange('0.135.0', range!)).toBe(false)
   })
 
