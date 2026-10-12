@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.126
+
+- fix(peers): agent-runtime floor is 0.316.0, the first release with every subpath src imports (#1065)
+
 ## 0.60.125
 
 - fix: make agent-app main green (#1063)
