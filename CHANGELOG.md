@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.144
+
+- fix(signoff): browser checks stay inside the shared edge limit (#1070)
+- feat(platform): record a person's sandbox billing consent for an app's service key (#1064)
+
 ## 0.60.143
 
 - feat(web-react): one shared, live-streamed reasoning row, reasoning state and reasoning part for every app (#1082)
