@@ -23,7 +23,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { ImagePlus, TriangleAlert, Volume2, VolumeX, X, type LucideIcon } from 'lucide-react'
+import { ImagePlus, Volume2, VolumeX, X, type LucideIcon } from 'lucide-react'
 import {
   CheckGlyph,
   ChevronDown,
@@ -32,8 +32,7 @@ import {
   PopoverSurface,
   usePopover,
 } from '../web-react/controls'
-import { ProviderLogo } from '../web-react/provider-logo'
-import { type MediaModelOption, type ModelOptionValue, validateCustomImageSize } from '../studio'
+import { type ModelOptionValue, validateCustomImageSize } from '../studio'
 
 /** The resting pill: one row height, never wraps, shrink-proof in the band. */
 const PILL = 'inline-flex h-7 flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-2.5 text-[14px] font-medium text-foreground transition hover:bg-accent'
@@ -631,107 +630,6 @@ export function ReferencePill({
           </div>
         </PopoverSurface>
       )}
-    </div>
-  )
-}
-
-/**
- * The model pill — first in the band on every lane, and the only pill that is
- * always there. A model with no published option metadata renders this and
- * nothing else, which is the honest reading of "we do not know what this model
- * takes".
- */
-export function ModelPill({
-  models,
-  value,
-  displayName,
-  provider,
-  unavailable,
-  onSelect,
-  bandRef,
-}: {
-  models: readonly MediaModelOption[]
-  value: string
-  /** What the pill reads. Falls back to the id — including for a model the
-   *  catalog does not list, such as an image-to-video sibling. */
-  displayName: string
-  provider?: string
-  /** The selected model is listed but not routable — the pill carries the warning instead of any status line. */
-  unavailable?: boolean
-  onSelect: (id: string) => void
-  bandRef: RefObject<HTMLDivElement | null>
-}) {
-  const [open, setOpen] = useState(false)
-  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
-  const panelId = useId()
-  useCloseWhenScrolledOut(open, setOpen, triggerRef, bandRef)
-
-  return (
-    <div ref={containerRef} className="relative inline-flex flex-none">
-      <button
-        type="button"
-        {...triggerProps}
-        aria-controls={open ? panelId : undefined}
-        title="Model"
-        aria-label={`Model: ${displayName}${unavailable ? ' (unavailable)' : ''}`}
-        onClick={() => setOpen(!open)}
-        className={`${PILL}${unavailable ? ' border-warning/50' : ''}`}
-      >
-        {unavailable && <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />}
-        {provider && <ProviderLogo provider={provider} size={14} />}
-        {/* No PILL_LABEL here: text-box trim ends the box at the alphabetic
-            baseline, and truncate's overflow:hidden then clips descender ink
-            (the g/p tails of "gpt-image-2"). A normal line box keeps them. */}
-        <span className="max-w-[168px] truncate leading-normal">{displayName}</span>
-        <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-      </button>
-
-      <PopoverSurface
-        open={open}
-        id={panelId}
-        role="menu"
-        triggerRef={triggerRef}
-        panelRef={panelRef}
-        className={`${MENU_PANEL} max-w-[320px]`}
-      >
-        <div className={MENU_HEADER}>Model</div>
-        {models.length === 0 && (
-          <p className="px-2.5 py-2 text-[14px] text-muted-foreground">No models are available for this media type.</p>
-        )}
-        {models.map((model) => (
-          <button
-            key={model.id}
-            type="button"
-            role="menuitemradio"
-            aria-checked={model.id === value}
-            onClick={() => {
-              onSelect(model.id)
-              setOpen(false)
-            }}
-            className={menuRowClass(model.id === value)}
-          >
-            {model.provider && (
-              <span className={model.status === 'unavailable' ? 'opacity-45' : undefined}>
-                <ProviderLogo provider={model.provider} size={14} />
-              </span>
-            )}
-            <span className={`truncate${model.status === 'unavailable' ? ' opacity-45' : ''}`}>
-              {model.name || model.id}
-            </span>
-            {model.status === 'unavailable' ? (
-              <>
-                <span className="ml-auto shrink-0 text-[14px] text-warning">Unavailable</span>
-                <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />
-              </>
-            ) : model.status === 'limited' && (
-              <span className="ml-auto shrink-0 text-[14px] capitalize text-muted-foreground">{model.status}</span>
-            )}
-            {model.id === value && (
-              <CheckGlyph className={`${model.status === 'available' ? 'ml-auto ' : ''}h-3.5 w-3.5 shrink-0 text-primary`} />
-            )}
-          </button>
-        ))}
-      </PopoverSurface>
     </div>
   )
 }

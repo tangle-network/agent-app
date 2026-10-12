@@ -52,6 +52,8 @@ export interface InvitationView {
   emailStatus: InvitationEmailStatus
   /** Date | epoch-ms | ISO string — normalized to a Date for display. */
   expiresAt: Date | number | string
+  /** When the invitee joined. An accepted row reads "joined <date>" instead of its expiry. */
+  acceptedAt?: Date | number | string | null
   /** Shareable accept link, for copy-to-clipboard. */
   inviteUrl: string
 }

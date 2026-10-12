@@ -201,7 +201,7 @@ agent-app 0.53.7. Local page code attributed below: 10,745 lines.
 | Billing and usage | local | — | `src/components/seat-paywall-modal.tsx` (73) |
 | Help, error and unavailable | local | — | `src/root.tsx` L207–L231 (25) |
 
-### Physim — `tangle-network/physim` @ `main` (`d25cc65`)
+### Physim — `tangle-network/hardware-agent` (then `tangle-network/physim`) @ `main` (`d25cc65`)
 
 agent-app 0.53.7. Local page code attributed below: 6,344 lines.
 

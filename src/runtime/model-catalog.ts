@@ -57,6 +57,20 @@ export interface CatalogModel {
   releaseDate?: string
   contextLength?: number
   pricing?: { prompt?: string; completion?: string }
+  /** What one generation produces. Text when absent. */
+  output?: 'text' | 'image' | 'video' | 'audio' | 'speech'
+  /** USD for one unit of output, for media models: one image, one second of
+   *  video, one minute of audio, or 1,000 characters of speech. */
+  outputPrice?: { usd: number; unit: 'image' | 'second' | 'minute' | '1k_chars' }
+  /** An example of the model's output (an image, or a video poster frame). */
+  previewUrl?: string
+  /** One line on what the model is for, shown under its name. */
+  capability?: string
+  /** Whether the model can be sent now. Absent means available. A limited or
+   *  unavailable model stays selectable; the picker marks it in a warning tone. */
+  status?: 'available' | 'limited' | 'unavailable'
+  /** Why a limited or unavailable model is so, in words a person can act on. */
+  statusReason?: string
   supportsTools: boolean
   supportsReasoning: boolean
   featured: boolean

@@ -117,6 +117,8 @@ export type ProducerPassthroughEventType =
   | 'plan.submitted'
   | 'done'
   | 'warning'
+  /** A tool's typed side event while it runs (`data`: toolCallId, toolName, kind, data, at). */
+  | 'tool.event'
   | 'session.run.started'
   | 'session.run.completed'
   | 'session.run.failed'

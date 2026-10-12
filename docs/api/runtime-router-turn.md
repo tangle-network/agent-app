@@ -4,14 +4,30 @@
 
 Source: `src/runtime/router-turn.ts`
 
-8 exports.
+18 exports.
+
+### `budgetTurnKnowledge`
+
+`function` — Apply the byte budget in path order: small files keep their text until the total is spent.
+
+```ts
+(files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]
+```
 
 ### `composeRouterTurnPrompt`
 
-`function` — The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls.
+`function` — The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…
 
 ```ts
 (profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…
+```
+
+### `placeRouterTurn`
+
+`function` — Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…
+
+```ts
+(input: RouterTurnPlacementInput) => PlacementRecord
 ```
 
 ### `routerFunctionName`
@@ -54,6 +70,14 @@ interface RouterTurnOptions
 interface RouterTurnOutcome
 ```
 
+### `RouterTurnPlacementInput`
+
+`interface` — What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose.
+
+```ts
+interface RouterTurnPlacementInput
+```
+
 ### `RouterTurnTool`
 
 `interface` — A tool the turn may call.
@@ -62,10 +86,66 @@ interface RouterTurnOutcome
 interface RouterTurnTool
 ```
 
+### `RouterTurnToolContext`
+
+`interface` — What a running tool gets besides its arguments.
+
+```ts
+interface RouterTurnToolContext
+```
+
+### `RouterTurnToolEvent`
+
+`interface` — One side event a tool reported while it ran.
+
+```ts
+interface RouterTurnToolEvent
+```
+
+### `RouterTurnToolOutcome`
+
+`type` — One tool call's result as the model reads it.
+
+```ts
+type RouterTurnToolOutcome
+```
+
 ### `runRouterTurn`
 
 `function`
 
 ```ts
 (options: RouterTurnOptions) => Promise<RouterTurnOutcome>
+```
+
+### `TurnKnowledgeBudget`
+
+`interface`
+
+```ts
+interface TurnKnowledgeBudget
+```
+
+### `TurnKnowledgeFile`
+
+`interface` — One knowledge file a turn carries; `text` is null when it is too large or not readable here.
+
+```ts
+interface TurnKnowledgeFile
+```
+
+### `turnKnowledgeInstructions`
+
+`function` — The prompt lines for a turn's knowledge.
+
+```ts
+(files: readonly TurnKnowledgeFile[], options?: { readTool?: string | undefined; }) => string[]
+```
+
+### `workspaceKnowledgeForTurn`
+
+`function` — A workspace store's knowledge files (kind `file` under `prefix`) as turn knowledge, within the budget.
+
+```ts
+(store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…
 ```

@@ -2787,6 +2787,18 @@
           "doc": "Host-resolved metadata only."
         },
         {
+          "name": "ChatTurnIntentLine",
+          "kind": "interface",
+          "signature": "interface ChatTurnIntentLine",
+          "doc": "The intent line: one plain sentence, written by a fast model call the moment a turn is admitted, saying what the agent is about to do."
+        },
+        {
+          "name": "ChatTurnIntentLineArgs",
+          "kind": "interface",
+          "signature": "interface ChatTurnIntentLineArgs",
+          "doc": "What `intentLine.generate` receives: the admitted turn's message and the thread's last few turns."
+        },
+        {
           "name": "ChatTurnLifecycle",
           "kind": "interface",
           "signature": "interface ChatTurnLifecycle",
@@ -2982,7 +2994,7 @@
           "name": "createProtectedRuntimeChatProducer",
           "kind": "function",
           "signature": "(options: ProtectedRuntimeChatOptions) => ChatTurnRouteProducer",
-          "doc": "Run a profile through the protected Router tool executor and the shared chat projection."
+          "doc": "Run a profile as one Router turn under a protected model grant (`runProtectedRouterTurn`), projected through the shared chat projection."
         },
         {
           "name": "createRouterTurnProducer",
@@ -3207,6 +3219,24 @@
           "doc": "Define the maximum byte size allowed for inline parts in data processing"
         },
         {
+          "name": "INTENT_LINE_HISTORY_MESSAGES",
+          "kind": "const",
+          "signature": "6",
+          "doc": "Turns of the thread the line is written from."
+        },
+        {
+          "name": "INTENT_LINE_MAX_CHARS",
+          "kind": "const",
+          "signature": "240",
+          "doc": "Longest line kept; anything longer is cut."
+        },
+        {
+          "name": "INTENT_LINE_TIMEOUT_MS",
+          "kind": "const",
+          "signature": "1500",
+          "doc": "A line slower than this shows nothing."
+        },
+        {
           "name": "isCommittingSandboxEvent",
           "kind": "function",
           "signature": "(event: unknown) => boolean",
@@ -3223,6 +3253,12 @@
           "kind": "function",
           "signature": "(event: unknown) => boolean",
           "doc": "Progress the consumer may see before the commit point: it names no model output and carries no billing receipt, so streaming it live cannot duplicate an answer or bill an abandoned attempt."
+        },
+        {
+          "name": "isTurnIntentEvent",
+          "kind": "function",
+          "signature": "(event: unknown) => event is TurnIntentEvent",
+          "doc": "True for a {@link TURN_INTENT_EVENT} with non-empty text."
         },
         {
           "name": "isTurnPhaseEvent",
@@ -3755,7 +3791,7 @@
         {
           "name": "settleTurnResponse",
           "kind": "function",
-          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>",
+          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void, onIntent?: ((intent: TurnIntentData) => void) | undefined…",
           "doc": "Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}."
         },
         {
@@ -3831,6 +3867,12 @@
           "doc": "The failure a completed run with an aborted tool call settles with."
         },
         {
+          "name": "TURN_INTENT_EVENT",
+          "kind": "const",
+          "signature": "\"session.run.intent\"",
+          "doc": "Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do (\"Looking at your three competitors' pricing pages, t…"
+        },
+        {
           "name": "TURN_PHASE_EVENT",
           "kind": "const",
           "signature": "\"session.run.phase\"",
@@ -3865,6 +3907,18 @@
           "kind": "const",
           "signature": "\"turn_stream_lost\"",
           "doc": "Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started."
+        },
+        {
+          "name": "TurnIntentData",
+          "kind": "type",
+          "signature": "type TurnIntentData",
+          "doc": "The data of a {@link TURN_INTENT_EVENT}."
+        },
+        {
+          "name": "TurnIntentEvent",
+          "kind": "type",
+          "signature": "type TurnIntentEvent",
+          "doc": "A {@link TURN_INTENT_EVENT} as it crosses the wire."
         },
         {
           "name": "TurnPhaseData",
@@ -7015,6 +7069,12 @@
       "error": null,
       "exports": [
         {
+          "name": "AskVerdict",
+          "kind": "interface",
+          "signature": "interface AskVerdict",
+          "doc": null
+        },
+        {
           "name": "assertGateDiscriminates",
           "kind": "function",
           "signature": "<TInput>(name: string, gate: GateFn<TInput>, cases: readonly CalibrationCase<TInput>[]) => Promise<CalibrationReport>",
@@ -7087,10 +7147,46 @@
           "doc": "A gate under calibration."
         },
         {
+          "name": "gradeAnswer",
+          "kind": "function",
+          "signature": "(text: string, ask: ParityAsk) => AskVerdict",
+          "doc": null
+        },
+        {
+          "name": "LaneAnswer",
+          "kind": "interface",
+          "signature": "interface LaneAnswer",
+          "doc": "One lane's answer to one ask."
+        },
+        {
           "name": "measureWithControl",
           "kind": "function",
           "signature": "<TValue>(opts: { readonly measure: () => TValue | Promise<TValue>; readonly control: () => TValue | Promise<TValue>; re…",
           "doc": "Measure something, but only after proving the instrument can register a non-zero — because an absence is a claim about the measurement first."
+        },
+        {
+          "name": "ParityAsk",
+          "kind": "interface",
+          "signature": "interface ParityAsk",
+          "doc": "Parity eval: the same asks through two or more lanes of one app (for example the Router turn and the sandbox turn), graded the same way, so a lane change is judged by numbers rather than by feel."
+        },
+        {
+          "name": "parityGate",
+          "kind": "function",
+          "signature": "(report: ParityReport, bar: { minCorrectRatio: number; maxFabricated?: number | undefined; maxFailed?: number | undefin…",
+          "doc": "The release bar: every lane at or above `minCorrect` of its asks, with no fabrication and no failed turn."
+        },
+        {
+          "name": "ParityLane",
+          "kind": "type",
+          "signature": "type ParityLane",
+          "doc": null
+        },
+        {
+          "name": "ParityReport",
+          "kind": "interface",
+          "signature": "interface ParityReport",
+          "doc": null
         },
         {
           "name": "ProbeReport",
@@ -7109,6 +7205,12 @@
           "kind": "interface",
           "signature": "interface ProducedState",
           "doc": "Everything observable about what a run actually produced."
+        },
+        {
+          "name": "runParityEval",
+          "kind": "function",
+          "signature": "(options: { asks: readonly ParityAsk[]; lanes: Record<string, ParityLane>; style?: string | undefined; }) => Promise<Pa…",
+          "doc": "Ask every lane every question, one ask at a time per lane (lanes run in parallel), and grade each answer the same way."
         },
         {
           "name": "RuntimeEventLike",
@@ -9339,6 +9441,400 @@
           "kind": "function",
           "signature": "(body: Record<string, unknown>) => InteractionAnswerBodyValidation",
           "doc": "Validates the client POST body: `{ id, outcome, data?"
+        }
+      ]
+    },
+    {
+      "id": "./journeys",
+      "source": "src/journeys/index.ts",
+      "dependsOn": [
+        "signoff",
+        "workspace-export"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "assertNoSecrets",
+          "kind": "function",
+          "signature": "(dir: string, needles: { hard: readonly string[]; soft: readonly string[]; }) => { softHits: string[]; }",
+          "doc": "Refuse to hand over a folder whose files hold a password or cookie value."
+        },
+        {
+          "name": "AuthPaths",
+          "kind": "interface",
+          "signature": "interface AuthPaths",
+          "doc": null
+        },
+        {
+          "name": "Chapter",
+          "kind": "interface",
+          "signature": "interface Chapter",
+          "doc": null
+        },
+        {
+          "name": "chapterCues",
+          "kind": "function",
+          "signature": "(chapters: readonly Chapter[], t0: number, duration: number) => Cue[]",
+          "doc": "Chapters on the video's own clock; each caption holds until the next."
+        },
+        {
+          "name": "ChatContract",
+          "kind": "interface",
+          "signature": "interface ChatContract",
+          "doc": "The chat DOM a turn is read from."
+        },
+        {
+          "name": "clickUntilSubmitted",
+          "kind": "function",
+          "signature": "(ops: SendDriveOps) => Promise<void>",
+          "doc": "Press until the page submits."
+        },
+        {
+          "name": "collectJourneyFiles",
+          "kind": "function",
+          "signature": "(root: string, probe: (file: string) => number | null) => JourneyFiles[]",
+          "doc": "Every journey folder under `root`: one that holds a `timings.json` or a `video/` folder, at any depth."
+        },
+        {
+          "name": "CONFIG_FILE_NAMES",
+          "kind": "const",
+          "signature": "readonly [\"journeys.config.mjs\", \"journeys.config.js\"]",
+          "doc": null
+        },
+        {
+          "name": "createSubmissionTracker",
+          "kind": "function",
+          "signature": "(routeUrl: string, sendPaths: readonly RegExp[]) => SubmissionTracker",
+          "doc": "Counts submissions from the page at `routeUrl`: a POST to that route (or its `.data` form), or to one of `sendPaths`, on the same origin."
+        },
+        {
+          "name": "credentialNames",
+          "kind": "function",
+          "signature": "(config: Pick<JourneysConfig, \"identities\">) => string[]",
+          "doc": "Environment variable names the config needs, for a vault loader."
+        },
+        {
+          "name": "CriticResult",
+          "kind": "interface",
+          "signature": "interface CriticResult",
+          "doc": "What the skeptical critic returns; the same shape the prove-journeys workflow asks for."
+        },
+        {
+          "name": "Cue",
+          "kind": "interface",
+          "signature": "interface Cue",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_AUTH_PATHS",
+          "kind": "const",
+          "signature": "AuthPaths",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_CHAT_CONTRACT",
+          "kind": "const",
+          "signature": "ChatContract",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_FAILURE_TEXT",
+          "kind": "const",
+          "signature": "readonly RegExp[]",
+          "doc": "Failure text any agent app can show: typed failure codes, provider errors and this package's own sandbox-stream copy."
+        },
+        {
+          "name": "DEFAULT_STOPPED_TEXT",
+          "kind": "const",
+          "signature": "readonly RegExp[]",
+          "doc": "Runtime wording for a turn the person stopped."
+        },
+        {
+          "name": "defineJourneys",
+          "kind": "function",
+          "signature": "(config: JourneysConfig) => JourneysConfig",
+          "doc": "Identity for a typed config; also validates it."
+        },
+        {
+          "name": "DESKTOP",
+          "kind": "const",
+          "signature": "{ width: number; height: number; }",
+          "doc": null
+        },
+        {
+          "name": "extractFrames",
+          "kind": "function",
+          "signature": "(video: string, srtFile: string | null, outDir: string, times: readonly number[], max?: number) => string[]",
+          "doc": "PNG frames of a video, named by label and timestamp, into `outDir`."
+        },
+        {
+          "name": "FailurePatterns",
+          "kind": "interface",
+          "signature": "interface FailurePatterns",
+          "doc": null
+        },
+        {
+          "name": "highlightPlan",
+          "kind": "function",
+          "signature": "(chapters: readonly Chapter[], t0: number, duration: number) => HighlightSegment[]",
+          "doc": "The highlights cut: which source ranges, at what speed, under which caption."
+        },
+        {
+          "name": "HighlightSegment",
+          "kind": "interface",
+          "signature": "interface HighlightSegment",
+          "doc": null
+        },
+        {
+          "name": "IndexInput",
+          "kind": "interface",
+          "signature": "interface IndexInput",
+          "doc": null
+        },
+        {
+          "name": "Journey",
+          "kind": "class",
+          "signature": "class Journey",
+          "doc": null
+        },
+        {
+          "name": "JourneyFiles",
+          "kind": "interface",
+          "signature": "interface JourneyFiles",
+          "doc": null
+        },
+        {
+          "name": "JourneyIdentity",
+          "kind": "interface",
+          "signature": "interface JourneyIdentity",
+          "doc": null
+        },
+        {
+          "name": "JourneysConfig",
+          "kind": "interface",
+          "signature": "interface JourneysConfig",
+          "doc": null
+        },
+        {
+          "name": "loadJourneysConfig",
+          "kind": "function",
+          "signature": "(dir?: any, env?: Record<string, string | undefined>) => Promise<ResolvedJourneysConfig>",
+          "doc": "`JOURNEYS_CONFIG`, else the first config file in `dir`."
+        },
+        {
+          "name": "MAX_HIGHLIGHTS_S",
+          "kind": "const",
+          "signature": "178",
+          "doc": null
+        },
+        {
+          "name": "oneLine",
+          "kind": "function",
+          "signature": "(text: string, max: number) => string",
+          "doc": null
+        },
+        {
+          "name": "PHONE",
+          "kind": "const",
+          "signature": "{ width: number; height: number; }",
+          "doc": null
+        },
+        {
+          "name": "postProcessVideo",
+          "kind": "function",
+          "signature": "(o: PostProcessInput) => string[]",
+          "doc": null
+        },
+        {
+          "name": "rebuildVideo",
+          "kind": "function",
+          "signature": "(rawLabelDir: string, videoDir: string, label: string, speedup2x: boolean) => string[]",
+          "doc": "Re-render from a raw folder after editing `<label>.chapters.json` by hand."
+        },
+        {
+          "name": "renderIndex",
+          "kind": "function",
+          "signature": "(input: IndexInput) => string",
+          "doc": null
+        },
+        {
+          "name": "ResolvedJourneysConfig",
+          "kind": "interface",
+          "signature": "interface ResolvedJourneysConfig",
+          "doc": null
+        },
+        {
+          "name": "resolveJourneysConfig",
+          "kind": "function",
+          "signature": "(config: JourneysConfig | ResolvedJourneysConfig, env?: Record<string, string | undefined>) => ResolvedJourneysConfig",
+          "doc": "Fill defaults and refuse a config that cannot drive a journey."
+        },
+        {
+          "name": "routeSubmitPaths",
+          "kind": "function",
+          "signature": "(routePath: string) => string[]",
+          "doc": "Paths a submission from `routePath` lands on: the route itself and its single-fetch `.data` form."
+        },
+        {
+          "name": "scoreTurn",
+          "kind": "function",
+          "signature": "(facts: TurnFacts) => TurnVerdict",
+          "doc": "The one place a turn's outcome is decided."
+        },
+        {
+          "name": "scrubTrace",
+          "kind": "function",
+          "signature": "(src: string, dst: string, needles: readonly string[]) => { entries: number; dropped: number; rewritten: number; }",
+          "doc": "Write a scrubbed copy of `src` to `dst`."
+        },
+        {
+          "name": "secretNeedles",
+          "kind": "function",
+          "signature": "(config: ResolvedJourneysConfig) => { hard: string[]; soft: string[]; }",
+          "doc": "Every value that must never leave the host."
+        },
+        {
+          "name": "SendDriveOps",
+          "kind": "interface",
+          "signature": "interface SendDriveOps",
+          "doc": null
+        },
+        {
+          "name": "SendOptions",
+          "kind": "interface",
+          "signature": "interface SendOptions",
+          "doc": null
+        },
+        {
+          "name": "sessionUser",
+          "kind": "function",
+          "signature": "(config: ResolvedJourneysConfig, state: string) => Promise<SessionUser | null>",
+          "doc": "The signed-in user behind a storage state, or null when it no longer signs in."
+        },
+        {
+          "name": "SessionUser",
+          "kind": "interface",
+          "signature": "interface SessionUser",
+          "doc": null
+        },
+        {
+          "name": "settleText",
+          "kind": "function",
+          "signature": "(read: () => Promise<string>, wait?: (ms: number) => Promise<void>, timeoutMs?: number) => Promise<string>",
+          "doc": "Read until the value stops changing: six identical reads 500 ms apart."
+        },
+        {
+          "name": "SignInMethod",
+          "kind": "type",
+          "signature": "type SignInMethod",
+          "doc": null
+        },
+        {
+          "name": "startJourney",
+          "kind": "function",
+          "signature": "(id: string, opts?: { config?: JourneysConfig | ResolvedJourneysConfig | undefined; cursor?: boolean | undefined; headl…",
+          "doc": "Open a journey."
+        },
+        {
+          "name": "STATUS_STALE_MS",
+          "kind": "const",
+          "signature": "20000",
+          "doc": "Whether a turn is still going, from what the page shows."
+        },
+        {
+          "name": "StepRecord",
+          "kind": "interface",
+          "signature": "interface StepRecord",
+          "doc": null
+        },
+        {
+          "name": "storageStateFor",
+          "kind": "function",
+          "signature": "(config: ResolvedJourneysConfig, name: string, opts?: { fresh?: boolean | undefined; }) => Promise<{ path: string; user…",
+          "doc": "Path to a storage state signed in as `identity`."
+        },
+        {
+          "name": "SubmissionTracker",
+          "kind": "interface",
+          "signature": "interface SubmissionTracker",
+          "doc": null
+        },
+        {
+          "name": "tallyTurns",
+          "kind": "function",
+          "signature": "(journeys: readonly JourneyFiles[]) => { total: number; byOutcome: Record<string, number>; }",
+          "doc": "Every recorded turn's outcome, counted."
+        },
+        {
+          "name": "ThreadRoute",
+          "kind": "interface",
+          "signature": "interface ThreadRoute",
+          "doc": "The ids a thread URL carries."
+        },
+        {
+          "name": "threadRouteIn",
+          "kind": "function",
+          "signature": "(url: string, config: Pick<ResolvedJourneysConfig, \"baseUrl\" | \"chat\">) => ThreadRoute | null",
+          "doc": "The ids in a thread URL, or null when the URL is not a thread on this origin."
+        },
+        {
+          "name": "TranscriptSnapshot",
+          "kind": "interface",
+          "signature": "interface TranscriptSnapshot",
+          "doc": "What one poll of the page returns."
+        },
+        {
+          "name": "TurnEvidence",
+          "kind": "class",
+          "signature": "class TurnEvidence",
+          "doc": "Failure evidence that appeared after the turn was sent."
+        },
+        {
+          "name": "TurnFacts",
+          "kind": "interface",
+          "signature": "interface TurnFacts",
+          "doc": null
+        },
+        {
+          "name": "turnLooksActive",
+          "kind": "function",
+          "signature": "(page: { stopVisible: boolean; statusLines: number; msSinceStatusChanged: number; }) => boolean",
+          "doc": null
+        },
+        {
+          "name": "TurnOutcome",
+          "kind": "type",
+          "signature": "type TurnOutcome",
+          "doc": null
+        },
+        {
+          "name": "TurnRecord",
+          "kind": "interface",
+          "signature": "interface TurnRecord",
+          "doc": null
+        },
+        {
+          "name": "TurnVerdict",
+          "kind": "interface",
+          "signature": "interface TurnVerdict",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./journeys/cli",
+      "source": "src/journeys/cli.ts",
+      "dependsOn": [
+        "signoff",
+        "workspace-export"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "main",
+          "kind": "function",
+          "signature": "(argv: readonly string[]) => Promise<number>",
+          "doc": null
         }
       ]
     },
@@ -14304,6 +14800,12 @@
           "doc": null
         },
         {
+          "name": "budgetTurnKnowledge",
+          "kind": "function",
+          "signature": "(files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]",
+          "doc": "Apply the byte budget in path order: small files keep their text until the total is spent."
+        },
+        {
           "name": "buildCatalog",
           "kind": "function",
           "signature": "(raw: RouterModel[], opts?: { preferredDefault?: string | undefined; } | undefined) => ModelCatalog",
@@ -14337,13 +14839,19 @@
           "name": "composeRouterTurnPrompt",
           "kind": "function",
           "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
-          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls."
+          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…"
         },
         {
           "name": "createCertifiedDelivery",
           "kind": "function",
           "signature": "(config: CertifiedPromptSourceOptions) => CertifiedDelivery",
           "doc": null
+        },
+        {
+          "name": "createOpenAICompatCompletionTurn",
+          "kind": "function",
+          "signature": "(opts: OpenAICompatStreamTurnOptions) => (messages: ToolLoopMessage[]) => AsyncIterable<LoopEvent>",
+          "doc": "The buffered sibling of {@link createOpenAICompatStreamTurn}: one `/chat/completions` request without `stream`, answered by one JSON completion, yielded as the same `LoopEvent`s (the same tool-call a…"
         },
         {
           "name": "createOpenAICompatStreamTurn",
@@ -14484,10 +14992,28 @@
           "doc": "Minimal OpenAI Chat Completions streaming chunk (structural — no `openai` dep)."
         },
         {
+          "name": "placeRouterTurn",
+          "kind": "function",
+          "signature": "(input: RouterTurnPlacementInput) => PlacementRecord",
+          "doc": "Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…"
+        },
+        {
           "name": "ProtectedModelSettlementError",
           "kind": "class",
           "signature": "class ProtectedModelSettlementError",
           "doc": "A validated charge remains authoritative when the product cannot save its audit record."
+        },
+        {
+          "name": "ProtectedRouterTurnOptions",
+          "kind": "type",
+          "signature": "type ProtectedRouterTurnOptions",
+          "doc": "A turn under a grant."
+        },
+        {
+          "name": "ProtectedRouterTurnOutcome",
+          "kind": "interface",
+          "signature": "interface ProtectedRouterTurnOutcome",
+          "doc": null
         },
         {
           "name": "resolveCatalogModelId",
@@ -14598,6 +15124,12 @@
           "doc": null
         },
         {
+          "name": "RouterTurnGrant",
+          "kind": "type",
+          "signature": "type RouterTurnGrant",
+          "doc": "Runtime's grant inputs for one turn: the port, the model request, the reservation and its deadline."
+        },
+        {
           "name": "RouterTurnOptions",
           "kind": "interface",
           "signature": "interface RouterTurnOptions",
@@ -14610,16 +15142,52 @@
           "doc": null
         },
         {
+          "name": "RouterTurnPlacementInput",
+          "kind": "interface",
+          "signature": "interface RouterTurnPlacementInput",
+          "doc": "What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose."
+        },
+        {
+          "name": "RouterTurnSettlement",
+          "kind": "interface",
+          "signature": "interface RouterTurnSettlement",
+          "doc": "What the grant settled for the turn."
+        },
+        {
           "name": "RouterTurnTool",
           "kind": "interface",
           "signature": "interface RouterTurnTool",
           "doc": "A tool the turn may call."
         },
         {
+          "name": "RouterTurnToolContext",
+          "kind": "interface",
+          "signature": "interface RouterTurnToolContext",
+          "doc": "What a running tool gets besides its arguments."
+        },
+        {
+          "name": "RouterTurnToolEvent",
+          "kind": "interface",
+          "signature": "interface RouterTurnToolEvent",
+          "doc": "One side event a tool reported while it ran."
+        },
+        {
+          "name": "RouterTurnToolOutcome",
+          "kind": "type",
+          "signature": "type RouterTurnToolOutcome",
+          "doc": "One tool call's result as the model reads it."
+        },
+        {
           "name": "runAppToolLoop",
           "kind": "function",
           "signature": "(opts: RunToolLoopOptions) => Promise<ToolLoopResult>",
           "doc": "Run the bounded tool loop and return the final text + every executed tool outcome."
+        },
+        {
+          "name": "runProtectedRouterTurn",
+          "kind": "function",
+          "signature": "(options: ProtectedRouterTurnOptions) => Promise<ProtectedRouterTurnOutcome>",
+          "doc": "Run one `runRouterTurn` under `options.grant`."
         },
         {
           "name": "runRouterTurn",
@@ -14764,6 +15332,30 @@
           "kind": "function",
           "signature": "(value: string | null | undefined) => string | null",
           "doc": "Resolve a string by trimming whitespace or returning null if empty or undefined"
+        },
+        {
+          "name": "TurnKnowledgeBudget",
+          "kind": "interface",
+          "signature": "interface TurnKnowledgeBudget",
+          "doc": null
+        },
+        {
+          "name": "TurnKnowledgeFile",
+          "kind": "interface",
+          "signature": "interface TurnKnowledgeFile",
+          "doc": "One knowledge file a turn carries; `text` is null when it is too large or not readable here."
+        },
+        {
+          "name": "turnKnowledgeInstructions",
+          "kind": "function",
+          "signature": "(files: readonly TurnKnowledgeFile[], options?: { readTool?: string | undefined; }) => string[]",
+          "doc": "The prompt lines for a turn's knowledge."
+        },
+        {
+          "name": "workspaceKnowledgeForTurn",
+          "kind": "function",
+          "signature": "(store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…",
+          "doc": "A workspace store's knowledge files (kind `file` under `prefix`) as turn knowledge, within the budget."
         }
       ]
     },
@@ -14776,10 +15368,22 @@
       "error": null,
       "exports": [
         {
+          "name": "budgetTurnKnowledge",
+          "kind": "function",
+          "signature": "(files: readonly TurnKnowledgeFile[], budget?: TurnKnowledgeBudget) => TurnKnowledgeFile[]",
+          "doc": "Apply the byte budget in path order: small files keep their text until the total is spent."
+        },
+        {
           "name": "composeRouterTurnPrompt",
           "kind": "function",
           "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; instructions?: readonly string[] | undefined; } | undefined;…",
-          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, then caller context, with tool names rewritten to the function names the model actually calls."
+          "doc": "The lean system prompt for a Router turn: the profile's system prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function names the model actu…"
+        },
+        {
+          "name": "placeRouterTurn",
+          "kind": "function",
+          "signature": "(input: RouterTurnPlacementInput) => PlacementRecord",
+          "doc": "Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…"
         },
         {
           "name": "routerFunctionName",
@@ -14812,16 +15416,64 @@
           "doc": null
         },
         {
+          "name": "RouterTurnPlacementInput",
+          "kind": "interface",
+          "signature": "interface RouterTurnPlacementInput",
+          "doc": "What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose."
+        },
+        {
           "name": "RouterTurnTool",
           "kind": "interface",
           "signature": "interface RouterTurnTool",
           "doc": "A tool the turn may call."
         },
         {
+          "name": "RouterTurnToolContext",
+          "kind": "interface",
+          "signature": "interface RouterTurnToolContext",
+          "doc": "What a running tool gets besides its arguments."
+        },
+        {
+          "name": "RouterTurnToolEvent",
+          "kind": "interface",
+          "signature": "interface RouterTurnToolEvent",
+          "doc": "One side event a tool reported while it ran."
+        },
+        {
+          "name": "RouterTurnToolOutcome",
+          "kind": "type",
+          "signature": "type RouterTurnToolOutcome",
+          "doc": "One tool call's result as the model reads it."
+        },
+        {
           "name": "runRouterTurn",
           "kind": "function",
           "signature": "(options: RouterTurnOptions) => Promise<RouterTurnOutcome>",
           "doc": null
+        },
+        {
+          "name": "TurnKnowledgeBudget",
+          "kind": "interface",
+          "signature": "interface TurnKnowledgeBudget",
+          "doc": null
+        },
+        {
+          "name": "TurnKnowledgeFile",
+          "kind": "interface",
+          "signature": "interface TurnKnowledgeFile",
+          "doc": "One knowledge file a turn carries; `text` is null when it is too large or not readable here."
+        },
+        {
+          "name": "turnKnowledgeInstructions",
+          "kind": "function",
+          "signature": "(files: readonly TurnKnowledgeFile[], options?: { readTool?: string | undefined; }) => string[]",
+          "doc": "The prompt lines for a turn's knowledge."
+        },
+        {
+          "name": "workspaceKnowledgeForTurn",
+          "kind": "function",
+          "signature": "(store: { list(workspaceId: string, prefix: string): Promise<readonly KnowledgeEntry[]>; }, workspaceId: string, option…",
+          "doc": "A workspace store's knowledge files (kind `file` under `prefix`) as turn knowledge, within the budget."
         }
       ]
     },
@@ -14975,9 +15627,21 @@
           "doc": "One speculator per turn."
         },
         {
+          "name": "createSandboxExecTool",
+          "kind": "function",
+          "signature": "(options: SandboxExecToolOptions) => SandboxExecTool",
+          "doc": null
+        },
+        {
           "name": "createSandboxPrewarmer",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer",
+          "doc": null
+        },
+        {
+          "name": "createSandboxRunTool",
+          "kind": "function",
+          "signature": "(options: SandboxRunToolOptions) => SandboxRunTool",
           "doc": null
         },
         {
@@ -15599,6 +16263,18 @@
           "doc": "How long a refused dispatch is resent."
         },
         {
+          "name": "SANDBOX_EXEC_DESCRIPTION",
+          "kind": "const",
+          "signature": "string",
+          "doc": null
+        },
+        {
+          "name": "SANDBOX_RUN_DESCRIPTION",
+          "kind": "const",
+          "signature": "string",
+          "doc": null
+        },
+        {
           "name": "SANDBOX_TRANSIENT_DEADLINE_MS",
           "kind": "const",
           "signature": "number",
@@ -15645,6 +16321,24 @@
           "kind": "interface",
           "signature": "interface SandboxExecOptions",
           "doc": "Define options to execute code within a sandbox environment with optional session control"
+        },
+        {
+          "name": "SandboxExecResult",
+          "kind": "interface",
+          "signature": "interface SandboxExecResult",
+          "doc": null
+        },
+        {
+          "name": "SandboxExecTool",
+          "kind": "interface",
+          "signature": "interface SandboxExecTool",
+          "doc": null
+        },
+        {
+          "name": "SandboxExecToolOptions",
+          "kind": "interface",
+          "signature": "interface SandboxExecToolOptions",
+          "doc": null
         },
         {
           "name": "SandboxExistingBoxStage",
@@ -15713,6 +16407,12 @@
           "doc": "Configuration needed to prepare a turn without provisioning a workspace."
         },
         {
+          "name": "sandboxPromptRunner",
+          "kind": "function",
+          "signature": "(shell: SandboxRuntimeConfig, prompt?: Omit<StreamSandboxPromptOptions, \"signal\" | \"history\">) => (box: SandboxInstance…",
+          "doc": "The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused)."
+        },
+        {
           "name": "SandboxPromptTokenLimits",
           "kind": "interface",
           "signature": "interface SandboxPromptTokenLimits",
@@ -15761,6 +16461,18 @@
           "doc": "Define the specification for restoring a sandbox from a snapshot or another sandbox ID"
         },
         {
+          "name": "SandboxRunError",
+          "kind": "class",
+          "signature": "class SandboxRunError",
+          "doc": "A typed `sandbox_run` failure."
+        },
+        {
+          "name": "SandboxRunFailureCode",
+          "kind": "type",
+          "signature": "type SandboxRunFailureCode",
+          "doc": null
+        },
+        {
           "name": "SandboxRuntimeAuthRefreshError",
           "kind": "class",
           "signature": "class SandboxRuntimeAuthRefreshError",
@@ -15771,6 +16483,18 @@
           "kind": "interface",
           "signature": "interface SandboxRuntimeConfig",
           "doc": "Define runtime configuration methods for sandbox environments including credentials, metadata, and permissions"
+        },
+        {
+          "name": "SandboxRunTool",
+          "kind": "interface",
+          "signature": "interface SandboxRunTool",
+          "doc": "The tool shape `runRouterTurn` takes (`RouterTurnTool`), kept structural so this module does not import the engine."
+        },
+        {
+          "name": "SandboxRunToolOptions",
+          "kind": "interface",
+          "signature": "interface SandboxRunToolOptions",
+          "doc": null
         },
         {
           "name": "SandboxScope",
@@ -18090,6 +18814,12 @@
           "doc": "Check each Worker config, and every environment it deploys, against the defaults."
         },
         {
+          "name": "checkWorkspaceSurface",
+          "kind": "function",
+          "signature": "(options: WorkspaceSurfaceOptions) => Promise<WorkspaceSurfaceReport>",
+          "doc": "Drive Chromium over every route × width × theme."
+        },
+        {
           "name": "collectShellDividers",
           "kind": "function",
           "signature": "() => Omit<ShellDividerSample, \"width\" | \"route\" | \"theme\">",
@@ -18100,6 +18830,12 @@
           "kind": "function",
           "signature": "() => Pick<SurfaceSample, \"boxes\" | \"copy\">",
           "doc": "Runs in the page (Playwright serializes it, so every helper lives inside)."
+        },
+        {
+          "name": "collectWorkspaceSurface",
+          "kind": "function",
+          "signature": "() => Omit<WorkspaceSurfaceSample, \"width\" | \"route\" | \"theme\">",
+          "doc": "Runs in the page."
         },
         {
           "name": "composite",
@@ -18144,6 +18880,18 @@
           "doc": null
         },
         {
+          "name": "formatWorkspaceSurfaceReport",
+          "kind": "function",
+          "signature": "(report: WorkspaceSurfaceReport) => string",
+          "doc": null
+        },
+        {
+          "name": "HEADER_TOP_TOLERANCE_PX",
+          "kind": "const",
+          "signature": "2",
+          "doc": "A header within this distance of the panel top is its first row (a 1px border)."
+        },
+        {
           "name": "judgeShellAlignment",
           "kind": "function",
           "signature": "(sample: ShellDividerSample, tolerancePx?: number) => ShellAlignmentFinding[]",
@@ -18153,6 +18901,12 @@
           "name": "judgeSurfaceLadder",
           "kind": "function",
           "signature": "(sample: SurfaceSample, limits?: SurfaceLadderLimits) => SurfaceFinding[]",
+          "doc": null
+        },
+        {
+          "name": "judgeWorkspaceSurface",
+          "kind": "function",
+          "signature": "(sample: WorkspaceSurfaceSample) => WorkspaceSurfaceFinding[]",
           "doc": null
         },
         {
@@ -18223,6 +18977,12 @@
         },
         {
           "name": "runSurfaceLadderCli",
+          "kind": "function",
+          "signature": "(argv: readonly string[]) => Promise<number>",
+          "doc": null
+        },
+        {
+          "name": "runWorkspaceSurfaceCli",
           "kind": "function",
           "signature": "(argv: readonly string[]) => Promise<number>",
           "doc": null
@@ -18442,6 +19202,30 @@
           "kind": "interface",
           "signature": "interface WorkerDefaultsResult",
           "doc": null
+        },
+        {
+          "name": "WorkspaceSurfaceFinding",
+          "kind": "interface",
+          "signature": "interface WorkspaceSurfaceFinding",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSurfaceOptions",
+          "kind": "interface",
+          "signature": "interface WorkspaceSurfaceOptions",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSurfaceReport",
+          "kind": "interface",
+          "signature": "interface WorkspaceSurfaceReport",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSurfaceSample",
+          "kind": "interface",
+          "signature": "interface WorkspaceSurfaceSample",
+          "doc": "Workspace surface: every route of a workspace renders exactly one shared floating panel (sandbox-ui `WorkspaceSurface`, or `WorkspaceLayout` with `surface=\"inset\"`), and that panel's first row is an…"
         }
       ]
     },
@@ -19728,7 +20512,9 @@
     {
       "id": "./studio",
       "source": "src/studio/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "runtime"
+      ],
       "error": null,
       "exports": [
         {
@@ -20145,6 +20931,7 @@
       "id": "./studio-react",
       "source": "src/studio-react/index.tsx",
       "dependsOn": [
+        "runtime",
         "studio",
         "web-react"
       ],
@@ -20245,12 +21032,6 @@
           "kind": "function",
           "signature": "<T extends string>({ label, value, choices, onSelect, className, icon: Icon, trigger, }: { label: string; value: T; cho…",
           "doc": "A standalone enum picker using the studio composer's pill and menu grammar."
-        },
-        {
-          "name": "ModelPill",
-          "kind": "function",
-          "signature": "({ models, value, displayName, provider, unavailable, onSelect, bandRef, }: { models: readonly MediaModelOption[]; valu…",
-          "doc": "The model pill — first in the band on every lane, and the only pill that is always there."
         },
         {
           "name": "OptionChoice",
@@ -20489,6 +21270,12 @@
           "doc": "True when `actual` is at least `minimum` on the workspace ladder."
         },
         {
+          "name": "INVITATION_EMAIL_HINT",
+          "kind": "const",
+          "signature": "\"Enter a full email address, such as name@company.com.\"",
+          "doc": "What to tell someone whose invite address cannot be delivered to."
+        },
+        {
           "name": "INVITATION_EXPIRY_DAYS",
           "kind": "const",
           "signature": "7",
@@ -20541,6 +21328,12 @@
           "kind": "function",
           "signature": "(value: unknown) => value is \"viewer\" | \"editor\" | \"admin\"",
           "doc": "Determine if a value is a valid assignable workspace role among viewer, editor, or admin"
+        },
+        {
+          "name": "isInvitationEmail",
+          "kind": "function",
+          "signature": "(email: string) => boolean",
+          "doc": "Whether an address has the shape an invitation can be delivered to."
         },
         {
           "name": "isInviteTokenShape",
@@ -22336,6 +23129,12 @@
           "doc": "Props the pane passes to the product's artifact renderer (e.g."
         },
         {
+          "name": "VaultContentMatch",
+          "kind": "interface",
+          "signature": "interface VaultContentMatch",
+          "doc": "A file whose text contains a search query."
+        },
+        {
           "name": "VaultDataPort",
           "kind": "interface",
           "signature": "interface VaultDataPort",
@@ -22406,6 +23205,12 @@
           "kind": "interface",
           "signature": "interface VaultPaneProps",
           "doc": "Define the properties and render methods for the vault pane UI components"
+        },
+        {
+          "name": "VaultRevision",
+          "kind": "interface",
+          "signature": "interface VaultRevision",
+          "doc": "One saved version of a file."
         },
         {
           "name": "VaultRichParts",
@@ -23882,6 +24687,12 @@
           "doc": "Splits a batch into what the `accept` list admits and what it refuses."
         },
         {
+          "name": "firstUnansweredRequiredField",
+          "kind": "function",
+          "signature": "(fields: ({ name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined;…",
+          "doc": "The first required field still without an answer, or null when every required field has one: the reason `buildAnswerData` returned null."
+        },
+        {
           "name": "FlowWaterfall",
           "kind": "function",
           "signature": "({ trace }: FlowWaterfallProps) => Element | null",
@@ -23922,6 +24733,12 @@
           "kind": "function",
           "signature": "(msg: ChatMessageMetrics, models: CatalogModel[]) => string | null",
           "doc": "\"$0.0042\" from token counts × catalogue per-token pricing; null when unknown."
+        },
+        {
+          "name": "formatModelPrice",
+          "kind": "function",
+          "signature": "(model: Pick<CatalogModel, \"pricing\" | \"outputPrice\">) => string | undefined",
+          "doc": "The price a person pays per output, in the unit that output comes in: per million prompt tokens for text, per image, per second of video, per minute of audio, per 1,000 characters of speech."
         },
         {
           "name": "formatRecordGridValue",
@@ -24308,6 +25125,12 @@
           "doc": "Resolve if the interaction status is a terminal state excluding pending"
         },
         {
+          "name": "isTurnIntentEvent",
+          "kind": "function",
+          "signature": "(event: unknown) => event is TurnIntentEvent",
+          "doc": "True for a {@link TURN_INTENT_EVENT} with non-empty text."
+        },
+        {
           "name": "isTurnPhaseEvent",
           "kind": "function",
           "signature": "(event: unknown) => event is TurnPhaseEvent",
@@ -24318,6 +25141,12 @@
           "kind": "function",
           "signature": "(interaction: ChatInteraction, data: InteractionData) => string",
           "doc": "Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s)."
+        },
+        {
+          "name": "LateAnswerResult",
+          "kind": "type",
+          "signature": "type LateAnswerResult",
+          "doc": "What a host did with a late answer: sent it (`true` or nothing returned), queued it behind the running turn, or refused it (`false`)."
         },
         {
           "name": "lazyRoute",
@@ -24420,6 +25249,12 @@
           "kind": "interface",
           "signature": "interface MessageAttachmentsProps",
           "doc": null
+        },
+        {
+          "name": "missingAnswerHint",
+          "kind": "function",
+          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
+          "doc": "What the reader still has to do before the card's action (`verb`: submit, send) is available, in plain words, for the line beside the disabled button."
         },
         {
           "name": "MissionActivityLane",
@@ -25222,7 +26057,7 @@
         {
           "name": "settleTurnResponse",
           "kind": "function",
-          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>",
+          "signature": "(response: Response, onPhase: (phase: TurnPhaseData) => void, onIntent?: ((intent: TurnIntentData) => void) | undefined…",
           "doc": "Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}."
         },
         {
@@ -25376,6 +26211,12 @@
           "doc": "Drives an anchor-click download from an already-resolved blob."
         },
         {
+          "name": "TURN_INTENT_EVENT",
+          "kind": "const",
+          "signature": "\"session.run.intent\"",
+          "doc": "Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do (\"Looking at your three competitors' pricing pages, t…"
+        },
+        {
           "name": "TURN_PHASE_EVENT",
           "kind": "const",
           "signature": "\"session.run.phase\"",
@@ -25410,6 +26251,18 @@
           "kind": "const",
           "signature": "\"turn_stream_lost\"",
           "doc": "Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started."
+        },
+        {
+          "name": "TurnIntentData",
+          "kind": "type",
+          "signature": "type TurnIntentData",
+          "doc": "The data of a {@link TURN_INTENT_EVENT}."
+        },
+        {
+          "name": "TurnIntentEvent",
+          "kind": "type",
+          "signature": "type TurnIntentEvent",
+          "doc": "A {@link TURN_INTENT_EVENT} as it crosses the wire."
         },
         {
           "name": "TurnPhaseData",
@@ -27232,7 +28085,7 @@
         {
           "name": "WorkspaceList",
           "kind": "function",
-          "signature": "({ items, noun, title, description, layout, fields, create, empty, rename, remove, removeConsequence, actions, children…",
+          "signature": "({ items, noun, title, description, layout, fields, create, empty, rename, remove, canRemove, removeConsequence, action…",
           "doc": "The listing every product opens on: one title, one primary action, the workspaces, and nothing that counts them."
         },
         {
