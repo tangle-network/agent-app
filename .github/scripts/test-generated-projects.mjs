@@ -25,6 +25,7 @@ const workspaceProof = fileURLToPath(new URL('../../create-agent-app/proof/works
 const require = createRequire(import.meta.url)
 const npmPackagePath = require.resolve('npm/package.json')
 const npmCli = join(dirname(npmPackagePath), 'bin', 'npm-cli.js')
+const playwrightCli = join(dirname(require.resolve('playwright/package.json')), 'cli.js')
 const dependencyCohort = process.env.AGENT_APP_TEST_COHORT
   ? JSON.parse(process.env.AGENT_APP_TEST_COHORT)
   : {}
@@ -39,7 +40,7 @@ function assertSuccess(result, label) {
   }
   if (result.error) throw result.error
   if (result.status !== 0) {
-    throw new Error(`${label} exited with status ${result.status ?? 'unknown'}`)
+    throw new Error(`${label} exited with status ${result.status ?? 'unknown'}${result.signal ? ` (signal ${result.signal})` : ''}`)
   }
 }
 
@@ -270,7 +271,9 @@ function installAndRunScaffolder({
     }
     // Playwright is the repository's proof driver, not a dependency available
     // to the fresh generated browser build. The child shares the scrubbed HOME.
-    run('pnpm', ['exec', 'playwright', 'install', 'chromium'], { env })
+    // Invoke the installed proof driver directly: pnpm exec would reinstall the
+    // repository when its store differs from the deliberately scrubbed HOME.
+    run(process.execPath, [playwrightCli, 'install', 'chromium'], { env })
     const evidence = process.env.VERIFICATION_DIR ?? join(scratch, 'evidence')
     run(process.execPath, [workspaceProof, project, evidence], { env })
   }
@@ -357,12 +360,21 @@ function main(scratch) {
     'template/_tsconfig.json',
     'template/pnpm-workspace.yaml',
     'template/src/worker.ts',
+    'template/src/agent-surfaces.ts',
     'template/tests/agent-app.test.ts',
     'template-chat/_package.json',
     'template-chat/_tsconfig.json',
     'template-chat/pnpm-workspace.yaml',
     'template-chat/migrations/0002_agent_gateway.sql',
     'template-chat/src/gateway.ts',
+    'template-chat/src/operator.ts',
+    'template-chat/src/openapi.ts',
+    'template-chat/src/agent-surfaces.ts',
+    'template-chat/migrations/0004_operator_admissions.sql',
+    'template-chat/migrations/0005_turn_stream_identity.sql',
+    'template-chat/src/turn-lock.ts',
+    'template-chat/tests/turn-lock.test.ts',
+    'template-chat/web/ApiAccess.tsx',
     'template-chat/src/worker.ts',
     'template-chat/tests/chat-turn.e2e.test.ts',
     'template-chat/web/index.html',

@@ -116,22 +116,15 @@ export function createSandboxProduce(env: AppEnv) {
     const model = body.model ?? env.MODEL_NAME ?? config.model.default
     return createSandboxChatProducer({
       model,
-      // Reactive model failover, ON by default: when `model`'s upstream is
-      // dead (quota wall, 502, provider outage), the turn moves to the next
-      // model in `config.model.fallbacks` BEFORE any client-visible byte.
-      // Never silent: the persisted row and billing receipt name the model
-      // that actually served, and the transcript gets a visible notice.
-      // Opt out with `modelFailover: false` (or empty `fallbacks`).
-      fallbackModels: config.model.fallbacks,
-      openEvents: ({ model: attemptModel, attempt, signal }) => {
-        // A failover attempt is a NEW dispatch, not a reconnect to the dead
-        // one — it needs its own execution identity or the platform would
-        // resume the failed execution instead of starting a fresh run.
-        const attemptExecutionId = attempt === 1 ? executionId : `${executionId}-f${attempt}`
+      errorNotice: true,
+      // A detached dispatch can keep doing hidden work after transport loss.
+      // Do not turn observation failure into another model dispatch.
+      modelFailover: false,
+      openEvents: ({ model: attemptModel, signal }) => {
         return streamSandboxPrompt(shell, box, normalizeChatPromptForSandbox(prompt), {
           sessionId: identity.sessionId,
-          executionId: attemptExecutionId,
-          turnId: attemptExecutionId,
+          executionId,
+          turnId: executionId,
           model: attemptModel,
           signal,
           // A zero reasoning allowance maps to the profile's supported
@@ -183,13 +176,16 @@ export async function resolveUploadSink(
 export async function resolveSidecarConnection(
   env: AppEnv,
   scope: { workspaceId: string; userId: string; threadId: string },
+  options: { readOnly?: boolean } = {},
 ): Promise<SidecarInteractionsConnection | null> {
   if (!env.SANDBOX_API_KEY?.trim() || !env.SANDBOX_GATEWAY_URL?.trim()) return null
   const shell = createSandboxShell(env)
-  const box = await ensureForegroundWorkspaceSandbox(env, shell, {
-    workspaceId: scope.workspaceId,
-    userId: scope.userId,
-  })
+  // Reading pending decisions must not provision paid compute.
+  const found = options.readOnly ? await peekWorkspaceSandbox(shell, { workspaceId: scope.workspaceId, userId: scope.userId }) : null
+  const box = options.readOnly
+    ? found?.status === 'running' ? found.box : null
+    : await ensureForegroundWorkspaceSandbox(env, shell, { workspaceId: scope.workspaceId, userId: scope.userId })
+  if (!box) return null
   const connection = box.connection
   if (!connection?.runtimeUrl) return null
   return {

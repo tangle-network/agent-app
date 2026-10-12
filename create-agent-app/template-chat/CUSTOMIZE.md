@@ -19,7 +19,7 @@ Discovery: **Which real model answers, on which harness?**
 - [ ] Set `model.default` to a model your Tangle Router key can reach.
 - [ ] Set `gateway.maxProviderInputTokens` to its full input limit, including retained tool and sidecar history.
 - [ ] Choose a compatible harness. Vendor-locked harnesses must use their provider's models.
-- [ ] Review fallbacks and the optional `MODEL_NAME` environment override.
+- [ ] Review the optional `MODEL_NAME` override. Detached automatic failover is disabled; fallback candidates require a separately verified non-admission/reconciliation policy.
 - [ ] Keep unavailable model, effort, profile, and plan-mode controls hidden. Add a display catalog and real callbacks only when your server can honor them. Resolve prompts, tools, permissions, connections, resources, and backend policy server-side. Profile authoring belongs in settings, not a new composer picker.
 
 The existing per-turn model/effort wire remains available. The template does
@@ -102,3 +102,46 @@ thread persistence in Chromium, including a process restart, without model calls
 Record local build, injected-producer, browser/D1, hosted, live-model, and live
 reconnect results separately. An unrun hosted/model proof stays unrun. Deploy
 and apply remote migrations only after the product is configured and verified.
+
+## External-agent onboarding
+
+- [ ] Fetch `/agent-setup.md`, `/llms.txt`, `/llms-full.txt`, `/agent-api.md` and
+      `/.well-known/tangle-agent.json` without a cookie. Check the configured public origin.
+- [ ] Use `/?view=api-access` as a new and existing owner. Issue a read-only
+      expiring key, discover its workspace, revoke it, and confirm 401.
+- [ ] Grant run access deliberately; verify read-only, cross-owner and capped
+      requests fail before execution. Operator work uses deployment credentials.
+- [ ] Submit one client-generated UUID, repeat it after an ambiguous response,
+      and verify one persisted turn. Read its settled state and actual output.
+- [ ] Configure product-owned safe artifact adapters when needed. Verify bytes
+      and hashes rather than filenames; unsupported capabilities must stay absent.
+- [ ] Exercise a pending owner decision; an external key cannot decide it.
+
+External-agent execution is disabled by default (`OPERATOR_RUN_ENABLED="false"`).
+Account signup and an account owner selecting a scope do not authorize spending
+the deployment payer’s funds. Before explicitly enabling `"true"`, the deployment
+payer must review signup/access controls, funding and admission policy. Read-only
+keys continue to work. Previously issued run keys are denied while disabled.
+
+All browser and API turns use the shared `TurnStreamDO` workspace lock. Configure
+`TURN_STREAM_AUTH_SECRET` in local development and production; missing lock
+configuration fails closed before model work. Apply the Wrangler Durable Object
+migration when upgrading. A stuck lock needs reconciliation of the existing turn,
+not an automatic retry of uncertain effects. Draft text is not terminal evidence.
+
+Detached execution disables automatic model failover: losing observation before
+visible output does not prove the previous backend refused its work. A real
+backend result/done is required to release the workspace lock and interpret the
+stream status as terminal. Transport loss or EOF retains unknown state and the
+lock until an operator reconciles the exact backend execution.
+
+### Recovery after lost observation
+
+A workspace conflict names the original backend execution and thread. The
+scaffold does not automatically release an uncertain detached execution or
+provide an external-agent recovery endpoint. A production recovery adapter must
+query that exact backend execution (a missing box, empty transcript or elapsed
+time is insufficient), then use `/turn-stream`’s `releaseDurableTurnLock` with
+the held executionId and lockId. Its authorization remains deployment-owned.
+This is a supported typed adapter requirement, not database surgery or automatic
+resubmission. Retained operator UUIDs continue to identify their original work.

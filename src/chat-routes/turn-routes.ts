@@ -175,6 +175,8 @@ export interface ChatTurnMessageStore {
  *  drain. `createSandboxChatProducer` returns this; a router-lane producer
  *  may omit the optional members (finalText persists as a single text part). */
 export interface ChatTurnRouteProducer extends ChatTurnProducer {
+  /** Actual backend result/done was observed; transport EOF/error alone is not completion. */
+  terminalObserved?(): boolean
   assistantParts?(): Array<Record<string, unknown>>
   /** MID-STREAM snapshot of the same projection, safe to call while the turn
    *  is running: no dangling-tool terminalization, no pending-ask settlement
@@ -1092,12 +1094,18 @@ export function createChatTurnRoutes<TContext = void>(
 
     // Turn identity: reuse the just-persisted user row on a retry (same
     // turnId or identical trailing content) instead of double-inserting.
-    const existingMessages = (await options.store.listMessages(payload.threadId)).map((m) => ({
+    const readHistory = async () => (await options.store.listMessages(payload.threadId)).map((m) => ({
       id: m.id,
       role: m.role,
       content: m.content,
       parts: (m.parts ?? null) as PersistedChatMessageForTurn['parts'],
     }))
+    const existingMessages = await readHistory()
+    // Lock acquisition is async and follows identity derivation. A previous
+    // owner can settle in that gap; the new owner must not dispatch an identity
+    // or prompt derived from the old history. Capture values now, including
+    // parts, rather than retaining mutable message references across the lock.
+    const historyBeforeLock = options.turnLock ? JSON.stringify(existingMessages) : undefined
     // An assistant row already trailing the thread is either this turn's
     // in-flight draft (retry — walk past it) or a settled answer (a genuine
     // repeat — new turn). The turn buffer's running index is the discriminator;
@@ -1284,6 +1292,13 @@ export function createChatTurnRoutes<TContext = void>(
     }
 
     try {
+      if (lockAcquired && JSON.stringify(await readHistory()) !== historyBeforeLock) {
+        await releaseLock()
+        return Response.json({
+          code: 'chat_history_changed',
+          error: 'The conversation changed while this turn was acquiring its lock. Refresh the conversation before starting new work.',
+        }, { status: 409 })
+      }
       // The product (via `authorize`) may suppress the user-row insert for a
       // dispatched/synthetic turn. AND-composition: it can only subtract, never
       // resurrect a turn the engine already deduped as a retry.

@@ -22,6 +22,7 @@
  * later: `@tangle-network/agent-app/teams` + `createChatTables({ workspaceTable })`.
  */
 
+import { createDurableTurnLock } from '@tangle-network/agent-app/turn-stream'
 import { config } from '../agent.config'
 import { createAppAuth, type AppAuth } from '@tangle-network/agent-app/app-auth'
 import {
@@ -61,11 +62,14 @@ export interface ChatAppOverrides {
   /** Server-trusted identity for a private gateway chat assembly. Never read
    *  this value from a request body or header. */
   trustedUserId?: string
+  /** Test seam at the sidecar transport boundary; real route authorization remains active. */
+  sidecarConnection?: typeof resolveSidecarConnection
 }
 
 export interface ChatApp {
   auth: AppAuth
   store: ChatStore
+  turnStore: TurnEventStore
   routes: ChatTurnRoutes & {
     /** POST `{ title?, firstMessage? }` → `{ thread }`. */
     createThread(request: Request): Promise<Response>
@@ -82,6 +86,7 @@ const notFound = () => Response.json({ error: 'Thread not found' }, { status: 40
 export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): ChatApp {
   const db = overrides.db ?? (drizzle(env.DB) as unknown as ChatDatabase)
   const store = createChatStore(db, { threads, messages })
+  const turnStore = overrides.turnStore ?? createD1TurnEventStore(env.DB)
 
   const auth = createAppAuth({
     appName: config.name,
@@ -130,12 +135,51 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
     return { ok: true, tenantId: user.id, userId: user.id, context: undefined }
   }
 
+  const durableLock = env.TURN_STREAM && env.TURN_STREAM_AUTH_SECRET
+    ? createDurableTurnLock<void>({ namespace: env.TURN_STREAM, auth: { secret: env.TURN_STREAM_AUTH_SECRET }, scopeOf: () => 'workspace',
+      onRefused: active => Response.json({ error: { code: 'workspace_turn_in_flight', message: `Execution ${active.executionId} in thread ${active.threadId} still owns this workspace. If observation was lost, the deployment operator must verify that exact backend execution stopped and use a fenced reconciliation adapter; elapsed time or another UUID is not recovery.`, executionId: active.executionId, threadId: active.threadId } }, { status: 409 }),
+    })
+    : null
+  interface Admission { handle: unknown; started: boolean; producer?: ChatTurnRouteProducer; userMessageId?: string }
+  const admissions = new Map<string, Admission>()
+  const produce = overrides.produce ?? createSandboxProduce(env)
   const routes = createChatTurnRoutes<void>({
+    turnLock: {
+      acquire: async args => {
+        if (!durableLock) return { acquired: false, response: Response.json({ error: 'Durable turn locking is not configured', code: 'chat.lock_not_configured' }, { status: 503 }) }
+        const acquired = await durableLock.acquire(args)
+        if (!acquired.acquired) return acquired
+        admissions.set(args.executionId, { handle: acquired.handle, started: false })
+        return { acquired: true, handle: args.executionId }
+      },
+      release: async handle => {
+        const id = String(handle)
+        const admission = admissions.get(id)
+        admissions.delete(id)
+        if (!admission) return
+        if (admission.started && !admission.producer?.terminalObserved?.()) return
+        if (admission.userMessageId) await store.updateMessage(admission.userMessageId, { extras: { backendTerminal: true } })
+        await durableLock?.release(admission.handle)
+      },
+    },
     projectId: appSlug,
     authorize,
     store,
-    turnStore: overrides.turnStore ?? createD1TurnEventStore(env.DB),
-    produce: overrides.produce ?? createSandboxProduce(env),
+    turnStore,
+    beforeTurn: async args => {
+      const admission = admissions.get(args.executionId)
+      if (args.userMessageId) {
+        if (admission) admission.userMessageId = args.userMessageId
+        await store.updateMessage(args.userMessageId, { extras: { turnStreamId: args.turnStreamId, backendTerminal: false } })
+      }
+    },
+    produce: async args => {
+      const admission = admissions.get(args.executionId)
+      if (!admission) throw new Error('Turn admission is unavailable')
+      admission.started = true
+      admission.producer = await produce(args)
+      return admission.producer
+    },
     interactions: {
       resolveConnection: async ({ request, intent, body }) => {
         const session = await requireUser(request)
@@ -147,11 +191,11 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
             : (new URL(request.url).searchParams.get('threadId') ?? '')
         const thread = await store.getThread(threadId)
         if (!thread || thread.workspaceId !== user.id) return { ok: false, response: notFound() }
-        const connection = await resolveSidecarConnection(env, {
+        const connection = await (overrides.sidecarConnection ?? resolveSidecarConnection)(env, {
           workspaceId: user.id,
           userId: user.id,
           threadId,
-        })
+        }, { readOnly: intent === 'list' })
         if (!connection) return { ok: false, unavailable: 'SANDBOX_UNAVAILABLE' }
         return { ok: true, connection }
       },
@@ -210,6 +254,7 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
   return {
     auth,
     store,
+    turnStore,
     routes: { ...routes, createThread, listThreads, threadMessages },
     upload,
   }

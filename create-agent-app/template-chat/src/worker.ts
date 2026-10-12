@@ -1,7 +1,7 @@
 /**
  * src/worker.ts — the HTTP surface. Routing only; every handler is a factory
- * product from `src/chat.ts`. Static assets (the dev chat page in `public/`)
- * are served by the Workers assets pipeline before this fetch handler runs.
+ * product from shared factories. Public agent docs answer before auth/database
+ * assembly; the home route negotiates markdown or compiled browser assets.
  *
  * Route map:
  *   ALL  /api/auth/*                    better-auth (sign-up/sign-in/session)
@@ -19,6 +19,9 @@
  *   POST /v1/agents/:slug/chat/completions  OpenAI-compatible API
  */
 
+export { TurnStreamDO } from './turn-lock'
+
+import { agentSurfaces } from './agent-surfaces'
 import { createArtifactIndex } from './files'
 import type { peekWorkspaceSandbox } from '@tangle-network/agent-app/sandbox'
 import { config } from '../agent.config'
@@ -80,11 +83,16 @@ export function createWorker(assembly: WorkerAssembly = defaultAssembly): Export
 
   return {
     async fetch(request: Request, env: AppEnv, ctx: ExecutionContext): Promise<Response> {
+      const surfaces = agentSurfaces(new URL(env.BETTER_AUTH_URL).origin, env.OPERATOR_RUN_ENABLED === 'true')
+      const surface = surfaces.handle(request)
+      if (surface) return surface
       const url = new URL(request.url)
       const { pathname } = url
       const method = request.method
 
-      const isGatewayPath = pathname === '/api/keys'
+      const isGatewayPath = pathname === '/api/operator/v1'
+        || pathname.startsWith('/api/operator/v1/')
+        || pathname === '/api/keys'
         || pathname.startsWith('/api/keys/')
         || pathname === '/v1/agents'
         || pathname.startsWith('/v1/agents/')
@@ -134,6 +142,7 @@ export function createWorker(assembly: WorkerAssembly = defaultAssembly): Export
         return app.routes.threadMessages(request, { threadId: transcript[1]! })
       }
 
+      if (pathname === '/' && env.ASSETS) return surfaces.finalize(request, await env.ASSETS.fetch(request))
       return Response.json({ error: 'Not found' }, { status: 404 })
     },
   }

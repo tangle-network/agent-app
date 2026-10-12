@@ -35,14 +35,11 @@ export const config = {
      */
     default: 'REPLACE_WITH_MODEL',
     /**
-     * Models to try, in order, when the chosen model's upstream is DEAD
-     * (quota wall, 502, provider outage). Failover is reactive — zero cost
-     * until the preferred model actually fails — and every fallback is
-     * surfaced: the persisted row and billing receipt name the model that
-     * actually served, and the transcript gets a visible notice. Keep this
-     * list cross-provider (an outage usually takes a whole provider down)
-     * and review it with your default: a stale ladder degrades to today's
-     * behavior (the turn fails), never to a silent wrong-model answer.
+     * Candidate fallback models for a product with verified retry admission.
+     * The generated detached sandbox lane disables automatic failover because
+     * transport loss is not proof the first backend stopped doing work.
+     * This list is inert until the product wires a policy that proves a failed
+     * attempt was never admitted or has actually stopped. Review it before use.
      */
     fallbacks: ['gemini-3.7-flash', 'glm-5.3'],
     /** Default reasoning effort for turns that don't specify one. */

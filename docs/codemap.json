@@ -11861,6 +11861,18 @@
           "doc": null
         },
         {
+          "name": "ChatOperatorAdmission",
+          "kind": "interface",
+          "signature": "interface ChatOperatorAdmission",
+          "doc": "A durable execution claim, separate from the chat transcript that owns results."
+        },
+        {
+          "name": "ChatOperatorAdmissionStore",
+          "kind": "interface",
+          "signature": "interface ChatOperatorAdmissionStore",
+          "doc": "Product-owned atomic storage for duplicate suppression across processes."
+        },
+        {
           "name": "ChatOperatorMessage",
           "kind": "interface",
           "signature": "interface ChatOperatorMessage",

@@ -209,3 +209,28 @@ Keep older private routes until their consumers move.
 
 Answering questions or approvals, interrupting a turn, and writing files stay on each app's own routes.
 Apps still issue their own keys for their own users; a Tangle agent key is the one credential every app accepts.
+
+### Durable chat admission
+
+`createChatOperatorAdapter` can take a `ChatOperatorAdmissionStore` in
+`admissions`. The product supplies atomic `claim`, owner/workspace-scoped `get`,
+and `recordRefusal` storage. Without this seam, transcript retry detection is
+not an atomic cross-process execution lock. The generated chat app wires it to
+D1 through migration `0004_operator_admissions.sql`.
+
+The claim is duplicate suppression, not a second completion owner: the retained
+chat transcript remains authoritative for results. Concurrent retries never
+dispatch twice. A repeated UUID returns its original work even if content changes;
+a different explicit thread identity returns a conflict. Changed content requires
+a separately authorized new turn, never an automatic retry UUID. A claim with no transcript after process loss returns `unknown`
+with the same thread and turn identity, rather than silently executing again.
+An explicit refusal before a stream opens is retained as `failed`; fixing its
+cause permits a separately authorized attempt with a new UUID. A transport
+exception remains unknown until the product reconciles it. Do not automatically
+release uncertain claims or infer that the absence of a transcript proves no
+external effect occurred.
+
+Apps with incremental drafts must supply `turnStatus` from the existing durable
+turn-status owner. An expired running lease is not terminal evidence: missing
+or still-running status leaves partial text `unknown`. The generated chat app
+records the stream identity on the user anchor and reads the existing turn store.

@@ -4,7 +4,7 @@
 
 Source: `src/operator/index.ts`
 
-53 exports.
+55 exports.
 
 ### `ChatOperatorAdapterOptions`
 
@@ -12,6 +12,22 @@ Source: `src/operator/index.ts`
 
 ```ts
 interface ChatOperatorAdapterOptions
+```
+
+### `ChatOperatorAdmission`
+
+`interface` — A durable execution claim, separate from the chat transcript that owns results.
+
+```ts
+interface ChatOperatorAdmission
+```
+
+### `ChatOperatorAdmissionStore`
+
+`interface` — Product-owned atomic storage for duplicate suppression across processes.
+
+```ts
+interface ChatOperatorAdmissionStore
 ```
 
 ### `ChatOperatorMessage`

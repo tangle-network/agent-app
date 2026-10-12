@@ -6,7 +6,14 @@
  * `.dev.vars.example` for the full list with comments.
  */
 
+import type { TurnStreamNamespaceLike } from '@tangle-network/agent-app/turn-stream'
+
 export interface AppEnv {
+  /** Shared durable workspace single-flight lock, used by every chat entrypoint. */
+  TURN_STREAM?: TurnStreamNamespaceLike
+  TURN_STREAM_AUTH_SECRET?: string
+  /** Compiled same-origin browser assets. */
+  ASSETS?: { fetch(request: Request): Promise<Response> }
   /** D1 database — run `migrations/` against it before first boot. */
   DB: D1Database
 
@@ -14,6 +21,9 @@ export interface AppEnv {
   BETTER_AUTH_URL: string
   /** better-auth HMAC secret (secret; set in .dev.vars / `wrangler secret`). */
   BETTER_AUTH_SECRET: string
+
+  /** Deployment payer opt-in. Public account signup never grants this authority. */
+  OPERATOR_RUN_ENABLED?: 'true' | 'false'
 
   /** Overrides `config.model.default` without a redeploy. */
   MODEL_NAME?: string
