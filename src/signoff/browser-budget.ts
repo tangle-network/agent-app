@@ -9,12 +9,18 @@
  * Chromium prerender every rail link as a hidden full page. It blocked a
  * production canary on another app. So the checks:
  *
- * - launch Chromium with prerender and speculative prefetch off, and abort the
- *   zone's `/cdn-cgi/speculation` rules;
+ * - launch Chromium with prerender and speculative prefetch off, which also
+ *   ignores the zone's `/cdn-cgi/speculation` rules;
+ * - keep the HTTP cache: they never call `context.route`, because Playwright
+ *   turns the cache off for a context with any route. In 0.60.141 a route that
+ *   aborted the speculation rules did that, and every page reload re-downloaded
+ *   every asset (creative production smoke: 1900 requests, busiest 10 s 373);
  * - count every request a context makes and wait before a navigation whenever
  *   the last 10 s already holds `REQUEST_BUDGET_PER_10S`;
- * - report the total and the busiest 10 s, so a run can be checked against the
- *   edge's own count.
+ * - report the total and the busiest 10 s, and exit `NETWORK_OVER_BUDGET_EXIT`
+ *   when the busiest 10 s went over the budget, so an over-budget run fails
+ *   instead of passing with a note. One page load can't be paced from outside
+ *   the page, so the exit code is the enforcement.
  */
 import type { BrowserContext } from 'playwright'
 
@@ -69,12 +75,24 @@ export function createRequestMeter(budget = REQUEST_BUDGET_PER_10S, sleep = (ms:
   }
 }
 
-/** Abort the zone's speculation rules and count every request the context sends. */
+/** Count every request the context sends. Never add a route here: it would turn off the HTTP cache. */
 export async function meterContext(context: BrowserContext, meter: RequestMeter): Promise<void> {
-  await context.route('**/cdn-cgi/speculation*', (route) => route.abort())
   context.on('request', () => meter.record())
 }
 
+/** Exit code of a check whose pages passed but whose busiest 10 s went over the budget. */
+export const NETWORK_OVER_BUDGET_EXIT = 3
+
+export function isOverBudget(count: NetworkCount, budget = REQUEST_BUDGET_PER_10S): boolean {
+  return count.peak10s > budget
+}
+
+/** 0, or `NETWORK_OVER_BUDGET_EXIT` when the run went over the budget. */
+export function networkExitCode(count: NetworkCount | undefined): number {
+  return count && isOverBudget(count) ? NETWORK_OVER_BUDGET_EXIT : 0
+}
+
 export function formatNetworkCount(count: NetworkCount): string {
-  return `network: ${count.requests} requests, busiest 10 s ${count.peak10s} (budget ${REQUEST_BUDGET_PER_10S})`
+  const line = `network: ${count.requests} requests, busiest 10 s ${count.peak10s} (budget ${REQUEST_BUDGET_PER_10S})`
+  return isOverBudget(count) ? `FAIL ${line}: over the shared edge budget` : line
 }

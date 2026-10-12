@@ -6,9 +6,10 @@
  *     --route /app/w1/assets --route /app/w1/tasks --storage-state auth.json
  *
  * Same options as `shell-alignment` (it ignores --tolerance). Exit 0 when every
- * page is on the panel, 1 on any page that is not, 2 on a usage error.
+ * page is on the panel, 1 on any page that is not, 2 on a usage error, 3 when
+ * the pages passed but the run went over the shared edge budget.
  */
-import { formatNetworkCount } from './browser-budget'
+import { formatNetworkCount, networkExitCode } from './browser-budget'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { parseShellAlignmentArgs, ShellAlignmentUsageError } from './shell-alignment-cli'
@@ -48,5 +49,5 @@ export async function runWorkspaceSurfaceCli(argv: readonly string[]): Promise<n
   }
   process.stdout.write(`${formatWorkspaceSurfaceReport(report)}\n`)
   if (report.network) process.stdout.write(`${formatNetworkCount(report.network)}\n`)
-  return report.findings.length ? 1 : 0
+  return report.findings.length ? 1 : networkExitCode(report.network)
 }

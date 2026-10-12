@@ -222,6 +222,10 @@ export interface RouterTurnOptions {
 
 const DEFAULT_BUDGET_MS = 90_000
 const RETRY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
+// The Router names a refusal no resend of the same model can fix: every
+// credential for it is out of quota, rejected or suspended (tangle-router
+// `X-Tangle-Failure-Category`). The turn moves to its next fallback model at once.
+const DEAD_CREDENTIAL_CATEGORIES = new Set(['provider_quota_exhausted', 'provider_key_invalid', 'provider_account_suspended'])
 const MAX_RETRY_DELAY_MS = 8_000
 const TOOL_EVENT_LIMIT = 500
 /** Marks a tool's typed event inside a loop progress update. */
@@ -322,6 +326,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         }
         // Nothing has streamed yet, so a resend repeats no word and no tool.
         if (attempt >= attempts || !RETRY_STATUS.has(response.status)) return response
+        if (DEAD_CREDENTIAL_CATEGORIES.has(response.headers.get('x-tangle-failure-category') ?? '')) return response
         const retryAfter = Number(response.headers.get('retry-after'))
         await response.body?.cancel().catch(() => {})
         await pause(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, MAX_RETRY_DELAY_MS) : backoff())

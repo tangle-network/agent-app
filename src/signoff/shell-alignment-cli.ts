@@ -6,9 +6,10 @@
  *     --route /app/w1/chat --route /app/w1/inbox --storage-state auth.json
  *
  * Exit 0 when every route, width and theme is within tolerance; 1 on any
- * misaligned divider; 2 on a usage error.
+ * misaligned divider; 2 on a usage error; 3 when every page passed but the
+ * run's busiest 10 s went over the shared edge budget (browser-budget.ts).
  */
-import { formatNetworkCount } from './browser-budget'
+import { formatNetworkCount, networkExitCode } from './browser-budget'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { checkShellAlignment, formatShellAlignmentReport, type ShellAlignmentOptions } from './shell-alignment'
@@ -95,5 +96,5 @@ export async function runShellAlignmentCli(argv: readonly string[]): Promise<num
   }
   process.stdout.write(`${formatShellAlignmentReport(report)}\n`)
   if (report.network) process.stdout.write(`${formatNetworkCount(report.network)}\n`)
-  return report.findings.length ? 1 : 0
+  return report.findings.length ? 1 : networkExitCode(report.network)
 }

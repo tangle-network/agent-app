@@ -25101,6 +25101,14 @@ interface CopyBlock
 2
 ```
 
+### `isOverBudget`
+
+`function`
+
+```ts
+(count: NetworkCount, budget?: number) => boolean
+```
+
 ### `judgeShellAlignment`
 
 `function` — Desktop: every header divider lands on the rail's first divider.
@@ -25151,10 +25159,18 @@ interface LoadSignoffConfigOptions
 
 ### `meterContext`
 
-`function` — Abort the zone's speculation rules and count every request the context sends.
+`function` — Count every request the context sends.
 
 ```ts
 (context: BrowserContext, meter: RequestMeter) => Promise<void>
+```
+
+### `NETWORK_OVER_BUDGET_EXIT`
+
+`const` — Exit code of a check whose pages passed but whose busiest 10 s went over the budget.
+
+```ts
+3
 ```
 
 ### `NetworkCount`
@@ -25163,6 +25179,14 @@ interface LoadSignoffConfigOptions
 
 ```ts
 interface NetworkCount
+```
+
+### `networkExitCode`
+
+`function` — 0, or `NETWORK_OVER_BUDGET_EXIT` when the run went over the budget.
+
+```ts
+(count: NetworkCount | undefined) => number
 ```
 
 ### `oklchL`

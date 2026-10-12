@@ -252,6 +252,24 @@ describe('runRouterTurn', () => {
     expect(once.calls).toHaveBeenCalledTimes(1)
   })
 
+  it('moves to the fallback model at once when the Router says every credential is dead', async () => {
+    // Tax 2026-10-12: five resends of a breaker-refused gpt-6-luna put 15-23 s before the fallback's first word.
+    const dead = () => new Response('{"error":{"message":"No provider served model"}}', {
+      status: 502, headers: { 'x-tangle-failure-category': 'provider_quota_exhausted' } })
+    const chain = router(dead, sse([text('From the fallback.')]))
+    const ok = await runRouterTurn({ apiKey: 'k', model: 'primary', fallbackModels: ['backup'], fetchImpl: chain.fetchImpl,
+      retry: { attempts: 5, baseDelayMs: 1 }, systemPrompt: 's', userMessage: 'u' })
+    expect(ok).toMatchObject({ text: 'From the fallback.' })
+    expect(chain.requests.map(request => request.body.model)).toEqual(['primary', 'backup'])
+
+    // A refusal without that category is still resent within its attempts.
+    const busy = router(() => new Response('upstream hiccup', { status: 503 }), sse([text('Second try.')]))
+    const retried = await runRouterTurn({ apiKey: 'k', model: 'primary', fetchImpl: busy.fetchImpl,
+      retry: { attempts: 5, baseDelayMs: 1 }, systemPrompt: 's', userMessage: 'u' })
+    expect(retried).toMatchObject({ text: 'Second try.' })
+    expect(busy.requests.map(request => request.body.model)).toEqual(['primary', 'primary'])
+  })
+
   it('keeps the cause at the end of a long service error', async () => {
     // Tax 2026-10-12: the Router's breaker message put its reason past 200 characters.
     const body = JSON.stringify({ error: { message: `No provider served model "gpt-6-luna" (provider_quota_exhausted). Refused by breaker without calling: every candidate credential is held open after an earlier refusal (${'provider_quota_exhausted, '.repeat(6)}cause_at_the_end).` } })
