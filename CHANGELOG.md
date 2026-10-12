@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.146
+
+- fix(router-turn): go to the fallback model at once when the Router names a dead credential (#1084)
+
 ## 0.60.145
 
 - fix(router-turn): keep up to 1000 characters of the model service's error text (#1083)
