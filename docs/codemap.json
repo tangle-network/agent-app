@@ -16641,6 +16641,12 @@
           "doc": "The small event shape consumed by agent-gateway's streaming adapters."
         },
         {
+          "name": "SandboxTaskOptions",
+          "kind": "interface",
+          "signature": "interface SandboxTaskOptions",
+          "doc": null
+        },
+        {
           "name": "SandboxTerminalConnectionRouteOptions",
           "kind": "interface",
           "signature": "interface SandboxTerminalConnectionRouteOptions",
@@ -16651,6 +16657,12 @@
           "kind": "function",
           "signature": "(options: SandboxToolPathOptions) => string",
           "doc": "Resolve the binary directory path for a sandbox tool based on provided options"
+        },
+        {
+          "name": "SandboxToolContext",
+          "kind": "interface",
+          "signature": "interface SandboxToolContext",
+          "doc": "The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine."
         },
         {
           "name": "sandboxToolPath",
