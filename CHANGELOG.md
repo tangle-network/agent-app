@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.147
+
+- fix(signoff): browser checks keep the HTTP cache and fail an over-budget run (#1085)
+
 ## 0.60.146
 
 - fix(router-turn): go to the fallback model at once when the Router names a dead credential (#1084)
