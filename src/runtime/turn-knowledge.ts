@@ -57,6 +57,11 @@ export function turnKnowledgeInstructions(files: readonly TurnKnowledgeFile[], o
       ' When two sources disagree, give each value with the source that states it and ask the owner which is current; never pick one silently.',
     ...files.map(file => file.text !== null ? `Knowledge file ${file.path}:\n${file.text}`
       : `Knowledge file ${file.path} (${file.size} bytes, text not shown)${read ? `: read it with ${read} when the question may be covered by it.` : '.'}`),
+    // The disagree rule above, read before the files, named a conflict in 10 of 20 bench turns
+    // (hospitality, 3 of 5 in production); repeated after the files as a check it named 20 of 20,
+    // and 10 of 10 single-file answers stayed unchanged (gemini-3.5-flash-lite, 2026-10-12,
+    // hospitality-agent #441).
+    ...(files.length > 1 ? ['Before answering from these files, check every file that states the asked fact. When they state different values, give each value with its file name and ask the owner which is current.'] : []),
   ]
 }
 
