@@ -14,14 +14,14 @@ function item(id: string, name: string, over: Partial<WorkspaceListItem> = {}): 
 }
 
 describe('canonical rail identity', () => {
-  it('names the open workspace and the product, truncating a long name with the full text on hover', () => {
+  it('names the open workspace and the product, clamping a long name to two lines with the full text on hover', () => {
     render(
       <AgentWorkspaceLayout product={product} workspace={{ id: 'w1', name: LONG }} navItems={[]}>
         <p>page</p>
       </AgentWorkspaceLayout>,
     )
     const name = screen.getAllByText(LONG)[0]!
-    expect(name.className).toContain('truncate')
+    expect(name.className).toContain('line-clamp-2')
     // Every ancestor up to the rail header must allow shrinking, or the name
     // overflows into the collapse button and the page (the Legal defect).
     const identity = name.closest('[title]')!
@@ -159,6 +159,30 @@ describe('WorkspaceList', () => {
     expect(remove.mock.calls[0]![0].id).toBe('a')
   })
 
+  it('never offers Delete on an item the viewer may not delete', () => {
+    render(
+      <WorkspaceList
+        items={[item('mine', 'Acme'), item('shared', 'Globex')]}
+        remove={async () => {}}
+        canRemove={(entry) => entry.id === 'mine'}
+        actions={(entry) => entry.id === 'shared' ? [{ id: 'open', label: 'Open', onSelect: () => {} }] : []}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Globex' }))
+    expect(screen.getByRole('menuitem', { name: 'Open' })).toBeTruthy()
+    expect(screen.queryAllByRole('menuitem', { name: 'Delete' })).toHaveLength(0)
+    cleanup()
+
+    render(<WorkspaceList items={[item('mine', 'Acme')]} remove={async () => {}} canRemove={(entry) => entry.id === 'mine'} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Acme' }))
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeTruthy()
+  })
+
+  it('shows no menu on an item whose only action is a Delete the viewer may not use', () => {
+    render(<WorkspaceList items={[item('shared', 'Globex')]} remove={async () => {}} canRemove={() => false} />)
+    expect(screen.queryByRole('button', { name: 'Actions for Globex' })).toBeNull()
+  })
+
   it('creates from a name in the shared dialog and keeps the dialog open on a refusal', async () => {
     const onCreate = vi.fn().mockRejectedValueOnce(new Error('That name is taken.')).mockResolvedValueOnce(undefined)
     render(<WorkspaceList items={[]} noun={{ singular: 'client', plural: 'clients' }} create={{ onCreate }} />)
@@ -172,6 +196,20 @@ describe('WorkspaceList', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(onCreate).toHaveBeenNthCalledWith(1, 'Acme')
     expect(onCreate).toHaveBeenCalledTimes(2)
+  })
+
+  it('paints search and name fields with the shared ui field, not the page colour', () => {
+    const items = Array.from({ length: 9 }, (_, i) => item(`c${i}`, `Client ${i}`))
+    render(<WorkspaceList items={items} noun={{ singular: 'client', plural: 'clients' }} create={{ onCreate: async () => {} }} />)
+    const search = screen.getByRole('searchbox', { name: 'Search clients' })
+    // bg-background sat at ΔL 0 on the page and border-border edged it at 1.26:1 (physim
+    // production, agent-app-signoff surface-ladder). ui's Input owns the well and its border.
+    expect(search.className).toContain('bg-[var(--field-surface,')
+    expect(search.className).not.toContain('bg-background')
+    fireEvent.click(screen.getByRole('button', { name: 'New client' }))
+    const name = within(screen.getByRole('dialog', { name: 'New client' })).getByLabelText('Name')
+    expect(name.className).toContain('bg-[var(--field-surface,')
+    expect(name.className).not.toContain('bg-background')
   })
 
   it('offers search past eight items and says when nothing matches', () => {

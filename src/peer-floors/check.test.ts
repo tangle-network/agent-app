@@ -156,7 +156,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('4.0.0', range!)).toBe(false)
   })
 
-  it('supports the verified Runtime 0.282, 0.283, 0.285, 0.289, 0.291, and 0.293 lines', async () => {
+  it('admits only Runtime lines that export every subpath src imports (0.316 to 0.318)', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -164,29 +164,15 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    // The OIDC caller is verified against published Runtime 0.282.2 and 0.283.0.
-    expect(satisfiesRange('0.281.999', range!)).toBe(false)
-    expect(satisfiesRange('0.282.0', range!)).toBe(false)
-    expect(satisfiesRange('0.282.2', range!)).toBe(true)
-    expect(satisfiesRange('0.282.999', range!)).toBe(true)
-    expect(satisfiesRange('0.283.0', range!)).toBe(true)
-    expect(satisfiesRange('0.283.999', range!)).toBe(true)
-    expect(satisfiesRange('0.284.0', range!)).toBe(false)
-    expect(satisfiesRange('0.284.999', range!)).toBe(false)
-    expect(satisfiesRange('0.285.0', range!)).toBe(true)
-    expect(satisfiesRange('0.285.999', range!)).toBe(true)
-    expect(satisfiesRange('0.286.0', range!)).toBe(false)
-    expect(satisfiesRange('0.289.0', range!)).toBe(false)
-    expect(satisfiesRange('0.289.1', range!)).toBe(true)
-    expect(satisfiesRange('0.289.999', range!)).toBe(true)
-    expect(satisfiesRange('0.290.0', range!)).toBe(false)
-    expect(satisfiesRange('0.290.999', range!)).toBe(false)
-    expect(satisfiesRange('0.291.0', range!)).toBe(true)
-    expect(satisfiesRange('0.291.999', range!)).toBe(true)
-    expect(satisfiesRange('0.292.0', range!)).toBe(false)
-    expect(satisfiesRange('0.293.0', range!)).toBe(true)
-    expect(satisfiesRange('0.293.999', range!)).toBe(true)
-    expect(satisfiesRange('0.294.0', range!)).toBe(false)
+    // ./runtime re-exports router-turn, which imports ./placement (0.315.0) and ./workspace-store (0.316.0):
+    // an older Runtime fails at module load, so the old verified lines are no longer admitted.
+    for (const old of ['0.282.2', '0.283.0', '0.285.0', '0.289.1', '0.291.0', '0.293.0', '0.308.0', '0.313.1', '0.315.9']) {
+      expect(satisfiesRange(old, range!)).toBe(false)
+    }
+    for (const current of ['0.316.0', '0.317.0', '0.318.0', '0.318.9']) {
+      expect(satisfiesRange(current, range!)).toBe(true)
+    }
+    expect(satisfiesRange('0.319.0', range!)).toBe(false)
   })
 
   it('admits the tcloud line used by the Sandbox 0.59 consumer', async () => {
@@ -263,7 +249,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('21.0.0', range!)).toBe(false)
   })
 
-  it('requires the Sandbox UI release that owns ShellHeader and the inset workspace surface, without claiming the next minor', async () => {
+  it('requires the Sandbox UI release whose ProviderMark renders a fallback, without claiming the next minor', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -272,13 +258,16 @@ describe('this package audits itself', () => {
 
     expect(range).toBeDefined()
     // The assistant panel, session history and Vault path bar render sandbox-ui's
-    // ShellHeader rows, first shipped in 0.133.0. AgentWorkspaceCompanion also passes
-    // WorkspaceLayout `surface="inset"` and the right-pane control labels (0.132.0).
-    expect(satisfiesRange('0.131.5', range!)).toBe(false)
+    // ShellHeader rows (0.133.0); AgentWorkspaceCompanion passes WorkspaceLayout
+    // `surface="inset"` (0.132.0). ProviderLogo draws sandbox-ui's ProviderMark,
+    // first exported in 0.134.1; 0.134.2 is the first release that renders the
+    // caller's monogram fallback for a provider with no bundled mark.
     expect(satisfiesRange('0.132.3', range!)).toBe(false)
-    expect(satisfiesRange('0.133.0', range!)).toBe(true)
-    expect(satisfiesRange('0.133.4', range!)).toBe(true)
-    expect(satisfiesRange('0.134.0', range!)).toBe(false)
+    expect(satisfiesRange('0.133.4', range!)).toBe(false)
+    expect(satisfiesRange('0.134.1', range!)).toBe(false)
+    expect(satisfiesRange('0.134.2', range!)).toBe(true)
+    expect(satisfiesRange('0.134.3', range!)).toBe(true)
+    expect(satisfiesRange('0.135.0', range!)).toBe(false)
   })
 
   it('requires the UI release that exports TRANSCRIPT_TEXT and ApprovalDiffSummary', async () => {

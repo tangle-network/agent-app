@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-493 exports.
+507 exports.
 
 ### `acceptRejectionReason`
 
@@ -588,6 +588,22 @@ interface ChatMessagesProps
 
 ```ts
 type ChatNoticeTone
+```
+
+### `chatReasoningFromParts`
+
+`function` — A saved message's reasoning, settled, from its persisted parts: every `{ type: 'reasoning', text, time }` part joined in order, from the first part's start to the last part's end.
+
+```ts
+(parts: readonly unknown[] | null | undefined) => ChatReasoningState | undefined
+```
+
+### `ChatReasoningState`
+
+`interface` — One message's reasoning as the stream delivers it: the text so far, when the model started reasoning and when it stopped.
+
+```ts
+interface ChatReasoningState
 ```
 
 ### `ChatSelectField`
@@ -1438,6 +1454,14 @@ interface FileMention
 (files: File[] | FileList, accept?: string | undefined) => { accepted: File[]; rejected: ComposerFileRejection[]; }
 ```
 
+### `firstUnansweredRequiredField`
+
+`function` — The first required field still without an answer, or null when every required field has one: the reason `buildAnswerData` returned null.
+
+```ts
+(fields: ({ name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined;…
+```
+
 ### `FlowWaterfall`
 
 `function` — Compact proportional waterfall over a FlowTrace — span name, bar, duration per row; total + cost in the footer.
@@ -1492,6 +1516,14 @@ interface FlowWaterfallProps
 
 ```ts
 (msg: ChatMessageMetrics, models: CatalogModel[]) => string | null
+```
+
+### `formatModelPrice`
+
+`function` — The price a person pays per output, in the unit that output comes in: per million prompt tokens for text, per image, per second of video, per minute of audio, per 1,000 characters of speech.
+
+```ts
+(model: Pick<CatalogModel, "pricing" | "outputPrice">) => string | undefined
 ```
 
 ### `formatRecordGridValue`
@@ -2006,6 +2038,14 @@ type InteractionSubmitResult
 (status: ChatInteractionStatus) => boolean
 ```
 
+### `isTurnIntentEvent`
+
+`function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
+
+```ts
+(event: unknown) => event is TurnIntentEvent
+```
+
 ### `isTurnPhaseEvent`
 
 `function` — True for a {@link TURN_PHASE_EVENT} with a usable `phase` and `message`.
@@ -2020,6 +2060,14 @@ type InteractionSubmitResult
 
 ```ts
 (interaction: ChatInteraction, data: InteractionData) => string
+```
+
+### `LateAnswerResult`
+
+`type` — What a host did with a late answer: sent it (`true` or nothing returned), queued it behind the running turn, or refused it (`false`).
+
+```ts
+type LateAnswerResult
 ```
 
 ### `lazyRoute`
@@ -2156,6 +2204,14 @@ interface MentionTextSegment
 
 ```ts
 interface MessageAttachmentsProps
+```
+
+### `missingAnswerHint`
+
+`function` — What the reader still has to do before the card's action (`verb`: submit, send) is available, in plain words, for the line beside the disabled button.
+
+```ts
+(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
 ```
 
 ### `MissionActivityLane`
@@ -2632,7 +2688,7 @@ interface ProvenanceValueProps
 
 ### `ProviderLogo`
 
-`function` — Real brand mark when we have one; tinted monogram otherwise.
+`function` — The shared brand mark when one is bundled; a tinted monogram otherwise.
 
 ```ts
 ({ provider, size }: ProviderLogoProps) => ReactNode
@@ -2708,6 +2764,22 @@ interface QuestionOptionListProps
 
 ```ts
 (column: RecordGridColumn, raw: string) => RecordGridCellOutcome
+```
+
+### `ReasoningRow`
+
+`function` — The model's reasoning for one message: live while it thinks, collapsed once it answers.
+
+```ts
+({ text, startedAt, endedAt, thinking: thinkingProp, defaultOpen, renderText, className, }: ReasoningRowProps) => Eleme…
+```
+
+### `ReasoningRowProps`
+
+`interface` — Props for {@link ReasoningRow}: the fields of a `ChatReasoningState`, plus presentation.
+
+```ts
+interface ReasoningRowProps
 ```
 
 ### `reconcileEffortLevels`
@@ -3227,7 +3299,7 @@ interface SessionPageQuery
 `function` — Settle a turn response for a client that sent {@link TURN_PROGRESS_HEADER}.
 
 ```ts
-(response: Response, onPhase: (phase: TurnPhaseData) => void) => Promise<Response>
+(response: Response, onPhase: (phase: TurnPhaseData) => void, onIntent?: ((intent: TurnIntentData) => void) | undefined…
 ```
 
 ### `SlashCommand`
@@ -3422,12 +3494,36 @@ interface ToolRunRecord
 interface ToolRunStep
 ```
 
+### `trackChatReasoning`
+
+`function` — Keep one turn's reasoning state from its stream: the first reasoning delta starts the clock, the answer's first text, an error or `end()` stops it, and every change reaches `callbacks.onReasoningStat…
+
+```ts
+(callbacks: ChatStreamCallbacks, now?: () => number) => TrackedChatStreamCallbacks
+```
+
+### `TrackedChatStreamCallbacks`
+
+`type` — Callbacks that keep the turn's reasoning state, plus the two moments only the transport knows.
+
+```ts
+type TrackedChatStreamCallbacks
+```
+
 ### `triggerAttachmentDownload`
 
 `function` — Drives an anchor-click download from an already-resolved blob.
 
 ```ts
 (name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }
+```
+
+### `TURN_INTENT_EVENT`
+
+`const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
+
+```ts
+"session.run.intent"
 ```
 
 ### `TURN_PHASE_EVENT`
@@ -3476,6 +3572,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 "turn_stream_lost"
+```
+
+### `TurnIntentData`
+
+`type` — The data of a {@link TURN_INTENT_EVENT}.
+
+```ts
+type TurnIntentData
+```
+
+### `TurnIntentEvent`
+
+`type` — A {@link TURN_INTENT_EVENT} as it crosses the wire.
+
+```ts
+type TurnIntentEvent
 ```
 
 ### `TurnPhaseData`
@@ -3736,7 +3848,7 @@ interface UseSessionHistoryOptions
 
 ### `useThinkingSeconds`
 
-`function` — Whole seconds elapsed while `active`, ticking once a second.
+`function` — Whole seconds elapsed while `active`, ticking once a second; counts from when `active` first turns true and freezes when it clears.
 
 ```ts
 (active: boolean) => number

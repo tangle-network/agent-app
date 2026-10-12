@@ -28,6 +28,10 @@ export interface UnansweredThread {
   pendingMessages: number
   /** Age of the OLDEST unanswered user message, in ms. */
   oldestAgeMs: number
+  /** The newest of these messages was followed by a row that showed the person
+   *  something (a failure notice or error prose), so they know it failed. False
+   *  or absent: nothing came back at all. */
+  notified?: boolean
 }
 
 /** A persisted assistant row, as the sweep needs to judge it. */
@@ -71,6 +75,75 @@ export interface TurnHealthSource {
    * 128 MB, which stopped the hourly cron and every sweep queued after this one.
    */
   readParts?(ids: readonly string[]): Promise<Map<string, unknown>>
+}
+
+/**
+ * The part fields classifyTurnOutcome reads, as SQL over one `json_each` row.
+ * Each string field is taken only when its JSON type is text, so a non-string
+ * value reads exactly as the classifier would see it in the full part.
+ */
+/** `expr` evaluated only on an object part: json_type and json_extract raise on a bare string element. */
+const onObject = (expr: string) => `CASE WHEN p.type = 'object' THEN ${expr} END`
+/** The value at `path` when it is a JSON string, else NULL. */
+const textAt = (path: string, take = `json_extract(p.value, '${path}')`) => onObject(`CASE WHEN json_type(p.value, '${path}') = 'text' THEN ${take} END`)
+const PART_PROJECTION = [
+  `p.type AS partKind`,
+  `${textAt('$.type')} AS type`,
+  `coalesce(${onObject(`CASE WHEN json_type(p.value, '$.text') = 'text' AND length(trim(json_extract(p.value, '$.text'), char(32, 9, 10, 13))) > 0 THEN 1 ELSE 0 END`)}, 0) AS hasText`,
+  `${textAt('$.tool')} AS tool`,
+  `${onObject(`json_type(p.value, '$.state')`)} AS stateKind`,
+  `${textAt('$.state.status')} AS status`,
+  `${textAt('$.state.error', `substr(json_extract(p.value, '$.state.error'), 1, 200)`)} AS stateError`,
+  `${onObject(`json_type(p.value, '$.state.input')`)} AS inputKind`,
+  `${textAt('$.state.input.error', `substr(json_extract(p.value, '$.state.input.error'), 1, 200)`)} AS inputError`,
+  `${textAt('$.state.input.tool')} AS inputTool`,
+  `${textAt('$.state.input', `json_valid(json_extract(p.value, '$.state.input'))`)} AS inputValid`,
+  `${textAt('$.state.input', `substr(json_extract(p.value, '$.state.input'), 1, 120)`)} AS inputSample`,
+].join(',\n  ')
+
+interface ProjectedPart {
+  partKind: string | null
+  type: string | null
+  hasText: number
+  tool: string | null
+  stateKind: string | null
+  status: string | null
+  stateError: string | null
+  inputKind: string | null
+  inputError: string | null
+  inputTool: string | null
+  inputValid: number | null
+  inputSample: string | null
+}
+
+/** A part rebuilt from its projection, judged by classifyTurnOutcome as the stored part would be. */
+function slimPart(row: ProjectedPart): unknown {
+  // classifyTurnOutcome treats an array part as a record with no type (an opaque part) and skips any other non-object.
+  if (row.partKind === 'array') return []
+  if (row.partKind !== 'object') return null
+  const part: Record<string, unknown> = {}
+  if (row.type !== null) part.type = row.type
+  if (row.hasText) part.text = 'x'
+  if (row.tool !== null) part.tool = row.tool
+  if (row.stateKind === 'object') {
+    const state: Record<string, unknown> = {}
+    if (row.status !== null) state.status = row.status
+    if (row.stateError !== null) state.error = row.stateError
+    if (row.inputKind === 'object') {
+      const input: Record<string, unknown> = {}
+      if (row.inputError !== null) input.error = row.inputError
+      if (row.inputTool !== null) input.tool = row.inputTool
+      state.input = input
+    } else if (row.inputKind === 'text') {
+      // A parseable string reads as parseable; an unparseable one keeps its sample and a NUL after it, so its prefix
+      // can never parse by accident.
+      state.input = row.inputValid ? '{}' : `${row.inputSample ?? ''}\u0000`
+    } else if (row.inputKind !== null) {
+      state.input = null
+    }
+    part.state = state
+  }
+  return part
 }
 
 /** Most stored parts the sweep reads in one batch; a larger row is read alone. */
@@ -159,8 +232,24 @@ export interface SweepOptions {
    * blindness this module now refuses to draw conclusions from.
    */
   decodeParts?: (raw: unknown, row: PersistedTurnRow) => Promise<unknown> | unknown
+  /**
+   * Which threads that got no reply at all should page (a `critical` alert);
+   * the rest are reported as a `warning`. A product passes its own rule, such
+   * as only its customers' and operators' threads, so internal and evaluation
+   * traffic stops paging. Default: threads silent for 24 hours or more.
+   */
+  pageSilentThreads?: (threads: UnansweredThread[]) => Promise<UnansweredThread[]> | UnansweredThread[]
+  /**
+   * Where a product already reports threads that ended on a failure the person
+   * saw, such as its reliability report. When set, those threads are counted
+   * but not alerted here. Unset, they are a `warning`, so a product whose every
+   * reply is an error message still shows up.
+   */
+  failureNoticesReportedBy?: string
   now?: number
 }
+
+const defaultPageSilentThreads = (threads: UnansweredThread[]) => threads.filter((thread) => thread.oldestAgeMs >= 24 * HOUR_MS)
 
 /** Apply the optional decoder, falling back to the stored value on any failure
  *  so a broken decoder degrades to blindness (reported) rather than to a fake
@@ -182,9 +271,17 @@ async function decodeRowParts(
  *  a test can assert on it. */
 export interface SweepResult {
   product: string
+  /** Threads whose user messages have no real answer: {@link silentThreads}
+   *  plus {@link notifiedThreads}. */
   unansweredThreads: number
   pendingUserMessages: number
   oldestUnansweredMs: number
+  /** Threads where nothing came back after the newest message. */
+  silentThreads: number
+  /** Of {@link silentThreads}, the ones `pageSilentThreads` selected. */
+  pagedSilentThreads: number
+  /** Threads that ended on a failure the person saw. */
+  notifiedThreads: number
   turnsJudged: number
   unhealthyTurns: number
   emptyCompletions: number
@@ -283,31 +380,42 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
   // ── silence: messages in, nothing out ──────────────────────────────────
   const pendingUserMessages = unanswered.reduce((sum, t) => sum + t.pendingMessages, 0)
   const oldestUnansweredMs = unanswered.reduce((max, t) => Math.max(max, t.oldestAgeMs), 0)
+  const silent = unanswered.filter((t) => !t.notified)
+  const notified = unanswered.filter((t) => t.notified)
+  const paged = new Set(
+    (await (options.pageSilentThreads ?? defaultPageSilentThreads)(silent)).map((t) => t.threadId),
+  )
+  const describeThread = (t: UnansweredThread) =>
+    `thread ${t.threadId}: ${t.pendingMessages} pending, oldest ${(t.oldestAgeMs / HOUR_MS).toFixed(1)}h`
 
-  if (unanswered.length > 0) {
-    const hours = (oldestUnansweredMs / HOUR_MS).toFixed(1)
+  if (silent.length > 0) {
+    const silentMessages = silent.reduce((sum, t) => sum + t.pendingMessages, 0)
+    const oldest = silent.reduce((max, t) => Math.max(max, t.oldestAgeMs), 0)
     alerts.push({
       product: options.product,
-      // A day of total silence is not a warning.
-      severity: oldestUnansweredMs >= 24 * HOUR_MS ? 'critical' : 'warning',
+      severity: paged.size > 0 ? 'critical' : 'warning',
       key: `sweep:${options.product}:unanswered_threads`,
-      title: `${options.product}: ${pendingUserMessages} user message(s) unanswered across ${unanswered.length} thread(s)`,
+      title: `${options.product}: ${silentMessages} user message(s) unanswered across ${silent.length} thread(s), with no reply at all`,
       details: [
-        `oldest unanswered message: ${hours}h`,
-        ...unanswered
+        `oldest unanswered message: ${(oldest / HOUR_MS).toFixed(1)}h; ${paged.size} of these thread(s) page`,
+        // The threads that page come first, so the alert names what to open.
+        ...[...silent.filter((t) => paged.has(t.threadId)), ...silent.filter((t) => !paged.has(t.threadId))]
           .slice(0, 5)
-          .map(
-            (t) =>
-              `thread ${t.threadId}: ${t.pendingMessages} pending, oldest ${(
-                t.oldestAgeMs / HOUR_MS
-              ).toFixed(1)}h`,
-          ),
+          .map((t) => `${describeThread(t)}${paged.has(t.threadId) ? ' (pages)' : ''}`),
       ],
-      data: {
-        unansweredThreads: unanswered.length,
-        pendingUserMessages,
-        oldestUnansweredMs,
-      },
+      data: { silentThreads: silent.length, pagedSilentThreads: paged.size, pendingUserMessages: silentMessages, oldestUnansweredMs: oldest },
+      at: now,
+    })
+  }
+  if (notified.length > 0 && !options.failureNoticesReportedBy) {
+    const notifiedMessages = notified.reduce((sum, t) => sum + t.pendingMessages, 0)
+    alerts.push({
+      product: options.product,
+      severity: 'warning',
+      key: `sweep:${options.product}:failed_threads`,
+      title: `${options.product}: ${notifiedMessages} user message(s) across ${notified.length} thread(s) ended on a failure the person saw`,
+      details: notified.slice(0, 5).map(describeThread),
+      data: { notifiedThreads: notified.length, pendingUserMessages: notifiedMessages },
       at: now,
     })
   }
@@ -529,6 +637,9 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
     unansweredThreads: unanswered.length,
     pendingUserMessages,
     oldestUnansweredMs,
+    silentThreads: silent.length,
+    pagedSilentThreads: paged.size,
+    notifiedThreads: notified.length,
     turnsJudged: turns.length,
     unhealthyTurns,
     emptyCompletions,
@@ -607,6 +718,12 @@ export function createD1TurnHealthSource(
      * Prefixes are bound as query parameters, never interpolated.
      */
     errorReplyPrefixes?: readonly string[]
+    /**
+     * Read each row's whole `parts` instead of the fields the classifier reads.
+     * Only a product whose `decodeParts` needs the stored bytes (an encrypted
+     * parts envelope) sets this; the default reads a small projection.
+     */
+    fullParts?: boolean
   } = {},
 ): TurnHealthSource {
   // Table names are identifiers and cannot be bound as parameters. They come
@@ -640,31 +757,47 @@ export function createD1TurnHealthSource(
       const errorClause = errorPrefixes
         .map((_, i) => ` AND a.content NOT LIKE ?${i + 3} || '%'`)
         .join('')
+      // A row after the newest pending message that showed something (error
+      // prose, or a notice part) means the person saw the failure. A blank row
+      // with no notice showed nothing, so its thread stays silent.
       const { results } = await db
         .prepare(
-          `SELECT m.thread_id AS threadId,
-                  COUNT(*) AS pendingMessages,
-                  MIN(m.created_at) AS oldestCreatedAt
-             FROM ${message} m
-            WHERE m.role = 'user'
-              AND m.created_at <= ?1
-              AND m.created_at >= ?2
-              AND m.created_at > COALESCE(
-                    (SELECT MAX(a.created_at)
-                       FROM ${message} a
-                      WHERE a.thread_id = m.thread_id
-                        AND a.role = 'assistant'
-                        AND length(trim(a.content)) > 0${errorClause}), 0)
-            GROUP BY m.thread_id
-            ORDER BY oldestCreatedAt ASC`,
+          `WITH pending AS (
+             SELECT m.thread_id AS threadId,
+                    COUNT(*) AS pendingMessages,
+                    MIN(m.created_at) AS oldestCreatedAt,
+                    MAX(m.created_at) AS newestCreatedAt
+               FROM ${message} m
+              WHERE m.role = 'user'
+                AND m.created_at <= ?1
+                AND m.created_at >= ?2
+                AND m.created_at > COALESCE(
+                      (SELECT MAX(a.created_at)
+                         FROM ${message} a
+                        WHERE a.thread_id = m.thread_id
+                          AND a.role = 'assistant'
+                          AND length(trim(a.content)) > 0${errorClause}), 0)
+              GROUP BY m.thread_id
+           )
+           SELECT p.threadId, p.pendingMessages, p.oldestCreatedAt,
+                  EXISTS (
+                    SELECT 1 FROM ${message} a
+                     WHERE a.thread_id = p.threadId AND a.role = 'assistant' AND a.created_at >= p.newestCreatedAt
+                       AND (length(trim(coalesce(a.content, ''))) > 0 OR EXISTS (
+                         SELECT 1 FROM json_each(CASE WHEN json_valid(a.parts) THEN CASE WHEN json_type(a.parts) = 'array' THEN a.parts ELSE '[]' END ELSE '[]' END) n
+                          WHERE CASE WHEN n.type = 'object' THEN json_extract(n.value, '$.type') END = 'notice'))
+                  ) AS notified
+             FROM pending p
+            ORDER BY p.oldestCreatedAt ASC`,
         )
         .bind(cutoffSeconds, floorSeconds, ...errorPrefixes)
-        .all<{ threadId: string; pendingMessages: number; oldestCreatedAt: number }>()
+        .all<{ threadId: string; pendingMessages: number; oldestCreatedAt: number; notified: number }>()
 
       return results.map((row) => ({
         threadId: row.threadId,
         pendingMessages: Number(row.pendingMessages),
         oldestAgeMs: now - Number(row.oldestCreatedAt) * 1000,
+        notified: Number(row.notified) === 1,
       }))
     },
 
@@ -696,11 +829,27 @@ export function createD1TurnHealthSource(
 
     async readParts(ids) {
       if (ids.length === 0) return new Map()
+      const placeholders = ids.map((_, i) => `?${i + 1}`).join(', ')
+      if (options.fullParts) {
+        const { results } = await db
+          .prepare(`SELECT id, parts FROM ${message} WHERE id IN (${placeholders})`)
+          .bind(...ids)
+          .all<{ id: string; parts: unknown }>()
+        return new Map(results.map((row) => [String(row.id), row.parts]))
+      }
+      // One row per part with only what classifyTurnOutcome reads, so a day of
+      // tool output never leaves the database: on 2026-10-11 the full read
+      // returned 141.9 MB per run for 500 turns.
       const { results } = await db
-        .prepare(`SELECT id, parts FROM ${message} WHERE id IN (${ids.map((_, i) => `?${i + 1}`).join(', ')})`)
+        .prepare(`SELECT m.id AS id, CAST(p.key AS INTEGER) AS idx, ${PART_PROJECTION}
+             FROM ${message} m, json_each(CASE WHEN json_valid(m.parts) THEN CASE WHEN json_type(m.parts) = 'array' THEN m.parts ELSE '[]' END ELSE '[]' END) p
+            WHERE m.id IN (${placeholders})
+            ORDER BY m.id, idx`)
         .bind(...ids)
-        .all<{ id: string; parts: unknown }>()
-      return new Map(results.map((row) => [String(row.id), row.parts]))
+        .all<ProjectedPart & { id: string }>()
+      const parts = new Map<string, unknown[]>(ids.map((id) => [id, []]))
+      for (const row of results) parts.get(String(row.id))?.push(slimPart(row))
+      return parts
     },
   }
 

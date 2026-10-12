@@ -113,6 +113,49 @@ export function resolveSessionHarness(input: ResolveSessionHarnessInput = {}): R
 }
 
 /**
+ * An app's harness configuration, read from its deploy configuration (for example the env vars
+ * `AGENT_HARNESS` and `AGENT_HARNESS_WORKSPACES`), so no product hard-codes `backend.type`.
+ */
+export interface HarnessConfig {
+  /** The app default for new sessions. Unset or blank means {@link DEFAULT_HARNESS}. */
+  default?: string
+  /** Per-workspace choices: a JSON object mapping a workspace id to a harness. */
+  workspaces?: string
+}
+
+function configHarness(value: unknown, where: string): Harness {
+  if (!isHarness(value)) throw new Error(`${where} names an unknown harness: ${String(value)}`)
+  return value
+}
+
+/**
+ * The harness a workspace's new sessions start on: its own choice, else the app default, else
+ * {@link DEFAULT_HARNESS}. Pass the result to {@link resolveSessionHarness} as `workspaceDefault`
+ * so a session that already ran keeps its harness. A value naming an unknown harness throws:
+ * a configuration typo must fail loudly, never run a different harness than the one configured.
+ */
+export function configuredHarness(config: HarnessConfig, workspaceId?: string): Harness {
+  const appDefault = config.default?.trim()
+    ? configHarness(config.default.trim(), 'The harness default') : DEFAULT_HARNESS
+  const raw = config.workspaces?.trim()
+  if (!raw) return appDefault
+  let choices: unknown
+  try {
+    choices = JSON.parse(raw)
+  } catch {
+    throw new Error('The per-workspace harness configuration is not JSON')
+  }
+  if (!choices || typeof choices !== 'object' || Array.isArray(choices)) {
+    throw new Error('The per-workspace harness configuration must map workspace ids to harnesses')
+  }
+  // Every entry is checked, not only the caller's, so one bad entry fails every workspace's
+  // first turn after the deploy instead of hiding until that workspace sends a message.
+  const parsed = new Map(Object.entries(choices).map(([id, value]) =>
+    [id, configHarness(value, `The harness for workspace ${id}`)]))
+  return (workspaceId === undefined ? undefined : parsed.get(workspaceId)) ?? appDefault
+}
+
+/**
  * Harness ↔ model compatibility + snapping — delegated to `@tangle-network/agent-interface`.
  *
  * `Harness` is the dispatchable subset of `HarnessType`: this shell drops only canonical harnesses

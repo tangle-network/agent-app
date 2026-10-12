@@ -68,6 +68,58 @@ export {
 } from './shell-alignment'
 export { parseShellAlignmentArgs, runShellAlignmentCli } from './shell-alignment-cli'
 export {
+  checkSurfaceLadder,
+  collectSurfaceLadder,
+  composite,
+  contrastRatio,
+  formatSurfaceLadderReport,
+  judgeSurfaceLadder,
+  oklchL,
+  summarizeSurfacePage,
+  surfaceDeltaL,
+  SURFACE_LADDER_MAX_WORDS,
+  SURFACE_LADDER_MIN_BORDER_CONTRAST,
+  SURFACE_LADDER_MIN_DELTA_L,
+  type CopyBlock,
+  type Rgb,
+  type Rgba,
+  type SurfaceBox,
+  type SurfaceFinding,
+  type SurfaceLadderLimits,
+  type SurfaceLadderOptions,
+  type SurfaceLadderReport,
+  type SurfacePageSummary,
+  type SurfaceRule,
+  type SurfaceSample,
+} from './surface-ladder'
+export { parseSurfaceLadderArgs, runSurfaceLadderCli } from './surface-ladder-cli'
+export {
+  checkWorkspaceSurface,
+  collectWorkspaceSurface,
+  formatWorkspaceSurfaceReport,
+  judgeWorkspaceSurface,
+  HEADER_TOP_TOLERANCE_PX,
+  type WorkspaceSurfaceFinding,
+  type WorkspaceSurfaceOptions,
+  type WorkspaceSurfaceReport,
+  type WorkspaceSurfaceSample,
+} from './workspace-surface'
+export { runWorkspaceSurfaceCli } from './workspace-surface-cli'
+export {
+  createRequestMeter,
+  formatNetworkCount,
+  isOverBudget,
+  meterPage,
+  reachedNetwork,
+  NETWORK_OVER_BUDGET_EXIT,
+  networkExitCode,
+  QUIET_CHROMIUM_ARGS,
+  REQUEST_BUDGET_PER_10S,
+  type CdpResponseSource,
+  type NetworkCount,
+  type RequestMeter,
+} from './browser-budget'
+export {
   checkWorkerDefaults,
   formatWorkerDefaults,
   WORKER_COMPATIBILITY_DATE_FLOOR,

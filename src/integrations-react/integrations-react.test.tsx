@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createHubSettingsRoutes } from '../platform'
 import { HubConnectCallbackPage } from './callback'
 import { createHubIntegrationsClient, type HubIntegrationsClient, type HubIntegrationsIdentity } from './client'
-import { HubIntegrationsPanel } from './panel'
+import { connectionTone, HubIntegrationsPanel, hubConnectionStatus } from './panel'
 import { connectWithPopup, HUB_CONNECTED_MESSAGE_TYPE, POPUP_TIMEOUT_MS } from './popup'
 import { useHubIntegrations } from './use-hub-integrations'
 
@@ -238,6 +238,46 @@ describe('integrations-react through the finite Hub settings server', () => {
     expect(screen.getByRole('tab', { name: 'Add integration 1' }).getAttribute('aria-selected')).toBe('true')
     fireEvent.click(screen.getByTestId('integration-cloudbeds'))
     expect(await screen.findByRole('dialog')).toBeTruthy()
+  })
+
+  it('renders each account tile as the shared Card with its connection state as a StatusPill', async () => {
+    const f = fixture()
+    f.setConnections([connection, { ...connection, id: 'conn_2', accountDisplay: 'Hotel B', status: 'reconnect_required' }])
+    render(<HubIntegrationsPanel identity={identity} client={f.client} can={allow} callbackPath="/integrations/callback"
+      accounts={{ title: 'Accounts' }} />)
+    const healthy = await screen.findByTestId('hub-account-conn_1')
+    const tile = healthy.querySelector('[data-slot="card"]')
+    expect(tile).not.toBeNull()
+    // The brand's [data-slot="card"] rule owns the surface level; the tile paints none of its own.
+    expect(tile!.className).not.toMatch(/shadow-none|bg-muted\/50 border/)
+    expect(tile!.getAttribute('data-connection-state')).toBe('connected')
+    expect(within(healthy).getByText('Connected')).toBeTruthy()
+    const broken = screen.getByTestId('hub-account-conn_2')
+    expect(broken.querySelector('[data-slot="card"]')!.getAttribute('data-connection-state')).toBe('error')
+    expect(within(broken).getByText('Reconnect required')).toBeTruthy()
+  })
+
+  it('maps connection states to StatusPill tones, with amber only for pending', () => {
+    expect(connectionTone('connected')).toBe('success')
+    expect(connectionTone('not_connected')).toBe('neutral')
+    expect(connectionTone('error')).toBe('danger')
+    expect(connectionTone('pending')).toBe('warning')
+    expect(hubConnectionStatus({ status: 'active', health: 'healthy' })).toEqual({ state: 'connected', label: 'Connected', tone: 'success' })
+    expect(hubConnectionStatus({ status: 'active', health: 'unknown' }).tone).toBe('success')
+    expect(hubConnectionStatus({ status: 'revoked', health: 'unknown' })).toEqual({ state: 'not_connected', label: 'Not connected', tone: 'neutral' })
+    expect(hubConnectionStatus({ status: 'unhealthy', health: 'unhealthy' }).tone).toBe('danger')
+    expect(hubConnectionStatus({ status: 'active', health: 'unhealthy' }).tone).toBe('danger')
+    expect(hubConnectionStatus({ status: 'reconnect_required', health: 'unknown' }).tone).toBe('danger')
+    expect(hubConnectionStatus({ status: 'active', health: 'rate_limited' }).tone).toBe('warning')
+  })
+
+  it('renders the empty account state as a Card, not a hand-painted box', async () => {
+    const f = fixture()
+    f.setConnections([])
+    render(<HubIntegrationsPanel identity={identity} client={f.client} can={allow} callbackPath="/integrations/callback"
+      accounts={{ title: 'Accounts', emptyLabel: 'No accounts connected yet.' }} />)
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Accounts 0' }), { button: 0, ctrlKey: false })
+    expect(screen.getByText('No accounts connected yet.').closest('[data-slot="card"]')).not.toBeNull()
   })
 
   it('names a failed account read instead of rendering an empty account list', async () => {

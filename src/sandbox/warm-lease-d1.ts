@@ -35,8 +35,23 @@ export const WARM_LEASE_TABLE_DDL = `CREATE TABLE IF NOT EXISTS ${DEFAULT_WARM_L
   slots TEXT NOT NULL DEFAULT '',
   slots_at INTEGER NOT NULL DEFAULT 0,
   first_seen_at INTEGER NOT NULL DEFAULT 0,
-  predicted_at INTEGER NOT NULL DEFAULT 0
+  predicted_at INTEGER NOT NULL DEFAULT 0,
+  declined_until INTEGER NOT NULL DEFAULT 0,
+  pending_warm_at INTEGER NOT NULL DEFAULT 0,
+  pending_ms INTEGER NOT NULL DEFAULT 0,
+  pending_reason TEXT
 )`
+
+/** For a table created from an earlier \`WARM_LEASE_TABLE_DDL\`: paste into a migration. */
+export const WARM_LEASE_DECLINED_UNTIL_DDL =
+  `ALTER TABLE ${DEFAULT_WARM_LEASE_TABLE} ADD COLUMN declined_until INTEGER NOT NULL DEFAULT 0`
+
+/** For a table created before pending charges: paste each into a migration. */
+export const WARM_LEASE_PENDING_DDL = [
+  `ALTER TABLE ${DEFAULT_WARM_LEASE_TABLE} ADD COLUMN pending_warm_at INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE ${DEFAULT_WARM_LEASE_TABLE} ADD COLUMN pending_ms INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE ${DEFAULT_WARM_LEASE_TABLE} ADD COLUMN pending_reason TEXT`,
+] as const
 
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
 
@@ -58,6 +73,10 @@ interface Row {
   slots_at: number
   first_seen_at: number
   predicted_at: number
+  declined_until: number
+  pending_warm_at: number
+  pending_ms: number
+  pending_reason: string | null
 }
 
 /** The D1 surface this store uses: `prepare().bind()` with `first`, `run` and `all`. A real `D1Database` satisfies it. */
@@ -101,6 +120,10 @@ function toRow(row: Row): WarmLeaseRow {
     slotsAt: row.slots_at,
     firstSeenAt: row.first_seen_at,
     predictedAt: row.predicted_at,
+    declinedUntil: row.declined_until ?? 0,
+    pendingWarmAt: row.pending_warm_at ?? 0,
+    pendingMs: row.pending_ms ?? 0,
+    pendingReason: row.pending_reason ?? null,
   }
 }
 
@@ -111,22 +134,24 @@ export function createD1WarmLeaseStore(
   const t = options.table ?? DEFAULT_WARM_LEASE_TABLE
   if (!SAFE_IDENTIFIER.test(t)) throw new Error(`Invalid warm lease table name: ${JSON.stringify(t)}`)
 
-  // Every SET expression reads the old row, so `lease_id IS NULL` means "no live lease before this write".
+  // Every SET expression reads the old row. A lease is free when there is none,
+  // or when its warm has not reported by ?6 (the request running it was cancelled).
+  const free = `(${t}.lease_id IS NULL OR (${t}.warm_at = 0 AND ${t}.started_at <= ?6))`
   const beginSql = `INSERT INTO ${t} (key, lease_id, reason, started_at, hold_until) VALUES (?1, ?2, ?3, ?4, ?5)
 ON CONFLICT(key) DO UPDATE SET
-  lease_id = COALESCE(${t}.lease_id, ?2),
-  reason = CASE WHEN ${t}.lease_id IS NULL THEN ?3 ELSE ${t}.reason END,
-  started_at = CASE WHEN ${t}.lease_id IS NULL THEN ?4 ELSE ${t}.started_at END,
-  warm_at = CASE WHEN ${t}.lease_id IS NULL THEN 0 ELSE ${t}.warm_at END,
-  used_at = CASE WHEN ${t}.lease_id IS NULL THEN 0 ELSE ${t}.used_at END,
-  resumed = CASE WHEN ${t}.lease_id IS NULL THEN 0 ELSE ${t}.resumed END,
-  ping_at = CASE WHEN ${t}.lease_id IS NULL THEN 0 ELSE ${t}.ping_at END,
+  lease_id = CASE WHEN ${free} THEN ?2 ELSE ${t}.lease_id END,
+  reason = CASE WHEN ${free} THEN ?3 ELSE ${t}.reason END,
+  started_at = CASE WHEN ${free} THEN ?4 ELSE ${t}.started_at END,
+  warm_at = CASE WHEN ${free} THEN 0 ELSE ${t}.warm_at END,
+  used_at = CASE WHEN ${free} THEN 0 ELSE ${t}.used_at END,
+  resumed = CASE WHEN ${free} THEN 0 ELSE ${t}.resumed END,
+  ping_at = CASE WHEN ${free} THEN 0 ELSE ${t}.ping_at END,
   hold_until = MAX(${t}.hold_until, ?5)
 RETURNING lease_id`
   const markWarmSql = `UPDATE ${t} SET warm_at = ?3, resumed = ?4 WHERE key = ?1 AND lease_id = ?2`
   const firstUseSql = `UPDATE ${t} SET used_at = ?2 WHERE key = ?1 AND lease_id IS NOT NULL AND used_at = 0 RETURNING key`
   const turnSql = `INSERT INTO ${t} (key, last_turn_at, hold_until) VALUES (?1, ?2, ?3)
-ON CONFLICT(key) DO UPDATE SET last_turn_at = ?2, hold_until = MAX(${t}.hold_until, ?3)`
+ON CONFLICT(key) DO UPDATE SET last_turn_at = ?2, hold_until = MAX(${t}.hold_until, ?3), declined_until = 0`
   // A charge for an older day than the row holds is dropped: that day's budget is already spent.
   const endSql = `UPDATE ${t} SET
   lease_id = NULL, reason = NULL, started_at = 0, warm_at = 0, used_at = 0, resumed = 0, ping_at = 0,
@@ -159,8 +184,8 @@ WHERE key = ?1 AND lease_id = ?2`
   return {
     read,
 
-    async begin(key, leaseId, reason, now, holdUntil) {
-      const row = await q(beginSql, key, leaseId, reason, now, holdUntil).first<{ lease_id: string }>()
+    async begin(key, leaseId, reason, now, holdUntil, staleBefore) {
+      const row = await q(beginSql, key, leaseId, reason, now, holdUntil, staleBefore).first<{ lease_id: string }>()
       if (!row) throw new Error('warm lease begin returned no row')
       return row.lease_id
     },
@@ -189,6 +214,28 @@ WHERE key = ?1 AND lease_id = ?2`
 
     async markPinged(key, at) {
       await q(`UPDATE ${t} SET ping_at = ?2 WHERE key = ?1`, key, at).run()
+    },
+
+    async markPending(key, warmAt, maxMs, reason) {
+      await q(`UPDATE ${t} SET pending_warm_at = ?2, pending_ms = ?3, pending_reason = ?4 WHERE key = ?1`,
+        key, warmAt, Math.max(0, Math.round(maxMs)), reason).run()
+    },
+
+    async settlePending(key, warmAt, day, chargeMs) {
+      // Fenced by the warm's start time, so a turn and a sweep cannot both settle it.
+      const settled = await q(`UPDATE ${t} SET
+  day_warm_ms = CASE WHEN day = ?3 THEN day_warm_ms + ?4 WHEN day < ?3 THEN ?4 ELSE day_warm_ms END,
+  day = CASE WHEN day < ?3 THEN ?3 ELSE day END,
+  pending_warm_at = 0, pending_ms = 0, pending_reason = NULL
+WHERE key = ?1 AND pending_warm_at = ?2 RETURNING key`, key, warmAt, day, Math.max(0, Math.round(chargeMs))).first<{ key: string }>()
+      return settled != null
+    },
+
+    listPendingDue: (now, limit) =>
+      list(`SELECT * FROM ${t} WHERE pending_warm_at > 0 AND pending_warm_at + pending_ms <= ?1 ORDER BY pending_warm_at LIMIT ?2`, now, limit),
+
+    async markDeclined(key, until) {
+      await q(`UPDATE ${t} SET declined_until = ?2 WHERE key = ?1`, key, until).run()
     },
 
     async markPredicted(key, at) {

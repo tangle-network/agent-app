@@ -4,7 +4,7 @@
 
 Source: `src/agent-profiles/index.ts`
 
-47 exports.
+53 exports.
 
 ### `addProfileKnowledgeDocument`
 
@@ -104,7 +104,7 @@ interface MountProfileChangeResult
 
 ### `parseProfileSwitch`
 
-`function`
+`function` — Chat profile-switch parsing with no dependencies, so browser code can import it without the profile schemas: through the agent-profiles barrel it pulled zod and the schemas into Hospitality's first p…
 
 ```ts
 (text: string) => { name: string; } | { invalid: true; } | null
@@ -126,12 +126,44 @@ readonly ["skills"]
 { readonly textEdit: { readonly admission: "automatic"; readonly conversation: "same"; readonly destructive: false; };…
 ```
 
+### `PROFILE_MEMORY_PREFIX`
+
+`const` — Workspace-shared memories live under this prefix in the workspace store.
+
+```ts
+"/memories/workspace/"
+```
+
 ### `ProfileAccessError`
 
 `class`
 
 ```ts
 class ProfileAccessError
+```
+
+### `ProfileAdmissionRead`
+
+`interface` — An opaque token for what `readProfileAdmission` read for one message.
+
+```ts
+interface ProfileAdmissionRead
+```
+
+### `profileAdmissionValues`
+
+`function` — A deep copy of what a token stands for; changing the copy changes nothing the token admits.
+
+```ts
+(read: ProfileAdmissionRead) => ProfileAdmissionValues
+```
+
+### `ProfileAdmissionValues`
+
+`interface` — The values a token stands for, as the caller may inspect them.
+
+```ts
+interface ProfileAdmissionValues
 ```
 
 ### `profileAuthority`
@@ -196,6 +228,14 @@ interface ProfileKnowledgeDocument
 
 ```ts
 interface ProfileKnowledgeEvent
+```
+
+### `ProfileMemoryStore`
+
+`interface` — The subset of agent-runtime's `WorkspaceStore` that `profile.remember` uses.
+
+```ts
+interface ProfileMemoryStore
 ```
 
 ### `ProfileRevision`
@@ -316,6 +356,14 @@ interface ProfileTurnPin
 
 ```ts
 interface ProposeRevisionInput
+```
+
+### `readProfileAdmission`
+
+`function` — Read what admitting a message needs: its prior pin and the binding together, then a pinned revision.
+
+```ts
+(store: ProfileRevisionStore, key: ProfileBindingKey, messageId: string, content: string) => Promise<ProfileAdmissionRe…
 ```
 
 ### `removeProfileKnowledgeDocument`

@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-102 exports.
+123 exports.
 
 ### `AdminGuardOptions`
 
@@ -102,6 +102,30 @@ interface BetterAuthSessionCookieSource
 interface BillableBalanceState
 ```
 
+### `BillingConsentOutcome`
+
+`type`
+
+```ts
+type BillingConsentOutcome
+```
+
+### `BillingConsentRefusal`
+
+`interface` — Record a person's consent that this app's Sandbox service key may bill them.
+
+```ts
+interface BillingConsentRefusal
+```
+
+### `canonicalDelegatedKeyName`
+
+`function` — The name Platform stores for a slot: `auto:<service>:<product>:<logical>` for Router and Sandbox keys (Platform's `canonicalProvisionedKeyName`), so the echo can be checked exactly.
+
+```ts
+(input: { serviceName: string; product: string; name: string; }) => string
+```
+
 ### `createAdminGuard`
 
 `function` — Non-admins (and empty allowlists) get 404, keeping the route invisible — better than a "forbidden" footprint that advertises its existence.
@@ -142,6 +166,14 @@ interface BillableBalanceState
 (options: D1TangleIdentityStoreOptions) => TangleIdentitySsoAccountStore
 ```
 
+### `createDelegatedKeyProvisioner`
+
+`function` — Plug the client into `createIdentityBoundWorkspaceKeyManager` for a workspace-held key.
+
+```ts
+(input: { client: PlatformDelegatedKeyClient; sourceKey: string; product: string; resource?: { type: string; id: string…
+```
+
 ### `createHubSettingsRoutes`
 
 `function` — Build the finite, application-authorized Hub settings server boundary.
@@ -166,12 +198,28 @@ interface BillableBalanceState
 (options: PlatformAgentSpendOptions) => PlatformAgentSpend
 ```
 
+### `createPlatformBillingConsent`
+
+`function`
+
+```ts
+(options: PlatformBillingConsentOptions) => PlatformBillingConsent
+```
+
 ### `createPlatformBillingHttp`
 
 `function` — Create a PlatformBillingHttp instance configured with given options and default behaviors
 
 ```ts
 (opts: PlatformBillingHttpOptions) => PlatformBillingHttp
+```
+
+### `createPlatformDelegatedKeyClient`
+
+`function`
+
+```ts
+(options: PlatformDelegatedKeyClientOptions) => PlatformDelegatedKeyClient
 ```
 
 ### `createSignedSsoState`
@@ -220,6 +268,94 @@ interface D1TangleIdentityStoreOptions
 
 ```ts
 Record<TanglePlanTier, TangleTierPolicy>
+```
+
+### `DelegatedKey`
+
+`interface`
+
+```ts
+interface DelegatedKey
+```
+
+### `DelegatedKeyBudget`
+
+`type` — How the child is paid for: its own budget, or spending the source's budget directly.
+
+```ts
+type DelegatedKeyBudget
+```
+
+### `DelegatedKeyCode`
+
+`type`
+
+```ts
+type DelegatedKeyCode
+```
+
+### `DelegatedKeyMissingError`
+
+`class` — A remote key the durable manager must treat as gone (it marks the row revoked and mints again).
+
+```ts
+class DelegatedKeyMissingError
+```
+
+### `DelegatedKeyOutcome`
+
+`type`
+
+```ts
+type DelegatedKeyOutcome
+```
+
+### `DelegatedKeyProvisioner`
+
+`interface` — The `DurableWorkspaceKeyProvisioner` shape (`./billing`), kept structural so this module stays standalone.
+
+```ts
+interface DelegatedKeyProvisioner
+```
+
+### `DelegatedKeyRefusal`
+
+`interface`
+
+```ts
+interface DelegatedKeyRefusal
+```
+
+### `DelegatedKeyRefusalError`
+
+`class` — A Platform refusal surfaced to the durable manager.
+
+```ts
+class DelegatedKeyRefusalError
+```
+
+### `DelegatedKeyRequest`
+
+`interface`
+
+```ts
+interface DelegatedKeyRequest
+```
+
+### `DelegatedKeySlotRef`
+
+`interface` — Identifies a key's slot for Platform's service-authenticated `revoke-slot`.
+
+```ts
+interface DelegatedKeySlotRef
+```
+
+### `DelegatedKeyVerdict`
+
+`interface` — Platform's `verify-by-id` verdict on one key, secret-free.
+
+```ts
+interface DelegatedKeyVerdict
 ```
 
 ### `FREE_TIER_SPEND_CAP_USD`
@@ -438,6 +574,22 @@ interface PlatformAgentSpendOptions
 interface PlatformBalanceSnapshot
 ```
 
+### `PlatformBillingConsent`
+
+`interface`
+
+```ts
+interface PlatformBillingConsent
+```
+
+### `PlatformBillingConsentOptions`
+
+`interface`
+
+```ts
+interface PlatformBillingConsentOptions
+```
+
 ### `PlatformBillingHttp`
 
 `interface` — Define methods to interact with platform billing endpoints using user or service authentication
@@ -460,6 +612,22 @@ class PlatformBillingHttpError
 
 ```ts
 interface PlatformBillingHttpOptions
+```
+
+### `PlatformDelegatedKeyClient`
+
+`interface`
+
+```ts
+interface PlatformDelegatedKeyClient
+```
+
+### `PlatformDelegatedKeyClientOptions`
+
+`interface`
+
+```ts
+interface PlatformDelegatedKeyClientOptions
 ```
 
 ### `PlatformIdentityStore`

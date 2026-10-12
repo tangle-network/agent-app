@@ -195,6 +195,7 @@ function Chat({ threadId }: { threadId: string }) {
       resume: (turnId, fromSeq) => fetch(`/api/chat/replay/${turnId}?fromSeq=${fromSeq}`),
       callbacks: {
         onText: appendDelta,
+        onReasoningState: setReasoning, // a ChatReasoningState: spread it onto <ReasoningRow>
         onToolCall: showToolChip,
         onInteraction: showQuestionCard,
         onNotice: ({ noticeKind, text }) => showTranscriptNotice(noticeKind, text),
@@ -220,6 +221,23 @@ structured `{ type: 'error', data: { message, code?, details? } }` lines.
 `onNotice` consumes visible warning/auto-decline notices;
 `onErrorEventDetail` receives the structured fields while the existing
 `onErrorEvent(message)` callback continues to fire unchanged.
+
+Reasoning has one path. Both producers stream `reasoning` deltas and persist
+each reasoning run as `{ type: 'reasoning', text, time: { start, end } }`.
+`onReasoningState` hands the client a `ChatReasoningState` (`text`,
+`startedAt`, `endedAt`, `thinking`) after every delta and once when the answer
+starts; `chatReasoningFromParts(message.parts)` gives a saved message the same
+state, settled. `ChatMessages` renders it from `ChatUiMessage.reasoning`,
+`reasoningStartedAt` and `reasoningEndedAt`; anywhere else, spread the state
+onto `ReasoningRow`. `trackChatReasoning` takes callbacks, not a stream, so
+it is the entry point for any other transport: an app that dispatches lines
+itself, or reads its own frames (a Durable Object's live parts, server-side
+events), wraps its handlers with it, feeds `onReasoning`, `onText` and
+`onToolCall`, and calls `end()` when its stream closes. `streamChatTurn` keeps
+one state across a resume, so a reconnect neither repeats the reasoning nor
+restarts its clock.
+An engine turn on an OpenAI model streams reasoning only when its
+`reasoningEffort` is above `none`.
 
 ### Bounded server tools
 

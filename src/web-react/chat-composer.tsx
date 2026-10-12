@@ -51,6 +51,8 @@ import {
   type ReactNode,
 } from 'react'
 
+import { focusFieldWithin } from '@tangle-network/ui/utils'
+
 import {
   filterAcceptedFiles,
   renamePastedImages,
@@ -1087,7 +1089,7 @@ export function ChatComposer({
   // Keep one basic input for textarea mode and the rich editor's loading
   // state. A slow or hung lazy chunk must not leave a visible dead composer.
   // The controlled draft transfers into the rich editor when it loads.
-  // Both render sites stay inside the card's `focus-within:ring-2` indicator.
+  // Both render sites stay inside the card's `focusFieldWithin` indicator.
   const textareaInput = (
     <textarea
       ref={textareaRef}
@@ -1102,7 +1104,7 @@ export function ChatComposer({
       style={{ minHeight: inputMinHeight, maxHeight }}
       aria-label="Message input"
       data-composer-input
-      className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground focus:outline-none placeholder:text-muted-foreground disabled:opacity-50"
+      className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground placeholder:text-muted-foreground disabled:opacity-50"
     />
   )
 
@@ -1297,10 +1299,14 @@ export function ChatComposer({
           its own row beneath. A single row would make the textarea share its
           line with the buttons, which is what squeezed the input and pushed the
           controls out of the card in the first place. */}
+      {/* `focusFieldWithin` makes the card a field: with brand's interaction
+          tokens it carries the well fill (`--well`), field border, hover glow
+          and focus ring. Under a brand without the ladder, tokens.css sets
+          `--well` to the card color. */}
       <div
         ref={cardRef}
         data-testid="composer-card"
-        className={`flex flex-col gap-1.5 rounded-2xl border border-card-edge bg-card px-3 py-2.5 transition focus-within:border-ring/40 focus-within:ring-2 focus-within:ring-ring/15 ${
+        className={`flex flex-col gap-1.5 rounded-2xl border bg-[var(--well,var(--color-card))] px-3 py-2.5 ${focusFieldWithin} ${
           floating ? 'shadow-raised' : ''
         }`}
       >
@@ -1340,8 +1346,9 @@ export function ChatComposer({
             </Suspense>
           </LazyLoadBoundary>
         ) : (
-          // The card draws the keyboard indicator through `focus-within:`, so
-          // the input does not need a second outline.
+          // The card is the field (`focusFieldWithin`: well fill, field border,
+          // hover glow, focus ring), so tokens.css clears the transparent
+          // input's own outline (`[data-composer-input]:focus-visible`).
           textareaInput
         )}
 

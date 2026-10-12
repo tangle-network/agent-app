@@ -171,7 +171,7 @@ AgentWorkspaceNoun
 `function` — The listing every product opens on: one title, one primary action, the workspaces, and nothing that counts them.
 
 ```ts
-({ items, noun, title, description, layout, fields, create, empty, rename, remove, removeConsequence, actions, children…
+({ items, noun, title, description, layout, fields, create, empty, rename, remove, canRemove, removeConsequence, action…
 ```
 
 ### `WorkspaceListAction`

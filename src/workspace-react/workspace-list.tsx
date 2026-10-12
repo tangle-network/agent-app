@@ -1,5 +1,5 @@
 import { useId, useMemo, useState, type ComponentType, type ReactNode } from 'react'
-import { PageHeader } from '@tangle-network/ui/primitives'
+import { Input, PageHeader } from '@tangle-network/ui/primitives'
 
 import { ActionDialog, ActionDialogButton } from '../web-react/action-dialog'
 import { OVERLAY_SHADOW, PopoverSurface, usePopover } from '../web-react/controls'
@@ -67,6 +67,12 @@ export interface WorkspaceListProps {
   rename?: (item: WorkspaceListItem, name: string) => Promise<void>
   /** Delete for good. Offered in the overflow menu, behind a confirmation. */
   remove?: (item: WorkspaceListItem) => Promise<void>
+  /**
+   * Whether this viewer may delete this item. Delete is left out of the menu
+   * when it returns false, so a member who does not own an item is never shown
+   * a destructive action the server would refuse. Defaults to every item.
+   */
+  canRemove?: (item: WorkspaceListItem) => boolean
   /** What deleting loses, for the confirmation. */
   removeConsequence?: (item: WorkspaceListItem) => string
   /** Extra overflow-menu actions. */
@@ -135,6 +141,7 @@ export function WorkspaceList({
   empty,
   rename,
   remove,
+  canRemove,
   removeConsequence,
   actions,
   children,
@@ -173,11 +180,12 @@ export function WorkspaceList({
   }
 
   const hasDates = items.some((item) => toDate(item.updatedAt) !== null)
-  const hasMenu = Boolean(rename) || Boolean(remove) || Boolean(actions)
+  const removable = (item: WorkspaceListItem) => Boolean(remove) && (canRemove?.(item) ?? true)
+  const hasMenu = Boolean(rename) || items.some(removable) || Boolean(actions)
   const menuFor = (item: WorkspaceListItem): MenuEntry[] => [
     ...(rename ? [{ id: 'rename', label: 'Rename', onSelect: () => { setError(null); setRenaming(item); setRenameValue(item.name) } }] : []),
     ...(actions?.(item) ?? []).map((action) => ({ id: action.id, label: action.label, onSelect: () => action.onSelect(item) })),
-    ...(remove ? [{ id: 'delete', label: 'Delete', destructive: true, onSelect: () => { setError(null); setRemoving(item) } }] : []),
+    ...(removable(item) ? [{ id: 'delete', label: 'Delete', destructive: true, onSelect: () => { setError(null); setRemoving(item) } }] : []),
   ]
 
   const run = async (work: () => Promise<void>, done: () => void) => {
@@ -230,13 +238,13 @@ export function WorkspaceList({
         <>
           {items.length > SEARCH_THRESHOLD && (
             <div className="mt-6">
-              <input
+              <Input
                 type="search"
                 aria-label={`Search ${noun.plural}`}
                 placeholder={`Search ${noun.plural}`}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                className="h-9 w-full max-w-sm rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
+                className="max-w-sm"
               />
             </div>
           )}
@@ -290,7 +298,7 @@ export function WorkspaceList({
           }
         >
           <label htmlFor={`${headingId}-rename`} className="text-sm text-muted-foreground">Name</label>
-          <input
+          <Input
             id={`${headingId}-rename`}
             value={renameValue}
             autoFocus
@@ -301,7 +309,7 @@ export function WorkspaceList({
                 submitRename()
               }
             }}
-            className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
+            className="mt-1.5"
           />
         </ActionDialog>
       )}
@@ -320,7 +328,7 @@ export function WorkspaceList({
           }
         >
           <label htmlFor={`${headingId}-create`} className="text-sm text-muted-foreground">Name</label>
-          <input
+          <Input
             id={`${headingId}-create`}
             value={createValue}
             autoFocus
@@ -332,7 +340,7 @@ export function WorkspaceList({
                 submitCreate()
               }
             }}
-            className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
+            className="mt-1.5"
           />
         </ActionDialog>
       )}

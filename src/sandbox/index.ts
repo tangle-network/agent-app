@@ -443,8 +443,10 @@ export interface SandboxRuntimeConfig {
   // BYOS3/R2 snapshot storage. Returns undefined => key omitted entirely
   // (fail-closed when creds absent). Product owns bucket/endpoint/credentials/prefix.
   storage?: (ctx: SandboxBuildContext) => StorageConfig | undefined
-  // Snapshot RESTORE-on-create. undefined => fresh box.
-  restore?: (ctx: SandboxBuildContext) => SandboxRestoreSpec | undefined
+  // Snapshot RESTORE-on-create. undefined => fresh box. Called only when a box
+  // is about to be created, so a product can resolve the restore point lazily
+  // (listing snapshots is a Sandbox API round trip a reused box never needs).
+  restore?: (ctx: SandboxBuildContext) => SandboxRestoreSpec | undefined | Promise<SandboxRestoreSpec | undefined>
   // Per-identity box NAME. Defaults to name(scope.workspaceId) when absent.
   boxKey?: (scope: SandboxScope) => string
   // Per-workspace child-key mint: overrides the resolved model apiKey before create.
@@ -543,6 +545,8 @@ interface ClientCacheEntry {
 
 let _cached: ClientCacheEntry | null = null
 const livenessVerifiedAt = new Map<string, number>()
+/** Reused boxes whose `open` egress this isolate verified, by {@link verifiedEgressKey}. */
+const verifiedEgress = new Map<string, number>()
 
 function getClientFromCreds(creds: SandboxClientCredentials): Sandbox {
   const fingerprint = `${creds.apiKey} ${creds.baseUrl}`
@@ -570,6 +574,7 @@ export function getClient(shell: SandboxRuntimeConfig): Sandbox {
 export function resetClientCache(): void {
   _cached = null
   livenessVerifiedAt.clear()
+  verifiedEgress.clear()
 }
 
 /** Describe an application tool with its name, unique key, and description */
@@ -1516,6 +1521,7 @@ async function materializeDeferredFilesForExistingBox(
   workspaceId: string,
   userId: string | undefined,
   harness: Harness,
+  corpusMarker?: Promise<string | null>,
 ): Promise<Outcome<SandboxInstance>> {
   if (!shell.deferProfileFiles) return ok(box)
   const connectedIntegrationIds = await shell.connectedIntegrationIds(workspaceId)
@@ -1536,9 +1542,44 @@ async function materializeDeferredFilesForExistingBox(
   // Fail-safe: a missing or mismatched hash (e.g. a redeploy with new skills, or
   // a box created before this optimization) WRITES — a stale skip is never
   // risked. Reads metadata only, so no extra exec/round-trip.
+  const corpusHash = deferredCorpusHash(deferredFiles)
   const stampedHash = (box.metadata as Record<string, unknown> | undefined)?.[DEFERRED_CORPUS_HASH_KEY]
-  if (typeof stampedHash === 'string' && stampedHash === deferredCorpusHash(deferredFiles)) return ok(box)
-  return writeDeferredFilesWithRuntimeAuthRefresh(client, box, deferredFiles, stage, name)
+  if (typeof stampedHash === 'string' && stampedHash === corpusHash) return ok(box)
+  // The create-time stamp goes stale on the first release that changes the
+  // corpus, and without this the box rewrote the whole corpus on every reuse
+  // after it (a ~0.7 s file batch per GTM turn, 2026-10-11). The marker is
+  // written only after a corpus write succeeds and lives on the same disk as
+  // the files, so a lost disk loses both and the corpus is written again.
+  if (corpusMarker && await corpusMarker === corpusHash) return ok(box)
+  const written = await writeDeferredFilesWithRuntimeAuthRefresh(client, box, deferredFiles, stage, name)
+  if (written.succeeded) await writeDeferredCorpusMarker(written.value, corpusHash)
+  return written
+}
+
+/** Where a reused box records the deferred corpus it last received in full,
+ *  relative to /home/agent like every file-API profile write. */
+const DEFERRED_CORPUS_MARKER_PATH = '.agent-app/deferred-corpus-hash'
+const DEFERRED_CORPUS_HASH_RE = /^[0-9a-f]{64}$/
+
+/** The corpus hash a box last recorded, or null when it is absent or unreadable. */
+async function readDeferredCorpusMarker(box: SandboxInstance): Promise<string | null> {
+  if (typeof box.read !== 'function') return null
+  try {
+    const value = (await box.read(`/home/agent/${DEFERRED_CORPUS_MARKER_PATH}`)).trim()
+    return DEFERRED_CORPUS_HASH_RE.test(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
+/** Best effort: a failed marker write only costs the next reuse a corpus rewrite. */
+async function writeDeferredCorpusMarker(box: SandboxInstance, corpusHash: string): Promise<void> {
+  if (typeof box.fs?.writeMany !== 'function') return
+  try {
+    await box.fs.writeMany([{ path: DEFERRED_CORPUS_MARKER_PATH, content: corpusHash }])
+  } catch {
+    // The corpus itself is on disk; the next reuse writes it and the marker again.
+  }
 }
 
 async function listRunning(
@@ -2184,6 +2225,106 @@ async function resolveWorkspaceRuntimeEnv(
   return env
 }
 
+/**
+ * Round trips of a reused box that do not depend on its liveness, started with
+ * the liveness probe so they overlap it. The egress read and the corpus marker
+ * are only reads: the policy is still asserted (and migrated) in finalize, and
+ * an unknown marker means the corpus is written as before. The runtime env is
+ * sent early only when the egress assertion cannot change where credentials
+ * may go (see {@link egressGatesCredentials}); otherwise it waits for it.
+ */
+interface ExistingBoxPrefetch {
+  egress?: Promise<Outcome<Awaited<ReturnType<SandboxInstance['egress']['get']>>>>
+  /** This isolate verified the box's egress since its last start (see {@link verifiedEgressKey}). */
+  egressVerified?: boolean
+  corpusMarker?: Promise<string | null>
+  /** The renewal already sent to the box; finalize waits for it instead of sending another. */
+  runtimeEnv?: Promise<Outcome<void>>
+}
+
+type ReuseMeasure = <T>(stage: string, operation: () => Promise<T>) => Promise<T>
+
+function prefetchExistingBoxReads(
+  shell: SandboxRuntimeConfig,
+  box: SandboxInstance,
+  runtimeEnv: Promise<Record<string, string>>,
+  measure: ReuseMeasure,
+): ExistingBoxPrefetch {
+  const prefetch: ExistingBoxPrefetch = {}
+  if (shell.egressPolicy && hasVerifiedEgress(box, shell.egressPolicy)) {
+    prefetch.egressVerified = true
+  } else if (shell.egressPolicy) {
+    prefetch.egress = measure('egress', async () => {
+      try {
+        return ok(await box.egress.get())
+      } catch (cause) {
+        return fail(cause)
+      }
+    })
+  }
+  if (shell.deferProfileFiles) prefetch.corpusMarker = readDeferredCorpusMarker(box)
+  if (!egressGatesCredentials(shell.egressPolicy)) {
+    // A mint failure rejects `runtimeEnv` and the reuse stops before finalize,
+    // so nothing was sent; the renewal itself is settled here and never rejects.
+    prefetch.runtimeEnv = runtimeEnv.then(
+      (env) => Object.keys(env).length === 0
+        ? ok(undefined)
+        : measure('runtime_env_push', () => box.setRuntimeEnv(env)).then(() => ok(undefined), (cause: unknown) => fail(cause)),
+      () => ok(undefined),
+    )
+  }
+  return prefetch
+}
+
+/**
+ * Whether the egress assertion must finish before credentials reach a reused
+ * box. `open` is the most permissive mode, so no policy the box can hold lets
+ * credentials go anywhere `open` would not; asserting it only restores the
+ * box's reach (a migration from a narrower policy). `strict` and `blocked`
+ * bound where credentials can be sent, so they are asserted first.
+ */
+function egressGatesCredentials(desired: EgressPolicy | undefined): boolean {
+  return desired !== undefined && desired.mode !== 'open'
+}
+
+/** How long a matching egress read stands for a box that has not restarted. */
+const VERIFIED_EGRESS_TTL_MS = 10 * 60_000
+const VERIFIED_EGRESS_MAX = 1_000
+
+/**
+ * The cache key for a box's verified egress, or null when it must be read.
+ * Only an `open` policy is cached: a stale `open` verdict can only cost the
+ * box its reach until the entry expires, never widen where credentials go.
+ * The key carries the box's start time, so a restarted box is read again.
+ */
+function verifiedEgressKey(box: SandboxInstance, desired: EgressPolicy): string | null {
+  if (desired.mode !== 'open' || !box.id) return null
+  const startedAt = box.startedAt instanceof Date ? box.startedAt.getTime() : Number.NaN
+  if (!Number.isFinite(startedAt)) return null
+  return `${box.id}|${startedAt}|${normalizedEgressPolicy(desired)}`
+}
+
+function hasVerifiedEgress(box: SandboxInstance, desired: EgressPolicy, now = Date.now()): boolean {
+  const key = verifiedEgressKey(box, desired)
+  if (!key) return false
+  const verifiedAt = verifiedEgress.get(key)
+  if (verifiedAt !== undefined && now - verifiedAt < VERIFIED_EGRESS_TTL_MS) return true
+  verifiedEgress.delete(key)
+  return false
+}
+
+function recordVerifiedEgress(box: SandboxInstance, desired: EgressPolicy): void {
+  const key = verifiedEgressKey(box, desired)
+  if (!key) return
+  verifiedEgress.delete(key)
+  verifiedEgress.set(key, Date.now())
+  while (verifiedEgress.size > VERIFIED_EGRESS_MAX) {
+    const oldest = verifiedEgress.keys().next().value
+    if (oldest === undefined) break
+    verifiedEgress.delete(oldest)
+  }
+}
+
 // All retained-box paths renew credentials before the product bootstrap.
 async function finalizeExistingBox(
   shell: SandboxRuntimeConfig,
@@ -2196,8 +2337,11 @@ async function finalizeExistingBox(
   harness: Harness,
   scope: SandboxScope,
   runtimeEnv: Record<string, string>,
+  prefetch: ExistingBoxPrefetch = {},
 ): Promise<SandboxInstance> {
-  await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name)
+  if (!prefetch.egressVerified) {
+    await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name, prefetch.egress)
+  }
   const written = await materializeDeferredFilesForExistingBox(
     shell,
     client,
@@ -2207,12 +2351,18 @@ async function finalizeExistingBox(
     workspaceId,
     userId,
     harness,
+    prefetch.corpusMarker,
   )
   if (!written.succeeded) {
     throw deferredProfileWriteFailed(stage, name, written.error)
   }
   const finalBox = written.value
-  if (Object.keys(runtimeEnv).length > 0) {
+  if (prefetch.runtimeEnv) {
+    // The same renewal, sent while the probe ran; its failure fails the reuse
+    // exactly as a renewal sent here would.
+    const renewed = await prefetch.runtimeEnv
+    if (!renewed.succeeded) throw renewed.error
+  } else if (Object.keys(runtimeEnv).length > 0) {
     await finalBox.setRuntimeEnv(runtimeEnv)
   }
   if (shell.bootstrap) {
@@ -2282,24 +2432,37 @@ async function assertExistingBoxEgress(
   migrate: boolean | undefined,
   stage: SandboxExistingBoxStage,
   name: string,
+  prefetched?: Promise<Outcome<Awaited<ReturnType<SandboxInstance['egress']['get']>>>>,
 ): Promise<void> {
   if (!desired) return
   let current: Awaited<ReturnType<SandboxInstance['egress']['get']>>
-  try {
-    current = await box.egress.get()
-  } catch (cause) {
-    throw existingBoxEgressError('read', box, stage, name, cause)
+  if (prefetched) {
+    const read = await prefetched
+    if (!read.succeeded) throw existingBoxEgressError('read', box, stage, name, read.error)
+    current = read.value
+  } else {
+    try {
+      current = await box.egress.get()
+    } catch (cause) {
+      throw existingBoxEgressError('read', box, stage, name, cause)
+    }
   }
   const matchingPolicy = normalizedEgressPolicy(current.policy) === normalizedEgressPolicy(desired)
   const explicitSource = current.source !== 'platform'
-  if (matchingPolicy && explicitSource) return
+  if (matchingPolicy && explicitSource) {
+    recordVerifiedEgress(box, desired)
+    return
+  }
 
   if (migrate) {
     try {
       await box.egress.update(desired)
       const migrated = await box.egress.get()
       const migratedPolicy = normalizedEgressPolicy(migrated.policy) === normalizedEgressPolicy(desired)
-      if (migratedPolicy && migrated.source !== 'platform') return
+      if (migratedPolicy && migrated.source !== 'platform') {
+        recordVerifiedEgress(box, desired)
+        return
+      }
       current = migrated
     } catch (cause) {
       throw existingBoxEgressError('migration', box, stage, name, cause)
@@ -2477,8 +2640,10 @@ async function provisionWorkspaceSandbox(
       // Resolve app credentials before any restart so a mint failure leaves the
       // existing sandbox running and intact. Reading the runtime connection
       // restarts nothing, so it runs alongside the mint.
+      const runtimeEnvMint = measure('runtime_env', () => resolveWorkspaceRuntimeEnv(shell, scope))
+      const prefetch = prefetchExistingBoxReads(shell, found, runtimeEnvMint, measure)
       const [envResult, readyResult] = await Promise.allSettled([
-        measure('runtime_env', () => resolveWorkspaceRuntimeEnv(shell, scope)),
+        runtimeEnvMint,
         measure('refresh', () => refreshRuntimeConnection(client, found)),
       ])
       if (envResult.status === 'rejected') throw envResult.reason
@@ -2487,8 +2652,9 @@ async function provisionWorkspaceSandbox(
         if (readyResult.status === 'rejected') throw readyResult.reason
         const ready = readyResult.value
         if ((await measure('liveness', () => isReusableBox(ready, shell.livenessProbe))).succeeded) {
-          return await measure('finalize', () => finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv))
+          return await measure('finalize', () => finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv, prefetch))
         }
+        // The prefetched reads never reject; a recovered box is read again in finalize.
         // Unresponsive (or never-connectable) box with the RIGHT harness: recover
         // in place — stop→resume preserves the workspace — and fail loud if the
         // box is still dead. Deleting here wiped user workspaces (#299); delete
@@ -2623,7 +2789,7 @@ async function provisionWorkspaceSandbox(
   }
 
   const storage = shell.storage?.(buildCtx)
-  const restore = recoveryRestore === undefined ? shell.restore?.(buildCtx) : recoveryRestore
+  const restore = recoveryRestore === undefined ? await shell.restore?.(buildCtx) : recoveryRestore
 
   const payload = {
     name,
@@ -3856,6 +4022,8 @@ export * from './terminal-connection'
 // back out of this module; tsup inlines both files into the one
 // `sandbox/index` chunk, so the cycle exists only in source.
 export * from './prewarm'
+export * from './sandbox-run-tool'
+export * from './sandbox-exec-tool'
 
 export * from './prewarm-claim-d1'
 export * from './prewarm-route'
@@ -3863,3 +4031,5 @@ export * from './foreground-single-flight'
 // Signal-driven warm leases: resume ahead of need, budget the misses, learn the daily ramp.
 export * from './warm-lease'
 export * from './warm-lease-d1'
+// Speculative warm for turns likely to call a sandbox tool (agent turn architecture S8).
+export * from './escalation-speculator'

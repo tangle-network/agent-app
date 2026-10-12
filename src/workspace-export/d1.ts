@@ -50,7 +50,8 @@ export interface D1WorkspaceTablesOptions {
   pageSize?: number
 }
 
-const INTERNAL = /^(sqlite_|_cf_|d1_|__drizzle|_litestream)/
+// Bookkeeping tables of SQLite, D1 and migration runners (drizzle, custom _migrations*).
+const INTERNAL = /^(sqlite_|_cf_|d1_|__drizzle|_litestream|_migrations)/
 
 function quote(identifier: string): string {
   return `"${identifier.replace(/"/g, '""')}"`
@@ -70,6 +71,15 @@ export async function d1WorkspaceTables(
     await db.prepare(`SELECT name, sql FROM sqlite_master WHERE type = 'table' ORDER BY name`).all<{ name: string; sql: string | null }>()
   ).results.filter((t) => !INTERNAL.test(t.name))
 
+  // Every advance request plans again, so the per-table column reads run together, not one round trip each.
+  const columnsOf = new Map(
+    await Promise.all(
+      tables
+        .filter((t) => options.exclude?.[t.name] === undefined && !options.scoped?.[t.name])
+        .map(async (t) => [t.name, (await db.prepare(`PRAGMA table_info(${quote(t.name)})`).all<{ name: string }>()).results.map((c) => c.name)] as const),
+    ),
+  )
+
   const sources: ExportRowsSource[] = []
   const coverage: D1TableCoverage[] = []
   for (const { name: table, sql } of tables) {
@@ -81,7 +91,7 @@ export async function d1WorkspaceTables(
     let where = options.scoped?.[table]
     let detail = where
     if (!where) {
-      const columns = (await db.prepare(`PRAGMA table_info(${quote(table)})`).all<{ name: string }>()).results.map((c) => c.name)
+      const columns = columnsOf.get(table) ?? []
       const column = options.workspaceColumns.find((c) => columns.includes(c))
       if (!column) {
         coverage.push({ table, status: 'unscoped' })

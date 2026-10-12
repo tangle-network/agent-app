@@ -1,25 +1,86 @@
 /**
- * The sandbox-archive source every app needs, so no product hand-rolls box
- * lifecycle around `fs.openArchive`.
+ * The sandbox sources every app needs, so no product hand-rolls box lifecycle
+ * around `fs.openArchive` and `fs.read`.
  *
- * `openArchive` refuses a box that is not running. A stopped box is resumed for
- * the export and stopped again once its archive has been read, so exporting
- * neither fails on an idle workspace nor leaves the owner paying for a box they
- * had stopped. A box that no longer exists exports nothing.
+ * Both refuse a box that is not running. A stopped box is resumed for the
+ * export and stopped again once it has been read, so exporting neither fails on
+ * an idle workspace nor leaves the owner paying for a box they had stopped. A
+ * box that no longer exists exports nothing. A box busy with another lifecycle
+ * operation (a page-open warm, the previous export's stop) is retried on a
+ * later request instead of failing the export.
  */
 
-import type { ExportArchiveSource, ExportDataClass } from './types'
+import { ExportRetryLater } from './engine'
+import type { ExportArchiveSource, ExportDataClass, ExportFile, ExportFilesSource } from './types'
 
-/** The slice of the Sandbox SDK's `SandboxInstance` this source uses. */
+/** The slice of the Sandbox SDK's `SandboxInstance` these sources use. */
 export interface ArchivableBox {
   readonly status: string
   resume(): Promise<void>
   stop?(): Promise<void>
   waitFor(status: 'running', options?: { timeoutMs?: number }): Promise<void>
-  fs: { openArchive(dir: string, options?: { signal?: AbortSignal }): Promise<ReadableStream<Uint8Array>> }
+  fs: {
+    openArchive(dir: string, options?: { signal?: AbortSignal }): Promise<ReadableStream<Uint8Array>>
+    read?(path: string): Promise<string>
+  }
 }
 
 const GONE = new Set(['deleted', 'expired', 'failed'])
+
+/**
+ * Never customer data: installed packages and the platform's runtime state. In
+ * a Hospitality box they were 98% of the archive (110 MB of node_modules and
+ * 12.5 MB of .sidecar beside 0.4 MB of workspace files).
+ */
+export const DEFAULT_SANDBOX_EXCLUDE: readonly string[] = ['node_modules', '.sidecar']
+
+/**
+ * A resume the platform failed on its side (HTTP 5xx). The box stays suspended
+ * and a later resume usually works: on 2026-10-12 one Hospitality export failed
+ * on "Project sidecar could not be reprovisioned for resume" and the next export,
+ * six minutes later, resumed the same box.
+ */
+function isServerFailure(err: unknown): boolean {
+  const status = (err as { status?: unknown } | null)?.status
+  return typeof status === 'number' && status >= 500
+}
+
+/** The platform's typed refusal while another resume, stop or delete holds the box. */
+function isLifecycleBusy(err: unknown): boolean {
+  const e = err as { status?: unknown; code?: unknown } | null
+  return typeof e === 'object' && e !== null && e.status === 409 && e.code === 'SANDBOX_LIFECYCLE_IN_PROGRESS'
+}
+
+/** The box, running, plus a callback that puts it back the way the owner left it. `null` when it is gone. */
+async function openRunning(
+  getBox: () => Promise<ArchivableBox | null>,
+  timeoutMs: number,
+): Promise<{ box: ArchivableBox; restore: () => Promise<void> } | null> {
+  const box = await getBox()
+  if (!box || GONE.has(box.status)) return null
+  const wasStopped = box.status === 'stopped'
+  let resumed = false
+  let restoring: Promise<void> | undefined
+  const restore = () => (restoring ??= (async () => {
+    if (resumed && box.stop) {
+      // Best effort, without replacing the export's original failure.
+      try { await box.stop() } catch {}
+    }
+  })())
+  try {
+    if (wasStopped) {
+      await box.resume()
+      resumed = true
+    }
+    if (box.status !== 'running' || wasStopped) await box.waitFor('running', { timeoutMs })
+  } catch (err) {
+    await restore()
+    if (isLifecycleBusy(err)) throw new ExportRetryLater('the sandbox is busy with another operation; retrying shortly')
+    if (isServerFailure(err)) throw new ExportRetryLater('the sandbox could not be started; retrying shortly')
+    throw err
+  }
+  return { box, restore }
+}
 
 /**
  * One sandbox's filesystem as `sandbox/<name>.tar.gz`. `getBox` returns the
@@ -30,6 +91,8 @@ export function sandboxArchive(args: {
   getBox(): Promise<ArchivableBox | null>
   /** Directory to archive, relative to the box workspace. Default `.`. */
   dir?: string
+  /** Directory names left out wherever they appear. Default `DEFAULT_SANDBOX_EXCLUDE`. */
+  exclude?: readonly string[]
   dataClass?: ExportDataClass
   description?: string
   /** How long to wait for a resumed box. Default 120 s. */
@@ -40,21 +103,102 @@ export function sandboxArchive(args: {
     name: args.name,
     dataClass: args.dataClass ?? 'sandbox',
     description: args.description,
+    exclude: args.exclude ?? DEFAULT_SANDBOX_EXCLUDE,
     async open() {
-      const box = await args.getBox()
-      if (!box || GONE.has(box.status)) return null
-      const wasStopped = box.status === 'stopped'
-      if (wasStopped) await box.resume()
-      if (box.status !== 'running' || wasStopped) await box.waitFor('running', { timeoutMs: args.resumeTimeoutMs ?? 120_000 })
-      const archive = await box.fs.openArchive(args.dir ?? '.')
-      if (!wasStopped || !box.stop) return archive
-      // Put the box back the way the owner left it once the archive is read.
-      const restore = () => box.stop!().catch(() => {})
-      return archive.pipeThrough(
-        new TransformStream<Uint8Array, Uint8Array>({
-          flush: () => restore(),
-        }),
-      )
+      const opened = await openRunning(args.getBox, args.resumeTimeoutMs ?? 120_000)
+      if (!opened) return null
+      try {
+        const archive = await opened.box.fs.openArchive(args.dir ?? '.')
+        const reader = archive.getReader()
+        let ended = false
+        return new ReadableStream<Uint8Array>({
+          async pull(controller) {
+            try {
+              const { done, value } = await reader.read()
+              if (ended) return
+              if (!done) {
+                controller.enqueue(value)
+                return
+              }
+              ended = true
+              await opened.restore()
+              reader.releaseLock()
+              controller.close()
+            } catch (err) {
+              if (ended) return
+              ended = true
+              await opened.restore()
+              reader.releaseLock()
+              controller.error(err)
+            }
+          },
+          async cancel(reason) {
+            ended = true
+            try {
+              await reader.cancel(reason)
+            } finally {
+              await opened.restore()
+              reader.releaseLock()
+            }
+          },
+        })
+      } catch (err) {
+        await opened.restore()
+        throw err
+      }
+    },
+  }
+}
+
+/**
+ * Named text files read from one sandbox, written under `files/<name>/<path>`.
+ * Use it where the product stores documents in a box under internal names (a
+ * content-addressed vault), so the owner gets each one under its real name.
+ * `list` reads the product's own records; the box is resumed only when it
+ * returns files.
+ */
+export function sandboxFiles(args: {
+  name: string
+  getBox(): Promise<ArchivableBox | null>
+  list(): Promise<{ path: string; boxPath: string }[]>
+  dataClass?: ExportDataClass
+  description?: string
+  resumeTimeoutMs?: number
+}): ExportFilesSource {
+  return {
+    kind: 'files',
+    name: args.name,
+    dataClass: args.dataClass ?? 'knowledge',
+    description: args.description,
+    async *files(): AsyncIterable<ExportFile> {
+      const listed = await args.list()
+      if (!listed.length) return
+      const opened = await openRunning(args.getBox, args.resumeTimeoutMs ?? 120_000)
+      if (!opened) return
+      const reading = new Set<Promise<string>>()
+      try {
+        const read = opened.box.fs.read
+        if (!read) throw new Error('workspace-export: this sandbox client cannot read files')
+        for (const file of listed) {
+          yield {
+            path: file.path,
+            async open() {
+              const pending = read.call(opened.box.fs, file.boxPath)
+              reading.add(pending)
+              try {
+                return await pending
+              } finally {
+                reading.delete(pending)
+              }
+            },
+          }
+        }
+      } finally {
+        // The engine starts opens before advancing the listing. Its final
+        // partial chunk may still be reading when iteration ends or is closed.
+        await Promise.allSettled(reading)
+        await opened.restore()
+      }
     },
   }
 }
