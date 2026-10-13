@@ -4,6 +4,7 @@ import {
   classifyTerminalFailure,
   createSandboxChatProducer,
   isCommittingSandboxEvent,
+  isLiveLifecycleEvent,
   MAX_EMPTY_TURN_RETRIES,
   runDetachedTurn,
   streamWithModelFailover,
@@ -157,6 +158,53 @@ describe('isCommittingSandboxEvent — the commit-point rule', () => {
       isCommittingSandboxEvent({ type: 'message.part.updated', data: { part: { type: 'tool', id: 'call-1', tool: 'search' } } }),
     ).toBe(true)
     expect(isCommittingSandboxEvent({ type: 'interaction', data: { request: { id: 'i1', kind: 'question' } } })).toBe(true)
+  })
+})
+
+// Public ADC /agents/run/stream wire shape at cb9ac80: run-controller's
+// onFirstModelRequest emits timing, and agents-stream buffers this event.
+// It reports an attempted request, not output, tools, or a successful answer.
+const FIRST_MODEL_REQUEST = { type: 'model.first_request', data: { executionId: 'primary', elapsedMs: 125 } }
+
+describe('public first-model-request timing', () => {
+  it('is inert live progress, not an answer commit point', () => {
+    expect(isCommittingSandboxEvent(FIRST_MODEL_REQUEST)).toBe(false)
+    expect(isLiveLifecycleEvent(FIRST_MODEL_REQUEST)).toBe(true)
+  })
+
+  it.each([false, true])('retains one eligible quota failover after timing (live progress: %s)', async (liveLifecycleEvents) => {
+    const opened: string[] = []
+    const failure = { type: 'error', data: { code: 'provider_quota_exhausted', message: 'Provider quota exhausted' } }
+    const handle = streamWithModelFailover({
+      models: ['primary', 'fallback'], liveLifecycleEvents,
+      open: ({ model }) => {
+        opened.push(model)
+        return feed(model === 'primary' ? [FIRST_MODEL_REQUEST, failure] : HEALTHY_MODEL_SEQUENCE)
+      },
+    })
+    const events = await collect(handle.events)
+    expect(opened).toEqual(['primary', 'fallback'])
+    expect(handle.servingModel()).toBe('fallback')
+    expect(events).not.toContainEqual(failure)
+    expect(events.filter(event => event.type === 'model.first_request')).toHaveLength(liveLifecycleEvents ? 1 : 0)
+  })
+
+  it.each([
+    { type: 'message.part.updated', data: { part: { type: 'text', text: 'Visible answer' } } },
+    { type: 'message.part.updated', data: { part: { type: 'tool', id: 'effect', tool: 'write' } } },
+    { type: 'some.future.event', data: {} },
+    { type: 'model.first_request.future', data: {} },
+  ])('does not replay a committed %j event after timing', async (committing) => {
+    const opened: string[] = []
+    const failure = { type: 'error', data: { code: 'provider_quota_exhausted', message: 'Provider quota exhausted' } }
+    const handle = streamWithModelFailover({
+      models: ['primary', 'fallback'],
+      open: ({ model }) => { opened.push(model); return feed([FIRST_MODEL_REQUEST, committing, failure]) },
+    })
+    const events = await collect(handle.events)
+    expect(opened).toEqual(['primary'])
+    expect(events).toContainEqual(committing)
+    expect(events).toContainEqual(failure)
   })
 })
 
