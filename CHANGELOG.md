@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.167
+
+- fix(web): preserve opaque profile resources for scoped hosts (#1103)
+
 ## 0.60.166
 
 - Scope shared profile prompt controls by product (#1102)
