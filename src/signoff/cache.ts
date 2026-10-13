@@ -4,6 +4,7 @@ import {
   existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync,
   statSync, unlinkSync, writeFileSync,
 } from 'node:fs'
+import type { Stats } from 'node:fs'
 import { hostname } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
 import lockfile from 'proper-lockfile'
@@ -167,15 +168,15 @@ export function activeStoreKeys(cacheDir: string): Set<string> {
   const { paths, unknown } = active
   if (unknown && existsSync(join(cacheDir, 'stores'))) return new Set(readdirSync(join(cacheDir, 'stores'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory()).map((entry) => entry.name))
-  return new Set([...paths].filter((path) => path.startsWith(join(cacheDir, 'stores') + sep)).map(basename))
+  return new Set([...paths].filter((path) => path.startsWith(join(cacheDir, 'stores') + sep)).map((path) => basename(path)))
 }
 
-function allocatedBytes(stat: ReturnType<typeof lstatSync>): number {
+function allocatedBytes(stat: Stats): number {
   return process.platform === 'win32' ? stat.size : stat.blocks * 512
 }
 
 function collectInodes(path: string, keys: Set<string>, sizes: Map<string, number>): void {
-  let stat: ReturnType<typeof lstatSync>
+  let stat: Stats
   try { stat = lstatSync(path) } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
     throw error
