@@ -112,6 +112,22 @@ describe('AgentProfileEditor model and runtime', () => {
 })
 
 describe('AgentProfileEditor instructions', () => {
+  it('preserves hidden resources for a host that checks their authority on save', async () => {
+    const files = [{ path: 'reference/brief.md', resource: { kind: 'inline' as const, name: 'brief.md', content: '# Brief' } }]
+    const initial: AgentProfile = { name: 'Creative', resources: { files } }
+    const onState = vi.fn()
+    const sections = ['identity', 'prompts'] as const
+    const { rerender } = render(<Harness initial={initial} onState={onState} config={{ sections }} />)
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: true }))
+    expect(screen.getByText(/resources this product does not use/)).toBeTruthy()
+
+    rerender(<Harness initial={initial} onState={onState} config={{ sections, preserveHiddenResources: true }} />)
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: false }))
+    expect(screen.queryByText(/resources this product does not use/)).toBeNull()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Creative QA' } })
+    expect(current().resources?.files).toEqual(files)
+  })
+
   it('hides prompt controls whose product host cannot save or execute them', () => {
     render(<Harness initial={{ prompt: { systemPrompt: 'Built-in', instructions: ['Project rule'] } }}
       config={{ sections: ['identity', 'prompts'], prompts: { appendSystemPrompt: false } }} />)
