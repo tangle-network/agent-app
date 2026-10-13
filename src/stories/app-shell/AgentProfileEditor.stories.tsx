@@ -157,6 +157,18 @@ export const ProductConfigured: Story = {
   args: { value: productProfile, config: productConfig, ...productConstraints },
 }
 
+/** The host validates approved resources; this editor only changes identity and prompt text. */
+export const PreservedHiddenResources: Story = {
+  args: { value: example, ...productConstraints,
+    config: { sections: ['identity', 'prompts'], preserveHiddenResources: true } },
+}
+
+/** Revealing files restores the same constraints; preserving other hidden resources is not a bypass. */
+export const PreservedResourcesWithEditableFiles: Story = {
+  args: { ...PreservedHiddenResources.args,
+    config: { sections: ['identity', 'prompts', 'files'], preserveHiddenResources: true } },
+}
+
 export const GitHubNotConnected: Story = {
   args: { value: productProfile, config: { ...productConfig, github: { ...productConfig.github!, port: profileEditorGitHubPort({ connected: false }) } }, ...productConstraints },
 }
