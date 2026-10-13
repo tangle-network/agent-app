@@ -60,7 +60,10 @@ export function createChannelsFixture() {
       list: async () => [state.line],
       get: async () => state.line,
       fromConnection: async input => {
-        state.line = channelLine({ transport: input.transport, connectionId: input.connectionId, ...(input.transport === 'whatsapp' ? { address: '+15550100002', connect: null, routerAddress: null, providerNumberId: input.phoneNumberId } : {}) })
+        state.line = channelLine({ transport: input.transport, connectionId: input.connectionId,
+          ...(input.transport === 'whatsapp' || input.transport === 'voice' || input.transport === 'sms' ? { address: '+15550100002', connect: null, routerAddress: null, providerNumberId: input.phoneNumberId } : {}),
+          ...(input.transport === 'telegram' ? { connect: null, routerAddress: null } : {}),
+        })
         return state.line
       },
       threads: () => ({ list: async () => [thread], messages: async () => state.messages }),

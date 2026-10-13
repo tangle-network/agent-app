@@ -14,9 +14,9 @@ const singleChoice: LineSetupSnapshot = {
   targets: [{ id: 'thread_research', label: 'Research conversation', kind: 'box', modes: ['shared'] }],
 }
 
-function setup(snapshot: LineSetupSnapshot) {
+function setup(snapshot: LineSetupSnapshot, onNotice = vi.fn()) {
   const connect = vi.fn(async (_input: LineConnectInput) => {})
-  render(<LineSetup scopeKey="research" canManage targetLabel="Conversation" client={{
+  render(<LineSetup scopeKey="research" canManage targetLabel="Conversation" onNotice={onNotice} client={{
     load: async () => snapshot,
     connect,
     disconnect: async () => {},
@@ -25,6 +25,79 @@ function setup(snapshot: LineSetupSnapshot) {
 }
 
 describe('LineSetup choice display', () => {
+  it.each(['voice', 'sms', 'whatsapp'] as const)('requires a provider number for %s even without a host hint', async transport => {
+    const onNotice = vi.fn()
+    const connect = setup({ ...singleChoice, connections: [{
+      id: 'conn_phone', label: 'Owned phone', providerId: 'phone',
+      identities: [{ kind: 'number', transport, label: 'Owned number' }],
+    }] }, onNotice)
+    const button = await screen.findByRole('button', { name: `Connect ${transport === 'voice' ? 'Voice' : transport === 'sms' ? 'SMS' : 'WhatsApp'}` })
+    expect(button).toHaveProperty('disabled', true)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Existing provider number ID' }), { target: { value: '  ' } })
+    fireEvent.click(button)
+    expect(connect).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Existing provider number ID' }), { target: { value: ' number_owned ' } })
+    fireEvent.click(button)
+    await waitFor(() => expect(connect).toHaveBeenCalledWith({ connectionId: 'conn_phone', transport, phoneNumberId: 'number_owned', targetId: 'thread_research', boxMode: 'shared' }))
+    if (transport === 'voice') await waitFor(() => expect(onNotice).toHaveBeenCalledWith({ kind: 'success', message: 'Voice line connected. Configure calls and verify prior member consent in your host.' }))
+  })
+
+  it.each(['voice', 'sms', 'whatsapp'] as const)('reconnects %s only with the same owned provider number', async transport => {
+    const connect = setup({ ...singleChoice, connections: [{
+      id: 'conn_phone', label: 'Owned phone', providerId: 'ph0ny',
+      identities: [{ kind: 'number', transport, label: 'Owned number' }],
+    }], lines: [{
+      id: 'ln_voice', connectionId: 'conn_phone', transport, address: '+15550100003',
+      connect: null, routerAddress: null, providerNumberId: 'voice_owned', status: 'active', answering: false,
+      canDisconnect: true, targetId: null, targetLabel: null, boxMode: null, lastTurn: { kind: 'none' },
+    }] })
+    const button = await screen.findByRole('button', { name: `Reconnect ${transport === 'voice' ? 'Voice' : transport === 'sms' ? 'SMS' : 'WhatsApp'}` })
+    const input = screen.getByRole('textbox', { name: 'Existing provider number ID' })
+    fireEvent.change(input, { target: { value: 'other_number' } })
+    expect(button).toHaveProperty('disabled', true)
+    fireEvent.click(button)
+    expect(connect).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { value: 'voice_owned' } })
+    fireEvent.click(button)
+    await waitFor(() => expect(connect).toHaveBeenCalledWith(expect.objectContaining({ transport, phoneNumberId: 'voice_owned' })))
+  })
+
+  it.each(['voice', 'sms', 'whatsapp'] as const)('does not reconnect a %s line missing its required provider number', async transport => {
+    const connect = setup({ ...singleChoice, connections: [{
+      id: 'conn_phone', label: 'Owned phone', providerId: 'phone',
+      identities: [{ kind: 'number', transport, label: 'Owned number' }],
+    }], lines: [{
+      id: 'ln_phone', connectionId: 'conn_phone', transport, address: '+15550100003',
+      connect: null, routerAddress: null, providerNumberId: null, status: 'active', answering: false,
+      canDisconnect: true, targetId: null, targetLabel: null, boxMode: null, lastTurn: { kind: 'none' },
+    }] })
+    await screen.findByText('+15550100003')
+    expect(screen.queryByRole('button', { name: /^Reconnect/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Connect/ })).toBeNull()
+    expect(connect).not.toHaveBeenCalled()
+  })
+
+  it('connects a Telegram identity without a provider number', async () => {
+    const connect = setup({ ...singleChoice, connections: [{
+      id: 'conn_telegram', label: 'Owned Telegram', providerId: 'telegram',
+      identities: [{ kind: 'handle', transport: 'telegram', label: '@research' }],
+    }] })
+    fireEvent.click(await screen.findByRole('button', { name: 'Connect Telegram' }))
+    await waitFor(() => expect(connect).toHaveBeenCalledWith({ connectionId: 'conn_telegram', transport: 'telegram', targetId: 'thread_research', boxMode: 'shared' }))
+    expect(screen.queryByRole('textbox', { name: 'Existing provider number ID' })).toBeNull()
+  })
+
+  it('does not imply that adding a voice member enables call routing', async () => {
+    setup({ ...singleChoice, connections: [], lines: [{
+      id: 'ln_voice', connectionId: 'conn_voice', transport: 'voice', address: '+15550100003',
+      connect: null, routerAddress: null, providerNumberId: 'voice_owned', status: 'active', answering: false,
+      canDisconnect: true, targetId: 'thread_research', targetLabel: 'Research conversation', boxMode: 'shared', lastTurn: { kind: 'none' },
+    }] })
+    expect(await screen.findByText('Not answering')).toBeTruthy()
+    expect(screen.queryByText('Awaiting member')).toBeNull()
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+
   it('labels the shared entry point as a connection, never the agent direct number', async () => {
     setup({ ...singleChoice, lines: [{
       id: 'ln_shared', connectionId: 'conn_inkbox', transport: 'imessage', address: '@research',

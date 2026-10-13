@@ -49,7 +49,7 @@ describe('application line setup', () => {
 
     const connect = await screen.findByRole('button', { name: 'Connect WhatsApp' }) as HTMLButtonElement
     expect(screen.getByText('+1 555 0100')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Inkbox handle' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Handle' })).toBeNull()
     expect(screen.queryByText('+1 555 0199')).toBeNull()
     expect(connect.disabled).toBe(true)
     const start = screen.getByRole('button', { name: 'Start phone test' }) as HTMLButtonElement

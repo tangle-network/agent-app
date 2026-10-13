@@ -5,10 +5,11 @@ import { NUMBER_CHARGE_NOTICE, NUMBER_RETRY_NOTICE, numberStage, useNumberChanne
 import type { Line, LineTransport } from './types'
 import { ChannelFailure, ChannelState, buttonClass, primaryButtonClass, inputClass, panelClass } from './ui'
 
-const labels: Record<LineTransport, string> = { imessage: 'iMessage', whatsapp: 'WhatsApp', sms: 'SMS', email: 'Email' }
+const labels: Record<LineTransport, string> = { imessage: 'iMessage', whatsapp: 'WhatsApp', sms: 'SMS', email: 'Email', telegram: 'Telegram', voice: 'Voice' }
 
 /** User-facing deep links, not provider API calls. Invalid addresses render as text only. */
 export function channelMessageLink(line: Line, instruction: string): string | null {
+  if (line.transport === 'voice' || line.transport === 'telegram') return null
   if (line.transport === 'imessage' && !!line.connect !== !!line.routerAddress) return null
   if (line.transport === 'email') {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(line.address)) return null
@@ -41,6 +42,11 @@ export function ChannelVerificationPanel({ lineId, className = '' }: { lineId: s
   return <section className={`${panelClass} ${className}`} aria-label="Channel verification" aria-busy={busy}>
     <h2 className="text-lg font-semibold">Verify this channel</h2>
     <ChannelState resource={channel.resource} empty="The channel is unavailable.">{({ line, verification: test }) => {
+      if (line.transport === 'voice') return <>
+        <p className="break-all font-medium">Voice · {line.address}</p>
+        <p>Voice calls require host-managed setup and prior member consent. Text verification does not enable or verify calls.</p>
+        <button type="button" className={buttonClass} disabled={busy} onClick={channel.resource.retry}>Refresh channel status</button>
+      </>
       const expired = test ? verificationExpired(test) : false
       const active = line.status === 'active' && line.attachment?.status === 'active'
       const link = test ? channelMessageLink(line, test.instruction) : null
@@ -64,7 +70,7 @@ export function ChannelVerificationPanel({ lineId, className = '' }: { lineId: s
             <button type="button" className={primaryButtonClass} disabled={busy} onClick={() => act('resume')}>Check setup</button></>
           : test.status === 'waiting' ? <>
             {line.connect && line.routerAddress && <><p>First, send this to {line.routerAddress}. The router replies with your agent’s number.</p><CopyLine text={line.connect} /></>}
-            <p>{line.transport === 'email' ? `From another email address, send this line to ${line.address}.` : line.connect ? 'Then send this to the number Inkbox sends you:' : `From your phone, send this to ${line.address}:`}</p>
+            <p>{line.transport === 'email' ? `From another email address, send this line to ${line.address}.` : line.transport === 'telegram' ? `In Telegram, send this to ${line.address}:` : line.connect ? 'Then send this to the number Inkbox sends you:' : `From your phone, send this to ${line.address}:`}</p>
             <CopyLine text={test.instruction} />
             {link && <a className={primaryButtonClass} href={link} target={line.transport === 'whatsapp' ? '_blank' : undefined} rel="noopener noreferrer">{sharedIMessage ? 'Connect iMessage' : line.transport === 'email' ? 'Open Email' : line.transport === 'whatsapp' ? 'Open WhatsApp' : 'Text it now'}</a>}
           </> : test.status === 'received' ? <><p role="status">Your test message arrived.</p><button type="button" className={primaryButtonClass} disabled={busy} onClick={() => act('send')}>Send test reply</button></>
@@ -107,21 +113,22 @@ function ConnectionPicker({ transport, onConnected }: { transport: Exclude<LineT
     <ChannelState resource={connections} empty="No eligible Hub connections. Connect an identity in your app’s Integrations first.">{items => <form className="space-y-4" onSubmit={event => {
       event.preventDefault()
       if (transport === 'email') void connect.run({ kind: 'email', connectionId, address })
-      else if (transport === 'whatsapp') void connect.run({ kind: 'connection', input: { transport, connectionId, phoneNumberId: numberId } })
+      else if (transport === 'whatsapp' || transport === 'voice') void connect.run({ kind: 'connection', input: { transport, connectionId, phoneNumberId: numberId.trim() } })
       else void connect.run({ kind: 'connection', input: { transport, connectionId } })
     }}>
       <label className="block">Connection<select className={inputClass} value={connectionId} disabled={busy} onChange={event => { setConnectionId(event.target.value); setNumberId(''); setShowNumbers(false) }} required>
         <option value="">Choose a connection</option>{items.map(item => <option key={item.id} value={item.id}>{item.account ?? item.displayName}</option>)}
       </select></label>
       {transport === 'email' && <label className="block">Mailbox address<input className={inputClass} type="email" required value={address} disabled={busy} onChange={event => setAddress(event.target.value)} placeholder="hello@example.com" /></label>}
+      {transport === 'voice' && <label className="block">Existing provider number ID<input className={inputClass} required value={numberId} disabled={busy} onChange={event => setNumberId(event.target.value)} autoComplete="off" placeholder="Owned ph0ny number ID from Hub" /></label>}
       {transport === 'whatsapp' && <>
         <button type="button" className={buttonClass} disabled={!connectionId || busy} onClick={() => { setShowNumbers(true); numbers.retry() }}>Show owned numbers</button>
         {showNumbers && <ChannelState resource={numbers} empty="This connection has no eligible WhatsApp numbers.">{owned => <label className="block">WhatsApp number<select className={inputClass} required value={numberId} disabled={busy} onChange={event => setNumberId(event.target.value)}>
           <option value="">Choose a number</option>{owned.map(number => <option key={number.id} value={number.id}>{number.address}</option>)}
         </select></label>}</ChannelState>}
       </>}
-      <p className="text-sm text-muted-foreground">Connect an owned line, then test both directions. Each person must message first. Permissions remain managed in Tangle Hub.</p>
-      <button type="submit" className={primaryButtonClass} disabled={busy || !connectionId || (transport === 'email' && !address.trim()) || (transport === 'whatsapp' && (!numberId || !showNumbers || numbers.status !== 'ready'))}>{busy ? 'Connecting…' : 'Connect channel'}</button>
+      <p className="text-sm text-muted-foreground">{transport === 'voice' ? 'Bind an already-owned ph0ny number. Your host must separately configure calls and verify each member’s prior consent.' : 'Connect an owned line, then test both directions. Each person must message first. Permissions remain managed in Tangle Hub.'}</p>
+      <button type="submit" className={primaryButtonClass} disabled={busy || !connectionId || (transport === 'email' && !address.trim()) || (transport === 'voice' && !numberId.trim()) || (transport === 'whatsapp' && (!numberId || !showNumbers || numbers.status !== 'ready'))}>{busy ? 'Connecting…' : 'Connect channel'}</button>
     </form>}</ChannelState>
     <ChannelFailure state={connect.state} />
   </>

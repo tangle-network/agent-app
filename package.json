@@ -699,9 +699,9 @@
     "@tangle-network/agent-runtime": "0.318.0",
     "@tangle-network/brand": "1.24.2",
     "@tangle-network/hub-sdk": "0.28.0",
-    "@tangle-network/sandbox": "0.60.22",
+    "@tangle-network/sandbox": "0.60.41",
     "@tangle-network/sandbox-ui": "0.134.6",
-    "@tangle-network/ui": "11.33.0",
+    "@tangle-network/ui": "11.35.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.6",
@@ -899,8 +899,5 @@
       "optional": true
     }
   },
-  "dependencies": {
-    "@tangle-network/ui": "11.35.0",
-    "@tangle-network/sandbox": "0.60.41"
-  }
+  "dependencies": {}
 }

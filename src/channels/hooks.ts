@@ -55,6 +55,7 @@ export function useConnectChannel(onConnected?: (line: Line) => void) {
     if (input.kind === 'connection') {
       if (!input.input.connectionId.trim()) throw new Error('Choose a connection.')
       if (input.input.transport === 'whatsapp' && !input.input.phoneNumberId.trim()) throw new Error('Choose a WhatsApp number.')
+      if ((input.input.transport === 'voice' || input.input.transport === 'sms') && !input.input.phoneNumberId.trim()) throw new Error('Enter an owned provider number ID.')
       return client.lines.fromConnection(input.input)
     }
     if (input.kind === 'order') {
@@ -76,7 +77,8 @@ export type VerificationAction = 'start' | 'resume' | 'send' | 'activate' | 'res
 export function useChannel(lineId: string) {
   const client = useChannelsClient()
   const resource = useChannelResource(async context => {
-    const [line, verification] = await Promise.all([client.lines.get(lineId), client.setup.verification(lineId, context)])
+    const line = await client.lines.get(lineId)
+    const verification = line.transport === 'voice' ? null : await client.setup.verification(lineId, context)
     if (line.id !== lineId || (line.attachment && line.attachment.lineId !== lineId) || (verification && verification.lineId !== lineId)) throw new Error('Channel binding changed. Reload channel setup.')
     return { line, verification }
   }, [lineId], !!lineId)
@@ -84,6 +86,7 @@ export function useChannel(lineId: string) {
     if (resource.status !== 'ready') throw new Error('Read the current channel state before changing it.')
     const { line, verification: test } = resource.value
     if (line.id !== lineId) throw new Error('Channel binding changed. Reload channel setup.')
+    if (line.transport === 'voice') throw new Error('Voice calls require host-managed setup and prior member consent. Text verification cannot configure calls.')
     if (action !== 'reset' && line.status !== 'active') throw new Error('This line is not active.')
     if (action === 'start') {
       if (test && test.status !== 'revoked') throw new Error('Stop the existing test before starting another.')
