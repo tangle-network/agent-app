@@ -24833,7 +24833,7 @@
         {
           "name": "ComposerProfilePill",
           "kind": "function",
-          "signature": "({ selection, locked, lockReason, onNewChat, capabilities, onCreate, onUpdate, onDelete, side, placement, className, }:…",
+          "signature": "({ selection, locked, lockReason, onNewChat, capabilities, onCreate, onUpdate, onDelete, onEdit, onNew, side, placement…",
           "doc": "The thread's agent profile as a composer control."
         },
         {
