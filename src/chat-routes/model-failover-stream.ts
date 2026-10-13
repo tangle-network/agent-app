@@ -102,17 +102,19 @@ export function isCommittingSandboxEvent(event: unknown): boolean {
   }
 
   // Session/turn lifecycle, progress status, and warnings belong to the
-  // attempt, not the transcript — discardable with an abandoned model. Every
-  // entry here was OBSERVED on a real box (2026-07-26 capture: a dead model
+  // attempt, not the transcript — discardable with an abandoned model.
+  // Captured examples (2026-07-26): a dead model
   // emits `start`, `execution.started`, `status`×3, `session.updated`×2,
   // `warning`×2 BEFORE its terminal `error` — any one of them committing
-  // would pin the turn to the dead model and kill the failover).
+  // would pin the turn to the dead model and kill the failover.
   if (
     type === 'start' ||
     type === 'execution.started' ||
     type === 'status' ||
     type === 'model-processing' ||
     type === 'model.processing' ||
+    // Public Sandbox timing metadata: a request was attempted, not answered.
+    type === 'model.first_request' ||
     type === 'session.created' ||
     type === 'session.updated' ||
     type === 'session.idle' ||
@@ -194,6 +196,8 @@ export function isLiveLifecycleEvent(event: unknown): boolean {
     type === 'status' ||
     type === 'model-processing' ||
     type === 'model.processing' ||
+    // Public Sandbox timing metadata: a request was attempted, not answered.
+    type === 'model.first_request' ||
     type === 'session.created' ||
     type === 'session.updated' ||
     type === 'session.idle'
