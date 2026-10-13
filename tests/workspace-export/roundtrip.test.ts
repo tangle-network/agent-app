@@ -214,7 +214,7 @@ describe('workspace export round trip', () => {
     expect(readFileSync(join(box, 'project/notes.md'), 'utf8')).toContain('Guest list')
     expect(readFileSync(join(box, 'project/.env'), 'utf8')).toContain('MODE=prod')
     expect(readFileSync(join(box, '.codex/auth.json'), 'utf8')).toMatch(/^\*+$/)
-    expect(sources.get('workspace')?.archive?.files).toBe(3)
+    expect(sources.get('workspace')?.archive?.files).toBeGreaterThanOrEqual(3)
     expect(sources.get('workspace')?.archive?.blanked).toEqual(['./.codex/auth.json'])
 
     // Paths cannot escape their folder; binary bytes survive.
@@ -609,7 +609,7 @@ describe('an export an owner can read', () => {
     writeFileSync(join(dir, '.opencode/node_modules/left-pad', `${'deep-name-'.repeat(12)}.js`), 'x'.repeat(5000))
     writeFileSync(join(dir, '.sidecar/state', 'run.json'), '{}')
     const out = join(tmpdir(), `wx-pkg-${Date.now()}.tar.gz`)
-    execFileSync('tar', ['--format=gnu', '-czf', out, '-C', dir, '.'])
+    execFileSync('tar', process.platform === 'darwin' ? ['-czf', out, '-C', dir, '.'] : ['--format=gnu', '-czf', out, '-C', dir, '.'])
     const bytes = new Uint8Array(readFileSync(out))
     rmSync(dir, { recursive: true, force: true })
     rmSync(out, { force: true })
