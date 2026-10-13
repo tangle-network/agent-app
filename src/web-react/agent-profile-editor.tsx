@@ -573,7 +573,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
                 onChange={event => prompt({ ...value.prompt, systemPrompt: event.target.value })} />
             </Field>}
             {config?.prompts?.systemPrompt !== false && value.prompt?.systemPrompt && <StatusLine id={`${id}-system-replaces`} tone="warning">
-              The built-in prompt is replaced. The agent receives this text, then the additional instructions.</StatusLine>}
+              The built-in prompt is replaced.{config?.prompts?.appendSystemPrompt !== false && ' The agent receives this text, then the additional instructions.'}</StatusLine>}
             {config?.prompts?.instructions !== false && <div role="group" aria-labelledby={`${id}-instructions-label`} className="space-y-2">
               <div className="flex items-center gap-1.5">
                 <span id={`${id}-instructions-label`} className={formText.label}>Project instructions</span>

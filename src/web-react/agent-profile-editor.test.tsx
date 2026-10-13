@@ -118,6 +118,8 @@ describe('AgentProfileEditor instructions', () => {
     expect(screen.queryByRole('textbox', { name: /Additional instructions/ })).toBeNull()
     expect((screen.getByRole('textbox', { name: /Replacement system prompt/ }) as HTMLTextAreaElement).value).toBe('Built-in')
     expect((screen.getByRole('textbox', { name: 'Instruction 1' }) as HTMLTextAreaElement).value).toBe('Project rule')
+    expect(screen.getByText('The built-in prompt is replaced.')).toBeTruthy()
+    expect(document.body.textContent).not.toContain('then the additional instructions')
   })
 
   it('shows saved additional instructions in the first box, which appends to the built-in prompt', () => {
