@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.164
+
+- fix(scaffold): align chat Sandbox UI with shell peer floor (#1100)
+
 ## 0.60.163
 
 - fix(web-react): forward profile host editor callbacks (#1099)
