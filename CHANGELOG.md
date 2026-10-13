@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.165
+
+- fix(chat): keep first-request timing from committing model failover (#1101)
+
 ## 0.60.164
 
 - fix(scaffold): align chat Sandbox UI with shell peer floor (#1100)
