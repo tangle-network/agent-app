@@ -59,7 +59,7 @@ export interface AgentProfileEditorConfig {
     systemPrompt?: boolean
     instructions?: boolean
   }
-  /** Keep hidden resources opaque when the host preserves and validates their authority on save. Defaults to false. */
+  /** Keep hidden resources opaque when the host preserves and validates their authority on save. Advanced JSON remains editable. Defaults to false. */
   preserveHiddenResources?: boolean
   /** Catalog-backed model selectors. Without it, model fields are plain text inputs. */
   models?: AgentProfileEditorModelCatalog
@@ -261,11 +261,13 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     if (mount.resource.kind === 'inline' && !mount.resource.name.trim()) return 'Name this file.'
     return githubRefIssue(mount.resource, requireGitHubCommitSha)
   }
+  // Opaque resources belong to the host. Advanced JSON makes every resource editable.
+  const constrainAllResources = !config?.preserveHiddenResources || show.advanced
   const constrainedEntryCount = workspaceFilePrefix || !allowExecutableFiles || requireGitHubCommitSha || requireUniqueSkillNames
-    ? files.filter((mount, index) => fileIssue(mount, index)).length +
-      skills.filter((ref, index) => skillIssue(ref, skills, index)).length +
-      toolFiles.filter(ref => requireGitHubCommitSha && githubRefIssue(ref, true)).length +
-      Number(Boolean(requireGitHubCommitSha && instructions && typeof instructions === 'object' && githubRefIssue(instructions, true)))
+    ? (constrainAllResources || show.files ? files.filter((mount, index) => fileIssue(mount, index)).length : 0) +
+      (constrainAllResources || show.skills ? skills.filter((ref, index) => skillIssue(ref, skills, index)).length : 0) +
+      (constrainAllResources || show.toolFiles ? toolFiles.filter(ref => requireGitHubCommitSha && githubRefIssue(ref, true)).length : 0) +
+      Number(Boolean(constrainAllResources && requireGitHubCommitSha && instructions && typeof instructions === 'object' && githubRefIssue(instructions, true)))
     : 0
   const invalidMcpCount = publicHttpsMcpOnly
     ? Object.values(value.mcp ?? {}).filter(server => server.enabled !== false &&

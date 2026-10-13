@@ -112,6 +112,99 @@ describe('AgentProfileEditor model and runtime', () => {
 })
 
 describe('AgentProfileEditor instructions', () => {
+  const unpinnedResource = { kind: 'github' as const, repository: 'acme/skills', path: 'SKILL.md', ref: 'main', name: 'research' }
+  const constrainedResources: { name: string; resources: NonNullable<AgentProfile['resources']>; props: Partial<AgentProfileEditorProps>; section: 'files' | 'skills' | 'toolFiles' | 'advanced' }[] = [
+    { name: 'file path prefix', section: 'files', props: { filePathPrefix: 'editable/' },
+      resources: { files: [{ path: 'approved/brief.md', resource: { kind: 'inline', name: 'brief.md', content: '# Brief' } }] } },
+    { name: 'executable file', section: 'files', props: { allowExecutableFiles: false },
+      resources: { files: [{ path: 'approved/run.sh', executable: true, resource: { kind: 'inline', name: 'run.sh', content: 'echo approved' } }] } },
+    { name: 'unpinned file', section: 'files', props: { requireGitHubCommitSha: true },
+      resources: { files: [{ path: 'approved/brief.md', resource: unpinnedResource }] } },
+    { name: 'duplicate skill names', section: 'skills', props: { requireUniqueSkillNames: true },
+      resources: { skills: [{ kind: 'inline', name: 'research', content: skill }, { kind: 'inline', name: 'research', content: skill }] } },
+    { name: 'unpinned skill', section: 'skills', props: { requireGitHubCommitSha: true }, resources: { skills: [unpinnedResource] } },
+    { name: 'unpinned tool file', section: 'toolFiles', props: { requireGitHubCommitSha: true }, resources: { tools: [unpinnedResource] } },
+    { name: 'unpinned resource instructions', section: 'advanced', props: { requireGitHubCommitSha: true }, resources: { instructions: unpinnedResource } },
+  ]
+
+  it.each(constrainedResources)('preserves a hidden $name while enforcing editable resources and the default policy', async ({ resources, props, section }) => {
+    const initial: AgentProfile = { name: 'Scoped host', resources }
+    const onState = vi.fn()
+    const sections = ['identity', 'prompts'] as const
+    const { rerender } = render(<Harness initial={initial} onState={onState} {...props}
+      config={{ sections, preserveHiddenResources: true }} />)
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: false }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Updated text' } })
+    expect(current().resources).toEqual(resources)
+    expect(current().name).toBe('Updated text')
+
+    rerender(<Harness initial={initial} onState={onState} {...props}
+      config={{ sections: [...sections, section], preserveHiddenResources: true }} />)
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: true }))
+
+    rerender(<Harness initial={initial} onState={onState} {...props}
+      config={{ sections, preserveHiddenResources: true }} />)
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: false }))
+    expect(current().resources).toEqual(resources)
+
+    rerender(<Harness initial={initial} onState={onState} {...props}
+      config={{ sections: [...sections, 'advanced'], preserveHiddenResources: true }} />)
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: true }))
+
+    rerender(<Harness initial={initial} onState={onState} {...props} config={{ sections }} />)
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: true }))
+    expect(current().resources).toEqual(resources)
+  })
+
+  it('keeps hidden invalid resources while visible valid files and prompts can be edited; revealing skills blocks save', async () => {
+    const resources = { files: [{ path: 'editable/guide.md', resource: { kind: 'inline' as const, name: 'guide.md', content: '# Guide' } }], skills: [unpinnedResource], tools: [unpinnedResource], instructions: unpinnedResource }
+    const onState = vi.fn()
+    const props = { initial: { name: 'Mixed', resources }, requireGitHubCommitSha: true, filePathPrefix: 'editable/', onState }
+    const { rerender } = render(<Harness {...props} config={{ sections: ['identity', 'prompts', 'files'], preserveHiddenResources: true }} />)
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: false }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Additional instructions' }), { target: { value: 'Edited append prompt' } })
+    fireEvent.click(screen.getByText('More instructions'))
+    fireEvent.click(screen.getByRole('button', { name: 'Add instruction' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Instruction 1' }), { target: { value: 'Edited project prompt' } })
+    expect(current().prompt).toEqual({ appendSystemPrompt: 'Edited append prompt', instructions: ['Edited project prompt'] })
+    expect(current().resources).toEqual(resources)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit editable/guide.md' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Content' }), { target: { value: '# Changed visible file' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(current().resources!.skills).toEqual(resources.skills)
+    expect(current().resources!.instructions).toEqual(unpinnedResource)
+    expect((current().resources!.files![0]!.resource as { content: string }).content).toBe('# Changed visible file')
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: false }))
+    rerender(<Harness {...props} config={{ sections: ['identity', 'prompts', 'files', 'skills'], preserveHiddenResources: true }} />)
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: true }))
+  })
+
+  it('Advanced Apply retains constraints and dirty/discard/invalid-schema states keep save closed correctly', async () => {
+    const onState = vi.fn()
+    render(<Harness initial={{ name: 'JSON' }} requireGitHubCommitSha onState={onState} config={{ sections: ['identity', 'advanced'], preserveHiddenResources: true }} />)
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: false }))
+    fireEvent.click(screen.getByText('Advanced JSON', { selector: 'span' }))
+    const json = screen.getByRole('textbox', { name: 'Full profile JSON' })
+    fireEvent.change(json, { target: { value: JSON.stringify({ name: 'JSON', resources: { instructions: unpinnedResource } }) } })
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: true, invalid: false }))
+    expect((screen.getByRole('textbox', { name: 'Name' }) as HTMLInputElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Discard JSON edits' }))
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: false }))
+    expect(current()).toEqual({ name: 'JSON' })
+    fireEvent.change(json, { target: { value: JSON.stringify({ name: 'JSON', resources: { instructions: unpinnedResource } }) } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply JSON' }))
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: true }))
+    expect(current().resources!.instructions).toEqual(unpinnedResource)
+    fireEvent.change(json, { target: { value: JSON.stringify({ name: 'JSON', resources: { instructions: { ...unpinnedResource, ref: 'a'.repeat(40) } } }) } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply JSON' }))
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: false }))
+    fireEvent.change(json, { target: { value: '{"resources":{"files":"bad"}}' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply JSON' }))
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: true, invalid: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'Discard JSON edits' }))
+    await waitFor(() => expect(onState).toHaveBeenLastCalledWith({ pending: false, invalid: false }))
+  })
+
   it('preserves hidden resources for a host that checks their authority on save', async () => {
     const files = [{ path: 'reference/brief.md', resource: { kind: 'inline' as const, name: 'brief.md', content: '# Brief' } }]
     const initial: AgentProfile = { name: 'Creative', resources: { files } }
