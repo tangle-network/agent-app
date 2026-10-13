@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { manifestCacheKey, manifestFiles, resolveStore } from './store'
 
@@ -136,6 +136,21 @@ describe('resolveStore', () => {
     expect(final.pruned).toEqual([dirs[0]])
     expect(() => statSync(dirs[2] as string)).not.toThrow()
     expect(() => statSync(dirs[0] as string)).toThrow()
+  })
+
+  it('never evicts an older generation while another signoff is using it', () => {
+    const cacheDir = tempDir('signoff-cache-')
+    const trees = [workspace(), workspace(), workspace()]
+    trees.forEach((tree, index) => writeFileSync(join(tree, 'pnpm-lock.yaml'), `lockfileVersion: 9.0\n# ${index}\n`))
+    const old = resolveStore({ treePath: trees[0] as string, cacheDir }).storeDir
+    utimesSync(old, new Date(Date.now() - 60_000), new Date(Date.now() - 60_000))
+    resolveStore({ treePath: trees[1] as string, cacheDir })
+    const guarded = resolveStore({ treePath: trees[2] as string, cacheDir, generations: 2,
+      protectedStoreKeys: new Set([basename(old)]) })
+
+    expect(guarded.pruned).toEqual([])
+    expect(() => statSync(old)).not.toThrow()
+    expect(resolveStore({ treePath: trees[2] as string, cacheDir, generations: 2 }).pruned).toEqual([old])
   })
 
   it('refuses a tree with no manifest instead of installing nothing and reporting success', () => {
