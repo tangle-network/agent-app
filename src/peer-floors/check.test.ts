@@ -249,7 +249,7 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('21.0.0', range!)).toBe(false)
   })
 
-  it('requires the Sandbox UI release whose ProviderMark renders a fallback, without claiming the next minor', async () => {
+  it('requires the Sandbox UI release with host profile editing and confirmed saves, without claiming the next minor', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
@@ -261,12 +261,16 @@ describe('this package audits itself', () => {
     // ShellHeader rows (0.133.0); AgentWorkspaceCompanion passes WorkspaceLayout
     // `surface="inset"` (0.132.0). ProviderLogo draws sandbox-ui's ProviderMark,
     // first exported in 0.134.1; 0.134.2 is the first release that renders the
-    // caller's monogram fallback for a provider with no bundled mark.
+    // caller's monogram fallback for a provider with no bundled mark. The
+    // Save safety shipped in 0.134.5; ComposerProfilePill host-editor callbacks
+    // require 0.134.6.
     expect(satisfiesRange('0.132.3', range!)).toBe(false)
     expect(satisfiesRange('0.133.4', range!)).toBe(false)
     expect(satisfiesRange('0.134.1', range!)).toBe(false)
-    expect(satisfiesRange('0.134.2', range!)).toBe(true)
-    expect(satisfiesRange('0.134.3', range!)).toBe(true)
+    expect(satisfiesRange('0.134.2', range!)).toBe(false)
+    expect(satisfiesRange('0.134.4', range!)).toBe(false)
+    expect(satisfiesRange('0.134.5', range!)).toBe(false)
+    expect(satisfiesRange('0.134.6', range!)).toBe(true)
     expect(satisfiesRange('0.135.0', range!)).toBe(false)
   })
 

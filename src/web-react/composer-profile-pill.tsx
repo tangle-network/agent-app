@@ -4,7 +4,7 @@ import type { AgentProfilePickerProps } from '@tangle-network/sandbox-ui/chat'
 /** The selection half of a thread's profile: the picker's own field names, so a rename upstream cannot drift past this. */
 export type ComposerProfileSelection = Pick<AgentProfilePickerProps, 'value' | 'onChange' | 'profiles' | 'disabled'>
 
-export interface ComposerProfilePillProps extends Pick<AgentProfilePickerProps, 'locked' | 'lockReason' | 'onNewChat' | 'side' | 'capabilities' | 'onCreate' | 'onUpdate' | 'onDelete'> {
+export interface ComposerProfilePillProps extends Pick<AgentProfilePickerProps, 'locked' | 'lockReason' | 'onNewChat' | 'side' | 'capabilities' | 'onCreate' | 'onUpdate' | 'onDelete' | 'onEdit' | 'onNew'> {
   /** The catalog and the current choice; products pass their server-resolvable profiles only. */
   selection: ComposerProfileSelection
   /**
@@ -45,6 +45,9 @@ const TRIGGER: Record<NonNullable<ComposerProfilePillProps['placement']>, string
  * writes and selection; pass its callbacks to enable authoring and switching
  * within the current conversation. `locked` is reserved for a product-specific
  * admission constraint, not a conversation that already has messages.
+ * Use `onEdit` and `onNew` to open the product's shared AgentProfileEditor.
+ * Inline `onCreate`/`onUpdate` callbacks resolve only after the write is
+ * confirmed and reject refused writes, so the picker can preserve the draft.
  */
 export function ComposerProfilePill({
   selection,
@@ -55,6 +58,8 @@ export function ComposerProfilePill({
   onCreate,
   onUpdate,
   onDelete,
+  onEdit,
+  onNew,
   side,
   placement = 'composer',
   className,
@@ -72,6 +77,8 @@ export function ComposerProfilePill({
       onCreate={onCreate}
       onUpdate={onUpdate}
       onDelete={onDelete}
+      onEdit={onEdit}
+      onNew={onNew}
       side={side}
       // The picker root shrink-wraps, which makes a trigger's own `w-full` a
       // no-op, so a full-width row widens the root as well.

@@ -11,6 +11,21 @@ const profiles = [
 afterEach(cleanup)
 
 describe('ComposerProfilePill', () => {
+  it('opens the host editor for built-in profiles and new profiles', () => {
+    const onEdit = vi.fn()
+    const onNew = vi.fn()
+    render(<ComposerProfilePill selection={{ value: 'research', onChange: () => {}, profiles: profiles.map(profile => ({ ...profile, builtin: true })) }} onEdit={onEdit} onNew={onNew} />)
+    const trigger = screen.getByRole('button', { name: 'Agent profile' })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]!)
+    expect(onEdit).toHaveBeenCalledWith('research')
+    expect(screen.queryByTestId('agent-profile-popover')).toBeNull()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: 'New agent…' }))
+    expect(onNew).toHaveBeenCalledOnce()
+    expect(screen.queryByTestId('agent-profile-popover')).toBeNull()
+  })
+
   it('shows the selected profile and changes it from the menu', () => {
     const onChange = vi.fn()
     render(<ComposerProfilePill selection={{ value: 'research', onChange, profiles }} />)
