@@ -216,6 +216,8 @@ export interface SignoffReport {
 
 /** Progress, for a CLI that prints as it goes rather than at the end. */
 export type SignoffEvent =
+  | { readonly kind: 'cache-prune'; readonly beforeBytes: number; readonly afterBytes: number;
+      readonly removed: readonly string[]; readonly overBudgetBytes: number }
   | { readonly kind: 'tree'; readonly path: string; readonly head: string; readonly dirty: boolean }
   | { readonly kind: 'store'; readonly storeDir: string; readonly cacheHit: boolean; readonly cacheKey: string }
   | { readonly kind: 'install-start'; readonly command: string }

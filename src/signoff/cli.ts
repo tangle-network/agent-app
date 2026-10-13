@@ -119,6 +119,10 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
 function progressWriter(): (event: SignoffEvent) => void {
   return (event) => {
     switch (event.kind) {
+      case 'cache-prune':
+        process.stderr.write(`· cache ${event.beforeBytes} → ${event.afterBytes} allocated bytes; ` +
+          `${event.removed.length} idle entries removed${event.overBudgetBytes ? `; ${event.overBudgetBytes} bytes held by active or kept trees` : ''}\n`)
+        break
       case 'tree':
         process.stderr.write(`· clean tree at ${event.path} (${event.head.slice(0, 12)}${event.dirty ? ' + working tree' : ''})\n`)
         break

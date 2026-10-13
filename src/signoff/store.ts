@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
-import { join, relative, sep } from 'node:path'
+import { basename, join, relative, sep } from 'node:path'
 
 /**
  * The pristine package store, cached on the lockfile so speed is not paid for
@@ -58,6 +58,8 @@ export interface ResolveStoreOptions {
   readonly cacheDir: string
   /** Generations to keep. Default 4. */
   readonly generations?: number
+  /** Keys held by other active signoff runs; they cannot be evicted. */
+  readonly protectedStoreKeys?: ReadonlySet<string>
 }
 
 function collectManifests(dir: string, root: string, out: string[]): void {
@@ -96,10 +98,10 @@ export function manifestCacheKey(treePath: string, files: readonly string[]): st
  * Recency is the directory's mtime, stamped on every use, so the store a run
  * just used is never the one evicted.
  */
-function pruneStores(storesRoot: string, keep: number): string[] {
+function pruneStores(storesRoot: string, keep: number, protectedKeys: ReadonlySet<string>): string[] {
   if (!existsSync(storesRoot)) return []
   const entries = readdirSync(storesRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && /^[a-f0-9]{64}$/.test(entry.name))
     .map((entry) => {
       const full = join(storesRoot, entry.name)
       return { full, mtimeMs: statSync(full).mtimeMs }
@@ -108,6 +110,7 @@ function pruneStores(storesRoot: string, keep: number): string[] {
 
   const pruned: string[] = []
   for (const stale of entries.slice(keep)) {
+    if (protectedKeys.has(basename(stale.full))) continue
     rmSync(stale.full, { recursive: true, force: true })
     pruned.push(stale.full)
   }
@@ -115,7 +118,7 @@ function pruneStores(storesRoot: string, keep: number): string[] {
 }
 
 export function resolveStore(options: ResolveStoreOptions): StoreResolution {
-  const { treePath, cacheDir, generations = 4 } = options
+  const { treePath, cacheDir, generations = 4, protectedStoreKeys = new Set<string>() } = options
   const files = manifestFiles(treePath)
   if (files.length === 0) {
     throw new Error(
@@ -138,5 +141,5 @@ export function resolveStore(options: ResolveStoreOptions): StoreResolution {
   const now = new Date()
   utimesSync(storeDir, now, now)
 
-  return { storeDir, cacheKey, hit, keyedOn: files, pruned: pruneStores(storesRoot, generations) }
+  return { storeDir, cacheKey, hit, keyedOn: files, pruned: pruneStores(storesRoot, generations, protectedStoreKeys) }
 }
