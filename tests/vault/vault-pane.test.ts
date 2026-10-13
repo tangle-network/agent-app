@@ -701,6 +701,9 @@ describe('VaultPaneHandle.openFile completion', () => {
     const onSelectedPathChange = vi.fn(() => false as const)
     const { paneRef } = mount({ selectedPath: 'a.md', onSelectedPathChange })
     await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md'))
+    // Match openFile(): let the selected file's draft/mode reset effect finish
+    // before switching to Source, so a late reset cannot switch it back to Rich.
+    await act(async () => {})
     fireEvent.click(screen.getByLabelText('Edit as source'))
     await typeSource('unsaved A')
 
