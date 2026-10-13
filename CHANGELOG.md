@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.166
+
+- Scope shared profile prompt controls by product (#1102)
+
 ## 0.60.165
 
 - fix(chat): keep first-request timing from committing model failover (#1101)
