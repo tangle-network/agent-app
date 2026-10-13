@@ -5,10 +5,14 @@ import { NUMBER_CHARGE_NOTICE, NUMBER_RETRY_NOTICE, numberStage, useNumberChanne
 import type { Line, LineTransport } from './types'
 import { ChannelFailure, ChannelState, buttonClass, primaryButtonClass, inputClass, panelClass } from './ui'
 
-const labels: Record<LineTransport, string> = { imessage: 'iMessage', whatsapp: 'WhatsApp', sms: 'SMS', email: 'Email' }
+type ConnectableTransport = Extract<LineTransport, 'imessage' | 'whatsapp' | 'sms' | 'email'>
+const labels: Record<LineTransport, string> = {
+  imessage: 'iMessage', whatsapp: 'WhatsApp', sms: 'SMS', email: 'Email', telegram: 'Telegram', voice: 'Voice',
+}
 
 /** User-facing deep links, not provider API calls. Invalid addresses render as text only. */
 export function channelMessageLink(line: Line, instruction: string): string | null {
+  if (line.transport === 'telegram' || line.transport === 'voice') return null
   if (line.transport === 'imessage' && !!line.connect !== !!line.routerAddress) return null
   if (line.transport === 'email') {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(line.address)) return null
@@ -86,7 +90,7 @@ export function ChannelVerificationPanel({ lineId, className = '' }: { lineId: s
   </section>
 }
 
-function ConnectionPicker({ transport, onConnected }: { transport: Exclude<LineTransport, 'sms'>; onConnected: (line: Line) => void }) {
+function ConnectionPicker({ transport, onConnected }: { transport: Exclude<ConnectableTransport, 'sms'>; onConnected: (line: Line) => void }) {
   const client = useChannelsClient()
   const connections = useChannelConnections(transport)
   const [connectionId, setConnectionId] = useState('')
@@ -127,7 +131,7 @@ function ConnectionPicker({ transport, onConnected }: { transport: Exclude<LineT
   </>
 }
 
-export interface ChannelConnectProps { transport: LineTransport; initialLineId?: string; className?: string }
+export interface ChannelConnectProps { transport: ConnectableTransport; initialLineId?: string; className?: string }
 
 /** Select an existing line or connect an owned source, then verify it. */
 export function ChannelConnect({ transport, initialLineId = '', className = '' }: ChannelConnectProps) {

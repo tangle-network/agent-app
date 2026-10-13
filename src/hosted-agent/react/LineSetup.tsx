@@ -8,7 +8,7 @@ import type {
 const useBrowserLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : useEffect
 
 const TRANSPORT: Record<Line['transport'], string> = {
-  imessage: 'iMessage', sms: 'SMS', whatsapp: 'WhatsApp', email: 'Email',
+  imessage: 'iMessage', sms: 'SMS', whatsapp: 'WhatsApp', email: 'Email', telegram: 'Telegram', voice: 'Voice',
 }
 const IDENTITY: Record<LineIdentityKind, string> = {
   handle: 'Inkbox handle', number: 'Dedicated number', email: 'Email line',
