@@ -59,6 +59,8 @@ export interface AgentProfileEditorConfig {
     systemPrompt?: boolean
     instructions?: boolean
   }
+  /** Keep hidden resources opaque when the host preserves and validates their authority on save. Defaults to false. */
+  preserveHiddenResources?: boolean
   /** Catalog-backed model selectors. Without it, model fields are plain text inputs. */
   models?: AgentProfileEditorModelCatalog
   /** Harnesses the product runs. Omit to hide the harness selector. */
@@ -230,8 +232,9 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
     files: sectionAllowed('files') && allowsResource('files'),
     advanced: sectionAllowed('advanced'),
   }
-  const unsupportedResources = (Object.keys(RESOURCE_KIND_LABELS) as AgentProfileResourceKind[])
-    .filter(kind => configuredResourceCount(value, kind) > 0 && !(
+  const unsupportedResources = config?.preserveHiddenResources ? [] :
+    (Object.keys(RESOURCE_KIND_LABELS) as AgentProfileResourceKind[])
+      .filter(kind => configuredResourceCount(value, kind) > 0 && !(
       (kind === 'skills' && show.skills) || (kind === 'tools' && show.toolFiles) || (kind === 'files' && show.files) ||
       (allowsResource(kind) && kind !== 'skills' && kind !== 'tools' && kind !== 'files')))
   const skills = value.resources?.skills ?? []
