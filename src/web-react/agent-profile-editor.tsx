@@ -53,6 +53,12 @@ export interface AgentProfileEditorConfig {
     /** False when the product fixes the profile name. Defaults to true. */
     nameEditable?: boolean
   }
+  /** Hide prompt controls that the host does not persist or execute. Omitted controls remain enabled. */
+  prompts?: {
+    appendSystemPrompt?: boolean
+    systemPrompt?: boolean
+    instructions?: boolean
+  }
   /** Catalog-backed model selectors. Without it, model fields are plain text inputs. */
   models?: AgentProfileEditorModelCatalog
   /** Harnesses the product runs. Omit to hide the harness selector. */
@@ -548,26 +554,27 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
       </Section>}
 
       {show.prompts && <Section title="Instructions" description="What the agent is told before every conversation.">
-        <Field label="Additional instructions" htmlFor={`${id}-append`}
+        {config?.prompts?.appendSystemPrompt !== false && <Field label="Additional instructions" htmlFor={`${id}-append`}
           info="Added after the agent's built-in prompt, which stays in force. Leave it empty to add nothing.">
           <Textarea id={`${id}-append`} className="min-h-40 text-sm leading-6" disabled={editingDisabled} value={value.prompt?.appendSystemPrompt ?? ''}
             onChange={event => prompt({ ...value.prompt, appendSystemPrompt: event.target.value })} />
-        </Field>
+        </Field>}
+        {(config?.prompts?.systemPrompt !== false || config?.prompts?.instructions !== false) &&
         <details className="group/more" open={moreOpen} onToggle={event => setMoreOpen(event.currentTarget.open)}>
           <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
             <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 transition-transform group-open/more:rotate-90" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
             More instructions
           </summary>
           <div className="mt-4 space-y-4">
-            <Field label="Replacement system prompt" htmlFor={`${id}-system`}
+            {config?.prompts?.systemPrompt !== false && <Field label="Replacement system prompt" htmlFor={`${id}-system`}
               info="Replaces the agent's built-in prompt entirely. Leave it empty to keep the built-in prompt.">
               <Textarea id={`${id}-system`} size="compact" className="min-h-24 text-sm leading-6" disabled={editingDisabled} value={value.prompt?.systemPrompt ?? ''}
                 aria-describedby={value.prompt?.systemPrompt ? `${id}-system-replaces` : undefined}
                 onChange={event => prompt({ ...value.prompt, systemPrompt: event.target.value })} />
-            </Field>
-            {value.prompt?.systemPrompt && <StatusLine id={`${id}-system-replaces`} tone="warning">
-              The built-in prompt is replaced. The agent receives this text, then the additional instructions.</StatusLine>}
-            <div role="group" aria-labelledby={`${id}-instructions-label`} className="space-y-2">
+            </Field>}
+            {config?.prompts?.systemPrompt !== false && value.prompt?.systemPrompt && <StatusLine id={`${id}-system-replaces`} tone="warning">
+              The built-in prompt is replaced.{config?.prompts?.appendSystemPrompt !== false && ' The agent receives this text, then the additional instructions.'}</StatusLine>}
+            {config?.prompts?.instructions !== false && <div role="group" aria-labelledby={`${id}-instructions-label`} className="space-y-2">
               <div className="flex items-center gap-1.5">
                 <span id={`${id}-instructions-label`} className={formText.label}>Project instructions</span>
               </div>
@@ -582,9 +589,9 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
                 </div>)}
               <Button type="button" size="compact" variant="outline" disabled={editingDisabled}
                 onClick={() => prompt({ ...value.prompt, instructions: [...(value.prompt?.instructions ?? []), ''] })}>Add instruction</Button>
-            </div>
+            </div>}
           </div>
-        </details>
+        </details>}
       </Section>}
 
       {show.model && <Section title="Model and runtime" description="Defaults for conversations and automations that do not choose their own.">

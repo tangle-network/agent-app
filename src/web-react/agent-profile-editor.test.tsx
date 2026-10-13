@@ -112,6 +112,16 @@ describe('AgentProfileEditor model and runtime', () => {
 })
 
 describe('AgentProfileEditor instructions', () => {
+  it('hides prompt controls whose product host cannot save or execute them', () => {
+    render(<Harness initial={{ prompt: { systemPrompt: 'Built-in', instructions: ['Project rule'] } }}
+      config={{ sections: ['identity', 'prompts'], prompts: { appendSystemPrompt: false } }} />)
+    expect(screen.queryByRole('textbox', { name: /Additional instructions/ })).toBeNull()
+    expect((screen.getByRole('textbox', { name: /Replacement system prompt/ }) as HTMLTextAreaElement).value).toBe('Built-in')
+    expect((screen.getByRole('textbox', { name: 'Instruction 1' }) as HTMLTextAreaElement).value).toBe('Project rule')
+    expect(screen.getByText('The built-in prompt is replaced.')).toBeTruthy()
+    expect(document.body.textContent).not.toContain('then the additional instructions')
+  })
+
   it('shows saved additional instructions in the first box, which appends to the built-in prompt', () => {
     render(<Harness initial={{ name: 'Pablo', prompt: { appendSystemPrompt: 'Always answer in one sentence.' } }} />)
     const first = screen.getAllByRole('textbox').find(box => box.id.endsWith('-append')) as HTMLTextAreaElement

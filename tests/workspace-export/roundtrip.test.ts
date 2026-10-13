@@ -559,6 +559,10 @@ describe('a source removed while the export runs', () => {
 describe('files sources', () => {
   it('copy files concurrently and keep each exactly once, in listing order', async () => {
     const storage = createMemoryExportStorage()
+    let activeReads = 0
+    let peakReads = 0
+    let releaseFirstChunk!: () => void
+    const firstChunkOpen = new Promise<void>((resolve) => { releaseFirstChunk = resolve })
     const engine = createExportEngine({
       app: 'testapp',
       storage,
@@ -569,22 +573,26 @@ describe('files sources', () => {
           dataClass: 'knowledge',
           async *files() {
             for (let i = 0; i < 40; i += 1) {
-              yield { path: `n/${String(i).padStart(2, '0')}.md`, open: async () => { await new Promise((r) => setTimeout(r, 50)); return `note ${i}` } }
+              yield { path: `n/${String(i).padStart(2, '0')}.md`, open: async () => {
+                activeReads += 1
+                peakReads = Math.max(peakReads, activeReads)
+                if (peakReads === 4) releaseFirstChunk()
+                if (i < 4) await firstChunkOpen
+                activeReads -= 1
+                return `note ${i}`
+              } }
             }
           },
         }],
       }),
     })
     const job = await engine.start(WS, 'u-owner')
-    const started = Date.now()
     let current = job
     for (let i = 0; i < 5 && current.status === 'running'; i += 1) current = (await engine.advance(WS, job.id))!
-    const elapsed = Date.now() - started
     expect(current.status).toBe('complete')
     const unit = current.units.find((u) => u.name === 'vault')!
     expect(unit.entries.map((e) => e.path)).toEqual(Array.from({ length: 40 }, (_, i) => `files/vault/n/${String(i).padStart(2, '0')}.md`))
-    // 40 reads of 50 ms take at least 2000 ms one at a time.
-    expect(elapsed).toBeLessThan(1200)
+    expect(peakReads).toBe(4)
   })
 })
 
