@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.168
+
+- fix(web): constrain only editable profile resources (#1104)
+
 ## 0.60.167
 
 - fix(web): preserve opaque profile resources for scoped hosts (#1103)
