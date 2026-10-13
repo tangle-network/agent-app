@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.163
+
+- fix(web-react): forward profile host editor callbacks (#1099)
+
 ## 0.60.162
 
 - fix(vault): preserve persisted baselines and guard saves (#1098)
