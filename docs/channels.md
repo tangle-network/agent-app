@@ -47,7 +47,7 @@ line list. The backend must authorize every supplied line, thread, source, and
 order identifier. `client.lines.threads(lineId).messages(threadId)` remains the
 authoritative channel history; it is not reconstructed from a replay buffer.
 
-The current development baseline is Sandbox **0.60.41** and Hub SDK **0.28.0**;
+The current development baseline is Sandbox **0.60.49** and Hub SDK **0.29.5**;
 the package manifest declares the supported optional peer ranges. Only type
 imports from Sandbox and Hub are emitted in declarations. JavaScript imports React and existing
 agent-app async primitives, not either server SDK.

@@ -102,3 +102,18 @@ abort/rebind), the sandbox SDK multiplexes them (`createSession`, per-run
 N agents with N profiles in one box is the supported shape, bounded only by
 the box's resources — which the payer owns. Every dynamic path materializes
 through the same validated door.
+
+### Verified Sandbox profile boundary
+
+The current development cohort uses Interface 5.2.0 and Runtime 0.319.3 with
+Sandbox 0.60.49. The App-to-Sandbox path is verified for ordinary profile file
+mounts, including the `/profile` composer's `knowledge` channel, which produces
+`resources.files`.
+
+This does not qualify Interface 5's named `resources.knowledge` generation pins
+for that Sandbox path. Sandbox 0.60.49 still validates profiles with its own
+Interface 4 dependency and rejects those pins before making the HTTP request.
+App's Interface peer range does not replace the SDK's nested schema. Keep the
+pins intact; do not strip them, override the dependency, or copy its validator
+into App. Named-generation execution requires separately qualified,
+owner-authorized resolution and a compatible published Sandbox contract.
