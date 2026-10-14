@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.60.169
+
+- fix: restore optional peers and handle Telegram/voice line contracts (#1107)
+- chore(deps): full interface-5 cohort — every @tangle-network dep to latest (#1109)
+- fix(tests): Node 26 localStorage, workspace-export archive count, and BSD tar
+- chore(deps): @tangle-network/ui 11.35.0 + sandbox 0.60.41 — align with the gtm-agent/hospitality cohort (#1105)
+
 ## 0.60.168
 
 - fix(web): constrain only editable profile resources (#1104)
