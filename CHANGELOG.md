@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.170
+
+- chore: rename agent-dev-container references to agent-container (#1111)
+
 ## 0.60.169
 
 - fix: restore optional peers and handle Telegram/voice line contracts (#1107)
