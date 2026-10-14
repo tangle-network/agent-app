@@ -175,3 +175,24 @@ describe('configured harness', () => {
     expect(() => configuredHarness({ workspaces: '["pi"]' })).toThrow('must map workspace ids')
   })
 })
+
+describe('harnessCapabilities', () => {
+  it('covers every known harness exhaustively', async () => {
+    const { KNOWN_HARNESSES, harnessCapabilities } = await import('./index')
+    for (const harness of KNOWN_HARNESSES) {
+      expect(() => harnessCapabilities(harness)).not.toThrow()
+    }
+  })
+
+  it('names the platform-verified facts', async () => {
+    const { harnessCapabilities } = await import('./index')
+    expect(harnessCapabilities('pi')).toEqual({
+      subagents: false, // materializer refuses: "subagents have no cwd file"
+      mcp: 'extension', // pi-mcp-adapter reads .pi/mcp.json
+      toolControls: 'startup', // allowlist validated before MCP tools register (exit 78, live)
+      skillsDir: '.pi/skills',
+    })
+    expect(harnessCapabilities('opencode').skillsDir).toBe('.opencode/skills')
+    expect(harnessCapabilities('hermes').skillsDir).toBeNull()
+  })
+})

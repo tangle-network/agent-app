@@ -225,3 +225,59 @@ export function assertHarnessModelCompatible(
     )
   }
 }
+
+// ── Harness capabilities ───────────────────────────────────────────────────
+//
+// The one place a product learns WHAT a harness can express, before it
+// assembles a profile — so incompatible content is never added in the first
+// place instead of being dropped (or refused) after the fact. Facts here are
+// sourced from the platform materializer's behavior (the per-harness subagent
+// lowering, the MCP config channel, the startup control validation) and the
+// placement map; when those change, this table changes with them.
+
+/** What a harness can express, for profile assembly. */
+export interface HarnessCapabilities {
+  /** Lower `profile.subagents` into native cwd files (e.g. `.claude/agents/`).
+   *  False: a profile carrying subagents is refused at materialization —
+   *  builders must not add them. */
+  subagents: boolean
+  /** How `profile.mcp` reaches the harness. */
+  mcp: 'native' | 'config-file' | 'extension' | 'none'
+  /** When tool controls are validated: 'startup' means an allowlist naming
+   *  MCP-carried verbs is checked before MCP tools register (spawn-time
+   *  validation refuses unknown names); 'runtime' tolerates them. */
+  toolControls: 'startup' | 'runtime'
+  /** cwd-relative directory `resources.skills` materializes into, or null
+   *  when the harness has no cwd skill primitive (falls back to inline). */
+  skillsDir: string | null
+}
+
+const HARNESS_CAPABILITIES: Record<Harness, HarnessCapabilities> = {
+  'claude-code': { subagents: true, mcp: 'native', toolControls: 'runtime', skillsDir: '.claude/skills' },
+  nanoclaw: { subagents: true, mcp: 'native', toolControls: 'runtime', skillsDir: '.claude/skills' },
+  opencode: { subagents: true, mcp: 'config-file', toolControls: 'runtime', skillsDir: '.opencode/skills' },
+  codex: { subagents: true, mcp: 'config-file', toolControls: 'runtime', skillsDir: '.codex/skills' },
+  gemini: { subagents: true, mcp: 'config-file', toolControls: 'runtime', skillsDir: '.gemini/skills' },
+  'kimi-code': { subagents: false, mcp: 'config-file', toolControls: 'runtime', skillsDir: '.kimi/skills' },
+  pi: { subagents: false, mcp: 'extension', toolControls: 'startup', skillsDir: '.pi/skills' },
+  prime: { subagents: true, mcp: 'native', toolControls: 'runtime', skillsDir: '.prime/agent/skills' },
+  hermes: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  openclaw: { subagents: false, mcp: 'config-file', toolControls: 'runtime', skillsDir: 'skills' },
+  // Harnesses the platform placement map does not bridge yet: conservative
+  // facts — assert nothing they have not proven. Each upgrades to its real
+  // facts when the materializer grows support for it.
+  acp: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  amp: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  'factory-droids': { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  forge: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  cursor: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  'cli-base': { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+}
+
+/** The capability facts for `harness`. Every harness in KNOWN_HARNESSES has
+ *  an entry; the map is exhaustive by construction (tests assert parity). */
+export function harnessCapabilities(harness: Harness): HarnessCapabilities {
+  const caps = HARNESS_CAPABILITIES[harness]
+  if (!caps) throw new Error(`harnessCapabilities: no capability facts for "${harness}"`)
+  return caps
+}
