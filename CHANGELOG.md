@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.171
+
+- fix(harness): drop the gemini capability row — gemini is a non-backend harness type (#1115)
+- feat(harness): harnessCapabilities — what a harness can express, before profile assembly (#1114)
+- feat(harness): harnessCapabilities — what a harness can express, before profile assembly (#1112)
+
 ## 0.60.170
 
 - chore: rename agent-dev-container references to agent-container (#1111)
