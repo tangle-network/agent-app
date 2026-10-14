@@ -257,7 +257,6 @@ const HARNESS_CAPABILITIES: Record<Harness, HarnessCapabilities> = {
   nanoclaw: { subagents: true, mcp: 'native', toolControls: 'runtime', skillsDir: '.claude/skills' },
   opencode: { subagents: true, mcp: 'config-file', toolControls: 'runtime', skillsDir: '.opencode/skills' },
   codex: { subagents: true, mcp: 'config-file', toolControls: 'runtime', skillsDir: '.codex/skills' },
-  gemini: { subagents: true, mcp: 'config-file', toolControls: 'runtime', skillsDir: '.gemini/skills' },
   'kimi-code': { subagents: false, mcp: 'config-file', toolControls: 'runtime', skillsDir: '.kimi/skills' },
   pi: { subagents: false, mcp: 'extension', toolControls: 'startup', skillsDir: '.pi/skills' },
   prime: { subagents: true, mcp: 'native', toolControls: 'runtime', skillsDir: '.prime/agent/skills' },
