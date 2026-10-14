@@ -220,6 +220,100 @@ describe('runWithModelFailover', () => {
   })
 })
 
+describe('runWithModelFailover — policy gating (no compliant-model 502 leaks PHI to a non-compliant fallback)', () => {
+  // A HIPAA posture: zero-data-retention AND BAA-eligible models only.
+  const POLICY_META = [
+    { id: 'anthropic/claude-sonnet-4-6', zeroDataRetention: true, hipaaEligible: true },
+    { id: 'openai/gpt-5', zeroDataRetention: true, hipaaEligible: false },
+  ]
+  const policy = {
+    catalog: POLICY_META,
+    filter: (m: { zeroDataRetention?: boolean; hipaaEligible?: boolean }) =>
+      m.zeroDataRetention === true && m.hipaaEligible === true,
+  }
+
+  it('never runs a chain member the policy refuses — the refusal skips to the next member', async () => {
+    const run = vi.fn(async () => REAL_SUCCESS_PAYLOAD)
+    const onFallback = vi.fn()
+    const result = await runWithModelFailover({
+      models: ['openai/gpt-5', 'anthropic/claude-sonnet-4-6'],
+      run,
+      policy,
+      onFallback,
+    })
+    // The denied preferred model is never EXECUTED — this is the assertion
+    // that goes red if the policy gate is removed from the walk.
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(run).toHaveBeenCalledWith('anthropic/claude-sonnet-4-6')
+    expect(result.model).toBe('anthropic/claude-sonnet-4-6')
+    expect(result.usedFallback).toBe(true)
+    expect(result.attempts[0]).toMatchObject({
+      model: 'openai/gpt-5',
+      ok: false,
+      reason: expect.stringContaining('not admitted by policy'),
+    })
+    expect(onFallback).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'openai/gpt-5', ok: false }),
+      'anthropic/claude-sonnet-4-6',
+    )
+  })
+
+  it('a dead compliant model fails over ONLY to a compliant fallback — a denied fallback never sees the turn', async () => {
+    // The audit's motivating case: the ZDR model 502s mid-turn; the only
+    // fallback is not BAA-eligible. Without the gate the turn's data would be
+    // re-run through it silently.
+    const run = vi.fn(async (model: string) =>
+      model === 'anthropic/claude-sonnet-4-6' ? REAL_OUTAGE_PAYLOAD : REAL_SUCCESS_PAYLOAD,
+    )
+    const failure = await runWithModelFailover({
+      models: ['anthropic/claude-sonnet-4-6', 'openai/gpt-5'],
+      run,
+      policy,
+    }).catch((err: unknown) => err)
+    expect(failure).toBeInstanceOf(ModelFailoverExhaustedError)
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(run).not.toHaveBeenCalledWith('openai/gpt-5')
+    const attempts = (failure as ModelFailoverExhaustedError).attempts
+    expect(attempts).toHaveLength(2)
+    expect(attempts[1]).toMatchObject({ model: 'openai/gpt-5', ok: false })
+    expect(attempts[1]!.reason).toContain('not admitted by policy')
+  })
+
+  it('an all-refused chain exhausts WITHOUT a single run call', async () => {
+    const run = vi.fn(async () => REAL_SUCCESS_PAYLOAD)
+    await expect(
+      runWithModelFailover({ models: ['openai/gpt-5', 'acme/unclassified'], run, policy }),
+    ).rejects.toBeInstanceOf(ModelFailoverExhaustedError)
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('fails closed on a member carrying no policy metadata', async () => {
+    const run = vi.fn(async () => REAL_SUCCESS_PAYLOAD)
+    const result = await runWithModelFailover({
+      models: ['acme/unclassified', 'anthropic/claude-sonnet-4-6'],
+      run,
+      policy,
+    })
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(result.model).toBe('anthropic/claude-sonnet-4-6')
+    expect(result.attempts[0]!.reason).toContain('no policy metadata')
+  })
+
+  it('a policy that admits every member changes nothing about the walk', async () => {
+    const run = vi.fn(async (model: string) =>
+      model === 'anthropic/claude-sonnet-4-6' ? REAL_OUTAGE_PAYLOAD : REAL_SUCCESS_PAYLOAD,
+    )
+    const result = await runWithModelFailover({
+      models: ['anthropic/claude-sonnet-4-6', 'openai/gpt-5'],
+      run,
+      policy: { catalog: POLICY_META, filter: () => true },
+    })
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(result.model).toBe('openai/gpt-5')
+    expect(result.usedFallback).toBe(true)
+  })
+})
+
 describe('buildModelChain', () => {
   it('puts the preferred model first and de-duplicates', () => {
     expect(buildModelChain('gpt-5-mini', ['gemini-2.5-flash', 'gpt-5-mini', ''])).toEqual([

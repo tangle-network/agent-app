@@ -4,7 +4,7 @@
 
 Source: `src/policy-filters/index.ts`
 
-18 exports.
+17 exports.
 
 ### `allOf`
 
@@ -12,6 +12,14 @@ Source: `src/policy-filters/index.ts`
 
 ```ts
 <T, C extends object = PolicyFilterContext>(...filters: PolicyFilter<T, C>[]) => PolicyFilter<T, C>
+```
+
+### `allowAll`
+
+`function` — The explicit "no restriction" filter — what an empty `allOf()` used to mean silently.
+
+```ts
+<T, C extends object = PolicyFilterContext>() => PolicyFilter<T, C>
 ```
 
 ### `anyOf`
@@ -30,14 +38,6 @@ Source: `src/policy-filters/index.ts`
 <T extends { id: string; }, C extends object = PolicyFilterContext>(input: PolicyCheckInput<T, C>) => Promise<T>
 ```
 
-### `checkHarnessPolicy`
-
-`function` — Policy check over a harness id.
-
-```ts
-<C extends object = PolicyFilterContext>(id: string, catalog: PolicyCatalog<HarnessPolicyInfo>, filter: PolicyFilter<Ha…
-```
-
 ### `checkModelPolicy`
 
 `function` — Policy check over a model id.
@@ -54,14 +54,6 @@ Source: `src/policy-filters/index.ts`
 <T extends { id: string; }, C extends object = PolicyFilterContext>(input: PolicyCheckInput<T, C>) => Promise<PolicyChe…
 ```
 
-### `checkProfilePolicy`
-
-`function` — Policy check over an agent-profile id.
-
-```ts
-<C extends object = PolicyFilterContext>(id: string, catalog: PolicyCatalog<ProfilePolicyInfo>, filter: PolicyFilter<Pr…
-```
-
 ### `filterItemsByPolicy`
 
 `function` — Browser-safe catalog filter for pickers: keep only items the policy admits.
@@ -70,12 +62,20 @@ Source: `src/policy-filters/index.ts`
 <Item extends { id: string; }, Info extends { id: string; }, C extends object = PolicyFilterContext>(items: readonly It…
 ```
 
-### `HarnessPolicyInfo`
+### `indexPolicyCatalog`
 
-`interface` — Policy metadata for one harness (the coding-agent CLI a sandbox drives).
+`function` — Index an iterable catalog into a `Map` keyed by exact id — the form to hold when one catalog answers many lookups (a picker filter, a failover chain, a busy route).
 
 ```ts
-interface HarnessPolicyInfo
+<T extends { id: string; }>(catalog: Iterable<T>) => Map<string, T>
+```
+
+### `ModelPolicy`
+
+`interface` — The policy a model-enforcement seam (`validateChatModelId`, `runWithModelFailover`, `createChatTurnRoutes`, `createSandboxChatProducer`) takes: which metadata to classify by, and which filter to appl…
+
+```ts
+interface ModelPolicy
 ```
 
 ### `ModelPolicyInfo`
@@ -88,7 +88,7 @@ interface ModelPolicyInfo
 
 ### `PolicyCatalog`
 
-`type` — Where enforcement reads an item's metadata: an in-memory iterable, or a lookup (sync or async) keyed by the item's id.
+`type` — Where enforcement reads an item's metadata: an in-memory iterable, a `ReadonlyMap` keyed by id, or a lookup (sync or async) keyed by the item's id.
 
 ```ts
 type PolicyCatalog
@@ -140,12 +140,4 @@ type PolicyFilter
 
 ```ts
 type PolicyFilterContext
-```
-
-### `ProfilePolicyInfo`
-
-`interface` — Policy metadata for one agent profile.
-
-```ts
-interface ProfilePolicyInfo
 ```

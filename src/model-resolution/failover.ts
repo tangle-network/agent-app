@@ -24,6 +24,11 @@
  * turn, a router chat completion, or a test fake without importing any of them.
  */
 
+import {
+  checkModelPolicy,
+  type ModelPolicy,
+} from '../policy-filters/index'
+
 /**
  * Error codes that mean "this model's upstream is unavailable — a different
  * model may still work". Deliberately excludes codes that would fail identically
@@ -258,6 +263,17 @@ export interface RunWithModelFailoverInput<T> {
   /** Executes one turn with the given model. */
   run: (model: string) => Promise<T>
   /**
+   * Product admission policy applied to EVERY chain member before it runs.
+   * Without this a compliant model 502ing mid-turn would silently re-run the
+   * turn's data through a non-compliant fallback: availability is not
+   * eligibility. A member the policy refuses is SKIPPED (recorded in the
+   * attempt trail with the refusal as its reason) and the walk continues; when
+   * no member is admitted the run ends in {@link ModelFailoverExhaustedError}
+   * like any other exhausted chain. Fail-closed — a member carrying no policy
+   * metadata is refused.
+   */
+  policy?: ModelPolicy
+  /**
    * Classifies a resolved result as an upstream outage. Defaults to
    * {@link isUpstreamUnavailable}, which understands the sandbox's
    * `{ success: false, errorCode }` payload.
@@ -265,7 +281,8 @@ export interface RunWithModelFailoverInput<T> {
   isUnavailableResult?: (result: T) => boolean
   /** Classifies a thrown error. Defaults to {@link isUpstreamUnavailable}. */
   isUnavailableError?: (error: unknown) => boolean
-  /** Observability hook fired each time a model is abandoned. */
+  /** Observability hook fired each time a model is abandoned — including a
+   *  policy refusal, whose `reason` is the policy's own refusal text. */
   onFallback?: (attempt: ModelFailoverAttempt, nextModel: string) => void
 }
 
@@ -287,7 +304,8 @@ function describe(signal: unknown): string {
  * immediately rather than retried down the chain — those fail identically on
  * every model, so walking the chain would only multiply latency and spend.
  *
- * @throws ModelFailoverExhaustedError when every model reports an outage.
+ * @throws ModelFailoverExhaustedError when every model reports an outage or is
+ *         refused by the configured admission policy.
  */
 export async function runWithModelFailover<T>(
   input: RunWithModelFailoverInput<T>,
@@ -301,6 +319,22 @@ export async function runWithModelFailover<T>(
 
   for (let index = 0; index < models.length; index += 1) {
     const model = models[index]!
+
+    // Policy BEFORE run: a chain member the deployment does not admit never
+    // sees the turn's data. The refusal is one failed attempt — the walk
+    // continues to the next member, and an all-refused chain exhausts exactly
+    // like an all-dead one.
+    if (input.policy) {
+      const decision = await checkModelPolicy(model, input.policy.catalog, input.policy.filter, input.policy.context)
+      if (!decision.allowed) {
+        const attempt: ModelFailoverAttempt = { model, ok: false, reason: decision.reason }
+        attempts.push(attempt)
+        const next = models[index + 1]
+        if (next) input.onFallback?.(attempt, next)
+        continue
+      }
+    }
+
     let result: T
     try {
       result = await input.run(model)

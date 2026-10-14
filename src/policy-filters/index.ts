@@ -1,6 +1,6 @@
 /**
- * Policy filters — product-supplied admission policy over the models,
- * harnesses, and agent profiles a deployment will run.
+ * Policy filters — product-supplied admission policy over the models a
+ * deployment will run.
  *
  * The engine owns the MECHANISM (a typed predicate, combinators, a fail-closed
  * enforcement seam, a catalog filter for pickers); the product owns the POLICY
@@ -38,10 +38,20 @@ export type PolicyFilter<T, C extends object = PolicyFilterContext> = (
   context: C,
 ) => boolean | Promise<boolean>
 
-/** Admit only items every filter admits. An empty `allOf` admits everything. */
+/**
+ * Admit only items every filter admits.
+ *
+ * Throws at COMPOSITION time on an empty `allOf()`: an empty conjunction
+ * admits everything, which reads as a policy that was never wired — the same
+ * silent-admission class as a missing filter. Say "no restriction" out loud
+ * with {@link allowAll} instead.
+ */
 export function allOf<T, C extends object = PolicyFilterContext>(
   ...filters: Array<PolicyFilter<T, C>>
 ): PolicyFilter<T, C> {
+  if (filters.length === 0) {
+    throw new Error('allOf() requires at least one filter — an empty allOf admits everything; use allowAll() to say so explicitly')
+  }
   return async (item, context) => {
     for (const filter of filters) {
       if (!(await filter(item, context))) return false
@@ -50,7 +60,8 @@ export function allOf<T, C extends object = PolicyFilterContext>(
   }
 }
 
-/** Admit items at least one filter admits. An empty `anyOf` admits nothing. */
+/** Admit items at least one filter admits. An empty `anyOf` admits nothing —
+ *  already fail-closed, so it is allowed. */
 export function anyOf<T, C extends object = PolicyFilterContext>(
   ...filters: Array<PolicyFilter<T, C>>
 ): PolicyFilter<T, C> {
@@ -60,6 +71,15 @@ export function anyOf<T, C extends object = PolicyFilterContext>(
     }
     return false
   }
+}
+
+/**
+ * The explicit "no restriction" filter — what an empty `allOf()` used to mean
+ * silently. Admits every item; the catalog still must classify the id (a
+ * policy of `allowAll` over an empty catalog admits nothing).
+ */
+export function allowAll<T, C extends object = PolicyFilterContext>(): PolicyFilter<T, C> {
+  return () => true
 }
 
 /**
@@ -78,32 +98,31 @@ export interface ModelPolicyInfo {
   [attribute: string]: unknown
 }
 
-/** Policy metadata for one harness (the coding-agent CLI a sandbox drives). */
-export interface HarnessPolicyInfo {
-  id: string
-  provider?: string
-  zeroDataRetention?: boolean
-  hipaaEligible?: boolean
-  [attribute: string]: unknown
-}
-
-/** Policy metadata for one agent profile. */
-export interface ProfilePolicyInfo {
-  id: string
-  model?: string
-  harness?: string
-  zeroDataRetention?: boolean
-  hipaaEligible?: boolean
-  [attribute: string]: unknown
+/**
+ * The policy a model-enforcement seam (`validateChatModelId`,
+ * `runWithModelFailover`, `createChatTurnRoutes`, `createSandboxChatProducer`)
+ * takes: which metadata to classify by, and which filter to apply. One shape,
+ * threaded unchanged through every seam so a product states its admission
+ * policy exactly once.
+ */
+export interface ModelPolicy<C extends object = PolicyFilterContext> {
+  filter: PolicyFilter<ModelPolicyInfo, C>
+  catalog: PolicyCatalog<ModelPolicyInfo>
+  /** Threaded to the filter unchanged. */
+  context?: C
 }
 
 /**
- * Where enforcement reads an item's metadata: an in-memory iterable, or a
- * lookup (sync or async) keyed by the item's id. Returning `undefined` means
- * UNCLASSIFIED — enforcement refuses the item.
+ * Where enforcement reads an item's metadata: an in-memory iterable, a
+ * `ReadonlyMap` keyed by id, or a lookup (sync or async) keyed by the item's
+ * id. Returning `undefined` means UNCLASSIFIED — enforcement refuses the item.
+ *
+ * Key the catalog by the EXACT id string the turn carries (see
+ * docs/policy-filters.md § "Ids are exact strings"). Lookups never normalize.
  */
 export type PolicyCatalog<T extends { id: string }> =
   | Iterable<T>
+  | ReadonlyMap<string, T>
   | ((id: string) => T | undefined | Promise<T | undefined>)
 
 /** Why a policy check refused, machine-readable on the result and on {@link PolicyDeniedError}. */
@@ -148,7 +167,11 @@ async function lookupPolicyInfo<T extends { id: string }>(
   id: string,
 ): Promise<T | undefined> {
   if (typeof catalog === 'function') return catalog(id)
-  for (const entry of catalog) {
+  // A ReadonlyMap answers by key — checked by its `get`, not `instanceof Map`,
+  // so a frozen or cross-realm map still counts.
+  const maybeMap = catalog as ReadonlyMap<string, T>
+  if (typeof maybeMap.get === 'function') return maybeMap.get(id)
+  for (const entry of catalog as Iterable<T>) {
     if (entry.id === id) return entry
   }
   return undefined
@@ -209,32 +232,15 @@ export function checkModelPolicy<C extends object = PolicyFilterContext>(
   return checkPolicy({ kind: 'model', id, catalog, filter, context })
 }
 
-/** Policy check over a harness id. See {@link checkPolicy}. */
-export function checkHarnessPolicy<C extends object = PolicyFilterContext>(
-  id: string,
-  catalog: PolicyCatalog<HarnessPolicyInfo>,
-  filter: PolicyFilter<HarnessPolicyInfo, C>,
-  context?: C,
-): Promise<PolicyCheckResult<HarnessPolicyInfo>> {
-  return checkPolicy({ kind: 'harness', id, catalog, filter, context })
-}
-
-/** Policy check over an agent-profile id. See {@link checkPolicy}. */
-export function checkProfilePolicy<C extends object = PolicyFilterContext>(
-  id: string,
-  catalog: PolicyCatalog<ProfilePolicyInfo>,
-  filter: PolicyFilter<ProfilePolicyInfo, C>,
-  context?: C,
-): Promise<PolicyCheckResult<ProfilePolicyInfo>> {
-  return checkPolicy({ kind: 'profile', id, catalog, filter, context })
-}
-
 /**
  * Browser-safe catalog filter for pickers: keep only items the policy admits.
  * Items the catalog does not classify are dropped — a picker offers exactly
  * what a turn would run, and no more. Per docs/ui-picker-canon.md the picker
  * itself still reconciles an absent SAVED value under its own name; this
  * filter shapes the offered list, never the saved value.
+ *
+ * An iterable catalog is indexed ONCE into a Map up front: per-item rescans
+ * are O(items × catalog) and silently return nothing on a one-shot iterable.
  */
 export async function filterItemsByPolicy<
   Item extends { id: string },
@@ -246,10 +252,27 @@ export async function filterItemsByPolicy<
   filter: PolicyFilter<Info, C>,
   context?: C,
 ): Promise<Item[]> {
+  const indexed: PolicyCatalog<Info> =
+    typeof catalog === 'function' || typeof (catalog as ReadonlyMap<string, Info>).get === 'function'
+      ? catalog
+      : indexPolicyCatalog(catalog as Iterable<Info>)
   const admitted: Item[] = []
   for (const item of items) {
-    const result = await checkPolicy({ kind: 'catalog item', id: item.id, catalog, filter, context })
+    const result = await checkPolicy({ kind: 'catalog item', id: item.id, catalog: indexed, filter, context })
     if (result.allowed) admitted.push(item)
   }
   return admitted
+}
+
+/**
+ * Index an iterable catalog into a `Map` keyed by exact id — the form to hold
+ * when one catalog answers many lookups (a picker filter, a failover chain, a
+ * busy route). Ids must be unique: a Map keeps the LAST entry for a repeated
+ * id while a linear scan of the iterable finds the FIRST, and a catalog with
+ * duplicate ids is a product bug either way.
+ */
+export function indexPolicyCatalog<T extends { id: string }>(catalog: Iterable<T>): Map<string, T> {
+  const index = new Map<string, T>()
+  for (const entry of catalog) index.set(entry.id, entry)
+  return index
 }

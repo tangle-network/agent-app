@@ -6,8 +6,10 @@ import {
   cleanModelId,
   isWellFormedModelId,
   catalogIdsForModel,
+  modelPolicyCatalogFromRouter,
   type LoadModels,
   type ModelInfo,
+  type RouterModelPolicyRow,
 } from './index'
 
 const DEFAULT = 'gemini-2.5-flash-lite'
@@ -154,6 +156,63 @@ describe('validateChatModelId — policy enforcement on the admission seam', () 
     // 'gpt-5' resolves to 'openai/gpt-5', which the policy rejects.
     const r = await validateChatModelId('gpt-5', { loadModels, routerBaseUrl: ROUTER, policy })
     expect(r.succeeded).toBe(false)
+  })
+})
+
+describe('modelPolicyCatalogFromRouter — snake_case router flags → ModelPolicyInfo', () => {
+  // Field names verified against the LIVE router (router.tangle.tools
+  // /api/models, 2026-10-14): every row carries `zdr` and `hipaa_eligible`
+  // snake_case alongside the bare `id` + `_provider` this module already reads.
+  const ROWS: RouterModelPolicyRow[] = [
+    { id: 'claude-sonnet-4-6', _provider: 'anthropic', zdr: true, hipaa_eligible: true },
+    { id: 'gpt-5', _provider: 'openai', zdr: true, hipaa_eligible: false },
+    { id: 'vertex/gemini-2.5-pro', zdr: false, hipaa_eligible: false },
+  ]
+
+  it('maps zdr/hipaa_eligible to zeroDataRetention/hipaaEligible and carries the provider', () => {
+    const catalog = modelPolicyCatalogFromRouter(ROWS)
+    const sonnet = catalog.find((m) => m.id === 'anthropic/claude-sonnet-4-6')
+    expect(sonnet).toEqual({
+      id: 'anthropic/claude-sonnet-4-6',
+      provider: 'anthropic',
+      zeroDataRetention: true,
+      hipaaEligible: true,
+    })
+    const gpt = catalog.find((m) => m.id === 'openai/gpt-5')
+    expect(gpt).toMatchObject({ zeroDataRetention: true, hipaaEligible: false })
+  })
+
+  it('emits an entry per admitted spelling — bare AND canonical — so exact-string lookups classify either', () => {
+    const catalog = modelPolicyCatalogFromRouter(ROWS)
+    const ids = catalog.map((m) => m.id)
+    // validateChatModelId admits both spellings of a provider-tagged bare id;
+    // the policy catalog must too, or one lane would fail closed on a model
+    // the other admitted.
+    expect(ids).toContain('claude-sonnet-4-6')
+    expect(ids).toContain('anthropic/claude-sonnet-4-6')
+    // An already-prefixed row yields exactly one entry.
+    expect(ids.filter((id) => id === 'vertex/gemini-2.5-pro')).toHaveLength(1)
+  })
+
+  it('never invents a flag — a row without one yields undefined, which a === true filter refuses', async () => {
+    const catalog = modelPolicyCatalogFromRouter([{ id: 'mystery-model', _provider: 'acme' }])
+    const entry = catalog.find((m) => m.id === 'acme/mystery-model')!
+    expect(entry.zeroDataRetention).toBeUndefined()
+    expect(entry.hipaaEligible).toBeUndefined()
+    const zdrHipaaOnly = allOf<ModelPolicyInfo>(
+      (m) => m.zeroDataRetention === true,
+      (m) => m.hipaaEligible === true,
+    )
+    expect(await zdrHipaaOnly(entry, {})).toBe(false)
+  })
+
+  it('skips rows with a blank or non-string id', () => {
+    const catalog = modelPolicyCatalogFromRouter([
+      { id: '  ', _provider: 'acme', zdr: true },
+      { id: 42 as unknown as string, _provider: 'acme', zdr: true },
+      { id: 'kept', _provider: 'acme', zdr: true },
+    ])
+    expect(catalog.map((m) => m.id).sort()).toEqual(['acme/kept', 'kept'])
   })
 })
 

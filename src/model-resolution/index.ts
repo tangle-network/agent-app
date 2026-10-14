@@ -24,10 +24,8 @@
 
 import {
   checkModelPolicy,
+  type ModelPolicy,
   type ModelPolicyInfo,
-  type PolicyCatalog,
-  type PolicyFilter,
-  type PolicyFilterContext,
 } from '../policy-filters/index'
 
 /** The router /v1/models entry shape this module reads. Minimal on purpose. */
@@ -111,11 +109,7 @@ export interface ValidateChatModelIdInput {
   /** Product admission policy, evaluated AFTER availability on EVERY admission
    *  path (allowlist, env, catalog). Fail-closed: a validated model with no
    *  policy metadata in `catalog` is refused. */
-  policy?: {
-    filter: PolicyFilter<ModelPolicyInfo>
-    catalog: PolicyCatalog<ModelPolicyInfo>
-    context?: PolicyFilterContext
-  }
+  policy?: ModelPolicy
 }
 
 /**
@@ -205,6 +199,54 @@ export function catalogIdsForModel(model: ModelInfo): string[] {
     if (canonical.includes('/')) ids.add(canonical)
   }
   return [...ids]
+}
+
+/**
+ * A router `/v1/models` row carrying the compliance flags
+ * {@link modelPolicyCatalogFromRouter} reads. The router spells them
+ * snake_case; the policy catalog spells them camelCase (`ModelPolicyInfo`).
+ */
+export interface RouterModelPolicyRow extends ModelInfo {
+  /** The provider retains no prompt/response data for this model. */
+  zdr?: boolean
+  /** The vendor will sign a BAA covering this model. */
+  hipaa_eligible?: boolean
+}
+
+/**
+ * Map router `/v1/models` rows to a {@link ModelPolicyInfo} catalog: snake_case
+ * `zdr` / `hipaa_eligible` become `zeroDataRetention` / `hipaaEligible`, and
+ * `provider` comes from the row's `_provider`/`provider`.
+ *
+ * GRANULARITY: the flags are trusted VERBATIM, per row, at whatever
+ * granularity the router publishes them. A ZDR/BAA attestation is commonly a
+ * provider-wide vendor fact, but this mapper never infers one model's
+ * eligibility from a sibling's — a row that omits a flag yields `undefined`
+ * for it, and a filter reading `=== true` refuses that row (fail closed). If
+ * your attestation is provider-wide, publish it on every row upstream rather
+ * than asking the mapper to guess.
+ *
+ * ID KEYING: one entry is emitted per spelling {@link catalogIdsForModel}
+ * yields (the bare id AND its provider-prefixed canonical form), so a turn
+ * carrying either spelling classifies — lookups in `/policy-filters` are
+ * exact-string and never normalize. Rows with a blank/non-string id are
+ * skipped. Duplicate ids across rows are a product bug (see
+ * `indexPolicyCatalog`).
+ */
+export function modelPolicyCatalogFromRouter(rows: Iterable<RouterModelPolicyRow>): ModelPolicyInfo[] {
+  const catalog: ModelPolicyInfo[] = []
+  for (const row of rows) {
+    if (typeof row.id !== 'string' || !row.id.trim()) continue
+    const provider = row._provider ?? row.provider
+    const flags = {
+      ...(typeof row.zdr === 'boolean' ? { zeroDataRetention: row.zdr } : {}),
+      ...(typeof row.hipaa_eligible === 'boolean' ? { hipaaEligible: row.hipaa_eligible } : {}),
+    }
+    for (const id of catalogIdsForModel(row)) {
+      catalog.push({ id, ...(provider ? { provider } : {}), ...flags })
+    }
+  }
+  return catalog
 }
 
 // Reactive failover for the case validation cannot catch: a model that IS in the

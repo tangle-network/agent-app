@@ -82,6 +82,7 @@ import {
   type TurnEventStore,
 } from '../stream/index'
 import type { ModelFailoverAttempt } from '../model-resolution/failover'
+import { checkModelPolicy, type ModelPolicy } from '../policy-filters/index'
 import { parseJsonObjectBody } from '../web/index'
 import {
   buildTurnPhaseEvent,
@@ -531,6 +532,19 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  a plain response without the progress header, a `turn.response` event
    *  with it. Omit → nothing to prepare. */
   prepareTurn?(args: ChatTurnPrepareArgs<TContext>): ChatTurnPrepareResult | Promise<ChatTurnPrepareResult>
+  /** Product admission policy over the model a turn NAMES. When the request
+   *  body carries a `model`, it is checked here — after `authorize`, before
+   *  the conversation loads, the lock is taken, or any row is written — and a
+   *  refusal answers 403 with the policy's reason. Fail-closed: a named model
+   *  carrying no policy metadata is refused.
+   *
+   *  This is half the enforcement. A body without `model` resolves to a
+   *  product default inside `produce`, which this seam never sees — enforce
+   *  that half at execution with `createSandboxChatProducer`'s `modelPolicy`
+   *  (or `runWithModelFailover`'s `policy` on a custom producer), which also
+   *  covers every fallback the turn could fail over to. Wire the SAME policy
+   *  object to both. Omit → no policy check (today's behavior). */
+  modelPolicy?: ModelPolicy
   /** Thread/message persistence (`/chat-store`'s store or a product adapter). */
   store: ChatTurnMessageStore
   /** Turn-event buffer (`createD1TurnEventStore(env.DB)` or `/turn-stream`'s
@@ -960,6 +974,21 @@ export function createChatTurnRoutes<TContext = void>(
     }
     const auth = await options.authorize({ request, intent: 'turn', body: parsed.payload })
     if (!auth.ok) return { ok: false, response: auth.response }
+    // Admission policy on the model the turn NAMES, before any side effect.
+    // The unnamed-model half resolves inside `produce`; the producer-side
+    // policy covers it at execution.
+    const namedModel = typeof parsed.payload.model === 'string' ? parsed.payload.model.trim() : ''
+    if (options.modelPolicy && namedModel) {
+      const decision = await checkModelPolicy(
+        namedModel,
+        options.modelPolicy.catalog,
+        options.modelPolicy.filter,
+        options.modelPolicy.context,
+      )
+      if (!decision.allowed) {
+        return { ok: false, response: Response.json({ code: 'model_policy_denied', error: decision.reason }, { status: 403 }) }
+      }
+    }
     return { ok: true, parsed, auth }
   }
 

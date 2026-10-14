@@ -26,7 +26,7 @@ _134 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./catalog`](api/catalog.md) | 10 | `runtime` |
 | [`./channels`](api/channels.md) | 47 | `web-react` |
 | [`./chat-react`](api/chat-react.md) | 5 | `web-react` |
-| [`./chat-routes`](api/chat-routes.md) | 259 | `chat-store`, `interactions`, `model-resolution`, `plans`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `web` |
+| [`./chat-routes`](api/chat-routes.md) | 259 | `chat-store`, `interactions`, `model-resolution`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `web` |
 | [`./chat-store`](api/chat-store.md) | 59 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
 | [`./chatgpt-react`](api/chatgpt-react.md) | 5 | `agent-enrollment`, `web-react` |
 | [`./chatgpt-react/styles`](api/chatgpt-react-styles.md) | 0 | `agent-enrollment`, `web-react` |
@@ -69,7 +69,7 @@ _134 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
 | [`./legibility/cli`](api/legibility-cli.md) | 0 | `signoff` |
 | [`./missions`](api/missions.md) | 65 | — |
-| [`./model-resolution`](api/model-resolution.md) | 24 | `policy-filters` |
+| [`./model-resolution`](api/model-resolution.md) | 26 | `policy-filters` |
 | [`./object-store`](api/object-store.md) | 20 | `crypto` |
 | [`./openui`](api/openui.md) | 35 | `web` |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
@@ -78,7 +78,7 @@ _134 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 1 | `signoff` |
 | [`./plans`](api/plans.md) | 12 | — |
 | [`./platform`](api/platform.md) | 123 | `billing`, `runtime`, `web` |
-| [`./policy-filters`](api/policy-filters.md) | 18 | — |
+| [`./policy-filters`](api/policy-filters.md) | 17 | — |
 | [`./preflight`](api/preflight.md) | 14 | `signoff` |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | `signoff` |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 36 | `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`, `web` |
@@ -329,7 +329,7 @@ Depends on: `web-react`
 
 Source: `src/chat-routes/index.ts` · 259 exports
 
-Depends on: `chat-store`, `interactions`, `model-resolution`, `plans`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `web`
+Depends on: `chat-store`, `interactions`, `model-resolution`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `web`
 
 `AbortAttachmentWriteFn`, `aggregateNativeCompletionReceipts`, `ALLOWED_ATTACHMENT_SNIFFED_MIMES`, `assertPromptPartsWithinCap`, `AssistantDraftSnapshot`, `AssistantDraftStore`, `AssistantDraftWriter`, `AssistantDraftWriterOptions`, `assistantRowIdForTurn`, `AssistantRowValues`, `AtomicAttachmentUploadAuthorization`, `AtomicAttachmentWriteOptions`, `AtomicAttachmentWriter`, `AtomicAttachmentWriteResult`, `AtomicPromoteAgentFilePartOptions`, `AtomicWriteAttachmentFn`, `ATTACHMENT_ACCEPT`, `ATTACHMENT_MAX_COUNT`, `ATTACHMENT_ROLLBACK_FAILURE_CODE`, `ATTACHMENT_ROLLBACK_FAILURE_MESSAGE`, `ATTACHMENT_STORAGE_FAILURE_MESSAGE`, `AttachmentPathArgs`, `AttachmentPathCheck`, `AttachmentReadResult`, `attachmentSizeErrorMessage`, `attachmentTotalSizeErrorMessage`, `AttachmentTypeCheckResult`, `AttachmentUploadAuthorization`, `AttachmentUploadLogger`, `AttachmentWriteOptions`, `AttachmentWriteOwnership`, `AttachmentWriteReceipt`, `AttachmentWriteResult`, `base64WireLen`, `boundNativeCompletionReceipt`, `buildDispatchParts`, `BuildDispatchPartsInput`, `buildMentionPromptBlock`, `buildTurnPhaseEvent`, `bytesToBase64`, `ChatAttachmentInput`, `ChatAttachmentKind`, `ChatMentionKind`, `ChatReasoningEffort`, `ChatRouteDurableProjection`, `ChatRouteDurableProjectionLogger`, `ChatRouteEvent`, `ChatTurnAuthorization`, `ChatTurnAuthorizeArgs`, `ChatTurnCompleteInput`, `ChatTurnExecutionLimits`, `ChatTurnFilePartInput`, `ChatTurnGateResult`, `ChatTurnHeartbeat`, `ChatTurnInputError`, `ChatTurnInputPatch`, `ChatTurnIntelligenceOptions`, `ChatTurnIntentLine`, `ChatTurnIntentLineArgs`, `ChatTurnLifecycle`, `ChatTurnLifecycleComplete`, `ChatTurnLifecycleError`, `ChatTurnLifecycleStart`, `ChatTurnLock`, `ChatTurnLockResult`, `ChatTurnMessageStore`, `ChatTurnModelAttribution`, `ChatTurnModelFailover`, `ChatTurnPartInput`, `ChatTurnPrepareArgs`, `ChatTurnPrepareResult`, `ChatTurnProduceArgs`, `ChatTurnRequestContext`, `chatTurnRequestInit`, `ChatTurnRequestPayload`, `ChatTurnRouteProducer`, `ChatTurnRoutes`, `ChatTurnTextPartInput`, `ChatTurnUsage`, `checkAttachmentType`, `classifyTerminalFailure`, `CompletedSandboxTurnSource`, `createAssistantDraftWriter`, `CreateAtomicAttachmentUploadRouteOptions`, `createAtomicAttachmentWriter`, `createAttachmentUploadRoute`, `CreateAttachmentUploadRouteOptions`, `createChatTurnRoutes`, `CreateChatTurnRoutesOptions`, `createD1PlanFollowUpGate`, `CreateLegacyAttachmentUploadRouteOptions`, `createProtectedRuntimeChatProducer`, `createRouterTurnProducer`, `createSandboxChatProducer`, `createSandboxFileIndexRoute`, `CreateSandboxFileIndexRouteOptions`, `createUploadRoute`, `CreateUploadRouteOptions`, `D1BoundForPlanFollowUps`, `D1LikeForPlanFollowUps`, `DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS`, `DEFAULT_MODEL_STREAM_OPEN_TIMEOUT_MS`, `DEFAULT_STALE_TURN_LOCK_GRACE_MS`, `DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS`, `defaultValidateAttachmentPath`, `DetachedTurnFinal`, `DetachedTurnOptions`, `DetachedTurnParts`, `DetachedTurnResult`, `DISPATCH_MAX_MEDIA_PARTS`, `DISPATCH_MAX_PARTS`, `DISPATCH_REQUEST_MAX_BYTES`, `DISPATCH_STRUCTURAL_RESERVE_BYTES`, `DispatchPartsOutcome`, `DraftPersistenceTuning`, `DraftStoredMessage`, `EmptyTurnRetryInfo`, `FileIndexAuthorization`, `FileIndexCache`, `FileIndexReadyResponse`, `FileIndexResponse`, `FileIndexWarmingResponse`, `FileMention`, `fileMentionsToParts`, `FileMentionsToPartsOptions`, `FilePartPromotionOutcome`, `formatBytes`, `immutableAttachmentPath`, `INLINE_PARTS_MAX_BYTES`, `INTENT_LINE_HISTORY_MESSAGES`, `INTENT_LINE_MAX_CHARS`, `INTENT_LINE_TIMEOUT_MS`, `isCommittingSandboxEvent`, `isDraftContentEvent`, `isLiveLifecycleEvent`, `isTurnIntentEvent`, `isTurnPhaseEvent`, `MACRO_ENABLED_OOXML_SNIFFED_MIMES`, `MAX_ATTACHMENT_TOTAL_BYTES`, `MAX_BINARY_ATTACHMENT_BYTES`, `MAX_EMPTY_TURN_RETRIES`, `MAX_TEXT_ATTACHMENT_BYTES`, `mediaTypeForMentionPath`, `MENTION_MAX_COUNT`, `mentionKindForPath`, `ModelAttemptTimeoutCode`, `ModelFailoverStreamHandle`, `ModelFailoverStreamOptions`, `ModelFailoverTimeoutError`, `ModelFallbackInfo`, `NATIVE_COMPLETION_RECEIPT_MAX_BYTES`, `NativeCompletionAdmission`, `NativeCompletionAdmissionStore`, `NativeCompletionObservation`, `NativeCompletionObservationOptions`, `NativeCompletionReceipt`, `NativeCompletionSessionSource`, `NativeCompletionTurnReceipt`, `normalizeChatPromptForSandbox`, `observeChatTurnStream`, `observeNativeCompletion`, `OOXML_PRESENTATION_MACRO_ENABLED_MIME`, `OOXML_PRESENTATION_MIME`, `OOXML_SNIFFED_MIMES`, `OOXML_SPREADSHEET_MACRO_ENABLED_MIME`, `OOXML_SPREADSHEET_MIME`, `OOXML_WORD_MACRO_ENABLED_MIME`, `OOXML_WORD_MIME`, `OpenModelStream`, `parseChatTurnParts`, `parseFileMentions`, `parsePlanFollowUpAttach`, `PlanFollowUpAdmission`, `PlanFollowUpAttach`, `planFollowUpExecutionId`, `PlanFollowUpGate`, `PlanFollowUpGateOptions`, `PlanFollowUpOutcome`, `PlanFollowUpResolution`, `PlanFollowUpSettlement`, `produceChatTurnWithIntelligence`, `ProducerErrorEvent`, `ProducerNoticeEvent`, `ProducerPassthroughEvent`, `ProducerPassthroughEventType`, `ProducerReasoningEvent`, `ProducerTextEvent`, `ProducerToolCallEvent`, `ProducerToolResultEvent`, `ProducerUsageEvent`, `ProducerWireEvent`, `PROMOTE_MAX_FILE_BYTES`, `promoteAgentFilePart`, `PromoteAgentFilePartOptions`, `PromoteFilePartResult`, `PromptInputPart`, `promptPartsByteSize`, `ProtectedRuntimeChatOptions`, `RawAgentFilePart`, `ReadAttachmentFn`, `readCompletedSandboxTurn`, `ReadCompletedSandboxTurnOptions`, `ReadSandboxMentionFn`, `reconcileStaleTurnLock`, `ReconcileStaleTurnLockOptions`, `ReconcileStaleTurnLockResult`, `recoverSandboxAssistantMessage`, `resolveChatAttachments`, `ResolveChatAttachmentsOptions`, `ResolveChatAttachmentsResult`, `resolveEmptyTurnRetries`, `resolvePlanFollowUpRequest`, `RouterTurnProducerOptions`, `rowIdOf`, `runDetachedTurn`, `RUNTIME_RESTARTED_ERROR`, `SandboxChatProducerOptions`, `SandboxFileTreeSource`, `SandboxMentionPathCheck`, `SandboxTreeFile`, `SandboxTreeResult`, `SandboxUploadSink`, `sanitizeAttachmentFileName`, `sanitizeUploadFilename`, `settleTurnResponse`, `sniffBinary`, `sniffMimeFromName`, `SniffResult`, `StaleTurnLockSandboxProbeResult`, `StaleTurnLockSessionProbeResult`, `storeSupportsDraftPersistence`, `streamChatRouteAsSandboxEvents`, `StreamChatRouteAsSandboxOptions`, `streamPlanFollowUpEvents`, `streamWithModelFailover`, `summarizeFailoverReason`, `TOOL_ABORTED_ERROR`, `TURN_INTENT_EVENT`, `TURN_PHASE_EVENT`, `TURN_PROGRESS_FIRST`, `TURN_PROGRESS_HEADER`, `TURN_RESPONSE_EVENT`, `TURN_ROUTE_PHASE_MESSAGES`, `TURN_STREAM_LOST_CODE`, `TurnIntentData`, `TurnIntentEvent`, `TurnPhaseData`, `TurnPhaseEvent`, `TurnResponseData`, `turnResponseEventFor`, `TurnRoutePhase`, `unwrapSessionEventPayload`, `UPLOAD_INLINE_MAX_BYTES`, `UPLOAD_MAX_FILE_BYTES`, `UploadAuthorization`, `UploadedChatFile`, `validateSandboxMentionPath`, `withDurableChatProjection`, `WriteAttachmentFn`
 
@@ -721,11 +721,11 @@ Source: `src/missions/index.ts` · 65 exports
 
 ## `./model-resolution`
 
-Source: `src/model-resolution/index.ts` · 24 exports
+Source: `src/model-resolution/index.ts` · 26 exports
 
 Depends on: `policy-filters`
 
-`buildModelChain`, `catalogIdsForModel`, `ChatModelSource`, `ChatModelValidationFailure`, `ChatModelValidationResult`, `ChatModelValidationSuccess`, `cleanModelId`, `isUpstreamUnavailable`, `isWellFormedModelId`, `LoadModels`, `ModelFailoverAttempt`, `ModelFailoverExhaustedError`, `ModelFailoverResult`, `ModelInfo`, `readHttpStatusHint`, `resolveChatModel`, `ResolveChatModelInput`, `ResolvedChatModel`, `runWithModelFailover`, `RunWithModelFailoverInput`, `UPSTREAM_UNAVAILABLE_CODES`, `UPSTREAM_UNAVAILABLE_STATUSES`, `validateChatModelId`, `ValidateChatModelIdInput`
+`buildModelChain`, `catalogIdsForModel`, `ChatModelSource`, `ChatModelValidationFailure`, `ChatModelValidationResult`, `ChatModelValidationSuccess`, `cleanModelId`, `isUpstreamUnavailable`, `isWellFormedModelId`, `LoadModels`, `ModelFailoverAttempt`, `ModelFailoverExhaustedError`, `ModelFailoverResult`, `ModelInfo`, `modelPolicyCatalogFromRouter`, `readHttpStatusHint`, `resolveChatModel`, `ResolveChatModelInput`, `ResolvedChatModel`, `RouterModelPolicyRow`, `runWithModelFailover`, `RunWithModelFailoverInput`, `UPSTREAM_UNAVAILABLE_CODES`, `UPSTREAM_UNAVAILABLE_STATUSES`, `validateChatModelId`, `ValidateChatModelIdInput`
 
 [Full API →](api/model-resolution.md)
 
@@ -809,9 +809,9 @@ Depends on: `billing`, `runtime`, `web`
 
 ## `./policy-filters`
 
-Source: `src/policy-filters/index.ts` · 18 exports
+Source: `src/policy-filters/index.ts` · 17 exports
 
-`allOf`, `anyOf`, `assertPolicy`, `checkHarnessPolicy`, `checkModelPolicy`, `checkPolicy`, `checkProfilePolicy`, `filterItemsByPolicy`, `HarnessPolicyInfo`, `ModelPolicyInfo`, `PolicyCatalog`, `PolicyCheckInput`, `PolicyCheckResult`, `PolicyDeniedCode`, `PolicyDeniedError`, `PolicyFilter`, `PolicyFilterContext`, `ProfilePolicyInfo`
+`allOf`, `allowAll`, `anyOf`, `assertPolicy`, `checkModelPolicy`, `checkPolicy`, `filterItemsByPolicy`, `indexPolicyCatalog`, `ModelPolicy`, `ModelPolicyInfo`, `PolicyCatalog`, `PolicyCheckInput`, `PolicyCheckResult`, `PolicyDeniedCode`, `PolicyDeniedError`, `PolicyFilter`, `PolicyFilterContext`
 
 [Full API →](api/policy-filters.md)
 

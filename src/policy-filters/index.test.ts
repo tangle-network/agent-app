@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   allOf,
+  allowAll,
   anyOf,
   assertPolicy,
-  checkHarnessPolicy,
   checkModelPolicy,
   checkPolicy,
-  checkProfilePolicy,
   filterItemsByPolicy,
+  indexPolicyCatalog,
   PolicyDeniedError,
   type ModelPolicyInfo,
   type PolicyFilter,
@@ -53,6 +53,26 @@ describe('allOf / anyOf combinators', () => {
     }
     await allOf(probe, probe)(MODELS[0]!, { workspaceId: 'w-1' })
     expect(seen).toEqual(['w-1', 'w-1'])
+  })
+
+  it('allOf() with zero filters THROWS at composition time — no silent admit-everything', () => {
+    // Pinned semantics: an empty conjunction is a policy that was never wired.
+    // Composition-time, not first-use: the bug fails the moment it is written,
+    // not the first turn that depends on it.
+    expect(() => allOf<ModelPolicyInfo>()).toThrow(/empty allOf admits everything/)
+  })
+
+  it('allowAll() is the explicit no-restriction filter, and the catalog still gates', async () => {
+    expect(await allowAll<ModelPolicyInfo>()(MODELS[2]!, {})).toBe(true)
+    // allowAll admits what the catalog CLASSIFIES; an unclassified id still
+    // fails closed — "no restriction" is not "no catalog".
+    const result = await checkModelPolicy('mystery/model', MODELS, allowAll())
+    expect(result.allowed).toBe(false)
+    if (!result.allowed) expect(result.code).toBe('policy-metadata-missing')
+  })
+
+  it('an empty anyOf admits nothing (fail-closed, so it stays allowed)', async () => {
+    expect(await anyOf<ModelPolicyInfo>()(MODELS[0]!, {})).toBe(false)
   })
 })
 
@@ -110,6 +130,24 @@ describe('checkPolicy — pass / deny / fail-closed', () => {
     expect((await checkModelPolicy('openai/gpt-5', async_, ZDR_ONLY)).allowed).toBe(true)
     expect((await checkModelPolicy('absent', async_, ZDR_ONLY)).allowed).toBe(false)
   })
+
+  it('accepts a ReadonlyMap catalog keyed by exact id', async () => {
+    const catalog = indexPolicyCatalog(MODELS)
+    const readonlyCatalog: ReadonlyMap<string, ModelPolicyInfo> = catalog
+    expect((await checkModelPolicy('anthropic/claude-sonnet-4-6', readonlyCatalog, zdrHipaa)).allowed).toBe(true)
+    expect((await checkModelPolicy('openai/gpt-5', readonlyCatalog, zdrHipaa)).allowed).toBe(false)
+    expect((await checkModelPolicy('absent', readonlyCatalog, zdrHipaa)).allowed).toBe(false)
+  })
+
+  it('generic kinds name the refused item — one mechanism serves any domain', async () => {
+    // Harnesses, profiles, anything else: `checkPolicy` takes the kind as data.
+    const harness = await checkPolicy({ kind: 'harness', id: 'opencode', catalog: [], filter: () => true })
+    const profile = await checkPolicy({ kind: 'profile', id: 'default', catalog: [], filter: () => true })
+    expect(harness.allowed).toBe(false)
+    expect(profile.allowed).toBe(false)
+    if (!harness.allowed) expect(harness.reason).toContain('harness "opencode"')
+    if (!profile.allowed) expect(profile.reason).toContain('profile "default"')
+  })
 })
 
 describe('assertPolicy — throwing enforcement form', () => {
@@ -140,17 +178,6 @@ describe('assertPolicy — throwing enforcement form', () => {
   })
 })
 
-describe('typed wrappers name the refused kind', () => {
-  it('harness and profile checks carry their kind in the reason', async () => {
-    const harness = await checkHarnessPolicy('opencode', [], () => true)
-    const profile = await checkProfilePolicy('default', [], () => true)
-    if (!harness.allowed) expect(harness.reason).toContain('harness "opencode"')
-    if (!profile.allowed) expect(profile.reason).toContain('profile "default"')
-    expect(harness.allowed).toBe(false)
-    expect(profile.allowed).toBe(false)
-  })
-})
-
 describe('filterItemsByPolicy — picker catalog filter', () => {
   it('keeps only classified, policy-passing items', async () => {
     const pickerCatalog = [
@@ -166,5 +193,32 @@ describe('filterItemsByPolicy — picker catalog filter', () => {
   it('an empty result is honest — the picker renders its empty-catalogue state', async () => {
     const admitted = await filterItemsByPolicy([{ id: 'acme/retained-logs' }], MODELS, ZDR_ONLY)
     expect(admitted).toEqual([])
+  })
+
+  it('consumes an iterable catalog ONCE — a one-shot generator still classifies every item', async () => {
+    // A per-item rescan is O(items x catalog) AND silently wrong on a one-shot
+    // iterable: the second item's scan would see an exhausted generator and
+    // fail closed. One hoisted index answers every lookup.
+    function* once() {
+      yield* MODELS
+    }
+    const items = MODELS.map((m) => ({ id: m.id, name: m.id }))
+    const admitted = await filterItemsByPolicy(items, once(), ZDR_ONLY)
+    expect(admitted.map((m) => m.id)).toEqual(['anthropic/claude-sonnet-4-6', 'openai/gpt-5'])
+  })
+
+  it('accepts a ReadonlyMap catalog without rescanning', async () => {
+    const items = MODELS.map((m) => ({ id: m.id }))
+    const admitted = await filterItemsByPolicy(items, indexPolicyCatalog(MODELS), ZDR_ONLY)
+    expect(admitted.map((m) => m.id)).toEqual(['anthropic/claude-sonnet-4-6', 'openai/gpt-5'])
+  })
+})
+
+describe('indexPolicyCatalog', () => {
+  it('indexes entries by exact id', () => {
+    const index = indexPolicyCatalog(MODELS)
+    expect(index.get('openai/gpt-5')).toBe(MODELS[1])
+    expect(index.get('OPENAI/GPT-5')).toBeUndefined()
+    expect(index.size).toBe(MODELS.length)
   })
 })
