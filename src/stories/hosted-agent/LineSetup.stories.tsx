@@ -71,6 +71,20 @@ export const ManualNumberReconnect: Story = {
   render: () => <SetupFixture snapshot={setupManualNumberReconnect} scopeKey="storybook-manual-number" initialTargetId="agent_guide" />,
 }
 
+export const OwnedVoiceNumber: Story = {
+  render: () => <SetupFixture snapshot={{ ...setupEmpty, connections: [{
+    id: 'conn_voice', label: 'Owned ph0ny connection', providerId: 'ph0ny',
+    identities: [{ kind: 'number', transport: 'voice', label: '+1 303 555 0101' }],
+  }] }} scopeKey="storybook-voice" />,
+}
+
+export const TelegramHandle: Story = {
+  render: () => <SetupFixture snapshot={{ ...setupEmpty, connections: [{
+    id: 'conn_telegram', label: 'Owned Telegram bot', providerId: 'telegram',
+    identities: [{ kind: 'handle', transport: 'telegram', label: '@helper' }],
+  }] }} scopeKey="storybook-telegram" />,
+}
+
 export const Empty: Story = {
   render: () => <SetupFixture snapshot={{ ...setupEmpty, connections: [] }} scopeKey="storybook-empty" />,
 }

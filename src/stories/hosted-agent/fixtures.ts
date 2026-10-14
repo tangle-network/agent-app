@@ -103,7 +103,7 @@ export function createSetupClient(initial: LineSetupSnapshot): LineSetupClient {
         id: 'ln_email',
         connectionId: input.connectionId,
         transport: input.transport,
-        address: 'agent@example.com',
+        address: input.transport === 'voice' ? '+13035550101' : input.transport === 'telegram' ? '@helper' : 'agent@example.com',
         connect: null,
         routerAddress: null,
         providerNumberId: input.phoneNumberId ?? null,
