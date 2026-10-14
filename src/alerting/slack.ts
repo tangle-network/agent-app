@@ -10,7 +10,7 @@
  * problem: the credentials were indistinguishable from where the code stood.
  *
  * This failure has already been paid for once, with numbers: in
- * `agent-dev-container`, a revoked webhook let the CI healthcheck sit dead for
+ * `agent-container`, a revoked webhook let the CI healthcheck sit dead for
  * 18 days — 2,567 consecutive failures, 27 successes, zero alerts — because
  * fifteen call sites across six workflows posted with no body inspection and
  * then asserted delivery. That repo fixed the reporting (its `post-slack.sh`
@@ -345,7 +345,7 @@ async function settleTokenResponse(
 /**
  * A webhook confirms delivery with a 2xx AND the literal three-byte body `ok`.
  * A revoked one answers `no_service` / `no_team`, sometimes under a 200. Both
- * halves are required: this is the shape `agent-dev-container` proved against a
+ * halves are required: this is the shape `agent-container` proved against a
  * stand-in webhook, where a healthy, a revoked and a deleted webhook produced
  * byte-identical output under a status-only check.
  */

@@ -14,7 +14,7 @@
  * package defines and `mention-editor.tsx` renders. The shape stays
  * structurally identical to sandbox-ui#184's `AgentComposerProps['mention']`,
  * so the same value drives sandbox-ui's `AgentComposer` during migration
- * (tangle-network/agent-dev-container#5934) without an import either way.
+ * (tangle-network/agent-container#5934) without an import either way.
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react'

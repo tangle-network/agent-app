@@ -29,7 +29,7 @@ cannot be expressed through its props. A canvas or other workbench can use the
 available width instead of the bounded `PageShell`.
 
 For a product example, read Platform's
-[DashboardStats](https://github.com/tangle-network/agent-dev-container/blob/main/products/platform/web/src/client/components/dashboard/DashboardStats.tsx)
+[DashboardStats](https://github.com/tangle-network/agent-container/blob/main/products/platform/web/src/client/components/dashboard/DashboardStats.tsx)
 for related metrics and a loading state matching their layout. Follow the
 [empty-state pattern](#pattern-1--empty-state) for first use, filtered results,
 and failed loads. Check the actual page at desktop and phone widths with long
