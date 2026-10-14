@@ -11287,7 +11287,9 @@
     {
       "id": "./model-resolution",
       "source": "src/model-resolution/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "policy-filters"
+      ],
       "error": null,
       "exports": [
         {
@@ -13177,6 +13179,122 @@
           "kind": "function",
           "signature": "(state: string, config: SsoStateConfig) => Promise<boolean>",
           "doc": "Verify the MAC (constant-time) and the signed TTL."
+        }
+      ]
+    },
+    {
+      "id": "./policy-filters",
+      "source": "src/policy-filters/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "allOf",
+          "kind": "function",
+          "signature": "<T, C extends object = PolicyFilterContext>(...filters: PolicyFilter<T, C>[]) => PolicyFilter<T, C>",
+          "doc": "Admit only items every filter admits."
+        },
+        {
+          "name": "anyOf",
+          "kind": "function",
+          "signature": "<T, C extends object = PolicyFilterContext>(...filters: PolicyFilter<T, C>[]) => PolicyFilter<T, C>",
+          "doc": "Admit items at least one filter admits."
+        },
+        {
+          "name": "assertPolicy",
+          "kind": "function",
+          "signature": "<T extends { id: string; }, C extends object = PolicyFilterContext>(input: PolicyCheckInput<T, C>) => Promise<T>",
+          "doc": "The throwing form of {@link checkPolicy} for enforcement seams that fail by exception."
+        },
+        {
+          "name": "checkHarnessPolicy",
+          "kind": "function",
+          "signature": "<C extends object = PolicyFilterContext>(id: string, catalog: PolicyCatalog<HarnessPolicyInfo>, filter: PolicyFilter<Ha…",
+          "doc": "Policy check over a harness id."
+        },
+        {
+          "name": "checkModelPolicy",
+          "kind": "function",
+          "signature": "<C extends object = PolicyFilterContext>(id: string, catalog: PolicyCatalog<ModelPolicyInfo>, filter: PolicyFilter<Mode…",
+          "doc": "Policy check over a model id."
+        },
+        {
+          "name": "checkPolicy",
+          "kind": "function",
+          "signature": "<T extends { id: string; }, C extends object = PolicyFilterContext>(input: PolicyCheckInput<T, C>) => Promise<PolicyChe…",
+          "doc": "Fail-closed policy check."
+        },
+        {
+          "name": "checkProfilePolicy",
+          "kind": "function",
+          "signature": "<C extends object = PolicyFilterContext>(id: string, catalog: PolicyCatalog<ProfilePolicyInfo>, filter: PolicyFilter<Pr…",
+          "doc": "Policy check over an agent-profile id."
+        },
+        {
+          "name": "filterItemsByPolicy",
+          "kind": "function",
+          "signature": "<Item extends { id: string; }, Info extends { id: string; }, C extends object = PolicyFilterContext>(items: readonly It…",
+          "doc": "Browser-safe catalog filter for pickers: keep only items the policy admits."
+        },
+        {
+          "name": "HarnessPolicyInfo",
+          "kind": "interface",
+          "signature": "interface HarnessPolicyInfo",
+          "doc": "Policy metadata for one harness (the coding-agent CLI a sandbox drives)."
+        },
+        {
+          "name": "ModelPolicyInfo",
+          "kind": "interface",
+          "signature": "interface ModelPolicyInfo",
+          "doc": "Policy metadata for one model — DATA the product supplies (from its router catalog, a compliance review, a vendor attestation), never engine policy."
+        },
+        {
+          "name": "PolicyCatalog",
+          "kind": "type",
+          "signature": "type PolicyCatalog",
+          "doc": "Where enforcement reads an item's metadata: an in-memory iterable, or a lookup (sync or async) keyed by the item's id."
+        },
+        {
+          "name": "PolicyCheckInput",
+          "kind": "interface",
+          "signature": "interface PolicyCheckInput",
+          "doc": "Input to one policy check: what is being admitted, from which catalog, under which filter."
+        },
+        {
+          "name": "PolicyCheckResult",
+          "kind": "type",
+          "signature": "type PolicyCheckResult",
+          "doc": "The outcome of one policy check."
+        },
+        {
+          "name": "PolicyDeniedCode",
+          "kind": "type",
+          "signature": "type PolicyDeniedCode",
+          "doc": "Why a policy check refused, machine-readable on the result and on {@link PolicyDeniedError}."
+        },
+        {
+          "name": "PolicyDeniedError",
+          "kind": "class",
+          "signature": "class PolicyDeniedError",
+          "doc": "The error {@link assertPolicy} throws on any refusal."
+        },
+        {
+          "name": "PolicyFilter",
+          "kind": "type",
+          "signature": "type PolicyFilter",
+          "doc": "A typed admission predicate over one catalog item."
+        },
+        {
+          "name": "PolicyFilterContext",
+          "kind": "type",
+          "signature": "type PolicyFilterContext",
+          "doc": "Arbitrary context a product threads to its filters (workspace, user, turn)."
+        },
+        {
+          "name": "ProfilePolicyInfo",
+          "kind": "interface",
+          "signature": "interface ProfilePolicyInfo",
+          "doc": "Policy metadata for one agent profile."
         }
       ]
     },

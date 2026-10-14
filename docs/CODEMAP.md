@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_134 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -69,7 +69,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
 | [`./legibility/cli`](api/legibility-cli.md) | 0 | `signoff` |
 | [`./missions`](api/missions.md) | 65 | — |
-| [`./model-resolution`](api/model-resolution.md) | 24 | — |
+| [`./model-resolution`](api/model-resolution.md) | 24 | `policy-filters` |
 | [`./object-store`](api/object-store.md) | 20 | `crypto` |
 | [`./openui`](api/openui.md) | 35 | `web` |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
@@ -78,6 +78,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 1 | `signoff` |
 | [`./plans`](api/plans.md) | 12 | — |
 | [`./platform`](api/platform.md) | 123 | `billing`, `runtime`, `web` |
+| [`./policy-filters`](api/policy-filters.md) | 18 | — |
 | [`./preflight`](api/preflight.md) | 14 | `signoff` |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | `signoff` |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 36 | `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`, `web` |
@@ -722,6 +723,8 @@ Source: `src/missions/index.ts` · 65 exports
 
 Source: `src/model-resolution/index.ts` · 24 exports
 
+Depends on: `policy-filters`
+
 `buildModelChain`, `catalogIdsForModel`, `ChatModelSource`, `ChatModelValidationFailure`, `ChatModelValidationResult`, `ChatModelValidationSuccess`, `cleanModelId`, `isUpstreamUnavailable`, `isWellFormedModelId`, `LoadModels`, `ModelFailoverAttempt`, `ModelFailoverExhaustedError`, `ModelFailoverResult`, `ModelInfo`, `readHttpStatusHint`, `resolveChatModel`, `ResolveChatModelInput`, `ResolvedChatModel`, `runWithModelFailover`, `RunWithModelFailoverInput`, `UPSTREAM_UNAVAILABLE_CODES`, `UPSTREAM_UNAVAILABLE_STATUSES`, `validateChatModelId`, `ValidateChatModelIdInput`
 
 [Full API →](api/model-resolution.md)
@@ -803,6 +806,14 @@ Depends on: `billing`, `runtime`, `web`
 `AdminGuardOptions`, `agentOperatorScopes`, `AgentSpendOutcome`, `AgentSpendRefusal`, `ApiKeyRequestAuthOptions`, `assertBillableBalance`, `AssertBillableBalanceOptions`, `AuthGuard`, `AuthGuardOptions`, `BetterAuthSessionCookieMinterOptions`, `BetterAuthSessionCookieSource`, `BillableBalanceState`, `BillingConsentOutcome`, `BillingConsentRefusal`, `canonicalDelegatedKeyName`, `createAdminGuard`, `createApiKeyRequestAuth`, `createAuthGuard`, `createBetterAuthSessionCookieMinter`, `createD1TangleIdentityStore`, `createDelegatedKeyProvisioner`, `createHubSettingsRoutes`, `createPlatformAgentKeyVerifier`, `createPlatformAgentSpend`, `createPlatformBillingConsent`, `createPlatformBillingHttp`, `createPlatformDelegatedKeyClient`, `createSignedSsoState`, `createTanglePlatformBillingClient`, `createTangleSsoHandlers`, `D1TangleIdentityStoreOptions`, `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`, `DEFAULT_TANGLE_TIER_POLICY`, `DelegatedKey`, `DelegatedKeyBudget`, `DelegatedKeyCode`, `DelegatedKeyMissingError`, `DelegatedKeyOutcome`, `DelegatedKeyProvisioner`, `DelegatedKeyRefusal`, `DelegatedKeyRefusalError`, `DelegatedKeyRequest`, `DelegatedKeySlotRef`, `DelegatedKeyVerdict`, `FREE_TIER_SPEND_CAP_USD`, `getProductEntitlement`, `guardResolution`, `GuardResolution`, `HubSettingsApiKeyMetadata`, `HubSettingsClient`, `HubSettingsClientBinding`, `HubSettingsContext`, `HubSettingsGrant`, `HubSettingsOAuthInput`, `HubSettingsOperation`, `HubSettingsPrincipal`, `HubSettingsRoutes`, `isPlatformBillingHttpError`, `isProductEntitled`, `isSeatBillingEnabled`, `normalizeTanglePlanTier`, `normalizeTangleSsoEmail`, `parseAdminEmails`, `PLATFORM_AGENT_KEY_PROVISIONER`, `PLATFORM_KEY_PREFIX`, `PlatformAgentKeyVerification`, `PlatformAgentKeyVerifier`, `PlatformAgentKeyVerifierOptions`, `PlatformAgentSpend`, `PlatformAgentSpendOptions`, `PlatformBalanceSnapshot`, `PlatformBillingConsent`, `PlatformBillingConsentOptions`, `PlatformBillingHttp`, `PlatformBillingHttpError`, `PlatformBillingHttpOptions`, `PlatformDelegatedKeyClient`, `PlatformDelegatedKeyClientOptions`, `PlatformIdentityStore`, `platformKeyRefusal`, `PlatformSubscriptionInfo`, `PlatformUsageProductRow`, `ProductEntitlement`, `ProductSeatOffer`, `ProductSeatOfferPeriod`, `readTangleTierState`, `RequestApiKey`, `resolveTangleSsoAccount`, `SeatBillingFlagOptions`, `seatCheckoutUrl`, `SeatStatus`, `signSessionCookieValue`, `SsoStateConfig`, `TANGLE_IDENTITY_ACCOUNT_INDEXES_SQL`, `TANGLE_IDENTITY_PROVIDER_ID`, `TangleIdentityD1Like`, `TangleIdentityD1Statement`, `TangleIdentityLegacyLinkTable`, `TangleIdentitySsoAccountStore`, `TangleIdentitySsoAuthClient`, `TangleIdentitySsoExchangeResult`, `TangleIdentitySsoHandlerOptions`, `TangleOidcSsoAccountStore`, `TangleOidcSsoAuthClient`, `TangleOidcSsoHandlerOptions`, `TangleOidcSsoTokens`, `TangleOidcSsoUser`, `TanglePlanTier`, `TangleSsoAccountConflictError`, `TangleSsoAccountConflictReason`, `TangleSsoAccountResolution`, `TangleSsoAccountResolutionInput`, `TangleSsoAccountStore`, `TangleSsoAuthClient`, `TangleSsoExchangeResult`, `TangleSsoHandlerOptions`, `TangleSsoHandlers`, `TangleSsoLocalAccount`, `TangleSsoSessionCookieArgs`, `TangleSsoUserCreateError`, `TangleTierPolicy`, `TangleTierState`, `verifySignedSsoState`
 
 [Full API →](api/platform.md)
+
+## `./policy-filters`
+
+Source: `src/policy-filters/index.ts` · 18 exports
+
+`allOf`, `anyOf`, `assertPolicy`, `checkHarnessPolicy`, `checkModelPolicy`, `checkPolicy`, `checkProfilePolicy`, `filterItemsByPolicy`, `HarnessPolicyInfo`, `ModelPolicyInfo`, `PolicyCatalog`, `PolicyCheckInput`, `PolicyCheckResult`, `PolicyDeniedCode`, `PolicyDeniedError`, `PolicyFilter`, `PolicyFilterContext`, `ProfilePolicyInfo`
+
+[Full API →](api/policy-filters.md)
 
 ## `./preflight`
 

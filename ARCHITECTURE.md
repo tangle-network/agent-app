@@ -26,7 +26,7 @@ navigable and is the seam a future package split would cut along.
       (substrate peers)    knowledge-loop · profile · run · preset-cloudflare · missions·*
         │  depends on ▼
   L0  Foundation          crypto · web · stream · redact · harness · missions · store
-      (zero peers)         prompt · model-resolution · tangle · delegation · skills · knowledge
+      (zero peers)         prompt · model-resolution · policy-filters · tangle · delegation · skills · knowledge
                            integrations · interactions · billing · eval-campaign · assets
                            brand-extraction · studio · work-product · email
 ```
@@ -41,7 +41,10 @@ Pure mechanism behind callback seams. Import nothing from the package; safe
 anywhere. `crypto` (AES-GCM fields) · `web` (request/body/rate-limit utils) ·
 `stream` (SSE normalize + resumable turn buffer) · `redact` (PII) · `harness` ·
 `missions` (durable step machine over a storage port) · `store` · `prompt` ·
-`model-resolution` · `tangle` (broker token) · `skills` ·
+`model-resolution` · `policy-filters` *(typed product admission policy over
+models/harnesses/profiles: predicates + combinators, fail-closed checks, and a
+browser-safe catalog filter for pickers; metadata is product data — see
+[docs/policy-filters.md](./docs/policy-filters.md))* · `tangle` (broker token) · `skills` ·
 `knowledge` · `integrations` (hub client) · `interactions` (human-in-the-loop
 ask contract + sidecar client + answer-route factory; `agent-interface` types
 peer, structural connection) · `billing` (budget-capped keys) ·
@@ -132,6 +135,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | Making a page the AGENT authored interactive (a form, a slider, a live button) | `openui` — `parseOpenUISegments`/`parseOpenUIArtifact` to read the page, `createOpenUIActionRoute` for the endpoint — plus `openui-react`'s `useOpenUIActions`, the `onAction` handler the renderer has always taken and no product passed. The action is a plain product REST call and cannot cost a model turn (`tests/openui/no-turn-cost.test.ts`); the agent reads what the user did on its NEXT turn via `describeOpenUIAction`. New INPUT nodes are the renderer's to add — cross-repo plan: [docs/openui-interactive.md](./docs/openui-interactive.md) |
 | A design token / color / spacing | `theme` (then it flows to every surface) |
 | Field encryption / PII redaction | `crypto` / `redact` |
+| Restricting which models / harnesses / profiles a deployment will run | `policy-filters` — `PolicyFilter` + `allOf`/`anyOf`, fail-closed `check*`/`assertPolicy`, picker-side `filterItemsByPolicy`; enforce at the `model-resolution` seam (`validateChatModelId`'s `policy`). See [docs/policy-filters.md](./docs/policy-filters.md) |
 
 Adding a module? Follow `CLAUDE.md` § "When you add a module": confirm it's
 shell not engine, domain-seam it, wire `tsup.config.ts` + `package.json`

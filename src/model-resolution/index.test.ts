@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { allOf, type ModelPolicyInfo, type PolicyFilter } from '../policy-filters/index'
 import {
   resolveChatModel,
   validateChatModelId,
@@ -95,6 +96,64 @@ describe('validateChatModelId — fail-closed admission', () => {
 
   it('fails closed when the catalog path is needed but no loader is provided', async () => {
     expect((await validateChatModelId('mystery/model', {})).succeeded).toBe(false)
+  })
+})
+
+describe('validateChatModelId — policy enforcement on the admission seam', () => {
+  // A HIPAA posture: zero-data-retention AND BAA-eligible models only.
+  const POLICY_META = [
+    { id: 'anthropic/claude-sonnet-4-6', provider: 'anthropic', zeroDataRetention: true, hipaaEligible: true },
+    { id: 'openai/gpt-5', provider: 'openai', zeroDataRetention: true, hipaaEligible: false },
+    { id: DEFAULT, zeroDataRetention: true, hipaaEligible: true },
+  ]
+  const zdrHipaaOnly: PolicyFilter<ModelPolicyInfo> = allOf(
+    (m) => m.zeroDataRetention === true,
+    (m) => m.hipaaEligible === true,
+  )
+  const policy = { filter: zdrHipaaOnly, catalog: POLICY_META }
+
+  it('admits an available model whose metadata passes the policy', async () => {
+    expect(
+      await validateChatModelId('anthropic/claude-sonnet-4-6', { loadModels, routerBaseUrl: ROUTER, policy }),
+    ).toEqual({ succeeded: true, value: 'anthropic/claude-sonnet-4-6' })
+  })
+
+  it('refuses an AVAILABLE model the policy rejects — availability is not eligibility', async () => {
+    const r = await validateChatModelId('openai/gpt-5', { loadModels, routerBaseUrl: ROUTER, policy })
+    expect(r.succeeded).toBe(false)
+    if (!r.succeeded) expect(r.error).toContain('not admitted by policy')
+  })
+
+  it('refuses an ALLOWLISTED model carrying no policy metadata (fail-closed on the operator-trusted lane)', async () => {
+    const r = await validateChatModelId(DEFAULT, { allowlist: [DEFAULT], policy: { ...policy, catalog: [] } })
+    expect(r.succeeded).toBe(false)
+    if (!r.succeeded) expect(r.error).toContain('no policy metadata')
+  })
+
+  it('refuses the operator-set env model when the policy rejects it', async () => {
+    const r = await validateChatModelId('openai/gpt-5', { envModel: 'openai/gpt-5', policy })
+    expect(r.succeeded).toBe(false)
+  })
+
+  it('fails closed when the policy filter throws', async () => {
+    const r = await validateChatModelId('anthropic/claude-sonnet-4-6', {
+      loadModels,
+      routerBaseUrl: ROUTER,
+      policy: {
+        catalog: POLICY_META,
+        filter: () => {
+          throw new Error('compliance store unreachable')
+        },
+      },
+    })
+    expect(r.succeeded).toBe(false)
+    if (!r.succeeded) expect(r.error).toContain('compliance store unreachable')
+  })
+
+  it('applies the policy to the canonicalized id a bare request resolves to', async () => {
+    // 'gpt-5' resolves to 'openai/gpt-5', which the policy rejects.
+    const r = await validateChatModelId('gpt-5', { loadModels, routerBaseUrl: ROUTER, policy })
+    expect(r.succeeded).toBe(false)
   })
 })
 
