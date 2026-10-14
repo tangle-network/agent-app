@@ -202,7 +202,7 @@ describe('postSlackAlert over an incoming webhook', () => {
     expect(JSON.parse(String(call?.init?.body))).toEqual({ text: 'page' })
   })
 
-  // The measured agent-dev-container case: a revoked webhook answers under a
+  // The measured agent-container case: a revoked webhook answers under a
   // 200, so a status-only check reads it as a delivered page.
   it('fails on a revoked webhook answering no_service under a 200', async () => {
     const { impl } = stubText([{ body: 'no_service', status: 200 }])

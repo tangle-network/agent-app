@@ -828,7 +828,7 @@ export function buildSandboxToolFileMounts(
  * segment by failing the whole box. Throwing names the offending directory
  * instead.
  *
- * The consuming half lives in agent-dev-container: `resolveSandboxToolBinDirs`
+ * The consuming half lives in agent-container: `resolveSandboxToolBinDirs`
  * parses this value and every PATH builder appends it at the tail — sidecar
  * exec and PTY through `packages/shared/src/cache-env.ts`, an SSH session
  * through `packages/shared/src/ssh-bootstrap.ts`, and a spawned CLI through

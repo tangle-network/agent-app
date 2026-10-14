@@ -11,7 +11,7 @@ A pre-fix defect had left their compute intervals open, and deletion settled eac
 Twenty-three settlements with July interval starts and durations of 124 to 268 hours landed inside seven minutes against one wallet: **$514.161090533**.
 Seven other wallets took another **$100.15** in the same window.
 
-The platform defect is fixed and every affected wallet was refunded ([agent-dev-container#4422](https://github.com/tangle-network/agent-dev-container/issues/4422)).
+The platform defect is fixed and every affected wallet was refunded ([agent-container#4422](https://github.com/tangle-network/agent-container/issues/4422)).
 The structural hole is not.
 Products bill to a shared company key, so no individual balance visibly goes negative; and no product holds an independent record of what it believes it should owe.
 Seven of the eight affected users never noticed.
@@ -399,7 +399,7 @@ Without this, `lastActivityAt` only advances when a box is provisioned, so a thr
 ### Scoping the ledger fetch
 
 The product supplies its own settled rows — this package never reaches for them, because the ledger is the counterparty's record and reading it is the product's authenticated business.
-The fetch is `GET /v1/billing/transactions?product=sandbox`, and the most it can narrow to is a **wallet**: `product` there is the platform's own service taxonomy, written by `agent-dev-container` for every sandbox compute charge from every consumer app.
+The fetch is `GET /v1/billing/transactions?product=sandbox`, and the most it can narrow to is a **wallet**: `product` there is the platform's own service taxonomy, written by `agent-container` for every sandbox compute charge from every consumer app.
 So on an account running two of our products, each product's fetch returns the other product's boxes.
 
 The endpoint does accept `keyId`, and filtering there is worth doing — it moves less data.

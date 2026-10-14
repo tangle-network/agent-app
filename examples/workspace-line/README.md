@@ -100,10 +100,10 @@ A message limit is not a dollar cap. Enforce compute spend at the service paying
 
 ## Release and proof
 
-The `hosted-agent/application` sender-proof helper requires a Sandbox SDK release containing agent-dev-container #8614.
+The `hosted-agent/application` sender-proof helper requires a Sandbox SDK release containing agent-container #8614.
 Sandbox 0.58.8 does not provide its verification methods or attach token type.
 The existing `hosted-agent` entrypoint remains importable with older Sandbox versions in the package's peer range.
-This addition depends on the native application-backed Lines SDK and server change in agent-dev-container #8499.
+This addition depends on the native application-backed Lines SDK and server change in agent-container #8499.
 Pin published SDK, Runtime and Agent App archives before consumer lock generation.
 
 Deploy native callback support before enabling the host flag. Use a disposable owned test line and consenting sender. Do not reattach an existing assistant's production line. The management client must use existing authorized application access, not a short-lived compute child: Lines retains that caller's key ID. Expiry/revocation ends the grant; do not extend a compute token indefinitely or expose application keys to the agent.
