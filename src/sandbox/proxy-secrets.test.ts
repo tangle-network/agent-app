@@ -348,7 +348,7 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
 
   it('refuses new profile authority instead of replacing installed workspace bindings', async () => {
     const retained = withPlacement(box())
-    await expect(resolveSandboxPromptBackend(shell(), {
+    await expect(resolveSandboxPromptBackend(shell({ proxySecrets: undefined }), {
       profile: { name: 'different', proxySecrets: [{ ...binding, secretRef: { kind: 'secret-ref', key: 'foreign-secret' } }] },
     }, 'test', retained as unknown as SandboxInstance)).rejects.toThrow('proxy')
     expect(retained.egress.update).not.toHaveBeenCalled()
@@ -356,7 +356,7 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
 
   it('refuses installed proxy names in raw turn secrets even when the turn profile omits declarations', async () => {
     const retained = withPlacement(box())
-    await expect(resolveSandboxPromptBackend(shell(), {
+    await expect(resolveSandboxPromptBackend(shell({ proxySecrets: undefined }), {
       profile: { name: 'no-declaration' }, runtimeSecrets: { APP_TOKEN: 'must-not-cross-boundary' },
     }, 'test', retained as unknown as SandboxInstance)).rejects.toThrow('proxy')
     expect(retained.egress.update).not.toHaveBeenCalled()
