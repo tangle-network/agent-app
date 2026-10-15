@@ -6,7 +6,8 @@
  * fetch-based and runs in Workers and Node.
  */
 import { z } from 'zod'
-import type { AgentProfileConfigValue, AgentProfileMcpServer } from '@tangle-network/agent-interface/profile'
+import type { AgentProfileMcpServer, AgentProfileSecretRef } from '@tangle-network/agent-interface/profile'
+import { agentProfileHeaderSchema } from '@tangle-network/agent-interface/profile-schema'
 import {
   isCommitSha, PROFILE_EDITOR_ROUTES, publicHttpsUrlProblem, readSkillFrontmatter,
   type GitHubCommitSummary, type GitHubFileList, type GitHubRepositorySummary, type GitHubSourceCheck,
@@ -351,6 +352,12 @@ export function formatBytes(bytes: number): string {
 
 export interface McpHealthCheckOptions {
   fetch?: typeof fetch
+  /** Trusted, request-authorized transport for reference-backed headers. It must
+   * authorize every reference and keep credential values at the proxy; the
+   * checker supplies only public request headers and canonical references.
+   * Missing or refused support fails closed without trying public fetch. */
+  proxyFetch?: (input: RequestInfo | URL, init: RequestInit,
+    secretHeaders: Readonly<Record<string, AgentProfileSecretRef>>) => Promise<Response>
   /** Total time for the whole check. Defaults to 8 seconds. */
   timeoutMs?: number
   /** The address policy. Return the reason an address is refused, or null. Defaults to {@link publicHttpsUrlProblem}. */
@@ -364,16 +371,22 @@ const MAX_MCP_BODY_BYTES = 2 * 1024 * 1024
 interface JsonRpcResponse { id?: unknown; result?: unknown; error?: { code?: number; message?: string } }
 
 class McpCheckFailure extends Error {
-  constructor(readonly problem: Exclude<McpHealth, { ok: true }>['problem'], message: string, readonly status?: number) { super(message) }
+  constructor(readonly problem: Exclude<McpHealth, { ok: true }>['problem'], message: string, readonly status?: number,
+    readonly upstreamDetails = false) { super(message) }
 }
 
-function publicHeaders(server: AgentProfileMcpServer): Record<string, string> {
-  if (!('headers' in server) || !server.headers) return {}
+function mcpHeaders(server: AgentProfileMcpServer): {
+  headers: Record<string, string>; secretHeaders: Record<string, AgentProfileSecretRef>
+} {
   const headers: Record<string, string> = {}
-  for (const [name, value] of Object.entries(server.headers as Record<string, AgentProfileConfigValue>)) {
-    if (value && typeof value === 'object' && value.kind === 'public' && typeof value.value === 'string') headers[name] = value.value
+  const secretHeaders: Record<string, AgentProfileSecretRef> = {}
+  const parsed = agentProfileHeaderSchema.safeParse(('headers' in server ? server.headers : undefined) ?? {})
+  if (!parsed.success) throw new McpCheckFailure('not-checkable', 'MCP headers must use public values or secret references.')
+  for (const [name, value] of Object.entries(parsed.data)) {
+    if (value.kind === 'public') headers[name] = value.value
+    else secretHeaders[name] = value
   }
-  return headers
+  return { headers, secretHeaders }
 }
 
 /** Read Server-Sent Events from a stream, yielding each complete event. */
@@ -418,7 +431,7 @@ function rpcResult(message: unknown, id: number): unknown {
   const items = Array.isArray(message) ? message : [message]
   const match = items.find((item): item is JsonRpcResponse => !!item && typeof item === 'object' && (item as JsonRpcResponse).id === id)
   if (!match) throw new McpCheckFailure('protocol-error', 'The server did not answer the MCP request.')
-  if (match.error) throw new McpCheckFailure('protocol-error', `The server returned an MCP error: ${match.error.message ?? match.error.code ?? 'unknown'}.`)
+  if (match.error) throw new McpCheckFailure('protocol-error', `The server returned an MCP error: ${match.error.message ?? match.error.code ?? 'unknown'}.`, undefined, true)
   return match.result
 }
 
@@ -452,8 +465,8 @@ const initializeSchema = z.object({ serverInfo: z.object({ name: z.string().opti
 /**
  * Connect to a remote MCP server, initialize a session, and list its tools.
  * Speaks Streamable HTTP, and the HTTP+SSE transport when the server declares
- * `transport: 'sse'`. Public header values are sent; secret references are not
- * resolved here, so a server that requires them reports `auth-required`.
+ * `transport: 'sse'`. Reference-backed headers require the trusted proxyFetch
+ * transport; references are never resolved to credential values here.
  */
 export async function checkMcpServer(server: AgentProfileMcpServer, options: McpHealthCheckOptions = {}): Promise<McpHealth> {
   const checkedAt = new Date().toISOString()
@@ -472,21 +485,32 @@ export async function checkMcpServer(server: AgentProfileMcpServer, options: Mcp
     try { new URL(url) } catch { parsed = false }
     return failed(new McpCheckFailure(parsed ? 'blocked-url' : 'invalid-url', urlProblem))
   }
-  const send = options.fetch ?? ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init))
+  let send: Send = options.fetch ?? ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init))
+  let hasSecretHeaders = false
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 8_000)
   const clientInfo = options.clientInfo ?? { name: 'tangle-agent-app', version: '1' }
-  const headers = publicHeaders(server)
   const initialize = { jsonrpc: '2.0', id: 1, method: 'initialize',
     params: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: {}, clientInfo } }
   const initialized = { jsonrpc: '2.0', method: 'notifications/initialized' }
   try {
+    const { headers, secretHeaders } = mcpHeaders(server)
+    hasSecretHeaders = Object.keys(secretHeaders).length > 0
+    if (hasSecretHeaders) {
+      const proxyFetch = options.proxyFetch
+      if (!proxyFetch) throw new McpCheckFailure('auth-required', 'This check requires an authorized proxy transport for its secret references.')
+      send = (input, init) => proxyFetch(input, init ?? {}, secretHeaders)
+    }
     const result = 'transport' in server && server.transport === 'sse'
       ? await checkSse(url, headers, send, controller.signal, initialize, initialized)
       : await checkStreamableHttp(url, headers, send, controller.signal, initialize, initialized)
     return { ok: true, ...result, latencyMs: Date.now() - started, checkedAt }
   } catch (error) {
-    if (error instanceof McpCheckFailure) return failed(error)
+    if (error instanceof McpCheckFailure) {
+      return failed(hasSecretHeaders && error.upstreamDetails
+        ? new McpCheckFailure(error.problem, 'The server returned an MCP error.', error.status)
+        : error)
+    }
     if (controller.signal.aborted) return failed(new McpCheckFailure('timeout', 'The server did not answer within 8 seconds.'))
     return failed(new McpCheckFailure('unreachable', 'Could not connect to the server. Check the URL and that the server is running.'))
   } finally {
@@ -553,7 +577,7 @@ async function checkStreamableHttp(url: string, headers: Record<string, string>,
     if (!cursor) break
   }
   if (session) {
-    await send(url, { method: 'DELETE', signal, headers: { ...headers, 'Mcp-Session-Id': session } })
+    await sendManual(send, url, { method: 'DELETE', signal, headers: { ...headers, 'Mcp-Session-Id': session } })
       .then(response => response.body?.cancel()).catch(() => undefined)
   }
   return listing(info, pages)

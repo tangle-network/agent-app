@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createServer } from 'node:http'
 import {
-  checkMcpServer, createGitHubRestReader, createGitHubSourceService, GitHubReadError, handleProfileEditorRequest,
+  checkMcpServer, createGitHubRestReader, createGitHubSourceService, createMcpHealthChecker, GitHubReadError, handleProfileEditorRequest,
   type GitHubSourceReader,
 } from './server'
 import { createProfileEditorClient, parseGitHubLocation, publicHttpsUrlProblem } from './index'
@@ -192,6 +192,20 @@ describe('checkMcpServer', () => {
     expect(anonymous).not.toHaveBeenCalled()
   })
 
+  it('requires secret references for credential headers arriving through the editor route', async () => {
+    const send = vi.fn()
+    for (const authorization of ['literal-not-allowed', { kind: 'public', value: 'public-not-credential' }]) {
+      const request = new Request('https://app.test/editor/mcp/check', { method: 'POST', body: JSON.stringify({
+        server: { url: 'https://docs.example.com/mcp', headers: { Authorization: authorization } },
+      }) })
+      const response = await handleProfileEditorRequest(request, 'mcp/check', {
+        github: null, mcp: createMcpHealthChecker({ fetch: send as typeof globalThis.fetch }),
+      })
+      expect(await response.json()).toMatchObject({ ok: false, problem: 'not-checkable' })
+    }
+    expect(send).not.toHaveBeenCalled()
+  })
+
   it('completes a real MCP handshake through the trusted reference transport without exposing its credential', async () => {
     const canary = 'controlled-mcp-custody-canary'
     const methods: string[] = []
@@ -262,6 +276,11 @@ describe('checkMcpServer', () => {
     const denied = await checkMcpServer(server, { proxyFetch: refused })
     expect(denied).toMatchObject({ ok: false, problem: 'unreachable' })
     expect(JSON.stringify(denied)).not.toContain(reflected)
+    const redirect = vi.fn(async () => new Response(null, { status: 307,
+      headers: { location: 'https://unapproved.example.com/mcp' } }))
+    expect(await checkMcpServer(server, { proxyFetch: redirect }))
+      .toMatchObject({ ok: false, problem: 'protocol-error', status: 307 })
+    expect(redirect).toHaveBeenCalledTimes(1)
     const reflection = await checkMcpServer(server, { proxyFetch: async () => Response.json({
       jsonrpc: '2.0', id: 1, error: { code: -32603, message: reflected },
     }) })
