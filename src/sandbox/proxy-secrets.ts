@@ -1,4 +1,4 @@
-import { ProxySecretBindingSchema, ProxySecretReceiptSchema, ProxySecretCapabilitiesSchema, ProxySecretsSchema } from '@tangle-network/agent-interface'
+import { ProxySecretReceiptSchema, ProxySecretCapabilitiesSchema, ProxySecretsSchema } from '@tangle-network/agent-interface'
 import type {
   AgentProfile,
   ProxySecretBinding,
@@ -37,7 +37,6 @@ export async function resolveProxySecrets(
   if (!resolve) return undefined
   try {
     const bindings = await resolve(scope, context)
-    if (!Array.isArray(bindings)) throw new Error('issuer must return an explicit binding array')
     return ProxySecretsSchema.parse(bindings)
   } catch (cause) {
     throw new SandboxProxySecretsError('reference issuance failed', cause)
@@ -91,23 +90,24 @@ export async function assertProxySecretCapabilities(
   }
 }
 
+/** Config callback owns the complete set; authored profiles may only request entries in it. */
 export function mergeProxySecrets(
-  ...sources: (readonly ProxySecretBinding[] | undefined)[]
+  authored: readonly ProxySecretBinding[] | undefined,
+  configured?: readonly ProxySecretBinding[],
 ): ProxySecretBinding[] | undefined {
-  if (sources.every((source) => source === undefined)) return undefined
-  const bindings = new Map<string, ProxySecretBinding>()
-  for (const source of sources) for (const declaration of source ?? []) {
-    let binding: ProxySecretBinding
-    try { binding = ProxySecretBindingSchema.parse(declaration) } catch (cause) {
-      throw new SandboxProxySecretsError('invalid proxy secret declaration', cause)
+  if (authored === undefined && configured === undefined) return undefined
+  try {
+    const requested = ProxySecretsSchema.parse(authored ?? [])
+    if (configured === undefined) return authored === undefined ? undefined : requested
+    const selected = ProxySecretsSchema.parse(configured)
+    for (const binding of requested) {
+      if (!selected.some((entry) => JSON.stringify(entry) === JSON.stringify(binding))) {
+        throw new SandboxProxySecretsError('authored proxy secret is outside the configured complete selection')
+      }
     }
-    const previous = bindings.get(binding.envName)
-    if (previous && JSON.stringify(previous) !== JSON.stringify(binding)) {
-      throw new SandboxProxySecretsError('conflicting proxy secret declarations')
-    }
-    bindings.set(binding.envName, binding)
-  }
-  try { return ProxySecretsSchema.parse([...bindings.values()]) } catch (cause) {
+    return selected
+  } catch (cause) {
+    if (cause instanceof SandboxProxySecretsError) throw cause
     throw new SandboxProxySecretsError('invalid proxy secret selection', cause)
   }
 }
@@ -129,15 +129,14 @@ function confirmedReceipt(
   if (receipt.sandboxId !== box.id
     || (previousGeneration !== undefined && receipt.generation <= previousGeneration)
     || receipt.status !== ((completeSet ? bindings.length : receipt.bindings.length) ? 'installed' : 'revoked')
-    || receipt.proxyAcknowledged !== true || receipt.materializationAcknowledged !== true
-    || (completeSet && receipt.bindings.length !== bindings.length)) {
+    || (completeSet && receipt.bindings.length !== bindings.length)
+    || receipt.bindings.some(({ grant }) => Date.parse(grant.issuedAt) > Date.now() || Date.parse(grant.expiresAt) <= Date.now())) {
     throw new SandboxProxySecretsError('proxy and materialization placement was not confirmed')
   }
   for (const binding of bindings) {
     const placed = receipt.bindings.find((entry) => entry.envName === binding.envName)
     const grant = placed?.grant
     if (!grant || placed?.secretRef.key !== binding.secretRef.key || grant.sandboxId !== box.id
-      || Date.parse(grant.issuedAt) > Date.now() || Date.parse(grant.expiresAt) <= Date.now()
       || (binding.ttlSeconds !== undefined
         && Date.parse(grant.expiresAt) - Date.parse(grant.issuedAt) > binding.ttlSeconds * 1_000)
       || JSON.stringify(grant.presentation) !== JSON.stringify(binding.presentation)
@@ -203,13 +202,16 @@ export async function verifyProfileProxySecrets(
   runtimeSecrets: Record<string, string> | undefined,
   requireReceipt: boolean,
 ): Promise<void> {
-  if (requested === undefined && !runtimeSecrets && !requireReceipt) return
+  if (requested === undefined && Object.keys(runtimeSecrets ?? {}).length === 0 && !requireReceipt) return
   const egress = box.egress as unknown as ProxyEgress | undefined
   if (!egress?.get && !requireReceipt && !requested?.length) return
   try {
     const current = await egress!.get()
     if (current.proxySecretReceipt === undefined && !requireReceipt && !requested?.length) return
     const receipt = confirmedReceipt(current.proxySecretReceipt, box, requested ?? [], undefined, false)
+    if (requested?.length === 0 && receipt.bindings.length > 0) {
+      throw new SandboxProxySecretsError('an explicit empty profile selection requires confirmed revocation')
+    }
     assertNoReadableProxySecrets(receipt.bindings, runtimeSecrets ?? {})
   } catch (cause) {
     if (cause instanceof SandboxProxySecretsError) throw cause

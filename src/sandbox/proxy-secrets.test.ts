@@ -138,7 +138,7 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
   it.each(['proxy-only', 'wrong-box', 'wrong-reference', 'wrong-format', 'expired', 'generation-race'] as const)('rejects an unconfirmed %s placement before bootstrap', async (failure) => {
     const retained = withPlacement(box())
     const receipt = placedReceipt(1)
-    if (failure === 'proxy-only') receipt.materializationAcknowledged = false
+    if (failure === 'proxy-only') { receipt.status = 'proxy-installed'; receipt.materializationAcknowledged = false }
     if (failure === 'wrong-box') receipt.sandboxId = 'other-sandbox'
     if (failure === 'wrong-reference') receipt.bindings[0]!.secretRef = { kind: 'secret-ref', key: 'different-secret' }
     if (failure === 'wrong-format') receipt.bindings[0]!.grant.placeholderFormat = 'jwt'
@@ -153,6 +153,23 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
     expect(retained.streamPrompt).not.toHaveBeenCalled()
   })
 
+
+
+  it('does not restore authored bindings when the complete callback selection revokes them', async () => {
+    list.mockResolvedValue([])
+    await expect(ensureWorkspaceSandbox(shell({
+      proxySecrets: async () => [], profile: () => ({ name: 'declared', proxySecrets: [binding] }),
+    }), scope)).rejects.toThrow('proxy')
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('requires confirmed revocation for an explicit empty turn profile selection', async () => {
+    const retained = withPlacement(box())
+    await expect(resolveSandboxPromptBackend(shell(), {
+      profile: { name: 'explicit-empty', proxySecrets: [] },
+    }, 'test', retained as unknown as SandboxInstance)).rejects.toThrow('proxy')
+    expect(retained.egress.update).not.toHaveBeenCalled()
+  })
 
   it('reconciles profile-only declarations before creation', async () => {
     const retained = withPlacement(box())

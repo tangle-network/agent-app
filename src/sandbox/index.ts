@@ -2702,10 +2702,8 @@ async function provisionWorkspaceSandbox(
   const proxyCapabilities = await assertProxySecretCapabilities(
     client, shell.proxySecrets || defaultProfile.proxySecrets !== undefined ? [] : undefined,
   )
-  let proxySecrets = mergeProxySecrets(
-    defaultProfile.proxySecrets,
-    await measure('proxy_secrets', () => resolveProxySecrets(shell.proxySecrets, scope, { client })),
-  )
+  const configuredProxySecrets = await measure('proxy_secrets', () => resolveProxySecrets(shell.proxySecrets, scope, { client }))
+  let proxySecrets = mergeProxySecrets(defaultProfile.proxySecrets, configuredProxySecrets)
   await assertProxySecretCapabilities(client, proxySecrets, proxyCapabilities)
   const runtimeEnvForScope = async () => {
     const env = await resolveWorkspaceRuntimeEnv(shell, scope)
@@ -2856,7 +2854,7 @@ async function provisionWorkspaceSandbox(
   const env = { ...creationEnv, ...runtimeEnv }
   const fullProfile = shell.profile({ extraFiles: files, harness })
   assertNoNestedProxySecrets(fullProfile)
-  proxySecrets = mergeProxySecrets(proxySecrets, fullProfile.proxySecrets)
+  proxySecrets = mergeProxySecrets(fullProfile.proxySecrets, configuredProxySecrets)
   await assertProxySecretCapabilities(client, proxySecrets, proxyCapabilities)
   assertNoReadableProxySecrets(proxySecrets, env, secrets)
   // When deferring, strip inline files from the create payload and write them
@@ -3122,7 +3120,7 @@ export interface StreamSandboxPromptOptions {
    * Explicit turn selections override this profile; otherwise its model and harness win
    * over shell defaults. Never populate this field from an untrusted request body. */
   profile?: AgentProfile
-  /** Server-owned per-turn authority, atomically confirmed on the actual box before dispatch. */
+  /** Per-turn authority requires separate placement; unsupported shared-box declarations refuse dispatch. */
   proxySecrets?: SandboxTurnProxySecrets
   sessionId?: string
   executionId?: string
