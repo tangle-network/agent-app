@@ -1,4 +1,10 @@
-import { ProxySecretReceiptSchema, ProxySecretCapabilitiesSchema, ProxySecretsSchema } from '@tangle-network/agent-interface'
+import {
+  ProxySecretReceiptSchema,
+  ProxySecretCapabilitiesSchema,
+  ProxySecretsSchema,
+  isProxySecretScopeAttenuation,
+  proxySecretPresentationsEqual,
+} from '@tangle-network/agent-interface'
 import type {
   AgentProfile,
   ProxySecretBinding,
@@ -113,10 +119,6 @@ export function mergeProxySecrets(
   }
 }
 
-function sameSelectors(actual: readonly string[] | undefined, requested: readonly string[] | undefined): boolean {
-  return JSON.stringify(actual && [...actual].sort()) === JSON.stringify(requested && [...requested].sort())
-}
-
 function confirmedReceipt(
   value: unknown,
   box: SandboxInstance,
@@ -140,11 +142,9 @@ function confirmedReceipt(
     if (!grant || placed?.secretRef.key !== binding.secretRef.key || grant.sandboxId !== box.id
       || (binding.ttlSeconds !== undefined
         && Date.parse(grant.expiresAt) - Date.parse(grant.issuedAt) > binding.ttlSeconds * 1_000)
-      || JSON.stringify(grant.presentation) !== JSON.stringify(binding.presentation)
+      || !proxySecretPresentationsEqual(binding.presentation, grant.presentation)
       || grant.placeholderFormat !== (binding.placeholderFormat ?? 'opaque')
-      || !sameSelectors(grant.scope.hosts, binding.hosts)
-      || !sameSelectors(grant.scope.methods, binding.methods)
-      || !sameSelectors(grant.scope.paths, binding.paths)) {
+      || !isProxySecretScopeAttenuation(binding, grant.scope)) {
       throw new SandboxProxySecretsError('effective grant does not confirm the requested sandbox and confinement')
     }
   }

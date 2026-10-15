@@ -181,13 +181,13 @@ describe('checkMcpServer', () => {
     expect(new Headers((fetch.mock.calls[0]![1] as RequestInit).headers).get('X-Team')).toBe('growth')
   })
 
-  it('refuses required references before a public transport can report anonymous success', async () => {
+  it.each(['Authorization', '__proto__'])('refuses required reference header %s before anonymous success', async (name) => {
     const anonymous = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const message = JSON.parse(String(init?.body)) as { id?: number }
       return Response.json({ jsonrpc: '2.0', id: message.id, result: { tools: [] } })
     })
     const result = await checkMcpServer({ url: 'https://docs.example.com/mcp',
-      headers: { Authorization: { kind: 'secret-ref', key: 'docs-access' } } }, { fetch: anonymous as typeof globalThis.fetch })
+      headers: { [name]: { kind: 'secret-ref', key: 'docs-access' } } }, { fetch: anonymous as typeof globalThis.fetch })
     expect(result).toMatchObject({ ok: false, problem: 'auth-required' })
     expect(anonymous).not.toHaveBeenCalled()
   })

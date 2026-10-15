@@ -108,6 +108,66 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
     expect(bootstrap).toHaveBeenCalledOnce()
   })
 
+
+  it('accepts issuer-narrowed hosts, methods, and subtree paths before bootstrap', async () => {
+    const requested: ProxySecretBinding = {
+      ...binding, hosts: ['tools.example.com', 'api.example.com'],
+      methods: ['GET', 'POST'], paths: ['/v1/*'],
+    }
+    const narrowed: ProxySecretBinding = {
+      ...requested, hosts: ['tools.example.com'], methods: ['GET'], paths: ['/v1/status'],
+    }
+    const retained = box()
+    const applied = placedReceipt(1, [narrowed])
+    retained.egress.get.mockReset().mockResolvedValueOnce({ proxySecretReceipt: placedReceipt(0) })
+      .mockResolvedValue({ proxySecretReceipt: applied })
+    retained.egress.update.mockResolvedValue({ proxySecretReceipt: applied })
+    list.mockResolvedValue([retained])
+    const bootstrap = vi.fn(async () => ({ succeeded: true as const, value: undefined }))
+    await ensureWorkspaceSandbox(shell({ proxySecrets: async () => [requested], bootstrap }), scope)
+    expect(bootstrap).toHaveBeenCalledOnce()
+  })
+
+  it('accepts issuer-added method and path restrictions on an unrestricted declaration', async () => {
+    const retained = box()
+    const applied = placedReceipt(1, [{ ...binding, methods: ['GET'], paths: ['/v1/status'] }])
+    retained.egress.get.mockReset().mockResolvedValueOnce({ proxySecretReceipt: placedReceipt(0) })
+      .mockResolvedValue({ proxySecretReceipt: applied })
+    retained.egress.update.mockResolvedValue({ proxySecretReceipt: applied })
+    list.mockResolvedValue([retained])
+    const bootstrap = vi.fn(async () => ({ succeeded: true as const, value: undefined }))
+    await ensureWorkspaceSandbox(shell({ bootstrap }), scope)
+    expect(bootstrap).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    { hosts: ['tools.example.com', 'foreign.example.com'], methods: ['GET'], paths: ['/v1/status'] },
+    { hosts: ['tools.example.com'], methods: ['GET', 'POST'], paths: ['/v1/status'] },
+    { hosts: ['tools.example.com'], methods: undefined, paths: ['/v1/status'] },
+    { hosts: ['tools.example.com'], methods: ['GET'], paths: ['/v10/status'] },
+    { hosts: ['tools.example.com'], methods: ['GET'], paths: undefined },
+  ])('refuses widened effective scope %j before bootstrap', async (effective) => {
+    const requested: ProxySecretBinding = { ...binding, methods: ['GET'], paths: ['/v1/*'] }
+    const retained = box()
+    const applied = placedReceipt(1, [{ ...requested, ...effective }])
+    retained.egress.get.mockReset().mockResolvedValueOnce({ proxySecretReceipt: placedReceipt(0) })
+      .mockResolvedValue({ proxySecretReceipt: applied })
+    retained.egress.update.mockResolvedValue({ proxySecretReceipt: applied })
+    list.mockResolvedValue([retained])
+    const bootstrap = vi.fn()
+    await expect(ensureWorkspaceSandbox(shell({ proxySecrets: async () => [requested], bootstrap }), scope))
+      .rejects.toThrow('proxy')
+    expect(bootstrap).not.toHaveBeenCalled()
+  })
+
+  it('allows a turn profile whose installed grant has narrower effective scope', async () => {
+    const retained = box()
+    const receipt = placedReceipt(1, [{ ...binding, methods: ['GET'], paths: ['/v1/status'] }])
+    retained.egress.get.mockResolvedValue({ proxySecretReceipt: receipt })
+    await resolveSandboxPromptBackend(shell(), { profile: { name: 'narrowed', proxySecrets: [binding] } }, 'test', retained as unknown as SandboxInstance)
+    expect(retained.egress.update).not.toHaveBeenCalled()
+  })
+
   it('renews a retained box before bootstrap and preserves unrelated runtime env', async () => {
     const retained = withPlacement(box())
     list.mockResolvedValue([retained])

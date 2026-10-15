@@ -378,8 +378,8 @@ class McpCheckFailure extends Error {
 function mcpHeaders(server: AgentProfileMcpServer): {
   headers: Record<string, string>; secretHeaders: Record<string, AgentProfileSecretRef>
 } {
-  const headers: Record<string, string> = {}
-  const secretHeaders: Record<string, AgentProfileSecretRef> = {}
+  const headers: Record<string, string> = Object.create(null)
+  const secretHeaders: Record<string, AgentProfileSecretRef> = Object.create(null)
   const parsed = agentProfileHeaderSchema.safeParse(('headers' in server ? server.headers : undefined) ?? {})
   if (!parsed.success) throw new McpCheckFailure('not-checkable', 'MCP headers must use public values or secret references.')
   for (const [name, value] of Object.entries(parsed.data)) {
