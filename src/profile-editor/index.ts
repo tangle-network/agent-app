@@ -127,7 +127,7 @@ export interface McpTool {
 }
 
 export type McpHealth =
-  | { ok: true; tools: McpTool[]; serverName?: string; serverVersion?: string; latencyMs: number; checkedAt: string }
+  | { ok: true; tools?: McpTool[]; serverName?: string; serverVersion?: string; latencyMs: number; checkedAt: string }
   | { ok: false; problem: McpHealthProblem; message: string; status?: number; checkedAt: string }
 
 /** Unsaved profile intent, never execution or secret-access authority. */

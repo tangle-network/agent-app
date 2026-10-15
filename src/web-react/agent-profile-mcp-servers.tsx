@@ -73,7 +73,7 @@ function checkIdentity(server: AgentProfileMcpServer, profile?: AgentProfile): s
 function healthStatus(health: McpHealth | 'checking' | undefined): { tone: StatusTone; label: string } {
   if (health === 'checking') return { tone: 'pending', label: 'Checking' }
   if (!health) return { tone: 'neutral', label: 'Not checked' }
-  if (health.ok) return { tone: 'success', label: `Connected · ${health.tools.length} ${health.tools.length === 1 ? 'tool' : 'tools'}` }
+  if (health.ok) return { tone: 'success', label: health.tools ? `Connected · ${health.tools.length} ${health.tools.length === 1 ? 'tool' : 'tools'}` : 'Connected' }
   const labels: Record<Exclude<McpHealth, { ok: true }>['problem'], [StatusTone, string]> = {
     'auth-required': ['warning', 'Needs credentials'],
     'invalid-url': ['error', 'Invalid address'],
@@ -270,7 +270,7 @@ export function McpServersEditor({ servers, profile, onChange, port, disabled, l
               {policyProblem && <p className={formText.error}>{policyProblem}</p>}
               {on && !local && result && result !== 'checking' && !result.ok && result.problem !== 'not-checkable' &&
                 <p className={result.problem === 'auth-required' || result.problem === 'unavailable' ? formText.muted : formText.error}>{result.message}</p>}
-              {on && result && result !== 'checking' && result.ok && result.tools.length > 0 &&
+              {on && result && result !== 'checking' && result.ok && result.tools && result.tools.length > 0 &&
                 <p className={`line-clamp-2 ${formText.muted}`}>Tools: {result.tools.map(tool => tool.name).join(', ')}</p>}
             </div>
           </div>

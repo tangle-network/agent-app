@@ -295,6 +295,14 @@ describe('AgentProfileEditor MCP servers', () => {
     expect(check).toHaveBeenLastCalledWith(revised.mcp!.research, expect.any(AbortSignal), { profile: revised, serverName: 'research' })
   })
 
+  it('shows native connection status without inventing an unknown tool count', async () => {
+    const check = vi.fn(async (): Promise<McpHealth> => ({ ok: true, latencyMs: 7, checkedAt: 'now' }))
+    render(<Harness initial={{ mcp: { research: servers.research! } }} config={config({ mcp: { port: { check } } })} />)
+    expect(await screen.findByText('Connected', { exact: true })).toBeTruthy()
+    expect(screen.queryByText(/Connected ·/)).toBeNull()
+    expect(screen.queryByText(/^Tools:/)).toBeNull()
+  })
+
   it('turns a server off and back on without losing its address', async () => {
     render(<Harness initial={{ mcp: servers }} config={config()} publicHttpsMcpOnly />)
     fireEvent.click(screen.getByRole('switch', { name: 'Turn off research' }))

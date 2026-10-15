@@ -112,3 +112,5 @@ it as a remote server whose `Authorization` header is a secret reference.
 The editor does not save. The product validates the final profile, decides which fields its runtime honors,
 and runs its revision and consent policy. Show only the sections the product's server accepts and its
 runtime applies.
+
+Native candidate checks may return connection status without tool metadata. Omit `tools` when it was not listed; the editor shows “Connected” without a count. An explicit `tools: []` means a real listing returned no tools. Measure `latencyMs` around the actual check.
