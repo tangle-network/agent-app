@@ -372,6 +372,12 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
     expect(retained.driveTurn).not.toHaveBeenCalled()
   })
 
+  it('requires an actual box for configured workspace proxy custody', async () => {
+    await expect(resolveSandboxPromptBackend(shell(), {
+      runtimeSecrets: { APP_TOKEN: 'must-not-cross-boundary' },
+    })).rejects.toThrow('proxy')
+  })
+
   it('refuses per-turn resolution without an actual box', async () => {
     await expect(resolveSandboxPromptBackend(shell(), {
       proxySecrets: {

@@ -3567,7 +3567,7 @@ export async function resolveSandboxPromptBackend(
   }
   assertNoNestedProxySecrets(profile)
   assertNoReadableProxySecrets(profile.proxySecrets, options.runtimeSecrets ?? {})
-  if (profile.proxySecrets !== undefined && !box) {
+  if ((profile.proxySecrets !== undefined || shell.proxySecrets !== undefined) && !box) {
     throw new SandboxProxySecretsError('profile proxy secrets require the actual sandbox')
   }
   if (box) await verifyProfileProxySecrets(box, mergeProxySecrets(profile.proxySecrets), options.runtimeSecrets, shell.proxySecrets !== undefined)
