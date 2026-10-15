@@ -573,7 +573,8 @@ Keep provider credentials with their existing server-side owner.
 
 The shell installs and confirms bindings before retained-box bootstrap, resume and dispatch. Failed renewal preserves the sandbox and prevents the turn from starting.
 Each callback result replaces the complete binding set: include every workspace, seat and turn binding that must remain active. Return `[]` to revoke the set; omission leaves the lifecycle unconfigured.
-A turn resolver must use authenticated server context and a sandbox isolated for its authority. A scope label or generation check cannot isolate sibling processes inside one sandbox.
+Supplied turn profiles verify their declarations against installed bindings; they cannot replace the workspace set. An explicit empty profile selection requires confirmed revocation.
+The per-turn `proxySecrets` resolver currently refuses shared-box execution because a scope label or generation check cannot isolate sibling processes. Use the workspace lifecycle on a sandbox placed for one authority; unsupported custody has no readable fallback.
 
 `runtimeEnv` remains available for ordinary readable process configuration. It does not provide proxy custody.
 Deploy a Sandbox runtime advertising the canonical proxy-secret capability before adopting protected declarations. Missing support or unconfirmed installation fails closed.
