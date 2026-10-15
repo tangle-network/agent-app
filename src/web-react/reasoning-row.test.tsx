@@ -7,6 +7,7 @@ import { ReasoningRow } from './reasoning-row'
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 /** The row's disclosure button: the run-row trigger that names the region it opens. */
@@ -97,6 +98,12 @@ describe('ReasoningRow', () => {
 describe('reading reasoning while it streams', () => {
   it('follows, stops immediately on upward input, preserves position on append, and resumes at the bottom', () => {
     vi.useFakeTimers()
+    let resized: () => void = () => {}
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resized = callback }
+      observe() {}
+      disconnect() {}
+    })
     const { container, rerender, getByRole } = render(<ReasoningRow text="First thought." thinking />)
     const viewport = container.querySelector('[data-reasoning]') as HTMLElement
     let height = 1_000
@@ -109,7 +116,7 @@ describe('reading reasoning while it streams', () => {
     const append = (text: string) => {
       height += 100
       rerender(<ReasoningRow text={text} thinking />)
-      act(() => { vi.advanceTimersByTime(1_000) })
+      act(() => { vi.advanceTimersByTime(1_000); resized() })
     }
     append('First thought. Following.')
     expect(top).toBe(700)

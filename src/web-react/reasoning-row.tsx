@@ -19,6 +19,7 @@ import { RunRowShell } from '@tangle-network/ui/run'
 import { Markdown } from '@tangle-network/ui/markdown'
 import { BrainGlyph } from './controls'
 import { useSmoothText } from './smooth-text'
+import { useChatScroll } from './chat-scroll'
 
 /** Props for {@link ReasoningRow}: the fields of a `ChatReasoningState`, plus presentation. */
 export interface ReasoningRowProps {
@@ -95,14 +96,8 @@ export function ReasoningRow({
   // Open while thinking, closed once the answer starts; a reader's click
   // outranks that default from then on, across every later delta.
   const [toggled, setToggled] = useState<boolean | null>(null)
-  const open = toggled ?? (thinking || defaultOpen)
-
-  // Keep the newest reasoning in view while it streams.
-  const scrollRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const el = scrollRef.current
-    if (el && thinking) el.scrollTop = el.scrollHeight
-  }, [shown, thinking])
+  const { viewportRef, contentRef, following, jumpToLatest } = useChatScroll()
+  const open = toggled ?? (thinking || defaultOpen || !following)
 
   if (!visible) return null
 
@@ -128,13 +123,24 @@ export function ReasoningRow({
       onOpenChange={setToggled}
     >
       <div
-        ref={scrollRef}
+        ref={viewportRef}
+        tabIndex={0}
+        role="region"
+        aria-label="Reasoning"
         data-reasoning={thinking ? 'thinking' : 'settled'}
         aria-busy={thinking || undefined}
-        className="max-h-48 overflow-y-auto px-3 py-2.5 text-sm leading-relaxed text-muted-foreground"
+        className="max-h-[min(28rem,60dvh)] overflow-y-auto overscroll-contain px-4 py-4 text-base leading-relaxed text-foreground"
       >
-        {body}
+        <div ref={contentRef} className="min-w-0 break-words">{body}</div>
       </div>
+      {!following && (
+        <div className="flex justify-end px-4 pb-3">
+          <button type="button" aria-label="Jump to latest reasoning" onClick={jumpToLatest}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+            Jump to latest
+          </button>
+        </div>
+      )}
     </RunRowShell>
   )
 }
