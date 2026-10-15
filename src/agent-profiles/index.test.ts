@@ -62,7 +62,7 @@ describe('proxy authority revision consent', () => {
         active = id
         return true
       },
-    } as ProfileRevisionStore
+    } as unknown as ProfileRevisionStore
     const binding = {
       envName: 'REPORTS_TOKEN', secretRef: { kind: 'secret-ref', key: 'reporting-api' },
       hosts: ['reports.example.com'], presentation: { type: 'bearer' }, methods: ['POST'],
