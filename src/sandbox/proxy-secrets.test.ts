@@ -297,6 +297,22 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
     await expect(ensureWorkspaceSandbox(config, scope)).rejects.toThrow('proxy')
   })
 
+  it('keeps both actual handles dispatchable when a waiter ensures the same complete selection', async () => {
+    const original = withPlacement(box())
+    const waiter = box()
+    // Two SDK handles for one server share placement, never private app proof.
+    waiter.egress = original.egress
+    list.mockResolvedValueOnce([original]).mockResolvedValueOnce([waiter])
+    const config = shell()
+    const first = await ensureWorkspaceSandbox(config, scope)
+    const second = await ensureWorkspaceSandbox(config, scope)
+    expect(first).toBe(original)
+    expect(second).toBe(waiter)
+    const turns = await Promise.allSettled([first, second].map(actual =>
+      resolveSandboxPromptBackend(config, { profile: { proxySecrets: [] } }, 'test', actual)))
+    expect(turns.map(turn => turn.status)).toEqual(['fulfilled', 'fulfilled'])
+  })
+
   it('does not treat callback presence as proof that an empty authored selection owns installed bindings', async () => {
     const retained = withPlacement(box())
     await expect(resolveSandboxPromptBackend(shell(), { profile: { proxySecrets: [] } }, 'test', retained as unknown as SandboxInstance))
