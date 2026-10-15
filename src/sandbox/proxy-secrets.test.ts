@@ -372,6 +372,15 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
     expect(retained.driveTurn).not.toHaveBeenCalled()
   })
 
+  it.each(['no-egress', 'no-receipt'])('refuses an explicit empty selection on an unsupported peer: %s', async (missing) => {
+    const retained = box()
+    if (missing === 'no-egress') retained.egress = undefined as never
+    else retained.egress.get.mockResolvedValue({} as never)
+    await expect(resolveSandboxPromptBackend(shell({ proxySecrets: undefined }), {
+      profile: { name: 'empty', proxySecrets: [] },
+    }, 'test', retained as unknown as SandboxInstance)).rejects.toThrow('proxy')
+  })
+
   it('requires an actual box for configured workspace proxy custody', async () => {
     await expect(resolveSandboxPromptBackend(shell(), {
       runtimeSecrets: { APP_TOKEN: 'must-not-cross-boundary' },

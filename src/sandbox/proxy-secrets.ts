@@ -205,10 +205,10 @@ export async function verifyProfileProxySecrets(
 ): Promise<void> {
   if (requested === undefined && Object.keys(runtimeSecrets ?? {}).length === 0 && !requireReceipt) return
   const egress = box.egress as unknown as ProxyEgress | undefined
-  if (!egress?.get && !requireReceipt && !requested?.length) return
+  if (!egress?.get && !requireReceipt && requested === undefined) return
   try {
     const current = await egress!.get()
-    if (current.proxySecretReceipt === undefined && !requireReceipt && !requested?.length) return
+    if (current.proxySecretReceipt === undefined && !requireReceipt && requested === undefined) return
     const receipt = confirmedReceipt(current.proxySecretReceipt, box, requested ?? [], undefined, false)
     if (requested?.length === 0 && receipt.bindings.length > 0) {
       throw new SandboxProxySecretsError('an explicit empty profile selection requires confirmed revocation')
