@@ -232,6 +232,52 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
     expect(retained.egress.update).not.toHaveBeenCalled()
   })
 
+  it('keeps the confirmed callback-owned product set when the authored profile clears its declarations', async () => {
+    const retained = withPlacement(box())
+    list.mockResolvedValue([retained])
+    const config = shell({ profile: () => ({ name: 'cleared-custom', proxySecrets: [] }) })
+    const actual = await ensureWorkspaceSandbox(config, scope)
+    const updates = retained.egress.update.mock.calls.length
+    const backend = await resolveSandboxPromptBackend(config, { profile: { name: 'cleared-custom', proxySecrets: [] } }, 'test', actual)
+    expect(backend.profile.proxySecrets).toEqual([])
+    expect(retained.egress.update).toHaveBeenCalledTimes(updates)
+    expect((await retained.egress.get()).proxySecretReceipt.bindings.map(entry => entry.envName)).toEqual(['APP_TOKEN'])
+  })
+
+  it('does not treat callback presence as proof that an empty authored selection owns installed bindings', async () => {
+    const retained = withPlacement(box())
+    await expect(resolveSandboxPromptBackend(shell(), { profile: { proxySecrets: [] } }, 'test', retained as unknown as SandboxInstance))
+      .rejects.toThrow('proxy')
+  })
+
+  it('refuses stale extra bindings after the callback confirmed its complete selection', async () => {
+    const retained = withPlacement(box())
+    list.mockResolvedValue([retained])
+    const config = shell({ profile: () => ({ proxySecrets: [] }) })
+    const actual = await ensureWorkspaceSandbox(config, scope)
+    const stale = { ...binding, envName: 'OLD_CUSTOM_TOKEN', secretRef: { kind: 'secret-ref' as const, key: 'old-custom' } }
+    retained.egress.get.mockResolvedValue({ proxySecretReceipt: placedReceipt(2, [binding, stale]) })
+    await expect(resolveSandboxPromptBackend(config, { profile: { proxySecrets: [] } }, 'test', actual)).rejects.toThrow('proxy')
+  })
+
+  it('refuses a changed receipt generation even when its binding names match the confirmed callback set', async () => {
+    const retained = withPlacement(box())
+    list.mockResolvedValue([retained])
+    const config = shell({ profile: () => ({ proxySecrets: [] }) })
+    const actual = await ensureWorkspaceSandbox(config, scope)
+    retained.egress.get.mockResolvedValue({ proxySecretReceipt: placedReceipt(2) })
+    await expect(resolveSandboxPromptBackend(config, { profile: { proxySecrets: [] } }, 'test', actual)).rejects.toThrow('proxy')
+  })
+
+  it('checks readable aliases of the managed set after the authored selection is cleared', async () => {
+    const retained = withPlacement(box())
+    list.mockResolvedValue([retained])
+    const config = shell({ profile: () => ({ proxySecrets: [] }) })
+    const actual = await ensureWorkspaceSandbox(config, scope)
+    await expect(resolveSandboxPromptBackend(config, { profile: { proxySecrets: [] }, runtimeSecrets: { APP_TOKEN: 'must-not-cross' } }, 'test', actual))
+      .rejects.toThrow('proxy')
+  })
+
   it('reconciles profile-only declarations before creation', async () => {
     const retained = withPlacement(box())
     list.mockResolvedValue([])
