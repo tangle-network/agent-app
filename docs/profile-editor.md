@@ -40,7 +40,7 @@ const checks = createProfileEditorClient({ endpoint: `/api/workspaces/${workspac
 | `harnesses` | Harnesses the product runs. Omit to hide the harness field. Choosing a harness keeps the default model runnable on it and says when it changed. |
 | `thinkingLevels` | Levels for a harness and model. The default is the levels the harness applies (`reasoningEffortsFor`) plus Auto, which stores no override. |
 | `github.storage` | `reference` stores `{ kind: 'github', repository, path, ref }` pinned to the checked commit. `inline` stores the checked file's text, for runtimes that do not fetch GitHub. |
-| `mcp.port` | Health checks. Each enabled remote server is checked when the editor opens and when its address changes. |
+| `mcp.port` | Public checks run when the editor opens or an address changes. Protected candidate checks run through the Check action. |
 | `mcp.lockReason` | Explains why servers are read-only for this person and locks toggles and edits. |
 | `files` | Upload type, size, and count limits. Dropped and chosen files are read in the browser and stored inline. |
 
@@ -82,12 +82,20 @@ addresses unless the product passes its own `urlProblem` policy. Header records 
 profile schema; credential-bearing header names require secret references. Local command servers report
 `not-checkable`.
 
-Reference-backed headers require `McpHealthCheckOptions.proxyFetch`. This trusted callback receives the
+A standalone server check without candidate context requires `McpHealthCheckOptions.proxyFetch` for reference-backed headers. This trusted callback receives the
 request, public request headers, and a separate map of canonical secret references. Bind it to the
 authenticated caller and workspace, authorize each reference, and use an already supported protected
 placement for that exact candidate. Initialize, tool listing and session cleanup all use this transport;
 credential values never enter the checker. A missing or refused transport has no anonymous-fetch fallback.
 Protected upstream error text is omitted from diagnostics.
+
+For an unsaved profile, call `check(server, signal, { profile: draft, serverName })`. The route validates
+and freezes the full canonical profile, verifies the selected server matches, and computes `profileDigest`.
+The host's `ProfileEditorMcpPort<ProfileEditorMcpCheckContext>` receives that identity; client-supplied
+digests are refused. Candidate intent and its digest grant no access: the host still authorizes the caller,
+references and destinations before isolated placement. The default checker returns `unavailable` for
+candidates with declared proxy bindings or reference-backed headers, even when `proxyFetch` is supplied.
+A candidate-aware host port must use its supported preparation lifecycle to check those profiles.
 
 The callback is a transport seam, not a generic Sandbox proxy-fetch API. An installed backend's MCP status
 cannot validate an unsaved candidate or a different profile. When the platform cannot check a candidate
