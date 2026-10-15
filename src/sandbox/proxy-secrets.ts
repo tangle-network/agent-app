@@ -62,21 +62,6 @@ export function assertNoReadableProxySecrets(
   }
 }
 
-// Structural bridge for the optional SDK peer until its canonical fields are
-// published. Transport method names remain the existing egress facade.
-type ProxyEgressResult = { proxySecretReceipt?: ProxySecretReceipt }
-type ProxyEgress = {
-  get(): Promise<ProxyEgressResult>
-  update(options: {
-    proxySecrets: ProxySecretBinding[]
-    expectedProxySecretGeneration: number
-    requireInPlace: true
-  }): Promise<ProxyEgressResult>
-}
-type ProxyCapabilitiesClient = {
-  capabilities(): Promise<{ proxySecrets?: ProxySecretCapabilities }>
-}
-
 export async function assertProxySecretCapabilities(
   client: Sandbox,
   bindings: readonly ProxySecretBinding[] | undefined,
@@ -85,7 +70,7 @@ export async function assertProxySecretCapabilities(
   if (bindings === undefined) return undefined
   try {
     const capability = cached ?? ProxySecretCapabilitiesSchema.parse(
-      (await (client as unknown as ProxyCapabilitiesClient).capabilities()).proxySecrets,
+      (await client.capabilities())?.proxySecrets,
     )
     if (bindings.some((binding) => !capability.presentations.includes(binding.presentation.type)
       || !capability.placeholderFormats.includes(binding.placeholderFormat ?? 'opaque'))) {
@@ -158,7 +143,7 @@ export async function reconcileProxySecrets(
 ): Promise<void> {
   if (bindings === undefined) return
   try {
-    const egress = box.egress as unknown as ProxyEgress
+    const egress = box.egress
     const current = await egress.get()
     const previous = ProxySecretReceiptSchema.safeParse(current.proxySecretReceipt)
     if (!previous.success || previous.data.sandboxId !== box.id) {
@@ -188,7 +173,7 @@ export async function verifyProxySecrets(
 ): Promise<void> {
   if (bindings === undefined) return
   try {
-    const current = await (box.egress as unknown as ProxyEgress).get()
+    const current = await box.egress.get()
     confirmedReceipt(current.proxySecretReceipt, box, bindings)
   } catch (cause) {
     if (cause instanceof SandboxProxySecretsError) throw cause
@@ -204,10 +189,10 @@ export async function verifyProfileProxySecrets(
   requireReceipt: boolean,
 ): Promise<void> {
   if (requested === undefined && Object.keys(runtimeSecrets ?? {}).length === 0 && !requireReceipt) return
-  const egress = box.egress as unknown as ProxyEgress | undefined
+  const egress = box.egress
   if (!egress?.get && !requireReceipt && requested === undefined) return
   try {
-    const current = await egress!.get()
+    const current = await egress.get()
     if (current.proxySecretReceipt === undefined && !requireReceipt && requested === undefined) return
     const receipt = confirmedReceipt(current.proxySecretReceipt, box, requested ?? [], undefined, false)
     if (requested?.length === 0 && receipt.bindings.length > 0) {
