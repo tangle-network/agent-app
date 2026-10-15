@@ -7717,6 +7717,18 @@
           "doc": "A coding-agent backend this shell can dispatch a session onto."
         },
         {
+          "name": "harnessCapabilities",
+          "kind": "function",
+          "signature": "(harness: Harness) => HarnessCapabilities",
+          "doc": "The capability facts for `harness`."
+        },
+        {
+          "name": "HarnessCapabilities",
+          "kind": "interface",
+          "signature": "interface HarnessCapabilities",
+          "doc": "What a harness can express, for profile assembly."
+        },
+        {
           "name": "HarnessConfig",
           "kind": "interface",
           "signature": "interface HarnessConfig",

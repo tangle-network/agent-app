@@ -93,7 +93,7 @@ export interface TangleSsoExchangeResult {
 /** Structural mirror of the platform auth wire client — any object with these
  *  two methods satisfies it without this module importing the concrete class. */
 export interface TangleSsoAuthClient {
-  authorizeUrl(options: { state: string; redirectUri?: string }): string
+  authorizeUrl(options: { state: string; redirectUri?: string; prompt?: 'login' | 'select_account' }): string
   exchange(code: string): Promise<TangleSsoExchangeResult>
 }
 
@@ -107,7 +107,7 @@ export interface TangleIdentitySsoExchangeResult {
 }
 
 export interface TangleIdentitySsoAuthClient {
-  authorizeUrl(options: { state: string; redirectUri?: string }): string
+  authorizeUrl(options: { state: string; redirectUri?: string; prompt?: 'login' | 'select_account' }): string
   exchange(code: string): Promise<TangleIdentitySsoExchangeResult>
 }
 
@@ -708,6 +708,13 @@ export function createTangleSsoHandlers(
         return loginErrorRedirect('tangle_origin_mismatch')
       }
       const redirectPath = sanitizeRedirectPath(url.searchParams.get('redirect'), defaultRedirectPath)
+      // `?prompt=` passes through to the platform authorize URL so an app can
+      // offer `login` (fresh primary auth — the "switch account" semantic)
+      // and `select_account` (the platform account picker). One-shot on the
+      // platform side; it is deliberately not persisted into the state
+      // cookie because the callback never replays it.
+      const promptParam = url.searchParams.get('prompt')
+      const prompt = promptParam === 'login' || promptParam === 'select_account' ? promptParam : undefined
       const state = await createSignedSsoState(stateConfig)
       const payload: StateCookiePayload = { s: state, r: redirectPath }
       let authorizationUrl: string
@@ -720,7 +727,7 @@ export function createTangleSsoHandlers(
           throw new Error('PlatformOidcClient.redirectUri must equal callbackUrl')
         }
       } else {
-        authorizationUrl = opts.auth.authorizeUrl({ state, redirectUri: opts.callbackUrl })
+        authorizationUrl = opts.auth.authorizeUrl({ state, redirectUri: opts.callbackUrl, prompt })
       }
       const cookie = serializeCookie(JSON.stringify(payload), {
         ...stateCookieOpts,
@@ -739,6 +746,16 @@ export function createTangleSsoHandlers(
       }
       const code = url.searchParams.get('code')
       const stateFromPlatform = url.searchParams.get('state')
+      // The platform's RP-initiated end-session returns `error=signed_out`:
+      // the person signed out of Tangle on purpose and lands back here. That
+      // is the app's sign-in surface, not a failed handshake — route there
+      // quietly (still clearing the one-shot state cookie).
+      if (url.searchParams.get('error') === 'signed_out') {
+        const signedOutPayload = parseStateCookiePayload(readCookieValue(request.headers.get('cookie'), opts.stateCookieName))
+        const headers = new Headers()
+        headers.append('Set-Cookie', serializeCookie('', { ...stateCookieOpts, maxAgeSeconds: 0 }))
+        return redirectResponse(sanitizeRedirectPath(signedOutPayload?.r ?? null, defaultRedirectPath), headers)
+      }
       if (!code || !stateFromPlatform || url.searchParams.has('error')) return loginErrorRedirect('tangle_callback_missing')
       const payload = parseStateCookiePayload(readCookieValue(request.headers.get('cookie'), opts.stateCookieName))
       if (!payload || !constantTimeEqual(payload.s, stateFromPlatform)) return loginErrorRedirect('tangle_state_mismatch')
