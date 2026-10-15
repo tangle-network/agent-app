@@ -13,6 +13,7 @@ vi.mock('@tangle-network/sandbox/core', () => ({ Sandbox: class {
 import {
   ensureWorkspaceSandbox,
   resetClientCache,
+  serializeSandboxProvisioningError,
   streamSandboxPrompt,
   driveSandboxTurn,
   resolveSandboxPromptBackend,
@@ -231,6 +232,17 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
     await expect(ensureWorkspaceSandbox(shell({ proxySecrets: async () => { throw new Error('issuer refused') } }), scope))
       .rejects.toThrow('proxy')
     expect(create).not.toHaveBeenCalled()
+  })
+
+  it('omits issuer credential bytes from public provisioning diagnostics', async () => {
+    const syntheticCredential = 'synthetic-credential-custody-canary';
+    const failure = await ensureWorkspaceSandbox(shell({
+      proxySecrets: async () => { throw new Error(syntheticCredential) },
+    }), scope).catch((error: unknown) => error);
+    expect(JSON.stringify(serializeSandboxProvisioningError(failure))).not.toContain(syntheticCredential);
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain('proxy');
+    expect(create).not.toHaveBeenCalled();
   })
 
   it.each(['APP_TOKEN', 'app-capability'])('refuses readable env aliases %s before POST', async (name) => {

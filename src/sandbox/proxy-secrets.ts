@@ -10,8 +10,9 @@ import type { SandboxInstance } from '@tangle-network/sandbox'
 import type { SandboxScope } from './index'
 
 export class SandboxProxySecretsError extends Error {
-  constructor(message: string, cause?: unknown) {
-    super(`sandbox proxy secrets: ${message}`, cause === undefined ? undefined : { cause })
+  constructor(message: string) {
+    // Issuer/transport errors can contain credential bytes; expose only owned diagnostics.
+    super(`sandbox proxy secrets: ${message}`)
     this.name = 'SandboxProxySecretsError'
   }
 }
@@ -38,8 +39,8 @@ export async function resolveProxySecrets(
   try {
     const bindings = await resolve(scope, context)
     return ProxySecretsSchema.parse(bindings)
-  } catch (cause) {
-    throw new SandboxProxySecretsError('reference issuance failed', cause)
+  } catch {
+    throw new SandboxProxySecretsError('reference issuance failed')
   }
 }
 
@@ -85,8 +86,8 @@ export async function assertProxySecretCapabilities(
       throw new Error('peer does not advertise the required proxy custody capability')
     }
     return capability
-  } catch (cause) {
-    throw new SandboxProxySecretsError('required proxy custody is unsupported', cause)
+  } catch {
+    throw new SandboxProxySecretsError('required proxy custody is unsupported')
   }
 }
 
@@ -108,7 +109,7 @@ export function mergeProxySecrets(
     return selected
   } catch (cause) {
     if (cause instanceof SandboxProxySecretsError) throw cause
-    throw new SandboxProxySecretsError('invalid proxy secret selection', cause)
+    throw new SandboxProxySecretsError('invalid proxy secret selection')
   }
 }
 
@@ -177,7 +178,7 @@ export async function reconcileProxySecrets(
     }
   } catch (cause) {
     if (cause instanceof SandboxProxySecretsError) throw cause
-    throw new SandboxProxySecretsError('atomic renewal failed; dispatch refused', cause)
+    throw new SandboxProxySecretsError('atomic renewal failed; dispatch refused')
   }
 }
 
@@ -191,7 +192,7 @@ export async function verifyProxySecrets(
     confirmedReceipt(current.proxySecretReceipt, box, bindings)
   } catch (cause) {
     if (cause instanceof SandboxProxySecretsError) throw cause
-    throw new SandboxProxySecretsError('placement could not be verified after runtime refresh', cause)
+    throw new SandboxProxySecretsError('placement could not be verified after runtime refresh')
   }
 }
 
@@ -215,7 +216,7 @@ export async function verifyProfileProxySecrets(
     assertNoReadableProxySecrets(receipt.bindings, runtimeSecrets ?? {})
   } catch (cause) {
     if (cause instanceof SandboxProxySecretsError) throw cause
-    throw new SandboxProxySecretsError('authored profile custody is not installed on the dispatch sandbox', cause)
+    throw new SandboxProxySecretsError('authored profile custody is not installed on the dispatch sandbox')
   }
 }
 
