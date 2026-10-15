@@ -122,6 +122,10 @@ describe('reading reasoning while it streams', () => {
     expect(top).toBe(700)
     // Pause before the scroll event; a delta can land between input and scroll.
     fireEvent.wheel(viewport, { deltaY: -5 })
+    // A queued programmatic scroll must not undo the pause before input moves.
+    fireEvent.scroll(viewport)
+    act(() => { resized() })
+    expect(getByRole('button', { name: 'Jump to latest reasoning' })).toBeTruthy()
     top -= 5
     append('First thought. Following. Reading now.')
     expect(top).toBe(695)

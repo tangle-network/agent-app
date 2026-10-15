@@ -31,7 +31,7 @@ export function useChatScroll() {
       // A scrollbar drag or keyboard scroll upward pauses even within the
       // bottom threshold. Only an actual return downward resumes following.
       if (top < previousTop.current) follow(false)
-      else if (viewport.scrollHeight - top - viewport.clientHeight <= 24) follow(true)
+      else if (top > previousTop.current && viewport.scrollHeight - top - viewport.clientHeight <= 24) follow(true)
       previousTop.current = top
     }
     const wheel = (event: WheelEvent) => { if (event.deltaY < 0) follow(false) }

@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react'
 import {
   ChatMessages,
   ReasoningRow,
+  useChatScroll,
   chatReasoningFromParts,
   trackChatReasoning,
   type ChatReasoningState,
@@ -149,6 +150,19 @@ export const StreamingReading: Story = {
       const timer = setInterval(() => setText(value => value + paragraph(++n)), 350)
       return () => clearInterval(timer)
     }, [])
-    return framed(<ReasoningRow text={text} thinking />)
+    const scroll = useChatScroll()
+    return (
+      <div className="mx-auto flex h-[85dvh] max-w-3xl flex-col px-4">
+        <div ref={scroll.viewportRef} data-transcript-viewport tabIndex={0} role="region" aria-label="Conversation"
+          className="min-h-0 flex-1 overflow-y-auto">
+          <div ref={scroll.contentRef} className="space-y-6 py-4">
+            {Array.from({ length: 8 }, (_, i) => <p key={i} className="py-4">Earlier message {i + 1}: retain the conversation while the model works.</p>)}
+            <ReasoningRow text={text} thinking />
+            <p>Tool activity and answers appear here without taking the reader away.</p>
+          </div>
+        </div>
+        {!scroll.following && <button type="button" onClick={scroll.jumpToLatest} className="rounded-md border border-border px-3 py-2">Jump to latest message</button>}
+      </div>
+    )
   },
 }
