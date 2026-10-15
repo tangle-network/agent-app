@@ -272,7 +272,7 @@ describe('AgentProfileEditor MCP servers', () => {
     expect(within(screen.getByLabelText('MCP server transcripts')).getByText('Off')).toBeTruthy()
   })
 
-  it('checks a protected draft only on request, forwards its identity and invalidates results after authority changes', async () => {
+  it.each([undefined, 'Only admins can edit MCP servers.'])('checks a protected draft only on request with editing lock %s, forwards identity and invalidates changed authority', async lockReason => {
     const profile: AgentProfile = {
       proxySecrets: [{ envName: 'MCP_TOKEN', secretRef: { kind: 'secret-ref', key: 'mcp-access' },
         hosts: ['mcp.example.com'], presentation: { type: 'bearer' }, ttlSeconds: 300 }],
@@ -280,7 +280,7 @@ describe('AgentProfileEditor MCP servers', () => {
         headers: { Authorization: { kind: 'secret-ref', key: 'mcp-access' } } } },
     }
     const check = vi.fn(async (): Promise<McpHealth> => ({ ok: true, tools: [{ name: 'search' }], latencyMs: 5, checkedAt: 'now' }))
-    const props = { onChange: vi.fn(), config: config({ mcp: { port: { check } } }), publicHttpsMcpOnly: true }
+    const props = { onChange: vi.fn(), config: config({ mcp: { port: { check }, lockReason } }), publicHttpsMcpOnly: true }
     const view = render(<AgentProfileEditor value={profile} {...props} />)
     expect(check).not.toHaveBeenCalled()
     fireEvent.click(within(screen.getByLabelText('MCP server research')).getByRole('button', { name: 'Check' }))

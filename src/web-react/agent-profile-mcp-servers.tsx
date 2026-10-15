@@ -274,13 +274,13 @@ export function McpServersEditor({ servers, profile, onChange, port, disabled, l
                 <p className={`line-clamp-2 ${formText.muted}`}>Tools: {result.tools.map(tool => tool.name).join(', ')}</p>}
             </div>
           </div>
-          {!locked && <div className="flex flex-wrap gap-1 pl-9">
+          {(!locked || (port && on && !local)) && <div className="flex flex-wrap gap-1 pl-9">
             {port && on && !local && <Button type="button" size="compact" variant="ghost" disabled={disabled || result === 'checking'}
               onClick={() => setRecheck(current => ({ ...current, [name]: { identity, attempt: (current[name]?.attempt ?? 0) + 1 } }))}>{result ? 'Check again' : 'Check'}</Button>}
-            <Button type="button" size="compact" variant="ghost" disabled={disabled} aria-label={`Edit ${name}`}
+            {!locked && <><Button type="button" size="compact" variant="ghost" disabled={disabled} aria-label={`Edit ${name}`}
               onClick={() => setEditing({ name, draft: { name, transport: serverTransport(config), target } })}>Edit</Button>
             <Button type="button" size="compact" variant="ghost" className="text-destructive hover:text-destructive" disabled={disabled}
-              aria-label={`Remove ${name}`} onClick={() => { if (setServer(name, null) && editing?.name === name) setEditing(null) }}>Remove</Button>
+              aria-label={`Remove ${name}`} onClick={() => { if (setServer(name, null) && editing?.name === name) setEditing(null) }}>Remove</Button></>}
           </div>}
           {editing?.name === name && <div className="space-y-2 @lg/profile-editor:pl-12">
             {editing.reason && <p className={formText.muted}>{editing.reason}</p>}
