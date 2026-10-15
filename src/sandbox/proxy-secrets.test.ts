@@ -248,6 +248,31 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
     expect((await retained.egress.get()).proxySecretReceipt.bindings).toHaveLength(1)
   })
 
+  it.each(['new', 'reused'])('confirms the final full receipt after trusted bootstrap advances the %s box generation', async stage => {
+    const retained = withPlacement(box())
+    list.mockResolvedValue(stage === 'new' ? [] : [retained])
+    create.mockResolvedValue(retained)
+    const config = shell({ bootstrap: async () => {
+      retained.egress.get.mockResolvedValue({ proxySecretReceipt: placedReceipt(2) })
+      return { succeeded: true as const, value: undefined }
+    } })
+    const actual = await ensureWorkspaceSandbox(config, scope)
+    expect(actual).toBe(retained)
+    await expect(resolveSandboxPromptBackend(config, { profile: { proxySecrets: [] } }, 'test', actual)).resolves.toMatchObject({ profile: { proxySecrets: [] } })
+  })
+
+  it.each(['new', 'reused'])('refuses stale extra bindings introduced during trusted bootstrap on the %s box', async stage => {
+    const retained = withPlacement(box())
+    list.mockResolvedValue(stage === 'new' ? [] : [retained])
+    create.mockResolvedValue(retained)
+    const stale = { ...binding, envName: 'UNSELECTED_TOKEN', secretRef: { kind: 'secret-ref' as const, key: 'unselected' } }
+    const config = shell({ bootstrap: async () => {
+      retained.egress.get.mockResolvedValue({ proxySecretReceipt: placedReceipt(2, [binding, stale]) })
+      return { succeeded: true as const, value: undefined }
+    } })
+    await expect(ensureWorkspaceSandbox(config, scope)).rejects.toThrow('proxy')
+  })
+
   it('does not treat callback presence as proof that an empty authored selection owns installed bindings', async () => {
     const retained = withPlacement(box())
     await expect(resolveSandboxPromptBackend(shell(), { profile: { proxySecrets: [] } }, 'test', retained as unknown as SandboxInstance))
