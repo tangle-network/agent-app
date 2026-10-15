@@ -8,7 +8,7 @@
  * turning it back on restores that configuration.
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import type { AgentProfileMcpServer } from '@tangle-network/agent-interface/profile'
+import type { AgentProfile, AgentProfileMcpServer } from '@tangle-network/agent-interface/profile'
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '@tangle-network/sandbox-ui/primitives'
 import { publicHttpsUrlProblem, type McpHealth, type ProfileEditorMcpPort } from '../profile-editor'
 import { Field, fieldMessageId, formRow, formText, noAutofill, StatusPill, type StatusTone } from './agent-profile-form-kit'
@@ -66,6 +66,14 @@ function healthKey(server: AgentProfileMcpServer): string {
   return JSON.stringify(['url' in server ? server.url : null, 'transport' in server ? server.transport : null, 'headers' in server ? server.headers : null])
 }
 
+function protectedCheck(server: AgentProfileMcpServer, profile?: AgentProfile): boolean {
+  return profile?.proxySecrets !== undefined || ('headers' in server && Object.values(server.headers ?? {}).some(value => value.kind === 'secret-ref'))
+}
+
+function checkIdentity(server: AgentProfileMcpServer, profile?: AgentProfile): string {
+  return JSON.stringify([healthKey(server), protectedCheck(server, profile) ? profile : null])
+}
+
 function healthStatus(health: McpHealth | 'checking' | undefined): { tone: StatusTone; label: string } {
   if (health === 'checking') return { tone: 'pending', label: 'Checking' }
   if (!health) return { tone: 'neutral', label: 'Not checked' }
@@ -86,6 +94,8 @@ function healthStatus(health: McpHealth | 'checking' | undefined): { tone: Statu
 
 export interface McpServersEditorProps {
   servers: Servers
+  /** Full current draft sent to the authorized candidate-check owner. */
+  profile?: AgentProfile
   /** Apply the next server map to the profile. Returns false when the profile rejected it. */
   onChange: (next: Servers) => boolean
   port?: ProfileEditorMcpPort
@@ -178,27 +188,33 @@ function ServerForm({ draft, onDraft, existingNames, nameEditable, publicHttpsOn
   </div>
 }
 
-export function McpServersEditor({ servers, onChange, port, disabled, lockReason, publicHttpsOnly, allowLocalCommand, registry, onPendingChange }: McpServersEditorProps) {
+export function McpServersEditor({ servers, profile, onChange, port, disabled, lockReason, publicHttpsOnly, allowLocalCommand, registry, onPendingChange }: McpServersEditorProps) {
   const [health, setHealth] = useState<Record<string, { key: string; result: McpHealth | 'checking' }>>({})
-  const [recheck, setRecheck] = useState<Record<string, number>>({})
+  const [recheck, setRecheck] = useState<Record<string, { identity: string; attempt: number }>>({})
   const [editing, setEditing] = useState<{ name: string; draft: Draft; reason?: string } | null>(null)
   const [adding, setAdding] = useState<Draft | null>(null)
   const controllers = useRef(new Map<string, AbortController>())
   const locked = lockReason !== undefined
   const entries = useMemo(() => Object.entries(servers), [servers])
 
-  // Check every enabled remote server once per configuration, and again on request.
+  // Public checks run once per server configuration; protected previews run only on request.
   useEffect(() => {
     if (!port) return
     for (const [name, server] of entries) {
       if (server.enabled === false || ('command' in server && server.command)) continue
-      const key = `${healthKey(server)}#${recheck[name] ?? 0}`
+      const identity = checkIdentity(server, profile)
+      const requested = recheck[name]
+      const key = `${identity}#${requested?.attempt ?? 0}`
+      if (protectedCheck(server, profile) && requested?.identity !== identity) {
+        controllers.current.get(name)?.abort()
+        continue
+      }
       if (health[name]?.key === key) continue
       controllers.current.get(name)?.abort()
       const controller = new AbortController()
       controllers.current.set(name, controller)
       setHealth(current => ({ ...current, [name]: { key, result: 'checking' } }))
-      port.check(server, controller.signal).then(result => {
+      port.check(server, controller.signal, profile ? { profile, serverName: name } : undefined).then(result => {
         if (!controller.signal.aborted) setHealth(current => ({ ...current, [name]: { key, result } }))
       }, () => {
         if (!controller.signal.aborted) {
@@ -206,7 +222,7 @@ export function McpServersEditor({ servers, onChange, port, disabled, lockReason
         }
       })
     }
-  }, [entries, port, recheck, health])
+  }, [entries, profile, port, recheck, health])
   useEffect(() => () => { for (const controller of controllers.current.values()) controller.abort() }, [])
   const pending = editing !== null || adding !== null
   useEffect(() => { onPendingChange?.(pending) }, [pending, onPendingChange])
@@ -233,7 +249,9 @@ export function McpServersEditor({ servers, onChange, port, disabled, lockReason
         const config = enabledConfig(server)
         const local = serverTransport(config) === 'stdio'
         const target = serverTarget(config)
-        const result = health[name]?.result
+        const identity = checkIdentity(server, profile)
+        const key = `${identity}#${recheck[name]?.attempt ?? 0}`
+        const result = health[name]?.key === key ? health[name]?.result : undefined
         const status = !on ? { tone: 'neutral' as const, label: 'Off' }
           : local ? { tone: 'neutral' as const, label: 'Checked at run time' }
           : port ? healthStatus(result) : { tone: 'neutral' as const, label: 'Not checked' }
@@ -262,7 +280,7 @@ export function McpServersEditor({ servers, onChange, port, disabled, lockReason
           </div>
           {!locked && <div className="flex flex-wrap gap-1 pl-9">
             {port && on && !local && <Button type="button" size="compact" variant="ghost" disabled={disabled || result === 'checking'}
-              onClick={() => setRecheck(current => ({ ...current, [name]: (current[name] ?? 0) + 1 }))}>Check again</Button>}
+              onClick={() => setRecheck(current => ({ ...current, [name]: { identity, attempt: (current[name]?.attempt ?? 0) + 1 } }))}>{result ? 'Check again' : 'Check'}</Button>}
             <Button type="button" size="compact" variant="ghost" disabled={disabled} aria-label={`Edit ${name}`}
               onClick={() => setEditing({ name, draft: { name, transport: serverTransport(config), target } })}>Edit</Button>
             <Button type="button" size="compact" variant="ghost" className="text-destructive hover:text-destructive" disabled={disabled}
