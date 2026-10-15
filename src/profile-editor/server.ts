@@ -6,13 +6,14 @@
  * fetch-based and runs in Workers and Node.
  */
 import { z } from 'zod'
+import { canonicalAgentProfileDigest, snapshotAgentProfile, type Sha256Digest } from '@tangle-network/agent-interface'
 import type { AgentProfileMcpServer, AgentProfileSecretRef } from '@tangle-network/agent-interface/profile'
 import { agentProfileHeaderSchema } from '@tangle-network/agent-interface/profile-schema'
 import {
   isCommitSha, PROFILE_EDITOR_ROUTES, publicHttpsUrlProblem, readSkillFrontmatter,
   type GitHubCommitSummary, type GitHubFileList, type GitHubRepositorySummary, type GitHubSourceCheck,
   type GitHubSourceFailure, type GitHubSourceOutcome, type GitHubSourceProblem, type GitHubSourceRequest,
-  type McpHealth, type McpTool, type ProfileEditorGitHubPort, type ProfileEditorMcpPort,
+  type McpHealth, type McpTool, type ProfileEditorGitHubPort, type ProfileEditorMcpCandidate, type ProfileEditorMcpPort,
 } from './index'
 
 export * from './index'
@@ -628,19 +629,29 @@ async function checkSse(url: string, headers: Record<string, string>, send: Send
 
 /** The editor's MCP port, running checks in this process with the given address policy. */
 export function createMcpHealthChecker(options: McpHealthCheckOptions = {}): ProfileEditorMcpPort {
-  return { check: (server, signal) => {
+  return { check: (server, signal, candidate) => {
     if (signal?.aborted) return Promise.resolve({ ok: false, problem: 'unavailable', message: 'The check was cancelled.', checkedAt: new Date().toISOString() })
+    if (candidate && (candidate.profile.proxySecrets !== undefined
+      || Object.values(('headers' in server ? server.headers : undefined) ?? {}).some(value => value?.kind === 'secret-ref'))) {
+      return Promise.resolve({ ok: false, problem: 'unavailable',
+        message: 'This product cannot prepare the protected candidate profile for MCP checks.', checkedAt: new Date().toISOString() })
+    }
     return checkMcpServer(server, options)
   } }
 }
 
 // ── Route handler ───────────────────────────────────────────────────────────
 
+/** Server-validated candidate identity. The host still authorizes its requested authority. */
+export interface ProfileEditorMcpCheckContext extends ProfileEditorMcpCandidate {
+  profileDigest: Sha256Digest
+}
+
 export interface ProfileEditorHandlerOptions {
   /** GitHub lookups for this workspace. Null when the product offers no GitHub sources. */
   github: ProfileEditorGitHubPort | null
   /** MCP checks. Null when the product offers no MCP servers. */
-  mcp: ProfileEditorMcpPort | null
+  mcp: ProfileEditorMcpPort<ProfileEditorMcpCheckContext> | null
 }
 
 const repositoryParam = z.string().trim().min(3).max(201)
@@ -653,7 +664,9 @@ const mcpBody = z.object({ server: z.object({
   url: z.string().max(2048).optional(),
   command: z.string().max(2048).optional(),
   headers: z.record(z.string(), z.unknown()).optional(),
-}).passthrough() }).strict()
+}).passthrough(),
+  candidate: z.object({ profile: z.unknown(), serverName: z.string().min(1).max(256) }).strict().optional(),
+}).strict()
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } })
@@ -686,7 +699,24 @@ export async function handleProfileEditorRequest(request: Request, path: string,
     if (!options.mcp) return json({ ok: false, problem: 'unavailable', message: 'This product does not check MCP servers.', checkedAt: new Date().toISOString() })
     let body: z.infer<typeof mcpBody>
     try { body = mcpBody.parse(await readBody(request)) } catch { return json({ error: 'Send { server } with the MCP server to check.' }, 400) }
-    return json(await options.mcp.check(body.server as unknown as AgentProfileMcpServer, signal))
+    let server = body.server as unknown as AgentProfileMcpServer
+    let candidate: ProfileEditorMcpCheckContext | undefined
+    if (body.candidate) {
+      try {
+        const profile = snapshotAgentProfile(body.candidate.profile)
+        const serverName = body.candidate.serverName
+        const selected = profile.mcp?.[serverName]
+        if (!selected || canonicalAgentProfileDigest({ mcp: { [serverName]: selected } })
+          !== canonicalAgentProfileDigest({ mcp: { [serverName]: server } })) {
+          return json({ error: 'The selected MCP server does not match the candidate profile.' }, 400)
+        }
+        candidate = { profile, serverName, profileDigest: canonicalAgentProfileDigest(profile) }
+        server = selected
+      } catch {
+        return json({ error: 'Send a valid candidate profile and matching MCP server.' }, 400)
+      }
+    }
+    return json(await (candidate ? options.mcp.check(server, signal, candidate) : options.mcp.check(server, signal)))
   }
   if (!options.github) return json(fail('unavailable', 'This product does not offer GitHub sources.'))
   const github = options.github

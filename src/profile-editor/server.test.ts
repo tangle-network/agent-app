@@ -391,6 +391,22 @@ describe('profile editor route handler and client', () => {
     expect(checked!.profile.proxySecrets).toEqual(profile.proxySecrets)
   })
 
+  it('does not downgrade a protected candidate check to generic server transport', async () => {
+    const send = vi.fn(async () => new Response())
+    const proxyFetch = vi.fn(async () => new Response())
+    const checker = createMcpHealthChecker({ fetch: send as typeof globalThis.fetch, proxyFetch })
+    for (const profile of [
+      { name: 'Revoked bindings', proxySecrets: [], mcp: { docs: { url: 'https://docs.example.com/mcp' } } },
+      { name: 'Reference headers', mcp: { docs: { url: 'https://docs.example.com/mcp',
+        headers: { Authorization: { kind: 'secret-ref', key: 'docs-access' } } } } },
+    ] satisfies AgentProfile[]) {
+      expect(await checker.check(profile.mcp.docs, undefined, { profile, serverName: 'docs' }))
+        .toMatchObject({ ok: false, problem: 'unavailable' })
+    }
+    expect(send).not.toHaveBeenCalled()
+    expect(proxyFetch).not.toHaveBeenCalled()
+  })
+
   it('refuses malformed candidates, substituted servers and client-supplied trusted digests before invoking the port', async () => {
     const server = { url: 'https://reports.example.com/mcp',
       headers: { Authorization: { kind: 'secret-ref', key: 'reporting-api' } } }
