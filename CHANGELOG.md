@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.172
+
+- feat(sso): prompt passthrough on start and a quiet signed_out callback (#1122)
+
 ## 0.60.171
 
 - fix(harness): drop the gemini capability row — gemini is a non-backend harness type (#1115)
