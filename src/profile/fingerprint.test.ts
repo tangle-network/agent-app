@@ -63,6 +63,48 @@ describe('fingerprintAgentProfile', () => {
   })
 })
 
+describe('proxy secret authority fingerprints', () => {
+  const binding = {
+    envName: 'REPORTS_TOKEN',
+    secretRef: { kind: 'secret-ref', key: 'reporting-api' },
+    hosts: ['reports.example.com'],
+    presentation: { type: 'bearer' },
+    methods: ['POST'],
+    paths: ['/v1/events'],
+    ttlSeconds: 300,
+  } satisfies NonNullable<AgentProfile['proxySecrets']>[number]
+
+  it('detects authority changes without publishing references or destinations', async () => {
+    const base = await fingerprintAgentProfile({ ...PROFILE, proxySecrets: [binding] }, CTX)
+    const changes = [
+      { secretRef: { kind: 'secret-ref', key: 'other-api' } },
+      { hosts: ['other.example.com'] },
+      { presentation: { type: 'header', name: 'X-Reports-Key' } },
+      { methods: ['GET'] },
+      { paths: ['/v1/accounts'] },
+      { ttlSeconds: 60 },
+    ] satisfies Partial<NonNullable<AgentProfile['proxySecrets']>[number]>[]
+    for (const change of changes) {
+      const updated = await fingerprintAgentProfile({
+        ...PROFILE, proxySecrets: [{ ...binding, ...change }],
+      }, CTX)
+      expect(updated.hash).not.toBe(base.hash)
+      const drift = diffProfileFingerprints(base, updated)
+      expect(drift.equal).toBe(false)
+      expect(drift.drift.map(({ channel }) => channel)).toContain('proxySecretAuthoritySha')
+      const publicEvidence = JSON.stringify([base, updated, formatProfileDrift(drift)])
+      expect(publicEvidence).not.toContain(binding.secretRef.key)
+      expect(publicEvidence).not.toContain(binding.hosts[0])
+    }
+  })
+
+  it('preserves fingerprints for profiles without bindings', async () => {
+    const absent = await fingerprintAgentProfile(PROFILE, CTX)
+    const empty = await fingerprintAgentProfile({ ...PROFILE, proxySecrets: [] }, CTX)
+    expect(empty).toEqual(absent)
+  })
+})
+
 describe('diffProfileFingerprints', () => {
   it('identical profiles: equal, and the formatter says exactly so', async () => {
     const a = await fingerprintAgentProfile(PROFILE, CTX)

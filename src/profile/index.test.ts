@@ -15,6 +15,7 @@ import {
   stripComments,
   userSkillMounts,
   type ProfileChannels,
+  type ProfileOverlay,
   type SkillEntry,
   type UserSkill,
 } from './index'
@@ -165,6 +166,31 @@ describe('composeAgentProfile — overlay (mcp / prompt / name)', () => {
     composeAgentProfile(BASE, { skills: CORPUS, userSkills: USER_SKILLS }, { name: 'x' })
     expect(must(BASE.resources).files?.length).toBe(baseFiles)
     expect(BASE.name).toBe('base-agent')
+  })
+})
+
+describe('composeAgentProfile — proxy secret authority', () => {
+  it('preserves authorized bindings when an untyped text overlay asks for broader authority', () => {
+    const binding = {
+      envName: 'REPORTS_TOKEN',
+      secretRef: { kind: 'secret-ref', key: 'reporting-api' },
+      hosts: ['reports.example.com'],
+      presentation: { type: 'bearer' },
+      methods: ['POST'],
+      paths: ['/v1/events'],
+      ttlSeconds: 300,
+    } satisfies NonNullable<AgentProfile['proxySecrets']>[number]
+    const base: AgentProfile = { ...BASE, proxySecrets: [binding] }
+    // Deserialized input can carry properties that TypeScript callers cannot.
+    const overlay = {
+      systemPrompt: 'Edited role text',
+      proxySecrets: [{ ...binding, hosts: ['unapproved.example.com'], ttlSeconds: 3600 }],
+    } as ProfileOverlay
+    const out = composeAgentProfile(base, {}, overlay)
+    expect(out.prompt?.systemPrompt).toBe('Edited role text')
+    expect(out.proxySecrets).toEqual([binding])
+    expect(base.proxySecrets).toEqual([binding])
+    expect(composeAgentProfile(BASE, {}, overlay).proxySecrets ?? []).toEqual([])
   })
 })
 
