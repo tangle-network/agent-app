@@ -1,0 +1,67 @@
+# Temporary implementation-branch tool. Remove after the generated docs and
+# maintained signoff receipt have been reviewed; this adds no required merge gate.
+name: Harness modularity documentation repair
+on:
+  pull_request:
+    paths: ['.github/workflows/harness-modularity-repair.yml']
+permissions:
+  contents: read
+jobs:
+  repair:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'refactor/harness-modularity-20261014'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    concurrency:
+      group: harness-modularity-documentation-repair
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate only the maintained API artifacts and commit without force
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          TARGET_BRANCH: refactor/harness-modularity-20261014
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          pnpm docs:gen
+          python3 - <<'PY'
+          import subprocess
+          allowed = {'docs/CODEMAP.md', 'docs/codemap.json', 'docs/llms.txt', 'docs/llms-full.txt', 'docs/api/harness.md'}
+          changed = set(subprocess.check_output(['git','diff','--name-only'], text=True).splitlines())
+          if changed - allowed:
+              raise SystemExit(f'Generator changed unexpected tracked files: {sorted(changed - allowed)}')
+          PY
+          git add -- docs/CODEMAP.md docs/codemap.json docs/llms.txt docs/llms-full.txt docs/api/harness.md
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'docs(harness): regenerate retirement-safe public API artifacts'
+            git push origin "HEAD:$TARGET_BRANCH"
+          fi
+          git rev-parse HEAD > "$RUNNER_TEMP/harness-verified-head.txt"
+      - name: Run the existing signoff against the generated-documentation commit
+        env:
+          VITEST_MAX_WORKERS: '2'
+          TMPDIR: ${{ runner.temp }}
+          VERIFICATION_DIR: ${{ runner.temp }}/agent-app-signoff-evidence
+        run: pnpm signoff --source head --max-parallel 1 --keep-going --json "$RUNNER_TEMP/agent-app-signoff.json"
+      - name: Retain the real receipt, not a synthetic success flag
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: harness-modularity-repair-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/agent-app-signoff.json
+            ${{ runner.temp }}/harness-verified-head.txt
+          if-no-files-found: warn
+          retention-days: 7
