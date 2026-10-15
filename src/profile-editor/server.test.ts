@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createServer } from 'node:http'
 import {
   checkMcpServer, createGitHubRestReader, createGitHubSourceService, GitHubReadError, handleProfileEditorRequest,
   type GitHubSourceReader,
@@ -178,6 +179,94 @@ describe('checkMcpServer', () => {
     expect(seen.map(call => call.method)).toEqual(['POST', 'POST', 'POST', 'DELETE'])
     expect(seen.slice(1).every(call => call.session === 'session-1')).toBe(true)
     expect(new Headers((fetch.mock.calls[0]![1] as RequestInit).headers).get('X-Team')).toBe('growth')
+  })
+
+  it('refuses required references before a public transport can report anonymous success', async () => {
+    const anonymous = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const message = JSON.parse(String(init?.body)) as { id?: number }
+      return Response.json({ jsonrpc: '2.0', id: message.id, result: { tools: [] } })
+    })
+    const result = await checkMcpServer({ url: 'https://docs.example.com/mcp',
+      headers: { Authorization: { kind: 'secret-ref', key: 'docs-access' } } }, { fetch: anonymous as typeof globalThis.fetch })
+    expect(result).toMatchObject({ ok: false, problem: 'auth-required' })
+    expect(anonymous).not.toHaveBeenCalled()
+  })
+
+  it('completes a real MCP handshake through the trusted reference transport without exposing its credential', async () => {
+    const canary = 'controlled-mcp-custody-canary'
+    const methods: string[] = []
+    const server = createServer(async (request, response) => {
+      if (request.headers.authorization !== `Bearer ${canary}`) {
+        response.writeHead(401).end()
+        return
+      }
+      if (request.method === 'DELETE') {
+        methods.push('DELETE')
+        response.writeHead(204).end()
+        return
+      }
+      const chunks: Buffer[] = []
+      for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      const message = JSON.parse(Buffer.concat(chunks).toString()) as { method: string; id?: number }
+      methods.push(message.method)
+      if (message.method === 'notifications/initialized') {
+        response.writeHead(202).end()
+        return
+      }
+      response.setHeader('Content-Type', 'application/json')
+      response.setHeader('Mcp-Session-Id', 'checked-session')
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: message.method === 'initialize'
+        ? { protocolVersion: '2025-06-18', serverInfo: { name: 'authenticated-docs' } }
+        : { tools: [{ name: 'read_docs' }] } }))
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('Expected a TCP test listener')
+    const url = `http://127.0.0.1:${address.port}/mcp`
+    const publicFetch = vi.fn(async () => { throw new Error('Public transport must not handle references') })
+    const boundaries: unknown[] = []
+    try {
+      const health = await checkMcpServer({ transport: 'http', url, headers: {
+        Authorization: { kind: 'secret-ref', key: 'docs-access' }, 'X-Team': { kind: 'public', value: 'growth' },
+      } }, {
+        urlProblem: value => value === url ? null : 'Test address refused',
+        fetch: publicFetch as typeof globalThis.fetch,
+        proxyFetch: async (input, init, secretHeaders) => {
+          boundaries.push([String(input), init, secretHeaders])
+          expect(secretHeaders).toEqual({ Authorization: { kind: 'secret-ref', key: 'docs-access' } })
+          expect(new Headers(init.headers).get('Authorization')).toBeNull()
+          expect(new Headers(init.headers).get('X-Team')).toBe('growth')
+          expect(init.redirect).toBe('manual')
+          const headers = new Headers(init.headers)
+          headers.set('Authorization', `Bearer ${canary}`)
+          return globalThis.fetch(input, { ...init, headers })
+        },
+      })
+      expect(health).toMatchObject({ ok: true, serverName: 'authenticated-docs', tools: [{ name: 'read_docs' }] })
+      expect(methods).toEqual(['initialize', 'notifications/initialized', 'tools/list', 'DELETE'])
+      expect(publicFetch).not.toHaveBeenCalled()
+      expect(JSON.stringify([boundaries, health])).not.toContain(canary)
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    }
+  })
+
+  it('redacts protected transport failures and upstream error text, and enforces the address policy', async () => {
+    const reflected = 'controlled-sensitive-upstream-detail'
+    const server = { url: 'https://docs.example.com/mcp',
+      headers: { Authorization: { kind: 'secret-ref', key: 'docs-access' } } } as const
+    const refused = vi.fn(async () => { throw new Error(reflected) })
+    expect(await checkMcpServer({ ...server, url: 'http://localhost/mcp' }, { proxyFetch: refused }))
+      .toMatchObject({ ok: false, problem: 'blocked-url' })
+    expect(refused).not.toHaveBeenCalled()
+    const denied = await checkMcpServer(server, { proxyFetch: refused })
+    expect(denied).toMatchObject({ ok: false, problem: 'unreachable' })
+    expect(JSON.stringify(denied)).not.toContain(reflected)
+    const reflection = await checkMcpServer(server, { proxyFetch: async () => Response.json({
+      jsonrpc: '2.0', id: 1, error: { code: -32603, message: reflected },
+    }) })
+    expect(reflection).toMatchObject({ ok: false, problem: 'protocol-error' })
+    expect(JSON.stringify(reflection)).not.toContain(reflected)
   })
 
   it('speaks the HTTP+SSE transport through the announced endpoint', async () => {
