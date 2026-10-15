@@ -2429,7 +2429,7 @@ async function finalizeExistingBox(
     throw deferredProfileWriteFailed(stage, name, written.error)
   }
   const finalBox = written.value
-  await verifyProxySecrets(finalBox, proxySecrets, shell.proxySecrets)
+  await verifyProxySecrets(finalBox, proxySecrets, shell.bootstrap ? undefined : shell.proxySecrets)
   if (prefetch.runtimeEnv) {
     // The same renewal, sent while the probe ran; its failure fails the reuse
     // exactly as a renewal sent here would.
@@ -2443,6 +2443,8 @@ async function finalizeExistingBox(
     if (!boot.succeeded) {
       throw new Error(`bootstrap failed on ${stage} box ${name}`, { cause: boot.error })
     }
+    // Native credential bootstrap can advance placement; prove the final full selection.
+    await verifyProxySecrets(finalBox, proxySecrets, shell.proxySecrets)
   }
   return finalBox
 }
@@ -2954,12 +2956,14 @@ async function provisionWorkspaceSandbox(
     }
   }
 
-  await verifyProxySecrets(box, proxySecrets, shell.proxySecrets)
+  await verifyProxySecrets(box, proxySecrets, shell.bootstrap ? undefined : shell.proxySecrets)
   if (shell.bootstrap) {
     const boot = await shell.bootstrap(box, scope)
     if (!boot.succeeded) {
       throw new Error(`bootstrap failed on new box ${name}`, { cause: boot.error })
     }
+    // Native credential bootstrap can advance placement; prove the final full selection.
+    await verifyProxySecrets(box, proxySecrets, shell.proxySecrets)
   }
   return box
 }
