@@ -44,6 +44,7 @@ function intendedChange(target: HTMLElement, event: Event): { action: string; ch
   if (target instanceof HTMLInputElement && ['checkbox', 'radio'].includes(target.type)) return { action: 'control:checked-state', changed: () => true }
   const dialog = target.closest('[role="dialog"]')
   if (event instanceof KeyboardEvent && event.key === 'Escape') {
+    if (!dialog) return null
     if (dialog?.getAttribute('aria-busy') === 'true') return { action: 'dialog:busy-dismiss-guard', changed: () => dialog.isConnected }
     return { action: 'dialog:escape', changed: () => !dialog?.isConnected }
   }
@@ -117,14 +118,17 @@ export function useInteractionEvidence() {
       if (!target || !(root.current?.contains(target) || target.closest('[role="dialog"]'))) return
       if (event instanceof KeyboardEvent && !(event.key === 'Escape' || (event.key === 'Enter' && target.matches('input,textarea')))) return
       const intent = intendedChange(target, event)
-      if (!intent) return
       const inputStart = event.timeStamp > performance.timeOrigin ? event.timeStamp - performance.timeOrigin : event.timeStamp
       const roleReadings = readRoles(target)
-      const sample: Sample = { attempt: samples.length + 1, action: intent.action, inputStart, handlerStart, batch: batch && { ...batch }, roleReadings, feedbackBudgetMs: roleReadings['--interaction-feedback-budget']?.ms ?? null,
+      const sample: Sample = { attempt: samples.length + 1, action: intent?.action ?? `unmapped:${event.type}:${nameOf(target)}`, inputStart, handlerStart, batch: batch && { ...batch }, roleReadings, feedbackBudgetMs: roleReadings['--interaction-feedback-budget']?.ms ?? null,
         status: 'UNCHECKED', reason: 'No relevant presented frame has been calibrated. Missing changes remain in the sample population.' }
       const anchor = root.current?.querySelector<HTMLElement>('[data-design-anchor]')
       if (anchor) sample.anchorBefore = { id: anchor.dataset.designAnchor ?? '', top: anchor.getBoundingClientRect().top, lineHeight: parseFloat(getComputedStyle(anchor).lineHeight) }
       samples.push(sample)
+      if (!intent) {
+        sample.reason = 'Unmapped input retained without observation; no relevant-feedback predicate is defined.'
+        return
+      }
       const roleTimes = roles.map(role => roleReadings[role]?.ms)
       if (roleTimes.some(time => time == null)) {
         sample.reason = 'Input retained without observation: a computed interaction role on its target is absent or invalid.'
