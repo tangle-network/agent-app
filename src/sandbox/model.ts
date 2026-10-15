@@ -1,7 +1,8 @@
+import type { BackendConfig } from '@tangle-network/sandbox'
 import { trimOrNull } from '../runtime/model'
 
 /** Define configuration options for resolving a provider and its model with optional API keys and routing details */
-export interface ProviderResolutionConfig {
+export interface ProviderResolutionConfig extends Pick<NonNullable<BackendConfig['model']>, 'authMode' | 'cliAuth'> {
   routerBaseUrl?: string
   apiKey?: string
   providerName?: string
@@ -32,7 +33,7 @@ export interface ProviderResolutionConfig {
  * provider, apiKey, baseUrl, modelId at path backend" (Creative, 2026-10-06).
  */
 export function backendModelFields(model: ResolvedModel): {
-  model: { model: string; provider: string; apiKey?: string; baseUrl?: string };
+  model: ResolvedModel;
 } {
   return {
     model: {
@@ -40,15 +41,17 @@ export function backendModelFields(model: ResolvedModel): {
       provider: model.provider,
       ...(model.apiKey !== undefined ? { apiKey: model.apiKey } : {}),
       ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
+      ...(model.authMode !== undefined ? { authMode: model.authMode } : {}),
+      ...(model.cliAuth !== undefined ? { cliAuth: { ...model.cliAuth } } : {}),
     },
   };
 }
 
-export interface ResolvedModel {
+export interface ResolvedModel extends Pick<NonNullable<BackendConfig['model']>, 'authMode' | 'cliAuth'> {
   model: string
   provider: string
-  // Omitted only under `allowKeylessModel` — keyless metadata tells the
-  // sandbox platform to mint its own per-user router key for the box.
+  // Native OAuth references and allowKeylessModel both omit an API key; only
+  // the latter permits the platform's managed Router credential selection.
   apiKey?: string
   baseUrl?: string
 }
@@ -152,6 +155,30 @@ export function resolveModelSelection(
     configModel ??
     (provider === 'openai' || provider === 'openai-compat' ? defaultModel : null)
 
+  if (c.authMode !== undefined && c.authMode !== 'oauth' && c.authMode !== 'api-key') {
+    throw new Error('sandbox native authentication mode is invalid')
+  }
+  if (c.authMode === 'oauth' || c.cliAuth !== undefined) {
+    if (c.authMode !== 'oauth' || provider !== 'openai' || !modelName
+      || explicitApiKey || openaiApiKey || explicitBaseUrl) {
+      throw new Error('sandbox native OAuth requires an explicit OpenAI model and no API credentials or base URL')
+    }
+    const reference = c.cliAuth
+    // The SDK owns canonical syntax and backend-format admission. Refuse
+    // missing reference fields and raw extras here without copying its schema.
+    if (!reference || typeof reference !== 'object' || Array.isArray(reference)
+      || Object.keys(reference).length !== 3
+      || Object.keys(reference).some(key => !['account', 'secretEnv', 'format'].includes(key))
+      || typeof reference.account !== 'string' || !reference.account.trim()
+      || typeof reference.secretEnv !== 'string' || !reference.secretEnv.trim()
+      || !['token', 'bundle', 'files'].includes(reference.format)) {
+      throw new Error('sandbox native OAuth requires a valid credential reference')
+    }
+    return { succeeded: true, value: {
+      model: modelName, provider, authMode: 'oauth', cliAuth: { ...reference },
+    } }
+  }
+
   if (!modelName) return { succeeded: true, value: undefined }
 
   const source: ModelSelectionSource = overrideModel ? 'override' : configModel ? 'config' : 'default'
@@ -170,6 +197,7 @@ export function resolveModelSelection(
       provider,
       ...(apiKey ? { apiKey } : {}),
       ...(explicitBaseUrl ? { baseUrl: explicitBaseUrl } : {}),
+      ...(c.authMode !== undefined ? { authMode: c.authMode } : {}),
     },
   }
 }
