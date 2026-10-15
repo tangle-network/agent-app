@@ -580,3 +580,16 @@ The per-turn `proxySecrets` resolver currently refuses shared-box execution beca
 Deploy a Sandbox runtime advertising the canonical proxy-secret capability before adopting protected declarations. Missing support or unconfirmed installation fails closed.
 
 An authored `profile.proxySecrets: []` clears the authored declarations and remains explicit in its digest. The runtime callback still owns the **complete effective selection**, including any independently authorized product bindings. Return that current set without old authored bindings; returning `[]` from the callback revokes the whole set. After `ensureWorkspaceSandbox`, dispatch with its actual returned box and the same callback configuration. For every callback-configured dispatch, the framework rechecks the exact confirmed full selection and generation before checking the authored subset; callback presence alone is insufficient. Without that confirmed callback placement, an empty authored selection requires an empty revoked receipt. Dispatch never unions or changes bindings.
+
+
+For a native subscription, pass the existing SDK credential reference through
+`shell.provider` with `providerName: 'openai'`, the selected `defaultModel`,
+`authMode: 'oauth'`, and `cliAuth`. Keep API keys and Router base URLs out of
+that provider configuration. Native OAuth resolves without `allowKeylessModel`.
+Keep credential issuance with the trusted product owner; grant/materialize it
+inside the existing `bootstrap` callback. The framework confirms the complete
+selected receipt before bootstrap and again afterwards, rejecting rollback or
+a changed receipt at the same generation. Pass the actual returned box to
+`resolveSandboxPromptBackend(shell, options, operation, box)` and shared turn
+helpers, with the existing preparation digest/receipt pins. A wrapper object
+does not inherit callback-placement proof.

@@ -179,15 +179,21 @@ export async function verifyProxySecrets(
   box: SandboxInstance,
   bindings: ProxySecretBinding[] | undefined,
   owner?: SandboxProxySecretsResolver,
-): Promise<void> {
+  previous?: ProxySecretReceipt,
+): Promise<ProxySecretReceipt | undefined> {
   if (bindings === undefined) return
   confirmedCallbackSelections.delete(box)
   try {
     const current = await box.egress.get()
     const receipt = confirmedReceipt(current.proxySecretReceipt, box, bindings)
+    if (previous && (receipt.generation < previous.generation
+      || (receipt.generation === previous.generation && JSON.stringify(receipt) !== JSON.stringify(previous)))) {
+      throw new SandboxProxySecretsError('bootstrap placement did not preserve or advance the confirmed generation')
+    }
     if (owner) confirmedCallbackSelections.set(box, {
       owner, bindings: ProxySecretsSchema.parse(bindings), receipt,
     })
+    return receipt
   } catch (cause) {
     if (cause instanceof SandboxProxySecretsError) throw cause
     throw new SandboxProxySecretsError('placement could not be verified after runtime refresh')
