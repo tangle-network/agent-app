@@ -26,13 +26,20 @@ export function useChatScroll() {
   useLayoutEffect(() => {
     if (!viewport || !content) return
     previousTop.current = viewport.scrollTop
+    let previousHeight = viewport.scrollHeight
+    let previousClient = viewport.clientHeight
     const scroll = () => {
       const top = viewport.scrollTop
       // A scrollbar drag or keyboard scroll upward pauses even within the
       // bottom threshold. Only an actual return downward resumes following.
-      if (top < previousTop.current) follow(false)
-      else if (top > previousTop.current && viewport.scrollHeight - top - viewport.clientHeight <= 24) follow(true)
+      const nearBottom = viewport.scrollHeight - top - viewport.clientHeight <= 24
+      const clampedToBottom = nearBottom && followingRef.current &&
+        (viewport.scrollHeight < previousHeight || viewport.clientHeight > previousClient)
+      if (top < previousTop.current && !clampedToBottom) follow(false)
+      else if (top > previousTop.current && nearBottom) follow(true)
       previousTop.current = top
+      previousHeight = viewport.scrollHeight
+      previousClient = viewport.clientHeight
     }
     const wheel = (event: WheelEvent) => { if (event.deltaY < 0) follow(false) }
     let touchY = 0
@@ -45,7 +52,11 @@ export function useChatScroll() {
     const key = (event: KeyboardEvent) => {
       if (['ArrowUp', 'PageUp', 'Home'].includes(event.key) || (event.key === ' ' && event.shiftKey)) follow(false)
     }
-    const resize = () => { if (followingRef.current) jumpToLatest() }
+    const resize = () => {
+      if (followingRef.current) jumpToLatest()
+      previousHeight = viewport.scrollHeight
+      previousClient = viewport.clientHeight
+    }
     viewport.addEventListener('scroll', scroll)
     viewport.addEventListener('wheel', wheel, { passive: true })
     viewport.addEventListener('touchstart', touchStart, { passive: true })

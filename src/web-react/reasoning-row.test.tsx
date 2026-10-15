@@ -145,6 +145,12 @@ describe('reading reasoning while it streams', () => {
     fireEvent.scroll(viewport)
     append('First thought. Following. Reading now. Still reading. Latest. Scrollbar reading. Resumed.')
     expect(top).toBe(height - 400)
+    // Content collapse can clamp scrollTop before ResizeObserver runs.
+    height -= 200
+    top = height - 400
+    fireEvent.scroll(viewport)
+    append('First thought. After a tool disclosure collapses, keep following.')
+    expect(top).toBe(height - 400)
   })
 
   it.each(['ArrowUp', 'PageUp', 'Home'])('keeps the reader in place for %s, including when reasoning ends', (key) => {
