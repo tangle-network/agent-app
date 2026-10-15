@@ -18,9 +18,11 @@ try {
     ['desktop-light', { width: 1440, height: 900 }, 'agent-light'],
     ['desktop-dark', { width: 1440, height: 900 }, 'agent-dark'],
     ['phone', { width: 390, height: 844 }, 'agent-light'],
+    ['desktop-reduced', { width: 1440, height: 900 }, 'agent-light'],
   ]) {
     const phone = name === 'phone'
-    const context = await browser.newContext({ viewport, isMobile: phone, hasTouch: phone, recordVideo: { dir: output, size: viewport } })
+    const context = await browser.newContext({ viewport, isMobile: phone, hasTouch: phone, reducedMotion: name === 'desktop-reduced' ? 'reduce' : 'no-preference', recordVideo: { dir: output, size: viewport } })
+    await context.tracing.start({ screenshots: true, snapshots: true })
     const page = await context.newPage()
     const row = { name, viewport, theme, mode, startedAt: new Date().toISOString(), steps: [] }
     results.push(row)
@@ -30,6 +32,11 @@ try {
       await reasoning.waitFor()
       await page.waitForTimeout(900)
       const before = await geometry(reasoning)
+      await reasoning.evaluate(el => {
+        const record = () => { window.__scrollInput = { top: el.scrollTop, at: performance.now() } }
+        el.addEventListener('wheel', record, { once: true, capture: true })
+        el.addEventListener('touchmove', record, { once: true, capture: true })
+      })
       assert.ok(before.height > before.client, 'long reasoning scrolls internally')
       const box = await reasoning.boundingBox()
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
@@ -46,20 +53,35 @@ try {
       } else await page.mouse.wheel(0, -220)
       await page.waitForTimeout(200)
       const reading = await geometry(reasoning)
+      const input = await page.evaluate(() => window.__scrollInput)
+      const anchor = await reasoning.evaluate(el => {
+        const top = el.getBoundingClientRect().top
+        const paragraph = [...el.querySelectorAll('p')].find(p => p.getBoundingClientRect().top >= top)
+        if (!paragraph) throw new Error('No visible reading anchor')
+        paragraph.dataset.readingAnchor = 'current'
+        return { text: paragraph.textContent, offset: paragraph.getBoundingClientRect().top - top, lineHeight: parseFloat(getComputedStyle(paragraph).lineHeight) }
+      })
       await page.screenshot({ path: `${output}/${name}-reading.png` })
       await page.waitForTimeout(1_200)
       const appended = await geometry(reasoning)
-      row.steps.push({ step: 'read during stream', before, reading, appended, forcedJumpPx: appended.top - reading.top })
+      const anchorAfter = await reasoning.evaluate(el => {
+        const p = el.querySelector('[data-reading-anchor="current"]')
+        return p ? { text: p.textContent, offset: p.getBoundingClientRect().top - el.getBoundingClientRect().top } : null
+      })
+      row.steps.push({ step: 'read during stream', before, input, reading, appended, anchor, anchorAfter, forcedJumpPx: appended.top - reading.top })
       assert.ok(appended.chars > reading.chars, 'reasoning grew while reading')
       if (mode === 'baseline') {
         row.reproduced = appended.top > reading.top + 20
         await page.screenshot({ path: `${output}/${name}-after-append.png` })
         continue
       }
-      assert.ok(reading.top < before.top, 'user input moved up')
+      assert.ok(input && reading.top < input.top, `user input moved up from dispatch position: ${JSON.stringify({ input, reading })}`)
       assert.ok(Math.abs(appended.top - reading.top) <= 1, 'streaming does not move the reader')
+      assert.equal(anchorAfter?.text, anchor.text, 'reading identity survives append')
+      assert.ok(Math.abs(anchorAfter.offset - anchor.offset) <= anchor.lineHeight, 'anchor remains within one computed line-height')
       assert.ok(parseFloat(appended.font) >= 16, 'reasoning uses body-sized text')
       await page.getByRole('button', { name: 'Jump to latest reasoning', exact: true }).click()
+      assert.equal(await reasoning.evaluate(el => document.activeElement === el), true, 'jump restores focus to the reading region')
       await page.waitForTimeout(900)
       const resumed = await geometry(reasoning)
       assert.ok(resumed.height - resumed.client - resumed.top <= 2, 'jump resumes following')
@@ -74,7 +96,8 @@ try {
       await page.keyboard.press('End')
       await page.waitForTimeout(900)
       const atBottom = await geometry(reasoning)
-      assert.ok(atBottom.height - atBottom.client - atBottom.top <= 2, 'returning to bottom resumes reasoning')
+      row.steps.push({ step: 'End return geometry', atBottom })
+      assert.ok(atBottom.height - atBottom.client - atBottom.top <= 2, `returning to bottom resumes reasoning: ${JSON.stringify(atBottom)}`)
       row.steps.push({ step: 'keyboard read and resume', keyboardReading, keyboardAppended, atBottom })
       const transcript = page.locator('[data-transcript-viewport]')
       await transcript.focus()
@@ -90,12 +113,23 @@ try {
       assert.ok(latest.height - latest.client - latest.top <= 2, 'outer jump reaches latest message')
       row.steps.push({ step: 'transcript read and resume', earlier, later, latest })
       await page.screenshot({ path: `${output}/${name}-latest.png` })
+      row.roles = await page.evaluate(() => {
+        const style = getComputedStyle(document.documentElement)
+        const time = value => value.endsWith('ms') ? parseFloat(value) : value.endsWith('s') ? parseFloat(value) * 1000 : null
+        return Object.fromEntries(['--motion-control', '--motion-surface', '--motion-dismiss', '--motion-stream', '--motion-arrive', '--interaction-feedback-budget', '--interaction-pending-delay', '--interaction-long-work-delay', '--interaction-mutation-budget'].map(role => {
+          const value = style.getPropertyValue(role).trim()
+          return [role, { value, milliseconds: role.startsWith('--interaction-') ? time(value) : null }]
+        }))
+      })
+      row.motion = await page.evaluate(() => [...document.getAnimations()].map(animation => ({ target: animation.effect?.target?.className, playState: animation.playState, timing: animation.effect?.getComputedTiming() })))
+      if (name === 'desktop-reduced') assert.equal(row.motion.filter(a => a.playState === 'running').length, 0, 'reduced motion has no active animation')
       row.passed = true
     } catch (error) {
       row.error = error.message
       await page.screenshot({ path: `${output}/${name}-failure.png` }).catch(() => {})
       process.exitCode = 1
     } finally {
+      await context.tracing.stop({ path: `${output}/${name}-trace.zip` })
       const video = page.video()
       await context.close()
       renameSync(await video.path(), `${output}/${name}.webm`)

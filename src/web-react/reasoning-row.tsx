@@ -18,7 +18,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { RunRowShell } from '@tangle-network/ui/run'
 import { Markdown } from '@tangle-network/ui/markdown'
 import { BrainGlyph } from './controls'
-import { useSmoothText } from './smooth-text'
+import { Button } from '@tangle-network/ui/primitives'
 import { useChatScroll } from './chat-scroll'
 
 /** Props for {@link ReasoningRow}: the fields of a `ChatReasoningState`, plus presentation. */
@@ -74,9 +74,7 @@ export function ReasoningRow({
   className,
 }: ReasoningRowProps) {
   const thinking = thinkingProp ?? (startedAt !== undefined && endedAt === undefined)
-  // Bursty deltas (a whole summary part at once) type out instead of popping in.
-  const shown = useSmoothText(text, thinking)
-  const body = useMemo(() => renderText(shown), [renderText, shown])
+  const body = useMemo(() => renderText(text), [renderText, text])
 
   // Without the stream's timestamps, time the run from what this row saw:
   // the first reasoning it showed while thinking to the first render after.
@@ -135,10 +133,9 @@ export function ReasoningRow({
       </div>
       {!following && (
         <div className="flex justify-end px-4 pb-3">
-          <button type="button" aria-label="Jump to latest reasoning" onClick={jumpToLatest}
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+          <Button type="button" variant="outline" aria-label="Jump to latest reasoning" onClick={jumpToLatest}>
             Jump to latest
-          </button>
+          </Button>
         </div>
       )}
     </RunRowShell>

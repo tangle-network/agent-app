@@ -15,16 +15,21 @@ export function useChatScroll() {
     followingRef.current = value
     setFollowing(value)
   }, [])
-  const jumpToLatest = useCallback(() => {
-    follow(true)
+  const scrollToBottom = useCallback(() => {
     if (viewport) {
       viewport.scrollTop = viewport.scrollHeight
       previousTop.current = viewport.scrollTop
     }
-  }, [viewport, follow])
+  }, [viewport])
+  const jumpToLatest = useCallback(() => {
+    follow(true)
+    scrollToBottom()
+    viewport?.focus({ preventScroll: true })
+  }, [viewport, follow, scrollToBottom])
 
   useLayoutEffect(() => {
     if (!viewport || !content) return
+    if (!followingRef.current) viewport.scrollTop = previousTop.current
     previousTop.current = viewport.scrollTop
     let previousHeight = viewport.scrollHeight
     let previousClient = viewport.clientHeight
@@ -53,7 +58,7 @@ export function useChatScroll() {
       if (['ArrowUp', 'PageUp', 'Home'].includes(event.key) || (event.key === ' ' && event.shiftKey)) follow(false)
     }
     const resize = () => {
-      if (followingRef.current) jumpToLatest()
+      if (followingRef.current) scrollToBottom()
       previousHeight = viewport.scrollHeight
       previousClient = viewport.clientHeight
     }
@@ -74,7 +79,7 @@ export function useChatScroll() {
       viewport.removeEventListener('touchmove', touchMove)
       viewport.removeEventListener('keydown', key)
     }
-  }, [viewport, content, follow, jumpToLatest])
+  }, [viewport, content, follow, scrollToBottom])
 
   return { viewportRef, contentRef, following, jumpToLatest }
 }

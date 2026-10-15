@@ -10,6 +10,7 @@ import {
   type ChatUiMessage,
 } from '../../web-react'
 import { renderMarkdown } from './markdown'
+import { Button } from '@tangle-network/ui/primitives'
 
 /**
  * The shared reasoning row. `Live turn` plays a reasoning model's turn through
@@ -161,7 +162,7 @@ export const StreamingReading: Story = {
             <p>Tool activity and answers appear here without taking the reader away.</p>
           </div>
         </div>
-        {!scroll.following && <button type="button" onClick={scroll.jumpToLatest} className="rounded-md border border-border px-3 py-2">Jump to latest message</button>}
+        {!scroll.following && <Button type="button" variant="outline" onClick={scroll.jumpToLatest}>Jump to latest message</Button>}
       </div>
     )
   },

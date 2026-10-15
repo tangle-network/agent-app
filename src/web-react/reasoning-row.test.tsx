@@ -96,6 +96,12 @@ describe('ReasoningRow', () => {
 
 // This regression exercises the visible reading surface, including smoothed deltas.
 describe('reading reasoning while it streams', () => {
+  it('renders every available delta immediately without artificial typing', () => {
+    const { container, rerender } = render(<ReasoningRow text="Available now." thinking />)
+    expect(container.textContent).toContain('Available now.')
+    rerender(<ReasoningRow text="Available now. The entire next delta." thinking />)
+    expect(container.textContent).toContain('Available now. The entire next delta.')
+  })
   it('follows, stops immediately on upward input, preserves position on append, and resumes at the bottom', () => {
     vi.useFakeTimers()
     let resized: () => void = () => {}
@@ -135,6 +141,7 @@ describe('reading reasoning while it streams', () => {
     expect(top).toBe(695)
     fireEvent.click(getByRole('button', { name: 'Jump to latest reasoning' }))
     expect(top).toBe(height - 400)
+    expect(document.activeElement).toBe(viewport)
     append('First thought. Following. Reading now. Still reading. Latest.')
     expect(top).toBe(height - 400)
     top = 100
