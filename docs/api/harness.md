@@ -4,7 +4,7 @@
 
 Source: `src/harness/index.ts`
 
-16 exports.
+18 exports.
 
 ### `assertHarnessModelCompatible`
 
@@ -44,6 +44,22 @@ Harness
 
 ```ts
 type Harness
+```
+
+### `harnessCapabilities`
+
+`function` — The capability facts for `harness`.
+
+```ts
+(harness: Harness) => HarnessCapabilities
+```
+
+### `HarnessCapabilities`
+
+`interface` — What a harness can express, for profile assembly.
+
+```ts
+interface HarnessCapabilities
 ```
 
 ### `HarnessConfig`

@@ -44,7 +44,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./eval`](api/eval.md) | 29 | `tools` |
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
-| [`./harness`](api/harness.md) | 16 | — |
+| [`./harness`](api/harness.md) | 18 | — |
 | [`./hosted-agent`](api/hosted-agent.md) | 26 | `profile`, `web` |
 | [`./hosted-agent/application`](api/hosted-agent-application.md) | 9 | `profile`, `web` |
 | [`./hosted-agent/react`](api/hosted-agent-react.md) | 29 | — |
@@ -494,9 +494,9 @@ Source: `src/forms/index.ts` · 29 exports
 
 ## `./harness`
 
-Source: `src/harness/index.ts` · 16 exports
+Source: `src/harness/index.ts` · 18 exports
 
-`assertHarnessModelCompatible`, `coerceHarness`, `configuredHarness`, `DEFAULT_HARNESS`, `Harness`, `HarnessConfig`, `HarnessModelSelection`, `isHarness`, `isModelCompatibleWithHarness`, `KNOWN_HARNESSES`, `modelProvider`, `ResolvedSessionHarness`, `resolveSessionHarness`, `ResolveSessionHarnessInput`, `snapHarnessToModel`, `snapModelToHarness`
+`assertHarnessModelCompatible`, `coerceHarness`, `configuredHarness`, `DEFAULT_HARNESS`, `Harness`, `harnessCapabilities`, `HarnessCapabilities`, `HarnessConfig`, `HarnessModelSelection`, `isHarness`, `isModelCompatibleWithHarness`, `KNOWN_HARNESSES`, `modelProvider`, `ResolvedSessionHarness`, `resolveSessionHarness`, `ResolveSessionHarnessInput`, `snapHarnessToModel`, `snapModelToHarness`
 
 [Full API →](api/harness.md)
 
