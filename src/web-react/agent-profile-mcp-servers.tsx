@@ -67,7 +67,7 @@ function protectedCheck(server: AgentProfileMcpServer, profile?: AgentProfile): 
 }
 
 function checkIdentity(server: AgentProfileMcpServer, profile?: AgentProfile): string {
-  return JSON.stringify([server, profile ?? null])
+  return JSON.stringify([server, protectedCheck(server, profile) ? profile : null])
 }
 
 function healthStatus(health: McpHealth | 'checking' | undefined): { tone: StatusTone; label: string } {
@@ -210,7 +210,7 @@ export function McpServersEditor({ servers, profile, onChange, port, disabled, l
       const controller = new AbortController()
       controllers.current.set(name, controller)
       setHealth(current => ({ ...current, [name]: { key, result: 'checking' } }))
-      port.check(server, controller.signal, profile ? { profile, serverName: name } : undefined).then(result => {
+      port.check(server, controller.signal, profile && protectedCheck(server, profile) ? { profile, serverName: name } : undefined).then(result => {
         if (!controller.signal.aborted) setHealth(current => ({ ...current, [name]: { key, result } }))
       }, () => {
         if (!controller.signal.aborted) {
