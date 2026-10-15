@@ -128,17 +128,6 @@ export function AsyncView<T>({
 function LoadingBlock({ label }: { label: string }): ReactElement {
   return (
     <div className={BLOCK_CLASS}>
-      {/* The ring is the brand colour, not `border-border`. A divider token is
-          tuned to be barely there, which is the opposite of what a busy
-          indicator needs: measured on this block it painted 1.10:1 in light and
-          1.20:1 in dark against its own panel — below the 3:1 a meaningful
-          graphic needs, and this spinner is the only signal that a fetch is in
-          flight. `border-primary` is also what the composer's send spinner
-          already uses, so this stops being the one that reads differently. */}
-      <span
-        className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
-        aria-hidden="true"
-      />
       <span className="text-sm text-muted-foreground">{label}</span>
     </div>
   )

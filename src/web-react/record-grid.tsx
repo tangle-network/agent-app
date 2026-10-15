@@ -54,7 +54,7 @@ import {
   type ReactNode,
 } from 'react'
 
-import { Button, EmptyState, Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from '@tangle-network/ui/primitives'
+import { Button, EmptyState, Skeleton, Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from '@tangle-network/ui/primitives'
 
 import { type AsyncEmptyAction, type AsyncEmptySpec, type AsyncResourceState } from './async'
 import { OVERLAY_SHADOW, PopoverSurface, usePopover } from './controls'
@@ -567,7 +567,7 @@ export function RecordGrid({
         >
           <span className="sr-only">Loading {caption}</span>
           {Array.from({ length: Math.max(1, loadingRowCount) }, (_, index) => (
-            <div key={index} className="h-8 animate-pulse rounded-md bg-secondary" aria-hidden />
+            <Skeleton key={index} className="h-8" aria-hidden />
           ))}
         </div>
       </div>

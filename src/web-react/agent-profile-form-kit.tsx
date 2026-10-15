@@ -121,7 +121,7 @@ export function Section({ title, description, summary, defaultOpen = false, coll
     </span>
     {(summary || collapsible) && <span className={`flex shrink-0 items-center gap-2 ${formText.muted}`}>
       {summary}
-      {collapsible && <Chevron className="size-4 transition-transform group-data-[state=open]:rotate-180" />}
+      {collapsible && <Chevron className="size-4 group-data-[state=open]:rotate-180" />}
     </span>}
   </span>
   if (!collapsible) {

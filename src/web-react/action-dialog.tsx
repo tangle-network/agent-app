@@ -22,7 +22,7 @@ export function ActionDialog({ title, children, footer, onClose, busy, error }: 
   // These dialogs mount without a DialogTrigger: retain the shell's opener.
   const opener = useRef(typeof document !== 'undefined' && document.activeElement instanceof HTMLElement ? document.activeElement : null)
   return <Dialog open onOpenChange={open => { if (!open && !busy) onClose() }}>
-    <DialogContent hideCloseButton aria-describedby={undefined} className="max-w-sm gap-0 p-5"
+    <DialogContent hideCloseButton aria-busy={busy} aria-describedby={undefined} className="max-w-sm gap-0 p-5"
       onEscapeKeyDown={event => { if (busy) event.preventDefault() }}
       onInteractOutside={event => { if (busy) event.preventDefault() }}
       onCloseAutoFocus={event => { event.preventDefault(); opener.current?.focus() }}>

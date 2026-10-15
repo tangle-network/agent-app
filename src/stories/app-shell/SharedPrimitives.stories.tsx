@@ -7,18 +7,21 @@ import { RecordGrid, type RecordGridRow } from '../../web-react/record-grid'
 import { ApiAccessPanel } from '../../web-react/api-access-panel'
 import { ChatMessages } from '../../web-react'
 import { doneShellToolCall } from '../chat/fixtures'
+import { useInteractionEvidence } from './interaction-evidence'
 
 function SharedPrimitives() {
+  const evidenceRoot = useInteractionEvidence()
   const [dialog, setDialog] = useState(false)
   const [busy, setBusy] = useState(false)
   const [name, setName] = useState('Research assistant')
   const [saved, setSaved] = useState(name)
   const [state, setState] = useState<AsyncResourceState<string>>({ status: 'empty', value: '', retry: () => {} })
   const [rows, setRows] = useState<RecordGridRow[]>([{ id: 'draft', values: { name: 'Review sources', count: 3 } }])
-  return <main className="mx-auto max-w-4xl space-y-6 p-4 text-foreground sm:p-8">
+  return <main ref={evidenceRoot} data-design-evidence-root="shared-primitives" className="mx-auto max-w-4xl space-y-6 p-4 text-foreground sm:p-8">
+    <output data-design-calibration aria-live="off" />
     <h1 className="text-2xl font-semibold">Shared application controls</h1>
     <Section title="Profile" description="Edit and check your assistant." summary={<StatusPill tone="success">Ready</StatusPill>}>
-      <p>Saved profile: {saved}</p>
+      <p data-design-anchor="saved-profile">Saved profile: {saved}</p>
       <ActionDialogButton onClick={() => setDialog(true)}>Rename profile</ActionDialogButton>
     </Section>
     <Section title="Advanced settings" collapsible><label>Advanced note<input defaultValue="Keep this draft" className="w-full border border-input bg-background p-2" /></label></Section>
