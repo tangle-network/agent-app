@@ -208,16 +208,19 @@ export async function verifyProfileProxySecrets(
   try {
     const current = await egress.get()
     if (current.proxySecretReceipt === undefined && !requireReceipt && requested === undefined) return
-    const receipt = confirmedReceipt(current.proxySecretReceipt, box, requested ?? [], undefined, false)
-    if (requested?.length === 0 && receipt.bindings.length > 0) {
+    if (owner) {
       const selected = confirmedCallbackSelections.get(box)
-      if (!owner || selected?.owner !== owner) {
-        throw new SandboxProxySecretsError('an empty authored selection requires confirmed callback ownership or revocation')
+      if (selected?.owner !== owner) {
+        throw new SandboxProxySecretsError('dispatch requires the callback’s confirmed complete selection')
       }
       const complete = confirmedReceipt(current.proxySecretReceipt, box, selected.bindings)
       if (JSON.stringify(complete) !== JSON.stringify(selected.receipt)) {
         throw new SandboxProxySecretsError('callback placement changed before dispatch')
       }
+    }
+    const receipt = confirmedReceipt(current.proxySecretReceipt, box, requested ?? [], undefined, false)
+    if (!owner && requested?.length === 0 && receipt.bindings.length > 0) {
+      throw new SandboxProxySecretsError('an empty authored selection requires confirmed callback ownership or revocation')
     }
     assertNoReadableProxySecrets(receipt.bindings, runtimeSecrets ?? {})
   } catch (cause) {
