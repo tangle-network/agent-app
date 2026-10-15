@@ -78,9 +78,22 @@ the next step. A skill must carry `name` and `description` frontmatter; a skill 
 
 `createMcpHealthChecker` initializes an MCP session over Streamable HTTP, or HTTP+SSE when the server
 declares `transport: 'sse'`, lists its tools, and closes the session. It connects only to public HTTPS
-addresses unless the product passes its own `urlProblem` policy. Public header values are sent; secret
-references are not resolved, so a server that needs them reports `auth-required`. Local command servers
-report `not-checkable`.
+addresses unless the product passes its own `urlProblem` policy. Header records use the canonical
+profile schema; credential-bearing header names require secret references. Local command servers report
+`not-checkable`.
+
+Reference-backed headers require `McpHealthCheckOptions.proxyFetch`. This trusted callback receives the
+request, public request headers, and a separate map of canonical secret references. Bind it to the
+authenticated caller and workspace, authorize each reference, and use an already supported protected
+placement for that exact candidate. Initialize, tool listing and session cleanup all use this transport;
+credential values never enter the checker. A missing or refused transport has no anonymous-fetch fallback.
+Protected upstream error text is omitted from diagnostics.
+
+The callback is a transport seam, not a generic Sandbox proxy-fetch API. An installed backend's MCP status
+cannot validate an unsaved candidate or a different profile. When the platform cannot check a candidate
+through its isolated preview/materialization lifecycle, retain the explicit unavailable result. Keep
+endpoint review and provider resource limits with the issuer; a successful tool listing alone does not
+establish that an upstream response cannot reflect a credential.
 
 For a customer who wants an agent to use their own database without handing over its credential, point
 them at [`customer-db-gateway`](../customer-db-gateway/README.md): they run it beside their database and add
