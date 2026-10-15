@@ -1,18 +1,18 @@
 # Harness retirement and deployment admission
 
-A recognized harness ID is not a promise that a deployment can execute it.
-Keep identities in saved sessions, profiles, receipts and historical traces. Do not
-remove an identity from a shared schema just to stop launching its executable.
+A recognized harness ID is not a promise that a deployment can execute it. Keep
+identities in saved sessions, profiles, receipts and traces. Retire execution through
+deployment admission, not by deleting history from shared schemas.
 
 ## Session selection
 
-`resolveSessionHarness` preserves a non-null saved lock. Unknown identities and
-invalid explicit requests throw `HarnessSelectionError` instead of selecting a
-different harness. Null and undefined mean absent; an empty string is invalid.
-`coerceHarness` remains a display/config convenience, not an admission function.
-Do not coerce a saved or explicitly requested ID before passing it to the resolver.
+`resolveSessionHarness` preserves a non-null saved lock. Unknown identities,
+malformed explicit requests and unavailable selections throw `HarnessSelectionError`
+instead of selecting a different harness. Only null and undefined mean absent.
+`coerceHarness` is a display/config convenience: never apply it to a saved or explicit
+requested identity before admission.
 
-A product derives availability from its authenticated deployment catalog:
+Derive availability on the authenticated server, not from a request body:
 
 ```ts
 const resolved = resolveSessionHarness({
@@ -26,81 +26,62 @@ const resolved = resolveSessionHarness({
 })
 ```
 
-Here Codex is enabled, Pi is draining, and other known harnesses are retired or
-unavailable. Omitted `existingSessions` inherits `newSessions`; an empty set denies
-all operations of that kind. Omitted `availability` preserves the previous known-ID
-admission behavior for compatibility, so products must supply it to enforce a
-restricted deployment. Never accept either set from the request body.
+Codex is enabled, Pi is draining, and other known harnesses are unavailable. Omitted
+`existingSessions` inherits `newSessions`; an empty set denies all operations of that
+kind. Omitted `availability` deliberately retains the previous known-ID admission
+behavior for compatibility. Products must supply the real sets to restrict execution.
 
-A known different requested harness still returns `swapAttempted: true` while
-preserving the saved lock. The caller must reject that attempt before execution.
-An unavailable default is an error, not permission to choose another installed
-runner. Model compatibility checks remain a separate required boundary.
+A known different request returns `swapAttempted: true` while retaining the saved
+lock; the caller must reject that attempt before execution. An unavailable default
+is an error, not permission to choose another runner. Model compatibility remains a
+separate required check.
 
-For a retired session, show its history and the unavailable state. An explicit
-transfer creates a new session with its own identity and documented continuation
-guarantees; this PR does not implement transfer or pretend native state is portable.
+Show a retired session's history and unavailable state. Explicit transfer would
+create a new identity with documented continuation guarantees; this PR implements
+no transfer and never pretends native session state is portable.
 
 ## Executed verification
 
-The import-free session-selection implementation passed 43 assertions under Node
-22.16.0 and strict TypeScript checking. Three mutations were independently detected:
-treating an unknown saved lock as absent, substituting the default for an unknown
-choice, and bypassing availability. Restored source passed all 43 assertions again.
+Focused source proof: 43 assertions and strict TypeScript passed. Three independent
+mutations were caught: treating an unknown lock as absent, defaulting an unknown
+choice and bypassing availability. The public regression tests cover the actual
+exported resolver, retirement and removal from the recognized set.
 
-The public resolver delegates to that implementation. `retirement.test.ts` covers
-the public export and physical removal from the recognized set; the existing tests
-no longer expect an explicit unknown request to fall back.
+Actions **38683763557**, artifact **11948919567**, regenerated the API/CODEMAP with
+`pnpm docs:gen`, then passed maintained signoff at source
+`411b25968b8b34aa48d851c7050a98e836761a75`.
 
-GitHub Actions run **38683763557**, artifact **11948919567**, regenerated the public
-API documents with `pnpm docs:gen` and ran the maintained signoff against commit
-`411b25968b8b34aa48d851c7050a98e836761a75`. The retained receipt records:
+Actions **38687307717**, artifact **11950709868**, subsequently passed maintained
+signoff at source `2e2448e2d6caa28c747a61520075e0f52af57497`, including removal of the
+temporary repair workflow:
 
-- Typecheck, build, generated-project checks and dead-surface/knip checks passed.
-- The incident-class suite passed all 465 tests, including browser-safe subpaths.
-- The full test suite passed **8,094 tests**, with 13 skipped, in both its normal
-  and shuffled order.
-- The maintained preflight gate exited zero.
+- Typecheck, build, generated-project, dead-surface/knip and worker checks passed.
+- Incident-class suite: **465 passed**, including browser-safe subpaths.
+- Unit suite: **8,094 passed, 13 skipped**, twice with independently shuffled seeds
+  **1113726259** and **2079756513**. These are two shuffled runs, not a claimed
+  unshuffled run. The retained receipt contains exact commands and exit codes.
+- The component catalog built and its deployment verification passed. This is
+  catalog validation, not an application retirement HTTP/UI or native harness proof.
 
-The earlier signoff failed only because generated API docs were stale; the maintained
-generator repaired them. No tests or gates were disabled. The temporary documentation
-repair workflow was subsequently removed. These are source/package checks, not
-proof of deployed availability, native execution or a real-product browser flow.
+The initial failure was stale generated documentation, repaired by the maintained
+generator without disabling checks. This evidence describes the exact source SHAs
+above, not later documentation-only changes.
 
-## Completion checklist for this PR
+## Exact remaining work
 
-- [x] Preserve locks when the saved identity is unknown or unavailable.
-- [x] Refuse invalid explicit requests and defaults without silent substitution.
-- [x] Support distinct start/resume sets, draining and explicit empty sets.
-- [x] Preserve existing known-different swap reporting and model compatibility.
-- [x] Add public regression tests and execute focused source mutation checks.
-- [x] Run repository install, full Vitest suites, build and browser-safe checks.
-- [x] Regenerate API docs/CODEMAP using the maintained generator.
+- [x] Preserve saved identity/locks and refuse unknown or unavailable execution.
+- [x] Support start/resume sets, draining and explicit empty sets.
+- [x] Preserve known-different swap reporting and model compatibility.
+- [x] Add public tests; run full maintained signoff and regenerate API/CODEMAP.
 - [x] Remove the temporary documentation repair workflow.
-- [ ] Thread real deployment availability through product callers and their pickers;
-      check that callers do not pre-coerce saved identities or explicit requests.
-- [ ] Replace profile-support facts duplicated here with materializer-owned descriptors.
-- [ ] Verify unavailable-session HTTP/UI behavior in a real reference product.
-- [ ] Complete independent review, merge, package publication and consumer adoption.
+- [ ] Thread real deployment availability through product admission and pickers;
+      remove any caller-side pre-coercion of saved/explicit IDs.
+- [ ] Replace the duplicated profile-support table with materializer-owned descriptors.
+- [ ] Verify unavailable-session HTTP/UI/history behavior in a real reference product.
+- [ ] Independent review, final-source validation, merge, publication, adoption and
+      served behavior. No production harness is retired by this source change.
 
-## Cross-repository roadmap
-
-1. `agent-sdk` (#498): preserve historical identity independently of executable
-   support; derive the type from its schema; accept additive capability catalogs
-   without granting unfamiliar execution. Full package/consumer proof is recorded
-   in that PR's `docs/harness-modularity.md`.
-2. `agent-container` (#10961): declare backend vocabulary positively; scope adapter
-   wiring to selected descriptors; move vendor-specific profile, auth, session and
-   packaging facts into their integrations. Preserve secret, isolation and persistence
-   checks. Registry omission is not physical package/image removal.
-3. `agent-runtime`: keep accounting/lifecycle generic; separate read-only native
-   codecs from executable adapters and consolidate local invocation rules with the
-   harness owner rather than adding another runner framework.
-4. `agent-app`: use the actual deployment catalog for admission and pickers; preserve
-   readable history and explicit unavailable states.
-5. Braid/products: adopt shared contracts, not a second taxonomy or vendor
-   configuration layer. Change Braid only where a real consumer mismatch exists.
-6. Prove builds with each executable adapter absent, dependency rejection (including
-   ACP backing agents), native cancellation/resume, historical decoding, package
-   compatibility, and the deployed result. This initiative does not retire an
-   existing production harness merely because its implementation was refactored.
+Continue agent-app **#1116**, SDK **#498** and container **#10961**, one PR per repo.
+The container registry README tracks the remaining deployment-manifest, ACP backing,
+profile ownership, runtime consolidation, physical-removal and native proof work.
+SDK's `docs/harness-modularity.md` records its independent packed-consumer proof.
