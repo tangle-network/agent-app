@@ -62,16 +62,12 @@ function serverTarget(server: AgentProfileMcpServer | null): string {
   return 'url' in server && server.url ? server.url : ''
 }
 
-function healthKey(server: AgentProfileMcpServer): string {
-  return JSON.stringify(['url' in server ? server.url : null, 'transport' in server ? server.transport : null, 'headers' in server ? server.headers : null])
-}
-
 function protectedCheck(server: AgentProfileMcpServer, profile?: AgentProfile): boolean {
   return profile?.proxySecrets !== undefined || ('headers' in server && Object.values(server.headers ?? {}).some(value => value.kind === 'secret-ref'))
 }
 
 function checkIdentity(server: AgentProfileMcpServer, profile?: AgentProfile): string {
-  return JSON.stringify([healthKey(server), protectedCheck(server, profile) ? profile : null])
+  return JSON.stringify([server, profile ?? null])
 }
 
 function healthStatus(health: McpHealth | 'checking' | undefined): { tone: StatusTone; label: string } {
