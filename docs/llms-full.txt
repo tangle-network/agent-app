@@ -9968,6 +9968,22 @@ Harness
 type Harness
 ```
 
+### `harnessCapabilities`
+
+`function` — The capability facts for `harness`.
+
+```ts
+(harness: Harness) => HarnessCapabilities
+```
+
+### `HarnessCapabilities`
+
+`interface` — What a harness can express, for profile assembly.
+
+```ts
+interface HarnessCapabilities
+```
+
 ### `HarnessConfig`
 
 `interface` — An app's harness configuration, read from its deploy configuration (for example the env vars `AGENT_HARNESS` and `AGENT_HARNESS_WORKSPACES`), so no product hard-codes `backend.type`.
