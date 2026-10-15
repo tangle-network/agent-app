@@ -153,14 +153,17 @@ describe('reading reasoning while it streams', () => {
     expect(top).toBe(height - 400)
   })
 
-  it.each(['ArrowUp', 'PageUp', 'Home'])('keeps the reader in place for %s, including when reasoning ends', (key) => {
+  it.each(['ArrowUp', 'PageUp', 'Home', 'touch'])('keeps the reader in place for %s, including when reasoning ends', (key) => {
     vi.useFakeTimers()
     const { container, rerender } = render(<ReasoningRow text="First thought." thinking />)
     const viewport = container.querySelector('[data-reasoning]') as HTMLElement
     Object.defineProperties(viewport, {
       clientHeight: { value: 400 }, scrollHeight: { value: 1_000 }, scrollTop: { value: 600, writable: true },
     })
-    fireEvent.keyDown(viewport, { key })
+    if (key === 'touch') {
+      fireEvent.touchStart(viewport, { touches: [{ clientY: 100 }] })
+      fireEvent.touchMove(viewport, { touches: [{ clientY: 120 }] })
+    } else fireEvent.keyDown(viewport, { key })
     rerender(<ReasoningRow text="First thought. More." thinking />)
     act(() => { vi.advanceTimersByTime(1_000) })
     expect(viewport.scrollTop).toBe(600)

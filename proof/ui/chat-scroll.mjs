@@ -12,7 +12,7 @@ const output = resolve(directory)
 mkdirSync(output, { recursive: true })
 const browser = await chromium.launch({ headless: true })
 const results = []
-const geometry = locator => locator.evaluate(el => ({ top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight, chars: el.textContent.length, font: getComputedStyle(el).fontSize }))
+const geometry = locator => locator.evaluate(el => ({ top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight, chars: el.textContent.length, font: getComputedStyle(el.querySelector('p') ?? el).fontSize }))
 try {
   for (const [name, viewport, theme] of [
     ['desktop-light', { width: 1440, height: 900 }, 'agent-light'],

@@ -61,7 +61,7 @@ function useSecondTick(active: boolean): void {
   }, [active])
 }
 
-const defaultRenderText = (text: string) => <Markdown>{text}</Markdown>
+const defaultRenderText = (text: string) => <Markdown className="text-base leading-relaxed">{text}</Markdown>
 
 /** The model's reasoning for one message: live while it thinks, collapsed once it answers. */
 export function ReasoningRow({
