@@ -297,20 +297,45 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
     await expect(ensureWorkspaceSandbox(config, scope)).rejects.toThrow('proxy')
   })
 
-  it('keeps both actual handles dispatchable when a waiter ensures the same complete selection', async () => {
+  it('refuses the original handle after a waiter explicitly renews the complete selection', async () => {
     const original = withPlacement(box())
     const waiter = box()
-    // Two SDK handles for one server share placement, never private app proof.
+    // Separate SDK handles share server placement, never private app proof.
     waiter.egress = original.egress
+    original.streamPrompt.mockImplementation(async function* () { yield { type: 'done' } })
+    waiter.streamPrompt.mockImplementation(async function* () { yield { type: 'done' } })
     list.mockResolvedValueOnce([original]).mockResolvedValueOnce([waiter])
     const config = shell()
     const first = await ensureWorkspaceSandbox(config, scope)
     const second = await ensureWorkspaceSandbox(config, scope)
     expect(first).toBe(original)
     expect(second).toBe(waiter)
-    const turns = await Promise.allSettled([first, second].map(actual =>
-      resolveSandboxPromptBackend(config, { profile: { proxySecrets: [] } }, 'test', actual)))
-    expect(turns.map(turn => turn.status)).toEqual(['fulfilled', 'fulfilled'])
+    const turns = await Promise.allSettled([first, second].map(async actual => {
+      for await (const _ of streamSandboxPrompt(config, actual, 'test', { profile: { proxySecrets: [] } })) { /* consume */ }
+    }))
+    expect(turns.map(turn => turn.status)).toEqual(['rejected', 'fulfilled'])
+    expect(original.streamPrompt).not.toHaveBeenCalled()
+    expect(waiter.streamPrompt).toHaveBeenCalledOnce()
+    expect(original.egress.update).toHaveBeenCalledTimes(2)
+  })
+
+  it('dispatches both actual handles when renewal stays inside ordered full lifecycles', async () => {
+    const original = withPlacement(box())
+    const waiter = box()
+    waiter.egress = original.egress
+    original.streamPrompt.mockImplementation(async function* () { yield { type: 'done' } })
+    waiter.streamPrompt.mockImplementation(async function* () { yield { type: 'done' } })
+    list.mockResolvedValueOnce([original]).mockResolvedValueOnce([waiter])
+    const config = shell()
+    // The product's durable lease must cover this entire operation, not ensure alone.
+    for (const expected of [original, waiter]) {
+      const actual = await ensureWorkspaceSandbox(config, scope)
+      expect(actual).toBe(expected)
+      for await (const _ of streamSandboxPrompt(config, actual, 'test', { profile: { proxySecrets: [] } })) { /* consume */ }
+    }
+    expect(original.streamPrompt).toHaveBeenCalledOnce()
+    expect(waiter.streamPrompt).toHaveBeenCalledOnce()
+    expect(original.egress.update).toHaveBeenCalledTimes(2)
   })
 
   it('does not treat callback presence as proof that an empty authored selection owns installed bindings', async () => {

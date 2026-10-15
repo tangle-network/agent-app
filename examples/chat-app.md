@@ -593,3 +593,14 @@ a changed receipt at the same generation. Pass the actual returned box to
 `resolveSandboxPromptBackend(shell, options, operation, box)` and shared turn
 helpers, with the existing preparation digest/receipt pins. A wrapper object
 does not inherit callback-placement proof.
+
+
+An explicit lifecycle renewal reissues placement, even for the same declarations.
+When requests share a sandbox, the product's durable lifecycle lease must cover
+credential issuance, ensure, hydration and dispatch acceptance; retain the lease
+through execution where renewal fences active grants. An ensure-only provisioning
+claim does not protect a caller after it returns. A later renewal invalidates
+the earlier handle's dispatch proof. Same-selection reuse requires explicit
+SDK/core support that validates the current source revision and freshness;
+reference-key equality is insufficient. Keep the exact receipt guard and avoid
+retrying a stale prepared turn.
