@@ -272,6 +272,29 @@ describe('AgentProfileEditor MCP servers', () => {
     expect(within(screen.getByLabelText('MCP server transcripts')).getByText('Off')).toBeTruthy()
   })
 
+  it('checks a protected draft only on request, forwards its identity and invalidates results after authority changes', async () => {
+    const profile: AgentProfile = {
+      proxySecrets: [{ envName: 'MCP_TOKEN', secretRef: { kind: 'secret-ref', key: 'mcp-access' },
+        hosts: ['mcp.example.com'], presentation: { type: 'bearer' }, ttlSeconds: 300 }],
+      mcp: { research: { transport: 'http', url: 'https://mcp.example.com/research',
+        headers: { Authorization: { kind: 'secret-ref', key: 'mcp-access' } } } },
+    }
+    const check = vi.fn(async (): Promise<McpHealth> => ({ ok: true, tools: [{ name: 'search' }], latencyMs: 5, checkedAt: 'now' }))
+    const props = { onChange: vi.fn(), config: config({ mcp: { port: { check } } }), publicHttpsMcpOnly: true }
+    const view = render(<AgentProfileEditor value={profile} {...props} />)
+    expect(check).not.toHaveBeenCalled()
+    fireEvent.click(within(screen.getByLabelText('MCP server research')).getByRole('button', { name: 'Check' }))
+    await screen.findByText('Connected · 1 tool')
+    expect(check).toHaveBeenLastCalledWith(profile.mcp!.research, expect.any(AbortSignal), { profile, serverName: 'research' })
+    const revised: AgentProfile = { ...profile, proxySecrets: [{ ...profile.proxySecrets![0]!, ttlSeconds: 120 }] }
+    view.rerender(<AgentProfileEditor value={revised} {...props} />)
+    expect(screen.queryByText('Connected · 1 tool')).toBeNull()
+    expect(check).toHaveBeenCalledTimes(1)
+    fireEvent.click(within(screen.getByLabelText('MCP server research')).getByRole('button', { name: 'Check' }))
+    await screen.findByText('Connected · 1 tool')
+    expect(check).toHaveBeenLastCalledWith(revised.mcp!.research, expect.any(AbortSignal), { profile: revised, serverName: 'research' })
+  })
+
   it('turns a server off and back on without losing its address', async () => {
     render(<Harness initial={{ mcp: servers }} config={config()} publicHttpsMcpOnly />)
     fireEvent.click(screen.getByRole('switch', { name: 'Turn off research' }))
