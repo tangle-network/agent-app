@@ -1,5 +1,7 @@
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
 
+import { Button, EmptyState } from '@tangle-network/ui/primitives'
+
 import type { AsyncResourceState } from './state'
 import type { MutationState } from './use-confirmed-mutation'
 
@@ -154,37 +156,16 @@ function ErrorBlock({
   return (
     <div role="alert" className={BLOCK_CLASS}>
       <p className="max-w-md text-sm text-muted-foreground">{message}</p>
-      <button
-        type="button"
-        onClick={retry}
-        className="h-8 rounded-md border border-border px-3 text-xs font-medium text-foreground transition hover:bg-accent"
-      >
-        {retryLabel}
-      </button>
+      <Button type="button" variant="outline" size="sm" onClick={retry}>{retryLabel}</Button>
     </div>
   )
 }
 
 function EmptyBlock({ spec }: { spec: AsyncEmptySpec }): ReactElement {
-  return (
-    <div className={BLOCK_CLASS}>
-      <p className="text-sm font-medium text-foreground">{spec.title}</p>
-      {spec.description ? <p className="max-w-md text-sm text-muted-foreground">{spec.description}</p> : null}
-      {spec.action ? (
-        isValidElement(spec.action) ? (
-          spec.action
-        ) : (
-          <button
-            type="button"
-            onClick={(spec.action as AsyncEmptyAction).onClick}
-            className="h-8 rounded-md border border-border px-3 text-xs font-medium text-foreground transition hover:bg-accent"
-          >
-            {(spec.action as AsyncEmptyAction).label}
-          </button>
-        )
-      ) : null}
-    </div>
-  )
+  const action = spec.action
+  return <EmptyState title={spec.title} description={spec.description} action={
+    isValidElement(action) ? action : action ? <Button type="button" variant="outline" size="sm" onClick={(action as AsyncEmptyAction).onClick}>{(action as AsyncEmptyAction).label}</Button> : undefined
+  } />
 }
 
 export interface MutationStatusLabels {

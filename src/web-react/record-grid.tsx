@@ -54,6 +54,8 @@ import {
   type ReactNode,
 } from 'react'
 
+import { Button, EmptyState, Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from '@tangle-network/ui/primitives'
+
 import { type AsyncEmptyAction, type AsyncEmptySpec, type AsyncResourceState } from './async'
 import { OVERLAY_SHADOW, PopoverSurface, usePopover } from './controls'
 import {
@@ -616,35 +618,11 @@ export function RecordGrid({
       <div className={`space-y-3 ${className ?? ''}`}>
         {toolbar}
         {addForm ?? (
-          <div className="rounded-xl border border-dashed border-border px-6 py-10 text-center">
-            <p className="text-sm font-medium text-foreground">{empty.title}</p>
-            {empty.description && (
-              <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{empty.description}</p>
-            )}
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              {empty.action &&
-                (isValidElement(empty.action) ? (
-                  empty.action
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(empty.action as AsyncEmptyAction).onClick}
-                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
-                  >
-                    {(empty.action as AsyncEmptyAction).label}
-                  </button>
-                ))}
-              {onCreate && (
-                <button
-                  type="button"
-                  onClick={openAdd}
-                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
-                >
-                  {addLabel}
-                </button>
-              )}
-            </div>
-          </div>
+          <EmptyState title={empty.title} description={empty.description} className="rounded-xl border border-dashed border-border"
+            action={<div className="flex flex-wrap items-center justify-center gap-2">
+              {empty.action && (isValidElement(empty.action) ? empty.action : <Button type="button" variant="outline" size="sm" onClick={(empty.action as AsyncEmptyAction).onClick}>{(empty.action as AsyncEmptyAction).label}</Button>)}
+              {onCreate && <Button type="button" variant="outline" size="sm" onClick={openAdd}>{addLabel}</Button>}
+            </div>} />
         )}
       </div>
     )
@@ -709,32 +687,32 @@ export function RecordGrid({
       {toolbar}
       {reviewBar}
       <div className="overflow-x-auto rounded-xl border border-card-edge bg-card">
-        <table
+        <Table wrapper={false}
           role="grid"
           aria-label={caption}
-          className="w-full border-collapse text-left text-sm"
+          className="border-collapse text-left"
           onKeyDown={handleGridKeyDown}
         >
-          <thead>
-            <tr role="row" className="border-b border-border text-xs uppercase tracking-[0.05em] text-muted-foreground">
+          <TableHeader>
+            <TableRow role="row" className="text-xs uppercase tracking-[0.05em] text-muted-foreground">
               {columns.map((column) => (
-                <th
+                <TableHead
                   key={column.id}
                   role="columnheader"
                   scope="col"
-                  className={`px-3 py-2 font-medium ${alignmentClass(column)}`}
+                  className={`h-auto px-3 py-2 ${alignmentClass(column)}`}
                 >
                   {column.header}
-                </th>
+                </TableHead>
               ))}
               {showActionsColumn && (
-                <th role="columnheader" scope="col" className="w-px px-3 py-2 font-medium">
+                <TableHead role="columnheader" scope="col" className="h-auto w-px px-3 py-2">
                   <span className="sr-only">{reviewing ? 'Review' : 'Row actions'}</span>
-                </th>
+                </TableHead>
               )}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {visibleRows.map((row) => {
               const rowLabel = recordGridRowLabel(columns, row)
               const pending = row.id in pendingRows
@@ -743,11 +721,11 @@ export function RecordGrid({
               const removedRow = rowDiff?.kind === 'removed'
               return (
                 <Fragment key={row.id}>
-                  <tr
+                  <TableRow
                     role="row"
                     aria-busy={pending}
                     data-record-grid-diff={rowDiff?.kind}
-                    className={`border-b border-border ${pending ? 'opacity-60' : ''} ${removedRow ? 'bg-destructive/[0.06]' : ''}`}
+                    className={`${pending ? 'opacity-60' : ''} ${removedRow ? 'bg-destructive/[0.06]' : ''}`}
                   >
                     {columns.map((column) => {
                       const key = cellKey(row.id, column.id)
@@ -771,7 +749,7 @@ export function RecordGrid({
 
                       if (isEditing && editable) {
                         return (
-                          <td key={column.id} role="gridcell" className={`px-3 py-1.5 ${alignmentClass(column)}`}>
+                          <TableCell key={column.id} role="gridcell" className={`px-3 py-1.5 ${alignmentClass(column)}`}>
                             <CellEditor
                               column={column}
                               rowLabel={rowLabel}
@@ -787,13 +765,13 @@ export function RecordGrid({
                                 {cellError}
                               </p>
                             )}
-                          </td>
+                          </TableCell>
                         )
                       }
 
                       if (column.kind === 'boolean' && editable) {
                         return (
-                          <td key={column.id} role="gridcell" className={`px-3 py-2 ${alignmentClass(column)}`}>
+                          <TableCell key={column.id} role="gridcell" className={`px-3 py-2 ${alignmentClass(column)}`}>
                             <input
                               type="checkbox"
                               checked={value === true}
@@ -808,13 +786,13 @@ export function RecordGrid({
                               onChange={(event) => void applyCellWrite(row, column, event.target.checked)}
                               className="h-4 w-4 rounded border-border accent-primary"
                             />
-                          </td>
+                          </TableCell>
                         )
                       }
 
                       const display = applicable ? formatRecordGridValue(column, value, locale) : ''
                       return (
-                        <td
+                        <TableCell
                           key={column.id}
                           role="gridcell"
                           aria-readonly={editable ? undefined : true}
@@ -874,11 +852,11 @@ export function RecordGrid({
                               />
                             )}
                           </span>
-                        </td>
+                        </TableCell>
                       )
                     })}
                     {showActionsColumn && (
-                      <td role="gridcell" className="px-3 py-2 text-right">
+                      <TableCell role="gridcell" className="px-3 py-2 text-right">
                         {reviewing ? (
                           rowDiff && (
                             <ReviewActions
@@ -930,17 +908,17 @@ export function RecordGrid({
                             </svg>
                           </button>
                         )}
-                      </td>
+                      </TableCell>
                     )}
-                  </tr>
+                  </TableRow>
                   {rowError !== undefined && (
-                    <tr role="row" className="border-b border-border">
-                      <td role="gridcell" colSpan={columnSpan} className="px-3 pb-2">
+                    <TableRow role="row" >
+                      <TableCell role="gridcell" colSpan={columnSpan} className="px-3 pb-2">
                         <p role="alert" className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">
                           {rowError}
                         </p>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )}
                 </Fragment>
               )
@@ -949,18 +927,18 @@ export function RecordGrid({
               addedRows.map((row) => {
                 const rowLabel = recordGridRowLabel(columns, row)
                 return (
-                  <tr
+                  <TableRow
                     key={row.id}
                     role="row"
                     data-record-grid-diff="added"
-                    className="border-b border-border bg-success/[0.06]"
+                    className="bg-success/[0.06]"
                   >
                     {columns.map((column, columnIndex) => {
                       const applicable = isRecordGridCellApplicable(column, row.values)
                       const value = row.values[column.id] ?? null
                       const display = applicable ? formatRecordGridValue(column, value, locale) : ''
                       return (
-                        <td key={column.id} role="gridcell" className={`px-3 py-2 ${alignmentClass(column)}`}>
+                        <TableCell key={column.id} role="gridcell" className={`px-3 py-2 ${alignmentClass(column)}`}>
                           <span className="inline-flex max-w-full items-center gap-1.5">
                             {columnIndex === 0 && (
                               <span className="inline-flex shrink-0 rounded border border-success/60 px-1 py-px text-[11px] font-semibold uppercase tracking-[0.05em] text-success">
@@ -973,10 +951,10 @@ export function RecordGrid({
                               {display === '' ? (applicable ? '—' : 'n/a') : display}
                             </span>
                           </span>
-                        </td>
+                        </TableCell>
                       )
                     })}
-                    <td role="gridcell" className="px-3 py-2 text-right">
+                    <TableCell role="gridcell" className="px-3 py-2 text-right">
                       <ReviewActions
                         rowId={row.id}
                         kind="added"
@@ -984,28 +962,28 @@ export function RecordGrid({
                         onAccept={onAcceptRow}
                         onReject={onRejectRow}
                       />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )
               })}
-          </tbody>
+          </TableBody>
           {hasFooter && (
-            <tfoot>
-              <tr role="row" className="border-t-2 border-border">
+            <TableFooter>
+              <TableRow role="row" className="border-t-2 border-border">
                 {columns.map((column) => (
-                  <td
+                  <TableCell
                     key={column.id}
                     role="gridcell"
                     className={`px-3 py-2 text-sm font-semibold text-foreground ${alignmentClass(column)}`}
                   >
                     {column.footerValue ? formatRecordGridValue(column, column.footerValue(visibleRows), locale) : ''}
-                  </td>
+                  </TableCell>
                 ))}
-                {showActionsColumn && <td role="gridcell" />}
-              </tr>
-            </tfoot>
+                {showActionsColumn && <TableCell role="gridcell" />}
+              </TableRow>
+            </TableFooter>
           )}
-        </table>
+        </Table>
       </div>
 
       {onCreate &&

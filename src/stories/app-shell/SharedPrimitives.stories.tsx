@@ -13,7 +13,7 @@ function SharedPrimitives() {
   const [busy, setBusy] = useState(false)
   const [name, setName] = useState('Research assistant')
   const [saved, setSaved] = useState(name)
-  const [state, setState] = useState<AsyncResourceState<string>>({ status: 'empty', value: null, retry: () => {} })
+  const [state, setState] = useState<AsyncResourceState<string>>({ status: 'empty', value: '', retry: () => {} })
   const [rows, setRows] = useState<RecordGridRow[]>([{ id: 'draft', values: { name: 'Review sources', count: 3 } }])
   return <main className="mx-auto max-w-4xl space-y-6 p-4 text-foreground sm:p-8">
     <h1 className="text-2xl font-semibold">Shared application controls</h1>
@@ -21,7 +21,7 @@ function SharedPrimitives() {
       <p>Saved profile: {saved}</p>
       <ActionDialogButton onClick={() => setDialog(true)}>Rename profile</ActionDialogButton>
     </Section>
-    <Section title="Advanced settings" collapsible><p>Settings are reachable with the keyboard.</p></Section>
+    <Section title="Advanced settings" collapsible><label>Advanced note<input defaultValue="Keep this draft" className="w-full border border-input bg-background p-2" /></label></Section>
     <AsyncView state={state} empty={{ title: 'No reports yet', description: 'Create your first report.', action: { label: 'Create report', onClick: () => setState({ status: 'ready', value: 'Report created', retry: () => {} }) } }}>
       {value => <p role="status">{value}</p>}
     </AsyncView>
