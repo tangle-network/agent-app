@@ -301,3 +301,53 @@ describe('createD1TangleIdentityStore', () => {
     })).toThrow(/invalid legacyLinkTable.table/)
   })
 })
+
+describe('tangle sso prompt passthrough and the signed_out callback', () => {
+  const origin = 'http://127.0.0.1:8791'
+  const callbackUrl = `${origin}/auth/tangle/callback`
+
+  function handlers(store: TangleIdentitySsoAccountStore, seenPrompt: { value: string | null }) {
+    const auth: TangleIdentitySsoAuthClient = {
+      authorizeUrl: ({ state, prompt }) => {
+        seenPrompt.value = prompt ?? null
+        return `http://127.0.0.1:4100/cross-site/authorize?state=${encodeURIComponent(state)}${prompt ? `&prompt=${prompt}` : ''}`
+      },
+      exchange: async () => ({ kind: 'identity', emailVerified: true, user: { id: 'p-1', email: 'a@example.test', name: null } }),
+    }
+    return createTangleSsoHandlers({
+      protocol: 'identity', auth, store,
+      stateSecret: 'identity-store-test-state-secret-32-bytes',
+      callbackUrl, stateCookieName: 'identity_state', secureCookies: false,
+      setSessionCookie: async ({ token }) => [`local_session=${token}; Path=/; HttpOnly`],
+      log: () => {},
+    })
+  }
+
+  it('forwards prompt=login and prompt=select_account to the platform; unknown values are dropped', async () => {
+    const h = database()
+    for (const [value, expectForwarded] of [['login', true], ['select_account', true], ['none', false]] as const) {
+      const seenPrompt: { value: string | null } = { value: null }
+      const started = await handlers(h.store(), seenPrompt).start(new Request(`${origin}/auth/tangle/start?redirect=/app&prompt=${value}`))
+      expect(started.status).toBe(302)
+      expect(new URL(started.headers.get('Location')!).searchParams.get('prompt')).toBe(expectForwarded ? value : null)
+      expect(seenPrompt.value).toBe(expectForwarded ? value : null)
+    }
+  })
+
+  it('routes error=signed_out back to the saved path quietly, with no local session', async () => {
+    const h = database()
+    const seenPrompt = { value: null as string | null }
+    const handler = handlers(h.store(), seenPrompt)
+    const started = await handler.start(new Request(`${origin}/auth/tangle/start?redirect=/workspaces/ws-1/chat`))
+    const stateCookie = started.headers.getSetCookie().find(value => value.startsWith('identity_state='))!.split(';')[0]!
+    const state = new URL(started.headers.get('Location')!).searchParams.get('state')!
+    const response = await handler.callback(new Request(`${callbackUrl}?error=signed_out&state=${encodeURIComponent(state)}`, {
+      headers: { cookie: stateCookie },
+    }))
+    expect(response.status).toBe(302)
+    expect(response.headers.get('Location')).toBe('/workspaces/ws-1/chat')
+    const cookies = response.headers.getSetCookie()
+    expect(cookies.some(value => value.startsWith('identity_state=;') || /identity_state=;[^;]*Max-Age=0/.test(value))).toBe(true)
+    expect(cookies.some(value => value.startsWith('local_session='))).toBe(false)
+  })
+})
