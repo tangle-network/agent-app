@@ -18,7 +18,7 @@ function SharedPrimitives() {
   const [state, setState] = useState<AsyncResourceState<string>>({ status: 'empty', value: '', retry: () => {} })
   const [rows, setRows] = useState<RecordGridRow[]>([{ id: 'draft', values: { name: 'Review sources', count: 3 } }])
   return <main ref={evidenceRoot} data-design-evidence-root="shared-primitives" className="mx-auto max-w-4xl space-y-6 p-4 text-foreground sm:p-8">
-    <output data-design-calibration aria-live="off" />
+    <output data-design-calibration hidden aria-live="off" />
     <h1 className="text-2xl font-semibold">Shared application controls</h1>
     <Section title="Profile" description="Edit and check your assistant." summary={<StatusPill tone="success">Ready</StatusPill>}>
       <p data-design-anchor="saved-profile">Saved profile: {saved}</p>

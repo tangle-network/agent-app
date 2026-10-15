@@ -92,6 +92,7 @@ export function useInteractionEvidence() {
         if (budget == null) return { status: 'UNCHECKED', reason: 'Installed CSS feedback role is missing or not an explicit CSS time.' }
         const indicator = root.current?.querySelector<HTMLElement>('[data-design-calibration]')
         if (!indicator) return { status: 'UNCHECKED', reason: 'Visible calibration fixture missing.' }
+        indicator.hidden = false
         indicator.textContent = 'Calibration waiting'
         const start = performance.now()
         await new Promise(resolve => setTimeout(resolve, budget * 2))
