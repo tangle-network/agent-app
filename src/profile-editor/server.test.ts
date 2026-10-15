@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createServer } from 'node:http'
+import { canonicalAgentProfileDigest, snapshotAgentProfile, type AgentProfile } from '@tangle-network/agent-interface'
 import {
   checkMcpServer, createGitHubRestReader, createGitHubSourceService, createMcpHealthChecker, GitHubReadError, handleProfileEditorRequest,
-  type GitHubSourceReader,
+  type GitHubSourceReader, type ProfileEditorMcpCheckContext,
 } from './server'
 import { createProfileEditorClient, parseGitHubLocation, publicHttpsUrlProblem } from './index'
 
@@ -364,6 +365,49 @@ describe('profile editor route handler and client', () => {
     expect(mcp.check).toHaveBeenCalledWith({ url: 'https://x.example.com/mcp' }, expect.anything())
     const none = await handleProfileEditorRequest(new Request('https://app.test/x/github/repositories'), 'github/repositories', { github: null, mcp: null })
     expect(await none.json()).toMatchObject({ ok: false, problem: 'unavailable' })
+  })
+
+  it('carries the unsaved canonical candidate through the public client and derives its identity on the server', async () => {
+    const server = { transport: 'http', url: 'https://reports.example.com/mcp',
+      headers: { Authorization: { kind: 'secret-ref', key: 'reporting-api', format: 'bearer' } } } as const
+    const profile: AgentProfile = { name: 'Unsaved role', harness: 'opencode', mcp: { reports: server }, proxySecrets: [{
+      envName: 'REPORTS_TOKEN', secretRef: { kind: 'secret-ref', key: 'reporting-api' },
+      hosts: ['reports.example.com'], presentation: { type: 'bearer' }, paths: ['/mcp'], ttlSeconds: 300,
+    }] }
+    let checked: ProfileEditorMcpCheckContext | undefined
+    const client = createProfileEditorClient({ endpoint: 'https://app.test/editor',
+      fetch: (async (input: RequestInfo | URL, init?: RequestInit) => handleProfileEditorRequest(
+        new Request(String(input), init), 'mcp/check', { github: null, mcp: {
+          check: async (_server, _signal, candidate) => {
+            checked = candidate
+            return { ok: true, tools: [], latencyMs: 1, checkedAt: 'now' }
+          },
+        } },
+      )) as typeof globalThis.fetch,
+    })
+    expect(await client.mcp.check(server, undefined, { profile, serverName: 'reports' })).toMatchObject({ ok: true })
+    expect(checked).toEqual({ profile: snapshotAgentProfile(profile), serverName: 'reports',
+      profileDigest: canonicalAgentProfileDigest(profile) })
+    expect(checked!.profile.proxySecrets).toEqual(profile.proxySecrets)
+  })
+
+  it('refuses malformed candidates, substituted servers and client-supplied trusted digests before invoking the port', async () => {
+    const server = { url: 'https://reports.example.com/mcp',
+      headers: { Authorization: { kind: 'secret-ref', key: 'reporting-api' } } }
+    const profile = { name: 'Unsaved role', mcp: { reports: server } }
+    const check = vi.fn(async () => ({ ok: true as const, tools: [], latencyMs: 1, checkedAt: 'now' }))
+    for (const candidate of [
+      { profile, serverName: 'missing' },
+      { profile: { ...profile, mcp: { reports: { ...server, url: 'https://other.example.com/mcp' } } }, serverName: 'reports' },
+      { profile: { ...profile, mcp: { reports: { ...server, headers: { Authorization: { kind: 'secret-ref', key: '' } } } } }, serverName: 'reports' },
+      { profile, serverName: 'reports', profileDigest: `sha256:${'a'.repeat(64)}` },
+    ]) {
+      const response = await handleProfileEditorRequest(new Request('https://app.test/editor/mcp/check', {
+        method: 'POST', body: JSON.stringify({ server, candidate }),
+      }), 'mcp/check', { github: null, mcp: { check } })
+      expect(response.status).toBe(400)
+    }
+    expect(check).not.toHaveBeenCalled()
   })
 
   it('returns typed outcomes from the client even when the route fails', async () => {
