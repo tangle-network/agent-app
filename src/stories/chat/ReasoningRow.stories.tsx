@@ -138,3 +138,17 @@ export const NoReasoning: Story = {
   name: 'No reasoning',
   render: () => framed(<ReasoningRow text="" />),
 }
+
+/** Long continuous reasoning: use wheel, keyboard or touch to read earlier paragraphs. */
+export const StreamingReading: Story = {
+  render: function StreamingReadingStory() {
+    const paragraph = (n: number) => `**Step ${n}.** Compare the evidence with the goal. Keep the earlier observations visible while new reasoning arrives. The reader should be able to pause here and understand the tradeoff before returning to the latest update.\n\n`
+    const [text, setText] = useState(() => Array.from({ length: 12 }, (_, i) => paragraph(i + 1)).join(''))
+    useEffect(() => {
+      let n = 12
+      const timer = setInterval(() => setText(value => value + paragraph(++n)), 350)
+      return () => clearInterval(timer)
+    }, [])
+    return framed(<ReasoningRow text={text} thinking />)
+  },
+}

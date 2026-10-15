@@ -92,3 +92,62 @@ describe('ReasoningRow', () => {
     expect(region?.textContent).toContain('Saved before times were kept.')
   })
 })
+
+// This regression exercises the visible reading surface, including smoothed deltas.
+describe('reading reasoning while it streams', () => {
+  it('follows, stops immediately on upward input, preserves position on append, and resumes at the bottom', () => {
+    vi.useFakeTimers()
+    const { container, rerender, getByRole } = render(<ReasoningRow text="First thought." thinking />)
+    const viewport = container.querySelector('[data-reasoning]') as HTMLElement
+    let height = 1_000
+    let top = 600
+    Object.defineProperties(viewport, {
+      clientHeight: { get: () => 400 },
+      scrollHeight: { get: () => height },
+      scrollTop: { get: () => top, set: (value: number) => { top = Math.min(value, height - 400) } },
+    })
+    const append = (text: string) => {
+      height += 100
+      rerender(<ReasoningRow text={text} thinking />)
+      act(() => { vi.advanceTimersByTime(1_000) })
+    }
+    append('First thought. Following.')
+    expect(top).toBe(700)
+    // Pause before the scroll event; a delta can land between input and scroll.
+    fireEvent.wheel(viewport, { deltaY: -5 })
+    top -= 5
+    append('First thought. Following. Reading now.')
+    expect(top).toBe(695)
+    expect(getByRole('button', { name: 'Jump to latest reasoning' })).toBeTruthy()
+    fireEvent.scroll(viewport)
+    append('First thought. Following. Reading now. Still reading.')
+    expect(top).toBe(695)
+    fireEvent.click(getByRole('button', { name: 'Jump to latest reasoning' }))
+    expect(top).toBe(height - 400)
+    append('First thought. Following. Reading now. Still reading. Latest.')
+    expect(top).toBe(height - 400)
+    top = 100
+    fireEvent.scroll(viewport)
+    append('First thought. Following. Reading now. Still reading. Latest. Scrollbar reading.')
+    expect(top).toBe(100)
+    top = height - 400
+    fireEvent.scroll(viewport)
+    append('First thought. Following. Reading now. Still reading. Latest. Scrollbar reading. Resumed.')
+    expect(top).toBe(height - 400)
+  })
+
+  it.each(['ArrowUp', 'PageUp', 'Home'])('keeps the reader in place for %s, including when reasoning ends', (key) => {
+    vi.useFakeTimers()
+    const { container, rerender } = render(<ReasoningRow text="First thought." thinking />)
+    const viewport = container.querySelector('[data-reasoning]') as HTMLElement
+    Object.defineProperties(viewport, {
+      clientHeight: { value: 400 }, scrollHeight: { value: 1_000 }, scrollTop: { value: 600, writable: true },
+    })
+    fireEvent.keyDown(viewport, { key })
+    rerender(<ReasoningRow text="First thought. More." thinking />)
+    act(() => { vi.advanceTimersByTime(1_000) })
+    expect(viewport.scrollTop).toBe(600)
+    rerender(<ReasoningRow text="First thought. More." thinking={false} />)
+    expect(trigger(container).getAttribute('aria-expanded')).toBe('true')
+  })
+})
