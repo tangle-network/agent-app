@@ -164,7 +164,7 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
     const retained = box()
     const receipt = placedReceipt(1, [{ ...binding, methods: ['GET'], paths: ['/v1/status'] }])
     retained.egress.get.mockResolvedValue({ proxySecretReceipt: receipt })
-    await resolveSandboxPromptBackend(shell(), { profile: { name: 'narrowed', proxySecrets: [binding] } }, 'test', retained as unknown as SandboxInstance)
+    await resolveSandboxPromptBackend(shell({ proxySecrets: undefined }), { profile: { name: 'narrowed', proxySecrets: [binding] } }, 'test', retained as unknown as SandboxInstance)
     expect(retained.egress.update).not.toHaveBeenCalled()
   })
 
@@ -289,6 +289,32 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
       .rejects.toThrow('proxy')
   })
 
+  it.each([undefined, [binding]])('verifies the confirmed complete callback set for authored selection %j', async authored => {
+    const retained = withPlacement(box())
+    list.mockResolvedValue([retained])
+    const config = shell()
+    const actual = await ensureWorkspaceSandbox(config, scope)
+    const updates = retained.egress.update.mock.calls.length
+    await resolveSandboxPromptBackend(config, { profile: { proxySecrets: authored } }, 'test', actual)
+    expect(retained.egress.update).toHaveBeenCalledTimes(updates)
+  })
+
+  it.each([undefined, [binding]])('refuses unprepared callback-owned dispatch for authored selection %j', async authored => {
+    const retained = withPlacement(box())
+    await expect(resolveSandboxPromptBackend(shell(), { profile: { proxySecrets: authored } }, 'test', retained as unknown as SandboxInstance))
+      .rejects.toThrow('proxy')
+  })
+
+  it.each([undefined, [binding]])('refuses stale complete-set extras for authored selection %j', async authored => {
+    const retained = withPlacement(box())
+    list.mockResolvedValue([retained])
+    const config = shell()
+    const actual = await ensureWorkspaceSandbox(config, scope)
+    const stale = { ...binding, envName: 'OLD_CUSTOM_TOKEN', secretRef: { kind: 'secret-ref' as const, key: 'old-custom' } }
+    retained.egress.get.mockResolvedValue({ proxySecretReceipt: placedReceipt(2, [binding, stale]) })
+    await expect(resolveSandboxPromptBackend(config, { profile: { proxySecrets: authored } }, 'test', actual)).rejects.toThrow('proxy')
+  })
+
   it('reconciles profile-only declarations before creation', async () => {
     const retained = withPlacement(box())
     list.mockResolvedValue([])
@@ -316,7 +342,7 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
 
   it('verifies a profile subset without replacing the complete workspace set', async () => {
     const retained = withPlacement(box())
-    await resolveSandboxPromptBackend(shell(), { profile: { name: 'subset', proxySecrets: [binding] } }, 'test', retained as unknown as SandboxInstance)
+    await resolveSandboxPromptBackend(shell({ proxySecrets: undefined }), { profile: { name: 'subset', proxySecrets: [binding] } }, 'test', retained as unknown as SandboxInstance)
     expect(retained.egress.update).not.toHaveBeenCalled()
   })
 
