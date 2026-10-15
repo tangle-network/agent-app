@@ -29,6 +29,14 @@ export type SandboxProxySecretsResolver = (
   context: { client?: Sandbox; box?: SandboxInstance },
 ) => Promise<ProxySecretBinding[]>
 
+// Same-box evidence from the callback's confirmed complete placement. This is
+// not caller-supplied metadata and never authorizes a broader selection.
+const confirmedCallbackSelections = new WeakMap<SandboxInstance, {
+  owner: SandboxProxySecretsResolver
+  bindings: ProxySecretBinding[]
+  receipt: ProxySecretReceipt
+}>()
+
 export interface SandboxTurnProxySecrets {
   scope: SandboxScope & { userId: string; threadId: string; executionId: string }
   resolve: (
@@ -170,11 +178,16 @@ export async function reconcileProxySecrets(
 export async function verifyProxySecrets(
   box: SandboxInstance,
   bindings: ProxySecretBinding[] | undefined,
+  owner?: SandboxProxySecretsResolver,
 ): Promise<void> {
   if (bindings === undefined) return
+  confirmedCallbackSelections.delete(box)
   try {
     const current = await box.egress.get()
-    confirmedReceipt(current.proxySecretReceipt, box, bindings)
+    const receipt = confirmedReceipt(current.proxySecretReceipt, box, bindings)
+    if (owner) confirmedCallbackSelections.set(box, {
+      owner, bindings: ProxySecretsSchema.parse(bindings), receipt,
+    })
   } catch (cause) {
     if (cause instanceof SandboxProxySecretsError) throw cause
     throw new SandboxProxySecretsError('placement could not be verified after runtime refresh')
@@ -186,8 +199,9 @@ export async function verifyProfileProxySecrets(
   box: SandboxInstance,
   requested: ProxySecretBinding[] | undefined,
   runtimeSecrets: Record<string, string> | undefined,
-  requireReceipt: boolean,
+  owner: SandboxProxySecretsResolver | undefined,
 ): Promise<void> {
+  const requireReceipt = owner !== undefined
   if (requested === undefined && Object.keys(runtimeSecrets ?? {}).length === 0 && !requireReceipt) return
   const egress = box.egress
   if (!egress?.get && !requireReceipt && requested === undefined) return
@@ -196,7 +210,14 @@ export async function verifyProfileProxySecrets(
     if (current.proxySecretReceipt === undefined && !requireReceipt && requested === undefined) return
     const receipt = confirmedReceipt(current.proxySecretReceipt, box, requested ?? [], undefined, false)
     if (requested?.length === 0 && receipt.bindings.length > 0) {
-      throw new SandboxProxySecretsError('an explicit empty profile selection requires confirmed revocation')
+      const selected = confirmedCallbackSelections.get(box)
+      if (!owner || selected?.owner !== owner) {
+        throw new SandboxProxySecretsError('an empty authored selection requires confirmed callback ownership or revocation')
+      }
+      const complete = confirmedReceipt(current.proxySecretReceipt, box, selected.bindings)
+      if (JSON.stringify(complete) !== JSON.stringify(selected.receipt)) {
+        throw new SandboxProxySecretsError('callback placement changed before dispatch')
+      }
     }
     assertNoReadableProxySecrets(receipt.bindings, runtimeSecrets ?? {})
   } catch (cause) {

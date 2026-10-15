@@ -2429,7 +2429,7 @@ async function finalizeExistingBox(
     throw deferredProfileWriteFailed(stage, name, written.error)
   }
   const finalBox = written.value
-  await verifyProxySecrets(finalBox, proxySecrets)
+  await verifyProxySecrets(finalBox, proxySecrets, shell.proxySecrets)
   if (prefetch.runtimeEnv) {
     // The same renewal, sent while the probe ran; its failure fails the reuse
     // exactly as a renewal sent here would.
@@ -2954,6 +2954,7 @@ async function provisionWorkspaceSandbox(
     }
   }
 
+  await verifyProxySecrets(box, proxySecrets, shell.proxySecrets)
   if (shell.bootstrap) {
     const boot = await shell.bootstrap(box, scope)
     if (!boot.succeeded) {
@@ -3570,7 +3571,7 @@ export async function resolveSandboxPromptBackend(
   if ((profile.proxySecrets !== undefined || shell.proxySecrets !== undefined) && !box) {
     throw new SandboxProxySecretsError('profile proxy secrets require the actual sandbox')
   }
-  if (box) await verifyProfileProxySecrets(box, mergeProxySecrets(profile.proxySecrets), options.runtimeSecrets, shell.proxySecrets !== undefined)
+  if (box) await verifyProfileProxySecrets(box, mergeProxySecrets(profile.proxySecrets), options.runtimeSecrets, shell.proxySecrets)
   return {
     type: harness,
     profile,
