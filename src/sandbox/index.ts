@@ -2702,7 +2702,9 @@ async function provisionWorkspaceSandbox(
   const proxyCapabilities = await assertProxySecretCapabilities(
     client, shell.proxySecrets || defaultProfile.proxySecrets !== undefined ? [] : undefined,
   )
-  const configuredProxySecrets = await measure('proxy_secrets', () => resolveProxySecrets(shell.proxySecrets, scope, { client }))
+  const configuredProxySecrets = shell.proxySecrets
+    ? await measure('proxy_secrets', () => resolveProxySecrets(shell.proxySecrets, scope, { client }))
+    : undefined
   let proxySecrets = mergeProxySecrets(defaultProfile.proxySecrets, configuredProxySecrets)
   await assertProxySecretCapabilities(client, proxySecrets, proxyCapabilities)
   const runtimeEnvForScope = async () => {

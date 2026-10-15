@@ -181,7 +181,7 @@ describe('proxy custody at sandbox dispatch boundaries', () => {
 
   it('renews before recovery resume and again before the recovered bootstrap', async () => {
     const retained = withPlacement(box())
-    retained.exec.mockResolvedValueOnce({ exitCode: 1 }).mockResolvedValue({ exitCode: 0 })
+    retained.exec.mockResolvedValueOnce({ exitCode: 1, stdout: '' }).mockResolvedValue({ exitCode: 0, stdout: 'alive' })
     retained.resume.mockImplementation(async () => {
       expect(retained.egress.update).toHaveBeenCalledOnce()
     })
