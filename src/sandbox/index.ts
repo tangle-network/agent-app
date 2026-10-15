@@ -40,6 +40,21 @@ import {
 } from './transient-failure'
 import { fingerprintAgentProfile, type ProfileFingerprint } from '../profile/fingerprint'
 import {
+  assertNoReadableProxySecrets,
+  assertNoNestedProxySecrets,
+  assertProxySecretCapabilities,
+  mergeProxySecrets,
+  reconcileProxySecrets,
+  verifyProxySecrets,
+  verifyProfileProxySecrets,
+  resolveProxySecrets,
+  SandboxProxySecretsError,
+  type SandboxProxySecretsResolver,
+  type SandboxTurnProxySecrets,
+} from './proxy-secrets'
+export { SandboxProxySecretsError } from './proxy-secrets'
+export type { SandboxProxySecretsResolver, SandboxTurnProxySecrets } from './proxy-secrets'
+import {
   assertProfilePromptWithinBudget,
   type ComposeProfileBudget,
 } from '../profile/budget'
@@ -396,13 +411,13 @@ export interface SandboxRuntimeConfig {
   metadata: (harness: Harness) => Record<string, unknown>
   connectedIntegrationIds: (workspaceId: string) => Promise<string[]>
   /**
-   * Creation-only environment. Use runtimeEnv for expiring app credentials.
-   * Values remain private; profiles reference their names through secret-ref.
+   * Creation-only environment, readable inside the guest.
+   * Use proxySecrets for protected credentials.
    * Workspace-wide values cannot carry per-user or per-resource authority.
    */
   env: (ctx: SandboxBuildContext) => Promise<Record<string, string>>
   /**
-   * Workspace app credentials resolved on creation and before every reuse,
+   * Readable runtime values resolved on creation and before every reuse,
    * resume, or recovery. Fresh values override env in the creation payload.
    * The SDK updates retained runtimes before bootstrap and refuses runtime-managed keys.
    * A resume receives only the keys the platform names as required to rebuild a runtime.
@@ -410,6 +425,13 @@ export interface SandboxRuntimeConfig {
    * the sandbox and prevents dispatch. Requires the matching Sandbox runtime.
    */
   runtimeEnv?: (scope: SandboxScope) => Promise<Record<string, string>>
+  /**
+   * Server-owned proxy-held references resolved before create, reuse, resume,
+   * recovery, and bootstrap. Omission preserves existing custody; [] revokes
+   * caller-owned bindings. Failed issuance or placement prevents dispatch.
+   * Declared env names and reference keys cannot also enter env/runtimeEnv/secrets.
+   */
+  proxySecrets?: SandboxProxySecretsResolver
   files: (ctx: SandboxBuildContext) => Promise<AgentProfileFileMount[]>
   secrets: (workspaceId: string) => Promise<string[]>
   profile: (options: ProfileComposeOptions) => AgentProfile
@@ -1555,6 +1577,7 @@ async function materializeDeferredFilesForExistingBox(
   }
   const files = await shell.files(buildCtx)
   const fullProfile = shell.profile({ extraFiles: files, harness })
+  assertNoNestedProxySecrets(fullProfile)
   const { deferredFiles } = splitDeferredProfileFiles(fullProfile)
   if (deferredFiles.length === 0) return ok(box)
   // Skip the whole re-write when the corpus is UNCHANGED since the box was
@@ -2136,6 +2159,7 @@ async function recoverUnresponsiveBox(
   resumeTimeout: number,
   runtimeEnv: Record<string, string>,
   onProgress?: (event: ProvisionEvent) => void,
+  proxySecrets?: Awaited<ReturnType<typeof resolveProxySecrets>>,
 ): Promise<SandboxInstance> {
   const running = await runningSessionCount(box)
   if (running) {
@@ -2158,6 +2182,7 @@ async function recoverUnresponsiveBox(
       err,
     )
   }
+  await reconcileProxySecrets(box, proxySecrets)
   const resumed = await resumeStoppedBox(box, resumeTimeout, runtimeEnv, onProgress)
   if (!resumed.succeeded) {
     throw new SandboxRecoveryFailedError(
@@ -2308,7 +2333,7 @@ function prefetchExistingBoxReads(
     })
   }
   if (shell.deferProfileFiles) prefetch.corpusMarker = readDeferredCorpusMarker(box)
-  if (!egressGatesCredentials(shell.egressPolicy)) {
+  if (!shell.proxySecrets && !egressGatesCredentials(shell.egressPolicy)) {
     // A mint failure rejects `runtimeEnv` and the reuse stops before finalize,
     // so nothing was sent; the renewal itself is settled here and never rejects.
     prefetch.runtimeEnv = runtimeEnv.then(
@@ -2382,11 +2407,13 @@ async function finalizeExistingBox(
   harness: Harness,
   scope: SandboxScope,
   runtimeEnv: Record<string, string>,
+  proxySecrets: Awaited<ReturnType<typeof resolveProxySecrets>>,
   prefetch: ExistingBoxPrefetch = {},
 ): Promise<SandboxInstance> {
   if (!prefetch.egressVerified) {
     await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name, prefetch.egress)
   }
+  await reconcileProxySecrets(box, proxySecrets)
   const written = await materializeDeferredFilesForExistingBox(
     shell,
     client,
@@ -2402,6 +2429,7 @@ async function finalizeExistingBox(
     throw deferredProfileWriteFailed(stage, name, written.error)
   }
   const finalBox = written.value
+  await verifyProxySecrets(finalBox, proxySecrets)
   if (prefetch.runtimeEnv) {
     // The same renewal, sent while the probe ran; its failure fails the reuse
     // exactly as a renewal sent here would.
@@ -2586,6 +2614,7 @@ async function bringUpWorkspaceSandbox(
     // again. Replacing it is a delete, so it happens only where the shell has
     // declared the box rebuildable — and only once, so a replacement that dies
     // the same way surfaces the error instead of looping.
+    if (err instanceof SandboxProxySecretsError) throw err
     if (!shell.replaceUnbringableBox) throw err
     if (options.forceNew) throw err
     if (!isUnbringableBoxError(err)) throw err
@@ -2633,6 +2662,7 @@ async function requestMissingSandboxReplacement(
   shell: SandboxRuntimeConfig,
   failure: MissingSandboxFailure,
 ): Promise<StoppedSandboxResumeRecovery> {
+  if (failure.error instanceof SandboxProxySecretsError) throw failure.error
   // Probe causes diagnose failed liveness; they do not authorize replacement.
   if (failure.error instanceof SandboxRecoveryFailedError && failure.error.phase === 'probe') {
     throw failure.error
@@ -2667,6 +2697,21 @@ async function provisionWorkspaceSandbox(
   let replacementRequested = false
   const resources = shell.resources ?? DEFAULT_SANDBOX_RESOURCES
   const resumeTimeout = shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS
+  const defaultProfile = shell.profile({ harness })
+  assertNoNestedProxySecrets(defaultProfile)
+  const proxyCapabilities = await assertProxySecretCapabilities(
+    client, shell.proxySecrets || defaultProfile.proxySecrets !== undefined ? [] : undefined,
+  )
+  let proxySecrets = mergeProxySecrets(
+    defaultProfile.proxySecrets,
+    await measure('proxy_secrets', () => resolveProxySecrets(shell.proxySecrets, scope, { client })),
+  )
+  await assertProxySecretCapabilities(client, proxySecrets, proxyCapabilities)
+  const runtimeEnvForScope = async () => {
+    const env = await resolveWorkspaceRuntimeEnv(shell, scope)
+    assertNoReadableProxySecrets(proxySecrets, env)
+    return env
+  }
 
   // Stage 1 — running-box reuse (skipped on forceNew).
   let existing = await measure('list_running', () => listRunning(client, name))
@@ -2685,7 +2730,7 @@ async function provisionWorkspaceSandbox(
       // Resolve app credentials before any restart so a mint failure leaves the
       // existing sandbox running and intact. Reading the runtime connection
       // restarts nothing, so it runs alongside the mint.
-      const runtimeEnvMint = measure('runtime_env', () => resolveWorkspaceRuntimeEnv(shell, scope))
+      const runtimeEnvMint = measure('runtime_env', runtimeEnvForScope)
       const prefetch = prefetchExistingBoxReads(shell, found, runtimeEnvMint, measure)
       const [envResult, readyResult] = await Promise.allSettled([
         runtimeEnvMint,
@@ -2697,7 +2742,7 @@ async function provisionWorkspaceSandbox(
         if (readyResult.status === 'rejected') throw readyResult.reason
         const ready = readyResult.value
         if ((await measure('liveness', () => isReusableBox(ready, shell.livenessProbe))).succeeded) {
-          return await measure('finalize', () => finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv, prefetch))
+          return await measure('finalize', () => finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv, proxySecrets, prefetch))
         }
         // The prefetched reads never reject; a recovered box is read again in finalize.
         // Unresponsive (or never-connectable) box with the RIGHT harness: recover
@@ -2713,8 +2758,9 @@ async function provisionWorkspaceSandbox(
           resumeTimeout,
           runtimeEnv,
           onProgress,
+          proxySecrets,
         )
-        return await finalizeExistingBox(shell, client, recovered, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv)
+        return await finalizeExistingBox(shell, client, recovered, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv, proxySecrets)
       } catch (cause) {
         const error = cause instanceof Error ? cause : new Error(String(cause))
         const recovery = await requestMissingSandboxReplacement(shell, {
@@ -2746,7 +2792,8 @@ async function provisionWorkspaceSandbox(
     const stopped = await listStopped(client, name)
     if (!stopped.succeeded) throw stopped.error
     if (stopped.value) {
-      const runtimeEnv = await resolveWorkspaceRuntimeEnv(shell, scope)
+      const runtimeEnv = await runtimeEnvForScope()
+      await reconcileProxySecrets(stopped.value, proxySecrets)
       const resumed = await resumeStoppedBox(stopped.value, resumeTimeout, runtimeEnv, onProgress)
       if (!resumed.succeeded) {
         const recovery = await requestSandboxReplacement(
@@ -2760,7 +2807,7 @@ async function provisionWorkspaceSandbox(
         try {
           const box = await refreshRuntimeConnection(client, resumed.value)
           if ((await isReusableBox(box, shell.livenessProbe)).succeeded) {
-            return await finalizeExistingBox(shell, client, box, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv)
+            return await finalizeExistingBox(shell, client, box, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv, proxySecrets)
           }
           // The box resumed but is unresponsive: one full stop→resume cycle is
           // the state-preserving recovery; still-dead fails loud. Never delete —
@@ -2774,8 +2821,9 @@ async function provisionWorkspaceSandbox(
             resumeTimeout,
             runtimeEnv,
             onProgress,
+            proxySecrets,
           )
-          return await finalizeExistingBox(shell, client, recovered, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv)
+          return await finalizeExistingBox(shell, client, recovered, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv, proxySecrets)
         } catch (cause) {
           const error = cause instanceof Error ? cause : new Error(String(cause))
           const recovery = await requestMissingSandboxReplacement(shell, {
@@ -2802,11 +2850,15 @@ async function provisionWorkspaceSandbox(
   const [secrets, creationEnv, runtimeEnv, files] = await Promise.all([
     shell.secrets(workspaceId),
     shell.env(buildCtx),
-    resolveWorkspaceRuntimeEnv(shell, scope),
+    runtimeEnvForScope(),
     shell.files(buildCtx),
   ])
   const env = { ...creationEnv, ...runtimeEnv }
   const fullProfile = shell.profile({ extraFiles: files, harness })
+  assertNoNestedProxySecrets(fullProfile)
+  proxySecrets = mergeProxySecrets(proxySecrets, fullProfile.proxySecrets)
+  await assertProxySecretCapabilities(client, proxySecrets, proxyCapabilities)
+  assertNoReadableProxySecrets(proxySecrets, env, secrets)
   // When deferring, strip inline files from the create payload and write them
   // into the box after it reaches running. Keeps the provision body under the
   // orchestrator's 256 KiB cap and lands real files on disk.
@@ -2852,6 +2904,7 @@ async function provisionWorkspaceSandbox(
     ...(userId ? { permissions: { initialUsers: [{ userId, role }] } } : {}),
     env,
     secrets,
+    ...(proxySecrets !== undefined ? { proxySecrets } : {}),
     backend: { type: harness, profile, ...(model ? backendModelFields(model) : {}) },
     ...(storage ? { storage } : {}),
     ...(restore ? restore : {}),
@@ -2892,6 +2945,7 @@ async function provisionWorkspaceSandbox(
     ...(onProgress ? { onProgress } : {}),
   })
   box = await refreshRuntimeConnection(client, box)
+  await reconcileProxySecrets(box, proxySecrets)
 
   if (deferredFiles.length > 0) {
     const written = await writeProfileFilesToBox(box, deferredFiles)
@@ -3068,6 +3122,8 @@ export interface StreamSandboxPromptOptions {
    * Explicit turn selections override this profile; otherwise its model and harness win
    * over shell defaults. Never populate this field from an untrusted request body. */
   profile?: AgentProfile
+  /** Server-owned per-turn authority, atomically confirmed on the actual box before dispatch. */
+  proxySecrets?: SandboxTurnProxySecrets
   sessionId?: string
   executionId?: string
   /** Stable idempotency key for one logical dispatch. Reuse it with the same
@@ -3419,7 +3475,7 @@ export function adaptSandboxStream(
 }
 
 /** Configuration needed to prepare a turn without provisioning a workspace. */
-export type SandboxPromptConfig = Pick<SandboxRuntimeConfig, 'provider' | 'deferProfileFiles' | 'promptBudget'>
+export type SandboxPromptConfig = Pick<SandboxRuntimeConfig, 'provider' | 'deferProfileFiles' | 'promptBudget' | 'proxySecrets'>
   & Partial<Pick<SandboxRuntimeConfig, 'profile'>>
 
 /** Prepare one effective backend for SDK dispatch or product-specific transport.
@@ -3430,6 +3486,7 @@ export async function resolveSandboxPromptBackend(
   shell: SandboxPromptConfig,
   options: StreamSandboxPromptOptions,
   operation = 'sandbox prompt',
+  box?: SandboxInstance,
 ) {
   const initialHarness = options.harness ?? options.profile?.harness ?? DEFAULT_HARNESS
   if (!isHarness(initialHarness)) throw new Error(`Unsupported sandbox harness: ${initialHarness}`)
@@ -3502,6 +3559,18 @@ export async function resolveSandboxPromptBackend(
   if (options.onProfileResolved) {
     options.onProfileResolved(await fingerprintAgentProfile(profile, { model: model?.model, harness }))
   }
+  if (options.proxySecrets) {
+    if (!box) throw new SandboxProxySecretsError('per-turn proxy secrets require the actual sandbox')
+    // The proxy authenticates a sandbox, not processes or sessions inside it.
+    // A grant receipt cannot prove exclusive authority on a shared box.
+    throw new SandboxProxySecretsError('per-turn proxy custody requires a separately authorized sandbox; shared-box execution isolation is unsupported')
+  }
+  assertNoNestedProxySecrets(profile)
+  assertNoReadableProxySecrets(profile.proxySecrets, options.runtimeSecrets ?? {})
+  if (profile.proxySecrets !== undefined && !box) {
+    throw new SandboxProxySecretsError('profile proxy secrets require the actual sandbox')
+  }
+  if (box) await verifyProfileProxySecrets(box, mergeProxySecrets(profile.proxySecrets), options.runtimeSecrets, shell.proxySecrets !== undefined)
   return {
     type: harness,
     profile,
@@ -3564,7 +3633,7 @@ export async function* streamSandboxPrompt(
   message: string | PromptInputPart[],
   options?: StreamSandboxPromptOptions,
 ): AsyncGenerator<unknown> {
-  const backend = await resolveSandboxPromptBackend(shell, options ?? {}, 'streamSandboxPrompt')
+  const backend = await resolveSandboxPromptBackend(shell, options ?? {}, 'streamSandboxPrompt', box)
   const prompt =
     typeof message === 'string'
       ? flattenHistory(message, options?.history)
@@ -3951,7 +4020,7 @@ export async function driveSandboxTurn(
   options: DriveSandboxTurnOptions,
 ): Promise<Outcome<TurnDriveResult>> {
   // Configuration failures precede the retryable transport boundary.
-  const backend = await resolveSandboxPromptBackend(shell, options, 'driveSandboxTurn')
+  const backend = await resolveSandboxPromptBackend(shell, options, 'driveSandboxTurn', box)
   const prompt =
     typeof message === 'string'
       ? flattenHistory(message, options.history)
