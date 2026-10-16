@@ -87,6 +87,6 @@ export function EmailPreview({ preview, account }: { preview: Email; account?: s
 
 export function linkedText(value: string) {
   return value.split(/(https?:\/\/[^\s<>"']+)/g).map((part, index) => /^https?:\/\//i.test(part)
-    ? <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-[#1155cc] underline">{part}</a>
+    ? <a key={index} href={part} onClick={(event) => event.preventDefault()} title="Link shown for review" className="text-[#1155cc] underline">{part}</a>
     : part)
 }

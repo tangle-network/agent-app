@@ -7,7 +7,7 @@ import { HUB_APPROVAL_UNKNOWN_WARNING } from '../hub-approvals/unknown'
 import { HubApprovalPhasePill, HubProviderMark, HubRawDetails, openPhaseLabel } from './parts'
 import { HubActionPreviewView } from './preview'
 import { HubActionReceiptCard } from './receipt'
-import { HubPreviewFeedback } from './feedback'
+import { HubPreviewFeedback, type HubPreviewFeedbackProps } from './feedback'
 
 export interface HubApprovalRowProps {
   item: HubApprovalItem
@@ -31,6 +31,8 @@ export function HubApprovalRow({ item, expanded: controlled, onExpandedChange, o
   const [own, setOwn] = useState(false)
   const expanded = controlled ?? own
   const ref = useRef<HTMLDivElement>(null)
+  const feedbackDrafts = useRef<NonNullable<HubPreviewFeedbackProps['drafts']>>(new Map())
+  const [feedbackSaving, setFeedbackSaving] = useState(false)
   const presentation = presentHubAction(item)
   const title = item.phase === 'done' ? hubActionReceipt(item).title : presentation.title
 
@@ -49,6 +51,7 @@ export function HubApprovalRow({ item, expanded: controlled, onExpandedChange, o
         <Button
           variant="bare"
           aria-expanded={expanded}
+          disabled={feedbackSaving}
           onClick={toggle}
           className="flex min-h-9 min-w-0 flex-1 items-center gap-3 rounded-md text-left"
         >
@@ -76,7 +79,10 @@ export function HubApprovalRow({ item, expanded: controlled, onExpandedChange, o
                 </>
               )}
           {item.phase !== 'unknown' && actions}
-          {onFeedback && <HubPreviewFeedback key={item.id} item={item} onFeedback={onFeedback} />}
+          {onFeedback && <HubPreviewFeedback key={item.id} item={item} drafts={feedbackDrafts.current} onFeedback={async (source, feedback) => {
+            setFeedbackSaving(true)
+            try { await onFeedback(source, feedback) } finally { setFeedbackSaving(false) }
+          }} />}
         </div>
       )}
       {!expanded && actions && (item.phase === 'expired' || item.phase === 'failed') && (

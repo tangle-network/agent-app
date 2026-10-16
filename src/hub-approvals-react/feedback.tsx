@@ -1,14 +1,18 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Button, Input, Label, Textarea } from '@tangle-network/ui/primitives'
 import { presentHubAction, type HubApprovalFeedback, type HubApprovalItem } from '../hub-approvals'
 
 export interface HubPreviewFeedbackProps {
   item: HubApprovalItem
   onFeedback: (item: HubApprovalItem, feedback: HubApprovalFeedback) => Promise<void>
+  /** Owner-local drafts survive collapsing/switching previews, never another viewer. */
+  drafts?: Map<string, FeedbackDraft>
 }
 
+interface FeedbackDraft { score: string; comment: string; editing: boolean; edited: boolean; subject: string; body: string; payload: string; saved: boolean }
+
 /** Host callback saves the signal; this component has no execution transport. */
-export function HubPreviewFeedback({ item, onFeedback }: HubPreviewFeedbackProps) {
+export function HubPreviewFeedback({ item, onFeedback, drafts }: HubPreviewFeedbackProps) {
   const id = useId()
   const saved = item.feedback
   const original = item.input && typeof item.input === 'object' && !Array.isArray(item.input) ? item.input as Record<string, unknown> : {}
@@ -18,20 +22,25 @@ export function HubPreviewFeedback({ item, onFeedback }: HubPreviewFeedbackProps
   const field = kind === 'email'
     ? typeof original.html === 'string' ? 'html' : typeof original.body === 'string' ? 'body' : 'text'
     : typeof original.commentary === 'string' ? 'commentary' : 'text'
-  const [score, setScore] = useState(saved ? String(saved.score) : '')
-  const [comment, setComment] = useState(saved?.comment ?? '')
-  const [editing, setEditing] = useState(false)
-  const [edited, setEdited] = useState(saved?.editedInput !== undefined)
-  const [subject, setSubject] = useState(String(prior.subject ?? ''))
-  const [body, setBody] = useState(String(prior[field] ?? ''))
-  const [payload, setPayload] = useState(JSON.stringify(prior, null, 2))
+  const draft = drafts?.get(item.id)
+  const [score, setScore] = useState(draft?.score ?? (saved ? String(saved.score) : ''))
+  const [comment, setComment] = useState(draft?.comment ?? saved?.comment ?? '')
+  const [editing, setEditing] = useState(draft?.editing ?? false)
+  const [edited, setEdited] = useState(draft?.edited ?? saved?.editedInput !== undefined)
+  const [subject, setSubject] = useState(draft?.subject ?? String(prior.subject ?? ''))
+  const [body, setBody] = useState(draft?.body ?? String(prior[field] ?? ''))
+  const [payload, setPayload] = useState(draft?.payload ?? JSON.stringify(prior, null, 2))
   const [busy, setBusy] = useState(false)
-  const [status, setStatus] = useState(saved ? 'Feedback saved' : '')
+  const [status, setStatus] = useState((draft ? draft.saved : saved) ? 'Feedback saved' : '')
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    drafts?.set(item.id, { score, comment, editing, edited, subject, body, payload, saved: status === 'Feedback saved' })
+  }, [drafts, item.id, score, comment, editing, edited, subject, body, payload, status])
 
   async function save() {
     if (busy) return
-    if (score.trim() === '' || !Number.isFinite(Number(score)) || Number(score) < 0 || Number(score) > 100) {
+    if (score.trim() === '' || !Number.isInteger(Number(score)) || Number(score) < 0 || Number(score) > 100) {
       setError('Enter a score from 0 to 100.'); return
     }
     setBusy(true); setError(''); setStatus('')
@@ -53,7 +62,7 @@ export function HubPreviewFeedback({ item, onFeedback }: HubPreviewFeedbackProps
       <div className="flex flex-wrap items-end gap-3">
         <div className="w-36 space-y-1">
           <Label htmlFor={`${id}-score`}>Score (0–100)</Label>
-          <Input id={`${id}-score`} type="number" inputMode="numeric" min={0} max={100} step="any" required value={score}
+          <Input id={`${id}-score`} type="number" inputMode="numeric" min={0} max={100} step={1} required value={score}
             placeholder="Unscored" disabled={busy} onChange={(event) => { setScore(event.target.value); setStatus('') }} />
         </div>
         <Button type="button" variant="outline" aria-expanded={editing} disabled={busy} onClick={() => { setEditing((value) => !value); setStatus('') }}>Edit to teach</Button>

@@ -30,6 +30,9 @@ const errors = []
 let failedSaves = 0
 let decisionCalls = 0
 let failNextSave = false
+let holdNextSave = false
+let releaseSave
+let checkName = 'initial render'
 let browser, context, server, page
 const original = {
   id: 'fixture-email-1', actionPath: 'gmail.send', providerId: 'gmail', phase: 'waiting',
@@ -58,17 +61,22 @@ import {createRoot} from 'react-dom/client';
 import {HubApprovalRow,HubApprovalDock} from './dist/hub-approvals-react/index.js';
 function App(){
   const [item,setItem]=useState(null);
-  const dock=new URLSearchParams(location.search).has('dock');
+  const [expanded,setExpanded]=useState(true);
+  const query=new URLSearchParams(location.search);
+  const dock=query.has('dock');
   useEffect(()=>{fetch('/api/approval').then(r=>r.json()).then(setItem)},[]);
   async function onFeedback(item,feedback){
     const response=await fetch('/api/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,...feedback})});
-    const body=await response.json();if(!response.ok)throw new Error(body.error);setItem(body);
+    const body=await response.json();if(!response.ok)throw new Error(body.error);if(!query.has('lag'))setItem(body);
   }
   async function onDecide(){await fetch('/api/decide',{method:'POST'});}
   if(!item)return <p>Loading preview…</p>;
   const feedback=${fault ? 'undefined' : 'onFeedback'};
+  const plain='Hi Alex, see https://example.invalid/plain-link for the walkthrough.';
+  const shown=query.has('plain')?{...item,input:{...item.input,html:false,body:plain}}:query.has('post')?{...item,providerId:'x',actionPath:'x.tweets.create',input:{text:'A smaller setup for your prototype: https://example.invalid/post-link'}}:item;
+  const other={...item,id:'fixture-email-2',feedback:undefined,input:{...item.input,subject:'A separate held email for Sam',to:['Sam <sam@example.invalid>']}};
   return <main className="mx-auto max-w-3xl space-y-5 px-4 py-6"><header><p className="text-sm text-muted-foreground">Local fixture · no message sent</p><h1 className="text-xl font-semibold">Review outreach for Alex</h1></header>
-  {dock?<HubApprovalDock items={[item]} onDecide={onDecide} onFeedback={feedback}/>:<HubApprovalRow item={item} expanded onFeedback={feedback}/>}</main>;
+  {dock?<HubApprovalDock items={[item,other]} onDecide={onDecide} onFeedback={feedback}/>:<HubApprovalRow item={shown} expanded={expanded} onExpandedChange={setExpanded} onFeedback={feedback}/>}</main>;
 }
 createRoot(document.getElementById('root')).render(<App/>);`
 
@@ -82,6 +90,7 @@ async function requestBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString())
 }
 async function check(name, run) {
+  checkName = name
   await run()
   checks.push({ name, result: 'PASS' })
 }
@@ -106,6 +115,7 @@ try {
       if (request.url === '/api/decide') { decisionCalls++; return json(response, { error: 'Live execution is outside this proof' }, 409) }
       if (request.url === '/api/feedback' && request.method === 'POST') {
         const feedback = await requestBody(request)
+        if (holdNextSave) { holdNextSave = false; await new Promise(resolve => { releaseSave = resolve }) }
         if (failNextSave) { failNextSave = false; failedSaves++; return json(response, { error: 'Fixture storage unavailable; your edits are still here.' }, 503) }
         if (feedback.id !== original.id || !Number.isFinite(feedback.score) || feedback.score < 0 || feedback.score > 100 || typeof feedback.comment !== 'string') return json(response, { error: 'Invalid feedback' }, 400)
         const edited = feedback.editedInput ?? original.input
@@ -165,6 +175,15 @@ try {
     await page.getByRole('button', { name: 'Edit to teach', exact: true }).click()
     await page.getByLabel('Subject', { exact: true }).fill(subject)
     await page.getByLabel('Body', { exact: true }).fill(body)
+    const collapse = page.locator('[data-hub-approval-row] button[aria-expanded]').first()
+    await collapse.click()
+    await expect(page.getByLabel('Score (0–100)', { exact: true })).toHaveCount(0)
+    await collapse.click()
+    await expect(page.getByLabel('Score (0–100)', { exact: true })).toHaveValue('82')
+    await expect(page.getByLabel('Comment', { exact: true })).toHaveValue('Make the opening specific. Keep one clear request.')
+    await expect(page.getByLabel('Subject', { exact: true })).toHaveValue(subject)
+    await expect(page.getByLabel('Body', { exact: true })).toHaveValue(body)
+    await expect(page.getByText('Feedback saved', { exact: true })).toHaveCount(0)
     await page.getByRole('button', { name: 'Save feedback', exact: true }).click()
     await expect(page.getByText('Feedback saved', { exact: true })).toBeVisible()
     const saved = latest()
@@ -214,6 +233,60 @@ try {
     await page.setViewportSize({ width: 390, height: 844 })
     await noOverflow(page)
     await page.screenshot({ path: path.join(output, 'dock-phone.png'), fullPage: true })
+  })
+  await check('switching between held previews preserves separate unsaved drafts and truthful save status', async () => {
+    await page.getByLabel('Score (0–100)', { exact: true }).fill('88')
+    await page.getByLabel('Comment', { exact: true }).fill('First preview has an unsaved correction.')
+    await page.getByRole('button', { name: 'Edit to teach', exact: true }).click()
+    await page.getByLabel('Subject', { exact: true }).fill('Keep the first draft separate')
+    await page.locator('[data-hub-approval-dock-row="fixture-email-2"]').click()
+    await expect(page.getByLabel('Score (0–100)', { exact: true })).toHaveValue('')
+    await page.getByLabel('Score (0–100)', { exact: true }).fill('29')
+    await page.getByLabel('Comment', { exact: true }).fill('Second preview has a different draft.')
+    await page.locator('[data-hub-approval-dock-row="fixture-email-1"]').click()
+    await expect(page.getByLabel('Score (0–100)', { exact: true })).toHaveValue('88')
+    await expect(page.getByLabel('Comment', { exact: true })).toHaveValue('First preview has an unsaved correction.')
+    await expect(page.getByLabel('Subject', { exact: true })).toHaveValue('Keep the first draft separate')
+    await expect(page.getByText('Feedback saved', { exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Hide the preview', exact: true }).click()
+    await page.getByRole('button', { name: 'Show the request', exact: true }).click()
+    await expect(page.getByLabel('Subject', { exact: true })).toHaveValue('Keep the first draft separate')
+    await expect(page.getByText('Feedback saved', { exact: true })).toHaveCount(0)
+    await page.locator('[data-hub-approval-dock-row="fixture-email-2"]').click()
+    await expect(page.getByLabel('Score (0–100)', { exact: true })).toHaveValue('29')
+    await expect(page.getByLabel('Comment', { exact: true })).toHaveValue('Second preview has a different draft.')
+    assert.equal(latest().score, 100, 'Unsaved drafts must not become outcome signals')
+  })
+  await check('save locks navigation and retains its success before host feedback refresh', async () => {
+    await page.goto(`${origin}/?dock=1&lag=1`)
+    await page.getByLabel('Score (0–100)', { exact: true }).fill('92')
+    holdNextSave = true
+    await page.getByRole('button', { name: 'Save feedback', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Saving feedback…', exact: true })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Hide the preview', exact: true })).toBeDisabled()
+    await expect(page.locator('[data-hub-approval-dock-row="fixture-email-2"]')).toBeDisabled()
+    await expect.poll(() => typeof releaseSave).toBe('function')
+    releaseSave()
+    releaseSave = undefined
+    await expect(page.getByText('Feedback saved', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Hide the preview', exact: true }).click()
+    await page.getByRole('button', { name: 'Show the request', exact: true }).click()
+    await expect(page.getByLabel('Score (0–100)', { exact: true })).toHaveValue('92')
+    await expect(page.getByText('Feedback saved', { exact: true })).toBeVisible()
+    await page.reload()
+    await expect(page.getByLabel('Score (0–100)', { exact: true })).toHaveValue('92')
+    assert.equal(latest().score, 92)
+  })
+  await check('plain email and social post links stay inert on click', async () => {
+    for (const kind of ['plain', 'post']) {
+      await page.goto(`${origin}/?${kind}=1`)
+      const link = page.getByRole('link', { name: `https://example.invalid/${kind}-link`, exact: true })
+      await expect(link).toBeVisible()
+      await link.click()
+      assert.equal(context.pages().length, 1, `${kind} preview must not open a live link`)
+      await noOverflow(page)
+      await page.screenshot({ path: path.join(output, `${kind}-phone.png`), fullPage: true })
+    }
     assert.equal(decisionCalls, 0)
     assert.equal(failedSaves, 1)
     assert.deepEqual(externalRequests, [])
@@ -221,9 +294,10 @@ try {
   })
 } catch (error) {
   await page?.screenshot({ path: path.join(output, 'failure.png'), fullPage: true }).catch(() => {})
-  checks.push({ name: 'flow completion', result: 'FAIL', error: String(error) })
+  checks.push({ name: checkName, result: 'FAIL', error: String(error) })
   process.exitCode = 1
 } finally {
+  releaseSave?.()
   await context?.close()
   await browser?.close()
   if (server) await new Promise(resolve => server.close(resolve))

@@ -14,7 +14,7 @@ import {
 import { HUB_APPROVAL_UNKNOWN_WARNING } from '../hub-approvals/unknown'
 import { closesIn, distinctAccount, HubApprovalPhasePill, HubApprovalWaitNote, HubProviderMark, HubRawDetails, openPhaseLabel } from './parts'
 import { HubActionPreviewView } from './preview'
-import { HubPreviewFeedback } from './feedback'
+import { HubPreviewFeedback, type HubPreviewFeedbackProps } from './feedback'
 
 /** The owner's answer to one held call. `allow` also grants a standing permission. */
 export type HubApprovalDecision =
@@ -112,6 +112,8 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
   const [collapsed, setCollapsed] = useState(false)
   const [permissionsOpen, setPermissionsOpen] = useState(false)
   const [scope, setScope] = useState<string | null>(null)
+  const feedbackDrafts = useRef<NonNullable<HubPreviewFeedbackProps['drafts']>>(new Map())
+  const [feedbackSaving, setFeedbackSaving] = useState(false)
 
   useEffect(() => {
     const finishedNow: Record<string, number> = {}
@@ -144,11 +146,11 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
   )), [items, dismissed, settled, submitting])
 
   useEffect(() => {
-    if (focusId && queue.some((item) => item.id === focusId)) {
+    if (!feedbackSaving && focusId && queue.some((item) => item.id === focusId)) {
       setActiveId(focusId)
       setCollapsed(false)
     }
-  }, [focusId, queue])
+  }, [focusId, queue, feedbackSaving])
 
   const activeIndex = Math.max(0, queue.findIndex((item) => item.id === activeId))
   const active = queue[activeIndex]
@@ -201,6 +203,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
           size="icon-sm"
           aria-label={collapsed ? 'Show the request' : 'Hide the preview'}
           aria-expanded={!collapsed}
+          disabled={feedbackSaving}
           onClick={() => setCollapsed((value) => !value)}
         >
           <ChevronDown className={`transition-transform ${collapsed ? '-rotate-90' : ''}`} />
@@ -223,7 +226,10 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
           )}
           <HubActionPreviewView preview={presentation.preview} account={active.account} />
           <HubRawDetails sections={[{ label: 'Call', value: { action: active.actionPath, input: active.input } }]} />
-          {onFeedback && <HubPreviewFeedback key={active.id} item={active} onFeedback={onFeedback} />}
+          {onFeedback && <HubPreviewFeedback key={active.id} item={active} drafts={feedbackDrafts.current} onFeedback={async (item, feedback) => {
+            setFeedbackSaving(true)
+            try { await onFeedback(item, feedback) } finally { setFeedbackSaving(false) }
+          }} />}
         </div>
       )}
 
@@ -273,8 +279,8 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
         <div className="flex flex-wrap items-center gap-2">
           {decidable && (
             <>
-              <Button onClick={() => void decide({ kind: 'approve' }, 'Approving…')}>{active.executionMode === 'dry-run' ? 'Approve live' : 'Approve'}</Button>
-              <Button variant="outline" onClick={() => void decide({ kind: 'deny' }, 'Denying…')}>Deny</Button>
+              <Button disabled={feedbackSaving} onClick={() => void decide({ kind: 'approve' }, 'Approving…')}>{active.executionMode === 'dry-run' ? 'Approve live' : 'Approve'}</Button>
+              <Button disabled={feedbackSaving} variant="outline" onClick={() => void decide({ kind: 'deny' }, 'Denying…')}>Deny</Button>
               {scopes.length > 0 && (
                 <Button variant="ghost" aria-expanded={permissionsOpen} onClick={() => setPermissionsOpen((value) => !value)}>
                   {permissionsOpen ? 'Fewer options' : 'Allow future calls…'}
@@ -319,6 +325,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
                   <Button
                     variant="bare"
                     data-hub-approval-dock-row={item.id}
+                    disabled={feedbackSaving}
                     onClick={() => {
                       setActiveId(item.id)
                       setCollapsed(false)
