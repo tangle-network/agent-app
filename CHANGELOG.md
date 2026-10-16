@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.179
+
+- refactor(web-react): replace local UI primitives with shared components (#1120)
+
 ## 0.60.178
 
 - feat(agent-profiles): shared self-mount storage adapters — every product is 3 lines (#1128)
