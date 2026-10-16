@@ -142,9 +142,8 @@ function stylesheet() {
   const imports = new Map([
     ['@tangle-network/brand/styles/legacy-light.css', { text: source, layer: 'theme' }],
     ['./compat.generated.css', { text: compat, layer: 'theme' }],
-    ['@tangle-network/ui/styles/presentation.css', {
-      text: readFileSync(require.resolve('@tangle-network/ui/styles/presentation.css'), 'utf8'), layer: null,
-    }],
+    ...['@tangle-network/brand/styles/presentation.css', '@tangle-network/ui/styles/presentation.css']
+      .map(id => [id, { text: readFileSync(require.resolve(id), 'utf8'), layer: null }]),
   ])
   css.walkAtRules('import', (rule) => {
     const match = /^['"]([^'"]+)['"](?:\s+layer\((theme)\))?$/.exec(rule.params)
