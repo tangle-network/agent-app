@@ -7,7 +7,7 @@ import { createHubSettingsRoutes } from '../platform'
 import { HubConnectCallbackPage } from './callback'
 import { createHubIntegrationsClient, type HubIntegrationsClient, type HubIntegrationsIdentity } from './client'
 import { connectionTone, HubIntegrationsPanel, hubConnectionStatus } from './panel'
-import { connectWithPopup, HUB_CONNECTED_MESSAGE_TYPE, POPUP_TIMEOUT_MS } from './popup'
+import { connectWithPopup, HUB_CONNECTED_MESSAGE_TYPE, HUB_CONNECT_FAILED_MESSAGE_TYPE, POPUP_TIMEOUT_MS } from './popup'
 import { useHubIntegrations } from './use-hub-integrations'
 
 const identity: HubIntegrationsIdentity = { userId: 'user_1', sessionId: 'session_1', workspaceId: 'workspace_1' }
@@ -101,6 +101,23 @@ describe('integrations-react through the finite Hub settings server', () => {
     await waitFor(() => expect(result.current.details?.permissionGroups?.[0]?.rows[0]?.decision).toBeNull())
     expect(f.seen.filter(call => call.path.endsWith('/policies') && call.method === 'GET').length).toBeGreaterThanOrEqual(3)
     expect(f.authorize.mock.calls.length).toBeGreaterThanOrEqual(12)
+  })
+
+  it('projects host-enforced approval through the SDK settings flow and prevents override editing', async () => {
+    const f = fixture()
+    await f.client.setPolicy(identity, connection.id, tool.path, 'allow')
+    window.history.replaceState(null, '', '/settings?integration=cloudbeds&connection=conn_1')
+    const view = render(<HubIntegrationsPanel identity={identity} client={f.client} can={allow} callbackPath="/integrations/callback"
+      getActionPolicy={({ connection: account, tool: action }) => account.id === connection.id && action.path === tool.path
+        ? { decision: 'ask', label: 'Asks for approval each time', sourceLabel: 'Required by this workspace' } : undefined} />)
+    const decision = await screen.findByRole('combobox', { name: `Decision for ${tool.path}` })
+    expect(decision).toHaveProperty('disabled', true)
+    expect(decision.textContent).toBe('Asks for approval each time')
+    expect(screen.queryByRole('button', { name: `Reset ${tool.path}` })).toBeNull()
+    expect(await f.client.policies(identity, connection.id)).toMatchObject([{ decision: 'allow' }])
+    view.rerender(<HubIntegrationsPanel identity={identity} client={f.client} can={allow} callbackPath="/integrations/callback" />)
+    await waitFor(() => expect(screen.getByRole('combobox', { name: `Decision for ${tool.path}` })).toHaveProperty('disabled', false))
+    expect(screen.getByRole('button', { name: `Reset ${tool.path}` })).toBeTruthy()
   })
 
   it('keeps a confirmed write distinct from failed authoritative refresh', async () => {
@@ -410,6 +427,9 @@ describe('integrations-react through the finite Hub settings server', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel connection' }))
     expect(await screen.findByTestId('integration-connect-error')).toHaveProperty('textContent', 'Connection was cancelled.')
     expect(popup.close).toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry connection' }))
+    expect(await screen.findByRole('button', { name: 'Cancel connection' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel connection' }))
   })
 
   it('discards delayed reads from a prior session and workspace', async () => {
@@ -519,14 +539,14 @@ describe('OAuth completion fencing', () => {
     expect(POPUP_TIMEOUT_MS).toBeGreaterThan(2500)
   })
 
-  it('signals only an opaque completion with matching context, never a grant', async () => {
+  it.each([['', HUB_CONNECTED_MESSAGE_TYPE], ['&hub_connection=error&hub_error=Please+restart+the+connection+flow.', HUB_CONNECT_FAILED_MESSAGE_TYPE]])('signals completion or failure with matching context, never a grant: %s', async (query, type) => {
     const sent: unknown[] = []
     class Channel { postMessage(value: unknown) { sent.push(value) } close() {} }
     vi.stubGlobal('BroadcastChannel', Channel)
-    window.history.replaceState(null, '', '/integrations/callback?provider=github&nonce=opaque&context=flow')
+    window.history.replaceState(null, '', `/integrations/callback?provider=github&nonce=opaque&context=flow${query}`)
     vi.spyOn(window, 'close').mockImplementation(() => {})
     render(<HubConnectCallbackPage returnHref="/settings" />)
-    await waitFor(() => expect(sent).toEqual([{ type: HUB_CONNECTED_MESSAGE_TYPE, provider: 'github', nonce: 'opaque', context: 'flow' }]))
+    await waitFor(() => expect(sent).toEqual([{ type, provider: 'github', nonce: 'opaque', context: 'flow' }]))
     expect(screen.getByRole('link', { name: 'Return to integrations' }).getAttribute('href')).toBe('/settings')
   })
 

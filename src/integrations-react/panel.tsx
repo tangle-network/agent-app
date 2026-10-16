@@ -12,7 +12,7 @@ import {
 import { Button, Card, Input, StatusPill, Tabs, TabsContent, TabsList, TabsTrigger, type StatusTone } from '@tangle-network/ui/primitives'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { HubIntegrationsClient, HubIntegrationsIdentity } from './client'
-import { contextKey, displayProvider, type HubIntegrationCapabilities } from './projection'
+import { contextKey, displayProvider, type HubActionPolicy, type HubIntegrationCapabilities } from './projection'
 import { type HubHostConnect, useHubIntegrations } from './use-hub-integrations'
 
 /** Host-owned access state for one account, such as whether this agent can use it. */
@@ -42,6 +42,8 @@ export interface HubIntegrationsPanelProps {
   identity: HubIntegrationsIdentity
   client: HubIntegrationsClient
   can: HubIntegrationCapabilities
+  /** Host-enforced execution policy, displayed read-only for each action. */
+  getActionPolicy?: HubActionPolicy
   callbackPath: string
   title?: string
   /** Compact, icon-led tiles or descriptive cards. Defaults to cards. */
@@ -238,6 +240,8 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
   const catalogRows = props.accounts && hub.connections.status === 'error' ? [] : props.accounts
     ? rows.filter(row => !connectedProviders.has(row.providerId)).map(row => ({ ...row, connections: [], selectedConnectionId: null }))
     : rows
+  const retryProvider = hub.providers.status === 'ready'
+    ? hub.providers.value.find(provider => provider.providerId === hub.connectStatus.providerId) : undefined
   const selectedConnection = hub.connection
   const detailError = hub.detail.status === 'error' ? hub.detail.message
     : hub.detail.status === 'ready' && hub.detail.value.truncated
@@ -283,7 +287,10 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
     {hub.writeState.status === 'pending' ? <p role="status">Saving Hub settings…</p> : null}
     {mutationError ? <p role="alert">{mutationError}</p> : null}
     {writeMessage ? <p role={writeWarning ? 'alert' : 'status'}>{writeMessage}</p> : null}
-    {hub.connectStatus.message && hub.provider ? <p role={hub.connectStatus.status === 'failed' ? 'alert' : 'status'}>{hub.connectStatus.message}</p> : null}
+    {hub.connectStatus.status === 'failed' ? <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 text-sm text-destructive">
+      <p>{hub.connectStatus.message}</p>
+      {retryProvider ? <Button type="button" variant="outline" disabled={pending} onClick={() => hub.beginConnect(retryProvider)}>Retry connection</Button> : null}
+    </div> : hub.connectStatus.message && hub.provider ? <p role="status">{hub.connectStatus.message}</p> : null}
     {hub.provider ? <>
       {(props.accounts && selectedConnection) || selectedRow?.canConnect ? <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
         {props.accounts && selectedConnection ? <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2" data-testid="hub-account-access"

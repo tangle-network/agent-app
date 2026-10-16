@@ -1,4 +1,4 @@
-import type { HubConnection, HubPolicy, HubProvider, HubTool } from '@tangle-network/hub-sdk'
+import type { HubConnection, HubPolicy, HubPolicyDecision, HubProvider, HubTool } from '@tangle-network/hub-sdk'
 import type {
   IntegrationConnectionDetails,
   IntegrationDisplayProvider,
@@ -14,6 +14,16 @@ export type HubIntegrationCapability =
 
 /** Display hints only. `createHubSettingsRoutes.authorize` remains authoritative. */
 export type HubIntegrationCapabilities = (intent: HubIntegrationCapability) => boolean
+
+/** Display of a policy enforced by the consuming app, never browser authority. */
+export interface HubActionPolicyDisplay {
+  decision: HubPolicyDecision
+  label: string
+  sourceLabel: string
+}
+
+/** Return only policies the host enforces independently of stored Hub overrides. */
+export type HubActionPolicy = (input: { connection: HubConnection; tool: HubTool }) => HubActionPolicyDisplay | undefined
 
 export const ACTION_LIMIT = 200
 
@@ -70,12 +80,13 @@ const OPTIONS = [
   { value: 'deny', label: 'Deny' },
 ] as const
 
-/** Stored overrides are shown; app-specific effective policy is never guessed. */
+/** Host-enforced policy takes precedence; other defaults remain unknown. */
 export function permissionDetails(
   tools: readonly HubTool[],
   policies: readonly HubPolicy[],
   connectionId: string,
   can: HubIntegrationCapabilities,
+  getActionPolicy?: (tool: HubTool) => HubActionPolicyDisplay | undefined,
 ): IntegrationConnectionDetails {
   const overrides = new Map(policies.filter(policy => policy.connectionId === connectionId).map(policy => [policy.actionPath, policy.decision]))
   const groups: IntegrationPermissionGroup[] = [
@@ -86,16 +97,17 @@ export function permissionDetails(
   const reads: IntegrationPermissionDisplay[] = []
   for (const tool of tools) {
     const override = overrides.get(tool.path)
+    const enforced = getActionPolicy?.(tool)
     const row = {
       actionPath: tool.path,
       title: tool.title ?? tool.path,
       riskLabel: tool.risk ?? 'unknown',
       riskTone: tool.risk === 'destructive' ? 'error' : tool.risk === 'write' || tool.risk === undefined ? 'warning' : 'neutral',
-      decision: override ?? null,
-      decisionOptions: OPTIONS,
-      sourceLabel: override ? 'Stored override' : 'No stored override',
-      canReset: override !== undefined && can({ operation: 'policy.reset', connectionId, actionPath: tool.path }),
-      disabled: !can({ operation: 'policy.set', connectionId, actionPath: tool.path }),
+      decision: enforced?.decision ?? override ?? null,
+      decisionOptions: enforced ? [{ value: enforced.decision, label: enforced.label }] : OPTIONS,
+      sourceLabel: enforced?.sourceLabel ?? (override ? 'Stored override' : 'No stored override'),
+      canReset: !enforced && override !== undefined && can({ operation: 'policy.reset', connectionId, actionPath: tool.path }),
+      disabled: !!enforced || !can({ operation: 'policy.set', connectionId, actionPath: tool.path }),
     } as const
     if (tool.risk === 'read') reads.push(row)
     else writes.push(row)

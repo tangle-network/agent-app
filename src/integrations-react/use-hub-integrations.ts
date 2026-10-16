@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { confirmWrite, useAsyncResource, useConfirmedMutation } from '../web-react/async'
 import type { HubIntegrationsClient, HubIntegrationsIdentity } from './client'
 import { connectWithPopup, type PopupConnectResult } from './popup'
-import { ACTION_LIMIT, catalogRows, contextKey, permissionDetails, type HubIntegrationCapabilities } from './projection'
+import { ACTION_LIMIT, catalogRows, contextKey, permissionDetails, type HubActionPolicy, type HubIntegrationCapabilities } from './projection'
 
 type Selection = { scope: string; providerId: string | null; connectionId: string | null }
 type Dialog = { scope: string; kind: 'api-key' | 'oauth'; provider: HubProvider } | null
@@ -13,6 +13,8 @@ export interface UseHubIntegrationsOptions {
   client: HubIntegrationsClient
   /** Display only. The host server must authorize every exact operation. */
   can: HubIntegrationCapabilities
+  /** Display only; the host server enforces these policies. */
+  getActionPolicy?: HubActionPolicy
   /** Local app route that renders `HubConnectCallbackPage`. */
   callbackPath: string
   /** Optional host handler for custom/native signup. No Platform redirect is assumed. */
@@ -61,7 +63,7 @@ function updateUrl(providerId: string | null, connectionId: string | null): void
 }
 
 /** Identity-bound Hub settings controller; connection state is always server-read. */
-export function useHubIntegrations({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect }: UseHubIntegrationsOptions) {
+export function useHubIntegrations({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect, getActionPolicy }: UseHubIntegrationsOptions) {
   const scope = contextKey(identity)
   const activeScope = useRef(scope)
   activeScope.current = scope
@@ -194,7 +196,7 @@ export function useHubIntegrations({ identity, client, can, callbackPath, onUnsu
       connections.retry()
       setDialog(null)
       setConnectStatus({ scope, status: 'connected', message: 'Connection verified.' })
-    } else setConnectStatus({ scope, status: 'failed', message: result === 'blocked' ? 'Allow the popup and try again.' : result === 'unverified' ? 'Could not verify a new connection. Refresh and try again.' : result === 'cancelled' ? 'Connection was cancelled.' : 'This connection flow is unavailable.' })
+    } else setConnectStatus({ scope, status: 'failed', providerId: target.providerId, message: result === 'blocked' ? 'Allow the popup and try again.' : result === 'unverified' ? 'Could not verify a new connection. Refresh and try again.' : result === 'failed' ? 'Could not connect your account. Please try again.' : result === 'cancelled' ? 'Connection was cancelled.' : 'This connection flow is unavailable.' })
     return result
   }, [can, connections, client, identity, callbackPath, scope])
 
@@ -239,7 +241,7 @@ export function useHubIntegrations({ identity, client, can, callbackPath, onUnsu
     hostConnect?.providerIds),
   [providerList, connectionList, visibleSelection.providerId, visibleSelection.connectionId, can, onUnsupportedConnect, hostConnect])
   const details = detail.status === 'ready' && connection
-    ? permissionDetails(detail.value.tools, detail.value.policies, connection.id, can) : undefined
+    ? permissionDetails(detail.value.tools, detail.value.policies, connection.id, can, tool => getActionPolicy?.({ connection, tool })) : undefined
 
   return {
     providers, connections, detail, rows, provider, connection, dialog: visibleDialog, setDialog,
