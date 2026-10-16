@@ -102,9 +102,9 @@ export function ReasoningRow({
   const elapsedSeconds = thinking && start !== undefined ? Math.max(0, Math.floor((Date.now() - start) / 1000)) : 0
   const durationMs = !thinking && start !== undefined && end !== undefined && end >= start ? end - start : undefined
   const title = thinking ? (
-    // The sweep through the glyphs is the working-versus-stuck signal; reduced
-    // motion swaps it for a static underline (`.agent-shimmer` in the theme).
-    <span className="agent-shimmer" data-motion="essential">
+    // The shared reduced-motion recipe stops the sweep; the label and timer
+    // still report the observed thinking state without an animation exemption.
+    <span className="agent-shimmer">
       Thinking{elapsedSeconds >= 1 ? ` · ${elapsedSeconds}s` : '…'}
     </span>
   ) : durationMs !== undefined ? thoughtForLabel(durationMs) : 'Thought process'
