@@ -72,6 +72,7 @@ try {
       assert.ok(appended.chars > reading.chars, 'reasoning grew while reading')
       if (mode === 'baseline') {
         row.reproduced = appended.top > reading.top + 20
+        assert.ok(row.reproduced, 'original implementation reproduces forced movement')
         await page.screenshot({ path: `${output}/${name}-after-append.png` })
         continue
       }

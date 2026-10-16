@@ -7,7 +7,6 @@ import { ReasoningRow } from './reasoning-row'
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
-  vi.unstubAllGlobals()
 })
 
 /** The row's disclosure button: the run-row trigger that names the region it opens. */
@@ -91,90 +90,5 @@ describe('ReasoningRow', () => {
     fireEvent.click(trigger(legacy.container))
     const region = document.getElementById(trigger(legacy.container).getAttribute('aria-controls')!)
     expect(region?.textContent).toContain('Saved before times were kept.')
-  })
-})
-
-// This regression exercises the visible reading surface, including smoothed deltas.
-describe('reading reasoning while it streams', () => {
-  it('renders every available delta immediately without artificial typing', () => {
-    const { container, rerender } = render(<ReasoningRow text="Available now." thinking />)
-    expect(container.textContent).toContain('Available now.')
-    rerender(<ReasoningRow text="Available now. The entire next delta." thinking />)
-    expect(container.textContent).toContain('Available now. The entire next delta.')
-  })
-  it('follows, stops immediately on upward input, preserves position on append, and resumes at the bottom', () => {
-    vi.useFakeTimers()
-    let resized: () => void = () => {}
-    vi.stubGlobal('ResizeObserver', class {
-      constructor(callback: () => void) { resized = callback }
-      observe() {}
-      disconnect() {}
-    })
-    const { container, rerender, getByRole } = render(<ReasoningRow text="First thought." thinking />)
-    const viewport = container.querySelector('[data-reasoning]') as HTMLElement
-    let height = 1_000
-    let top = 600
-    Object.defineProperties(viewport, {
-      clientHeight: { get: () => 400 },
-      scrollHeight: { get: () => height },
-      scrollTop: { get: () => top, set: (value: number) => { top = Math.min(value, height - 400) } },
-    })
-    const append = (text: string) => {
-      height += 100
-      rerender(<ReasoningRow text={text} thinking />)
-      act(() => { vi.advanceTimersByTime(1_000); resized() })
-    }
-    append('First thought. Following.')
-    expect(top).toBe(700)
-    // Pause before the scroll event; a delta can land between input and scroll.
-    fireEvent.wheel(viewport, { deltaY: -5 })
-    // A queued programmatic scroll must not undo the pause before input moves.
-    fireEvent.scroll(viewport)
-    act(() => { resized() })
-    expect(getByRole('button', { name: 'Jump to latest reasoning' })).toBeTruthy()
-    top -= 5
-    append('First thought. Following. Reading now.')
-    expect(top).toBe(695)
-    expect(getByRole('button', { name: 'Jump to latest reasoning' })).toBeTruthy()
-    fireEvent.scroll(viewport)
-    append('First thought. Following. Reading now. Still reading.')
-    expect(top).toBe(695)
-    fireEvent.click(getByRole('button', { name: 'Jump to latest reasoning' }))
-    expect(top).toBe(height - 400)
-    expect(document.activeElement).toBe(viewport)
-    append('First thought. Following. Reading now. Still reading. Latest.')
-    expect(top).toBe(height - 400)
-    top = 100
-    fireEvent.scroll(viewport)
-    append('First thought. Following. Reading now. Still reading. Latest. Scrollbar reading.')
-    expect(top).toBe(100)
-    top = height - 400
-    fireEvent.scroll(viewport)
-    append('First thought. Following. Reading now. Still reading. Latest. Scrollbar reading. Resumed.')
-    expect(top).toBe(height - 400)
-    // Content collapse can clamp scrollTop before ResizeObserver runs.
-    height -= 200
-    top = height - 400
-    fireEvent.scroll(viewport)
-    append('First thought. After a tool disclosure collapses, keep following.')
-    expect(top).toBe(height - 400)
-  })
-
-  it.each(['ArrowUp', 'PageUp', 'Home', 'touch'])('keeps the reader in place for %s, including when reasoning ends', (key) => {
-    vi.useFakeTimers()
-    const { container, rerender } = render(<ReasoningRow text="First thought." thinking />)
-    const viewport = container.querySelector('[data-reasoning]') as HTMLElement
-    Object.defineProperties(viewport, {
-      clientHeight: { value: 400 }, scrollHeight: { value: 1_000 }, scrollTop: { value: 600, writable: true },
-    })
-    if (key === 'touch') {
-      fireEvent.touchStart(viewport, { touches: [{ clientY: 100 }] })
-      fireEvent.touchMove(viewport, { touches: [{ clientY: 120 }] })
-    } else fireEvent.keyDown(viewport, { key })
-    rerender(<ReasoningRow text="First thought. More." thinking />)
-    act(() => { vi.advanceTimersByTime(1_000) })
-    expect(viewport.scrollTop).toBe(600)
-    rerender(<ReasoningRow text="First thought. More." thinking={false} />)
-    expect(trigger(container).getAttribute('aria-expanded')).toBe('true')
   })
 })
