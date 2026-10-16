@@ -9,10 +9,12 @@ import {
   presentHubAction,
   type HubApprovalItem,
   type HubApprovalPhase,
+  type HubApprovalFeedback,
 } from '../hub-approvals'
 import { HUB_APPROVAL_UNKNOWN_WARNING } from '../hub-approvals/unknown'
 import { closesIn, distinctAccount, HubApprovalPhasePill, HubApprovalWaitNote, HubProviderMark, HubRawDetails, openPhaseLabel } from './parts'
 import { HubActionPreviewView } from './preview'
+import { HubPreviewFeedback } from './feedback'
 
 /** The owner's answer to one held call. `allow` also grants a standing permission. */
 export type HubApprovalDecision =
@@ -36,6 +38,7 @@ export interface HubApprovalDockProps {
   /** Bring one call to the front, e.g. after it was picked in the Approvals list. */
   focusId?: string | null
   className?: string
+  onFeedback?: (item: HubApprovalItem, feedback: HubApprovalFeedback) => Promise<void>
 }
 
 /** How long a finished call stays in the dock, so its result is seen where it was approved. */
@@ -95,7 +98,7 @@ function Progress({ item }: { item: HubApprovalItem }) {
  * permissions a host offers sit beside it. Approving shows the run in place —
  * starting, running, then the result — without leaving the conversation.
  */
-export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId, className = '' }: HubApprovalDockProps) {
+export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId, onFeedback, className = '' }: HubApprovalDockProps) {
   const now = useNow(30_000)
   // Calls that finished while this dock watched them stay with their result: a
   // success briefly, a failure until dismissed. Uncertain outcomes also stay
@@ -163,7 +166,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
   if (!active) return null
   const presentation = presentHubAction(active)
   const waitingCount = queue.filter((item) => HUB_APPROVAL_OPEN_PHASES.has(item.phase)).length
-  const choices = permissions?.(active) ?? null
+  const choices = active.executionMode === 'dry-run' ? null : permissions?.(active) ?? null
   const scopes = choices && 'scopes' in choices ? choices.scopes : []
   const chosenScope = scope ?? scopes[0]?.id ?? null
   const busy = submitting?.id === active.id
@@ -205,7 +208,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
       </div>
 
       {!collapsed && (
-        <div className="max-h-48 space-y-3 overflow-y-auto px-4 pt-3 sm:max-h-80">
+        <div className="max-h-[55vh] space-y-3 overflow-y-auto px-4 pt-3 sm:max-h-[60vh]">
           {active.bundle?.steps && active.bundle.steps.length > 0 && (
             <ol className="space-y-1 text-sm" aria-label="Steps this approval covers">
               {active.bundle.steps.map((stepItem, index) => (
@@ -220,6 +223,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
           )}
           <HubActionPreviewView preview={presentation.preview} account={active.account} />
           <HubRawDetails sections={[{ label: 'Call', value: { action: active.actionPath, input: active.input } }]} />
+          {onFeedback && <HubPreviewFeedback key={active.id} item={active} onFeedback={onFeedback} />}
         </div>
       )}
 
@@ -231,6 +235,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
           </p>
         )}
         <Progress item={active} />
+        {HUB_APPROVAL_OPEN_PHASES.has(active.phase) && active.executionMode === 'dry-run' && <p className="text-sm text-muted-foreground">Dry run. This exact payload stays held until you approve this action live.</p>}
         {error?.id === active.id && active.phase === 'waiting' && <p role="alert" className="text-sm text-[var(--surface-danger-text)]">{error.message}</p>}
         {HUB_APPROVAL_OPEN_PHASES.has(active.phase) && active.wait && <HubApprovalWaitNote wait={active.wait} />}
         {active.phase === 'blocked' && !active.wait && <p className="text-sm text-muted-foreground">The workspace owner approves this request.</p>}
@@ -268,7 +273,7 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
         <div className="flex flex-wrap items-center gap-2">
           {decidable && (
             <>
-              <Button onClick={() => void decide({ kind: 'approve' }, 'Approving…')}>Approve</Button>
+              <Button onClick={() => void decide({ kind: 'approve' }, 'Approving…')}>{active.executionMode === 'dry-run' ? 'Approve live' : 'Approve'}</Button>
               <Button variant="outline" onClick={() => void decide({ kind: 'deny' }, 'Denying…')}>Deny</Button>
               {scopes.length > 0 && (
                 <Button variant="ghost" aria-expanded={permissionsOpen} onClick={() => setPermissionsOpen((value) => !value)}>

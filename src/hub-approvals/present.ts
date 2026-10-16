@@ -168,13 +168,19 @@ function mergedFiles(declared: readonly HubActionFile[], counted: readonly HubAc
 }
 
 function emailPreview(input: Record<string, unknown>, reply: boolean): HubActionPreview {
+  const from = asRecord(input.from)
+  const htmlBody = typeof input.html === 'string' ? input.html : undefined
   return {
     kind: 'email',
     to: list(input.to ?? input.recipients),
     cc: list(input.cc),
     bcc: list(input.bcc),
     subject: text(input.subject),
-    body: text(input.body) ?? text(input.text) ?? text(input.html) ?? text(input.comment),
+    from: text(input.from) ?? text(from.email) ?? text(from.address),
+    fromName: text(input.fromName) ?? text(input.from_name) ?? text(from.name),
+    previewText: text(input.previewText) ?? text(input.preview_text) ?? text(input.preheader),
+    // The payload is evidence: retain whitespace and prefer the actual HTML part.
+    body: htmlBody ?? [input.body, input.text, input.comment].find((value): value is string => typeof value === 'string'),
     html: input.html === true || text(input.bodyType)?.toLowerCase() === 'html' || typeof input.html === 'string',
     reply,
   }
@@ -287,7 +293,7 @@ function sendEmail(verb: 'Send' | 'Save draft', reply = false): Presenter {
 
 function post(channel: 'x' | 'linkedin', reply = false): Presenter {
   return (input) => {
-    const body = text(input.text) ?? text(input.commentary) ?? ''
+    const body = typeof input.text === 'string' ? input.text : typeof input.commentary === 'string' ? input.commentary : ''
     const url = text(input.url)
     const where = channel === 'x' ? 'X' : 'LinkedIn'
     return {
@@ -298,6 +304,11 @@ function post(channel: 'x' | 'linkedin', reply = false): Presenter {
         kind: 'post',
         channel,
         text: body,
+        images: (Array.isArray(input.images) ? input.images : input.image ? [input.image] : []).flatMap((image) => {
+          const record = asRecord(image)
+          const url = text(image) ?? text(record.url)
+          return url ? [{ url, alt: text(record.alt) }] : []
+        }),
         ...(url ? { link: { url, title: text(input.title), description: text(input.description) } } : {}),
       },
     }
@@ -461,7 +472,7 @@ const PRESENTERS: Record<string, Presenter> = {
 }
 
 /** A held call in the owner's words, with the preview its integration renders. */
-export function presentHubAction(item: Pick<HubApprovalItem, 'actionPath' | 'providerId' | 'input' | 'files' | 'bundle'>): HubActionPresentation {
+export function presentHubAction(item: Pick<HubApprovalItem, 'actionPath' | 'providerId' | 'input' | 'files' | 'bundle' | 'preview'>): HubActionPresentation {
   const { provider: pathProvider, action } = splitHubActionPath(item.actionPath)
   const providerId = item.providerId || pathProvider
   const provider = { id: providerId, name: hubProviderName(providerId) }
@@ -479,7 +490,7 @@ export function presentHubAction(item: Pick<HubApprovalItem, 'actionPath' | 'pro
           preview: { kind: 'fields', fields: scalarFields(input) } as HubActionPreview,
         }
       })()
-  return { provider, ...presented, ...(item.bundle ? { title: item.bundle.title } : {}) }
+  return { provider, ...presented, ...(item.preview ? { preview: item.preview } : {}), ...(item.bundle ? { title: item.bundle.title } : {}) }
 }
 
 // ---------- receipts ----------

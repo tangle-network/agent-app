@@ -2,11 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Button } from '@tangle-network/ui/primitives'
 
-import { hubActionReceipt, presentHubAction, type HubApprovalItem } from '../hub-approvals'
+import { hubActionReceipt, presentHubAction, type HubApprovalFeedback, type HubApprovalItem } from '../hub-approvals'
 import { HUB_APPROVAL_UNKNOWN_WARNING } from '../hub-approvals/unknown'
 import { HubApprovalPhasePill, HubProviderMark, HubRawDetails, openPhaseLabel } from './parts'
 import { HubActionPreviewView } from './preview'
 import { HubActionReceiptCard } from './receipt'
+import { HubPreviewFeedback } from './feedback'
 
 export interface HubApprovalRowProps {
   item: HubApprovalItem
@@ -17,6 +18,7 @@ export interface HubApprovalRowProps {
   onReview?: (item: HubApprovalItem) => void
   /** Extra controls for settled calls; suppressed for unknown outcomes to prevent unsafe retries. */
   actions?: ReactNode
+  onFeedback?: (item: HubApprovalItem, feedback: HubApprovalFeedback) => Promise<void>
 }
 
 /**
@@ -25,7 +27,7 @@ export interface HubApprovalRowProps {
  * exact call. The decision itself lives in the dock, so the transcript stays
  * readable while a request waits.
  */
-export function HubApprovalRow({ item, expanded: controlled, onExpandedChange, onReview, actions }: HubApprovalRowProps) {
+export function HubApprovalRow({ item, expanded: controlled, onExpandedChange, onReview, actions, onFeedback }: HubApprovalRowProps) {
   const [own, setOwn] = useState(false)
   const expanded = controlled ?? own
   const ref = useRef<HTMLDivElement>(null)
@@ -74,6 +76,7 @@ export function HubApprovalRow({ item, expanded: controlled, onExpandedChange, o
                 </>
               )}
           {item.phase !== 'unknown' && actions}
+          {onFeedback && <HubPreviewFeedback key={item.id} item={item} onFeedback={onFeedback} />}
         </div>
       )}
       {!expanded && actions && (item.phase === 'expired' || item.phase === 'failed') && (
