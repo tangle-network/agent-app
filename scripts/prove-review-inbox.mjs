@@ -34,7 +34,9 @@ const fixtures = kinds.map((kind, index) => {
   const preview = kind === 'hub' ? { kind: 'email', from: input.from, to: input.to, cc: [], bcc: [], subject: input.subject, body: input.body, html: false, reply: false }
     : kind === 'work-product' ? undefined : { kind: 'post', channel: kind === 'asset' ? 'instagram' : 'x', text: input.text,
       ...(kind === 'asset' ? { placement: 'feed', media: [{ kind: 'image', src: image, alt: 'Local Sandbox asset fixture', width: 1, height: 1 }] } : {}) }
-  const provenance = { profileHash: 'fixture-profile-' + index, runId: 'fixture-turn-' + index, servingModels: ['fixture/vendor/model-long-name'], producedAt: index + 1 }
+  // Match the compact unknown provenance of the retained failing GTM phone record.
+  const provenance = index === 0 ? { profileHash: '', runId: '', servingModels: [], producedAt: index + 1 }
+    : { profileHash: 'fixture-profile-' + index, runId: 'fixture-turn-' + index, servingModels: ['fixture/vendor/model-long-name'], producedAt: index + 1 }
   const workProduct = kind === 'work-product' ? {
     id: 'fixture-work-product-' + index, workspaceId: 'fixture-workspace', scopeKey: 'fixture-scope-' + index, status: 'ready', version: 1,
     artifact: { kind: 'document', title: 'A retained work product with a long phone review title', content: input.content, baseline: { content: 'Prior retained brief.' } },
