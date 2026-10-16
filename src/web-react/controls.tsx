@@ -180,7 +180,7 @@ const POPOVER_PATH_SEPARATOR = '/'
  * so bind the synchronous hook only where there is a DOM and the effect hook
  * elsewhere — placement never runs on the server either way.
  */
-const useBrowserLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : useEffect
+export const useBrowserLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : useEffect
 
 export interface PopoverSurfaceProps {
   open: boolean

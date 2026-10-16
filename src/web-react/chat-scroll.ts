@@ -1,4 +1,5 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useBrowserLayoutEffect } from './controls'
 
 /** Follow a growing transcript only while its reader stays at the bottom.
  * Bind the refs to the scrolling viewport and its content. ResizeObserver also
@@ -27,7 +28,7 @@ export function useChatScroll() {
     viewport?.focus({ preventScroll: true })
   }, [viewport, follow, scrollToBottom])
 
-  useLayoutEffect(() => {
+  useBrowserLayoutEffect(() => {
     if (!viewport || !content) return
     if (!followingRef.current) viewport.scrollTop = previousTop.current
     previousTop.current = viewport.scrollTop
