@@ -18,7 +18,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { RunRowShell } from '@tangle-network/ui/run'
 import { Markdown } from '@tangle-network/ui/markdown'
 import { BrainGlyph } from './controls'
-import { useSmoothText } from './smooth-text'
+import { Button } from '@tangle-network/ui/primitives'
+import { useChatScroll } from './chat-scroll'
 
 /** Props for {@link ReasoningRow}: the fields of a `ChatReasoningState`, plus presentation. */
 export interface ReasoningRowProps {
@@ -60,7 +61,7 @@ function useSecondTick(active: boolean): void {
   }, [active])
 }
 
-const defaultRenderText = (text: string) => <Markdown>{text}</Markdown>
+const defaultRenderText = (text: string) => <Markdown className="text-base leading-relaxed">{text}</Markdown>
 
 /** The model's reasoning for one message: live while it thinks, collapsed once it answers. */
 export function ReasoningRow({
@@ -73,9 +74,7 @@ export function ReasoningRow({
   className,
 }: ReasoningRowProps) {
   const thinking = thinkingProp ?? (startedAt !== undefined && endedAt === undefined)
-  // Bursty deltas (a whole summary part at once) type out instead of popping in.
-  const shown = useSmoothText(text, thinking)
-  const body = useMemo(() => renderText(shown), [renderText, shown])
+  const body = useMemo(() => renderText(text), [renderText, text])
 
   // Without the stream's timestamps, time the run from what this row saw:
   // the first reasoning it showed while thinking to the first render after.
@@ -95,23 +94,17 @@ export function ReasoningRow({
   // Open while thinking, closed once the answer starts; a reader's click
   // outranks that default from then on, across every later delta.
   const [toggled, setToggled] = useState<boolean | null>(null)
-  const open = toggled ?? (thinking || defaultOpen)
-
-  // Keep the newest reasoning in view while it streams.
-  const scrollRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const el = scrollRef.current
-    if (el && thinking) el.scrollTop = el.scrollHeight
-  }, [shown, thinking])
+  const { viewportRef, contentRef, following, jumpToLatest } = useChatScroll()
+  const open = toggled ?? (thinking || defaultOpen || !following)
 
   if (!visible) return null
 
   const elapsedSeconds = thinking && start !== undefined ? Math.max(0, Math.floor((Date.now() - start) / 1000)) : 0
   const durationMs = !thinking && start !== undefined && end !== undefined && end >= start ? end - start : undefined
   const title = thinking ? (
-    // The sweep through the glyphs is the working-versus-stuck signal; reduced
-    // motion swaps it for a static underline (`.agent-shimmer` in the theme).
-    <span className="agent-shimmer" data-motion="essential">
+    // The shared reduced-motion recipe stops the sweep; the label and timer
+    // still report the observed thinking state without an animation exemption.
+    <span className="agent-shimmer">
       Thinking{elapsedSeconds >= 1 ? ` · ${elapsedSeconds}s` : '…'}
     </span>
   ) : durationMs !== undefined ? thoughtForLabel(durationMs) : 'Thought process'
@@ -128,13 +121,23 @@ export function ReasoningRow({
       onOpenChange={setToggled}
     >
       <div
-        ref={scrollRef}
+        ref={viewportRef}
+        tabIndex={0}
+        role="region"
+        aria-label="Reasoning"
         data-reasoning={thinking ? 'thinking' : 'settled'}
         aria-busy={thinking || undefined}
-        className="max-h-48 overflow-y-auto px-3 py-2.5 text-sm leading-relaxed text-muted-foreground"
+        className="max-h-[min(28rem,60dvh)] overflow-y-auto overscroll-contain px-4 py-4 text-base leading-relaxed text-foreground"
       >
-        {body}
+        <div ref={contentRef} className="min-w-0 break-words">{body}</div>
       </div>
+      {!following && (
+        <div className="flex justify-end px-4 pb-3">
+          <Button type="button" variant="outline" aria-label="Jump to latest reasoning" onClick={jumpToLatest}>
+            Jump to latest
+          </Button>
+        </div>
+      )}
     </RunRowShell>
   )
 }
