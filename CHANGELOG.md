@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.178
+
+- feat(agent-profiles): shared self-mount storage adapters — every product is 3 lines (#1128)
+- feat(hub-approvals): preview held effects and capture review feedback (#1129)
+
 ## 0.60.177
 
 - fix(chat): sync release cohort and generated API docs (#1127)
