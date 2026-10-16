@@ -175,6 +175,17 @@ export function catalogIdsForModel(model: ModelInfo): string[] {
   return [...ids]
 }
 
+// Live model routing by allow-list: the positive form of model_not_allowed.
+// Parse the set the router's refusal already names, reroute within the
+// product's fallback order, or refuse loudly naming the set.
+export {
+  parseModelNotAllowed,
+  resolveModelWithinAllowList,
+  formatModelNotAllowedRefusal,
+  type ResolveModelWithinAllowListInput,
+  type ModelWithinAllowListResolution,
+} from './allow-list'
+
 // Reactive failover for the case validation cannot catch: a model that IS in the
 // catalog but whose upstream is down. Catalog membership is not liveness.
 export {

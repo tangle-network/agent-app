@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_135 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -69,7 +69,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
 | [`./legibility/cli`](api/legibility-cli.md) | 0 | `signoff` |
 | [`./missions`](api/missions.md) | 65 | — |
-| [`./model-resolution`](api/model-resolution.md) | 24 | — |
+| [`./model-resolution`](api/model-resolution.md) | 29 | — |
 | [`./object-store`](api/object-store.md) | 20 | `crypto` |
 | [`./openui`](api/openui.md) | 35 | `web` |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
@@ -103,9 +103,10 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./signoff/cli`](api/signoff-cli.md) | 2 | — |
 | [`./signoff/proof`](api/signoff-proof.md) | 22 | — |
 | [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | — |
-| [`./skills`](api/skills.md) | 27 | — |
+| [`./skills`](api/skills.md) | 42 | — |
 | [`./skills-placement`](api/skills-placement.md) | 9 | `harness`, `skills` |
-| [`./spend`](api/spend.md) | 60 | `sandbox` |
+| [`./skills/marketplace-drizzle`](api/skills-marketplace-drizzle.md) | 2 | — |
+| [`./spend`](api/spend.md) | 65 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
 | [`./stream`](api/stream.md) | 67 | `interactions`, `plans` |
@@ -120,6 +121,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./theme-contract`](api/theme-contract.md) | 4 | `legibility`, `signoff` |
 | [`./theme-contract/cli`](api/theme-contract-cli.md) | 0 | `legibility`, `signoff` |
 | [`./theme/tailwind-preset`](api/theme-tailwind-preset.md) | 1 | — |
+| [`./toolbelt`](api/toolbelt.md) | 11 | — |
 | [`./tools`](api/tools.md) | 66 | `crypto`, `eval`, `openui` |
 | [`./trace`](api/trace.md) | 33 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting`, `launch-invariants` |
@@ -720,9 +722,9 @@ Source: `src/missions/index.ts` · 65 exports
 
 ## `./model-resolution`
 
-Source: `src/model-resolution/index.ts` · 24 exports
+Source: `src/model-resolution/index.ts` · 29 exports
 
-`buildModelChain`, `catalogIdsForModel`, `ChatModelSource`, `ChatModelValidationFailure`, `ChatModelValidationResult`, `ChatModelValidationSuccess`, `cleanModelId`, `isUpstreamUnavailable`, `isWellFormedModelId`, `LoadModels`, `ModelFailoverAttempt`, `ModelFailoverExhaustedError`, `ModelFailoverResult`, `ModelInfo`, `readHttpStatusHint`, `resolveChatModel`, `ResolveChatModelInput`, `ResolvedChatModel`, `runWithModelFailover`, `RunWithModelFailoverInput`, `UPSTREAM_UNAVAILABLE_CODES`, `UPSTREAM_UNAVAILABLE_STATUSES`, `validateChatModelId`, `ValidateChatModelIdInput`
+`buildModelChain`, `catalogIdsForModel`, `ChatModelSource`, `ChatModelValidationFailure`, `ChatModelValidationResult`, `ChatModelValidationSuccess`, `cleanModelId`, `formatModelNotAllowedRefusal`, `isUpstreamUnavailable`, `isWellFormedModelId`, `LoadModels`, `ModelFailoverAttempt`, `ModelFailoverExhaustedError`, `ModelFailoverResult`, `ModelInfo`, `ModelWithinAllowListResolution`, `parseModelNotAllowed`, `readHttpStatusHint`, `resolveChatModel`, `ResolveChatModelInput`, `ResolvedChatModel`, `resolveModelWithinAllowList`, `ResolveModelWithinAllowListInput`, `runWithModelFailover`, `RunWithModelFailoverInput`, `UPSTREAM_UNAVAILABLE_CODES`, `UPSTREAM_UNAVAILABLE_STATUSES`, `validateChatModelId`, `ValidateChatModelIdInput`
 
 [Full API →](api/model-resolution.md)
 
@@ -1036,9 +1038,9 @@ _No public exports._
 
 ## `./skills`
 
-Source: `src/skills/index.ts` · 27 exports
+Source: `src/skills/index.ts` · 42 exports
 
-`assertSkillDeliveryDisjoint`, `ComposedSkills`, `composeShellResources`, `ComposeShellResourcesInput`, `composeSkills`, `ComposeSkillsInput`, `CorpusEntry`, `CorpusLoadResult`, `corpusSkills`, `GlobModules`, `LoadCorpusOptions`, `loadMarkdownCorpus`, `mergeComposedSkills`, `parseCorpusSkills`, `ParsedSkill`, `parseSkillFrontmatter`, `registrySkills`, `renderInlineSkills`, `RenderInlineSkillsInput`, `renderSkillIndex`, `RenderSkillIndexInput`, `SkillDeliveryMode`, `SkillEntry`, `skillEntryFromMarkdown`, `SkillFrontmatter`, `skillMountPath`, `skillRefs`
+`assertSkillDeliveryDisjoint`, `CatalogSkillEntry`, `ComposedSkills`, `composeShellResources`, `ComposeShellResourcesInput`, `composeSkills`, `ComposeSkillsInput`, `CorpusEntry`, `CorpusLoadResult`, `corpusSkills`, `createInMemoryMarketplaceStore`, `createKVMarketplaceStore`, `createStaticMarketplaceStore`, `GlobModules`, `LoadCorpusOptions`, `loadMarkdownCorpus`, `marketplaceDiscoveryLine`, `MarketplaceRow`, `marketplaceRowsFor`, `MarketplaceSkill`, `MarketplaceStore`, `MAX_MARKETPLACE_ENTRIES`, `mergeComposedSkills`, `mergeSkillCatalogs`, `namespacedSkillId`, `parseCorpusSkills`, `ParsedSkill`, `parseNamespacedSkillId`, `parseSkillFrontmatter`, `registrySkills`, `renderInlineSkills`, `RenderInlineSkillsInput`, `renderSkillIndex`, `RenderSkillIndexInput`, `SkillDeliveryMode`, `SkillEntry`, `skillEntryFromMarkdown`, `SkillFrontmatter`, `skillMountPath`, `skillRefs`, `validateMarketplaceCatalog`, `validateMarketplaceSkill`
 
 [Full API →](api/skills.md)
 
@@ -1052,13 +1054,21 @@ Depends on: `harness`, `skills`
 
 [Full API →](api/skills-placement.md)
 
+## `./skills/marketplace-drizzle`
+
+Source: `src/skills/marketplace-drizzle.ts` · 2 exports
+
+`createDrizzleMarketplaceStore`, `marketplaceSkillTable`
+
+[Full API →](api/skills-marketplace-drizzle.md)
+
 ## `./spend`
 
-Source: `src/spend/index.ts` · 60 exports
+Source: `src/spend/index.ts` · 65 exports
 
 Depends on: `sandbox`
 
-`AllExcludedAssessment`, `AllExcludedBasis`, `assertComputeBudget`, `assertSpendWindow`, `assessAllExcluded`, `BilledDurationBasis`, `boxLivenessInWindow`, `BoxLivenessOptions`, `BoxRateResolver`, `CeilingBasis`, `chargeNanoUsd`, `ComputeBudget`, `ComputeBudgetExceededError`, `ComputeBudgetRefusal`, `computeExpectedCeiling`, `ComputeExpectedCeilingOptions`, `createInMemorySpendLedgerStore`, `createSandboxSpendHooks`, `createSpendLedger`, `decideBoxOwnership`, `DEFAULT_CEILING_TOLERANCE_MS`, `DEFAULT_EXPECTATION_GRACE_MS`, `ExpectedCeiling`, `foldSpendBoxRecord`, `formatSpendReport`, `InMemorySpendLedgerStore`, `isCharge`, `ObservedBalance`, `ObserveSandboxInput`, `ownedByBillingKeys`, `parseSandboxGroupKey`, `parseSettlementReference`, `reconcileSpend`, `ReconcileSpendOptions`, `SandboxSpendHooksOptions`, `SandboxSpendSeam`, `SettlementReference`, `SettlementRow`, `settlementSandboxId`, `SPEND_CHECKS`, `SpendBoxLiveness`, `SpendBoxPatch`, `SpendBoxRecord`, `SpendCheckId`, `SpendCoverage`, `SpendExpectationSummary`, `SpendFinding`, `SpendLedger`, `SpendLedgerOptions`, `SpendLedgerStorePort`, `SpendOwnershipCandidate`, `SpendOwnershipRule`, `SpendOwnershipSummary`, `SpendOwnershipVerdict`, `SpendProvisionObservation`, `SpendReport`, `spendReportToJson`, `SpendWindow`, `undeclaredExpectation`, `VelocityOptions`
+`AllExcludedAssessment`, `AllExcludedBasis`, `assertComputeBudget`, `assertSpendWindow`, `assessAllExcluded`, `BilledDurationBasis`, `boxLivenessInWindow`, `BoxLivenessOptions`, `BoxRateResolver`, `CeilingBasis`, `chargeNanoUsd`, `ComputeBudget`, `ComputeBudgetExceededError`, `ComputeBudgetRefusal`, `computeExpectedCeiling`, `ComputeExpectedCeilingOptions`, `createInMemorySpendLedgerStore`, `createSandboxSpendHooks`, `createSpendLedger`, `decideBoxOwnership`, `DEFAULT_CEILING_TOLERANCE_MS`, `DEFAULT_EXPECTATION_GRACE_MS`, `DeriveChildKeyBudgetInput`, `deriveChildKeyBudgetUsd`, `DerivedChildKeyBudget`, `ExpectedCeiling`, `foldSpendBoxRecord`, `formatSpendReport`, `InMemorySpendLedgerStore`, `isCharge`, `MIN_CHILD_KEY_BUDGET_USD`, `ObservedBalance`, `ObserveSandboxInput`, `ownedByBillingKeys`, `ParentBudgetExhaustedError`, `parseSandboxGroupKey`, `parseSettlementReference`, `reconcileSpend`, `ReconcileSpendOptions`, `SandboxSpendHooksOptions`, `SandboxSpendSeam`, `SettlementReference`, `SettlementRow`, `settlementSandboxId`, `SPEND_CHECKS`, `SpendBoxLiveness`, `SpendBoxPatch`, `SpendBoxRecord`, `SpendCheckId`, `SpendCoverage`, `SpendExpectationSummary`, `SpendFinding`, `SpendLedger`, `SpendLedgerOptions`, `SpendLedgerStorePort`, `SpendOwnershipCandidate`, `SpendOwnershipRule`, `SpendOwnershipSummary`, `SpendOwnershipVerdict`, `SpendProvisionObservation`, `SpendReport`, `spendReportToJson`, `SpendWindow`, `undeclaredExpectation`, `VelocityOptions`
 
 [Full API →](api/spend.md)
 
@@ -1183,6 +1193,14 @@ Source: `src/theme/tailwind-preset.ts` · 1 exports
 `default`
 
 [Full API →](api/theme-tailwind-preset.md)
+
+## `./toolbelt`
+
+Source: `src/toolbelt/index.ts` · 11 exports
+
+`assertToolbeltParity`, `formatToolbeltParityDiff`, `ProbedTool`, `probeStdioToolProgram`, `ProbeStdioToolProgramOptions`, `ToolbeltFieldDrift`, `ToolbeltManifestTool`, `toolbeltParityDiff`, `ToolbeltParityDiff`, `ToolbeltParityError`, `ToolProgramProbe`
+
+[Full API →](api/toolbelt.md)
 
 ## `./tools`
 
