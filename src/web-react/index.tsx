@@ -83,6 +83,8 @@ export * from './record-grid'
 export * from './command-palette'
 export * from './sparkline'
 export * from './insight-card'
+export { ReviewInbox, type ReviewInboxItem, type ReviewInboxFeedback, type ReviewInboxProps } from './review-inbox'
+export { ReviewFeedbackForm, type ReviewFeedbackFormProps, type ReviewFeedbackFormHandle, type ReviewFeedbackDraft, type ReviewVerdict } from '../hub-approvals-react/feedback'
 export * from './use-dictation'
 export {
   usePopover,
