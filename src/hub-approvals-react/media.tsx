@@ -45,15 +45,17 @@ function MediaAsset({ media, active = true, fit = 'cover' }: { media: HubPreview
     let visible = false
     const update = () => {
       element.loop = !preference.matches
-      if (active && visible && !preference.matches && !document.hidden) void element.play().catch(() => {})
-      else element.pause()
+      if (!active || !visible || document.hidden) element.pause()
+      else if (!preference.matches) void element.play().catch(() => {})
     }
     const observer = new IntersectionObserver(([entry]) => { visible = entry?.isIntersecting ?? false; update() })
     observer.observe(element)
-    preference.addEventListener('change', update)
+    // Reduced motion disables autoplay, while the native Play control stays usable.
+    const preferenceChanged = () => { if (preference.matches) element.pause(); update() }
+    preference.addEventListener('change', preferenceChanged)
     document.addEventListener('visibilitychange', update)
     return () => {
-      observer.disconnect(); preference.removeEventListener('change', update)
+      observer.disconnect(); preference.removeEventListener('change', preferenceChanged)
       document.removeEventListener('visibilitychange', update); element.pause()
     }
   }, [source, active])
