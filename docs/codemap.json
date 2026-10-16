@@ -22381,6 +22381,12 @@
           "doc": "Define methods to retrieve and enforce user access permissions within workspaces"
         },
         {
+          "name": "WorkspaceAccessReader",
+          "kind": "interface",
+          "signature": "interface WorkspaceAccessReader",
+          "doc": "Authorization fields consumed by membership writers; products own their access policy."
+        },
+        {
           "name": "WorkspaceAccessTable",
           "kind": "interface",
           "signature": "interface WorkspaceAccessTable",

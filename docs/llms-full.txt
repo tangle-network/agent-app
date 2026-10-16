@@ -28973,6 +28973,14 @@ interface WorkspaceAccess
 interface WorkspaceAccessApi
 ```
 
+### `WorkspaceAccessReader`
+
+`interface` — Authorization fields consumed by membership writers; products own their access policy.
+
+```ts
+interface WorkspaceAccessReader
+```
+
 ### `WorkspaceAccessTable`
 
 `interface` — The product's workspace table, narrowed to the columns the access joins read.

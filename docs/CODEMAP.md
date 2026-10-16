@@ -113,7 +113,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./studio-react`](api/studio-react.md) | 48 | `runtime`, `studio`, `web-react` |
 | [`./teams`](api/teams.md) | 35 | — |
 | [`./teams-react`](api/teams-react.md) | 10 | `brand`, `teams` |
-| [`./teams/drizzle`](api/teams-drizzle.md) | 26 | — |
+| [`./teams/drizzle`](api/teams-drizzle.md) | 27 | — |
 | [`./teams/invitations-api`](api/teams-invitations-api.md) | 13 | — |
 | [`./teams/members-api`](api/teams-members-api.md) | 9 | — |
 | [`./theme`](api/theme.md) | 6 | — |
@@ -1128,9 +1128,9 @@ Depends on: `brand`, `teams`
 
 ## `./teams/drizzle`
 
-Source: `src/teams/drizzle.ts` · 26 exports
+Source: `src/teams/drizzle.ts` · 27 exports
 
-`CreateAccessOptions`, `createEnsurePersonalOrganization`, `createOrganizationAccess`, `CreateOrganizationAccessOptions`, `CreatePersonalOrganizationOptions`, `createTeamTables`, `CreateTeamTablesOptions`, `createWorkspaceAccess`, `createWorkspaceInvitationTable`, `CreateWorkspaceInvitationTableOptions`, `EnsurePersonalOrganizationUser`, `OrganizationAccess`, `OrganizationAccessApi`, `OrganizationMemberRow`, `OrganizationRow`, `PersonalOrganizationResult`, `TeamDatabase`, `TeamParentTable`, `TeamTables`, `UserWorkspaceSummary`, `WorkspaceAccess`, `WorkspaceAccessApi`, `WorkspaceAccessTable`, `WorkspaceInvitationRow`, `WorkspaceInvitationTables`, `WorkspaceMemberRow`
+`CreateAccessOptions`, `createEnsurePersonalOrganization`, `createOrganizationAccess`, `CreateOrganizationAccessOptions`, `CreatePersonalOrganizationOptions`, `createTeamTables`, `CreateTeamTablesOptions`, `createWorkspaceAccess`, `createWorkspaceInvitationTable`, `CreateWorkspaceInvitationTableOptions`, `EnsurePersonalOrganizationUser`, `OrganizationAccess`, `OrganizationAccessApi`, `OrganizationMemberRow`, `OrganizationRow`, `PersonalOrganizationResult`, `TeamDatabase`, `TeamParentTable`, `TeamTables`, `UserWorkspaceSummary`, `WorkspaceAccess`, `WorkspaceAccessApi`, `WorkspaceAccessReader`, `WorkspaceAccessTable`, `WorkspaceInvitationRow`, `WorkspaceInvitationTables`, `WorkspaceMemberRow`
 
 [Full API →](api/teams-drizzle.md)
 
