@@ -19,16 +19,23 @@ export function HubPreviewFeedback({ item, onFeedback, drafts }: HubPreviewFeedb
   const prior = saved?.editedInput && typeof saved.editedInput === 'object' && !Array.isArray(saved.editedInput)
     ? saved.editedInput as Record<string, unknown> : original
   const kind = presentHubAction(item).preview.kind
+  const container = kind === 'post' && original.container && typeof original.container === 'object' && !Array.isArray(original.container)
+    ? original.container as Record<string, unknown> : null
+  const nestedCaption = container && typeof container.caption === 'string'
+  const copyField = ['text', 'commentary', 'caption', 'message', 'title'].find((key) => typeof original[key] === 'string')
+  const editablePost = kind === 'post' && (nestedCaption || copyField)
   const field = kind === 'email'
     ? typeof original.html === 'string' ? 'html' : typeof original.body === 'string' ? 'body' : 'text'
-    : typeof original.commentary === 'string' ? 'commentary' : 'text'
+    : nestedCaption ? 'caption' : copyField ?? 'text'
+  const priorText = nestedCaption && prior.container && typeof prior.container === 'object'
+    ? (prior.container as Record<string, unknown>)[field] : prior[field]
   const draft = drafts?.get(item.id)
   const [score, setScore] = useState(draft?.score ?? (saved ? String(saved.score) : ''))
   const [comment, setComment] = useState(draft?.comment ?? saved?.comment ?? '')
   const [editing, setEditing] = useState(draft?.editing ?? false)
   const [edited, setEdited] = useState(draft?.edited ?? saved?.editedInput !== undefined)
   const [subject, setSubject] = useState(draft?.subject ?? String(prior.subject ?? ''))
-  const [body, setBody] = useState(draft?.body ?? String(prior[field] ?? ''))
+  const [body, setBody] = useState(draft?.body ?? String(priorText ?? ''))
   const [payload, setPayload] = useState(draft?.payload ?? JSON.stringify(prior, null, 2))
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState((draft ? draft.saved : saved) ? 'Feedback saved' : '')
@@ -47,7 +54,7 @@ export function HubPreviewFeedback({ item, onFeedback, drafts }: HubPreviewFeedb
     try {
       const editedInput: unknown = edited
         ? kind === 'email' ? { ...original, subject, [field]: body }
-          : kind === 'post' ? { ...original, [field]: body } : JSON.parse(payload)
+          : editablePost ? nestedCaption ? { ...original, container: { ...container, [field]: body } } : { ...original, [field]: body } : JSON.parse(payload)
         : saved?.editedInput
       await onFeedback(item, { score: Number(score), comment,
         ...(editedInput !== undefined && JSON.stringify(editedInput) !== JSON.stringify(item.input) ? { editedInput } : {}) })
@@ -74,7 +81,7 @@ export function HubPreviewFeedback({ item, onFeedback, drafts }: HubPreviewFeedb
       {editing && <div className="space-y-3">
         <p className="text-sm text-muted-foreground">Your edit is saved as a teaching example. Live approval applies to the original held payload.</p>
         {kind === 'email' && <div className="space-y-1"><Label htmlFor={`${id}-subject`}>Subject</Label><Input id={`${id}-subject`} value={subject} disabled={busy} onChange={(event) => { setSubject(event.target.value); setEdited(true); setStatus('') }} /></div>}
-        {kind === 'email' || kind === 'post'
+        {kind === 'email' || editablePost
           ? <div className="space-y-1"><Label htmlFor={`${id}-body`}>{kind === 'email' ? 'Body' : 'Post text'}</Label><Textarea id={`${id}-body`} value={body} rows={6} disabled={busy} onChange={(event) => { setBody(event.target.value); setEdited(true); setStatus('') }} /></div>
           : <div className="space-y-1"><Label htmlFor={`${id}-payload`}>Payload</Label><Textarea id={`${id}-payload`} value={payload} rows={6} disabled={busy} onChange={(event) => { setPayload(event.target.value); setEdited(true); setStatus('') }} /></div>}
       </div>}

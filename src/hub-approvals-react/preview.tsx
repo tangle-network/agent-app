@@ -4,6 +4,7 @@ import { ApprovalDiffSummary } from '@tangle-network/ui/run'
 import { formatMinorAmount, formatWhen, type HubActionPreview } from '../hub-approvals'
 import { Chip, HubFieldList } from './parts'
 import { EmailPreview, embeddedPreviewImage, linkedText } from './email'
+import { HubMediaPreview } from './media'
 
 function initial(name: string | null | undefined): string {
   return (name?.trim().replace(/^@/, '').charAt(0) || '?').toUpperCase()
@@ -202,7 +203,9 @@ export function HubActionPreviewView({ preview, account }: { preview: HubActionP
     case 'email':
       return <EmailPreview preview={preview} account={account} />
     case 'post':
-      return <PostPreview preview={preview} account={account} />
+      return preview.channel !== 'slack' && (preview.media?.length || preview.placement)
+        ? <HubMediaPreview preview={preview} account={account} />
+        : <PostPreview preview={preview} account={account} />
     case 'ad':
       return (
         <Panel className="overflow-hidden">
