@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.182
+
+- feat: the fleet lift — toolbelt parity gate, budget-derived mint, allow-list routing, skill marketplace (#1132)
+
 ## 0.60.181
 
 - fix(teams): accept invitations atomically across workspace transfers
