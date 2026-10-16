@@ -61,3 +61,11 @@ The maintained owner is the existing SharedPrimitives story and
 `interaction-evidence.ts`, registered in `.storybook/critical-components.json`.
 No separate benchmark service, copied budget constants or new CI gate exists.
 Media is outside the package `files` allowlist (`dist`, `bin`, `.claude/skills`).
+
+## Later checked dismissal cohort
+
+[UI11.38.1 consumer evidence](dismiss-ui-11.38.1/README.md) records the separate
+6d6e4bd9 public-theme composition fix and affected dialog proof. The older media
+and manifest above retain their original de38/UI11.37 identity. Their full-page
+screenshot recording artifact leaves motion appearance unqualified; functional
+and scoped geometry observations remain as recorded.
