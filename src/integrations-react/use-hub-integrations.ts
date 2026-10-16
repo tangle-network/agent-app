@@ -233,7 +233,7 @@ export function useHubIntegrations({ identity, client, can, callbackPath, onUnsu
     pendingPopup.current?.abort()
     pendingPopup.current = null
     setDialog(null)
-    setConnectStatus({ scope, status: 'failed', message: 'Connection was cancelled.' })
+    setConnectStatus(current => ({ scope, status: 'failed', providerId: current.scope === scope ? current.providerId : undefined, message: 'Connection was cancelled.' }))
   }, [scope])
 
   const rows = useMemo(() => catalogRows(providerList, connectionList, visibleSelection.providerId && visibleSelection.connectionId
