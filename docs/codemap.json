@@ -171,16 +171,34 @@
           "doc": "The per-turn text overlay is validated without admitting tools, model, MCP or resources."
         },
         {
+          "name": "createDrizzleSelfMountStorage",
+          "kind": "function",
+          "signature": "(db: any, table: SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name: \"scop…",
+          "doc": "A drizzle-backed SelfMountStorage against any table with the standard shape (scope primary key + mounted JSON text column)."
+        },
+        {
           "name": "createInMemorySelfMountStorage",
           "kind": "function",
           "signature": "() => SelfMountStorage",
           "doc": "Non-durable default for tests and single-instance products."
         },
         {
+          "name": "createKVSelfMountStorage",
+          "kind": "function",
+          "signature": "(kv: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void>; }, prefix: string, bas…",
+          "doc": "A KV-backed SelfMountStorage (Cloudflare KV, any namespace)."
+        },
+        {
           "name": "createMountProfileChangeTool",
           "kind": "function",
           "signature": "(deps: MountProfileChangeDeps) => AppToolDefinition<Record<string, unknown>>",
           "doc": "The permitted, idempotent self-mount verb as an app tool."
+        },
+        {
+          "name": "createProductSelfMount",
+          "kind": "function",
+          "signature": "(config: ProductSelfMountConfig) => AppToolDefinition<Record<string, unknown>>",
+          "doc": null
         },
         {
           "name": "createTextProfile",
@@ -235,6 +253,12 @@
           "kind": "const",
           "signature": "readonly [\"skills\"]",
           "doc": "The only profile dimensions an agent may change on its own mounted state."
+        },
+        {
+          "name": "ProductSelfMountConfig",
+          "kind": "interface",
+          "signature": "interface ProductSelfMountConfig",
+          "doc": "The one-call product wiring: catalog + storage + baseline + cap."
         },
         {
           "name": "PROFILE_CHANGE_POLICY",
@@ -445,6 +469,12 @@
           "kind": "interface",
           "signature": "interface SelfMountStorage",
           "doc": "Durable mounted-skill state, keyed by the product's scope."
+        },
+        {
+          "name": "selfMountTable",
+          "kind": "function",
+          "signature": "(tableName: string) => SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name:…",
+          "doc": "Create (or use) the standard self-mount table in a drizzle/D1 database."
         },
         {
           "name": "serializeProfileRevisionDiff",
@@ -8320,6 +8350,12 @@
           "doc": "What a decided call did, as its receipt shows it."
         },
         {
+          "name": "HubApprovalFeedback",
+          "kind": "interface",
+          "signature": "interface HubApprovalFeedback",
+          "doc": "The host authenticates the reviewer, binds provenance and computes the edit diff."
+        },
+        {
           "name": "HubApprovalItem",
           "kind": "interface",
           "signature": "interface HubApprovalItem",
@@ -8350,6 +8386,12 @@
           "doc": "Whether an open call waits for the owner, in the owner's words."
         },
         {
+          "name": "HubPreviewMedia",
+          "kind": "interface",
+          "signature": "interface HubPreviewMedia",
+          "doc": "Frozen media bytes supplied by the host; renderers never resolve a provider URL."
+        },
+        {
           "name": "hubProviderName",
           "kind": "function",
           "signature": "(id: string) => string",
@@ -8364,7 +8406,7 @@
         {
           "name": "presentHubAction",
           "kind": "function",
-          "signature": "(item: Pick<HubApprovalItem, \"input\" | \"actionPath\" | \"providerId\" | \"files\" | \"bundle\">) => HubActionPresentation",
+          "signature": "(item: Pick<HubApprovalItem, \"input\" | \"actionPath\" | \"providerId\" | \"files\" | \"bundle\" | \"preview\">) => HubActionPrese…",
           "doc": "A held call in the owner's words, with the preview its integration renders."
         },
         {
@@ -8422,7 +8464,7 @@
         {
           "name": "HubApprovalDock",
           "kind": "function",
-          "signature": "({ items, onDecide, permissions, onOpen, focusId, className }: HubApprovalDockProps) => Element | null",
+          "signature": "({ items, onDecide, permissions, onOpen, focusId, onFeedback, className }: HubApprovalDockProps) => Element | null",
           "doc": "The calls waiting on the owner, pinned above the composer so a held action never scrolls away."
         },
         {
@@ -8458,7 +8500,7 @@
         {
           "name": "HubApprovalRow",
           "kind": "function",
-          "signature": "({ item, expanded: controlled, onExpandedChange, onReview, actions }: HubApprovalRowProps) => Element",
+          "signature": "({ item, expanded: controlled, onExpandedChange, onReview, actions, onFeedback }: HubApprovalRowProps) => Element",
           "doc": "A held call where the agent made it: one line with the integration, what the call does and where it stands, opening to its preview, result and the exact call."
         },
         {
@@ -8486,16 +8528,58 @@
           "doc": "Why an open call waits for the owner, or how it will run without them."
         },
         {
+          "name": "HubPreviewFeedback",
+          "kind": "function",
+          "signature": "({ item, onFeedback, drafts }: HubPreviewFeedbackProps) => Element",
+          "doc": "Existing Hub adapter: teaching never calls the effect transport."
+        },
+        {
+          "name": "HubPreviewFeedbackProps",
+          "kind": "interface",
+          "signature": "interface HubPreviewFeedbackProps",
+          "doc": null
+        },
+        {
           "name": "HubProviderMark",
           "kind": "function",
           "signature": "({ providerId, name, size }: { providerId: string; name: string; size?: number | undefined; }) => Element",
-          "doc": "The integration's own logo on a neutral tile, so dark marks stay legible."
+          "doc": "A local provider mark: reviewing a held payload must not fetch a remote logo."
         },
         {
           "name": "openPhaseLabel",
           "kind": "function",
           "signature": "(item: Pick<HubApprovalItem, \"phase\" | \"wait\">, blocked?: string) => string | undefined",
           "doc": "The pill an open call shows: who it waits for, or that a permission runs it."
+        },
+        {
+          "name": "ReviewFeedbackDraft",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackDraft",
+          "doc": null
+        },
+        {
+          "name": "ReviewFeedbackForm",
+          "kind": "function",
+          "signature": "ForwardRefExoticComponent<ReviewFeedbackFormProps & RefAttributes<ReviewFeedbackFormHandle>>",
+          "doc": "One form for Hub previews, assets and work products."
+        },
+        {
+          "name": "ReviewFeedbackFormHandle",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackFormHandle",
+          "doc": null
+        },
+        {
+          "name": "ReviewFeedbackFormProps",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackFormProps",
+          "doc": null
+        },
+        {
+          "name": "ReviewVerdict",
+          "kind": "type",
+          "signature": "type ReviewVerdict",
+          "doc": null
         }
       ]
     },
@@ -24254,6 +24338,8 @@
         "chat-routes",
         "chat-store",
         "harness",
+        "hub-approvals",
+        "hub-approvals-react",
         "interactions",
         "missions",
         "plans",
@@ -26583,6 +26669,54 @@
           "doc": "Define options to control how chat interactions are restored during the restore process"
         },
         {
+          "name": "ReviewFeedbackDraft",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackDraft",
+          "doc": null
+        },
+        {
+          "name": "ReviewFeedbackForm",
+          "kind": "function",
+          "signature": "ForwardRefExoticComponent<ReviewFeedbackFormProps & RefAttributes<ReviewFeedbackFormHandle>>",
+          "doc": "One form for Hub previews, assets and work products."
+        },
+        {
+          "name": "ReviewFeedbackFormHandle",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackFormHandle",
+          "doc": null
+        },
+        {
+          "name": "ReviewFeedbackFormProps",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackFormProps",
+          "doc": null
+        },
+        {
+          "name": "ReviewInbox",
+          "kind": "function",
+          "signature": "({ items, initialSelectedId, renderItem, onVerdict, onFeedback, loading, error, onRefresh }: ReviewInboxProps) => Eleme…",
+          "doc": "One oldest-first review round."
+        },
+        {
+          "name": "ReviewInboxFeedback",
+          "kind": "interface",
+          "signature": "interface ReviewInboxFeedback",
+          "doc": null
+        },
+        {
+          "name": "ReviewInboxItem",
+          "kind": "interface",
+          "signature": "interface ReviewInboxItem",
+          "doc": null
+        },
+        {
+          "name": "ReviewInboxProps",
+          "kind": "interface",
+          "signature": "interface ReviewInboxProps",
+          "doc": null
+        },
+        {
           "name": "ReviewQueueItem",
           "kind": "interface",
           "signature": "interface ReviewQueueItem",
@@ -26610,6 +26744,12 @@
           "name": "ReviewQueueState",
           "kind": "type",
           "signature": "type ReviewQueueState",
+          "doc": null
+        },
+        {
+          "name": "ReviewVerdict",
+          "kind": "type",
+          "signature": "type ReviewVerdict",
           "doc": null
         },
         {
@@ -27324,6 +27464,8 @@
         "chat-routes",
         "chat-store",
         "harness",
+        "hub-approvals",
+        "hub-approvals-react",
         "interactions",
         "missions",
         "plans",
@@ -27612,6 +27754,8 @@
         "chat-routes",
         "chat-store",
         "harness",
+        "hub-approvals",
+        "hub-approvals-react",
         "interactions",
         "missions",
         "plans",
