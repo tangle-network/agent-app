@@ -55,6 +55,13 @@ export function useChatScroll() {
       touchY = nextY
     }
     const key = (event: KeyboardEvent) => {
+      // Native End targets an old bottom while output is still growing.
+      // An explicit return to latest follows the current bottom immediately.
+      if (event.key === 'End' && event.target === viewport) {
+        event.preventDefault()
+        follow(true)
+        scrollToBottom()
+      }
       if (['ArrowUp', 'PageUp', 'Home'].includes(event.key) || (event.key === ' ' && event.shiftKey)) follow(false)
     }
     const resize = () => {
