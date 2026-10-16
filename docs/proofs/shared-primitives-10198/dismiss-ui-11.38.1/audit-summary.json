@@ -1,0 +1,332 @@
+{
+  "source": "6d6e4bd9a82b0b24a770024497a0202855ff9ec4",
+  "gate": "beelink1-a12f135206f0c08000c066fb4318b3e5",
+  "identity": {
+    "ui": "11.38.1",
+    "brand": "1.25.1",
+    "files": {
+      "@tangle-network/ui/styles/presentation.css": {
+        "sha256": "60dd92d57f8e6debc2d2261e62e1b93d82ea6027aafd87084d79680f8c3c2266"
+      },
+      "@tangle-network/brand/styles/presentation.css": {
+        "sha256": "428f8aaf2793bb4c5c5ad22cf2836155f508c5467e9b5d25f0ef8137cd9967f1"
+      },
+      "@tangle-network/brand/styles/legacy-light.css": {
+        "sha256": "33e13702150c34d3a1350846ce3dae2c6c7ef17e1632fbae5d3479a1b43f55f3"
+      },
+      "surfaceMotion": {
+        "sha256": "f744b19887da230400176cad7328f53389932396bbfdfc5dfa610805af75473b"
+      },
+      "publicTheme": {
+        "sha256": "4789c9b84aaba8ced78ce39deb410c7483ccf4b04172f04dabb3cd8af9a92608",
+        "presenceKeyframes": true
+      }
+    },
+    "ownerReleaseSource": "bfd032ec40d578b42bf738b92ffd56df9300968e",
+    "target": "Actual agent-app ActionDialog and CommandPalette consumer fixture; no published agent-app proof"
+  },
+  "cases": [
+    {
+      "case": "agent-dark-390-normal",
+      "status": "PASS",
+      "video": "dismiss/page@c161fb28a16b59ab23cebc18942087f7.webm",
+      "videoSha256": "0b67d739ee9da9f76637b5bc5a2a31b39d52a7847d1ce9fcfeaba0d95d96fdaa",
+      "durationSeconds": 29.04,
+      "nativeRate": "25/1",
+      "videoSize": [
+        390,
+        844
+      ],
+      "contactSheets": 2,
+      "acceptedNormalReversalIndependentlyRecomputed": true,
+      "sameNode": true,
+      "inFlightStatus": "OBSERVED",
+      "timelineEvents": 53,
+      "timelineOverflow": 0,
+      "inputAttempts": 17,
+      "unresolvedAttempts": [
+        {
+          "attempt": 1,
+          "action": "control:Open action dialog",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 8,
+          "action": "control:Open action dialog",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 10,
+          "action": "control:Open command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 11,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 12,
+          "action": "control:Open command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 13,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 14,
+          "action": "control:Open command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 15,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 16,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 17,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        }
+      ],
+      "unreadableCssom": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
+      ]
+    },
+    {
+      "case": "agent-light-1280-normal",
+      "status": "PASS",
+      "video": "dismiss/page@6f24535722bd9d1fae0cc2d735bf08bb.webm",
+      "videoSha256": "bce0a31591b0482c122350409ac8559df5fd8366ae6e4c875a625db205bca330",
+      "durationSeconds": 13.04,
+      "nativeRate": "25/1",
+      "videoSize": [
+        1280,
+        1000
+      ],
+      "contactSheets": 1,
+      "acceptedNormalReversalIndependentlyRecomputed": true,
+      "sameNode": true,
+      "inFlightStatus": "OBSERVED",
+      "timelineEvents": 53,
+      "timelineOverflow": 0,
+      "inputAttempts": 17,
+      "unresolvedAttempts": [
+        {
+          "attempt": 1,
+          "action": "control:Open action dialog",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 8,
+          "action": "control:Open action dialog",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 10,
+          "action": "control:Open command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 11,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 12,
+          "action": "control:Open command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 13,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 14,
+          "action": "control:Open command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 15,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 16,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 17,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        }
+      ],
+      "unreadableCssom": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
+      ]
+    },
+    {
+      "case": "agent-dark-390-reduced-motion",
+      "status": "PASS",
+      "video": "dismiss/page@d1b9e31923f345f79693bd07b232c39f.webm",
+      "videoSha256": "9fe0bfed85c3a212c5cf72ece17aa53718802effc381b9471bd67cbbbbc193d5",
+      "durationSeconds": 8.72,
+      "nativeRate": "25/1",
+      "videoSize": [
+        390,
+        844
+      ],
+      "contactSheets": 1,
+      "acceptedNormalReversalIndependentlyRecomputed": null,
+      "sameNode": false,
+      "inFlightStatus": "UNCHECKED",
+      "timelineEvents": 58,
+      "timelineOverflow": 0,
+      "inputAttempts": 17,
+      "unresolvedAttempts": [
+        {
+          "attempt": 1,
+          "action": "control:Open action dialog",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 8,
+          "action": "control:Open action dialog",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 10,
+          "action": "control:Open command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 11,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 12,
+          "action": "control:Open command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 13,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 14,
+          "action": "control:Open command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 15,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 16,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 17,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        }
+      ],
+      "unreadableCssom": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
+      ]
+    },
+    {
+      "case": "agent-light-1280-reduced-motion",
+      "status": "PASS",
+      "video": "dismiss/page@b9dcebd80bca8db0b9cee972d1552a84.webm",
+      "videoSha256": "2489061fd256a49db1a4647c810c191d37a80288b822ab9445d6b8c561022c96",
+      "durationSeconds": 8.4,
+      "nativeRate": "25/1",
+      "videoSize": [
+        1280,
+        1000
+      ],
+      "contactSheets": 1,
+      "acceptedNormalReversalIndependentlyRecomputed": null,
+      "sameNode": false,
+      "inFlightStatus": "UNCHECKED",
+      "timelineEvents": 58,
+      "timelineOverflow": 0,
+      "inputAttempts": 17,
+      "unresolvedAttempts": [
+        {
+          "attempt": 1,
+          "action": "control:Open action dialog",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 8,
+          "action": "control:Open action dialog",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 10,
+          "action": "control:Open command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 11,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 12,
+          "action": "control:Open command palette",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained."
+        },
+        {
+          "attempt": 13,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 14,
+          "action": "control:Open command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 15,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 16,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        },
+        {
+          "attempt": 17,
+          "action": "disclosure:Dismiss command palette",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population."
+        }
+      ],
+      "unreadableCssom": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
+      ]
+    }
+  ],
+  "attempts": 68,
+  "unresolved": 40,
+  "actuallyWithheldLifecycleEvents": 1,
+  "consoleErrorsInRetainedTrace": [],
+  "latency": "UNKNOWN: DOM timeline and callbacks are not calibrated presented frames; no2x40 batches",
+  "motionQualification": "Scoped normal in-flight identity and real callback-loss cleanup; recordings reviewed through native-frame contact sheets and selected frames, not native playback or calibrated motion conformance"
+}

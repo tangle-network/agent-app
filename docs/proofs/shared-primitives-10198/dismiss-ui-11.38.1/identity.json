@@ -1,0 +1,24 @@
+{
+  "ui": "11.38.1",
+  "brand": "1.25.1",
+  "files": {
+    "@tangle-network/ui/styles/presentation.css": {
+      "sha256": "60dd92d57f8e6debc2d2261e62e1b93d82ea6027aafd87084d79680f8c3c2266"
+    },
+    "@tangle-network/brand/styles/presentation.css": {
+      "sha256": "428f8aaf2793bb4c5c5ad22cf2836155f508c5467e9b5d25f0ef8137cd9967f1"
+    },
+    "@tangle-network/brand/styles/legacy-light.css": {
+      "sha256": "33e13702150c34d3a1350846ce3dae2c6c7ef17e1632fbae5d3479a1b43f55f3"
+    },
+    "surfaceMotion": {
+      "sha256": "f744b19887da230400176cad7328f53389932396bbfdfc5dfa610805af75473b"
+    },
+    "publicTheme": {
+      "sha256": "4789c9b84aaba8ced78ce39deb410c7483ccf4b04172f04dabb3cd8af9a92608",
+      "presenceKeyframes": true
+    }
+  },
+  "ownerReleaseSource": "bfd032ec40d578b42bf738b92ffd56df9300968e",
+  "target": "Actual agent-app ActionDialog and CommandPalette consumer fixture; no published agent-app proof"
+}

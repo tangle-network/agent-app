@@ -1,0 +1,234 @@
+{
+  "theme": "agent-dark",
+  "width": 1280,
+  "height": 1000,
+  "condition": "normal",
+  "browser": "153.0.8010.12",
+  "errors": [],
+  "flow": "busy dialog/return, disclosure draft, grid edit, async action, settled terminal and synthetic API key",
+  "latency": "UNCHECKED: behavioral journeys are not2x40 latency batches or calibrated presented-frame measurements",
+  "terminal": {
+    "text": "Rendered page-1 → out/poster.png (1080x1080)",
+    "selected": "Rendered page-1 → out/poster.png (1080x1080)",
+    "whiteSpace": "pre-wrap"
+  },
+  "openAnimations": [
+    {
+      "playState": "running",
+      "timing": {
+        "delay": 0,
+        "direction": "normal",
+        "duration": 150,
+        "easing": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "endDelay": 0,
+        "fill": "backwards",
+        "iterationStart": 0,
+        "iterations": 1
+      },
+      "target": "<button class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium [transition:color_var(--motion-control),background-color_var(--motion-control),border-color_var(--motion-control),box-shadow_var(--motion-control),transform_var(--motion-control),scale_var(--motion-control),op",
+      "frames": [
+        {
+          "offset": 0,
+          "easing": "linear",
+          "composite": "auto",
+          "backgroundColor": "oklab(0.468767 0.0342499 -0.197278 / 0.9)",
+          "computedOffset": 0
+        },
+        {
+          "offset": 1,
+          "easing": "linear",
+          "composite": "auto",
+          "backgroundColor": "rgb(76, 63, 198)",
+          "computedOffset": 1
+        }
+      ]
+    },
+    {
+      "playState": "running",
+      "timing": {
+        "delay": 0,
+        "direction": "normal",
+        "duration": 150,
+        "easing": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "endDelay": 0,
+        "fill": "backwards",
+        "iterationStart": 0,
+        "iterations": 1
+      },
+      "target": "<button class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium [transition:color_var(--motion-control),background-color_var(--motion-control),border-color_var(--motion-control),box-shadow_var(--motion-control),transform_var(--motion-control),scale_var(--motion-control),op",
+      "frames": [
+        {
+          "offset": 0,
+          "easing": "linear",
+          "composite": "auto",
+          "borderBottomColor": "rgb(255, 255, 255)",
+          "computedOffset": 0
+        },
+        {
+          "offset": 1,
+          "easing": "linear",
+          "composite": "auto",
+          "borderBottomColor": "rgb(0, 0, 0)",
+          "computedOffset": 1
+        }
+      ]
+    },
+    {
+      "playState": "running",
+      "timing": {
+        "delay": 0,
+        "direction": "normal",
+        "duration": 150,
+        "easing": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "endDelay": 0,
+        "fill": "backwards",
+        "iterationStart": 0,
+        "iterations": 1
+      },
+      "target": "<button class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium [transition:color_var(--motion-control),background-color_var(--motion-control),border-color_var(--motion-control),box-shadow_var(--motion-control),transform_var(--motion-control),scale_var(--motion-control),op",
+      "frames": [
+        {
+          "offset": 0,
+          "easing": "linear",
+          "composite": "auto",
+          "borderLeftColor": "rgb(255, 255, 255)",
+          "computedOffset": 0
+        },
+        {
+          "offset": 1,
+          "easing": "linear",
+          "composite": "auto",
+          "borderLeftColor": "rgb(0, 0, 0)",
+          "computedOffset": 1
+        }
+      ]
+    },
+    {
+      "playState": "running",
+      "timing": {
+        "delay": 0,
+        "direction": "normal",
+        "duration": 150,
+        "easing": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "endDelay": 0,
+        "fill": "backwards",
+        "iterationStart": 0,
+        "iterations": 1
+      },
+      "target": "<button class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium [transition:color_var(--motion-control),background-color_var(--motion-control),border-color_var(--motion-control),box-shadow_var(--motion-control),transform_var(--motion-control),scale_var(--motion-control),op",
+      "frames": [
+        {
+          "offset": 0,
+          "easing": "linear",
+          "composite": "auto",
+          "borderRightColor": "rgb(255, 255, 255)",
+          "computedOffset": 0
+        },
+        {
+          "offset": 1,
+          "easing": "linear",
+          "composite": "auto",
+          "borderRightColor": "rgb(0, 0, 0)",
+          "computedOffset": 1
+        }
+      ]
+    },
+    {
+      "playState": "running",
+      "timing": {
+        "delay": 0,
+        "direction": "normal",
+        "duration": 150,
+        "easing": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "endDelay": 0,
+        "fill": "backwards",
+        "iterationStart": 0,
+        "iterations": 1
+      },
+      "target": "<button class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium [transition:color_var(--motion-control),background-color_var(--motion-control),border-color_var(--motion-control),box-shadow_var(--motion-control),transform_var(--motion-control),scale_var(--motion-control),op",
+      "frames": [
+        {
+          "offset": 0,
+          "easing": "linear",
+          "composite": "auto",
+          "borderTopColor": "rgb(255, 255, 255)",
+          "computedOffset": 0
+        },
+        {
+          "offset": 1,
+          "easing": "linear",
+          "composite": "auto",
+          "borderTopColor": "rgb(0, 0, 0)",
+          "computedOffset": 1
+        }
+      ]
+    },
+    {
+      "playState": "running",
+      "timing": {
+        "delay": 0,
+        "direction": "normal",
+        "duration": 150,
+        "easing": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "endDelay": 0,
+        "fill": "backwards",
+        "iterationStart": 0,
+        "iterations": 1
+      },
+      "target": "<button class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium [transition:color_var(--motion-control),background-color_var(--motion-control),border-color_var(--motion-control),box-shadow_var(--motion-control),transform_var(--motion-control),scale_var(--motion-control),op",
+      "frames": [
+        {
+          "offset": 0,
+          "easing": "linear",
+          "composite": "auto",
+          "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+          "computedOffset": 0
+        },
+        {
+          "offset": 1,
+          "easing": "linear",
+          "composite": "auto",
+          "boxShadow": "none",
+          "computedOffset": 1
+        }
+      ]
+    },
+    {
+      "playState": "finished",
+      "timing": {
+        "delay": 0,
+        "direction": "normal",
+        "duration": 600,
+        "easing": "linear",
+        "endDelay": 0,
+        "fill": "both",
+        "iterationStart": 0,
+        "iterations": 1
+      },
+      "target": "<div class=\"agent-arrive\" style=\"--stagger-index: 0;\"><div data-state=\"open\"><div class=\"flex items-start gap-2\"><div data-run-row=\"\" data-state=\"open\" class=\"group min-w-0 flex-1 overflow-hidden border transition-colors border-border bg-[var(--md3-surface-container)] rounded-[var(--radius-lg)]\"><bu",
+      "frames": [
+        {
+          "offset": 0,
+          "easing": "cubic-bezier(0.23, 1, 0.32, 1)",
+          "composite": "auto",
+          "opacity": "0",
+          "transform": "translateY(8px)",
+          "computedOffset": 0
+        },
+        {
+          "offset": 1,
+          "easing": "cubic-bezier(0.23, 1, 0.32, 1)",
+          "composite": "auto",
+          "opacity": "1",
+          "transform": "none",
+          "computedOffset": 1
+        }
+      ]
+    }
+  ],
+  "status": "FAIL",
+  "error": "Error: Reduced motion retains spatial/blur/loop animation: [{\"playState\":\"running\",\"timing\":{\"delay\":0,\"direction\":\"normal\",\"duration\":1,\"easing\":\"ease\",\"endDelay\":0,\"fill\":\"backwards\",\"iterationStart\":0,\"iterations\":1},\"target\":\"<div class=\\\"fixed inset-0 z-50 bg-black/40 data-[state=open]:[animation:tangle-surface-present_var(--motion-surface)_both] data-[state=delayed-open]:[animation:tangle-surface-present_var(--motion-surface)_both] data-[state=instant-open]:[animation:tangle-surface-present_var(--motion-surface)_both] d\",\"frames\":[{\"offset\":0,\"easing\":\"linear\",\"composite\":\"auto\",\"transform\":\"none\",\"computedOffset\":0},{\"offset\":1,\"easing\":\"linear\",\"composite\":\"auto\",\"transform\":\"translateX(0px) translateY(0px) scale(1)\",\"computedOffset\":1}]},{\"playState\":\"running\",\"timing\":{\"delay\":0,\"direction\":\"normal\",\"duration\":1,\"easing\":\"ease\",\"endDelay\":0,\"fill\":\"backwards\",\"iterationStart\":0,\"iterations\":1},\"target\":\"<div role=\\\"dialog\\\" id=\\\"radix-_r_6_\\\" class=\\\"fixed top-[50%] left-[50%] z-50 grid w-full translate-x-[-50%] translate-y-[-50%] rounded-lg border bg-card shadow-lg data-[state=open]:[animation:tangle-surface-present_var(--motion-surface)_both] data-[state=delayed-open]:[animation:tangle-surface-present\",\"frames\":[{\"offset\":0,\"easing\":\"linear\",\"composite\":\"auto\",\"transform\":\"none\",\"computedOffset\":0},{\"offset\":1,\"easing\":\"linear\",\"composite\":\"auto\",\"transform\":\"translateX(0px) translateY(0px) scale(1)\",\"computedOffset\":1}]}]",
+  "url": "http://localhost:6198/iframe.html?id=app-shell-shared-primitives--interactive&viewMode=story&globals=agentTheme%3Aagent-dark",
+  "consoleErrors": [],
+  "requestFailures": []
+}

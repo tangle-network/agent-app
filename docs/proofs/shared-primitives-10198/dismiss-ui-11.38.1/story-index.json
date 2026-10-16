@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "entry": {
+    "type": "story",
+    "subtype": "story",
+    "id": "app-shell-shared-primitives--dismiss",
+    "name": "Dismiss",
+    "title": "App Shell/Shared primitives",
+    "importPath": "./src/stories/app-shell/SharedPrimitives.stories.tsx",
+    "tags": [
+      "dev",
+      "test",
+      "manifest"
+    ],
+    "exportName": "Dismiss"
+  },
+  "ids": [
+    "app-shell-shared-primitives--interactive",
+    "app-shell-shared-primitives--dismiss",
+    "channels-connect-and-verify--shared-i-message",
+    "hosted-agent-lines-shared-app-conversation--light",
+    "hosted-agent-lines-shared-app-conversation--dark",
+    "hosted-agent-lines-shared-app-conversation--one-app",
+    "hosted-agent-lines-shared-app-conversation--duplicate-registration",
+    "workspace-shared-controls--research",
+    "workspace-shared-controls--tax",
+    "workspace-shared-controls--legal",
+    "workspace-shared-controls--engineering",
+    "workspace-shared-controls--insurance",
+    "workspace-shared-controls--relationships"
+  ]
+}
