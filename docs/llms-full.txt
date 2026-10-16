@@ -2449,7 +2449,7 @@ interface LogoProps
 `function`
 
 ```ts
-({ size, className }: { size?: number | undefined; className?: string | undefined; }) => Element
+({ size, className, label }: TangleKnotProps) => Element
 ```
 
 
@@ -35023,6 +35023,14 @@ type UseChatInteractionsOptions
 
 ```ts
 interface UseChatInteractionsResult
+```
+
+### `useChatScroll`
+
+`function` — Follow a growing transcript only while its reader stays at the bottom.
+
+```ts
+() => { viewportRef: Dispatch<SetStateAction<HTMLDivElement | null>>; contentRef: Dispatch<SetStateAction<HTMLDivElemen…
 ```
 
 ### `useComposerAttachments`
