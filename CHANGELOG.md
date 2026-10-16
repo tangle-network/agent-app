@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.176
+
+- fix(chat): let readers scroll reasoning while it streams (#1121)
+
 ## 0.60.175
 
 - fix(deps): support Hub SDK 0.30.2 in agent apps (#1126)
