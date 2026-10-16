@@ -15,6 +15,7 @@ import tailwind from '@tailwindcss/postcss'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argument = process.argv.indexOf('--output')
+const faultNoVerdictTransport = process.argv.includes('--fault-no-verdict-transport')
 const output = path.resolve(argument < 0 ? path.join(os.homedir(), 'reviews', `review-inbox-${Date.now()}`) : process.argv[argument + 1])
 await mkdir(output, { recursive: true })
 const temp = await mkdtemp(path.join(os.tmpdir(), 'review-inbox-'))
@@ -74,7 +75,7 @@ function HubFixture(){const[item,setItem]=useState(null);useEffect(()=>{fetch('/
 function App(){const[items,setItems]=useState([]);const[loading,setLoading]=useState(true);const[error,setError]=useState(null);
 async function load(){try{const response=await fetch('/api/items');if(!response.ok)throw new Error('Inbox unavailable');setItems(await response.json());setError(null)}catch(error){setError(error.message)}finally{setLoading(false)}}
 useEffect(()=>{load();const updates=new EventSource('/api/updates');updates.onmessage=event=>{const state=JSON.parse(event.data);if(state.items){setItems(state.items);setLoading(state.loading);setError(state.error)}};return()=>updates.close()},[]);
-async function verdict(item,feedback){const response=await fetch('/api/verdict',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,revision:item.revision,...feedback})});const result=await response.json();if(!response.ok)throw new Error(result.error);setItems(result.items)}
+async function verdict(item,feedback){if(${JSON.stringify(faultNoVerdictTransport)})return;const response=await fetch('/api/verdict',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,revision:item.revision,...feedback})});const result=await response.json();if(!response.ok)throw new Error(result.error);setItems(result.items)}
 return <main className="px-4 py-6"><ReviewInbox items={items} initialSelectedId={new URLSearchParams(location.search).get('item')??undefined} loading={loading} error={error} onRefresh={load} onVerdict={verdict} renderItem={item=>item.preview?<HubActionPreviewView preview={item.preview} account="Example studio"/>:<article className="rounded-lg border border-border bg-card p-5"><h3 className="font-semibold">Retained work product</h3><p className="mt-3 whitespace-pre-wrap">{item.input.content}</p></article>}/></main>}
 createRoot(document.getElementById('root')).render(new URLSearchParams(location.search).has('hub')?<HubFixture/>:<App/>);`
 
@@ -296,7 +297,8 @@ try {
   if (server) await new Promise(resolve => server.close(resolve))
   const report = { target: 'Built shared ReviewInbox with real local HTTP/SSE and SQLite; keyboard-only fixture triage',
     revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), capturedAt: new Date().toISOString(),
-    checks, previewCount: fixtures.length, verdictCount: count('verdicts'), learningRowCount: count('signals'), verdictRequests, failedWrites, externalRequests, browserErrors,
+    checks, fault: faultNoVerdictTransport ? 'verdict callback returns without transport or persistence' : null,
+    previewCount: fixtures.length, verdictCount: count('verdicts'), learningRowCount: count('signals'), verdictRequests, failedWrites, externalRequests, browserErrors,
     missingCoverage: ['Actual Drew ratings', 'Real phone hardware', 'Served GTM consumer', 'Live send, publish or ad buy'] }
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
   const media = (await readdir(output)).filter(file => /\.(png|webm)$/.test(file)).sort().map(file => `<figure><figcaption>${file}</figcaption>${file.endsWith('.webm') ? `<video controls src="${file}"></video>` : `<img alt="${file}" src="${file}">`}</figure>`).join('')
