@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 const roles = ['--interaction-feedback-budget', '--interaction-pending-delay', '--interaction-long-work-delay', '--interaction-mutation-budget'] as const
-export const interactionProtocol = {
+const interactionProtocol = {
   batches: 2,
   attemptsPerBatch: 40,
   conditions: ['normal', 'interrupted', 'reduced-motion'],
