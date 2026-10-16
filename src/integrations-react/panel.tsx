@@ -273,7 +273,7 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
     onDisconnect={connection => { void hub.revoke(connection.id) }}
     onRequestIntegration={props.onRequestIntegration} onRetry={() => hub.refresh()}
     loading={hub.providers.status === 'loading' || hub.connections.status === 'loading'} error={error}
-    actionError={mutationError} connectError={hub.connectStatus.status === 'failed' ? hub.connectStatus.message : null}
+    actionError={mutationError}
     busyProviderId={hub.connectStatus.status === 'pending' ? hub.connectStatus.providerId ?? null : null}
     reserveConnectionContext
     emptyCatalogLabel={props.accounts && rows.length > 0 ? 'Every available integration has a connected account. Manage an account to connect another.' : undefined}
@@ -288,7 +288,7 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
     {mutationError ? <p role="alert">{mutationError}</p> : null}
     {writeMessage ? <p role={writeWarning ? 'alert' : 'status'}>{writeMessage}</p> : null}
     {hub.connectStatus.status === 'failed' ? <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 text-sm text-destructive">
-      <p>{hub.connectStatus.message}</p>
+      <p data-testid="integration-connect-error">{hub.connectStatus.message}</p>
       {retryProvider ? <Button type="button" variant="outline" disabled={pending} onClick={() => hub.beginConnect(retryProvider)}>Retry connection</Button> : null}
     </div> : hub.connectStatus.message && hub.provider ? <p role="status">{hub.connectStatus.message}</p> : null}
     {hub.provider ? <>
