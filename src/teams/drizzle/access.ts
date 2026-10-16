@@ -17,7 +17,7 @@
  * better-sqlite3, D1, and libsql handles all behave identically.
  */
 
-import { and, desc, eq, isNotNull } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, isNull, or } from 'drizzle-orm'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 import {
   type OrganizationRole,
@@ -57,7 +57,7 @@ export interface CreateAccessOptions {
 export interface WorkspaceAccess {
   workspace: Record<string, unknown>
   organization: OrganizationRow
-  organizationMember: OrganizationMemberRow
+  organizationMember: OrganizationMemberRow | null
   role: WorkspaceRole
 }
 
@@ -86,7 +86,7 @@ export function createWorkspaceAccess(opts: CreateAccessOptions): WorkspaceAcces
     userId: string,
     minRole: WorkspaceRole = 'viewer',
   ): Promise<WorkspaceAccess | null> {
-    const [row] = await db
+    const rows = await db
       .select({
         workspace: workspaces,
         organization: organizations,
@@ -96,30 +96,33 @@ export function createWorkspaceAccess(opts: CreateAccessOptions): WorkspaceAcces
       })
       .from(workspaces)
       .innerJoin(organizations, eq(organizations.id, workspaces.organizationId))
-      .innerJoin(organizationMembers, and(
+      .leftJoin(organizationMembers, and(
         eq(organizationMembers.organizationId, workspaces.organizationId),
         eq(organizationMembers.userId, userId),
       ))
       .leftJoin(workspaceMembers, and(
         eq(workspaceMembers.workspaceId, workspaces.id),
-        eq(workspaceMembers.organizationMemberId, organizationMembers.id),
+        or(
+          eq(workspaceMembers.organizationMemberId, organizationMembers.id),
+          // Pre-teams accepted grants are independently scoped to one user and
+          // project. A linked grant never falls back after org access is lost.
+          and(isNull(workspaceMembers.organizationMemberId), eq(workspaceMembers.userId, userId)),
+        ),
         isNotNull(workspaceMembers.acceptedAt),
       ))
-      .where(eq(workspaces.id, workspaceId))
-      .limit(1)
+      .where(and(eq(workspaces.id, workspaceId),
+        or(isNotNull(organizationMembers.id), isNotNull(workspaceMembers.id))))
 
-    if (!row) return null
-
-    const role = resolveWorkspaceRole(row.organizationMember.role, row.projectRole as WorkspaceRole | null)
-    if (!role) return null
-    if (!hasWorkspaceRole(role, minRole)) return null
-
-    return {
-      workspace: row.workspace as Record<string, unknown>,
-      organization: row.organization,
-      organizationMember: row.organizationMember,
-      role,
-    }
+    return rows.reduce<WorkspaceAccess | null>((best, row) => {
+      const role = resolveWorkspaceRole(row.organizationMember?.role, row.projectRole as WorkspaceRole | null)
+      if (!role || !hasWorkspaceRole(role, minRole) || (best && hasWorkspaceRole(best.role, role))) return best
+      return {
+        workspace: row.workspace as Record<string, unknown>,
+        organization: row.organization,
+        organizationMember: row.organizationMember,
+        role,
+      }
+    }, null)
   }
 
   async function requireWorkspaceAccess(
@@ -142,29 +145,40 @@ export function createWorkspaceAccess(opts: CreateAccessOptions): WorkspaceAcces
       })
       .from(workspaces)
       .innerJoin(organizations, eq(organizations.id, workspaces.organizationId))
-      .innerJoin(organizationMembers, and(
+      .leftJoin(organizationMembers, and(
         eq(organizationMembers.organizationId, workspaces.organizationId),
         eq(organizationMembers.userId, userId),
       ))
       .leftJoin(workspaceMembers, and(
         eq(workspaceMembers.workspaceId, workspaces.id),
-        eq(workspaceMembers.organizationMemberId, organizationMembers.id),
+        or(
+          eq(workspaceMembers.organizationMemberId, organizationMembers.id),
+          // Pre-teams accepted grants are independently scoped to one user and
+          // project. A linked grant never falls back after org access is lost.
+          and(isNull(workspaceMembers.organizationMemberId), eq(workspaceMembers.userId, userId)),
+        ),
         isNotNull(workspaceMembers.acceptedAt),
       ))
+      .where(or(isNotNull(organizationMembers.id), isNotNull(workspaceMembers.id)))
       // Most recently active workspace first, so callers taking rows[0] as the
       // default pick the freshest one.
       .orderBy(desc(workspaces.updatedAt))
 
-    return rows.flatMap((row: any) => {
-      const role = resolveWorkspaceRole(row.organizationMember.role, row.projectRole as WorkspaceRole | null)
-      if (!role) return []
-      return [{
+    // Legacy rows lack the linked-member unique key. Fold duplicate direct
+    // grants once at their strongest role, using the shared role algebra.
+    const summaries = new Map<string, UserWorkspaceSummary>()
+    for (const row of rows) {
+      const role = resolveWorkspaceRole(row.organizationMember?.role, row.projectRole as WorkspaceRole | null)
+      const previous = summaries.get(row.workspace.id as string)
+      if (!role || (previous && hasWorkspaceRole(previous.role, role))) continue
+      summaries.set(row.workspace.id as string, {
         ...(row.workspace as Record<string, unknown>),
         organizationId: row.organization.id,
         organizationName: row.organization.name,
         role,
-      } as UserWorkspaceSummary]
-    })
+      } as UserWorkspaceSummary)
+    }
+    return [...summaries.values()]
   }
 
   return { getWorkspaceAccess, requireWorkspaceAccess, listUserWorkspaces }
