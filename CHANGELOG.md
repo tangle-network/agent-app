@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.173
+
+- refactor(harness): preserve session identity and enforce deployment admission (#1116)
+
 ## 0.60.172
 
 - feat(sso): prompt passthrough on start and a quiet signed_out callback (#1122)
