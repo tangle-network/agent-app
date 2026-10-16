@@ -108,4 +108,15 @@ export {
   type SpendProvisionObservation,
 } from './budget'
 
+// The budget-derived delegated mint: an ask must derive from the parent key's
+// REMAINING budget (the platform reserves the child's budget against it),
+// never a flat default. Lifted from the hardware-agent production fix.
+export {
+  MIN_CHILD_KEY_BUDGET_USD,
+  ParentBudgetExhaustedError,
+  deriveChildKeyBudgetUsd,
+  type DeriveChildKeyBudgetInput,
+  type DerivedChildKeyBudget,
+} from './delegate-budget'
+
 export { formatSpendReport, spendReportToJson } from './report'
