@@ -22,7 +22,7 @@ const invitationTables = createWorkspaceInvitationTable({
 const ORIGIN = 'https://app.test'
 
 async function seed() {
-  const db = openDatabase([
+  const native = openDatabase([
     usersTable,
     workspacesTable,
     tables.organizations,
@@ -30,6 +30,11 @@ async function seed() {
     tables.workspaceMembers,
     invitationTables.workspaceInvitations,
   ])
+  // D1-shaped atomic batch, executing real Drizzle queries on the same SQLite connection.
+  const db = Object.assign(native, {
+    batch: async (statements: [any, ...any[]]) => native.$client.transaction(() =>
+      statements.map(statement => statement.all()))(),
+  })
   await db.insert(usersTable).values([
     { id: 'owner-1', name: 'Owner', email: 'owner@x.com', emailVerified: true },
     { id: 'editor-1', name: 'Editor', email: 'editor@x.com', emailVerified: true },
@@ -284,5 +289,178 @@ describe('getPreview + acceptInvitation', () => {
     const res = await api.acceptInvitation({ token: created.value.invitation.token, userId: 'late-1', now: after })
     expect(res.succeeded).toBe(false)
     if (!res.succeeded) expect(res.status).toBe(409)
+  })
+})
+
+// A real driver boundary: the SELECT has returned its rows, but the caller has
+// not started membership writes. No query/result is fabricated or skipped.
+function afterMembershipRead(deps: Deps, change: () => void) {
+  const client = deps.db.$client
+  const prepare = client.prepare.bind(client)
+  let armed = true
+  client.prepare = ((query: string) => {
+    const statement = prepare(query)
+    const wrapped: typeof statement = new Proxy(statement, {
+      get(target, key) {
+        const value = Reflect.get(target, key)
+        if (key === 'all') return (...args: unknown[]) => {
+          const rows = value.apply(target, args)
+          if (armed && query.startsWith('select ') && query.includes('from "organization_member" where')) {
+            armed = false
+            change()
+          }
+          return rows
+        }
+        return typeof value === 'function' ? (...args: unknown[]) => {
+          const result = value.apply(target, args)
+          // better-sqlite3 raw()/bind() return this; keep the real statement
+          // behind the boundary wrapper throughout Drizzle's fluent chain.
+          return result === target ? wrapped : result
+        } : value
+      },
+    })
+    return wrapped
+  }) as typeof client.prepare
+  return () => expect(armed, 'The real SQLite membership-read barrier must execute').toBe(false)
+}
+
+async function pendingFixture() {
+  const deps = await seed()
+  const { api, adds } = makeApi(deps)
+  const invitation = await api.createInvitation({ workspaceId: 'ws-1', email: 'editor@x.com',
+    permissions: 'editor', invitedByUserId: 'owner-1', origin: ORIGIN })
+  if (!invitation.succeeded) throw new Error('setup')
+  return { ...deps, api, adds, invitation: invitation.value.invitation }
+}
+
+async function expectNoGrant(deps: Awaited<ReturnType<typeof pendingFixture>>) {
+  expect(await deps.db.select().from(tables.organizationMembers)
+    .where(eq(tables.organizationMembers.userId, 'editor-1'))).toHaveLength(0)
+  expect(await deps.db.select().from(tables.workspaceMembers)
+    .where(eq(tables.workspaceMembers.userId, 'editor-1'))).toHaveLength(0)
+  expect(deps.adds).toHaveLength(0)
+}
+
+describe('atomic invitation acceptance against real SQLite races', () => {
+  it('stale acceptance loses to workspace transfer; fresh acceptance grants only the destination', async () => {
+    const deps = await pendingFixture()
+    const [destination] = await deps.db.insert(tables.organizations).values({
+      name: 'Destination', slug: 'destination', kind: 'team', createdBy: 'owner-1',
+    }).returning()
+    const assertInterleaved = afterMembershipRead(deps, () => deps.db.$client.transaction(() => {
+      deps.db.update(workspacesTable).set({ organizationId: destination!.id }).where(eq(workspacesTable.id, 'ws-1')).run()
+      deps.db.update(invitationTables.workspaceInvitations).set({ organizationId: destination!.id })
+        .where(eq(invitationTables.workspaceInvitations.id, deps.invitation.id)).run()
+    })())
+    const stale = await deps.api.acceptInvitation({ token: deps.invitation.token, userId: 'editor-1' })
+    assertInterleaved()
+    expect(stale).toMatchObject({ succeeded: false, status: 409 })
+    await expectNoGrant(deps)
+    expect((await deps.db.select().from(invitationTables.workspaceInvitations))[0]!.status).toBe('pending')
+    expect(await deps.api.acceptInvitation({ token: deps.invitation.token, userId: 'editor-1' }))
+      .toEqual({ succeeded: true, value: { workspaceId: 'ws-1' } })
+    const members = await deps.db.select().from(tables.organizationMembers)
+      .where(eq(tables.organizationMembers.userId, 'editor-1'))
+    expect(members.map(member => member.organizationId)).toEqual([destination!.id])
+    expect((await deps.access.getWorkspaceAccess('ws-1', 'editor-1'))?.role).toBe('editor')
+    expect(deps.adds).toHaveLength(1)
+  })
+
+  for (const race of ['revoked', 'expired', 'email', 'verification', 'collision'] as const) {
+    it(`refuses ${race} changed after the membership read without materializing access`, async () => {
+      const deps = await pendingFixture()
+      const assertInterleaved = afterMembershipRead(deps, () => {
+        if (race === 'revoked') deps.db.update(invitationTables.workspaceInvitations).set({ status: 'revoked' })
+          .where(eq(invitationTables.workspaceInvitations.id, deps.invitation.id)).run()
+        if (race === 'expired') deps.db.update(invitationTables.workspaceInvitations).set({ expiresAt: new Date(0) })
+          .where(eq(invitationTables.workspaceInvitations.id, deps.invitation.id)).run()
+        if (race === 'email') deps.db.update(usersTable).set({ email: 'another@x.com' }).where(eq(usersTable.id, 'editor-1')).run()
+        if (race === 'verification') deps.db.update(usersTable).set({ emailVerified: false }).where(eq(usersTable.id, 'editor-1')).run()
+        if (race === 'collision') deps.db.insert(usersTable).values({
+          id: 'collision', name: 'Collision', email: 'EDITOR@x.com', emailVerified: true,
+        }).run()
+      })
+      const result = await deps.api.acceptInvitation({ token: deps.invitation.token, userId: 'editor-1' })
+      assertInterleaved()
+      expect(result).toMatchObject({ succeeded: false, status: 409 })
+      await expectNoGrant(deps)
+    })
+  }
+
+  it('losing acceptance preserves a concurrently existing grant and never syncs', async () => {
+    const deps = await pendingFixture()
+    {
+      const [orgMember] = deps.db.insert(tables.organizationMembers).values({
+        organizationId: deps.org.id, userId: 'editor-1', role: 'member',
+      }).returning().all()
+      deps.db.insert(tables.workspaceMembers).values({ id: 'preexisting', workspaceId: 'ws-1',
+        organizationMemberId: orgMember!.id, userId: 'editor-1', role: 'viewer', acceptedAt: new Date(),
+      }).run()
+    }
+    const assertInterleaved = afterMembershipRead(deps, () => {
+      deps.db.update(invitationTables.workspaceInvitations).set({ status: 'revoked' })
+        .where(eq(invitationTables.workspaceInvitations.id, deps.invitation.id)).run()
+    })
+    const result = await deps.api.acceptInvitation({ token: deps.invitation.token, userId: 'editor-1' })
+    assertInterleaved()
+    expect(result).toMatchObject({ succeeded: false, status: 409 })
+    expect((await deps.db.select().from(tables.workspaceMembers)).map(member => [member.id, member.role]))
+      .toEqual([['preexisting', 'viewer']])
+    expect(deps.adds).toHaveLength(0)
+  })
+
+  it('duplicate simultaneous accept attempts create one grant and sync once', async () => {
+    const deps = await pendingFixture()
+    const results = await Promise.all([
+      deps.api.acceptInvitation({ token: deps.invitation.token, userId: 'editor-1' }),
+      deps.api.acceptInvitation({ token: deps.invitation.token, userId: 'editor-1' }),
+    ])
+    expect(results.filter(result => result.succeeded)).toHaveLength(1)
+    expect(results.filter(result => !result.succeeded)).toEqual([
+      expect.objectContaining({ status: 409 }),
+    ])
+    expect(await deps.db.select().from(tables.workspaceMembers)).toHaveLength(1)
+    expect(deps.adds).toHaveLength(1)
+  })
+})
+
+
+describe('atomic acceptance conflicts preserve existing membership semantics', () => {
+  it('refuses a pending linked grant without marking the invitation accepted', async () => {
+    const deps = await pendingFixture()
+    const [member] = await deps.db.insert(tables.organizationMembers).values({
+      organizationId: deps.org.id, userId: 'editor-1', role: 'member',
+    }).returning()
+    await deps.db.insert(tables.workspaceMembers).values({ id: 'pending-grant', workspaceId: 'ws-1',
+      organizationMemberId: member!.id, userId: 'editor-1', role: 'viewer', acceptedAt: null,
+    })
+    expect(await deps.api.acceptInvitation({ token: deps.invitation.token, userId: 'editor-1' }))
+      .toMatchObject({ succeeded: false, status: 409 })
+    expect((await deps.db.select().from(invitationTables.workspaceInvitations))[0]!.status).toBe('pending')
+    expect((await deps.db.select().from(tables.workspaceMembers))[0]!.acceptedAt).toBeNull()
+    expect(deps.adds).toHaveLength(0)
+  })
+
+  it('refuses an occupied invite token without leaving even organization membership', async () => {
+    const deps = await pendingFixture()
+    const [member] = await deps.db.select().from(tables.organizationMembers)
+      .where(eq(tables.organizationMembers.userId, 'existing-1'))
+    await deps.db.insert(tables.workspaceMembers).values({ id: 'token-conflict', workspaceId: 'ws-1',
+      organizationMemberId: member!.id, userId: 'existing-1', role: 'viewer',
+      inviteToken: deps.invitation.token, acceptedAt: new Date(),
+    })
+    expect(await deps.api.acceptInvitation({ token: deps.invitation.token, userId: 'editor-1' }))
+      .toMatchObject({ succeeded: false, status: 409 })
+    await expectNoGrant(deps)
+    expect((await deps.db.select().from(invitationTables.workspaceInvitations))[0]!.status).toBe('pending')
+    expect((await deps.db.select().from(tables.workspaceMembers))[0]!.id).toBe('token-conflict')
+  })
+
+  it('fails closed without atomic batch before making any acceptance write', async () => {
+    const deps = await pendingFixture()
+    Reflect.deleteProperty(deps.db, 'batch')
+    expect(await deps.api.acceptInvitation({ token: deps.invitation.token, userId: 'editor-1' }))
+      .toMatchObject({ succeeded: false, status: 500 })
+    await expectNoGrant(deps)
   })
 })
