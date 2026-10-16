@@ -144,7 +144,7 @@ export function WorkProductPane({
   return (
     <div className={`flex min-h-0 flex-col gap-3 ${className ?? ''}`}>
       <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-full sm:basis-0">
           <div className="flex min-w-0 items-center gap-2">
             <p className="min-w-0 truncate text-sm font-semibold text-foreground">
               {artifact?.title ?? workProduct.scopeKey}
@@ -163,7 +163,9 @@ export function WorkProductPane({
         <ProvenanceStamp provenance={workProduct.provenance} backtest={backtest} />
       </div>
 
-      <PillTabs items={tabs} value={tab} onChange={setTab} aria-label="Work product views" />
+      <div className="min-w-0 overflow-x-auto">
+        <PillTabs items={tabs} value={tab} onChange={setTab} aria-label="Work product views" />
+      </div>
 
       {tab === 'artifact' && (
         <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border">
