@@ -11570,6 +11570,22 @@ Source: `src/integrations-react/index.ts` · depends on `platform`, `web-react`
 interface HubAccountStatus
 ```
 
+### `HubActionPolicy`
+
+`type` — Return only policies the host enforces independently of stored Hub overrides.
+
+```ts
+type HubActionPolicy
+```
+
+### `HubActionPolicyDisplay`
+
+`interface` — Display of a policy enforced by the consuming app, never browser authority.
+
+```ts
+interface HubActionPolicyDisplay
+```
+
 ### `HubConnectCallbackPage`
 
 `function` — The callback only signals completion; the opener verifies fresh Hub state.
@@ -11703,7 +11719,7 @@ number
 `function` — Identity-bound Hub settings controller; connection state is always server-read.
 
 ```ts
-({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect }: UseHubIntegrationsOptions) => { providers:…
+({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect, getActionPolicy }: UseHubIntegrationsOptions…
 ```
 
 ### `UseHubIntegrationsOptions`

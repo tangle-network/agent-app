@@ -8989,6 +8989,18 @@
           "doc": "Host-owned access state for one account, such as whether this agent can use it."
         },
         {
+          "name": "HubActionPolicy",
+          "kind": "type",
+          "signature": "type HubActionPolicy",
+          "doc": "Return only policies the host enforces independently of stored Hub overrides."
+        },
+        {
+          "name": "HubActionPolicyDisplay",
+          "kind": "interface",
+          "signature": "interface HubActionPolicyDisplay",
+          "doc": "Display of a policy enforced by the consuming app, never browser authority."
+        },
+        {
           "name": "HubConnectCallbackPage",
           "kind": "function",
           "signature": "({ returnHref }: HubConnectCallbackPageProps) => Element",
@@ -9087,7 +9099,7 @@
         {
           "name": "useHubIntegrations",
           "kind": "function",
-          "signature": "({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect }: UseHubIntegrationsOptions) => { providers:…",
+          "signature": "({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect, getActionPolicy }: UseHubIntegrationsOptions…",
           "doc": "Identity-bound Hub settings controller; connection state is always server-read."
         },
         {
