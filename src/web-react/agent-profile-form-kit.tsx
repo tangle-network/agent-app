@@ -13,7 +13,7 @@
  * screen.
  */
 import { useId, useState, type ReactNode } from 'react'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@tangle-network/ui/primitives'
+import { Card, CardContent, Collapsible, CollapsibleContent, CollapsibleTrigger, StatusPill as SharedStatusPill, Tooltip, TooltipContent, TooltipTrigger } from '@tangle-network/ui/primitives'
 
 export const formText = {
   body: 'text-sm leading-6 text-foreground',
@@ -110,9 +110,10 @@ function Chevron({ className }: { className?: string }) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
 }
 
-/** A bordered section. Collapsible sections use a native disclosure so they work without script. */
+/** Profile copy and spacing compose the shared card and disclosure. */
 export function Section({ title, description, summary, defaultOpen = false, collapsible = false, children }: SectionProps) {
   const headingId = useId()
+  const [open, setOpen] = useState(defaultOpen)
   const header = <span className="flex min-w-0 flex-1 items-start justify-between gap-3">
     <span className="min-w-0 space-y-0.5">
       <span id={headingId} className={`block ${formText.title}`}>{title}</span>
@@ -120,21 +121,23 @@ export function Section({ title, description, summary, defaultOpen = false, coll
     </span>
     {(summary || collapsible) && <span className={`flex shrink-0 items-center gap-2 ${formText.muted}`}>
       {summary}
-      {collapsible && <Chevron className="size-4 transition-transform group-open:rotate-180" />}
+      {collapsible && <Chevron className="size-4 group-data-[state=open]:rotate-180" />}
     </span>}
   </span>
   if (!collapsible) {
-    return <section aria-labelledby={headingId} className="min-w-0 rounded-xl border border-border bg-card">
+    return <Card role="region" aria-labelledby={headingId} className="min-w-0">
       <header className="flex px-4 pt-4">{header}</header>
-      <div className="min-w-0 space-y-4 p-4">{children}</div>
-    </section>
+      <CardContent className="min-w-0 space-y-4 p-4">{children}</CardContent>
+    </Card>
   }
-  return <details open={defaultOpen || undefined} className="group min-w-0 rounded-xl border border-border bg-card">
-    <summary aria-labelledby={headingId} className="flex cursor-pointer list-none rounded-xl p-4 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-      {header}
-    </summary>
-    <div className="min-w-0 space-y-4 border-t border-border p-4">{children}</div>
-  </details>
+  return <Collapsible open={open} onOpenChange={setOpen} asChild>
+    <Card className="group min-w-0">
+      <CollapsibleTrigger aria-labelledby={headingId} className="flex w-full cursor-pointer rounded-xl p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+        {header}
+      </CollapsibleTrigger>
+      <CollapsibleContent forceMount hidden={!open} asChild><CardContent className="min-w-0 space-y-4 border-t border-border p-4">{children}</CardContent></CollapsibleContent>
+    </Card>
+  </Collapsible>
 }
 
 export type StatusTone = 'neutral' | 'pending' | 'success' | 'warning' | 'error'
@@ -170,12 +173,7 @@ export function StatusLine({ tone, children, id }: { tone: StatusTone; children:
 
 /** A short state label with a dot, for list rows. */
 export function StatusPill({ tone, children }: { tone: StatusTone; children: ReactNode }) {
-  return <span className={`inline-flex shrink-0 items-center gap-1.5 text-sm leading-6 ${toneClass[tone]}`}>
-    {tone === 'pending'
-      ? <StatusGlyph tone="pending" />
-      : <span aria-hidden="true" className="size-2 rounded-full bg-current" />}
-    {children}
-  </span>
+  return <SharedStatusPill bare size="md" tone={tone === 'pending' ? 'running' : tone === 'error' ? 'danger' : tone}>{children}</SharedStatusPill>
 }
 
 /** A banner for a form-wide state, such as an error the person must fix before saving. */

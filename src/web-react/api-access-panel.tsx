@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { PageHeader } from '@tangle-network/ui/primitives'
+import { Button, Input, PageHeader } from '@tangle-network/ui/primitives'
 
 export interface ApiAccessKey {
   id: string
@@ -48,10 +48,6 @@ export interface ApiAccessPanelProps {
 }
 
 const defaultExpiryChoices = [1, 7, 30] as const
-
-const inputClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground'
-const buttonClass = 'inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50'
-const outlineClass = 'inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground disabled:opacity-50'
 
 function pruneScopes(scopes: readonly string[], access: readonly ApiAccessScope[]): string[] {
   const offered = new Map(access.map(option => [option.scope, option]))
@@ -190,17 +186,17 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
               Keep it out of chat messages and prompts.
             </p>
             <div className="flex gap-2">
-              <input aria-label="New API key" type="password" value={created.key} readOnly autoComplete="off" className={`${inputClass} min-w-0 font-mono`} />
-              <button className={buttonClass} onClick={async () => {
+              <Input size="lg" aria-label="New API key" type="password" value={created.key} readOnly autoComplete="off" className="min-w-0 font-mono" />
+              <Button onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(created.key)
                   setNotice('Key copied')
                 } catch {
                   setError('Clipboard unavailable. Select the key field and copy it manually.')
                 }
-              }}>Copy key</button>
+              }}>Copy key</Button>
             </div>
-            <button className={outlineClass} onClick={() => { setCreated(null); setNotice(null) }}>I’ve saved it</button>
+            <Button variant="outline" onClick={() => { setCreated(null); setNotice(null) }}>I’ve saved it</Button>
           </section>
         ) : (
           <form onSubmit={createKey} className="space-y-5 rounded-xl border border-border bg-card p-5">
@@ -208,7 +204,7 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
             <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium" htmlFor="key-name">Name</label>
-                <input ref={nameInput} id="key-name" className={inputClass} value={name} onChange={event => setName(event.target.value)} placeholder="Client on my server" maxLength={100} required autoComplete="off" />
+                <Input size="lg" ref={nameInput} id="key-name" value={name} onChange={event => setName(event.target.value)} placeholder="Client on my server" maxLength={100} required autoComplete="off" />
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium" htmlFor="key-expiry">Expires in</label>
@@ -247,7 +243,7 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
               })}
             </fieldset>
             {limitsDescription && <p className="text-sm text-muted-foreground">{limitsDescription}</p>}
-            <button className={buttonClass} type="submit" disabled={creating || !name.trim() || !selectedScopes.length || selectedDays === undefined}>{creating ? 'Creating…' : 'Create key'}</button>
+            <Button type="submit" disabled={creating || !name.trim() || !selectedScopes.length || selectedDays === undefined}>{creating ? 'Creating…' : 'Create key'}</Button>
           </form>
         )}
 
@@ -269,9 +265,9 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
                       </p>
                     )}
                   </div>
-                  <button className={outlineClass} disabled={revoking !== null} onClick={() => revokeKey(key.id)} aria-label={`Revoke ${key.name}`}>
+                  <Button variant="outline" disabled={revoking !== null} onClick={() => revokeKey(key.id)} aria-label={`Revoke ${key.name}`}>
                     {revoking === key.id ? 'Revoking…' : 'Revoke'}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>

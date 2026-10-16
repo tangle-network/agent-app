@@ -54,8 +54,8 @@ function Harness({ initial = {}, registry: port, ...constraints }: { initial?: A
 }
 
 function openDisclosure(title: string) {
-  const summary = screen.getByText(title).closest('summary')
-  if (summary && !summary.parentElement?.hasAttribute('open')) fireEvent.click(summary)
+  const trigger = screen.getByRole('button', { name: title })
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger)
 }
 
 function search(label: string, query: string) {

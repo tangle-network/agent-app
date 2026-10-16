@@ -1,0 +1,530 @@
+{
+  "source": "de38bbc50b93167e1f35c479db058102cdb9db79",
+  "baselineRendererSource": "3fb3521d4d7c15355cb0dca9986e49177e4b77b7",
+  "sharedReleaseSource": "1109fe3aa2de8437fcebd431dc51210387f338d3",
+  "sharedReleaseUrl": "https://github.com/tangle-network/brand/releases/tag/%40tangle-network/ui%4011.37.0",
+  "gate": "beelink1-df1bf30b57d3d0b6abec7774248472a0",
+  "target": "Local source Storybook synthetic fixture; no production or published agent-app consumer claim",
+  "roles": {
+    "brandVersion": "1.25.1",
+    "uiVersion": "11.37.0",
+    "identitySource": "Exact frozen source lockfile and gate receipt; see shared owner immutable-source gate0ac943e1"
+  },
+  "matrix": "1280x1000 and390x844; agent-dark andagent-light; before normal, after normal/interrupted/reduced-motion",
+  "evidenceStates": {
+    "behavioralJourneys": "PASS",
+    "calibratedPresentedFrameLatency": "UNCHECKED",
+    "twoBatchesOfForty": "UNCHECKED",
+    "manualScreenReader": "UNKNOWN",
+    "physicalTouch": "UNKNOWN",
+    "actualDesktopZoom": "UNKNOWN",
+    "independentHumanCraft": "UNKNOWN"
+  },
+  "captureHelperSha256": "c7912a0d20fdd202501970fd7fdfd865341975a3c2342a70fabc74db045478b1",
+  "gateHelperSha256": "db8904f4d860992c61d84604a6dd8e2c45d7c139ec1774f47cf5ab46875986dc",
+  "beforeProvenance": {
+    "gate": "beelink1-d99b99491d1d43913a8d93b2bc23958b",
+    "source": "de38bbc50b93167e1f35c479db058102cdb9db79",
+    "rendererFixture": "3fb3521d4d7c15355cb0dca9986e49177e4b77b7",
+    "helperSha256": "4e9b9686caec11d05e5c7a4712ebade51c15c45da5a0fedf8ac1fbb6d11521a9",
+    "result": "4 normal baseline cases PASS",
+    "reuseReason": "Source, installed cohort, viewport/theme and baseline fixture unchanged; reduced-check correction applies only to after phase. Originals copied unchanged, failed after attempt retained separately."
+  },
+  "media": [
+    {
+      "path": "before/agent-dark-1280-normal-completed.png",
+      "bytes": 81673,
+      "sha256": "3208d5f25686e98e3243664e9f11317c11e53f596f57ba821679f772f1a71031"
+    },
+    {
+      "path": "before/agent-dark-1280-normal-dialog.png",
+      "bytes": 88797,
+      "sha256": "6db06a64924d90b1f851f6af696b4ac8a99f1de24a7a59b31e09317574969405"
+    },
+    {
+      "path": "before/agent-dark-1280-normal.png",
+      "bytes": 81353,
+      "sha256": "90121e4591f8c8dbd5a3f80e706b1d8ad70ad11787248fb2e0807df2134cca90"
+    },
+    {
+      "path": "before/agent-dark-390-normal-completed.png",
+      "bytes": 72919,
+      "sha256": "82c7dad13749b61ff836ab07c96ee5b60a7c8a7bd105caf0d8ffe7400036abc0"
+    },
+    {
+      "path": "before/agent-dark-390-normal-dialog.png",
+      "bytes": 78706,
+      "sha256": "455d9d39ebbb351c576382838ab5252205ae46edd47f79358c61151ab9106574"
+    },
+    {
+      "path": "before/agent-dark-390-normal.png",
+      "bytes": 72851,
+      "sha256": "e2a3f15b0859245d67102ac92f7e7ec725fd10e23af6a2499748c08b520f1859"
+    },
+    {
+      "path": "before/agent-light-1280-normal-completed.png",
+      "bytes": 79600,
+      "sha256": "87d9d55089b4fea0bdea632ec4fad98b44c66c1b109ae5ab18e5fe49fed19256"
+    },
+    {
+      "path": "before/agent-light-1280-normal-dialog.png",
+      "bytes": 85604,
+      "sha256": "2de6f4c9270a97e44d3fed661db2bf1acf20ae84a292089a0520cf64d27c0b86"
+    },
+    {
+      "path": "before/agent-light-1280-normal.png",
+      "bytes": 79660,
+      "sha256": "f5a9a80bbb15d51c6c059476a8621ad084c50ebd06229b613de06797d16e0d6a"
+    },
+    {
+      "path": "before/agent-light-390-normal-completed.png",
+      "bytes": 70619,
+      "sha256": "9324449fd4d7594918208ae2245af8465b9008c7e11320ad291acc724d64382e"
+    },
+    {
+      "path": "before/agent-light-390-normal-dialog.png",
+      "bytes": 76200,
+      "sha256": "7833e60078e9d5497cf5b0036da6bf066f4a892a16c6b25002cc66809893b5be"
+    },
+    {
+      "path": "before/agent-light-390-normal.png",
+      "bytes": 70945,
+      "sha256": "55355a34f729a9dddb6c0f9d2706864bcc3c27921a2870b66cf0edc7a7393099"
+    },
+    {
+      "path": "before/page@31e6f39bfda8299b7d4061ca928dfc14.webm",
+      "bytes": 1206058,
+      "sha256": "033001c7c8278c35cabe9e76161f4a3ef22cec8cda3d8d094a09bdb55eeb97d9"
+    },
+    {
+      "path": "before/page@3fedd10d38c166616d9c0ad90d1d9913.webm",
+      "bytes": 581454,
+      "sha256": "af6c9d5b695a9617d971071da2eec45e0b55f8426bef37820d1da1268ed7caaf"
+    },
+    {
+      "path": "before/page@6e53fe0ca741b90f028ef8114d16b0de.webm",
+      "bytes": 481142,
+      "sha256": "07c763a3028564f83766a70f73d410041bebd17cacf8bd102ac8cf1685642549"
+    },
+    {
+      "path": "before/page@d82b383676a0750fdbe898b8096cce02.webm",
+      "bytes": 1206248,
+      "sha256": "5130a58eed1459c047cb123e6769a04a1911bd0e19001d2d93fda470c6e706a8"
+    },
+    {
+      "path": "before/receipt.json",
+      "bytes": 3536,
+      "sha256": "a08b8945f5074f3dc36677024b805bf15a82054563a0f2659d0ab8aaf65f6bbc"
+    },
+    {
+      "path": "before/story-index.json",
+      "bytes": 999,
+      "sha256": "00ce13b0d7b86d457178e29ca6550a2d16506d8af75bd5146a9678bbf4948bbf"
+    },
+    {
+      "path": "after/agent-dark-1280-interrupted-completed.png",
+      "bytes": 83932,
+      "sha256": "e14e3722a86e4af1694e7ea55067ecd1abab53d46b0f38421ff07ad4431090f0"
+    },
+    {
+      "path": "after/agent-dark-1280-interrupted-dialog.png",
+      "bytes": 87609,
+      "sha256": "012057836ced2594ef88e0d00ab934e2b018f67d56d130266ecdb8057c08bcbc"
+    },
+    {
+      "path": "after/agent-dark-1280-interrupted.png",
+      "bytes": 84147,
+      "sha256": "1d0e20e7e6decb552015c595c236bea1172a6dae2c9dfb97327dadc3056647cf"
+    },
+    {
+      "path": "after/agent-dark-1280-normal-completed.png",
+      "bytes": 83936,
+      "sha256": "fc587ac2ec61d31bbef4e0981e278a2bec1309033f8bd82a9bcc3673d4ec733f"
+    },
+    {
+      "path": "after/agent-dark-1280-normal-dialog.png",
+      "bytes": 87609,
+      "sha256": "012057836ced2594ef88e0d00ab934e2b018f67d56d130266ecdb8057c08bcbc"
+    },
+    {
+      "path": "after/agent-dark-1280-normal.png",
+      "bytes": 84147,
+      "sha256": "1d0e20e7e6decb552015c595c236bea1172a6dae2c9dfb97327dadc3056647cf"
+    },
+    {
+      "path": "after/agent-dark-1280-reduced-motion-completed.png",
+      "bytes": 83929,
+      "sha256": "1129cd8ffe6cfe611f12e5124aad2e3a961a8e942b0423417facf8c8be12f810"
+    },
+    {
+      "path": "after/agent-dark-1280-reduced-motion-dialog.png",
+      "bytes": 87609,
+      "sha256": "012057836ced2594ef88e0d00ab934e2b018f67d56d130266ecdb8057c08bcbc"
+    },
+    {
+      "path": "after/agent-dark-1280-reduced-motion.png",
+      "bytes": 84147,
+      "sha256": "1d0e20e7e6decb552015c595c236bea1172a6dae2c9dfb97327dadc3056647cf"
+    },
+    {
+      "path": "after/agent-dark-390-interrupted-completed.png",
+      "bytes": 75119,
+      "sha256": "2a9c6770ff8ccbfcafde15286f4987b4479dbf1fe4a998bec21d330509543254"
+    },
+    {
+      "path": "after/agent-dark-390-interrupted-dialog.png",
+      "bytes": 78793,
+      "sha256": "28303411ec6032e7ec7b26dcd0767a9dd6fa9eadb39ae6fcf21792f82d8c4125"
+    },
+    {
+      "path": "after/agent-dark-390-interrupted.png",
+      "bytes": 75039,
+      "sha256": "326be9cafcf0b4e31770c7182d2746dda3711e37b5afbc10e27d2a3917aba0d2"
+    },
+    {
+      "path": "after/agent-dark-390-normal-completed.png",
+      "bytes": 75128,
+      "sha256": "113d45b819844dd5131801bf080edd39f2a18515206141cb6de2db1b79a3dedd"
+    },
+    {
+      "path": "after/agent-dark-390-normal-dialog.png",
+      "bytes": 78738,
+      "sha256": "13f7f06c7165ac302c31d87364b1f87691a44d62e7ef9d799803d94916d2f671"
+    },
+    {
+      "path": "after/agent-dark-390-normal.png",
+      "bytes": 75039,
+      "sha256": "326be9cafcf0b4e31770c7182d2746dda3711e37b5afbc10e27d2a3917aba0d2"
+    },
+    {
+      "path": "after/agent-dark-390-reduced-motion-completed.png",
+      "bytes": 75127,
+      "sha256": "19161af6d009884e908117a44852455529495233a8495e98acc0ffcdc19cc155"
+    },
+    {
+      "path": "after/agent-dark-390-reduced-motion-dialog.png",
+      "bytes": 77975,
+      "sha256": "079c9ca14396168e67ff64642a78f5603d65ada7bbaa78d660da5c7948bd3465"
+    },
+    {
+      "path": "after/agent-dark-390-reduced-motion.png",
+      "bytes": 75039,
+      "sha256": "326be9cafcf0b4e31770c7182d2746dda3711e37b5afbc10e27d2a3917aba0d2"
+    },
+    {
+      "path": "after/agent-light-1280-interrupted-completed.png",
+      "bytes": 81585,
+      "sha256": "a3bd9e801fd2ffab8c9afb951daa02ed11f9a8fd7edfc305433ec0fbef499732"
+    },
+    {
+      "path": "after/agent-light-1280-interrupted-dialog.png",
+      "bytes": 86731,
+      "sha256": "d328f1e97feacd05c65809ea38d8e0201b1fd739a30f8e934c141dd72c388040"
+    },
+    {
+      "path": "after/agent-light-1280-interrupted.png",
+      "bytes": 82556,
+      "sha256": "b411cad1d5449447046ae7cfc24f8fe6fcf56b2367cf844c0626fdb00c787701"
+    },
+    {
+      "path": "after/agent-light-1280-normal-completed.png",
+      "bytes": 81585,
+      "sha256": "a3bd9e801fd2ffab8c9afb951daa02ed11f9a8fd7edfc305433ec0fbef499732"
+    },
+    {
+      "path": "after/agent-light-1280-normal-dialog.png",
+      "bytes": 86698,
+      "sha256": "87ec20555d6b19cd65d0aedf65f066c2d9c5cafe2f5f6137e9b8d0d0d9e29409"
+    },
+    {
+      "path": "after/agent-light-1280-normal.png",
+      "bytes": 82556,
+      "sha256": "b411cad1d5449447046ae7cfc24f8fe6fcf56b2367cf844c0626fdb00c787701"
+    },
+    {
+      "path": "after/agent-light-1280-reduced-motion-completed.png",
+      "bytes": 81590,
+      "sha256": "857b2f543143f4329ed8e950043210f06574071fca185355257bee67927288b4"
+    },
+    {
+      "path": "after/agent-light-1280-reduced-motion-dialog.png",
+      "bytes": 86700,
+      "sha256": "1b7a8357517431648a0fb61bf4ee881b028472612fac9890d3acf712737e5dd1"
+    },
+    {
+      "path": "after/agent-light-1280-reduced-motion.png",
+      "bytes": 82554,
+      "sha256": "d18dd85c71999c08bcf7dd456a9a4638f6001f9f56c176c0e440dbbd5151b410"
+    },
+    {
+      "path": "after/agent-light-390-interrupted-completed.png",
+      "bytes": 72946,
+      "sha256": "d3b79dad6df88bfb93373b5befe8552e5284370a6278badf13290e65134f1b70"
+    },
+    {
+      "path": "after/agent-light-390-interrupted-dialog.png",
+      "bytes": 77321,
+      "sha256": "d747d6dc4f80715fd55dfc06e7545d693b4b507081d552d82e923bc72168debd"
+    },
+    {
+      "path": "after/agent-light-390-interrupted.png",
+      "bytes": 73366,
+      "sha256": "e83830770ee18bc7e272fddbbba0448476e6bcc9e1293dfb1b54bb809d1c2d92"
+    },
+    {
+      "path": "after/agent-light-390-normal-completed.png",
+      "bytes": 72954,
+      "sha256": "25b4af69b6e27823e7218803f02ef0cdd3fe2d4b80936fb7002bf0e871b568dc"
+    },
+    {
+      "path": "after/agent-light-390-normal-dialog.png",
+      "bytes": 77297,
+      "sha256": "1c07bee9ec4751c4e901991800f6d4aa4e574bc3b61d1789275466a95a1d85eb"
+    },
+    {
+      "path": "after/agent-light-390-normal.png",
+      "bytes": 73371,
+      "sha256": "11675dfca2a2032aad6a3e54aeaef28c6c414194aaa471c5bfa239c6af6df512"
+    },
+    {
+      "path": "after/agent-light-390-reduced-motion-completed.png",
+      "bytes": 72940,
+      "sha256": "d528ca4d1a7e05079e3ce018178602d8346139ee88820e08118e728182ac0acc"
+    },
+    {
+      "path": "after/agent-light-390-reduced-motion-dialog.png",
+      "bytes": 76730,
+      "sha256": "267518c10cf0c384249ae24f387afe92954eea506f2ecfc0a59886d226571442"
+    },
+    {
+      "path": "after/agent-light-390-reduced-motion.png",
+      "bytes": 73371,
+      "sha256": "11675dfca2a2032aad6a3e54aeaef28c6c414194aaa471c5bfa239c6af6df512"
+    },
+    {
+      "path": "after/page@2f4cce0322eec761b5d6644692f09f8f.webm",
+      "bytes": 968929,
+      "sha256": "25d2a598ad3138bfedd0be7724f7a71e90f388e4040f9a121517af9fc733567a"
+    },
+    {
+      "path": "after/page@3b1e221a1dd9cee605b1b3283e9e88c1.webm",
+      "bytes": 1628129,
+      "sha256": "6d0bc33e1b9e73beaec5215bf502ebad8d5d488130c9b63aae6660c48c8f9d7a"
+    },
+    {
+      "path": "after/page@3b77286d66194ea0a6541c1cef3d5ece.webm",
+      "bytes": 1180151,
+      "sha256": "f36d3dfcf149418b2ea1d0616612b81a298605848f1b4d2a1273e28cb5fd75c5"
+    },
+    {
+      "path": "after/page@3d71b0fbdc55df0928bfe403af29210d.webm",
+      "bytes": 616320,
+      "sha256": "2c609ca849ad61860e818d3542258903b3a564b7c4cdbf003213e128d81a4ac2"
+    },
+    {
+      "path": "after/page@54188b96bcf6fada899e91573bca81d7.webm",
+      "bytes": 453210,
+      "sha256": "069ab688af74ad66510199b6ab1ed6d1da86401fcaa066676a2502aac04b3acf"
+    },
+    {
+      "path": "after/page@61f7302e46a07aae542cc647a594c3f3.webm",
+      "bytes": 1363883,
+      "sha256": "c0aa21261f9ae7f94931d9e61a2a7575804126e390e5d193de7f3e20fb382fbb"
+    },
+    {
+      "path": "after/page@6c3ef14c94573e764b2e360a019309a3.webm",
+      "bytes": 1440442,
+      "sha256": "e6eae86406fc2b7e87e1e6e8c95dde2ddcff727177726bc131dee27e4c13497b"
+    },
+    {
+      "path": "after/page@93a44635cff2191696786e148e19d242.webm",
+      "bytes": 654663,
+      "sha256": "c27364984aaf8cc519a633751ec53d96c65343832c03437aa8e5777f2c89c7f4"
+    },
+    {
+      "path": "after/page@ace02ca7b8e65a027fdcf26eaef9837f.webm",
+      "bytes": 781229,
+      "sha256": "cfca5b4b48ef23974ff4628632711b9b7d6e27c8107cd6f99d58e6bacc2022a3"
+    },
+    {
+      "path": "after/page@c202184727adc004f9a44df76312629b.webm",
+      "bytes": 1285249,
+      "sha256": "2c7ac6c23decba3e2ced1699ea31664ffa5e6b4d29bb5388d398b7a8cd535060"
+    },
+    {
+      "path": "after/page@d5ed144cb9b79cc5a27e2ac868a8f03e.webm",
+      "bytes": 913403,
+      "sha256": "94c0de109632e7c8d267024eb218ee78e597e39654e61eef55fda3bed76822ce"
+    },
+    {
+      "path": "after/page@f7c9b01675576771c36088064268741d.webm",
+      "bytes": 457754,
+      "sha256": "2df558f3587bae9d543176df60f13d6b9209608a4e269547e9cbfe9f4f46f312"
+    },
+    {
+      "path": "after/receipt.json",
+      "bytes": 1547411,
+      "sha256": "38c952199051403677efeed288ab473bcd4a1ac1b04db8906e51b306d2d00929"
+    },
+    {
+      "path": "after/story-index.json",
+      "bytes": 999,
+      "sha256": "00ce13b0d7b86d457178e29ca6550a2d16506d8af75bd5146a9678bbf4948bbf"
+    },
+    {
+      "path": "historical-failed-after/page@3fde0da67639f6b93d43c4b7943cf2ab.webm",
+      "bytes": 681615,
+      "sha256": "b2bc370642f73ae5d9feb10b0056bc91a270abeb95051b8e2aedf94324b04da7"
+    },
+    {
+      "path": "historical-failed-after/receipt.json",
+      "bytes": 10035,
+      "sha256": "c09dcb116bda29f0fb7caaae29e76e4981b3ba0b873127cd90aa35d0fcc3c669"
+    },
+    {
+      "path": "historical-failed-after/agent-dark-1280-normal-failure.png",
+      "bytes": 87635,
+      "sha256": "4f6187df0939a16b3bd518e0531293b7c71ec91f9f63541ff44ba820d431554c"
+    },
+    {
+      "path": "historical-failed-after/agent-dark-1280-normal-failure.json",
+      "bytes": 9754,
+      "sha256": "0c05f166af1bc3d67b7edf79be2481619553a6430e6ea644817ee5da8ac971b1"
+    },
+    {
+      "path": "historical-failed-after/agent-dark-1280-normal.png",
+      "bytes": 84147,
+      "sha256": "1d0e20e7e6decb552015c595c236bea1172a6dae2c9dfb97327dadc3056647cf"
+    },
+    {
+      "path": "audit-summary.json",
+      "bytes": 10621,
+      "sha256": "123d7f14b1e34c2815ad8cbea7f10ef299e0061c24b2a543238a191bc28a62e6"
+    },
+    {
+      "path": "video-review-index.json",
+      "bytes": 3808,
+      "sha256": "b2a008d2629ac73397d8d8bb519db4aebe96c20888ab298e8d3e047ec9b6f3b8"
+    }
+  ],
+  "cases": [
+    {
+      "phase": "before",
+      "case": "agent-dark-1280-normal",
+      "video": "before/page@d82b383676a0750fdbe898b8096cce02.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "dfb56f9719e8ecbbf9737ece859f9de404a3974189885547248084f2b8a4a5de"
+    },
+    {
+      "phase": "before",
+      "case": "agent-light-1280-normal",
+      "video": "before/page@31e6f39bfda8299b7d4061ca928dfc14.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "31941796a61902c9d42b9e14a307a2bd1a54a5e3becdc606391a879257c70720"
+    },
+    {
+      "phase": "before",
+      "case": "agent-dark-390-normal",
+      "video": "before/page@3fedd10d38c166616d9c0ad90d1d9913.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "c9bd8c343861d4c9871e3c98e061bc49fc44118651ff3321e71e71224879e313"
+    },
+    {
+      "phase": "before",
+      "case": "agent-light-390-normal",
+      "video": "before/page@6e53fe0ca741b90f028ef8114d16b0de.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "821f74ac6b119085d453fbd5942df156cee1d9820337e47925681a6389097c72"
+    },
+    {
+      "phase": "after",
+      "case": "agent-dark-1280-normal",
+      "video": "after/page@c202184727adc004f9a44df76312629b.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "1db352a81a6b4c37785fc534c21ef1c9b4bacace1f999a72eec3f52ed2ff29bc"
+    },
+    {
+      "phase": "after",
+      "case": "agent-light-1280-normal",
+      "video": "after/page@3b1e221a1dd9cee605b1b3283e9e88c1.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "3c4dc03cf91fef6b5fced41ff5f1cae9400d62805dd08a1f40f840a48084d8dd"
+    },
+    {
+      "phase": "after",
+      "case": "agent-dark-390-normal",
+      "video": "after/page@ace02ca7b8e65a027fdcf26eaef9837f.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "705d51f2a6f27010186d3bc33e41eaca6841ab574fa54c87139f361198bda2cf"
+    },
+    {
+      "phase": "after",
+      "case": "agent-light-390-normal",
+      "video": "after/page@3d71b0fbdc55df0928bfe403af29210d.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "b2ad4ed8317c5cd7647d5d0723b96421796297c9fb39ef017b2ad58eac7dfe2b"
+    },
+    {
+      "phase": "after",
+      "case": "agent-dark-1280-interrupted",
+      "video": "after/page@6c3ef14c94573e764b2e360a019309a3.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "fe2e1b156bcb3c9fa54d7a10b023b728b9fe9144e5f0138d6ee3554c1e5494d4"
+    },
+    {
+      "phase": "after",
+      "case": "agent-light-1280-interrupted",
+      "video": "after/page@61f7302e46a07aae542cc647a594c3f3.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "3ef421eb8694bc246a7fd1f8c9f04f23f46dc1171f9d533562ae150a06e55ddb"
+    },
+    {
+      "phase": "after",
+      "case": "agent-dark-390-interrupted",
+      "video": "after/page@d5ed144cb9b79cc5a27e2ac868a8f03e.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "ac5a555101e1f9238607f2d7063ea1ddadaa841d7f22bb83870af4224ca80a06"
+    },
+    {
+      "phase": "after",
+      "case": "agent-light-390-interrupted",
+      "video": "after/page@93a44635cff2191696786e148e19d242.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "e767aeadec7e3234a8daf22343cf4daa66e43ea8314326b8898f32596ba80923"
+    },
+    {
+      "phase": "after",
+      "case": "agent-dark-1280-reduced-motion",
+      "video": "after/page@2f4cce0322eec761b5d6644692f09f8f.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "dbd723e5851a9dc56b568f8e20477965266414083360ad84a874c1b194aaa3c0"
+    },
+    {
+      "phase": "after",
+      "case": "agent-light-1280-reduced-motion",
+      "video": "after/page@3b77286d66194ea0a6541c1cef3d5ece.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "413ce3ea91e2f327421b1033ed782dab4813bc99978a8e1141890b9014d80c9d"
+    },
+    {
+      "phase": "after",
+      "case": "agent-dark-390-reduced-motion",
+      "video": "after/page@f7c9b01675576771c36088064268741d.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "4a4484b4d75b61beecb0c61a1c0b01352564f71fb09bef1e6b6e08265b163dd6"
+    },
+    {
+      "phase": "after",
+      "case": "agent-light-390-reduced-motion",
+      "video": "after/page@54188b96bcf6fada899e91573bca81d7.webm",
+      "videoAssociation": "Sequential contexts close before the next begins; original recording final-write order matched to retained receipt order. Originals are unchanged.",
+      "privateTraceSha256": "23dc8dad61892e3508a01fdf6e37c452ccc7f52cc0bf65a65dc3cf363d26dcab"
+    }
+  ],
+  "historicalFailedAfter": {
+    "source": "de38bbc50b93167e1f35c479db058102cdb9db79",
+    "gate": "beelink1-d99b99491d1d43913a8d93b2bc23958b",
+    "result": "FAIL: identity transform string predicate; original live instrument population UNKNOWN",
+    "helperSha256": "4e9b9686caec11d05e5c7a4712ebade51c15c45da5a0fedf8ac1fbb6d11521a9"
+  }
+}

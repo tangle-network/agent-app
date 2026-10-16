@@ -1,5 +1,6 @@
 [
   { "component": "ChatComposer", "source": "src/web-react/chat-composer.tsx", "storyFile": "src/stories/chat-controls/ChatComposer.stories.tsx", "task": "Compose, attach, submit and recover a request" },
   { "component": "AgentSessionControls", "source": "src/web-react/agent-session-controls.tsx", "storyFile": "src/stories/chat-controls/AgentSessionControls.stories.tsx", "task": "Choose the actual execution controls" },
-  { "component": "VaultPane", "source": "src/vault/VaultPane.tsx", "storyFile": "src/stories/vault/VaultPane.stories.tsx", "task": "Inspect the private knowledge surface" }
+  { "component": "VaultPane", "source": "src/vault/VaultPane.tsx", "storyFile": "src/stories/vault/VaultPane.stories.tsx", "task": "Inspect the private knowledge surface" },
+  { "component": "SharedPrimitives", "source": "src/web-react/action-dialog.tsx", "storyFile": "src/stories/app-shell/SharedPrimitives.stories.tsx", "task": "Rename, interrupt and return; preserve disclosure drafts; edit records and issue a synthetic fixture key", "instrument": "src/stories/app-shell/interaction-evidence.ts" }
 ]
