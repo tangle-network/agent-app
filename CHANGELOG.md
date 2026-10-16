@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.181
+
+- fix(teams): accept invitations atomically across workspace transfers
+
 ## 0.60.180
 
 - feat(approvals): add media previews and a scored review inbox
