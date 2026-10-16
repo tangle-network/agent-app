@@ -24,7 +24,7 @@ const db = new DatabaseSync(path.join(output, 'media-feedback.sqlite'))
 db.exec('CREATE TABLE IF NOT EXISTS previews (id TEXT PRIMARY KEY, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY, approval_id TEXT NOT NULL, body TEXT NOT NULL)')
 const require = createRequire(import.meta.url)
 const { build } = await import(createRequire(require.resolve('tsup')).resolve('esbuild'))
-const checks = [], playback = [], externalRequests = [], browserErrors = []
+const checks = [], playback = [], swipes = [], externalRequests = [], browserErrors = []
 let checkName = 'initial render', browser, context, page, server
 
 // This runs inside the real browser: its MediaRecorder creates an actual moving WebM fixture.
@@ -195,10 +195,25 @@ try {
       await expect(page.getByText('Slide 1 of 3', { exact: true })).toHaveText('Slide 1 of 3')
       const scroller = page.locator('[data-hub-media-carousel-scroll]')
       await scroller.scrollIntoViewIfNeeded()
+      await expect.poll(() => scroller.evaluate(element => element.scrollLeft)).toBeLessThan(1)
       const box = await scroller.boundingBox()
+      const viewport = page.viewportSize()
+      const y = Math.max(24, Math.min(box.y + box.height / 2, viewport.height - 72))
+      assert.ok(y > box.y && y < box.y + box.height, 'Touch gesture must start inside the visible carousel')
       const cdp = await context.newCDPSession(page)
-      await cdp.send('Input.synthesizeScrollGesture', { x: box.x + box.width / 2, y: Math.min(box.y + box.height / 2, 700), xDistance: -box.width * 0.85, yDistance: 0, gestureSourceType: 'touch', speed: 500 })
+      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
+      const touch = x => [{ x, y, id: 1, radiusX: 1, radiusY: 1, force: 1 }]
+      const start = box.x + box.width * 0.85
+      const distance = box.width * 0.7
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: touch(start) })
+      for (let step = 1; step <= 12; step++) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: touch(start - distance * step / 12) })
+        await page.evaluate(() => new Promise(requestAnimationFrame))
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
       await expect.poll(() => scroller.evaluate(element => element.scrollLeft / element.clientWidth)).toBeGreaterThan(0.5)
+      swipes.push({ fixture: fixture.id, box, xFrom: start, xTo: start - distance, y,
+        afterSlides: await scroller.evaluate(element => element.scrollLeft / element.clientWidth), source: 'native Chromium touch events' })
       await cdp.detach()
       await page.screenshot({ path: path.join(output, 'instagram-carousel-after-swipe.png'), fullPage: true })
     }
@@ -256,7 +271,7 @@ try {
   if (server) await new Promise(resolve => server.close(resolve))
   const items = list()
   const report = { target: 'Built shared approval UI and local HTTP/SQLite fixture transport', revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
-    capturedAt: new Date().toISOString(), faultVideoPoster, checks, playback, externalRequests, browserErrors,
+    capturedAt: new Date().toISOString(), faultVideoPoster, checks, playback, swipes, externalRequests, browserErrors,
     previewCount: items.length, scoredCount: items.filter(item => Number.isFinite(item.feedback?.score)).length,
     missingCoverage: ['Actual Drew ratings', 'Real phone hardware gestures', 'Platform screenshot fidelity comparison', 'Deployed GTM consumer', 'Live publishing or ad buying'] }
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
