@@ -1922,7 +1922,7 @@
         {
           "name": "TangleKnot",
           "kind": "function",
-          "signature": "({ size, className }: { size?: number | undefined; className?: string | undefined; }) => Element",
+          "signature": "({ size, className, label }: TangleKnotProps) => Element",
           "doc": null
         }
       ]
@@ -27013,6 +27013,12 @@
           "kind": "interface",
           "signature": "interface UseChatInteractionsResult",
           "doc": "Resolve and manage chat interactions with methods to update, cancel, mark resolved, and restore state"
+        },
+        {
+          "name": "useChatScroll",
+          "kind": "function",
+          "signature": "() => { viewportRef: Dispatch<SetStateAction<HTMLDivElement | null>>; contentRef: Dispatch<SetStateAction<HTMLDivElemen…",
+          "doc": "Follow a growing transcript only while its reader stays at the bottom."
         },
         {
           "name": "useComposerAttachments",

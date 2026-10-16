@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-507 exports.
+508 exports.
 
 ### `acceptRejectionReason`
 
@@ -3668,6 +3668,14 @@ type UseChatInteractionsOptions
 
 ```ts
 interface UseChatInteractionsResult
+```
+
+### `useChatScroll`
+
+`function` — Follow a growing transcript only while its reader stays at the bottom.
+
+```ts
+() => { viewportRef: Dispatch<SetStateAction<HTMLDivElement | null>>; contentRef: Dispatch<SetStateAction<HTMLDivElemen…
 ```
 
 ### `useComposerAttachments`
