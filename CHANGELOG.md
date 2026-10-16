@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.175
+
+- fix(deps): support Hub SDK 0.30.2 in agent apps (#1126)
+- docs(integrations): refresh policy API map [skip release] (#1124)
+
 ## 0.60.174
 
 - fix(integrations): show enforced approval policy and OAuth retry (#1123)
