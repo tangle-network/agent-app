@@ -7696,7 +7696,7 @@
           "name": "coerceHarness",
           "kind": "function",
           "signature": "(value: unknown, fallback?: Harness) => Harness",
-          "doc": "Coerce an arbitrary value to a known harness, falling back (default `opencode`)."
+          "doc": "Display/config convenience only."
         },
         {
           "name": "configuredHarness",
@@ -7708,19 +7708,25 @@
           "name": "DEFAULT_HARNESS",
           "kind": "const",
           "signature": "Harness",
-          "doc": "Define the default harness to use for code execution and testing environments"
+          "doc": "Default for an absent choice; never a replacement for an invalid explicit ID."
         },
         {
           "name": "Harness",
           "kind": "type",
           "signature": "type Harness",
-          "doc": "A coding-agent backend this shell can dispatch a session onto."
+          "doc": "A recognized coding-agent backend, not a promise that it is installed."
+        },
+        {
+          "name": "HarnessAvailability",
+          "kind": "type",
+          "signature": "type HarnessAvailability",
+          "doc": "Server-owned start and resume sets."
         },
         {
           "name": "harnessCapabilities",
           "kind": "function",
           "signature": "(harness: Harness) => HarnessCapabilities",
-          "doc": "The capability facts for `harness`."
+          "doc": "Profile-support facts, independent of whether this deployment enables the harness."
         },
         {
           "name": "HarnessCapabilities",
@@ -7741,10 +7747,16 @@
           "doc": "A resolved model and the transport provider that will execute it."
         },
         {
+          "name": "HarnessSelectionError",
+          "kind": "class",
+          "signature": "class HarnessSelectionError",
+          "doc": "An admission failure, never permission to retry on another harness."
+        },
+        {
           "name": "isHarness",
           "kind": "function",
           "signature": "(value: unknown) => value is Harness",
-          "doc": "Determine if a value is a recognized harness string identifier"
+          "doc": "Determine whether a value is a recognized identity, independently of availability."
         },
         {
           "name": "isModelCompatibleWithHarness",
@@ -7756,7 +7768,7 @@
           "name": "KNOWN_HARNESSES",
           "kind": "const",
           "signature": "readonly Harness[]",
-          "doc": "The known coding-agent backends: the canonical harness set minus what has no provider adapter, Derived from `harnessTypeSchema.options` so a harness added upstream reaches this shell without an edit…"
+          "doc": "Recognized backend identities, including IDs needed by historical sessions."
         },
         {
           "name": "modelProvider",
@@ -7766,21 +7778,21 @@
         },
         {
           "name": "ResolvedSessionHarness",
-          "kind": "interface",
-          "signature": "interface ResolvedSessionHarness",
-          "doc": "Represent resolved session state including harness, lock status, and swap attempt flag"
+          "kind": "type",
+          "signature": "type ResolvedSessionHarness",
+          "doc": "The selected identity and the existing session-lock/swap-attempt result."
         },
         {
           "name": "resolveSessionHarness",
           "kind": "function",
           "signature": "(input?: ResolveSessionHarnessInput) => ResolvedSessionHarness",
-          "doc": "Resolve the harness for a turn, enforcing the session lock."
+          "doc": "Resolve requested → workspaceDefault → fallback only for a genuinely new session."
         },
         {
           "name": "ResolveSessionHarnessInput",
-          "kind": "interface",
-          "signature": "interface ResolveSessionHarnessInput",
-          "doc": "Resolve input options to determine the appropriate session harness to use"
+          "kind": "type",
+          "signature": "type ResolveSessionHarnessInput",
+          "doc": "A saved lock, explicit choice, workspace default, and optional deployment availability."
         },
         {
           "name": "snapHarnessToModel",
