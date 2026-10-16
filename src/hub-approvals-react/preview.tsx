@@ -3,8 +3,8 @@ import { ApprovalDiffSummary } from '@tangle-network/ui/run'
 
 import { formatMinorAmount, formatWhen, type HubActionPreview } from '../hub-approvals'
 import { Chip, HubFieldList } from './parts'
-import { EmailPreview, embeddedPreviewImage, linkedText } from './email'
-import { HubMediaPreview } from './media'
+import { EmailPreview, linkedText } from './email'
+import { HubMediaPreview, previewMediaSource } from './media'
 
 function initial(name: string | null | undefined): string {
   return (name?.trim().replace(/^@/, '').charAt(0) || '?').toUpperCase()
@@ -177,7 +177,7 @@ export function HubActionPreviewView({ preview, account }: { preview: HubActionP
             <p className="text-sm text-muted-foreground">Sponsored · {preview.placement}</p>
             {preview.text && <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{preview.text}</p>}
           </div>
-          {preview.image && (embeddedPreviewImage(preview.image)
+          {preview.image && (previewMediaSource(preview.image, 'image')
             ? <img src={preview.image} alt={preview.headline ?? 'Ad creative'} className="aspect-[1.91/1] w-full object-cover" />
             : <p className="bg-muted p-4 text-sm text-muted-foreground">Creative image not embedded in this preview</p>)}
           <div className="flex flex-wrap items-center gap-3 bg-muted/40 px-4 py-3">
@@ -190,7 +190,7 @@ export function HubActionPreviewView({ preview, account }: { preview: HubActionP
       return (
         <Panel className="overflow-hidden">
           <div className="border-b border-border px-4 py-2"><p className="text-sm font-medium text-foreground">{preview.title ?? 'Page preview'}</p>{preview.url && <p className="truncate text-sm text-muted-foreground">{preview.url}</p>}</div>
-          {embeddedPreviewImage(preview.screenshot)
+          {previewMediaSource(preview.screenshot, 'image')
             ? <img src={preview.screenshot} alt={preview.title ?? 'Page screenshot'} className="h-auto w-full" />
             : <p className="p-4 text-sm text-muted-foreground">A captured screenshot is needed to preview this page.</p>}
         </Panel>
