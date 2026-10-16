@@ -4,51 +4,60 @@ PR: https://github.com/tangle-network/agent-app/pull/1120
 Policy: https://github.com/tangle-network/brand/blob/main/docs/design-bible.md
 Protocol: https://github.com/tangle-network/brand/blob/main/docs/design-evidence-contract.md
 
-This is a synthetic shared-component consumer fixture. No model turn, production
-API mutation, provider operation, real account or customer data is exercised.
-No user-study, published-package or production-flow success is claimed.
-Drew approves design direction through the existing PR.
+The source Storybook synthetic fixture passed four BEFORE contexts and twelve AFTER
+contexts: desktop/phone, dark/light; AFTER adds normal, interrupted and reduced
+motion. Executable source is `de38bbc50b93167e1f35c479db058102cdb9db79`.
+This proves the scoped source behavior below. Published agent-app consumer proof
+remains **0 of 11** inventoried primitive/file pairs. No production API, provider,
+real account or customer data is exercised. Expected external effects are zero.
 
-## Current evidence rows
+## Evidence rows
 
-| Changed surface / rule | State | Evidence and exact next check |
+| Changed surface / rule | State | Evidence and limits |
 | --- | --- | --- |
-| Shared ownership and preserved callbacks | Static reviewed; runtime incomplete | Six inventoried files compose shared UI, preserving grid editing/rollback, async branches and application callbacks. Independent source review and 148 scoped tests passed at `78b290f0`; later production changes remain unverified. |
-| Immediate local acknowledgment | UNCHECKED | The existing Shared primitives story now owns `interaction-evidence.ts`. It reads all budget values from computed `--interaction-*` roles on each actual input target and converts CSS seconds/milliseconds. It retains input/handler/DOM/frame clocks and every sample. Any unresolved attempt suppresses its batch percentile/maximum summaries. Observation stops at the maximum computed interaction-role time; absent/invalid roles retain an unresolved sample without an observer or fallback value. Observers/timers end on resolution, expiry or unmount, with disposed guards for queued work. DOM/frame callbacks are candidate bounds, never silently equated with presented frames. |
-| Normal, interrupted and reduced-motion protocol | UNCHECKED | The live instrument declares batches, consecutive attempts, cold/warm separation, resets and conditions. Run each action/condition separately, preserve all failures and calibrate against the role-derived deliberately delayed visible fixture plus trace/recording frames. Attach environment, refresh-rate, clock and capture uncertainty from the actual run. |
-| Dialog initial focus, containment, busy guard, return and reopen | UNCHECKED | `aria-busy` now exposes the existing busy state. Existing controls retain immediate callbacks; no application action waits for animation-end. The retained capture asserts busy outside/Escape, Save/reopen, initial/return focus. Repeat on the adopted shared motion recipe, including close/reopen during entrance and reduced motion before load and while running. |
-| Disclosure anchored state and draft retention | UNCHECKED | Shared Collapsible is anchored in its card and keeps children force-mounted but hidden while closed. Redundant local chevron animation was deleted; state orientation remains immediate. Capture keyboard open/close/reopen, exact draft and content-anchor offsets. |
-| Loading loops and reduced motion | UNCHECKED | Decorative local AsyncView spinning ring was deleted; labeled busy state remains. RecordGrid delegates its loading placeholder to shared Skeleton. Shared Skeleton now uses the published B2 reduced-motion recipe; runtime evidence is pending. Inspect CSS and JS animations with preference set before load and toggled in flight. |
-| Shared motion roles / recipes | UNCHECKED | Brand owns dialog, control, hover and skeleton recipes. The Brand dependency is now locked to the owner-checked published release containing the motion/interaction roles (exact identity in package.json and pnpm-lock.yaml). This lockfile-only author update does not link or prove installed runtime behavior. The checked UI cohort is now locked alongside Brand and its presentation stylesheet is imported after Brand. The existing catalog Tailwind scan includes UI source (including presentation.ts) and dist. Runtime proof is pending; record exact installed identity from the gate; do not copy role values into this document. Upstream requests: `914a680b0d6442299c6dc34a69585cfa` and `f2c84b5c3b124011b527dcfb0265e44a`. |
-| Reader anchor and input | UNCHECKED | Live samples include the declared saved-profile anchor identity, viewport top and computed line-height before/after. Focus-driven navigation is declared separately. Inspect no unexpected page movement, lost draft or queued reversal. |
-| Input methods and accessibility | UNCHECKED | Retain mouse/keyboard/phone fixture media. Physical touch, manual screen-reader use, actual desktop zoom, narrow reflow, target spacing and nested-theme contrast need explicit evidence; desktop emulation does not pass them. No new recruitment study is required for this routine migration. |
-| Content and states | UNCHECKED | Current fixture covers empty, editable rows, open/closed disclosure, busy dialog, saved name, shell output and synthetic key creation. Add bounded long/failed/slow/invalid state assertions to the existing stories for the affected controls; report coverage and omissions separately. |
-| Persistence/provider effects and disconnect reconciliation | NOT APPLICABLE to this presentation-only synthetic fixture | Expected real external effects are zero. This change retains callback/optimistic state owners and does not change provider, storage, retry or cancellation admission. Existing producer tests cover callback refusal/rollback; no production reconciliation claim is made. |
-| Stream usefulness and output following | NOT APPLICABLE to these changed surfaces | ShellDetail formats settled command output; this change does not change token streaming, scroll following, useful-artifact criteria or turn completion. |
-| Artifact preview expansion / phone navigation | NOT APPLICABLE to this scope | No artifact preview-to-workspace or navigation drawer is changed. The applicable disclosure and dialog open/return paths are covered in their own rows. |
-| Static and interaction media | UNCHECKED | Match before/after desktop/phone and supported themes. Interactions require uncut original videos; static views require screenshots. Keep failed attempts and uncertainty. Inspect all images, decode original recordings for review, and state the review method honestly. |
-| Terminal copy/package variant | NOT APPLICABLE to B3 copy variants | Published B2 TerminalDisplay/TerminalLine have no CopyButton or clipboard control, and that file is unchanged on the published B3 cohort source. ShellDetail disables autoScroll and uses settled command/output/error/success lines, never thinking/cursor/input variants. The prior local shell also had no copy control. Preserve selectable text and pre-wrap; no clipboard-success claim is made. |
-| Release and consumer adoption | UNCHECKED | UI publication is complete; consumer normal protected merge, main verification and Publish must succeed, then the exact published npm tarball consumer and served catalog identity must be exercised. A source Storybook fixture or policy publication proves neither. |
+| Shared owner and installed identity | PASS | Frozen UI11.37.0 / Brand1.25.1, checked owner source1109fe3; lockfile integrity and installed CSS hashes match owner gate0ac943. Brand precedes UI presentation.css; catalog scans source including presentation.ts. Manifest records exact identities. |
+| Normal prepare and typecheck | PASS on de38bbc5 | Gate d99b passed normal frozen install/prepare/build and typecheck before browser capture. Gate df1bf repeated normal frozen install/prepare, then AFTER-only browser integration. No unit/mock invocation or new CI gate. |
+| Dialog busy, keyboard, focus and reopen | Scoped behavioral PASS | All12 AFTER cases assert initial focus; busy outside/Escape dismissal guard; Save, reopen and Escape focus return. Interrupted cases also close/cancel/reopen during entrance. Browser assertions do not prove manual screen-reader usability. |
+| Disclosure draft and reader anchor | Scoped behavioral PASS | Keyboard close hides force-mounted content; reopening restores exact draft. Saved-profile anchor before/after rectangles are identical in all12 cases. Focus destination is declared. |
+| Editable grid, async and settled output | Scoped behavioral PASS | Grid edit commits exact text, async action changes empty state, terminal remains selectable with preserved pre-wrap, and synthetic key creation completes. Existing callback/rollback owners remain; no clipboard-write or provider reconciliation proof. |
+| Reduced motion, including JS | Scoped behavioral PASS | 16 load/in-flight checks; zero failures or unresolved endpoints. 48 callback-frame geometry observations are invariant. Eight identity-transform transitions normalize to identical finite DOMMatrix values; 237 scrollbar-color transitions are nonspatial. Checks reject actual matrix differences, repeated animations, filters or unsupported endpoints. This is scoped geometry/continuity proof, not input-to-presented-frame timing. |
+| Immediate acknowledgment / latency | UNKNOWN / UNCHECKED | The maintained instrument retains268 input attempts, each with finite target-computed CSS role readings; none unresolved in this successful matrix. Every sample and summary remains UNCHECKED. DOM/rAF callbacks do not calibrate presented frames; no2x40 consecutive cold/warm batches were run. Shared owner's retarget probes also prove continuity only. |
+| Role-backed calibration fixture | Clock check only PASS; conformance UNCHECKED | Delayed visible fixture uses computed roles. All12 clock checks passed. Capture uncertainty, refresh/presentation calibration and required batch protocol remain absent; no latency percentile pass is inferred. |
+| Static and interaction media | Retained and inspected | 48 matched PNGs and16 original uncut WebMs across BEFORE4/AFTER12; hashes and case association in manifest. All36 AFTER static images inspected in overview plus selected full-size screenshots. All12 AFTER recordings decoded at native25fps into16 complete contact sheets; full-sequence overviews plus24 selected frames reviewed, three selected frames full-size. BEFORE12 images/four recordings were reviewed separately. No native playback was performed. Initial loading and screenshot-related viewport/letterbox frames remain. |
+| Accessibility and human craft | UNKNOWN outside scoped assertions | Automated keyboard/focus/phone viewport evidence exists. Physical touch, manual screen reader, actual desktop zoom, nested-theme contrast and independent human craft were not established. No recruitment or reviewer-name permission gate. |
+| Broader content states | Partial | Fixture covers empty, busy, editable, saved, disclosure open/closed, settled output and synthetic key states. Exhaustive invalid/slow/failure/long-content combinations were not exercised in this pass. |
+| Persistence/provider/disconnect reconciliation | NOT APPLICABLE | Presentation migration retains callback/state owners and introduces no storage/provider/retry/cancellation admission changes. Synthetic fixture expects zero external effects. |
+| Streaming, output following, artifact navigation | NOT APPLICABLE | ShellDetail handles settled output with autoScroll disabled. No token-stream, cursor/thinking/input, artifact expansion-to-workspace or navigation drawer change. |
+| B3 code/copy variants | NOT APPLICABLE to terminal migration | Old and shared settled terminal have no clipboard control. TerminalDisplay/TerminalLine use command/output/error/success lines only. Selectable text/pre-wrap are checked; no CopyButton success claim. |
+| Release and published consumer | UNCHECKED | PR remains draft. Refresh conflicting base, resolve reviews, independent final source audit, exact-head protected merge, normal main verification/Publish, then explicit-version npm tarball public-API flow with served identity and uncut video. Source Storybook is not published consumer proof. |
 
-## Instrument and retained attempts
+## Receipts and provenance
 
-The maintained catalog registration is `.storybook/critical-components.json`;
-`src/stories/app-shell/SharedPrimitives.stories.tsx` owns the live fixture.
-The browser can export `window.__agentAppInteractionEvidence.snapshot()` and
-invoke its role-backed delayed calibration fixture. No separate scoring service,
-new CI gate or hand-only latency benchmark was added.
+`manifest.json` records source, baseline renderer, installed cohort, helper hashes,
+all retained artifact hashes and original case association. `audit-summary.json`
+contains every case's input/unresolved counts and geometry-check counts;
+`video-review-index.json` links original filenames to cases using authoritative
+Beelink finalization order, not timestamps created during file transfer.
 
-Earlier source verification: normal gate
-`beelink1-6b653ef0c1edc99a90568d2a96e67611`, frozen install/typecheck and 148 tests
-passed, but capture ended on a phone locator that targeted hidden descriptive
-text. The locator now targets the visible expandable row. The corrected capture-only gate
-`beelink1-2a2f5fd0e5dc3990f4d2fa81bfaee736` exited 1 after its first heading
-failed to appear within 120 seconds. Storybook reported ready, but diagnostic
-collection was insufficient to determine the cause. Its recording has an invalid
-EBML header and remains retained outside this proof directory. No suite was
-repeated; neither failed attempt is treated as a product pass or discarded as a
-flake. The harness now collects failure screenshots, DOM, console/request errors
-and traces and finalizes each browser context on failure. These diagnostics have
-not yet run.
-Current source/fixture changes require their own scoped check after shared-role
-adoption; earlier proof is retained for unchanged inputs only.
+- BEFORE4 comes unchanged from gate `beelink1-d99b99491d1d43913a8d93b2bc23958b`,
+  baseline renderer `3fb3521d4d7c15355cb0dca9986e49177e4b77b7`, same installed
+  cohort/source/viewport/theme. `beforeProvenance` states this reuse explicitly.
+- AFTER12 comes from gate `beelink1-df1bf30b57d3d0b6abec7774248472a0`, remote0,
+  attach0 and command receipt present. Wait63s, run307s, browser command223s.
+- Original failed AFTER d99b is retained in `historical-failed-after/`: the old
+  string predicate rejected `none` versus an identity translate/scale. The
+  corrected helper compares exact finite DOMMatrix endpoints and geometry,
+  retaining every observation/failure/unresolved endpoint. No product CSS patch
+  or dropped real-motion check was used. Original failed capture did not export
+  live instrument samples, so its unresolved population remains UNKNOWN.
+- Earlier missing-heading failure2a2f and stale-projection103ca0df remain historical
+  failures. The first cause is still UNKNOWN; current fixture loads. Generation
+  f0408 was refused before command execution. Successful generation087d refreshed
+  only two projection provenance hashes, committed in de38bbc5.
+- Historical148-test proof belongs only to source78b290f0, before the current
+  no-unit/mock policy; it is not current source coverage.
+
+The maintained owner is the existing SharedPrimitives story and
+`interaction-evidence.ts`, registered in `.storybook/critical-components.json`.
+No separate benchmark service, copied budget constants or new CI gate exists.
+Media is outside the package `files` allowlist (`dist`, `bin`, `.claude/skills`).
