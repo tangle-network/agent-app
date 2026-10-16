@@ -52,9 +52,11 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, onVerdict, o
   const form = useRef<ReviewFeedbackFormHandle>(null)
   for (const item of items) cache.current.set(item.id, item)
   const currentItems = new Map(items.map(item => [item.id, item]))
+  // Confirmed source changes affect this render's navigation, before effects retain the snapshot.
+  const missing = loading || error || busy || refreshing ? resolvedElsewhere : new Set(round.filter(id => !currentItems.has(id)))
   const unanswered = round.filter(id => {
     const item = cache.current.get(id)
-    return item && !answered.has(revisionKey(item)) && !resolvedElsewhere.has(id)
+    return item && !answered.has(revisionKey(item)) && !missing.has(id)
   })
   const currentId = activeId && unanswered.includes(activeId) ? activeId
     : unanswered.find(id => round.indexOf(id) > round.indexOf(activeId ?? '')) ?? unanswered[0]

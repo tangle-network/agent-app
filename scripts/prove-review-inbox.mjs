@@ -76,7 +76,7 @@ function App(){const[items,setItems]=useState([]);const[loading,setLoading]=useS
 async function load(){try{const response=await fetch('/api/items');if(!response.ok)throw new Error('Inbox unavailable');setItems(await response.json());setError(null)}catch(error){setError(error.message)}finally{setLoading(false)}}
 useEffect(()=>{load();const updates=new EventSource('/api/updates');updates.onmessage=event=>{const state=JSON.parse(event.data);if(state.items){setItems(state.items);setLoading(state.loading);setError(state.error)}};return()=>updates.close()},[]);
 async function verdict(item,feedback){if(${JSON.stringify(faultNoVerdictTransport)})return;const response=await fetch('/api/verdict',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,revision:item.revision,...feedback})});const result=await response.json();if(!response.ok)throw new Error(result.error);setItems(result.items)}
-return <main className="px-4 py-6"><ReviewInbox items={items} initialSelectedId={new URLSearchParams(location.search).get('item')??undefined} loading={loading} error={error} onRefresh={load} onVerdict={verdict} renderItem={item=>item.preview?<HubActionPreviewView preview={item.preview} account="Example studio"/>:<article className="rounded-lg border border-border bg-card p-5"><h3 className="font-semibold">Retained work product</h3><p className="mt-3 whitespace-pre-wrap">{item.input.content}</p></article>}/></main>}
+return <main className="px-4 py-6" data-fixture-source-count={items.length}><ReviewInbox items={items} initialSelectedId={new URLSearchParams(location.search).get('item')??undefined} loading={loading} error={error} onRefresh={load} onVerdict={verdict} renderItem={item=>item.preview?<HubActionPreviewView preview={item.preview} account="Example studio"/>:<article className="rounded-lg border border-border bg-card p-5"><h3 className="font-semibold">Retained work product</h3><p className="mt-3 whitespace-pre-wrap">{item.input.content}</p></article>}/></main>}
 createRoot(document.getElementById('root')).render(new URLSearchParams(location.search).has('hub')?<HubFixture/>:<App/>);`
 
 try {
@@ -243,6 +243,7 @@ try {
     assert.equal(count('signals'), 1); assert.equal(verdictRequests, 2)
     db.prepare('INSERT INTO items VALUES (?, ?)').run(item.id, JSON.stringify(item))
     publish({ items: pendingItems(), loading: false, error: null })
+    await expect(page.locator('[data-fixture-source-count]')).toHaveAttribute('data-fixture-source-count', String(pendingItems().length))
     await expect(page.locator('[data-review-title]')).toHaveText(originalOrder[2].title)
     await page.keyboard.press('k')
     await expect(page.locator('[data-review-title]')).toHaveText(item.title)
