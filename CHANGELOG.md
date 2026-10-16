@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.177
+
+- fix(chat): sync release cohort and generated API docs (#1127)
+
 ## 0.60.176
 
 - fix(chat): let readers scroll reasoning while it streams (#1121)
