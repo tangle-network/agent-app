@@ -380,13 +380,15 @@ describe('atomic invitation acceptance against real SQLite races', () => {
 
   it('losing acceptance preserves a concurrently existing grant and never syncs', async () => {
     const deps = await pendingFixture()
-    afterMembershipRead(deps, () => {
+    {
       const [orgMember] = deps.db.insert(tables.organizationMembers).values({
         organizationId: deps.org.id, userId: 'editor-1', role: 'member',
       }).returning().all()
       deps.db.insert(tables.workspaceMembers).values({ id: 'preexisting', workspaceId: 'ws-1',
         organizationMemberId: orgMember!.id, userId: 'editor-1', role: 'viewer', acceptedAt: new Date(),
       }).run()
+    }
+    afterMembershipRead(deps, () => {
       deps.db.update(invitationTables.workspaceInvitations).set({ status: 'revoked' })
         .where(eq(invitationTables.workspaceInvitations.id, deps.invitation.id)).run()
     })
