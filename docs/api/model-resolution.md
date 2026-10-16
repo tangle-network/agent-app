@@ -4,7 +4,7 @@
 
 Source: `src/model-resolution/index.ts`
 
-24 exports.
+26 exports.
 
 ### `buildModelChain`
 
@@ -118,6 +118,14 @@ interface ModelFailoverResult
 interface ModelInfo
 ```
 
+### `modelPolicyCatalogFromRouter`
+
+`function` — Map router `/v1/models` rows to a {@link ModelPolicyInfo} catalog: snake_case `zdr` / `hipaa_eligible` become `zeroDataRetention` / `hipaaEligible`, and `provider` comes from the row's `_provider`/`p…
+
+```ts
+(rows: Iterable<RouterModelPolicyRow>) => ModelPolicyInfo[]
+```
+
 ### `readHttpStatusHint`
 
 `function` — The HTTP status a message states in prose, or `undefined` when it states none.
@@ -148,6 +156,14 @@ interface ResolveChatModelInput
 
 ```ts
 interface ResolvedChatModel
+```
+
+### `RouterModelPolicyRow`
+
+`interface` — A router `/v1/models` row carrying the compliance flags {@link modelPolicyCatalogFromRouter} reads.
+
+```ts
+interface RouterModelPolicyRow
 ```
 
 ### `runWithModelFailover`

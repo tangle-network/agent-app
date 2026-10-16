@@ -679,6 +679,96 @@ describe('streamWithModelFailover — over the verbatim sequences', () => {
   })
 })
 
+describe('createSandboxChatProducer — policy gating (failover cannot bypass admission policy)', () => {
+  // A HIPAA posture over the two models the shared fixtures exercise:
+  // zero-data-retention AND BAA-eligible only.
+  const POLICY_META = [
+    { id: 'dead-model', zeroDataRetention: true, hipaaEligible: true },
+    { id: 'gpt-5-mini', zeroDataRetention: true, hipaaEligible: true },
+  ]
+  const zdrHipaa = (m: { zeroDataRetention?: boolean; hipaaEligible?: boolean }) =>
+    m.zeroDataRetention === true && m.hipaaEligible === true
+
+  function producerWithPolicy(policy: { catalog: typeof POLICY_META; filter: typeof zdrHipaa }) {
+    const opened: string[] = []
+    const producer = createSandboxChatProducer({
+      model: 'dead-model',
+      fallbackModels: ['gpt-5-mini'],
+      modelPolicy: policy,
+      openEvents: ({ model }) => {
+        opened.push(model)
+        return feed(model === 'dead-model' ? DEAD_MODEL_SEQUENCE : HEALTHY_MODEL_SEQUENCE)
+      },
+      log: () => {},
+    })
+    return { producer, opened }
+  }
+
+  it('a policy that admits the chain fails over exactly as before', async () => {
+    const { producer, opened } = producerWithPolicy({ catalog: POLICY_META, filter: zdrHipaa })
+    const events = await collect(producer.stream as AsyncGenerator<unknown>)
+    expect(opened).toEqual(['dead-model', 'gpt-5-mini'])
+    expect(producer.model).toBe('gpt-5-mini')
+    expect(events.some((e) => (e as { type?: string }).type === 'text')).toBe(true)
+  })
+
+  it('a non-compliant fallback is NEVER opened — the dead compliant model cannot leak the turn to it', async () => {
+    // The audit's worst finding: without the gate, `dead-model` 502ing would
+    // silently re-run the turn's data through a fallback the deployment does
+    // not admit. `opened` never containing the fallback is the assertion that
+    // goes red if the policy check is dropped from the walk.
+    const { producer, opened } = producerWithPolicy({
+      catalog: [
+        POLICY_META[0]!,
+        { id: 'gpt-5-mini', zeroDataRetention: true, hipaaEligible: false },
+      ],
+      filter: zdrHipaa,
+    })
+    const events = await collect(producer.stream as AsyncGenerator<unknown>)
+
+    expect(opened).toEqual(['dead-model'])
+    // The chain exhausted (dead + refused), so the turn ends in the structured
+    // failure path — never a silent compliant-looking answer.
+    expect(events.some((e) => (e as { type?: string }).type === 'error')).toBe(true)
+    expect(events.some((e) => (e as { type?: string }).type === 'text' && String((e as { text?: unknown }).text).includes('ok'))).toBe(false)
+    // The refusal is in the attempt trail with the policy's own reason.
+    const failover = producer.modelFailover?.()
+    expect(failover?.attempts).toHaveLength(2)
+    expect(failover?.attempts[1]).toMatchObject({ model: 'gpt-5-mini', ok: false })
+    expect(failover?.attempts[1]?.reason).toContain('not admitted by policy')
+  })
+
+  it('a refused PREFERRED model is never opened; the admitted fallback serves', async () => {
+    const { producer, opened } = producerWithPolicy({
+      catalog: [
+        { id: 'dead-model', zeroDataRetention: false, hipaaEligible: false },
+        POLICY_META[1]!,
+      ],
+      filter: zdrHipaa,
+    })
+    await collect(producer.stream as AsyncGenerator<unknown>)
+    expect(opened).toEqual(['gpt-5-mini'])
+    expect(producer.model).toBe('gpt-5-mini')
+    expect(producer.modelFailover?.()).toMatchObject({ usedFallback: true })
+  })
+
+  it('a preferred model carrying no policy metadata fails closed — unclassified is not admitted', async () => {
+    const opened: string[] = []
+    const producer = createSandboxChatProducer({
+      model: 'mystery-model',
+      modelPolicy: { catalog: POLICY_META, filter: zdrHipaa },
+      openEvents: ({ model }) => {
+        opened.push(model)
+        return feed(HEALTHY_MODEL_SEQUENCE)
+      },
+      log: () => {},
+    })
+    const events = await collect(producer.stream as AsyncGenerator<unknown>)
+    expect(opened).toEqual([])
+    expect(events.some((e) => (e as { type?: string }).type === 'error')).toBe(true)
+  })
+})
+
 describe('createSandboxChatProducer — failover wiring', () => {
   function producerFor(opts: { failover?: false; onFallback?: (info: { from: string; to: string }) => void } = {}) {
     const opened: string[] = []

@@ -599,6 +599,89 @@ describe('createChatTurnRoutes — turn', () => {
   })
 })
 
+describe('createChatTurnRoutes — modelPolicy seam (admission policy on the model a turn NAMES)', () => {
+  const POLICY_META = [
+    { id: 'anthropic/claude-sonnet-4-6', zeroDataRetention: true, hipaaEligible: true },
+    { id: 'openai/gpt-5', zeroDataRetention: true, hipaaEligible: false },
+  ]
+  const zdrHipaa = (m: { zeroDataRetention?: boolean; hipaaEligible?: boolean }) =>
+    m.zeroDataRetention === true && m.hipaaEligible === true
+  const modelPolicy = { catalog: POLICY_META, filter: zdrHipaa }
+
+  it('refuses a policy-denied model with 403 BEFORE any side effect — no row, no producer', async () => {
+    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'hi' }], 'hi'))
+    const { routes, rows } = makeRoutes({ modelPolicy, produce })
+    const res = await routes.turn(turnRequest({ threadId: 't-1', content: 'hello', model: 'openai/gpt-5' }))
+    expect(res.status).toBe(403)
+    const body = (await res.json()) as { code?: string; error?: string }
+    expect(body.code).toBe('model_policy_denied')
+    expect(body.error).toContain('openai/gpt-5')
+    expect(body.error).toContain('not admitted by policy')
+    // Nothing ran: this is the assertion that goes red if the check is dropped.
+    expect(produce).not.toHaveBeenCalled()
+    expect(rows).toHaveLength(0)
+  })
+
+  it('fails closed on a named model carrying no policy metadata', async () => {
+    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'hi' }], 'hi'))
+    const { routes } = makeRoutes({ modelPolicy, produce })
+    const res = await routes.turn(turnRequest({ threadId: 't-1', content: 'hello', model: 'acme/unclassified' }))
+    expect(res.status).toBe(403)
+    expect(((await res.json()) as { error?: string }).error).toContain('no policy metadata')
+    expect(produce).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the policy filter throws — a broken policy never waves a turn through', async () => {
+    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'hi' }], 'hi'))
+    const { routes } = makeRoutes({
+      modelPolicy: {
+        catalog: POLICY_META,
+        filter: () => {
+          throw new Error('compliance store unreachable')
+        },
+      },
+      produce,
+    })
+    const res = await routes.turn(turnRequest({ threadId: 't-1', content: 'hello', model: 'anthropic/claude-sonnet-4-6' }))
+    expect(res.status).toBe(403)
+    expect(((await res.json()) as { error?: string }).error).toContain('compliance store unreachable')
+    expect(produce).not.toHaveBeenCalled()
+  })
+
+  it('admits a policy-passing model and streams the turn normally', async () => {
+    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'hi' }], 'hi'))
+    const { routes, ctx, pending } = makeRoutes({ modelPolicy, produce })
+    const res = await routes.turn(
+      turnRequest({ threadId: 't-1', content: 'hello', model: 'anthropic/claude-sonnet-4-6' }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    await readLines(res.body!)
+    await Promise.all(pending)
+    expect(produce).toHaveBeenCalledTimes(1)
+  })
+
+  it('a turn that NAMES no model is not checked here — the producer-side policy owns that half', async () => {
+    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'hi' }], 'hi'))
+    const { routes, ctx, pending } = makeRoutes({ modelPolicy, produce })
+    const res = await routes.turn(turnRequest({ threadId: 't-1', content: 'hello' }), ctx)
+    expect(res.status).toBe(200)
+    await readLines(res.body!)
+    await Promise.all(pending)
+    expect(produce).toHaveBeenCalledTimes(1)
+  })
+
+  it('omitting modelPolicy keeps today\'s behavior — any named model reaches the producer', async () => {
+    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'hi' }], 'hi'))
+    const { routes, ctx, pending } = makeRoutes({ produce })
+    const res = await routes.turn(turnRequest({ threadId: 't-1', content: 'hello', model: 'openai/gpt-5' }), ctx)
+    expect(res.status).toBe(200)
+    await readLines(res.body!)
+    await Promise.all(pending)
+    expect(produce).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('createChatTurnRoutes — buffered replay', () => {
   it('replays the full turn after a simulated client drop', async () => {
     const { routes, ctx, pending } = makeRoutes({

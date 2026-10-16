@@ -58,6 +58,7 @@ import {
   runWithModelFailover,
   type ModelFailoverAttempt,
 } from '../model-resolution/failover'
+import type { ModelPolicy } from '../policy-filters/index'
 import { asRecord, asString } from '../stream/index'
 
 /** Terminal event types that end an attempt with a failure verdict. */
@@ -275,6 +276,13 @@ export interface ModelFailoverStreamOptions {
   /** Preferred model first, then fallbacks in descending preference. */
   models: readonly string[]
   open: OpenModelStream
+  /**
+   * Product admission policy applied to EVERY chain member before its stream
+   * is opened — see `runWithModelFailover`'s `policy`. A member the policy
+   * refuses is skipped (never opened, never sent the turn's data) and the walk
+   * continues; an all-refused chain ends in `ModelFailoverExhaustedError`.
+   */
+  policy?: ModelPolicy
   /**
    * Maximum time to open/start one model's event source, including its first
    * iterator pull. Default 120 seconds, matching the sandbox provisioning
@@ -728,6 +736,7 @@ export function streamWithModelFailover(
     const settled = runWithModelFailover<AttemptOutcome>({
       models: options.models,
       run: probe,
+      ...(options.policy ? { policy: options.policy } : {}),
       // The probe has already classified the raw payload with
       // `isUpstreamUnavailable`; this reads its verdict rather than
       // re-classifying a wrapper object, so the two can never disagree.
