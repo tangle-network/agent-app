@@ -3,12 +3,14 @@ import type { Meta, StoryObj } from '@storybook/react'
 import {
   ChatMessages,
   ReasoningRow,
+  useChatScroll,
   chatReasoningFromParts,
   trackChatReasoning,
   type ChatReasoningState,
   type ChatUiMessage,
 } from '../../web-react'
 import { renderMarkdown } from './markdown'
+import { Button } from '@tangle-network/ui/primitives'
 
 /**
  * The shared reasoning row. `Live turn` plays a reasoning model's turn through
@@ -137,4 +139,31 @@ export const SavedWithoutTimes: Story = {
 export const NoReasoning: Story = {
   name: 'No reasoning',
   render: () => framed(<ReasoningRow text="" />),
+}
+
+/** Long continuous reasoning: use wheel, keyboard or touch to read earlier paragraphs. */
+export const StreamingReading: Story = {
+  render: function StreamingReadingStory() {
+    const paragraph = (n: number) => `**Step ${n}.** Compare the evidence with the goal. Keep the earlier observations visible while new reasoning arrives. The reader should be able to pause here and understand the tradeoff before returning to the latest update.\n\n`
+    const [text, setText] = useState(() => Array.from({ length: 12 }, (_, i) => paragraph(i + 1)).join(''))
+    useEffect(() => {
+      let n = 12
+      const timer = setInterval(() => setText(value => value + paragraph(++n)), 350)
+      return () => clearInterval(timer)
+    }, [])
+    const scroll = useChatScroll()
+    return (
+      <div className="mx-auto flex h-[85dvh] max-w-3xl flex-col px-4">
+        <div ref={scroll.viewportRef} data-transcript-viewport tabIndex={0} role="region" aria-label="Conversation"
+          className="min-h-0 flex-1 overflow-y-auto">
+          <div ref={scroll.contentRef} className="space-y-6 py-4">
+            {Array.from({ length: 8 }, (_, i) => <p key={i} className="py-4">Earlier message {i + 1}: retain the conversation while the model works.</p>)}
+            <ReasoningRow text={text} thinking />
+            <p>Tool activity and answers appear here without taking the reader away.</p>
+          </div>
+        </div>
+        {!scroll.following && <Button type="button" variant="outline" onClick={scroll.jumpToLatest}>Jump to latest message</Button>}
+      </div>
+    )
+  },
 }

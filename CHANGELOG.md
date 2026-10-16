@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.60.177
+
+- fix(chat): sync release cohort and generated API docs (#1127)
+
+## 0.60.176
+
+- fix(chat): let readers scroll reasoning while it streams (#1121)
+
+## 0.60.175
+
+- fix(deps): support Hub SDK 0.30.2 in agent apps (#1126)
+- docs(integrations): refresh policy API map [skip release] (#1124)
+
 ## 0.60.174
 
 - fix(integrations): show enforced approval policy and OAuth retry (#1123)

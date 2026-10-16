@@ -78,8 +78,8 @@ importers:
         specifier: 0.36.3
         version: 0.36.3(@ai-sdk/anthropic@3.0.122(zod@4.4.3))(@ai-sdk/google@3.0.127(zod@4.4.3))(@anthropic-ai/sdk@0.93.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(playwright@1.63.0)(ws@8.21.3)(zod@4.4.3)
       '@tangle-network/hub-sdk':
-        specifier: 0.29.5
-        version: 0.29.5(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
+        specifier: 0.30.2
+        version: 0.30.2(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
       '@tangle-network/sandbox':
         specifier: 0.60.49
         version: 0.60.49(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
@@ -2826,8 +2826,8 @@ packages:
     engines: {node: '>=22.13.0'}
     hasBin: true
 
-  '@tangle-network/hub-sdk@0.29.5':
-    resolution: {integrity: sha512-VdR7O2EMgBnafdELEI5J7KEBguRdNFRCxFiUQLqFCJdhGRum+4qSQyrBVcr96/qhL8KDmr8nN8DPTbPGeqK98A==}
+  '@tangle-network/hub-sdk@0.30.2':
+    resolution: {integrity: sha512-fMz9o2yPmV3qWPIlrHWsC2XCij/x51X66VPRutVeAxPA0W0w9iQW76u5FVg6Zsn8mdSogS7lE0gJWVvRqn7LlQ==}
 
   '@tangle-network/sandbox-ui@0.134.7':
     resolution: {integrity: sha512-fkCYOtxha3WRec2KHRxHTJAc6ILPKJMx4ysAdcgyobocFJxhD1vgv10dor83e9d+4nrvc3Lx8O67UVKpfqHXCw==}
@@ -8745,7 +8745,7 @@ snapshots:
     dependencies:
       '@tangle-network/agent-trace-contract': 2.0.0
 
-  '@tangle-network/hub-sdk@0.29.5(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))':
+  '@tangle-network/hub-sdk@0.30.2(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))':
     dependencies:
       '@tangle-network/agent-core': 0.11.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
     transitivePeerDependencies:

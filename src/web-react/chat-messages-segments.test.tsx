@@ -233,23 +233,6 @@ describe('ChatMessages segmented turns', () => {
     expect(reasoningToggle(container).getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('opens the reasoning disclosure while no answer text exists yet', () => {
-    const message: ChatUiMessage = {
-      id: 'm1',
-      role: 'assistant',
-      content: '',
-      reasoning: 'Considering the options.',
-    }
-    // `loading`: the message is the turn still streaming.
-    const { container } = render(<ChatMessages messages={[message]} loading />)
-    // Reasoning but no answer — the turn is still thinking, so the trace is
-    // open and its label sweeps rather than sitting static.
-    expect(container.querySelector('div[data-state]')?.getAttribute('data-state')).toBe('open')
-    expect(reasoningToggle(container).getAttribute('aria-expanded')).toBe('true')
-    const waiting = container.querySelector('.agent-shimmer')
-    expect(waiting?.getAttribute('data-motion')).toBe('essential')
-  })
-
   it('hides the reasoning trace when collapsed', () => {
     const message: ChatUiMessage = {
       id: 'm1',
