@@ -23,7 +23,7 @@ export interface HubActionPolicyDisplay {
 }
 
 /** Return only policies the host enforces independently of stored Hub overrides. */
-export type HubActionPolicy = (input: { connection: HubConnection; tool: HubTool }) => HubActionPolicyDisplay | undefined
+export type HubActionPolicy = (input: { connection: HubConnection; tool: HubTool; storedDecision?: HubPolicyDecision }) => HubActionPolicyDisplay | undefined
 
 export const ACTION_LIMIT = 200
 
@@ -86,7 +86,7 @@ export function permissionDetails(
   policies: readonly HubPolicy[],
   connectionId: string,
   can: HubIntegrationCapabilities,
-  getActionPolicy?: (tool: HubTool) => HubActionPolicyDisplay | undefined,
+  getActionPolicy?: (tool: HubTool, storedDecision?: HubPolicyDecision) => HubActionPolicyDisplay | undefined,
 ): IntegrationConnectionDetails {
   const overrides = new Map(policies.filter(policy => policy.connectionId === connectionId).map(policy => [policy.actionPath, policy.decision]))
   const groups: IntegrationPermissionGroup[] = [
@@ -97,7 +97,7 @@ export function permissionDetails(
   const reads: IntegrationPermissionDisplay[] = []
   for (const tool of tools) {
     const override = overrides.get(tool.path)
-    const enforced = getActionPolicy?.(tool)
+    const enforced = getActionPolicy?.(tool, override)
     const row = {
       actionPath: tool.path,
       title: tool.title ?? tool.path,

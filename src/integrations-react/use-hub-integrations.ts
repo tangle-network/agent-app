@@ -241,7 +241,7 @@ export function useHubIntegrations({ identity, client, can, callbackPath, onUnsu
     hostConnect?.providerIds),
   [providerList, connectionList, visibleSelection.providerId, visibleSelection.connectionId, can, onUnsupportedConnect, hostConnect])
   const details = detail.status === 'ready' && connection
-    ? permissionDetails(detail.value.tools, detail.value.policies, connection.id, can, tool => getActionPolicy?.({ connection, tool })) : undefined
+    ? permissionDetails(detail.value.tools, detail.value.policies, connection.id, can, (tool, storedDecision) => getActionPolicy?.({ connection, tool, storedDecision })) : undefined
 
   return {
     providers, connections, detail, rows, provider, connection, dialog: visibleDialog, setDialog,
