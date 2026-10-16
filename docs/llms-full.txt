@@ -202,6 +202,14 @@ Source: `src/agent-profiles/index.ts` · depends on `tools`
 (consentedBaseline: AgentProfile, selected: AgentProfile) => AgentProfile
 ```
 
+### `createDrizzleSelfMountStorage`
+
+`function` — A drizzle-backed SelfMountStorage against any table with the standard shape (scope primary key + mounted JSON text column).
+
+```ts
+(db: any, table: SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name: "scop…
+```
+
 ### `createInMemorySelfMountStorage`
 
 `function` — Non-durable default for tests and single-instance products.
@@ -210,12 +218,28 @@ Source: `src/agent-profiles/index.ts` · depends on `tools`
 () => SelfMountStorage
 ```
 
+### `createKVSelfMountStorage`
+
+`function` — A KV-backed SelfMountStorage (Cloudflare KV, any namespace).
+
+```ts
+(kv: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void>; }, prefix: string, bas…
+```
+
 ### `createMountProfileChangeTool`
 
 `function` — The permitted, idempotent self-mount verb as an app tool.
 
 ```ts
 (deps: MountProfileChangeDeps) => AppToolDefinition<Record<string, unknown>>
+```
+
+### `createProductSelfMount`
+
+`function`
+
+```ts
+(config: ProductSelfMountConfig) => AppToolDefinition<Record<string, unknown>>
 ```
 
 ### `createTextProfile`
@@ -288,6 +312,14 @@ interface MountProfileChangeResult
 
 ```ts
 readonly ["skills"]
+```
+
+### `ProductSelfMountConfig`
+
+`interface` — The one-call product wiring: catalog + storage + baseline + cap.
+
+```ts
+interface ProductSelfMountConfig
 ```
 
 ### `PROFILE_CHANGE_POLICY`
@@ -568,6 +600,14 @@ interface SelfMountSkillEntry
 
 ```ts
 interface SelfMountStorage
+```
+
+### `selfMountTable`
+
+`function` — Create (or use) the standard self-mount table in a drizzle/D1 database.
+
+```ts
+(tableName: string) => SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name:…
 ```
 
 ### `serializeProfileRevisionDiff`
@@ -10738,6 +10778,14 @@ type HubActionPreview
 interface HubActionReceipt
 ```
 
+### `HubApprovalFeedback`
+
+`interface` — The host authenticates the reviewer, binds provenance and computes the edit diff.
+
+```ts
+interface HubApprovalFeedback
+```
+
 ### `HubApprovalItem`
 
 `interface` — One held Hub action and its decision, in the form every surface renders.
@@ -10778,6 +10826,14 @@ interface HubApprovalResumePart
 interface HubApprovalWait
 ```
 
+### `HubPreviewMedia`
+
+`interface` — Frozen media bytes supplied by the host; renderers never resolve a provider URL.
+
+```ts
+interface HubPreviewMedia
+```
+
 ### `hubProviderName`
 
 `function` — A provider's display name: `github` is GitHub, `outlook-mail` is Outlook.
@@ -10799,7 +10855,7 @@ interface HubApprovalWait
 `function` — A held call in the owner's words, with the preview its integration renders.
 
 ```ts
-(item: Pick<HubApprovalItem, "input" | "actionPath" | "providerId" | "files" | "bundle">) => HubActionPresentation
+(item: Pick<HubApprovalItem, "input" | "actionPath" | "providerId" | "files" | "bundle" | "preview">) => HubActionPrese…
 ```
 
 ### `splitHubActionPath`
@@ -10868,7 +10924,7 @@ type HubApprovalDecision
 `function` — The calls waiting on the owner, pinned above the composer so a held action never scrolls away.
 
 ```ts
-({ items, onDecide, permissions, onOpen, focusId, className }: HubApprovalDockProps) => Element | null
+({ items, onDecide, permissions, onOpen, focusId, onFeedback, className }: HubApprovalDockProps) => Element | null
 ```
 
 ### `HubApprovalDockProps`
@@ -10916,7 +10972,7 @@ interface HubApprovalReceiptsProps
 `function` — A held call where the agent made it: one line with the integration, what the call does and where it stands, opening to its preview, result and the exact call.
 
 ```ts
-({ item, expanded: controlled, onExpandedChange, onReview, actions }: HubApprovalRowProps) => Element
+({ item, expanded: controlled, onExpandedChange, onReview, actions, onFeedback }: HubApprovalRowProps) => Element
 ```
 
 ### `HubApprovalRowProps`
@@ -10951,9 +11007,25 @@ interface HubApprovalsListProps
 ({ wait, className }: { wait: HubApprovalWait; className?: string | undefined; }) => Element
 ```
 
+### `HubPreviewFeedback`
+
+`function` — Existing Hub adapter: teaching never calls the effect transport.
+
+```ts
+({ item, onFeedback, drafts }: HubPreviewFeedbackProps) => Element
+```
+
+### `HubPreviewFeedbackProps`
+
+`interface`
+
+```ts
+interface HubPreviewFeedbackProps
+```
+
 ### `HubProviderMark`
 
-`function` — The integration's own logo on a neutral tile, so dark marks stay legible.
+`function` — A local provider mark: reviewing a held payload must not fetch a remote logo.
 
 ```ts
 ({ providerId, name, size }: { providerId: string; name: string; size?: number | undefined; }) => Element
@@ -10965,6 +11037,46 @@ interface HubApprovalsListProps
 
 ```ts
 (item: Pick<HubApprovalItem, "phase" | "wait">, blocked?: string) => string | undefined
+```
+
+### `ReviewFeedbackDraft`
+
+`interface`
+
+```ts
+interface ReviewFeedbackDraft
+```
+
+### `ReviewFeedbackForm`
+
+`function` — One form for Hub previews, assets and work products.
+
+```ts
+ForwardRefExoticComponent<ReviewFeedbackFormProps & RefAttributes<ReviewFeedbackFormHandle>>
+```
+
+### `ReviewFeedbackFormHandle`
+
+`interface`
+
+```ts
+interface ReviewFeedbackFormHandle
+```
+
+### `ReviewFeedbackFormProps`
+
+`interface`
+
+```ts
+interface ReviewFeedbackFormProps
+```
+
+### `ReviewVerdict`
+
+`type`
+
+```ts
+type ReviewVerdict
 ```
 
 
@@ -31359,7 +31471,7 @@ interface WithFreeRouteLimitOptions
 
 ## `./web-react`
 
-Source: `src/web-react/index.tsx` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product`
+Source: `src/web-react/index.tsx` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product`
 
 ### `acceptRejectionReason`
 
@@ -34449,6 +34561,70 @@ interface ResourceFileLimits
 interface RestoreChatInteractionsOptions
 ```
 
+### `ReviewFeedbackDraft`
+
+`interface`
+
+```ts
+interface ReviewFeedbackDraft
+```
+
+### `ReviewFeedbackForm`
+
+`function` — One form for Hub previews, assets and work products.
+
+```ts
+ForwardRefExoticComponent<ReviewFeedbackFormProps & RefAttributes<ReviewFeedbackFormHandle>>
+```
+
+### `ReviewFeedbackFormHandle`
+
+`interface`
+
+```ts
+interface ReviewFeedbackFormHandle
+```
+
+### `ReviewFeedbackFormProps`
+
+`interface`
+
+```ts
+interface ReviewFeedbackFormProps
+```
+
+### `ReviewInbox`
+
+`function` — One oldest-first review round.
+
+```ts
+({ items, initialSelectedId, renderItem, onVerdict, onFeedback, loading, error, onRefresh }: ReviewInboxProps) => Eleme…
+```
+
+### `ReviewInboxFeedback`
+
+`interface`
+
+```ts
+interface ReviewInboxFeedback
+```
+
+### `ReviewInboxItem`
+
+`interface`
+
+```ts
+interface ReviewInboxItem
+```
+
+### `ReviewInboxProps`
+
+`interface`
+
+```ts
+interface ReviewInboxProps
+```
+
 ### `ReviewQueueItem`
 
 `interface` — One row of the review queue projection for an engagement scope
@@ -34487,6 +34663,14 @@ interface ReviewQueuePanelProps
 
 ```ts
 type ReviewQueueState
+```
+
+### `ReviewVerdict`
+
+`type`
+
+```ts
+type ReviewVerdict
 ```
 
 ### `rollUpProvenanceStanding`
@@ -35428,7 +35612,7 @@ interface WorkspaceSwitcherProps
 
 ## `./web-react/agent-profile-editor`
 
-Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product`
+Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product`
 
 ### `AGENT_PROFILE_EDITOR_SECTIONS`
 
@@ -35782,7 +35966,7 @@ interface UseConfirmedMutationOptions
 
 ## `./web-react/terminal`
 
-Source: `src/web-react/terminal.ts` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product`
+Source: `src/web-react/terminal.ts` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product`
 
 ### `SandboxTerminalConnection`
 
