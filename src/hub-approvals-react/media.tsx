@@ -48,7 +48,7 @@ function MediaAsset({ media, active = true, fit = 'cover' }: { media: HubPreview
       if (active && visible && !preference.matches && !document.hidden) void element.play().catch(() => {})
       else element.pause()
     }
-    const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; update() })
+    const observer = new IntersectionObserver(([entry]) => { visible = entry?.isIntersecting ?? false; update() })
     observer.observe(element)
     preference.addEventListener('change', update)
     document.addEventListener('visibilitychange', update)
