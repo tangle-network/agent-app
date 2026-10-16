@@ -16,6 +16,7 @@ import { presentHubAction } from '../dist/hub-approvals/index.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const at = process.argv.indexOf('--output')
+const faultVideoPoster = process.argv.includes('--fault-video-poster')
 const output = path.resolve(at >= 0 ? process.argv[at + 1] : path.join(os.homedir(), 'reviews', `hub-media-${Date.now()}`))
 await mkdir(output, { recursive: true })
 const temp = await mkdtemp(path.join(os.tmpdir(), 'hub-media-'))
@@ -88,7 +89,7 @@ import React,{useEffect,useState} from 'react';import {createRoot} from 'react-d
 import {HubApprovalRow} from './dist/hub-approvals-react/index.js';
 const makeFixtures=${makeFixtures.toString()};
 function App(){const[items,setItems]=useState([]);const[selected,setSelected]=useState('x-image');
-useEffect(()=>{const urls=[];(async()=>{let data=await(await fetch('/api/fixtures')).json();if(!data.length)data=await(await fetch('/api/fixtures',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(await makeFixtures())})).json();const reel=data.find(item=>item.id==='instagram-reel');const asset=reel?.preview.media[0];if(asset){const bytes=await(await fetch(asset.src)).blob();const url=URL.createObjectURL(bytes);urls.push(url);asset.src=url}for(const item of data){const field=item.preview.kind==='page'?'screenshot':item.preview.kind==='ad'?'image':null;if(field){const bytes=await(await fetch(item.preview[field])).blob();const url=URL.createObjectURL(bytes);urls.push(url);item.preview[field]=url}}setItems(data)})();return()=>urls.forEach(url=>URL.revokeObjectURL(url))},[]);
+useEffect(()=>{const urls=[];(async()=>{let data=await(await fetch('/api/fixtures')).json();if(!data.length)data=await(await fetch('/api/fixtures',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(await makeFixtures())})).json();const reel=data.find(item=>item.id==='instagram-reel');const asset=reel?.preview.media[0];if(asset){const bytes=await(await fetch(asset.src)).blob();const url=URL.createObjectURL(bytes);urls.push(url);asset.src=url}if(${JSON.stringify(faultVideoPoster)})for(const item of data)if(item.preview.media)item.preview.media=item.preview.media.map(asset=>asset.kind==='video'?{...asset,kind:'image',src:asset.poster}:asset);for(const item of data){const field=item.preview.kind==='page'?'screenshot':item.preview.kind==='ad'?'image':null;if(field){const bytes=await(await fetch(item.preview[field])).blob();const url=URL.createObjectURL(bytes);urls.push(url);item.preview[field]=url}}setItems(data)})();return()=>urls.forEach(url=>URL.revokeObjectURL(url))},[]);
 async function feedback(item,fields){const response=await fetch('/api/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,...fields})});const body=await response.json();if(!response.ok)throw new Error(body.error);setItems(items=>items.map(item=>item.id===body.id?body:item))}
 const item=items.find(item=>item.id===selected);if(!item)return <p>Preparing local media…</p>;
 return <main className="mx-auto max-w-xl space-y-4 px-3 py-6"><header><h1 className="text-xl font-semibold">Review media before publishing</h1><p className="text-sm text-muted-foreground">Local fixtures. Automated fixture ratings; no actual Drew ratings.</p></header>
@@ -156,7 +157,7 @@ try {
     await page.getByLabel('Preview case', { exact: true }).selectOption(fixture.id)
     await expect(page.locator('[data-hub-media-channel]')).toBeVisible()
     await expect(page.getByLabel('Score (0–100)', { exact: true })).toHaveValue('')
-    await expect(page.getByText('Example studio', { exact: false }).first()).toBeVisible()
+    await expect(page.getByText(fixture.preview.placement === 'vertical' ? '@example-studio' : 'Example studio', { exact: false }).first()).toBeVisible()
     if (fixture.id === 'blocked-remote') {
       await expect(page.getByText(/not embedded in this preview/)).toHaveCount(3)
       await expect(page.locator('video,img')).toHaveCount(0)
@@ -255,7 +256,7 @@ try {
   if (server) await new Promise(resolve => server.close(resolve))
   const items = list()
   const report = { target: 'Built shared approval UI and local HTTP/SQLite fixture transport', revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
-    capturedAt: new Date().toISOString(), checks, playback, externalRequests, browserErrors,
+    capturedAt: new Date().toISOString(), faultVideoPoster, checks, playback, externalRequests, browserErrors,
     previewCount: items.length, scoredCount: items.filter(item => Number.isFinite(item.feedback?.score)).length,
     missingCoverage: ['Actual Drew ratings', 'Real phone hardware gestures', 'Platform screenshot fidelity comparison', 'Deployed GTM consumer', 'Live publishing or ad buying'] }
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
