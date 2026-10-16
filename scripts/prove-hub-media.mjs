@@ -203,7 +203,7 @@ try {
       await page.screenshot({ path: path.join(output, 'instagram-carousel-after-swipe.png'), fullPage: true })
     }
     await page.getByLabel('Score (0–100)', { exact: true }).fill(String(70 + position))
-    await page.getByLabel('Comment', { exact: true }).fill(`Fixture feedback for ${fixture.id}; actual owner rating unknown.`)
+    await page.getByRole('textbox', { name: 'Comment', exact: true }).fill(`Fixture feedback for ${fixture.id}; actual owner rating unknown.`)
     await page.getByRole('button', { name: 'Edit to teach', exact: true }).click()
     await expect(page.getByLabel('Post text', { exact: true })).toHaveValue(fixture.preview.text)
     await page.getByLabel('Post text', { exact: true }).fill(fixture.preview.text + ' Edited for clarity.')
@@ -220,7 +220,7 @@ try {
     assert.ok(await image.evaluate(element => element.src.startsWith('blob:')), 'Host resolves owned retained bytes to a local Blob')
     await expect(page.getByLabel('Score (0–100)', { exact: true })).toHaveValue('')
     await page.getByLabel('Score (0–100)', { exact: true }).fill('85')
-    await page.getByLabel('Comment', { exact: true }).fill('Fixture screenshot/creative review; actual owner rating unknown.')
+    await page.getByRole('textbox', { name: 'Comment', exact: true }).fill('Fixture screenshot/creative review; actual owner rating unknown.')
     await page.getByRole('button', { name: 'Edit to teach', exact: true }).click()
     await page.getByLabel('Payload', { exact: true }).fill(JSON.stringify({ ...fixture.input, teachingNote: 'Use the retained image.' }))
     await page.getByRole('button', { name: 'Save feedback', exact: true }).click()
