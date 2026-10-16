@@ -109,6 +109,16 @@ export interface HubActionField {
   mono?: boolean
 }
 
+/** Frozen media bytes supplied by the host; renderers never resolve a provider URL. */
+export interface HubPreviewMedia {
+  kind: 'image' | 'video'
+  src: string
+  alt: string
+  poster?: string
+  width?: number
+  height?: number
+}
+
 /** What a held call will do, shaped for its integration's renderer. */
 export type HubActionPreview =
   | {
@@ -140,12 +150,18 @@ export type HubActionPreview =
     }
   | {
       kind: 'post'
-      channel: 'x' | 'linkedin' | 'slack'
+      channel: 'x' | 'linkedin' | 'slack' | 'instagram' | 'facebook' | 'tiktok' | 'youtube'
       text: string
       /** The post's place, such as a Slack channel. */
       where?: string
       link?: { url: string; title?: string; description?: string }
       images?: readonly { url: string; alt?: string }[]
+      media?: readonly HubPreviewMedia[]
+      placement?: 'feed' | 'vertical' | 'carousel'
+      sponsored?: boolean
+      displayName?: string
+      handle?: string
+      callToAction?: string
     }
   | { kind: 'ad'; placement: string; advertiser?: string; headline?: string; text?: string; image?: string; destination?: string; callToAction?: string }
   | { kind: 'page'; title?: string; url?: string; screenshot?: string }
