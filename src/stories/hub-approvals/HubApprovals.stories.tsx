@@ -183,3 +183,17 @@ export const Receipts: Story = {
     </div>
   ),
 }
+
+/** Teaching is independent of approving this exact action live. */
+export const DryRunEmailFeedback: Story = {
+  render: function PreviewFeedbackStory() {
+    const [item, setItem] = useState<HubApprovalItem>({ ...EMAIL, executionMode: 'dry-run', input: {
+      from: 'Taylor <taylor@example.invalid>', fromName: 'Taylor', to: ['Alex <alex@example.invalid>'],
+      subject: 'A sandbox for your next prototype', previewText: 'A working environment without a setup afternoon.',
+      body: '<p>Hi Alex,</p><p>Your prototype should start with code. Here is the <a href="https://example.invalid/sandbox">walkthrough</a>.</p><p>Taylor<br>Example team</p>', html: true,
+    } })
+    return <div className="mx-auto max-w-3xl p-4"><HubApprovalRow item={item} expanded onFeedback={async (_, feedback) => {
+      setItem((current) => ({ ...current, feedback: { ...feedback, savedAt: new Date().toISOString() } }))
+    }} /></div>
+  },
+}
