@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.174
+
+- fix(integrations): show enforced approval policy and OAuth retry (#1123)
+
 ## 0.60.173
 
 - refactor(harness): preserve session identity and enforce deployment admission (#1116)

@@ -3,4 +3,4 @@ export { createHubIntegrationsClient, type HubIntegrationsClient, type HubIntegr
 export { connectionTone, HubIntegrationsPanel, hubConnectionStatus, type HubAccountStatus, type HubConnectionState, type HubIntegrationsAccounts, type HubIntegrationsPanelProps } from './panel'
 export { HUB_CONNECT_CHANNEL, HUB_CONNECTED_MESSAGE_TYPE, HUB_CONNECT_FAILED_MESSAGE_TYPE, POPUP_TIMEOUT_MS } from './popup'
 export { useHubIntegrations, type HubHostConnect, type HubWriteReceipt, type UseHubIntegrationsOptions } from './use-hub-integrations'
-export { type HubIntegrationCapabilities, type HubIntegrationCapability } from './projection'
+export { type HubActionPolicy, type HubActionPolicyDisplay, type HubIntegrationCapabilities, type HubIntegrationCapability } from './projection'

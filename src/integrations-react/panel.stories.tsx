@@ -83,3 +83,22 @@ function IdentitySwitchFixture(args: ComponentProps<typeof HubIntegrationsPanel>
   </div>
 }
 export const WorkspaceSwitch: Story = { args: { layout: 'tiles' }, render: args => <IdentitySwitchFixture {...args} /> }
+
+/** Host policy stays visible even when Hub has no stored override. */
+export const ApprovalRequired: Story = {
+  args: {
+    client: createHubIntegrationsClient(async ({ path }) => {
+      const url = new URL(path, 'https://fixture.invalid')
+      if (url.pathname.endsWith('/providers')) return Response.json({ providers })
+      if (url.pathname.endsWith('/connections')) return Response.json({ connections: [connection] })
+      if (url.pathname.endsWith('/actions')) return Response.json({ tools: [
+        { path: 'github.messages.send', providerId: 'github', title: 'Send', risk: 'write' },
+        { path: 'github.messages.reply', providerId: 'github', title: 'Send Reply', risk: 'write' },
+      ] })
+      if (url.pathname.endsWith('/policies')) return Response.json({ policies: [] })
+      return Response.json({ error: 'Read-only story' }, { status: 403 })
+    }),
+    accounts: { title: 'Connected accounts' },
+    getActionPolicy: () => ({ decision: 'ask', label: 'Asks for approval each time', sourceLabel: 'Required by this workspace' }),
+  },
+}
