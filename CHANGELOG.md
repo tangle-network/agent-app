@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.180
+
+- feat(approvals): add media previews and a scored review inbox
+
 ## 0.60.179
 
 - refactor(web-react): replace local UI primitives with shared components (#1120)
