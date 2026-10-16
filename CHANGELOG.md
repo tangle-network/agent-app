@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.183
+
+- chore(changesets): drop the fleet-lift changeset — consumed by the 0.60.182 release (#1133)
+
 ## 0.60.182
 
 - feat: the fleet lift — toolbelt parity gate, budget-derived mint, allow-list routing, skill marketplace (#1132)
