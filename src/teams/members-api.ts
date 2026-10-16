@@ -31,7 +31,7 @@ import {
   organizationRoleGrantsWorkspaceOwner,
 } from './roles'
 import { generateInviteToken } from './invite'
-import type { TeamDatabase, WorkspaceAccessApi } from './drizzle/access'
+import type { TeamDatabase, WorkspaceAccessReader } from './drizzle/access'
 import type { TeamParentTable, TeamTables } from './drizzle/schema'
 
 /** The authenticated caller — apps resolve this from their own session layer. */
@@ -106,7 +106,7 @@ export interface MembersApiOptions {
   /** The product's workspace table (FK target passed to createTeamTables). */
   workspaceTable: TeamParentTable & WorkspaceLookupTable
   /** Workspace-access API from createWorkspaceAccess — RBAC stays one source. */
-  access: Pick<WorkspaceAccessApi, 'getWorkspaceAccess'>
+  access: WorkspaceAccessReader
   enforceSeat?: EnforceSeatSeam
   memberSyncSeam?: MemberSyncSeam
 }

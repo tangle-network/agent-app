@@ -39,7 +39,7 @@ import {
 } from './invitations'
 import { type WorkspaceRole, hasWorkspaceRole } from './roles'
 import { type EnforceSeatSeam, type MemberSyncSeam, SeatLimitError } from './members-api'
-import type { TeamDatabase, WorkspaceAccessApi } from './drizzle/access'
+import type { TeamDatabase, WorkspaceAccessReader } from './drizzle/access'
 import type { TeamParentTable, TeamTables } from './drizzle/schema'
 import type { WorkspaceInvitationRow, WorkspaceInvitationTables } from './drizzle/invitations-schema'
 
@@ -75,17 +75,18 @@ export interface InvitationUserTable {
 export interface InvitationWorkspaceTable {
   id: any
   name: any
+  organizationId: any
 }
 
 /** Define configuration options required to manage workspace invitations and related data sources */
 export interface InvitationsApiOptions {
-  db: TeamDatabase
+  db: TeamDatabase & { batch?: (statements: [any, ...any[]]) => Promise<any[]> }
   tables: TeamTables
   /** The invitation table from `createWorkspaceInvitationTable`. */
   invitationsTable: WorkspaceInvitationTables
   userTable: TeamParentTable & InvitationUserTable
   workspaceTable: TeamParentTable & InvitationWorkspaceTable
-  access: Pick<WorkspaceAccessApi, 'getWorkspaceAccess'>
+  access: WorkspaceAccessReader
   /** REQUIRED — the app's mail transport (e.g. Resend + `inviteEmail` from `./email`). */
   sendInvitationEmail: SendInvitationEmailSeam
   /** OPTIONAL — seat-limit gate at create time; mirrors members-api. */
@@ -378,10 +379,7 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
     const row = await getInvitationByToken(input.token)
     if (!row) return { succeeded: false, status: 404, error: 'Invitation not found' }
 
-    let invitation = row.invitation
-    if (invitation.status === 'pending' && invitation.expiresAt <= now) {
-      invitation = await markInvitationExpired(invitation.id)
-    }
+    const invitation = row.invitation
 
     const [currentUser] = await db
       .select({ id: users.id, email: users.email, emailVerified: users.emailVerified })
@@ -403,7 +401,7 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
       }
     }
 
-    let orgMember = await getOrganizationMember(invitation.organizationId, currentUser.id)
+    const orgMember = await getOrganizationMember(invitation.organizationId, currentUser.id)
     if (orgMember?.role === 'owner' || orgMember?.role === 'admin') {
       return { succeeded: false, status: 409, error: 'This user already has account-level access.' }
     }
@@ -416,51 +414,85 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
     if (invitation.status === 'expired') return { succeeded: false, status: 409, error: 'Invitation has expired' }
     if (invitation.status === 'revoked') return { succeeded: false, status: 409, error: 'Invitation has been revoked' }
 
-    if (!orgMember) {
-      const [inserted] = await db.insert(organizationMembers).values({
-        organizationId: invitation.organizationId,
-        userId: currentUser.id,
-        role: 'member',
-        createdAt: now,
-        updatedAt: now,
-      }).returning()
-      if (!inserted) return { succeeded: false, status: 500, error: 'Failed to create organization membership' }
-      orgMember = inserted
-    }
+    if (invitation.expiresAt <= now) return { succeeded: false, status: 409, error: 'Invitation has expired' }
+    if (!db.batch) return { succeeded: false, status: 500, error: 'Atomic invitation acceptance is unavailable' }
 
-    const existingMember = await getWorkspaceMemberByOrganizationMember(invitation.workspaceId, orgMember.id)
-    if (!existingMember) {
-      await db.insert(workspaceMembers).values({
-        workspaceId: invitation.workspaceId,
-        organizationMemberId: orgMember.id,
-        userId: currentUser.id,
-        role: invitation.permissions,
-        inviteEmail: invitation.email,
-        // members-api nulls the token on accept to release the unique slot; the
-        // invitations flow keeps it (its `inv_` tokens never collide), so the
-        // materialized row carries the originating token for audit.
-        inviteToken: invitation.token,
-        invitedAt: now,
-        acceptedAt: now,
-      })
-      if (memberSyncSeam?.add) {
-        const userId = currentUser.id
-        const role = invitation.permissions as WorkspaceRole
-        fireSync(() => memberSyncSeam.add!({ workspaceId: invitation.workspaceId, userId, role }))
-      }
-    }
-
-    const [accepted] = await db.update(workspaceInvitations)
-      .set({ status: 'accepted', acceptedAt: now })
-      .where(and(eq(workspaceInvitations.id, invitation.id), eq(workspaceInvitations.status, 'pending')))
-      .returning()
-
-    if (!accepted) {
-      // Membership was materialized before the final compare-and-set. Remove
-      // only the row created by this attempt before reporting the conflict.
-      await db.delete(workspaceMembers)
-        .where(and(eq(workspaceMembers.workspaceId, invitation.workspaceId), eq(workspaceMembers.userId, currentUser.id)))
+    // All three writes share this live fence, evaluated inside one atomic D1
+    // batch. A workspace transfer or revoke between the reads and batch wins
+    // cleanly: there is no membership to repair or runtime access to retract.
+    const eligible = and(
+      eq(workspaceInvitations.id, invitation.id),
+      eq(workspaceInvitations.token, input.token),
+      eq(workspaceInvitations.status, 'pending'),
+      eq(workspaceInvitations.organizationId, invitation.organizationId),
+      eq(workspaceInvitations.workspaceId, invitation.workspaceId),
+      eq(workspaceInvitations.email, invitation.email),
+      eq(workspaceInvitations.permissions, invitation.permissions),
+      sql`${workspaceInvitations.expiresAt} > ${Math.floor(now.getTime() / 1000)}`,
+      sql`exists (select 1 from ${workspaces} where ${workspaces.id} = ${workspaceInvitations.workspaceId}
+        and ${workspaces.organizationId} = ${invitation.organizationId})`,
+      sql`exists (select 1 from ${users} where ${users.id} = ${currentUser.id}
+        and lower(trim(${users.email})) = ${invitation.email}
+        and ${users.emailVerified} = ${currentUser.emailVerified ? 1 : 0})`,
+      sql`(select count(*) from ${users} where lower(trim(${users.email})) = ${invitation.email}) = 1`,
+      sql`not exists (select 1 from ${workspaceMembers} inner join ${organizationMembers}
+        on ${organizationMembers.id} = ${workspaceMembers.organizationMemberId}
+        where ${workspaceMembers.workspaceId} = ${invitation.workspaceId}
+          and ${organizationMembers.organizationId} = ${invitation.organizationId}
+          and ${organizationMembers.userId} = ${currentUser.id}
+          and ${workspaceMembers.acceptedAt} is null)`,
+      sql`not exists (select 1 from ${workspaceMembers} where ${workspaceMembers.inviteToken} = ${invitation.token}
+        and (${workspaceMembers.workspaceId} != ${invitation.workspaceId}
+          or ${workspaceMembers.organizationMemberId} is null
+          or ${workspaceMembers.organizationMemberId} not in (select ${organizationMembers.id} from ${organizationMembers}
+            where ${organizationMembers.organizationId} = ${invitation.organizationId}
+              and ${organizationMembers.userId} = ${currentUser.id})))`,
+      sql`not exists (select 1 from ${organizationMembers}
+        where ${organizationMembers.organizationId} = ${invitation.organizationId}
+          and ${organizationMembers.userId} = ${currentUser.id}
+          and ${organizationMembers.role} in ('owner', 'admin'))`,
+    )
+    const eligibleInvitation = sql`exists (select 1 from ${workspaceInvitations} where ${eligible})`
+    const timestamp = sql`${Math.floor(now.getTime() / 1000)}`
+    const [, insertedMembers, accepted] = await db.batch([
+      db.insert(organizationMembers).select(db.select({
+        id: sql`lower(hex(randomblob(16)))`,
+        organizationId: sql`${invitation.organizationId}`,
+        userId: sql`${currentUser.id}`,
+        role: sql`'member'`,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }).from(workspaceInvitations).where(eligible)).onConflictDoNothing({ target: [organizationMembers.organizationId, organizationMembers.userId] }).returning(),
+      db.insert(workspaceMembers).select(db.select({
+        id: sql`lower(hex(randomblob(16)))`,
+        workspaceId: sql`${invitation.workspaceId}`,
+        organizationMemberId: organizationMembers.id,
+        userId: sql`${currentUser.id}`,
+        role: sql`${invitation.permissions}`,
+        invitedBy: sql`null`,
+        inviteEmail: sql`${invitation.email}`,
+        inviteToken: sql`${invitation.token}`,
+        invitedAt: timestamp,
+        acceptedAt: timestamp,
+      }).from(organizationMembers).where(and(
+        eq(organizationMembers.organizationId, invitation.organizationId),
+        eq(organizationMembers.userId, currentUser.id),
+        eligibleInvitation,
+      ))).onConflictDoNothing({ target: [workspaceMembers.workspaceId, workspaceMembers.organizationMemberId] }).returning(),
+      db.update(workspaceInvitations)
+        .set({ status: 'accepted', acceptedAt: now })
+        .where(eligible)
+        .returning(),
+    ])
+    if (!accepted.length) {
       return { succeeded: false, status: 409, error: 'The invitation changed. Reload it before continuing.' }
+    }
+    if (insertedMembers.length && memberSyncSeam?.add) {
+      fireSync(() => memberSyncSeam.add!({
+        workspaceId: invitation.workspaceId,
+        userId: currentUser.id,
+        role: invitation.permissions as WorkspaceRole,
+      }))
     }
 
     return { succeeded: true, value: { workspaceId: invitation.workspaceId } }
