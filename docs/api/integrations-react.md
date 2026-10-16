@@ -4,7 +4,7 @@
 
 Source: `src/integrations-react/index.ts`
 
-24 exports.
+26 exports.
 
 ### `connectionTone`
 
@@ -52,6 +52,22 @@ Source: `src/integrations-react/index.ts`
 
 ```ts
 interface HubAccountStatus
+```
+
+### `HubActionPolicy`
+
+`type` — Return only policies the host enforces independently of stored Hub overrides.
+
+```ts
+type HubActionPolicy
+```
+
+### `HubActionPolicyDisplay`
+
+`interface` — Display of a policy enforced by the consuming app, never browser authority.
+
+```ts
+interface HubActionPolicyDisplay
 ```
 
 ### `HubConnectCallbackPage`
@@ -187,7 +203,7 @@ number
 `function` — Identity-bound Hub settings controller; connection state is always server-read.
 
 ```ts
-({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect }: UseHubIntegrationsOptions) => { providers:…
+({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect, getActionPolicy }: UseHubIntegrationsOptions…
 ```
 
 ### `UseHubIntegrationsOptions`

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.60.175
+
+- fix(deps): support Hub SDK 0.30.2 in agent apps (#1126)
+- docs(integrations): refresh policy API map [skip release] (#1124)
+
+## 0.60.174
+
+- fix(integrations): show enforced approval policy and OAuth retry (#1123)
+
+## 0.60.173
+
+- refactor(harness): preserve session identity and enforce deployment admission (#1116)
+
 ## 0.60.172
 
 - feat(sso): prompt passthrough on start and a quiet signed_out callback (#1122)

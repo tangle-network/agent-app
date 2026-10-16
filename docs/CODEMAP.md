@@ -44,7 +44,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./eval`](api/eval.md) | 29 | `tools` |
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
-| [`./harness`](api/harness.md) | 18 | — |
+| [`./harness`](api/harness.md) | 20 | — |
 | [`./hosted-agent`](api/hosted-agent.md) | 26 | `profile`, `web` |
 | [`./hosted-agent/application`](api/hosted-agent-application.md) | 9 | `profile`, `web` |
 | [`./hosted-agent/react`](api/hosted-agent-react.md) | 29 | — |
@@ -57,7 +57,7 @@ _133 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./intakes/api`](api/intakes-api.md) | 3 | — |
 | [`./intakes/drizzle`](api/intakes-drizzle.md) | 18 | — |
 | [`./integrations`](api/integrations.md) | 10 | — |
-| [`./integrations-react`](api/integrations-react.md) | 24 | `platform`, `web-react` |
+| [`./integrations-react`](api/integrations-react.md) | 26 | `platform`, `web-react` |
 | [`./interactions`](api/interactions.md) | 64 | `web` |
 | [`./journeys`](api/journeys.md) | 72 | `signoff`, `workspace-export` |
 | [`./journeys/cli`](api/journeys-cli.md) | 1 | `signoff`, `workspace-export` |
@@ -494,9 +494,9 @@ Source: `src/forms/index.ts` · 29 exports
 
 ## `./harness`
 
-Source: `src/harness/index.ts` · 18 exports
+Source: `src/harness/index.ts` · 20 exports
 
-`assertHarnessModelCompatible`, `coerceHarness`, `configuredHarness`, `DEFAULT_HARNESS`, `Harness`, `harnessCapabilities`, `HarnessCapabilities`, `HarnessConfig`, `HarnessModelSelection`, `isHarness`, `isModelCompatibleWithHarness`, `KNOWN_HARNESSES`, `modelProvider`, `ResolvedSessionHarness`, `resolveSessionHarness`, `ResolveSessionHarnessInput`, `snapHarnessToModel`, `snapModelToHarness`
+`assertHarnessModelCompatible`, `coerceHarness`, `configuredHarness`, `DEFAULT_HARNESS`, `Harness`, `HarnessAvailability`, `harnessCapabilities`, `HarnessCapabilities`, `HarnessConfig`, `HarnessModelSelection`, `HarnessSelectionError`, `isHarness`, `isModelCompatibleWithHarness`, `KNOWN_HARNESSES`, `modelProvider`, `ResolvedSessionHarness`, `resolveSessionHarness`, `ResolveSessionHarnessInput`, `snapHarnessToModel`, `snapModelToHarness`
 
 [Full API →](api/harness.md)
 
@@ -606,11 +606,11 @@ Source: `src/integrations/index.ts` · 10 exports
 
 ## `./integrations-react`
 
-Source: `src/integrations-react/index.ts` · 24 exports
+Source: `src/integrations-react/index.ts` · 26 exports
 
 Depends on: `platform`, `web-react`
 
-`connectionTone`, `createHubIntegrationsClient`, `HUB_CONNECT_CHANNEL`, `HUB_CONNECT_FAILED_MESSAGE_TYPE`, `HUB_CONNECTED_MESSAGE_TYPE`, `HubAccountStatus`, `HubConnectCallbackPage`, `HubConnectCallbackPageProps`, `HubConnectionState`, `hubConnectionStatus`, `HubHostConnect`, `HubIntegrationCapabilities`, `HubIntegrationCapability`, `HubIntegrationsAccounts`, `HubIntegrationsClient`, `HubIntegrationsIdentity`, `HubIntegrationsPanel`, `HubIntegrationsPanelProps`, `HubSettingsRequest`, `HubSettingsRequestFn`, `HubWriteReceipt`, `POPUP_TIMEOUT_MS`, `useHubIntegrations`, `UseHubIntegrationsOptions`
+`connectionTone`, `createHubIntegrationsClient`, `HUB_CONNECT_CHANNEL`, `HUB_CONNECT_FAILED_MESSAGE_TYPE`, `HUB_CONNECTED_MESSAGE_TYPE`, `HubAccountStatus`, `HubActionPolicy`, `HubActionPolicyDisplay`, `HubConnectCallbackPage`, `HubConnectCallbackPageProps`, `HubConnectionState`, `hubConnectionStatus`, `HubHostConnect`, `HubIntegrationCapabilities`, `HubIntegrationCapability`, `HubIntegrationsAccounts`, `HubIntegrationsClient`, `HubIntegrationsIdentity`, `HubIntegrationsPanel`, `HubIntegrationsPanelProps`, `HubSettingsRequest`, `HubSettingsRequestFn`, `HubWriteReceipt`, `POPUP_TIMEOUT_MS`, `useHubIntegrations`, `UseHubIntegrationsOptions`
 
 [Full API →](api/integrations-react.md)
 
