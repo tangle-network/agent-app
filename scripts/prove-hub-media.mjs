@@ -75,6 +75,10 @@ async function makeFixtures() {
     post('instagram-carousel', 'instagram', 'instagram-business.media.createContainer', { container: { caption, media_type: 'CAROUSEL', children: ['fixture-slide-1', 'fixture-slide-2', 'fixture-slide-3'] } }, 'carousel', images),
     post('facebook-ad', 'facebook', 'meta-ads.creatives.createLink', { message: caption, headline: 'A smaller setup for your prototype', imageUrl: 'https://example.invalid/image.png', callToAction: 'Learn more' }, 'feed', [images[0]], { sponsored: true, callToAction: 'Learn more', link: { url: 'https://example.invalid/sandbox', title: 'A smaller setup for your prototype' } }),
     post('linkedin-sponsored', 'linkedin', 'linkedin.posts.create', { commentary: caption }, 'feed', [images[0]], { sponsored: true, callToAction: 'Learn more', link: { url: 'https://example.invalid/sandbox', title: 'A smaller setup for your prototype' } }),
+    { id: 'retained-page', providerId: 'work-product', actionPath: 'work-product', phase: 'waiting', executionMode: 'dry-run', input: { title: 'Retained page screenshot' },
+      preview: { kind: 'page', title: 'Retained page screenshot', url: 'https://example.invalid/page', screenshot: images[0].src } },
+    { id: 'retained-ad', providerId: 'work-product', actionPath: 'work-product', phase: 'waiting', executionMode: 'dry-run', input: { headline: 'Retained ad creative' },
+      preview: { kind: 'ad', placement: 'feed', advertiser: 'Example studio', headline: 'Retained ad creative', image: images[0].src } },
     post('blocked-remote', 'x', 'x.tweets.create', { text: caption }, 'carousel', [{ kind: 'image', src: 'https://example.invalid/tracker.png', alt: 'Remote image' }, { kind: 'video', src: 'https://example.invalid/video.webm', alt: 'Remote video' }, { kind: 'image', src: 'blob:https://example.invalid/foreign', alt: 'Foreign Blob image' }]),
   ]
 }
@@ -84,7 +88,7 @@ import React,{useEffect,useState} from 'react';import {createRoot} from 'react-d
 import {HubApprovalRow} from './dist/hub-approvals-react/index.js';
 const makeFixtures=${makeFixtures.toString()};
 function App(){const[items,setItems]=useState([]);const[selected,setSelected]=useState('x-image');
-useEffect(()=>{const urls=[];(async()=>{let data=await(await fetch('/api/fixtures')).json();if(!data.length)data=await(await fetch('/api/fixtures',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(await makeFixtures())})).json();const reel=data.find(item=>item.id==='instagram-reel');const asset=reel?.preview.media[0];if(asset){const bytes=await(await fetch(asset.src)).blob();const url=URL.createObjectURL(bytes);urls.push(url);asset.src=url}setItems(data)})();return()=>urls.forEach(url=>URL.revokeObjectURL(url))},[]);
+useEffect(()=>{const urls=[];(async()=>{let data=await(await fetch('/api/fixtures')).json();if(!data.length)data=await(await fetch('/api/fixtures',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(await makeFixtures())})).json();const reel=data.find(item=>item.id==='instagram-reel');const asset=reel?.preview.media[0];if(asset){const bytes=await(await fetch(asset.src)).blob();const url=URL.createObjectURL(bytes);urls.push(url);asset.src=url}for(const item of data){const field=item.preview.kind==='page'?'screenshot':item.preview.kind==='ad'?'image':null;if(field){const bytes=await(await fetch(item.preview[field])).blob();const url=URL.createObjectURL(bytes);urls.push(url);item.preview[field]=url}}setItems(data)})();return()=>urls.forEach(url=>URL.revokeObjectURL(url))},[]);
 async function feedback(item,fields){const response=await fetch('/api/feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,...fields})});const body=await response.json();if(!response.ok)throw new Error(body.error);setItems(items=>items.map(item=>item.id===body.id?body:item))}
 const item=items.find(item=>item.id===selected);if(!item)return <p>Preparing local media…</p>;
 return <main className="mx-auto max-w-xl space-y-4 px-3 py-6"><header><h1 className="text-xl font-semibold">Review media before publishing</h1><p className="text-sm text-muted-foreground">Local fixtures. Automated fixture ratings; no actual Drew ratings.</p></header>
@@ -148,7 +152,7 @@ try {
       assert.equal(derived.text, fixture.preview.text)
     }
   })
-  for (const [position, fixture] of list().entries()) await check(`${fixture.id}: payload, playback, phone layout and persisted feedback`, async () => {
+  for (const [position, fixture] of list().filter(item => item.preview.kind === 'post').entries()) await check(`${fixture.id}: payload, playback, phone layout and persisted feedback`, async () => {
     await page.getByLabel('Preview case', { exact: true }).selectOption(fixture.id)
     await expect(page.locator('[data-hub-media-channel]')).toBeVisible()
     await expect(page.getByLabel('Score (0–100)', { exact: true })).toHaveValue('')
@@ -207,6 +211,22 @@ try {
     assert.equal(storedFeedback(fixture.id).score, 70 + position)
     const field = fixture.input.container ? 'container' : typeof fixture.input.title === 'string' ? 'title' : typeof fixture.input.message === 'string' ? 'message' : typeof fixture.input.caption === 'string' ? 'caption' : typeof fixture.input.commentary === 'string' ? 'commentary' : 'text'
     assert.deepEqual(storedFeedback(fixture.id).diff.map(entry => entry.path), [field])
+  })
+  for (const fixture of list().filter(item => item.preview.kind !== 'post')) await check(`${fixture.id}: retained Blob screenshot/creative and stored feedback`, async () => {
+    await page.getByLabel('Preview case', { exact: true }).selectOption(fixture.id)
+    const image = page.locator('img').first()
+    await expect(image).toBeVisible()
+    assert.ok(await image.evaluate(element => element.src.startsWith('blob:')), 'Host resolves owned retained bytes to a local Blob')
+    await expect(page.getByLabel('Score (0–100)', { exact: true })).toHaveValue('')
+    await page.getByLabel('Score (0–100)', { exact: true }).fill('85')
+    await page.getByLabel('Comment', { exact: true }).fill('Fixture screenshot/creative review; actual owner rating unknown.')
+    await page.getByRole('button', { name: 'Edit to teach', exact: true }).click()
+    await page.getByLabel('Payload', { exact: true }).fill(JSON.stringify({ ...fixture.input, teachingNote: 'Use the retained image.' }))
+    await page.getByRole('button', { name: 'Save feedback', exact: true }).click()
+    await expect(page.getByText('Feedback saved', { exact: true })).toBeVisible()
+    assert.equal(storedFeedback(fixture.id).score, 85)
+    assert.deepEqual(storedFeedback(fixture.id).diff.map(entry => entry.path), ['teachingNote'])
+    await page.screenshot({ path: path.join(output, `${fixture.id}-phone.png`), fullPage: true })
   })
   await check('reduced motion pauses autoplay while native video playback remains available', async () => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
