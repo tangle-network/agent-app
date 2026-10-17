@@ -2,6 +2,12 @@
  * The words a settings row shows after its label while a write is in flight
  * or just landed. One size (14px) and no colour at rest: "Saved" is the only
  * green, and it fades on its own.
+ *
+ * `MutationStatus` (web-react/async) is the status line for a write with no
+ * settings row: it shows the moment a write starts, keeps "Saved" until the
+ * next write, and prints the refusal itself. A row's status instead waits out
+ * the pending delay, fades, and leaves the refusal to the row's error slot,
+ * so its words are drawn here.
  */
 
 import { Check, LoaderCircle } from 'lucide-react'

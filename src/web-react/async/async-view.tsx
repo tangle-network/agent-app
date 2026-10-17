@@ -177,20 +177,20 @@ export function MutationStatus<T>({ state, labels, className }: MutationStatusPr
   if (state.status === 'idle') return null
   if (state.status === 'pending') {
     return (
-      <span role="status" aria-live="polite" aria-busy={true} className={className ?? 'text-xs text-muted-foreground'}>
+      <span role="status" aria-live="polite" aria-busy={true} className={className ?? 'text-sm text-muted-foreground'}>
         {labels?.pending ?? 'Saving…'}
       </span>
     )
   }
   if (state.status === 'succeeded') {
     return (
-      <span role="status" aria-live="polite" aria-busy={false} className={className ?? 'text-xs text-muted-foreground'}>
+      <span role="status" aria-live="polite" aria-busy={false} className={className ?? 'text-sm text-muted-foreground'}>
         {labels?.succeeded ?? 'Saved'}
       </span>
     )
   }
   return (
-    <span role="alert" className={className ?? 'text-xs text-destructive'}>
+    <span role="alert" className={className ?? 'text-sm text-destructive'}>
       {state.message}
     </span>
   )

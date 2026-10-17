@@ -10,7 +10,7 @@
  * members panel shows accepted members, this owns the invite flow + pending list.
  */
 
-import { Button } from '@tangle-network/ui/primitives'
+import { Button, Heading } from '@tangle-network/ui/primitives'
 import { useState } from 'react'
 import { hasWorkspaceRole, type WorkspaceRole } from '../../teams/roles'
 import type { InvitationView, InvitationsPanelProps } from '../contracts'
@@ -98,7 +98,7 @@ export function InvitationsPanel({
 
       <div className="flex flex-col gap-2 border-t border-[var(--border-default)] pt-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-[var(--text-primary)]">Invitation history</h4>
+          <Heading as="h4" variant="subsection">Invitation history</Heading>
           <span className="text-sm text-[var(--text-muted)]">{invitations.length} total</span>
         </div>
         {invitations.length === 0 ? (

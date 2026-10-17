@@ -81,7 +81,8 @@ it saves at once.
   edited, and Escape restores it. Writes go one at a time: a change made while
   one is in flight waits for it, so the server ends on the person's last choice.
   When the server keeps a normalised value, such as a trimmed name, the control
-  shows that value and the row shows "Saved".
+  shows that value and the row shows "Saved". A `debounceMs` change still
+  waiting when the section unmounts is sent then, not dropped.
 - "Saving…" appears only after `--interaction-pending-delay`. "Saved" appears
   only on a confirmed write (`useConfirmedMutation`) and fades after two
   seconds.
@@ -107,14 +108,23 @@ it saves at once.
   bottom sheet. A refusal stays in the dialog with the server's sentence and
   the `refusalAction` that answers it, such as View plans for `plan_limit`.
 - Values that only make sense together use the page's one `SettingsSaveBar`.
+  Its "Saved" fades after two seconds too. On a narrow card with unsaved
+  changes it sticks to the bottom of the screen.
 - The danger card's button is an outline destructive button at rest; the
   filled destructive button is in the dialog.
 
 **Shared sections.** `MembersSection` and `InvitationsSection` take the teams
 module's `MemberView`, `InvitationView` and role ladder. They name roles by
-capability, and on a narrow card the role picker takes its own full-width line.
-A seat-limit refusal on Invite links to `plansHref` as View plans, through
-the app's `LinkComponent`.
+capability, and the open role list says in one line what each role adds. On a
+narrow card the role picker takes its own full-width line. The lists offer no
+role change or removal for an owner, an inherited organization admin or the
+viewer's own row. A past invitation says in words that it was joined, expired or
+revoked. A seat-limit refusal on Invite links to `plansHref` as View plans,
+through the app's `LinkComponent`. The `teams-react` `MembersPanel` and
+`InvitationsPanel` follow the same rules (`MembersPanel` takes
+`currentUserId`). They stay for the pages that render them today, and they
+retire once Tax, Legal and GTM adopt the sections
+([#1136](https://github.com/tangle-network/agent-app/issues/1136)).
 `ExportSection` runs the workspace export as rows. `DeleteWorkspaceSection`
 counts what goes and asks for the name. `TimezonePicker` searches zones by city
 or UTC offset. Product rows go in the same cards from the same atoms.

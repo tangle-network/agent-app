@@ -1,7 +1,7 @@
 /**
  * The shell's type floor: nothing a product's shell, workspace listing, API
- * access panel, question card, settings page or team panel renders is smaller
- * than 14px (`text-sm`).
+ * access panel, question card, settings page, team panel or write status line
+ * renders is smaller than 14px (`text-sm`).
  * Drew's rule for every agent product is one type scale and no tiny fonts;
  * these surfaces appear in all of them, so the floor is enforced here once.
  *
@@ -26,6 +26,7 @@ const FILES = [
   join(ROOT, 'src/teams-react/components/RoleSelect.tsx'),
   join(ROOT, 'src/workspace-export/react.tsx'),
   join(ROOT, 'src/web-react/api-access-panel.tsx'),
+  join(ROOT, 'src/web-react/async/async-view.tsx'),
   join(ROOT, 'src/web-react/interaction-question-card.tsx'),
   join(ROOT, 'src/web-react/workspace-switcher.tsx'),
 ]

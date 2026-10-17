@@ -25,11 +25,12 @@ import {
 } from '@tangle-network/ui/primitives'
 import { ChevronDown } from 'lucide-react'
 import { Fragment, useEffect, useId, useState, type ReactNode } from 'react'
-import { INVITATION_EMAIL_HINT, isInvitationEmail } from '../teams/invitations'
+import { INVITATION_EMAIL_HINT, INVITATION_EXPIRY_DAYS, isInvitationEmail } from '../teams/invitations'
 import { hasWorkspaceRole, type WorkspaceRole } from '../teams/roles'
 import type { InvitationView, MemberView } from '../teams-react/contracts'
 import { invitationDetail } from '../teams-react/components/invitation-detail'
-import { ROLE_CAPABILITY, RoleSelect } from '../teams-react/components/RoleSelect'
+import { canManageMember, isCurrentMember, memberRoleLabel } from '../teams-react/components/member-access'
+import { RoleSelect } from '../teams-react/components/RoleSelect'
 import { confirmWrite, type MutationOutcome } from '../web-react/async'
 import { ConfirmAction } from './confirm-action'
 import { PlainLink, type SettingsLinkComponent } from './settings-layout'
@@ -108,7 +109,6 @@ function MemberItem({ member, editable, self, noun, onChangeRole, onRemove, extr
   const { field, select } = useMemberRole(member, onChangeRole)
   const name = displayName(member)
   const pending = member.acceptedAt == null
-  const fixedRole = member.role === 'owner' ? (member.inherited ? 'Organization admin' : 'Owner') : ROLE_CAPABILITY[member.role]
   const email = member.name && member.email ? member.email : null
   const status = field.rowProps.status
   return (
@@ -128,7 +128,7 @@ function MemberItem({ member, editable, self, noun, onChangeRole, onRemove, extr
             </span>
           </span>
         }
-        status={editable ? select : <span className="text-foreground">{fixedRole}</span>}
+        status={editable ? select : <span className="text-foreground">{memberRoleLabel(member)}</span>}
         error={field.rowProps.error}
         menu={editable ? [...extraMenu, { label: `Remove from ${noun}…`, tone: 'danger', onSelect: () => setRemoving(true) }] : undefined}
       />
@@ -179,7 +179,7 @@ function InviteDialog({ onInvite, plansHref, LinkComponent, open, onOpenChange }
       open={open}
       onOpenChange={onOpenChange}
       title="Invite people"
-      consequence="They get an email with a link to join. The link works for 7 days."
+      consequence={`They get an email with a link to join. The link works for ${INVITATION_EXPIRY_DAYS} days.`}
       confirmLabel="Send invite"
       canConfirm={valid}
       onConfirm={() => onInvite({ email: email.trim(), role })}
@@ -237,14 +237,13 @@ export function MembersSection({
         : (
           <SettingsList aria-label={title} columns={MEMBER_COLUMNS}>
             {members.map((member) => {
-              const self = currentUserId != null && member.userId === currentUserId
-              const editable = canManage && member.role !== 'owner' && !member.inherited && !self
+              const editable = canManageMember(member, currentRole, currentUserId)
               return (
                 <MemberItem
                   key={member.id}
                   member={member}
                   editable={editable}
-                  self={self}
+                  self={isCurrentMember(member, currentUserId)}
                   noun={noun}
                   onChangeRole={onChangeRole}
                   onRemove={onRemove}

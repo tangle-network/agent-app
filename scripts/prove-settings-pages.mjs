@@ -41,7 +41,7 @@ document.documentElement.classList.add(theme)
 const backend = createSettingsBackend({ viewer })
 window.__settings = backend
 createRoot(document.getElementById('root')).render(params.get('view') === 'team-panels'
-  ? <TeamPanelsDemo />
+  ? <TeamPanelsDemo viewer={viewer} />
   : <SettingsDemo backend={backend} viewer={viewer} initialSection={params.get('section') ?? 'general'} />)`
 
 // The demo imports the package's source paths; the proof runs the built package.
@@ -325,14 +325,34 @@ try {
       })
       await shot('notifications')
 
-      // One grouped save: lowering would save at once; raising asks with from → to.
+      // Approval emails save 600 ms after the last pick; the section unmounts 350 ms after the nav click.
+      await page.locator('#approval-email').getByRole('radio', { name: 'Once a day' }).click()
       await nav.locator('a[data-settings-section="limits"]').click()
+      await check(`${tag}: a debounced pick made just before a section switch is still saved`, async () => {
+        await expect(page.locator('#spend-caps')).toBeVisible()
+        await expect.poll(() => heldValue('approvalEmail'), { timeout: 3_000 }).toBe('daily')
+      })
+
+      // One grouped save: lowering would save at once; raising asks with from → to.
       await page.locator('#cap-perDay').fill('1,500')
       const bar = page.locator('[data-settings-save-bar]')
       await check(`${tag}: the save bar counts the change and shows the old value`, async () => {
         await expect(bar).toContainText('1 unsaved change')
         await expect(page.locator('#spend-caps')).toContainText('Was $50')
       })
+      if (phone) {
+        // A short screen, so the card runs past its bottom edge.
+        await page.setViewportSize({ width, height: 420 })
+        await page.evaluate(() => window.scrollTo(0, 0))
+        await check(`${tag}: with unsaved changes the save bar stays at the bottom of the screen`, async () => {
+          const card = await page.locator('#spend-caps').boundingBox()
+          const footer = await bar.locator('xpath=..').boundingBox()
+          assert.ok(card.y + card.height > 421, `the card ends at ${Math.round(card.y + card.height)}, inside the 420px screen`)
+          assert.ok(Math.abs(footer.y + footer.height - 420) <= 1, `the save bar ends at ${Math.round(footer.y + footer.height)}, not at the screen's bottom`)
+        })
+        await shot('save-bar-sticky')
+        await page.setViewportSize({ width, height: 844 })
+      }
       await page.locator('#spend-caps').scrollIntoViewIfNeeded()
       await shot('save-bar')
       await bar.getByRole('button', { name: 'Save caps' }).click()
@@ -344,7 +364,12 @@ try {
       })
       await shot('confirm-raise')
       await raise.locator('[data-confirm-action]').click()
-      await expect(bar).toContainText('Saved')
+      await check(`${tag}: the save bar shows Saved for two seconds, then no unsaved changes`, async () => {
+        await expect(bar.locator('[data-setting-status="saved"]')).toBeVisible()
+        await expect(bar.locator('[data-setting-status="saved"]')).toHaveCount(0, { timeout: 3_500 })
+        await expect(bar).toContainText('No unsaved changes')
+        assert.equal(await bar.getAttribute('data-dirty'), null, 'the bar still sticks with nothing to save')
+      })
 
       await nav.locator('a[data-settings-section="team"]').click()
       const members = page.locator('#members')
@@ -375,7 +400,18 @@ try {
       })
       await shot('team')
       await members.getByRole('combobox', { name: 'Role for Sam Okafor' }).click()
-      await page.getByRole('option', { name: 'Can edit' }).click()
+      const roles = page.getByRole('listbox')
+      await check(`${tag}: the open role list says what each role adds, the trigger shows the name alone, and the list fits the screen`, async () => {
+        await expect(roles.getByRole('option', { name: /^Can view/ })).toContainText('can’t chat')
+        await expect(roles.getByRole('option', { name: /^Can edit/ })).toContainText('Also chats with the agent')
+        await expect(roles.getByRole('option', { name: /^Can manage settings and people/ })).toContainText('Also invites people')
+        await expect(members.getByRole('combobox', { name: 'Role for Sam Okafor' })).toHaveText('Can view')
+        const box = await roles.boundingBox()
+        assert.ok(box.x >= 0 && box.x + box.width <= width + 0.5, `the list spans ${Math.round(box.x)} to ${Math.round(box.x + box.width)} of ${width}px`)
+        assert.deepEqual(await tinyText(page), [])
+      })
+      await shot('role-list')
+      await roles.getByRole('option', { name: /^Can edit/ }).click()
       await check(`${tag}: a role change saves at once and says so in its row`, async () => {
         await expect(members.locator('[data-setting-status="saved"]')).toBeVisible()
       })
@@ -392,8 +428,18 @@ try {
       await check(`${tag}: the page takes clicks again once a confirmation opened from a menu closes`, async () => {
         await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).pointerEvents)).not.toBe('none')
       })
-      await page.locator('#invitations').scrollIntoViewIfNeeded()
+      const invitationsCard = page.locator('#invitations')
+      await invitationsCard.scrollIntoViewIfNeeded()
       await shot('invitations')
+      await invitationsCard.getByRole('button', { name: /^Show \d+ past invitations/ }).click()
+      await check(`${tag}: each past invitation says in words that it was joined, expired or revoked`, async () => {
+        const past = invitationsCard.locator('[aria-label="Past invitations"]')
+        await expect(past.locator('li', { hasText: 'contractor@fieldnote.example' })).toContainText('Can edit · revoked')
+        await expect(past.locator('li', { hasText: 'mara@fieldnote.example' })).toContainText('Can edit · joined')
+        await expect(past.locator('li', { hasText: 'old-agency@example.com' })).toContainText('Can view · expired')
+      })
+      await invitationsCard.scrollIntoViewIfNeeded()
+      await shot('invitations-past')
 
       // A seat-limit refusal stays in the invite dialog with its sentence and View plans.
       await members.getByRole('button', { name: 'Invite', exact: true }).click()
@@ -429,6 +475,22 @@ try {
       })
       await page.locator('#export').scrollIntoViewIfNeeded()
       await shot('locked-general')
+      await open('viewer=admin&section=team')
+      await check(`${tag}: an admin's own row in Members offers no role change or removal`, async () => {
+        await expect(members).toContainText('Jonas Weber (you)')
+        await expect(members.getByRole('combobox', { name: 'Role for Jonas Weber' })).toHaveCount(0)
+        await expect(members.getByRole('button', { name: /^More actions.*Jonas Weber/ })).toHaveCount(0)
+        await expect(members.getByRole('combobox', { name: 'Role for Ana Lima' })).toBeVisible()
+      })
+      await page.goto(`${origin}/?theme=${theme}&view=team-panels&viewer=admin`)
+      await check(`${tag}: the teams-react MembersPanel applies the same rule to an admin's own row`, async () => {
+        const panel = page.locator('[data-team-panel="members"]')
+        await expect(panel).toContainText('Amir Chen (you)')
+        await expect(panel.getByRole('combobox', { name: 'Role for Amir Chen' })).toHaveCount(0)
+        await expect(panel.getByRole('button', { name: 'Remove Amir Chen' })).toHaveCount(0)
+        await expect(panel.getByRole('combobox', { name: 'Role for Sofia Reyes' })).toBeVisible()
+        await expect(panel).toContainText('Organization admin')
+      })
 
       // The teams-react panels Tax, Legal and GTM render today stay inside their cards.
       await page.goto(`${origin}/?theme=${theme}&view=team-panels`)

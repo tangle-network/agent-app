@@ -116,7 +116,7 @@ function useWorkspaceField<K extends keyof DemoWorkspace>(
   workspace: DemoWorkspace,
   key: K,
   patch: (next: Patch) => Promise<MutationOutcome<DemoWorkspace>>,
-  options: { commitOn?: 'change' | 'blur'; validate?: (value: DemoWorkspace[K]) => string | null } = {},
+  options: { commitOn?: 'change' | 'blur'; debounceMs?: number; validate?: (value: DemoWorkspace[K]) => string | null } = {},
 ) {
   return useSettingField<DemoWorkspace[K]>({
     saved: workspace[key],
@@ -228,7 +228,8 @@ const NOTICE_OPTIONS = [
 
 function NotificationsSection({ workspace, patch, put, send, viewer }: SectionProps) {
   const digest = useSettingField({ saved: workspace.digest, save: (next) => put('/api/digest', 'digest', next) })
-  const email = useWorkspaceField(workspace, 'approvalEmail', patch)
+  // Clicking through the choices sends only the one the person stops on.
+  const email = useWorkspaceField(workspace, 'approvalEmail', patch, { debounceMs: 600 })
   const text = useWorkspaceField(workspace, 'approvalText', patch)
   const [sent, setSent] = useState<{ ok: true; at: string } | { ok: false; message: string } | null>(null)
   const [sending, setSending] = useState(false)

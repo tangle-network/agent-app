@@ -91,6 +91,7 @@ export function createSettingsBackend({ viewer = 'owner', latencyMs = 120 }: { v
     { id: 'i2', email: 'quarterly-planning-review-board@fieldnote-analytics.example', permissions: 'viewer', status: 'pending', emailStatus: 'failed', expiresAt: '2026-10-22T12:00:00Z', inviteUrl: 'https://app.example/invite/i2' },
     { id: 'i3', email: 'mara@fieldnote.example', permissions: 'editor', status: 'accepted', emailStatus: 'sent', expiresAt: '2026-10-09T12:00:00Z', acceptedAt: '2026-10-04T12:00:00Z', inviteUrl: 'https://app.example/invite/i3' },
     { id: 'i4', email: 'old-agency@example.com', permissions: 'viewer', status: 'expired', emailStatus: 'sent', expiresAt: '2026-09-30T12:00:00Z', inviteUrl: 'https://app.example/invite/i4' },
+    { id: 'i5', email: 'contractor@fieldnote.example', permissions: 'editor', status: 'revoked', emailStatus: 'sent', expiresAt: '2026-10-20T12:00:00Z', inviteUrl: 'https://app.example/invite/i5' },
   ]
   let exportJob: ExportProgress | null = null
   let digestSends = 0

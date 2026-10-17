@@ -5,26 +5,28 @@
  * `./teams/members-api`), so this imports no app router, fetch client, or toast.
  * Styled with the shipped Tangle Quiet tokens (`var(--*)`).
  *
- * Role gating mirrors the API: only admins/owners see role selects and the
- * remove control; inherited org owners and explicit owners are not editable
- * here (org-level concern). The invite role select offers `admin` only to
- * admins/owners.
+ * Role gating mirrors the API and `MembersSection` (`canManageMember`): only
+ * admins/owners see role selects and the remove control; inherited org owners,
+ * explicit owners and the viewer's own row are not editable here. The invite
+ * role select offers `admin` only to admins/owners.
  *
  * Below 36rem of panel a member's role picker takes its own full-width line
  * under the name, and Remove stays beside the name, so the longest capability
  * name fits and nothing passes the card's edge.
  */
 
-import { Button } from '@tangle-network/ui/primitives'
+import { Button, Heading } from '@tangle-network/ui/primitives'
 import type { WorkspaceRole } from '../../teams/roles'
 import { hasWorkspaceRole } from '../../teams/roles'
 import type { MemberView, MembersPanelProps } from '../contracts'
 import { InviteForm } from './InviteForm'
-import { ROLE_CAPABILITY, RoleSelect } from './RoleSelect'
+import { canManageMember, isCurrentMember, memberRoleLabel } from './member-access'
+import { RoleSelect } from './RoleSelect'
 
 export function MembersPanel({
   members,
   currentRole,
+  currentUserId,
   onInvite,
   onChangeRole,
   onRemove,
@@ -69,7 +71,7 @@ export function MembersPanel({
   return (
     <section className="@container/members flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-[var(--text-primary)]">Members</h4>
+        <Heading as="h4" variant="subsection">Members</Heading>
         <span className="text-sm text-[var(--text-muted)]">{members.length} total</span>
       </div>
       <div className="flex flex-col gap-2">
@@ -77,7 +79,8 @@ export function MembersPanel({
           <MemberRow
             key={member.id}
             member={member}
-            canManage={canManage}
+            editable={canManageMember(member, currentRole, currentUserId)}
+            self={isCurrentMember(member, currentUserId)}
             onChangeRole={changeRole}
             onRemove={remove}
           />
@@ -98,17 +101,16 @@ export function MembersPanel({
 
 interface MemberRowProps {
   member: MemberView
-  canManage: boolean
+  editable: boolean
+  self: boolean
   onChangeRole(memberId: string, role: WorkspaceRole): void
   onRemove(memberId: string): void
 }
 
-function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps) {
+function MemberRow({ member, editable, self, onChangeRole, onRemove }: MemberRowProps) {
   const pending = member.acceptedAt == null
   const label = member.name ?? member.email ?? 'Unknown'
   const initial = (member.name?.[0] ?? member.email?.[0] ?? '?').toUpperCase()
-  const isOwner = member.role === 'owner'
-  const editable = canManage && !isOwner && !member.inherited
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--border-default)] py-2 last:border-0">
@@ -118,7 +120,7 @@ function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps
         </div>
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-x-2 text-sm font-medium text-[var(--text-primary)]">
-            <span className="min-w-0 [overflow-wrap:anywhere]">{label}</span>
+            <span className="min-w-0 [overflow-wrap:anywhere]">{label}{self && <span className="font-normal text-[var(--text-muted)]"> (you)</span>}</span>
             {pending && (
               <span className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-sm font-medium text-[var(--text-muted)]">
                 Pending
@@ -131,11 +133,7 @@ function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps
         </div>
       </div>
 
-      {isOwner ? (
-        <span className="ml-auto rounded border border-[var(--border-default)] px-2 py-0.5 text-sm text-[var(--text-secondary)]">
-          {member.inherited ? 'Org Admin' : 'Owner'}
-        </span>
-      ) : editable ? (
+      {editable ? (
         <>
           <div className="w-72 shrink-0 @max-[36rem]/members:order-last @max-[36rem]/members:w-full">
             <RoleSelect
@@ -150,7 +148,7 @@ function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps
         </>
       ) : (
         <span className="ml-auto rounded border border-[var(--border-default)] px-2 py-0.5 text-sm text-[var(--text-secondary)]">
-          {ROLE_CAPABILITY[member.role]}
+          {memberRoleLabel(member)}
         </span>
       )}
     </div>

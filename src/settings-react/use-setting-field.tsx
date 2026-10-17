@@ -36,11 +36,18 @@ export interface UseSettingFieldOptions<T> {
   save: (next: T, context: AsyncLoadContext) => Promise<MutationOutcome<T>>
   /** `change` (default) saves on every change: selects, switches, segmented choices. `blur` saves on `commit()`: text. */
   commitOn?: 'change' | 'blur'
-  /** With `commitOn: 'change'`, waits this long after the last change before saving. */
+  /**
+   * With `commitOn: 'change'`, waits this long after the last change before saving. A change
+   * still waiting when the field unmounts, as on a section switch, is sent then.
+   */
   debounceMs?: number
   /** Returns the sentence that says what to fix, or null. Checked on every change; an invalid value is never sent. */
   validate?: (draft: T) => string | null
-  /** Defaults to `Object.is`. */
+  /**
+   * Defaults to structural equality over primitives, arrays and plain objects, so a `saved`
+   * record built inline on each render is not a new server value. Other objects compare by
+   * identity: pass one for them, such as `(a, b) => a.getTime() === b.getTime()` for a Date.
+   */
   isEqual?: (a: T, b: T) => boolean
   /** Fires with the confirmed value. */
   onSaved?: (value: T) => void
@@ -67,13 +74,30 @@ export interface SettingField<T> {
   rowProps: SettingFieldRowProps
 }
 
+function isPlain(value: object): boolean {
+  const prototype = Object.getPrototypeOf(value)
+  return Array.isArray(value) || prototype === Object.prototype || prototype === null
+}
+
+/** The default `isEqual`: the same primitive, or arrays and plain objects with the same entries. */
+function samePlainValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a) !== Array.isArray(b) || !isPlain(a) || !isPlain(b)) return false
+  const left = a as Record<string, unknown>
+  const right = b as Record<string, unknown>
+  const keys = Object.keys(left)
+  return keys.length === Object.keys(right).length
+    && keys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && samePlainValue(left[key], right[key]))
+}
+
 export function useSettingField<T>({
   saved,
   save,
   commitOn = 'change',
   debounceMs = 0,
   validate,
-  isEqual = Object.is,
+  isEqual = samePlainValue,
   onSaved,
 }: UseSettingFieldOptions<T>): SettingField<T> {
   const [confirmed, setConfirmed] = useState(saved)
@@ -124,11 +148,6 @@ export function useSettingField<T>({
     return () => clearTimeout(timer)
   }, [pending])
 
-  useEffect(() => () => {
-    if (debounce.current) clearTimeout(debounce.current)
-    if (savedTimer.current) clearTimeout(savedTimer.current)
-  }, [])
-
   const send = useCallback(async (first: T) => {
     inFlight.current = true
     let value = first
@@ -174,6 +193,19 @@ export function useSettingField<T>({
     void send(value)
   }, [send])
 
+  // A change still inside its debounce window when the field unmounts is the
+  // person's last choice, so it is sent rather than dropped with the section.
+  // `useConfirmedMutation` does not abort a write on unmount.
+  const commitRef = useRef(commit)
+  commitRef.current = commit
+  useEffect(() => () => {
+    if (savedTimer.current) clearTimeout(savedTimer.current)
+    if (!debounce.current) return
+    clearTimeout(debounce.current)
+    debounce.current = null
+    commitRef.current(draftRef.current)
+  }, [])
+
   const setDraft = useCallback((next: T) => {
     draftRef.current = next
     setDraftState(next)
@@ -186,6 +218,7 @@ export function useSettingField<T>({
 
   const revert = useCallback(() => {
     if (debounce.current) clearTimeout(debounce.current)
+    debounce.current = null
     waiting.current = null
     mutation.reset()
     setFailedValue(null)
