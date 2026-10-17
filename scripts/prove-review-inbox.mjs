@@ -16,6 +16,9 @@ import tailwind from '@tailwindcss/postcss'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argument = process.argv.indexOf('--output')
 const faultNoVerdictTransport = process.argv.includes('--fault-no-verdict-transport')
+const faultArgument = process.argv.indexOf('--fault-work-product-layout')
+const faultWorkProductLayout = faultArgument < 0 ? null : process.argv[faultArgument + 1]
+assert.ok(faultWorkProductLayout === null || ['header', 'tabs'].includes(faultWorkProductLayout), 'Layout fault must isolate header or tabs')
 const output = path.resolve(argument < 0 ? path.join(os.homedir(), 'reviews', `review-inbox-${Date.now()}`) : process.argv[argument + 1])
 await mkdir(output, { recursive: true })
 const temp = await mkdtemp(path.join(os.tmpdir(), 'review-inbox-'))
@@ -31,8 +34,18 @@ const fixtures = kinds.map((kind, index) => {
   const preview = kind === 'hub' ? { kind: 'email', from: input.from, to: input.to, cc: [], bcc: [], subject: input.subject, body: input.body, html: false, reply: false }
     : kind === 'work-product' ? undefined : { kind: 'post', channel: kind === 'asset' ? 'instagram' : 'x', text: input.text,
       ...(kind === 'asset' ? { placement: 'feed', media: [{ kind: 'image', src: image, alt: 'Local Sandbox asset fixture', width: 1, height: 1 }] } : {}) }
+  // Match the compact unknown provenance of the retained failing GTM phone record.
+  const provenance = index === 0 ? { profileHash: '', runId: '', servingModels: [], producedAt: index + 1 }
+    : { profileHash: 'fixture-profile-' + index, runId: 'fixture-turn-' + index, servingModels: ['fixture/vendor/model-long-name'], producedAt: index + 1 }
+  const workProduct = kind === 'work-product' ? {
+    id: 'fixture-work-product-' + index, workspaceId: 'fixture-workspace', scopeKey: 'fixture-scope-' + index, status: 'ready', version: 1,
+    artifact: { kind: 'document', title: 'A retained work product with a long phone review title', content: input.content, baseline: { content: 'Prior retained brief.' } },
+    evidence: [{ id: 'source-' + index, sourceRef: 'fixture/retained-source.txt', target: 'content', claim: 'Retained source for this brief', locator: {} }],
+    exceptions: [], checks: [], history: [{ version: 1, status: 'ready', at: index + 1, reviewNote: 'Retained fixture revision', provenance }],
+    provenance, createdAt: index + 1, updatedAt: index + 1,
+  } : undefined
   return { id: `${kind}:${String(index + 1).padStart(2, '0')}`, revision: 'v1', title, kind, createdAt: (index === 3 ? 3 : index + 1) * 1000,
-    canReview: true, input, preview, ...(kind === 'hub' ? { approveLabel: 'Approve preview' } : {}) }
+    canReview: true, input, preview, ...(workProduct ? { workProduct } : {}), ...(kind === 'hub' ? { approveLabel: 'Approve preview' } : {}) }
 })
 for (const item of fixtures) db.prepare('INSERT INTO items VALUES (?, ?)').run(item.id, JSON.stringify(item))
 const held = { id: 'held-email', actionPath: 'gmail.send', providerId: 'gmail', phase: 'waiting', executionMode: 'dry-run', input: fixtures.find(item => item.kind === 'hub').input }
@@ -41,7 +54,17 @@ const originalOrder = [...fixtures].sort((a, b) => a.createdAt - b.createdAt || 
 const clients = new Set()
 const checks = [], externalRequests = [], browserErrors = []
 let activeCheck = 'initial render', failNext = false, holdNext = false, releaseVerdict, verdictRequests = 0, failedWrites = 0
-let browser, context, page, server
+let browser, context, page, server, phoneContext, phonePage
+let workProductPhone
+const headerGeometry = element => {
+  const rect = node => { const r = node.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height } }
+  const header = element.firstElementChild.firstElementChild
+  const identity = header.firstElementChild
+  return { viewport: innerWidth, header: rect(header), identity: rect(identity), provenance: rect(header.lastElementChild),
+    identityChildren: [...identity.querySelectorAll(':scope > *, :scope > div > *')].map(rect) }
+}
+const headerStacked = g => g.identity.width >= g.header.width - 1 && g.provenance.top >= g.identity.bottom - 1
+  && g.identityChildren.every(r => r.left >= g.identity.left - 1 && r.right <= g.identity.right + 1)
 const count = table => db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n
 function pendingItems() {
   return db.prepare('SELECT body FROM items ORDER BY id DESC').all().map(row => JSON.parse(row.body))
@@ -71,12 +94,13 @@ async function score(value) {
 
 const app = `import React,{useEffect,useState} from 'react';import {createRoot} from 'react-dom/client';
 import {ReviewInbox} from './dist/web-react/index.js';import {HubActionPreviewView,HubApprovalRow} from './dist/hub-approvals-react/index.js';
+import {WorkProductPane} from './dist/work-product-react/index.js';
 function HubFixture(){const[item,setItem]=useState(null);useEffect(()=>{fetch('/api/held').then(response=>response.json()).then(setItem);const updates=new EventSource('/api/updates');updates.onmessage=event=>{const state=JSON.parse(event.data);if(state.held)setItem(state.held)};return()=>updates.close()},[]);if(!item)return <p>Loading held revision…</p>;return <main className="mx-auto max-w-2xl p-4"><HubApprovalRow item={item} expanded onFeedback={async(item,value)=>{const response=await fetch('/api/held-feedback',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(value)});if(!response.ok)throw new Error('Feedback could not save')}}/></main>}
 function App(){const[items,setItems]=useState([]);const[loading,setLoading]=useState(true);const[error,setError]=useState(null);
 async function load(){try{const response=await fetch('/api/items');if(!response.ok)throw new Error('Inbox unavailable');setItems(await response.json());setError(null)}catch(error){setError(error.message)}finally{setLoading(false)}}
 useEffect(()=>{load();const updates=new EventSource('/api/updates');updates.onmessage=event=>{const state=JSON.parse(event.data);if(state.items){setItems(state.items);setLoading(state.loading);setError(state.error)}};return()=>updates.close()},[]);
 async function verdict(item,feedback){if(${JSON.stringify(faultNoVerdictTransport)})return;const response=await fetch('/api/verdict',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,revision:item.revision,...feedback})});const result=await response.json();if(!response.ok)throw new Error(result.error);setItems(result.items)}
-return <main className="px-4 py-6" data-fixture-source-count={items.length}><ReviewInbox items={items} initialSelectedId={new URLSearchParams(location.search).get('item')??undefined} loading={loading} error={error} onRefresh={load} onVerdict={verdict} renderItem={item=>item.preview?<HubActionPreviewView preview={item.preview} account="Example studio"/>:<article className="rounded-lg border border-border bg-card p-5"><h3 className="font-semibold">Retained work product</h3><p className="mt-3 whitespace-pre-wrap">{item.input.content}</p></article>}/></main>}
+return <main className="px-4 py-6" data-fixture-source-count={items.length}><ReviewInbox items={items} initialSelectedId={new URLSearchParams(location.search).get('item')??undefined} loading={loading} error={error} onRefresh={load} onVerdict={verdict} renderItem={item=>item.preview?<HubActionPreviewView preview={item.preview} account="Example studio"/>:<div data-work-product-proof><WorkProductPane workProduct={item.workProduct} defaultTab="artifact" resolveSourceUrl={entry=>'/vault?file='+encodeURIComponent(entry.sourceRef)}/></div>}/></main>}
 createRoot(document.getElementById('root')).render(new URLSearchParams(location.search).has('hub')?<HubFixture/>:<App/>);`
 
 try {
@@ -132,6 +156,84 @@ try {
   await page.goto(origin)
   await expect(page.locator('[data-review-title]')).toHaveText(originalOrder[0].title)
   await page.screenshot({ path: path.join(output, 'starting-desktop.png'), fullPage: true })
+  await check('phone work-product identity and all tabs remain reachable by touch and keyboard', async () => {
+    phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
+      recordVideo: { dir: output, size: { width: 390, height: 844 } } })
+    phoneContext.on('request', request => { if (/^https?:/.test(request.url()) && !request.url().startsWith(origin + '/')) externalRequests.push(request.url()) })
+    phonePage = await phoneContext.newPage(); phonePage.on('pageerror', error => browserErrors.push(error.message))
+    await phonePage.goto(origin + '/?item=' + encodeURIComponent(originalOrder[0].id))
+    const pane = phonePage.locator('[data-work-product-proof]')
+    const tabs = pane.getByRole('tablist', { name: 'Work product views' })
+    await expect(tabs).toBeVisible()
+    if (faultWorkProductLayout) {
+      await pane.evaluate((element, fault) => {
+        if (fault === 'header') element.firstElementChild.firstElementChild.firstElementChild.classList.remove('basis-full', '@[640px]/work-product:basis-0')
+        if (fault === 'tabs') element.querySelector('[role="tablist"]').parentElement.classList.remove('overflow-x-auto')
+      }, faultWorkProductLayout)
+    }
+    const geometry = await pane.evaluate(headerGeometry)
+    workProductPhone = { faultApplied: faultWorkProductLayout, geometry, tabs: [] }
+    await phonePage.screenshot({ path: path.join(output, 'work-product-phone-header.png'), fullPage: true })
+    assert.ok(headerStacked(geometry), 'Phone work-product identity must fit above provenance without overlap')
+    const scrollport = tabs.locator('..')
+    await scrollport.scrollIntoViewIfNeeded()
+    const box = await scrollport.boundingBox()
+    assert.ok(box && box.x >= 0 && box.x + box.width <= 391, 'Phone tab viewport must fit the screen')
+    const cdp = await phoneContext.newCDPSession(phonePage)
+    const startX = box.x + box.width * .85, endX = box.x + box.width * .15, y = box.y + box.height / 2
+    async function swipeTabs() {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: startX, y }] })
+      for (let step = 1; step <= 12; step++) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: startX + (endX - startX) * step / 12, y }] })
+        await phonePage.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)))
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    }
+    await swipeTabs()
+    await expect.poll(() => scrollport.evaluate(element => element.scrollLeft), { message: 'Phone tabs must scroll after a native swipe' }).toBeGreaterThan(0)
+    workProductPhone.nativeScrollLeft = await scrollport.evaluate(element => element.scrollLeft)
+    const history = tabs.getByRole('tab', { name: 'History (1)', exact: true })
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const historyBox = await history.boundingBox()
+      if (historyBox.x + historyBox.width <= box.x + box.width + 1) break
+      await swipeTabs()
+    }
+    await expect(history).toBeInViewport({ ratio: 1 })
+    await history.tap(); await expect(pane.getByText('Retained fixture revision', { exact: true })).toBeVisible()
+    await phonePage.screenshot({ path: path.join(output, 'work-product-phone-history.png'), fullPage: true })
+    await history.focus(); await phonePage.keyboard.press('Home')
+    const names = ['Artifact', 'Diff', 'Lineage (1)', 'Exceptions (0)', 'Checks (0)', 'History (1)']
+    for (let index = 0; index < names.length; index++) {
+      if (index) await phonePage.keyboard.press('ArrowRight')
+      const tab = tabs.getByRole('tab', { name: names[index], exact: true })
+      await expect(tab).toBeFocused(); await expect(tab).toHaveAttribute('aria-selected', 'true')
+      await expect(tab).toBeInViewport({ ratio: 1 })
+      await expect.poll(() => tabs.evaluate(element => {
+        const active = element.querySelector('[aria-selected="true"]').getBoundingClientRect()
+        const indicator = element.querySelector(':scope > [aria-hidden="true"]').getBoundingClientRect()
+        return Math.max(Math.abs(active.left - indicator.left), Math.abs(active.width - indicator.width))
+      })).toBeLessThan(2)
+      workProductPhone.tabs.push(await tab.evaluate(element => { const r = element.getBoundingClientRect(); return { name: element.textContent, left: r.left, right: r.right } }))
+      if (index === 2) {
+        await expect(pane.getByRole('link', { name: /retained-source/ })).toBeVisible()
+        await phonePage.screenshot({ path: path.join(output, 'work-product-phone-lineage.png'), fullPage: true })
+      }
+    }
+    await phonePage.keyboard.press('Home')
+    await expect(pane).toContainText(originalOrder[0].input.content)
+    await phonePage.screenshot({ path: path.join(output, 'work-product-phone-artifact.png'), fullPage: true })
+    assert.equal(count('signals'), 0); assert.equal(verdictRequests, 0)
+    await phoneContext.close(); phoneContext = undefined
+    const narrow = await context.newPage(); narrow.on('pageerror', error => browserErrors.push(error.message))
+    await narrow.goto(origin + '/?item=' + encodeURIComponent(originalOrder[0].id))
+    const narrowPane = narrow.locator('[data-work-product-proof]')
+    await expect(narrowPane).toBeVisible()
+    await narrowPane.evaluate(element => { element.style.width = '360px' })
+    workProductPhone.narrowDesktop = await narrowPane.evaluate(headerGeometry)
+    await narrow.screenshot({ path: path.join(output, 'work-product-narrow-desktop-header.png') })
+    await narrow.close()
+    assert.ok(headerStacked(workProductPhone.narrowDesktop), 'A 360px pane in a desktop viewport must stack identity above provenance')
+  })
   await check('a held call isolates unsaved edits by immutable source payload and restores the prior draft', async () => {
     const hub = await context.newPage(); hub.on('pageerror', error => browserErrors.push(error.message))
     await hub.goto(`${origin}/?hub=1`)
@@ -290,15 +392,16 @@ try {
     await page.setViewportSize({ width: 390, height: 844 }); await page.screenshot({ path: path.join(output, 'all-caught-up-phone.png'), fullPage: true })
   })
 } catch (error) {
+  await phonePage?.screenshot({ path: path.join(output, 'failure-phone.png'), fullPage: true }).catch(() => {})
   await page?.screenshot({ path: path.join(output, 'failure.png'), fullPage: true }).catch(() => {})
   checks.push({ name: activeCheck, result: 'FAIL', error: String(error) }); process.exitCode = 1
 } finally {
   releaseVerdict?.(); for (const client of clients) client.end()
-  await context?.close(); await browser?.close()
+  await phoneContext?.close(); await context?.close(); await browser?.close()
   if (server) await new Promise(resolve => server.close(resolve))
   const report = { target: 'Built shared ReviewInbox with real local HTTP/SSE and SQLite; keyboard-only fixture triage',
     revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), capturedAt: new Date().toISOString(),
-    checks, fault: faultNoVerdictTransport ? 'verdict callback returns without transport or persistence' : null,
+    checks, workProductPhone, fault: faultWorkProductLayout ? 'remove only work-product ' + faultWorkProductLayout + ' protection' : faultNoVerdictTransport ? 'verdict callback returns without transport or persistence' : null,
     previewCount: fixtures.length, verdictCount: count('verdicts'), learningRowCount: count('signals'), verdictRequests, failedWrites, externalRequests, browserErrors,
     missingCoverage: ['Actual Drew ratings', 'Real phone hardware', 'Served GTM consumer', 'Live send, publish or ad buy'] }
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')

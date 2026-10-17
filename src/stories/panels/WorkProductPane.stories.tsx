@@ -38,6 +38,13 @@ export const ArtifactTab: Story = {
   args: { workProduct: REDLINE_RECORD, defaultTab: 'artifact' },
 }
 
+/** A phone-width review keeps all tabs reachable without crowding provenance. */
+export const NarrowReview: Story = {
+  name: 'Phone-width review',
+  decorators: [(Story) => <div className="w-full max-w-sm p-3"><Story /></div>],
+  args: { workProduct: REDLINE_RECORD, defaultTab: 'artifact', resolveSourceUrl },
+}
+
 export const LineageTab: Story = {
   name: 'Lineage tab',
   decorators: [(Story) => <PaneFrame><Story /></PaneFrame>],
