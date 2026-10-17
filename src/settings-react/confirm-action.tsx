@@ -142,11 +142,13 @@ export function ConfirmAction<T = unknown>({
   }
 
   // A dialog with fields opens on its first field; otherwise on Cancel, so Enter never confirms by accident.
+  // Focus moves a task later: a ⋯ menu that opened the dialog still holds focus in its own trap until it closes.
   const focusFirst = (event: Event) => {
-    const target = bodyRef.current?.querySelector<HTMLElement>('input, textarea, [role="combobox"]') ?? cancelRef.current
-    if (!target) return
     event.preventDefault()
-    target.focus()
+    setTimeout(() => {
+      const target = bodyRef.current?.querySelector<HTMLElement>('input, textarea, [role="combobox"]') ?? cancelRef.current
+      target?.focus()
+    }, 0)
   }
 
   const hasBody = Boolean(changes?.length) || notice != null || children != null || requireText !== undefined || failure != null
