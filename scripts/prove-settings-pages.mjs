@@ -80,7 +80,12 @@ await once(server, 'listening')
 const origin = `http://127.0.0.1:${server.address().port}`
 
 async function check(name, run) {
-  await run()
+  try {
+    await run()
+  } catch (error) {
+    console.error(`FAIL ${name}`)
+    throw error
+  }
   checks.push({ name, result: 'PASS' })
 }
 
