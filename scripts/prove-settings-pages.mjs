@@ -281,7 +281,12 @@ try {
         const name = await members.getByText('Ana Lima', { exact: true }).boundingBox()
         const card = await members.boundingBox()
         assert.ok(select.y > name.y + name.height - 1, 'the role picker sits under the name')
-        assert.ok(select.width >= card.width - 2 * 16 - 32 - 36 - 16 - 2, `the role picker is ${select.width}px of a ${card.width}px card`)
+        assert.ok(select.width >= card.width - 2 * 16 - 2, `the role picker is ${select.width}px of a ${card.width}px card`)
+        const clipped = await members.getByRole('combobox', { name: 'Role for Jonas Weber' }).evaluate((trigger) => {
+          const value = trigger.querySelector('span')
+          return value.scrollWidth > value.clientWidth + 1
+        })
+        assert.equal(clipped, false, '"Can manage settings and people" is cut off')
         const tab = await nav.locator('a[data-settings-section="team"]').boundingBox()
         const strip = await nav.boundingBox()
         assert.ok(tab.x >= strip.x && tab.x + tab.width <= strip.x + strip.width + 1, 'the current tab is inside the strip')

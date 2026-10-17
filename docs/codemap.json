@@ -25849,7 +25849,7 @@
           "name": "fieldPickerTriggerClass",
           "kind": "function",
           "signature": "({ interactive }?: { interactive?: boolean | undefined; }) => string",
-          "doc": "Trigger classes for a `field` picker."
+          "doc": "Trigger classes for a `field` picker: `@tangle-network/ui`'s own field presentation and `md` field size, the classes its `Input` and `SelectTrigger` draw, so a model, harness or timezone selector sit…"
         },
         {
           "name": "FieldValues",

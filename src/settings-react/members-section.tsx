@@ -72,7 +72,10 @@ function initials(member: MemberView): string {
   return ((parts[0]?.[0] ?? '?') + (member.name ? parts[1]?.[0] ?? '' : '')).toUpperCase()
 }
 
-const MEMBER_COLUMNS = { leading: '32px', status: '18rem', menu: '36px' }
+// The avatar rides in the title rather than a leading column, so on a narrow
+// card the role picker's own line starts at the card's edge and the longest
+// capability name fits.
+const MEMBER_COLUMNS = { status: '18rem', menu: '36px' }
 
 /** A member's role, saved the moment it is picked. */
 function useMemberRole(member: MemberView, onChangeRole: MembersSectionProps['onChangeRole']) {
@@ -105,11 +108,20 @@ function MemberItem({ member, editable, self, noun, onChangeRole, onRemove, extr
   return (
     <>
       <SettingsListItem
-        leading={<Avatar size="sm"><AvatarFallback>{initials(member)}</AvatarFallback></Avatar>}
-        title={self ? <>{name} <span className="font-normal text-muted-foreground">(you)</span></> : name}
-        meta={email || pending || status
-          ? <span className="inline-flex flex-wrap items-center gap-x-2"><span>{email && breakable(email)}{email && pending && ' · '}{pending && 'Hasn’t joined yet'}</span>{status}</span>
-          : undefined}
+        title={
+          <span className="flex min-w-0 items-center gap-3">
+            <Avatar size="sm"><AvatarFallback>{initials(member)}</AvatarFallback></Avatar>
+            <span className="min-w-0">
+              <span className="block">{name}{self && <span className="font-normal text-muted-foreground"> (you)</span>}</span>
+              {(email || pending || status) && (
+                <span className="flex flex-wrap items-center gap-x-2 font-normal text-muted-foreground">
+                  <span>{email && breakable(email)}{email && pending && ' · '}{pending && 'Hasn’t joined yet'}</span>
+                  {status}
+                </span>
+              )}
+            </span>
+          </span>
+        }
         status={editable ? select : <span className="text-foreground">{fixedRole}</span>}
         error={field.rowProps.error}
         menu={editable ? [...extraMenu, { label: `Remove from ${noun}…`, tone: 'danger', onSelect: () => setRemoving(true) }] : undefined}
