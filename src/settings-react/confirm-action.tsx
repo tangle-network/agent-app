@@ -148,7 +148,8 @@ export function ConfirmAction<T = unknown>({
     field.focus()
   }
 
-  const body = (
+  const hasBody = Boolean(changes?.length) || notice != null || children != null || requireText !== undefined || failure != null
+  const body = hasBody && (
     <div ref={bodyRef} className="grid min-w-0 gap-4 text-sm">
       {changes && changes.length > 0 && (
         <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 rounded-lg border border-border px-4 py-3">
@@ -217,7 +218,7 @@ export function ConfirmAction<T = unknown>({
             <SheetTitle>{title}</SheetTitle>
             <SheetDescription>{consequence}</SheetDescription>
           </SheetHeader>
-          <div className="px-4">{body}</div>
+          {body && <div className="px-4">{body}</div>}
           <SheetFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
             {confirmButton}
             <Button type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>{cancelLabel}</Button>

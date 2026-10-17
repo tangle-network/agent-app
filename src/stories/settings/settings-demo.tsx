@@ -227,8 +227,8 @@ function NotificationsSection({ workspace, patch, send, viewer }: SectionProps) 
   return (
     <>
       <SettingsSection id="digest" title="Daily digest">
-        <SettingsRow label="Email the owner a daily digest" htmlFor="digest" layout="compact" {...digest.rowProps}>
-          <Switch id="digest" checked={digest.draft} onCheckedChange={digest.setDraft} />
+        <SettingsRow label="Email the owner a daily digest" htmlFor="digest-email" layout="compact" {...digest.rowProps}>
+          <Switch id="digest-email" checked={digest.draft} onCheckedChange={digest.setDraft} />
         </SettingsRow>
         <SettingsRow
           label="Send a digest now"
