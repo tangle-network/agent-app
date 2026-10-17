@@ -1,6 +1,7 @@
 /**
  * The shell's type floor: nothing a product's shell, workspace listing, API
- * access panel or question card renders is smaller than 14px (`text-sm`).
+ * access panel, question card, settings page or team panel renders is smaller
+ * than 14px (`text-sm`).
  * Drew's rule for every agent product is one type scale and no tiny fonts;
  * these surfaces appear in all of them, so the floor is enforced here once.
  *
@@ -13,11 +14,17 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const workspaceReact = readdirSync(join(ROOT, 'src/workspace-react'))
+const sourcesIn = (dir: string) => readdirSync(join(ROOT, dir))
   .filter((name) => name.endsWith('.tsx') && !name.includes('.test.'))
-  .map((name) => join(ROOT, 'src/workspace-react', name))
+  .map((name) => join(ROOT, dir, name))
 const FILES = [
-  ...workspaceReact,
+  ...sourcesIn('src/workspace-react'),
+  ...sourcesIn('src/settings-react'),
+  join(ROOT, 'src/teams-react/components/MembersPanel.tsx'),
+  join(ROOT, 'src/teams-react/components/InvitationsPanel.tsx'),
+  join(ROOT, 'src/teams-react/components/InviteForm.tsx'),
+  join(ROOT, 'src/teams-react/components/RoleSelect.tsx'),
+  join(ROOT, 'src/workspace-export/react.tsx'),
   join(ROOT, 'src/web-react/api-access-panel.tsx'),
   join(ROOT, 'src/web-react/interaction-question-card.tsx'),
   join(ROOT, 'src/web-react/workspace-switcher.tsx'),

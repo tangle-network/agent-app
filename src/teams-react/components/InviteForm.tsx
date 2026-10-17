@@ -73,7 +73,9 @@ export function InviteForm({ label, placeholder, onInvite }: InviteFormProps) {
           className="min-w-[12rem] flex-1"
         />
         <div className="ml-auto flex shrink-0 gap-2">
-          <RoleSelect value={role} ariaLabel="Invite role" onChange={setRole} />
+          <div className="w-72 max-w-full">
+            <RoleSelect value={role} ariaLabel="Invite role" onChange={setRole} />
+          </div>
           <Button type="button" onClick={() => void submit()} disabled={inviting || !valid}>
             {inviting ? 'Inviting…' : 'Invite'}
           </Button>

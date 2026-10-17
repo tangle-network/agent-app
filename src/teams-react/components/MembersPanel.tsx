@@ -11,11 +11,12 @@
  * admins/owners.
  */
 
+import { Button } from '@tangle-network/ui/primitives'
 import type { WorkspaceRole } from '../../teams/roles'
 import { hasWorkspaceRole } from '../../teams/roles'
 import type { MemberView, MembersPanelProps } from '../contracts'
 import { InviteForm } from './InviteForm'
-import { RoleSelect } from './RoleSelect'
+import { ROLE_CAPABILITY, RoleSelect } from './RoleSelect'
 
 export function MembersPanel({
   members,
@@ -133,23 +134,20 @@ function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps
           </span>
         ) : editable ? (
           <>
-            <RoleSelect
-              value={member.role}
-              ariaLabel={`Role for ${label}`}
-              onChange={(role) => onChangeRole(member.id, role)}
-            />
-            <button
-              type="button"
-              aria-label={`Remove ${label}`}
-              onClick={() => onRemove(member.id)}
-              className="rounded px-2 py-1 text-sm text-[var(--text-danger)] hover:bg-[var(--border-default)]"
-            >
+            <div className="w-72 max-w-full">
+              <RoleSelect
+                value={member.role}
+                ariaLabel={`Role for ${label}`}
+                onChange={(role) => onChangeRole(member.id, role)}
+              />
+            </div>
+            <Button type="button" variant="ghost" aria-label={`Remove ${label}`} onClick={() => onRemove(member.id)}>
               Remove
-            </button>
+            </Button>
           </>
         ) : (
-          <span className="rounded border border-[var(--border-default)] px-2 py-0.5 text-sm capitalize text-[var(--text-secondary)]">
-            {member.role}
+          <span className="rounded border border-[var(--border-default)] px-2 py-0.5 text-sm text-[var(--text-secondary)]">
+            {ROLE_CAPABILITY[member.role]}
           </span>
         )}
       </div>

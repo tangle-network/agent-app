@@ -46,7 +46,33 @@ async function readJson<T>(response: Response): Promise<T> {
   return body as T
 }
 
-export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export workspace data', description = DEFAULT_DESCRIPTION, className, fetcher, continuesInBackground = false }: WorkspaceExportPanelProps) {
+export interface UseWorkspaceExportOptions {
+  /** The mount path of the product's export routes. */
+  endpoint: string
+  /** False skips loading; the server refuses non-owners regardless. */
+  enabled: boolean
+  fetcher?: typeof fetch
+}
+
+export interface WorkspaceExportState {
+  /** The newest export, if any. */
+  latest: ExportProgress | undefined
+  /** The last request failure, as a sentence. */
+  error: string | null
+  loading: boolean
+  starting: boolean
+  running: boolean
+  start: () => Promise<void>
+  /** Resumes a running export, or reloads the list. */
+  retry: () => void
+}
+
+/**
+ * Starts an export, drives it to completion by calling `advance` while the
+ * page is open, and resumes a running one on mount. `WorkspaceExportPanel`
+ * and the settings `ExportSection` both draw from it.
+ */
+export function useWorkspaceExport({ endpoint, enabled, fetcher }: UseWorkspaceExportOptions): WorkspaceExportState {
   const doFetch = fetcher ?? fetch
   const [exports, setExports] = useState<ExportProgress[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -114,8 +140,8 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
   }, [doFetch, drive, endpoint])
 
   useEffect(() => {
-    if (canExport) void refresh()
-  }, [canExport, refresh])
+    if (enabled) void refresh()
+  }, [enabled, refresh])
 
   const start = async () => {
     setStarting(true)
@@ -131,9 +157,15 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
     }
   }
 
-  if (!canExport) return null
   const latest = exports[0]
   const running = latest?.status === 'running'
+  const retry = () => (latest?.status === 'running' ? void drive(latest.id) : void refresh())
+  return { latest, error, loading, starting, running, start, retry }
+}
+
+export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export workspace data', description = DEFAULT_DESCRIPTION, className, fetcher, continuesInBackground = false }: WorkspaceExportPanelProps) {
+  const { latest, error, loading, starting, running, start, retry } = useWorkspaceExport({ endpoint, enabled: canExport, fetcher })
+  if (!canExport) return null
 
   return (
     <Card className={['min-w-0 space-y-4 p-5 shadow-none', className].filter(Boolean).join(' ')} aria-busy={running || loading || undefined}>
@@ -152,7 +184,7 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
       {error ? (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-destructive/40 p-3 text-sm text-destructive">
           <p className="min-w-0 flex-1 break-words">{error}</p>
-          <Button type="button" variant="outline" size="sm" onClick={() => (latest?.status === 'running' ? void drive(latest.id) : void refresh())}>
+          <Button type="button" variant="outline" size="sm" onClick={retry}>
             Retry
           </Button>
         </div>
@@ -168,7 +200,7 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
             {latest.current ? <span className="min-w-0 truncate text-sm text-muted-foreground">Now: {latest.current}</span> : null}
           </div>
           {running && continuesInBackground ? (
-            <p className="text-xs text-muted-foreground">You can close this page. The export keeps going, and the download is here when you return.</p>
+            <p className="text-sm text-muted-foreground">You can close this page. The export keeps going, and the download is here when you return.</p>
           ) : null}
           <div
             role="progressbar"
@@ -191,7 +223,7 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
               <Button asChild>
                 <a href={latest.downloadUrl} download>Download zip</a>
               </Button>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 Link expires {latest.downloadExpiresAt ? new Date(latest.downloadExpiresAt).toLocaleTimeString() : 'soon'}; refresh the page for a new one.
               </span>
             </div>
@@ -202,7 +234,7 @@ export function WorkspaceExportPanel({ endpoint, canExport, title = 'Export work
               {latest.units.map((unit) => (
                 <li key={unit.name} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
                   <span className="min-w-0 [overflow-wrap:anywhere]">{unit.name}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-sm text-muted-foreground">
                     {unit.status === 'pending' ? 'waiting' : unit.status === 'empty' ? 'nothing to export' : unit.status === 'failed' ? 'failed' : unit.rows !== undefined ? `${unit.rows} rows` : unit.files !== undefined ? `${unit.files} files · ${formatBytes(unit.bytes)}` : formatBytes(unit.bytes)}
                   </span>
                 </li>
