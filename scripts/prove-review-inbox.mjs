@@ -56,6 +56,15 @@ const checks = [], externalRequests = [], browserErrors = []
 let activeCheck = 'initial render', failNext = false, holdNext = false, releaseVerdict, verdictRequests = 0, failedWrites = 0
 let browser, context, page, server, phoneContext, phonePage
 let workProductPhone
+const headerGeometry = element => {
+  const rect = node => { const r = node.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height } }
+  const header = element.firstElementChild.firstElementChild
+  const identity = header.firstElementChild
+  return { viewport: innerWidth, header: rect(header), identity: rect(identity), provenance: rect(header.lastElementChild),
+    identityChildren: [...identity.querySelectorAll(':scope > *, :scope > div > *')].map(rect) }
+}
+const headerStacked = g => g.identity.width >= g.header.width - 1 && g.provenance.top >= g.identity.bottom - 1
+  && g.identityChildren.every(r => r.left >= g.identity.left - 1 && r.right <= g.identity.right + 1)
 const count = table => db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n
 function pendingItems() {
   return db.prepare('SELECT body FROM items ORDER BY id DESC').all().map(row => JSON.parse(row.body))
@@ -158,23 +167,14 @@ try {
     await expect(tabs).toBeVisible()
     if (faultWorkProductLayout) {
       await pane.evaluate((element, fault) => {
-        if (fault === 'header') element.firstElementChild.firstElementChild.firstElementChild.classList.remove('basis-full', 'sm:basis-0')
+        if (fault === 'header') element.firstElementChild.firstElementChild.firstElementChild.classList.remove('basis-full', '@[640px]/work-product:basis-0')
         if (fault === 'tabs') element.querySelector('[role="tablist"]').parentElement.classList.remove('overflow-x-auto')
       }, faultWorkProductLayout)
     }
-    const geometry = await pane.evaluate(element => {
-      const rect = node => { const r = node.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height } }
-      const header = element.firstElementChild.firstElementChild
-      const identity = header.firstElementChild
-      return { viewport: innerWidth, header: rect(header), identity: rect(identity), provenance: rect(header.lastElementChild),
-        identityChildren: [...identity.querySelectorAll(':scope > *, :scope > div > *')].map(rect) }
-    })
+    const geometry = await pane.evaluate(headerGeometry)
     workProductPhone = { faultApplied: faultWorkProductLayout, geometry, tabs: [] }
     await phonePage.screenshot({ path: path.join(output, 'work-product-phone-header.png'), fullPage: true })
-    assert.ok(geometry.identity.width >= geometry.header.width - 1
-      && geometry.provenance.top >= geometry.identity.bottom - 1
-      && geometry.identityChildren.every(r => r.left >= geometry.identity.left - 1 && r.right <= geometry.identity.right + 1),
-    'Phone work-product identity must fit above provenance without overlap')
+    assert.ok(headerStacked(geometry), 'Phone work-product identity must fit above provenance without overlap')
     const scrollport = tabs.locator('..')
     await scrollport.scrollIntoViewIfNeeded()
     const box = await scrollport.boundingBox()
@@ -224,6 +224,15 @@ try {
     await phonePage.screenshot({ path: path.join(output, 'work-product-phone-artifact.png'), fullPage: true })
     assert.equal(count('signals'), 0); assert.equal(verdictRequests, 0)
     await phoneContext.close(); phoneContext = undefined
+    const narrow = await context.newPage(); narrow.on('pageerror', error => browserErrors.push(error.message))
+    await narrow.goto(origin + '/?item=' + encodeURIComponent(originalOrder[0].id))
+    const narrowPane = narrow.locator('[data-work-product-proof]')
+    await expect(narrowPane).toBeVisible()
+    await narrowPane.evaluate(element => { element.style.width = '360px' })
+    workProductPhone.narrowDesktop = await narrowPane.evaluate(headerGeometry)
+    await narrow.screenshot({ path: path.join(output, 'work-product-narrow-desktop-header.png') })
+    await narrow.close()
+    assert.ok(headerStacked(workProductPhone.narrowDesktop), 'A 360px pane in a desktop viewport must stack identity above provenance')
   })
   await check('a held call isolates unsaved edits by immutable source payload and restores the prior draft', async () => {
     const hub = await context.newPage(); hub.on('pageerror', error => browserErrors.push(error.message))
