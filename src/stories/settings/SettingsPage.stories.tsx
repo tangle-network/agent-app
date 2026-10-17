@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { useMemo } from 'react'
 import { createSettingsBackend, type ViewerRole } from './settings-backend'
 import { SettingsDemo, type DemoSectionId } from './settings-demo'
+import { SaveGroupDemo } from './save-group-demo'
 import { TeamPanelsDemo } from './team-panels-demo'
 
 /**
@@ -41,3 +42,6 @@ export const Team: Story = { args: { section: 'team' } }
 
 /** The `teams-react` panels in their cards: below 36rem of card each role picker takes its own line and Remove stays beside the name. */
 export const TeamPanels: Story = { render: () => <TeamPanelsDemo /> }
+
+/** One save across several cards, as an agent profile's: the group bar follows the last card it saves and stays at the bottom of the screen while it has something to report. */
+export const SaveGroup: Story = { render: () => <SaveGroupDemo /> }

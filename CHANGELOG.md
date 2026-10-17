@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- fix(settings-react): `SettingsSaveBar` stays in reach while it has something to report: unsaved changes, a refusal, "Saved", or a `summary` shown after a save. A footer bar on a narrow card no longer drops out of view the moment a save is confirmed (#1138). `placement="group"` is the bar for one save that covers several cards: rendered after the last of them, it is its own card and sticks to the bottom of the screen at every width over every card above it. The bar's `data-sticky` marks when it sticks; `data-dirty` now means only that there are unsaved changes.
+
 ## 0.60.185
 
 - feat(settings-react): the shared settings page. `SettingsLayout` and `SettingsNav` give each section its own URL, a sticky section column from 60rem of content and a 56px tab strip below it that keeps the current tab in view; the nav marks a click current at once and never dims the page. `useSettingField` autosaves a row and shows "Saving…" after the pending delay, "Saved" only on a confirmed write, and the server's typed refusal with Retry, keeping the person's value; `confirmSettingResponse` reads `{ error: { code, message } }` refusals, and its `parse` returns the value the server kept (`() => next` for a route that answers `{ success: true }` or 204); without `parse` the value is `unknown`, so it cannot be a field's saved value. `ConfirmAction` (a bottom sheet below 40rem) closes only on a confirmed write and shows a refusal with its `refusalAction`, such as View plans. `SettingsSaveBar` is the one grouped save. `MembersSection`, `InvitationsSection`, `ExportSection`, `DeleteWorkspaceSection` and `TimezonePicker` are the shared sections. Rows and cards are `@tangle-network/ui` 11.40.0 settings atoms; the contract is docs/product-surfaces.md#settings-pages.

@@ -108,8 +108,13 @@ it saves at once.
   bottom sheet. A refusal stays in the dialog with the server's sentence and
   the `refusalAction` that answers it, such as View plans for `plan_limit`.
 - Values that only make sense together use the page's one `SettingsSaveBar`.
-  Its "Saved" fades after two seconds too. On a narrow card with unsaved
-  changes it sticks to the bottom of the screen.
+  Its "Saved" fades after two seconds too. While it has something to report
+  (unsaved changes, a refusal, "Saved", or a `summary` after a save) it stays
+  in reach: as a card's footer it sticks to the bottom of the screen on a
+  narrow card. When one save covers several cards, such as an agent profile
+  and its knowledge, it goes after the last of them with `placement="group"`
+  and then sticks to the bottom of the screen at every width, over every card
+  above it, so an edit in the first card never leaves Save out of view.
 - The danger card's button is an outline destructive button at rest; the
   filled destructive button is in the dialog.
 
