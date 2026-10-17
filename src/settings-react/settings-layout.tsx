@@ -99,8 +99,8 @@ function useOptimisticSection(activeId: string) {
   return { currentId: pendingId ?? activeId, pending: pendingId !== null && pendingId !== activeId, setPendingId }
 }
 
-/** Size of an edge chevron, as in `SegmentedControl`: it takes no room in the strip. */
-const CUE_SIZE = 32
+/** The edge panel a chevron sits on: a 44px touch target that takes no room in the strip. */
+const CUE_PANEL = 44
 const STRIP_GAP = 4
 
 /** Chevrons on the strip's edges while links lie past them. They page the strip; touch and trackpads scroll it natively. */
@@ -136,8 +136,15 @@ function useStripOverflow(listRef: RefObject<HTMLUListElement | null>) {
   return { overflow, page }
 }
 
+/**
+ * A chevron on a solid panel at the strip's edge, as `SegmentedControl` draws
+ * its own: a fade over a tab's text shows nothing. The panel's shadow paints
+ * the page gutter too, so no half-hidden label shows beyond it.
+ */
 function ScrollCue({ side, onPage }: { side: 'start' | 'end'; onPage: () => void }) {
-  const Icon = side === 'start' ? ChevronLeft : ChevronRight
+  const start = side === 'start'
+  const Icon = start ? ChevronLeft : ChevronRight
+  const gutter = start ? 'calc(-1 * var(--tangle-settings-gutter, 0px))' : 'var(--tangle-settings-gutter, 0px)'
   return (
     <Button
       type="button"
@@ -146,10 +153,16 @@ function ScrollCue({ side, onPage }: { side: 'start' | 'end'; onPage: () => void
       aria-hidden="true"
       data-scroll-cue={side}
       onClick={onPage}
-      className={`sticky z-[1] flex shrink-0 items-center justify-center self-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:text-foreground ${side === 'start' ? 'left-0' : 'right-0'}`}
-      style={{ width: CUE_SIZE, height: CUE_SIZE, [side === 'start' ? 'marginRight' : 'marginLeft']: -(CUE_SIZE + STRIP_GAP) }}
+      className={`sticky z-[1] mb-px flex shrink-0 items-center self-stretch bg-background ${start ? 'left-0 justify-start' : 'right-0 justify-end'}`}
+      style={{
+        width: CUE_PANEL,
+        [start ? 'marginRight' : 'marginLeft']: -(CUE_PANEL + STRIP_GAP),
+        boxShadow: `${gutter} 0 0 0 hsl(var(--background))`,
+      }}
     >
-      <Icon aria-hidden="true" className="size-4" />
+      <span className="flex size-8 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm">
+        <Icon aria-hidden="true" className="size-4" />
+      </span>
     </Button>
   )
 }

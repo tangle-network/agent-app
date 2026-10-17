@@ -24,7 +24,7 @@ import {
   type SettingsListMenuItem,
 } from '@tangle-network/ui/primitives'
 import { ChevronDown } from 'lucide-react'
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useId, useState, type ReactNode } from 'react'
 import { INVITATION_EMAIL_HINT, isInvitationEmail } from '../teams/invitations'
 import { hasWorkspaceRole, type WorkspaceRole } from '../teams/roles'
 import type { InvitationView, MemberView } from '../teams-react/contracts'
@@ -54,6 +54,12 @@ export interface MembersSectionProps {
   onInvite?(input: { email: string; role: WorkspaceRole }): Promise<MutationOutcome<unknown>>
   /** More ⋯ items for a member the viewer can manage, such as "Make team owner…". */
   menuItems?(member: MemberView): SettingsListMenuItem[]
+}
+
+/** An address that wraps after `@`, a dot or a hyphen before it wraps mid-word. */
+function breakable(address: string): ReactNode {
+  const parts = address.split(/(?<=[@.\-_])/)
+  return parts.map((part, index) => <Fragment key={index}>{part}{index < parts.length - 1 && <wbr />}</Fragment>)
 }
 
 function displayName(member: MemberView): string {
@@ -94,14 +100,16 @@ function MemberItem({ member, editable, self, noun, onChangeRole, onRemove, extr
   const name = displayName(member)
   const pending = member.acceptedAt == null
   const fixedRole = member.role === 'owner' ? (member.inherited ? 'Organization admin' : 'Owner') : ROLE_CAPABILITY[member.role]
-  const metaParts = [member.name && member.email ? member.email : null, pending ? 'Hasn’t joined yet' : null].filter(Boolean)
+  const email = member.name && member.email ? member.email : null
   const status = field.rowProps.status
   return (
     <>
       <SettingsListItem
         leading={<Avatar size="sm"><AvatarFallback>{initials(member)}</AvatarFallback></Avatar>}
         title={self ? <>{name} <span className="font-normal text-muted-foreground">(you)</span></> : name}
-        meta={metaParts.length > 0 || status ? <span className="inline-flex flex-wrap items-center gap-x-2">{metaParts.join(' · ')}{status}</span> : undefined}
+        meta={email || pending || status
+          ? <span className="inline-flex flex-wrap items-center gap-x-2"><span>{email && breakable(email)}{email && pending && ' · '}{pending && 'Hasn’t joined yet'}</span>{status}</span>
+          : undefined}
         status={editable ? select : <span className="text-foreground">{fixedRole}</span>}
         error={field.rowProps.error}
         menu={editable ? [...extraMenu, { label: `Remove from ${noun}…`, tone: 'danger', onSelect: () => setRemoving(true) }] : undefined}
@@ -272,7 +280,7 @@ function PendingInvitation({ invitation, canManage, onResend, onRevoke, onCopy }
   return (
     <>
       <SettingsListItem
-        title={invitation.email}
+        title={breakable(invitation.email)}
         meta={<span className="inline-flex flex-wrap items-center gap-x-2">{invitationDetail(invitation)}{note && <span className="text-[var(--surface-success-text)]">{note}</span>}</span>}
         error={error ?? undelivered ?? undefined}
         action={canManage ? { label: 'Copy link', onSelect: () => void copy() } : undefined}
@@ -333,7 +341,7 @@ export function InvitationsSection({
           <CollapsibleContent>
             <SettingsList aria-label="Past invitations" columns={{}}>
               {past.map((invitation) => (
-                <SettingsListItem key={invitation.id} title={invitation.email} meta={invitationDetail(invitation)} />
+                <SettingsListItem key={invitation.id} title={breakable(invitation.email)} meta={invitationDetail(invitation)} />
               ))}
             </SettingsList>
           </CollapsibleContent>
