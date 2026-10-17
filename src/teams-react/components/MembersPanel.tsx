@@ -9,6 +9,10 @@
  * remove control; inherited org owners and explicit owners are not editable
  * here (org-level concern). The invite role select offers `admin` only to
  * admins/owners.
+ *
+ * Below 36rem of panel a member's role picker takes its own full-width line
+ * under the name, and Remove stays beside the name, so the longest capability
+ * name fits and nothing passes the card's edge.
  */
 
 import { Button } from '@tangle-network/ui/primitives'
@@ -63,7 +67,7 @@ export function MembersPanel({
   }
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="@container/members flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-[var(--text-primary)]">Members</h4>
         <span className="text-sm text-[var(--text-muted)]">{members.length} total</span>
@@ -107,8 +111,8 @@ function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps
   const editable = canManage && !isOwner && !member.inherited
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--border-default)] py-2 last:border-0">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--border-default)] py-2 last:border-0">
+      <div className="flex min-w-0 flex-1 items-center gap-3 @max-[36rem]/members:basis-40">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--bg-input)] text-sm font-semibold text-[var(--text-secondary)]">
           {initial}
         </div>
@@ -127,30 +131,28 @@ function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps
         </div>
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        {isOwner ? (
-          <span className="rounded border border-[var(--border-default)] px-2 py-0.5 text-sm text-[var(--text-secondary)]">
-            {member.inherited ? 'Org Admin' : 'Owner'}
-          </span>
-        ) : editable ? (
-          <>
-            <div className="w-72 max-w-full">
-              <RoleSelect
-                value={member.role}
-                ariaLabel={`Role for ${label}`}
-                onChange={(role) => onChangeRole(member.id, role)}
-              />
-            </div>
-            <Button type="button" variant="ghost" aria-label={`Remove ${label}`} onClick={() => onRemove(member.id)}>
-              Remove
-            </Button>
-          </>
-        ) : (
-          <span className="rounded border border-[var(--border-default)] px-2 py-0.5 text-sm text-[var(--text-secondary)]">
-            {ROLE_CAPABILITY[member.role]}
-          </span>
-        )}
-      </div>
+      {isOwner ? (
+        <span className="ml-auto rounded border border-[var(--border-default)] px-2 py-0.5 text-sm text-[var(--text-secondary)]">
+          {member.inherited ? 'Org Admin' : 'Owner'}
+        </span>
+      ) : editable ? (
+        <>
+          <div className="w-72 shrink-0 @max-[36rem]/members:order-last @max-[36rem]/members:w-full">
+            <RoleSelect
+              value={member.role}
+              ariaLabel={`Role for ${label}`}
+              onChange={(role) => onChangeRole(member.id, role)}
+            />
+          </div>
+          <Button type="button" variant="destructive-outline" aria-label={`Remove ${label}`} onClick={() => onRemove(member.id)}>
+            Remove
+          </Button>
+        </>
+      ) : (
+        <span className="ml-auto rounded border border-[var(--border-default)] px-2 py-0.5 text-sm text-[var(--text-secondary)]">
+          {ROLE_CAPABILITY[member.role]}
+        </span>
+      )}
     </div>
   )
 }

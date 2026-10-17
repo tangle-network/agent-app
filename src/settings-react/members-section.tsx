@@ -32,6 +32,7 @@ import { invitationDetail } from '../teams-react/components/invitation-detail'
 import { ROLE_CAPABILITY, RoleSelect } from '../teams-react/components/RoleSelect'
 import { confirmWrite, type MutationOutcome } from '../web-react/async'
 import { ConfirmAction } from './confirm-action'
+import type { SettingFailure } from './setting-outcome'
 import { SAVED_VISIBLE_MS } from './save-status'
 import { useSettingField } from './use-setting-field'
 
@@ -52,6 +53,8 @@ export interface MembersSectionProps {
   onRemove(input: { memberId: string }): Promise<MutationOutcome<unknown>>
   /** Adds the Invite action. A refusal (a seat limit, a failed email) stays in the dialog with its sentence. */
   onInvite?(input: { email: string; role: WorkspaceRole }): Promise<MutationOutcome<unknown>>
+  /** The plans page. A `plan_limit` refusal on Invite links to it as View plans. */
+  plansHref?: string
   /** More ⋯ items for a member the viewer can manage, such as "Make team owner…". */
   menuItems?(member: MemberView): SettingsListMenuItem[]
 }
@@ -141,8 +144,17 @@ function MemberItem({ member, editable, self, noun, onChangeRole, onRemove, extr
   )
 }
 
-function InviteDialog({ onInvite, open, onOpenChange }: {
+/** View plans after a plan-limit refusal, as an inline link after the sentence. */
+function plansAction(href: string | undefined) {
+  if (!href) return undefined
+  return (failure: SettingFailure) => failure.code === 'plan_limit'
+    ? <a href={href} className="font-medium text-[var(--accent-text)] underline-offset-4 hover:underline">View plans</a>
+    : null
+}
+
+function InviteDialog({ onInvite, plansHref, open, onOpenChange }: {
   onInvite: NonNullable<MembersSectionProps['onInvite']>
+  plansHref?: string
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -167,6 +179,7 @@ function InviteDialog({ onInvite, open, onOpenChange }: {
       confirmLabel="Send invite"
       canConfirm={valid}
       onConfirm={() => onInvite({ email: email.trim(), role })}
+      refusalAction={plansAction(plansHref)}
     >
       <div className="grid gap-2">
         <Label htmlFor={`${id}-email`}>Email</Label>
@@ -202,6 +215,7 @@ export function MembersSection({
   onChangeRole,
   onRemove,
   onInvite,
+  plansHref,
   menuItems,
 }: MembersSectionProps) {
   const [inviting, setInviting] = useState(false)
@@ -235,7 +249,7 @@ export function MembersSection({
             })}
           </SettingsList>
         )}
-      {onInvite && <InviteDialog onInvite={onInvite} open={inviting} onOpenChange={setInviting} />}
+      {onInvite && <InviteDialog onInvite={onInvite} plansHref={plansHref} open={inviting} onOpenChange={setInviting} />}
     </SettingsSection>
   )
 }
@@ -344,7 +358,7 @@ export function InvitationsSection({
         <Collapsible open={showPast} onOpenChange={setShowPast}>
           <div className="border-t border-[color:var(--border-subtle)] px-5 py-3 @max-[34rem]/settings-section:px-4">
             <CollapsibleTrigger asChild>
-              <Button type="button" variant="ghost">
+              <Button type="button" variant="ghost" className="-ml-4">
                 {showPast ? 'Hide past invitations' : `Show ${past.length} past ${past.length === 1 ? 'invitation' : 'invitations'}`}
                 <ChevronDown aria-hidden="true" className={showPast ? 'rotate-180' : undefined} />
               </Button>

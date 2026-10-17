@@ -3,7 +3,8 @@
  * something or acts outside the product. It states the consequence, any
  * from → to changes and an optional notice, can require the person to type a
  * name, and closes only when the write is confirmed: a refusal stays in the
- * dialog with the server's sentence, so the person can try again or cancel.
+ * dialog with the server's sentence, and any action that answers it, such as
+ * View plans for a plan limit, so the person can act, try again or cancel.
  *
  * Wide screens get an `AlertDialog`; below 40rem it is a bottom `Sheet` with
  * full-width buttons, the confirming one first.
@@ -33,6 +34,7 @@ import {
 import { CircleAlert } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react'
 import { useConfirmedMutation, type MutationOutcome } from '../web-react/async'
+import { settingFailure, type SettingFailure } from './setting-outcome'
 
 /** One value the action changes, shown as `label: from → to`. */
 export interface ConfirmChange {
@@ -68,6 +70,8 @@ export interface ConfirmActionProps<T = unknown> {
   onConfirm: () => Promise<MutationOutcome<T>>
   /** Runs after a confirmed outcome, with its value: navigate away, refresh a list. */
   onConfirmed?: (value: T) => void
+  /** The action shown after a refusal's sentence, such as a View plans link for `plan_limit`; null shows none. */
+  refusalAction?: (failure: SettingFailure) => ReactNode
 }
 
 const NARROW = '(max-width: 40rem)'
@@ -103,6 +107,7 @@ export function ConfirmAction<T = unknown>({
   requireText,
   onConfirm,
   onConfirmed,
+  refusalAction,
 }: ConfirmActionProps<T>) {
   const [innerOpen, setInnerOpen] = useState(false)
   const open = openProp ?? innerOpen
@@ -115,7 +120,8 @@ export function ConfirmAction<T = unknown>({
 
   const mutation = useConfirmedMutation<void, T>({ mutate: () => onConfirm(), concurrency: 'reject' })
   const pending = mutation.state.status === 'pending'
-  const failure = mutation.state.status === 'failed' ? mutation.state.message : null
+  const failure = mutation.state.status === 'failed' ? settingFailure(mutation.state) : null
+  const failureAction = failure && refusalAction?.(failure)
   const { reset } = mutation
 
   const setOpen = useCallback((next: boolean) => {
@@ -193,7 +199,7 @@ export function ConfirmAction<T = unknown>({
       {failure && (
         <p id={errorId} role="alert" className="flex items-start gap-1.5 text-[var(--surface-danger-text)] [overflow-wrap:anywhere]">
           <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <span className="min-w-0">{failure}</span>
+          <span className="min-w-0">{failure.message}{failureAction != null && <>{' '}{failureAction}</>}</span>
         </p>
       )}
     </div>
@@ -217,12 +223,12 @@ export function ConfirmAction<T = unknown>({
       <Sheet open={open} onOpenChange={setOpen}>
         {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
         <SheetContent side="bottom" hideCloseButton onOpenAutoFocus={focusFirst} className="max-h-[90dvh] overflow-y-auto">
-          <SheetHeader>
+          <SheetHeader className="pb-0">
             <SheetTitle>{title}</SheetTitle>
             <SheetDescription>{consequence}</SheetDescription>
           </SheetHeader>
           {body && <div className="px-4">{body}</div>}
-          <SheetFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <SheetFooter className="pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
             {confirmButton}
             <Button ref={cancelRef} type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>{cancelLabel}</Button>
           </SheetFooter>

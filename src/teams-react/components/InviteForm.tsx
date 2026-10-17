@@ -3,8 +3,8 @@
  * address is checked with the same rule the invitations API enforces, so
  * Invite stays disabled until the address could be delivered to, and the
  * reason appears under the field once the person leaves it or tries to send.
- * On a narrow card the role and Invite wrap below the field together instead
- * of being pushed past the card's edge.
+ * On a narrow card the field, the role and Invite stack, the role at full
+ * width so its longest name fits, and nothing passes the card's edge.
  */
 
 import { Button, Input } from '@tangle-network/ui/primitives'
@@ -50,7 +50,7 @@ export function InviteForm({ label, placeholder, onInvite }: InviteFormProps) {
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="@container/invite flex flex-col gap-1.5">
       <label htmlFor={`${id}-email`} className="text-sm font-medium text-[var(--text-secondary)]">{label}</label>
       <div className="flex flex-wrap gap-2">
         <Input
@@ -72,14 +72,12 @@ export function InviteForm({ label, placeholder, onInvite }: InviteFormProps) {
           }}
           className="min-w-[12rem] flex-1"
         />
-        <div className="ml-auto flex shrink-0 gap-2">
-          <div className="w-72 max-w-full">
-            <RoleSelect value={role} ariaLabel="Invite role" onChange={setRole} />
-          </div>
-          <Button type="button" onClick={() => void submit()} disabled={inviting || !valid}>
-            {inviting ? 'Inviting…' : 'Invite'}
-          </Button>
+        <div className="w-72 shrink-0 @max-[36rem]/invite:w-full">
+          <RoleSelect value={role} ariaLabel="Invite role" onChange={setRole} />
         </div>
+        <Button type="button" className="ml-auto" onClick={() => void submit()} disabled={inviting || !valid}>
+          {inviting ? 'Inviting…' : 'Invite'}
+        </Button>
       </div>
       {showHint && (
         <p id={`${id}-hint`} role="alert" className="text-sm text-[var(--surface-danger-text)]">

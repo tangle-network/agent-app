@@ -95,8 +95,8 @@ export async function confirmSettingResponse<T = unknown>(
   }
 }
 
-/** The typed failure behind a rejected settings write, when the rejection carries one. */
-export function settingFailure(outcome: MutationRejected): SettingFailure {
+/** The typed failure behind a rejected settings write (or a mutation's `failed` state), when it carries one. */
+export function settingFailure(outcome: Pick<MutationRejected, 'message' | 'error'>): SettingFailure {
   const error = outcome.error as Partial<SettingFailure> | undefined
   return typeof error === 'object' && error !== null && typeof error.code === 'string'
     ? { ...error, code: error.code, message: outcome.message }

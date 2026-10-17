@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { useMemo } from 'react'
 import { createSettingsBackend, type ViewerRole } from './settings-backend'
 import { SettingsDemo, type DemoSectionId } from './settings-demo'
+import { TeamPanelsDemo } from './team-panels-demo'
 
 /**
  * A whole project settings page from `settings-react`: one URL per section,
@@ -37,3 +38,6 @@ export const AdminView: Story = { args: { viewer: 'admin', section: 'limits' } }
 
 /** Members with capability roles; on a narrow card the role picker takes its own line. */
 export const Team: Story = { args: { section: 'team' } }
+
+/** The `teams-react` panels in their cards: below 36rem of card each role picker takes its own line and Remove stays beside the name. */
+export const TeamPanels: Story = { render: () => <TeamPanelsDemo /> }

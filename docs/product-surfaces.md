@@ -80,6 +80,8 @@ it saves at once.
   switches save on change; text saves on blur or Enter, shows "Unsaved" while
   edited, and Escape restores it. Writes go one at a time: a change made while
   one is in flight waits for it, so the server ends on the person's last choice.
+  When the server keeps a normalised value, such as a trimmed name, the control
+  shows that value and the row shows "Saved".
 - "Saving…" appears only after `--interaction-pending-delay`. "Saved" appears
   only on a confirmed write (`useConfirmedMutation`) and fades after two
   seconds.
@@ -96,7 +98,8 @@ it saves at once.
   It names the consequence and any from → to `changes`, can require the
   workspace name, and closes only on a confirmed write. It opens on its first
   field, or on Cancel, so Enter never confirms by accident. Below 40rem it is a
-  bottom sheet.
+  bottom sheet. A refusal stays in the dialog with the server's sentence and
+  the `refusalAction` that answers it, such as View plans for `plan_limit`.
 - Values that only make sense together use the page's one `SettingsSaveBar`.
 - The danger card's button is an outline destructive button at rest; the
   filled destructive button is in the dialog.
@@ -104,6 +107,7 @@ it saves at once.
 **Shared sections.** `MembersSection` and `InvitationsSection` take the teams
 module's `MemberView`, `InvitationView` and role ladder. They name roles by
 capability, and on a narrow card the role picker takes its own full-width line.
+A seat-limit refusal on Invite links to `plansHref` as View plans.
 `ExportSection` runs the workspace export as rows. `DeleteWorkspaceSection`
 counts what goes and asks for the name. `TimezonePicker` searches zones by city
 or UTC offset. Product rows go in the same cards from the same atoms.

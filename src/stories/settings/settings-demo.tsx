@@ -346,6 +346,7 @@ function TeamSection({ members, invitations, send, viewer }: SectionProps) {
         onChangeRole={({ memberId, role: next }) => send('PATCH', `/api/members/${memberId}`, { role: next })}
         onRemove={({ memberId }) => send('DELETE', `/api/members/${memberId}`)}
         onInvite={(input) => send('POST', '/api/invitations', input)}
+        plansHref="#plans"
         menuItems={() => [{ label: 'Make team owner…', onSelect: () => undefined, disabledReason: viewer === 'owner' ? undefined : ownerOnly('choose the team owner') }]}
       />
       <InvitationsSection

@@ -32,6 +32,7 @@ const app = `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { SettingsDemo } from './src/stories/settings/settings-demo.tsx'
 import { createSettingsBackend } from './src/stories/settings/settings-backend.ts'
+import { TeamPanelsDemo } from './src/stories/settings/team-panels-demo.tsx'
 const params = new URLSearchParams(location.search)
 const viewer = params.get('viewer') === 'admin' ? 'admin' : 'owner'
 const theme = params.get('theme') === 'light' ? 'light' : 'dark'
@@ -39,13 +40,15 @@ document.documentElement.dataset.theme = theme
 document.documentElement.classList.add(theme)
 const backend = createSettingsBackend({ viewer })
 window.__settings = backend
-createRoot(document.getElementById('root')).render(<SettingsDemo backend={backend} viewer={viewer} initialSection={params.get('section') ?? 'general'} />)`
+createRoot(document.getElementById('root')).render(params.get('view') === 'team-panels'
+  ? <TeamPanelsDemo />
+  : <SettingsDemo backend={backend} viewer={viewer} initialSection={params.get('section') ?? 'general'} />)`
 
 // The demo imports the package's source paths; the proof runs the built package.
 const distPackage = {
   name: 'dist-package',
   setup(build) {
-    build.onResolve({ filter: /^\.\.\/\.\.\/(settings-react|web-react\/async)$/ }, (args) => ({
+    build.onResolve({ filter: /^\.\.\/\.\.\/(settings-react|teams-react|web-react\/async)$/ }, (args) => ({
       path: path.join(root, 'dist', args.path.slice('../../'.length), 'index.js'),
     }))
   },
@@ -154,8 +157,9 @@ try {
       await shot('general')
 
       // Autosave on blur: "Saving…" only while the write is held, "Saved" only after it lands.
+      // The trailing space is one the server trims, as GTM's does.
       await page.evaluate(() => window.__settings.control.holdNext())
-      await page.locator('#project-name').fill('Fieldnote GTM EU')
+      await page.locator('#project-name').fill('Fieldnote GTM EU ')
       await page.locator('#project-name').press('Tab')
       await check(`${tag}: a held write shows Saving… after the pending delay and never Saved`, async () => {
         await expect(project.locator('[data-setting-status="saving"]')).toBeVisible()
@@ -169,6 +173,15 @@ try {
         await expect(page.getByRole('heading', { name: 'Project settings' }).locator('..')).toContainText('Fieldnote GTM EU')
       })
       await shot('saved')
+      await check(`${tag}: a name the server trims shows as kept, and a second blur sends nothing`, async () => {
+        await expect(page.locator('#project-name')).toHaveValue('Fieldnote GTM EU')
+        await expect(project.locator('[data-setting-status="unsaved"]')).toHaveCount(0)
+        const writes = await page.evaluate(() => window.__settings.writes.length)
+        await page.locator('#project-name').focus()
+        await page.locator('#project-name').press('Tab')
+        await page.waitForTimeout(300)
+        assert.equal(await page.evaluate(() => window.__settings.writes.length), writes, 'the second blur sent the name again')
+      })
 
       // A typed refusal keeps the person's value, names the problem and offers Retry.
       await page.locator('#project-name').fill('Acme')
@@ -350,6 +363,20 @@ try {
       await page.locator('#invitations').scrollIntoViewIfNeeded()
       await shot('invitations')
 
+      // A seat-limit refusal stays in the invite dialog with its sentence and View plans.
+      await members.getByRole('button', { name: 'Invite', exact: true }).click()
+      const invite = phone ? page.getByRole('dialog') : page.getByRole('alertdialog')
+      await invite.getByLabel('Email').fill('new@seats.example')
+      await invite.locator('[data-confirm-action]').click()
+      await check(`${tag}: a seat-limit refusal on Invite stays in the dialog with View plans`, async () => {
+        await expect(invite.getByRole('alert')).toContainText('All 5 seats on your plan are in use.')
+        await expect(invite.getByRole('alert').getByRole('link', { name: 'View plans' })).toHaveAttribute('href', '#plans')
+        await expect(invite.getByLabel('Email')).toHaveValue('new@seats.example')
+      })
+      await shot('invite-plan-limit')
+      await invite.getByRole('button', { name: 'Cancel' }).click()
+      await expect(invite).toHaveCount(0)
+
       // What an admin cannot change is locked with the reason.
       await open('viewer=admin&section=limits')
       await check(`${tag}: an admin sees owner-only caps locked with the reason`, async () => {
@@ -365,6 +392,49 @@ try {
       })
       await page.locator('#export').scrollIntoViewIfNeeded()
       await shot('locked-general')
+
+      // The teams-react panels Tax, Legal and GTM render today stay inside their cards.
+      await page.goto(`${origin}/?theme=${theme}&view=team-panels`)
+      const memberCard = page.locator('[data-team-panel="members"]')
+      await expect(memberCard.getByRole('button', { name: 'Remove Amir Chen' })).toBeVisible()
+      await check(`${tag}: the team panels keep every control inside their card${phone ? ', each role picker full width under its name' : ''}`, async () => {
+        const overflow = await page.evaluate(() => {
+          const hits = []
+          for (const card of document.querySelectorAll('[data-team-panel]')) {
+            const edge = card.getBoundingClientRect()
+            for (const control of card.querySelectorAll('button, [role="combobox"], input')) {
+              const box = control.getBoundingClientRect()
+              if (box.right > edge.right + 0.5) hits.push(`${control.getAttribute('aria-label') || control.textContent.trim()} ends at ${Math.round(box.right)}, past the card's ${Math.round(edge.right)}`)
+            }
+          }
+          return hits
+        })
+        assert.deepEqual(overflow, [])
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'the page scrolls sideways')
+        assert.deepEqual(await tinyText(page), [])
+        const select = await memberCard.getByRole('combobox', { name: 'Role for Amir Chen' }).boundingBox()
+        const name = await memberCard.getByText('Amir Chen', { exact: true }).boundingBox()
+        const remove = await memberCard.getByRole('button', { name: 'Remove Amir Chen' }).boundingBox()
+        if (!phone) {
+          assert.ok(Math.abs(select.y + select.height / 2 - (remove.y + remove.height / 2)) <= 2, 'the role picker and Remove share the row')
+          return
+        }
+        const card = await memberCard.boundingBox()
+        assert.ok(select.y > name.y + name.height - 1, 'the role picker sits under the name')
+        assert.ok(select.width >= card.width - 2 * 16 - 2, `the role picker is ${select.width}px of a ${card.width}px card`)
+        assert.ok(remove.y < select.y, 'Remove stays on the name line')
+        const clipped = await memberCard.getByRole('combobox', { name: 'Role for Amir Chen' }).evaluate((trigger) => {
+          const value = trigger.querySelector('span')
+          return value.scrollWidth > value.clientWidth + 1
+        })
+        assert.equal(clipped, false, '"Can manage settings and people" is cut off')
+        const inviteRole = await page.getByRole('combobox', { name: 'Invite role' }).first().boundingBox()
+        const email = await page.getByLabel('Invite member').boundingBox()
+        assert.ok(inviteRole.y > email.y + email.height - 1 && inviteRole.width >= card.width - 2 * 16 - 2, 'the invite role sits under the address at full width')
+      })
+      await shot('team-panels')
+      await page.locator('[data-team-panel="invitations"]').scrollIntoViewIfNeeded()
+      await shot('team-panels-invitations')
       await context.close()
     }
   }

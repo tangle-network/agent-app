@@ -6,7 +6,8 @@
  * Retry when it refused. The control keeps the person's value on a failure.
  * Writes go one at a time: a change made while one is in flight waits for it,
  * and only the newest waiting value is sent, so the server ends on the
- * person's last choice.
+ * person's last choice. A confirmed write the person has not edited since
+ * shows the value the server kept, so a name it trims reads as saved.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -132,8 +133,16 @@ export function useSettingField<T>({
     for (;;) {
       setShowSaved(false)
       const outcome = await mutation.run(value)
-      const next = waiting.current
+      const queued = waiting.current
       waiting.current = null
+      // The same value committed again while it was in flight is already written.
+      const next = queued && !(outcome.succeeded && options.current.isEqual(queued.value, value)) ? queued : null
+      // The server may keep a normalised form, such as a trimmed name. Unless the
+      // person edited since, the control shows what was kept and nothing re-sends.
+      if (outcome.succeeded && !next && options.current.isEqual(draftRef.current, value)) {
+        draftRef.current = outcome.value
+        setDraftState(outcome.value)
+      }
       // `confirmedRef` now holds what the server keeps: this value if it landed, the earlier one if not.
       if (next && !options.current.isEqual(next.value, confirmedRef.current)) {
         value = next.value
