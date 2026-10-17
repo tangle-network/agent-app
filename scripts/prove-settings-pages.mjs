@@ -399,13 +399,15 @@ try {
         assert.deepEqual(await tinyText(page), [])
       })
       await shot('team')
-      await members.getByRole('combobox', { name: 'Role for Sam Okafor' }).click()
+      // The open list hides the rest of the page from the accessibility tree, so the trigger is read first.
+      const samRole = members.getByRole('combobox', { name: 'Role for Sam Okafor' })
       const roles = page.getByRole('listbox')
-      await check(`${tag}: the open role list says what each role adds, the trigger shows the name alone, and the list fits the screen`, async () => {
+      await check(`${tag}: the trigger shows the role's name alone, the open list says what each role adds, and the list fits the screen`, async () => {
+        await expect(samRole).toHaveText('Can view')
+        await samRole.click()
         await expect(roles.getByRole('option', { name: /^Can view/ })).toContainText('can’t chat')
         await expect(roles.getByRole('option', { name: /^Can edit/ })).toContainText('Also chats with the agent')
         await expect(roles.getByRole('option', { name: /^Can manage settings and people/ })).toContainText('Also invites people')
-        await expect(members.getByRole('combobox', { name: 'Role for Sam Okafor' })).toHaveText('Can view')
         const box = await roles.boundingBox()
         assert.ok(box.x >= 0 && box.x + box.width <= width + 0.5, `the list spans ${Math.round(box.x)} to ${Math.round(box.x + box.width)} of ${width}px`)
         assert.deepEqual(await tinyText(page), [])

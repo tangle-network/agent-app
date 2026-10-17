@@ -22606,7 +22606,7 @@
         {
           "name": "MembersPanel",
           "kind": "function",
-          "signature": "({ members, currentRole, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPanelProps) => Element",
+          "signature": "({ members, currentRole, currentUserId, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPanelProp…",
           "doc": null
         },
         {
