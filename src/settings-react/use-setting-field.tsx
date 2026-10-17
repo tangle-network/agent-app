@@ -28,8 +28,10 @@ export interface UseSettingFieldOptions<T> {
   /** The value the server holds. A new value replaces the draft unless the person is editing it. */
   saved: T
   /**
-   * Writes the value and returns the confirmed outcome: `confirmSettingResponse(fetch(...))`,
-   * or `confirmWrite`/`rejectWrite` from `web-react/async`. A refusal's message is what the row shows.
+   * Writes the value and resolves with the value the server kept, which the control then shows:
+   * `confirmSettingResponse(fetch(...), () => next)` for a route that answers `{ success: true }`
+   * or 204, a `parse` that reads the kept value from a route that answers with the record, or
+   * `confirmWrite`/`rejectWrite` from `web-react/async`. A refusal's message is what the row shows.
    */
   save: (next: T, context: AsyncLoadContext) => Promise<MutationOutcome<T>>
   /** `change` (default) saves on every change: selects, switches, segmented choices. `blur` saves on `commit()`: text. */

@@ -88,6 +88,18 @@ function useWorkspaceApi(backend: DemoBackend) {
     if (outcome.succeeded) setWorkspace(outcome.value)
     return outcome
   }, [backend])
+  // A route that answers `{ success: true }` or 204 kept the value it was sent.
+  const put = useCallback(async <K extends keyof DemoWorkspace>(path: string, key: K, value: DemoWorkspace[K]) => {
+    const outcome = await confirmSettingResponse(
+      backend.fetch(path, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ value }) }),
+      () => value,
+    )
+    if (outcome.succeeded) {
+      const kept = outcome.value
+      setWorkspace((current) => current && { ...current, [key]: kept })
+    }
+    return outcome
+  }, [backend])
   const send = useCallback(async (method: string, path: string, body?: unknown) => {
     const outcome = await confirmSettingResponse(backend.fetch(path, {
       method,
@@ -96,7 +108,7 @@ function useWorkspaceApi(backend: DemoBackend) {
     if (outcome.succeeded && !path.startsWith('/api/digest')) void reload()
     return outcome
   }, [backend, reload])
-  return { workspace, members, invitations, patch, send }
+  return { workspace, members, invitations, patch, put, send }
 }
 
 /** A field whose saved value lives in the workspace record. */
@@ -165,9 +177,13 @@ function GeneralSection({ workspace, patch, send, fetcher, viewer, onDeleted }: 
   )
 }
 
-function AgentSection({ workspace, patch }: SectionProps) {
+function AgentSection({ workspace, patch, put }: SectionProps) {
   const charts = useWorkspaceField(workspace, 'charts', patch)
-  const instructions = useWorkspaceField(workspace, 'instructions', patch, { commitOn: 'blur' })
+  const instructions = useSettingField({
+    saved: workspace.instructions,
+    commitOn: 'blur',
+    save: (next) => put('/api/agent/instructions', 'instructions', next),
+  })
   const dailyRun = useWorkspaceField(workspace, 'dailyRun', patch)
   const [confirmRun, setConfirmRun] = useState(false)
   return (
@@ -210,8 +226,8 @@ const NOTICE_OPTIONS = [
   { value: 'never' as const, label: 'Never' },
 ]
 
-function NotificationsSection({ workspace, patch, send, viewer }: SectionProps) {
-  const digest = useWorkspaceField(workspace, 'digest', patch)
+function NotificationsSection({ workspace, patch, put, send, viewer }: SectionProps) {
+  const digest = useSettingField({ saved: workspace.digest, save: (next) => put('/api/digest', 'digest', next) })
   const email = useWorkspaceField(workspace, 'approvalEmail', patch)
   const text = useWorkspaceField(workspace, 'approvalText', patch)
   const [sent, setSent] = useState<{ ok: true; at: string } | { ok: false; message: string } | null>(null)
@@ -347,6 +363,7 @@ function TeamSection({ members, invitations, send, viewer }: SectionProps) {
         onRemove={({ memberId }) => send('DELETE', `/api/members/${memberId}`)}
         onInvite={(input) => send('POST', '/api/invitations', input)}
         plansHref="#plans"
+        LinkComponent={DemoLink}
         menuItems={() => [{ label: 'Make team owner…', onSelect: () => undefined, disabledReason: viewer === 'owner' ? undefined : ownerOnly('choose the team owner') }]}
       />
       <InvitationsSection
@@ -366,13 +383,14 @@ interface SectionProps {
   invitations: DemoInvitation[]
   viewer: ViewerRole
   patch: (next: Patch) => Promise<MutationOutcome<DemoWorkspace>>
+  put: <K extends keyof DemoWorkspace>(path: string, key: K, value: DemoWorkspace[K]) => Promise<MutationOutcome<DemoWorkspace[K]>>
   send: (method: string, path: string, body?: unknown) => Promise<MutationOutcome<unknown>>
   /** The export section reads through the same backend as every other row. */
   fetcher: typeof fetch
 }
 
 export function SettingsDemo({ backend: api, viewer = 'owner', initialSection = 'general', routeDelayMs = 350 }: SettingsDemoProps) {
-  const { workspace, members, invitations, patch, send } = useWorkspaceApi(api)
+  const { workspace, members, invitations, patch, put, send } = useWorkspaceApi(api)
   const [active, setActive] = useState<DemoSectionId>(initialSection)
   const [deleted, setDeleted] = useState(false)
   const navigate = useCallback((href: string) => {
@@ -389,7 +407,7 @@ export function SettingsDemo({ backend: api, viewer = 'owner', initialSection = 
   ]
   if (deleted) return <p className="p-8 text-sm text-muted-foreground" role="status">The project was deleted. A product navigates to its project list here.</p>
   if (!workspace) return <p className="p-8 text-sm text-muted-foreground" role="status">Loading settings…</p>
-  const props: SectionProps = { workspace, members, invitations, viewer, patch, send, fetcher: api.fetch }
+  const props: SectionProps = { workspace, members, invitations, viewer, patch, put, send, fetcher: api.fetch }
   const body: Record<DemoSectionId, ReactNode> = {
     general: <GeneralSection {...props} onDeleted={() => setDeleted(true)} />,
     agent: <AgentSection {...props} />,

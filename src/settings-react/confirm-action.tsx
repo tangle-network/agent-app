@@ -83,12 +83,18 @@ function subscribeNarrow(onChange: () => void): () => void {
   return () => query.removeEventListener('change', onChange)
 }
 
+/** A menu's exit animation is 150ms; a menu still on the page after this is not closing. */
+const MENU_EXIT_LIMIT_MS = 1000
+
 /**
- * `open`, held back while a ⋯ menu is still on the page. ui 11.40.0's
- * `AlertDialog` and `DropdownMenu` run different copies of Radix's dismissable
- * layer, which do not see each other: a dialog that mounts while the menu that
- * opened it is still closing records the menu's pointer lock as the page's own
- * and puts it back when it closes, leaving the page unclickable.
+ * `open`, held back while the ⋯ menu that opened the dialog is still closing.
+ * ui 11.40.0's `AlertDialog` and `DropdownMenu` run different copies of
+ * Radix's dismissable layer, which do not see each other: a dialog that mounts
+ * while the menu that opened it is still closing records the menu's pointer
+ * lock as the page's own and puts it back when it closes, leaving the page
+ * unclickable. Only the menus on the page when `open` turned true are waited
+ * for, and for at most `MENU_EXIT_LIMIT_MS`, so a menu that stays open, or one
+ * opened later, never keeps the dialog shut.
  */
 function useOpenAfterMenus(open: boolean): boolean {
   const [clear, setClear] = useState(false)
@@ -97,9 +103,11 @@ function useOpenAfterMenus(open: boolean): boolean {
       setClear(false)
       return
     }
+    const closing = Array.from(document.querySelectorAll('[role="menu"]'))
+    const deadline = performance.now() + MENU_EXIT_LIMIT_MS
     let frame = 0
     const wait = () => {
-      if (document.querySelector('[role="menu"]')) frame = requestAnimationFrame(wait)
+      if (closing.some((menu) => menu.isConnected) && performance.now() < deadline) frame = requestAnimationFrame(wait)
       else setClear(true)
     }
     wait()

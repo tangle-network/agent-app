@@ -79,7 +79,8 @@ export interface SettingsLayoutProps extends SettingsNavProps {
   className?: string
 }
 
-function PlainLink({ href, children, ...rest }: SettingsLinkProps) {
+/** The default `LinkComponent`: a plain anchor, so a click is a document load. */
+export function PlainLink({ href, children, ...rest }: SettingsLinkProps) {
   return <a href={href} {...rest}>{children}</a>
 }
 

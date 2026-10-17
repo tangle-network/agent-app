@@ -148,6 +148,16 @@ export function createSettingsBackend({ viewer = 'owner', latencyMs = 120 }: { v
       Object.assign(workspace, patch)
       return json(workspace)
     }
+    // Routes that answer without the saved record: `{ success: true }`, as GTM's
+    // PATCH /api/workspaces does, and 204 with no body.
+    if (method === 'PUT' && path === '/api/agent/instructions') {
+      workspace.instructions = String((body as { value: unknown }).value)
+      return json({ success: true })
+    }
+    if (method === 'PUT' && path === '/api/digest') {
+      workspace.digest = Boolean((body as { value: unknown }).value)
+      return new Response(null, { status: 204 })
+    }
     if (method === 'POST' && path === '/api/digest/send') {
       digestSends += 1
       if (digestSends > 1) return refuse(429, 'rate_limited', '', { retryAfterSeconds: 3000 })

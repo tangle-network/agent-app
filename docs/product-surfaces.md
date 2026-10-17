@@ -90,8 +90,14 @@ it saves at once.
   only as a toast.
 - Settings routes refuse with
   `{ error: { code, message, field?, retryAfterSeconds? } }`, and
-  `confirmSettingResponse(fetch(...))` turns that into the row's message. A
-  request that never arrives is the `network` code.
+  `confirmSettingResponse` turns that into the row's message. A request that
+  never arrives is the `network` code.
+- A field's `save` resolves with the value the server kept, and the control
+  shows it. For a route that answers `{ success: true }` or 204, that is the
+  value sent: `confirmSettingResponse(fetch(...), () => next)`. For a route
+  that answers with the saved record, `parse` reads the kept value from it.
+  Without `parse` the confirmed value is the body, typed `unknown`, so a
+  `save` that returns it does not type-check.
 - An action that sends, starts a job or adds one entry (send now, export,
   invite) shows its result in its own row.
 - Billed, external, removing or high-reach changes go through `ConfirmAction`.
@@ -107,7 +113,8 @@ it saves at once.
 **Shared sections.** `MembersSection` and `InvitationsSection` take the teams
 module's `MemberView`, `InvitationView` and role ladder. They name roles by
 capability, and on a narrow card the role picker takes its own full-width line.
-A seat-limit refusal on Invite links to `plansHref` as View plans.
+A seat-limit refusal on Invite links to `plansHref` as View plans, through
+the app's `LinkComponent`.
 `ExportSection` runs the workspace export as rows. `DeleteWorkspaceSection`
 counts what goes and asks for the name. `TimezonePicker` searches zones by city
 or UTC offset. Product rows go in the same cards from the same atoms.

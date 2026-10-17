@@ -32,6 +32,7 @@ import { invitationDetail } from '../teams-react/components/invitation-detail'
 import { ROLE_CAPABILITY, RoleSelect } from '../teams-react/components/RoleSelect'
 import { confirmWrite, type MutationOutcome } from '../web-react/async'
 import { ConfirmAction } from './confirm-action'
+import { PlainLink, type SettingsLinkComponent } from './settings-layout'
 import type { SettingFailure } from './setting-outcome'
 import { SAVED_VISIBLE_MS } from './save-status'
 import { useSettingField } from './use-setting-field'
@@ -55,6 +56,8 @@ export interface MembersSectionProps {
   onInvite?(input: { email: string; role: WorkspaceRole }): Promise<MutationOutcome<unknown>>
   /** The plans page. A `plan_limit` refusal on Invite links to it as View plans. */
   plansHref?: string
+  /** Renders View plans: pass the router's link, as to `SettingsLayout`. Defaults to a plain anchor. */
+  LinkComponent?: SettingsLinkComponent
   /** More ⋯ items for a member the viewer can manage, such as "Make team owner…". */
   menuItems?(member: MemberView): SettingsListMenuItem[]
 }
@@ -145,16 +148,17 @@ function MemberItem({ member, editable, self, noun, onChangeRole, onRemove, extr
 }
 
 /** View plans after a plan-limit refusal, as an inline link after the sentence. */
-function plansAction(href: string | undefined) {
+function plansAction(href: string | undefined, Link: SettingsLinkComponent) {
   if (!href) return undefined
   return (failure: SettingFailure) => failure.code === 'plan_limit'
-    ? <a href={href} className="font-medium text-[var(--accent-text)] underline-offset-4 hover:underline">View plans</a>
+    ? <Link href={href} className="font-medium text-[var(--accent-text)] underline-offset-4 hover:underline">View plans</Link>
     : null
 }
 
-function InviteDialog({ onInvite, plansHref, open, onOpenChange }: {
+function InviteDialog({ onInvite, plansHref, LinkComponent, open, onOpenChange }: {
   onInvite: NonNullable<MembersSectionProps['onInvite']>
   plansHref?: string
+  LinkComponent: SettingsLinkComponent
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -179,7 +183,7 @@ function InviteDialog({ onInvite, plansHref, open, onOpenChange }: {
       confirmLabel="Send invite"
       canConfirm={valid}
       onConfirm={() => onInvite({ email: email.trim(), role })}
-      refusalAction={plansAction(plansHref)}
+      refusalAction={plansAction(plansHref, LinkComponent)}
     >
       <div className="grid gap-2">
         <Label htmlFor={`${id}-email`}>Email</Label>
@@ -216,6 +220,7 @@ export function MembersSection({
   onRemove,
   onInvite,
   plansHref,
+  LinkComponent = PlainLink,
   menuItems,
 }: MembersSectionProps) {
   const [inviting, setInviting] = useState(false)
@@ -249,7 +254,7 @@ export function MembersSection({
             })}
           </SettingsList>
         )}
-      {onInvite && <InviteDialog onInvite={onInvite} plansHref={plansHref} open={inviting} onOpenChange={setInviting} />}
+      {onInvite && <InviteDialog onInvite={onInvite} plansHref={plansHref} LinkComponent={LinkComponent} open={inviting} onOpenChange={setInviting} />}
     </SettingsSection>
   )
 }

@@ -252,6 +252,14 @@ try {
       await shot('confirm-delete')
       await dialog.getByRole('button', { name: 'Cancel' }).click()
       await expect(dialog).toHaveCount(0)
+      await check(`${tag}: a menu that stays on the page never keeps a confirmation shut`, async () => {
+        await page.evaluate(() => document.body.insertAdjacentHTML('beforeend', '<div role="menu" data-stuck-menu></div>'))
+        await page.getByRole('button', { name: 'Delete project…' }).click()
+        await expect(dialog).toBeVisible({ timeout: 2_500 })
+        await page.evaluate(() => document.querySelector('[data-stuck-menu]').remove())
+        await dialog.getByRole('button', { name: 'Cancel' }).click()
+        await expect(dialog).toHaveCount(0)
+      })
 
       // The nav answers at once: the clicked section is current before its route resolves.
       await nav.locator('a[data-settings-section="agent"]').click()
@@ -277,6 +285,18 @@ try {
         await expect(chartsStatus).toHaveAttribute('data-setting-status', 'saved')
       })
 
+      // Routes that answer without the saved record: the control keeps what the person set, with Saved.
+      const settingRow = (control) => page.locator('[data-layout]', { has: page.locator(control) })
+      const heldValue = (key) => page.evaluate(async (name) => (await (await window.__settings.fetch('/api/workspace')).json())[name], key)
+      const instructionsText = 'Write in plain English. Cite the source for every number.'
+      await page.locator('#instructions').fill(instructionsText)
+      await page.locator('#instructions').press('Tab')
+      await check(`${tag}: a route that answers { success: true } leaves the typed text in the field, with Saved`, async () => {
+        await expect(settingRow('#instructions').locator('[data-setting-status="saved"]')).toBeVisible()
+        await expect(page.locator('#instructions')).toHaveValue(instructionsText)
+        assert.equal(await heldValue('instructions'), instructionsText)
+      })
+
       await page.locator('#daily-run').click()
       const billed = phone ? page.getByRole('dialog') : page.getByRole('alertdialog')
       await check(`${tag}: turning on billed compute asks first, opens on Cancel and saves only on confirm`, async () => {
@@ -291,6 +311,12 @@ try {
 
       await nav.locator('a[data-settings-section="notifications"]').click()
       await expect(page.locator('#digest')).toBeVisible()
+      await page.locator('#digest-email').click()
+      await check(`${tag}: a route that answers 204 leaves the switch where it was set, with Saved`, async () => {
+        await expect(settingRow('#digest-email').locator('[data-setting-status="saved"]')).toBeVisible()
+        await expect(page.locator('#digest-email')).toHaveAttribute('aria-checked', 'false')
+        assert.equal(await heldValue('digest'), false)
+      })
       await page.getByRole('button', { name: 'Send now' }).click()
       await expect(page.locator('#digest')).toContainText('Sent at')
       await page.getByRole('button', { name: 'Send now' }).click()
@@ -380,6 +406,11 @@ try {
         await expect(invite.getByLabel('Email')).toHaveValue('new@seats.example')
       })
       await shot('invite-plan-limit')
+      await check(`${tag}: View plans is the app's router link, so the browser does not navigate`, async () => {
+        const before = page.url()
+        await invite.getByRole('alert').getByRole('link', { name: 'View plans' }).click()
+        assert.equal(page.url(), before, 'View plans was a plain anchor')
+      })
       await invite.getByRole('button', { name: 'Cancel' }).click()
       await expect(invite).toHaveCount(0)
 

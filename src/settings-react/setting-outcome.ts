@@ -64,13 +64,18 @@ function readFailure(body: unknown, status: number): SettingFailure {
  * Confirms a settings write from its response, or rejects it with the
  * server's typed failure. Pass the `fetch` promise itself so a request that
  * never reached the server becomes a `network` failure rather than a throw.
- * `parse` reads the confirmed value from a 2xx body; without it the value is
- * the body (or `undefined` for an empty one).
+ * `parse` returns the value the server kept: read it from the 2xx body when
+ * the route answers with the saved record, or return the value sent
+ * (`() => next`) when it answers `{ success: true }` or 204. Without `parse`
+ * the value is the body, typed `unknown`, so it cannot stand in for a field's
+ * value.
  */
-export async function confirmSettingResponse<T = unknown>(
+export function confirmSettingResponse(request: Response | Promise<Response>): Promise<MutationOutcome<unknown>>
+export function confirmSettingResponse<T>(request: Response | Promise<Response>, parse: (data: unknown) => T): Promise<MutationOutcome<T>>
+export async function confirmSettingResponse<T>(
   request: Response | Promise<Response>,
   parse?: (data: unknown) => T,
-): Promise<MutationOutcome<T>> {
+): Promise<MutationOutcome<unknown>> {
   let response: Response
   try {
     response = await request
@@ -89,7 +94,7 @@ export async function confirmSettingResponse<T = unknown>(
     return rejectWrite(failure.message, failure)
   }
   try {
-    return confirmWrite(parse ? parse(body) : body as T)
+    return confirmWrite(parse ? parse(body) : body)
   } catch (error) {
     return rejectWrite('The server answered, but not with the saved value. Reload to see what was kept.', error)
   }
