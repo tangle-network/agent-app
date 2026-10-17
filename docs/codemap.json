@@ -19487,7 +19487,7 @@
         {
           "name": "confirmSettingResponse",
           "kind": "function",
-          "signature": "<T = unknown>(request: Response | Promise<Response>, parse?: ((data: unknown) => T) | undefined) => Promise<MutationOut…",
+          "signature": "{ (request: Response | Promise<Response>): Promise<MutationOutcome<unknown>>; <T>(request: Response | Promise<Response>…",
           "doc": "Confirms a settings write from its response, or rejects it with the server's typed failure."
         },
         {
@@ -19535,7 +19535,7 @@
         {
           "name": "MembersSection",
           "kind": "function",
-          "signature": "({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, plansHref, menu…",
+          "signature": "({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, plansHref, Link…",
           "doc": null
         },
         {

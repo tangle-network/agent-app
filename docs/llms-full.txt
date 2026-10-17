@@ -25210,7 +25210,7 @@ interface ConfirmChange
 `function` — Confirms a settings write from its response, or rejects it with the server's typed failure.
 
 ```ts
-<T = unknown>(request: Response | Promise<Response>, parse?: ((data: unknown) => T) | undefined) => Promise<MutationOut…
+{ (request: Response | Promise<Response>): Promise<MutationOutcome<unknown>>; <T>(request: Response | Promise<Response>…
 ```
 
 ### `DeleteCount`
@@ -25274,7 +25274,7 @@ interface InvitationsSectionProps
 `function`
 
 ```ts
-({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, plansHref, menu…
+({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, plansHref, Link…
 ```
 
 ### `MembersSectionProps`
