@@ -19535,7 +19535,7 @@
         {
           "name": "MembersSection",
           "kind": "function",
-          "signature": "({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, menuItems, }: M…",
+          "signature": "({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, plansHref, menu…",
           "doc": null
         },
         {
@@ -19547,8 +19547,8 @@
         {
           "name": "settingFailure",
           "kind": "function",
-          "signature": "(outcome: MutationRejected) => SettingFailure",
-          "doc": "The typed failure behind a rejected settings write, when the rejection carries one."
+          "signature": "(outcome: Pick<MutationRejected, \"error\" | \"message\">) => SettingFailure",
+          "doc": "The typed failure behind a rejected settings write (or a mutation's `failed` state), when it carries one."
         },
         {
           "name": "SettingFailure",

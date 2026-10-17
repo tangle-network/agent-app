@@ -83,6 +83,31 @@ function subscribeNarrow(onChange: () => void): () => void {
   return () => query.removeEventListener('change', onChange)
 }
 
+/**
+ * `open`, held back while a ⋯ menu is still on the page. ui 11.40.0's
+ * `AlertDialog` and `DropdownMenu` run different copies of Radix's dismissable
+ * layer, which do not see each other: a dialog that mounts while the menu that
+ * opened it is still closing records the menu's pointer lock as the page's own
+ * and puts it back when it closes, leaving the page unclickable.
+ */
+function useOpenAfterMenus(open: boolean): boolean {
+  const [clear, setClear] = useState(false)
+  useEffect(() => {
+    if (!open) {
+      setClear(false)
+      return
+    }
+    let frame = 0
+    const wait = () => {
+      if (document.querySelector('[role="menu"]')) frame = requestAnimationFrame(wait)
+      else setClear(true)
+    }
+    wait()
+    return () => cancelAnimationFrame(frame)
+  }, [open])
+  return open && clear
+}
+
 function useNarrowViewport(): boolean {
   return useSyncExternalStore(
     subscribeNarrow,
@@ -111,6 +136,7 @@ export function ConfirmAction<T = unknown>({
 }: ConfirmActionProps<T>) {
   const [innerOpen, setInnerOpen] = useState(false)
   const open = openProp ?? innerOpen
+  const shown = useOpenAfterMenus(open)
   const [typed, setTyped] = useState('')
   const narrow = useNarrowViewport()
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -220,7 +246,7 @@ export function ConfirmAction<T = unknown>({
 
   if (narrow) {
     return (
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={shown} onOpenChange={setOpen}>
         {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
         <SheetContent side="bottom" hideCloseButton onOpenAutoFocus={focusFirst} className="max-h-[90dvh] overflow-y-auto">
           <SheetHeader className="pb-0">
@@ -238,7 +264,7 @@ export function ConfirmAction<T = unknown>({
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialog open={shown} onOpenChange={setOpen}>
       {trigger && <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>}
       <AlertDialogContent onOpenAutoFocus={focusFirst}>
         <AlertDialogHeader>

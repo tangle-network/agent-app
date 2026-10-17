@@ -360,6 +360,9 @@ try {
         await expect(remove).toHaveCount(0)
         await expect(members.getByRole('combobox', { name: 'Role for Sam Okafor' })).toBeVisible()
       })
+      await check(`${tag}: the page takes clicks again once a confirmation opened from a menu closes`, async () => {
+        await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).pointerEvents)).not.toBe('none')
+      })
       await page.locator('#invitations').scrollIntoViewIfNeeded()
       await shot('invitations')
 

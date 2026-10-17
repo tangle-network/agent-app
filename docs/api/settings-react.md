@@ -99,7 +99,7 @@ interface InvitationsSectionProps
 `function`
 
 ```ts
-({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, menuItems, }: M…
+({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, plansHref, menu…
 ```
 
 ### `MembersSectionProps`
@@ -112,10 +112,10 @@ interface MembersSectionProps
 
 ### `settingFailure`
 
-`function` — The typed failure behind a rejected settings write, when the rejection carries one.
+`function` — The typed failure behind a rejected settings write (or a mutation's `failed` state), when it carries one.
 
 ```ts
-(outcome: MutationRejected) => SettingFailure
+(outcome: Pick<MutationRejected, "error" | "message">) => SettingFailure
 ```
 
 ### `SettingFailure`
