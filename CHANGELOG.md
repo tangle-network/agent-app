@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.184
+
+- fix(work-product): keep identity and tabs usable on phones (#1134)
+
 ## 0.60.183
 
 - chore(changesets): drop the fleet-lift changeset — consumed by the 0.60.182 release (#1133)
