@@ -67,7 +67,7 @@ type InviteAcceptStatus
 `function`
 
 ```ts
-({ members, currentRole, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPanelProps) => Element
+({ members, currentRole, currentUserId, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPanelProp…
 ```
 
 ### `MembersPanelProps`

@@ -4,7 +4,23 @@
 
 Source: `src/workspace-export/react.tsx`
 
-2 exports.
+5 exports.
+
+### `useWorkspaceExport`
+
+`function` — Starts an export, drives it to completion by calling `advance` while the page is open, and resumes a running one on mount.
+
+```ts
+({ endpoint, enabled, fetcher }: UseWorkspaceExportOptions) => WorkspaceExportState
+```
+
+### `UseWorkspaceExportOptions`
+
+`interface`
+
+```ts
+interface UseWorkspaceExportOptions
+```
 
 ### `WorkspaceExportPanel`
 
@@ -20,4 +36,12 @@ Source: `src/workspace-export/react.tsx`
 
 ```ts
 interface WorkspaceExportPanelProps
+```
+
+### `WorkspaceExportState`
+
+`interface`
+
+```ts
+interface WorkspaceExportState
 ```

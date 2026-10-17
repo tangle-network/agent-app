@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_135 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -99,6 +99,7 @@ _135 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
 | [`./sequences/drizzle`](api/sequences-drizzle.md) | 13 | `tools`, `web` |
 | [`./session-shell`](api/session-shell.md) | 58 | — |
+| [`./settings-react`](api/settings-react.md) | 33 | `teams`, `teams-react`, `web-react`, `workspace-export` |
 | [`./signoff`](api/signoff.md) | 84 | — |
 | [`./signoff/cli`](api/signoff-cli.md) | 2 | — |
 | [`./signoff/proof`](api/signoff-proof.md) | 22 | — |
@@ -138,7 +139,7 @@ _135 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
 | [`./workspace-apps`](api/workspace-apps.md) | 17 | — |
 | [`./workspace-export`](api/workspace-export.md) | 44 | `object-store` |
-| [`./workspace-export/react`](api/workspace-export-react.md) | 2 | `object-store` |
+| [`./workspace-export/react`](api/workspace-export-react.md) | 5 | `object-store` |
 | [`./workspace-react`](api/workspace-react.md) | 28 | `session-shell`, `web-react`, `workspace-apps` |
 | [`./workspace-store/d1`](api/workspace-store-d1.md) | 6 | — |
 
@@ -1006,6 +1007,16 @@ Source: `src/session-shell/index.ts` · 58 exports
 
 [Full API →](api/session-shell.md)
 
+## `./settings-react`
+
+Source: `src/settings-react/index.ts` · 33 exports
+
+Depends on: `teams`, `teams-react`, `web-react`, `workspace-export`
+
+`ConfirmAction`, `ConfirmActionProps`, `ConfirmChange`, `confirmSettingResponse`, `DeleteCount`, `DeleteWorkspaceSection`, `DeleteWorkspaceSectionProps`, `ExportSection`, `ExportSectionProps`, `InvitationsSection`, `InvitationsSectionProps`, `MembersSection`, `MembersSectionProps`, `settingFailure`, `SettingFailure`, `SettingFailureCode`, `SettingField`, `SettingFieldRowProps`, `SettingFieldState`, `SettingsIcon`, `SettingsLayout`, `SettingsLayoutProps`, `SettingsLinkComponent`, `SettingsLinkProps`, `SettingsNav`, `SettingsNavProps`, `SettingsNavSection`, `SettingsSaveBar`, `SettingsSaveBarProps`, `TimezonePicker`, `TimezonePickerProps`, `useSettingField`, `UseSettingFieldOptions`
+
+[Full API →](api/settings-react.md)
+
 ## `./signoff`
 
 Source: `src/signoff/index.ts` · 84 exports
@@ -1352,11 +1363,11 @@ Depends on: `object-store`
 
 ## `./workspace-export/react`
 
-Source: `src/workspace-export/react.tsx` · 2 exports
+Source: `src/workspace-export/react.tsx` · 5 exports
 
 Depends on: `object-store`
 
-`WorkspaceExportPanel`, `WorkspaceExportPanelProps`
+`useWorkspaceExport`, `UseWorkspaceExportOptions`, `WorkspaceExportPanel`, `WorkspaceExportPanelProps`, `WorkspaceExportState`
 
 [Full API →](api/workspace-export-react.md)
 

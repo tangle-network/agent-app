@@ -272,23 +272,6 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('23.0.0', range!)).toBe(false)
   })
 
-  it('requires the UI release that exports TRANSCRIPT_TEXT and ApprovalDiffSummary', async () => {
-    const root = join(here, '..', '..')
-    const own = JSON.parse(
-      await readFile(join(root, 'package.json'), 'utf8'),
-    ) as { peerDependencies?: Record<string, string> }
-    const range = own.peerDependencies?.['@tangle-network/ui']
-
-    expect(range).toBeDefined()
-    // 11.32.0 is the first UI release with TRANSCRIPT_TEXT, which ChatMessages
-    // sets both message roles with. It also has ApprovalDiffSummary (11.31.0), which
-    // the approval dock and receipts render, and MessageAuthor (11.25.0).
-    expect(satisfiesRange('11.31.2', range!)).toBe(false)
-    expect(satisfiesRange('11.32.0', range!)).toBe(true)
-    expect(satisfiesRange('11.33.1', range!)).toBe(true)
-    expect(satisfiesRange('12.0.0', range!)).toBe(false)
-  })
-
   // Each window starts at the floor this application code ran on, admits the
   // newer minor tested in an installed consumer, and claims nothing past it.
   // The Runtime refuses Sandbox

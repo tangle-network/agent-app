@@ -19456,6 +19456,217 @@
       ]
     },
     {
+      "id": "./settings-react",
+      "source": "src/settings-react/index.ts",
+      "dependsOn": [
+        "teams",
+        "teams-react",
+        "web-react",
+        "workspace-export"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "ConfirmAction",
+          "kind": "function",
+          "signature": "<T = unknown>({ trigger, open: openProp, onOpenChange, title, consequence, changes, notice, confirmLabel, cancelLabel,…",
+          "doc": null
+        },
+        {
+          "name": "ConfirmActionProps",
+          "kind": "interface",
+          "signature": "interface ConfirmActionProps",
+          "doc": null
+        },
+        {
+          "name": "ConfirmChange",
+          "kind": "interface",
+          "signature": "interface ConfirmChange",
+          "doc": "One value the action changes, shown as `label: from → to`."
+        },
+        {
+          "name": "confirmSettingResponse",
+          "kind": "function",
+          "signature": "{ (request: Response | Promise<Response>): Promise<MutationOutcome<unknown>>; <T>(request: Response | Promise<Response>…",
+          "doc": "Confirms a settings write from its response, or rejects it with the server's typed failure."
+        },
+        {
+          "name": "DeleteCount",
+          "kind": "interface",
+          "signature": "interface DeleteCount",
+          "doc": "One thing the delete removes or stops, such as `{ count: 12, label: 'chats' }`."
+        },
+        {
+          "name": "DeleteWorkspaceSection",
+          "kind": "function",
+          "signature": "({ id, name, counts, noun, disabledReason, notice, onDelete, onDeleted, }: DeleteWorkspaceSectionProps) => Element",
+          "doc": null
+        },
+        {
+          "name": "DeleteWorkspaceSectionProps",
+          "kind": "interface",
+          "signature": "interface DeleteWorkspaceSectionProps",
+          "doc": null
+        },
+        {
+          "name": "ExportSection",
+          "kind": "function",
+          "signature": "({ id, title, endpoint, canExport, disabledReason, description, fetcher, continuesInBackground, children, }: ExportSect…",
+          "doc": null
+        },
+        {
+          "name": "ExportSectionProps",
+          "kind": "interface",
+          "signature": "interface ExportSectionProps",
+          "doc": null
+        },
+        {
+          "name": "InvitationsSection",
+          "kind": "function",
+          "signature": "({ id, title, invitations, currentRole, onResend, onRevoke, onCopy, }: InvitationsSectionProps) => Element",
+          "doc": null
+        },
+        {
+          "name": "InvitationsSectionProps",
+          "kind": "interface",
+          "signature": "interface InvitationsSectionProps",
+          "doc": null
+        },
+        {
+          "name": "MembersSection",
+          "kind": "function",
+          "signature": "({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, plansHref, Link…",
+          "doc": null
+        },
+        {
+          "name": "MembersSectionProps",
+          "kind": "interface",
+          "signature": "interface MembersSectionProps",
+          "doc": null
+        },
+        {
+          "name": "settingFailure",
+          "kind": "function",
+          "signature": "(outcome: Pick<MutationRejected, \"error\" | \"message\">) => SettingFailure",
+          "doc": "The typed failure behind a rejected settings write (or a mutation's `failed` state), when it carries one."
+        },
+        {
+          "name": "SettingFailure",
+          "kind": "interface",
+          "signature": "interface SettingFailure",
+          "doc": null
+        },
+        {
+          "name": "SettingFailureCode",
+          "kind": "type",
+          "signature": "type SettingFailureCode",
+          "doc": "The refusal codes settings routes share."
+        },
+        {
+          "name": "SettingField",
+          "kind": "interface",
+          "signature": "interface SettingField",
+          "doc": null
+        },
+        {
+          "name": "SettingFieldRowProps",
+          "kind": "interface",
+          "signature": "interface SettingFieldRowProps",
+          "doc": "Spread into `SettingsRow`: the status after the label, the error that replaces the description, and Retry."
+        },
+        {
+          "name": "SettingFieldState",
+          "kind": "type",
+          "signature": "type SettingFieldState",
+          "doc": "- `idle`: the control shows the saved value."
+        },
+        {
+          "name": "SettingsIcon",
+          "kind": "type",
+          "signature": "type SettingsIcon",
+          "doc": "An icon component such as a `lucide-react` icon."
+        },
+        {
+          "name": "SettingsLayout",
+          "kind": "function",
+          "signature": "({ title, description, meta, sections, activeId, LinkComponent, onIntent, navigationLabel, className, children, }: Sett…",
+          "doc": null
+        },
+        {
+          "name": "SettingsLayoutProps",
+          "kind": "interface",
+          "signature": "interface SettingsLayoutProps",
+          "doc": null
+        },
+        {
+          "name": "SettingsLinkComponent",
+          "kind": "type",
+          "signature": "type SettingsLinkComponent",
+          "doc": null
+        },
+        {
+          "name": "SettingsLinkProps",
+          "kind": "interface",
+          "signature": "interface SettingsLinkProps",
+          "doc": "What a `LinkComponent` receives: render an anchor (or a router link) with these props."
+        },
+        {
+          "name": "SettingsNav",
+          "kind": "function",
+          "signature": "(props: SettingsNavProps) => Element",
+          "doc": "The section links alone, for a page that composes its own `PageShell measure=\"settings\"`: pass it as the shell's `navigation`, which draws the column, the tab strip and the current link."
+        },
+        {
+          "name": "SettingsNavProps",
+          "kind": "interface",
+          "signature": "interface SettingsNavProps",
+          "doc": null
+        },
+        {
+          "name": "SettingsNavSection",
+          "kind": "interface",
+          "signature": "interface SettingsNavSection",
+          "doc": null
+        },
+        {
+          "name": "SettingsSaveBar",
+          "kind": "function",
+          "signature": "({ changes, summary, onDiscard, onSave, state, error, saveLabel, disabledReason, }: SettingsSaveBarProps) => Element",
+          "doc": null
+        },
+        {
+          "name": "SettingsSaveBarProps",
+          "kind": "interface",
+          "signature": "interface SettingsSaveBarProps",
+          "doc": null
+        },
+        {
+          "name": "TimezonePicker",
+          "kind": "function",
+          "signature": "({ id, value, onChange, disabled, \"aria-describedby\": describedBy, \"aria-invalid\": invalid }: TimezonePickerProps) => E…",
+          "doc": null
+        },
+        {
+          "name": "TimezonePickerProps",
+          "kind": "interface",
+          "signature": "interface TimezonePickerProps",
+          "doc": null
+        },
+        {
+          "name": "useSettingField",
+          "kind": "function",
+          "signature": "<T>({ saved, save, commitOn, debounceMs, validate, isEqual, onSaved, }: UseSettingFieldOptions<T>) => SettingField<T>",
+          "doc": null
+        },
+        {
+          "name": "UseSettingFieldOptions",
+          "kind": "interface",
+          "signature": "interface UseSettingFieldOptions",
+          "doc": null
+        }
+      ]
+    },
+    {
       "id": "./signoff",
       "source": "src/signoff/index.ts",
       "dependsOn": [],
@@ -22395,7 +22606,7 @@
         {
           "name": "MembersPanel",
           "kind": "function",
-          "signature": "({ members, currentRole, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPanelProps) => Element",
+          "signature": "({ members, currentRole, currentUserId, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPanelProp…",
           "doc": null
         },
         {
@@ -25638,7 +25849,7 @@
           "name": "fieldPickerTriggerClass",
           "kind": "function",
           "signature": "({ interactive }?: { interactive?: boolean | undefined; }) => string",
-          "doc": "Trigger classes for a `field` picker."
+          "doc": "Trigger classes for a `field` picker: `@tangle-network/ui`'s own field presentation and `md` field size, the classes its `Input` and `SelectTrigger` draw, so a model, harness or timezone selector sit…"
         },
         {
           "name": "FieldValues",
@@ -29029,6 +29240,18 @@
       "error": null,
       "exports": [
         {
+          "name": "useWorkspaceExport",
+          "kind": "function",
+          "signature": "({ endpoint, enabled, fetcher }: UseWorkspaceExportOptions) => WorkspaceExportState",
+          "doc": "Starts an export, drives it to completion by calling `advance` while the page is open, and resumes a running one on mount."
+        },
+        {
+          "name": "UseWorkspaceExportOptions",
+          "kind": "interface",
+          "signature": "interface UseWorkspaceExportOptions",
+          "doc": null
+        },
+        {
           "name": "WorkspaceExportPanel",
           "kind": "function",
           "signature": "({ endpoint, canExport, title, description, className, fetcher, continuesInBackground }: WorkspaceExportPanelProps) =>…",
@@ -29038,6 +29261,12 @@
           "name": "WorkspaceExportPanelProps",
           "kind": "interface",
           "signature": "interface WorkspaceExportPanelProps",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceExportState",
+          "kind": "interface",
+          "signature": "interface WorkspaceExportState",
           "doc": null
         }
       ]

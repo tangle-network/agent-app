@@ -27,11 +27,11 @@ A server module or a type does not count; neither does a component in another pa
 | Tasks, runs and schedules | `/web-react`: `AgentActivityPanel`, `MissionActivityLane`, `RunDrillIn`, `FlowWaterfall` | Parts | Only Creative uses `AgentActivityPanel`; no schedule view. |
 | Review, approvals and questions | `/web-react`: `ReviewQueuePanel`, `WorkProductCard`, `InteractionQuestionCard`, `InteractionPlanCard`, `DurablePlanCard`, `RecordGrid`; `/work-product-react`: `WorkProductPane` | Owned | |
 | Inbox and notifications | none | No owner | |
-| Workspace, team and account settings | `/teams-react`: `MembersPanel`, `InvitationsPanel`; `/web-react`: `ApiAccessPanel` | Parts | No settings page. Slice 3 of the decision builds it with `ui` fields and settings rows. |
+| Workspace, team and account settings | `/settings-react`: `SettingsLayout`, `SettingsNav`, `useSettingField`, `ConfirmAction`, `SettingsSaveBar`, `MembersSection`, `InvitationsSection`, `ExportSection`, `DeleteWorkspaceSection`, `TimezonePicker`; `/teams-react`: `MembersPanel`, `InvitationsPanel`; `/web-react`: `ApiAccessPanel` | Owned | Slice 3 of the decision: rows, cards and fields are `ui` primitives; the contract is [Settings pages](./product-surfaces.md#settings-pages). |
 | Billing and usage | `/web-react`: `SeatPaywall`, `getChatFundingRecovery` | Parts | `SeatPaywall` is the no-seat unlock screen and no app uses it (GTM and Creative keep local seat-paywall modals); `getChatFundingRecovery` maps a failed turn to a recovery action. `sandbox-ui/pages` exports `BillingPage`. `/billing` and `/platform` are server modules. |
 | Help, error and unavailable | `/web-react`: `RouteChunkBoundary` | Parts | Covers lazy-chunk failure only; no error, not-found or help page. |
 
-The input plan's anchors `AuthPage` and `BillingPage` are `sandbox-ui/pages` exports, not `agent-app` exports. `SettingsPage` exists in neither package.
+The input plan's anchors `AuthPage` and `BillingPage` are `sandbox-ui/pages` exports, not `agent-app` exports.
 Before slice 5 builds access or billing, decide whether `agent-app` composes the `sandbox-ui` page or the page moves; two owners for one concept is the state this map exists to remove.
 
 ## Coverage

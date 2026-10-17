@@ -25,6 +25,7 @@ import {
 import { createPortal } from 'react-dom'
 import { ProviderLogo } from './provider-logo'
 import { StatusPill } from '@tangle-network/ui/primitives'
+import { fieldPresentation, fieldSizes, fieldTouchText } from '@tangle-network/ui/presentation'
 import {
   MAX_RECOMMENDED_MODELS,
   sortModelsByFreshness,
@@ -397,15 +398,14 @@ export function pickerRootClass(fullWidth: boolean): string {
 export type PickerVariant = 'chip' | 'quiet' | 'field'
 
 /**
- * Trigger classes for a `field` picker. It matches `@tangle-network/ui`'s
- * compact `Input` (height, `rounded-lg`, `--bg-input` well, border hover, and
- * `:focus` halo) so a model or harness selector sits in a form as one more
- * field. Written out here because `/web-react` controls stay free of the
- * sandbox-ui peer.
+ * Trigger classes for a `field` picker: `@tangle-network/ui`'s own field
+ * presentation and `md` field size, the classes its `Input` and `SelectTrigger`
+ * draw, so a model, harness or timezone selector sits in a form as one more
+ * field — the same well on every plane, the same border, hover and focus halo.
  */
 export function fieldPickerTriggerClass({ interactive = true }: { interactive?: boolean } = {}): string {
-  return `inline-flex h-[var(--control-height)] w-full min-w-0 items-center justify-between gap-2 whitespace-nowrap rounded-lg border border-border bg-[var(--bg-input)] px-3 text-left text-sm font-normal text-foreground transition-[border-color,box-shadow] duration-150 ease-out focus:outline-hidden focus:border-[var(--focus-border)] focus:ring-3 focus:ring-[var(--focus-halo)] disabled:cursor-not-allowed disabled:opacity-50 ${
-    interactive ? 'hover:border-[var(--border-strong)] data-[state=open]:border-[var(--focus-border)]' : 'cursor-default'}`
+  return `${fieldPresentation} ${fieldSizes.md} ${fieldTouchText} inline-flex w-full min-w-0 items-center justify-between gap-2 whitespace-nowrap border text-left font-normal text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${
+    interactive ? 'data-[state=open]:border-[var(--ix-hover-border)] data-[state=open]:shadow-[var(--ix-after)]' : 'cursor-default'}`
 }
 
 /** The chip trigger: a fixed 32px height (no vertical padding, so the 20px
