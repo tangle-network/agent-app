@@ -35,6 +35,88 @@ for related metrics and a loading state matching their layout. Follow the
 and failed loads. Check the actual page at desktop and phone widths with long
 values and those states; component selection alone does not prove the result.
 
+## Settings pages
+
+A page whose job is changing how a workspace, team or account behaves is a
+settings page, and it composes `@tangle-network/agent-app/settings-react`.
+Rows, cards and fields are `@tangle-network/ui/primitives` (`SettingsSection`,
+`SettingsRow`, `SettingsList`, `SettingsListItem`, `Field`); `settings-react`
+composes them, so a change at the source reaches every product on its next
+version bump. Read the [settings page story](../src/stories/settings/settings-demo.tsx)
+for a whole page.
+
+**Layout.** `SettingsLayout` takes the title, the workspace name as
+`description`, an optional `meta` line, the `sections` (`id`, `label`, `href`,
+`icon`, `hidden`, `badge`), the route's `activeId`, the router's
+`LinkComponent` and an `onIntent` hook that warms a section's route module.
+Each section is its own URL and route, and its loader reads only that section's
+data. A section holds at most four cards. From 60rem of content the sections are
+a sticky column; below it they are a 56px tab strip that keeps the current tab
+in view. The nav marks a clicked section current at once and never dims the
+page; a progress line shows only after the pending delay. Every card has an
+`id`, and `#id` links scroll to it and focus its heading. A page with its own
+frame passes `SettingsNav` to `PageShell measure="settings"` instead.
+
+**Rows.**
+
+- The label is on the left and one `md` control is on the right; switches and
+  single buttons stay on the line (`layout="compact"`), and text areas and
+  lists take the full width (`layout="stacked"`).
+- Most rows have no description. A description is one line that states a
+  consequence the person needs before acting, such as billed compute. Help that
+  explains a setting goes in `info`. Field paths and implementation notes never
+  appear.
+- A setting the viewer cannot change shows `disabledReason`, a sentence naming
+  who can change it, rather than disappearing.
+- In lists, the title is the link to the item, one verb is the at-rest action,
+  and Remove, Revoke and Delete live only in the ⋯ menu, each behind a
+  confirmation.
+- Text is 14px throughout, with 16px card titles and a 20px page title.
+
+**Saving.** A change that adds cost or reach asks first; a change that reduces
+it saves at once.
+
+- Low-risk, reversible settings autosave through `useSettingField`. Picks and
+  switches save on change; text saves on blur or Enter, shows "Unsaved" while
+  edited, and Escape restores it.
+- "Saving…" appears only after `--interaction-pending-delay`. "Saved" appears
+  only on a confirmed write (`useConfirmedMutation`) and fades after two
+  seconds.
+- A refusal replaces the row's description with the server's sentence and a
+  Retry, and the control keeps the person's value. A failure is never shown
+  only as a toast.
+- Settings routes refuse with
+  `{ error: { code, message, field?, retryAfterSeconds? } }`, and
+  `confirmSettingResponse(fetch(...))` turns that into the row's message. A
+  request that never arrives is the `network` code.
+- An action that sends, starts a job or adds one entry (send now, export,
+  invite) shows its result in its own row.
+- Billed, external, removing or high-reach changes go through `ConfirmAction`.
+  It names the consequence and any from → to `changes`, can require the
+  workspace name, and closes only on a confirmed write. Below 40rem it is a
+  bottom sheet.
+- Values that only make sense together use the page's one `SettingsSaveBar`.
+- The danger card's button is an outline destructive button at rest; the
+  filled destructive button is in the dialog.
+
+**Shared sections.** `MembersSection` and `InvitationsSection` take the teams
+module's `MemberView`, `InvitationView` and role ladder. They name roles by
+capability, and on a narrow card the role picker takes its own full-width line.
+`ExportSection` runs the workspace export as rows. `DeleteWorkspaceSection`
+counts what goes and asks for the name. `TimezonePicker` searches zones by city
+or UTC offset. Product rows go in the same cards from the same atoms.
+
+**Enforcement.** `tangle-drift` in `@tangle-network/brand` 1.26.0 and later
+gates `settings_layout`: a settings route or page file that imports nothing from
+`@tangle-network/agent-app/settings-react` (and sits under no settings layout
+that does) counts against its product. Each product's baseline in
+`drift-baseline.json` only falls, so a new local settings page fails that
+product's drift check, and adopting `SettingsLayout` and deleting the local
+layout lowers the count. In this repository, `tests/web-react/shell-type-floor.test.ts`
+holds `settings-react` to the 14px floor, and `scripts/prove-settings-pages.mjs`
+drives the built package through every saving, saved, failed, locked and
+confirm state at 1280 and 390 wide in both themes.
+
 ## The one principle behind every naming call here
 
 **A name should answer "what is this for," not "what is this."** "Timeline" names

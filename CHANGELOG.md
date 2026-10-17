@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- feat(settings-react): the shared settings page. `SettingsLayout` and `SettingsNav` give each section its own URL, a sticky section column from 60rem of content and a 56px tab strip below it that keeps the current tab in view; the nav marks a click current at once and never dims the page. `useSettingField` autosaves a row and shows "Saving…" after the pending delay, "Saved" only on a confirmed write, and the server's typed refusal with Retry, keeping the person's value; `confirmSettingResponse` reads `{ error: { code, message } }` refusals. `ConfirmAction` (a bottom sheet below 40rem) closes only on a confirmed write. `SettingsSaveBar` is the one grouped save. `MembersSection`, `InvitationsSection`, `ExportSection`, `DeleteWorkspaceSection` and `TimezonePicker` are the shared sections. Rows and cards are `@tangle-network/ui` 11.40.0 settings atoms; the contract is docs/product-surfaces.md#settings-pages.
+- The teams panels name roles by capability ("Can view", "Can edit", "Can manage settings and people") in the ui `Select`, and their buttons are the ui `Button`. `useWorkspaceExport` is the export engine both `WorkspaceExportPanel` and `ExportSection` draw from; the panel's notes are 14px.
+- The `@tangle-network/ui` peer floor is 11.40.0 (the settings atoms); the chat template pins ui 11.40.0 and brand 1.26.0.
+
 ## 0.60.184
 
 - fix(work-product): keep identity and tabs usable on phones (#1134)
