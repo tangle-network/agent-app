@@ -128,6 +128,14 @@ try {
       const nav = page.getByRole('navigation', { name: 'Settings sections' })
       const project = page.locator('#project')
 
+      // A hand-edited #hash that does not decode leaves the page up.
+      await open('section=general#%E0%A4%A')
+      await check(`${tag}: a malformed #hash leaves the page up`, async () => {
+        await page.waitForTimeout(300)
+        assert.deepEqual(browserErrors.filter((entry) => entry.startsWith(`${tag}:`)), [])
+        await expect(project).toBeVisible()
+      })
+
       await open('section=general')
       await check(`${tag}: the section nav is a ${phone ? '56px tab strip' : 'sticky column'} at this width`, async () => {
         const box = await nav.boundingBox()
@@ -230,10 +238,29 @@ try {
         await expect(nav.locator('a[data-settings-section="agent"]')).toHaveAttribute('aria-current', 'page', { timeout: 100 })
         await expect(page.locator('#defaults')).toBeVisible()
       })
+
+      // Two changes while the first write is held: the server ends on the second, as the switch does.
+      const charts = page.locator('#charts')
+      const chartsStatus = page.locator('#defaults [data-setting-status]')
+      await page.evaluate(() => window.__settings.control.holdNext())
+      await charts.click()
+      await charts.click()
+      await check(`${tag}: a change made while a write is held is the value the server keeps`, async () => {
+        await expect(page.locator('#defaults [data-setting-status="saving"]')).toBeVisible()
+        await page.evaluate(() => window.__settings.control.release())
+        await expect(page.locator('#defaults [data-setting-status="saving"]')).toHaveCount(0)
+        const held = await page.evaluate(async () => (await (await window.__settings.fetch('/api/workspace')).json()).charts)
+        const shown = await charts.getAttribute('aria-checked')
+        assert.equal(String(held), shown, `the server holds charts=${held} while the switch shows ${shown}`)
+        assert.equal(shown, 'true')
+        await expect(chartsStatus).toHaveAttribute('data-setting-status', 'saved')
+      })
+
       await page.locator('#daily-run').click()
       const billed = phone ? page.getByRole('dialog') : page.getByRole('alertdialog')
-      await check(`${tag}: turning on billed compute asks first and saves only on confirm`, async () => {
+      await check(`${tag}: turning on billed compute asks first, opens on Cancel and saves only on confirm`, async () => {
         await expect(billed).toContainText('billed sandbox compute')
+        await expect(billed.getByRole('button', { name: 'Cancel' })).toBeFocused()
         await expect(page.locator('#daily-run')).toHaveAttribute('aria-checked', 'false')
       })
       await shot('confirm-billed')
@@ -263,9 +290,10 @@ try {
       await shot('save-bar')
       await bar.getByRole('button', { name: 'Save caps' }).click()
       const raise = phone ? page.getByRole('dialog') : page.getByRole('alertdialog')
-      await check(`${tag}: raising a cap confirms the change from $50 to $1,500`, async () => {
+      await check(`${tag}: raising a cap confirms the change from $50 to $1,500 and opens on Cancel`, async () => {
         await expect(raise).toContainText('$50')
         await expect(raise).toContainText('$1,500')
+        await expect(raise.getByRole('button', { name: 'Cancel' })).toBeFocused()
       })
       await shot('confirm-raise')
       await raise.locator('[data-confirm-action]').click()
@@ -303,6 +331,16 @@ try {
       await page.getByRole('option', { name: 'Can edit' }).click()
       await check(`${tag}: a role change saves at once and says so in its row`, async () => {
         await expect(members.locator('[data-setting-status="saved"]')).toBeVisible()
+      })
+      await members.getByRole('button', { name: /^More actions.*Sam Okafor/ }).click()
+      await page.getByRole('menuitem', { name: /^Remove from/ }).click()
+      const remove = phone ? page.getByRole('dialog') : page.getByRole('alertdialog')
+      await check(`${tag}: Remove opens on Cancel, so Enter keeps the member`, async () => {
+        await expect(remove).toContainText('Remove Sam Okafor?')
+        await expect(remove.getByRole('button', { name: 'Cancel' })).toBeFocused()
+        await page.keyboard.press('Enter')
+        await expect(remove).toHaveCount(0)
+        await expect(members.getByRole('combobox', { name: 'Role for Sam Okafor' })).toBeVisible()
       })
       await page.locator('#invitations').scrollIntoViewIfNeeded()
       await shot('invitations')

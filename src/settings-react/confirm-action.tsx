@@ -109,6 +109,7 @@ export function ConfirmAction<T = unknown>({
   const [typed, setTyped] = useState('')
   const narrow = useNarrowViewport()
   const bodyRef = useRef<HTMLDivElement>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
   const inputId = useId()
   const errorId = useId()
 
@@ -140,12 +141,12 @@ export function ConfirmAction<T = unknown>({
     onConfirmed?.(outcome.value)
   }
 
-  // A dialog with fields opens on its first field; otherwise Cancel takes focus, so Enter never confirms by accident.
+  // A dialog with fields opens on its first field; otherwise on Cancel, so Enter never confirms by accident.
   const focusFirst = (event: Event) => {
-    const field = bodyRef.current?.querySelector<HTMLElement>('input, textarea, [role="combobox"]')
-    if (!field) return
+    const target = bodyRef.current?.querySelector<HTMLElement>('input, textarea, [role="combobox"]') ?? cancelRef.current
+    if (!target) return
     event.preventDefault()
-    field.focus()
+    target.focus()
   }
 
   const hasBody = Boolean(changes?.length) || notice != null || children != null || requireText !== undefined || failure != null
@@ -221,7 +222,7 @@ export function ConfirmAction<T = unknown>({
           {body && <div className="px-4">{body}</div>}
           <SheetFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
             {confirmButton}
-            <Button type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>{cancelLabel}</Button>
+            <Button ref={cancelRef} type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>{cancelLabel}</Button>
           </SheetFooter>
         </SheetContent>
       </Sheet>
@@ -238,7 +239,7 @@ export function ConfirmAction<T = unknown>({
         </AlertDialogHeader>
         {body}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
+          <AlertDialogCancel ref={cancelRef} disabled={pending}>{cancelLabel}</AlertDialogCancel>
           {confirmButton}
         </AlertDialogFooter>
       </AlertDialogContent>

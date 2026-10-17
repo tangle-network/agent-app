@@ -78,7 +78,8 @@ it saves at once.
 
 - Low-risk, reversible settings autosave through `useSettingField`. Picks and
   switches save on change; text saves on blur or Enter, shows "Unsaved" while
-  edited, and Escape restores it.
+  edited, and Escape restores it. Writes go one at a time: a change made while
+  one is in flight waits for it, so the server ends on the person's last choice.
 - "Saving…" appears only after `--interaction-pending-delay`. "Saved" appears
   only on a confirmed write (`useConfirmedMutation`) and fades after two
   seconds.
@@ -93,7 +94,8 @@ it saves at once.
   invite) shows its result in its own row.
 - Billed, external, removing or high-reach changes go through `ConfirmAction`.
   It names the consequence and any from → to `changes`, can require the
-  workspace name, and closes only on a confirmed write. Below 40rem it is a
+  workspace name, and closes only on a confirmed write. It opens on its first
+  field, or on Cancel, so Enter never confirms by accident. Below 40rem it is a
   bottom sheet.
 - Values that only make sense together use the page's one `SettingsSaveBar`.
 - The danger card's button is an outline destructive button at rest; the

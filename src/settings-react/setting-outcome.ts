@@ -25,7 +25,7 @@ const FALLBACK: Record<SettingFailureCode, string> = {
   forbidden: "You don't have permission to change this.",
   invalid: "That value can't be saved. Check it and try again.",
   plan_limit: "Your plan doesn't include this.",
-  rate_limited: 'Too many requests at once. Try again shortly.',
+  rate_limited: "You've reached the limit for now. Try again shortly.",
   not_runnable: "This can't run right now.",
   upstream: "A connected service didn't respond. Nothing changed; try again.",
   network: "Couldn't reach the server. Check your connection, then retry.",
@@ -51,7 +51,7 @@ function readFailure(body: unknown, status: number): SettingFailure {
   const retryAfterSeconds = typeof error.retryAfterSeconds === 'number' ? error.retryAfterSeconds : undefined
   const given = typeof error.message === 'string' && error.message.trim() ? error.message.trim() : null
   let message = given ?? FALLBACK[code as SettingFailureCode] ?? FALLBACK.upstream
-  if (retryAfterSeconds !== undefined && code === 'rate_limited' && !given) message = `Too many requests at once. ${retryWording(retryAfterSeconds)}`
+  if (retryAfterSeconds !== undefined && code === 'rate_limited' && !given) message = `You've reached the limit for now. ${retryWording(retryAfterSeconds)}`
   return {
     code,
     message,

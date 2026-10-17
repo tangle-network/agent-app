@@ -4,6 +4,9 @@
  * happened — "Saving…" only after the pending delay, "Saved" only on a
  * confirmed write and only for two seconds, the server's own sentence and a
  * Retry when it refused. The control keeps the person's value on a failure.
+ * Writes go one at a time: a change made while one is in flight waits for it,
+ * and only the newest waiting value is sent, so the server ends on the
+ * person's last choice.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -83,10 +86,13 @@ export function useSettingField<T>({
   options.current = { validate, isEqual, onSaved }
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inFlight = useRef(false)
+  const waiting = useRef<{ value: T } | null>(null)
 
   const mutation = useConfirmedMutation<T, T>({
     mutate: (value, context) => save(value, context),
     onSucceeded: (value) => {
+      confirmedRef.current = value
       setConfirmed(value)
       setFailedValue(null)
       setShowSaved(true)
@@ -120,6 +126,25 @@ export function useSettingField<T>({
     if (savedTimer.current) clearTimeout(savedTimer.current)
   }, [])
 
+  const send = useCallback(async (first: T) => {
+    inFlight.current = true
+    let value = first
+    for (;;) {
+      setShowSaved(false)
+      const outcome = await mutation.run(value)
+      const next = waiting.current
+      waiting.current = null
+      // `confirmedRef` now holds what the server keeps: this value if it landed, the earlier one if not.
+      if (next && !options.current.isEqual(next.value, confirmedRef.current)) {
+        value = next.value
+        continue
+      }
+      inFlight.current = false
+      if (!outcome.succeeded && !next) setFailedValue({ value })
+      return
+    }
+  }, [mutation.run])
+
   const commit = useCallback((next?: T) => {
     if (debounce.current) {
       clearTimeout(debounce.current)
@@ -127,15 +152,16 @@ export function useSettingField<T>({
     }
     const value = next === undefined ? draftRef.current : next
     if (options.current.validate?.(value)) return
+    if (inFlight.current) {
+      waiting.current = { value }
+      return
+    }
     if (options.current.isEqual(value, confirmedRef.current)) {
       setFailedValue(null)
       return
     }
-    setShowSaved(false)
-    void mutation.run(value).then((outcome) => {
-      if (!outcome.succeeded) setFailedValue({ value })
-    })
-  }, [mutation.run])
+    void send(value)
+  }, [send])
 
   const setDraft = useCallback((next: T) => {
     draftRef.current = next
@@ -149,6 +175,7 @@ export function useSettingField<T>({
 
   const revert = useCallback(() => {
     if (debounce.current) clearTimeout(debounce.current)
+    waiting.current = null
     mutation.reset()
     setFailedValue(null)
     setDraftState(confirmedRef.current)

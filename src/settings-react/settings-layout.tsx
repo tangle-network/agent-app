@@ -224,12 +224,22 @@ export function SettingsNav(props: SettingsNavProps) {
   return <NavLinks {...props} currentId={currentId} onPick={setPendingId} />
 }
 
+/** The decoded `#hash`, or the raw one when a hand-edited link does not decode. */
+function readHash(): string {
+  const raw = window.location.hash.slice(1)
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
 /** Scrolls `#hash` into view and focuses its heading; without a hash, a section change starts at the top. */
 function useSectionScroll(activeId: string, rootRef: RefObject<HTMLDivElement | null>) {
   const first = useRef(true)
   useEffect(() => {
     const reveal = () => {
-      const hash = decodeURIComponent(window.location.hash.slice(1))
+      const hash = readHash()
       const target = hash ? document.getElementById(hash) : null
       if (!target) return false
       target.scrollIntoView({ block: 'start' })
