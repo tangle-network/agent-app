@@ -84,8 +84,8 @@ importers:
         specifier: 0.60.49
         version: 0.60.49(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       '@tangle-network/sandbox-ui':
-        specifier: 0.134.7
-        version: 0.134.7(d553f2d2ff678681dfac55e4b9f25054)
+        specifier: 0.134.10
+        version: 0.134.10(d553f2d2ff678681dfac55e4b9f25054)
       '@tangle-network/tcloud':
         specifier: 0.8.2
         version: 0.8.2(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(typescript@7.0.2)(zod@4.4.3)
@@ -2829,14 +2829,14 @@ packages:
   '@tangle-network/hub-sdk@0.30.2':
     resolution: {integrity: sha512-fMz9o2yPmV3qWPIlrHWsC2XCij/x51X66VPRutVeAxPA0W0w9iQW76u5FVg6Zsn8mdSogS7lE0gJWVvRqn7LlQ==}
 
-  '@tangle-network/sandbox-ui@0.134.7':
-    resolution: {integrity: sha512-fkCYOtxha3WRec2KHRxHTJAc6ILPKJMx4ysAdcgyobocFJxhD1vgv10dor83e9d+4nrvc3Lx8O67UVKpfqHXCw==}
+  '@tangle-network/sandbox-ui@0.134.10':
+    resolution: {integrity: sha512-sN9GvTdD/8Bf12ovlTzplSANWZi8ghA7w4MLkI4pLFLVgRfI3l3GKtskZYJgm2hEuAS8Mefu1HpRfmF5qSzjjg==}
     peerDependencies:
       '@hocuspocus/provider': '>=2.15.0 <5.0.0'
       '@nanostores/react': '>=0.8.4 <2.0.0'
       '@tangle-network/agent-interface': ^1.0.0 || ^2.0.0 || ^3.0.0 || ^5.2.0
-      '@tangle-network/brand': ^1.23.0
-      '@tangle-network/ui': ^11.33.0
+      '@tangle-network/brand': ^1.25.1
+      '@tangle-network/ui': ^11.38.1
       '@tanstack/react-query': ^5.0.0
       '@tiptap/core': '>=3.20.4 <4.0.0'
       '@tiptap/extension-collaboration': '>=3.20.4 <4.0.0'
@@ -8751,7 +8751,7 @@ snapshots:
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
 
-  '@tangle-network/sandbox-ui@0.134.7(d553f2d2ff678681dfac55e4b9f25054)':
+  '@tangle-network/sandbox-ui@0.134.10(d553f2d2ff678681dfac55e4b9f25054)':
     dependencies:
       '@lobehub/icons-static-svg': 1.95.1
       '@pierre/diffs': 1.5.1(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
