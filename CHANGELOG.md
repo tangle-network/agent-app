@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.188
+
+- test: drop peer-floor ceiling assertions that mirror the current range (#1145)
+
 ## 0.60.187
 
 - Accept agent-runtime 0.325.x in the peer range (#1142)
