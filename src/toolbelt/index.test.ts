@@ -102,10 +102,20 @@ describe('probeStdioToolProgram', () => {
     await expect(probeStdioToolProgram({ program })).rejects.toThrow(/exited before answering tools\/list.*boom: missing PHYSIM_THING/s)
   })
 
-  it('times out with the collected output named', async () => {
+  it('times out with the collected output named (stdout diagnostics include lines already processed)', async () => {
     const program = join(dir, 'hangs.cjs')
-    writeFileSync(program, 'console.error("waiting forever"); setInterval(() => {}, 1000);')
-    await expect(probeStdioToolProgram({ program, timeoutMs: 750 })).rejects.toThrow(/timed out after 750ms.*waiting forever/s)
+    writeFileSync(program, [`
+      const readline = require("node:readline");
+      // A banner, then a reply to initialize but never to tools/list: the
+      // probe must name BOTH streams in the timeout, including stdout lines
+      // it already consumed while line-splitting.
+      process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { serverInfo: { name: "stalls" } } }) + "\\n");
+      console.error("waiting forever");
+      setInterval(() => {}, 1000);
+    `].join("\n"))
+    await expect(probeStdioToolProgram({ program, timeoutMs: 750 })).rejects.toThrow(
+      /timed out after 750ms.*stderr so far: waiting forever.*stdout so far: .*stalls/s,
+    )
   })
 })
 

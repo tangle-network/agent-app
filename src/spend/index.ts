@@ -116,7 +116,6 @@ export {
   ParentBudgetExhaustedError,
   deriveChildKeyBudgetUsd,
   type DeriveChildKeyBudgetInput,
-  type DerivedChildKeyBudget,
 } from './delegate-budget'
 
 export { formatSpendReport, spendReportToJson } from './report'
