@@ -33,6 +33,7 @@ import { createRoot } from 'react-dom/client'
 import { SettingsDemo } from './src/stories/settings/settings-demo.tsx'
 import { createSettingsBackend } from './src/stories/settings/settings-backend.ts'
 import { TeamPanelsDemo } from './src/stories/settings/team-panels-demo.tsx'
+import { SaveGroupDemo } from './src/stories/settings/save-group-demo.tsx'
 const params = new URLSearchParams(location.search)
 const viewer = params.get('viewer') === 'admin' ? 'admin' : 'owner'
 const theme = params.get('theme') === 'light' ? 'light' : 'dark'
@@ -40,8 +41,11 @@ document.documentElement.dataset.theme = theme
 document.documentElement.classList.add(theme)
 const backend = createSettingsBackend({ viewer })
 window.__settings = backend
-createRoot(document.getElementById('root')).render(params.get('view') === 'team-panels'
+const view = params.get('view')
+createRoot(document.getElementById('root')).render(view === 'team-panels'
   ? <TeamPanelsDemo viewer={viewer} />
+  : view === 'save-group'
+  ? <SaveGroupDemo />
   : <SettingsDemo backend={backend} viewer={viewer} initialSection={params.get('section') ?? 'general'} />)`
 
 // The demo imports the package's source paths; the proof runs the built package.
@@ -366,9 +370,10 @@ try {
       await raise.locator('[data-confirm-action]').click()
       await check(`${tag}: the save bar shows Saved for two seconds, then no unsaved changes`, async () => {
         await expect(bar.locator('[data-setting-status="saved"]')).toBeVisible()
+        assert.equal(await bar.getAttribute('data-sticky'), 'true', 'the bar stops sticking before its Saved fades')
         await expect(bar.locator('[data-setting-status="saved"]')).toHaveCount(0, { timeout: 3_500 })
         await expect(bar).toContainText('No unsaved changes')
-        assert.equal(await bar.getAttribute('data-dirty'), null, 'the bar still sticks with nothing to save')
+        assert.equal(await bar.getAttribute('data-sticky'), null, 'the bar still sticks with nothing to save')
       })
 
       await nav.locator('a[data-settings-section="team"]').click()
@@ -536,6 +541,54 @@ try {
       await shot('team-panels')
       await page.locator('[data-team-panel="invitations"]').scrollIntoViewIfNeeded()
       await shot('team-panels-invitations')
+
+      // One save across several cards (an agent profile): the group bar follows the last card it saves and,
+      // while it reports, stays at the bottom of the screen over every card above it, at every width.
+      const screen = phone ? 700 : 640
+      await page.setViewportSize({ width, height: screen })
+      await page.goto(`${origin}/?theme=${theme}&view=save-group`)
+      const group = page.locator('[data-settings-save-group]')
+      const groupBar = group.locator('[data-settings-save-bar]')
+      await expect(page.locator('#profile-instructions')).toBeVisible()
+      await check(`${tag}: with nothing to save the group bar waits after the last card it saves, below the screen`, async () => {
+        await expect(groupBar).toContainText('No unsaved changes')
+        assert.equal(await groupBar.getAttribute('data-sticky'), null)
+        const knowledge = await page.locator('#knowledge').boundingBox()
+        const box = await group.boundingBox()
+        assert.ok(box.y >= knowledge.y + knowledge.height, 'the bar is not after the last card it saves')
+        assert.ok(box.y > screen, `the bar starts at ${Math.round(box.y)}, on the ${screen}px screen, so this proves nothing`)
+      })
+      await page.locator('#profile-instructions').fill('Answer guests in one sentence.')
+      await check(`${tag}: an edit in the first card puts Save at the bottom of the screen without scrolling`, async () => {
+        await expect(groupBar).toContainText('1 unsaved change')
+        assert.equal(await page.evaluate(() => scrollY), 0, 'the page scrolled')
+        const box = await group.boundingBox()
+        const save = await groupBar.getByRole('button', { name: 'Save profile' }).boundingBox()
+        assert.ok(save.y >= 0 && save.y + save.height <= screen, `Save is at ${Math.round(save.y)} on a ${screen}px screen`)
+        assert.ok(Math.abs(box.y + box.height - (screen - 12)) <= 1, `the bar ends at ${Math.round(box.y + box.height)}, not 12px above the screen's bottom`)
+        assert.ok(await page.evaluate((opened) => document.documentElement.scrollWidth <= opened, width), 'the page scrolls sideways')
+        assert.deepEqual(await tinyText(page), [])
+      })
+      await shot('save-group-unsaved')
+      await groupBar.getByRole('button', { name: 'Save profile' }).click()
+      await check(`${tag}: the group bar shows Saved in view, then returns after the last card it saves`, async () => {
+        await expect(groupBar.locator('[data-setting-status="saved"]')).toBeVisible()
+        const box = await group.boundingBox()
+        assert.ok(box.y + box.height <= screen, 'Saved is below the screen')
+        await shot('save-group-saved')
+        await expect(groupBar.locator('[data-setting-status="saved"]')).toHaveCount(0, { timeout: 3_500 })
+        await expect(groupBar).toContainText('No unsaved changes')
+        assert.equal(await groupBar.getAttribute('data-sticky'), null, 'the bar still sticks with nothing to save')
+        assert.ok((await group.boundingBox()).y > screen, 'the bar stayed on the screen with nothing to report')
+      })
+      await page.locator('#profile-model').fill('gpt-5-mini')
+      await page.locator('#history').scrollIntoViewIfNeeded()
+      await check(`${tag}: scrolled past the cards it saves, the group bar stays above Version history`, async () => {
+        const box = await group.boundingBox()
+        const history = await page.locator('#history').boundingBox()
+        assert.ok(box.y + box.height <= history.y, `the bar ends at ${Math.round(box.y + box.height)}, over Version history at ${Math.round(history.y)}`)
+      })
+      await shot('save-group-history')
       await context.close()
     }
   }

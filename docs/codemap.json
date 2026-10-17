@@ -19631,7 +19631,7 @@
         {
           "name": "SettingsSaveBar",
           "kind": "function",
-          "signature": "({ changes, summary, onDiscard, onSave, state, error, saveLabel, disabledReason, }: SettingsSaveBarProps) => Element",
+          "signature": "({ changes, summary, onDiscard, onSave, state, error, saveLabel, disabledReason, placement, }: SettingsSaveBarProps) =>…",
           "doc": null
         },
         {
