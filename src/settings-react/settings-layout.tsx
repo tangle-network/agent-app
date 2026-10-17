@@ -17,7 +17,6 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type AnchorHTMLAttributes,
@@ -26,6 +25,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
+import { useBrowserLayoutEffect } from '../web-react/controls'
 import { PENDING_DELAY_MS } from './save-status'
 
 /** An icon component such as a `lucide-react` icon. It shows only in the column. */
@@ -107,7 +107,8 @@ const STRIP_GAP = 4
 function useStripOverflow(listRef: RefObject<HTMLUListElement | null>) {
   const [overflow, setOverflow] = useState({ start: false, end: false })
   const strip = useCallback(() => listRef.current?.parentElement ?? null, [listRef])
-  useLayoutEffect(() => {
+  // Measured before paint, so a strip that overflows shows its chevrons on the first frame.
+  useBrowserLayoutEffect(() => {
     const nav = strip()
     if (!nav) return
     const measure = () => {
