@@ -23,7 +23,7 @@
  * gap this closes.
  */
 
-import type { AgentProfile } from '@tangle-network/agent-interface'
+import { canonicalAgentProfileDigest, type AgentProfile } from '@tangle-network/agent-interface'
 
 /** The dispatch context a profile cannot see but a turn's identity includes. */
 export interface ProfileFingerprintContext {
@@ -47,6 +47,8 @@ export interface ProfileFingerprint {
   fileMountPaths: string[]
   /** Sorted hub connection ids (alias-qualified when present). */
   connectionIds: string[]
+  /** Canonical public profile identity when proxy binding lifecycle is declared. */
+  proxySecretAuthoritySha?: string
   model?: string
   harness?: string
 }
@@ -71,6 +73,9 @@ export async function fingerprintAgentProfile(
   const connectionIds = (profile.connections ?? [])
     .map((connection) => (connection.alias ? `${connection.connectionId}:${connection.alias}` : connection.connectionId))
     .sort()
+  const proxySecretAuthoritySha = profile.proxySecrets !== undefined
+    ? canonicalAgentProfileDigest(profile)
+    : undefined
   const hash = await sha256Hex(
     JSON.stringify([
       promptSha,
@@ -80,6 +85,7 @@ export async function fingerprintAgentProfile(
       connectionIds,
       context?.model ?? null,
       context?.harness ?? null,
+      ...(proxySecretAuthoritySha ? [proxySecretAuthoritySha] : []),
     ]),
   )
   return {
@@ -90,6 +96,7 @@ export async function fingerprintAgentProfile(
     subagentNames,
     fileMountPaths,
     connectionIds,
+    ...(proxySecretAuthoritySha ? { proxySecretAuthoritySha } : {}),
     model: context?.model,
     harness: context?.harness,
   }
@@ -97,7 +104,7 @@ export async function fingerprintAgentProfile(
 
 /** One drifted channel between two fingerprints, rendered as comparable strings. */
 export interface ProfileDriftEntry {
-  channel: 'promptSha' | 'promptBytes' | 'mcpKeys' | 'subagentNames' | 'fileMountPaths' | 'connectionIds' | 'model' | 'harness'
+  channel: 'promptSha' | 'promptBytes' | 'mcpKeys' | 'subagentNames' | 'fileMountPaths' | 'connectionIds' | 'model' | 'harness' | 'proxySecretAuthoritySha'
   a: string
   b: string
 }
@@ -120,6 +127,7 @@ const DRIFT_CHANNELS: ProfileDriftEntry['channel'][] = [
   'subagentNames',
   'fileMountPaths',
   'connectionIds',
+  'proxySecretAuthoritySha',
   'model',
   'harness',
 ]

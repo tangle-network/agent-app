@@ -551,21 +551,56 @@ Products with their own SDK transport can call `resolveSandboxPromptBackend` dir
 It accepts only profile, provider, and preparation configuration; it does not require provisioning or storage adapters.
 Use its returned backend for both request-size checks and dispatch, preserving product-specific recovery and persistence.
 
-## Renew workspace credentials
+## Renew proxy-held workspace credentials
 
-Put expiring application credentials in `SandboxRuntimeConfig.runtimeEnv`, rather than creation-only `env` or a custom bootstrap hook.
-The shell resolves them on creation and before each reuse, resume, or recovery, even when liveness is cached.
+Declare network credentials through `SandboxRuntimeConfig.proxySecrets`.
+The callback returns authorized references from the existing encrypted Sandbox secret store:
 
 ```ts
-runtimeEnv: async ({ workspaceId }) => ({
-  APP_TOOL_BEARER: await mintWorkspaceToolToken(workspaceId),
-}),
+proxySecrets: async ({ workspaceId, userId }) => [{
+  envName: 'APP_TOOL_BEARER',
+  secretRef: { kind: 'secret-ref', key: await authorizedCapabilityRef(workspaceId, userId) },
+  hosts: ['tools.example.com'],
+  presentation: { type: 'bearer' },
+  methods: ['POST'],
+  paths: ['/mcp'],
+}],
 ```
 
-The product owns `mintWorkspaceToolToken` and throws when required credentials are unavailable.
-Profiles reference `APP_TOOL_BEARER` by name; credential values stay outside profile material.
-Values have workspace-wide authority, so this callback cannot carry per-user or per-request secrets.
-Static process configuration remains in `env`; Sandbox owns managed model and Hub credentials.
-On existing sandboxes, the shell awaits the SDK's `setRuntimeEnv` acknowledgement before bootstrap or dispatch.
-An update failure preserves the sandbox and prevents the turn from starting.
-Deploy the matching Sandbox runtime before adopting this callback; a package upgrade cannot update already-running sidecars.
+The product owns issuance, reference authorization and renewal. It throws when required authority is unavailable.
+The declaration carries no credential bytes. Do not also select its key as a readable Sandbox secret or return either its key or env name from `env`, `runtimeEnv`, or per-turn `runtimeSecrets`.
+Keep provider credentials with their existing server-side owner.
+
+The shell installs and confirms bindings before retained-box bootstrap, resume and dispatch. Failed renewal preserves the sandbox and prevents the turn from starting.
+Each callback result replaces the complete binding set: include every workspace, seat and turn binding that must remain active. Return `[]` to revoke the set; omission leaves the lifecycle unconfigured.
+Supplied turn profiles verify their declarations against installed bindings; they cannot replace the workspace set. An explicit empty profile selection requires confirmed revocation.
+The per-turn `proxySecrets` resolver currently refuses shared-box execution because a scope label or generation check cannot isolate sibling processes. Use the workspace lifecycle on a sandbox placed for one authority; unsupported custody has no readable fallback.
+
+`runtimeEnv` remains available for ordinary readable process configuration. It does not provide proxy custody.
+Deploy a Sandbox runtime advertising the canonical proxy-secret capability before adopting protected declarations. Missing support or unconfirmed installation fails closed.
+
+An authored `profile.proxySecrets: []` clears the authored declarations and remains explicit in its digest. The runtime callback still owns the **complete effective selection**, including any independently authorized product bindings. Return that current set without old authored bindings; returning `[]` from the callback revokes the whole set. After `ensureWorkspaceSandbox`, dispatch with its actual returned box and the same callback configuration. For every callback-configured dispatch, the framework rechecks the exact confirmed full selection and generation before checking the authored subset; callback presence alone is insufficient. Without that confirmed callback placement, an empty authored selection requires an empty revoked receipt. Dispatch never unions or changes bindings.
+
+
+For a native subscription, pass the existing SDK credential reference through
+`shell.provider` with `providerName: 'openai'`, the selected `defaultModel`,
+`authMode: 'oauth'`, and `cliAuth`. Keep API keys and Router base URLs out of
+that provider configuration. Native OAuth resolves without `allowKeylessModel`.
+Keep credential issuance with the trusted product owner; grant/materialize it
+inside the existing `bootstrap` callback. The framework confirms the complete
+selected receipt before bootstrap and again afterwards, rejecting rollback or
+a changed receipt at the same generation. Pass the actual returned box to
+`resolveSandboxPromptBackend(shell, options, operation, box)` and shared turn
+helpers, with the existing preparation digest/receipt pins. A wrapper object
+does not inherit callback-placement proof.
+
+
+An explicit lifecycle renewal reissues placement, even for the same declarations.
+When requests share a sandbox, the product's durable lifecycle lease must cover
+credential issuance, ensure, hydration and dispatch acceptance; retain the lease
+through execution where renewal fences active grants. An ensure-only provisioning
+claim does not protect a caller after it returns. A later renewal invalidates
+the earlier handle's dispatch proof. Same-selection reuse requires explicit
+SDK/core support that validates the current source revision and freshness;
+reference-key equality is insufficient. Keep the exact receipt guard and avoid
+retrying a stale prepared turn.

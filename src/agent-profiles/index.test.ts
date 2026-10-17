@@ -1,6 +1,6 @@
-import { canonicalCandidateBytes, snapshotAgentProfile } from '@tangle-network/agent-interface'
+import { canonicalCandidateBytes, snapshotAgentProfile, type AgentProfile } from '@tangle-network/agent-interface'
 import { describe, expect, it, vi } from 'vitest'
-import { admitProfileTurn, bindProfileText, profileAdmissionValues, readProfileAdmission, switchProfile, type ProfileRevision, type ProfileRevisionStore } from './index'
+import { admitProfileTurn, bindProfileText, profileAdmissionValues, proposeRevision, promoteRevision, readProfileAdmission, switchProfile, type ProfileRevision, type ProfileRevisionStore } from './index'
 
 const baseline = snapshotAgentProfile({
   name: 'GTM Agent', harness: 'opencode', prompt: { systemPrompt: 'base' },
@@ -34,6 +34,78 @@ describe('bindProfileText', () => {
     const bound = bindProfileText(bare, bare)
     expect('prompt' in bound).toBe(false)
     expect('description' in bound).toBe(false)
+  })
+})
+
+describe('proxy authority revision consent', () => {
+  it('saves and reloads references, auto-activates text, and requires verified owner consent for authority edits', async () => {
+    const workspaceId = 'ws-1'
+    const profileId = 'p-1'
+    const planDigest = `sha256:${'a'.repeat(64)}`
+    const rows = new Map<string, string>()
+    let active: string | null = null
+    const load = (id: string | null): ProfileRevision | null => id && rows.has(id)
+      ? JSON.parse(rows.get(id)!) as ProfileRevision : null
+    // The existing memory-store compare-and-append contract, with serialized
+    // rows so reads exercise the stored revision rather than the input object.
+    const store = {
+      async getActiveRevision() { return load(active) },
+      async getRevision(_workspaceId: string, _profileId: string, id: string) { return load(id) },
+      async appendRevision(revision: ProfileRevision, expectedActiveId: string | null, activate: boolean) {
+        if (active !== expectedActiveId) return false
+        rows.set(revision.id, JSON.stringify(revision))
+        if (activate) active = revision.id
+        return true
+      },
+      async promoteRevision(_workspaceId: string, _profileId: string, id: string, expectedActiveId: string | null) {
+        if (active !== expectedActiveId || !rows.has(id)) return false
+        active = id
+        return true
+      },
+    } as unknown as ProfileRevisionStore
+    const binding = {
+      envName: 'REPORTS_TOKEN', secretRef: { kind: 'secret-ref', key: 'reporting-api' },
+      hosts: ['reports.example.com'], presentation: { type: 'bearer' }, methods: ['POST'],
+      paths: ['/v1/events'], ttlSeconds: 300,
+    } satisfies NonNullable<AgentProfile['proxySecrets']>[number]
+    const authorized = snapshotAgentProfile({ ...baseline, proxySecrets: [binding] })
+    const save = (profile: AgentProfile, id: string, expectedRevisionId: string | null) => proposeRevision({
+      store, workspaceId, profileId, expectedRevisionId, profile, id,
+      knowledgeText: '', planDigest, author: { kind: 'person', id: 'm-1' },
+      actorRole: 'manager', reason: 'Requested profile revision',
+    })
+    const seed = await save(authorized, 'approved', null)
+    expect((await store.getRevision(workspaceId, profileId, seed.id))?.profile.proxySecrets).toEqual([binding])
+    const text = await save({ ...authorized, prompt: { systemPrompt: 'Edited role text' } }, 'text', seed.id)
+    expect(text.state).toBe('active')
+    expect(text.authorityDigest).toBe(seed.authorityDigest)
+    expect((await store.getActiveRevision(workspaceId, profileId))?.profile.proxySecrets).toEqual([binding])
+
+    const changes = [
+      { secretRef: { kind: 'secret-ref', key: 'other-api' } },
+      { hosts: ['other.example.com'] },
+      { presentation: { type: 'header', name: 'X-Reports-Key' } },
+      { paths: ['/v1/accounts'] },
+    ] satisfies Partial<NonNullable<AgentProfile['proxySecrets']>[number]>[]
+    let latest = text
+    for (const [index, change] of changes.entries()) {
+      const requested = [{ ...binding, ...change }]
+      const draft = await save({ ...text.profile, proxySecrets: requested }, `draft-${index}`, text.id)
+      expect(draft.state).toBe('pending-consent')
+      expect(draft.authorityDigest).not.toBe(seed.authorityDigest)
+      expect((await store.getRevision(workspaceId, profileId, draft.id))?.profile.proxySecrets).toEqual(requested)
+      await expect(promoteRevision({ store, workspaceId, profileId, revisionId: draft.id,
+        actorRole: 'manager', verifyConsent: async () => true })).rejects.toThrow('Authority changes require owner consent')
+      expect((await store.getActiveRevision(workspaceId, profileId))?.id).toBe(text.id)
+      latest = draft
+    }
+    await expect(promoteRevision({ store, workspaceId, profileId, revisionId: latest.id,
+      actorRole: 'owner', verifyConsent: async () => false })).rejects.toThrow('Authority changes require owner consent')
+    await promoteRevision({ store, workspaceId, profileId, revisionId: latest.id,
+      actorRole: 'owner', verifyConsent: async revision => revision.id === latest.id && revision.authorityDigest === latest.authorityDigest })
+    expect((await store.getActiveRevision(workspaceId, profileId))?.id).toBe(latest.id)
+    expect((await store.getActiveRevision(workspaceId, profileId))?.profile.proxySecrets).toEqual(latest.profile.proxySecrets)
+    expect((await store.getRevision(workspaceId, profileId, seed.id))?.profile.proxySecrets).toEqual([binding])
   })
 })
 

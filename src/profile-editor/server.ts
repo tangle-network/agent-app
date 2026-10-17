@@ -6,12 +6,14 @@
  * fetch-based and runs in Workers and Node.
  */
 import { z } from 'zod'
-import type { AgentProfileConfigValue, AgentProfileMcpServer } from '@tangle-network/agent-interface/profile'
+import { canonicalAgentProfileDigest, snapshotAgentProfile, type Sha256Digest } from '@tangle-network/agent-interface'
+import type { AgentProfileMcpServer, AgentProfileSecretRef } from '@tangle-network/agent-interface/profile'
+import { agentProfileHeaderSchema } from '@tangle-network/agent-interface/profile-schema'
 import {
   isCommitSha, PROFILE_EDITOR_ROUTES, publicHttpsUrlProblem, readSkillFrontmatter,
   type GitHubCommitSummary, type GitHubFileList, type GitHubRepositorySummary, type GitHubSourceCheck,
   type GitHubSourceFailure, type GitHubSourceOutcome, type GitHubSourceProblem, type GitHubSourceRequest,
-  type McpHealth, type McpTool, type ProfileEditorGitHubPort, type ProfileEditorMcpPort,
+  type McpHealth, type McpTool, type ProfileEditorGitHubPort, type ProfileEditorMcpCandidate, type ProfileEditorMcpPort,
 } from './index'
 
 export * from './index'
@@ -351,6 +353,12 @@ export function formatBytes(bytes: number): string {
 
 export interface McpHealthCheckOptions {
   fetch?: typeof fetch
+  /** Trusted, request-authorized transport for reference-backed headers. It must
+   * authorize every reference and keep credential values at the proxy; the
+   * checker supplies only public request headers and canonical references.
+   * Missing or refused support fails closed without trying public fetch. */
+  proxyFetch?: (input: RequestInfo | URL, init: RequestInit,
+    secretHeaders: Readonly<Record<string, AgentProfileSecretRef>>) => Promise<Response>
   /** Total time for the whole check. Defaults to 8 seconds. */
   timeoutMs?: number
   /** The address policy. Return the reason an address is refused, or null. Defaults to {@link publicHttpsUrlProblem}. */
@@ -364,16 +372,22 @@ const MAX_MCP_BODY_BYTES = 2 * 1024 * 1024
 interface JsonRpcResponse { id?: unknown; result?: unknown; error?: { code?: number; message?: string } }
 
 class McpCheckFailure extends Error {
-  constructor(readonly problem: Exclude<McpHealth, { ok: true }>['problem'], message: string, readonly status?: number) { super(message) }
+  constructor(readonly problem: Exclude<McpHealth, { ok: true }>['problem'], message: string, readonly status?: number,
+    readonly upstreamDetails = false) { super(message) }
 }
 
-function publicHeaders(server: AgentProfileMcpServer): Record<string, string> {
-  if (!('headers' in server) || !server.headers) return {}
-  const headers: Record<string, string> = {}
-  for (const [name, value] of Object.entries(server.headers as Record<string, AgentProfileConfigValue>)) {
-    if (value && typeof value === 'object' && value.kind === 'public' && typeof value.value === 'string') headers[name] = value.value
+function mcpHeaders(server: AgentProfileMcpServer): {
+  headers: Record<string, string>; secretHeaders: Record<string, AgentProfileSecretRef>
+} {
+  const headers: Record<string, string> = Object.create(null)
+  const secretHeaders: Record<string, AgentProfileSecretRef> = Object.create(null)
+  const parsed = agentProfileHeaderSchema.safeParse(('headers' in server ? server.headers : undefined) ?? {})
+  if (!parsed.success) throw new McpCheckFailure('not-checkable', 'MCP headers must use public values or secret references.')
+  for (const [name, value] of Object.entries(parsed.data)) {
+    if (value.kind === 'public') headers[name] = value.value
+    else secretHeaders[name] = value
   }
-  return headers
+  return { headers, secretHeaders }
 }
 
 /** Read Server-Sent Events from a stream, yielding each complete event. */
@@ -418,7 +432,7 @@ function rpcResult(message: unknown, id: number): unknown {
   const items = Array.isArray(message) ? message : [message]
   const match = items.find((item): item is JsonRpcResponse => !!item && typeof item === 'object' && (item as JsonRpcResponse).id === id)
   if (!match) throw new McpCheckFailure('protocol-error', 'The server did not answer the MCP request.')
-  if (match.error) throw new McpCheckFailure('protocol-error', `The server returned an MCP error: ${match.error.message ?? match.error.code ?? 'unknown'}.`)
+  if (match.error) throw new McpCheckFailure('protocol-error', `The server returned an MCP error: ${match.error.message ?? match.error.code ?? 'unknown'}.`, undefined, true)
   return match.result
 }
 
@@ -452,8 +466,8 @@ const initializeSchema = z.object({ serverInfo: z.object({ name: z.string().opti
 /**
  * Connect to a remote MCP server, initialize a session, and list its tools.
  * Speaks Streamable HTTP, and the HTTP+SSE transport when the server declares
- * `transport: 'sse'`. Public header values are sent; secret references are not
- * resolved here, so a server that requires them reports `auth-required`.
+ * `transport: 'sse'`. Reference-backed headers require the trusted proxyFetch
+ * transport; references are never resolved to credential values here.
  */
 export async function checkMcpServer(server: AgentProfileMcpServer, options: McpHealthCheckOptions = {}): Promise<McpHealth> {
   const checkedAt = new Date().toISOString()
@@ -472,21 +486,32 @@ export async function checkMcpServer(server: AgentProfileMcpServer, options: Mcp
     try { new URL(url) } catch { parsed = false }
     return failed(new McpCheckFailure(parsed ? 'blocked-url' : 'invalid-url', urlProblem))
   }
-  const send = options.fetch ?? ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init))
+  let send: Send = options.fetch ?? ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init))
+  let hasSecretHeaders = false
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 8_000)
   const clientInfo = options.clientInfo ?? { name: 'tangle-agent-app', version: '1' }
-  const headers = publicHeaders(server)
   const initialize = { jsonrpc: '2.0', id: 1, method: 'initialize',
     params: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: {}, clientInfo } }
   const initialized = { jsonrpc: '2.0', method: 'notifications/initialized' }
   try {
+    const { headers, secretHeaders } = mcpHeaders(server)
+    hasSecretHeaders = Object.keys(secretHeaders).length > 0
+    if (hasSecretHeaders) {
+      const proxyFetch = options.proxyFetch
+      if (!proxyFetch) throw new McpCheckFailure('auth-required', 'This check requires an authorized proxy transport for its secret references.')
+      send = (input, init) => proxyFetch(input, init ?? {}, secretHeaders)
+    }
     const result = 'transport' in server && server.transport === 'sse'
       ? await checkSse(url, headers, send, controller.signal, initialize, initialized)
       : await checkStreamableHttp(url, headers, send, controller.signal, initialize, initialized)
     return { ok: true, ...result, latencyMs: Date.now() - started, checkedAt }
   } catch (error) {
-    if (error instanceof McpCheckFailure) return failed(error)
+    if (error instanceof McpCheckFailure) {
+      return failed(hasSecretHeaders && error.upstreamDetails
+        ? new McpCheckFailure(error.problem, 'The server returned an MCP error.', error.status)
+        : error)
+    }
     if (controller.signal.aborted) return failed(new McpCheckFailure('timeout', 'The server did not answer within 8 seconds.'))
     return failed(new McpCheckFailure('unreachable', 'Could not connect to the server. Check the URL and that the server is running.'))
   } finally {
@@ -553,7 +578,7 @@ async function checkStreamableHttp(url: string, headers: Record<string, string>,
     if (!cursor) break
   }
   if (session) {
-    await send(url, { method: 'DELETE', signal, headers: { ...headers, 'Mcp-Session-Id': session } })
+    await sendManual(send, url, { method: 'DELETE', signal, headers: { ...headers, 'Mcp-Session-Id': session } })
       .then(response => response.body?.cancel()).catch(() => undefined)
   }
   return listing(info, pages)
@@ -604,19 +629,29 @@ async function checkSse(url: string, headers: Record<string, string>, send: Send
 
 /** The editor's MCP port, running checks in this process with the given address policy. */
 export function createMcpHealthChecker(options: McpHealthCheckOptions = {}): ProfileEditorMcpPort {
-  return { check: (server, signal) => {
+  return { check: (server, signal, candidate) => {
     if (signal?.aborted) return Promise.resolve({ ok: false, problem: 'unavailable', message: 'The check was cancelled.', checkedAt: new Date().toISOString() })
+    if (candidate && (candidate.profile.proxySecrets !== undefined
+      || Object.values(('headers' in server ? server.headers : undefined) ?? {}).some(value => value?.kind === 'secret-ref'))) {
+      return Promise.resolve({ ok: false, problem: 'unavailable',
+        message: 'This product cannot prepare the protected candidate profile for MCP checks.', checkedAt: new Date().toISOString() })
+    }
     return checkMcpServer(server, options)
   } }
 }
 
 // ── Route handler ───────────────────────────────────────────────────────────
 
+/** Server-validated candidate identity. The host still authorizes its requested authority. */
+export interface ProfileEditorMcpCheckContext extends ProfileEditorMcpCandidate {
+  profileDigest: Sha256Digest
+}
+
 export interface ProfileEditorHandlerOptions {
   /** GitHub lookups for this workspace. Null when the product offers no GitHub sources. */
   github: ProfileEditorGitHubPort | null
   /** MCP checks. Null when the product offers no MCP servers. */
-  mcp: ProfileEditorMcpPort | null
+  mcp: ProfileEditorMcpPort<ProfileEditorMcpCheckContext> | null
 }
 
 const repositoryParam = z.string().trim().min(3).max(201)
@@ -629,7 +664,9 @@ const mcpBody = z.object({ server: z.object({
   url: z.string().max(2048).optional(),
   command: z.string().max(2048).optional(),
   headers: z.record(z.string(), z.unknown()).optional(),
-}).passthrough() }).strict()
+}).passthrough(),
+  candidate: z.object({ profile: z.unknown(), serverName: z.string().min(1).max(256) }).strict().optional(),
+}).strict()
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } })
@@ -662,7 +699,24 @@ export async function handleProfileEditorRequest(request: Request, path: string,
     if (!options.mcp) return json({ ok: false, problem: 'unavailable', message: 'This product does not check MCP servers.', checkedAt: new Date().toISOString() })
     let body: z.infer<typeof mcpBody>
     try { body = mcpBody.parse(await readBody(request)) } catch { return json({ error: 'Send { server } with the MCP server to check.' }, 400) }
-    return json(await options.mcp.check(body.server as unknown as AgentProfileMcpServer, signal))
+    let server = body.server as unknown as AgentProfileMcpServer
+    let candidate: ProfileEditorMcpCheckContext | undefined
+    if (body.candidate) {
+      try {
+        const profile = snapshotAgentProfile(body.candidate.profile)
+        const serverName = body.candidate.serverName
+        const selected = profile.mcp?.[serverName]
+        if (!selected || canonicalAgentProfileDigest({ mcp: { [serverName]: selected } })
+          !== canonicalAgentProfileDigest({ mcp: { [serverName]: server } })) {
+          return json({ error: 'The selected MCP server does not match the candidate profile.' }, 400)
+        }
+        candidate = { profile, serverName, profileDigest: canonicalAgentProfileDigest(profile) }
+        server = selected
+      } catch {
+        return json({ error: 'Send a valid candidate profile and matching MCP server.' }, 400)
+      }
+    }
+    return json(await (candidate ? options.mcp.check(server, signal, candidate) : options.mcp.check(server, signal)))
   }
   if (!options.github) return json(fail('unavailable', 'This product does not offer GitHub sources.'))
   const github = options.github

@@ -672,7 +672,7 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
 
       {show.mcp && <Section title="MCP servers" description="Tool servers the agent connects to."
         collapsible defaultOpen={Object.keys(value.mcp ?? {}).length > 0} summary={countLabel(Object.keys(value.mcp ?? {}).length, 'server')}>
-        <McpServersEditor servers={value.mcp ?? {}} disabled={editingDisabled} port={config?.mcp?.port} lockReason={config?.mcp?.lockReason}
+        <McpServersEditor servers={value.mcp ?? {}} profile={value} disabled={editingDisabled} port={config?.mcp?.port} lockReason={config?.mcp?.lockReason}
           publicHttpsOnly={publicHttpsMcpOnly} allowLocalCommand={config?.mcp?.allowLocalCommand ?? !publicHttpsMcpOnly}
           registry={registry} onPendingChange={setMcpPending}
           onChange={next => { const { mcp: _mcp, ...rest } = value; return emit(Object.keys(next).length ? { ...value, mcp: next } : rest) }} />

@@ -6,7 +6,7 @@
  * `./profile-editor/server`. This module is browser-safe: types, the wire
  * format, and a fetch client for the product's route.
  */
-import type { AgentProfileMcpServer } from '@tangle-network/agent-interface/profile'
+import type { AgentProfile, AgentProfileMcpServer } from '@tangle-network/agent-interface/profile'
 import { parseSkillFrontmatter } from '../skills/frontmatter'
 
 /** Why a GitHub source cannot be used. Each one renders its own message and next step. */
@@ -127,12 +127,18 @@ export interface McpTool {
 }
 
 export type McpHealth =
-  | { ok: true; tools: McpTool[]; serverName?: string; serverVersion?: string; latencyMs: number; checkedAt: string }
+  | { ok: true; tools?: McpTool[]; serverName?: string; serverVersion?: string; latencyMs: number; checkedAt: string }
   | { ok: false; problem: McpHealthProblem; message: string; status?: number; checkedAt: string }
 
+/** Unsaved profile intent, never execution or secret-access authority. */
+export interface ProfileEditorMcpCandidate {
+  profile: AgentProfile
+  serverName: string
+}
+
 /** Connects to an MCP server and lists its tools. The product decides which addresses it will reach. */
-export interface ProfileEditorMcpPort {
-  check(server: AgentProfileMcpServer, signal?: AbortSignal): Promise<McpHealth>
+export interface ProfileEditorMcpPort<Candidate extends ProfileEditorMcpCandidate = ProfileEditorMcpCandidate> {
+  check(server: AgentProfileMcpServer, signal?: AbortSignal, candidate?: Candidate): Promise<McpHealth>
 }
 
 /** The product route's subpaths, relative to the endpoint passed to {@link createProfileEditorClient}. */
@@ -191,7 +197,8 @@ export function createProfileEditorClient({ endpoint, fetch: fetchImpl }: Profil
     check: (request, signal) => call(PROFILE_EDITOR_ROUTES.check, { signal, method: 'POST', body: JSON.stringify(request) }, unavailable),
   }
   const mcp: ProfileEditorMcpPort = {
-    check: (server, signal) => call(PROFILE_EDITOR_ROUTES.mcpCheck, { signal, method: 'POST', body: JSON.stringify({ server }) },
+    check: (server, signal, candidate) => call(PROFILE_EDITOR_ROUTES.mcpCheck, { signal, method: 'POST',
+      body: JSON.stringify({ server, ...(candidate ? { candidate: { profile: candidate.profile, serverName: candidate.serverName } } : {}) }) },
       (message): McpHealth => ({ ok: false, problem: 'unavailable', message, checkedAt: new Date().toISOString() })),
   }
   return { github, mcp }

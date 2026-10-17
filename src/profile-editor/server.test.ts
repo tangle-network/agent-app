@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createServer } from 'node:http'
+import { canonicalAgentProfileDigest, snapshotAgentProfile, type AgentProfile } from '@tangle-network/agent-interface'
 import {
-  checkMcpServer, createGitHubRestReader, createGitHubSourceService, GitHubReadError, handleProfileEditorRequest,
-  type GitHubSourceReader,
+  checkMcpServer, createGitHubRestReader, createGitHubSourceService, createMcpHealthChecker, GitHubReadError, handleProfileEditorRequest,
+  type GitHubSourceReader, type ProfileEditorMcpCheckContext,
 } from './server'
 import { createProfileEditorClient, parseGitHubLocation, publicHttpsUrlProblem } from './index'
 
@@ -180,6 +182,113 @@ describe('checkMcpServer', () => {
     expect(new Headers((fetch.mock.calls[0]![1] as RequestInit).headers).get('X-Team')).toBe('growth')
   })
 
+  it.each(['Authorization', '__proto__'])('refuses required reference header %s before anonymous success', async (name) => {
+    const anonymous = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const message = JSON.parse(String(init?.body)) as { id?: number }
+      return Response.json({ jsonrpc: '2.0', id: message.id, result: { tools: [] } })
+    })
+    const result = await checkMcpServer({ url: 'https://docs.example.com/mcp',
+      headers: { [name]: { kind: 'secret-ref', key: 'docs-access' } } }, { fetch: anonymous as typeof globalThis.fetch })
+    expect(result).toMatchObject({ ok: false, problem: 'auth-required' })
+    expect(anonymous).not.toHaveBeenCalled()
+  })
+
+  it('requires secret references for credential headers arriving through the editor route', async () => {
+    const send = vi.fn()
+    for (const authorization of ['literal-not-allowed', { kind: 'public', value: 'public-not-credential' }]) {
+      const request = new Request('https://app.test/editor/mcp/check', { method: 'POST', body: JSON.stringify({
+        server: { url: 'https://docs.example.com/mcp', headers: { Authorization: authorization } },
+      }) })
+      const response = await handleProfileEditorRequest(request, 'mcp/check', {
+        github: null, mcp: createMcpHealthChecker({ fetch: send as typeof globalThis.fetch }),
+      })
+      expect(await response.json()).toMatchObject({ ok: false, problem: 'not-checkable' })
+    }
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('completes a real MCP handshake through the trusted reference transport without exposing its credential', async () => {
+    const canary = 'controlled-mcp-custody-canary'
+    const methods: string[] = []
+    const server = createServer(async (request, response) => {
+      if (request.headers.authorization !== `Bearer ${canary}`) {
+        response.writeHead(401).end()
+        return
+      }
+      if (request.method === 'DELETE') {
+        methods.push('DELETE')
+        response.writeHead(204).end()
+        return
+      }
+      const chunks: Buffer[] = []
+      for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      const message = JSON.parse(Buffer.concat(chunks).toString()) as { method: string; id?: number }
+      methods.push(message.method)
+      if (message.method === 'notifications/initialized') {
+        response.writeHead(202).end()
+        return
+      }
+      response.setHeader('Content-Type', 'application/json')
+      response.setHeader('Mcp-Session-Id', 'checked-session')
+      response.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: message.method === 'initialize'
+        ? { protocolVersion: '2025-06-18', serverInfo: { name: 'authenticated-docs' } }
+        : { tools: [{ name: 'read_docs' }] } }))
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('Expected a TCP test listener')
+    const url = `http://127.0.0.1:${address.port}/mcp`
+    const publicFetch = vi.fn(async () => { throw new Error('Public transport must not handle references') })
+    const boundaries: unknown[] = []
+    try {
+      const health = await checkMcpServer({ transport: 'http', url, headers: {
+        Authorization: { kind: 'secret-ref', key: 'docs-access' }, 'X-Team': { kind: 'public', value: 'growth' },
+      } }, {
+        urlProblem: value => value === url ? null : 'Test address refused',
+        fetch: publicFetch as typeof globalThis.fetch,
+        proxyFetch: async (input, init, secretHeaders) => {
+          boundaries.push([String(input), init, secretHeaders])
+          expect(secretHeaders).toEqual({ Authorization: { kind: 'secret-ref', key: 'docs-access' } })
+          expect(new Headers(init.headers).get('Authorization')).toBeNull()
+          expect(new Headers(init.headers).get('X-Team')).toBe('growth')
+          expect(init.redirect).toBe('manual')
+          const headers = new Headers(init.headers)
+          headers.set('Authorization', `Bearer ${canary}`)
+          return globalThis.fetch(input, { ...init, headers })
+        },
+      })
+      expect(health).toMatchObject({ ok: true, serverName: 'authenticated-docs', tools: [{ name: 'read_docs' }] })
+      expect(methods).toEqual(['initialize', 'notifications/initialized', 'tools/list', 'DELETE'])
+      expect(publicFetch).not.toHaveBeenCalled()
+      expect(JSON.stringify([boundaries, health])).not.toContain(canary)
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    }
+  })
+
+  it('redacts protected transport failures and upstream error text, and enforces the address policy', async () => {
+    const reflected = 'controlled-sensitive-upstream-detail'
+    const server = { url: 'https://docs.example.com/mcp',
+      headers: { Authorization: { kind: 'secret-ref', key: 'docs-access' } } } as const
+    const refused = vi.fn(async () => { throw new Error(reflected) })
+    expect(await checkMcpServer({ ...server, url: 'http://localhost/mcp' }, { proxyFetch: refused }))
+      .toMatchObject({ ok: false, problem: 'blocked-url' })
+    expect(refused).not.toHaveBeenCalled()
+    const denied = await checkMcpServer(server, { proxyFetch: refused })
+    expect(denied).toMatchObject({ ok: false, problem: 'unreachable' })
+    expect(JSON.stringify(denied)).not.toContain(reflected)
+    const redirect = vi.fn(async () => new Response(null, { status: 307,
+      headers: { location: 'https://unapproved.example.com/mcp' } }))
+    expect(await checkMcpServer(server, { proxyFetch: redirect }))
+      .toMatchObject({ ok: false, problem: 'protocol-error', status: 307 })
+    expect(redirect).toHaveBeenCalledTimes(1)
+    const reflection = await checkMcpServer(server, { proxyFetch: async () => Response.json({
+      jsonrpc: '2.0', id: 1, error: { code: -32603, message: reflected },
+    }) })
+    expect(reflection).toMatchObject({ ok: false, problem: 'protocol-error' })
+    expect(JSON.stringify(reflection)).not.toContain(reflected)
+  })
+
   it('speaks the HTTP+SSE transport through the announced endpoint', async () => {
     let stream: ReadableStreamDefaultController<Uint8Array> | undefined
     const push = (event: string, data: string) => stream!.enqueue(encoder.encode(`event: ${event}\ndata: ${data}\n\n`))
@@ -256,6 +365,65 @@ describe('profile editor route handler and client', () => {
     expect(mcp.check).toHaveBeenCalledWith({ url: 'https://x.example.com/mcp' }, expect.anything())
     const none = await handleProfileEditorRequest(new Request('https://app.test/x/github/repositories'), 'github/repositories', { github: null, mcp: null })
     expect(await none.json()).toMatchObject({ ok: false, problem: 'unavailable' })
+  })
+
+  it('carries the unsaved canonical candidate through the public client and derives its identity on the server', async () => {
+    const server = { transport: 'http', url: 'https://reports.example.com/mcp',
+      headers: { Authorization: { kind: 'secret-ref', key: 'reporting-api', format: 'bearer' } } } as const
+    const profile: AgentProfile = { name: 'Unsaved role', harness: 'opencode', mcp: { reports: server }, proxySecrets: [{
+      envName: 'REPORTS_TOKEN', secretRef: { kind: 'secret-ref', key: 'reporting-api' },
+      hosts: ['reports.example.com'], presentation: { type: 'bearer' }, paths: ['/mcp'], ttlSeconds: 300,
+    }] }
+    let checked: ProfileEditorMcpCheckContext | undefined
+    const client = createProfileEditorClient({ endpoint: 'https://app.test/editor',
+      fetch: (async (input: RequestInfo | URL, init?: RequestInit) => handleProfileEditorRequest(
+        new Request(String(input), init), 'mcp/check', { github: null, mcp: {
+          check: async (_server, _signal, candidate) => {
+            checked = candidate
+            return { ok: true, tools: [], latencyMs: 1, checkedAt: 'now' }
+          },
+        } },
+      )) as typeof globalThis.fetch,
+    })
+    expect(await client.mcp.check(server, undefined, { profile, serverName: 'reports' })).toMatchObject({ ok: true })
+    expect(checked).toEqual({ profile: snapshotAgentProfile(profile), serverName: 'reports',
+      profileDigest: canonicalAgentProfileDigest(profile) })
+    expect(checked!.profile.proxySecrets).toEqual(profile.proxySecrets)
+  })
+
+  it('does not downgrade a protected candidate check to generic server transport', async () => {
+    const send = vi.fn(async () => new Response())
+    const proxyFetch = vi.fn(async () => new Response())
+    const checker = createMcpHealthChecker({ fetch: send as typeof globalThis.fetch, proxyFetch })
+    for (const profile of [
+      { name: 'Revoked bindings', proxySecrets: [], mcp: { docs: { url: 'https://docs.example.com/mcp' } } },
+      { name: 'Reference headers', mcp: { docs: { url: 'https://docs.example.com/mcp',
+        headers: { Authorization: { kind: 'secret-ref', key: 'docs-access' } } } } },
+    ] satisfies AgentProfile[]) {
+      expect(await checker.check(profile.mcp.docs, undefined, { profile, serverName: 'docs' }))
+        .toMatchObject({ ok: false, problem: 'unavailable' })
+    }
+    expect(send).not.toHaveBeenCalled()
+    expect(proxyFetch).not.toHaveBeenCalled()
+  })
+
+  it('refuses malformed candidates, substituted servers and client-supplied trusted digests before invoking the port', async () => {
+    const server = { url: 'https://reports.example.com/mcp',
+      headers: { Authorization: { kind: 'secret-ref', key: 'reporting-api' } } }
+    const profile = { name: 'Unsaved role', mcp: { reports: server } }
+    const check = vi.fn(async () => ({ ok: true as const, tools: [], latencyMs: 1, checkedAt: 'now' }))
+    for (const candidate of [
+      { profile, serverName: 'missing' },
+      { profile: { ...profile, mcp: { reports: { ...server, url: 'https://other.example.com/mcp' } } }, serverName: 'reports' },
+      { profile: { ...profile, mcp: { reports: { ...server, headers: { Authorization: { kind: 'secret-ref', key: '' } } } } }, serverName: 'reports' },
+      { profile, serverName: 'reports', profileDigest: `sha256:${'a'.repeat(64)}` },
+    ]) {
+      const response = await handleProfileEditorRequest(new Request('https://app.test/editor/mcp/check', {
+        method: 'POST', body: JSON.stringify({ server, candidate }),
+      }), 'mcp/check', { github: null, mcp: { check } })
+      expect(response.status).toBe(400)
+    }
+    expect(check).not.toHaveBeenCalled()
   })
 
   it('returns typed outcomes from the client even when the route fails', async () => {

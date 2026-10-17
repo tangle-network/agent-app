@@ -40,7 +40,7 @@ const checks = createProfileEditorClient({ endpoint: `/api/workspaces/${workspac
 | `harnesses` | Harnesses the product runs. Omit to hide the harness field. Choosing a harness keeps the default model runnable on it and says when it changed. |
 | `thinkingLevels` | Levels for a harness and model. The default is the levels the harness applies (`reasoningEffortsFor`) plus Auto, which stores no override. |
 | `github.storage` | `reference` stores `{ kind: 'github', repository, path, ref }` pinned to the checked commit. `inline` stores the checked file's text, for runtimes that do not fetch GitHub. |
-| `mcp.port` | Health checks. Each enabled remote server is checked when the editor opens and when its address changes. |
+| `mcp.port` | Public checks run when the editor opens or an address changes. Protected candidate checks run through the Check action. |
 | `mcp.lockReason` | Explains why servers are read-only for this person and locks toggles and edits. |
 | `files` | Upload type, size, and count limits. Dropped and chosen files are read in the browser and stored inline. |
 
@@ -78,9 +78,30 @@ the next step. A skill must carry `name` and `description` frontmatter; a skill 
 
 `createMcpHealthChecker` initializes an MCP session over Streamable HTTP, or HTTP+SSE when the server
 declares `transport: 'sse'`, lists its tools, and closes the session. It connects only to public HTTPS
-addresses unless the product passes its own `urlProblem` policy. Public header values are sent; secret
-references are not resolved, so a server that needs them reports `auth-required`. Local command servers
-report `not-checkable`.
+addresses unless the product passes its own `urlProblem` policy. Header records use the canonical
+profile schema; credential-bearing header names require secret references. Local command servers report
+`not-checkable`.
+
+A standalone server check without candidate context requires `McpHealthCheckOptions.proxyFetch` for reference-backed headers. This trusted callback receives the
+request, public request headers, and a separate map of canonical secret references. Bind it to the
+authenticated caller and workspace, authorize each reference, and use an already supported protected
+placement for that exact candidate. Initialize, tool listing and session cleanup all use this transport;
+credential values never enter the checker. A missing or refused transport has no anonymous-fetch fallback.
+Protected upstream error text is omitted from diagnostics.
+
+For an unsaved profile, call `check(server, signal, { profile: draft, serverName })`. The route validates
+and freezes the full canonical profile, verifies the selected server matches, and computes `profileDigest`.
+The host's `ProfileEditorMcpPort<ProfileEditorMcpCheckContext>` receives that identity; client-supplied
+digests are refused. Candidate intent and its digest grant no access: the host still authorizes the caller,
+references and destinations before isolated placement. The default checker returns `unavailable` for
+candidates with declared proxy bindings or reference-backed headers, even when `proxyFetch` is supplied.
+A candidate-aware host port must use its supported preparation lifecycle to check those profiles.
+
+The callback is a transport seam, not a generic Sandbox proxy-fetch API. An installed backend's MCP status
+cannot validate an unsaved candidate or a different profile. When the platform cannot check a candidate
+through its isolated preview/materialization lifecycle, retain the explicit unavailable result. Keep
+endpoint review and provider resource limits with the issuer; a successful tool listing alone does not
+establish that an upstream response cannot reflect a credential.
 
 For a customer who wants an agent to use their own database without handing over its credential, point
 them at [`customer-db-gateway`](../customer-db-gateway/README.md): they run it beside their database and add
@@ -91,3 +112,5 @@ it as a remote server whose `Authorization` header is a secret reference.
 The editor does not save. The product validates the final profile, decides which fields its runtime honors,
 and runs its revision and consent policy. Show only the sections the product's server accepts and its
 runtime applies.
+
+Native candidate checks may return connection status without tool metadata. Omit `tools` when it was not listed; the editor shows “Connected” without a count. An explicit `tools: []` means a real listing returned no tools. Measure `latencyMs` around the actual check.
