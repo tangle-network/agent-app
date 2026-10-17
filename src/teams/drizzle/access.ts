@@ -75,6 +75,11 @@ export interface WorkspaceAccessApi {
   listUserWorkspaces(userId: string): Promise<UserWorkspaceSummary[]>
 }
 
+/** Authorization fields consumed by membership writers; products own their access policy. */
+export interface WorkspaceAccessReader {
+  getWorkspaceAccess(...args: Parameters<WorkspaceAccessApi['getWorkspaceAccess']>): Promise<Pick<WorkspaceAccess, 'workspace' | 'organization' | 'role'> | null>
+}
+
 /** Create workspace access API to manage user roles and permissions within a workspace */
 export function createWorkspaceAccess(opts: CreateAccessOptions): WorkspaceAccessApi {
   const { db, tables, workspaceTable } = opts

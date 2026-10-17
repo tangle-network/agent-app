@@ -171,16 +171,34 @@
           "doc": "The per-turn text overlay is validated without admitting tools, model, MCP or resources."
         },
         {
+          "name": "createDrizzleSelfMountStorage",
+          "kind": "function",
+          "signature": "(db: any, table: SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name: \"scop…",
+          "doc": "A drizzle-backed SelfMountStorage against any table with the standard shape (scope primary key + mounted JSON text column)."
+        },
+        {
           "name": "createInMemorySelfMountStorage",
           "kind": "function",
           "signature": "() => SelfMountStorage",
           "doc": "Non-durable default for tests and single-instance products."
         },
         {
+          "name": "createKVSelfMountStorage",
+          "kind": "function",
+          "signature": "(kv: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void>; }, prefix: string, bas…",
+          "doc": "A KV-backed SelfMountStorage (Cloudflare KV, any namespace)."
+        },
+        {
           "name": "createMountProfileChangeTool",
           "kind": "function",
           "signature": "(deps: MountProfileChangeDeps) => AppToolDefinition<Record<string, unknown>>",
           "doc": "The permitted, idempotent self-mount verb as an app tool."
+        },
+        {
+          "name": "createProductSelfMount",
+          "kind": "function",
+          "signature": "(config: ProductSelfMountConfig) => AppToolDefinition<Record<string, unknown>>",
+          "doc": null
         },
         {
           "name": "createTextProfile",
@@ -235,6 +253,12 @@
           "kind": "const",
           "signature": "readonly [\"skills\"]",
           "doc": "The only profile dimensions an agent may change on its own mounted state."
+        },
+        {
+          "name": "ProductSelfMountConfig",
+          "kind": "interface",
+          "signature": "interface ProductSelfMountConfig",
+          "doc": "The one-call product wiring: catalog + storage + baseline + cap."
         },
         {
           "name": "PROFILE_CHANGE_POLICY",
@@ -445,6 +469,12 @@
           "kind": "interface",
           "signature": "interface SelfMountStorage",
           "doc": "Durable mounted-skill state, keyed by the product's scope."
+        },
+        {
+          "name": "selfMountTable",
+          "kind": "function",
+          "signature": "(tableName: string) => SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name:…",
+          "doc": "Create (or use) the standard self-mount table in a drizzle/D1 database."
         },
         {
           "name": "serializeProfileRevisionDiff",
@@ -8320,6 +8350,12 @@
           "doc": "What a decided call did, as its receipt shows it."
         },
         {
+          "name": "HubApprovalFeedback",
+          "kind": "interface",
+          "signature": "interface HubApprovalFeedback",
+          "doc": "The host authenticates the reviewer, binds provenance and computes the edit diff."
+        },
+        {
           "name": "HubApprovalItem",
           "kind": "interface",
           "signature": "interface HubApprovalItem",
@@ -8350,6 +8386,12 @@
           "doc": "Whether an open call waits for the owner, in the owner's words."
         },
         {
+          "name": "HubPreviewMedia",
+          "kind": "interface",
+          "signature": "interface HubPreviewMedia",
+          "doc": "Frozen media bytes supplied by the host; renderers never resolve a provider URL."
+        },
+        {
           "name": "hubProviderName",
           "kind": "function",
           "signature": "(id: string) => string",
@@ -8364,7 +8406,7 @@
         {
           "name": "presentHubAction",
           "kind": "function",
-          "signature": "(item: Pick<HubApprovalItem, \"input\" | \"actionPath\" | \"providerId\" | \"files\" | \"bundle\">) => HubActionPresentation",
+          "signature": "(item: Pick<HubApprovalItem, \"input\" | \"actionPath\" | \"providerId\" | \"files\" | \"bundle\" | \"preview\">) => HubActionPrese…",
           "doc": "A held call in the owner's words, with the preview its integration renders."
         },
         {
@@ -8422,7 +8464,7 @@
         {
           "name": "HubApprovalDock",
           "kind": "function",
-          "signature": "({ items, onDecide, permissions, onOpen, focusId, className }: HubApprovalDockProps) => Element | null",
+          "signature": "({ items, onDecide, permissions, onOpen, focusId, onFeedback, className }: HubApprovalDockProps) => Element | null",
           "doc": "The calls waiting on the owner, pinned above the composer so a held action never scrolls away."
         },
         {
@@ -8458,7 +8500,7 @@
         {
           "name": "HubApprovalRow",
           "kind": "function",
-          "signature": "({ item, expanded: controlled, onExpandedChange, onReview, actions }: HubApprovalRowProps) => Element",
+          "signature": "({ item, expanded: controlled, onExpandedChange, onReview, actions, onFeedback }: HubApprovalRowProps) => Element",
           "doc": "A held call where the agent made it: one line with the integration, what the call does and where it stands, opening to its preview, result and the exact call."
         },
         {
@@ -8486,16 +8528,58 @@
           "doc": "Why an open call waits for the owner, or how it will run without them."
         },
         {
+          "name": "HubPreviewFeedback",
+          "kind": "function",
+          "signature": "({ item, onFeedback, drafts }: HubPreviewFeedbackProps) => Element",
+          "doc": "Existing Hub adapter: teaching never calls the effect transport."
+        },
+        {
+          "name": "HubPreviewFeedbackProps",
+          "kind": "interface",
+          "signature": "interface HubPreviewFeedbackProps",
+          "doc": null
+        },
+        {
           "name": "HubProviderMark",
           "kind": "function",
           "signature": "({ providerId, name, size }: { providerId: string; name: string; size?: number | undefined; }) => Element",
-          "doc": "The integration's own logo on a neutral tile, so dark marks stay legible."
+          "doc": "A local provider mark: reviewing a held payload must not fetch a remote logo."
         },
         {
           "name": "openPhaseLabel",
           "kind": "function",
           "signature": "(item: Pick<HubApprovalItem, \"phase\" | \"wait\">, blocked?: string) => string | undefined",
           "doc": "The pill an open call shows: who it waits for, or that a permission runs it."
+        },
+        {
+          "name": "ReviewFeedbackDraft",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackDraft",
+          "doc": null
+        },
+        {
+          "name": "ReviewFeedbackForm",
+          "kind": "function",
+          "signature": "ForwardRefExoticComponent<ReviewFeedbackFormProps & RefAttributes<ReviewFeedbackFormHandle>>",
+          "doc": "One form for Hub previews, assets and work products."
+        },
+        {
+          "name": "ReviewFeedbackFormHandle",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackFormHandle",
+          "doc": null
+        },
+        {
+          "name": "ReviewFeedbackFormProps",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackFormProps",
+          "doc": null
+        },
+        {
+          "name": "ReviewVerdict",
+          "kind": "type",
+          "signature": "type ReviewVerdict",
+          "doc": null
         }
       ]
     },
@@ -11369,6 +11453,12 @@
           "doc": "Resolve and return a trimmed string model ID or undefined for invalid or empty input"
         },
         {
+          "name": "formatModelNotAllowedRefusal",
+          "kind": "function",
+          "signature": "(input: { requested: string; allowedModels: readonly string[]; }) => string",
+          "doc": "Format the loud, correctable refusal: the blocked model, the allowed set, and the fix."
+        },
+        {
           "name": "isUpstreamUnavailable",
           "kind": "function",
           "signature": "(signal: unknown) => boolean",
@@ -11411,6 +11501,18 @@
           "doc": "The router /v1/models entry shape this module reads."
         },
         {
+          "name": "ModelWithinAllowListResolution",
+          "kind": "type",
+          "signature": "type ModelWithinAllowListResolution",
+          "doc": null
+        },
+        {
+          "name": "parseModelNotAllowed",
+          "kind": "function",
+          "signature": "(message: string) => string[] | null",
+          "doc": "Parse the allowed-model set out of a router `model_not_allowed` refusal."
+        },
+        {
           "name": "readHttpStatusHint",
           "kind": "function",
           "signature": "(text: string) => number | undefined",
@@ -11433,6 +11535,18 @@
           "kind": "interface",
           "signature": "interface ResolvedChatModel",
           "doc": "Resolve a chat model with its identifier and source information"
+        },
+        {
+          "name": "resolveModelWithinAllowList",
+          "kind": "function",
+          "signature": "(input: ResolveModelWithinAllowListInput) => ModelWithinAllowListResolution",
+          "doc": "Resolve a model request against the key's allow-list: unscoped → allowed as-is; requested permitted → allowed; a fallback permitted → rerouted (named); nothing permitted → refused with the set."
+        },
+        {
+          "name": "ResolveModelWithinAllowListInput",
+          "kind": "interface",
+          "signature": "interface ResolveModelWithinAllowListInput",
+          "doc": null
         },
         {
           "name": "runWithModelFailover",
@@ -20033,6 +20147,12 @@
           "doc": "Throw when the same skill id is delivered both `inline` and `mounted` — the agent would see it twice (once in the prompt body, once as a mounted file it's told to go read), doubling prompt bytes and…"
         },
         {
+          "name": "CatalogSkillEntry",
+          "kind": "interface",
+          "signature": "interface CatalogSkillEntry",
+          "doc": "A shared-skill entry as it joins a product's local catalog: the namespaced mount id plus the description (annotated with the owner)."
+        },
+        {
           "name": "ComposedSkills",
           "kind": "interface",
           "signature": "interface ComposedSkills",
@@ -20081,6 +20201,24 @@
           "doc": "Project corpus entries onto SDK file mounts at a relative path under `<anchor>/`."
         },
         {
+          "name": "createInMemoryMarketplaceStore",
+          "kind": "function",
+          "signature": "(entries: readonly MarketplaceSkill[]) => MarketplaceStore",
+          "doc": "Non-durable default for tests and single-instance products."
+        },
+        {
+          "name": "createKVMarketplaceStore",
+          "kind": "function",
+          "signature": "(kv: { get(key: string): Promise<string | null>; }, prefix?: string) => MarketplaceStore",
+          "doc": "A KV-backed read-only MarketplaceStore (Cloudflare KV or any lookalike)."
+        },
+        {
+          "name": "createStaticMarketplaceStore",
+          "kind": "function",
+          "signature": "(entries: readonly MarketplaceSkill[]) => MarketplaceStore",
+          "doc": "Static-list store over a product-pinned catalog (checked into the product repo)."
+        },
+        {
           "name": "GlobModules",
           "kind": "type",
           "signature": "type GlobModules",
@@ -20099,10 +20237,58 @@
           "doc": "Load a markdown corpus, preferring a Vite glob-result map and falling back to a Node fs walk."
         },
         {
+          "name": "marketplaceDiscoveryLine",
+          "kind": "function",
+          "signature": "(shared: readonly MarketplaceSkill[]) => string | null",
+          "doc": "The discovery fragment: one line naming every shared skill a foreign agent can mount, for system prompts and tool descriptions."
+        },
+        {
+          "name": "MarketplaceRow",
+          "kind": "interface",
+          "signature": "interface MarketplaceRow",
+          "doc": "Publish helper for the write side (products/platform own the writer): render validated rows for the standard table (see `./skills/marketplace-drizzle` for the table itself)."
+        },
+        {
+          "name": "marketplaceRowsFor",
+          "kind": "function",
+          "signature": "(entries: readonly MarketplaceSkill[]) => readonly MarketplaceRow[]",
+          "doc": null
+        },
+        {
+          "name": "MarketplaceSkill",
+          "kind": "interface",
+          "signature": "interface MarketplaceSkill",
+          "doc": "A shareable skill as the owning product publishes it."
+        },
+        {
+          "name": "MarketplaceStore",
+          "kind": "interface",
+          "signature": "interface MarketplaceStore",
+          "doc": "Read-only view over a shared catalog."
+        },
+        {
+          "name": "MAX_MARKETPLACE_ENTRIES",
+          "kind": "const",
+          "signature": "64",
+          "doc": "Bound on a shared catalog so discovery text stays a prompt-sized line, not a dump."
+        },
+        {
           "name": "mergeComposedSkills",
           "kind": "function",
           "signature": "(batches: ComposedSkills[]) => ComposedSkills",
           "doc": "Combine multiple {@link ComposedSkills} batches (e.g."
+        },
+        {
+          "name": "mergeSkillCatalogs",
+          "kind": "function",
+          "signature": "(local: readonly CatalogSkillEntry[], shared: readonly MarketplaceSkill[]) => readonly CatalogSkillEntry[]",
+          "doc": "Union a product's local catalog with shared marketplace entries."
+        },
+        {
+          "name": "namespacedSkillId",
+          "kind": "function",
+          "signature": "(entry: { product: string; id: string; }) => string",
+          "doc": "The mounted id for a shared skill: `product:id` (namespaced so a foreign skill can never shadow a local one)."
         },
         {
           "name": "parseCorpusSkills",
@@ -20115,6 +20301,12 @@
           "kind": "interface",
           "signature": "interface ParsedSkill",
           "doc": "The result of {@link parseSkillFrontmatter}: the parsed fields, the body with the frontmatter block stripped, and the original untouched text."
+        },
+        {
+          "name": "parseNamespacedSkillId",
+          "kind": "function",
+          "signature": "(mountedId: string) => { product: string | null; id: string; }",
+          "doc": "Split a namespaced id back into `{ product, id }`; a bare id resolves to product `null` (a local skill)."
         },
         {
           "name": "parseSkillFrontmatter",
@@ -20187,6 +20379,18 @@
           "kind": "function",
           "signature": "(skills: SkillEntry[], opts?: { tier?: string | undefined; }) => AgentProfileResourceRef[]",
           "doc": "Project skills onto the typed `resources.skills` channel (`AgentProfileResourceRef[]`), tier-filtered (same `s.tier === tier` semantics as {@link registrySkills}) when `opts.tier` is given, sorted by…"
+        },
+        {
+          "name": "validateMarketplaceCatalog",
+          "kind": "function",
+          "signature": "(entries: readonly MarketplaceSkill[]) => readonly MarketplaceSkill[]",
+          "doc": "Validate a whole shared catalog: entries well-formed, ids unique, size capped."
+        },
+        {
+          "name": "validateMarketplaceSkill",
+          "kind": "function",
+          "signature": "(entry: MarketplaceSkill) => MarketplaceSkill",
+          "doc": "Validate one marketplace entry — fail loud on a malformed catalog rather than silently mis-mounting it."
         }
       ]
     },
@@ -20252,6 +20456,26 @@
           "kind": "function",
           "signature": "<P extends { resources?: AgentProfile[\"resources\"]; }>(profile: P, harness: Harness, skillId: string, files: readonly S…",
           "doc": "Attach a skill's support files to `profile` for `harness`, idempotently."
+        }
+      ]
+    },
+    {
+      "id": "./skills/marketplace-drizzle",
+      "source": "src/skills/marketplace-drizzle.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "createDrizzleMarketplaceStore",
+          "kind": "function",
+          "signature": "(db: any, table: SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { id: SQLiteColumn<{ name: \"id\"; ta…",
+          "doc": "A drizzle-backed read-only MarketplaceStore over the standard table."
+        },
+        {
+          "name": "marketplaceSkillTable",
+          "kind": "function",
+          "signature": "(tableName?: string) => SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { id: SQLiteColumn<{ name: \"…",
+          "doc": "The standard marketplace table: one row per namespaced `product:id`."
         }
       ]
     },
@@ -20396,6 +20620,24 @@
           "doc": "How much live time a box needs inside the window before a settlement is EXPECTED for it."
         },
         {
+          "name": "DeriveChildKeyBudgetInput",
+          "kind": "interface",
+          "signature": "interface DeriveChildKeyBudgetInput",
+          "doc": null
+        },
+        {
+          "name": "deriveChildKeyBudgetUsd",
+          "kind": "function",
+          "signature": "(input: DeriveChildKeyBudgetInput) => DerivedChildKeyBudget",
+          "doc": "Derive the delegated child-key budget from the parent's remaining budget."
+        },
+        {
+          "name": "DerivedChildKeyBudget",
+          "kind": "interface",
+          "signature": "interface DerivedChildKeyBudget",
+          "doc": null
+        },
+        {
           "name": "ExpectedCeiling",
           "kind": "interface",
           "signature": "interface ExpectedCeiling",
@@ -20426,6 +20668,12 @@
           "doc": "True when a row is a charge (the ledger stores charges as negative amounts)."
         },
         {
+          "name": "MIN_CHILD_KEY_BUDGET_USD",
+          "kind": "const",
+          "signature": "0.5",
+          "doc": "The platform's minimum child-key budget."
+        },
+        {
           "name": "ObservedBalance",
           "kind": "interface",
           "signature": "interface ObservedBalance",
@@ -20442,6 +20690,12 @@
           "kind": "function",
           "signature": "(keyIds: readonly string[]) => SpendOwnershipRule",
           "doc": "Claim every settlement the platform stamped with one of these API keys."
+        },
+        {
+          "name": "ParentBudgetExhaustedError",
+          "kind": "class",
+          "signature": "class ParentBudgetExhaustedError",
+          "doc": "The source key is exhausted — the only refusal this contract throws."
         },
         {
           "name": "parseSandboxGroupKey",
@@ -22297,6 +22551,12 @@
           "doc": "Define methods to retrieve and enforce user access permissions within workspaces"
         },
         {
+          "name": "WorkspaceAccessReader",
+          "kind": "interface",
+          "signature": "interface WorkspaceAccessReader",
+          "doc": "Authorization fields consumed by membership writers; products own their access policy."
+        },
+        {
           "name": "WorkspaceAccessTable",
           "kind": "interface",
           "signature": "interface WorkspaceAccessTable",
@@ -22570,6 +22830,80 @@
           "kind": "const",
           "signature": "{ darkMode: [string, string]; theme: { extend: { colors: { background: string; foreground: string; border: string; inpu…",
           "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./toolbelt",
+      "source": "src/toolbelt/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "assertToolbeltParity",
+          "kind": "function",
+          "signature": "(manifest: readonly ToolbeltManifestTool[], listed: readonly ProbedTool[]) => void",
+          "doc": "Assert parity: same names, byte-identical descriptions, structurally equal schemas and annotations."
+        },
+        {
+          "name": "formatToolbeltParityDiff",
+          "kind": "function",
+          "signature": "(diff: ToolbeltParityDiff) => string",
+          "doc": "Render a diff as one actionable report — every drift named, never a bare count."
+        },
+        {
+          "name": "ProbedTool",
+          "kind": "interface",
+          "signature": "interface ProbedTool",
+          "doc": "A tool as the spawned program actually listed it."
+        },
+        {
+          "name": "probeStdioToolProgram",
+          "kind": "function",
+          "signature": "(options: ProbeStdioToolProgramOptions) => Promise<ToolProgramProbe>",
+          "doc": "Spawn the embedded tool program and read its REAL tool surface."
+        },
+        {
+          "name": "ProbeStdioToolProgramOptions",
+          "kind": "interface",
+          "signature": "interface ProbeStdioToolProgramOptions",
+          "doc": null
+        },
+        {
+          "name": "ToolbeltFieldDrift",
+          "kind": "interface",
+          "signature": "interface ToolbeltFieldDrift",
+          "doc": "Field-level drift between the manifest and the program's real surface."
+        },
+        {
+          "name": "ToolbeltManifestTool",
+          "kind": "interface",
+          "signature": "interface ToolbeltManifestTool",
+          "doc": "One authored tool in the product's manifest — the ONE source of truth the generated program and every derived surface (allowlists, prompt tool tables, dashboards) must agree with."
+        },
+        {
+          "name": "toolbeltParityDiff",
+          "kind": "function",
+          "signature": "(manifest: readonly ToolbeltManifestTool[], listed: readonly ProbedTool[]) => ToolbeltParityDiff",
+          "doc": "Diff a spawned program's real surface against the authored manifest."
+        },
+        {
+          "name": "ToolbeltParityDiff",
+          "kind": "interface",
+          "signature": "interface ToolbeltParityDiff",
+          "doc": "The named diff."
+        },
+        {
+          "name": "ToolbeltParityError",
+          "kind": "class",
+          "signature": "class ToolbeltParityError",
+          "doc": "Thrown by {@link assertToolbeltParity} with the full formatted diff."
+        },
+        {
+          "name": "ToolProgramProbe",
+          "kind": "interface",
+          "signature": "interface ToolProgramProbe",
+          "doc": "What `probeStdioToolProgram` saw."
         }
       ]
     },
@@ -24254,6 +24588,8 @@
         "chat-routes",
         "chat-store",
         "harness",
+        "hub-approvals",
+        "hub-approvals-react",
         "interactions",
         "missions",
         "plans",
@@ -26583,6 +26919,54 @@
           "doc": "Define options to control how chat interactions are restored during the restore process"
         },
         {
+          "name": "ReviewFeedbackDraft",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackDraft",
+          "doc": null
+        },
+        {
+          "name": "ReviewFeedbackForm",
+          "kind": "function",
+          "signature": "ForwardRefExoticComponent<ReviewFeedbackFormProps & RefAttributes<ReviewFeedbackFormHandle>>",
+          "doc": "One form for Hub previews, assets and work products."
+        },
+        {
+          "name": "ReviewFeedbackFormHandle",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackFormHandle",
+          "doc": null
+        },
+        {
+          "name": "ReviewFeedbackFormProps",
+          "kind": "interface",
+          "signature": "interface ReviewFeedbackFormProps",
+          "doc": null
+        },
+        {
+          "name": "ReviewInbox",
+          "kind": "function",
+          "signature": "({ items, initialSelectedId, renderItem, onVerdict, onFeedback, loading, error, onRefresh }: ReviewInboxProps) => Eleme…",
+          "doc": "One oldest-first review round."
+        },
+        {
+          "name": "ReviewInboxFeedback",
+          "kind": "interface",
+          "signature": "interface ReviewInboxFeedback",
+          "doc": null
+        },
+        {
+          "name": "ReviewInboxItem",
+          "kind": "interface",
+          "signature": "interface ReviewInboxItem",
+          "doc": null
+        },
+        {
+          "name": "ReviewInboxProps",
+          "kind": "interface",
+          "signature": "interface ReviewInboxProps",
+          "doc": null
+        },
+        {
           "name": "ReviewQueueItem",
           "kind": "interface",
           "signature": "interface ReviewQueueItem",
@@ -26610,6 +26994,12 @@
           "name": "ReviewQueueState",
           "kind": "type",
           "signature": "type ReviewQueueState",
+          "doc": null
+        },
+        {
+          "name": "ReviewVerdict",
+          "kind": "type",
+          "signature": "type ReviewVerdict",
           "doc": null
         },
         {
@@ -27324,6 +27714,8 @@
         "chat-routes",
         "chat-store",
         "harness",
+        "hub-approvals",
+        "hub-approvals-react",
         "interactions",
         "missions",
         "plans",
@@ -27612,6 +28004,8 @@
         "chat-routes",
         "chat-store",
         "harness",
+        "hub-approvals",
+        "hub-approvals-react",
         "interactions",
         "missions",
         "plans",

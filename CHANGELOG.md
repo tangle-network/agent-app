@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.60.183
+
+- chore(changesets): drop the fleet-lift changeset — consumed by the 0.60.182 release (#1133)
+
+## 0.60.182
+
+- feat: the fleet lift — toolbelt parity gate, budget-derived mint, allow-list routing, skill marketplace (#1132)
+
+## 0.60.181
+
+- fix(teams): accept invitations atomically across workspace transfers
+
+## 0.60.180
+
+- feat(approvals): add media previews and a scored review inbox
+
 ## 0.60.179
 
 - refactor(web-react): replace local UI primitives with shared components (#1120)

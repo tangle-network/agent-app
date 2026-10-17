@@ -4,7 +4,7 @@
 
 Source: `src/teams/drizzle.ts`
 
-26 exports.
+27 exports.
 
 ### `CreateAccessOptions`
 
@@ -180,6 +180,14 @@ interface WorkspaceAccess
 
 ```ts
 interface WorkspaceAccessApi
+```
+
+### `WorkspaceAccessReader`
+
+`interface` — Authorization fields consumed by membership writers; products own their access policy.
+
+```ts
+interface WorkspaceAccessReader
 ```
 
 ### `WorkspaceAccessTable`

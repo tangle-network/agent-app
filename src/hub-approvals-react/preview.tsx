@@ -3,7 +3,8 @@ import { ApprovalDiffSummary } from '@tangle-network/ui/run'
 
 import { formatMinorAmount, formatWhen, type HubActionPreview } from '../hub-approvals'
 import { Chip, HubFieldList } from './parts'
-import { EmailPreview, embeddedPreviewImage, linkedText } from './email'
+import { EmailPreview, linkedText } from './email'
+import { HubMediaPreview, previewMediaSource } from './media'
 
 function initial(name: string | null | undefined): string {
   return (name?.trim().replace(/^@/, '').charAt(0) || '?').toUpperCase()
@@ -37,54 +38,17 @@ function PullRequestPreview({ preview }: { preview: Extract<HubActionPreview, { 
   )
 }
 
-function PostPreview({ preview, account }: { preview: Extract<HubActionPreview, { kind: 'post' }>; account?: string | null }) {
-  if (preview.channel === 'slack') {
-    return (
-      <Panel className="px-3 py-3">
-        <p className="text-sm font-semibold text-foreground">{preview.where ?? 'Slack'}</p>
-        <div className="mt-2 flex gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold text-foreground">{initial(account)}</span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground">{account ?? 'Your account'}</p>
-            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{linkedText(preview.text)}</p>
-          </div>
-        </div>
-      </Panel>
-    )
-  }
-  const x = preview.channel === 'x'
-  const length = [...preview.text].length
+function SlackPreview({ preview, account }: { preview: Extract<HubActionPreview, { kind: 'post' }>; account?: string | null }) {
   return (
-    <Panel className="px-4 py-3">
-      <div className="flex gap-3">
-        <span className={`flex size-10 shrink-0 items-center justify-center rounded-full text-base font-semibold ${x ? 'bg-foreground text-background' : 'bg-[#0a66c2] text-white'}`}>
-          {initial(account)}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-baseline gap-x-1.5 text-sm">
-            <span className="font-semibold text-foreground">{account ?? 'Your account'}</span>
-            <span className="text-muted-foreground">{x ? '· now' : '· Post · Anyone'}</span>
-          </p>
-          <p className={`mt-1 whitespace-pre-wrap break-words text-foreground ${x ? 'text-base leading-6' : 'text-sm leading-6'}`}>{linkedText(preview.text)}</p>
-          {preview.images && preview.images.length > 0 && <div className="mt-3 grid grid-cols-2 gap-0.5 overflow-hidden rounded-xl border border-border">
-            {preview.images.map((image, index) => <div key={index} className={`${preview.images!.length === 1 ? 'col-span-2 aspect-[16/9]' : 'aspect-square'} overflow-hidden bg-muted`}>
-              {embeddedPreviewImage(image.url)
-                ? <img src={image.url} alt={image.alt ?? `Post image ${index + 1}`} className="size-full object-cover" />
-                : <p className="p-3 text-sm text-muted-foreground">Image not embedded in this preview</p>}
-            </div>)}
-          </div>}
-          {preview.link && (
-            <div className="mt-3 overflow-hidden rounded-lg border border-border">
-              <div className="px-3 py-2">
-                <p className="truncate text-sm text-muted-foreground">{preview.link.url.replace(/^https?:\/\//, '')}</p>
-                {preview.link.title && <p className="truncate text-sm font-semibold text-foreground">{preview.link.title}</p>}
-                {preview.link.description && <p className="line-clamp-2 text-sm text-muted-foreground">{preview.link.description}</p>}
-              </div>
-            </div>
-          )}
+    <Panel className="px-3 py-3">
+      <p className="text-sm font-semibold text-foreground">{preview.where ?? 'Slack'}</p>
+      <div className="mt-2 flex gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold text-foreground">{initial(account)}</span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">{account ?? 'Your account'}</p>
+          <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{linkedText(preview.text)}</p>
         </div>
       </div>
-      <p className="mt-2 text-right text-sm tabular-nums text-muted-foreground">{length} characters</p>
     </Panel>
   )
 }
@@ -202,7 +166,9 @@ export function HubActionPreviewView({ preview, account }: { preview: HubActionP
     case 'email':
       return <EmailPreview preview={preview} account={account} />
     case 'post':
-      return <PostPreview preview={preview} account={account} />
+      return preview.channel === 'slack'
+        ? <SlackPreview preview={preview} account={account} />
+        : <HubMediaPreview preview={preview} account={account} />
     case 'ad':
       return (
         <Panel className="overflow-hidden">
@@ -211,7 +177,7 @@ export function HubActionPreviewView({ preview, account }: { preview: HubActionP
             <p className="text-sm text-muted-foreground">Sponsored · {preview.placement}</p>
             {preview.text && <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{preview.text}</p>}
           </div>
-          {preview.image && (embeddedPreviewImage(preview.image)
+          {preview.image && (previewMediaSource(preview.image, 'image')
             ? <img src={preview.image} alt={preview.headline ?? 'Ad creative'} className="aspect-[1.91/1] w-full object-cover" />
             : <p className="bg-muted p-4 text-sm text-muted-foreground">Creative image not embedded in this preview</p>)}
           <div className="flex flex-wrap items-center gap-3 bg-muted/40 px-4 py-3">
@@ -224,7 +190,7 @@ export function HubActionPreviewView({ preview, account }: { preview: HubActionP
       return (
         <Panel className="overflow-hidden">
           <div className="border-b border-border px-4 py-2"><p className="text-sm font-medium text-foreground">{preview.title ?? 'Page preview'}</p>{preview.url && <p className="truncate text-sm text-muted-foreground">{preview.url}</p>}</div>
-          {embeddedPreviewImage(preview.screenshot)
+          {previewMediaSource(preview.screenshot, 'image')
             ? <img src={preview.screenshot} alt={preview.title ?? 'Page screenshot'} className="h-auto w-full" />
             : <p className="p-4 text-sm text-muted-foreground">A captured screenshot is needed to preview this page.</p>}
         </Panel>

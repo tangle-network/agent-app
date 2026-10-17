@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.60.179",
+  "version": "0.60.183",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -124,10 +124,20 @@
       "import": "./dist/skills/index.js",
       "default": "./dist/skills/index.js"
     },
+    "./skills/marketplace-drizzle": {
+      "types": "./dist/skills/marketplace-drizzle.d.ts",
+      "import": "./dist/skills/marketplace-drizzle.js",
+      "default": "./dist/skills/marketplace-drizzle.js"
+    },
     "./skills-placement": {
       "types": "./dist/skills-placement/index.d.ts",
       "import": "./dist/skills-placement/index.js",
       "default": "./dist/skills-placement/index.js"
+    },
+    "./toolbelt": {
+      "types": "./dist/toolbelt/index.d.ts",
+      "import": "./dist/toolbelt/index.js",
+      "default": "./dist/toolbelt/index.js"
     },
     "./profile": {
       "types": "./dist/profile/index.d.ts",

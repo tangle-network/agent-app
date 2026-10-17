@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-508 exports.
+517 exports.
 
 ### `acceptRejectionReason`
 
@@ -3094,6 +3094,70 @@ interface ResourceFileLimits
 interface RestoreChatInteractionsOptions
 ```
 
+### `ReviewFeedbackDraft`
+
+`interface`
+
+```ts
+interface ReviewFeedbackDraft
+```
+
+### `ReviewFeedbackForm`
+
+`function` — One form for Hub previews, assets and work products.
+
+```ts
+ForwardRefExoticComponent<ReviewFeedbackFormProps & RefAttributes<ReviewFeedbackFormHandle>>
+```
+
+### `ReviewFeedbackFormHandle`
+
+`interface`
+
+```ts
+interface ReviewFeedbackFormHandle
+```
+
+### `ReviewFeedbackFormProps`
+
+`interface`
+
+```ts
+interface ReviewFeedbackFormProps
+```
+
+### `ReviewInbox`
+
+`function` — One oldest-first review round.
+
+```ts
+({ items, initialSelectedId, renderItem, onVerdict, onFeedback, loading, error, onRefresh }: ReviewInboxProps) => Eleme…
+```
+
+### `ReviewInboxFeedback`
+
+`interface`
+
+```ts
+interface ReviewInboxFeedback
+```
+
+### `ReviewInboxItem`
+
+`interface`
+
+```ts
+interface ReviewInboxItem
+```
+
+### `ReviewInboxProps`
+
+`interface`
+
+```ts
+interface ReviewInboxProps
+```
+
 ### `ReviewQueueItem`
 
 `interface` — One row of the review queue projection for an engagement scope
@@ -3132,6 +3196,14 @@ interface ReviewQueuePanelProps
 
 ```ts
 type ReviewQueueState
+```
+
+### `ReviewVerdict`
+
+`type`
+
+```ts
+type ReviewVerdict
 ```
 
 ### `rollUpProvenanceStanding`
