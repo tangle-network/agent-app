@@ -3,24 +3,7 @@ import { ApprovalDiffSummary } from '@tangle-network/ui/run'
 
 import { formatMinorAmount, formatWhen, type HubActionPreview } from '../hub-approvals'
 import { Chip, HubFieldList } from './parts'
-
-/** Readable text of an HTML email body, for a preview that never renders markup. */
-function plainText(body: string, html: boolean): string {
-  if (!html) return body
-  return body
-    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
+import { EmailPreview, embeddedPreviewImage, linkedText } from './email'
 
 function initial(name: string | null | undefined): string {
   return (name?.trim().replace(/^@/, '').charAt(0) || '?').toUpperCase()
@@ -54,41 +37,6 @@ function PullRequestPreview({ preview }: { preview: Extract<HubActionPreview, { 
   )
 }
 
-function EmailPreview({ preview, account }: { preview: Extract<HubActionPreview, { kind: 'email' }>; account?: string | null }) {
-  const rows: Array<[string, string]> = [
-    ...(account ? [['From', account] as [string, string]] : []),
-    ...(preview.to.length ? [['To', preview.to.join(', ')] as [string, string]] : []),
-    ...(preview.cc.length ? [['Cc', preview.cc.join(', ')] as [string, string]] : []),
-    ...(preview.bcc.length ? [['Bcc', preview.bcc.join(', ')] as [string, string]] : []),
-  ]
-  const body = preview.body ? plainText(preview.body, preview.html) : ''
-  return (
-    <Panel className="overflow-hidden">
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 border-b border-border px-3 py-2.5 text-sm">
-        {rows.map(([label, value]) => (
-          <div key={label} className="contents">
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="break-words text-foreground">{value}</dd>
-          </div>
-        ))}
-        {preview.subject && (
-          <div className="contents">
-            <dt className="text-muted-foreground">Subject</dt>
-            <dd className="break-words font-semibold text-foreground">{preview.subject}</dd>
-          </div>
-        )}
-        {preview.reply && !preview.subject && (
-          <div className="contents">
-            <dt className="text-muted-foreground">Reply</dt>
-            <dd className="text-foreground">In the existing conversation</dd>
-          </div>
-        )}
-      </dl>
-      {body && <div className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words px-3 py-3 text-sm leading-6 text-foreground">{body}</div>}
-    </Panel>
-  )
-}
-
 function PostPreview({ preview, account }: { preview: Extract<HubActionPreview, { kind: 'post' }>; account?: string | null }) {
   if (preview.channel === 'slack') {
     return (
@@ -98,7 +46,7 @@ function PostPreview({ preview, account }: { preview: Extract<HubActionPreview, 
           <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold text-foreground">{initial(account)}</span>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">{account ?? 'Your account'}</p>
-            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{preview.text}</p>
+            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{linkedText(preview.text)}</p>
           </div>
         </div>
       </Panel>
@@ -117,7 +65,14 @@ function PostPreview({ preview, account }: { preview: Extract<HubActionPreview, 
             <span className="font-semibold text-foreground">{account ?? 'Your account'}</span>
             <span className="text-muted-foreground">{x ? '· now' : '· Post · Anyone'}</span>
           </p>
-          <p className={`mt-1 whitespace-pre-wrap break-words text-foreground ${x ? 'text-base leading-6' : 'text-sm leading-6'}`}>{preview.text}</p>
+          <p className={`mt-1 whitespace-pre-wrap break-words text-foreground ${x ? 'text-base leading-6' : 'text-sm leading-6'}`}>{linkedText(preview.text)}</p>
+          {preview.images && preview.images.length > 0 && <div className="mt-3 grid grid-cols-2 gap-0.5 overflow-hidden rounded-xl border border-border">
+            {preview.images.map((image, index) => <div key={index} className={`${preview.images!.length === 1 ? 'col-span-2 aspect-[16/9]' : 'aspect-square'} overflow-hidden bg-muted`}>
+              {embeddedPreviewImage(image.url)
+                ? <img src={image.url} alt={image.alt ?? `Post image ${index + 1}`} className="size-full object-cover" />
+                : <p className="p-3 text-sm text-muted-foreground">Image not embedded in this preview</p>}
+            </div>)}
+          </div>}
           {preview.link && (
             <div className="mt-3 overflow-hidden rounded-lg border border-border">
               <div className="px-3 py-2">
@@ -129,11 +84,7 @@ function PostPreview({ preview, account }: { preview: Extract<HubActionPreview, 
           )}
         </div>
       </div>
-      {x && (
-        <p className={`mt-2 text-right text-sm tabular-nums ${length > 280 ? 'text-[var(--surface-danger-text)]' : 'text-muted-foreground'}`}>
-          {length} / 280
-        </p>
-      )}
+      <p className="mt-2 text-right text-sm tabular-nums text-muted-foreground">{length} characters</p>
     </Panel>
   )
 }
@@ -252,6 +203,32 @@ export function HubActionPreviewView({ preview, account }: { preview: HubActionP
       return <EmailPreview preview={preview} account={account} />
     case 'post':
       return <PostPreview preview={preview} account={account} />
+    case 'ad':
+      return (
+        <Panel className="overflow-hidden">
+          <div className="space-y-1 px-4 py-3">
+            <p className="text-sm font-semibold text-foreground">{preview.advertiser ?? account ?? 'Advertiser unavailable'}</p>
+            <p className="text-sm text-muted-foreground">Sponsored · {preview.placement}</p>
+            {preview.text && <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{preview.text}</p>}
+          </div>
+          {preview.image && (embeddedPreviewImage(preview.image)
+            ? <img src={preview.image} alt={preview.headline ?? 'Ad creative'} className="aspect-[1.91/1] w-full object-cover" />
+            : <p className="bg-muted p-4 text-sm text-muted-foreground">Creative image not embedded in this preview</p>)}
+          <div className="flex flex-wrap items-center gap-3 bg-muted/40 px-4 py-3">
+            <div className="min-w-0 flex-1">{preview.destination && <p className="truncate text-sm text-muted-foreground">{preview.destination}</p>}{preview.headline && <p className="break-words font-semibold text-foreground">{preview.headline}</p>}</div>
+            {preview.callToAction && <span className="rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground">{preview.callToAction}</span>}
+          </div>
+        </Panel>
+      )
+    case 'page':
+      return (
+        <Panel className="overflow-hidden">
+          <div className="border-b border-border px-4 py-2"><p className="text-sm font-medium text-foreground">{preview.title ?? 'Page preview'}</p>{preview.url && <p className="truncate text-sm text-muted-foreground">{preview.url}</p>}</div>
+          {embeddedPreviewImage(preview.screenshot)
+            ? <img src={preview.screenshot} alt={preview.title ?? 'Page screenshot'} className="h-auto w-full" />
+            : <p className="p-4 text-sm text-muted-foreground">A captured screenshot is needed to preview this page.</p>}
+        </Panel>
+      )
     case 'payment':
       return <PaymentPreview preview={preview} />
     case 'speech':

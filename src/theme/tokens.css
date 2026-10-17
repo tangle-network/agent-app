@@ -6,6 +6,8 @@
  */
 @layer theme, base, components, utilities;
 @import '@tangle-network/brand/styles/legacy-light.css' layer(theme);
+@import '@tangle-network/brand/styles/presentation.css';
+@import '@tangle-network/ui/styles/presentation.css';
 @import './compat.generated.css' layer(theme);
 
 @layer theme {

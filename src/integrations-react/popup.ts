@@ -9,7 +9,7 @@ const PRE_REDIRECT_TIMEOUT_MS = 30_000
 const POLL_INTERVAL_MS = 2500
 const POPUP_FEATURES = 'popup=yes,width=520,height=680'
 
-export type PopupConnectResult = 'connected' | 'blocked' | 'cancelled' | 'unverified' | 'unavailable'
+export type PopupConnectResult = 'connected' | 'blocked' | 'failed' | 'cancelled' | 'unverified' | 'unavailable'
 
 export function localAppUrl(path: string): URL | null {
   if (!path.startsWith('/') || path.startsWith('//')) return null
@@ -88,7 +88,7 @@ function waitForConnection(input: {
       candidate.onmessage = event => {
         const message = event.data as Record<string, unknown> | null
         if (!message || message.provider !== input.providerId || message.nonce !== input.nonce || message.context !== input.contextToken) return
-        if (message.type === HUB_CONNECT_FAILED_MESSAGE_TYPE) finish('cancelled')
+        if (message.type === HUB_CONNECT_FAILED_MESSAGE_TYPE) finish('failed')
         if (message.type === HUB_CONNECTED_MESSAGE_TYPE) {
           if (pollId !== undefined) window.clearTimeout(pollId)
           void check()

@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.60.179
+
+- refactor(web-react): replace local UI primitives with shared components (#1120)
+
+## 0.60.178
+
+- feat(agent-profiles): shared self-mount storage adapters — every product is 3 lines (#1128)
+- feat(hub-approvals): preview held effects and capture review feedback (#1129)
+
+## 0.60.177
+
+- fix(chat): sync release cohort and generated API docs (#1127)
+
+## 0.60.176
+
+- fix(chat): let readers scroll reasoning while it streams (#1121)
+
+## 0.60.175
+
+- fix(deps): support Hub SDK 0.30.2 in agent apps (#1126)
+- docs(integrations): refresh policy API map [skip release] (#1124)
+
+## 0.60.174
+
+- fix(integrations): show enforced approval policy and OAuth retry (#1123)
+
+## 0.60.173
+
+- refactor(harness): preserve session identity and enforce deployment admission (#1116)
+
+## 0.60.172
+
+- feat(sso): prompt passthrough on start and a quiet signed_out callback (#1122)
+
 ## 0.60.171
 
 - fix(harness): drop the gemini capability row — gemini is a non-backend harness type (#1115)

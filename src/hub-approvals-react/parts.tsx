@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react'
 import { ChevronRight, Clock, Zap } from 'lucide-react'
-import { ProviderIcon } from '@tangle-network/sandbox-ui/integrations'
 import { Button, StatusPill, type StatusTone } from '@tangle-network/ui/primitives'
 
 import { HUB_APPROVAL_PHASE_LABELS, type HubApprovalItem, type HubApprovalPhase, type HubApprovalWait } from '../hub-approvals'
@@ -44,15 +43,17 @@ export function HubApprovalWaitNote({ wait, className = '' }: { wait: HubApprova
   )
 }
 
-/** The integration's own logo on a neutral tile, so dark marks stay legible. */
+/** A local provider mark: reviewing a held payload must not fetch a remote logo. */
 export function HubProviderMark({ providerId, name, size = 28 }: { providerId: string; name: string; size?: number }) {
-  const inner = Math.round(size * 0.64)
   return (
     <span
       className="flex shrink-0 items-center justify-center rounded-lg border border-border bg-background"
       style={{ width: size, height: size }}
+      title={name}
+      data-provider={providerId}
+      aria-hidden
     >
-      <ProviderIcon id={providerId} displayName={name} size={inner} className="rounded-sm" />
+      <span className="text-sm font-semibold text-muted-foreground">{name.charAt(0).toUpperCase()}</span>
     </span>
   )
 }

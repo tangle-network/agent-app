@@ -64,9 +64,9 @@ const config = (overrides: Partial<AgentProfileEditorConfig> = {}): AgentProfile
 })
 
 function openSection(title: string) {
-  const summary = screen.getByText(title, { selector: 'span' }).closest('summary')
-  if (summary && !summary.parentElement?.hasAttribute('open')) fireEvent.click(summary)
-  return within(summary!.parentElement as HTMLElement)
+  const trigger = screen.getByRole('button', { name: title })
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger)
+  return within(trigger.parentElement as HTMLElement)
 }
 
 describe('AgentProfileEditor model and runtime', () => {
