@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.60.186
 
 - fix(settings-react): `SettingsSaveBar` stays in reach while it has something to report: unsaved changes, a refusal, "Saved", or a `summary` shown after a save. A footer bar on a narrow card no longer drops out of view the moment a save is confirmed (#1138). `placement="group"` is the bar for one save that covers several cards: rendered after the last of them, it is its own card and sticks to the bottom of the screen at every width over every card above it. The bar's `data-sticky` marks when it sticks; `data-dirty` now means only that there are unsaved changes.
 
