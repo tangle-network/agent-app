@@ -23,6 +23,8 @@ export interface TimezonePickerProps {
 
 interface Zone {
   id: string
+  /** The name the browser's list used, when it is an older spelling of `id`. */
+  legacy?: string
   city: string
   region: string
   offsetMinutes: number
@@ -75,16 +77,48 @@ function offsetLabel(minutes: number): string {
   return `UTC${sign}${Math.floor(abs / 60)}${rest ? `:${String(rest).padStart(2, '0')}` : ''}`
 }
 
-function zoneOf(id: string, now: Date): Zone | null {
+/**
+ * Browsers list some zones under names the IANA database has since replaced
+ * (Chromium lists `Asia/Calcutta`). The picker shows and saves the current
+ * name, so a search for "Kolkata" or "Kyiv" finds its city; the old spelling
+ * still matches.
+ */
+const CURRENT_NAME: Record<string, string> = {
+  'America/Buenos_Aires': 'America/Argentina/Buenos_Aires',
+  'America/Catamarca': 'America/Argentina/Catamarca',
+  'America/Cordoba': 'America/Argentina/Cordoba',
+  'America/Godthab': 'America/Nuuk',
+  'America/Indianapolis': 'America/Indiana/Indianapolis',
+  'America/Jujuy': 'America/Argentina/Jujuy',
+  'America/Louisville': 'America/Kentucky/Louisville',
+  'America/Mendoza': 'America/Argentina/Mendoza',
+  'Asia/Calcutta': 'Asia/Kolkata',
+  'Asia/Katmandu': 'Asia/Kathmandu',
+  'Asia/Rangoon': 'Asia/Yangon',
+  'Asia/Saigon': 'Asia/Ho_Chi_Minh',
+  'Atlantic/Faeroe': 'Atlantic/Faroe',
+  'Europe/Kiev': 'Europe/Kyiv',
+  'Pacific/Enderbury': 'Pacific/Kanton',
+  'Pacific/Ponape': 'Pacific/Pohnpei',
+  'Pacific/Truk': 'Pacific/Chuuk',
+}
+
+function zoneOf(id: string, now: Date, legacy?: string): Zone | null {
   const offset = offsetMinutesOf(id, now)
   if (offset === null) return null
-  return { id, city: cityOf(id), region: regionOf(id), offsetMinutes: offset, offsetLabel: offsetLabel(offset) }
+  return { id, ...(legacy ? { legacy } : {}), city: cityOf(id), region: regionOf(id), offsetMinutes: offset, offsetLabel: offsetLabel(offset) }
 }
 
 function allZones(now: Date): Zone[] {
-  const ids = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
-  const unique = ids.includes('UTC') ? ids : [...ids, 'UTC']
-  return unique.map((id) => zoneOf(id, now)).filter((zone): zone is Zone => zone !== null)
+  const listed = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
+  const zones = new Map<string, Zone>()
+  for (const name of listed.includes('UTC') ? listed : [...listed, 'UTC']) {
+    const id = CURRENT_NAME[name] ?? name
+    if (zones.has(id)) continue
+    const zone = zoneOf(id, now, id === name ? undefined : name) ?? zoneOf(name, now)
+    if (zone) zones.set(zone.id, zone)
+  }
+  return [...zones.values()]
 }
 
 /** "+5:30", "utc-4", "gmt +2" and "−03" read as an offset in minutes. */
@@ -100,6 +134,7 @@ function matches(zone: Zone, query: string): boolean {
   if (offset !== null) return zone.offsetMinutes === offset
   return zone.city.toLowerCase().includes(query)
     || zone.id.toLowerCase().replace(/_/g, ' ').includes(query)
+    || (zone.legacy?.toLowerCase().replace(/_/g, ' ').includes(query) ?? false)
     || zone.region.toLowerCase().includes(query)
 }
 
@@ -128,7 +163,7 @@ export function TimezonePicker({ id, value, onChange, disabled = false, 'aria-de
   const searchId = useId()
   // Offsets are today's, so a zone in daylight time shows its current offset.
   const now = useMemo(() => new Date(), [expanded])
-  const selected = useMemo(() => zoneOf(value, new Date()), [value])
+  const selected = useMemo(() => zoneOf(CURRENT_NAME[value] ?? value, new Date()), [value])
   const zones = useMemo(() => (expanded ? allZones(now) : []), [expanded, now])
   const q = query.trim().toLowerCase()
   const groups = useMemo(() => grouped(q ? zones.filter((zone) => matches(zone, q)) : zones), [zones, q])
@@ -241,7 +276,7 @@ export function TimezonePicker({ id, value, onChange, disabled = false, 'aria-de
             <div key={group.region} role="group" aria-label={group.region}>
               <p className="px-3 pb-1 pt-3 text-sm font-semibold text-muted-foreground">{group.region}</p>
               {group.zones.map((zone) => {
-                const current = zone.id === value
+                const current = zone.id === (CURRENT_NAME[value] ?? value)
                 return (
                   <Button
                     key={zone.id}
