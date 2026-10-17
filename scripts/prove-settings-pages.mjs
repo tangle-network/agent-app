@@ -92,6 +92,9 @@ async function check(name, run) {
   checks.push({ name, result: 'PASS' })
 }
 
+// A phone viewport widens its layout to fit content that overflows, so the
+// sideways-scroll checks compare with the width the page was opened at.
+
 /** Text under 14px anywhere visible on the page. */
 async function tinyText(page) {
   return page.evaluate(() => {
@@ -152,7 +155,7 @@ try {
       })
       await check(`${tag}: no text under 14px and no sideways page scroll`, async () => {
         assert.deepEqual(await tinyText(page), [])
-        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'the page scrolls sideways')
+        assert.ok(await page.evaluate((opened) => document.documentElement.scrollWidth <= opened && innerWidth <= opened, width), 'the page scrolls sideways')
       })
       await shot('general')
 
@@ -413,7 +416,7 @@ try {
           return hits
         })
         assert.deepEqual(overflow, [])
-        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'the page scrolls sideways')
+        assert.ok(await page.evaluate((opened) => document.documentElement.scrollWidth <= opened && innerWidth <= opened, width), 'the page scrolls sideways')
         assert.deepEqual(await tinyText(page), [])
         const select = await memberCard.getByRole('combobox', { name: 'Role for Amir Chen' }).boundingBox()
         const name = await memberCard.getByText('Amir Chen', { exact: true }).boundingBox()
