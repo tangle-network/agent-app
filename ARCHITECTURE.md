@@ -27,7 +27,7 @@ navigable and is the seam a future package split would cut along.
         │  depends on ▼
   L0  Foundation          crypto · web · stream · redact · harness · missions · store
       (zero peers)         prompt · model-resolution · tangle · delegation · skills · knowledge
-                           integrations · interactions · billing · eval-campaign · assets
+                           toolbelt · integrations · interactions · billing · eval-campaign · assets
                            brand-extraction · studio · work-product · email
 ```
 
@@ -42,6 +42,7 @@ anywhere. `crypto` (AES-GCM fields) · `web` (request/body/rate-limit utils) ·
 `stream` (SSE normalize + resumable turn buffer) · `redact` (PII) · `harness` ·
 `missions` (durable step machine over a storage port) · `store` · `prompt` ·
 `model-resolution` · `tangle` (broker token) · `skills` ·
+`toolbelt` *(the parity gate: spawn an embedded tool program, diff its real surface against the authored manifest — Node builtins only, no test-framework dependency)* ·
 `knowledge` · `integrations` (hub client) · `interactions` (human-in-the-loop
 ask contract + sidecar client + answer-route factory; `agent-interface` types
 peer, structural connection) · `billing` (budget-capped keys) ·
