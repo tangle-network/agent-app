@@ -1,3 +1,4 @@
+import { parseChatAttachmentInputs } from '../chat-routes/attachment-validation.js'
 import { createApiKeyRequestAuth, type RequestApiKey } from '../platform/api-key-auth.js'
 import {
   OPERATOR_API_BASE_PATH,
@@ -97,7 +98,7 @@ const TURN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const THREAD_ID = /^[A-Za-z0-9_-]{1,256}$/
 const MAX_BODY_BYTES = 128 * 1024
 const MAX_CONTENT_BYTES = 64 * 1024
-const START_FIELDS = new Set(['turnId', 'content', 'threadId', 'title', 'model'])
+const START_FIELDS = new Set(['turnId', 'content', 'threadId', 'title', 'model', 'attachments'])
 
 const NO_STORE = { 'cache-control': 'private, no-store' }
 
@@ -174,12 +175,17 @@ function parseStartTurn(body: Record<string, unknown>): StartTurnInput {
   }
   const title = optionalString(body, 'title', 200)
   const model = optionalString(body, 'model', 200)
+  // The chat route's own structural rules; the app's store read re-checks
+  // every path against this workspace and re-derives every size.
+  const attachments = parseChatAttachmentInputs(body.attachments)
+  if (!attachments.succeeded) throw new OperatorError('operator.invalid_input', 400, attachments.error)
   return {
     turnId: body.turnId.toLowerCase(),
     content: body.content,
     ...(threadId === undefined ? {} : { threadId }),
     ...(title === undefined ? {} : { title }),
     ...(model === undefined ? {} : { model }),
+    ...(attachments.value.length === 0 ? {} : { attachments: attachments.value }),
   }
 }
 

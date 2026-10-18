@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-259 exports.
+261 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -1356,6 +1356,22 @@ ReadonlySet<string>
 
 ```ts
 type OpenModelStream
+```
+
+### `parseChatAttachmentInputs`
+
+`function` — Validate an `attachments` value's shape without reading the store: an array of at most `maxCount` {@link ChatAttachmentInput}s with valid, distinct paths.
+
+```ts
+(value: unknown, options?: ParseChatAttachmentInputsOptions) => { succeeded: true; value: ChatAttachmentInput[]; } | {…
+```
+
+### `ParseChatAttachmentInputsOptions`
+
+`interface` — Structural limits for {@link parseChatAttachmentInputs}.
+
+```ts
+interface ParseChatAttachmentInputsOptions
 ```
 
 ### `parseChatTurnParts`

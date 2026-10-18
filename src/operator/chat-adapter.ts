@@ -1,3 +1,4 @@
+import type { ChatAttachmentInput } from '../chat-routes/wire.js'
 import { messageHasTurnId } from '../stream/turn-identity.js'
 import type {
   OperatorApproval,
@@ -93,8 +94,13 @@ export interface ChatOperatorAdapterOptions<Identity> {
    * Run one turn through the app's own chat route as this caller. The adapter
    * reads the response to its end, so the turn is driven exactly as a browser
    * holding its stream drives it, and the start request returns once it settles.
+   * Forward `attachments` in the chat request body, where the route's
+   * attachment resolver checks them; an app without one refuses them.
    */
-  runTurn(ctx: OperatorContext<Identity>, input: { workspaceId: string; threadId: string; turnId: string; content: string; model?: string }): Promise<Response>
+  runTurn(ctx: OperatorContext<Identity>, input: {
+    workspaceId: string; threadId: string; turnId: string; content: string; model?: string
+    attachments?: ChatAttachmentInput[]
+  }): Promise<Response>
   /** Optional authoritative status of this user-turn anchor. When supplied,
    *  missing/running status without a live lease never promotes a partial reply to success. */
   turnStatus?(ctx: OperatorContext<Identity>, workspaceId: string, threadId: string, user: ChatOperatorMessage): Promise<'running' | 'complete' | 'error' | null>
@@ -314,6 +320,7 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       const response = await options.runTurn(ctx, {
         workspaceId: workspace.id, threadId, turnId: input.turnId, content: input.content,
         ...(input.model === undefined ? {} : { model: input.model }),
+        ...(input.attachments === undefined ? {} : { attachments: input.attachments }),
       })
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { error?: unknown; code?: unknown }

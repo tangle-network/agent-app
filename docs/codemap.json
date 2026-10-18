@@ -3513,6 +3513,18 @@
           "doc": "Open the raw turn stream for one specific model."
         },
         {
+          "name": "parseChatAttachmentInputs",
+          "kind": "function",
+          "signature": "(value: unknown, options?: ParseChatAttachmentInputsOptions) => { succeeded: true; value: ChatAttachmentInput[]; } | {…",
+          "doc": "Validate an `attachments` value's shape without reading the store: an array of at most `maxCount` {@link ChatAttachmentInput}s with valid, distinct paths."
+        },
+        {
+          "name": "ParseChatAttachmentInputsOptions",
+          "kind": "interface",
+          "signature": "interface ParseChatAttachmentInputsOptions",
+          "doc": "Structural limits for {@link parseChatAttachmentInputs}."
+        },
+        {
           "name": "parseChatTurnParts",
           "kind": "function",
           "signature": "(raw: unknown) => ChatTurnFilePartInput[]",
@@ -11998,6 +12010,7 @@
       "id": "./operator",
       "source": "src/operator/index.ts",
       "dependsOn": [
+        "chat-routes",
         "platform",
         "stream",
         "web"
@@ -12086,7 +12099,7 @@
           "name": "OPERATOR_API_VERSION",
           "kind": "const",
           "signature": "\"v1\"",
-          "doc": "The standard operator API contract every agent app mounts at `/api/operator/v1`."
+          "doc": null
         },
         {
           "name": "OPERATOR_ROUTES",

@@ -4517,6 +4517,22 @@ ReadonlySet<string>
 type OpenModelStream
 ```
 
+### `parseChatAttachmentInputs`
+
+`function` — Validate an `attachments` value's shape without reading the store: an array of at most `maxCount` {@link ChatAttachmentInput}s with valid, distinct paths.
+
+```ts
+(value: unknown, options?: ParseChatAttachmentInputsOptions) => { succeeded: true; value: ChatAttachmentInput[]; } | {…
+```
+
+### `ParseChatAttachmentInputsOptions`
+
+`interface` — Structural limits for {@link parseChatAttachmentInputs}.
+
+```ts
+interface ParseChatAttachmentInputsOptions
+```
+
 ### `parseChatTurnParts`
 
 `function` — Validates the untyped `parts` array off the wire.
@@ -15457,7 +15473,7 @@ interface UseOpenUIActionsOptions
 
 ## `./operator`
 
-Source: `src/operator/index.ts` · depends on `platform`, `stream`, `web`
+Source: `src/operator/index.ts` · depends on `chat-routes`, `platform`, `stream`, `web`
 
 ### `ChatOperatorAdapterOptions`
 
@@ -15565,7 +15581,7 @@ readonly ("operator:read" | "operator:write" | "operator:run")[]
 
 ### `OPERATOR_API_VERSION`
 
-`const` — The standard operator API contract every agent app mounts at `/api/operator/v1`.
+`const`
 
 ```ts
 "v1"
