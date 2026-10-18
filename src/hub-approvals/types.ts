@@ -85,6 +85,19 @@ export interface HubApprovalItem {
   /** Files with line counts read by the host, replacing those the input declares. */
   files?: readonly HubActionFile[]
   bundle?: HubActionBundle | null
+  /** Previewing and teaching never execute a call. Live approval remains a separate action. */
+  executionMode?: 'dry-run' | 'live'
+  feedback?: HubApprovalFeedback & { savedAt?: string }
+  /** Host-resolved presentation, e.g. a retained page screenshot or ad creative. No remote fetches. */
+  preview?: HubActionPreview
+}
+
+/** The host authenticates the reviewer, binds provenance and computes the edit diff. */
+export interface HubApprovalFeedback {
+  score: number
+  comment: string
+  /** A teaching example only; never replaces the held input or authorizes execution. */
+  editedInput?: unknown
 }
 
 /** A labelled value on a preview or a receipt. */
@@ -94,6 +107,16 @@ export interface HubActionField {
   href?: string
   /** Render in the monospace face: shas, ids, paths. */
   mono?: boolean
+}
+
+/** Frozen media bytes supplied by the host; renderers never resolve a provider URL. */
+export interface HubPreviewMedia {
+  kind: 'image' | 'video'
+  src: string
+  alt: string
+  poster?: string
+  width?: number
+  height?: number
 }
 
 /** What a held call will do, shaped for its integration's renderer. */
@@ -118,18 +141,30 @@ export type HubActionPreview =
       cc: readonly string[]
       bcc: readonly string[]
       subject?: string
+      from?: string
+      fromName?: string
+      previewText?: string
       body?: string
       html: boolean
       reply: boolean
     }
   | {
       kind: 'post'
-      channel: 'x' | 'linkedin' | 'slack'
+      channel: 'x' | 'linkedin' | 'slack' | 'instagram' | 'facebook' | 'tiktok' | 'youtube'
       text: string
       /** The post's place, such as a Slack channel. */
       where?: string
       link?: { url: string; title?: string; description?: string }
+      images?: readonly { url: string; alt?: string }[]
+      media?: readonly HubPreviewMedia[]
+      placement?: 'feed' | 'vertical' | 'carousel'
+      sponsored?: boolean
+      displayName?: string
+      handle?: string
+      callToAction?: string
     }
+  | { kind: 'ad'; placement: string; advertiser?: string; headline?: string; text?: string; image?: string; destination?: string; callToAction?: string }
+  | { kind: 'page'; title?: string; url?: string; screenshot?: string }
   | { kind: 'payment'; label: string; amount?: number; currency?: string; customer?: string; description?: string }
   | { kind: 'speech'; text: string; voice?: string; seconds?: number }
   | { kind: 'call'; to?: string; from?: string; purpose?: string }

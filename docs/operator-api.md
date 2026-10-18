@@ -90,7 +90,7 @@ There is no browser-cookie fallback.
 | GET | `/workspaces` | read | `{ workspaces }` the key can reach |
 | POST | `/workspaces` | write | `{ workspace }`; body `{ name }`; refused for workspace-restricted keys |
 | GET | `/workspaces/:id` | read | `{ workspace }` |
-| POST | `/workspaces/:id/turns` | read, run | 202 `{ turn }`; body `{ turnId, content, threadId?, title?, model? }` |
+| POST | `/workspaces/:id/turns` | read, run | 202 `{ turn }`; body `{ turnId, content, threadId?, title?, model?, attachments? }` |
 | GET | `/workspaces/:id/threads` | read | `{ threads, nextCursor }` |
 | GET | `/workspaces/:id/threads/:thread` | read | `{ thread, latestTurn }` |
 | GET | `/workspaces/:id/threads/:thread/turns/:turn?wait=<s>` | read | `{ turn }`, held up to `wait` seconds (at most 25) |
@@ -117,6 +117,32 @@ Errors are `{ error, code, retryable? }`.
    `unknown` means the app cannot establish the state; it is never evidence of success.
 
 An accepted turn or an open connection does not establish completion; read the settled turn.
+
+### Attach files
+
+A turn carries files the same way a browser-composer message does.
+Upload them to the workspace through the app's attachment upload route, which `createAttachmentUploadRoute` builds and which answers `{ files: ChatAttachmentInput[] }`.
+Send that list unchanged as the turn's `attachments`:
+
+```json
+{
+  "turnId": "4b7c1f9e-2d3a-4c5b-8e6f-7a8b9c0d1e2f",
+  "content": "Summarize the brief and draft the launch post.",
+  "attachments": [
+    { "path": "uploads/brief.txt", "name": "brief.txt", "size": 2048, "mediaType": "text/plain", "kind": "file" }
+  ]
+}
+```
+
+The handler checks the shape with the chat route's own rules, `parseChatAttachmentInputs` from `/chat-routes`.
+The value is an array of at most `ATTACHMENT_MAX_COUNT` entries with distinct paths.
+Each entry has a store-relative `path` with no traversal, absolute, backslash, control-character or hidden segment, a bounded `name`, a finite `size`, a `mediaType`, and a `kind` of `image` or `file`.
+A malformed value answers 400 `operator.invalid_input` naming `attachments`; an empty list is the same as none.
+Delivery is an explicit adapter capability, so an adapter written before the field existed never drops files silently.
+An adapter that sets `acceptsAttachments: true` receives the list as `input.attachments` and passes it into the app's chat request; `createChatOperatorAdapter` takes the same option and forwards the list to `runTurn`.
+There the app's attachment resolver reads each path from the path workspace's own store and re-derives its size, so a key cannot attach another workspace's files.
+`GET /api/operator/v1` lists `turns.attachments` among the capabilities of an app that accepts them; any other app answers 501 `operator.unsupported` to a turn that carries attachments.
+A retry with the same `turnId` carries the same attachments.
 
 ## Authority model
 

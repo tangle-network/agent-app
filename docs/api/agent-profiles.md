@@ -4,7 +4,7 @@
 
 Source: `src/agent-profiles/index.ts`
 
-53 exports.
+58 exports.
 
 ### `addProfileKnowledgeDocument`
 
@@ -30,6 +30,14 @@ Source: `src/agent-profiles/index.ts`
 (consentedBaseline: AgentProfile, selected: AgentProfile) => AgentProfile
 ```
 
+### `createDrizzleSelfMountStorage`
+
+`function` — A drizzle-backed SelfMountStorage against any table with the standard shape (scope primary key + mounted JSON text column).
+
+```ts
+(db: any, table: SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name: "scop…
+```
+
 ### `createInMemorySelfMountStorage`
 
 `function` — Non-durable default for tests and single-instance products.
@@ -38,12 +46,28 @@ Source: `src/agent-profiles/index.ts`
 () => SelfMountStorage
 ```
 
+### `createKVSelfMountStorage`
+
+`function` — A KV-backed SelfMountStorage (Cloudflare KV, any namespace).
+
+```ts
+(kv: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void>; }, prefix: string, bas…
+```
+
 ### `createMountProfileChangeTool`
 
 `function` — The permitted, idempotent self-mount verb as an app tool.
 
 ```ts
 (deps: MountProfileChangeDeps) => AppToolDefinition<Record<string, unknown>>
+```
+
+### `createProductSelfMount`
+
+`function`
+
+```ts
+(config: ProductSelfMountConfig) => AppToolDefinition<Record<string, unknown>>
 ```
 
 ### `createTextProfile`
@@ -116,6 +140,14 @@ interface MountProfileChangeResult
 
 ```ts
 readonly ["skills"]
+```
+
+### `ProductSelfMountConfig`
+
+`interface` — The one-call product wiring: catalog + storage + baseline + cap.
+
+```ts
+interface ProductSelfMountConfig
 ```
 
 ### `PROFILE_CHANGE_POLICY`
@@ -396,6 +428,14 @@ interface SelfMountSkillEntry
 
 ```ts
 interface SelfMountStorage
+```
+
+### `selfMountTable`
+
+`function` — Create (or use) the standard self-mount table in a drizzle/D1 database.
+
+```ts
+(tableName: string) => SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name:…
 ```
 
 ### `serializeProfileRevisionDiff`

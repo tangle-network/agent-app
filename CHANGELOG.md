@@ -1,5 +1,111 @@
 # Changelog
 
+## 0.60.192
+
+- feat(operator): turns carry file attachments (#1148)
+
+## 0.60.191
+
+- docs(architecture): toolbelt belongs on the L0 foundation map (#1147)
+
+## 0.60.190
+
+- fix(scaffolder): regenerate the template engine cohort for the #1142 bumps (#1146)
+
+## 0.60.189
+
+- refactor: simpler parity probe (readline) + simpler mint (number) (#1143)
+
+## 0.60.188
+
+- test: drop peer-floor ceiling assertions that mirror the current range (#1145)
+
+## 0.60.187
+
+- Accept agent-runtime 0.325.x in the peer range (#1142)
+
+## 0.60.186
+
+- fix(settings-react): `SettingsSaveBar` stays in reach while it has something to report: unsaved changes, a refusal, "Saved", or a `summary` shown after a save. A footer bar on a narrow card no longer drops out of view the moment a save is confirmed (#1138). `placement="group"` is the bar for one save that covers several cards: rendered after the last of them, it is its own card and sticks to the bottom of the screen at every width over every card above it. The bar's `data-sticky` marks when it sticks; `data-dirty` now means only that there are unsaved changes.
+
+## 0.60.185
+
+- feat(settings-react): the shared settings page. `SettingsLayout` and `SettingsNav` give each section its own URL, a sticky section column from 60rem of content and a 56px tab strip below it that keeps the current tab in view; the nav marks a click current at once and never dims the page. `useSettingField` autosaves a row and shows "Saving…" after the pending delay, "Saved" only on a confirmed write, and the server's typed refusal with Retry, keeping the person's value; `confirmSettingResponse` reads `{ error: { code, message } }` refusals, and its `parse` returns the value the server kept (`() => next` for a route that answers `{ success: true }` or 204); without `parse` the value is `unknown`, so it cannot be a field's saved value. `ConfirmAction` (a bottom sheet below 40rem) closes only on a confirmed write and shows a refusal with its `refusalAction`, such as View plans. `SettingsSaveBar` is the one grouped save. `MembersSection`, `InvitationsSection`, `ExportSection`, `DeleteWorkspaceSection` and `TimezonePicker` are the shared sections. Rows and cards are `@tangle-network/ui` 11.40.0 settings atoms; the contract is docs/product-surfaces.md#settings-pages.
+- The teams panels name roles by capability ("Can view", "Can edit", "Can manage settings and people") in the ui `Select`, whose open list says in one line what each role adds, and their buttons are the ui `Button` and titles the ui `Heading`. Below 36rem of panel the role picker takes its own full-width line, so nothing passes a phone's card edge. `MembersPanel` takes `currentUserId` and, like `MembersSection`, offers no role change or removal on the viewer's own row; an inherited owner reads "Organization admin" in both. A revoked invitation's line says "revoked".
+- `MutationStatus` renders at 14px. `useWorkspaceExport` is the export engine both `WorkspaceExportPanel` and `ExportSection` draw from; the panel's notes are 14px.
+- The `@tangle-network/ui` peer floor is 11.40.0 (the settings atoms); the chat template pins ui 11.40.0 and brand 1.26.0.
+
+## 0.60.184
+
+- fix(work-product): keep identity and tabs usable on phones (#1134)
+
+## 0.60.183
+
+- chore(changesets): drop the fleet-lift changeset — consumed by the 0.60.182 release (#1133)
+
+## 0.60.182
+
+- feat: the fleet lift — toolbelt parity gate, budget-derived mint, allow-list routing, skill marketplace (#1132)
+
+## 0.60.181
+
+- fix(teams): accept invitations atomically across workspace transfers
+
+## 0.60.180
+
+- feat(approvals): add media previews and a scored review inbox
+
+## 0.60.179
+
+- refactor(web-react): replace local UI primitives with shared components (#1120)
+
+## 0.60.178
+
+- feat(agent-profiles): shared self-mount storage adapters — every product is 3 lines (#1128)
+- feat(hub-approvals): preview held effects and capture review feedback (#1129)
+
+## 0.60.177
+
+- fix(chat): sync release cohort and generated API docs (#1127)
+
+## 0.60.176
+
+- fix(chat): let readers scroll reasoning while it streams (#1121)
+
+## 0.60.175
+
+- fix(deps): support Hub SDK 0.30.2 in agent apps (#1126)
+- docs(integrations): refresh policy API map [skip release] (#1124)
+
+## 0.60.174
+
+- fix(integrations): show enforced approval policy and OAuth retry (#1123)
+
+## 0.60.173
+
+- refactor(harness): preserve session identity and enforce deployment admission (#1116)
+
+## 0.60.172
+
+- feat(sso): prompt passthrough on start and a quiet signed_out callback (#1122)
+
+## 0.60.171
+
+- fix(harness): drop the gemini capability row — gemini is a non-backend harness type (#1115)
+- feat(harness): harnessCapabilities — what a harness can express, before profile assembly (#1114)
+- feat(harness): harnessCapabilities — what a harness can express, before profile assembly (#1112)
+
+## 0.60.170
+
+- chore: rename agent-dev-container references to agent-container (#1111)
+
+## 0.60.169
+
+- fix: restore optional peers and handle Telegram/voice line contracts (#1107)
+- chore(deps): full interface-5 cohort — every @tangle-network dep to latest (#1109)
+- fix(tests): Node 26 localStorage, workspace-export archive count, and BSD tar
+- chore(deps): @tangle-network/ui 11.35.0 + sandbox 0.60.41 — align with the gtm-agent/hospitality cohort (#1105)
+
 ## 0.60.168
 
 - fix(web): constrain only editable profile resources (#1104)

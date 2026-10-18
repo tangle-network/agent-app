@@ -8,10 +8,10 @@ import type {
 const useBrowserLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : useEffect
 
 const TRANSPORT: Record<Line['transport'], string> = {
-  imessage: 'iMessage', sms: 'SMS', whatsapp: 'WhatsApp', email: 'Email',
+  imessage: 'iMessage', sms: 'SMS', whatsapp: 'WhatsApp', email: 'Email', telegram: 'Telegram', voice: 'Voice',
 }
 const IDENTITY: Record<LineIdentityKind, string> = {
-  handle: 'Inkbox handle', number: 'Dedicated number', email: 'Email line',
+  handle: 'Handle', number: 'Dedicated number', email: 'Email line',
 }
 
 type Choice = { key: string; connection: LineConnectionOption; identity: LineIdentityOption }
@@ -44,16 +44,20 @@ function choicesFor(snapshot: LineSetupSnapshot): Choice[] {
   })))
 }
 
+function requiresNumber(identity: LineIdentityOption): boolean {
+  return identity.transport === 'whatsapp' || identity.transport === 'sms' || identity.transport === 'voice' || identity.requiresPhoneNumberId === true
+}
+
 function canOfferReconnect(line: LineSetupLine, choice: Choice): boolean {
   if (line.connectionId !== choice.connection.id || line.transport !== choice.identity.transport || line.targetId !== null) return false
-  if (line.providerNumberId === null) return line.transport !== 'whatsapp' && !choice.identity.phoneNumberId && !choice.identity.requiresPhoneNumberId
+  if (line.providerNumberId === null) return !choice.identity.phoneNumberId && !requiresNumber(choice.identity)
   return choice.identity.phoneNumberId === line.providerNumberId ||
-    (!choice.identity.phoneNumberId && choice.identity.requiresPhoneNumberId === true)
+    (!choice.identity.phoneNumberId && requiresNumber(choice.identity))
 }
 
 function matchesLineIdentity(line: LineSetupLine, identity: LineIdentityOption, numberId: string): boolean {
   if (line.transport !== identity.transport) return false
-  if (line.providerNumberId === null) return line.transport !== 'whatsapp' && !identity.phoneNumberId && !identity.requiresPhoneNumberId
+  if (line.providerNumberId === null) return !identity.phoneNumberId && !requiresNumber(identity)
   return numberId === line.providerNumberId
 }
 
@@ -170,8 +174,8 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
   const SetupHeading = showExisting ? 'h3' : 'h2'
   const selectedTarget = snapshot?.targets.find(target => target.id === targetId)
   const selectedMode = selectedTarget?.modes.includes(boxMode) ? boxMode : selectedTarget?.modes[0]
-  const enteredNumber = selected?.identity.phoneNumberId ?? phoneNumberId.trim()
-  const needsNumber = selected?.identity.transport === 'whatsapp' || selected?.identity.requiresPhoneNumberId
+  const enteredNumber = (selected?.identity.phoneNumberId ?? phoneNumberId).trim()
+  const needsNumber = selected && requiresNumber(selected.identity)
   const occupied = selected && snapshot?.lines.filter(line => line.status !== 'released' && line.transport === selected.identity.transport)
   const [occupiedLine] = occupied || []
   const reconnectChoice = Boolean(selected && occupied?.length === 1 && occupiedLine && canOfferReconnect(occupiedLine, selected))
@@ -207,7 +211,9 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
       }
       const line = updated.lines.find(item => item.status !== 'released' && item.connectionId === selected.connection.id &&
         item.transport === selected.identity.transport && item.providerNumberId === (enteredNumber || null))
-      onNotice?.({ kind: 'success', message: line?.answering ? 'The line is answering.' : 'Line connected. Add a member to start answers.' })
+      onNotice?.({ kind: 'success', message: line?.answering ? 'The line is answering.' : selected.identity.transport === 'voice'
+        ? 'Voice line connected. Configure calls and verify prior member consent in your host.'
+        : 'Line connected. Add a member to start answers.' })
     } catch (cause) {
       if (!stillCurrent(requestIncarnation)) return
       const detail = message(cause)
@@ -267,7 +273,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
         {visibleLines.map(line =>
           <div className="tangle-lines__row" key={line.id}>
             <div className="tangle-lines__row-main">
-              <div className="tangle-lines__row-heading"><span className="tangle-lines__transport">{TRANSPORT[line.transport]}</span><span className={`tangle-lines__status${line.answering ? ' tangle-lines__status--answering' : ''}`}>{line.answering ? 'Answering' : line.targetId === null ? 'Disconnected' : line.status === 'active' ? 'Awaiting member' : line.status}</span></div>
+              <div className="tangle-lines__row-heading"><span className="tangle-lines__transport">{TRANSPORT[line.transport]}</span><span className={`tangle-lines__status${line.answering ? ' tangle-lines__status--answering' : ''}`}>{line.answering ? 'Answering' : line.targetId === null ? 'Disconnected' : line.status === 'active' ? line.transport === 'voice' ? 'Not answering' : 'Awaiting member' : line.status}</span></div>
               <strong>{line.address}</strong>
               {line.transport === 'imessage' && line.connect && line.routerAddress && line.targetId !== null && <p>Send <code>{line.connect}</code> to {line.routerAddress}. Then message the number Inkbox sends you.</p>}
               <LineMessageAction line={line} />

@@ -4,7 +4,7 @@
 
 Source: `src/harness/index.ts`
 
-16 exports.
+20 exports.
 
 ### `assertHarnessModelCompatible`
 
@@ -16,7 +16,7 @@ Source: `src/harness/index.ts`
 
 ### `coerceHarness`
 
-`function` — Coerce an arbitrary value to a known harness, falling back (default `opencode`).
+`function` — Display/config convenience only.
 
 ```ts
 (value: unknown, fallback?: Harness) => Harness
@@ -32,7 +32,7 @@ Source: `src/harness/index.ts`
 
 ### `DEFAULT_HARNESS`
 
-`const` — Define the default harness to use for code execution and testing environments
+`const` — Default for an absent choice; never a replacement for an invalid explicit ID.
 
 ```ts
 Harness
@@ -40,10 +40,34 @@ Harness
 
 ### `Harness`
 
-`type` — A coding-agent backend this shell can dispatch a session onto.
+`type` — A recognized coding-agent backend, not a promise that it is installed.
 
 ```ts
 type Harness
+```
+
+### `HarnessAvailability`
+
+`type` — Server-owned start and resume sets.
+
+```ts
+type HarnessAvailability
+```
+
+### `harnessCapabilities`
+
+`function` — Profile-support facts, independent of whether this deployment enables the harness.
+
+```ts
+(harness: Harness) => HarnessCapabilities
+```
+
+### `HarnessCapabilities`
+
+`interface` — What a harness can express, for profile assembly.
+
+```ts
+interface HarnessCapabilities
 ```
 
 ### `HarnessConfig`
@@ -62,9 +86,17 @@ interface HarnessConfig
 interface HarnessModelSelection
 ```
 
+### `HarnessSelectionError`
+
+`class` — An admission failure, never permission to retry on another harness.
+
+```ts
+class HarnessSelectionError
+```
+
 ### `isHarness`
 
-`function` — Determine if a value is a recognized harness string identifier
+`function` — Determine whether a value is a recognized identity, independently of availability.
 
 ```ts
 (value: unknown) => value is Harness
@@ -80,7 +112,7 @@ interface HarnessModelSelection
 
 ### `KNOWN_HARNESSES`
 
-`const` — The known coding-agent backends: the canonical harness set minus what has no provider adapter, Derived from `harnessTypeSchema.options` so a harness added upstream reaches this shell without an edit…
+`const` — Recognized backend identities, including IDs needed by historical sessions.
 
 ```ts
 readonly Harness[]
@@ -96,15 +128,15 @@ readonly Harness[]
 
 ### `ResolvedSessionHarness`
 
-`interface` — Represent resolved session state including harness, lock status, and swap attempt flag
+`type` — The selected identity and the existing session-lock/swap-attempt result.
 
 ```ts
-interface ResolvedSessionHarness
+type ResolvedSessionHarness
 ```
 
 ### `resolveSessionHarness`
 
-`function` — Resolve the harness for a turn, enforcing the session lock.
+`function` — Resolve requested → workspaceDefault → fallback only for a genuinely new session.
 
 ```ts
 (input?: ResolveSessionHarnessInput) => ResolvedSessionHarness
@@ -112,10 +144,10 @@ interface ResolvedSessionHarness
 
 ### `ResolveSessionHarnessInput`
 
-`interface` — Resolve input options to determine the appropriate session harness to use
+`type` — A saved lock, explicit choice, workspace default, and optional deployment availability.
 
 ```ts
-interface ResolveSessionHarnessInput
+type ResolveSessionHarnessInput
 ```
 
 ### `snapHarnessToModel`

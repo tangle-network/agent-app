@@ -140,12 +140,18 @@ function check() {
 function stylesheet() {
   const css = postcss.parse(readFileSync(join(here, 'tokens.css'), 'utf8'))
   const imports = new Map([
-    ['@tangle-network/brand/styles/legacy-light.css', source], ['./compat.generated.css', compat],
+    ['@tangle-network/brand/styles/legacy-light.css', { text: source, layer: 'theme' }],
+    ['./compat.generated.css', { text: compat, layer: 'theme' }],
+    ...['@tangle-network/brand/styles/presentation.css', '@tangle-network/ui/styles/presentation.css']
+      .map(id => [id, { text: readFileSync(require.resolve(id), 'utf8'), layer: null }]),
   ])
   css.walkAtRules('import', (rule) => {
-    const match = /^['"]([^'"]+)['"]\s+layer\(theme\)$/.exec(rule.params)
-    if (!match || !imports.has(match[1])) throw new Error(`Unreviewed theme import: ${rule.params}`)
-    rule.replaceWith(postcss.atRule({ name: 'layer', params: 'theme', nodes: postcss.parse(imports.get(match[1])).nodes }))
+    const match = /^['"]([^'"]+)['"](?:\s+layer\((theme)\))?$/.exec(rule.params)
+    const entry = match && imports.get(match[1])
+    if (!entry || (match[2] ?? null) !== entry.layer) throw new Error(`Unreviewed theme import: ${rule.params}`)
+    const nodes = postcss.parse(entry.text).nodes
+    if (entry.layer) rule.replaceWith(postcss.atRule({ name: 'layer', params: entry.layer, nodes }))
+    else rule.replaceWith(...nodes)
   })
   return css.toString()
 }

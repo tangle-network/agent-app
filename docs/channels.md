@@ -47,16 +47,16 @@ line list. The backend must authorize every supplied line, thread, source, and
 order identifier. `client.lines.threads(lineId).messages(threadId)` remains the
 authoritative channel history; it is not reconstructed from a replay buffer.
 
-Use Sandbox **0.52.1** and Hub SDK **0.19.0** for the complete channels surface.
-Sandbox 0.51.0 supplies the original iMessage line API but does not type WhatsApp
-connection creation. The package inherits Sandbox 0.52.1 and its compatible
-Runtime 0.266.0 from the merged hosted-agent lane. Only type imports from Sandbox
-and Hub are emitted in declarations. JavaScript imports React and existing
+The current development baseline is Sandbox **0.60.49** and Hub SDK **0.29.5**;
+the package manifest declares the supported optional peer ranges. Only type
+imports from Sandbox and Hub are emitted in declarations. JavaScript imports React and existing
 agent-app async primitives, not either server SDK.
 
-Sandbox `fromConnection` currently accepts shared iMessage and an owned
-WhatsApp phone-number ID. It does **not** accept email or SMS. The host's `setup`
-methods deliberately supply missing Hub/hosted-agent operations: available
+Sandbox 0.60.41's `fromConnection` accepts iMessage, SMS, WhatsApp, email,
+Telegram, and voice. SMS, WhatsApp, and voice require an owned provider number
+ID; Telegram does not take one. `ChannelConnect` accepts these transports;
+voice binds an already-owned ph0ny number using its ID, without ordering one.
+The host's `setup` methods retain the existing authenticated application seams: available
 connections/numbers, email creation, managed-order binding, verification, and
 activation. They must delegate to the Hub SDK and sandbox.lines, not providers.
 The merged `src/hosted-agent` entrypoint exposes `createHostedAgent` and
@@ -69,6 +69,13 @@ not in channels. Other transports remain on the injected host boundary. The
 entrypoint does not export a browser line-setup client, so this module does not
 bundle its server runtime or change its files. There is no fabricated SDK
 method or hardcoded Builder route.
+
+Voice is not a text-verification transport. Its panel does not call the text
+verification endpoint, offer SMS links, or claim that messages or calls are
+enabled. Configure calls and verify members' prior consent in the host's
+separate voice flow. Telegram uses the host's text-verification callbacks and
+Telegram-specific instructions, without guessing a deep link. Offer either
+transport only when the owned connection and deployed host support it.
 
 For hosted iMessage, the authenticated `lines.fromConnection` adapter must use
 the same server-selected connection and client reference as `attachLine`

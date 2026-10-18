@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.60.168",
+  "version": "0.60.192",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -124,10 +124,20 @@
       "import": "./dist/skills/index.js",
       "default": "./dist/skills/index.js"
     },
+    "./skills/marketplace-drizzle": {
+      "types": "./dist/skills/marketplace-drizzle.d.ts",
+      "import": "./dist/skills/marketplace-drizzle.js",
+      "default": "./dist/skills/marketplace-drizzle.js"
+    },
     "./skills-placement": {
       "types": "./dist/skills-placement/index.d.ts",
       "import": "./dist/skills-placement/index.js",
       "default": "./dist/skills-placement/index.js"
+    },
+    "./toolbelt": {
+      "types": "./dist/toolbelt/index.d.ts",
+      "import": "./dist/toolbelt/index.js",
+      "default": "./dist/toolbelt/index.js"
     },
     "./profile": {
       "types": "./dist/profile/index.d.ts",
@@ -552,6 +562,11 @@
       "import": "./dist/teams/invitations-api.js",
       "default": "./dist/teams/invitations-api.js"
     },
+    "./settings-react": {
+      "types": "./dist/settings-react/index.d.ts",
+      "import": "./dist/settings-react/index.js",
+      "default": "./dist/settings-react/index.js"
+    },
     "./teams-react": {
       "types": "./dist/teams-react/index.d.ts",
       "import": "./dist/teams-react/index.js",
@@ -695,18 +710,18 @@
     "@storybook/react-vite": "^10.5.10",
     "@tailwindcss/postcss": "^4.3.3",
     "@tangle-network/agent-docs": "0.2.1",
-    "@tangle-network/agent-eval": "0.213.0",
+    "@tangle-network/agent-eval": "0.214.0",
     "@tangle-network/agent-gateway": "0.11.4",
     "@tangle-network/agent-integrations": "0.75.0",
-    "@tangle-network/agent-interface": "5.2.0",
-    "@tangle-network/agent-knowledge": "22.0.1",
+    "@tangle-network/agent-interface": "5.2.1",
+    "@tangle-network/agent-knowledge": "22.0.3",
     "@tangle-network/agent-profile-materialize": "0.25.2",
-    "@tangle-network/agent-runtime": "0.319.0",
-    "@tangle-network/brand": "1.24.2",
-    "@tangle-network/hub-sdk": "0.29.5",
+    "@tangle-network/agent-runtime": "0.325.0",
+    "@tangle-network/brand": "1.26.0",
+    "@tangle-network/hub-sdk": "0.30.2",
     "@tangle-network/sandbox": "0.60.49",
-    "@tangle-network/sandbox-ui": "0.134.7",
-    "@tangle-network/ui": "11.33.0",
+    "@tangle-network/sandbox-ui": "0.134.10",
+    "@tangle-network/ui": "11.40.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.6",
@@ -768,17 +783,17 @@
     "@better-auth/oauth-provider": ">=1.7.2",
     "@firecrawl/pdf-inspector-wasm": ">=0.1.3",
     "@huggingface/transformers": ">=3",
-    "@tangle-network/agent-eval": ">=0.199.0 <0.205.0 || >=0.205.1 <0.206.0 || >=0.209.1 <0.210.0 || >=0.211.2 <0.212.0 || >=0.213.0 <0.214.0",
+    "@tangle-network/agent-eval": ">=0.199.0 <0.205.0 || >=0.205.1 <0.206.0 || >=0.209.1 <0.210.0 || >=0.211.2 <0.212.0 || >=0.213.0 <0.215.0",
     "@tangle-network/agent-integrations": ">=0.54.2 <0.58.0 || >=0.59.0 <0.61.0 || >=0.66.0 <0.67.0 || >=0.67.0 <0.68.0 || >=0.68.0 <0.69.0 || >=0.69.0 <0.70.0 || >=0.70.0 <0.71.0 || >=0.75.0 <0.76.0",
     "@tangle-network/agent-interface": "^2.13.0 || ^3.0.0 || ^5.2.0",
     "@tangle-network/agent-knowledge": "^17.1.2 || ^18.0.0 || ^19.0.1 || ^20.0.0 || ^22.0.1",
-    "@tangle-network/agent-profile-materialize": ">=0.20.1 <0.21.0 || >=0.21.0 <0.22.0 || >=0.22.0 <0.23.0",
-    "@tangle-network/agent-runtime": ">=0.318.0 <0.319.0 || >=0.319.0 <0.320.0",
+    "@tangle-network/agent-profile-materialize": ">=0.20.1 <0.21.0 || >=0.21.0 <0.22.0 || >=0.22.0 <0.23.0 || >=0.25.2 <0.26.0",
+    "@tangle-network/agent-runtime": ">=0.318.0 <0.319.0 || >=0.319.3 <0.326.0",
     "@tangle-network/brand": ">=1.21.1",
-    "@tangle-network/hub-sdk": ">=0.19.3 <0.21.0 || >=0.21.0 <0.22.0 || >=0.22.1 <0.25.0 || >=0.27.0 <0.28.0 || >=0.28.0 <0.29.0",
+    "@tangle-network/hub-sdk": ">=0.19.3 <0.21.0 || >=0.21.0 <0.22.0 || >=0.22.1 <0.25.0 || >=0.27.0 <0.28.0 || >=0.28.0 <0.29.0 || >=0.29.5 <0.30.0 || >=0.30.2 <0.31.0",
     "@tangle-network/sandbox": ">=0.45.0 <0.48.0 || ^0.49.0 || ^0.50.0 || ^0.51.0 || ^0.52.0 || ^0.53.0 || ^0.54.0 || ^0.55.0 || >=0.58.1 <0.60.0 || >=0.60.3 <0.61.0",
-    "@tangle-network/sandbox-ui": ">=0.134.6 <0.135.0",
-    "@tangle-network/ui": ">=11.32.0 <12.0.0",
+    "@tangle-network/sandbox-ui": ">=0.134.10 <0.135.0",
+    "@tangle-network/ui": ">=11.40.0 <12.0.0",
     "@tiptap/core": ">=3.28.0 <4.0.0",
     "@tiptap/extension-mention": ">=3.28.0 <4.0.0",
     "@tiptap/pm": ">=3.28.0 <4.0.0",
@@ -904,8 +919,5 @@
       "optional": true
     }
   },
-  "dependencies": {
-    "@tangle-network/ui": "11.35.0",
-    "@tangle-network/sandbox": "0.60.49"
-  }
+  "dependencies": {}
 }

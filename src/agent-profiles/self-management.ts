@@ -195,3 +195,111 @@ export function createMountProfileChangeTool(deps: MountProfileChangeDeps): AppT
     },
   })
 }
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/** Any drizzle database instance (structural — the adapters only use
+ *  select/insert with the standard builder chain). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DrizzleLike = any
+
+// ── Shared storage adapters ────────────────────────────────────────────────
+//
+// Every product's self-mount storage is the same shape: a scope key and a
+// JSON list of mounted skill ids. These adapters mean each product wires
+// the verb in 3 lines instead of hand-writing a drizzle query.
+
+import type { drizzle as drizzleD1 } from 'drizzle-orm/d1'
+import { eq } from 'drizzle-orm'
+import { sqliteTable, text } from 'drizzle-orm/sqlite-core'
+
+/** Create (or use) the standard self-mount table in a drizzle/D1 database. */
+export function selfMountTable(tableName: string) {
+  return sqliteTable(tableName, {
+    scope: text('scope').primaryKey(),
+    mounted: text('mounted').notNull(),
+  })
+}
+
+/** A drizzle-backed SelfMountStorage against any table with the standard
+ *  shape (scope primary key + mounted JSON text column). Works with the
+ *  tables every product creates via {@link selfMountTable}. */
+export function createDrizzleSelfMountStorage(
+  db: DrizzleLike,
+  table: ReturnType<typeof selfMountTable>,
+  baseline: string,
+): SelfMountStorage {
+  return {
+    async get(scope: string): Promise<readonly string[]> {
+      const rows = await db
+        .select({ mounted: table.mounted })
+        .from(table)
+        .where(eq(table.scope, scope))
+        .limit(1)
+      try {
+        return rows[0] ? (JSON.parse(rows[0].mounted) as string[]) : [baseline]
+      } catch {
+        return [baseline]
+      }
+    },
+    async set(scope: string, ids: readonly string[]): Promise<void> {
+      await db
+        .insert(table)
+        .values({ scope, mounted: JSON.stringify(ids) })
+        .onConflictDoUpdate({
+          target: table.scope,
+          set: { mounted: JSON.stringify(ids) },
+        })
+    },
+  }
+}
+
+/** A KV-backed SelfMountStorage (Cloudflare KV, any namespace). */
+export function createKVSelfMountStorage(
+  kv: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> },
+  prefix: string,
+  baseline: string,
+): SelfMountStorage {
+  const key = (scope: string) => `${prefix}:${scope}`
+  return {
+    async get(scope: string): Promise<readonly string[]> {
+      const raw = await kv.get(key(scope))
+      try { return raw ? (JSON.parse(raw) as string[]) : [baseline] } catch { return [baseline] }
+    },
+    async set(scope: string, ids: readonly string[]): Promise<void> {
+      await kv.put(key(scope), JSON.stringify(ids))
+    },
+  }
+}
+
+/** The one-call product wiring: catalog + storage + baseline + cap. */
+export interface ProductSelfMountConfig {
+  /** The product's skill catalog (id + description per skill). */
+  skills: ReadonlyArray<{ id: string; description: string }>
+  /** A drizzle/D1 database (uses a self-mount table) or a KV namespace. */
+  db?: DrizzleLike
+  kv?: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> }
+  /** The table name for drizzle storage (default: 'agent_self_mounts'). */
+  tableName?: string
+  /** KV prefix (default: 'self-mount'). */
+  kvPrefix?: string
+  /** The skill id that can never be removed. */
+  baseline: string
+  /** Max simultaneous mounts (default: 12). */
+  maxMounted?: number
+}
+
+export function createProductSelfMount(config: ProductSelfMountConfig) {
+  const storage = config.db
+    ? createDrizzleSelfMountStorage(config.db, selfMountTable(config.tableName ?? 'agent_self_mounts'), config.baseline)
+    : config.kv
+      ? createKVSelfMountStorage(config.kv, config.kvPrefix ?? 'self-mount', config.baseline)
+      : undefined
+  if (!storage) throw new Error('createProductSelfMount needs db or kv')
+  return createMountProfileChangeTool({
+    skills: config.skills,
+    storage,
+    scopeKey: (ctx) => ctx.workspaceId ?? ctx.threadId ?? '',
+    baseline: config.baseline,
+    maxMounted: config.maxMounted ?? 12,
+  })
+}

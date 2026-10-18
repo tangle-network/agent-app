@@ -4,7 +4,7 @@
 
 Source: `src/spend/index.ts`
 
-60 exports.
+64 exports.
 
 ### `AllExcludedAssessment`
 
@@ -182,6 +182,22 @@ interface ComputeExpectedCeilingOptions
 900000
 ```
 
+### `DeriveChildKeyBudgetInput`
+
+`interface`
+
+```ts
+interface DeriveChildKeyBudgetInput
+```
+
+### `deriveChildKeyBudgetUsd`
+
+`function` — Derive the delegated child-key budget from the parent's remaining budget: the ask the mint should make — never above a known remaining, never below the platform minimum.
+
+```ts
+(input: DeriveChildKeyBudgetInput) => number
+```
+
 ### `ExpectedCeiling`
 
 `interface` — The upper bound on one box's billable duration, and what earned it.
@@ -222,6 +238,14 @@ interface InMemorySpendLedgerStore
 (row: SettlementRow) => boolean
 ```
 
+### `MIN_CHILD_KEY_BUDGET_USD`
+
+`const` — The platform's minimum child-key budget.
+
+```ts
+0.5
+```
+
 ### `ObservedBalance`
 
 `interface` — The balance the product observes, and the floor it must not cross.
@@ -244,6 +268,14 @@ interface ObserveSandboxInput
 
 ```ts
 (keyIds: readonly string[]) => SpendOwnershipRule
+```
+
+### `ParentBudgetExhaustedError`
+
+`class` — The source key is exhausted — the only refusal this contract throws.
+
+```ts
+class ParentBudgetExhaustedError
 ```
 
 ### `parseSandboxGroupKey`

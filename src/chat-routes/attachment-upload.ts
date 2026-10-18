@@ -54,10 +54,11 @@ import {
   attachmentSizeErrorMessage,
   attachmentTotalSizeErrorMessage,
   checkAttachmentType,
+  defaultValidateAttachmentPath,
   sanitizeAttachmentFileName,
+  type AttachmentPathCheck,
 } from './attachment-validation'
 import { sniffBinary } from './binary-sniff'
-import { defaultValidateAttachmentPath, type AttachmentPathCheck } from './resolve-attachments'
 import { sniffMimeFromName } from './promote-file-part'
 
 /** Stable authorization result for the original writer contract. */

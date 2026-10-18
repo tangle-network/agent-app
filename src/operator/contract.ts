@@ -5,6 +5,8 @@
  * through these routes; the app supplies only storage and execution.
  */
 
+import type { ChatAttachmentInput } from '../chat-routes/wire.js'
+
 export const OPERATOR_API_VERSION = 'v1'
 export const OPERATOR_API_BASE_PATH = '/api/operator/v1'
 
@@ -71,6 +73,7 @@ export interface OperatorAppInfo {
 }
 
 export type OperatorCapability =
+  | 'turns.attachments'
   | 'workspaces.create'
   | 'threads.read'
   | 'files.read'
@@ -215,6 +218,15 @@ export interface StartTurnInput {
   /** Title for a new conversation. */
   title?: string
   model?: string
+  /**
+   * Files uploaded to this workspace ahead of the turn, as the app's
+   * attachment upload route returned them in `{ files }`. They reach the
+   * agent exactly as browser-composer attachments do; the app re-checks each
+   * path against the workspace's own store. At most `ATTACHMENT_MAX_COUNT`
+   * (`/chat-routes`) entries. Apps without the `turns.attachments`
+   * capability refuse them.
+   */
+  attachments?: ChatAttachmentInput[]
 }
 
 /** Route table: method, path pattern under the base path, and required scopes. */

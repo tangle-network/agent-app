@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
-import { ChannelConversation, ChannelVerificationPanel, ChannelsProvider, EmailChannel, IMessageChannel, LinePayPage, NumberChannel, WhatsAppChannel } from '../channels'
+import { ChannelConnect, ChannelConversation, ChannelVerificationPanel, ChannelsProvider, EmailChannel, IMessageChannel, LinePayPage, NumberChannel, WhatsAppChannel } from '../channels'
 import { channelAttachment, channelMessage, channelTest, createChannelsFixture, numberOrder } from './fixtures/channels'
 import type { ChannelVerification } from '../channels'
 
 function Surface({ surface = 'imessage', status, expired = false, failure = false, active = false, empty = false, loading = false }: {
-  surface?: 'imessage' | 'whatsapp' | 'email' | 'number' | 'history' | 'payment' | 'verification'
+  surface?: 'imessage' | 'whatsapp' | 'email' | 'telegram' | 'voice' | 'number' | 'history' | 'payment' | 'verification'
   status?: ChannelVerification['status']
   expired?: boolean
   failure?: boolean
@@ -25,7 +25,7 @@ function Surface({ surface = 'imessage', status, expired = false, failure = fals
     return fake
   })
   return <div className="w-full max-w-2xl"><ChannelsProvider client={fixture.client} pollInterval={false}>
-    {surface === 'imessage' ? <IMessageChannel /> : surface === 'whatsapp' ? <WhatsAppChannel /> : surface === 'email' ? <EmailChannel /> : surface === 'number' ? <NumberChannel transport="sms" /> : surface === 'history' ? <ChannelConversation lineId="ln_demo" threadId="thread_demo" /> : surface === 'payment' ? <LinePayPage lineId="ln_demo" /> : <ChannelVerificationPanel lineId="ln_demo" />}
+    {surface === 'imessage' ? <IMessageChannel /> : surface === 'whatsapp' ? <WhatsAppChannel /> : surface === 'email' ? <EmailChannel /> : surface === 'telegram' || surface === 'voice' ? <ChannelConnect transport={surface} /> : surface === 'number' ? <NumberChannel transport="sms" /> : surface === 'history' ? <ChannelConversation lineId="ln_demo" threadId="thread_demo" /> : surface === 'payment' ? <LinePayPage lineId="ln_demo" /> : <ChannelVerificationPanel lineId="ln_demo" />}
   </ChannelsProvider></div>
 }
 
@@ -34,6 +34,8 @@ export default meta
 type Story = StoryObj<typeof meta>
 export const SharedIMessage: Story = { args: { surface: 'imessage' } }
 export const WhatsApp: Story = { args: { surface: 'whatsapp' } }
+export const Telegram: Story = { args: { surface: 'telegram' } }
+export const OwnedVoiceNumber: Story = { args: { surface: 'voice' } }
 export const Mailbox: Story = { args: { surface: 'email' } }
 export const WaitingForInbound: Story = { args: { surface: 'verification', status: 'waiting' } }
 export const InboundReceived: Story = { args: { surface: 'verification', status: 'received' } }

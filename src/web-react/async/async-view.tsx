@@ -1,5 +1,7 @@
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
 
+import { Button, EmptyState } from '@tangle-network/ui/primitives'
+
 import type { AsyncResourceState } from './state'
 import type { MutationState } from './use-confirmed-mutation'
 
@@ -126,17 +128,6 @@ export function AsyncView<T>({
 function LoadingBlock({ label }: { label: string }): ReactElement {
   return (
     <div className={BLOCK_CLASS}>
-      {/* The ring is the brand colour, not `border-border`. A divider token is
-          tuned to be barely there, which is the opposite of what a busy
-          indicator needs: measured on this block it painted 1.10:1 in light and
-          1.20:1 in dark against its own panel — below the 3:1 a meaningful
-          graphic needs, and this spinner is the only signal that a fetch is in
-          flight. `border-primary` is also what the composer's send spinner
-          already uses, so this stops being the one that reads differently. */}
-      <span
-        className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
-        aria-hidden="true"
-      />
       <span className="text-sm text-muted-foreground">{label}</span>
     </div>
   )
@@ -154,37 +145,16 @@ function ErrorBlock({
   return (
     <div role="alert" className={BLOCK_CLASS}>
       <p className="max-w-md text-sm text-muted-foreground">{message}</p>
-      <button
-        type="button"
-        onClick={retry}
-        className="h-8 rounded-md border border-border px-3 text-xs font-medium text-foreground transition hover:bg-accent"
-      >
-        {retryLabel}
-      </button>
+      <Button type="button" variant="outline" size="sm" onClick={retry}>{retryLabel}</Button>
     </div>
   )
 }
 
 function EmptyBlock({ spec }: { spec: AsyncEmptySpec }): ReactElement {
-  return (
-    <div className={BLOCK_CLASS}>
-      <p className="text-sm font-medium text-foreground">{spec.title}</p>
-      {spec.description ? <p className="max-w-md text-sm text-muted-foreground">{spec.description}</p> : null}
-      {spec.action ? (
-        isValidElement(spec.action) ? (
-          spec.action
-        ) : (
-          <button
-            type="button"
-            onClick={(spec.action as AsyncEmptyAction).onClick}
-            className="h-8 rounded-md border border-border px-3 text-xs font-medium text-foreground transition hover:bg-accent"
-          >
-            {(spec.action as AsyncEmptyAction).label}
-          </button>
-        )
-      ) : null}
-    </div>
-  )
+  const action = spec.action
+  return <EmptyState title={spec.title} description={spec.description} action={
+    isValidElement(action) ? action : action ? <Button type="button" variant="outline" size="sm" onClick={(action as AsyncEmptyAction).onClick}>{(action as AsyncEmptyAction).label}</Button> : undefined
+  } />
 }
 
 export interface MutationStatusLabels {
@@ -207,20 +177,20 @@ export function MutationStatus<T>({ state, labels, className }: MutationStatusPr
   if (state.status === 'idle') return null
   if (state.status === 'pending') {
     return (
-      <span role="status" aria-live="polite" aria-busy={true} className={className ?? 'text-xs text-muted-foreground'}>
+      <span role="status" aria-live="polite" aria-busy={true} className={className ?? 'text-sm text-muted-foreground'}>
         {labels?.pending ?? 'Saving…'}
       </span>
     )
   }
   if (state.status === 'succeeded') {
     return (
-      <span role="status" aria-live="polite" aria-busy={false} className={className ?? 'text-xs text-muted-foreground'}>
+      <span role="status" aria-live="polite" aria-busy={false} className={className ?? 'text-sm text-muted-foreground'}>
         {labels?.succeeded ?? 'Saved'}
       </span>
     )
   }
   return (
-    <span role="alert" className={className ?? 'text-xs text-destructive'}>
+    <span role="alert" className={className ?? 'text-sm text-destructive'}>
       {state.message}
     </span>
   )

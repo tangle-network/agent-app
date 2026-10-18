@@ -14,6 +14,7 @@ import type {
   HubActionPreview,
   HubActionReceipt,
   HubApprovalItem,
+  HubPreviewMedia,
 } from './types'
 
 const PROVIDER_NAMES: Record<string, string> = {
@@ -36,6 +37,12 @@ const PROVIDER_NAMES: Record<string, string> = {
   linear: 'Linear',
   inkbox: 'Inkbox',
   resend: 'Resend',
+  'instagram-business': 'Instagram',
+  'facebook-pages': 'Facebook',
+  'meta-ads': 'Meta Ads',
+  'linkedin-ads': 'LinkedIn Ads',
+  tiktok: 'TikTok',
+  'youtube-data': 'YouTube',
 }
 
 /** A provider's display name: `github` is GitHub, `outlook-mail` is Outlook. */
@@ -168,13 +175,19 @@ function mergedFiles(declared: readonly HubActionFile[], counted: readonly HubAc
 }
 
 function emailPreview(input: Record<string, unknown>, reply: boolean): HubActionPreview {
+  const from = asRecord(input.from)
+  const htmlBody = typeof input.html === 'string' ? input.html : undefined
   return {
     kind: 'email',
     to: list(input.to ?? input.recipients),
     cc: list(input.cc),
     bcc: list(input.bcc),
     subject: text(input.subject),
-    body: text(input.body) ?? text(input.text) ?? text(input.html) ?? text(input.comment),
+    from: text(input.from) ?? text(from.email) ?? text(from.address),
+    fromName: text(input.fromName) ?? text(input.from_name) ?? text(from.name),
+    previewText: text(input.previewText) ?? text(input.preview_text) ?? text(input.preheader),
+    // The payload is evidence: retain whitespace and prefer the actual HTML part.
+    body: htmlBody ?? [input.body, input.text, input.comment].find((value): value is string => typeof value === 'string'),
     html: input.html === true || text(input.bodyType)?.toLowerCase() === 'html' || typeof input.html === 'string',
     reply,
   }
@@ -285,11 +298,29 @@ function sendEmail(verb: 'Send' | 'Save draft', reply = false): Presenter {
   }
 }
 
-function post(channel: 'x' | 'linkedin', reply = false): Presenter {
+function post(channel: 'x' | 'linkedin' | 'instagram' | 'facebook' | 'tiktok', reply = false, sponsored = false): Presenter {
   return (input) => {
-    const body = text(input.text) ?? text(input.commentary) ?? ''
-    const url = text(input.url)
-    const where = channel === 'x' ? 'X' : 'LinkedIn'
+    const container = asRecord(input.container)
+    const body = [input.text, input.commentary, input.caption, input.message, container.caption, input.title]
+      .find((value): value is string => typeof value === 'string') ?? ''
+    const url = text(input.url) ?? text(input.link)
+    const where = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok' }[channel]
+    const media = (Array.isArray(input.media) ? input.media : []).flatMap((value): HubPreviewMedia[] => {
+      const entry = asRecord(value)
+      if ((entry.kind !== 'image' && entry.kind !== 'video') || typeof entry.src !== 'string') return []
+      return [{ kind: entry.kind, src: entry.src, alt: typeof entry.alt === 'string' ? entry.alt : '',
+        ...(typeof entry.poster === 'string' ? { poster: entry.poster } : {}),
+        ...(typeof entry.width === 'number' ? { width: entry.width } : {}),
+        ...(typeof entry.height === 'number' ? { height: entry.height } : {}) }]
+    })
+    if (!media.length) {
+      const video = text(input.video_url) ?? text(container.video_url)
+      const image = text(input.imageUrl) ?? text(input.image_url) ?? text(container.image_url)
+      if (video) media.push({ kind: 'video', src: video, alt: '' })
+      else if (image) media.push({ kind: 'image', src: image, alt: '' })
+    }
+    const placement = channel === 'tiktok' || container.media_type === 'REELS' ? 'vertical'
+      : container.media_type === 'CAROUSEL' ? 'carousel' : 'feed'
     return {
       action: reply ? `Reply on ${where}` : `Post on ${where}`,
       title: `${reply ? 'Reply' : 'Post'} on ${where}${body ? `: “${clipped(body, 60)}”` : ''}`,
@@ -298,7 +329,18 @@ function post(channel: 'x' | 'linkedin', reply = false): Presenter {
         kind: 'post',
         channel,
         text: body,
-        ...(url ? { link: { url, title: text(input.title), description: text(input.description) } } : {}),
+        ...(media.length ? { media } : {}),
+        placement,
+        ...(sponsored ? { sponsored: true } : {}),
+        displayName: text(input.displayName),
+        handle: text(input.handle),
+        callToAction: text(input.callToAction),
+        images: (Array.isArray(input.images) ? input.images : input.image ? [input.image] : []).flatMap((image) => {
+          const record = asRecord(image)
+          const url = text(image) ?? text(record.url)
+          return url ? [{ url, alt: text(record.alt) }] : []
+        }),
+        ...(url ? { link: { url, title: text(input.headline) ?? text(input.title), description: text(input.description) } } : {}),
       },
     }
   }
@@ -389,6 +431,13 @@ const PRESENTERS: Record<string, Presenter> = {
   'x.tweets.create': post('x'),
   'linkedin.posts.create': post('linkedin'),
   'linkedin.shares.create': post('linkedin'),
+  'instagram-business.media.createContainer': post('instagram'),
+  'tiktok.publishing.videoFromUrl': post('tiktok'),
+  'tiktok.publishing.photosFromUrls': post('tiktok'),
+  'facebook-pages.pages.feed.create': post('facebook'),
+  'facebook-pages.pages.photos.create': post('facebook'),
+  'meta-ads.creatives.createLink': post('facebook', false, true),
+  'linkedin-ads.creatives.create': post('linkedin', false, true),
   'slack.post_message': (input) => {
     const channel = text(input.channel) ?? text(input.channelId)
     const where = channel ? (channel.startsWith('#') || /^[CDG][A-Z0-9]{6,}$/.test(channel) ? channel : `#${channel}`) : undefined
@@ -461,7 +510,7 @@ const PRESENTERS: Record<string, Presenter> = {
 }
 
 /** A held call in the owner's words, with the preview its integration renders. */
-export function presentHubAction(item: Pick<HubApprovalItem, 'actionPath' | 'providerId' | 'input' | 'files' | 'bundle'>): HubActionPresentation {
+export function presentHubAction(item: Pick<HubApprovalItem, 'actionPath' | 'providerId' | 'input' | 'files' | 'bundle' | 'preview'>): HubActionPresentation {
   const { provider: pathProvider, action } = splitHubActionPath(item.actionPath)
   const providerId = item.providerId || pathProvider
   const provider = { id: providerId, name: hubProviderName(providerId) }
@@ -479,7 +528,7 @@ export function presentHubAction(item: Pick<HubApprovalItem, 'actionPath' | 'pro
           preview: { kind: 'fields', fields: scalarFields(input) } as HubActionPreview,
         }
       })()
-  return { provider, ...presented, ...(item.bundle ? { title: item.bundle.title } : {}) }
+  return { provider, ...presented, ...(item.preview ? { preview: item.preview } : {}), ...(item.bundle ? { title: item.bundle.title } : {}) }
 }
 
 // ---------- receipts ----------

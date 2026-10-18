@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { ChannelConversation, ChannelVerificationPanel, ChannelsProvider, EmailChannel, LinePayPage, NumberChannel, WhatsAppChannel, channelMessageLink, safeCheckoutUrl } from '../../src/channels'
+import { ChannelConnect, ChannelConversation, ChannelVerificationPanel, ChannelsProvider, EmailChannel, LinePayPage, NumberChannel, WhatsAppChannel, channelMessageLink, safeCheckoutUrl } from '../../src/channels'
 import { channelAttachment, channelLine, channelMessage, channelTest, createChannelsFixture, numberOrder } from '../../src/stories/fixtures/channels'
 import type { ReactNode } from 'react'
 
@@ -88,6 +88,59 @@ describe('rendered channel surfaces', () => {
     await user.click(screen.getByRole('button', { name: 'Connect channel' }))
     await waitFor(() => expect(fromEmail).toHaveBeenCalledWith({ connectionId: 'conn_demo', address: 'hello@example.com' }))
     expect(await screen.findByText('Email · hello@example.com')).toBeTruthy()
+  })
+
+  it('requires an owned voice number without offering a text verification flow', async () => {
+    const user = userEvent.setup()
+    const fake = mount(<ChannelConnect transport="voice" />)
+    const fromConnection = vi.spyOn(fake.client.lines, 'fromConnection')
+    const whatsappNumbers = vi.spyOn(fake.client.setup, 'whatsappNumbers')
+    const verification = vi.spyOn(fake.client.setup, 'verification')
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Connection' }), 'conn_demo')
+    const button = screen.getByRole('button', { name: 'Connect channel' })
+    expect(button).toHaveProperty('disabled', true)
+    const number = screen.getByRole('textbox', { name: 'Existing provider number ID' })
+    await user.type(number, '   ')
+    expect(button).toHaveProperty('disabled', true)
+    await user.type(number, 'voice_number')
+    button.focus()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(fromConnection).toHaveBeenCalledWith({ transport: 'voice', connectionId: 'conn_demo', phoneNumberId: 'voice_number' }))
+    expect(await screen.findByText(/Voice calls require host-managed setup/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Start channel test' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Turn on messaging' })).toBeNull()
+    expect(whatsappNumbers).not.toHaveBeenCalled()
+    expect(verification).not.toHaveBeenCalled()
+  })
+
+  it('connects Telegram without a number and gives Telegram-specific test instructions', async () => {
+    const user = userEvent.setup()
+    const fake = mount(<ChannelConnect transport="telegram" />)
+    const fromConnection = vi.spyOn(fake.client.lines, 'fromConnection')
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Connection' }), 'conn_demo')
+    expect(screen.queryByRole('textbox', { name: 'Existing provider number ID' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Connect channel' }))
+    await waitFor(() => expect(fromConnection).toHaveBeenCalledWith({ transport: 'telegram', connectionId: 'conn_demo' }))
+    await user.click(await screen.findByRole('button', { name: 'Start channel test' }))
+    expect(await screen.findByText('In Telegram, send this to @helper:')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Text it now' })).toBeNull()
+  })
+
+  it.each(['voice', 'telegram'] as const)('never sends %s to an SMS deep link', transport => {
+    expect(channelMessageLink(channelLine({ transport, address: '+15550100003', connect: null, routerAddress: null }), 'TEST x')).toBeNull()
+  })
+
+  it('does not treat an attached voice line and text proof as verified calls', async () => {
+    const fake = mount(<ChannelVerificationPanel lineId="ln_demo" />, fixture => {
+      fixture.state.line = channelLine({ transport: 'voice', address: '+15550100003', connect: null, routerAddress: null, attachment: channelAttachment() })
+      fixture.state.test = channelTest('verified')
+    })
+    const verification = vi.spyOn(fake.client.setup, 'verification')
+    expect(await screen.findByText(/Voice calls require host-managed setup/)).toBeTruthy()
+    expect(screen.queryByText(/Both directions verified/)).toBeNull()
+    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Refresh channel status'])
+    expect(verification).not.toHaveBeenCalled()
   })
 
   it('shows read failures instead of an empty conversation', async () => {

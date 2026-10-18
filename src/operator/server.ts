@@ -1,3 +1,4 @@
+import { parseChatAttachmentInputs } from '../chat-routes/attachment-validation.js'
 import { createApiKeyRequestAuth, type RequestApiKey } from '../platform/api-key-auth.js'
 import {
   OPERATOR_API_BASE_PATH,
@@ -38,6 +39,13 @@ export interface OperatorAdapter<Identity> {
   authorizeWorkspace(ctx: OperatorContext<Identity>, workspaceId: string, access: 'read' | 'run'): Promise<OperatorWorkspace | null>
   listWorkspaces(ctx: OperatorContext<Identity>): Promise<OperatorWorkspace[]>
   createWorkspace?(ctx: OperatorContext<Identity>, input: { name: string }): Promise<OperatorWorkspace>
+  /**
+   * True when `startTurn` delivers `input.attachments` to the agent, through
+   * a chat route whose attachment resolver reads them from the workspace's
+   * store. Otherwise the handler refuses turns that carry attachments rather
+   * than letting them be dropped.
+   */
+  acceptsAttachments?: boolean
   /** Admit the turn durably and return without waiting for it; the same turnId never starts twice. */
   startTurn(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace, input: StartTurnInput): Promise<OperatorTurn>
   getTurn(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace, target: { threadId: string; turnId: string }): Promise<OperatorTurn | null>
@@ -97,7 +105,7 @@ const TURN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const THREAD_ID = /^[A-Za-z0-9_-]{1,256}$/
 const MAX_BODY_BYTES = 128 * 1024
 const MAX_CONTENT_BYTES = 64 * 1024
-const START_FIELDS = new Set(['turnId', 'content', 'threadId', 'title', 'model'])
+const START_FIELDS = new Set(['turnId', 'content', 'threadId', 'title', 'model', 'attachments'])
 
 const NO_STORE = { 'cache-control': 'private, no-store' }
 
@@ -174,12 +182,17 @@ function parseStartTurn(body: Record<string, unknown>): StartTurnInput {
   }
   const title = optionalString(body, 'title', 200)
   const model = optionalString(body, 'model', 200)
+  // The chat route's own structural rules; the app's store read re-checks
+  // every path against this workspace and re-derives every size.
+  const attachments = parseChatAttachmentInputs(body.attachments)
+  if (!attachments.succeeded) throw new OperatorError('operator.invalid_input', 400, attachments.error)
   return {
     turnId: body.turnId.toLowerCase(),
     content: body.content,
     ...(threadId === undefined ? {} : { threadId }),
     ...(title === undefined ? {} : { title }),
     ...(model === undefined ? {} : { model }),
+    ...(attachments.value.length === 0 ? {} : { attachments: attachments.value }),
   }
 }
 
@@ -192,7 +205,8 @@ function capabilities<Identity>(adapter: OperatorAdapter<Identity>): OperatorCap
     ['assets.read', adapter.readAsset],
     ['scorecard.read', adapter.getScorecard],
   ]
-  return present.filter(([, implemented]) => typeof implemented === 'function').map(([name]) => name)
+  const implemented = present.filter(([, method]) => typeof method === 'function').map(([name]) => name)
+  return adapter.acceptsAttachments === true ? ['turns.attachments', ...implemented] : implemented
 }
 
 function unsupported(): never {
@@ -302,6 +316,9 @@ export function createOperatorApi<Key extends RequestApiKey, Identity>(
           return json({ workspace })
         case 'turns.start': {
           const input = parseStartTurn(await readJsonBody(request))
+          if (input.attachments && adapter.acceptsAttachments !== true) {
+            throw new OperatorError('operator.unsupported', 501, 'This app does not accept attachments on operator turns')
+          }
           return json({ turn: await adapter.startTurn(ctx, workspace, input) }, 202)
         }
         case 'threads.list': {

@@ -33,7 +33,7 @@ function platform(...responses: Responder[]) {
 }
 
 /**
- * Platform's 201 for POST /v1/keys/delegate, in its real shape (agent-dev-container
+ * Platform's 201 for POST /v1/keys/delegate, in its real shape (agent-container
  * key-provisioning.ts delegate return + key-issuance-routes.ts envelope): the key row
  * and its attribution; the granted expiry is attribution.expiresAt, never top-level.
  */

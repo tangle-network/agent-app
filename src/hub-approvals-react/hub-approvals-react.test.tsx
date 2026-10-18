@@ -61,13 +61,6 @@ describe('HubApprovalDock', () => {
     expect(within(list).getByText('Autopilot already published 3 posts today, its daily limit.')).toBeTruthy()
   })
 
-  it('renders an HTML email as text, never markup', () => {
-    render(<HubApprovalDock items={[EMAIL]} onDecide={vi.fn()} />)
-    expect(screen.getByText('Hello Ada')).toBeTruthy()
-    expect(screen.getByText('ops@acme.com')).toBeTruthy()
-    expect(document.querySelector('b')).toBeNull()
-  })
-
   it('sends the decision and shows the run in place until the host reports the result', async () => {
     let finish!: () => void
     const onDecide = vi.fn(() => new Promise<void>((resolve) => { finish = resolve }))

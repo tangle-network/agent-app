@@ -12,7 +12,7 @@
  * cold first reply took 68 s on the web and 76 s on a line.
  *
  * WHO SUSPENDS. Not this module. `POST /v1/sandboxes/:id/stop` suspends a box
- * even while a turn runs in it (agent-dev-container
+ * even while a turn runs in it (agent-container
  * `routes/projects/lifecycle.ts`), whereas the platform's idle reaper re-checks
  * the sidecar for live work before it suspends. So a lease only ever resumes
  * and, during a burst hold, pings. An unused warm ends when the box's own idle

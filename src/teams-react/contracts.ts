@@ -27,6 +27,8 @@ export interface MembersPanelProps {
   members: MemberView[]
   /** The viewer's effective role — gates which controls are interactive. */
   currentRole: WorkspaceRole
+  /** The viewer's user id, so their own row offers no role change or removal, as in `MembersSection`. */
+  currentUserId?: string | null
   /** Invite a member; resolve with the shareable invite URL (or void). */
   onInvite(input: { email: string; role: WorkspaceRole }): Promise<{ inviteUrl?: string } | void>
   /** Change a member's role. */

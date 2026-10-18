@@ -10,9 +10,11 @@
  * members panel shows accepted members, this owns the invite flow + pending list.
  */
 
+import { Button, Heading } from '@tangle-network/ui/primitives'
 import { useState } from 'react'
 import { hasWorkspaceRole, type WorkspaceRole } from '../../teams/roles'
 import type { InvitationView, InvitationsPanelProps } from '../contracts'
+import { invitationDetail } from './invitation-detail'
 import { InviteForm } from './InviteForm'
 
 const BADGE_BASE = 'inline-flex items-center rounded border px-2 py-0.5 text-sm font-medium'
@@ -26,33 +28,6 @@ const STATUS: Record<InvitationView['status'], { label: string; tone: string }> 
   pending: { label: 'Pending', tone: 'border-[var(--surface-warning-border)] bg-[var(--surface-warning-bg)] text-[var(--surface-warning-text)]' },
   revoked: { label: 'Revoked', tone: 'border-[var(--surface-danger-border)] bg-[var(--surface-danger-bg)] text-[var(--surface-danger-text)]' },
   expired: { label: 'Expired', tone: 'border-[var(--border-default)] text-[var(--text-muted)]' },
-}
-
-/** Uppercase the role's first letter in JS (not CSS `capitalize`, which would
- *  also hit the lowercase words that follow it on the same line). */
-function capitalize(text: string): string {
-  return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1)
-}
-
-function shortDate(value: Date | number | string): string {
-  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-/** The line under the address: the role, then only what is true of this invitation now. */
-function invitationDetail(invitation: InvitationView): string {
-  const role = capitalize(invitation.permissions)
-  switch (invitation.status) {
-    case 'accepted':
-      return invitation.acceptedAt ? `${role} · joined ${shortDate(invitation.acceptedAt)}` : role
-    case 'pending': {
-      const delivery = invitation.emailStatus === 'sent' ? 'email sent' : invitation.emailStatus === 'not_sent' ? 'email not sent yet' : null
-      return [role, delivery, `expires ${shortDate(invitation.expiresAt)}`].filter(Boolean).join(' · ')
-    }
-    case 'expired':
-      return `${role} · expired ${shortDate(invitation.expiresAt)}`
-    case 'revoked':
-      return role
-  }
 }
 
 export function InvitationsPanel({
@@ -123,7 +98,7 @@ export function InvitationsPanel({
 
       <div className="flex flex-col gap-2 border-t border-[var(--border-default)] pt-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-[var(--text-primary)]">Invitation history</h4>
+          <Heading as="h4" variant="subsection">Invitation history</Heading>
           <span className="text-sm text-[var(--text-muted)]">{invitations.length} total</span>
         </div>
         {invitations.length === 0 ? (
@@ -173,30 +148,9 @@ function InvitationRow({ invitation, canManage, busy, onCopy, onResend, onRevoke
       </div>
       {canManage && isPending && (
         <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCopy}
-            disabled={busy}
-            className="rounded border border-[var(--border-default)] px-2.5 py-1 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
-          >
-            Copy link
-          </button>
-          <button
-            type="button"
-            onClick={onResend}
-            disabled={busy}
-            className="rounded border border-[var(--border-default)] px-2.5 py-1 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-50"
-          >
-            {busy ? 'Working…' : 'Resend'}
-          </button>
-          <button
-            type="button"
-            onClick={onRevoke}
-            disabled={busy}
-            className="rounded px-2.5 py-1 text-sm text-[var(--text-danger)] hover:bg-[var(--border-default)] disabled:opacity-50"
-          >
-            Revoke
-          </button>
+          <Button type="button" variant="outline" onClick={onCopy} disabled={busy}>Copy link</Button>
+          <Button type="button" variant="outline" onClick={onResend} disabled={busy}>{busy ? 'Working…' : 'Resend'}</Button>
+          <Button type="button" variant="destructive-outline" onClick={onRevoke} disabled={busy}>Revoke</Button>
         </div>
       )}
     </div>

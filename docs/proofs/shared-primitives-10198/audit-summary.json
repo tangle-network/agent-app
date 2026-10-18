@@ -1,0 +1,404 @@
+{
+  "source": "de38bbc50b93167e1f35c479db058102cdb9db79",
+  "gate": "beelink1-df1bf30b57d3d0b6abec7774248472a0",
+  "cases": [
+    {
+      "case": "agent-dark-1280-normal",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 0,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            1,
+            1,
+            1
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 21,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    },
+    {
+      "case": "agent-light-1280-normal",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 19,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            19,
+            19,
+            19
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 21,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    },
+    {
+      "case": "agent-dark-390-normal",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 19,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            19,
+            19,
+            19
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 21,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    },
+    {
+      "case": "agent-light-390-normal",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 2,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            3,
+            3,
+            3
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 21,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    },
+    {
+      "case": "agent-dark-1280-interrupted",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 19,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            19,
+            19,
+            19
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 25,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    },
+    {
+      "case": "agent-light-1280-interrupted",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 19,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            19,
+            19,
+            19
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 25,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    },
+    {
+      "case": "agent-dark-390-interrupted",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 9,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            10,
+            10,
+            10
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 25,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    },
+    {
+      "case": "agent-light-390-interrupted",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 1,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            2,
+            2,
+            2
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 25,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    },
+    {
+      "case": "agent-dark-1280-reduced-motion",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedAtLoad",
+          "animationObservations": 0,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            0,
+            0,
+            0
+          ],
+          "failures": 0,
+          "unresolved": 0
+        },
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 56,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            56,
+            56,
+            56
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 21,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    },
+    {
+      "case": "agent-light-1280-reduced-motion",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedAtLoad",
+          "animationObservations": 0,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            0,
+            0,
+            0
+          ],
+          "failures": 0,
+          "unresolved": 0
+        },
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 41,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            42,
+            42,
+            42
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 21,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    },
+    {
+      "case": "agent-dark-390-reduced-motion",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedAtLoad",
+          "animationObservations": 0,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            0,
+            0,
+            0
+          ],
+          "failures": 0,
+          "unresolved": 0
+        },
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 19,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            20,
+            20,
+            20
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 21,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    },
+    {
+      "case": "agent-light-390-reduced-motion",
+      "status": "PASS",
+      "errors": [],
+      "reducedChecks": [
+        {
+          "kind": "reducedAtLoad",
+          "animationObservations": 0,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            0,
+            0,
+            0
+          ],
+          "failures": 0,
+          "unresolved": 0
+        },
+        {
+          "kind": "reducedToggledInFlight",
+          "animationObservations": 41,
+          "geometryFrames": 3,
+          "geometryNodes": [
+            42,
+            42,
+            42
+          ],
+          "failures": 0,
+          "unresolved": 0
+        }
+      ],
+      "inputAttempts": 21,
+      "unresolvedAttempts": [],
+      "allSampleStatus": "UNCHECKED",
+      "batch": null,
+      "anchorBeforeAfterIdentical": true,
+      "calibrationClockCheck": "PASS",
+      "calibrationConformance": "UNCHECKED",
+      "rolesEveryInputFinite": true
+    }
+  ],
+  "totalAfterCases": 12,
+  "reducedChecks": 16,
+  "geometryFrames": 48,
+  "inputAttempts": 268,
+  "animationObservationGroups": [
+    {
+      "kind": "CSSTransition",
+      "property": "scrollbar-color",
+      "count": 237
+    },
+    {
+      "kind": "CSSTransition",
+      "property": "transform",
+      "count": 8
+    }
+  ],
+  "latency": "UNKNOWN: DOM/rAF/geometry do not calibrate presented frames; no 2x40 batches",
+  "beforeProvenance": {
+    "gate": "beelink1-d99b99491d1d43913a8d93b2bc23958b",
+    "source": "de38bbc50b93167e1f35c479db058102cdb9db79",
+    "rendererFixture": "3fb3521d4d7c15355cb0dca9986e49177e4b77b7",
+    "helperSha256": "4e9b9686caec11d05e5c7a4712ebade51c15c45da5a0fedf8ac1fbb6d11521a9",
+    "result": "4 normal baseline cases PASS",
+    "reuseReason": "Source, installed cohort, viewport/theme and baseline fixture unchanged; reduced-check correction applies only to after phase. Originals copied unchanged, failed after attempt retained separately."
+  },
+  "mediaReview": "Complete original videos decoded to native-frame contact sheets; full-sequence overviews and selected full-size frames inspected. No native playback or presented-frame calibration."
+}

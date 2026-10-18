@@ -25,6 +25,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, memo, type ReactNode } from 'react'
 import { isViewerMessage, MessageAuthor, TRANSCRIPT_TEXT } from '@tangle-network/ui/chat'
+import { TerminalDisplay, TerminalLine } from '@tangle-network/ui/primitives'
 import { InlineToolItem } from '@tangle-network/ui/run'
 import type { ChatAuthor, ToolPart } from '@tangle-network/ui/types'
 import { useSmoothText } from './smooth-text'
@@ -43,6 +44,7 @@ import { ReasoningRow } from './reasoning-row'
 export * from './chat-stream'
 export { TurnProgress, type TurnProgressProps } from './turn-progress'
 export { ReasoningRow, type ReasoningRowProps } from './reasoning-row'
+export { useChatScroll } from './chat-scroll'
 export * from './chat-interactions'
 export * from './chat-composer'
 export * from './workspace-prewarm'
@@ -82,6 +84,8 @@ export * from './record-grid'
 export * from './command-palette'
 export * from './sparkline'
 export * from './insight-card'
+export { ReviewInbox, type ReviewInboxItem, type ReviewInboxFeedback, type ReviewInboxProps } from './review-inbox'
+export { ReviewFeedbackForm, type ReviewFeedbackFormProps, type ReviewFeedbackFormHandle, type ReviewFeedbackDraft, type ReviewVerdict } from '../hub-approvals-react/feedback'
 export * from './use-dictation'
 export {
   usePopover,
@@ -660,18 +664,13 @@ function ShellDetail({ call }: { call: ChatToolCallInfo }) {
   const outcome = toolOutcomeOf(call)
   const r = (outcome?.result ?? {}) as { stdout?: string; stderr?: string; exitCode?: number }
   return (
-    <div className="overflow-hidden rounded-md bg-zinc-900 font-mono text-xs leading-relaxed">
-      <div className="flex items-center gap-2 px-3 pt-2 text-zinc-400">
-        <span className="select-none text-zinc-500">$</span>
-        <span className="min-w-0 flex-1 truncate text-zinc-200">{String(call.args?.command ?? '')}</span>
-        {r.exitCode != null && (
-          <span className={r.exitCode === 0 ? 'text-success' : 'text-destructive'}>exit {r.exitCode}</span>
-        )}
-      </div>
-      <pre className="max-h-56 overflow-auto whitespace-pre-wrap px-3 pb-2.5 pt-1.5 text-zinc-300">
+    <TerminalDisplay showHeader={false} autoScroll={false} maxHeight="14rem" className="text-xs">
+      <TerminalLine type="command">{String(call.args?.command ?? '')}</TerminalLine>
+      {r.exitCode != null && <TerminalLine type={r.exitCode === 0 ? 'success' : 'error'}>exit {r.exitCode}</TerminalLine>}
+      <TerminalLine type={outcome?.ok === false ? 'error' : 'output'}>
         {outcome?.ok === false ? (outcome.message ?? 'failed') : [r.stdout, r.stderr].filter(Boolean).join('\n') || '(no output)'}
-      </pre>
-    </div>
+      </TerminalLine>
+    </TerminalDisplay>
   )
 }
 

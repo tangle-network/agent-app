@@ -1,0 +1,256 @@
+{
+  "source": "6d6e4bd9a82b0b24a770024497a0202855ff9ec4",
+  "gate": "beelink1-a12f135206f0c08000c066fb4318b3e5",
+  "ui": "11.38.1",
+  "brand": "1.25.1",
+  "sharedReleaseSource": "bfd032ec40d578b42bf738b92ffd56df9300968e",
+  "scope": "Actual agent-app ActionDialog and CommandPalette Storybook consumers, dark phone/light desktop normal/reduced; no published agent-app consumer claim",
+  "mediaReview": "All16 PNGs reviewed in overview plus2 full-size statics. Original4 uncut59.2s recordings decoded at native25fps into5 complete contact sheets; full-sequence overviews+8 selectedframes reviewed,2 selectedframes full-size. No native playback or calibrated motion/latency conformance. Viewport-only originals retain loading.",
+  "evidence": {
+    "functionalJourneys": "4/4 PASS",
+    "actualAcceptedNormalReversalRetainsNode": "2/2 observed; DOM deadline premise only",
+    "reducedInFlightReversal": "UNCHECKED: synchronous cleanup then reopen",
+    "actualWithheldCssCallbacks": 1,
+    "timingAttempts": 68,
+    "unresolvedTimingAttempts": 40,
+    "calibratedLatency": "UNKNOWN",
+    "twoBatchesOfForty": "UNCHECKED",
+    "publishedAgentAppConsumer": "0/11",
+    "humanScreenReaderTouchZoomCraft": "UNKNOWN"
+  },
+  "cases": [
+    {
+      "case": "agent-dark-390-normal",
+      "video": "page@c161fb28a16b59ab23cebc18942087f7.webm",
+      "privateTraceSha256": "8fbbfbb1650ae7c9f44824d68d745798f95129db090ee343b04d42f6f45c5361"
+    },
+    {
+      "case": "agent-light-1280-normal",
+      "video": "page@6f24535722bd9d1fae0cc2d735bf08bb.webm",
+      "privateTraceSha256": "e863481eb497aa3282761f8e859c7a56a88d8ac257695ef6eaf9c9b6079a502f"
+    },
+    {
+      "case": "agent-dark-390-reduced-motion",
+      "video": "page@d1b9e31923f345f79693bd07b232c39f.webm",
+      "privateTraceSha256": "e763c6b5dab1cfc3b46f2f4f9d680092d5de6a05f6af749ec4da80a21afcb754"
+    },
+    {
+      "case": "agent-light-1280-reduced-motion",
+      "video": "page@b9dcebd80bca8db0b9cee972d1552a84.webm",
+      "privateTraceSha256": "6bd1d14e589fe4259766f4b9416e6088972cb49c2814c56f49725907c674a2fc"
+    }
+  ],
+  "historicalFailure": {
+    "source": "2a7e1423e50bd72109c1c60d1fc1dc7980b2c41e",
+    "gate": "beelink1-044adbe05a6a28cfe879c10a79dd8adf",
+    "result": "FAIL; accepted-before-deadline premise unrecorded, missing Brand keyframes confirmed; no shared bug established",
+    "privateTraceSha256": "594ee59de050fe2485045d44edd733d6c66f186752545b3fa12ec8f4fdb8f14a"
+  },
+  "artifacts": [
+    {
+      "path": "README.md",
+      "bytes": 4932,
+      "sha256": "ab6b0a5ddfbe4307bd330d9782894a3921721f2ce7eba0eeee90e6ea583c8ac5"
+    },
+    {
+      "path": "agent-dark-390-normal-busy.png",
+      "bytes": 17426,
+      "sha256": "3591132eb45502f47b47904f1efb41ab692cbe5ef839c3ca7deec6e2943ca339"
+    },
+    {
+      "path": "agent-dark-390-normal-closed.png",
+      "bytes": 11950,
+      "sha256": "2a2053206fe20b1a4ba3ab93be042f4f6fc16e2c4591955f57671df607223e1c"
+    },
+    {
+      "path": "agent-dark-390-normal-lost-events-open.png",
+      "bytes": 17182,
+      "sha256": "601da5fdb03ecb4160b7e97173e92ec511367452c946649cbd6aed5948d9bf51"
+    },
+    {
+      "path": "agent-dark-390-normal-normal-open.png",
+      "bytes": 17201,
+      "sha256": "4ba5d51ffa9277960a7c408267e403155901702c828867bb9b2d3baacb49b229"
+    },
+    {
+      "path": "agent-dark-390-reduced-motion-busy.png",
+      "bytes": 17426,
+      "sha256": "3591132eb45502f47b47904f1efb41ab692cbe5ef839c3ca7deec6e2943ca339"
+    },
+    {
+      "path": "agent-dark-390-reduced-motion-closed.png",
+      "bytes": 11949,
+      "sha256": "1e05917d39474263823f44dd8cf548d7ef044756bc856cbe2300136b84b7711d"
+    },
+    {
+      "path": "agent-dark-390-reduced-motion-lost-events-open.png",
+      "bytes": 17182,
+      "sha256": "601da5fdb03ecb4160b7e97173e92ec511367452c946649cbd6aed5948d9bf51"
+    },
+    {
+      "path": "agent-dark-390-reduced-motion-normal-open.png",
+      "bytes": 17182,
+      "sha256": "601da5fdb03ecb4160b7e97173e92ec511367452c946649cbd6aed5948d9bf51"
+    },
+    {
+      "path": "agent-light-1280-normal-busy.png",
+      "bytes": 22177,
+      "sha256": "7c3b12265f36f7e0801f4051e51d29c8866a088a828aad4809fa71c15a4292f4"
+    },
+    {
+      "path": "agent-light-1280-normal-closed.png",
+      "bytes": 15059,
+      "sha256": "98bfa0dc88ee32009b234208d212963b68486a2aed631242f275d155476b45ff"
+    },
+    {
+      "path": "agent-light-1280-normal-lost-events-open.png",
+      "bytes": 21609,
+      "sha256": "e1b5f31cce698efdde9d25516dabe7f21798ffd12d629ce95959690ea4e30b9c"
+    },
+    {
+      "path": "agent-light-1280-normal-normal-open.png",
+      "bytes": 21609,
+      "sha256": "e1b5f31cce698efdde9d25516dabe7f21798ffd12d629ce95959690ea4e30b9c"
+    },
+    {
+      "path": "agent-light-1280-reduced-motion-busy.png",
+      "bytes": 22177,
+      "sha256": "7c3b12265f36f7e0801f4051e51d29c8866a088a828aad4809fa71c15a4292f4"
+    },
+    {
+      "path": "agent-light-1280-reduced-motion-closed.png",
+      "bytes": 15049,
+      "sha256": "ab708139f91cf425ead1aef19bb605bd06230143b3cea00ffb0377782ed90f47"
+    },
+    {
+      "path": "agent-light-1280-reduced-motion-lost-events-open.png",
+      "bytes": 21512,
+      "sha256": "484a3db00c526413f486053723777fd7e6dfdc63ccfcdfb42bf12b1b605c5cd9"
+    },
+    {
+      "path": "agent-light-1280-reduced-motion-normal-open.png",
+      "bytes": 21515,
+      "sha256": "1de4f41abbf14ced513ab9165d31b1bcc7f16ae9ba9048e42db68d94cac32798"
+    },
+    {
+      "path": "audit-summary.json",
+      "bytes": 13672,
+      "sha256": "d1b2d3d24db8c862260e7151569ca1622de2ea667fb03f8e31ffb8db63c624fc"
+    },
+    {
+      "path": "capture-used.mjs",
+      "bytes": 25063,
+      "sha256": "e9c68b6f5684f42aa12d9acd60ced3d90ca255d6531ac8745d74a2af4868209b"
+    },
+    {
+      "path": "failed-before-brand-presence/agent-dark-390-normal-busy.png",
+      "bytes": 17426,
+      "sha256": "3591132eb45502f47b47904f1efb41ab692cbe5ef839c3ca7deec6e2943ca339"
+    },
+    {
+      "path": "failed-before-brand-presence/agent-dark-390-normal-failure.json",
+      "bytes": 20356,
+      "sha256": "7743bf73ad5034b9e38d34e26fb39241c6ed166ecad165bbc0c537680fea3995"
+    },
+    {
+      "path": "failed-before-brand-presence/agent-dark-390-normal-failure.png",
+      "bytes": 17182,
+      "sha256": "601da5fdb03ecb4160b7e97173e92ec511367452c946649cbd6aed5948d9bf51"
+    },
+    {
+      "path": "failed-before-brand-presence/agent-dark-390-normal-lost-events-open.png",
+      "bytes": 17182,
+      "sha256": "601da5fdb03ecb4160b7e97173e92ec511367452c946649cbd6aed5948d9bf51"
+    },
+    {
+      "path": "failed-before-brand-presence/agent-dark-390-normal-normal-open.png",
+      "bytes": 17182,
+      "sha256": "601da5fdb03ecb4160b7e97173e92ec511367452c946649cbd6aed5948d9bf51"
+    },
+    {
+      "path": "failed-before-brand-presence/capture-used.mjs",
+      "bytes": 20162,
+      "sha256": "152877501e995290d6662a4682a3b39fa54a582c3beebaef64117314e6ea6011"
+    },
+    {
+      "path": "failed-before-brand-presence/causal-audit.json",
+      "bytes": 4248,
+      "sha256": "9249ec2e848931088dfe27612b8639908b74f449e2bd4dc7a92fdd2d27d18893"
+    },
+    {
+      "path": "failed-before-brand-presence/gate-used.sh",
+      "bytes": 3577,
+      "sha256": "4d90d0a5e851b56cdbf0a428444333225cf5c7930a6533c4f9b5b8d43d9bfdc4"
+    },
+    {
+      "path": "failed-before-brand-presence/identity.json",
+      "bytes": 639,
+      "sha256": "1c1ea1a26ed0ce7442dce9663ae6a28412c0f2a0072ddb2d7a56a17bb2c9a5e6"
+    },
+    {
+      "path": "failed-before-brand-presence/page@b4ce58fe135b7071fad9a479b028ef7b.webm",
+      "bytes": 435015,
+      "sha256": "c448c4d5310c054d498649843610db554ed9aa9d4e7f18ed9dbdb24882221700"
+    },
+    {
+      "path": "failed-before-brand-presence/receipt.json",
+      "bytes": 21473,
+      "sha256": "502275452929d1e3adc83bc5e2cae27e1bf97575e4fb17e4e44a67f47ba25a23"
+    },
+    {
+      "path": "failed-before-brand-presence/source-sha.txt",
+      "bytes": 41,
+      "sha256": "7ec73d3a98d19099202b205a16bae062ff7f638ed9bece769bfa7033345b267f"
+    },
+    {
+      "path": "gate-receipt.json",
+      "bytes": 1452,
+      "sha256": "28f6758b5584779d1d5ced48947da20782c8c381551f6031f6fae60b2cf24613"
+    },
+    {
+      "path": "gate-used.sh",
+      "bytes": 3937,
+      "sha256": "e33d340db609800ef09d45cb8b563172b7476102d01604e883f68b137797aad0"
+    },
+    {
+      "path": "identity.json",
+      "bytes": 928,
+      "sha256": "be87e88a43e4eda9fb8303ea702f8e949f679ad3f8c453a28989c621af405e0c"
+    },
+    {
+      "path": "page@6f24535722bd9d1fae0cc2d735bf08bb.webm",
+      "bytes": 507933,
+      "sha256": "bce0a31591b0482c122350409ac8559df5fd8366ae6e4c875a625db205bca330"
+    },
+    {
+      "path": "page@b9dcebd80bca8db0b9cee972d1552a84.webm",
+      "bytes": 220368,
+      "sha256": "2489061fd256a49db1a4647c810c191d37a80288b822ab9445d6b8c561022c96"
+    },
+    {
+      "path": "page@c161fb28a16b59ab23cebc18942087f7.webm",
+      "bytes": 381085,
+      "sha256": "0b67d739ee9da9f76637b5bc5a2a31b39d52a7847d1ce9fcfeaba0d95d96fdaa"
+    },
+    {
+      "path": "page@d1b9e31923f345f79693bd07b232c39f.webm",
+      "bytes": 178273,
+      "sha256": "9fe0bfed85c3a212c5cf72ece17aa53718802effc381b9471bd67cbbbbc193d5"
+    },
+    {
+      "path": "receipt.json",
+      "bytes": 587265,
+      "sha256": "153bcbbb275e5a938e7eaeb3cea90f96c6f2442f86a930aa5afb44f1c0feb65b"
+    },
+    {
+      "path": "source-sha.txt",
+      "bytes": 41,
+      "sha256": "903f45aa822796bea6f0a38286f5ed8754a69da082660ee5b6b5861cabd5d70b"
+    },
+    {
+      "path": "story-index.json",
+      "bytes": 1031,
+      "sha256": "0fd282f9bbdd223d795be5b2797a6cd8a8430caf19b4c199703d42e669fe529f"
+    }
+  ]
+}
