@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.191
+
+- docs(architecture): toolbelt belongs on the L0 foundation map (#1147)
+
 ## 0.60.190
 
 - fix(scaffolder): regenerate the template engine cohort for the #1142 bumps (#1146)
