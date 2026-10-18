@@ -73,6 +73,7 @@ export interface OperatorAppInfo {
 }
 
 export type OperatorCapability =
+  | 'turns.attachments'
   | 'workspaces.create'
   | 'threads.read'
   | 'files.read'
@@ -222,7 +223,8 @@ export interface StartTurnInput {
    * attachment upload route returned them in `{ files }`. They reach the
    * agent exactly as browser-composer attachments do; the app re-checks each
    * path against the workspace's own store. At most `ATTACHMENT_MAX_COUNT`
-   * (`/chat-routes`) entries.
+   * (`/chat-routes`) entries. Apps without the `turns.attachments`
+   * capability refuse them.
    */
   attachments?: ChatAttachmentInput[]
 }

@@ -66,6 +66,12 @@ export interface ChatOperatorAdmissionStore<Identity> {
 export interface ChatOperatorAdapterOptions<Identity> {
   /** Optional durable claims; without one, transcript retry detection is not an atomic admission lock. */
   admissions?: ChatOperatorAdmissionStore<Identity>
+  /**
+   * Set when `runTurn` forwards `attachments` in the chat request body and the
+   * chat route resolves them from the workspace's store, as with
+   * `resolveChatAttachments`. Without it, turns that carry attachments are refused.
+   */
+  acceptsAttachments?: boolean
   /** The app's public origin, the base of every browser link. */
   origin: string
   /** Browser path of a conversation; defaults to `/app/<workspace>/chat/<thread>`. */
@@ -94,8 +100,7 @@ export interface ChatOperatorAdapterOptions<Identity> {
    * Run one turn through the app's own chat route as this caller. The adapter
    * reads the response to its end, so the turn is driven exactly as a browser
    * holding its stream drives it, and the start request returns once it settles.
-   * Forward `attachments` in the chat request body, where the route's
-   * attachment resolver checks them; an app without one refuses them.
+   * `attachments` arrives only when `acceptsAttachments` is set.
    */
   runTurn(ctx: OperatorContext<Identity>, input: {
     workspaceId: string; threadId: string; turnId: string; content: string; model?: string
@@ -288,6 +293,7 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
   }
 
   const adapter: OperatorAdapter<Identity> = {
+    ...(options.acceptsAttachments === true ? { acceptsAttachments: true } : {}),
     async authorizeWorkspace(ctx, workspaceId, access) {
       const workspace = await options.workspaces.authorize(ctx, workspaceId, access)
       return workspace ? workspaceView(workspace) : null

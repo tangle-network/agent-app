@@ -138,9 +138,10 @@ The handler checks the shape with the chat route's own rules, `parseChatAttachme
 The value is an array of at most `ATTACHMENT_MAX_COUNT` entries with distinct paths.
 Each entry has a store-relative `path` with no traversal, absolute, backslash, control-character or hidden segment, a bounded `name`, a finite `size`, a `mediaType`, and a `kind` of `image` or `file`.
 A malformed value answers 400 `operator.invalid_input` naming `attachments`; an empty list is the same as none.
-The adapter receives the list as `input.attachments` and passes it into the app's chat request.
+Delivery is an explicit adapter capability, so an adapter written before the field existed never drops files silently.
+An adapter that sets `acceptsAttachments: true` receives the list as `input.attachments` and passes it into the app's chat request; `createChatOperatorAdapter` takes the same option and forwards the list to `runTurn`.
 There the app's attachment resolver reads each path from the path workspace's own store and re-derives its size, so a key cannot attach another workspace's files.
-An app whose chat route has no attachment store refuses attachments rather than dropping them.
+`GET /api/operator/v1` lists `turns.attachments` among the capabilities of an app that accepts them; any other app answers 501 `operator.unsupported` to a turn that carries attachments.
 A retry with the same `turnId` carries the same attachments.
 
 ## Authority model

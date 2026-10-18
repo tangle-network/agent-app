@@ -119,8 +119,6 @@ export function buildOperatorApi(env: AppEnv, chat: ChatApp, options: OperatorAp
       // key must never enter it and silently bypass the gateway's enforcement.
       if (env.OPERATOR_RUN_ENABLED !== 'true') throw new OperatorError('operator.execution_disabled', 403, 'The deployment payer has not enabled operator execution')
       if (ctx.identity.spendingLimitCents !== null) throw new OperatorError('operator.capped_execution_unsupported', 402, 'Use the paid gateway with a backend that enforces this key spending cap')
-      // This chat route has no durable attachment store to resolve them from.
-      if (input.attachments) throw new OperatorError('operator.attachments_unsupported', 400, 'This app does not accept attachments on operator turns')
       return trusted(ctx.identity.userId).routes.turn(new Request(origin + '/api/chat', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ threadId: input.threadId, turnId: input.turnId, content: input.content, ...(input.model ? { model: input.model } : {}) }),

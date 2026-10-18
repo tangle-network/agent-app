@@ -39,6 +39,13 @@ export interface OperatorAdapter<Identity> {
   authorizeWorkspace(ctx: OperatorContext<Identity>, workspaceId: string, access: 'read' | 'run'): Promise<OperatorWorkspace | null>
   listWorkspaces(ctx: OperatorContext<Identity>): Promise<OperatorWorkspace[]>
   createWorkspace?(ctx: OperatorContext<Identity>, input: { name: string }): Promise<OperatorWorkspace>
+  /**
+   * True when `startTurn` delivers `input.attachments` to the agent, through
+   * a chat route whose attachment resolver reads them from the workspace's
+   * store. Otherwise the handler refuses turns that carry attachments rather
+   * than letting them be dropped.
+   */
+  acceptsAttachments?: boolean
   /** Admit the turn durably and return without waiting for it; the same turnId never starts twice. */
   startTurn(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace, input: StartTurnInput): Promise<OperatorTurn>
   getTurn(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace, target: { threadId: string; turnId: string }): Promise<OperatorTurn | null>
@@ -198,7 +205,8 @@ function capabilities<Identity>(adapter: OperatorAdapter<Identity>): OperatorCap
     ['assets.read', adapter.readAsset],
     ['scorecard.read', adapter.getScorecard],
   ]
-  return present.filter(([, implemented]) => typeof implemented === 'function').map(([name]) => name)
+  const implemented = present.filter(([, method]) => typeof method === 'function').map(([name]) => name)
+  return adapter.acceptsAttachments === true ? ['turns.attachments', ...implemented] : implemented
 }
 
 function unsupported(): never {
@@ -308,6 +316,9 @@ export function createOperatorApi<Key extends RequestApiKey, Identity>(
           return json({ workspace })
         case 'turns.start': {
           const input = parseStartTurn(await readJsonBody(request))
+          if (input.attachments && adapter.acceptsAttachments !== true) {
+            throw new OperatorError('operator.unsupported', 501, 'This app does not accept attachments on operator turns')
+          }
           return json({ turn: await adapter.startTurn(ctx, workspace, input) }, 202)
         }
         case 'threads.list': {
