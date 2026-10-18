@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.190
+
+- fix(scaffolder): regenerate the template engine cohort for the #1142 bumps (#1146)
+
 ## 0.60.189
 
 - refactor: simpler parity probe (readline) + simpler mint (number) (#1143)
