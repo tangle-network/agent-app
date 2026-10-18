@@ -112,7 +112,7 @@ readonly ("operator:read" | "operator:write" | "operator:run")[]
 
 ### `OPERATOR_API_VERSION`
 
-`const` — The standard operator API contract every agent app mounts at `/api/operator/v1`.
+`const`
 
 ```ts
 "v1"

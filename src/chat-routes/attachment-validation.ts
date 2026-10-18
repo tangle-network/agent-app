@@ -2,7 +2,9 @@
  * Shared attachment validation core — constants, type-gate, and filename
  * sanitization used by BOTH the (server) attachment upload route and the
  * (browser) composer's client-side pre-validation, so a rejection never
- * differs depending on which side classified the bytes first.
+ * differs depending on which side classified the bytes first. The structural
+ * `attachments` parser lives here too, so the chat route and the operator API
+ * refuse the same turn bodies without either pulling in the chat store.
  *
  * ≈ gtm-agent's `src/lib/attachment-limits.ts`, minus what agent-app already
  * has (`ATTACHMENT_MAX_COUNT`/`MAX_ATTACHMENT_TOTAL_BYTES`/
@@ -15,7 +17,7 @@
  * may reach a Node builtin or an engine package.
  */
 
-import { formatBytes } from './wire'
+import { formatBytes, type ChatAttachmentInput, type ChatAttachmentKind } from './wire'
 import {
   OOXML_PRESENTATION_MACRO_ENABLED_MIME,
   OOXML_PRESENTATION_MIME,
@@ -214,4 +216,147 @@ export function attachmentSizeErrorMessage(name: string, actualBytes: number, li
  *  the aggregate raw-byte ceiling. */
 export function attachmentTotalSizeErrorMessage(totalBytes: number, limitBytes: number): string {
   return `Attachments total ${formatBytes(totalBytes)}; each message is limited to ${formatBytes(limitBytes)}`
+}
+
+/** Verdict of a path check: OK, or a rejection naming why. Mirrors
+ *  `SandboxMentionPathCheck` in `./wire`. */
+export type AttachmentPathCheck =
+  | { succeeded: true }
+  | { succeeded: false; error: string }
+
+/** Longest attachment display name accepted — bounds what gets echoed into the
+ *  prompt block and rendered as a chip label. */
+const MAX_ATTACHMENT_NAME_LENGTH = 256
+
+function isAttachmentKind(value: unknown): value is ChatAttachmentKind {
+  return value === 'image' || value === 'file'
+}
+
+/** C0 control characters (0x00–0x1F) plus DEL (0x7F) — covers `\n`/`\r`/`\t`.
+ *  A `name` or `path` carrying one of these has no legitimate use here and
+ *  everything to gain from an attacker: {@link buildAttachmentPromptBlock} in
+ *  `/chat-store` renders both fields verbatim into the dispatched agent
+ *  prompt, so an embedded newline fabricates new prompt lines (a
+ *  prompt-injection vector) rather than naming a file. Rejected at this
+ *  boundary — not merely neutralized downstream — so the wire never accepts
+ *  the input in the first place; a legitimate name/path never contains one. */
+const CONTROL_CHARS = /[\x00-\x1F\x7F]/
+
+/**
+ * Default path validator when a caller supplies none. Rejects the ways a path
+ * picked in a client can escape the store root — traversal (`..` segment),
+ * absolute (leading `/`), backslashes, null bytes, control characters (see
+ * {@link CONTROL_CHARS} — a path also feeds {@link buildAttachmentPromptBlock}'s
+ * `(vault: ${path})` pointer, so it is exposed to the same injection surface as
+ * `name`) — plus a dotfile/hidden segment (a leading `.` on any segment).
+ * Generalized from gtm's `validateVaultFilePath`, in the spirit of
+ * `validateSandboxMentionPath` (`/chat-routes`'s wire mention-path validator) —
+ * but the dotfile rejection here is INTENTIONALLY stricter than that sibling:
+ * an uploaded attachment path is sanitized store-relative storage the product
+ * itself assigned, whereas a mention path points at a file that already exists
+ * in the sandbox and may legitimately live under a dotfile segment. A caller
+ * that needs gtm's exact (looser) rule can supply `validatePath` to override
+ * this default entirely.
+ */
+export function defaultValidateAttachmentPath(path: string): AttachmentPathCheck {
+  if (path.includes('\0')) return { succeeded: false, error: 'attachment path must not contain null bytes' }
+  if (path.includes('\\')) return { succeeded: false, error: 'attachment path must not contain backslashes' }
+  if (CONTROL_CHARS.test(path)) return { succeeded: false, error: 'attachment path must not contain control characters' }
+  if (path.startsWith('/')) return { succeeded: false, error: 'attachment path must be store-relative, not absolute' }
+  const segments = path.split('/')
+  if (segments.some((segment) => segment === '..')) {
+    return { succeeded: false, error: 'attachment path must not contain ".." segments' }
+  }
+  if (segments.some((segment) => segment.startsWith('.'))) {
+    return { succeeded: false, error: 'attachment path must not contain a hidden (dotfile) segment' }
+  }
+  return { succeeded: true }
+}
+
+function parseAttachmentInput(
+  value: unknown,
+  index: number,
+  validatePath: (path: string) => AttachmentPathCheck,
+): { succeeded: true; value: ChatAttachmentInput } | { succeeded: false; error: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { succeeded: false, error: `attachments[${index}] must be an object` }
+  }
+  const record = value as Record<string, unknown>
+
+  const path = record.path
+  if (typeof path !== 'string' || !path) {
+    return { succeeded: false, error: `attachments[${index}].path must be a non-empty string` }
+  }
+  const name = record.name
+  if (typeof name !== 'string' || !name.trim()) {
+    return { succeeded: false, error: `attachments[${index}].name must be a non-empty string` }
+  }
+  if (name.length > MAX_ATTACHMENT_NAME_LENGTH) {
+    return { succeeded: false, error: `attachments[${index}].name must not exceed ${MAX_ATTACHMENT_NAME_LENGTH} characters` }
+  }
+  if (CONTROL_CHARS.test(name)) {
+    return { succeeded: false, error: `attachments[${index}].name must not contain control characters` }
+  }
+  const size = record.size
+  if (typeof size !== 'number' || !Number.isFinite(size)) {
+    return { succeeded: false, error: `attachments[${index}].size must be a finite number` }
+  }
+  if (size < 0) {
+    return { succeeded: false, error: `attachments[${index}].size must not be negative` }
+  }
+  const mediaType = record.mediaType
+  if (typeof mediaType !== 'string') {
+    return { succeeded: false, error: `attachments[${index}].mediaType must be a string` }
+  }
+  const kind = record.kind
+  if (!isAttachmentKind(kind)) {
+    return { succeeded: false, error: `attachments[${index}].kind must be "image" or "file"` }
+  }
+
+  const pathCheck = validatePath(path)
+  if (!pathCheck.succeeded) return { succeeded: false, error: pathCheck.error }
+
+  return { succeeded: true, value: { path, name, size, mediaType, kind } }
+}
+
+/** Structural limits for {@link parseChatAttachmentInputs}. */
+export interface ParseChatAttachmentInputsOptions {
+  /** Most attachments one request may carry. Default {@link ATTACHMENT_MAX_COUNT}. */
+  maxCount?: number
+  /** Path validator override. Default {@link defaultValidateAttachmentPath}. */
+  validatePath?: (path: string) => AttachmentPathCheck
+}
+
+/**
+ * Validate an `attachments` value's shape without reading the store: an
+ * array of at most `maxCount` {@link ChatAttachmentInput}s with valid,
+ * distinct paths. Absent (`undefined`/`null`) is an empty list. Sizes are
+ * still client-reported here; {@link resolveChatAttachments} re-derives them
+ * from the store.
+ */
+export function parseChatAttachmentInputs(
+  value: unknown,
+  options: ParseChatAttachmentInputsOptions = {},
+): { succeeded: true; value: ChatAttachmentInput[] } | { succeeded: false; error: string } {
+  const maxCount = options.maxCount ?? ATTACHMENT_MAX_COUNT
+  const validatePath = options.validatePath ?? defaultValidateAttachmentPath
+
+  if (value === undefined || value === null) return { succeeded: true, value: [] }
+  if (!Array.isArray(value)) return { succeeded: false, error: 'attachments must be an array' }
+  if (value.length > maxCount) {
+    return { succeeded: false, error: `attachments must not exceed ${maxCount} entries` }
+  }
+
+  const inputs: ChatAttachmentInput[] = []
+  const seenPaths = new Set<string>()
+  for (let index = 0; index < value.length; index += 1) {
+    const parsed = parseAttachmentInput(value[index], index, validatePath)
+    if (!parsed.succeeded) return parsed
+    if (seenPaths.has(parsed.value.path)) {
+      return { succeeded: false, error: `attachments must not repeat a path: ${parsed.value.path}` }
+    }
+    seenPaths.add(parsed.value.path)
+    inputs.push(parsed.value)
+  }
+  return { succeeded: true, value: inputs }
 }
