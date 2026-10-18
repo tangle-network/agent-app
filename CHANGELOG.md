@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.194
+
+- feat(sandbox): carry a stored-secret key reference in the resolved model (#1149)
+
 ## 0.60.193
 
 - feat(policy-filters): product admission policy over the models a deployment will run (#1110)
