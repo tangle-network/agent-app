@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.192
+
+- feat(operator): turns carry file attachments (#1148)
+
 ## 0.60.191
 
 - docs(architecture): toolbelt belongs on the L0 foundation map (#1147)
