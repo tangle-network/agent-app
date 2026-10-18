@@ -27,6 +27,7 @@
  * ```
  */
 import { spawn } from 'node:child_process'
+import { createInterface } from 'node:readline'
 
 /** One authored tool in the product's manifest — the ONE source of truth the
  *  generated program and every derived surface (allowlists, prompt tool
@@ -85,16 +86,19 @@ export function probeStdioToolProgram(options: ProbeStdioToolProgramOptions): Pr
       cwd: options.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
     })
-    let stdout = ''
+    // Diagnostics only: the last 2 KB each side ever emitted, so a failed
+    // probe names the layer instead of an unprocessed tail.
+    const recent = (text: string) => text.slice(-2000).trim() || '(empty)'
     let stderr = ''
+    let stdoutSeen = ''
     let settled = false
     let initializeReply: Record<string, unknown> | null = null
-    const lines: string[] = []
 
     const finish = (run: () => void) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
+      rl.close()
       try { child.kill() } catch { /* already gone */ }
       run()
     }
@@ -102,59 +106,56 @@ export function probeStdioToolProgram(options: ProbeStdioToolProgramOptions): Pr
     const timer = setTimeout(
       () => finish(() => reject(new Error(
         `tool program probe timed out after ${timeoutMs}ms waiting for tools/list. ` +
-        `stderr so far: ${stderr.trim().slice(0, 2000) || '(empty)'}; ` +
-        `stdout so far: ${stdout.trim().slice(0, 2000) || '(empty)'}`,
+        `stderr so far: ${recent(stderr)}; stdout so far: ${recent(stdoutSeen)}`,
       ))),
       timeoutMs,
     )
 
-    child.stdout.setEncoding('utf8')
-    child.stdout.on('data', (chunk: string) => {
-      stdout += chunk
-      let index: number
-      while ((index = stdout.indexOf('\n')) >= 0) {
-        const line = stdout.slice(0, index).trim()
-        stdout = stdout.slice(index + 1)
-        if (!line) continue
-        lines.push(line)
-        let message: Record<string, unknown>
-        try {
-          message = JSON.parse(line) as Record<string, unknown>
-        } catch {
-          continue // a banner line, not JSON-RPC
-        }
-        if (message.method !== undefined) continue // notification from server
-        if (message.id === 1) initializeReply = message.result as Record<string, unknown> ?? null
-        if (message.id === 2 && message.result !== undefined && message.error === undefined) {
-          const rawTools = (message.result as { tools?: unknown }).tools
-          const tools: ProbedTool[] = Array.isArray(rawTools)
-            ? rawTools.filter((t): t is Record<string, unknown> => !!t && typeof t === 'object' && typeof (t as { name?: unknown }).name === 'string')
-              .map((t) => {
-                const tool = t as unknown as { name: string; description?: string; inputSchema?: unknown; annotations?: unknown }
-                return {
-                  name: tool.name,
-                  ...(tool.description !== undefined ? { description: tool.description } : {}),
-                  ...(tool.inputSchema !== undefined ? { inputSchema: tool.inputSchema } : {}),
-                  ...(tool.annotations !== undefined ? { annotations: tool.annotations } : {}),
-                }
-              })
-            : []
-          finish(() => resolve({ tools, initializeReply }))
-        } else if (message.id === 2 && message.error !== undefined) {
-          finish(() => reject(new Error(
-            `tool program refused tools/list: ${JSON.stringify(message.error)}`,
-          )))
-        }
+    // Line-delimited JSON-RPC over stdio: readline owns the buffering (no
+    // manual byte scanning), and every line seen is also diagnostics.
+    const rl = createInterface({ input: child.stdout })
+    rl.on('line', (line: string) => {
+      const trimmed = line.trim()
+      if (!trimmed) return
+      stdoutSeen = (stdoutSeen + trimmed + '\n').slice(-2000)
+      let message: Record<string, unknown>
+      try {
+        message = JSON.parse(trimmed) as Record<string, unknown>
+      } catch {
+        return // a banner line, not JSON-RPC
+      }
+      if (message.method !== undefined) return // notification from server
+      if (message.id === 1) initializeReply = message.result as Record<string, unknown> ?? null
+      if (message.id === 2 && message.result !== undefined && message.error === undefined) {
+        const rawTools = (message.result as { tools?: unknown }).tools
+        const tools: ProbedTool[] = Array.isArray(rawTools)
+          ? rawTools.filter((t): t is Record<string, unknown> => !!t && typeof t === 'object' && typeof (t as { name?: unknown }).name === 'string')
+            .map((t) => {
+              const tool = t as unknown as { name: string; description?: string; inputSchema?: unknown; annotations?: unknown }
+              return {
+                name: tool.name,
+                ...(tool.description !== undefined ? { description: tool.description } : {}),
+                ...(tool.inputSchema !== undefined ? { inputSchema: tool.inputSchema } : {}),
+                ...(tool.annotations !== undefined ? { annotations: tool.annotations } : {}),
+              }
+            })
+          : []
+        finish(() => resolve({ tools, initializeReply }))
+      } else if (message.id === 2 && message.error !== undefined) {
+        finish(() => reject(new Error(
+          `tool program refused tools/list: ${JSON.stringify(message.error)}`,
+        )))
       }
     })
+    child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
-    child.stderr.on('data', (chunk: string) => { stderr += chunk })
+    child.stderr.on('data', (chunk: string) => { stderr = (stderr + chunk).slice(-2000) })
     child.on('error', (error) => finish(() => reject(new Error(
       `tool program probe failed to spawn ${options.program}: ${error.message}`,
     ))))
     child.on('exit', (code, signal) => finish(() => reject(new Error(
       `tool program exited before answering tools/list (code ${code}${signal ? `, signal ${signal}` : ''}). ` +
-      `stderr: ${stderr.trim().slice(0, 2000) || '(empty)'}`,
+      `stderr: ${recent(stderr)}`,
     ))))
 
     // Minimal MCP handshake: initialize → initialized → tools/list. Replies

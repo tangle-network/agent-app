@@ -56,21 +56,11 @@ export interface DeriveChildKeyBudgetInput {
   readonly minChildUsd?: number
 }
 
-export interface DerivedChildKeyBudget {
-  /** The ask the mint should make — never above a known remaining, never
-   *  below the platform minimum. */
-  readonly budgetUsd: number
-  /** True when the ask was lowered (or floored) because the parent holds
-   *  less than the configured default. */
-  readonly derivedFromParent: boolean
-  /** True when the platform reports no ceiling and the configured ask stood. */
-  readonly parentRemainingUnknown: boolean
-}
-
-/** Derive the delegated child-key budget from the parent's remaining budget.
- *  Throws {@link ParentBudgetExhaustedError} when the parent is exhausted,
- *  before any mint is attempted. */
-export function deriveChildKeyBudgetUsd(input: DeriveChildKeyBudgetInput): DerivedChildKeyBudget {
+/** Derive the delegated child-key budget from the parent's remaining budget:
+ *  the ask the mint should make — never above a known remaining, never below
+ *  the platform minimum. Throws {@link ParentBudgetExhaustedError} when the
+ *  parent is exhausted, before any mint is attempted. */
+export function deriveChildKeyBudgetUsd(input: DeriveChildKeyBudgetInput): number {
   const minChildUsd = input.minChildUsd ?? MIN_CHILD_KEY_BUDGET_USD
   if (!Number.isFinite(input.requestedUsd) || input.requestedUsd <= 0) {
     throw new Error(
@@ -84,16 +74,9 @@ export function deriveChildKeyBudgetUsd(input: DeriveChildKeyBudgetInput): Deriv
   }
   const ceiling = input.parentRemainingUsd
   const known = typeof ceiling === 'number' && Number.isFinite(ceiling)
-  if (!known) {
-    return { budgetUsd: input.requestedUsd, derivedFromParent: false, parentRemainingUnknown: true }
-  }
+  if (!known) return input.requestedUsd
   if (ceiling <= 0) throw new ParentBudgetExhaustedError(input.requestedUsd, ceiling)
   // Never above remaining (floored to whole cents), never below the platform
   // minimum: max(min, min(requested, floor(remaining·100)/100)).
-  const budgetUsd = Math.max(minChildUsd, Math.min(input.requestedUsd, Math.floor(ceiling * 100) / 100))
-  return {
-    budgetUsd,
-    derivedFromParent: budgetUsd < input.requestedUsd || ceiling < minChildUsd,
-    parentRemainingUnknown: false,
-  }
+  return Math.max(minChildUsd, Math.min(input.requestedUsd, Math.floor(ceiling * 100) / 100))
 }

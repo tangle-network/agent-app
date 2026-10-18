@@ -20839,14 +20839,8 @@
         {
           "name": "deriveChildKeyBudgetUsd",
           "kind": "function",
-          "signature": "(input: DeriveChildKeyBudgetInput) => DerivedChildKeyBudget",
-          "doc": "Derive the delegated child-key budget from the parent's remaining budget."
-        },
-        {
-          "name": "DerivedChildKeyBudget",
-          "kind": "interface",
-          "signature": "interface DerivedChildKeyBudget",
-          "doc": null
+          "signature": "(input: DeriveChildKeyBudgetInput) => number",
+          "doc": "Derive the delegated child-key budget from the parent's remaining budget: the ask the mint should make — never above a known remaining, never below the platform minimum."
         },
         {
           "name": "ExpectedCeiling",
