@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.193
+
+- feat(policy-filters): product admission policy over the models a deployment will run (#1110)
+
 ## 0.60.192
 
 - feat(operator): turns carry file attachments (#1148)
