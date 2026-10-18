@@ -26,6 +26,7 @@ export default defineConfig({
     'agent-profiles/reaper': 'src/agent-profiles/reaper.ts',
     'prompt/index': 'src/prompt/index.ts',
     'model-resolution/index': 'src/model-resolution/index.ts',
+    'policy-filters/index': 'src/policy-filters/index.ts',
     'sandbox/index': 'src/sandbox/index.ts',
     'peer-floors/check': 'src/peer-floors/check.ts',
     'peer-floors/cli': 'src/peer-floors/cli.ts',
