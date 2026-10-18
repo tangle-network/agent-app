@@ -134,6 +134,24 @@ describe('createPlatformDelegatedKeyClient.delegate', () => {
   })
 })
 
+describe('createPlatformDelegatedKeyClient.delegate decisions', () => {
+  // 2026-10-18: Platform answered a Creative Router-turn delegation 400 DELEGATION_FAILED (a spend-through
+  // child of an unbudgeted source), and this client reported it as 403 delegated_key.refused, which read as
+  // a wrong service token and sent the diagnosis the wrong way.
+  it('keeps a 4xx decision as its own status and code, apart from an authorization refusal', async () => {
+    const { client } = platform(
+      () => ({ status: 400, body: { success: false, error: { code: 'DELEGATION_FAILED', message: 'internal detail' } } }),
+      () => ({ status: 403, body: { success: false, error: { code: 'FORBIDDEN', message: 'internal detail' } } }),
+    )
+    const declined = await client.delegate(request)
+    expect(declined).toEqual({ succeeded: false, error: {
+      status: 400, code: 'delegated_key.failed', message: 'Platform declined this delegation (DELEGATION_FAILED).', platformCode: 'DELEGATION_FAILED' } })
+    expect(JSON.stringify(declined)).not.toContain('internal detail')
+    await expect(client.delegate(request)).resolves.toMatchObject({ succeeded: false,
+      error: { status: 403, code: 'delegated_key.refused', platformCode: 'FORBIDDEN' } })
+  })
+})
+
 describe('createPlatformDelegatedKeyClient.verify, revoke and listChildren', () => {
   it("returns Platform's verify-by-id verdict for this key and fails closed on anything else", async () => {
     const { client, calls } = platform(
