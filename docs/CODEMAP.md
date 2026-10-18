@@ -107,7 +107,7 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./skills`](api/skills.md) | 42 | — |
 | [`./skills-placement`](api/skills-placement.md) | 9 | `harness`, `skills` |
 | [`./skills/marketplace-drizzle`](api/skills-marketplace-drizzle.md) | 2 | — |
-| [`./spend`](api/spend.md) | 65 | `sandbox` |
+| [`./spend`](api/spend.md) | 64 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
 | [`./stream`](api/stream.md) | 67 | `interactions`, `plans` |
@@ -1075,11 +1075,11 @@ Source: `src/skills/marketplace-drizzle.ts` · 2 exports
 
 ## `./spend`
 
-Source: `src/spend/index.ts` · 65 exports
+Source: `src/spend/index.ts` · 64 exports
 
 Depends on: `sandbox`
 
-`AllExcludedAssessment`, `AllExcludedBasis`, `assertComputeBudget`, `assertSpendWindow`, `assessAllExcluded`, `BilledDurationBasis`, `boxLivenessInWindow`, `BoxLivenessOptions`, `BoxRateResolver`, `CeilingBasis`, `chargeNanoUsd`, `ComputeBudget`, `ComputeBudgetExceededError`, `ComputeBudgetRefusal`, `computeExpectedCeiling`, `ComputeExpectedCeilingOptions`, `createInMemorySpendLedgerStore`, `createSandboxSpendHooks`, `createSpendLedger`, `decideBoxOwnership`, `DEFAULT_CEILING_TOLERANCE_MS`, `DEFAULT_EXPECTATION_GRACE_MS`, `DeriveChildKeyBudgetInput`, `deriveChildKeyBudgetUsd`, `DerivedChildKeyBudget`, `ExpectedCeiling`, `foldSpendBoxRecord`, `formatSpendReport`, `InMemorySpendLedgerStore`, `isCharge`, `MIN_CHILD_KEY_BUDGET_USD`, `ObservedBalance`, `ObserveSandboxInput`, `ownedByBillingKeys`, `ParentBudgetExhaustedError`, `parseSandboxGroupKey`, `parseSettlementReference`, `reconcileSpend`, `ReconcileSpendOptions`, `SandboxSpendHooksOptions`, `SandboxSpendSeam`, `SettlementReference`, `SettlementRow`, `settlementSandboxId`, `SPEND_CHECKS`, `SpendBoxLiveness`, `SpendBoxPatch`, `SpendBoxRecord`, `SpendCheckId`, `SpendCoverage`, `SpendExpectationSummary`, `SpendFinding`, `SpendLedger`, `SpendLedgerOptions`, `SpendLedgerStorePort`, `SpendOwnershipCandidate`, `SpendOwnershipRule`, `SpendOwnershipSummary`, `SpendOwnershipVerdict`, `SpendProvisionObservation`, `SpendReport`, `spendReportToJson`, `SpendWindow`, `undeclaredExpectation`, `VelocityOptions`
+`AllExcludedAssessment`, `AllExcludedBasis`, `assertComputeBudget`, `assertSpendWindow`, `assessAllExcluded`, `BilledDurationBasis`, `boxLivenessInWindow`, `BoxLivenessOptions`, `BoxRateResolver`, `CeilingBasis`, `chargeNanoUsd`, `ComputeBudget`, `ComputeBudgetExceededError`, `ComputeBudgetRefusal`, `computeExpectedCeiling`, `ComputeExpectedCeilingOptions`, `createInMemorySpendLedgerStore`, `createSandboxSpendHooks`, `createSpendLedger`, `decideBoxOwnership`, `DEFAULT_CEILING_TOLERANCE_MS`, `DEFAULT_EXPECTATION_GRACE_MS`, `DeriveChildKeyBudgetInput`, `deriveChildKeyBudgetUsd`, `ExpectedCeiling`, `foldSpendBoxRecord`, `formatSpendReport`, `InMemorySpendLedgerStore`, `isCharge`, `MIN_CHILD_KEY_BUDGET_USD`, `ObservedBalance`, `ObserveSandboxInput`, `ownedByBillingKeys`, `ParentBudgetExhaustedError`, `parseSandboxGroupKey`, `parseSettlementReference`, `reconcileSpend`, `ReconcileSpendOptions`, `SandboxSpendHooksOptions`, `SandboxSpendSeam`, `SettlementReference`, `SettlementRow`, `settlementSandboxId`, `SPEND_CHECKS`, `SpendBoxLiveness`, `SpendBoxPatch`, `SpendBoxRecord`, `SpendCheckId`, `SpendCoverage`, `SpendExpectationSummary`, `SpendFinding`, `SpendLedger`, `SpendLedgerOptions`, `SpendLedgerStorePort`, `SpendOwnershipCandidate`, `SpendOwnershipRule`, `SpendOwnershipSummary`, `SpendOwnershipVerdict`, `SpendProvisionObservation`, `SpendReport`, `spendReportToJson`, `SpendWindow`, `undeclaredExpectation`, `VelocityOptions`
 
 [Full API →](api/spend.md)
 

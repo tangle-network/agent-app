@@ -26960,18 +26960,10 @@ interface DeriveChildKeyBudgetInput
 
 ### `deriveChildKeyBudgetUsd`
 
-`function` — Derive the delegated child-key budget from the parent's remaining budget.
+`function` — Derive the delegated child-key budget from the parent's remaining budget: the ask the mint should make — never above a known remaining, never below the platform minimum.
 
 ```ts
-(input: DeriveChildKeyBudgetInput) => DerivedChildKeyBudget
-```
-
-### `DerivedChildKeyBudget`
-
-`interface`
-
-```ts
-interface DerivedChildKeyBudget
+(input: DeriveChildKeyBudgetInput) => number
 ```
 
 ### `ExpectedCeiling`
