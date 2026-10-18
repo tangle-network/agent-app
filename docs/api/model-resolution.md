@@ -4,7 +4,7 @@
 
 Source: `src/model-resolution/index.ts`
 
-29 exports.
+31 exports.
 
 ### `buildModelChain`
 
@@ -126,6 +126,14 @@ interface ModelFailoverResult
 interface ModelInfo
 ```
 
+### `modelPolicyCatalogFromRouter`
+
+`function` — Map router `/v1/models` rows to a {@link ModelPolicyInfo} catalog: snake_case `zdr` / `hipaa_eligible` become `zeroDataRetention` / `hipaaEligible`, and `provider` comes from the row's `_provider`/`p…
+
+```ts
+(rows: Iterable<RouterModelPolicyRow>) => ModelPolicyInfo[]
+```
+
 ### `ModelWithinAllowListResolution`
 
 `type`
@@ -188,6 +196,14 @@ interface ResolvedChatModel
 
 ```ts
 interface ResolveModelWithinAllowListInput
+```
+
+### `RouterModelPolicyRow`
+
+`interface` — A router `/v1/models` row carrying the compliance flags {@link modelPolicyCatalogFromRouter} reads.
+
+```ts
+interface RouterModelPolicyRow
 ```
 
 ### `runWithModelFailover`
