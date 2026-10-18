@@ -194,6 +194,11 @@
       "import": "./dist/model-resolution/index.js",
       "default": "./dist/model-resolution/index.js"
     },
+    "./policy-filters": {
+      "types": "./dist/policy-filters/index.d.ts",
+      "import": "./dist/policy-filters/index.js",
+      "default": "./dist/policy-filters/index.js"
+    },
     "./sandbox": {
       "types": "./dist/sandbox/index.d.ts",
       "import": "./dist/sandbox/index.js",
