@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.201
+
+- fix(turn-trace): send a turn's trace with one OTLP POST and no agent-runtime import (#1158)
+- wip (#1157)
+
 ## 0.60.200
 
 - feat(turn-trace): traceSandboxPromptEvents for products that call box.streamPrompt themselves (#1156)
