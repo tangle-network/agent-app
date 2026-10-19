@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createChatTurnRoutes, createRouterTurnProducer, type ChatTurnMessageStore } from '../../src/chat-routes/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
-import { turnTraceId, type TurnTraceSnapshot } from '../../src/turn-trace/index'
+import { createIntelligenceTurnTraceSink, otlpTraceId, turnTraceId, type TurnTraceSnapshot } from '../../src/turn-trace/index'
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
@@ -11,9 +11,18 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
  * A Router on a real socket: it waits like the real one (a pre-upstream step, a provider wait), answers with a
  * `Server-Timing` header, then streams the completion in chunks with gaps. Two completions: a tool call, then text.
  */
-function startRouter(seen: IncomingHttpHeaders[]): Promise<{ server: Server; url: string }> {
+function startRouter(seen: IncomingHttpHeaders[], otlp: Array<{ authorization?: string; body: any }>): Promise<{ server: Server; url: string }> {
   let calls = 0
   const server = createServer((request, response) => {
+    if (request.url === '/v1/otlp/v1/traces') {
+      const chunks: Buffer[] = []
+      request.on('data', (chunk: Buffer) => chunks.push(chunk))
+      request.on('end', () => {
+        otlp.push({ authorization: request.headers.authorization, body: JSON.parse(Buffer.concat(chunks).toString('utf8')) })
+        response.writeHead(200, { 'content-type': 'application/json' }).end('{}')
+      })
+      return
+    }
     seen.push(request.headers)
     request.resume()
     request.on('end', async () => {
@@ -43,7 +52,8 @@ function startRouter(seen: IncomingHttpHeaders[]): Promise<{ server: Server; url
 describe('turn trace: a real turn through createChatTurnRoutes', () => {
   let router: { server: Server; url: string }
   const routerHeaders: IncomingHttpHeaders[] = []
-  beforeAll(async () => { router = await startRouter(routerHeaders) })
+  const otlpPosts: Array<{ authorization?: string; body: any }> = []
+  beforeAll(async () => { router = await startRouter(routerHeaders, otlpPosts) })
   afterAll(() => { router.server.close() })
 
   it('puts at least 90% of the turn inside named spans and sends the trace id to the Router', async () => {
@@ -60,7 +70,14 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
       store,
       turnStore: createMemoryTurnEventStore(),
       incrementalPersistence: false,
-      turnTrace: { sink: (done) => { snapshot = done } },
+      turnTrace: {
+        // The Intelligence sink posts OTLP to the same socket; the capture keeps the snapshot for the span assertions.
+        sink: async (done, labels) => {
+          snapshot = done
+          await createIntelligenceTurnTraceSink({ project: 'trace-app', apiKey: 'tenant-key', baseUrl: router.url })(done, labels)
+        },
+        labels: ({ context }) => ({ 'tangle.test': context !== undefined }),
+      },
       produce: ({ prompt, trace }) => createRouterTurnProducer({
         apiKey: 'k', model: 'requested/model', systemPrompt: 's', userMessage: typeof prompt === 'string' ? prompt : '',
         baseUrl: router.url, trace,
@@ -103,5 +120,17 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     expect(model.attrs).toMatchObject({ 'http.status_code': 200, 'server_timing.upstream_start_ms': 40, 'gen_ai.request.model': 'requested/model',
       'gen_ai.usage.input_tokens': 900, 'gen_ai.usage.output_tokens': 12 })
     expect(model.attrs.ttft_ms).toBeGreaterThan(0)
+
+    // One OTLP POST per turn: the root span with the turn's numbers, every child under it, in the trace id the Sandbox SDK maps.
+    expect(otlpPosts).toHaveLength(1)
+    expect(otlpPosts[0]!.authorization).toBe('Bearer tenant-key')
+    const exported = otlpPosts[0]!.body.resourceSpans[0].scopeSpans[0].spans as Array<{ traceId: string; spanId: string; parentSpanId?: string; name: string; attributes: Array<{ key: string; value: Record<string, unknown> }> }>
+    expect(exported).toHaveLength(spans.length + 1)
+    const root = exported.find((span) => span.name === 'agent_app.turn')!
+    expect(root.parentSpanId).toBeUndefined()
+    expect(root.attributes.find((attribute) => attribute.key === 'tangle.turn.coverage_pct')?.value.doubleValue).toBe(summary.coveragePct)
+    expect(root.attributes.find((attribute) => attribute.key === 'tangle.trace_id')?.value.stringValue).toBe(snapshot!.traceId)
+    expect(new Set(exported.map((span) => span.traceId))).toEqual(new Set([otlpTraceId(snapshot!.traceId)]))
+    for (const span of exported.filter((candidate) => candidate !== root)) expect(exported.some((candidate) => candidate.spanId === span.parentSpanId)).toBe(true)
   })
 })

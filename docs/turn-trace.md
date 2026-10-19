@@ -1,7 +1,7 @@
 # One trace per turn
 
 Where a customer's wait goes: every turn records one trace whose child spans cover its wall time, on the Router lane and the sandbox lane.
-`@tangle-network/agent-app/turn-trace` owns the recorder, the Router `Server-Timing` reader and the Intelligence sink.
+`@tangle-network/agent-app/turn-trace` owns the recorder, the Router `Server-Timing` reader and the Intelligence sink (one OTLP POST per turn, in agent-runtime's attribute vocabulary; it imports no other package, because the agent-runtime root pulls the sandbox SDK's `viem` import into a Worker bundle).
 `createChatTurnRoutes` owns the turn, so it creates the trace and records admission and persistence itself.
 
 ## The trace
