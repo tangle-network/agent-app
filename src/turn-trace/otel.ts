@@ -108,7 +108,7 @@ const DEFAULT_INTELLIGENCE_BASE_URL = 'https://intelligence.tangle.tools'
  */
 export function createIntelligenceTurnTraceSink(options: IntelligenceTurnTraceSinkOptions): TurnTraceSink {
   let exporter: OtelExporter | undefined
-  const exporterFor = (apiKey: string): OtelExporter => {
+  const exporterFor = (apiKey: string): OtelExporter | undefined => {
     exporter ??= createOtelExporter({
       endpoint: `${(options.baseUrl ?? DEFAULT_INTELLIGENCE_BASE_URL).replace(/\/+$/, '')}/v1/otlp`,
       headers: { authorization: `Bearer ${apiKey}` },
@@ -121,6 +121,7 @@ export function createIntelligenceTurnTraceSink(options: IntelligenceTurnTraceSi
     if (!options.apiKey) return
     try {
       const sink = exporterFor(options.apiKey)
+      if (!sink) return
       for (const span of buildTurnTraceOtelSpans(snapshot, { project: options.project, ...labels })) sink.exportSpan(span)
       await sink.flush()
     } catch (error) {
