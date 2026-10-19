@@ -263,6 +263,42 @@ async function readRawBody(
   return offset === declaredBytes ? { succeeded: true, value: bytes } : mismatch
 }
 
+/** Read a body of at most `maxBytes`, refusing a longer one as soon as it
+ *  passes the cap. A declared `Content-Length` over the cap is refused before
+ *  any byte is read. */
+async function readBodyUpTo(
+  request: Request,
+  maxBytes: number,
+): Promise<{ succeeded: true; value: Uint8Array<ArrayBuffer> } | { succeeded: false; tooLarge: boolean }> {
+  const declared = Number(request.headers.get('Content-Length') ?? Number.NaN)
+  if (Number.isFinite(declared) && declared > maxBytes) return { succeeded: false, tooLarge: true }
+  if (!request.body) return { succeeded: true, value: new Uint8Array(0) }
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      length += value.length
+      if (length > maxBytes) {
+        await reader.cancel().catch(() => undefined)
+        return { succeeded: false, tooLarge: true }
+      }
+      chunks.push(value)
+    }
+  } catch {
+    return { succeeded: false, tooLarge: false }
+  }
+  const bytes = new Uint8Array(length)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.length
+  }
+  return { succeeded: true, value: bytes }
+}
+
 /** The media type a streamed write records before the whole file is read.
  *  The head decides every family except a zip container, whose Office
  *  subtype lives in the central directory at the end; for that, the
@@ -550,19 +586,26 @@ export function createAttachmentUploadRoute(
       if (!body.succeeded) return body.response
       files.push(new File([body.value], filename))
     } else {
+      let formSource: Request | Response = request
       if (maxFormBytes !== undefined) {
-        const length = Number(request.headers.get('Content-Length') ?? Number.NaN)
-        if (!Number.isFinite(length) || length > maxFormBytes) {
+        // Read at most the cap before parsing, whether or not the client sent
+        // a Content-Length, so an oversized form is refused while small.
+        const bounded = await readBodyUpTo(request, maxFormBytes)
+        if (!bounded.succeeded && !bounded.tooLarge) {
+          return attachmentUploadError(400, 'invalid_upload', 'The upload body ended early')
+        }
+        if (!bounded.succeeded) {
           return attachmentUploadError(
             413,
             'form_upload_too_large',
             `Form uploads are limited to ${formatBytes(maxFormBytes)}; send a larger file as a raw request body named by the filename query parameter`,
           )
         }
+        formSource = new Response(bounded.value, { headers: { 'Content-Type': request.headers.get('Content-Type') ?? '' } })
       }
       let form: FormData
       try {
-        form = await request.formData()
+        form = await formSource.formData()
       } catch {
         return attachmentUploadError(400, 'invalid_upload', 'Expected a multipart/form-data body with file fields')
       }
