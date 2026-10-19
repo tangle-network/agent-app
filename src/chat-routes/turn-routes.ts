@@ -1679,7 +1679,8 @@ export function createChatTurnRoutes<TContext = void>(
                   // the one that actually served — a fallback included.
                   const failoverInfo = producer?.modelFailover?.()
                   const attribution = producer?.modelAttribution?.()
-                  return options.onTurnComplete!({
+                  // The engine awaits this before the stream ends, so the product's completion work is a span, not a gap.
+                  return trace.measure('persist.on_turn_complete', 'persist', () => options.onTurnComplete!({
                     identity: turnIdentity,
                     finalText,
                     context,
@@ -1693,7 +1694,7 @@ export function createChatTurnRoutes<TContext = void>(
                     ...(attribution?.servedProvider ? { servedProvider: attribution.servedProvider } : {}),
                     ...(attribution?.servedSource ? { servedSource: attribution.servedSource } : {}),
                     ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
-                  })
+                  }))
                 },
               }
             : {}),

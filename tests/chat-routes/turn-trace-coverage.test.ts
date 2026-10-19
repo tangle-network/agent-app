@@ -157,7 +157,7 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     for (const span of exported.filter((candidate) => candidate !== root)) expect(exported.some((candidate) => candidate.spanId === span.parentSpanId)).toBe(true)
   })
 
-  it('names the wait before a resend, so a retried send leaves no gap between its two calls', async () => {
+  it('names the wait before a resend and the product completion hook, so neither is a gap', async () => {
     const sent = routerHeaders.length
     let snapshot: TurnTraceSnapshot | undefined
     const pending: Promise<unknown>[] = []
@@ -168,6 +168,8 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
       turnStore: createMemoryTurnEventStore(),
       incrementalPersistence: false,
       turnTrace: { sink: (done) => { snapshot = done } },
+      // The product's completion work runs before the stream ends, as a product's billing and row updates do.
+      onTurnComplete: async () => { await sleep(80) },
       produce: ({ prompt, trace }) => createRouterTurnProducer({
         apiKey: 'k', model: 'requested/model', systemPrompt: 's', userMessage: typeof prompt === 'string' ? prompt : '',
         baseUrl: `${router.url}/flaky`, trace, retry: { attempts: 2, baseDelayMs: 120 },
@@ -191,6 +193,9 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     expect(waits[0]!.endMs - waits[0]!.startMs).toBeGreaterThanOrEqual(60)
     expect(waits[0]!.startMs).toBeGreaterThanOrEqual(calls[0]!.startMs)
     expect(waits[0]!.endMs).toBeLessThanOrEqual(calls[1]!.startMs)
+    const complete = spans.find((span) => span.name === 'persist.on_turn_complete')!
+    expect(complete.endMs - complete.startMs).toBeGreaterThanOrEqual(75)
+    expect(complete.startMs).toBeGreaterThanOrEqual(calls[1]!.startMs)
     expect(summary.largestGapMs).toBeLessThan(60)
   })
 })
