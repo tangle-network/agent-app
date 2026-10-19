@@ -128,7 +128,7 @@ _139 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./trace`](api/trace.md) | 20 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting`, `launch-invariants` |
 | [`./turn-stream`](api/turn-stream.md) | 58 | `chat-routes`, `crypto`, `stream` |
-| [`./turn-trace`](api/turn-trace.md) | 25 | — |
+| [`./turn-trace`](api/turn-trace.md) | 26 | — |
 | [`./vault`](api/vault.md) | 23 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
@@ -1268,9 +1268,9 @@ Depends on: `chat-routes`, `crypto`, `stream`
 
 ## `./turn-trace`
 
-Source: `src/turn-trace/index.ts` · 25 exports
+Source: `src/turn-trace/index.ts` · 26 exports
 
-`buildTurnTraceOtelSpans`, `createIntelligenceTurnTraceSink`, `createTurnTrace`, `CreateTurnTraceOptions`, `IntelligenceTurnTraceSinkOptions`, `isTraceId`, `nextCallIndex`, `OtlpSpan`, `otlpTraceId`, `parseServerTiming`, `serverTimingAttrs`, `ServerTimingEntry`, `summarizeTurnSpans`, `tracedModelFetch`, `TracedModelFetchOptions`, `TURN_SPAN_KINDS`, `TurnSpan`, `TurnSpanAttrs`, `TurnSpanKind`, `TurnSpanRecord`, `TurnTrace`, `turnTraceId`, `TurnTraceSink`, `TurnTraceSnapshot`, `TurnTraceSummary`
+`buildTurnTraceOtelSpans`, `createIntelligenceTurnTraceSink`, `createTurnTrace`, `CreateTurnTraceOptions`, `formatServerTiming`, `IntelligenceTurnTraceSinkOptions`, `isTraceId`, `nextCallIndex`, `OtlpSpan`, `otlpTraceId`, `parseServerTiming`, `serverTimingAttrs`, `ServerTimingEntry`, `summarizeTurnSpans`, `tracedModelFetch`, `TracedModelFetchOptions`, `TURN_SPAN_KINDS`, `TurnSpan`, `TurnSpanAttrs`, `TurnSpanKind`, `TurnSpanRecord`, `TurnTrace`, `turnTraceId`, `TurnTraceSink`, `TurnTraceSnapshot`, `TurnTraceSummary`
 
 [Full API →](api/turn-trace.md)
 

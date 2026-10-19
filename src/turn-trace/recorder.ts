@@ -117,6 +117,8 @@ export interface TurnTrace {
   markFirstText(at?: number): void
   /** Read the current numbers without ending the trace. */
   summary(now?: number): TurnTraceSummary
+  /** Read the spans recorded so far without ending the trace; an open span reads as ending at `now`. */
+  spans(now?: number): TurnSpanRecord[]
   /** End the trace: open spans close at `endedAt`, and later spans are refused. A second call returns the first result. */
   finish(outcome?: { error?: unknown; endedAt?: number }): TurnTraceSnapshot
 }
@@ -349,8 +351,11 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
     },
     summary(at) {
       const end = at ?? finished?.endedAt ?? now()
-      const spans = [...records.values()].map((record) => open.has(record.spanId) ? { ...record, endMs: end } : record)
-      return withFirstText(summarizeTurnSpans(spans, rootId, startedAt, end, traceId, dropped))
+      return withFirstText(summarizeTurnSpans(trace.spans(end), rootId, startedAt, end, traceId, dropped))
+    },
+    spans(at) {
+      const end = at ?? finished?.endedAt ?? now()
+      return [...records.values()].map((record) => open.has(record.spanId) ? { ...record, endMs: end } : { ...record })
     },
     finish(outcome) {
       if (finished) return finished
