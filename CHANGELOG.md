@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.199
+
+- feat(turn-trace): one trace per agent turn with named child spans on the Router and sandbox lanes (#1155)
+
 ## 0.60.198
 
 - fix(workspace-apps): revalidate every artifact share access (#1154)
