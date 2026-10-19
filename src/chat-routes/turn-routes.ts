@@ -1158,12 +1158,16 @@ export function createChatTurnRoutes<TContext = void>(
 
     if (options.turnLock?.warm) {
       // Overlaps the lock's first-use cost with prepareTurn and the history read.
-      try {
-        void Promise.resolve(options.turnLock.warm({ tenantId, userId, threadId: payload.threadId, context })).catch((err) => {
-          log('[chat-routes] turnLock.warm failed', { error: err instanceof Error ? err.message : String(err) })
-        })
-      } catch (err) {
+      // Its span shows that cost: a thread's first turn creates the lock's Durable Object.
+      const warmSpan = trace.start('admission.lock_warm', 'admission')
+      const warmFailed = (err: unknown) => {
+        warmSpan.end(undefined, err)
         log('[chat-routes] turnLock.warm failed', { error: err instanceof Error ? err.message : String(err) })
+      }
+      try {
+        void Promise.resolve(options.turnLock.warm({ tenantId, userId, threadId: payload.threadId, context })).then(() => warmSpan.end(), warmFailed)
+      } catch (err) {
+        warmFailed(err)
       }
     }
 

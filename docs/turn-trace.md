@@ -11,7 +11,7 @@ Every Router request and every Sandbox call of the turn sends that id, so a Rout
 
 ```text
 agent_app.turn                       wall time of the turn; coverage and time per kind as attributes
-├─ admission.*                       parse, authorize, model_policy, prepare, history, lock, history_recheck, persist_user, gate, before_turn, stream_setup, produce
+├─ admission.*                       parse, authorize, model_policy, prepare, lock_warm, history, lock, history_recheck, persist_user, gate, before_turn, stream_setup, produce
 │  └─ admission.running_probe        under history: the turn buffer's running index, read only when it decides a retry
 ├─ model.call                        one per Router request
 │  ├─ network                        wait for headers, less the Router's server time
@@ -43,6 +43,7 @@ A span records metadata only: ids, durations, status codes, model names and toke
 3. A product that owns its turn without `createChatTurnRoutes` (a Durable Object turn) calls `createTurnTrace({ startedAt, executionId })`, records its own admission spans with `trace.record`, passes `trace` to `runRouterTurn`, and sends `trace.finish()` to the same sink.
 
 Admission's serial reads are the history, the turn lock, the history recheck under the lock, and the user-row insert.
+`admission.lock_warm` runs alongside the history read and ends when the lock's Durable Object answers; on a thread's first turn it holds that object's creation, which `admission.lock` then waits out.
 The running-index read under `admission.history` runs only when its answer can change the turn: no client `turnId`, an assistant row trailing the thread, and the user row behind it repeating this content.
 `produce` and the seams see `userMessageInserted: true` when this turn's insert created `userMessageId`, so a gate that refuses an already-answered retry skips its own read for a fresh row.
 
