@@ -680,7 +680,7 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   /**
    * Where each finished turn's trace goes (`createIntelligenceTurnTraceSink`). The route always records the
    * turn's trace (`ChatTurnProduceArgs.trace`) and reports its summary to `lifecycle`; this sends the spans on.
-   * The sink runs under `waitUntil` after the lifecycle hooks, and its failure never fails a turn. A turn handed
+   * The sink runs under `waitUntil` after the lifecycle hooks and after the turn lock is released, and its failure never fails a turn. A turn handed
    * to a durable owner (`handoffCompletion`) is exported by that owner, not here.
    */
   turnTrace?: ChatTurnTraceOptions<TContext>
@@ -1315,6 +1315,8 @@ export function createChatTurnRoutes<TContext = void>(
     // Set when `contextGate` answered the turn without running the producer.
     let gatedTurn = false
 
+    let pendingTraceExport: (() => void | Promise<void>) | undefined
+
     // Exactly one terminal lifecycle hook, after the turn settles (idempotent).
     // Failure is this route's own verdict (`runFailed` from error/failed
     // events, or a drain/sync throw), not the engine's envelope.
@@ -1363,25 +1365,40 @@ export function createChatTurnRoutes<TContext = void>(
           error: err instanceof Error ? err.message : String(err),
         })
       }
+      // Sent by `exportTrace`, after the turn lock is released: a slow collector must not hold the next send.
       const traceOptions = options.turnTrace
       if (traceOptions?.sink) {
-        try {
-          await traceOptions.sink(snapshot, {
-            'tangle.sessionId': identity.sessionId,
-            'tangle.userId': identity.userId,
-            'tangle.tenantId': identity.tenantId,
-            'tangle.turn.failed': failed,
-            ...(gatedTurn ? { 'tangle.turn.gated': true } : {}),
-            ...(failureCode ? { 'tangle.turn.failure_code': failureCode } : {}),
-            ...(traceOptions.labels?.({ identity, executionId, context }) ?? {}),
-          })
-        } catch (err) {
-          log('[chat-routes] turn trace sink failed', {
-            turnId: turnStreamId,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        }
+        const sink = traceOptions.sink
+        pendingTraceExport = () => sink(snapshot, {
+          'tangle.sessionId': identity.sessionId,
+          'tangle.userId': identity.userId,
+          'tangle.tenantId': identity.tenantId,
+          'tangle.turn.failed': failed,
+          ...(gatedTurn ? { 'tangle.turn.gated': true } : {}),
+          ...(failureCode ? { 'tangle.turn.failure_code': failureCode } : {}),
+          ...(traceOptions.labels?.({ identity, executionId, context }) ?? {}),
+        })
       }
+    }
+    /** Send the finished trace to its sink. Never throws. */
+    const exportTrace = async (): Promise<void> => {
+      const send = pendingTraceExport
+      pendingTraceExport = undefined
+      if (!send) return
+      try {
+        await send()
+      } catch (err) {
+        log('[chat-routes] turn trace sink failed', {
+          turnId: turnStreamId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    /** Export after the response is on its way: under `waitUntil` where the host has one. */
+    const exportTraceInBackground = (): void => {
+      const sent = exportTrace()
+      if (ctx?.waitUntil) ctx.waitUntil(sent)
+      else void sent.catch(() => {})
     }
 
     try {
@@ -1455,6 +1472,7 @@ export function createChatTurnRoutes<TContext = void>(
             }
           }
           await fireTerminalLifecycle(false, undefined)
+          exportTraceInBackground()
           return gate.response
         }
       }
@@ -1720,6 +1738,7 @@ export function createChatTurnRoutes<TContext = void>(
         finalize.end()
         await fireTerminalLifecycle(failed, drainError)
         await releaseLock()
+        await exportTrace()
       })()
       if (ctx?.waitUntil) ctx.waitUntil(drained)
       else void drained.catch(() => {})
@@ -1749,6 +1768,7 @@ export function createChatTurnRoutes<TContext = void>(
       if (!completionHandoff) {
         if (turnStarted) await fireTerminalLifecycle(true, err)
         await releaseLock()
+        exportTraceInBackground()
       }
       throw err
     }
