@@ -64,6 +64,7 @@ Approvals attach to an action's effects, such as spending or publishing, rather 
   Preserve explicit unreadable/OCR outcomes and limits on expanded untrusted content.
 - For workspace data export, read [workspace-export.md](docs/workspace-export.md).
   Keep authorization owner-only and fail-closed, and keep credentials out of archives and logs.
+- For where a turn's wait goes (admission, each model call, each tool call, the box claim and prompt), read [turn-trace.md](docs/turn-trace.md); every turn records one trace, and a product passes `args.trace` to the Router engine and the sandbox helpers.
 - For scheduled jobs, report routes, auth lookups, turn settlement or platform-limit alarms, read [launch-invariants.md](docs/launch-invariants.md); every agent app proves them with `agent-app-invariants`.
   For where a turn's lifecycle is decided, read [turn-lifecycle-owner.md](docs/turn-lifecycle-owner.md).
 - To prove an app's product flows as a person uses them (recorded journeys, scored chat turns, a reviewer's INDEX.md), read [journeys.md](docs/journeys.md); every agent app records them with `agent-app-journeys`.

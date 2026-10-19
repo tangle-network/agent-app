@@ -473,6 +473,11 @@
       "import": "./dist/trace/index.js",
       "default": "./dist/trace/index.js"
     },
+    "./turn-trace": {
+      "types": "./dist/turn-trace/index.d.ts",
+      "import": "./dist/turn-trace/index.js",
+      "default": "./dist/turn-trace/index.js"
+    },
     "./sequences": {
       "types": "./dist/sequences/index.d.ts",
       "import": "./dist/sequences/index.js",

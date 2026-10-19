@@ -33,6 +33,8 @@ import {
   type TangleExecutionEnvironment,
 } from '../runtime/model'
 import { ok, fail, type Outcome } from './outcome'
+import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'
+import { createPromptTrace } from './prompt-trace'
 import {
   SandboxTransientDeadlineError,
   classifySandboxTransientFailure,
@@ -664,6 +666,15 @@ export interface EnsureWorkspaceSandboxOptions {
    *  product can see which round trip a slow acquisition spent its time in.
    *  Omitted, nothing is measured. */
   measure?: <T>(stage: string, operation: () => Promise<T>) => Promise<T>
+  /**
+   * The turn's trace. The ensure is recorded as one `sandbox.claim` span whose children are the
+   * `sandbox.ensure.*` steps (`credentials`, `list_running`, `finalize` for a reused box; `list_stopped`,
+   * `resume` for a stopped one; `create`, `wait_running`, `bootstrap` for a new one), so a slow claim names
+   * the step it waited on. Omitted, nothing is recorded; `measure` is unchanged and still called.
+   */
+  trace?: TurnTrace
+  /** The span the claim hangs from. Default: the trace's root. */
+  traceParent?: TurnSpan
 }
 
 /** What `/sandbox` reports once a box is provisioned, reused, or resumed. */
@@ -2534,9 +2545,27 @@ export async function ensureWorkspaceSandbox(
     workspaceId: options.workspaceId,
     ...(options.userId ? { userId: options.userId } : {}),
   })
-  const box = await bringUpWorkspaceSandbox(shell, options)
-  await observeProvisionedBox(shell, options, box)
-  return box
+  const { trace } = options
+  const claim = trace?.start('sandbox.claim', 'sandbox', { 'workspace.harness': options.harness }, options.traceParent)
+  // Each ensure step is a child of the claim, and the caller's own `measure` still sees it.
+  const traced: EnsureWorkspaceSandboxOptions = trace && claim
+    ? {
+      ...options,
+      measure: <T,>(stage: string, operation: () => Promise<T>): Promise<T> => {
+        const run = () => trace.measure(stage, 'sandbox', () => operation(), undefined, claim)
+        return options.measure ? options.measure(stage, run) : run()
+      },
+    }
+    : options
+  try {
+    const box = await bringUpWorkspaceSandbox(shell, traced)
+    claim?.end({ 'sandbox.id': box.id })
+    await observeProvisionedBox(shell, options, box)
+    return box
+  } catch (error) {
+    claim?.end(undefined, error)
+    throw error
+  }
 }
 
 /**
@@ -2743,11 +2772,12 @@ async function provisionWorkspaceSandbox(
 
   // Stage 2 — stopped-box resume (skipped on forceNew or resumeStopped===false).
   if (!replacementRequested && !forceNew && shell.resumeStopped !== false) {
-    const stopped = await listStopped(client, name)
+    const stopped = await measure('list_stopped', () => listStopped(client, name))
     if (!stopped.succeeded) throw stopped.error
     if (stopped.value) {
-      const runtimeEnv = await resolveWorkspaceRuntimeEnv(shell, scope)
-      const resumed = await resumeStoppedBox(stopped.value, resumeTimeout, runtimeEnv, onProgress)
+      const stoppedBox = stopped.value
+      const runtimeEnv = await measure('runtime_env', () => resolveWorkspaceRuntimeEnv(shell, scope))
+      const resumed = await measure('resume', () => resumeStoppedBox(stoppedBox, resumeTimeout, runtimeEnv, onProgress))
       if (!resumed.succeeded) {
         const recovery = await requestSandboxReplacement(
           shell.recoverStoppedSandbox,
@@ -2885,13 +2915,13 @@ async function provisionWorkspaceSandbox(
   // is always defined. The structural sections type needs no cast.
   assertProvisionPayloadWithinCap(payload ?? {})
 
-  let box = await client.create(payload)
+  let box = await measure('create', () => client.create(payload))
 
-  await box.waitFor('running', {
+  await measure('wait_running', () => box.waitFor('running', {
     timeoutMs: shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS,
     ...(onProgress ? { onProgress } : {}),
-  })
-  box = await refreshRuntimeConnection(client, box)
+  }))
+  box = await measure('refresh_connection', () => refreshRuntimeConnection(client, box))
 
   if (deferredFiles.length > 0) {
     const written = await writeProfileFilesToBox(box, deferredFiles)
@@ -2901,7 +2931,8 @@ async function provisionWorkspaceSandbox(
   }
 
   if (shell.bootstrap) {
-    const boot = await shell.bootstrap(box, scope)
+    const bootstrap = shell.bootstrap.bind(shell)
+    const boot = await measure('bootstrap', () => bootstrap(box, scope))
     if (!boot.succeeded) {
       throw new Error(`bootstrap failed on new box ${name}`, { cause: boot.error })
     }
@@ -3137,6 +3168,15 @@ export interface StreamSandboxPromptOptions {
   // the SAME object `ensureWorkspaceSandbox` does, so a product builds one and
   // wires it in both places; only `onActivity` is read here.
   spend?: SandboxSpendHooks
+  /**
+   * The turn's trace (`@tangle-network/agent-app/turn-trace`). Its id is sent as `traceId`, the
+   * `x-tangle-trace-id` the Sandbox API, orchestrator, sidecar and the Router's dispatch rows all record, and
+   * the stream is recorded as a `sandbox.prompt` span: the sidecar's first-text phases, the generation and
+   * each tool the box agent ran. Omitted, the SDK mints a trace id the app does not keep.
+   */
+  trace?: TurnTrace
+  /** The span the prompt hangs from. Default: the trace's root. */
+  traceParent?: TurnSpan
 }
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
@@ -3224,6 +3264,7 @@ async function* detachedSandboxPromptEvents(
           : {}),
         ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
         ...(options.ttlMs !== undefined ? { ttlMs: options.ttlMs } : {}),
+        ...(options.trace ? { traceId: options.trace.traceId } : {}),
       } as DispatchPromptOptions)
   const admittedExecutionId = admission?.executionId ?? executionId
   if (!admittedExecutionId) {
@@ -3249,6 +3290,7 @@ async function* detachedSandboxPromptEvents(
     sessionId: admission?.sessionId ?? sessionId,
     executionId: admittedExecutionId,
     lastEventId: lastEventId || '0',
+    ...(options.trace ? { traceId: options.trace.traceId } : {}),
     ...(options.signal ? { signal: options.signal } : {}),
   } as StreamPromptOptions)
 }
@@ -3589,14 +3631,25 @@ export async function* streamSandboxPrompt(
         ...(options?.expectedSecretProfileReceipt
           ? { expectedSecretProfileReceipt: options.expectedSecretProfileReceipt }
           : {}),
+        ...(options?.trace ? { traceId: options.trace.traceId } : {}),
         backend,
       } as StreamPromptOptions)
   const stream = options?.lastEventId ? dispatch() : resendRefusedDispatch(dispatch, options?.signal)
 
   emitSandboxActivity(options?.spend, box)
   let severedFinishReason: string | null = null
+  const promptTrace = options?.trace
+    ? createPromptTrace(options.trace, options.traceParent, {
+      'sandbox.id': box.id,
+      ...(options.model ? { 'gen_ai.request.model': options.model } : {}),
+      ...(options.harness ? { 'sandbox.harness': options.harness } : {}),
+      ...(options.detach ? { 'sandbox.detached': true } : {}),
+    })
+    : undefined
+  let promptError: unknown
   try {
     for await (const event of stream) {
+      promptTrace?.observe(event)
       const step = classifySeveredStream(event)
       if (step) severedFinishReason = step.kind === 'step-finish' && step.severed ? step.reason : null
       if (severedFinishReason && isTerminalPromptEvent(event)) {
@@ -3610,10 +3663,14 @@ export async function* streamSandboxPrompt(
       }
       yield event
     }
+  } catch (error) {
+    promptError = error
+    throw error
   } finally {
     // The box was working right up to here, however this turn ended — a throw,
     // an abandoned generator and a clean finish all bill the same.
     emitSandboxActivity(options?.spend, box)
+    promptTrace?.end(promptError)
   }
   // Reconnect-exhausted path: the stream ended on a severed step without a
   // terminal event. A truncated turn must fail loud, not return silently.

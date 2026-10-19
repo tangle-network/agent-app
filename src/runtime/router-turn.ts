@@ -24,6 +24,8 @@ import { createOpenAICompatCompletionTurn, createOpenAICompatStreamTurn, createO
 import { turnKnowledgeInstructions, type TurnKnowledgeFile } from './turn-knowledge'
 import { replyLanguageInstruction } from './reply-language'
 import { placeExecution, type PlacementRecord, type VacuousAxis } from '@tangle-network/agent-runtime/placement'
+import { turnTraceId, type TurnSpan, type TurnTrace } from '../turn-trace/recorder'
+import { nextCallIndex, tracedModelFetch } from '../turn-trace/traced-fetch'
 export { DURABLE_HOP_BUDGET_MS, turnCheckpointPath, workspaceTurnCheckpoints, type CheckpointWorkspaceStore, type TurnCheckpointStore } from './turn-continuation'
 export { budgetTurnKnowledge, turnKnowledgeInstructions, workspaceKnowledgeForTurn, type TurnKnowledgeBudget, type TurnKnowledgeFile } from './turn-knowledge'
 export { asksForLanguage, replyLanguageInstruction } from './reply-language'
@@ -47,6 +49,10 @@ export interface RouterTurnToolContext {
   emit(kind: string, data?: unknown): void
   /** The sender's message this turn answers, so a tool can act only on what was asked (see {@link asksForLanguage}). */
   userMessage: string
+  /** The turn's trace, when the turn records one. A tool that waits on a box or a service adds its own child spans under {@link span}. */
+  trace?: TurnTrace
+  /** This tool call's `tool.call` span; the parent of any span the tool records. */
+  span?: TurnSpan
 }
 
 /** One side event a tool reported while it ran. */
@@ -170,8 +176,16 @@ export interface RouterTurnOptions {
   /** Runaway backstop on model turns. Default 12. */
   maxToolTurns?: number
   maxTokens?: number
-  /** Sent as `x-tangle-trace-id` so the router's generation joins the app's trace. */
+  /** Sent as `x-tangle-trace-id` so the router's generation joins the app's trace. Characters the Router
+   *  refuses in that header (the `:` of an execution id) become `_`; see {@link turnTraceId}. Default: the
+   *  `trace`'s id. */
   traceId?: string
+  /**
+   * The turn's trace (`@tangle-network/agent-app/turn-trace`). Every model request is recorded as a
+   * `model.call` span with the Router's `Server-Timing` split into network and server time, and every tool
+   * call as a `tool.call` span that tool-side spans hang from. Without it nothing is recorded.
+   */
+  trace?: TurnTrace
   fetchImpl?: typeof fetch
   onEvent?: (event: RouterTurnEvent) => void
   /** Map a thrown tool error to what the model reads. Default: an error carrying string `code`
@@ -309,6 +323,16 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     const timer = setTimeout(resolve, ms)
     signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason) }, { once: true })
   })
+  const traceId = options.traceId !== undefined ? turnTraceId(options.traceId) : options.trace?.traceId
+  const { trace } = options
+  let currentModel = options.model
+  let lastModelSpan: TurnSpan | undefined
+  // Each HTTP send is its own `model.call` span, so a retried 503 is visible beside the send that answered.
+  const sendOnce: typeof fetch | undefined = trace
+    ? tracedModelFetch(trace, options.fetchImpl ?? fetch, {
+      onSpan: span => { lastModelSpan = span; span.set({ 'gen_ai.request.model': currentModel }) },
+    })
+    : options.fetchImpl
   const fetchImpl: typeof fetch | undefined = signal || attempts > 1 || attemptTimeoutMs
     ? async (input, init) => {
       for (let attempt = 1; ; attempt++) {
@@ -320,7 +344,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         let response: Response
         try {
           // A cancelled turn sends nothing more, whatever the injected fetch does with the signal.
-          response = await (options.fetchImpl ?? fetch)(input, { ...init, ...(attemptSignal ? { signal: attemptSignal } : {}) })
+          response = await (sendOnce ?? fetch)(input, { ...init, ...(attemptSignal ? { signal: attemptSignal } : {}) })
         } catch (error) {
           if (signal?.aborted || attempt >= attempts) throw error
           await pause(backoff())
@@ -334,7 +358,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         await pause(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, MAX_RETRY_DELAY_MS) : backoff())
       }
     }
-    : options.fetchImpl
+    : sendOnce
   const extraBody = {
     ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
     ...(options.maxCompletionTokens ? { max_completion_tokens: options.maxCompletionTokens } : {}),
@@ -359,9 +383,12 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       type: 'function', function: { name, description: tool.description, parameters: tool.inputSchema },
     })),
     ...(Object.keys(extraBody).length ? { extraBody } : {}),
-    ...(options.traceId ? { headers: { 'x-tangle-trace-id': options.traceId } } : {}),
+    ...(traceId ? { headers: { 'x-tangle-trace-id': traceId } } : {}),
     ...(fetchImpl ? { fetchImpl } : {}),
-    onServedModel: served => { servedModel = served.servedModel },
+    onServedModel: served => {
+      servedModel = served.servedModel
+      if (served.servedModel) lastModelSpan?.set({ 'gen_ai.response.model': served.servedModel })
+    },
   })
   const segments: string[] = []
   const usage = { promptTokens: 0, completionTokens: 0, modelCalls: 0 }
@@ -388,6 +415,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         return 'placement_refused'
       }
     }
+    currentModel = model
     const streamTurn = streamTurnFor(model)
     for await (const step of streamAppToolLoop<LoopEvent>({
       systemPrompt: options.systemPrompt,
@@ -413,10 +441,23 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         toolsRan++
         // A tool's typed event rides the loop's progress channel, so it streams in order before the result.
         const emitEvent = (kind: string, data?: unknown) => context?.progress({ data: { [TOOL_EVENT]: kind, data } })
+        const toolSpan = trace?.start('tool.call', 'tool', {
+          'gen_ai.tool.name': tool.name,
+          'tool.call_id': call.toolCallId ?? '',
+          'call.index': nextCallIndex(trace, 'tool.call'),
+        })
         try {
-          return { ok: true, result: await tool.run(call.args, { emit: emitEvent, userMessage: currentUserMessage }) }
+          const result = await tool.run(call.args, {
+            emit: emitEvent,
+            userMessage: currentUserMessage,
+            ...(trace && toolSpan ? { trace, span: toolSpan } : {}),
+          })
+          toolSpan?.end({ 'tool.ok': true })
+          return { ok: true, result }
         } catch (error) {
           const mapped = (options.toolError ?? defaultToolError)(error)
+          // The span names the failure by its code; a thrown message can carry customer text.
+          toolSpan?.end({ 'tool.ok': false }, mapped?.code ?? 'tool_failed')
           if (mapped) return { ok: false, ...mapped }
           options.onToolFailure?.(tool.name, error)
           return { ok: false, code: 'tool_failed', message: 'The tool failed; tell the user what could not be completed.' }
@@ -437,6 +478,10 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           usage.promptTokens += event.usage.promptTokens
           usage.completionTokens += event.usage.completionTokens
           usage.modelCalls++
+          lastModelSpan?.set({
+            'gen_ai.usage.input_tokens': event.usage.promptTokens,
+            'gen_ai.usage.output_tokens': event.usage.completionTokens,
+          })
           emit({ type: 'usage', ...event.usage })
         } else if (event.type === 'tool_call') {
           segmentOpen = false

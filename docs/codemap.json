@@ -2495,6 +2495,7 @@
         "sandbox",
         "stream",
         "tools",
+        "turn-trace",
         "web"
       ],
       "error": null,
@@ -2972,6 +2973,12 @@
           "kind": "interface",
           "signature": "interface ChatTurnTextPartInput",
           "doc": "Wire contract between the chat client (composer + `streamChatTurn`) and the assembled server vertical (`createChatTurnRoutes`)."
+        },
+        {
+          "name": "ChatTurnTraceOptions",
+          "kind": "interface",
+          "signature": "interface ChatTurnTraceOptions",
+          "doc": "Where a finished turn's trace goes, and the host's labels for its root span."
         },
         {
           "name": "ChatTurnUsage",
@@ -15503,7 +15510,8 @@
       "id": "./runtime",
       "source": "src/runtime/index.ts",
       "dependsOn": [
-        "tools"
+        "tools",
+        "turn-trace"
       ],
       "error": null,
       "exports": [
@@ -16149,7 +16157,8 @@
       "id": "./runtime/router-turn",
       "source": "src/runtime/router-turn.ts",
       "dependsOn": [
-        "tools"
+        "tools",
+        "turn-trace"
       ],
       "error": null,
       "exports": [
@@ -16318,7 +16327,8 @@
         "harness",
         "profile",
         "runtime",
-        "tools"
+        "tools",
+        "turn-trace"
       ],
       "error": null,
       "exports": [
@@ -23721,12 +23731,6 @@
           "doc": "Derive a span trace from timestamped turn events."
         },
         {
-          "name": "buildStageTimingRecord",
-          "kind": "function",
-          "signature": "(context: StageTimingContext, stage: string, startedAt: number, durationMs: number, input?: StageTimingRecordInput) =>…",
-          "doc": "Build one safe record, or return null when its required fields are invalid."
-        },
-        {
           "name": "childSpanContext",
           "kind": "function",
           "signature": "(parent: MissionTraceContext | StepSpanContext, seed?: string | undefined) => StepSpanContext",
@@ -23743,18 +23747,6 @@
           "kind": "function",
           "signature": "(missionId?: string | undefined) => MissionTraceContext",
           "doc": "Mint a mission's trace context."
-        },
-        {
-          "name": "createStageTiming",
-          "kind": "function",
-          "signature": "(options: CreateStageTimingOptions) => StageTiming",
-          "doc": "Create a stage timer with an injected carrier."
-        },
-        {
-          "name": "CreateStageTimingOptions",
-          "kind": "interface",
-          "signature": "interface CreateStageTimingOptions",
-          "doc": null
         },
         {
           "name": "delegationActivityToFlowSpans",
@@ -23815,66 +23807,6 @@
           "kind": "function",
           "signature": "(trace: FlowTrace, opts?: { width?: number | undefined; } | undefined) => string",
           "doc": "ASCII waterfall cascade — the default artifact for explaining a flow."
-        },
-        {
-          "name": "STAGE_TIMING_EVENT",
-          "kind": "const",
-          "signature": "\"stage_timing\"",
-          "doc": "Structured, bounded latency records for one request or agent turn."
-        },
-        {
-          "name": "STAGE_TIMING_VERSION",
-          "kind": "const",
-          "signature": "1",
-          "doc": null
-        },
-        {
-          "name": "StageTiming",
-          "kind": "interface",
-          "signature": "interface StageTiming",
-          "doc": null
-        },
-        {
-          "name": "StageTimingContext",
-          "kind": "interface",
-          "signature": "interface StageTimingContext",
-          "doc": null
-        },
-        {
-          "name": "StageTimingDetailValue",
-          "kind": "type",
-          "signature": "type StageTimingDetailValue",
-          "doc": null
-        },
-        {
-          "name": "StageTimingHandle",
-          "kind": "interface",
-          "signature": "interface StageTimingHandle",
-          "doc": null
-        },
-        {
-          "name": "StageTimingKind",
-          "kind": "type",
-          "signature": "type StageTimingKind",
-          "doc": null
-        },
-        {
-          "name": "StageTimingOutcome",
-          "kind": "type",
-          "signature": "type StageTimingOutcome",
-          "doc": null
-        },
-        {
-          "name": "StageTimingRecord",
-          "kind": "interface",
-          "signature": "interface StageTimingRecord",
-          "doc": null
-        },
-        {
-          "name": "StageTimingRecordInput",
-          "kind": "interface",
-          "signature": "interface StageTimingRecordInput",
-          "doc": null
         },
         {
           "name": "stepActivityFlowTrace",
@@ -24474,6 +24406,152 @@
           "kind": "function",
           "signature": "(workspaceId: string) => string",
           "doc": "Channel for workspace signals and the workspace-scoped lock."
+        }
+      ]
+    },
+    {
+      "id": "./turn-trace",
+      "source": "src/turn-trace/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "buildTurnTraceOtelSpans",
+          "kind": "function",
+          "signature": "(snapshot: TurnTraceSnapshot, labels?: TurnSpanAttrs) => OtelSpan[]",
+          "doc": "The root span (`agent_app.turn`) carries the host's labels and the turn's numbers: wall time, the share inside child spans, and the time credited to each kind of span."
+        },
+        {
+          "name": "createIntelligenceTurnTraceSink",
+          "kind": "function",
+          "signature": "(options: IntelligenceTurnTraceSinkOptions) => TurnTraceSink",
+          "doc": "The sink a chat route or a Worker turn hands each finished trace to."
+        },
+        {
+          "name": "createTurnTrace",
+          "kind": "function",
+          "signature": "(options?: CreateTurnTraceOptions) => TurnTrace",
+          "doc": null
+        },
+        {
+          "name": "CreateTurnTraceOptions",
+          "kind": "interface",
+          "signature": "interface CreateTurnTraceOptions",
+          "doc": null
+        },
+        {
+          "name": "IntelligenceTurnTraceSinkOptions",
+          "kind": "interface",
+          "signature": "interface IntelligenceTurnTraceSinkOptions",
+          "doc": null
+        },
+        {
+          "name": "isTraceId",
+          "kind": "function",
+          "signature": "(value: string) => boolean",
+          "doc": "True when the Router and the Sandbox API keep this id as a `x-tangle-trace-id`."
+        },
+        {
+          "name": "nextCallIndex",
+          "kind": "function",
+          "signature": "(trace: TurnTrace, name: string) => number",
+          "doc": "1-based count of `name` spans started through {@link nextCallIndex} on this trace."
+        },
+        {
+          "name": "parseServerTiming",
+          "kind": "function",
+          "signature": "(header: string | null | undefined) => ServerTimingEntry[]",
+          "doc": "Parse a `Server-Timing` header, as the Router and the Sandbox orchestrator send it."
+        },
+        {
+          "name": "serverTimingAttrs",
+          "kind": "function",
+          "signature": "(entries: readonly ServerTimingEntry[]) => Record<string, string | number>",
+          "doc": "Flat span attributes for the entries: `server_timing.<name>_ms` for a duration, `server_timing.<name>` for a `desc`."
+        },
+        {
+          "name": "ServerTimingEntry",
+          "kind": "interface",
+          "signature": "interface ServerTimingEntry",
+          "doc": "One entry of a `Server-Timing` response header."
+        },
+        {
+          "name": "summarizeTurnSpans",
+          "kind": "function",
+          "signature": "(spans: readonly Pick<TurnSpanRecord, \"name\" | \"kind\" | \"spanId\" | \"parentSpanId\" | \"startMs\" | \"endMs\">[], rootSpanId:…",
+          "doc": "Coverage and the per-kind split for a set of spans over `[startMs, endMs]`."
+        },
+        {
+          "name": "tracedModelFetch",
+          "kind": "function",
+          "signature": "(trace: TurnTrace, inner: (input: URL | RequestInfo, init?: RequestInit | undefined) => Promise<Response>, options?: Tr…",
+          "doc": "`fetch` for a model request, recording one `model.call` span per send: the wall time from the request to the end of its body, the time to the first byte, and the Router's own `Server-Timing` so the w…"
+        },
+        {
+          "name": "TracedModelFetchOptions",
+          "kind": "interface",
+          "signature": "interface TracedModelFetchOptions",
+          "doc": null
+        },
+        {
+          "name": "TURN_SPAN_KINDS",
+          "kind": "const",
+          "signature": "readonly TurnSpanKind[]",
+          "doc": null
+        },
+        {
+          "name": "TurnSpan",
+          "kind": "interface",
+          "signature": "interface TurnSpan",
+          "doc": null
+        },
+        {
+          "name": "TurnSpanAttrs",
+          "kind": "type",
+          "signature": "type TurnSpanAttrs",
+          "doc": "Bounded primitive metadata."
+        },
+        {
+          "name": "TurnSpanKind",
+          "kind": "type",
+          "signature": "type TurnSpanKind",
+          "doc": "What a span's time is spent on."
+        },
+        {
+          "name": "TurnSpanRecord",
+          "kind": "interface",
+          "signature": "interface TurnSpanRecord",
+          "doc": null
+        },
+        {
+          "name": "TurnTrace",
+          "kind": "interface",
+          "signature": "interface TurnTrace",
+          "doc": null
+        },
+        {
+          "name": "turnTraceId",
+          "kind": "function",
+          "signature": "(executionId: string) => string",
+          "doc": "The turn's execution id as a trace id."
+        },
+        {
+          "name": "TurnTraceSink",
+          "kind": "type",
+          "signature": "type TurnTraceSink",
+          "doc": "Where a finished turn's trace goes."
+        },
+        {
+          "name": "TurnTraceSnapshot",
+          "kind": "interface",
+          "signature": "interface TurnTraceSnapshot",
+          "doc": null
+        },
+        {
+          "name": "TurnTraceSummary",
+          "kind": "interface",
+          "signature": "interface TurnTraceSummary",
+          "doc": "How much of the turn's wall time is inside named spans, and what the time was spent on."
         }
       ]
     },
