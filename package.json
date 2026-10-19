@@ -433,6 +433,11 @@
       "import": "./dist/workspace-apps/index.js",
       "default": "./dist/workspace-apps/index.js"
     },
+    "./workspace-apps/react": {
+      "types": "./dist/workspace-apps/react.d.ts",
+      "import": "./dist/workspace-apps/react.js",
+      "default": "./dist/workspace-apps/react.js"
+    },
     "./workspace-react": {
       "types": "./dist/workspace-react/index.d.ts",
       "import": "./dist/workspace-react/index.js",

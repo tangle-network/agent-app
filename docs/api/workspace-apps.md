@@ -4,7 +4,215 @@
 
 Source: `src/workspace-apps/index.ts`
 
-17 exports.
+54 exports.
+
+### `CLOUD_ARTIFACT_FRAME_SANDBOX`
+
+`const` — The iframe sandbox for an artifact frame; never add `allow-same-origin`.
+
+```ts
+"allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"
+```
+
+### `CLOUD_ARTIFACT_MAX_BYTES`
+
+`const`
+
+```ts
+number
+```
+
+### `CLOUD_ARTIFACT_MAX_FILE_BYTES`
+
+`const`
+
+```ts
+number
+```
+
+### `CLOUD_ARTIFACT_MAX_FILES`
+
+`const`
+
+```ts
+200
+```
+
+### `CLOUD_ARTIFACT_SCRIPT_HOSTS`
+
+`const` — Script and style CDNs a generated page may load.
+
+```ts
+readonly ["https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://unpkg.com"]
+```
+
+### `CLOUD_ARTIFACT_SHARE_ROLE`
+
+`const` — Opening an artifact needs `viewer`; creating or revoking a public link needs this role.
+
+```ts
+"owner" | "viewer" | "editor" | "admin"
+```
+
+### `CLOUD_ARTIFACT_VIEW_TTL_MS`
+
+`const` — Member view links are re-minted on every page load, so they can be short.
+
+```ts
+number
+```
+
+### `CLOUD_ARTIFACT_WORKER_MODULE`
+
+`const` — The module a `worker` bundle runs, at the bundle root (the Cloudflare Pages name).
+
+```ts
+"_worker.js"
+```
+
+### `cloudArtifactContentSecurityPolicy`
+
+`function` — The Content-Security-Policy every artifact response carries.
+
+```ts
+(input: { origin: string; frameAncestors: readonly string[]; }) => string
+```
+
+### `cloudArtifactContentType`
+
+`function` — The served type for a path, or null when cloud artifacts do not serve it.
+
+```ts
+(path: string) => string | null
+```
+
+### `CloudArtifactError`
+
+`class`
+
+```ts
+class CloudArtifactError
+```
+
+### `CloudArtifactErrorCode`
+
+`type`
+
+```ts
+type CloudArtifactErrorCode
+```
+
+### `CloudArtifactFile`
+
+`interface` — One stored file of a version.
+
+```ts
+interface CloudArtifactFile
+```
+
+### `CloudArtifactGrant`
+
+`type` — Who a view link was minted for: a workspace member, or a public share.
+
+```ts
+type CloudArtifactGrant
+```
+
+### `CloudArtifactInputFile`
+
+`interface`
+
+```ts
+interface CloudArtifactInputFile
+```
+
+### `CloudArtifactKind`
+
+`type`
+
+```ts
+type CloudArtifactKind
+```
+
+### `cloudArtifactObjectKey`
+
+`function` — Content-addressed per workspace, so erasing a workspace deletes one prefix.
+
+```ts
+(workspaceId: string, sha256Hex: string) => string
+```
+
+### `CloudArtifactOriginOptions`
+
+`interface`
+
+```ts
+interface CloudArtifactOriginOptions
+```
+
+### `CloudArtifactRecord`
+
+`interface` — What the origin needs from the product's record.
+
+```ts
+interface CloudArtifactRecord
+```
+
+### `cloudArtifactReferences`
+
+`function` — Local files an HTML, CSS or JavaScript document refers to, as bundle paths.
+
+```ts
+(text: string, documentPath: string) => string[]
+```
+
+### `CloudArtifactVersion`
+
+`interface` — An immutable snapshot.
+
+```ts
+interface CloudArtifactVersion
+```
+
+### `CloudArtifactView`
+
+`interface`
+
+```ts
+interface CloudArtifactView
+```
+
+### `CloudArtifactWorkerCode`
+
+`interface` — The code shape Worker Loader's `get` callback returns (Cloudflare `WorkerCode`).
+
+```ts
+interface CloudArtifactWorkerCode
+```
+
+### `CloudArtifactWorkerLoader`
+
+`interface` — Structural `env.LOADER` (a `worker_loaders` binding), so workers-types stays out of the public types.
+
+```ts
+interface CloudArtifactWorkerLoader
+```
+
+### `cloudArtifactWorkspacePrefix`
+
+`function` — The prefix holding every stored byte of a workspace's artifacts.
+
+```ts
+(workspaceId: string) => string
+```
+
+### `collectCloudArtifactBundle`
+
+`function` — Gather an entry and every local file it refers to, transitively, plus `_worker.js` and its imports when the root has one.
+
+```ts
+(input: { entry: string; readMany(paths: readonly string[]): Promise<ReadonlyMap<string, Uint8Array<ArrayBufferLike>>>;…
+```
 
 ### `confirmWorkspaceAppReady`
 
@@ -12,6 +220,38 @@ Source: `src/workspace-apps/index.ts`
 
 ```ts
 (app: WorkspaceAppRecord, proof: WorkspaceAppHttpProof) => WorkspaceAppRecord
+```
+
+### `createCloudArtifactId`
+
+`function` — A random 32-hex id for an artifact or a share.
+
+```ts
+() => string
+```
+
+### `createCloudArtifactOrigin`
+
+`function` — Serve cloud artifacts on their own origin.
+
+```ts
+(options: CloudArtifactOriginOptions) => (request: Request) => Promise<Response>
+```
+
+### `createCloudArtifactShareToken`
+
+`function` — The secret part of a public link: `<shareId>.<HMAC>`.
+
+```ts
+(shareId: string, secret: string) => Promise<string>
+```
+
+### `createCloudArtifactViewUrl`
+
+`function` — A short-lived URL on the artifact origin for one artifact and one grant.
+
+```ts
+(input: { origin: string; secret: string; artifactId: string; grant: CloudArtifactGrant; path: string; ttlMs?: number |…
 ```
 
 ### `createWorkspaceAppDataClient`
@@ -30,12 +270,68 @@ Source: `src/workspace-apps/index.ts`
 (options: WorkspaceAppDataHostOptions) => WorkspaceAppDataHost
 ```
 
+### `isCloudArtifactPath`
+
+`function` — A bundle path: relative, no `.` or `..` segments, no control or URL-special characters.
+
+```ts
+(path: string) => boolean
+```
+
+### `prepareCloudArtifact`
+
+`function` — Validate and hash a bundle.
+
+```ts
+(input: { files: readonly CloudArtifactInputFile[]; entry: string; openui?: boolean | undefined; carry?: readonly Cloud…
+```
+
+### `PreparedCloudArtifact`
+
+`interface`
+
+```ts
+interface PreparedCloudArtifact
+```
+
+### `readCloudArtifactShareToken`
+
+`function` — The share id a public link names, or null when its signature does not verify.
+
+```ts
+(token: string, secret: string) => Promise<string | null>
+```
+
+### `readCloudArtifactViewUrl`
+
+`function` — Read and verify a view URL on the artifact origin; null for anything forged, expired or malformed.
+
+```ts
+(url: URL, options: { secret: string; now?: (() => number) | undefined; }) => Promise<CloudArtifactView | null>
+```
+
 ### `refreshWorkspaceAppPreview`
 
 `function` — Refresh delivery state without changing which sandbox service this app means.
 
 ```ts
 (app: WorkspaceAppRecord, link: WorkspaceAppPreviewLink, updatedAt?: string) => WorkspaceAppRecord
+```
+
+### `resolveCloudArtifactReference`
+
+`function` — Resolve a document-relative reference to a bundle path, or null when it is not a local file.
+
+```ts
+(reference: string, documentPath: string) => string | null
+```
+
+### `storeCloudArtifact`
+
+`function` — Store a prepared version's new bytes; objects already present are not rewritten.
+
+```ts
+(store: ObjectStore, workspaceId: string, prepared: PreparedCloudArtifact) => Promise<CloudArtifactVersion>
 ```
 
 ### `workspaceAppBuilderInstructions`
