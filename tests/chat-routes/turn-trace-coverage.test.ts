@@ -98,7 +98,7 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     const names = spans.map((span) => span.name)
     expect(names.filter((name) => name === 'model.call')).toHaveLength(2)
     expect(names.filter((name) => name === 'tool.call')).toHaveLength(1)
-    expect(names).toEqual(expect.arrayContaining(['admission.authorize', 'admission.lock'.replace('lock', 'history'), 'admission.produce', 'persist.assistant', 'router.pre_upstream', 'model.stream']))
+    expect(names).toEqual(expect.arrayContaining(['admission.authorize', 'admission.history', 'admission.produce', 'persist.assistant', 'router.pre_upstream', 'model.stream']))
     const model = spans.find((span) => span.name === 'model.call')!
     expect(model.attrs).toMatchObject({ 'http.status_code': 200, 'server_timing.upstream_start_ms': 40, 'gen_ai.request.model': 'requested/model',
       'gen_ai.usage.input_tokens': 900, 'gen_ai.usage.output_tokens': 12 })
