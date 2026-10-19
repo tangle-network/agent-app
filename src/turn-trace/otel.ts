@@ -28,16 +28,29 @@ export interface OtlpSpan {
   status: { code: number; message?: string }
 }
 
-function attributes(record: Record<string, string | number | boolean>): OtlpSpan['attributes'] {
+/** `doubles` names measurements that stay `doubleValue` when they land on a whole number, so a reader sees one type per key. */
+function attributes(record: Record<string, string | number | boolean>, doubles: ReadonlySet<string> = new Set()): OtlpSpan['attributes'] {
   return Object.entries(record).flatMap(([key, value]) => {
     if (typeof value === 'number' && !Number.isFinite(value)) return []
     return [{
       key,
-      value: typeof value === 'number' ? (Number.isInteger(value) ? { intValue: value.toString() } : { doubleValue: value })
+      value: typeof value === 'number' ? (Number.isInteger(value) && !doubles.has(key) ? { intValue: value.toString() } : { doubleValue: value })
         : typeof value === 'boolean' ? { boolValue: value } : { stringValue: value },
     }]
   })
 }
+
+/** The root span's measured numbers: one decimal, so each is always a `doubleValue`. */
+const ROOT_MEASUREMENTS: ReadonlySet<string> = new Set([
+  'tangle.duration_ms',
+  'tangle.turn.wall_ms',
+  'tangle.turn.covered_ms',
+  'tangle.turn.coverage_pct',
+  'tangle.turn.uncovered_ms',
+  'tangle.turn.largest_gap_ms',
+  'tangle.turn.first_text_ms',
+  ...TURN_SPAN_KINDS.map((kind) => `tangle.turn.${kind}_ms`),
+])
 
 /**
  * A Tangle trace id as the 32-hex OTLP trace id. The mapping is the Sandbox SDK's `otelTraceIdForTangleTrace`, so a
@@ -101,7 +114,7 @@ export function buildTurnTraceOtelSpans(snapshot: TurnTraceSnapshot, labels: Tur
     kind: 1,
     startTimeUnixNano: msToNs(snapshot.startedAt),
     endTimeUnixNano: msToNs(snapshot.endedAt),
-    attributes: attributes(rootAttrs),
+    attributes: attributes(rootAttrs, ROOT_MEASUREMENTS),
     status: snapshot.status === 'ok' ? { code: 1 } : { code: 2, ...(snapshot.error ? { message: snapshot.error } : {}) },
   }]
   for (const span of snapshot.spans) {

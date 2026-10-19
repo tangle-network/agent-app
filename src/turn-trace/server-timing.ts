@@ -63,3 +63,16 @@ export function serverTimingAttrs(entries: readonly ServerTimingEntry[]): Record
   }
   return out
 }
+
+/** Format entries as a `Server-Timing` header value, the inverse of {@link parseServerTiming}. Invalid names are skipped. */
+export function formatServerTiming(entries: readonly ServerTimingEntry[]): string {
+  return entries
+    .filter((entry) => /^[\w.!#$%&'*+^`|~-]+$/.test(entry.name))
+    .slice(0, 32)
+    .map((entry) => [
+      entry.name,
+      ...(entry.durMs === undefined ? [] : [`dur=${Math.round(entry.durMs * 10) / 10}`]),
+      ...(entry.desc === undefined ? [] : [`desc="${entry.desc.replace(/["\\]/g, '').slice(0, 120)}"`]),
+    ].join(';'))
+    .join(', ')
+}

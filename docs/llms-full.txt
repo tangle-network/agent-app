@@ -31609,6 +31609,14 @@ Source: `src/turn-trace/index.ts`
 interface CreateTurnTraceOptions
 ```
 
+### `formatServerTiming`
+
+`function` — Format entries as a `Server-Timing` header value, the inverse of {@link parseServerTiming}.
+
+```ts
+(entries: readonly ServerTimingEntry[]) => string
+```
+
 ### `IntelligenceTurnTraceSinkOptions`
 
 `interface`

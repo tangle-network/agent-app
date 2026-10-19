@@ -24452,6 +24452,12 @@
           "doc": null
         },
         {
+          "name": "formatServerTiming",
+          "kind": "function",
+          "signature": "(entries: readonly ServerTimingEntry[]) => string",
+          "doc": "Format entries as a `Server-Timing` header value, the inverse of {@link parseServerTiming}."
+        },
+        {
           "name": "IntelligenceTurnTraceSinkOptions",
           "kind": "interface",
           "signature": "interface IntelligenceTurnTraceSinkOptions",
