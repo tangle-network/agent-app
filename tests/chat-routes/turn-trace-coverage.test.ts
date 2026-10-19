@@ -13,6 +13,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
  */
 function startRouter(seen: IncomingHttpHeaders[], otlp: Array<{ authorization?: string; body: any }>): Promise<{ server: Server; url: string }> {
   let calls = 0
+  let flakyServed = false
   const server = createServer((request, response) => {
     if (request.url === '/v1/otlp/v1/traces') {
       const chunks: Buffer[] = []
@@ -25,6 +26,12 @@ function startRouter(seen: IncomingHttpHeaders[], otlp: Array<{ authorization?: 
     }
     seen.push(request.headers)
     request.resume()
+    // `/flaky` answers its first send with a 503, as an overloaded provider does.
+    if (request.url?.startsWith('/flaky') && !flakyServed) {
+      flakyServed = true
+      request.on('end', () => { response.writeHead(503, { 'content-type': 'application/json' }).end('{"error":"overloaded"}') })
+      return
+    }
     request.on('end', async () => {
       const call = ++calls
       await sleep(60)
@@ -148,5 +155,42 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     expect(root.attributes.find((attribute) => attribute.key === 'tangle.trace_id')?.value.stringValue).toBe(snapshot!.traceId)
     expect(new Set(exported.map((span) => span.traceId))).toEqual(new Set([otlpTraceId(snapshot!.traceId)]))
     for (const span of exported.filter((candidate) => candidate !== root)) expect(exported.some((candidate) => candidate.spanId === span.parentSpanId)).toBe(true)
+  })
+
+  it('names the wait before a resend, so a retried send leaves no gap between its two calls', async () => {
+    const sent = routerHeaders.length
+    let snapshot: TurnTraceSnapshot | undefined
+    const pending: Promise<unknown>[] = []
+    const routes = createChatTurnRoutes<Record<string, never>>({
+      projectId: 'trace-app',
+      authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'user-1', context: {} }),
+      store: { async listMessages() { return [] }, async appendMessage() { return { id: 'm-1' } } },
+      turnStore: createMemoryTurnEventStore(),
+      incrementalPersistence: false,
+      turnTrace: { sink: (done) => { snapshot = done } },
+      produce: ({ prompt, trace }) => createRouterTurnProducer({
+        apiKey: 'k', model: 'requested/model', systemPrompt: 's', userMessage: typeof prompt === 'string' ? prompt : '',
+        baseUrl: `${router.url}/flaky`, trace, retry: { attempts: 2, baseDelayMs: 120 },
+      }),
+      log: () => {},
+    })
+    const response = await routes.turn(new Request('http://app.test/api/chat', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId: 't-2', content: 'Ready?' }) }),
+    { waitUntil: (p: Promise<unknown>) => { pending.push(p) } })
+    expect(await response.text()).toContain('are ready.')
+    await Promise.all(pending)
+
+    expect(routerHeaders.length - sent).toBe(2)
+    const { spans, summary } = snapshot!
+    const calls = spans.filter((span) => span.name === 'model.call').sort((a, b) => a.startMs - b.startMs)
+    expect(calls.map((span) => span.attrs['http.status_code'])).toEqual([503, 200])
+    const waits = spans.filter((span) => span.name === 'model.retry_wait')
+    expect(waits).toHaveLength(1)
+    expect(waits[0]!.attrs).toMatchObject({ 'retry.attempt': 1, 'retry.reason': 'http_503' })
+    // The backoff is at least half its base; it sits between the failed send and the resend.
+    expect(waits[0]!.endMs - waits[0]!.startMs).toBeGreaterThanOrEqual(60)
+    expect(waits[0]!.startMs).toBeGreaterThanOrEqual(calls[0]!.startMs)
+    expect(waits[0]!.endMs).toBeLessThanOrEqual(calls[1]!.startMs)
+    expect(summary.largestGapMs).toBeLessThan(60)
   })
 })

@@ -341,13 +341,17 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           .filter((value): value is AbortSignal => Boolean(value))
         const attemptSignal = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
         const backoff = () => Math.min(MAX_RETRY_DELAY_MS, baseDelayMs * 2 ** (attempt - 1)) * (0.5 + Math.random() / 2)
+        // The wait before a resend is its own span, so the time between two sends is named, not a gap.
+        const wait = (ms: number, reason: string) => trace
+          ? trace.measure('model.retry_wait', 'other', () => pause(ms), { 'retry.attempt': attempt, 'retry.reason': reason, 'retry.wait_ms': Math.round(ms) })
+          : pause(ms)
         let response: Response
         try {
           // A cancelled turn sends nothing more, whatever the injected fetch does with the signal.
           response = await (sendOnce ?? fetch)(input, { ...init, ...(attemptSignal ? { signal: attemptSignal } : {}) })
         } catch (error) {
           if (signal?.aborted || attempt >= attempts) throw error
-          await pause(backoff())
+          await wait(backoff(), 'send_failed')
           continue
         }
         // Nothing has streamed yet, so a resend repeats no word and no tool.
@@ -355,7 +359,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         if (DEAD_CREDENTIAL_CATEGORIES.has(response.headers.get('x-tangle-failure-category') ?? '')) return response
         const retryAfter = Number(response.headers.get('retry-after'))
         await response.body?.cancel().catch(() => {})
-        await pause(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, MAX_RETRY_DELAY_MS) : backoff())
+        await wait(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, MAX_RETRY_DELAY_MS) : backoff(), `http_${response.status}`)
       }
     }
     : sendOnce
