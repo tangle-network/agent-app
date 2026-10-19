@@ -151,6 +151,12 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     expect(exported).toHaveLength(spans.length + 1)
     const root = exported.find((span) => span.name === 'agent_app.turn')!
     expect(root.parentSpanId).toBeUndefined()
+    // Every duration and ratio is a double whatever its value (an integral 0 ms is not an int); counts stay ints.
+    const timed = root.attributes.filter((attribute) => /^tangle\.turn\..*_(ms|pct)$/.test(attribute.key))
+    expect(timed.length).toBeGreaterThan(6)
+    expect(timed.some((attribute) => attribute.value.doubleValue === 0)).toBe(true)
+    for (const attribute of timed) expect(attribute.value.intValue).toBeUndefined()
+    expect(root.attributes.find((attribute) => attribute.key === 'tangle.turn.spans')?.value.intValue).toBeDefined()
     expect(root.attributes.find((attribute) => attribute.key === 'tangle.turn.coverage_pct')?.value.doubleValue).toBe(summary.coveragePct)
     expect(root.attributes.find((attribute) => attribute.key === 'tangle.trace_id')?.value.stringValue).toBe(snapshot!.traceId)
     expect(new Set(exported.map((span) => span.traceId))).toEqual(new Set([otlpTraceId(snapshot!.traceId)]))

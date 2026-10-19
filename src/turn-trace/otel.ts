@@ -28,15 +28,15 @@ export interface OtlpSpan {
   status: { code: number; message?: string }
 }
 
-/** A ratio keeps one OTLP type whatever its value: a coverage of exactly 99 is still a double, not an int. */
-const DOUBLE_ATTRS = new Set(['tangle.turn.coverage_pct'])
+/** A duration or ratio keeps one OTLP type whatever its value: a 0 ms or a coverage of exactly 99 is still a double, not an int. Counts stay integers. */
+const isDoubleAttr = (key: string) => /^tangle\.turn\..*_(ms|pct)$/.test(key)
 
 function attributes(record: Record<string, string | number | boolean>): OtlpSpan['attributes'] {
   return Object.entries(record).flatMap(([key, value]) => {
     if (typeof value === 'number' && !Number.isFinite(value)) return []
     return [{
       key,
-      value: typeof value === 'number' ? (Number.isInteger(value) && !DOUBLE_ATTRS.has(key) ? { intValue: value.toString() } : { doubleValue: value })
+      value: typeof value === 'number' ? (Number.isInteger(value) && !isDoubleAttr(key) ? { intValue: value.toString() } : { doubleValue: value })
         : typeof value === 'boolean' ? { boolValue: value } : { stringValue: value },
     }]
   })
