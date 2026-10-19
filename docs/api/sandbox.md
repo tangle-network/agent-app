@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-256 exports.
+258 exports.
 
 ### `adaptSandboxStream`
 
@@ -1636,6 +1636,22 @@ interface StreamSandboxPromptOptions
 
 ```ts
 interface TerminalConnectionBoxLike
+```
+
+### `traceSandboxPromptEvents`
+
+`function` — Pass a sandbox prompt stream through unchanged while recording it in the turn's trace (see {@link createPromptTrace}).
+
+```ts
+(events: AsyncIterable<unknown>, options: TraceSandboxPromptOptions) => AsyncGenerator<unknown, any, any>
+```
+
+### `TraceSandboxPromptOptions`
+
+`interface`
+
+```ts
+interface TraceSandboxPromptOptions
 ```
 
 ### `utcDay`

@@ -17557,6 +17557,18 @@
           "doc": "The structural surface this route needs from an SDK sandbox box — no `@tangle-network/sandbox` class import (invariant 3)."
         },
         {
+          "name": "traceSandboxPromptEvents",
+          "kind": "function",
+          "signature": "(events: AsyncIterable<unknown>, options: TraceSandboxPromptOptions) => AsyncGenerator<unknown, any, any>",
+          "doc": "Pass a sandbox prompt stream through unchanged while recording it in the turn's trace (see {@link createPromptTrace})."
+        },
+        {
+          "name": "TraceSandboxPromptOptions",
+          "kind": "interface",
+          "signature": "interface TraceSandboxPromptOptions",
+          "doc": null
+        },
+        {
           "name": "utcDay",
           "kind": "function",
           "signature": "(at: number) => string",

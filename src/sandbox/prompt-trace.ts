@@ -20,14 +20,14 @@ const asNum = (value: unknown): number | undefined => typeof value === 'number' 
 /** The sidecar's phase order, and what each one's span is called. */
 const PHASES = ['agent_run_start', 'harness_spawn', 'harness_ready', 'first_model_request', 'first_upstream_byte', 'first_text'] as const
 
-export interface PromptTrace {
+interface PromptTrace {
   /** Read one raw sandbox event. Never throws. */
   observe(event: unknown): void
   /** End the stream's spans. `error` marks the prompt failed. */
   end(error?: unknown): void
 }
 
-export function createPromptTrace(trace: TurnTrace, parent: TurnSpan | undefined, meta: TurnSpanAttrs): PromptTrace {
+function createPromptTrace(trace: TurnTrace, parent: TurnSpan | undefined, meta: TurnSpanAttrs): PromptTrace {
   const startedAt = Date.now()
   const prompt = trace.start('sandbox.prompt', 'sandbox', meta, parent)
   let firstEventAt: number | undefined
@@ -133,4 +133,33 @@ export function createPromptTrace(trace: TurnTrace, parent: TurnSpan | undefined
   }
 
   return { observe, end }
+}
+
+export interface TraceSandboxPromptOptions {
+  trace: TurnTrace
+  /** The span the prompt hangs from. Default: the trace's root. */
+  parent?: TurnSpan
+  /** Attributes for the `sandbox.prompt` span: the sandbox id, the model, the harness. */
+  meta?: TurnSpanAttrs
+}
+
+/**
+ * Pass a sandbox prompt stream through unchanged while recording it in the turn's trace (see {@link createPromptTrace}).
+ * `streamSandboxPrompt` does this itself when given a `trace`; a product that calls `box.streamPrompt` directly wraps
+ * its stream here, and sends `trace.traceId` as the prompt's `traceId` so the Sandbox API records join the turn.
+ */
+export async function* traceSandboxPromptEvents(events: AsyncIterable<unknown>, options: TraceSandboxPromptOptions): AsyncGenerator<unknown> {
+  const prompt = createPromptTrace(options.trace, options.parent, options.meta ?? {})
+  let failure: unknown
+  try {
+    for await (const event of events) {
+      prompt.observe(event)
+      yield event
+    }
+  } catch (error) {
+    failure = error
+    throw error
+  } finally {
+    prompt.end(failure)
+  }
 }
