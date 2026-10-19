@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.203
+
+- feat(turn-trace): the member's first visible text from the request, and the trace in authorize (#1161)
+- wip (#1160)
+
 ## 0.60.202
 
 - fix(turn-trace): keep a trace id in the Router charset as it is and guard the Worker entry across directories (#1159)
