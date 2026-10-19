@@ -65,8 +65,6 @@ const msToNs = (ms: number) => (BigInt(Math.floor(ms)) * 1_000_000n).toString()
 /** OpenInference span kind per turn span: model calls read as LLM, tool calls as TOOL. */
 const SPAN_KIND: Partial<Record<string, 'LLM' | 'TOOL'>> = { 'model.call': 'LLM', 'tool.call': 'TOOL' }
 
-const msToNs = (ms: number) => (BigInt(Math.floor(ms)) * 1_000_000n).toString()
-
 /**
  * The root span (`agent_app.turn`) carries the host's labels and the turn's
  * numbers: wall time, the share inside child spans, and the time credited to
