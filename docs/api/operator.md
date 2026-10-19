@@ -4,7 +4,7 @@
 
 Source: `src/operator/index.ts`
 
-55 exports.
+56 exports.
 
 ### `ChatOperatorAdapterOptions`
 
@@ -140,6 +140,14 @@ Readonly<Record<string, readonly string[]>>
 
 ```ts
 readonly OperatorTurnState[]
+```
+
+### `OPERATOR_TURN_CANCELLED_CODE`
+
+`const` — `failure.code` of a turn that settled because it was cancelled before it finished.
+
+```ts
+"turn.cancelled"
 ```
 
 ### `OPERATOR_WORKSPACE_SCOPE_PREFIX`
