@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.195
+
+- feat(chat-routes): stream large raw attachment uploads to the store (#1151)
+
 ## 0.60.194
 
 - feat(sandbox): carry a stored-secret key reference in the resolved model (#1149)
