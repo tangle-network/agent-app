@@ -28,6 +28,7 @@ import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
 import { createChatTables } from '../../src/chat-store/schema'
 import type { ChatMessagePart } from '../../src/chat-store/parts'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
+import { parseServerTiming } from '../../src/turn-trace/server-timing'
 import { openDatabase, workspacesTable } from '../teams/db-helper'
 
 const tables = createChatTables({ workspaceTable: workspacesTable })
@@ -106,6 +107,11 @@ function routesOver(
 
 async function drain(res: Response): Promise<void> {
   await new Response(res.body!).text()
+}
+
+/** The admission step names a turn response reports in its `Server-Timing` header. */
+function admissionSteps(res: Response): string[] {
+  return parseServerTiming(res.headers.get('server-timing')).map((entry) => entry.name)
 }
 
 // ── 1. the row exists and grows mid-run ─────────────────────────────────────
@@ -376,13 +382,26 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
     // Attempt 2: the durable driver / client retries the SAME turn against the
     // SAME turn store (its running index is what tells the retry apart from a
     // user genuinely repeating themselves).
+    const gateSaw: Array<{ userMessageId?: string | null; userMessageInserted?: boolean }> = []
     const second = routesOver(
       store as unknown as ChatTurnMessageStore,
       () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'anthropic/claude' }),
-      { incrementalPersistence: { intervalMs: 0 }, turnStore: first.turnStore },
+      {
+        incrementalPersistence: { intervalMs: 0 },
+        turnStore: first.turnStore,
+        contextGate: async (args: { userMessageId?: string | null; userMessageInserted?: boolean }) => {
+          gateSaw.push({ userMessageId: args.userMessageId, userMessageInserted: args.userMessageInserted })
+          return { proceed: true }
+        },
+      },
     )
-    await drain(await second.routes.turn(turnRequest(threadId, 'find the lease'), second.ctx))
+    const secondRes = await second.routes.turn(turnRequest(threadId, 'find the lease'), second.ctx)
+    // Same content, no turn id, an assistant row trailing: only the running index decides, so it is read.
+    expect(admissionSteps(secondRes)).toContain('admission.running_probe')
+    await drain(secondRes)
     await second.settle()
+    // The retry reused the crashed attempt's user row; nothing was inserted.
+    expect(gateSaw).toEqual([{ userMessageId: expect.any(String), userMessageInserted: false }])
 
     const all = await rows(store, threadId)
     // Converged: one user row, one assistant row — and it is the SAME row the
@@ -465,6 +484,49 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
     const all = await rows(store, threadId)
     expect(all.filter((row) => row.role === 'user')).toHaveLength(2)
     expect(all.filter((row) => row.role === 'assistant')).toHaveLength(2)
+  })
+
+  it('an ordinary follow-up admits without the running probe and names each admission step', async () => {
+    const { store, threadId } = await freshStore()
+    const shared = createMemoryTurnEventStore()
+    // Count reads of the running index on the real buffer.
+    let runningReads = 0
+    const listRunning = shared.listRunning!.bind(shared)
+    shared.listRunning = (id) => { runningReads += 1; return listRunning(id) }
+    const gateSaw: Array<boolean | undefined> = []
+    async function run(content: string): Promise<string[]> {
+      const { routes, ctx, settle } = routesOver(
+        store as unknown as ChatTurnMessageStore,
+        () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
+        {
+          incrementalPersistence: { intervalMs: 0 },
+          turnStore: shared,
+          contextGate: async (args: { userMessageInserted?: boolean }) => {
+            gateSaw.push(args.userMessageInserted)
+            return { proceed: true }
+          },
+        },
+      )
+      const res = await routes.turn(turnRequest(threadId, content), ctx)
+      const steps = admissionSteps(res)
+      await drain(res)
+      await settle()
+      return steps
+    }
+    await run('first question')
+    // The thread now ends in a settled assistant row. A different message cannot reuse a row
+    // under either reading of the running index, so admission skips that read.
+    const steps = await run('a different question')
+    expect(runningReads).toBe(0)
+    expect(steps).not.toContain('admission.running_probe')
+    expect(steps).toEqual(expect.arrayContaining(['admission.authorize', 'admission.history', 'admission.persist_user', 'admission.gate', 'admission']))
+    expect(steps[0]).toBe('admission')
+
+    const all = await rows(store, threadId)
+    expect(all.filter((row) => row.role === 'user').map((row) => row.content)).toEqual(['first question', 'a different question'])
+    expect(all.filter((row) => row.role === 'assistant')).toHaveLength(2)
+    // Both user rows were this turn's own fresh inserts.
+    expect(gateSaw).toEqual([true, true])
   })
 
   it('autonomous lane: runDetachedTurn owns the row, drafts it mid-run, and converges after a crash', async () => {

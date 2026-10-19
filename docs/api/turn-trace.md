@@ -4,7 +4,7 @@
 
 Source: `src/turn-trace/index.ts`
 
-25 exports.
+26 exports.
 
 ### `buildTurnTraceOtelSpans`
 
@@ -36,6 +36,14 @@ Source: `src/turn-trace/index.ts`
 
 ```ts
 interface CreateTurnTraceOptions
+```
+
+### `formatServerTiming`
+
+`function` — Format entries as a `Server-Timing` header value, the inverse of {@link parseServerTiming}.
+
+```ts
+(entries: readonly ServerTimingEntry[]) => string
 ```
 
 ### `IntelligenceTurnTraceSinkOptions`

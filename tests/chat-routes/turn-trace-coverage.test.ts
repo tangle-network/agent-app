@@ -158,6 +158,11 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     for (const attribute of timed) expect(attribute.value.intValue).toBeUndefined()
     expect(root.attributes.find((attribute) => attribute.key === 'tangle.turn.spans')?.value.intValue).toBeDefined()
     expect(root.attributes.find((attribute) => attribute.key === 'tangle.turn.coverage_pct')?.value.doubleValue).toBe(summary.coveragePct)
+    // A measurement keeps one OTLP type whatever its value: a whole number (0 ms of sandbox here) is still a double.
+    for (const key of ['tangle.turn.wall_ms', 'tangle.turn.coverage_pct', 'tangle.turn.sandbox_ms', 'tangle.turn.admission_ms']) {
+      const value = root.attributes.find((attribute) => attribute.key === key)?.value
+      expect(value, key).toEqual({ doubleValue: expect.any(Number) })
+    }
     expect(root.attributes.find((attribute) => attribute.key === 'tangle.trace_id')?.value.stringValue).toBe(snapshot!.traceId)
     expect(new Set(exported.map((span) => span.traceId))).toEqual(new Set([otlpTraceId(snapshot!.traceId)]))
     for (const span of exported.filter((candidate) => candidate !== root)) expect(exported.some((candidate) => candidate.spanId === span.parentSpanId)).toBe(true)

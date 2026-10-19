@@ -85,6 +85,7 @@ import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import { checkModelPolicy, type ModelPolicy } from '../policy-filters/index'
 import { parseJsonObjectBody } from '../web/index'
 import { createTurnTrace, type TurnSpan, type TurnSpanAttrs, type TurnTrace, type TurnTraceSink, type TurnTraceSummary } from '../turn-trace/recorder'
+import { formatServerTiming } from '../turn-trace/server-timing'
 import {
   buildTurnPhaseEvent,
   TURN_INTENT_EVENT,
@@ -344,6 +345,11 @@ export interface ChatTurnProduceArgs<TContext> {
    *    resolved without a usable id.
    *  - a string — the row id, for `contextGate`, `beforeTurn`, and `produce`. */
   userMessageId?: string | null
+  /** True when this turn's own insert created `userMessageId`, so no earlier
+   *  attempt can have answered it; false when retry-dedup reused the row or no
+   *  row was written. A gate that refuses an already-answered retry can skip
+   *  its read when this is true. Undefined until `userMessageId` resolves. */
+  userMessageInserted?: boolean
   /**
    * Transfer completion ownership to a product-owned durable runner. The
    * product MUST first register that runner durably, then await this callback
@@ -781,6 +787,21 @@ interface ParsedTurnBody {
   turnId: string | undefined
 }
 
+/**
+ * The turn's admission as a `Server-Timing` value: `admission` for the
+ * request-to-stream wall time, then each `admission.*` span the trace holds in
+ * start order. A timed request reads where admission went from the response
+ * headers alone; the same spans reach the trace sink.
+ */
+function admissionServerTiming(trace: TurnTrace): string {
+  const now = Date.now()
+  const steps = trace.spans(now)
+    .filter((span) => span.kind === 'admission')
+    .sort((a, b) => a.startMs - b.startMs)
+    .map((span) => ({ name: span.name, durMs: span.endMs - span.startMs }))
+  return formatServerTiming([{ name: 'admission', durMs: now - trace.startedAt }, ...steps])
+}
+
 function validateTurnBody(body: Record<string, unknown>, maxInlinePartBytes: number | undefined): ParsedTurnBody {
   const threadId = typeof body.threadId === 'string' ? body.threadId.trim() : ''
   if (!threadId) throw new ChatTurnInputError('Missing threadId')
@@ -1137,12 +1158,16 @@ export function createChatTurnRoutes<TContext = void>(
 
     if (options.turnLock?.warm) {
       // Overlaps the lock's first-use cost with prepareTurn and the history read.
-      try {
-        void Promise.resolve(options.turnLock.warm({ tenantId, userId, threadId: payload.threadId, context })).catch((err) => {
-          log('[chat-routes] turnLock.warm failed', { error: err instanceof Error ? err.message : String(err) })
-        })
-      } catch (err) {
+      // Its span shows that cost: a thread's first turn creates the lock's Durable Object.
+      const warmSpan = trace.start('admission.lock_warm', 'admission')
+      const warmFailed = (err: unknown) => {
+        warmSpan.end(undefined, err)
         log('[chat-routes] turnLock.warm failed', { error: err instanceof Error ? err.message : String(err) })
+      }
+      try {
+        void Promise.resolve(options.turnLock.warm({ tenantId, userId, threadId: payload.threadId, context })).then(() => warmSpan.end(), warmFailed)
+      } catch (err) {
+        warmFailed(err)
       }
     }
 
@@ -1180,19 +1205,29 @@ export function createChatTurnRoutes<TContext = void>(
     // repeat — new turn). The turn buffer's running index is the discriminator;
     // it is only consulted in the one case that can be ambiguous, so the common
     // path costs nothing.
-    let hasRunningTurn = false
+    //
+    // The probe can only change the answer when the running reading would
+    // reuse a row (no client turnId, and the user row behind the trailing
+    // assistant rows repeats this content); the settled reading never reuses
+    // past a trailing assistant row. Every other turn, including each ordinary
+    // follow-up, skips the round trip with an identical result.
+    let chatTurn = resolveChatTurn({ existingMessages, userContent: content, turnId, hasRunningTurn: false })
     if (draftTuning && existingMessages.at(-1)?.role === 'assistant') {
-      try {
-        hasRunningTurn = ((await options.turnStore.listRunning?.(payload.threadId)) ?? []).length > 0
-      } catch (err) {
-        log('[chat-routes] listRunning probe failed; treating the thread as idle', {
-          threadId: payload.threadId,
-          error: err instanceof Error ? err.message : String(err),
-        })
+      const ifRunning = resolveChatTurn({ existingMessages, userContent: content, turnId, hasRunningTurn: true })
+      if (!ifRunning.shouldInsertUserMessage) {
+        let hasRunningTurn = false
+        try {
+          hasRunningTurn = ((await trace.measure('admission.running_probe', 'admission', () => options.turnStore.listRunning?.(payload.threadId), undefined, historySpan)) ?? []).length > 0
+        } catch (err) {
+          log('[chat-routes] listRunning probe failed; treating the thread as idle', {
+            threadId: payload.threadId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+        if (hasRunningTurn) chatTurn = ifRunning
       }
     }
-    historySpan.end()
-    const chatTurn = resolveChatTurn({ existingMessages, userContent: content, turnId, hasRunningTurn })
+    historySpan.end({ messages: existingMessages.length })
 
     const identity: ChatTurnIdentity = {
       tenantId,
@@ -1429,6 +1464,7 @@ export function createChatTurnRoutes<TContext = void>(
       // falling back to the newest row, which mis-resolves under sub-second
       // same-thread turns.
       let userMessageId: string | null = chatTurn.reusedUserMessageId ?? null
+      let userMessageInserted = false
       if (insertUserMessage) {
         userMessageId = rowIdOf(
           await trace.measure('admission.persist_user', 'admission', () => options.store.appendMessage({
@@ -1438,8 +1474,9 @@ export function createChatTurnRoutes<TContext = void>(
             parts: userPartsWithFiles(chatTurn.userParts, fileParts, mentions),
           })),
         )
+        userMessageInserted = userMessageId !== null
       }
-      produceArgs = { ...produceArgs, userMessageId }
+      produceArgs = { ...produceArgs, userMessageId, userMessageInserted }
 
       // Domain-readiness gate: may short-circuit with the product's own
       // response before the producer runs. The user row above is kept (a real
@@ -1771,6 +1808,7 @@ export function createChatTurnRoutes<TContext = void>(
           'Content-Type': result.contentType,
           'Cache-Control': 'no-cache',
           'X-Turn-Id': turnStreamId,
+          'Server-Timing': admissionServerTiming(trace),
         },
       })
     } catch (err) {

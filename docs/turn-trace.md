@@ -11,7 +11,8 @@ Every Router request and every Sandbox call of the turn sends that id, so a Rout
 
 ```text
 agent_app.turn                       wall time of the turn; coverage and time per kind as attributes
-├─ admission.*                       parse, authorize, prepare, history, lock, persist_user, gate, before_turn, stream_setup, produce
+├─ admission.*                       parse, authorize, model_policy, prepare, lock_warm, history, lock, history_recheck, persist_user, gate, before_turn, stream_setup, produce
+│  └─ admission.running_probe        under history: the turn buffer's running index, read only when it decides a retry
 ├─ model.call                        one per Router request
 │  ├─ network                        wait for headers, less the Router's server time
 │  ├─ router.pre_upstream            Server-Timing upstream_start
@@ -41,6 +42,11 @@ A span records metadata only: ids, durations, status codes, model names and toke
 2. Pass `args.trace` to what the turn runs: `createRouterTurnProducer({ trace })` or `runRouterTurn({ trace })`, `streamSandboxPrompt(..., { trace })` and `ensureWorkspaceSandbox(..., { trace })`. A product that calls `box.streamPrompt` itself sends `traceId: trace.traceId` with the prompt and wraps the stream in `traceSandboxPromptEvents`. A call that gets no trace records nothing, and the turn's coverage says so.
 3. A product that owns its turn without `createChatTurnRoutes` (a Durable Object turn) calls `createTurnTrace({ startedAt, executionId })`, records its own admission spans with `trace.record`, passes `trace` to `runRouterTurn`, and sends `trace.finish()` to the same sink.
 
+Admission's serial reads are the history, the turn lock, the history recheck under the lock, and the user-row insert.
+`admission.lock_warm` runs alongside the history read and ends when the lock's Durable Object answers; on a thread's first turn it holds that object's creation, which `admission.lock` then waits out.
+The running-index read under `admission.history` runs only when its answer can change the turn: no client `turnId`, an assistant row trailing the thread, and the user row behind it repeating this content.
+`produce` and the seams see `userMessageInserted: true` when this turn's insert created `userMessageId`, so a gate that refuses an already-answered retry skips its own read for a fresh row.
+
 `authorize` receives the turn's `trace` and the `admission.authorize` span, and `beforeTurn` receives the `admission.before_turn` span as its second argument; a product records its own steps with `trace.measure(name, 'admission', work, undefined, span)` so each wait inside the seam is named and nested.
 
 A turn handed to a durable owner with `handoffCompletion` is not exported by the route; that owner finishes `args.trace`.
@@ -53,6 +59,8 @@ The trace id is `turnTraceId(executionId)`; the OTLP trace id Intelligence store
 
 | Where | How to read it |
 |---|---|
+| The turn response | `Server-Timing` on a turn sent without the progress-first header: `admission` (request to stream) and each `admission.*` span in start order, so `curl -sD - -o /dev/null` names where admission went; a progress-first stream reads the same spans from the sink |
+| Inside the turn | `args.trace.spans()` returns the spans recorded so far, so a product's own log line can carry the route's admission steps |
 | Tangle Intelligence (spans) | `GET /v1/traces/<otlpTraceId>/spans`; the root span `agent_app.turn` carries `tangle.trace_id`, `tangle.turn.coverage_pct`, `tangle.turn.wall_ms` and `tangle.turn.<kind>_ms` |
 | Router dispatch audit row | `GET /api/admin/provider-dispatches?trace_id=<traceId>` (the admin-cli service identity); every model request of the turn, and every model call the box agent made, carries it |
 | Hospitality | the turn's `web_turn_timing.record` JSON (`traceId`, `trace`) and its `hospitality_web_turn_timing` line |

@@ -28,6 +28,7 @@ import {
   reconcileStaleDurableTurnLock,
 } from '../../src/turn-stream/index'
 import type { ChatMessagePart } from '../../src/chat-store/parts'
+import { parseServerTiming } from '../../src/turn-trace/server-timing'
 
 const WS = 'ws-1'
 const THREAD = 'th-1'
@@ -253,6 +254,13 @@ describe('turn-stream × createChatTurnRoutes', () => {
       waitUntil: (p) => void pending.push(p),
     })
     expect(first.status).toBe(200)
+    // The response names every admission step, the lock's warm-up and the reread under the lock included.
+    const steps = parseServerTiming(first.headers.get('server-timing'))
+    expect(steps[0]?.name).toBe('admission')
+    expect(steps.map((step) => step.name)).toEqual(expect.arrayContaining([
+      'admission.authorize', 'admission.lock_warm', 'admission.history', 'admission.lock', 'admission.history_recheck', 'admission.persist_user',
+    ]))
+    for (const step of steps) expect(step.durMs).toBeGreaterThanOrEqual(0)
 
     const second = await routes.turn(turnRequest({ threadId: THREAD, content: 'two' }), {
       waitUntil: (p) => void pending.push(p),
