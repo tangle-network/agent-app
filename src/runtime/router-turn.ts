@@ -377,6 +377,15 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const reasoningAsked = Boolean(options.reasoningEffort) && options.reasoningEffort !== 'none'
   const useResponses = (model: string) => options.stream !== false &&
     (options.api === 'responses' || ((options.api ?? 'auto') === 'auto' && reasoningAsked && isOpenAIResponsesModel(model)))
+  // A caller that takes events receives the model's reasoning as it streams (the `reasoning` event), so a
+  // streamed chat call asks the Router to release the stream at the first reasoning frame rather than hold
+  // it for the first word, which also makes it return Gemini's thought summaries (tangle-router gateway
+  // option `streamReasoningImmediately`). The cost: once reasoning has been shown the Router no longer
+  // switches models silently; a reasoning-only finish arrives as a blank answer, which the safe repeat below
+  // retries on the next fallback model.
+  const bodyFor = (model: string) => options.onEvent && options.stream !== false && !useResponses(model)
+    ? { ...extraBody, gateway: { streamReasoningImmediately: true } }
+    : extraBody
   const streamTurnFor = (model: string) => (options.stream === false ? createOpenAICompatCompletionTurn
     : useResponses(model) ? createOpenAIResponsesTurn : createOpenAICompatStreamTurn)({
     baseUrl: options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL,
@@ -386,7 +395,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     tools: [...byFunction.entries()].map(([name, tool]) => ({
       type: 'function', function: { name, description: tool.description, parameters: tool.inputSchema },
     })),
-    ...(Object.keys(extraBody).length ? { extraBody } : {}),
+    ...(Object.keys(bodyFor(model)).length ? { extraBody: bodyFor(model) } : {}),
     ...(traceId ? { headers: { 'x-tangle-trace-id': traceId } } : {}),
     ...(fetchImpl ? { fetchImpl } : {}),
     onServedModel: served => {
