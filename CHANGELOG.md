@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.205
+
+- docs(worker-defaults): pin the Worker beside its D1 primary, and the placement hazard measured on Legal (#1163)
+
 ## 0.60.204
 
 - feat(turn-trace): authorize and beforeTurn receive their admission span (#1162)
