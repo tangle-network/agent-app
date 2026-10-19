@@ -84,7 +84,7 @@ import {
 import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import { checkModelPolicy, type ModelPolicy } from '../policy-filters/index'
 import { parseJsonObjectBody } from '../web/index'
-import { createTurnTrace, type TurnSpanAttrs, type TurnTrace, type TurnTraceSink, type TurnTraceSummary } from '../turn-trace/recorder'
+import { createTurnTrace, type TurnSpan, type TurnSpanAttrs, type TurnTrace, type TurnTraceSink, type TurnTraceSummary } from '../turn-trace/recorder'
 import {
   buildTurnPhaseEvent,
   TURN_INTENT_EVENT,
@@ -261,6 +261,8 @@ export interface ChatTurnAuthorizeArgs {
   /** The turn's trace (turn intent only). A product records its own child spans (a billing read, a workspace check) so the
    *  admission wait is named by step; the route already records `admission.authorize` around the whole call. */
   trace?: TurnTrace
+  /** The `admission.authorize` span (turn intent only): the parent for those child spans, so they nest under it. */
+  span?: TurnSpan
 }
 
 /** What `prepareTurn` receives: the admitted turn, before the conversation loads. */
@@ -617,7 +619,11 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  `lifecycle.onTurnStart`, so a throw here fires no terminal lifecycle hook —
    *  the span never opened. Telemetry for a failure in this seam belongs in the
    *  seam, not in `lifecycle`. */
-  beforeTurn?(args: ChatTurnProduceArgs<TContext>): ChatTurnInputPatch | void | Promise<ChatTurnInputPatch | void>
+  beforeTurn?(
+    args: ChatTurnProduceArgs<TContext>,
+    /** `span` is the `admission.before_turn` span: the parent for a product's own child spans. */
+    seam?: { span: TurnSpan },
+  ): ChatTurnInputPatch | void | Promise<ChatTurnInputPatch | void>
   /** Deterministic run telemetry (start / complete / error) with identity and
    *  timing. Omit → no telemetry. */
   lifecycle?: ChatTurnLifecycle<TContext>
@@ -1003,7 +1009,7 @@ export function createChatTurnRoutes<TContext = void>(
       throw err
     }
     parse.end()
-    const auth = await trace.measure('admission.authorize', 'admission', () => options.authorize({ request, intent: 'turn', body: parsed.payload, trace }))
+    const auth = await trace.measure('admission.authorize', 'admission', (span) => options.authorize({ request, intent: 'turn', body: parsed.payload, trace, span }))
     if (!auth.ok) return { ok: false, response: auth.response }
     // Admission policy on the model the turn NAMES, before any side effect.
     // The unnamed-model half resolves inside `produce`; the producer-side
@@ -1483,7 +1489,7 @@ export function createChatTurnRoutes<TContext = void>(
       // Observe + optionally augment the assembled producer input.
       const beforeTurn = options.beforeTurn
       if (beforeTurn) {
-        const patch = await trace.measure('admission.before_turn', 'admission', () => beforeTurn(produceArgs))
+        const patch = await trace.measure('admission.before_turn', 'admission', (span) => beforeTurn(produceArgs, { span }))
         if (patch) produceArgs = { ...produceArgs, ...patch }
       }
       const streamSetup = trace.start('admission.stream_setup', 'admission')
