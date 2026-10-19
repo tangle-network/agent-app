@@ -41,6 +41,8 @@ A span records metadata only: ids, durations, status codes, model names and toke
 2. Pass `args.trace` to what the turn runs: `createRouterTurnProducer({ trace })` or `runRouterTurn({ trace })`, `streamSandboxPrompt(..., { trace })` and `ensureWorkspaceSandbox(..., { trace })`. A product that calls `box.streamPrompt` itself sends `traceId: trace.traceId` with the prompt and wraps the stream in `traceSandboxPromptEvents`. A call that gets no trace records nothing, and the turn's coverage says so.
 3. A product that owns its turn without `createChatTurnRoutes` (a Durable Object turn) calls `createTurnTrace({ startedAt, executionId })`, records its own admission spans with `trace.record`, passes `trace` to `runRouterTurn`, and sends `trace.finish()` to the same sink.
 
+`authorize` receives the turn's `trace` and the `admission.authorize` span, and `beforeTurn` receives the `admission.before_turn` span as its second argument; a product records its own steps with `trace.measure(name, 'admission', work, undefined, span)` so each wait inside the seam is named and nested.
+
 A turn handed to a durable owner with `handoffCompletion` is not exported by the route; that owner finishes `args.trace`.
 Sandbox SDK 0.62.2 sends `traceId` on `exec`; an older SDK ignores the field, and the prompt path has sent `traceId` since 0.60.
 
