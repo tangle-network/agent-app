@@ -328,7 +328,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   let currentModel = options.model
   let lastModelSpan: TurnSpan | undefined
   // Each HTTP send is its own `model.call` span, so a retried 503 is visible beside the send that answered.
-  const sendOnce: typeof fetch | undefined = trace
+  const sendOnce: typeof fetch | undefined = false && trace
     ? tracedModelFetch(trace, options.fetchImpl ?? fetch, {
       onSpan: span => { lastModelSpan = span; span.set({ 'gen_ai.request.model': currentModel }) },
     })

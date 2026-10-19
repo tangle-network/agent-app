@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-268 exports.
+269 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -636,6 +636,14 @@ interface ChatTurnRoutes
 
 ```ts
 interface ChatTurnTextPartInput
+```
+
+### `ChatTurnTraceOptions`
+
+`interface` — Where a finished turn's trace goes, and the host's labels for its root span.
+
+```ts
+interface ChatTurnTraceOptions
 ```
 
 ### `ChatTurnUsage`
