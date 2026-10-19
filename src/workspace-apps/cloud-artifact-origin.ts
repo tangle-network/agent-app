@@ -221,7 +221,7 @@ export function createCloudArtifactOrigin(options: CloudArtifactOriginOptions): 
       const headers = baseHeaders()
       headers.set('Content-Type', file.contentType)
       headers.set('ETag', `"${file.sha256}"`)
-      headers.set('Cache-Control', 'private, max-age=60')
+      headers.set('Cache-Control', 'no-store')
       if (request.headers.get('If-None-Match') === `"${file.sha256}"`) {
         await object.stream().cancel()
         return new Response(null, { status: 304, headers })
