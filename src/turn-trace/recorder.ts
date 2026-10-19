@@ -137,7 +137,8 @@ export function isTraceId(value: string): boolean {
  * `[A-Za-z0-9_-]` becomes `_`. An id already in the charset is returned as it is.
  */
 export function turnTraceId(executionId: string): string {
-  if (TRACE_ID_PATTERN.test(executionId)) return executionId
+  // An id in the charset is the caller's own, whatever its length (the Router drops one under 8 characters; it is not rewritten here).
+  if (/^[\w-]{1,200}$/.test(executionId)) return executionId
   const id = executionId.replace(/[^\w-]/g, '_').slice(0, 200)
   return id.length >= 8 ? id : id.padEnd(8, '_')
 }
