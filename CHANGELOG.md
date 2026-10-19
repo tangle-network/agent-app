@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.207
+
+- feat(turn-trace): the Router's own steps and retry waits as spans of each model call (#1164)
+
 ## 0.60.206
 
 - perf(chat-routes): one fewer serial admission read per follow-up turn, admission steps in Server-Timing (#1165)
