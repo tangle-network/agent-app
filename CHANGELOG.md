@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.196
+
+- feat(operator): turns.cancel stops a running turn (#1152)
+
 ## 0.60.195
 
 - feat(chat-routes): stream large raw attachment uploads to the store (#1151)
