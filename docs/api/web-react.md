@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-517 exports.
+519 exports.
 
 ### `acceptRejectionReason`
 
@@ -260,6 +260,14 @@ interface AgentSettingsPopoverProps
 
 ```ts
 interface AgentSetupBlockProps
+```
+
+### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
+
+`const` — Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats `sniffBinary` can identify from content among the accepted types.
+
+```ts
+ReadonlySet<string>
 ```
 
 ### `ApiAccessKey`
@@ -2284,6 +2292,14 @@ type NoticeKind
 
 ```ts
 type NoticePersistedPart
+```
+
+### `OOXML_SNIFFED_MIMES`
+
+`const` — The Office (OOXML) package mimes the default allow-list admits — the formats professionals actually send: Word contracts, Excel workpapers, PowerPoint decks.
+
+```ts
+ReadonlySet<string>
 ```
 
 ### `OVERLAY_SHADOW`

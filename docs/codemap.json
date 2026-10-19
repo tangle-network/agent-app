@@ -25180,6 +25180,12 @@
           "doc": null
         },
         {
+          "name": "ALLOWED_ATTACHMENT_SNIFFED_MIMES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats `sniffBinary` can identify from content among the accepted types."
+        },
+        {
           "name": "ApiAccessKey",
           "kind": "interface",
           "signature": "interface ApiAccessKey",
@@ -26696,6 +26702,12 @@
           "kind": "type",
           "signature": "type NoticePersistedPart",
           "doc": "Define a persisted notice part with type, id, kind, and text properties"
+        },
+        {
+          "name": "OOXML_SNIFFED_MIMES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "The Office (OOXML) package mimes the default allow-list admits — the formats professionals actually send: Word contracts, Excel workpapers, PowerPoint decks."
         },
         {
           "name": "OVERLAY_SHADOW",

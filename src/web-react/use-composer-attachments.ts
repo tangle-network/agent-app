@@ -48,7 +48,13 @@ import {
 } from '../chat-routes/attachment-validation'
 import { sniffBinary } from '../chat-routes/binary-sniff'
 
-export { ATTACHMENT_ACCEPT } from '../chat-routes/attachment-validation'
+// The gate's defaults, so a host widening its composer gate starts from the
+// route's own values instead of a copy.
+export {
+  ALLOWED_ATTACHMENT_SNIFFED_MIMES,
+  ATTACHMENT_ACCEPT,
+  OOXML_SNIFFED_MIMES,
+} from '../chat-routes/attachment-validation'
 
 /** One staged file and its upload lifecycle. `file` is retained so a failed
  *  upload can be retried without re-selecting; `previewUrl` is an object URL
