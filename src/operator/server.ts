@@ -46,6 +46,12 @@ export interface OperatorAdapter<Identity> {
    * than letting them be dropped.
    */
   acceptsAttachments?: boolean
+  /**
+   * Most attachments one turn may carry. Default `ATTACHMENT_MAX_COUNT`, the
+   * chat route's own default; an app whose chat route admits more per message
+   * sets the same number here.
+   */
+  maxAttachments?: number
   /** Admit the turn durably and return without waiting for it; the same turnId never starts twice. */
   startTurn(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace, input: StartTurnInput): Promise<OperatorTurn>
   getTurn(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace, target: { threadId: string; turnId: string }): Promise<OperatorTurn | null>
@@ -164,7 +170,7 @@ function optionalString(body: Record<string, unknown>, name: string, max: number
 }
 
 /** Identity and destination come from the key and the path; the body can only describe the work. */
-function parseStartTurn(body: Record<string, unknown>): StartTurnInput {
+function parseStartTurn(body: Record<string, unknown>, maxAttachments: number | undefined): StartTurnInput {
   const unknown = Object.keys(body).filter((field) => !START_FIELDS.has(field))
   if (unknown.length) throw new OperatorError('operator.invalid_input', 400, `Unknown fields: ${unknown.join(', ')}`)
   if (typeof body.turnId !== 'string' || !TURN_ID.test(body.turnId)) {
@@ -184,7 +190,7 @@ function parseStartTurn(body: Record<string, unknown>): StartTurnInput {
   const model = optionalString(body, 'model', 200)
   // The chat route's own structural rules; the app's store read re-checks
   // every path against this workspace and re-derives every size.
-  const attachments = parseChatAttachmentInputs(body.attachments)
+  const attachments = parseChatAttachmentInputs(body.attachments, maxAttachments === undefined ? {} : { maxCount: maxAttachments })
   if (!attachments.succeeded) throw new OperatorError('operator.invalid_input', 400, attachments.error)
   return {
     turnId: body.turnId.toLowerCase(),
@@ -315,7 +321,7 @@ export function createOperatorApi<Key extends RequestApiKey, Identity>(
         case 'workspaces.get':
           return json({ workspace })
         case 'turns.start': {
-          const input = parseStartTurn(await readJsonBody(request))
+          const input = parseStartTurn(await readJsonBody(request), adapter.maxAttachments)
           if (input.attachments && adapter.acceptsAttachments !== true) {
             throw new OperatorError('operator.unsupported', 501, 'This app does not accept attachments on operator turns')
           }

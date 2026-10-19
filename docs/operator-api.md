@@ -122,7 +122,17 @@ An accepted turn or an open connection does not establish completion; read the s
 
 A turn carries files the same way a browser-composer message does.
 Upload them to the workspace through the app's attachment upload route, which `createAttachmentUploadRoute` builds and which answers `{ files: ChatAttachmentInput[] }`.
-Send that list unchanged as the turn's `attachments`:
+The route takes either a `multipart/form-data` body or one raw file body: the file's bytes as the request body, its name in the `filename` query parameter and its size in `Content-Length` (or `X-Upload-Length`).
+An app that supplies `writeAttachmentStream` writes a raw body to its store as it arrives, checking the type, kind and size on the way and withholding the last bytes until the file passes, so a large export is never held whole in the Worker.
+Send one raw request per large file; an app may cap form bodies with `limits.maxFormBytes`, because a form is parsed whole.
+
+```sh
+curl -X POST "$APP/api/vault/upload?workspaceId=$WS&filename=delivery-detail.csv" \
+  -H "Authorization: Bearer $KEY" -H 'Content-Type: application/octet-stream' \
+  --data-binary @delivery-detail.csv
+```
+
+Send the returned lists, joined, unchanged as the turn's `attachments`:
 
 ```json
 {
@@ -135,7 +145,7 @@ Send that list unchanged as the turn's `attachments`:
 ```
 
 The handler checks the shape with the chat route's own rules, `parseChatAttachmentInputs` from `/chat-routes`.
-The value is an array of at most `ATTACHMENT_MAX_COUNT` entries with distinct paths.
+The value is an array of distinct paths, at most the adapter's `maxAttachments` entries; without one, `ATTACHMENT_MAX_COUNT`. An app whose chat route admits more files per message sets the same number on its adapter.
 Each entry has a store-relative `path` with no traversal, absolute, backslash, control-character or hidden segment, a bounded `name`, a finite `size`, a `mediaType`, and a `kind` of `image` or `file`.
 A malformed value answers 400 `operator.invalid_input` naming `attachments`; an empty list is the same as none.
 Delivery is an explicit adapter capability, so an adapter written before the field existed never drops files silently.

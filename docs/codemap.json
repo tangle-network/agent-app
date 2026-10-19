@@ -2650,6 +2650,12 @@
           "doc": "Human-readable error naming both the actual size and the limit that was exceeded."
         },
         {
+          "name": "AttachmentStreamWriteOptions",
+          "kind": "interface",
+          "signature": "interface AttachmentStreamWriteOptions",
+          "doc": "Options for a streamed write."
+        },
+        {
           "name": "attachmentTotalSizeErrorMessage",
           "kind": "function",
           "signature": "(totalBytes: number, limitBytes: number) => string",
@@ -3074,6 +3080,12 @@
           "kind": "interface",
           "signature": "interface CreateSandboxFileIndexRouteOptions",
           "doc": "Define options to authorize and configure sandbox file index route behavior"
+        },
+        {
+          "name": "createStreamingSniffer",
+          "kind": "function",
+          "signature": "() => StreamingSniffer",
+          "doc": "Start a {@link StreamingSniffer} for one file."
         },
         {
           "name": "createUploadRoute",
@@ -3868,6 +3880,12 @@
           "doc": "Decide whether uploaded bytes are binary or text, and identify the mime type when it can be determined from content."
         },
         {
+          "name": "sniffedMimeImpliedByName",
+          "kind": "function",
+          "signature": "(fileName: string) => string | undefined",
+          "doc": "The sniffed mime a filename's extension implies, when its format has an unambiguous magic-byte family (`.xlsx` → the spreadsheet mime)."
+        },
+        {
           "name": "sniffMimeFromName",
           "kind": "function",
           "signature": "(filename: string) => string",
@@ -3898,6 +3916,18 @@
           "doc": "True when a store can support incremental persistence at all."
         },
         {
+          "name": "STREAM_SNIFF_HEAD_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Leading bytes a streamed classification keeps."
+        },
+        {
+          "name": "STREAM_SNIFF_TAIL_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Trailing bytes a streamed classification keeps for the zip reader."
+        },
+        {
           "name": "streamChatRouteAsSandboxEvents",
           "kind": "function",
           "signature": "(options: StreamChatRouteAsSandboxOptions) => AsyncGenerator<SandboxStreamEvent, any, any>",
@@ -3908,6 +3938,12 @@
           "kind": "interface",
           "signature": "interface StreamChatRouteAsSandboxOptions",
           "doc": null
+        },
+        {
+          "name": "StreamingSniffer",
+          "kind": "interface",
+          "signature": "interface StreamingSniffer",
+          "doc": "Classifies a file from its bytes as they stream past, holding at most {@link STREAM_SNIFF_HEAD_BYTES} + {@link STREAM_SNIFF_TAIL_BYTES} of it."
         },
         {
           "name": "streamPlanFollowUpEvents",
@@ -4064,6 +4100,12 @@
           "kind": "type",
           "signature": "type WriteAttachmentFn",
           "doc": "The stable writer port."
+        },
+        {
+          "name": "WriteAttachmentStreamFn",
+          "kind": "type",
+          "signature": "type WriteAttachmentStreamFn",
+          "doc": "Streamed writer port for an upload too large to hold in memory."
         }
       ]
     },
@@ -16325,7 +16367,7 @@
         {
           "name": "backendModelFields",
           "kind": "function",
-          "signature": "(model: ResolvedModel) => { model: { model: string; provider: string; apiKey?: string | undefined; baseUrl?: string | u…",
+          "signature": "(model: ResolvedModel) => { model: { model: string; provider: string; apiKey?: string | undefined; apiKeyEnv?: string |…",
           "doc": "Spread a {@link ResolvedModel} onto a sandbox backend config as the nested `model` object — the one spelling every admitted SDK accepts."
         },
         {
