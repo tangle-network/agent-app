@@ -24430,14 +24430,14 @@
         {
           "name": "buildTurnTraceOtelSpans",
           "kind": "function",
-          "signature": "(snapshot: TurnTraceSnapshot, labels?: TurnSpanAttrs) => OtelSpan[]",
+          "signature": "(snapshot: TurnTraceSnapshot, labels?: TurnSpanAttrs) => OtlpSpan[]",
           "doc": "The root span (`agent_app.turn`) carries the host's labels and the turn's numbers: wall time, the share inside child spans, and the time credited to each kind of span."
         },
         {
           "name": "createIntelligenceTurnTraceSink",
           "kind": "function",
           "signature": "(options: IntelligenceTurnTraceSinkOptions) => TurnTraceSink",
-          "doc": "The sink a chat route or a Worker turn hands each finished trace to."
+          "doc": "The sink a chat route or a Worker turn hands each finished trace to: one OTLP POST per turn, awaited, so a host that runs it under `waitUntil` keeps the isolate alive until delivery."
         },
         {
           "name": "createTurnTrace",
@@ -24468,6 +24468,18 @@
           "kind": "function",
           "signature": "(trace: TurnTrace, name: string) => number",
           "doc": "1-based count of `name` spans started through {@link nextCallIndex} on this trace."
+        },
+        {
+          "name": "OtlpSpan",
+          "kind": "interface",
+          "signature": "interface OtlpSpan",
+          "doc": "One OTLP/JSON span, as Intelligence's ingest reads it."
+        },
+        {
+          "name": "otlpTraceId",
+          "kind": "function",
+          "signature": "(traceId: string) => string",
+          "doc": "A Tangle trace id as the 32-hex OTLP trace id."
         },
         {
           "name": "parseServerTiming",

@@ -31582,12 +31582,12 @@ Source: `src/turn-trace/index.ts`
 `function` — The root span (`agent_app.turn`) carries the host's labels and the turn's numbers: wall time, the share inside child spans, and the time credited to each kind of span.
 
 ```ts
-(snapshot: TurnTraceSnapshot, labels?: TurnSpanAttrs) => OtelSpan[]
+(snapshot: TurnTraceSnapshot, labels?: TurnSpanAttrs) => OtlpSpan[]
 ```
 
 ### `createIntelligenceTurnTraceSink`
 
-`function` — The sink a chat route or a Worker turn hands each finished trace to.
+`function` — The sink a chat route or a Worker turn hands each finished trace to: one OTLP POST per turn, awaited, so a host that runs it under `waitUntil` keeps the isolate alive until delivery.
 
 ```ts
 (options: IntelligenceTurnTraceSinkOptions) => TurnTraceSink
@@ -31631,6 +31631,22 @@ interface IntelligenceTurnTraceSinkOptions
 
 ```ts
 (trace: TurnTrace, name: string) => number
+```
+
+### `OtlpSpan`
+
+`interface` — One OTLP/JSON span, as Intelligence's ingest reads it.
+
+```ts
+interface OtlpSpan
+```
+
+### `otlpTraceId`
+
+`function` — A Tangle trace id as the 32-hex OTLP trace id.
+
+```ts
+(traceId: string) => string
 ```
 
 ### `parseServerTiming`
