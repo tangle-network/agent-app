@@ -40,3 +40,21 @@ A span records metadata only: ids, durations, status codes, model names and toke
 
 A turn handed to a durable owner with `handoffCompletion` is not exported by the route; that owner finishes `args.trace`.
 Sandbox SDK 0.62.2 sends `traceId` on `exec`; an older SDK ignores the field, and the prompt path has sent `traceId` since 0.60.
+
+## Reading a turn
+
+One id finds the turn in every store.
+The trace id is `turnTraceId(executionId)`; the OTLP trace id Intelligence stores it under is `otlpTraceId(traceId)`.
+
+| Where | How to read it |
+|---|---|
+| Tangle Intelligence (spans) | `GET /v1/traces/<otlpTraceId>/spans`; the root span `agent_app.turn` carries `tangle.trace_id`, `tangle.turn.coverage_pct`, `tangle.turn.wall_ms` and `tangle.turn.<kind>_ms` |
+| Router dispatch audit row | `GET /api/admin/provider-dispatches?trace_id=<traceId>` (the admin-cli service identity); every model request of the turn, and every model call the box agent made, carries it |
+| Hospitality | the turn's `web_turn_timing.record` JSON (`traceId`, `trace`) and its `hospitality_web_turn_timing` line |
+| Legal | the `legal_turn_trace` log line (wall time, `coveragePct`, `byKind`, `largestGapMs`) |
+
+## Limits
+
+- A trace is exported when the route's drain finishes. A host that cancels the invocation first loses it: Legal's sandbox lane turn that outlived its invocation (330 s on 2026-10-19, `waitUntil() tasks did not complete ... cancelled`) exported nothing, and no lifecycle hook ran for it either.
+- `sandbox_exec` and the sandbox prompt are timed from this side. The SDK's `onTiming` is per client and its entries carry no trace id, so a tool call's network and server time are not split yet; `sdk.request` timing needs `traceId` on `SdkTimingEntry` in the Sandbox SDK.
+- Coverage counts any span, including one a product names `other`. A product that does not pass `args.trace` to its producers shows a low coverage rather than a made-up span.
