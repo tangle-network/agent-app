@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.202
+
+- fix(turn-trace): keep a trace id in the Router charset as it is and guard the Worker entry across directories (#1159)
+
 ## 0.60.201
 
 - fix(turn-trace): send a turn's trace with one OTLP POST and no agent-runtime import (#1158)
