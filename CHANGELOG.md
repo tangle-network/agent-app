@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.200
+
+- feat(turn-trace): traceSandboxPromptEvents for products that call box.streamPrompt themselves (#1156)
+
 ## 0.60.199
 
 - feat(turn-trace): one trace per agent turn with named child spans on the Router and sandbox lanes (#1155)
