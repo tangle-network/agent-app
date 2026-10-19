@@ -125,7 +125,7 @@ _139 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./theme/tailwind-preset`](api/theme-tailwind-preset.md) | 1 | — |
 | [`./toolbelt`](api/toolbelt.md) | 11 | — |
 | [`./tools`](api/tools.md) | 66 | `crypto`, `eval`, `openui` |
-| [`./trace`](api/trace.md) | 33 | `missions` |
+| [`./trace`](api/trace.md) | 20 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting`, `launch-invariants` |
 | [`./turn-stream`](api/turn-stream.md) | 58 | `chat-routes`, `crypto`, `stream` |
 | [`./turn-trace`](api/turn-trace.md) | 23 | — |
@@ -1238,11 +1238,11 @@ Depends on: `crypto`, `eval`, `openui`
 
 ## `./trace`
 
-Source: `src/trace/index.ts` · 33 exports
+Source: `src/trace/index.ts` · 20 exports
 
 Depends on: `missions`
 
-`buildFlowTrace`, `buildStageTimingRecord`, `childSpanContext`, `composeMissionFlowTrace`, `createMissionTraceContext`, `createStageTiming`, `CreateStageTimingOptions`, `delegationActivityToFlowSpans`, `DistributionSummary`, `FlowSpan`, `FlowTrace`, `LoopTraceEventLike`, `loopTraceEventsToFlowSpans`, `MissionFlowStep`, `MissionTraceContext`, `renderHistogram`, `renderWaterfall`, `STAGE_TIMING_EVENT`, `STAGE_TIMING_VERSION`, `StageTiming`, `StageTimingContext`, `StageTimingDetailValue`, `StageTimingHandle`, `StageTimingKind`, `StageTimingOutcome`, `StageTimingRecord`, `StageTimingRecordInput`, `stepActivityFlowTrace`, `StepSpanContext`, `summarize`, `TimedEvent`, `timedEventsFromLines`, `traceEnv`
+`buildFlowTrace`, `childSpanContext`, `composeMissionFlowTrace`, `createMissionTraceContext`, `delegationActivityToFlowSpans`, `DistributionSummary`, `FlowSpan`, `FlowTrace`, `LoopTraceEventLike`, `loopTraceEventsToFlowSpans`, `MissionFlowStep`, `MissionTraceContext`, `renderHistogram`, `renderWaterfall`, `stepActivityFlowTrace`, `StepSpanContext`, `summarize`, `TimedEvent`, `timedEventsFromLines`, `traceEnv`
 
 [Full API →](api/trace.md)
 
