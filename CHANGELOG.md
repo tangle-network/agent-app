@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.208
+
+- Release Router reasoning as it arrives on turns that render it (#1166)
+
 ## 0.60.207
 
 - feat(turn-trace): the Router's own steps and retry waits as spans of each model call (#1164)
