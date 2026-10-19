@@ -69,6 +69,8 @@ export type RouterTurnEvent =
   | { type: 'text'; segment: number; delta: string }
   /** Hidden reasoning the model streamed (`reasoning_content` / `thinking`), for a thinking view. Never part of the answer. */
   | { type: 'reasoning'; delta: string }
+  /** The safe repeat is starting a fresh model call on `model`; what the failed call reasoned is finished. */
+  | { type: 'repeat'; model: string }
   | { type: 'tool'; callId: string; toolName: string; status: 'running'; input: Record<string, unknown>; startedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'completed'; output: unknown; startedAt: number; endedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'error'; error: { code: string; message: string }; startedAt: number; endedAt: number }
@@ -76,7 +78,8 @@ export type RouterTurnEvent =
   | ({ type: 'tool_event' } & RouterTurnToolEvent)
 
 export interface RouterTurnFailure {
-  /** `model_http_<status>`, `model_unavailable`, `model_empty`, `turn_<stopReason>`, `turn_aborted`,
+  /** `model_http_<status>`, `model_stream_<code>` (an error frame inside the stream, e.g. `model_stream_empty_completion`),
+   *  `model_unavailable`, `model_empty`, `turn_<stopReason>`, `turn_aborted`,
    *  `turn_tool_limit`, `router_unconfigured` or `placement_fallback_refused`; under a protected grant also the `grant_*` and
    *  `settlement_*` codes of `./protected-router-turn`. */
   code: string
@@ -204,6 +207,13 @@ export interface RouterTurnOptions {
   stream?: boolean
   /** Sent as `reasoning_effort`. */
   reasoningEffort?: string
+  /**
+   * The caller shows the model's reasoning as it streams (`onEvent` `reasoning` events). With `onEvent`, a
+   * streamed chat call and the safe repeat on, the Router then releases the stream at the first reasoning frame
+   * instead of holding it for the first word, and returns Gemini's thought summaries (gateway
+   * `streamReasoningImmediately`). Default false; `createRouterTurnProducer` turns it on.
+   */
+  showReasoning?: boolean
   /** Sent as `max_completion_tokens`: one model call's visible and reasoning tokens together. */
   maxCompletionTokens?: number
   /** At most this many tool calls run. The next one is refused before it runs and the turn ends
@@ -242,6 +252,11 @@ const RETRY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
 // `X-Tangle-Failure-Category`). The turn moves to its next fallback model at once.
 const DEAD_CREDENTIAL_CATEGORIES = new Set(['provider_quota_exhausted', 'provider_key_invalid', 'provider_account_suspended'])
 const MAX_RETRY_DELAY_MS = 8_000
+// Silence the Router allows between upstream chunks once it has released a reasoning stream. Gemini's thought
+// summaries arrive 1-3 s apart on chat-sized turns (6 s from first thought to answer on a 5-slide plan, measured
+// 2026-10-19), so 45 s is far above a live think, yet a stream that stalls mid-thought ends 75 s sooner than the
+// Router's 120 s default and the safe repeat still has time to run.
+const REASONING_STREAM_IDLE_MS = 45_000
 const TOOL_EVENT_LIMIT = 500
 /** Marks a tool's typed event inside a loop progress update. */
 const TOOL_EVENT = '__routerTurnToolEvent'
@@ -377,6 +392,16 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const reasoningAsked = Boolean(options.reasoningEffort) && options.reasoningEffort !== 'none'
   const useResponses = (model: string) => options.stream !== false &&
     (options.api === 'responses' || ((options.api ?? 'auto') === 'auto' && reasoningAsked && isOpenAIResponsesModel(model)))
+  // A caller that shows reasoning asks the Router to release a streamed chat call at the first reasoning frame
+  // rather than hold it for the first word, which also makes it return Gemini's thought summaries (tangle-router
+  // gateway option `streamReasoningImmediately`). The cost: once reasoning has been shown the Router no longer
+  // switches models silently. A reasoning-only finish or a stall arrives as an error frame (`empty_completion`,
+  // `stream_idle_timeout`), which ends the call by name and takes the safe repeat on the next fallback model, so
+  // the option is sent only while that repeat is on.
+  const bodyFor = (model: string) => options.showReasoning && options.onEvent && options.repeat !== false &&
+    options.stream !== false && !useResponses(model)
+    ? { ...extraBody, gateway: { streamReasoningImmediately: true, streamIdleTimeout: REASONING_STREAM_IDLE_MS } }
+    : extraBody
   const streamTurnFor = (model: string) => (options.stream === false ? createOpenAICompatCompletionTurn
     : useResponses(model) ? createOpenAIResponsesTurn : createOpenAICompatStreamTurn)({
     baseUrl: options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL,
@@ -386,7 +411,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     tools: [...byFunction.entries()].map(([name, tool]) => ({
       type: 'function', function: { name, description: tool.description, parameters: tool.inputSchema },
     })),
-    ...(Object.keys(extraBody).length ? { extraBody } : {}),
+    ...(Object.keys(bodyFor(model)).length ? { extraBody: bodyFor(model) } : {}),
     ...(traceId ? { headers: { 'x-tangle-trace-id': traceId } } : {}),
     ...(fetchImpl ? { fetchImpl } : {}),
     onServedModel: served => {
@@ -542,11 +567,18 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       // Safe to repeat only while nothing was said and no tool ran.
       const next = repeats.shift()
       if (next === undefined || signal?.aborted || toolsRan > 0 || segments.length > 0) throw error
+      emit({ type: 'repeat', model: next })
       stop = await run(next)
     }
   } catch (error) {
     if (signal?.aborted) return outcome({ code: 'turn_aborted', message: 'The turn was cancelled.' })
     const status = (error as { status?: unknown }).status
+    // An error frame inside a 200 stream (`openai-stream`'s stream failure) keeps the service's code.
+    const streamCode = (error as { streamFailure?: unknown; code?: unknown }).streamFailure === true ? (error as { code?: unknown }).code : undefined
+    if (typeof streamCode === 'string' && /^[\w.-]{1,80}$/.test(streamCode)) {
+      return outcome({ code: `model_stream_${streamCode}`, message: 'The model service ended the reply with an error.',
+        detail: error instanceof Error ? error.message.slice(0, 1000) : streamCode })
+    }
     // The stream adapter puts the service's own text after the status; keep it, short, for the app's error categories.
     const detail = error instanceof Error ? error.message.match(/\(HTTP \d+\): ([\s\S]*)$/)?.[1]?.slice(0, 1000) : undefined
     return outcome(typeof status === 'number'
@@ -566,6 +598,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   if (!segments.some(part => part.trim()) && !options.continueFrom?.text.trim()) {
     const next = repeats.shift()
     if (toolsRan === 0 && next !== undefined) {
+      emit({ type: 'repeat', model: next })
       try { stop = await run(next) } catch { stop = 'completed' }
       if (placementFailure) return outcome(placementFailure)
       if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
