@@ -42,6 +42,9 @@ export interface OpenAIStreamChunk {
     }
     finish_reason?: string | null
   }>
+  /** A failure the service reports inside the stream (the Tangle Router's
+   *  `empty_completion`, `reasoning_budget_exhausted`, `stream_idle_timeout`, …). */
+  error?: { code?: string | null; message?: string | null; type?: string | null }
   /** Token accounting (requires `stream_options.include_usage`). Cumulative for
    *  the call: the Tangle Router can send it on more than one chunk. */
   usage?: {
@@ -423,9 +426,17 @@ async function* streamChatCompletions(
       // for a request of `openai/gpt-5` even with NO substitution, so a raw
       // `!==` would report a swap on literally every turn.
       if (attribution && !reported && chunk.model) report(servedFromBody(chunk.model, attribution.requestedModel))
+      // A failure inside a 200 stream ends the call by name instead of reading as a blank answer.
+      if (chunk.error) throw streamFailure(chunk.error)
       yield chunk
     }
   }
+}
+
+/** The error a stream's own error frame becomes: its `code` and message, for the caller's failure categories. */
+function streamFailure(failure: NonNullable<OpenAIStreamChunk['error']>): Error {
+  const code = failure.code || failure.type || 'stream_error'
+  return Object.assign(new Error(`OpenAI-compat stream failed: ${code}${failure.message ? `: ${failure.message.slice(0, 1000)}` : ''}`), { code, streamFailure: true })
 }
 
 /** OpenAI models answer reasoning summaries only on the Responses API; chat completions carry none. */
