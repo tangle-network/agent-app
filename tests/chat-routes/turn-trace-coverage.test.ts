@@ -30,7 +30,7 @@ function startRouter(seen: IncomingHttpHeaders[], otlp: Array<{ authorization?: 
       await sleep(60)
       response.writeHead(200, {
         'content-type': 'text/event-stream',
-        'server-timing': 'auth;dur=12.0, upstream_start;dur=40.0, upstream_headers;dur=80.0, t_admitted;dur=35.0',
+        'server-timing': 'auth;dur=12.0, t_authed;dur=14.0, t_admitted;dur=25.0, dispatch_row;dur=4.0, spend_authorize;dur=8.0, upstream_start;dur=40.0, upstream_headers;dur=80.0',
       })
       await sleep(80)
       const chunks = call === 1
@@ -120,6 +120,22 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     expect(model.attrs).toMatchObject({ 'http.status_code': 200, 'server_timing.upstream_start_ms': 40, 'gen_ai.request.model': 'requested/model',
       'gen_ai.usage.input_tokens': 900, 'gen_ai.usage.output_tokens': 12 })
     expect(model.attrs.ttft_ms).toBeGreaterThan(0)
+
+    // The Router's own steps hang under its pre-upstream span on every model call: auth, admission, then the dispatch
+    // that ends in the spend hold right before the provider fetch.
+    const byId = new Map(spans.map((span) => [span.spanId, span]))
+    for (const call of spans.filter((span) => span.name === 'model.call')) {
+      const pre = spans.find((span) => span.name === 'router.pre_upstream' && span.parentSpanId === call.spanId)!
+      const steps = spans.filter((span) => span.parentSpanId === pre.spanId).sort((a, b) => a.startMs - b.startMs)
+      expect(steps.map((span) => span.name)).toEqual(['router.auth', 'router.admission', 'router.dispatch'])
+      expect(steps[0]!.startMs).toBe(pre.startMs)
+      expect(steps[2]!.endMs).toBe(pre.endMs)
+      const spend = spans.find((span) => span.name === 'router.spend_authorize' && byId.get(span.parentSpanId)?.parentSpanId === pre.spanId)!
+      expect(spend.endMs).toBe(pre.endMs)
+      expect(spend.endMs - spend.startMs).toBe(8)
+      const row = spans.find((span) => span.name === 'router.dispatch_row' && span.parentSpanId === spend.parentSpanId)!
+      expect(row.endMs).toBe(spend.startMs)
+    }
 
     // One OTLP POST per turn: the root span with the turn's numbers, every child under it, in the trace id the Sandbox SDK maps.
     expect(otlpPosts).toHaveLength(1)

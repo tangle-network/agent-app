@@ -12,6 +12,38 @@ export function nextCallIndex(trace: TurnTrace, name: string): number {
   return next
 }
 
+/**
+ * The Router's own steps before its provider fetch, as children of `router.pre_upstream` (`origin` is the Router's
+ * handler start on this clock, `end` its `upstream_start`). `t_authed` and `t_admitted` are offsets from the handler
+ * start: `router.auth` runs to the first, `router.admission` (budgets, credits, routing) to the second, and
+ * `router.dispatch` (body, pricing, the dispatch row, the spend hold) to the provider fetch. `dispatch_row` and
+ * `spend_authorize` are durations that run back to back and end just before the fetch, so they are placed backwards
+ * from `end`. A step the header does not carry is left out, and nothing is placed outside `[origin, end]`.
+ */
+function recordRouterSteps(parent: TurnSpan, origin: number, end: number, stamp: (name: string) => number | undefined): void {
+  const offset = (name: string) => {
+    const ms = stamp(name)
+    return ms === undefined ? undefined : Math.min(end, origin + ms)
+  }
+  let at = origin
+  for (const [step, name] of [['t_authed', 'router.auth'], ['t_admitted', 'router.admission']] as const) {
+    const until = offset(step)
+    if (until === undefined || until <= at) continue
+    parent.record(name, 'router', at, until)
+    at = until
+  }
+  if (end <= at) return
+  const dispatch = parent.record('router.dispatch', 'router', at, end)
+  let stepEnd = end
+  for (const step of ['spend_authorize', 'dispatch_row']) {
+    const ms = stamp(step)
+    if (ms === undefined) continue
+    const start = Math.max(at, stepEnd - ms)
+    dispatch.record(`router.${step}`, 'router', start, stepEnd)
+    stepEnd = start
+  }
+}
+
 export interface TracedModelFetchOptions {
   /** The span a model call hangs from. Default: the trace's root. */
   parent?: TurnSpan
@@ -30,7 +62,7 @@ export interface TracedModelFetchOptions {
  * Children partition the call:
  * - `network`: the wait for headers, less the Router's server time;
  * - `router.pre_upstream`: the Router's work before its provider fetch
- *   (`upstream_start`);
+ *   (`upstream_start`), split by its own steps (see {@link recordRouterSteps});
  * - `router.upstream_wait`: the provider's time to response headers
  *   (`upstream_headers`);
  * - `model.stream`: headers to the end of the body.
@@ -58,7 +90,11 @@ export function tracedModelFetch(trace: TurnTrace, inner: typeof fetch, options:
     }
     const headersAt = Date.now()
     const timing = parseServerTiming(response.headers.get('server-timing'))
-    const stamp = (name: string) => timing.find((entry) => entry.name === name)?.durMs
+    // The last entry: a fallback chain repeats a step, and the response is the last provider's.
+    const stamp = (name: string) => {
+      for (let i = timing.length - 1; i >= 0; i--) if (timing[i]!.name === name && timing[i]!.durMs !== undefined) return timing[i]!.durMs
+      return undefined
+    }
     const preUpstreamMs = stamp('upstream_start')
     const upstreamWaitMs = stamp('upstream_headers')
     const waitMs = headersAt - sentAt
@@ -75,7 +111,7 @@ export function tracedModelFetch(trace: TurnTrace, inner: typeof fetch, options:
         at += networkMs
         if (preUpstreamMs !== undefined) {
           const end = Math.min(headersAt, at + preUpstreamMs)
-          span.record('router.pre_upstream', 'router', at, end)
+          recordRouterSteps(span.record('router.pre_upstream', 'router', at, end), at, end, stamp)
           at = end
         }
         if (upstreamWaitMs !== undefined) span.record('router.upstream_wait', 'model', at, headersAt)
