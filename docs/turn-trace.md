@@ -35,7 +35,7 @@ A span records metadata only: ids, durations, status codes, model names and toke
 ## Wiring a product
 
 1. `createChatTurnRoutes({ turnTrace: { sink: createIntelligenceTurnTraceSink({ project, apiKey }), labels } })`. The route runs the sink under `waitUntil` after the lifecycle hooks; `lifecycle.onTurnComplete` and `onTurnError` also receive `trace` (the summary).
-2. Pass `args.trace` to what the turn runs: `createRouterTurnProducer({ trace })` or `runRouterTurn({ trace })`, `streamSandboxPrompt(..., { trace })` and `ensureWorkspaceSandbox(..., { trace })`. A call that gets no trace records nothing, and the turn's coverage says so.
+2. Pass `args.trace` to what the turn runs: `createRouterTurnProducer({ trace })` or `runRouterTurn({ trace })`, `streamSandboxPrompt(..., { trace })` and `ensureWorkspaceSandbox(..., { trace })`. A product that calls `box.streamPrompt` itself sends `traceId: trace.traceId` with the prompt and wraps the stream in `traceSandboxPromptEvents`. A call that gets no trace records nothing, and the turn's coverage says so.
 3. A product that owns its turn without `createChatTurnRoutes` (a Durable Object turn) calls `createTurnTrace({ startedAt, executionId })`, records its own admission spans with `trace.record`, passes `trace` to `runRouterTurn`, and sends `trace.finish()` to the same sink.
 
 A turn handed to a durable owner with `handoffCompletion` is not exported by the route; that owner finishes `args.trace`.

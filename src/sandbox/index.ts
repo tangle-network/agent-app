@@ -34,7 +34,8 @@ import {
 } from '../runtime/model'
 import { ok, fail, type Outcome } from './outcome'
 import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'
-import { createPromptTrace } from './prompt-trace'
+import { traceSandboxPromptEvents } from './prompt-trace'
+export { traceSandboxPromptEvents, type TraceSandboxPromptOptions } from './prompt-trace'
 import {
   SandboxTransientDeadlineError,
   classifySandboxTransientFailure,
@@ -3638,18 +3639,20 @@ export async function* streamSandboxPrompt(
 
   emitSandboxActivity(options?.spend, box)
   let severedFinishReason: string | null = null
-  const promptTrace = options?.trace
-    ? createPromptTrace(options.trace, options.traceParent, {
-      'sandbox.id': box.id,
-      ...(options.model ? { 'gen_ai.request.model': options.model } : {}),
-      ...(options.harness ? { 'sandbox.harness': options.harness } : {}),
-      ...(options.detach ? { 'sandbox.detached': true } : {}),
+  const observed = options?.trace
+    ? traceSandboxPromptEvents(stream, {
+      trace: options.trace,
+      ...(options.traceParent ? { parent: options.traceParent } : {}),
+      meta: {
+        'sandbox.id': box.id,
+        ...(options.model ? { 'gen_ai.request.model': options.model } : {}),
+        ...(options.harness ? { 'sandbox.harness': options.harness } : {}),
+        ...(options.detach ? { 'sandbox.detached': true } : {}),
+      },
     })
-    : undefined
-  let promptError: unknown
+    : stream
   try {
-    for await (const event of stream) {
-      promptTrace?.observe(event)
+    for await (const event of observed) {
       const step = classifySeveredStream(event)
       if (step) severedFinishReason = step.kind === 'step-finish' && step.severed ? step.reason : null
       if (severedFinishReason && isTerminalPromptEvent(event)) {
@@ -3663,14 +3666,10 @@ export async function* streamSandboxPrompt(
       }
       yield event
     }
-  } catch (error) {
-    promptError = error
-    throw error
   } finally {
     // The box was working right up to here, however this turn ended — a throw,
     // an abandoned generator and a clean finish all bill the same.
     emitSandboxActivity(options?.spend, box)
-    promptTrace?.end(promptError)
   }
   // Reconnect-exhausted path: the stream ended on a severed step without a
   // terminal event. A truncated turn must fail loud, not return silently.
