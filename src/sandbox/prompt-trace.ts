@@ -72,7 +72,7 @@ function createPromptTrace(trace: TurnTrace, parent: TurnSpan | undefined, meta:
       }
       if (type === 'tool_result' || type === 'tool.result') {
         const id = String(data?.id ?? data?.callId ?? data?.callID ?? data?.name ?? '')
-        tools.get(id)?.end(undefined, data?.error ?? (data?.status === 'error' ? 'tool_error' : undefined))
+        tools.get(id)?.end(undefined, data?.error || data?.status === 'error' ? 'tool_error' : undefined)
         return
       }
       if (type !== 'message.part.updated') return
