@@ -96,6 +96,7 @@ export default defineConfig({
     'redact/index': 'src/redact/index.ts',
     'store/index': 'src/store/index.ts',
     'trace/index': 'src/trace/index.ts',
+    'turn-trace/index': 'src/turn-trace/index.ts',
     'assets/index': 'src/assets/index.ts',
     'brand-extraction/index': 'src/brand-extraction/index.ts',
     'sequences/index': 'src/sequences/index.ts',
