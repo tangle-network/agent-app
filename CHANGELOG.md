@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.204
+
+- feat(turn-trace): authorize and beforeTurn receive their admission span (#1162)
+
 ## 0.60.203
 
 - feat(turn-trace): the member's first visible text from the request, and the trace in authorize (#1161)
