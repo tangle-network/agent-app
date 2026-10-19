@@ -75,7 +75,7 @@ interface AppToolDescriptor
 `function` — Spread a {@link ResolvedModel} onto a sandbox backend config as the nested `model` object — the one spelling every admitted SDK accepts.
 
 ```ts
-(model: ResolvedModel) => { model: { model: string; provider: string; apiKey?: string | undefined; baseUrl?: string | u…
+(model: ResolvedModel) => { model: { model: string; provider: string; apiKey?: string | undefined; apiKeyEnv?: string |…
 ```
 
 ### `buildAppToolMcpServers`

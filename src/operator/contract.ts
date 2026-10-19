@@ -222,9 +222,10 @@ export interface StartTurnInput {
    * Files uploaded to this workspace ahead of the turn, as the app's
    * attachment upload route returned them in `{ files }`. They reach the
    * agent exactly as browser-composer attachments do; the app re-checks each
-   * path against the workspace's own store. At most `ATTACHMENT_MAX_COUNT`
-   * (`/chat-routes`) entries. Apps without the `turns.attachments`
-   * capability refuse them.
+   * path against the workspace's own store. At most the app's
+   * `maxAttachments` entries, `ATTACHMENT_MAX_COUNT` (`/chat-routes`) unless
+   * the app sets one. Apps without the `turns.attachments` capability refuse
+   * them.
    */
   attachments?: ChatAttachmentInput[]
 }

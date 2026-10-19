@@ -14,6 +14,12 @@
  * never invents a 401 or 429 response, it only returns `auth.response`
  * verbatim on failure.
  *
+ * Two body shapes: a `multipart/form-data` batch, parsed whole, and one raw
+ * file body named by the `filename` query parameter. A raw body larger than
+ * the sniff head streams to `writeAttachmentStream` when the product supplies
+ * one: the Worker never holds the file whole, which is what lets a product
+ * admit data files of tens of MB inside a 128 MB isolate.
+ *
  * Lifted from gtm-agent's `src/routes/api.vault.upload.ts` (the hardening
  * lineage other lifted modules in this vertical cite: gtm#584 binary
  * corruption, gtm#592 sniff gate/caps, gtm#593 batch-atomic writes) and
@@ -28,7 +34,7 @@
  * comment for the up-to-date framing between the two.
  */
 
-import type { ChatAttachmentInput, ChatAttachmentKind } from './wire'
+import { formatBytes, type ChatAttachmentInput, type ChatAttachmentKind } from './wire'
 import { attachmentKindForMime } from '../chat-store/parts'
 import { redactErrorMessage } from '../redact'
 import {
@@ -40,6 +46,7 @@ import {
   type AttachmentWriteOwnership,
   type AttachmentWriteReceipt,
   type WriteAttachmentFn,
+  type WriteAttachmentStreamFn,
 } from './attachment-store'
 import {
   inspectAtomicAttachmentWriteResult,
@@ -56,9 +63,10 @@ import {
   checkAttachmentType,
   defaultValidateAttachmentPath,
   sanitizeAttachmentFileName,
+  sniffedMimeImpliedByName,
   type AttachmentPathCheck,
 } from './attachment-validation'
-import { sniffBinary } from './binary-sniff'
+import { createStreamingSniffer, sniffBinary, STREAM_SNIFF_HEAD_BYTES, type SniffResult } from './binary-sniff'
 import { sniffMimeFromName } from './promote-file-part'
 
 /** Stable authorization result for the original writer contract. */
@@ -67,6 +75,7 @@ export type AttachmentUploadAuthorization =
       ok: true
       scopeId: string
       writeAttachment?: WriteAttachmentFn
+      writeAttachmentStream?: WriteAttachmentStreamFn
     }
   | { ok: false; response: Response }
 
@@ -114,6 +123,12 @@ interface AttachmentUploadRouteCommonOptions {
     maxTextBytes?: number
     /** Aggregate raw-byte ceiling. Default {@link MAX_ATTACHMENT_TOTAL_BYTES}. */
     maxTotalBytes?: number
+    /** Largest `multipart/form-data` body this route parses. A form body is
+     *  held whole while it parses, at about three copies at peak, so a
+     *  product that admits files too large for that sets this and takes them
+     *  as raw bodies (see {@link createAttachmentUploadRoute}). Default: no
+     *  limit beyond the per-file and aggregate caps. */
+    maxFormBytes?: number
   }
   /** Attachment kinds this route accepts. Default `['image', 'file']`. */
   allowedKinds?: ChatAttachmentKind[]
@@ -138,6 +153,11 @@ export interface CreateLegacyAttachmentUploadRouteOptions extends AttachmentUplo
   authorize(args: { request: Request }): Promise<AttachmentUploadAuthorization>
   /** Stable writer. `authorize` may override it per-request. */
   writeAttachment: WriteAttachmentFn
+  /** Writer for a raw-body upload larger than {@link STREAM_SNIFF_HEAD_BYTES}:
+   *  the route checks the file while it streams to this writer, so the file
+   *  is never held whole. Without it, a raw body is read whole and goes
+   *  through `writeAttachment` under the same caps. */
+  writeAttachmentStream?: WriteAttachmentStreamFn
 }
 
 /**
@@ -168,6 +188,126 @@ function atomicAttachmentFailure(path: string, cleanupFailures = 0): Response {
     cleanupFailures > 0 ? ATTACHMENT_ROLLBACK_FAILURE_MESSAGE : ATTACHMENT_STORAGE_FAILURE_MESSAGE,
     path,
   )
+}
+
+/** Longest raw-upload `filename` accepted. */
+const MAX_RAW_FILENAME_LENGTH = 255
+
+type RawUploadTarget =
+  | { succeeded: true; filename: string; declaredBytes: number }
+  | { succeeded: false; response: Response }
+
+/**
+ * A raw upload is one file as the request body, named by the `filename`
+ * query parameter, with its size in `Content-Length` or `X-Upload-Length`
+ * (the browser's `File.size`), as in `/object-store`'s upload route. Knowing
+ * the size up front is what lets a store receive a fixed-length stream.
+ */
+function rawUploadTarget(request: Request): RawUploadTarget {
+  const filename = new URL(request.url).searchParams.get('filename')
+  if (!filename || filename.length > MAX_RAW_FILENAME_LENGTH) {
+    return {
+      succeeded: false,
+      response: attachmentUploadError(
+        400,
+        'invalid_upload',
+        'Expected a multipart/form-data body with file fields, or one raw file body named by the filename query parameter',
+      ),
+    }
+  }
+  const uploadLength = request.headers.get('X-Upload-Length')
+  const transportLength = request.headers.get('Content-Length')
+  if (uploadLength !== null && transportLength !== null && uploadLength !== transportLength) {
+    return { succeeded: false, response: attachmentUploadError(400, 'invalid_length', 'Conflicting upload lengths') }
+  }
+  const declared = uploadLength ?? transportLength
+  if (declared === null) {
+    return {
+      succeeded: false,
+      response: attachmentUploadError(411, 'length_required', 'A raw upload declares its size in Content-Length or X-Upload-Length'),
+    }
+  }
+  const declaredBytes = Number(declared)
+  if (!/^(0|[1-9]\d*)$/.test(declared) || !Number.isSafeInteger(declaredBytes)) {
+    return { succeeded: false, response: attachmentUploadError(400, 'invalid_length', 'Invalid upload length') }
+  }
+  return { succeeded: true, filename, declaredBytes }
+}
+
+const LENGTH_MISMATCH_MESSAGE = 'Upload length does not match the file body'
+
+/** Read a small raw body whole, refusing one longer or shorter than declared. */
+async function readRawBody(
+  request: Request,
+  declaredBytes: number,
+): Promise<{ succeeded: true; value: Uint8Array<ArrayBuffer> } | { succeeded: false; response: Response }> {
+  const mismatch = { succeeded: false as const, response: attachmentUploadError(400, 'invalid_length', LENGTH_MISMATCH_MESSAGE) }
+  const bytes = new Uint8Array(declaredBytes)
+  if (!request.body) return declaredBytes === 0 ? { succeeded: true, value: bytes } : mismatch
+  const reader = request.body.getReader()
+  let offset = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (offset + value.length > declaredBytes) {
+        await reader.cancel().catch(() => undefined)
+        return mismatch
+      }
+      bytes.set(value, offset)
+      offset += value.length
+    }
+  } catch {
+    return { succeeded: false, response: attachmentUploadError(400, 'invalid_upload', 'The upload body ended early') }
+  }
+  return offset === declaredBytes ? { succeeded: true, value: bytes } : mismatch
+}
+
+/** Read a body of at most `maxBytes`, refusing a longer one as soon as it
+ *  passes the cap. A declared `Content-Length` over the cap is refused before
+ *  any byte is read. */
+async function readBodyUpTo(
+  request: Request,
+  maxBytes: number,
+): Promise<{ succeeded: true; value: Uint8Array<ArrayBuffer> } | { succeeded: false; tooLarge: boolean }> {
+  const declared = Number(request.headers.get('Content-Length') ?? Number.NaN)
+  if (Number.isFinite(declared) && declared > maxBytes) return { succeeded: false, tooLarge: true }
+  if (!request.body) return { succeeded: true, value: new Uint8Array(0) }
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      length += value.length
+      if (length > maxBytes) {
+        await reader.cancel().catch(() => undefined)
+        return { succeeded: false, tooLarge: true }
+      }
+      chunks.push(value)
+    }
+  } catch {
+    return { succeeded: false, tooLarge: false }
+  }
+  const bytes = new Uint8Array(length)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.length
+  }
+  return { succeeded: true, value: bytes }
+}
+
+/** The media type a streamed write records before the whole file is read.
+ *  The head decides every family except a zip container, whose Office
+ *  subtype lives in the central directory at the end; for that, the
+ *  extension's implied type stands in, and the route's response carries the
+ *  final one. */
+function provisionalMediaType(name: string, head: SniffResult, sniffMime: (name: string) => string): string {
+  if (!head.binary) return sniffMime(name)
+  if (head.mime === 'application/zip') return sniffedMimeImpliedByName(name) ?? head.mime
+  return head.mime ?? 'application/octet-stream'
 }
 
 interface SuccessfulAttachmentWrite {
@@ -252,6 +392,161 @@ export function createAttachmentUploadRoute(
       })
     : undefined
   const logger = options.logger ?? console
+  const maxFormBytes = options.limits?.maxFormBytes
+  const streamWriter = atomic ? undefined : options.writeAttachmentStream
+  const limitFor = (sniff: SniffResult): number => {
+    if (!sniff.binary) return maxTextBytes
+    return sniff.mime === null ? maxBinaryBytes : maxBytesBySniffedMime?.get(sniff.mime) ?? maxBinaryBytes
+  }
+  // The most any admitted type may weigh, checked against a raw upload's
+  // declared size before a byte is read; the type's own cap is checked once
+  // the content is known.
+  const largestFileBytes = Math.max(maxTextBytes, maxBinaryBytes, ...(maxBytesBySniffedMime?.values() ?? []))
+
+  /**
+   * The streamed lane: one raw body larger than the sniff head, written as it
+   * arrives. The sniffer keeps only the head and tail, and the last chunk is
+   * withheld until the whole file passes the type, kind and size gates, so a
+   * refused file never reaches the store in full and its write fails.
+   */
+  async function streamRawUpload(input: {
+    request: Request
+    scopeId: string
+    writer: WriteAttachmentStreamFn
+    filename: string
+    name: string
+    path: string
+    declaredBytes: number
+  }): Promise<Response> {
+    const { request, declaredBytes, name, path } = input
+    if (!request.body) return attachmentUploadError(400, 'invalid_length', LENGTH_MISMATCH_MESSAGE)
+    const reader = request.body.getReader()
+    const sniffer = createStreamingSniffer()
+    const head: Uint8Array[] = []
+    let refusal: Response | undefined
+    const tooLong = () => attachmentUploadError(400, 'invalid_length', LENGTH_MISMATCH_MESSAGE)
+
+    try {
+      while (sniffer.size < STREAM_SNIFF_HEAD_BYTES) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (sniffer.size + value.length > declaredBytes) {
+          await reader.cancel().catch(() => undefined)
+          return tooLong()
+        }
+        sniffer.push(value)
+        head.push(value)
+      }
+    } catch {
+      return attachmentUploadError(400, 'invalid_upload', 'The upload body ended early')
+    }
+    const mediaTypeBeforeEnd = provisionalMediaType(name, sniffBinary(sniffer.head()), sniffMime)
+
+    let held = head.pop()
+    let finalSniff: SniffResult | undefined
+    const refuse = (controller: ReadableStreamDefaultController<Uint8Array>, response: Response) => {
+      refusal = response
+      controller.error(new Error('attachment upload refused'))
+    }
+    const content = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of head) controller.enqueue(chunk)
+      },
+      async pull(controller) {
+        let next: ReadableStreamReadResult<Uint8Array>
+        try {
+          next = await reader.read()
+        } catch {
+          refuse(controller, attachmentUploadError(400, 'invalid_upload', 'The upload body ended early'))
+          return
+        }
+        if (!next.done) {
+          if (sniffer.size + next.value.length > declaredBytes) {
+            await reader.cancel().catch(() => undefined)
+            refuse(controller, tooLong())
+            return
+          }
+          sniffer.push(next.value)
+          if (held) controller.enqueue(held)
+          held = next.value
+          return
+        }
+        if (sniffer.size !== declaredBytes) {
+          refuse(controller, tooLong())
+          return
+        }
+        const sniff = sniffer.finish()
+        const typeCheck = checkAttachmentType(name, sniff, allowedSniffedMimes)
+        if (!typeCheck.succeeded) {
+          refuse(controller, attachmentUploadError(
+            typeCheck.code === 'attachment_type_mismatch' ? 400 : 415,
+            typeCheck.code,
+            typeCheck.message,
+          ))
+          return
+        }
+        const kind = attachmentKindForMime(sniff.mime ?? '')
+        if (!allowedKinds.includes(kind)) {
+          refuse(controller, attachmentUploadError(
+            415,
+            'attachment_kind_not_allowed',
+            `${name} is a "${kind}" attachment, which this upload route does not accept`,
+          ))
+          return
+        }
+        const limit = limitFor(sniff)
+        if (declaredBytes > limit) {
+          refuse(controller, attachmentUploadError(413, 'attachment_too_large', attachmentSizeErrorMessage(name, declaredBytes, limit)))
+          return
+        }
+        finalSniff = sniff
+        if (held) controller.enqueue(held)
+        held = undefined
+        controller.close()
+      },
+      cancel(reason) {
+        return reader.cancel(reason).catch(() => undefined)
+      },
+    }, { highWaterMark: 0 })
+
+    let written: unknown
+    try {
+      written = await input.writer(input.scopeId, path, content, {
+        mediaType: mediaTypeBeforeEnd,
+        name,
+        originalName: input.filename,
+        size: declaredBytes,
+      })
+    } catch (error) {
+      if (!finalSniff) await reader.cancel().catch(() => undefined)
+      if (refusal) return refusal
+      logAttachmentUploadError(logger, '[attachment-upload] stream writer failed', { path, error: redactErrorMessage(error) })
+      return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE, path)
+    }
+    if (!finalSniff) await reader.cancel().catch(() => undefined)
+    if (refusal) return refusal
+    const result = inspectLegacyAttachmentWriteResult(written)
+    if (!result || (result.ok && !finalSniff)) {
+      // A writer that reports success without reading the file to its end
+      // stored something the route never checked.
+      logAttachmentUploadError(logger, '[attachment-upload] stream writer returned without a checked file', { path })
+      return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE, path)
+    }
+    if (!result.ok) {
+      const reason = redactErrorMessage(result.reason)
+      logAttachmentUploadError(logger, '[attachment-upload] stream write rejected', { path, error: reason })
+      return attachmentUploadError(413, 'attachment_write_failed', reason, path)
+    }
+    const sniff = finalSniff!
+    const uploaded: ChatAttachmentInput = {
+      path,
+      name,
+      size: declaredBytes,
+      mediaType: sniff.mime ?? sniffMime(name),
+      kind: attachmentKindForMime(sniff.mime ?? ''),
+    }
+    return Response.json({ files: [uploaded] })
+  }
 
   return async function attachmentUpload(request: Request): Promise<Response> {
     const auth = await options.authorize({ request })
@@ -266,18 +561,60 @@ export function createAttachmentUploadRoute(
       return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE)
     }
 
-    let form: FormData
-    try {
-      form = await request.formData()
-    } catch {
-      return attachmentUploadError(400, 'invalid_upload', 'Expected a multipart/form-data body with file fields')
-    }
-    // Collect every File value regardless of field name — the client may
-    // send one field per file or a single repeated field.
     const files: File[] = []
-    form.forEach((value) => {
-      if (value instanceof File) files.push(value)
-    })
+    const contentType = request.headers.get('Content-Type')?.toLowerCase() ?? ''
+    if (!contentType.startsWith('multipart/form-data')) {
+      const target = rawUploadTarget(request)
+      if (!target.succeeded) return target.response
+      const { filename, declaredBytes } = target
+      const name = sanitizeAttachmentFileName(filename)
+      if (declaredBytes > largestFileBytes) {
+        return attachmentUploadError(413, 'attachment_too_large', attachmentSizeErrorMessage(name, declaredBytes, largestFileBytes))
+      }
+      if (declaredBytes > maxTotalBytes) {
+        return attachmentUploadError(413, 'attachments_total_too_large', attachmentTotalSizeErrorMessage(declaredBytes, maxTotalBytes))
+      }
+      if (streamWriter && declaredBytes > STREAM_SNIFF_HEAD_BYTES) {
+        const path = pathFor(name)
+        const pathCheck = validatePath(path)
+        if (!pathCheck.succeeded) return attachmentUploadError(400, 'invalid_attachment_path', pathCheck.error, path)
+        const writer = (auth as Extract<AttachmentUploadAuthorization, { ok: true }>).writeAttachmentStream ?? streamWriter
+        return streamRawUpload({ request, scopeId: auth.scopeId, writer, filename, name, path, declaredBytes })
+      }
+      // A small raw body takes the batch path below as a one-file batch.
+      const body = await readRawBody(request, declaredBytes)
+      if (!body.succeeded) return body.response
+      files.push(new File([body.value], filename))
+    } else {
+      let formSource: Request | Response = request
+      if (maxFormBytes !== undefined) {
+        // Read at most the cap before parsing, whether or not the client sent
+        // a Content-Length, so an oversized form is refused while small.
+        const bounded = await readBodyUpTo(request, maxFormBytes)
+        if (!bounded.succeeded && !bounded.tooLarge) {
+          return attachmentUploadError(400, 'invalid_upload', 'The upload body ended early')
+        }
+        if (!bounded.succeeded) {
+          return attachmentUploadError(
+            413,
+            'form_upload_too_large',
+            `Form uploads are limited to ${formatBytes(maxFormBytes)}; send a larger file as a raw request body named by the filename query parameter`,
+          )
+        }
+        formSource = new Response(bounded.value, { headers: { 'Content-Type': request.headers.get('Content-Type') ?? '' } })
+      }
+      let form: FormData
+      try {
+        form = await formSource.formData()
+      } catch {
+        return attachmentUploadError(400, 'invalid_upload', 'Expected a multipart/form-data body with file fields')
+      }
+      // Collect every File value regardless of field name — the client may
+      // send one field per file or a single repeated field.
+      form.forEach((value) => {
+        if (value instanceof File) files.push(value)
+      })
+    }
     if (files.length === 0) {
       return attachmentUploadError(400, 'invalid_upload', 'No files in the upload body')
     }
@@ -347,12 +684,7 @@ export function createAttachmentUploadRoute(
         )
       }
 
-      let limit = maxTextBytes
-      if (sniff.binary) {
-        limit = sniff.mime === null
-          ? maxBinaryBytes
-          : maxBytesBySniffedMime?.get(sniff.mime) ?? maxBinaryBytes
-      }
+      const limit = limitFor(sniff)
       if (bytes.length > limit) {
         return attachmentUploadError(
           413,
