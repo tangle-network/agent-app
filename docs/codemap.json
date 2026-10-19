@@ -12177,6 +12177,12 @@
           "doc": null
         },
         {
+          "name": "OPERATOR_TURN_CANCELLED_CODE",
+          "kind": "const",
+          "signature": "\"turn.cancelled\"",
+          "doc": "`failure.code` of a turn that settled because it was cancelled before it finished."
+        },
+        {
           "name": "OPERATOR_WORKSPACE_SCOPE_PREFIX",
           "kind": "const",
           "signature": "\"operator:workspace:\"",

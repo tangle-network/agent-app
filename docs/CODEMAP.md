@@ -73,7 +73,7 @@ _137 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./object-store`](api/object-store.md) | 20 | `crypto` |
 | [`./openui`](api/openui.md) | 35 | `web` |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
-| [`./operator`](api/operator.md) | 55 | `chat-routes`, `platform`, `stream`, `web` |
+| [`./operator`](api/operator.md) | 56 | `chat-routes`, `platform`, `stream`, `web` |
 | [`./peer-floors/check`](api/peer-floors-check.md) | 23 | `signoff` |
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 1 | `signoff` |
 | [`./plans`](api/plans.md) | 12 | — |
@@ -764,11 +764,11 @@ Depends on: `openui`
 
 ## `./operator`
 
-Source: `src/operator/index.ts` · 55 exports
+Source: `src/operator/index.ts` · 56 exports
 
 Depends on: `chat-routes`, `platform`, `stream`, `web`
 
-`ChatOperatorAdapterOptions`, `ChatOperatorAdmission`, `ChatOperatorAdmissionStore`, `ChatOperatorMessage`, `ChatOperatorThread`, `ChatOperatorWorkspace`, `createChatOperatorAdapter`, `createOperatorApi`, `createOperatorClient`, `matchOperatorRoute`, `OPERATOR_ACCESS`, `OPERATOR_API_BASE_PATH`, `OPERATOR_API_SCOPES`, `OPERATOR_API_VERSION`, `OPERATOR_ROUTES`, `OPERATOR_SCOPE_DEPENDENCIES`, `OPERATOR_SETTLED_STATES`, `OPERATOR_WORKSPACE_SCOPE_PREFIX`, `OperatorAdapter`, `OperatorApi`, `OperatorApiOptions`, `OperatorAppInfo`, `OperatorApproval`, `OperatorApprovalKind`, `OperatorAssetRef`, `OperatorCapability`, `OperatorClient`, `OperatorClientOptions`, `OperatorContext`, `OperatorError`, `OperatorErrorBody`, `OperatorFile`, `OperatorFileChange`, `OperatorFileEntry`, `OperatorJournalEntry`, `OperatorKeyStore`, `operatorKeyWorkspaces`, `OperatorMetric`, `OperatorPrincipalInfo`, `OperatorResult`, `OperatorRole`, `OperatorRouteId`, `OperatorScope`, `OperatorScorecard`, `OperatorThread`, `OperatorTurn`, `OperatorTurnState`, `OperatorWorkspace`, `operatorWorkspaceScope`, `PlatformAgentKeyAccess`, `PlatformAgentKeyContext`, `PlatformAgentOperatorKey`, `StartTurnInput`, `WaitForTurnOptions`, `withPlatformAgentKeys`
+`ChatOperatorAdapterOptions`, `ChatOperatorAdmission`, `ChatOperatorAdmissionStore`, `ChatOperatorMessage`, `ChatOperatorThread`, `ChatOperatorWorkspace`, `createChatOperatorAdapter`, `createOperatorApi`, `createOperatorClient`, `matchOperatorRoute`, `OPERATOR_ACCESS`, `OPERATOR_API_BASE_PATH`, `OPERATOR_API_SCOPES`, `OPERATOR_API_VERSION`, `OPERATOR_ROUTES`, `OPERATOR_SCOPE_DEPENDENCIES`, `OPERATOR_SETTLED_STATES`, `OPERATOR_TURN_CANCELLED_CODE`, `OPERATOR_WORKSPACE_SCOPE_PREFIX`, `OperatorAdapter`, `OperatorApi`, `OperatorApiOptions`, `OperatorAppInfo`, `OperatorApproval`, `OperatorApprovalKind`, `OperatorAssetRef`, `OperatorCapability`, `OperatorClient`, `OperatorClientOptions`, `OperatorContext`, `OperatorError`, `OperatorErrorBody`, `OperatorFile`, `OperatorFileChange`, `OperatorFileEntry`, `OperatorJournalEntry`, `OperatorKeyStore`, `operatorKeyWorkspaces`, `OperatorMetric`, `OperatorPrincipalInfo`, `OperatorResult`, `OperatorRole`, `OperatorRouteId`, `OperatorScope`, `OperatorScorecard`, `OperatorThread`, `OperatorTurn`, `OperatorTurnState`, `OperatorWorkspace`, `operatorWorkspaceScope`, `PlatformAgentKeyAccess`, `PlatformAgentKeyContext`, `PlatformAgentOperatorKey`, `StartTurnInput`, `WaitForTurnOptions`, `withPlatformAgentKeys`
 
 [Full API →](api/operator.md)
 

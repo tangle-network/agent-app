@@ -3,6 +3,7 @@ import { createApiKeyRequestAuth, type RequestApiKey } from '../platform/api-key
 import {
   OPERATOR_API_BASE_PATH,
   OPERATOR_API_VERSION,
+  OPERATOR_SETTLED_STATES,
   matchOperatorRoute,
   operatorKeyWorkspaces,
   type OperatorApproval,
@@ -55,6 +56,15 @@ export interface OperatorAdapter<Identity> {
   /** Admit the turn durably and return without waiting for it; the same turnId never starts twice. */
   startTurn(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace, input: StartTurnInput): Promise<OperatorTurn>
   getTurn(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace, target: { threadId: string; turnId: string }): Promise<OperatorTurn | null>
+  /**
+   * Stop an unsettled turn through the app's own interrupt path and return the
+   * turn as read afterwards. It may still read `working` until the app's turn
+   * owner records the stop; once recorded, the turn settles `failed` with
+   * `OPERATOR_TURN_CANCELLED_CODE`. Null when the turn is not in this
+   * workspace. Throw a retryable `OperatorError` when the stop could not be
+   * delivered. The handler never calls it for a settled turn.
+   */
+  cancelTurn?(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace, target: { threadId: string; turnId: string }): Promise<OperatorTurn | null>
   listThreads?(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace, query: { cursor?: string; limit: number }): Promise<{ threads: OperatorThread[]; nextCursor: string | null }>
   getThread?(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace, threadId: string): Promise<{ thread: OperatorThread; latestTurn: OperatorTurn | null } | null>
   listApprovals(ctx: OperatorContext<Identity>, workspace: OperatorWorkspace): Promise<OperatorApproval[]>
@@ -204,6 +214,7 @@ function parseStartTurn(body: Record<string, unknown>, maxAttachments: number | 
 
 function capabilities<Identity>(adapter: OperatorAdapter<Identity>): OperatorCapability[] {
   const present: Array<[OperatorCapability, unknown]> = [
+    ['turns.cancel', adapter.cancelTurn],
     ['workspaces.create', adapter.createWorkspace],
     ['threads.read', adapter.getThread ?? adapter.listThreads],
     ['files.read', adapter.readFile ?? adapter.listFiles],
@@ -219,9 +230,13 @@ function unsupported(): never {
   throw new OperatorError('operator.unsupported', 501, 'This app does not implement this operation')
 }
 
+function settled(turn: OperatorTurn): boolean {
+  return OPERATOR_SETTLED_STATES.includes(turn.state)
+}
+
 /** A held turn read returns as soon as the turn settles or waits on a decision. */
 function needsAttention(turn: OperatorTurn): boolean {
-  return turn.state === 'succeeded' || turn.state === 'failed' || turn.state === 'input-required' || turn.approvals.length > 0
+  return settled(turn) || turn.state === 'input-required' || turn.approvals.length > 0
 }
 
 const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve) => {
@@ -314,8 +329,21 @@ export function createOperatorApi<Key extends RequestApiKey, Identity>(
       if (restriction && !restriction.includes(workspaceId)) {
         throw new OperatorError('operator.workspace_not_found', 404, 'Workspace not found')
       }
-      const workspace = await adapter.authorizeWorkspace(ctx, workspaceId, route.id === 'turns.start' ? 'run' : 'read')
+      const runs = route.id === 'turns.start' || route.id === 'turns.cancel'
+      const workspace = await adapter.authorizeWorkspace(ctx, workspaceId, runs ? 'run' : 'read')
       if (!workspace) throw new OperatorError('operator.workspace_not_found', 404, 'Workspace not found')
+
+      /** Re-read the turn every poll interval until `done`, `wait` seconds pass, or the caller leaves. */
+      const hold = async (first: OperatorTurn | null, target: { threadId: string; turnId: string }, wait: number, done: (turn: OperatorTurn) => boolean) => {
+        const deadline = Date.now() + wait * 1000
+        let turn = first
+        while (turn && !done(turn) && Date.now() + pollIntervalMs <= deadline && !request.signal.aborted) {
+          await sleep(pollIntervalMs, request.signal)
+          turn = await adapter.getTurn(ctx, workspace, target)
+        }
+        if (!turn) throw new OperatorError('operator.turn_not_found', 404, 'Turn not found')
+        return turn
+      }
 
       switch (route.id) {
         case 'workspaces.get':
@@ -345,14 +373,18 @@ export function createOperatorApi<Key extends RequestApiKey, Identity>(
         case 'turns.get': {
           const target = { threadId: params.threadId!, turnId: params.turnId! }
           const wait = boundedInteger(url.searchParams.get('wait'), 0, 0, maxWaitSeconds, 'wait')
-          const deadline = Date.now() + wait * 1000
-          let turn = await adapter.getTurn(ctx, workspace, target)
-          while (turn && !needsAttention(turn) && Date.now() + pollIntervalMs <= deadline && !request.signal.aborted) {
-            await sleep(pollIntervalMs, request.signal)
-            turn = await adapter.getTurn(ctx, workspace, target)
-          }
-          if (!turn) throw new OperatorError('operator.turn_not_found', 404, 'Turn not found')
-          return json({ turn })
+          return json({ turn: await hold(await adapter.getTurn(ctx, workspace, target), target, wait, needsAttention) })
+        }
+        case 'turns.cancel': {
+          if (!adapter.cancelTurn) unsupported()
+          const target = { threadId: params.threadId!, turnId: params.turnId! }
+          const wait = boundedInteger(url.searchParams.get('wait'), 0, 0, maxWaitSeconds, 'wait')
+          const current = await adapter.getTurn(ctx, workspace, target)
+          if (!current) throw new OperatorError('operator.turn_not_found', 404, 'Turn not found')
+          // Cancelling a settled turn reads it: a repeat or late cancel never fails and never reaches the app.
+          if (settled(current)) return json({ turn: current })
+          const turn = await hold(await adapter.cancelTurn(ctx, workspace, target), target, wait, settled)
+          return json({ turn }, settled(turn) ? 200 : 202)
         }
         case 'approvals.list':
           return json({ approvals: await adapter.listApprovals(ctx, workspace) })

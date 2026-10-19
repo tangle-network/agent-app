@@ -94,6 +94,7 @@ There is no browser-cookie fallback.
 | GET | `/workspaces/:id/threads` | read | `{ threads, nextCursor }` |
 | GET | `/workspaces/:id/threads/:thread` | read | `{ thread, latestTurn }` |
 | GET | `/workspaces/:id/threads/:thread/turns/:turn?wait=<s>` | read | `{ turn }`, held up to `wait` seconds (at most 25) |
+| POST | `/workspaces/:id/threads/:thread/turns/:turn/cancel?wait=<s>` | read, run | `{ turn }`: 200 once settled, 202 while the stop is pending; see [Cancel a turn](#cancel-a-turn) |
 | GET | `/workspaces/:id/approvals` | read | `{ approvals }` open in the workspace |
 | GET | `/workspaces/:id/journal?days=<n>` | read | `{ entries }`: dated journal files |
 | GET | `/workspaces/:id/files?prefix=<p>` | read | `{ files }` |
@@ -115,8 +116,24 @@ Errors are `{ error, code, retryable? }`.
 3. `succeeded` and `failed` are settled and carry `reply` or `failure`, plus referenced `assets`, changed `files`, and open `approvals`.
    `input-required`, or a nonempty `approvals` list, waits on someone in `approvals[].decidedBy`.
    `unknown` means the app cannot establish the state; it is never evidence of success.
+4. To stop the turn early, the caller posts its cancel route; see [Cancel a turn](#cancel-a-turn).
 
 An accepted turn or an open connection does not establish completion; read the settled turn.
+
+### Cancel a turn
+
+`POST /workspaces/:id/threads/:thread/turns/:turn/cancel` stops a turn the key may run, through the app's own interrupt path, the one its browser Stop uses.
+It needs `operator:read` and `operator:run` and the workspace role that may start agent work, and it takes no body.
+
+- A settled turn answers 200 with the turn as it settled, without reaching the app, so a repeated or late cancel never fails.
+- An unsettled turn is stopped and answers 202 with the turn as read afterwards. It may still read `working` until the app's turn owner records the stop; read it with `?wait=` until it settles.
+- `?wait=<s>` holds the cancel response, as on a turn read, until the turn settles; a settled response is 200.
+- A stopped turn settles `failed` with `failure.code` `turn.cancelled` (`OPERATOR_TURN_CANCELLED_CODE`). A turn that finished before the stop reached it settles as it finished.
+- A stop the app could not deliver answers a retryable error; retry the same route.
+
+The adapter implements `cancelTurn(ctx, workspace, { threadId, turnId })` by calling the app's existing interrupt for that turn and returning `getTurn`'s view of it. The handler never calls it for a settled turn.
+`GET /api/operator/v1` lists `turns.cancel` among the capabilities of an app that implements it; any other app answers 501 `operator.unsupported`.
+`createOperatorClient` exposes it as `cancelTurn(workspaceId, threadId, turnId, { waitSeconds })`.
 
 ### Attach files
 
@@ -167,7 +184,7 @@ Work runs on the owner's plan and model budget, under the app's normal product p
 | --- | --- |
 | `operator:read` | Read workspaces, conversations, files, journal, assets, approvals, scorecards, and turn status. |
 | `operator:write` | Create workspaces; an app's older private routes may also use it for conversations and files. |
-| `operator:run` | Start and continue agent turns; requires `operator:read`. The agent can change workspace files and take actions the product allows. An app's older private routes may also use it to answer questions and tool-permission requests, or to interrupt a turn. |
+| `operator:run` | Start, continue, and cancel agent turns; requires `operator:read`. The agent can change workspace files and take actions the product allows. An app's older private routes may also use it to answer questions and tool-permission requests, or to interrupt a turn. |
 | `operator:workspace:<id>` | Restricts the key to the named workspaces. A restricted key cannot create workspaces, and apps refuse it on their older private routes. |
 
 `OPERATOR_ACCESS` carries the labels an app's API access page shows; `OPERATOR_SCOPE_DEPENDENCIES` carries the run-requires-read rule for the key issuer.
@@ -243,7 +260,7 @@ Keep older private routes until their consumers move.
 
 ## Not in v1
 
-Answering questions or approvals, interrupting a turn, and writing files stay on each app's own routes.
+Answering questions or approvals and writing files stay on each app's own routes.
 Apps still issue their own keys for their own users; a Tangle agent key is the one credential every app accepts.
 
 ### Durable chat admission
