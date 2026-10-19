@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.198
+
+- fix(workspace-apps): revalidate every artifact share access (#1154)
+
 ## 0.60.197
 
 - feat(workspace-apps): cloud artifacts that open while the box sleeps (#1153)
