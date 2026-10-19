@@ -21,6 +21,9 @@
 import type { SandboxInstance } from '@tangle-network/sandbox'
 import { SandboxRunError, type SandboxToolContext } from './sandbox-run-tool'
 
+/** `ExecOptions` from SDK 0.62.2, which sends `traceId` as `x-tangle-trace-id`; spelled here so the tool builds against the pinned older SDK too. */
+type ExecOptionsWithTrace = NonNullable<Parameters<SandboxInstance['exec']>[1]> & { traceId?: string }
+
 export interface SandboxExecToolOptions {
   /** The box commands run in. The product provisions, binds and bills it. A throw is
    *  `sandbox_unavailable`, unless it is a `SandboxRunError`, which is kept as it is. */
@@ -163,8 +166,9 @@ export function createSandboxExecTool(options: SandboxExecToolOptions): SandboxE
           ...(options.env ? { env: options.env } : {}),
           timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)),
           // The same id the Router turn sends, so this command's Sandbox API and host records join the turn.
+          // SDK 0.62.2 added `traceId` to ExecOptions; an older SDK ignores the field.
           ...(context?.trace ? { traceId: context.trace.traceId } : {}),
-        }), signal)
+        } as ExecOptionsWithTrace), signal)
         execSpan?.end({ 'exec.exit_code': result.exitCode })
       } catch (error) {
         execSpan?.end(undefined, 'exec_failed')
