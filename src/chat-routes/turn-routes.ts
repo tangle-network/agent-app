@@ -258,6 +258,9 @@ export interface ChatTurnAuthorizeArgs {
   turnId?: string
   /** The thread whose running turns are being discovered (running intent only). */
   threadId?: string
+  /** The turn's trace (turn intent only). A product records its own child spans (a billing read, a workspace check) so the
+   *  admission wait is named by step; the route already records `admission.authorize` around the whole call. */
+  trace?: TurnTrace
 }
 
 /** What `prepareTurn` receives: the admitted turn, before the conversation loads. */
@@ -1000,7 +1003,7 @@ export function createChatTurnRoutes<TContext = void>(
       throw err
     }
     parse.end()
-    const auth = await trace.measure('admission.authorize', 'admission', () => options.authorize({ request, intent: 'turn', body: parsed.payload }))
+    const auth = await trace.measure('admission.authorize', 'admission', () => options.authorize({ request, intent: 'turn', body: parsed.payload, trace }))
     if (!auth.ok) return { ok: false, response: auth.response }
     // Admission policy on the model the turn NAMES, before any side effect.
     // The unnamed-model half resolves inside `produce`; the producer-side
@@ -1572,7 +1575,10 @@ export function createChatTurnRoutes<TContext = void>(
             finalText: () => producer?.finalText() ?? '',
           }),
           onEvent: async (event) => {
-            if (firstTextAtMs === undefined && isVisibleText(event)) firstTextAtMs = Date.now()
+            if (firstTextAtMs === undefined && isVisibleText(event)) {
+              firstTextAtMs = Date.now()
+              trace.markFirstText(firstTextAtMs)
+            }
             if (event.type === 'session.run.failed' || event.type === 'error') {
               runFailed = true
               lastFailureData = event.data

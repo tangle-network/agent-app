@@ -75,6 +75,8 @@ export interface TurnTraceSummary {
   toolCalls: number
   /** Spans refused after the per-turn cap. */
   dropped: number
+  /** From the request to the first visible text the member could read (see {@link TurnTrace.markFirstText}); absent when none streamed. */
+  firstTextMs?: number
 }
 
 export interface TurnTraceSnapshot {
@@ -107,6 +109,12 @@ export interface TurnTrace {
   record(name: string, kind: TurnSpanKind, startMs: number, endMs: number, attrs?: TurnSpanAttrs, parent?: TurnSpan): TurnSpan
   /** Run `work` inside a span; the span ends when it settles, failed if it throws. */
   measure<T>(name: string, kind: TurnSpanKind, work: (span: TurnSpan) => Promise<T> | T, attrs?: TurnSpanAttrs, parent?: TurnSpan): Promise<T>
+  /**
+   * Note that the turn's first visible text reached the member. The chat route calls it on the first text event of
+   * either lane; a product that owns its turn calls it itself. Only the first call counts. The summary's
+   * `firstTextMs` then reads from the request, so it holds admission, the box or the Router, and the model.
+   */
+  markFirstText(at?: number): void
   /** Read the current numbers without ending the trace. */
   summary(now?: number): TurnTraceSummary
   /** End the trace: open spans close at `endedAt`, and later spans are refused. A second call returns the first result. */
@@ -246,6 +254,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
   const open = new Set<string>()
   let dropped = 0
   let finished: TurnTraceSnapshot | undefined
+  let firstTextAt: number | undefined
 
   // A refused or late span still returns a handle, so instrumentation never branches on the trace's state.
   const inert = (id: string): TurnSpan => {
@@ -309,6 +318,9 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
     record: (name, kind, start, end, attrs) => trace.record(name, kind, start, end, attrs),
   }
 
+  const withFirstText = (summary: TurnTraceSummary): TurnTraceSummary =>
+    firstTextAt === undefined ? summary : { ...summary, firstTextMs: round1(firstTextAt - startedAt) }
+
   const trace: TurnTrace = {
     get traceId() { return traceId },
     get executionId() { return executionId },
@@ -331,10 +343,14 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
         throw error
       }
     },
+    markFirstText(at) {
+      if (finished || firstTextAt !== undefined) return
+      firstTextAt = Math.max(startedAt, at ?? now())
+    },
     summary(at) {
       const end = at ?? finished?.endedAt ?? now()
       const spans = [...records.values()].map((record) => open.has(record.spanId) ? { ...record, endMs: end } : record)
-      return summarizeTurnSpans(spans, rootId, startedAt, end, traceId, dropped)
+      return withFirstText(summarizeTurnSpans(spans, rootId, startedAt, end, traceId, dropped))
     },
     finish(outcome) {
       if (finished) return finished
@@ -353,7 +369,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
         startedAt,
         endedAt,
         spans,
-        summary: summarizeTurnSpans(spans, rootId, startedAt, endedAt, traceId, dropped),
+        summary: withFirstText(summarizeTurnSpans(spans, rootId, startedAt, endedAt, traceId, dropped)),
         status: outcome?.error === undefined ? 'ok' : 'error',
         ...(outcome?.error === undefined ? {} : { error: errorText(outcome.error) }),
       }
