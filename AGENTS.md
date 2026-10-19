@@ -70,6 +70,7 @@ Approvals attach to an action's effects, such as spending or publishing, rather 
 - For billing verification, read [spend-verification.md](docs/spend-verification.md).
   Preserve declared ownership, observation coverage, and uncertainty; missing observations cannot certify a clean bill.
 - For dependency provenance or peer checks, read [dependency-source-gate.md](docs/dependency-source-gate.md).
+- For agent-made pages and small apps that open from a link while the box sleeps, or sharing them, read [cloud-artifacts.md](docs/cloud-artifacts.md).
 - For asynchronous UI state or agent-authored interactive pages, read [async-state-module.md](docs/async-state-module.md) or [openui-interactive.md](docs/openui-interactive.md), respectively.
 - For generated applications, read the relevant template's `AGENTS.md` and `CUSTOMIZE.md` before changing its contract.
 

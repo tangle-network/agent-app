@@ -234,3 +234,49 @@ export type {
   WorkspaceAppDataHost,
   WorkspaceAppDataHostOptions,
 } from './data-bridge'
+
+export {
+  CLOUD_ARTIFACT_MAX_BYTES,
+  CLOUD_ARTIFACT_MAX_FILES,
+  CLOUD_ARTIFACT_MAX_FILE_BYTES,
+  CLOUD_ARTIFACT_SHARE_ROLE,
+  CLOUD_ARTIFACT_VIEW_TTL_MS,
+  CLOUD_ARTIFACT_WORKER_MODULE,
+  CloudArtifactError,
+  cloudArtifactContentType,
+  cloudArtifactObjectKey,
+  cloudArtifactReferences,
+  cloudArtifactWorkspacePrefix,
+  collectCloudArtifactBundle,
+  createCloudArtifactId,
+  createCloudArtifactShareToken,
+  createCloudArtifactViewUrl,
+  isCloudArtifactPath,
+  prepareCloudArtifact,
+  readCloudArtifactShareToken,
+  readCloudArtifactViewUrl,
+  resolveCloudArtifactReference,
+  storeCloudArtifact,
+} from './cloud-artifacts'
+export type {
+  CloudArtifactErrorCode,
+  CloudArtifactFile,
+  CloudArtifactGrant,
+  CloudArtifactInputFile,
+  CloudArtifactKind,
+  CloudArtifactRecord,
+  CloudArtifactVersion,
+  CloudArtifactView,
+  PreparedCloudArtifact,
+} from './cloud-artifacts'
+export {
+  CLOUD_ARTIFACT_FRAME_SANDBOX,
+  CLOUD_ARTIFACT_SCRIPT_HOSTS,
+  cloudArtifactContentSecurityPolicy,
+  createCloudArtifactOrigin,
+} from './cloud-artifact-origin'
+export type {
+  CloudArtifactOriginOptions,
+  CloudArtifactWorkerCode,
+  CloudArtifactWorkerLoader,
+} from './cloud-artifact-origin'

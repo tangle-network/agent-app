@@ -87,6 +87,7 @@ export default defineConfig({
     'work-product-react/index': 'src/work-product-react/index.tsx',
     'chat-react/index': 'src/chat-react/index.tsx',
     'workspace-apps/index': 'src/workspace-apps/index.ts',
+    'workspace-apps/react': 'src/workspace-apps/react.tsx',
     'workspace-react/index': 'src/workspace-react/index.tsx',
     'web-react/terminal': 'src/web-react/terminal.ts',
     'web-react/async/index': 'src/web-react/async/index.ts',

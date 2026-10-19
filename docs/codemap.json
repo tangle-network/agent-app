@@ -29042,14 +29042,200 @@
     {
       "id": "./workspace-apps",
       "source": "src/workspace-apps/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "crypto",
+        "object-store",
+        "teams",
+        "tools",
+        "web-react"
+      ],
       "error": null,
       "exports": [
+        {
+          "name": "CLOUD_ARTIFACT_FRAME_SANDBOX",
+          "kind": "const",
+          "signature": "\"allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads\"",
+          "doc": "The iframe sandbox for an artifact frame; never add `allow-same-origin`."
+        },
+        {
+          "name": "CLOUD_ARTIFACT_MAX_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": null
+        },
+        {
+          "name": "CLOUD_ARTIFACT_MAX_FILE_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": null
+        },
+        {
+          "name": "CLOUD_ARTIFACT_MAX_FILES",
+          "kind": "const",
+          "signature": "200",
+          "doc": null
+        },
+        {
+          "name": "CLOUD_ARTIFACT_SCRIPT_HOSTS",
+          "kind": "const",
+          "signature": "readonly [\"https://cdn.jsdelivr.net\", \"https://cdnjs.cloudflare.com\", \"https://unpkg.com\"]",
+          "doc": "Script and style CDNs a generated page may load."
+        },
+        {
+          "name": "CLOUD_ARTIFACT_SHARE_ROLE",
+          "kind": "const",
+          "signature": "\"owner\" | \"viewer\" | \"editor\" | \"admin\"",
+          "doc": "Opening an artifact needs `viewer`; creating or revoking a public link needs this role."
+        },
+        {
+          "name": "CLOUD_ARTIFACT_VIEW_TTL_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Member view links are re-minted on every page load, so they can be short."
+        },
+        {
+          "name": "CLOUD_ARTIFACT_WORKER_MODULE",
+          "kind": "const",
+          "signature": "\"_worker.js\"",
+          "doc": "The module a `worker` bundle runs, at the bundle root (the Cloudflare Pages name)."
+        },
+        {
+          "name": "cloudArtifactContentSecurityPolicy",
+          "kind": "function",
+          "signature": "(input: { origin: string; frameAncestors: readonly string[]; }) => string",
+          "doc": "The Content-Security-Policy every artifact response carries."
+        },
+        {
+          "name": "cloudArtifactContentType",
+          "kind": "function",
+          "signature": "(path: string) => string | null",
+          "doc": "The served type for a path, or null when cloud artifacts do not serve it."
+        },
+        {
+          "name": "CloudArtifactError",
+          "kind": "class",
+          "signature": "class CloudArtifactError",
+          "doc": null
+        },
+        {
+          "name": "CloudArtifactErrorCode",
+          "kind": "type",
+          "signature": "type CloudArtifactErrorCode",
+          "doc": null
+        },
+        {
+          "name": "CloudArtifactFile",
+          "kind": "interface",
+          "signature": "interface CloudArtifactFile",
+          "doc": "One stored file of a version."
+        },
+        {
+          "name": "CloudArtifactGrant",
+          "kind": "type",
+          "signature": "type CloudArtifactGrant",
+          "doc": "Who a view link was minted for: a workspace member, or a public share."
+        },
+        {
+          "name": "CloudArtifactInputFile",
+          "kind": "interface",
+          "signature": "interface CloudArtifactInputFile",
+          "doc": null
+        },
+        {
+          "name": "CloudArtifactKind",
+          "kind": "type",
+          "signature": "type CloudArtifactKind",
+          "doc": null
+        },
+        {
+          "name": "cloudArtifactObjectKey",
+          "kind": "function",
+          "signature": "(workspaceId: string, sha256Hex: string) => string",
+          "doc": "Content-addressed per workspace, so erasing a workspace deletes one prefix."
+        },
+        {
+          "name": "CloudArtifactOriginOptions",
+          "kind": "interface",
+          "signature": "interface CloudArtifactOriginOptions",
+          "doc": null
+        },
+        {
+          "name": "CloudArtifactRecord",
+          "kind": "interface",
+          "signature": "interface CloudArtifactRecord",
+          "doc": "What the origin needs from the product's record."
+        },
+        {
+          "name": "cloudArtifactReferences",
+          "kind": "function",
+          "signature": "(text: string, documentPath: string) => string[]",
+          "doc": "Local files an HTML, CSS or JavaScript document refers to, as bundle paths."
+        },
+        {
+          "name": "CloudArtifactVersion",
+          "kind": "interface",
+          "signature": "interface CloudArtifactVersion",
+          "doc": "An immutable snapshot."
+        },
+        {
+          "name": "CloudArtifactView",
+          "kind": "interface",
+          "signature": "interface CloudArtifactView",
+          "doc": null
+        },
+        {
+          "name": "CloudArtifactWorkerCode",
+          "kind": "interface",
+          "signature": "interface CloudArtifactWorkerCode",
+          "doc": "The code shape Worker Loader's `get` callback returns (Cloudflare `WorkerCode`)."
+        },
+        {
+          "name": "CloudArtifactWorkerLoader",
+          "kind": "interface",
+          "signature": "interface CloudArtifactWorkerLoader",
+          "doc": "Structural `env.LOADER` (a `worker_loaders` binding), so workers-types stays out of the public types."
+        },
+        {
+          "name": "cloudArtifactWorkspacePrefix",
+          "kind": "function",
+          "signature": "(workspaceId: string) => string",
+          "doc": "The prefix holding every stored byte of a workspace's artifacts."
+        },
+        {
+          "name": "collectCloudArtifactBundle",
+          "kind": "function",
+          "signature": "(input: { entry: string; readMany(paths: readonly string[]): Promise<ReadonlyMap<string, Uint8Array<ArrayBufferLike>>>;…",
+          "doc": "Gather an entry and every local file it refers to, transitively, plus `_worker.js` and its imports when the root has one."
+        },
         {
           "name": "confirmWorkspaceAppReady",
           "kind": "function",
           "signature": "(app: WorkspaceAppRecord, proof: WorkspaceAppHttpProof) => WorkspaceAppRecord",
           "doc": "Mark an app ready only after the host fetched its HTML over the trusted preview URL."
+        },
+        {
+          "name": "createCloudArtifactId",
+          "kind": "function",
+          "signature": "() => string",
+          "doc": "A random 32-hex id for an artifact or a share."
+        },
+        {
+          "name": "createCloudArtifactOrigin",
+          "kind": "function",
+          "signature": "(options: CloudArtifactOriginOptions) => (request: Request) => Promise<Response>",
+          "doc": "Serve cloud artifacts on their own origin."
+        },
+        {
+          "name": "createCloudArtifactShareToken",
+          "kind": "function",
+          "signature": "(shareId: string, secret: string) => Promise<string>",
+          "doc": "The secret part of a public link: `<shareId>.<HMAC>`."
+        },
+        {
+          "name": "createCloudArtifactViewUrl",
+          "kind": "function",
+          "signature": "(input: { origin: string; secret: string; artifactId: string; grant: CloudArtifactGrant; path: string; ttlMs?: number |…",
+          "doc": "A short-lived URL on the artifact origin for one artifact and one grant."
         },
         {
           "name": "createWorkspaceAppDataClient",
@@ -29064,10 +29250,52 @@
           "doc": "Bind one registered preview to a product-authorized data adapter."
         },
         {
+          "name": "isCloudArtifactPath",
+          "kind": "function",
+          "signature": "(path: string) => boolean",
+          "doc": "A bundle path: relative, no `.` or `..` segments, no control or URL-special characters."
+        },
+        {
+          "name": "prepareCloudArtifact",
+          "kind": "function",
+          "signature": "(input: { files: readonly CloudArtifactInputFile[]; entry: string; openui?: boolean | undefined; carry?: readonly Cloud…",
+          "doc": "Validate and hash a bundle."
+        },
+        {
+          "name": "PreparedCloudArtifact",
+          "kind": "interface",
+          "signature": "interface PreparedCloudArtifact",
+          "doc": null
+        },
+        {
+          "name": "readCloudArtifactShareToken",
+          "kind": "function",
+          "signature": "(token: string, secret: string) => Promise<string | null>",
+          "doc": "The share id a public link names, or null when its signature does not verify."
+        },
+        {
+          "name": "readCloudArtifactViewUrl",
+          "kind": "function",
+          "signature": "(url: URL, options: { secret: string; now?: (() => number) | undefined; }) => Promise<CloudArtifactView | null>",
+          "doc": "Read and verify a view URL on the artifact origin; null for anything forged, expired or malformed."
+        },
+        {
           "name": "refreshWorkspaceAppPreview",
           "kind": "function",
           "signature": "(app: WorkspaceAppRecord, link: WorkspaceAppPreviewLink, updatedAt?: string) => WorkspaceAppRecord",
           "doc": "Refresh delivery state without changing which sandbox service this app means."
+        },
+        {
+          "name": "resolveCloudArtifactReference",
+          "kind": "function",
+          "signature": "(reference: string, documentPath: string) => string | null",
+          "doc": "Resolve a document-relative reference to a bundle path, or null when it is not a local file."
+        },
+        {
+          "name": "storeCloudArtifact",
+          "kind": "function",
+          "signature": "(store: ObjectStore, workspaceId: string, prepared: PreparedCloudArtifact) => Promise<CloudArtifactVersion>",
+          "doc": "Store a prepared version's new bytes; objects already present are not rewritten."
         },
         {
           "name": "workspaceAppBuilderInstructions",
@@ -29146,6 +29374,50 @@
           "kind": "interface",
           "signature": "interface WorkspaceAppRecord",
           "doc": "A sandbox app registered in one product workspace."
+        }
+      ]
+    },
+    {
+      "id": "./workspace-apps/react",
+      "source": "src/workspace-apps/react.tsx",
+      "dependsOn": [
+        "crypto",
+        "object-store",
+        "teams",
+        "tools",
+        "web-react"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "CLOUD_ARTIFACT_FRAME_SANDBOX",
+          "kind": "const",
+          "signature": "\"allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads\"",
+          "doc": "The iframe sandbox for an artifact frame; never add `allow-same-origin`."
+        },
+        {
+          "name": "CloudArtifactFrame",
+          "kind": "function",
+          "signature": "({ src, title, className }: { src: string; title: string; className?: string | undefined; }) => Element",
+          "doc": "Render a cloud artifact from its view URL on the artifact origin."
+        },
+        {
+          "name": "CloudArtifactPublicLink",
+          "kind": "interface",
+          "signature": "interface CloudArtifactPublicLink",
+          "doc": "A live public link to one artifact."
+        },
+        {
+          "name": "CloudArtifactSharePanel",
+          "kind": "function",
+          "signature": "({ link: initial, canShare, onCreate, onRevoke }: CloudArtifactSharePanelProps) => Element",
+          "doc": "Turn an artifact's public link on, copy it, or turn it off."
+        },
+        {
+          "name": "CloudArtifactSharePanelProps",
+          "kind": "interface",
+          "signature": "interface CloudArtifactSharePanelProps",
+          "doc": null
         }
       ]
     },

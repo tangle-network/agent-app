@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_137 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_138 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -138,7 +138,8 @@ _137 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
-| [`./workspace-apps`](api/workspace-apps.md) | 17 | — |
+| [`./workspace-apps`](api/workspace-apps.md) | 54 | `crypto`, `object-store`, `teams`, `tools`, `web-react` |
+| [`./workspace-apps/react`](api/workspace-apps-react.md) | 5 | `crypto`, `object-store`, `teams`, `tools`, `web-react` |
 | [`./workspace-export`](api/workspace-export.md) | 44 | `object-store` |
 | [`./workspace-export/react`](api/workspace-export-react.md) | 5 | `object-store` |
 | [`./workspace-react`](api/workspace-react.md) | 28 | `session-shell`, `web-react`, `workspace-apps` |
@@ -1356,11 +1357,23 @@ Depends on: `web-react`, `work-product`
 
 ## `./workspace-apps`
 
-Source: `src/workspace-apps/index.ts` · 17 exports
+Source: `src/workspace-apps/index.ts` · 54 exports
 
-`confirmWorkspaceAppReady`, `createWorkspaceAppDataClient`, `createWorkspaceAppDataHost`, `refreshWorkspaceAppPreview`, `workspaceAppBuilderInstructions`, `WorkspaceAppBuilderInstructionsOptions`, `WorkspaceAppDataClient`, `WorkspaceAppDataClientOptions`, `WorkspaceAppDataConflict`, `WorkspaceAppDataEntry`, `WorkspaceAppDataHost`, `WorkspaceAppDataHostOptions`, `workspaceAppFromPreviewLink`, `WorkspaceAppHttpProof`, `WorkspaceAppIdentity`, `WorkspaceAppPreviewLink`, `WorkspaceAppRecord`
+Depends on: `crypto`, `object-store`, `teams`, `tools`, `web-react`
+
+`CLOUD_ARTIFACT_FRAME_SANDBOX`, `CLOUD_ARTIFACT_MAX_BYTES`, `CLOUD_ARTIFACT_MAX_FILE_BYTES`, `CLOUD_ARTIFACT_MAX_FILES`, `CLOUD_ARTIFACT_SCRIPT_HOSTS`, `CLOUD_ARTIFACT_SHARE_ROLE`, `CLOUD_ARTIFACT_VIEW_TTL_MS`, `CLOUD_ARTIFACT_WORKER_MODULE`, `cloudArtifactContentSecurityPolicy`, `cloudArtifactContentType`, `CloudArtifactError`, `CloudArtifactErrorCode`, `CloudArtifactFile`, `CloudArtifactGrant`, `CloudArtifactInputFile`, `CloudArtifactKind`, `cloudArtifactObjectKey`, `CloudArtifactOriginOptions`, `CloudArtifactRecord`, `cloudArtifactReferences`, `CloudArtifactVersion`, `CloudArtifactView`, `CloudArtifactWorkerCode`, `CloudArtifactWorkerLoader`, `cloudArtifactWorkspacePrefix`, `collectCloudArtifactBundle`, `confirmWorkspaceAppReady`, `createCloudArtifactId`, `createCloudArtifactOrigin`, `createCloudArtifactShareToken`, `createCloudArtifactViewUrl`, `createWorkspaceAppDataClient`, `createWorkspaceAppDataHost`, `isCloudArtifactPath`, `prepareCloudArtifact`, `PreparedCloudArtifact`, `readCloudArtifactShareToken`, `readCloudArtifactViewUrl`, `refreshWorkspaceAppPreview`, `resolveCloudArtifactReference`, `storeCloudArtifact`, `workspaceAppBuilderInstructions`, `WorkspaceAppBuilderInstructionsOptions`, `WorkspaceAppDataClient`, `WorkspaceAppDataClientOptions`, `WorkspaceAppDataConflict`, `WorkspaceAppDataEntry`, `WorkspaceAppDataHost`, `WorkspaceAppDataHostOptions`, `workspaceAppFromPreviewLink`, `WorkspaceAppHttpProof`, `WorkspaceAppIdentity`, `WorkspaceAppPreviewLink`, `WorkspaceAppRecord`
 
 [Full API →](api/workspace-apps.md)
+
+## `./workspace-apps/react`
+
+Source: `src/workspace-apps/react.tsx` · 5 exports
+
+Depends on: `crypto`, `object-store`, `teams`, `tools`, `web-react`
+
+`CLOUD_ARTIFACT_FRAME_SANDBOX`, `CloudArtifactFrame`, `CloudArtifactPublicLink`, `CloudArtifactSharePanel`, `CloudArtifactSharePanelProps`
+
+[Full API →](api/workspace-apps-react.md)
 
 ## `./workspace-export`
 
