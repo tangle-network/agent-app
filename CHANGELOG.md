@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.197
+
+- feat(workspace-apps): cloud artifacts that open while the box sleeps (#1153)
+
 ## 0.60.196
 
 - feat(operator): turns.cancel stops a running turn (#1152)
