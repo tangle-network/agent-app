@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.224
+
+- fix(deps): accept sandbox-ui 0.135 and 0.136 as the peer (#1183)
+
 ## 0.60.223
 
 - fix(router-turn): a Router turn rides out a Platform outage, keeps Gemini's long tool calls, falls back to GPT-6.1 Sol through Responses, and runs past 12 tool rounds (#1182)
