@@ -145,28 +145,41 @@ export function buildTurnTraceOtelSpans(snapshot: TurnTraceSnapshot, labels: Tur
 export interface IntelligenceTurnTraceSinkOptions {
   /** The Intelligence project the spans belong to, e.g. `legal-agent`. */
   project: string
-  /** The tenant key the ingest requires. Without one the sink does nothing. */
-  apiKey: string | undefined
+  /**
+   * The tenant key the ingest requires. Omit it: the sink reads the Sandbox product key from `SANDBOX_API_KEY`, the
+   * platform key the ingest verifies. A Worker's `TANGLE_API_KEY` is a Router key and gets 401 (Legal #468, 2026-10-19).
+   */
+  apiKey?: string
   /** Default `https://intelligence.tangle.tools`; spans go to `<base>/v1/otlp/v1/traces`. */
   baseUrl?: string
-  /** Called with a short reason when a delivery fails. Never receives span content. */
+  /** Called with a short reason when a delivery fails. Never receives span content. Default: a console warning. */
   onError?: (reason: string) => void
   /** Milliseconds one POST may take (default 5000). */
   timeoutMs?: number
 }
 
 const DEFAULT_INTELLIGENCE_BASE_URL = 'https://intelligence.tangle.tools'
+/** The key the ingest verifies when the host passes none. Read per delivery: a Worker's env is not populated at module scope. */
+const INGEST_KEY_ENV = 'SANDBOX_API_KEY'
 const SCOPE = { name: '@tangle-network/agent-app', version: 'turn-trace' }
 
 /**
  * The sink a chat route or a Worker turn hands each finished trace to: one OTLP POST per turn, awaited, so a host that
- * runs it under `waitUntil` keeps the isolate alive until delivery. It never throws; a failure goes to `onError`.
+ * runs it under `waitUntil` keeps the isolate alive until delivery. It never throws; every failure, including a missing
+ * key and a non-2xx answer, goes to `onError` (a console warning by default), because a silent sink hid Legal's 401s.
  */
 export function createIntelligenceTurnTraceSink(options: IntelligenceTurnTraceSinkOptions): TurnTraceSink {
   const url = `${(options.baseUrl ?? DEFAULT_INTELLIGENCE_BASE_URL).replace(/\/+$/, '')}/v1/otlp/v1/traces`
-  const fail = (reason: string) => { try { options.onError?.(reason.slice(0, 200)) } catch { /* telemetry only */ } }
+  const report = options.onError ?? ((reason: string) => console.warn(`[turn-trace] export failed: ${reason}`))
+  const fail = (reason: string) => { try { report(reason.slice(0, 200)) } catch { /* telemetry only */ } }
+  let missingKeyReported = false
   return async (snapshot, labels) => {
-    if (!options.apiKey) return
+    const apiKey = options.apiKey?.trim() || (typeof process === 'undefined' ? undefined : process.env?.[INGEST_KEY_ENV]?.trim())
+    if (!apiKey) {
+      if (!missingKeyReported) fail(`no ingest key: set ${INGEST_KEY_ENV} or pass apiKey`)
+      missingKeyReported = true
+      return
+    }
     try {
       const body = {
         resourceSpans: [{
@@ -176,7 +189,7 @@ export function createIntelligenceTurnTraceSink(options: IntelligenceTurnTraceSi
       }
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${options.apiKey}` },
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(options.timeoutMs ?? 5_000),
       })

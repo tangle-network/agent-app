@@ -142,6 +142,24 @@ function assertGeneratedWorkerDefaults(project, env) {
   run(process.execPath, ['--input-type=module', '--eval', source], { cwd: project, env })
 }
 
+// The chat scaffold carries every agent-app default a new app can have today: the report fails on any row that is
+// not in place or exempted with a reason in its signoff.config.mjs. The pin is the one row skipped: this test installs
+// the packed tarball with a `file:` range. It reads the built Worker, so it runs after the build.
+function assertGeneratedAppDefaults(project, env) {
+  run('git', ['init', '-q'], { cwd: project, env })
+  run('git', ['add', '-A'], { cwd: project, env })
+  const rows = join(project, '.app-defaults.json')
+  run('pnpm', ['exec', 'agent-app-signoff', 'defaults', '--json', rows], { cwd: project, env })
+  const [app] = JSON.parse(readFileSync(rows, 'utf8')).apps
+  rmSync(rows)
+  const missing = app.rows.filter((row) => !['pin', 'tool-count'].includes(row.id) && !['ok', 'exempt', 'na'].includes(row.status))
+  if (missing.length > 0) {
+    throw new Error(`generated chat app lacks agent-app defaults: ${missing.map((row) => `${row.label} (${row.status}: ${row.detail})`).join('; ')}`)
+  }
+  const deploy = JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')).scripts?.deploy
+  if (!/\bsignoff\b/.test(deploy ?? '')) throw new Error(`generated chat deploy script does not run signoff: ${deploy}`)
+}
+
 function assertToolVersions(env) {
   const npmPackage = JSON.parse(readFileSync(npmPackagePath, 'utf8'))
   assertEqual(npmPackage.version, NPM_VERSION, 'installed npm package version')
@@ -260,6 +278,7 @@ function installAndRunScaffolder({
   )
   assertGeneratedWorkerDefaults(project, env)
   if (variant === 'chat') {
+    assertGeneratedAppDefaults(project, env)
     const html = readFileSync(join(project, 'dist/client/index.html'), 'utf8')
     if (html.includes('/main.tsx') || !/assets\/[^"']+\.js/.test(html) || !/assets\/[^"']+\.css/.test(html)) {
       throw new Error('Chat build did not emit compiled JavaScript and standalone CSS')

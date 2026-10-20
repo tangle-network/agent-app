@@ -11,7 +11,7 @@ Every agent app holds nine invariants before launch. Each is a failure GTM shipp
 | `coalesced-events` | The recorded long turn stores at most 5,000 events | the turn buffer (`/stream`) | `checkCoalescedTurn` |
 | `auth-survives-d1-stall` | A key or session verified within 60 s keeps working while D1 errors or stalls; never past revoke or expiry; cache keys are SHA-256 | `createAuthLookupCache`, `credentialCacheKey` | `checkAuthSurvivesStall` |
 | `authorize-before-stream` | A refused request gets a plain 4xx; no stream opens and no state is touched first | `createChatTurnRoutes` (`/chat-routes`) | `checkAuthorizeBeforeStream` |
-| `limit-alarms` | Worker memory, D1 rows per query, sandbox disk, snapshot count and key rate alarm at 80% of a declared limit | `createLimitAlarms`, `withD1LimitAlarms` | `checkLimitAlarms` |
+| `limit-alarms` | Worker memory, D1 rows per query, sandbox disk, snapshot count and key rate alarm at 80% of a declared limit | `createProductLimitAlarms`, `withD1LimitAlarms` | `checkLimitAlarms` |
 | `pasted-code-reaches-chat` | An authenticated chat message carrying pasted code (shell, SQL, markup) gets the route's normal response; no app filter, sanitizer or edge rule refuses it | `PASTED_CODE_SAMPLES`, `isEdgeBlock` | `checkChatAcceptsCode` |
 
 The runtime pieces are server-safe. The checks are in `@tangle-network/agent-app/launch-invariants/testing`, which uses Node built-ins and belongs in tests only.
@@ -127,7 +127,7 @@ Pass the app's mounted route handler and requests it must refuse (no session, an
 
 ### Limit alarms
 
-Declare a limit for each of the five resources and build alarms with `createLimitAlarms` over the app's alert sink, wrapped in `createThrottledAlertSink` from `/turn-health`. Wrap the Worker's D1 binding with `withD1LimitAlarms` to observe rows read and response size per query. Read sandbox disk and snapshot count from the Sandbox SDK on a schedule, and the per-key request rate where the operator API counts it. workerd exposes no heap reading, so Worker memory is observed through response sizes, plus a tail consumer reporting `exceededMemory` at the full limit.
+Build the app's alarms with `createProductLimitAlarms({ product, webhookUrl, overrides })`: every resource starts from the budgets in `LAUNCH_BUDGETS` (128 MB Worker memory, 250,000 D1 rows per query, a 10 GB box disk, 25 snapshots, 60 key requests per minute), the alerts go to the console and the ops webhook, and one resource pages once every six hours. Pass `overrides` only for a limit the product measured differently (GTM's larger box disk); a product that needs another alert transport passes `sink`, and `createLimitAlarms` takes explicit budgets. Wrap the Worker's D1 binding with `withD1LimitAlarms` to observe rows read and response size per query. Read sandbox disk and snapshot count from the Sandbox SDK on a schedule, and the per-key request rate where the operator API counts it. workerd exposes no heap reading, so Worker memory is observed through response sizes, plus a tail consumer reporting `exceededMemory` at the full limit.
 
 `checkLimitAlarms` builds the app's alarms over a capturing sink and checks each resource: silent at 79%, a warning at 80%, critical at the limit, and no declared limit above the platform's.
 

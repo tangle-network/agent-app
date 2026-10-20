@@ -32,6 +32,9 @@ export interface AppEnv {
   /** Tangle Router base URL; omit for the platform default. */
   TANGLE_ROUTER_URL?: string
 
+  /** Ops webhook for platform-limit alarms; without it they go to the Worker log only. */
+  SLACK_OPS_WEBHOOK_URL?: string
+
   /** Sandbox gateway credentials. Without them every turn fails loud with a
    *  clear error — there is no mock fallback. */
   SANDBOX_API_KEY?: string

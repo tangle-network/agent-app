@@ -61,6 +61,8 @@ export {
 } from './schedule.js'
 export {
   createLimitAlarms,
+  createProductLimitAlarms,
+  DEFAULT_LIMIT_BUDGETS,
   estimatedBytes,
   LIMIT_RESOURCES,
   withD1LimitAlarms,
@@ -70,6 +72,7 @@ export {
   type LimitLevel,
   type LimitObservation,
   type LimitResource,
+  type ProductLimitAlarmOptions,
 } from './limit-alarms.js'
 export {
   checkSettlementScenarios,

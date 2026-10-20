@@ -37,6 +37,12 @@ Omit controls without real product data and callbacks.
 The upload adapter preserves inline/sandbox `parts`; it is not the store-backed attachment contract.
 Keep browser DOM types separate from Worker types and scan installed UI package classes in the CSS build.
 
+## Defaults
+
+This app inherits agent-app's defaults: a trace per turn sent to Intelligence, limit alarms on D1, and the shared Worker settings.
+`pnpm signoff` runs the checks in `signoff.config.mjs` and reports which defaults the app has (`agent-app-signoff defaults` prints the same report alone).
+Turn a default off only with an exemption and its reason in `signoff.config.mjs`; the prewarm and placement exemptions there are temporary.
+
 ## Verification
 
 Run `pnpm build` and `pnpm test`.

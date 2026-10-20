@@ -27,6 +27,7 @@ import type { peekWorkspaceSandbox } from '@tangle-network/agent-app/sandbox'
 import { config } from '../agent.config'
 import { buildChatApp, type ChatApp } from './chat'
 import type { AppEnv } from './env'
+import { withLimitAlarms } from './limit-alarms'
 import {
   buildGatewayApp,
   type GatewayAppOptions,
@@ -82,7 +83,8 @@ export function createWorker(assembly: WorkerAssembly = defaultAssembly): Export
   }
 
   return {
-    async fetch(request: Request, env: AppEnv, ctx: ExecutionContext): Promise<Response> {
+    async fetch(request: Request, rawEnv: AppEnv, ctx: ExecutionContext): Promise<Response> {
+      const env = withLimitAlarms(rawEnv)
       const surfaces = agentSurfaces(new URL(env.BETTER_AUTH_URL).origin, env.OPERATOR_RUN_ENABLED === 'true')
       const surface = surfaces.handle(request)
       if (surface) return surface

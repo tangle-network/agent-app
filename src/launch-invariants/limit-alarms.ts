@@ -16,7 +16,15 @@
  * - `sandbox-disk` and `snapshot-count`: the Sandbox SDK's box usage and snapshot list, read on a schedule.
  * - `key-rate`: the per-key request counter the operator API keeps.
  */
-import type { AlertSink, TurnHealthAlert } from '../turn-health/sink.js'
+import {
+  createConsoleAlertSink,
+  createMemoryThrottleStore,
+  createMultiAlertSink,
+  createThrottledAlertSink,
+  createWebhookAlertSink,
+  type AlertSink,
+  type TurnHealthAlert,
+} from '../turn-health/sink.js'
 import { LAUNCH_BUDGETS } from './catalog.js'
 
 export type LimitResource = 'worker-memory' | 'd1-rows-per-query' | 'sandbox-disk' | 'snapshot-count' | 'key-rate'
@@ -106,6 +114,39 @@ export function createLimitAlarms(options: LimitAlarmOptions): LimitAlarms {
 function formatAmount(value: number, resource: LimitResource): string {
   if (UNITS[resource] === 'bytes') return `${(value / (1024 * 1024)).toFixed(1)} MB`
   return Math.round(value).toLocaleString('en-US')
+}
+
+/** The budgets every product starts from: {@link LAUNCH_BUDGETS}' platform limits. */
+export const DEFAULT_LIMIT_BUDGETS: LimitBudgets = {
+  'worker-memory': LAUNCH_BUDGETS.workerMemoryBytes,
+  'd1-rows-per-query': LAUNCH_BUDGETS.d1RowsPerQuery,
+  'sandbox-disk': LAUNCH_BUDGETS.sandboxDiskBytes,
+  'snapshot-count': LAUNCH_BUDGETS.snapshotCount,
+  'key-rate': LAUNCH_BUDGETS.keyRatePerMinute,
+}
+
+export interface ProductLimitAlarmOptions {
+  /** The product's name in alerts, e.g. `legal`. */
+  product: string
+  /** The ops webhook; without one alarms go to the console only. */
+  webhookUrl?: string
+  /** The few budgets this product measured differently, e.g. a larger sandbox disk. */
+  overrides?: Partial<LimitBudgets>
+  /** Replace the default console-and-webhook sink (tests, or an app with its own alert transport). */
+  sink?: AlertSink
+}
+
+/**
+ * A product's limit alarms with every default in place: {@link DEFAULT_LIMIT_BUDGETS}, the console and optional webhook
+ * sink, and one page per resource every {@link LAUNCH_BUDGETS.alarmRepeatHours} hours. A product passes only what it
+ * measured differently; Legal, Creative, Tax and GTM each kept a 40-line copy of this before.
+ */
+export function createProductLimitAlarms(options: ProductLimitAlarmOptions): LimitAlarms {
+  const sink = options.sink ?? createThrottledAlertSink(createMultiAlertSink([
+    createConsoleAlertSink((message) => console.error(message)),
+    ...(options.webhookUrl ? [createWebhookAlertSink({ webhookUrl: options.webhookUrl })] : []),
+  ]), { store: createMemoryThrottleStore(), windowMs: LAUNCH_BUDGETS.alarmRepeatHours * 60 * 60 * 1000 })
+  return createLimitAlarms({ product: options.product, budgets: { ...DEFAULT_LIMIT_BUDGETS, ...options.overrides }, sink })
 }
 
 /** The D1 surface the wrapper measures; Cloudflare `D1Database` satisfies it. */

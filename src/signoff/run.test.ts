@@ -139,7 +139,7 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
     const report = await runSignoff({ repoDir: repo, cacheDir: temp('signoff-cache-'), source: 'head' })
 
     expect(report.ok).toBe(true)
-    expect(report.steps.map((step) => step.name)).toEqual(['committed config', 'worker defaults'])
+    expect(report.steps.map((step) => step.name)).toEqual(['committed config', 'worker defaults', 'agent-app defaults'])
     expect(report.configOrigin).toEqual({ kind: 'file', path: join(report.workspace, 'signoff.config.mjs') })
   })
 
@@ -163,7 +163,7 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
     const report = await runSignoff({ repoDir: repo, cacheDir: temp('signoff-cache-'), source: 'head' })
 
     expect(report.ok).toBe(true)
-    expect(report.steps.map((step) => step.name)).toEqual(['committed package config', 'worker defaults'])
+    expect(report.steps.map((step) => step.name)).toEqual(['committed package config', 'worker defaults', 'agent-app defaults'])
     expect(report.configOrigin).toEqual({ kind: 'package-json', path: join(report.workspace, 'package.json') })
   })
 
