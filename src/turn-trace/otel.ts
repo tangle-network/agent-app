@@ -48,6 +48,7 @@ const ROOT_MEASUREMENTS: ReadonlySet<string> = new Set([
   'tangle.turn.coverage_pct',
   'tangle.turn.uncovered_ms',
   'tangle.turn.largest_gap_ms',
+  'tangle.turn.first_visible_ms',
   'tangle.turn.first_text_ms',
   ...TURN_SPAN_KINDS.map((kind) => `tangle.turn.${kind}_ms`),
 ])
@@ -103,6 +104,7 @@ export function buildTurnTraceOtelSpans(snapshot: TurnTraceSnapshot, labels: Tur
     'tangle.turn.spans': summary.spans,
     'tangle.turn.model_calls': summary.modelCalls,
     'tangle.turn.tool_calls': summary.toolCalls,
+    ...(summary.firstVisibleMs === undefined ? {} : { 'tangle.turn.first_visible_ms': summary.firstVisibleMs }),
     ...(summary.firstTextMs === undefined ? {} : { 'tangle.turn.first_text_ms': summary.firstTextMs }),
     ...(summary.d1Queries === undefined ? {} : { 'tangle.turn.d1_queries': summary.d1Queries }),
     ...(summary.dropped ? { 'tangle.turn.spans_dropped': summary.dropped } : {}),

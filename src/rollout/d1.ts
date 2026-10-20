@@ -4,7 +4,7 @@
  * from those rows.
  *
  * Record from the chat route's lifecycle (`onTurnComplete` / `onTurnError`
- * carry `firstTextMs` and `durationMs`), then serve `measureStage` behind an
+ * carry `firstVisibleMs`, `firstTextMs` and `durationMs`), then serve `measureStage` behind an
  * operator endpoint that the deploy's `rollout.config.mjs` calls. A stage is
  * measured on the turns of the workspaces it admits, in the lane being rolled
  * out, since the time it went live.
@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS rollout_turn_timing (
   rollout TEXT NOT NULL,
   workspace_id TEXT NOT NULL,
   lane TEXT NOT NULL,
+  first_visible_ms INTEGER,
   first_text_ms INTEGER,
   settled_ms INTEGER NOT NULL,
   failed INTEGER NOT NULL CHECK (failed IN (0, 1)),
@@ -35,6 +36,10 @@ CREATE TABLE IF NOT EXISTS rollout_turn_timing (
 );
 CREATE INDEX IF NOT EXISTS rollout_turn_timing_by_lane ON rollout_turn_timing (rollout, lane, at);
 `
+
+/** Apply once through the product migration runner to existing tables; historical rows stay NULL. */
+export const ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL =
+  `ALTER TABLE rollout_turn_timing ADD COLUMN first_visible_ms INTEGER;`
 
 export interface TurnTimingRow {
   turnId: string
@@ -45,6 +50,8 @@ export interface TurnTimingRow {
   lane: string
   /** From the lifecycle's `firstTextMs`; absent when no word streamed. */
   firstTextMs?: number
+  /** From the lifecycle firstVisibleMs; absent when no reasoning, tool or answer streamed. */
+  firstVisibleMs?: number
   settledMs: number
   failed: boolean
   failureCode?: string
@@ -61,10 +68,13 @@ function percentile(sorted: readonly number[], p: number): number | null {
 }
 
 /** Stage metrics from turn rows: first-words and settled percentiles in ms, and the failure rate. */
-export function stageMetrics(rows: ReadonlyArray<Pick<TurnTimingRow, 'firstTextMs' | 'settledMs' | 'failed'>>) {
+export function stageMetrics(rows: ReadonlyArray<Pick<TurnTimingRow, 'firstVisibleMs' | 'firstTextMs' | 'settledMs' | 'failed'>>) {
+  const firstVisible = rows.flatMap(row => row.firstVisibleMs == null ? [] : [row.firstVisibleMs]).sort((a, b) => a - b)
   const firstWords = rows.flatMap(row => row.firstTextMs === undefined || row.firstTextMs === null ? [] : [row.firstTextMs]).sort((a, b) => a - b)
   const settled = rows.filter(row => !row.failed).map(row => row.settledMs).sort((a, b) => a - b)
   return {
+    first_visible_p50_ms: percentile(firstVisible, 50),
+    first_visible_p90_ms: percentile(firstVisible, 90),
     first_words_p50_ms: percentile(firstWords, 50),
     first_words_p90_ms: percentile(firstWords, 90),
     settled_p50_ms: percentile(settled, 50),
@@ -82,9 +92,10 @@ export function createD1TurnTimingStore(options: { db: D1LikeForRollout; now?: (
       try {
         await options.db.prepare(
           `INSERT OR IGNORE INTO rollout_turn_timing
-             (turn_id, rollout, workspace_id, lane, first_text_ms, settled_ms, failed, failure_code, at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (turn_id, rollout, workspace_id, lane, first_visible_ms, first_text_ms, settled_ms, failed, failure_code, at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).bind(row.turnId, row.rollout, row.workspaceId, row.lane,
+          row.firstVisibleMs === undefined ? null : Math.round(row.firstVisibleMs),
           row.firstTextMs === undefined ? null : Math.round(row.firstTextMs), Math.round(row.settledMs),
           row.failed ? 1 : 0, row.failureCode ?? null, row.at ?? now()).run()
       } catch (error) {
@@ -97,14 +108,14 @@ export function createD1TurnTimingStore(options: { db: D1LikeForRollout; now?: (
      *  workspace creation time, so a workspace admitted only by a `new-since:` entry is not counted. */
     async measureStage(input: { rollout: string; stage: RolloutStage; lane: string; since: number }): Promise<StageMeasurement> {
       const { results = [] } = await options.db.prepare(
-        `SELECT workspace_id, first_text_ms, settled_ms, failed FROM rollout_turn_timing
+        `SELECT workspace_id, first_visible_ms, first_text_ms, settled_ms, failed FROM rollout_turn_timing
           WHERE rollout = ? AND lane = ? AND at >= ? ORDER BY at DESC LIMIT ?`,
       ).bind(input.rollout, input.lane, input.since, MEASURE_ROW_LIMIT).all<{
-        workspace_id: string; first_text_ms: number | null; settled_ms: number; failed: number
+        workspace_id: string; first_visible_ms: number | null; first_text_ms: number | null; settled_ms: number; failed: number
       }>()
       const rows = results
         .filter(row => rolloutAdmits(input.stage.value, { id: row.workspace_id }))
-        .map(row => ({ firstTextMs: row.first_text_ms ?? undefined, settledMs: row.settled_ms, failed: row.failed === 1 }))
+        .map(row => ({ firstVisibleMs: row.first_visible_ms ?? undefined, firstTextMs: row.first_text_ms ?? undefined, settledMs: row.settled_ms, failed: row.failed === 1 }))
       return {
         stage: input.stage.name,
         samples: rows.length,
