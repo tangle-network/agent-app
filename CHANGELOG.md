@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.222
+
+- feat(chat-routes): the hybrid turn is the default: Router first, one box start shared by admission, the speculator and sandbox_run (#1181)
+
 ## 0.60.221
 
 - feat(turn-trace): every chat turn exports its trace by default, a handed-off turn included (#1180)
