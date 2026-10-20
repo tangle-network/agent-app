@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.212
+
+- fix(copy-quality): catch measured reveals and permission closers (#1172)
+
 ## 0.60.211
 
 - perf(turn-stream): keep thread locks on the workspace channel (#1170)
