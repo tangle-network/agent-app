@@ -17,6 +17,7 @@ agent-app-signoff defaults --no-bundle --json matrix.json
 |---|---|---|
 | agent-app pin | the pinned version is at or above every outcome's floor (`AGENT_APP_OUTCOME_FLOORS`: turn trace 0.60.199, first text 0.60.203, default turn trace 0.60.221) | `package.json` |
 | turn trace | the app uses `createChatTurnRoutes` at agent-app 0.60.221 or later (it exports every turn by default, a turn handed to `handoffCompletion` included), or wires a sink (`createIntelligenceTurnTraceSink`, or a `turnTrace: { sink }`); with `--probe`, Intelligence also holds a turn from the last 30 days. An app that passes `handoffCompletion` below 0.60.221 is a gap: nothing exports its handed-off turns. A sink that exports with an explicit `TANGLE_API_KEY` reads `?` until `--probe` shows an accepted turn: the ingest refused Legal's Worker key (HTTP 401, #468) and accepts Hospitality's | source, Intelligence |
+| first visible | latency headline: the turn owner marks reasoning, tool activity or answer output (`createChatTurnRoutes`, or `trace.markFirstVisible()`) and the trace is on | source + last export |
 | first text | the turn owner marks it (`createChatTurnRoutes` from 0.60.203, or `trace.markFirstText()` in a Durable Object turn) and the trace is on | source |
 | prewarm route | the app mounts `createWorkspacePrewarmRoute`; a local route named prewarm is a local copy | source |
 | placement | a Wrangler `[placement]` names a `region` or `host`; smart placement does not pin | Wrangler config |
@@ -42,5 +43,5 @@ export default {
 }
 ```
 
-An exemption may name `turn-trace`, `first-text`, `prewarm`, `placement` or `limit-alarms`; a reason shorter than eight characters is a configuration error.
+An exemption may name `turn-trace`, `first-visible`, `first-text`, `prewarm`, `placement` or `limit-alarms`; a reason shorter than eight characters is a configuration error.
 Passing `turnTrace: false` to `createChatTurnRoutes` is an opt-out too, and it fails the step until its exemption carries a reason.

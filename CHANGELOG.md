@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.227
+
+- feat(chat): headline time to first visible output
+
 ## 0.60.226
 
 - perf(web): allow coarse rate counters to persist through request lifetime (#1185)

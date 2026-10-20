@@ -13,7 +13,9 @@
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createRouterTurnProducer } from '../../src/chat-routes/index'
+import { createChatTurnRoutes, createRouterTurnProducer } from '../../src/chat-routes/index'
+import { createMemoryTurnEventStore } from '../../src/stream/index'
+import { buildTurnTraceOtelSpans, type TurnTraceSnapshot } from '../../src/turn-trace/index'
 import { runRouterTurn } from '../../src/runtime/router-turn'
 
 const THINK_MS = 400
@@ -84,6 +86,37 @@ describe('Router reasoning release', () => {
     expect(arrivals.filter((event) => event.type === 'text').map((event) => event.text).join('')).toBe('Four rooms are ready.')
     const parts = producer.assistantParts!()
     expect(parts.find((part) => part.type === 'reasoning')).toMatchObject({ text: expect.stringContaining('Counting rooms') })
+  })
+
+  it('records reasoning-first latency separately in the lifecycle and exported root span', async () => {
+    let snapshot: TurnTraceSnapshot | undefined
+    let timing: { firstVisibleMs?: number; firstTextMs?: number } | undefined
+    const pending: Promise<unknown>[] = []
+    const routes = createChatTurnRoutes<Record<string, never>>({
+      projectId: 'reasoning-timing',
+      authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'u-1', context: {} }),
+      store: { async listMessages() { return [] }, async appendMessage() { return { id: 'm-1' } } },
+      turnStore: createMemoryTurnEventStore(), incrementalPersistence: false, log: () => {},
+      turnTrace: { sink: done => { snapshot = done } },
+      lifecycle: { onTurnComplete: info => { timing = info } },
+      produce: ({ trace }) => createRouterTurnProducer({
+        apiKey: 'k', model: 'gemini-3.7-flash', baseUrl: router.url,
+        systemPrompt: 's', userMessage: 'How many rooms?', trace,
+      }),
+    })
+    const response = await routes.turn(new Request('http://app.test/api/chat', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ threadId: 'timing', content: 'How many rooms?' }),
+    }), { waitUntil: promise => { pending.push(promise) } })
+    expect(await response.text()).toContain('Counting rooms')
+    await Promise.all(pending)
+    expect(timing?.firstVisibleMs).toBeGreaterThanOrEqual(0)
+    expect(timing!.firstTextMs! - timing!.firstVisibleMs!).toBeGreaterThanOrEqual(THINK_MS - 50)
+    const summary = snapshot!.summary
+    expect(summary.firstTextMs! - summary.firstVisibleMs!).toBeGreaterThanOrEqual(THINK_MS - 50)
+    const root = buildTurnTraceOtelSpans(snapshot!)[0]!
+    expect(root.attributes.find(attr => attr.key === 'tangle.turn.first_visible_ms')?.value).toEqual({ doubleValue: summary.firstVisibleMs })
+    expect(root.attributes.find(attr => attr.key === 'tangle.turn.first_text_ms')?.value).toEqual({ doubleValue: summary.firstTextMs })
   })
 
   it('sends no gateway option without onEvent, without showReasoning, or with the repeat off', async () => {

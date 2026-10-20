@@ -464,6 +464,8 @@ interface ChatTurnLifecycleBase<TContext> {
 }
 /** When the turn's first visible word streamed, measured from `onTurnStart`. Absent when no word streamed. */
 interface ChatTurnLifecycleTiming {
+  /** First reasoning, tool activity or answer output, measured from onTurnStart. */
+  firstVisibleMs?: number
   firstTextMs?: number
   /** Where the turn's wall time went: its share inside named spans and the time per kind of span. */
   trace?: TurnTraceSummary
@@ -922,6 +924,20 @@ function isVisibleText(event: ChatRouteEvent): boolean {
   const part = event.data?.part as { type?: unknown } | undefined
   const delta = event.data?.delta
   return part?.type === 'text' && typeof delta === 'string' && delta.trim().length > 0
+}
+
+/** Output rendered by either lane; admission/status/usage events are not model output. */
+function isVisibleOutput(event: ChatRouteEvent): boolean {
+  if (isVisibleText(event)) return true
+  const value = event as ChatRouteEvent & { text?: unknown }
+  if (event.type === 'reasoning') return typeof value.text === 'string' && value.text.trim().length > 0
+  if (event.type === 'tool_call' || event.type === 'tool.call' || event.type === 'tool_result' || event.type === 'tool.result' || event.type === 'tool.event') return true
+  if (event.type !== 'message.part.updated') return false
+  const part = event.data?.part as { type?: unknown; text?: unknown } | undefined
+  if (part?.type === 'tool') return true
+  if (part?.type !== 'reasoning' && part?.type !== 'text') return false
+  const text = event.data?.delta ?? part.text
+  return typeof text === 'string' && text.trim().length > 0
 }
 
 // ── producer-stream wrappers (heartbeat + raw tap) ───────────────────────────
@@ -1469,7 +1485,8 @@ export function createChatTurnRoutes<TContext = void>(
     // when no drain throw supplies a richer cause.
     let lastFailureData: Record<string, unknown> | undefined
     let turnStartedAtMs = 0
-    // The first visible word, the number a rollout's first-words kill line reads.
+    let firstVisibleAtMs: number | undefined
+    // Answer text stays separate from reasoning and tools.
     let firstTextAtMs: number | undefined
     let turnStarted = false
     let lifecycleSettled = false
@@ -1535,6 +1552,7 @@ export function createChatTurnRoutes<TContext = void>(
       const lifecycle = options.lifecycle
       const durationMs = Date.now() - turnStartedAtMs
       const timing = {
+        ...(firstVisibleAtMs === undefined ? {} : { firstVisibleMs: firstVisibleAtMs - turnStartedAtMs }),
         ...(firstTextAtMs === undefined ? {} : { firstTextMs: firstTextAtMs - turnStartedAtMs }),
         trace: snapshot.summary,
       }
@@ -1788,6 +1806,10 @@ export function createChatTurnRoutes<TContext = void>(
             finalText: () => producer?.finalText() ?? '',
           }),
           onEvent: async (event) => {
+            if (firstVisibleAtMs === undefined && isVisibleOutput(event)) {
+              firstVisibleAtMs = Date.now()
+              trace.markFirstVisible(firstVisibleAtMs)
+            }
             if (firstTextAtMs === undefined && isVisibleText(event)) {
               firstTextAtMs = Date.now()
               trace.markFirstText(firstTextAtMs)
