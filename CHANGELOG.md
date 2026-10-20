@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.214
+
+- perf(sandbox): a reuse reads its box by id and trusts a recent probe, egress read and env push; the lease and spend gate wait for a lifecycle step (#1175)
+- perf(chat-routes): afterAuthorize starts a turn's box and keys when the caller is admitted (#1174)
+
 ## 0.60.213
 
 - feat(chat-routes): lifecycle.afterSettle runs a turn's follow-up work once its row is saved and its lock is free (#1173)
