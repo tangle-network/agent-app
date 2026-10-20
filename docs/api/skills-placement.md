@@ -4,7 +4,7 @@
 
 Source: `src/skills-placement/index.ts`
 
-9 exports.
+10 exports.
 
 ### `ComposedSkills`
 
@@ -59,7 +59,15 @@ interface SkillSupportFile
 `function` — Inline file mounts placing a skill's support files beside its entry on `harness`: `<skillDir>/<skillId>/<path>`.
 
 ```ts
-(harness: Harness, skillId: string, files: readonly SkillSupportFile[]) => AgentProfileFileMount[]
+(harness: Harness, skillId: string, files: readonly SkillSupportFile[], options?: Pick<SkillSupportFileOptions, "resour…
+```
+
+### `SkillSupportFileOptions`
+
+`interface` — Optional naming and reconciliation policies for skill support files.
+
+```ts
+interface SkillSupportFileOptions
 ```
 
 ### `unsupportedSkillHarnesses`

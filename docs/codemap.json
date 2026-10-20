@@ -2487,6 +2487,7 @@
       "dependsOn": [
         "chat-store",
         "interactions",
+        "launch-invariants",
         "model-resolution",
         "plans",
         "policy-filters",
@@ -4977,7 +4978,7 @@
           "name": "CANVAS_MCP_TOOLS",
           "kind": "const",
           "signature": "McpToolDefinition<DesignCanvasMcpToolEnv>[]",
-          "doc": "Provide a collection of MCP tool definitions for manipulating and querying the design canvas environment"
+          "doc": null
         },
         {
           "name": "CHANNEL_PRESETS",
@@ -10312,10 +10313,22 @@
           "doc": "The minutes of the day (0–1439, UTC) a cron fires, or null when it does not fire every day (a day-of-month, month or weekday restriction) or cannot be read."
         },
         {
+          "name": "currentD1QueryCounter",
+          "kind": "function",
+          "signature": "() => D1QueryCounter | undefined",
+          "doc": "The current scope's counter, shared with the turn trace and product phase logs."
+        },
+        {
           "name": "D1_MAX_BOUND_PARAMETERS",
           "kind": "const",
           "signature": "100",
           "doc": "D1 binds at most 100 parameters to one query."
+        },
+        {
+          "name": "D1QueryCounter",
+          "kind": "interface",
+          "signature": "interface D1QueryCounter",
+          "doc": "Round trips: batch = 1; first/all/raw/run = 1 each, including failed calls."
         },
         {
           "name": "DEFAULT_LIMIT_BUDGETS",
@@ -10585,7 +10598,13 @@
           "name": "withD1LimitAlarms",
           "kind": "function",
           "signature": "<D extends D1Measurable>(d1: D, alarms: LimitAlarms, options?: { subject?: string | undefined; }) => D",
-          "doc": "The D1 binding with each query's rows read and response size observed."
+          "doc": "The D1 binding with each query's rows read and response size observed, and each round trip counted inside withD1QueryCount (chat routes scope it automatically)."
+        },
+        {
+          "name": "withD1QueryCount",
+          "kind": "function",
+          "signature": "<T>(work: () => T) => T",
+          "doc": "Run work in a fresh counter scope."
         },
         {
           "name": "WranglerCrons",
@@ -15487,6 +15506,12 @@
           "doc": "Minimal D1 surface (Cloudflare's `D1Database` satisfies it)."
         },
         {
+          "name": "ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL",
+          "kind": "const",
+          "signature": "\"ALTER TABLE rollout_turn_timing ADD COLUMN first_visible_ms INTEGER;\"",
+          "doc": "Apply once through the product migration runner to existing tables; historical rows stay NULL."
+        },
+        {
           "name": "ROLLOUT_TURN_TIMING_SCHEMA_SQL",
           "kind": "const",
           "signature": "\"\\nCREATE TABLE IF NOT EXISTS rollout_turn_timing (\\n turn_id TEXT PRIMARY KEY,\\n rollout TEXT NOT NULL,\\n workspace_id…",
@@ -15495,7 +15520,7 @@
         {
           "name": "stageMetrics",
           "kind": "function",
-          "signature": "(rows: readonly Pick<TurnTimingRow, \"failed\" | \"firstTextMs\" | \"settledMs\">[]) => { first_words_p50_ms: number | null;…",
+          "signature": "(rows: readonly Pick<TurnTimingRow, \"failed\" | \"firstVisibleMs\" | \"firstTextMs\" | \"settledMs\">[]) => { first_visible_p5…",
           "doc": "Stage metrics from turn rows: first-words and settled percentiles in ms, and the failure rate."
         },
         {
@@ -16882,7 +16907,7 @@
           "name": "peekWorkspaceSandbox",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; }) => Promise<PeekWorkspaceS…",
-          "doc": "Read-only twin of {@link ensureWorkspaceSandbox}: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything."
+          "doc": "Read-only twin of {@link ensureWorkspaceSandbox }: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything."
         },
         {
           "name": "PeekWorkspaceSandboxOutcome",
@@ -20899,8 +20924,14 @@
         {
           "name": "skillSupportFileMounts",
           "kind": "function",
-          "signature": "(harness: Harness, skillId: string, files: readonly SkillSupportFile[]) => AgentProfileFileMount[]",
+          "signature": "(harness: Harness, skillId: string, files: readonly SkillSupportFile[], options?: Pick<SkillSupportFileOptions, \"resour…",
           "doc": "Inline file mounts placing a skill's support files beside its entry on `harness`: `<skillDir>/<skillId>/<path>`."
+        },
+        {
+          "name": "SkillSupportFileOptions",
+          "kind": "interface",
+          "signature": "interface SkillSupportFileOptions",
+          "doc": "Optional naming and reconciliation policies for skill support files."
         },
         {
           "name": "unsupportedSkillHarnesses",
@@ -24908,7 +24939,7 @@
         {
           "name": "checkRateLimit",
           "kind": "function",
-          "signature": "(kv: KvLike, key: string, limit: number, windowSeconds: number) => Promise<RateLimitResult>",
+          "signature": "(kv: KvLike, key: string, limit: number, windowSeconds: number, options?: RateLimitOptions) => Promise<RateLimitResult>",
           "doc": "KV-backed sliding-window rate limit."
         },
         {
@@ -25060,6 +25091,12 @@
           "kind": "interface",
           "signature": "interface RateLimitBudget",
           "doc": "Requests allowed per identity inside a sliding window."
+        },
+        {
+          "name": "RateLimitOptions",
+          "kind": "interface",
+          "signature": "interface RateLimitOptions",
+          "doc": "Request-lifetime persistence for a coarse limiter."
         },
         {
           "name": "RateLimitResult",
@@ -26121,7 +26158,7 @@
           "name": "EffortPicker",
           "kind": "function",
           "signature": "({ value, onChange, levels, label, fullWidth, variant, disabled, id, \"aria-describedby\": ariaDescribedBy }: EffortPicke…",
-          "doc": "Thinking-budget selector pill, styled to match {@link ModelPicker}."
+          "doc": "Thinking-budget selector pill, styled to match {@link ModelPicker }."
         },
         {
           "name": "EffortPickerProps",
