@@ -143,6 +143,8 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
     start = undefined
     throw error
   })
+  // A turn that never calls the box never awaits its admission start; that start's failure is not unhandled.
+  start?.catch(() => undefined)
   const acquire = (): Promise<SandboxInstance> => (start ??= box.acquire(stop).catch((error: unknown) => {
     start = undefined
     throw error
