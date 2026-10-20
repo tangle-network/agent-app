@@ -1,8 +1,11 @@
 import { spawnSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { availableParallelism, homedir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { loadSignoffConfig } from './config'
+import { activeStoreKeys, openSignoffCacheSession, pruneSignoffCache, withCacheLock,
+  type SignoffCacheSession } from './cache'
 import {
   assertNodeTypesVersion,
   assertNodeVersion,
@@ -12,7 +15,7 @@ import {
 import { runCommand, type CommandResult } from './exec'
 import { runGraph, validateGraph, type TaskOutcome } from './schedule'
 import { assertShuffleArgsReachTheRunner, newSeedBase, planAttempts } from './seeds'
-import { resolveStore } from './store'
+import { manifestCacheKey, manifestFiles, resolveStore } from './store'
 import { APP_DEFAULTS_STEP, checkAppDefaults, formatAppDefaults } from './app-defaults'
 import { checkWorkerDefaults, formatWorkerDefaults, WORKER_DEFAULTS_STEP } from './worker-defaults'
 import { materializeCleanTree, removeCleanTree, repoRootOf, type CleanTree } from './workspace'
@@ -126,15 +129,33 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
   // The tree lives under the same root as the stores on purpose: pnpm hardlinks
   // from the store into `node_modules`, and a store on another filesystem
   // silently degrades to a full copy.
-  const treePath = (): string => join(cacheDir, 'trees', `${basename(repoRoot)}-${process.pid}`)
+  const treeName = `${basename(repoRoot)}-${process.pid}-${randomUUID()}`
+  const treePath = (): string => join(cacheDir, 'trees', treeName)
 
   let tree: CleanTree | null = null
+  const sessions: SignoffCacheSession[] = []
+  let session = await openSignoffCacheSession(cacheDir, treePath())
+  sessions.push(session)
+  cacheDir = session.cacheDir
+  const prune = async (root: string, keepPaths: readonly string[] = []): Promise<void> => {
+    const result = await pruneSignoffCache(root, { keepPaths })
+    if (result.removed.length || result.overBudgetBytes) {
+      options.onEvent?.({ kind: 'cache-prune', ...result })
+    }
+  }
   try {
+    await prune(cacheDir)
     tree = materializeCleanTree({ repoDir: repoRoot, dest: treePath(), source })
     let loaded = await loadSignoffConfig({ repoRoot: tree.path, configPath: options.configPath })
 
     cacheDir = resolve(options.cacheDir ?? loaded.config.cacheDir ?? DEFAULT_CACHE_DIR)
     if (tree.path !== treePath() || (loaded.config.carryFiles?.length ?? 0) > 0) {
+      if (session.cacheDir !== cacheDir) {
+        session = await openSignoffCacheSession(cacheDir, treePath())
+        sessions.push(session)
+        cacheDir = session.cacheDir
+        await prune(cacheDir)
+      }
       removeCleanTree(tree)
       tree = materializeCleanTree({ repoDir: repoRoot, dest: treePath(), source, carryFiles: loaded.config.carryFiles })
       // The second load gives the report an origin inside the final selected
@@ -151,7 +172,11 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
 
     options.onEvent?.({ kind: 'tree', path: tree.path, head: tree.head, dirty: tree.dirty })
 
-    const store = resolveStore({ treePath: tree.path, cacheDir, generations: config.storeGenerations })
+    // Publish the selected key before creating/pruning stores. A concurrent
+    // signoff can then prune under the same lock without deleting this install.
+    await session.protectStore(manifestCacheKey(tree.path, manifestFiles(tree.path)))
+    const store = await withCacheLock(cacheDir, () => resolveStore({ treePath: tree!.path, cacheDir,
+      generations: config.storeGenerations, protectedStoreKeys: activeStoreKeys(cacheDir) }))
     options.onEvent?.({ kind: 'store', storeDir: store.storeDir, cacheHit: store.hit, cacheKey: store.cacheKey })
 
     const installSpec = config.install ?? {}
@@ -280,7 +305,14 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
       options,
     })
   } finally {
-    if (tree && !options.keepWorkspace && existsSync(tree.path)) removeCleanTree(tree)
+    try {
+      if (tree && !options.keepWorkspace && existsSync(tree.path)) removeCleanTree(tree)
+    } finally {
+      for (const active of sessions) {
+        await active.close()
+        await prune(active.cacheDir, options.keepWorkspace && tree ? [tree.path] : [])
+      }
+    }
   }
 }
 

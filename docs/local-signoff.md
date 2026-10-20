@@ -89,6 +89,15 @@ The **store** is reused, keyed on the sha256 of every manifest in the tree: the 
 This is safe because a pnpm store is content-addressed — an entry is named by the hash of what is in it, so a reused entry cannot be a version the lockfile did not ask for.
 Reusing it skips downloads, not resolution.
 Any manifest byte that could change what gets installed changes the key, and a changed key means an empty store and an honest cold install.
+
+The idle tree and store cache is bounded by the age and allocated-byte limits in
+[`src/signoff/cache.ts`](../src/signoff/cache.ts). Signoff prunes before and after
+each run, excluding trees and stores held by live runs. An explicitly kept
+workspace survives its own run for inspection, but a later run may retire it.
+Cache paths are canonicalized before locking, so symlinked paths share leases.
+A detached install or check keeps its lease after its coordinator exits; unreadable
+process state and malformed lease markers preserve the cache conservatively.
+The CLI reports any bytes it could not reclaim because a run still holds them.
 Four generations are kept, so moving between a branch and `main` finds both warm.
 
 Measured, install wall clock, same commit either side:
