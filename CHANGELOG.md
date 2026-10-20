@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.60.236
+
+- refactor(composer): separate send commands and file intake (#1200)
+- refactor(chat): separate message rendering responsibilities (#1199)
+- refactor(records): separate grid editing review and sources (#1198)
+
+## 0.60.235
+
+- refactor(chat): separate session history responsibilities (#1197)
+
+## 0.60.234
+
+- test(chat-routes): prove settlement after HTTP disconnect
+
+## 0.60.233
+
+- fix(trace): parent Router requests to the model call span
+- fix(signoff): isolate fixture identity after PR1108 (#1194)
+
+## 0.60.232
+
+- refactor(web-react): separate picker and popover responsibilities (#1193)
+
+## 0.60.231
+
+- refactor(work-product): separate draft emission and submission checks (#1192)
+
 ## 0.60.230
 
 - refactor(chat): separate turn admission execution and streaming (#1190)

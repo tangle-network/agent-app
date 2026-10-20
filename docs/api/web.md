@@ -4,7 +4,7 @@
 
 Source: `src/web/index.ts`
 
-43 exports.
+44 exports.
 
 ### `acquisitionFromRequest`
 
@@ -59,7 +59,7 @@ interface ApiKeyFetchOptions
 `function` — KV-backed sliding-window rate limit.
 
 ```ts
-(kv: KvLike, key: string, limit: number, windowSeconds: number) => Promise<RateLimitResult>
+(kv: KvLike, key: string, limit: number, windowSeconds: number, options?: RateLimitOptions) => Promise<RateLimitResult>
 ```
 
 ### `clearCookieHeader`
@@ -260,6 +260,14 @@ interface KvLike
 
 ```ts
 interface RateLimitBudget
+```
+
+### `RateLimitOptions`
+
+`interface` — Request-lifetime persistence for a coarse limiter.
+
+```ts
+interface RateLimitOptions
 ```
 
 ### `RateLimitResult`
