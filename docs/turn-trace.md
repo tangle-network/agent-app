@@ -47,6 +47,9 @@ Admission's serial reads are the history, the turn lock, the history recheck und
 The running-index read under `admission.history` runs only when its answer can change the turn: no client `turnId`, an assistant row trailing the thread, and the user row behind it repeating this content.
 `produce` and the seams see `userMessageInserted: true` when this turn's insert created `userMessageId`, so a gate that refuses an already-answered retry skips its own read for a fresh row.
 
+`afterAuthorize` starts a turn's box, keys and session as soon as `authorize` and the model policy admit it, so `sandbox.acquire` begins beside `admission.history` and the lock instead of after `admission.produce`.
+The work it starts is never awaited by the route; a turn that ends before `produce` (a held lock, a changed history, a gate's answer) calls the release function the seam returned.
+
 `authorize` receives the turn's `trace` and the `admission.authorize` span, and `beforeTurn` receives the `admission.before_turn` span as its second argument; a product records its own steps with `trace.measure(name, 'admission', work, undefined, span)` so each wait inside the seam is named and nested.
 
 A turn handed to a durable owner with `handoffCompletion` is not exported by the route; that owner finishes `args.trace`.
