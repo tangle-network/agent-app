@@ -415,6 +415,17 @@ function toolCountRow(): DefaultRow {
   return { id: 'tool-count', label: 'tool calls p50', status: 'unknown', detail: 'tangle.turn.tool_calls on each root span; no ceiling until a measured link to first text exists' }
 }
 
+/** The installed agent-app's version, for a spec that names no version (`file:`, `link:`, `workspace:`), such as the
+ *  packed tarball a generated project installs. Null when it is not installed. */
+function installedAgentAppVersion(repoRoot: string, dir: string): string | null {
+  try {
+    const version = (JSON.parse(readFileSync(join(repoRoot, dir, 'node_modules', '@tangle-network', 'agent-app', 'package.json'), 'utf8')) as { version?: unknown }).version
+    return typeof version === 'string' && versionTuple(version) ? version : null
+  } catch {
+    return null
+  }
+}
+
 /** Report each agent app in the checkout against the defaults. Reads only tracked files; measures the Worker upload with the app's own Wrangler. */
 export function checkAppDefaults(repoRoot: string, options: AppDefaultsOptions = {}): AppDefaultsResult {
   const tracked = trackedFiles(repoRoot)
@@ -433,7 +444,7 @@ export function checkAppDefaults(repoRoot: string, options: AppDefaultsOptions =
     const sources = readSources(repoRoot, tracked, pkg.dir, packages.map((other) => other.dir))
     const configs = (owned.get(pkg.dir) ?? []).map((path) => ({ path, text: readFileSync(join(repoRoot, path), 'utf8') }))
     const exemptions = options.exemptions ?? {}
-    const pin = versionTuple(pkg.spec) ? (/(\d+\.\d+\.\d+)/.exec(pkg.spec)?.[1] ?? null) : null
+    const pin = versionTuple(pkg.spec) ? (/(\d+\.\d+\.\d+)/.exec(pkg.spec)?.[1] ?? null) : installedAgentAppVersion(repoRoot, pkg.dir)
     const calls = sinkCalls(sources)
     const trace = turnTraceRow(pin, sources, calls, options.exports)
     const traceWired = trace.wired
