@@ -65,8 +65,6 @@ function hasRunProcesses(run: ActiveRun): boolean {
         // protected /proc files must not keep every crashed lease forever.
         const start = processStart(Number(entry))
         if (run.processStart && start && BigInt(start) < BigInt(run.processStart)) continue
-        // Other users cannot be children of this signoff process.
-        if (statSync(proc).uid !== process.getuid?.()) continue
         const cwd = readlinkSync(join(proc, 'cwd'))
         if (cwd === run.tree || cwd.startsWith(run.tree + sep)) return true
         const env = readFileSync(join(proc, 'environ'), 'utf8').split('\0')
