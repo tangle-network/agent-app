@@ -84,7 +84,6 @@ import {
 
 export * from './record-grid-model'
 
-/** One committed cell edit, handed to `onUpdate`. */
 export type { RecordGridCellChange, RecordGridWriteOutcome, RecordGridCreateOutcome, RecordGridProps } from './record-grid-types'
 import type { RecordGridWriteOutcome, RecordGridCreateOutcome, RecordGridProps } from './record-grid-types'
 import { ReviewActions } from './record-grid-review-actions'

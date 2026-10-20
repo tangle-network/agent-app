@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.235
+
+- refactor(chat): separate session history responsibilities (#1197)
+
 ## 0.60.234
 
 - test(chat-routes): prove settlement after HTTP disconnect
