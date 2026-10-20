@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import {
   existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync,
-  statSync, unlinkSync, writeFileSync,
+  readlinkSync, statSync, unlinkSync, writeFileSync,
 } from 'node:fs'
 import type { Stats } from 'node:fs'
 import { hostname } from 'node:os'
@@ -53,14 +53,37 @@ function processStart(pid: number): string | null {
   } catch { return null }
 }
 
+/** Detached install/check processes can outlive the signoff coordinator. */
+function hasRunProcesses(run: ActiveRun): boolean {
+  if (process.platform !== 'linux') return true // cannot prove the run has stopped
+  try {
+    for (const entry of readdirSync('/proc')) {
+      if (!/^\d+$/.test(entry)) continue
+      const proc = join('/proc', entry)
+      // Other users cannot be children of this signoff process.
+      if (statSync(proc).uid !== process.getuid?.()) continue
+      try {
+        const cwd = readlinkSync(join(proc, 'cwd'))
+        if (cwd === run.tree || cwd.startsWith(run.tree + sep)) return true
+        const env = readFileSync(join(proc, 'environ'), 'utf8').split('\0')
+        if (env.includes(`SIGNOFF_TREE=${run.tree}`)) return true
+      } catch (error) {
+        if (['ENOENT', 'ESRCH'].includes((error as NodeJS.ErrnoException).code ?? '')) continue
+        return true // unreadable process state is not evidence that it stopped
+      }
+    }
+    return false
+  } catch { return true }
+}
+
 function alive(run: ActiveRun): boolean {
   if (run.host !== hostname()) return true // a configured shared cache may have another host's run
   try { process.kill(run.pid, 0) } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return hasRunProcesses(run)
     return true // EPERM is not proof of a dead process
   }
   const currentStart = processStart(run.pid)
-  return !run.processStart || !currentStart || currentStart === run.processStart
+  return !run.processStart || !currentStart || currentStart === run.processStart || hasRunProcesses(run)
 }
 
 /** One short cross-process lock protects lease transitions and deletion decisions. */
@@ -95,8 +118,10 @@ function protectedPaths(cacheDir: string): { paths: Set<string>; unknown: boolea
     let run: ActiveRun
     try {
       run = JSON.parse(readFileSync(file, 'utf8')) as ActiveRun
-      if (!Number.isSafeInteger(run.pid) || typeof run.host !== 'string' ||
-        typeof run.tree !== 'string' || (run.storeKey !== null && typeof run.storeKey !== 'string')) {
+      if (!Number.isSafeInteger(run.pid) || run.pid <= 0 || typeof run.host !== 'string' ||
+        typeof run.tree !== 'string' || !run.tree.startsWith(resolve(cacheDir) + sep) ||
+        (run.processStart !== null && typeof run.processStart !== 'string') ||
+        (run.storeKey !== null && (typeof run.storeKey !== 'string' || !/^[a-f0-9]{64}$/.test(run.storeKey)))) {
         unknown = true
         continue
       }
