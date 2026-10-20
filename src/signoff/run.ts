@@ -135,8 +135,14 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
   let session = await openSignoffCacheSession(cacheDir, treePath())
   sessions.push(session)
   cacheDir = session.cacheDir
+  const prune = async (root: string, keepPaths: readonly string[] = []): Promise<void> => {
+    const result = await pruneSignoffCache(root, { keepPaths })
+    if (result.removed.length || result.overBudgetBytes) {
+      options.onEvent?.({ kind: 'cache-prune', ...result })
+    }
+  }
   try {
-    await pruneSignoffCache(cacheDir)
+    await prune(cacheDir)
     tree = materializeCleanTree({ repoDir: repoRoot, dest: treePath(), source })
     let loaded = await loadSignoffConfig({ repoRoot: tree.path, configPath: options.configPath })
 
@@ -146,7 +152,7 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
         session = await openSignoffCacheSession(cacheDir, treePath())
         sessions.push(session)
         cacheDir = session.cacheDir
-        await pruneSignoffCache(cacheDir)
+        await prune(cacheDir)
       }
       removeCleanTree(tree)
       tree = materializeCleanTree({ repoDir: repoRoot, dest: treePath(), source, carryFiles: loaded.config.carryFiles })
@@ -300,11 +306,7 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
     } finally {
       for (const active of sessions) {
         await active.close()
-        const result = await pruneSignoffCache(active.cacheDir, { keepPaths: options.keepWorkspace && tree
-          ? [tree.path] : [] })
-        if (result.removed.length || result.overBudgetBytes) {
-          options.onEvent?.({ kind: 'cache-prune', ...result })
-        }
+        await prune(active.cacheDir, options.keepWorkspace && tree ? [tree.path] : [])
       }
     }
   }

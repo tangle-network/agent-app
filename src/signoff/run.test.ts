@@ -112,8 +112,13 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
     const old = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000)
     utimesSync(expired, old, old)
 
-    const report = await runSignoff({ repoDir: repo, cacheDir, source: 'head' })
+    const pruned: string[] = []
+    const report = await runSignoff({ repoDir: repo, cacheDir, source: 'head', onEvent: (event) => {
+      if (event.kind === 'cache-prune') pruned.push(...event.removed)
+      if (event.kind === 'install-start') expect(pruned).toContain(expired)
+    } })
     expect(report.ok).toBe(true)
+    expect(pruned).toContain(expired)
     expect(existsSync(expired)).toBe(false)
   })
 
