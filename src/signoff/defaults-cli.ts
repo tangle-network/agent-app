@@ -6,7 +6,7 @@
  *   agent-app-signoff defaults --json matrix.json      # the same rows, machine-readable
  *
  * Exit 0 unless an app turns a default off without a reason (1), or the usage is wrong (2). `--probe` reads the
- * Sandbox product key from `SANDBOX_API_KEY`, the key the turn trace sink exports with.
+ * Intelligence key from `TANGLE_INTELLIGENCE_API_KEY`; it reads the traces of the tenant that owns the apps' export keys.
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -17,7 +17,7 @@ function defaultsUsage(): string {
   return [
     'Usage: agent-app-signoff defaults [repoDir] [options]',
     '',
-    '  --probe        ask Intelligence for each app\'s last exported turn (needs SANDBOX_API_KEY)',
+    '  --probe        ask Intelligence for each app\'s last exported turn (needs TANGLE_INTELLIGENCE_API_KEY)',
     '  --no-bundle    skip the Worker upload measure (it runs the app\'s own wrangler, so build first)',
     '  --json <path>  write the rows',
   ].join('\n')
@@ -48,8 +48,8 @@ export async function runDefaultsCli(argv: readonly string[]): Promise<number> {
   } catch {
     // A checkout with no signoff config, or one that does not load here, declares no exemptions.
   }
-  const apiKey = process.env.SANDBOX_API_KEY?.trim()
-  if (probe && !apiKey) return usageError('--probe needs SANDBOX_API_KEY')
+  const apiKey = process.env.TANGLE_INTELLIGENCE_API_KEY?.trim()
+  if (probe && !apiKey) return usageError('--probe needs TANGLE_INTELLIGENCE_API_KEY')
   const exports = probe && apiKey ? await collectLastExports(repoDir, apiKey) : undefined
   const result = checkAppDefaults(repoDir, { exemptions, measureBundle, exports })
   if (jsonPath !== undefined) {

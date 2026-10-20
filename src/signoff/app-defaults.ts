@@ -231,25 +231,29 @@ function withExemption(
   return { row, finding: null }
 }
 
-function turnTraceRow(sources: readonly SourceFile[], calls: readonly SinkCall[], exports: AppDefaultsOptions['exports']): { row: DefaultRow; optedOut: string | null } {
+function turnTraceRow(sources: readonly SourceFile[], calls: readonly SinkCall[], exports: AppDefaultsOptions['exports']): { row: DefaultRow; optedOut: string | null; wired: boolean } {
   const optOut = filesMatching(sources, /\bturnTrace\s*:\s*false\b/)[0]
-  if (optOut) return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: '' }, optedOut: `turnTrace: false in ${optOut.path}` }
+  if (optOut) return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: '' }, optedOut: `turnTrace: false in ${optOut.path}`, wired: false }
   const customSink = filesMatching(sources, /\bturnTrace\s*:\s*\{/)
   if (calls.length === 0 && customSink.length === 0) {
-    return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: 'no turn trace sink; createChatTurnRoutes gets no turnTrace' }, optedOut: null }
-  }
-  const badKey = calls.find((call) => /\bapiKey\s*:[^,}]*\bTANGLE_API_KEY\b/.test(call.args))
-  if (badKey) {
-    return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: `exports with TANGLE_API_KEY in ${badKey.file}; the ingest answers 401 (Legal #468): drop apiKey, the sink reads the Sandbox product key` }, optedOut: null }
+    return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: 'no turn trace sink; createChatTurnRoutes gets no turnTrace' }, optedOut: null, wired: false }
   }
   const project = calls.find((call) => call.project)?.project ?? null
   const last = project === null ? undefined : exports?.get(project)
-  if (last === null) {
-    return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: `sink wired (${project}); Intelligence holds no turn from the last 30 days` }, optedOut: null }
-  }
   const where = calls[0]?.file ?? customSink[0]?.path ?? ''
-  const exported = last ? `; last export accepted ${new Date(last.at).toISOString().slice(0, 16)}Z` : '; last export not checked'
-  return { row: { id: 'turn-trace', label: 'turn trace', status: 'ok', detail: `sink wired in ${where}${project ? ` (${project})` : ''}${exported}` }, optedOut: null }
+  const wired = `sink wired in ${where}${project ? ` (${project})` : ''}`
+  if (last) {
+    return { row: { id: 'turn-trace', label: 'turn trace', status: 'ok', detail: `${wired}; last export accepted ${new Date(last.at).toISOString().slice(0, 16)}Z` }, optedOut: null, wired: true }
+  }
+  if (last === null) {
+    return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: `${wired}; Intelligence holds no turn from the last 30 days for this key` }, optedOut: null, wired: true }
+  }
+  const routerKey = calls.find((call) => /\bapiKey\s*:[^,}]*\bTANGLE_API_KEY\b/.test(call.args))
+  if (routerKey) {
+    // Legal's Worker TANGLE_API_KEY was refused with HTTP 401 (#468) and Hospitality's is accepted. Only the ingest knows.
+    return { row: { id: 'turn-trace', label: 'turn trace', status: 'unknown', detail: `${wired} with TANGLE_API_KEY; the ingest refused it for Legal (#468): run with --probe, or drop apiKey so the sink reads the Sandbox product key` }, optedOut: null, wired: true }
+  }
+  return { row: { id: 'turn-trace', label: 'turn trace', status: 'ok', detail: `${wired}; last export not checked` }, optedOut: null, wired: true }
 }
 
 function firstTextRow(pin: string | null, sources: readonly SourceFile[], traceWired: boolean, calls: readonly SinkCall[], exports: AppDefaultsOptions['exports']): DefaultRow {
@@ -386,7 +390,7 @@ export function checkAppDefaults(repoRoot: string, options: AppDefaultsOptions =
     const pin = versionTuple(pkg.spec) ? (/(\d+\.\d+\.\d+)/.exec(pkg.spec)?.[1] ?? null) : null
     const calls = sinkCalls(sources)
     const trace = turnTraceRow(sources, calls, options.exports)
-    const traceWired = trace.row.status === 'ok'
+    const traceWired = trace.wired
     const reports: { row: DefaultRow; id: ExemptibleDefault | null; optedOut: string | null }[] = [
       { row: pinRow(pin, pkg.spec), id: null, optedOut: null },
       { row: trace.row, id: 'turn-trace', optedOut: trace.optedOut },

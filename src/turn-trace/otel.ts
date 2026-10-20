@@ -148,7 +148,7 @@ export interface IntelligenceTurnTraceSinkOptions {
   /**
    * The tenant key the ingest requires. Omit it: the sink reads the Sandbox product key from the first of
    * `SANDBOX_PRODUCTION_API_KEY`, `TCLOUD_SANDBOX_API_KEY` and `SANDBOX_API_KEY` that is set, the platform key the
-   * ingest verifies. A Worker's `TANGLE_API_KEY` is a Router key and gets 401 (Legal #468, 2026-10-19).
+   * ingest verifies. Legal's Worker `TANGLE_API_KEY` got 401 on every export (#468, 2026-10-19), so a key is never assumed: a refusal is a console warning.
    */
   apiKey?: string
   /** Default `https://intelligence.tangle.tools`; spans go to `<base>/v1/otlp/v1/traces`. */
@@ -163,7 +163,8 @@ const DEFAULT_INTELLIGENCE_BASE_URL = 'https://intelligence.tangle.tools'
 /** The Sandbox product key names, in the order the apps' sandbox lanes prefer them. Read per delivery: a Worker's env is not populated at module scope. */
 const INGEST_KEY_ENV = ['SANDBOX_PRODUCTION_API_KEY', 'TCLOUD_SANDBOX_API_KEY', 'SANDBOX_API_KEY'] as const
 
-function ingestKeyFromEnv(): string | undefined {
+/** The key the ingest verifies, from the host's environment: what the sink uses when it is given none, and what an app's other Intelligence client should use too. */
+export function resolveIngestKey(): string | undefined {
   if (typeof process === 'undefined') return undefined
   for (const name of INGEST_KEY_ENV) {
     const value = process.env?.[name]?.trim()
@@ -184,7 +185,7 @@ export function createIntelligenceTurnTraceSink(options: IntelligenceTurnTraceSi
   const fail = (reason: string) => { try { report(reason.slice(0, 200)) } catch { /* telemetry only */ } }
   let missingKeyReported = false
   return async (snapshot, labels) => {
-    const apiKey = options.apiKey?.trim() || ingestKeyFromEnv()
+    const apiKey = options.apiKey?.trim() || resolveIngestKey()
     if (!apiKey) {
       if (!missingKeyReported) fail(`no ingest key: set ${INGEST_KEY_ENV.join(', ')} or pass apiKey`)
       missingKeyReported = true

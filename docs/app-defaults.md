@@ -7,7 +7,7 @@ It is a report: it fails only on an explicit opt-out that gives no reason.
 
 ```bash
 agent-app-signoff defaults            # this checkout; builds first if you want the Worker upload measured
-agent-app-signoff defaults --probe    # also ask Intelligence for each app's last exported turn (SANDBOX_API_KEY)
+agent-app-signoff defaults --probe    # also ask Intelligence for each app's last exported turn (TANGLE_INTELLIGENCE_API_KEY)
 agent-app-signoff defaults --no-bundle --json matrix.json
 ```
 
@@ -16,7 +16,7 @@ agent-app-signoff defaults --no-bundle --json matrix.json
 | Row | Has the default when | Source of the read |
 |---|---|---|
 | agent-app pin | the pinned version is at or above every outcome's floor (`AGENT_APP_OUTCOME_FLOORS`: turn trace 0.60.199, first text 0.60.203) | `package.json` |
-| turn trace | the app wires a sink (`createIntelligenceTurnTraceSink`, or a `turnTrace: { sink }`) that does not export with `TANGLE_API_KEY` (a Router key the ingest rejects); with `--probe`, Intelligence also holds a turn from the last 30 days | source, Intelligence |
+| turn trace | the app wires a sink (`createIntelligenceTurnTraceSink`, or a `turnTrace: { sink }`); with `--probe`, Intelligence also holds a turn from the last 30 days. A sink that exports with an explicit `TANGLE_API_KEY` reads `?` until `--probe` shows an accepted turn: the ingest refused Legal's Worker key (HTTP 401, #468) and accepts Hospitality's | source, Intelligence |
 | first text | the turn owner marks it (`createChatTurnRoutes` from 0.60.203, or `trace.markFirstText()` in a Durable Object turn) and the trace is on | source |
 | prewarm route | the app mounts `createWorkspacePrewarmRoute`; a local route named prewarm is a local copy | source |
 | placement | a Wrangler `[placement]` names a `region` or `host`; smart placement does not pin | Wrangler config |
