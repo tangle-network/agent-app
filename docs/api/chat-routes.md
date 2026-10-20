@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-269 exports.
+271 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -388,6 +388,22 @@ type ChatRouteDurableProjectionLogger
 
 ```ts
 type ChatRouteEvent
+```
+
+### `ChatTurnAfterAuthorizeArgs`
+
+`interface` — What `afterAuthorize` receives: the admitted turn, before the conversation loads and before any lock, read or write.
+
+```ts
+interface ChatTurnAfterAuthorizeArgs
+```
+
+### `ChatTurnAfterAuthorizeRelease`
+
+`type` — Frees what `afterAuthorize` started, for a turn that ends before `produce` takes it.
+
+```ts
+type ChatTurnAfterAuthorizeRelease
 ```
 
 ### `ChatTurnAuthorization`
