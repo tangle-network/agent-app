@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.223
+
+- fix(router-turn): a Router turn rides out a Platform outage, keeps Gemini's long tool calls, falls back to GPT-6.1 Sol through Responses, and runs past 12 tool rounds (#1182)
+
 ## 0.60.222
 
 - feat(chat-routes): the hybrid turn is the default: Router first, one box start shared by admission, the speculator and sandbox_run (#1181)
