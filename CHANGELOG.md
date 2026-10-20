@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.234
+
+- test(chat-routes): prove settlement after HTTP disconnect
+
 ## 0.60.233
 
 - fix(trace): parent Router requests to the model call span
