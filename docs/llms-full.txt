@@ -13193,6 +13193,14 @@ class AuthLookupRefused
 (options: LimitAlarmOptions) => LimitAlarms
 ```
 
+### `createProductLimitAlarms`
+
+`function` — A product's limit alarms with every default in place: {@link DEFAULT_LIMIT_BUDGETS}, the console and optional webhook sink, and one page per resource every {@link LAUNCH_BUDGETS.alarmRepeatHours} hou…
+
+```ts
+(options: ProductLimitAlarmOptions) => LimitAlarms
+```
+
 ### `createScheduledDispatch`
 
 `function`
@@ -13223,6 +13231,14 @@ class AuthLookupRefused
 
 ```ts
 100
+```
+
+### `DEFAULT_LIMIT_BUDGETS`
+
+`const` — The budgets every product starts from: {@link LAUNCH_BUDGETS}' platform limits.
+
+```ts
+Readonly<Record<LimitResource, number>>
 ```
 
 ### `describeVerdict`
@@ -13391,6 +13407,14 @@ interface ObservedSlot
 
 ```ts
 readonly { name: string; text: string; }[]
+```
+
+### `ProductLimitAlarmOptions`
+
+`interface`
+
+```ts
+interface ProductLimitAlarmOptions
 ```
 
 ### `readInSizedBatches`
@@ -25646,7 +25670,7 @@ interface UseSettingFieldOptions
 
 ## `./signoff`
 
-Source: `src/signoff/index.ts`
+Source: `src/signoff/index.ts` · depends on `launch-invariants`
 
 ### `CdpResponseSource`
 
@@ -26323,7 +26347,7 @@ interface WorkspaceSurfaceSample
 
 ## `./signoff/cli`
 
-Source: `src/signoff/cli.ts`
+Source: `src/signoff/cli.ts` · depends on `launch-invariants`
 
 ### `parseArgs`
 
@@ -26344,7 +26368,7 @@ Source: `src/signoff/cli.ts`
 
 ## `./signoff/proof`
 
-Source: `src/signoff/proof.ts`
+Source: `src/signoff/proof.ts` · depends on `launch-invariants`
 
 ### `AttachedSignoffProof`
 
@@ -26525,7 +26549,7 @@ interface VerifySignoffProofOptions
 
 ## `./signoff/proof-cli`
 
-Source: `src/signoff/proof-cli.ts`
+Source: `src/signoff/proof-cli.ts` · depends on `launch-invariants`
 
 _No public exports._
 
@@ -31608,6 +31632,14 @@ interface OtlpSpan
 
 ```ts
 (header: string | null | undefined) => ServerTimingEntry[]
+```
+
+### `resolveIngestKey`
+
+`function` — The key the ingest verifies, from the host's environment: what the sink uses when it is given none, and what an app's other Intelligence client should use too.
+
+```ts
+() => string | undefined
 ```
 
 ### `serverTimingAttrs`

@@ -4,7 +4,7 @@
 
 Source: `src/launch-invariants/index.ts`
 
-59 exports.
+62 exports.
 
 ### `AUTH_LOOKUP_DEADLINE_MS`
 
@@ -94,6 +94,14 @@ class AuthLookupRefused
 (options: LimitAlarmOptions) => LimitAlarms
 ```
 
+### `createProductLimitAlarms`
+
+`function` — A product's limit alarms with every default in place: {@link DEFAULT_LIMIT_BUDGETS}, the console and optional webhook sink, and one page per resource every {@link LAUNCH_BUDGETS.alarmRepeatHours} hou…
+
+```ts
+(options: ProductLimitAlarmOptions) => LimitAlarms
+```
+
 ### `createScheduledDispatch`
 
 `function`
@@ -124,6 +132,14 @@ class AuthLookupRefused
 
 ```ts
 100
+```
+
+### `DEFAULT_LIMIT_BUDGETS`
+
+`const` — The budgets every product starts from: {@link LAUNCH_BUDGETS}' platform limits.
+
+```ts
+Readonly<Record<LimitResource, number>>
 ```
 
 ### `describeVerdict`
@@ -292,6 +308,14 @@ interface ObservedSlot
 
 ```ts
 readonly { name: string; text: string; }[]
+```
+
+### `ProductLimitAlarmOptions`
+
+`interface`
+
+```ts
+interface ProductLimitAlarmOptions
 ```
 
 ### `readInSizedBatches`

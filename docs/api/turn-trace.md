@@ -4,7 +4,7 @@
 
 Source: `src/turn-trace/index.ts`
 
-26 exports.
+27 exports.
 
 ### `buildTurnTraceOtelSpans`
 
@@ -92,6 +92,14 @@ interface OtlpSpan
 
 ```ts
 (header: string | null | undefined) => ServerTimingEntry[]
+```
+
+### `resolveIngestKey`
+
+`function` — The key the ingest verifies, from the host's environment: what the sink uses when it is given none, and what an app's other Intelligence client should use too.
+
+```ts
+() => string | undefined
 ```
 
 ### `serverTimingAttrs`

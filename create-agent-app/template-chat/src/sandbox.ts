@@ -33,6 +33,7 @@ import {
   streamSandboxPrompt,
   type SandboxRuntimeConfig,
 } from '@tangle-network/agent-app/sandbox'
+import type { TurnTrace } from '@tangle-network/agent-app/turn-trace'
 import type { AppEnv } from './env'
 
 /** Lowercased, non-alphanumerics collapsed: box names + projectId. */
@@ -84,12 +85,13 @@ async function ensureForegroundWorkspaceSandbox(
   env: AppEnv,
   shell: SandboxRuntimeConfig,
   scope: { workspaceId: string; userId: string },
+  trace?: TurnTrace,
 ) {
   return runForegroundSandboxSingleFlight({
     claim: createD1PrewarmClaimStore(env.DB),
     workspaceId: scope.workspaceId,
     harness: config.harness,
-    provision: () => ensureWorkspaceSandbox(shell, { ...scope, harness: config.harness }),
+    provision: () => ensureWorkspaceSandbox(shell, { ...scope, harness: config.harness, ...(trace ? { trace } : {}) }),
     peek: () => peekWorkspaceSandbox(shell, scope),
     adopt: ({ box }) => box,
   })
@@ -108,11 +110,12 @@ export function createSandboxProduce(env: AppEnv) {
     prompt,
     executionId,
     executionLimits,
+    trace,
   }: ChatTurnProduceArgs<void>): Promise<ChatTurnRouteProducer> => {
     const box = await ensureForegroundWorkspaceSandbox(env, shell, {
       workspaceId: identity.tenantId,
       userId: identity.userId,
-    })
+    }, trace)
     const model = body.model ?? env.MODEL_NAME ?? config.model.default
     return createSandboxChatProducer({
       model,
@@ -127,6 +130,7 @@ export function createSandboxProduce(env: AppEnv) {
           turnId: executionId,
           model: attemptModel,
           signal,
+          ...(trace ? { trace } : {}),
           // A zero reasoning allowance maps to the profile's supported
           // no-reasoning control. Positive limits use token ceilings below.
           effort: executionLimits?.maxReasoningTokens === 0

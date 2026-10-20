@@ -24,6 +24,22 @@ export const LAUNCH_BUDGETS = {
   authCacheTtlMs: 60_000,
   /** A platform-limit alarm fires at this share of the limit. */
   alarmRatio: 0.8,
+  /** A Worker isolate's memory. */
+  workerMemoryBytes: 128 * 1024 * 1024,
+  /** Rows one D1 query may read before an alarm; a sized read stays far below it (GTM's 1.63 M-event scan overloaded D1). */
+  d1RowsPerQuery: 250_000,
+  /** A workspace box's disk: the Sandbox SDK's default tier (10 GB). */
+  sandboxDiskBytes: 10 * 1024 ** 3,
+  /** Platform snapshots per box; the cap GTM hit on 2026-10-10. */
+  snapshotCount: 25,
+  /** Operator key requests per minute. */
+  keyRatePerMinute: 60,
+  /** Hours one resource's limit alarm waits before it repeats. */
+  alarmRepeatHours: 6,
+  /** Cloudflare's gzip limit on a Worker's Total Upload on the paid plan, in KiB; Legal deployed 9,659 KiB (94%) on 2026-10-19. */
+  workerUploadGzipKiB: 10 * 1024,
+  /** Cloudflare's raw limit on a Worker's Total Upload, in KiB. */
+  workerUploadRawKiB: 64 * 1024,
 } as const
 
 export type LaunchInvariantId =
