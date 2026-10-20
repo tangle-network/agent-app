@@ -31610,6 +31610,14 @@ interface OtlpSpan
 (header: string | null | undefined) => ServerTimingEntry[]
 ```
 
+### `resolveIngestKey`
+
+`function` — The key the ingest verifies, from the host's environment: what the sink uses when it is given none, and what an app's other Intelligence client should use too.
+
+```ts
+() => string | undefined
+```
+
 ### `serverTimingAttrs`
 
 `function` — Flat span attributes for the entries: `server_timing.<name>_ms` for a duration, `server_timing.<name>` for a `desc`.

@@ -24442,6 +24442,12 @@
           "doc": "Parse a `Server-Timing` header, as the Router and the Sandbox orchestrator send it."
         },
         {
+          "name": "resolveIngestKey",
+          "kind": "function",
+          "signature": "() => string | undefined",
+          "doc": "The key the ingest verifies, from the host's environment: what the sink uses when it is given none, and what an app's other Intelligence client should use too."
+        },
+        {
           "name": "serverTimingAttrs",
           "kind": "function",
           "signature": "(entries: readonly ServerTimingEntry[]) => Record<string, string | number>",
