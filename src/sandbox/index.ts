@@ -2395,9 +2395,10 @@ export type PeekWorkspaceSandboxOutcome =
  * costs the caller a cold start it never asked for.
  *
  * Matching is on BOTH the box key and the display name, IN THAT ORDER.
- * `client.get(id)` keys on the platform's opaque sandbox id, not the
- * deterministic key a product derives from a workspace, and is itself a
- * `list().find` underneath — so a lookup by identity has to list and match.
+ * `client.get(id)` is a direct read by the platform's opaque sandbox id, not by
+ * the deterministic key a product derives from a workspace, so a lookup that
+ * has not seen the box before has to list and match (`ensureWorkspaceSandbox`
+ * reads a box it has seen by id).
  * Provisioning here always stamps `name` with the box key, so the key is the
  * authoritative match; the display-name pass exists only to adopt boxes on a
  * host that predates that convention. The order matters: a single unordered
