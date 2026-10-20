@@ -127,6 +127,11 @@ function underDir(path: string, dir: string): boolean {
   return dir === '.' || path === dir || path.startsWith(`${dir}/`)
 }
 
+/** Source without comments, so a sentence that mentions `turnTrace: false` is not an opt-out. `://` stays: it is a URL. */
+function withoutComments(text: string): string {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(?<!:)\/\/.*$/gm, '')
+}
+
 function readSources(repoRoot: string, tracked: readonly string[], dir: string, others: readonly string[]): SourceFile[] {
   const files: SourceFile[] = []
   for (const path of tracked) {
@@ -136,7 +141,7 @@ function readSources(repoRoot: string, tracked: readonly string[], dir: string, 
     const abs = join(repoRoot, path)
     try {
       if (statSync(abs).size > MAX_SOURCE_BYTES) continue
-      files.push({ path, text: readFileSync(abs, 'utf8') })
+      files.push({ path, text: withoutComments(readFileSync(abs, 'utf8')) })
     } catch {
       /* a tracked file that is gone from the tree is not a source */
     }
