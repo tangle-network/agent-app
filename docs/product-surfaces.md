@@ -345,7 +345,7 @@ The ruler, track lanes, and time grid make timing visible before playback.
   might fail. Nothing else on the surface destroys anything, which is what lets
   every other control stay one click with no dialog.
 
-### Teams (`teams-react`) & Intakes (`intakes-react`)
+### Teams (`teams-react`) & Intakes (`intakes`)
 - **Teams purpose:** invite people, set roles, manage the org. Goal: *"give the
   right people the right access."* First impression: roles named by capability
   ("Can publish", "Can only view"), not abstract tiers.
