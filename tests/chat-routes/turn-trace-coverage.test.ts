@@ -110,6 +110,10 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     for (const headers of routerHeaders) expect(headers['x-tangle-trace-id']).toBe(snapshot!.traceId)
     expect(snapshot!.traceId).toMatch(/^[\w-]{8,200}$/)
 
+    // The first tool card is visible before the tool finishes and the answer arrives.
+    expect(summary.firstVisibleMs).toBeGreaterThanOrEqual(0)
+    expect(summary.firstTextMs! - summary.firstVisibleMs!).toBeGreaterThanOrEqual(100)
+
     // The hill: named child spans cover at least 90% of the turn's wall time.
     expect(summary.coveragePct).toBeGreaterThanOrEqual(90)
     expect(summary.byKind.admission).toBeGreaterThan(0)
@@ -151,6 +155,7 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     expect(exported).toHaveLength(spans.length + 1)
     const root = exported.find((span) => span.name === 'agent_app.turn')!
     expect(root.parentSpanId).toBeUndefined()
+    expect(root.attributes.find(attr => attr.key === 'tangle.turn.first_visible_ms')?.value.doubleValue).toBe(summary.firstVisibleMs)
     // Every duration and ratio is a double whatever its value (an integral 0 ms is not an int); counts stay ints.
     const timed = root.attributes.filter((attribute) => /^tangle\.turn\..*_(ms|pct)$/.test(attribute.key))
     expect(timed.length).toBeGreaterThan(6)

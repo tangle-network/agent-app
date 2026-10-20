@@ -77,6 +77,8 @@ export interface TurnTraceSummary {
   dropped: number
   /** From the request to the first visible text the member could read (see {@link TurnTrace.markFirstText}); absent when none streamed. */
   firstTextMs?: number
+  /** Headline latency: request to first reasoning, tool activity or answer output. */
+  firstVisibleMs?: number
   /** D1 round trips in the turn scope, when its binding is instrumented. */
   d1Queries?: number
 }
@@ -117,6 +119,8 @@ export interface TurnTrace {
    * `firstTextMs` then reads from the request, so it holds admission, the box or the Router, and the model.
    */
   markFirstText(at?: number): void
+  /** Mark the first reasoning, tool activity or answer output. Only the first call counts. */
+  markFirstVisible(at?: number): void
   /** Read the current numbers without ending the trace. */
   summary(now?: number): TurnTraceSummary
   /** Read the spans recorded so far without ending the trace; an open span reads as ending at `now`. */
@@ -260,6 +264,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
   const open = new Set<string>()
   let dropped = 0
   let finished: TurnTraceSnapshot | undefined
+  let firstVisibleAt: number | undefined
   let firstTextAt: number | undefined
 
   // A refused or late span still returns a handle, so instrumentation never branches on the trace's state.
@@ -326,6 +331,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
 
   const withMeasurements = (summary: TurnTraceSummary): TurnTraceSummary => ({
     ...summary,
+    ...(firstVisibleAt === undefined ? {} : { firstVisibleMs: round1(firstVisibleAt - startedAt) }),
     ...(firstTextAt === undefined ? {} : { firstTextMs: round1(firstTextAt - startedAt) }),
     ...(options.d1QueryCounter === undefined ? {} : { d1Queries: options.d1QueryCounter.queries }),
   })
@@ -352,9 +358,14 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
         throw error
       }
     },
+    markFirstVisible(at) {
+      if (finished || firstVisibleAt !== undefined) return
+      firstVisibleAt = Math.max(startedAt, at ?? now())
+    },
     markFirstText(at) {
       if (finished || firstTextAt !== undefined) return
       firstTextAt = Math.max(startedAt, at ?? now())
+      firstVisibleAt ??= firstTextAt
     },
     summary(at) {
       if (finished) return finished.summary

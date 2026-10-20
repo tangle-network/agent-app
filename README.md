@@ -232,6 +232,12 @@ Build is [tsup](https://tsup.egoist.dev) for the ESM output plus `tsc` for the `
 
 ## Shared turn defaults
 
+First visible output is the latency headline: `firstVisibleMs` / `tangle.turn.first_visible_ms`
+measure request to the first reasoning, tool activity or answer output. First answer text
+(`firstTextMs` / `tangle.turn.first_text_ms`) is the second line and stays answer-only.
+Chat routes mark both automatically; lifecycle timings start at `onTurnStart` after
+admission. See [turn timing and rollout migration](docs/turn-trace.md#the-trace).
+
 `/router-turn` compresses bodies of at least 32 KiB when the base URL has the
 origin of `DEFAULT_TANGLE_ROUTER_BASE_URL`. Other origins stay uncompressed.
 `gzipRequestAboveBytes` overrides the threshold; a negative value disables it.

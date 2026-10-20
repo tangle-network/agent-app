@@ -24,7 +24,7 @@ import { trackedFiles, trackedWorkerConfigs } from './worker-defaults'
 export const APP_DEFAULTS_STEP = 'agent-app defaults'
 
 /** Defaults an app may turn off with a reason. */
-export const EXEMPTIBLE_DEFAULTS = ['turn-trace', 'first-text', 'prewarm', 'placement', 'limit-alarms'] as const
+export const EXEMPTIBLE_DEFAULTS = ['turn-trace', 'first-visible', 'first-text', 'prewarm', 'placement', 'limit-alarms'] as const
 type ExemptibleDefault = (typeof EXEMPTIBLE_DEFAULTS)[number]
 
 /** An app's declared opt-outs: the default and why. An empty reason is a configuration error. */
@@ -37,6 +37,7 @@ export type AppDefaultsExemptions = Readonly<Partial<Record<ExemptibleDefault, s
 const AGENT_APP_OUTCOME_FLOORS = [
   { id: 'turn-trace', label: 'turn trace', since: '0.60.199' },
   { id: 'first-text', label: 'first text', since: '0.60.203' },
+  { id: 'first-visible', label: 'first visible', since: '0.60.227' },
   // createChatTurnRoutes exports every turn without a sink option, and a turn handed to `handoffCompletion` too.
   { id: 'default-trace', label: 'default turn trace', since: '0.60.221' },
   { id: 'router-turn-defaults', label: 'router-turn defaults (gzip and D1 queries)', since: '0.60.225' },
@@ -45,7 +46,7 @@ const AGENT_APP_OUTCOME_FLOORS = [
 type DefaultStatus = 'ok' | 'gap' | 'unknown' | 'exempt' | 'opted-out' | 'na'
 
 interface DefaultRow {
-  readonly id: 'pin' | 'turn-trace' | 'first-text' | 'prewarm' | 'placement' | 'tool-count' | 'limit-alarms' | 'worker-bundle'
+  readonly id: 'pin' | 'turn-trace' | 'first-visible' | 'first-text' | 'prewarm' | 'placement' | 'tool-count' | 'limit-alarms' | 'worker-bundle'
   readonly label: string
   readonly status: DefaultStatus
   readonly detail: string
@@ -81,6 +82,7 @@ export interface AppDefaultsOptions {
 interface LastTurnExport {
   readonly at: number
   readonly traceId: string
+  readonly firstVisibleMs?: number
   readonly firstTextMs?: number
 }
 
@@ -303,19 +305,25 @@ function turnTraceRow(
   return { row: { id: 'turn-trace', label: 'turn trace', status: 'ok', detail: `${wired}; last export not checked` }, optedOut: null, wired: true }
 }
 
-function firstTextRow(pin: string | null, sources: readonly SourceFile[], traceWired: boolean, calls: readonly SinkCall[], exports: AppDefaultsOptions['exports']): DefaultRow {
-  const floor = AGENT_APP_OUTCOME_FLOORS.find((entry) => entry.id === 'first-text')?.since ?? ''
+function firstOutputRow(kind: 'visible' | 'text', pin: string | null, sources: readonly SourceFile[], traceWired: boolean, calls: readonly SinkCall[], exports: AppDefaultsOptions['exports']): DefaultRow {
+  const id = kind === 'visible' ? 'first-visible' : 'first-text'
+  const label = `first ${kind}`
+  const method = kind === 'visible' ? 'markFirstVisible' : 'markFirstText'
+  const metric = kind === 'visible' ? 'first_visible_ms' : 'first_text_ms'
+  const field = kind === 'visible' ? 'firstVisibleMs' : 'firstTextMs'
+  const floor = AGENT_APP_OUTCOME_FLOORS.find((entry) => entry.id === id)?.since ?? ''
   const tuple = pin === null ? null : versionTuple(pin)
-  const marks = filesMatching(sources, /\.markFirstText\s*\(/).length > 0
+  const marks = filesMatching(sources, new RegExp(`\\.${method}\\s*\\(`)).length > 0
   const routes = filesMatching(sources, /\bcreateChatTurnRoutes\s*[(<]/).length > 0
-  if (!traceWired) return { id: 'first-text', label: 'first text', status: 'gap', detail: 'needs the turn trace' }
-  if (tuple !== null && !atLeast(tuple, floor)) return { id: 'first-text', label: 'first text', status: 'gap', detail: `agent-app ${pin} does not mark first text; ${floor} does` }
-  if (!routes && !marks) return { id: 'first-text', label: 'first text', status: 'gap', detail: 'the turn owner does not call trace.markFirstText() and the app does not use createChatTurnRoutes' }
+  if (!traceWired) return { id, label, status: 'gap', detail: 'needs the turn trace' }
+  if (tuple !== null && !atLeast(tuple, floor)) return { id, label, status: 'gap', detail: `agent-app ${pin} does not mark ${label}; ${floor} does` }
+  if (!routes && !marks) return { id, label, status: 'gap', detail: `the turn owner does not call trace.${method}() and the app does not use createChatTurnRoutes` }
   const project = calls.find((call) => call.project)?.project ?? routeProjects(sources).find((call) => call.project)?.project ?? null
   const last = project === null ? undefined : exports?.get(project)
-  const observed = last?.firstTextMs === undefined ? '' : `; last turn first_text_ms ${Math.round(last.firstTextMs)}`
-  if (last && last.firstTextMs === undefined) return { id: 'first-text', label: 'first text', status: 'gap', detail: 'the last exported turn has no tangle.turn.first_text_ms' }
-  return { id: 'first-text', label: 'first text', status: 'ok', detail: `${routes ? 'createChatTurnRoutes marks it' : 'the turn owner marks it'}${observed}` }
+  const measured = last?.[field]
+  const observed = measured === undefined ? '' : `; last turn ${metric} ${Math.round(measured)}`
+  if (last && measured === undefined) return { id, label, status: 'gap', detail: `the last exported turn has no tangle.turn.${metric}` }
+  return { id, label, status: 'ok', detail: `${routes ? 'createChatTurnRoutes marks it' : 'the turn owner marks it'}${observed}` }
 }
 
 function prewarmRow(sources: readonly SourceFile[]): DefaultRow {
@@ -452,7 +460,8 @@ export function checkAppDefaults(repoRoot: string, options: AppDefaultsOptions =
     const reports: { row: DefaultRow; id: ExemptibleDefault | null; optedOut: string | null }[] = [
       { row: pinRow(pin, pkg.spec), id: null, optedOut: null },
       { row: trace.row, id: 'turn-trace', optedOut: trace.optedOut },
-      { row: firstTextRow(pin, sources, traceWired, calls, options.exports), id: 'first-text', optedOut: null },
+      { row: firstOutputRow('visible', pin, sources, traceWired, calls, options.exports), id: 'first-visible', optedOut: null },
+      { row: firstOutputRow('text', pin, sources, traceWired, calls, options.exports), id: 'first-text', optedOut: null },
       { row: prewarmRow(sources), id: 'prewarm', optedOut: null },
       { row: placementRow(configs), id: 'placement', optedOut: null },
       { row: toolCountRow(), id: null, optedOut: null },
@@ -525,10 +534,12 @@ async function readLastTurnExport(
   const spans = (await get(`/v1/traces/${newest.traceId}/spans`)) as {
     items?: { name?: string; attributes?: Record<string, unknown> }[]
   }
+  const firstVisibleMs = Number(spans.items?.find((span) => span.name === 'agent_app.turn')?.attributes?.['tangle.turn.first_visible_ms'])
   const firstTextMs = Number(spans.items?.find((span) => span.name === 'agent_app.turn')?.attributes?.['tangle.turn.first_text_ms'])
   return {
     at: Number(BigInt(newest.startUnixNano) / 1_000_000n),
     traceId: newest.traceId,
+    ...(Number.isFinite(firstVisibleMs) ? { firstVisibleMs } : {}),
     ...(Number.isFinite(firstTextMs) ? { firstTextMs } : {}),
   }
 }
