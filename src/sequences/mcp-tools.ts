@@ -1,3 +1,4 @@
+import { isRecord, requireString, requireEnum, objectSchema } from '../tools/mcp-arguments'
 /**
  * The sequences MCP tool registry — what the in-sandbox agent sees over the
  * live agent→timeline channel. Each entry carries an LLM-facing description,
@@ -78,22 +79,6 @@ export const MAX_CAPTION_BATCH = 500
 
 const MAX_INSTRUCTION_ARG_CHARS = 400
 
-// ---------------------------------------------------------------------------
-// Argument readers — fail loud with the argument name and expected unit
-// ---------------------------------------------------------------------------
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function requireString(args: Record<string, unknown>, name: string): string {
-  const value = args[name]
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new Error(`${name} is required and must be a non-empty string`)
-  }
-  return value
-}
-
 function optionalString(args: Record<string, unknown>, name: string): string | undefined {
   const value = args[name]
   if (value === undefined || value === null) return undefined
@@ -129,14 +114,6 @@ function optionalPositiveInteger(args: Record<string, unknown>, name: string, ma
     throw new Error(`${name} must be an integer between 1 and ${max}`)
   }
   return value
-}
-
-function requireEnum<T extends string>(args: Record<string, unknown>, name: string, values: readonly T[]): T {
-  const value = args[name]
-  if (typeof value !== 'string' || !(values as readonly string[]).includes(value)) {
-    throw new Error(`${name} must be one of: ${values.join(', ')}`)
-  }
-  return value as T
 }
 
 function optionalEnum<T extends string>(args: Record<string, unknown>, name: string, values: readonly T[]): T | undefined {
@@ -350,13 +327,6 @@ async function runMutation(
 
 function secondsSchema(description: string): Record<string, unknown> {
   return { type: 'number', minimum: 0, description }
-}
-
-function objectSchema(
-  properties: Record<string, unknown>,
-  required: string[],
-): Record<string, unknown> {
-  return { type: 'object', properties, required, additionalProperties: false }
 }
 
 const CLIP_ID_SCHEMA = { type: 'string', description: 'Clip id from get_timeline_state or get_clip' }
