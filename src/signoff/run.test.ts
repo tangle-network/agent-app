@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -103,6 +103,25 @@ function logStep(name: string): string {
 const E2E_TIMEOUT_MS = 120_000
 
 describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
+  it('prunes an expired cached store before installing a fresh clean tree', async () => {
+    const repo = fixtureRepo({ steps: `[{ name: 'check', run: "node -e \\"process.exit(0)\\"" }]` })
+    const cacheDir = temp('signoff-cache-')
+    const expired = join(cacheDir, 'stores', 'a'.repeat(64))
+    mkdirSync(expired, { recursive: true })
+    writeFileSync(join(expired, 'blob'), 'unused cache data')
+    const old = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000)
+    utimesSync(expired, old, old)
+
+    const pruned: string[] = []
+    const report = await runSignoff({ repoDir: repo, cacheDir, source: 'head', onEvent: (event) => {
+      if (event.kind === 'cache-prune') pruned.push(...event.removed)
+      if (event.kind === 'install-start') expect(pruned).toContain(expired)
+    } })
+    expect(report.ok).toBe(true)
+    expect(pruned).toContain(expired)
+    expect(existsSync(expired)).toBe(false)
+  })
+
   it('runs every declared step in a clean tree and reports a pass', async () => {
     const log = join(temp('signoff-log-'), 'log.txt')
     writeFileSync(log, '')

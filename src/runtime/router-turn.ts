@@ -20,6 +20,7 @@
  */
 import { streamAppToolLoop, type LoopEvent, type LoopMessage, type LoopToolCall, type ToolLoopStopReason } from './loop'
 import { DEFAULT_TANGLE_ROUTER_BASE_URL } from './model'
+import { gzipRequestBodies } from './gzip-request'
 import { createOpenAICompatCompletionTurn, createOpenAICompatStreamTurn, createOpenAIResponsesTurn, isOpenAIResponsesModel } from './openai-stream'
 import { turnKnowledgeInstructions, type TurnKnowledgeFile } from './turn-knowledge'
 import { replyLanguageInstruction } from './reply-language'
@@ -243,6 +244,12 @@ export interface RouterTurnOptions {
    * chat completions otherwise. A buffered turn (`stream: false`) always uses chat completions.
    */
   api?: 'auto' | 'chat' | 'responses'
+  /**
+   * Gzip a model request body of at least this many bytes (`Content-Encoding: gzip`), so a large system prompt
+   * uploads in fewer round trips. The Tangle Router accepts gzip on its model APIs; leave it unset for an
+   * endpoint that may not. Default: unset, bodies are sent as they are.
+   */
+  gzipRequestAboveBytes?: number
 }
 
 const DEFAULT_BUDGET_MS = 90_000
@@ -342,12 +349,16 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const { trace } = options
   let currentModel = options.model
   let lastModelSpan: TurnSpan | undefined
+  const gzipAbove = options.gzipRequestAboveBytes
+  const baseFetch: typeof fetch | undefined = gzipAbove !== undefined && gzipAbove >= 0
+    ? gzipRequestBodies(options.fetchImpl ?? fetch, gzipAbove)
+    : options.fetchImpl
   // Each HTTP send is its own `model.call` span, so a retried 503 is visible beside the send that answered.
   const sendOnce: typeof fetch | undefined = trace
-    ? tracedModelFetch(trace, options.fetchImpl ?? fetch, {
+    ? tracedModelFetch(trace, baseFetch ?? fetch, {
       onSpan: span => { lastModelSpan = span; span.set({ 'gen_ai.request.model': currentModel }) },
     })
-    : options.fetchImpl
+    : baseFetch
   const fetchImpl: typeof fetch | undefined = signal || attempts > 1 || attemptTimeoutMs
     ? async (input, init) => {
       for (let attempt = 1; ; attempt++) {

@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.60.216",
+  "version": "0.60.218",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -728,6 +728,7 @@
     "@tiptap/suggestion": "^3.30.5",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^24.13.3",
+    "@types/proper-lockfile": "4.1.4",
     "@types/react": "^19.2.18",
     "@types/react-dom": "19.2.5",
     "@types/semver": "^7.8.0",
@@ -914,5 +915,7 @@
       "optional": true
     }
   },
-  "dependencies": {}
+  "dependencies": {
+    "proper-lockfile": "4.1.2"
+  }
 }
