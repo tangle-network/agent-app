@@ -72,6 +72,9 @@ export type RouterTurnEvent =
   | { type: 'reasoning'; delta: string }
   /** The safe repeat is starting a fresh model call on `model`; what the failed call reasoned is finished. */
   | { type: 'repeat'; model: string }
+  /** The model named a tool; its arguments are still streaming. Lets a caller start slow work the call will need
+   *  (the box `sandbox_run` runs in) seconds before the call itself. `toolName` is the app's name. */
+  | { type: 'tool_start'; toolName: string }
   | { type: 'tool'; callId: string; toolName: string; status: 'running'; input: Record<string, unknown>; startedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'completed'; output: unknown; startedAt: number; endedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'error'; error: { code: string; message: string }; startedAt: number; endedAt: number }
@@ -525,6 +528,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
             'gen_ai.usage.output_tokens': event.usage.completionTokens,
           })
           emit({ type: 'usage', ...event.usage })
+        } else if (event.type === 'tool_call_start') {
+          emit({ type: 'tool_start', toolName: byFunction.get(event.toolName)?.name ?? event.toolName })
         } else if (event.type === 'tool_call') {
           segmentOpen = false
           const tool = byFunction.get(event.call.toolName)

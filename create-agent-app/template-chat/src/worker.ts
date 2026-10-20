@@ -132,6 +132,7 @@ export function createWorker(assembly: WorkerAssembly = defaultAssembly): Export
       // reloaded mid-turn re-attaches via /replay instead of losing the run.
       if (pathname === '/api/chat/running' && method === 'GET') return app.routes.running(request)
       if (pathname === '/api/chat/upload' && method === 'POST') return app.upload(request)
+      if (pathname === '/api/chat/prewarm' && method === 'POST') return app.prewarm(request)
       if (pathname === '/api/chat/interactions' && app.routes.interactions) {
         if (method === 'GET') return app.routes.interactions.list(request)
         if (method === 'POST') return app.routes.interactions.answer(request)

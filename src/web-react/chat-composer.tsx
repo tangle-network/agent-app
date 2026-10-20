@@ -63,6 +63,7 @@ import { OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, PopoverSurface } from './controls
 import { formatDictationElapsed, useDictation, type DictationAudio } from './use-dictation'
 import type { ComposerMentionProp } from './use-file-mentions'
 import { LazyLoadBoundary } from './lazy-load-boundary'
+import { useWorkspacePrewarmHandle } from './workspace-prewarm'
 
 /**
  * The TipTap editor is a lazy chunk: only consumers that pass `mention` pull
@@ -456,7 +457,8 @@ export interface ChatComposerProps {
   /** Cmd/Ctrl+L focuses the input and shows the hint. Default true. */
   focusShortcut?: boolean
   /** Called when focus enters the composer: the input or any of its controls.
-   *  Pass `useWorkspacePrewarm().reassert` so a box that suspended while the
+   *  Default: the surrounding workspace shell's prewarm `reassert`
+   *  (`AgentWorkspaceLayout` with `prewarm`), so a box that suspended while the
    *  tab sat open starts resuming before the member sends. */
   onFocusWithin?: () => void
   /** Float the card on a soft two-layer foreground-tinted shadow (opt-in).
@@ -569,6 +571,8 @@ export function ChatComposer({
   sendTone = 'contrast',
   className,
 }: ChatComposerProps) {
+  const shellPrewarm = useWorkspacePrewarmHandle()
+  const focusWithin = onFocusWithin ?? shellPrewarm?.reassert
   const isControlled = value !== undefined
   const [internal, setInternal] = useState(initialValue ?? '')
   const text = isControlled ? value : internal
@@ -1111,7 +1115,7 @@ export function ChatComposer({
   return (
     <div
       className={`relative ${className ?? ''}`}
-      onFocus={onFocusWithin}
+      onFocus={focusWithin}
       onDragEnter={onAttach ? handleDragEnter : undefined}
       onDragLeave={onAttach ? handleDragLeave : undefined}
       onDragOver={onAttach ? handleDragOver : undefined}

@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-519 exports.
+521 exports.
 
 ### `acceptRejectionReason`
 
@@ -3958,6 +3958,14 @@ interface UseSessionHistoryOptions
 (options: UseWorkspacePrewarmOptions) => WorkspacePrewarmHandle
 ```
 
+### `useWorkspacePrewarmHandle`
+
+`function`
+
+```ts
+() => WorkspacePrewarmHandle | null
+```
+
 ### `UseWorkspacePrewarmOptions`
 
 `interface`
@@ -4116,6 +4124,14 @@ interface WorkProductCardProps
 
 ```ts
 ({ name, size }: { name: string; size?: "sm" | "lg" | undefined; }) => Element
+```
+
+### `WorkspacePrewarmContext`
+
+`function` — The prewarm handle of the workspace shell around this component.
+
+```ts
+Context<WorkspacePrewarmHandle | null>
 ```
 
 ### `WorkspacePrewarmHandle`

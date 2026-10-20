@@ -115,7 +115,7 @@ interface AgentWorkspaceIdentity
 `function` — The default agent workspace composition.
 
 ```ts
-({ children, navItems, sessions, apps, activeRoute, activeId, product, workspace, ...sidebarProps }: AgentWorkspaceLayo…
+({ children, navItems, sessions, apps, activeRoute, activeId, product, workspace, prewarm, ...sidebarProps }: AgentWork…
 ```
 
 ### `AgentWorkspaceLayoutProps`

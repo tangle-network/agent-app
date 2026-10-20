@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-265 exports.
+263 exports.
 
 ### `adaptSandboxStream`
 
@@ -734,14 +734,6 @@ type ModelSelectionSource
 type Outcome
 ```
 
-### `parsePrewarmHint`
-
-`function`
-
-```ts
-(value: string | null | undefined) => PrewarmHintMode
-```
-
 ### `peekWorkspaceSandbox`
 
 `function` — Read-only twin of {@link ensureWorkspaceSandbox}: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything.
@@ -828,14 +820,6 @@ interface PrewarmDecision
 
 ```ts
 type PrewarmEvent
-```
-
-### `PrewarmHintMode`
-
-`type` — `SANDBOX_PREWARM_HINT`: `off` (default) or `deterministic`.
-
-```ts
-type PrewarmHintMode
 ```
 
 ### `PrewarmOutcome`

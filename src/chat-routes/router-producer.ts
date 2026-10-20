@@ -8,7 +8,7 @@
  * `stream` generator drains in order, so a slow consumer never drops a frame
  * and the engine never waits on the consumer.
  */
-import { runRouterTurn, type RouterTurnOptions, type RouterTurnOutcome } from '../runtime/router-turn'
+import { runRouterTurn, type RouterTurnEvent, type RouterTurnOptions, type RouterTurnOutcome } from '../runtime/router-turn'
 import { createReasoningClock } from './reasoning-clock'
 import type { ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
 import type { ProducerWireEvent } from './wire'
@@ -16,6 +16,8 @@ import type { ProducerWireEvent } from './wire'
 export type RouterTurnProducerOptions = Omit<RouterTurnOptions, 'onEvent'> & {
   /** Observe the finished turn (placement records, metrics, billing). */
   onOutcome?: (outcome: RouterTurnOutcome) => void
+  /** Observe each engine event after the producer has projected it (a box speculator, metrics). A throw is ignored. */
+  onEvent?: (event: RouterTurnEvent) => void
 }
 
 export function createRouterTurnProducer(options: RouterTurnProducerOptions): ChatTurnRouteProducer {
@@ -92,6 +94,9 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
           part.state = { ...state, events: [...(state.events as unknown[] ?? []), { kind: event.kind, data: event.data, at: event.at }] }
         }
         push({ type: 'tool.event', data: { toolCallId: event.callId, toolName: event.toolName, kind: event.kind, data: event.data, at: event.at } })
+      }
+      if (options.onEvent) {
+        try { options.onEvent(event) } catch { /* an observer never changes the turn */ }
       }
     },
   }).then(result => {

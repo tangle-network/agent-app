@@ -14,7 +14,7 @@
  * still places the box, so nothing here may surface to the member.
  */
 
-import { useCallback, useEffect } from 'react'
+import { createContext, useCallback, useContext, useEffect } from 'react'
 
 export interface WorkspacePrewarmRequestOptions {
   /** Minimum gap between requests for the same URL in this tab. Default 60 000 ms. */
@@ -88,4 +88,15 @@ export function useWorkspacePrewarm(options: UseWorkspacePrewarmOptions): Worksp
   }, [active, url, minIntervalMs])
 
   return { reassert }
+}
+
+/**
+ * The prewarm handle of the workspace shell around this component. `AgentWorkspaceLayout` provides it when the
+ * product passes `prewarm`; `ChatComposer` reasserts through it on focus unless the product passes its own
+ * `onFocusWithin`. Outside a shell that warms, `reassert` does nothing.
+ */
+export const WorkspacePrewarmContext = createContext<WorkspacePrewarmHandle | null>(null)
+
+export function useWorkspacePrewarmHandle(): WorkspacePrewarmHandle | null {
+  return useContext(WorkspacePrewarmContext)
 }

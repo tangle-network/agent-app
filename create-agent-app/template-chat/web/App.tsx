@@ -85,7 +85,8 @@ function Workspace({ session }: { session: Session }) {
     activeId={showApiAccess ? 'api-access' : showHistory ? 'history' : activeId ? undefined : 'new'}
     logo={<span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground" title={productName}>{productName.slice(0, 1)}</span>}
     logoHref="/" user={session.user} settingsHref={null} onLogout={() => void logout()}
-    contentClassName="h-dvh min-h-0 overflow-hidden" defaultRailCollapsed={false}>
+    contentClassName="h-dvh min-h-0 overflow-hidden" defaultRailCollapsed={false}
+    prewarm={{ url: '/api/chat/prewarm' }}>
     {error && <div role="alert" className="p-4 text-sm text-destructive">{error} <button className="underline" onClick={() => location.reload()}>Reload</button></div>}
     {showApiAccess ? <ApiAccess /> : showHistory ? loaded ? <HistoryPage threads={threads} /> : <p role="status" className="p-6">Loading History…</p>
       : <AgentWorkspaceCompanion tabs={workspaceTools} persistenceKey={`workspace:${session.user.id}:tools`}><Conversation initialThreadId={initialThreadId} onThread={setActiveId} onChanged={refreshThreads} /></AgentWorkspaceCompanion>}

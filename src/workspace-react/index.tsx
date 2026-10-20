@@ -1,6 +1,8 @@
 import { SidebarLayout, type SidebarLayoutNavItem, type SidebarLayoutProps } from '@tangle-network/sandbox-ui/dashboard'
 import type { ReactNode } from 'react'
 
+import { useWorkspacePrewarm, WorkspacePrewarmContext, type UseWorkspacePrewarmOptions } from '../web-react/workspace-prewarm'
+
 import type { WorkspaceAppRecord } from '../workspace-apps'
 import { AgentRailIdentity, type AgentProductIdentity, type AgentWorkspaceIdentity } from './rail-identity'
 
@@ -117,6 +119,13 @@ export interface AgentWorkspaceLayoutProps
   hideBelow?: SidebarLayoutProps['hideBelow']
   /** Show labels beside rail icons. Defaults to `true`. */
   railLabels?: SidebarLayoutProps['railLabels']
+  /**
+   * Warm the open workspace: the shell posts to the product's prewarm route
+   * (`createWorkspacePrewarmRoute`) when the page opens in a visible tab, and
+   * every `ChatComposer` inside reasserts on focus. Pass the route's URL and
+   * whether this member may chat. Omit on pages with no workspace.
+   */
+  prewarm?: UseWorkspacePrewarmOptions
 }
 
 /**
@@ -139,8 +148,10 @@ export function AgentWorkspaceLayout({
   activeId,
   product,
   workspace,
+  prewarm,
   ...sidebarProps
 }: AgentWorkspaceLayoutProps) {
+  const prewarmHandle = useWorkspacePrewarm(prewarm ?? { url: null })
   const sessionNav = sessions
     ? (() => {
         const composed = composeSidebarSessions({
@@ -261,13 +272,15 @@ export function AgentWorkspaceLayout({
   }
 
   return (
-    <SidebarLayout
-      {...layoutProps}
-      navItems={workspaceNavItems}
-      activeId={activeAppId ? appGroup?.id : resolvedActiveId}
-    >
-      {children}
-    </SidebarLayout>
+    <WorkspacePrewarmContext.Provider value={prewarm ? prewarmHandle : null}>
+      <SidebarLayout
+        {...layoutProps}
+        navItems={workspaceNavItems}
+        activeId={activeAppId ? appGroup?.id : resolvedActiveId}
+      >
+        {children}
+      </SidebarLayout>
+    </WorkspacePrewarmContext.Provider>
   )
 }
 

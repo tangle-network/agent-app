@@ -39,9 +39,9 @@ Keep browser DOM types separate from Worker types and scan installed UI package 
 
 ## Defaults
 
-This app inherits agent-app's defaults: a trace per turn sent to Intelligence, limit alarms on D1, and the shared Worker settings.
+This app inherits agent-app's defaults: the hybrid turn (the Router answers first and escalates to the box through `sandbox_run`), the shared prewarm route, a trace per turn sent to Intelligence, limit alarms on D1, and the shared Worker settings.
 `pnpm signoff` runs the checks in `signoff.config.mjs` and reports which defaults the app has (`agent-app-signoff defaults` prints the same report alone).
-Turn a default off only with an exemption and its reason in `signoff.config.mjs`; the prewarm and placement exemptions there are temporary.
+Turn a default off only with an exemption and its reason in `signoff.config.mjs`; the placement exemption there is temporary.
 
 ## Verification
 

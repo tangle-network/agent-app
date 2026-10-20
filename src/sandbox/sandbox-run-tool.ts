@@ -13,9 +13,10 @@
  * fail instead.
  *
  * WARM LEASES. When the product passes `warm`, the call counts as a turn on the
- * box's lease (`leases.turn(key)`), so an `escalation-likely` warm from
- * `createEscalationSpeculator` is recorded as used. The default name is the
- * one the speculator listens for (`DEFAULT_ESCALATION_TOOLS`).
+ * box's lease (`leases.turn(key)`), so an `escalation-likely` warm the product
+ * signalled is recorded as used. The default name is the one the speculator
+ * listens for (`DEFAULT_ESCALATION_TOOLS`). `createHybridTurnProducer` in
+ * `/chat-routes` mounts this tool with the turn's single box start.
  */
 import type { SandboxInstance } from '@tangle-network/sandbox'
 import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'

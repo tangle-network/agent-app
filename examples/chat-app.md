@@ -15,6 +15,7 @@ Who owns each hop:
 | Thread/message tables + CRUD | `/chat-store` (`createChatTables` + `createChatStore`) |
 | Body parse, turn identity, routes | `/chat-routes` (`createChatTurnRoutes`) |
 | Turn engine (NDJSON protocol, hook order) | agent-runtime `handleChatTurn` |
+| The default turn: Router first, box through `sandbox_run` | `/chat-routes` (`createHybridTurnProducer`, `startHybridBox` in `afterAuthorize`) |
 | Sandbox events → client vocabulary + persisted parts | `/chat-routes` (`createSandboxChatProducer`) |
 | Model failover on a dead upstream (attributed, pre-first-byte) | `/chat-routes` (`openEvents` + `fallbackModels` on the producer) |
 | Buffered replay after a drop | `/stream` turn buffer (wired by default) |
@@ -26,6 +27,20 @@ Who owns each hop:
 
 A deliberate retry keeps the original `turnId` and supplies a new `retryAttemptId`.
 Transport retries reuse both identifiers, preserving the user message while each deliberate attempt gets separate execution and completion records.
+
+## The default turn
+
+A chat turn answers on the Router with the app's tools in process
+(`createHybridTurnProducer`), and work that needs a computer goes to the
+workspace box through one `sandbox_run` call. The box starts once per turn: at
+admission when the ask needs it (`startHybridBox` in `afterAuthorize`, handed
+to the producer as `box.started`), or when the model names `sandbox_run`.
+A turn that carries files runs on the sandbox lane, where the
+files are (`turnCarriesFiles`). The generated `--chat` app's `createHybridLane`
+in `src/sandbox.ts` is the reference wiring. The shell warms the open
+workspace through `AgentWorkspaceLayout`'s `prewarm` and the shared
+`createWorkspacePrewarmRoute`; a Router-lane workspace declines the warm and
+relies on the speculator.
 
 ## Schema (Drizzle + shared migration constants)
 
