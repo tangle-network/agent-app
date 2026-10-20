@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.218
+
+- perf(router-turn): gzip a large model request body when the caller asks (#1176)
+
 ## 0.60.217
 
 - fix(sandbox): a reuse keys what it trusts on the box's filesystem incarnation, because the Sandbox API reports no startedAt (#1177)
