@@ -4,6 +4,9 @@ import type { ComposerFileRejection } from './composer-file-accept'
 import type { ComposerMentionProp } from './use-file-mentions'
 import type { DictationAudio } from './use-dictation'
 
+/** Prompt-part descriptor an uploaded file carries (the upload route's
+ *  `UploadedChatFile.part`), echoed back in the turn body on send. Mirrors
+ *  `/chat-routes`' wire shape structurally — no server import here. */
 export interface ComposerFilePart {
   type: 'image' | 'file'
   filename?: string

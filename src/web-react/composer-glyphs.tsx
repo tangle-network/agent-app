@@ -73,9 +73,3 @@ export function MicGlyph({ className }: { className?: string }) {
     </svg>
   )
 }
-
-// ── component ──────────────────────────────────────────────────────────────
-
-/** Prompt-part descriptor an uploaded file carries (the upload route's
- *  `UploadedChatFile.part`), echoed back in the turn body on send. Mirrors
- *  `/chat-routes`' wire shape structurally — no server import here. */
