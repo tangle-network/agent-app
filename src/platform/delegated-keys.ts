@@ -44,6 +44,7 @@ export type DelegatedKeyCode =
   | 'delegated_key.owner_unverified'
   | 'delegated_key.unavailable'
   | 'delegated_key.refused'
+  | 'delegated_key.failed'
   | 'delegated_key.response_invalid'
   | 'delegated_key.invalid_request'
 
@@ -53,6 +54,8 @@ export interface DelegatedKeyRefusal {
   message: string
   /** Set when an untrusted child could not be revoked: the id (never the key) the app must retire. */
   unrevokedKeyId?: string
+  /** Platform's own error code (never its message) for a decision this client does not type, for logs. */
+  platformCode?: string
 }
 
 export type DelegatedKeyOutcome<T> =
@@ -167,7 +170,19 @@ function refusal(status: number, code: unknown): DelegatedKeyRefusal {
   if (status >= 500 || status === 429 || code === 'PLATFORM_BUSY') {
     return { status: 503, code: 'delegated_key.unavailable', message: 'Platform could not answer; retry.' }
   }
-  return { status: 403, code: 'delegated_key.refused', message: 'Platform refused to delegate this key.' }
+  // Only an authorization answer is a refusal. Any other 4xx is a decision about this request (Platform's
+  // 400 DELEGATION_FAILED, say), kept as its own status with Platform's code so it is not mistaken for
+  // a credential problem. The message stays out: it can name Platform internals.
+  const platformCode = typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(code) ? code : undefined
+  if (status === 401 || status === 403 || status < 400) {
+    return { status: 403, code: 'delegated_key.refused', message: 'Platform refused to delegate this key.', ...(platformCode ? { platformCode } : {}) }
+  }
+  return {
+    status,
+    code: 'delegated_key.failed',
+    message: `Platform declined this delegation${platformCode ? ` (${platformCode})` : ''}.`,
+    ...(platformCode ? { platformCode } : {}),
+  }
 }
 
 const failure = <T,>(status: number, code: DelegatedKeyCode, message: string, extra: Partial<DelegatedKeyRefusal> = {}): DelegatedKeyOutcome<T> =>
