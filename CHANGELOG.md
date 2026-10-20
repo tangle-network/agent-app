@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.217
+
+- fix(sandbox): a reuse keys what it trusts on the box's filesystem incarnation, because the Sandbox API reports no startedAt (#1177)
+- fix(signoff): bound idle caches while preserving active leases
+
 ## 0.60.216
 
 - feat(signoff): report app defaults and share alarm configuration (#1168)
