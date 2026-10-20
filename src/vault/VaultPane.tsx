@@ -12,50 +12,22 @@
  * default). Chrome uses the shared theme tokens (bg-card, border-border, …).
  */
 
-import {
-  Component,
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type ErrorInfo,
-  type ReactNode,
-} from 'react'
-import { Download, FileText, Folder, History, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { VaultTree } from '@tangle-network/sandbox-ui/vault-tree'
 import { ConfirmDialog } from './ConfirmDialog'
-import { readRecentFiles, recordRecentFile } from './recent-files'
-import { VaultContentResults, type ContentSearchState } from './VaultContentResults'
+import { SourceEditor } from './SourceEditor'
 import { VaultHistoryPanel } from './VaultHistoryPanel'
-import { filterFileNodes, VaultTree } from '@tangle-network/sandbox-ui/vault-tree'
-import type {
-  VaultEditorMode,
-  VaultFile,
-  VaultMarkdownCodec,
-  VaultOperation,
-  VaultOperationFailure,
-  VaultOperationPhase,
-  VaultPaneHandle,
-  VaultPaneProps,
-  VaultRichParts,
-  VaultTreeNode,
-} from './contracts'
-import { ShellHeader } from '@tangle-network/sandbox-ui/workspace'
-
-/** Narrowest pane that places a dock beside the document rather than in it. */
-const DOCK_SIDE_MIN_PX = 960
-
-/** Characters a content search needs before it asks the port. */
-const CONTENT_SEARCH_MIN = 2
-/** Pause after the last keystroke before a content search is sent. */
-const CONTENT_SEARCH_DEBOUNCE_MS = 250
-
-/** Square header action on the control scale's small step, a touch target on coarse pointers. */
-const TREE_ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:size-10'
+import { VaultContentResults } from './VaultContentResults'
+import { DocumentEmptyState, EditorErrorBoundary, EditorSkeleton, OperationErrorAlert, ReadErrorState, TreeEmptyState, TreeErrorState, TreeNoMatchState, TreeSkeleton, treeFailureMessage, operationMessage } from './VaultPaneStates'
+import { VaultDocumentToolbar } from './VaultDocumentToolbar'
+import { VaultTreePanel } from './VaultTreePanel'
+import { VaultPaneNavigation } from './VaultPaneNavigation'
+import { VaultCreateDialog } from './VaultCreateDialog'
+import { useVaultSearch } from './useVaultSearch'
+import { useVaultDockPlacement } from './useVaultDockPlacement'
+import { readRecentFiles, recordRecentFile } from './recent-files'
+import { collectTreePaths, findDirectory, resolveTreePath } from './vault-tree-paths'
+import type { VaultEditorMode, VaultFile, VaultMarkdownCodec, VaultOperation, VaultOperationFailure, VaultOperationPhase, VaultPaneHandle, VaultPaneProps, VaultRichParts, VaultTreeNode } from './contracts'
 
 const IDENTITY_CODEC: VaultMarkdownCodec = {
   parse: (raw) => raw,
@@ -85,289 +57,8 @@ interface TreeFailureState {
 
 const LIST_CONTEXT: TreeRefreshContext = { operation: 'list', phase: 'operation' }
 
-function operationMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
-}
-
-function treeFailureMessage(failure: VaultOperationFailure, label: string): string {
-  if (failure.phase !== 'post-mutation-refresh') return failure.message
-  const completed = failure.operation === 'create' ? 'created' : 'deleted'
-  return `The file was ${completed}, but ${label} couldn't refresh. ${failure.message}`
-}
-
-interface TreePaths {
-  files: Set<string>
-  directories: Set<string>
-}
-
-// Directories are collected alongside files because a click on one has to be
-// RECOGNIZED to be answered — dropping them here is what made a folder row a
-// dead target: the path resolved to nothing and every downstream branch was
-// keyed on a file.
-function collectTreePaths(nodes: VaultTreeNode[], into: TreePaths): TreePaths {
-  for (const node of nodes) {
-    if (node.type === 'file') into.files.add(node.path)
-    else into.directories.add(node.path)
-    if (node.children) collectTreePaths(node.children, into)
-  }
-  return into
-}
-
-function resolveFilePath(rawPath: string, filePaths: Set<string>): string | null {
-  if (filePaths.has(rawPath)) return rawPath
-  const path = rawPath.replace(/^\/+|\/+$/g, '')
-  return filePaths.has(path) ? path : null
-}
-
-function resolveTreePath(rawPath: string, paths: TreePaths): { path: string; type: 'file' | 'directory' } | null {
-  const file = resolveFilePath(rawPath, paths.files)
-  if (file) return { path: file, type: 'file' }
-  if (paths.directories.has(rawPath)) return { path: rawPath, type: 'directory' }
-  const trimmed = rawPath.replace(/^\/+|\/+$/g, '')
-  return paths.directories.has(trimmed) ? { path: trimmed, type: 'directory' } : null
-}
-
-function findDirectory(nodes: VaultTreeNode[], path: string): VaultTreeNode | null {
-  for (const node of nodes) {
-    if (node.type === 'directory' && node.path === path) return node
-    const found = node.children ? findDirectory(node.children, path) : null
-    if (found) return found
-  }
-  return null
-}
-
-class EditorErrorBoundary extends Component<{ children: ReactNode; label: string; onReset?: () => void }, { error: unknown }> {
-  state: { error: unknown } = { error: null }
-  static getDerivedStateFromError(error: unknown) {
-    return { error }
-  }
-  componentDidCatch(error: unknown, info: ErrorInfo) {
-    console.error('Vault crashed:', error, info)
-  }
-  render() {
-    if (this.state.error) {
-      const msg = this.state.error instanceof Error
-        ? this.state.error.message
-        : typeof this.state.error === 'string'
-          ? this.state.error
-          : `${this.props.label} did not load. Reload the page to try again.`
-      return (
-        <div className="flex h-full flex-1 flex-col items-center justify-center p-8 text-center">
-          <h3 className="mb-1 text-sm font-medium text-foreground">{this.props.label} failed to load</h3>
-          <p className="mb-4 max-w-xs text-xs text-muted-foreground">{String(msg)}</p>
-          <button
-            type="button"
-            onClick={() => { this.setState({ error: null }); this.props.onReset?.() }}
-            className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-          >
-            Try again
-          </button>
-        </div>
-      )
-    }
-    return this.props.children
-  }
-}
-
-/**
- * A skeleton is a picture of a wait, and a picture is exactly what a screen
- * reader cannot see. `aria-hidden` on the shimmer bars is right — they carry no
- * information — but hiding them without saying anything else is what left the
- * whole load silent. The container announces the wait instead: `aria-busy` for
- * the state, a `status` live region so arrival is reported, and a real text
- * label, since a live region with only decorative children announces nothing.
- */
-function SkeletonRegion({ label, className, children }: { label: string; className: string; children: ReactNode }) {
-  // The live region is a SIBLING of the shimmer, not a wrapper around it: the
-  // shimmer container keeps its exact classes and its exact position in the
-  // parent's layout, so adding the announcement cannot move a pixel. Wrapping
-  // it would put a new box between `space-y-*` and the bars it spaces.
-  return (
-    <>
-      <span role="status" aria-live="polite" aria-busy={true} className="sr-only">
-        {label}
-      </span>
-      <div className={className} aria-hidden="true">
-        {children}
-      </div>
-    </>
-  )
-}
-
-function TreeSkeleton() {
-  return (
-    <SkeletonRegion label="Loading files…" className="space-y-2 p-4">
-      {[32, 48, 40, 52].map((w, i) => (
-        <div key={i} className="h-4 animate-pulse rounded bg-muted" style={{ width: `${w * 4}px` }} />
-      ))}
-    </SkeletonRegion>
-  )
-}
-
-function EditorSkeleton() {
-  return (
-    <SkeletonRegion label="Loading file…" className="space-y-3 p-8">
-      <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
-      <div className="h-4 w-full animate-pulse rounded bg-muted" />
-      <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
-      <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
-    </SkeletonRegion>
-  )
-}
-
-function ReadErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">Couldn't open this file</h3>
-        <p className="mt-1 max-w-md text-xs text-muted-foreground">{message}</p>
-      </div>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-      >
-        Retry
-      </button>
-    </div>
-  )
-}
-
-function TreeErrorState({ label, message, onRetry }: { label: string; message: string; onRetry: () => void }) {
-  return (
-    <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">Couldn't load {label}</h3>
-        <p className="mt-1 max-w-xs text-xs text-muted-foreground">{message}</p>
-      </div>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-      >
-        Retry
-      </button>
-    </div>
-  )
-}
-
-/**
- * The tree pane when the vault holds nothing at all. It sits under the header
- * whose controls add files, so it names the state and offers the same action
- * instead of leaving a blank column under a search box with nothing to search.
- */
-function TreeEmptyState({ canCreate, onCreate }: { canCreate: boolean; onCreate: () => void }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">No files yet</h3>
-        <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-          {canCreate ? 'Create a file to start.' : 'Files appear here once they are added.'}
-        </p>
-      </div>
-      {canCreate && (
-        <button
-          type="button"
-          onClick={onCreate}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          New file
-        </button>
-      )}
-    </div>
-  )
-}
-
-function TreeNoMatchState({ query, onClear }: { query: string; onClear: () => void }) {
-  return (
-    <div className="flex flex-col items-center gap-3 p-6 text-center">
-      <p className="max-w-xs break-words text-xs text-muted-foreground">No files match “{query}”.</p>
-      <button
-        type="button"
-        onClick={onClear}
-        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-      >
-        Clear search
-      </button>
-    </div>
-  )
-}
-
-function OperationErrorAlert({
-  message,
-  retryLabel,
-  onRetry,
-  onDismiss,
-}: {
-  message: string
-  retryLabel: string
-  onRetry: () => void
-  onDismiss: () => void
-}) {
-  return (
-    <div
-      role="alert"
-      className="flex shrink-0 items-center justify-between gap-3 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-[var(--surface-danger-text)]"
-    >
-      <span className="min-w-0 flex-1">{message}</span>
-      <div className="flex shrink-0 items-center gap-3">
-        <button type="button" aria-label={retryLabel} onClick={onRetry} className="font-medium underline-offset-2 hover:underline">
-          Retry
-        </button>
-        <button type="button" onClick={onDismiss} className="underline-offset-2 hover:underline">
-          Dismiss
-        </button>
-      </div>
-    </div>
-  )
-}
-
 /** How many recent files the empty document pane offers. */
 const RECENT_SHOWN = 5
-
-/**
- * The document pane with nothing open: says what to do, and offers the files
- * this reader opened last in this vault so returning work is one click away.
- */
-function DocumentEmptyState({ label, recent, onOpen }: { label: string; recent: string[]; onOpen: (path: string) => void }) {
-  const recentHeadingId = useId()
-  return (
-    <div data-vault-document-empty className="flex h-full items-center justify-center overflow-y-auto p-8">
-      <div className="w-full max-w-sm text-center">
-        <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          <FileText className="size-5" aria-hidden="true" />
-        </span>
-        <h3 className="mt-4 text-base font-semibold text-foreground">Select a file</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Choose a file in {label} to open it here.</p>
-        {recent.length > 0 && (
-          <section aria-labelledby={recentHeadingId} className="mt-8 text-left">
-            <h4 id={recentHeadingId} className="text-xs font-medium text-muted-foreground">Recently opened</h4>
-            <ul className="mt-2 overflow-hidden rounded-xl border border-border bg-card shadow-raised">
-              {recent.map((path) => {
-                const slash = path.lastIndexOf('/')
-                return (
-                  <li key={path} className="border-b border-border last:border-b-0">
-                    <button
-                      type="button"
-                      onClick={() => onOpen(path)}
-                      title={path}
-                      className="flex min-h-10 w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                    >
-                      <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      <span className="min-w-0 truncate font-medium">{path.slice(slash + 1)}</span>
-                      {slash > 0 && <span className="ml-auto min-w-0 shrink truncate text-xs text-muted-foreground">{path.slice(0, slash)}</span>}
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </section>
-        )}
-      </div>
-    </div>
-  )
-}
 
 /**
  * Browse and edit files in the available pane width.
@@ -465,22 +156,9 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   // and the document and its Files switcher were unreachable). There the dock
   // opens IN the document pane instead, behind a path-bar toggle. Measured, not
   // a media query: the pane is often a drawer or a split inside a wide window.
-  const rootRef = useRef<HTMLDivElement>(null)
-  const [dockInline, setDockInline] = useState(false)
-  useLayoutEffect(() => {
-    const root = rootRef.current
-    if (!root || !renderDock || typeof ResizeObserver === 'undefined') return
-    const apply = (width: number) => { if (width > 0) setDockInline(width < DOCK_SIDE_MIN_PX) }
-    apply(root.getBoundingClientRect().width)
-    const observer = new ResizeObserver((entries) => apply(entries[0]?.contentRect.width ?? 0))
-    observer.observe(root)
-    return () => observer.disconnect()
-  }, [renderDock])
+  const { rootRef, dockInline } = useVaultDockPlacement(renderDock)
   const [pendingNav, setPendingNav] = useState<PendingNav>(null)
-  const [query, setQuery] = useState('')
   const [folderPath, setFolderPath] = useState<string | null>(null)
-  const [contentSearch, setContentSearch] = useState<ContentSearchState>({ status: 'idle' })
-  const [contentSearchNonce, setContentSearchNonce] = useState(0)
   const [historyOpen, setHistoryOpen] = useState(false)
 
   const dirtyRef = useRef(isDirty)
@@ -561,52 +239,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     () => ({ name: label, path: '', type: 'directory', children: tree }),
     [tree, label],
   )
-  // Search always covers the whole vault. Expanding a folder makes it the
-  // active folder, and a search silently narrowed to it hid files the reader
-  // was looking for; the active folder only decides where a new file goes.
-  const visibleRoot = useMemo<VaultTreeNode>(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return treeRoot
-    return { ...treeRoot, children: filterFileNodes(treeRoot.children ?? [], q) }
-  }, [treeRoot, query])
-
-  // Words inside files, from the port, a moment after the reader stops typing.
-  const searchQuery = query.trim()
-  const canSearchContent = typeof port.searchContent === 'function'
-  useEffect(() => {
-    if (!canSearchContent || searchQuery.length < CONTENT_SEARCH_MIN) {
-      setContentSearch({ status: 'idle' })
-      return
-    }
-    const controller = new AbortController()
-    setContentSearch((current) => ({
-      status: 'loading',
-      query: searchQuery,
-      matches: current.status !== 'idle' && current.status !== 'error' && current.query === searchQuery ? current.matches : [],
-    }))
-    const timer = setTimeout(() => {
-      port.searchContent!(searchQuery, { signal: controller.signal }).then(
-        (matches) => {
-          if (!controller.signal.aborted) setContentSearch({ status: 'done', query: searchQuery, matches })
-        },
-        (error) => {
-          if (!controller.signal.aborted) {
-            setContentSearch({ status: 'error', query: searchQuery, message: operationMessage(error, 'The search did not answer.') })
-          }
-        },
-      )
-    }, CONTENT_SEARCH_DEBOUNCE_MS)
-    return () => {
-      clearTimeout(timer)
-      controller.abort()
-    }
-  }, [port, canSearchContent, searchQuery, contentSearchNonce])
-  // Until the effect catches up with a new query, its results are pending, not empty.
-  const contentResults: ContentSearchState = !canSearchContent || searchQuery.length < CONTENT_SEARCH_MIN
-    ? { status: 'idle' }
-    : contentSearch.status !== 'idle' && contentSearch.query === searchQuery
-      ? contentSearch
-      : { status: 'loading', query: searchQuery, matches: [] }
+  const { query, onQueryChange, visibleRoot, canSearchContent, contentResults, retry: retryContentSearch } = useVaultSearch({ port, treeRoot })
 
   const commitPath = useCallback(
     (next: string | null) => {
@@ -1053,7 +686,6 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     .filter((path) => path !== selectedPath && treePaths.files.has(path))
     .slice(0, RECENT_SHOWN)
 
-  const createFileName = newPath.trim().split('/').pop()?.trim() ?? ''
   const dockButtonLabel = persistentDock ? dockLabel : dockToggleCfg.label
   const dockBlockedByDraft = !persistentDock && (dockToggleCfg.disabledWhenDirty ?? true) && isDirty
   const openCreate = () => { setCreateError(null); setNewPath(activeFolder ? `${activeFolder}/` : ''); setCreateOpen(true) }
@@ -1063,6 +695,17 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const vaultEmpty = treeLoaded && treePaths.files.size === 0 && treePaths.directories.size === 0
   const trimmedQuery = query.trim()
   const nameMatches = (visibleRoot.children?.length ?? 0) > 0
+  const showFileList = () => {
+    const focused = document.activeElement
+    setFilesOpen(true)
+    requestAnimationFrame(() => {
+      if (document.activeElement === focused || document.activeElement === document.body) {
+        searchRef.current?.focus()
+      }
+    })
+  }
+
+  const cancelCreate = () => { setCreateOpen(false); setNewPath(''); setCreateError(null) }
 
   let treeContent: ReactNode
   if (!treeLoaded && (treeLoading || !treeError)) {
@@ -1083,7 +726,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
         {vaultEmpty && !trimmedQuery
           ? (treeEmptyState !== undefined ? treeEmptyState : <TreeEmptyState canCreate={canCreate} onCreate={openCreate} />)
           : trimmedQuery && !nameMatches && (contentResults.status === 'idle' || (contentResults.status === 'done' && contentResults.matches.length === 0))
-            ? <TreeNoMatchState query={trimmedQuery} onClear={() => setQuery('')} />
+            ? <TreeNoMatchState query={trimmedQuery} onClear={() => onQueryChange('')} />
             : trimmedQuery && !nameMatches
               ? null
               : renderTree
@@ -1109,7 +752,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
             state={contentResults}
             selectedPath={resolvedSelectedPath}
             onOpen={(path) => guardedOpen(path)}
-            onRetry={() => setContentSearchNonce((n) => n + 1)}
+            onRetry={retryContentSearch}
           />
         )}
       </>
@@ -1123,109 +766,15 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
           {/* The pane switcher exists only while there is a document to switch
               to; with nothing selected the Files pane is already all there is,
               and a lone Files chip would be a control that does nothing. */}
-          {selectedPath && (
-          <nav aria-label={`${label} navigation`} className="flex shrink-0 items-center gap-1 border-b border-border p-2 @[60rem]/vault:hidden">
-            <button
-              type="button"
-              aria-pressed={showFiles}
-              onClick={() => {
-                const focused = document.activeElement
-                setFilesOpen(true)
-                requestAnimationFrame(() => {
-                  if (document.activeElement === focused || document.activeElement === document.body) {
-                    searchRef.current?.focus()
-                  }
-                })
-              }}
-              className={`shrink-0 rounded-md px-3 py-2 text-sm ${showFiles ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:bg-muted'}`}
-            >
-              Files
-            </button>
-            {selectedPath && (
-              <button
-                type="button"
-                aria-pressed={!showFiles}
-                onClick={showDocument}
-                title={selectedPath}
-                className={`min-w-0 truncate rounded-md px-3 py-2 text-sm ${!showFiles ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:bg-muted'}`}
-              >
-                {selectedPath.split('/').pop()}
-              </button>
-            )}
-          </nav>
-          )}
+          <VaultPaneNavigation label={label} selectedPath={selectedPath} showFiles={showFiles} onShowFiles={showFileList} onShowDocument={showDocument} />
           <div className="flex min-h-0 min-w-0 flex-1">
             <div data-vault-tree className={`${showFiles ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col p-2 @[60rem]/vault:flex @[60rem]/vault:p-3 @[60rem]/vault:w-[23rem] @[60rem]/vault:min-w-[23rem] @[60rem]/vault:flex-none`}>
               {/* The tree is its own surface: a card on the page background,
                   so the file list reads as a finished panel rather than
                   text floating on the canvas. */}
-              <section
-                aria-labelledby={treeHeadingId}
-                data-vault-tree-surface
-                data-slot="card"
-                className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-raised"
-              >
-                <div className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-3">
-                  <h2 id={treeHeadingId} className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
-                    {label}
-                  </h2>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {headerActions}
-                    <button
-                      type="button"
-                      aria-label={`Refresh ${noun}`}
-                      title="Refresh"
-                      onClick={() => void refresh()}
-                      className={`${TREE_ICON_BUTTON} text-muted-foreground hover:bg-muted hover:text-foreground`}
-                    >
-                      <RefreshCw className="size-4" aria-hidden="true" />
-                    </button>
-                    {canCreate && (
-                      <button
-                        type="button"
-                        title="New file"
-                        aria-label={activeFolder ? `New file in ${activeFolder}` : 'New file'}
-                        onClick={openCreate}
-                        className={`${TREE_ICON_BUTTON} bg-primary text-primary-foreground hover:bg-primary/90`}
-                      >
-                        <Plus className="size-4" aria-hidden="true" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="shrink-0 px-3 pb-2">
-                  <input
-                    ref={searchRef}
-                    type="search"
-                    disabled={vaultEmpty}
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder={canSearchContent ? `Search ${noun} names and text…` : `Search ${noun}…`}
-                    aria-label={`Search ${noun}`}
-                    className="h-8 w-full rounded-md border border-[var(--field-border,var(--color-border))] bg-[var(--well,var(--color-input))] px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-10 [@media(pointer:coarse)]:text-base"
-                  />
-                </div>
-                {activeFolder && canCreate && (
-                  <div className="mx-3 mb-2 flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-sm">
-                    <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                    <span className="shrink-0 text-muted-foreground">New files go in</span>
-                    <span data-vault-folder className="min-w-0 flex-1 truncate font-medium text-foreground" title={activeFolder}>
-                      {activeFolder}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label="Clear the active folder"
-                      onClick={() => setFolderPath(null)}
-                      className="shrink-0 rounded px-1 text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                )}
-                <div className="min-h-0 flex-1 overflow-y-auto border-t border-border px-1.5 py-1.5">
-                  {treeContent}
-                </div>
-              </section>
+              <VaultTreePanel label={label} treeHeadingId={treeHeadingId} headerActions={headerActions} onRefresh={() => void refresh()} onCreate={canCreate ? openCreate : undefined} activeFolder={activeFolder} onClearFolder={() => setFolderPath(null)} query={query} onQueryChange={onQueryChange} canSearchContent={canSearchContent} empty={vaultEmpty} searchRef={searchRef}>
+                {treeContent}
+              </VaultTreePanel>
             </div>
 
             <div
@@ -1236,98 +785,17 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
               className={`${showFiles ? 'hidden' : 'flex'} min-w-0 flex-1 flex-col overflow-hidden @[60rem]/vault:flex`}
             >
               {selectedFile && (
-                <ShellHeader className={`justify-between gap-2 px-4 ${pathBarClassName ?? 'bg-card'}`}>
-                  <span data-vault-path className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{selectedFile.path}</span>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {canWrite && isMarkdownCapable && (
-                      <div className="mr-1 flex items-center gap-1">
-                        <button
-                          type="button"
-                          aria-label="Edit as rich text"
-                          aria-pressed={editorMode === 'rich'}
-                          onClick={showRichMode}
-                          className={`inline-flex h-8 items-center rounded px-2.5 text-sm transition-colors ${
-                            editorMode === 'rich'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                          }`}
-                        >
-                          Rich
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Edit as source"
-                          aria-pressed={editorMode === 'source'}
-                          onClick={showSourceMode}
-                          className={`inline-flex h-8 items-center rounded px-2.5 text-sm transition-colors ${
-                            editorMode === 'source'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                          }`}
-                        >
-                          Source
-                        </button>
-                      </div>
-                    )}
-                    {canShowHistory && (
-                      <button
-                        type="button"
-                        aria-pressed={historyOpen}
-                        disabled={isDirty && !historyOpen}
-                        title={isDirty && !historyOpen ? 'Save or discard your edits first' : 'Saved versions of this file'}
-                        onClick={() => setHistoryOpen((open) => !open)}
-                        className={`inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-sm transition-colors disabled:pointer-events-none disabled:opacity-40 ${
-                          historyOpen
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                        }`}
-                      >
-                        <History className="size-4" aria-hidden="true" />
-                        History
-                      </button>
-                    )}
-                    {renderDock && (!persistentDock || dockInline) && (
-                      <button
-                        type="button"
-                        aria-label={dockButtonLabel}
-                        aria-pressed={dockOpen}
-                        disabled={dockBlockedByDraft}
-                        title={dockBlockedByDraft ? 'Save your changes first' : (persistentDock ? dockLabel : (dockToggleCfg.title ?? dockToggleCfg.label))}
-                        onClick={() => setDockOpen((v) => !v)}
-                        className={`inline-flex h-8 items-center gap-1 rounded px-2.5 text-sm transition-colors disabled:pointer-events-none disabled:opacity-40 ${
-                          dockOpen
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                        }`}
-                      >
-                        {dockButtonLabel}
-                      </button>
-                    )}
-                    {fileActions?.(selectedFile)}
-                    {onDownloadFile && (
-                      <button
-                        type="button"
-                        aria-label="Download this file"
-                        title="Download file"
-                        onClick={() => onDownloadFile(selectedFile)}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      >
-                        <Download className="h-4 w-4" />
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button
-                        type="button"
-                        aria-label="Delete this file"
-                        title="Delete file"
-                        onClick={() => { setDeleteError(null); setDeleteOpen(true) }}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded text-[var(--surface-danger-text)] transition-colors hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </ShellHeader>
+                <VaultDocumentToolbar
+                  file={selectedFile}
+                  className={pathBarClassName}
+                  editing={canWrite && isMarkdownCapable ? { value: editorMode, onRich: showRichMode, onSource: showSourceMode } : undefined}
+                  history={canShowHistory ? { open: historyOpen, dirty: isDirty, onToggle: () => setHistoryOpen((open) => !open) } : undefined}
+                  dock={renderDock && (!persistentDock || dockInline) ? { label: dockButtonLabel, open: dockOpen, blocked: dockBlockedByDraft, title: persistentDock ? dockLabel : (dockToggleCfg.title ?? dockToggleCfg.label), onToggle: () => setDockOpen((v) => !v) } : undefined}
+                  onDownloadFile={onDownloadFile}
+                  onDelete={canDelete ? () => { setDeleteError(null); setDeleteOpen(true) } : undefined}
+                >
+                  {fileActions?.(selectedFile)}
+                </VaultDocumentToolbar>
               )}
               {selectedFile && saveError && (
                 <OperationErrorAlert
@@ -1413,30 +881,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
           placement: 'side',
         })}
 
-        <ConfirmDialog
-          open={createOpen}
-          title="Create file"
-          description={activeFolder ? `Add a new document to ${activeFolder}.` : `Add a new document to ${label}.`}
-          confirmLabel={creating ? 'Creating…' : 'Create'}
-          // A prefilled folder is a path with no file name yet, so emptiness is
-          // not the test — `folder/` would otherwise be sent to the port as a
-          // file to create.
-          confirmDisabled={creating || !createFileName}
-          onConfirm={() => void handleCreate()}
-          onCancel={() => { setCreateOpen(false); setNewPath(''); setCreateError(null) }}
-        >
-          <div className="space-y-2">
-            <input
-              value={newPath}
-              autoFocus
-              onChange={(e) => setNewPath(e.target.value)}
-              placeholder="e.g. playbooks/new-strategy.md"
-              aria-label="New file path"
-              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
-            />
-            {createError && <p role="alert" className="text-xs text-[var(--surface-danger-text)]">{createError.message}</p>}
-          </div>
-        </ConfirmDialog>
+        <VaultCreateDialog open={createOpen} path={newPath} label={label} folder={activeFolder} busy={creating} error={createError} onPathChange={setNewPath} onConfirm={() => void handleCreate()} onCancel={cancelCreate} />
 
         <ConfirmDialog
           open={deleteOpen}
@@ -1464,67 +909,3 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     </EditorErrorBoundary>
   )
 })
-
-function SourceEditor({
-  path,
-  content,
-  saving,
-  dirty,
-  onChange,
-  onSave,
-}: {
-  path: string
-  content: string
-  saving: boolean
-  dirty: boolean
-  onChange: (content: string) => void
-  onSave: () => void
-}) {
-  return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <p className="truncate font-mono text-sm text-muted-foreground">{path}</p>
-        {/* One save state, as in the rich editor: Save exists only while there is something to save. */}
-        <div className="flex shrink-0 items-center gap-2">
-          <span
-            role="status"
-            aria-live="polite"
-            className={`rounded-full border px-2.5 py-1 text-sm ${
-              dirty
-                ? 'border-[var(--surface-warning-border)] bg-[var(--surface-warning-bg)] text-[var(--surface-warning-text)]'
-                : 'border-border bg-background text-muted-foreground'
-            }`}
-          >
-            {saving ? 'Saving…' : dirty ? 'Unsaved changes' : 'Saved'}
-          </span>
-          {(dirty || saving) && (
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={saving}
-              title="Save (Ctrl+S)"
-              className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-            >
-              Save
-            </button>
-          )}
-        </div>
-      </div>
-      <textarea
-        value={content}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 's') {
-            event.preventDefault()
-            if (dirty && !saving) onSave()
-          }
-        }}
-        spellCheck={false}
-        aria-label="Source editor"
-        // Full-bleed editor: keep the floor's ring but draw it inside the border
-        // box, since an outward ring on a `flex-1` pane child is clipped.
-        className="min-h-0 flex-1 resize-none border-0 bg-background p-4 font-mono text-sm leading-6 text-foreground focus-visible:[outline-offset:-2px]"
-      />
-    </div>
-  )
-}
