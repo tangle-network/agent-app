@@ -2824,7 +2824,7 @@ interface RecordGridBooleanColumn
 
 ### `RecordGridCellChange`
 
-`interface` — One committed cell edit, handed to `onUpdate`.
+`interface`
 
 ```ts
 interface RecordGridCellChange

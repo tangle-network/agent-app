@@ -27304,7 +27304,7 @@
           "name": "RecordGridCellChange",
           "kind": "interface",
           "signature": "interface RecordGridCellChange",
-          "doc": "One committed cell edit, handed to `onUpdate`."
+          "doc": null
         },
         {
           "name": "RecordGridCellDiff",
