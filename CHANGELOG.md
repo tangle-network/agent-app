@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.228
+
+- refactor(sandbox): separate lifecycle and prompt responsibilities
+
 ## 0.60.227
 
 - feat(chat): headline time to first visible output
