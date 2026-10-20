@@ -18,6 +18,12 @@ export interface RateLimitResult {
   resetAt: number
 }
 
+/** Request-lifetime persistence for a coarse limiter. Callers must retain the
+ * promise until it settles and observe write failures; hard quotas must await. */
+export interface RateLimitOptions {
+  waitUntil?: (persist: Promise<void>) => void
+}
+
 /** KV-backed sliding-window rate limit. Stores recent timestamps per key,
  *  prunes the window, allows until `limit` is hit.
  *
@@ -31,7 +37,7 @@ export interface RateLimitResult {
  *  truncated value) is treated as a full window, so a tampered key cannot reset
  *  the count and bypass the limiter. A bare `JSON.parse` here would throw and
  *  abort the request handler, silently disabling the limit (fail-open). */
-export async function checkRateLimit(kv: KvLike, key: string, limit: number, windowSeconds: number): Promise<RateLimitResult> {
+export async function checkRateLimit(kv: KvLike, key: string, limit: number, windowSeconds: number, options: RateLimitOptions = {}): Promise<RateLimitResult> {
   const now = Math.floor(Date.now() / 1000)
   const windowStart = now - windowSeconds
   const kvKey = `rl:${key}`
@@ -45,7 +51,9 @@ export async function checkRateLimit(kv: KvLike, key: string, limit: number, win
   const valid = parsed.filter((t) => t > windowStart)
   if (valid.length >= limit) return { allowed: false, remaining: 0, resetAt: (valid[0] ?? now) + windowSeconds }
   valid.push(now)
-  await kv.put(kvKey, JSON.stringify(valid), { expirationTtl: windowSeconds * 2 })
+  const persist = kv.put(kvKey, JSON.stringify(valid), { expirationTtl: windowSeconds * 2 })
+  if (options.waitUntil) options.waitUntil(persist)
+  else await persist
   return { allowed: true, remaining: limit - valid.length, resetAt: now + windowSeconds }
 }
 
