@@ -104,6 +104,7 @@ export function buildTurnTraceOtelSpans(snapshot: TurnTraceSnapshot, labels: Tur
     'tangle.turn.model_calls': summary.modelCalls,
     'tangle.turn.tool_calls': summary.toolCalls,
     ...(summary.firstTextMs === undefined ? {} : { 'tangle.turn.first_text_ms': summary.firstTextMs }),
+    ...(summary.d1Queries === undefined ? {} : { 'tangle.turn.d1_queries': summary.d1Queries }),
     ...(summary.dropped ? { 'tangle.turn.spans_dropped': summary.dropped } : {}),
     ...Object.fromEntries(TURN_SPAN_KINDS.map((kind: TurnSpanKind) => [`tangle.turn.${kind}_ms`, summary.byKind[kind]])),
   }

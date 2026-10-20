@@ -255,8 +255,8 @@ export interface RouterTurnOptions {
   api?: 'auto' | 'chat' | 'responses'
   /**
    * Gzip a model request body of at least this many bytes (`Content-Encoding: gzip`), so a large system prompt
-   * uploads in fewer round trips. The Tangle Router accepts gzip on its model APIs; leave it unset for an
-   * endpoint that may not. Default: unset, bodies are sent as they are.
+   * uploads in fewer round trips. Unset defaults to 32 KiB for the origin of DEFAULT_TANGLE_ROUTER_BASE_URL;
+   * other origins send bodies as they are. An explicit threshold wins; a negative value disables gzip.
    */
   gzipRequestAboveBytes?: number
 }
@@ -358,7 +358,11 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const { trace } = options
   let currentModel = options.model
   let lastModelSpan: TurnSpan | undefined
-  const gzipAbove = options.gzipRequestAboveBytes
+  const gzipAbove = options.gzipRequestAboveBytes ?? (
+    URL.canParse(options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL) &&
+    new URL(options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL).origin === new URL(DEFAULT_TANGLE_ROUTER_BASE_URL).origin
+      ? 32 * 1024 : undefined
+  )
   const baseFetch: typeof fetch | undefined = gzipAbove !== undefined && gzipAbove >= 0
     ? gzipRequestBodies(options.fetchImpl ?? fetch, gzipAbove)
     : options.fetchImpl

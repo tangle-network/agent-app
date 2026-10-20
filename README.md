@@ -229,3 +229,23 @@ Build is [tsup](https://tsup.egoist.dev) for the ESM output plus `tsc` for the `
 ## License
 
 [MIT](./LICENSE)
+
+## Shared turn defaults
+
+`/router-turn` compresses bodies of at least 32 KiB when the base URL has the
+origin of `DEFAULT_TANGLE_ROUTER_BASE_URL`. Other origins stay uncompressed.
+`gzipRequestAboveBytes` overrides the threshold; a negative value disables it.
+
+Wrap the app's D1 binding once with `withD1LimitAlarms` from `/launch-invariants`.
+That existing proxy also counts round trips (batch = one; first/all/raw/run =
+one each, including failures). `createChatTurnRoutes` opens an isolated
+AsyncLocalStorage counter for each turn, captures it before admission, and
+exports its total as `tangle.turn.d1_queries` on the `agent_app.turn` root span
+and `d1Queries` in the `agent_app_turn_trace` log. Only calls through the wrapped
+binding are observed; sandbox or remote-owner queries are outside this scope.
+The scope requires Node or Workers `nodejs_compat`.
+
+Products can read `currentD1QueryCounter()` from `/launch-invariants` for phase
+counts. A custom turn owner uses `withD1QueryCount(() => { ... })` around its
+entire turn and passes `d1QueryCounter: currentD1QueryCounter()` to
+`createTurnTrace`; the recorder captures the total at finish.

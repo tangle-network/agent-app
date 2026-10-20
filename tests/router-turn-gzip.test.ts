@@ -7,6 +7,7 @@ import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { gunzipSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { DEFAULT_TANGLE_ROUTER_BASE_URL } from '../src/runtime/model'
 import { runRouterTurn } from '../src/runtime/router-turn'
 
 type Received = { encoding: string | null; wireBytes: number; body: { messages: Array<{ role: string; content: string }> } }
@@ -59,4 +60,29 @@ describe('gzipRequestAboveBytes', () => {
     expect(received.map(request => request.encoding)).toEqual([null, null])
     expect(received[1]?.wireBytes).toBeGreaterThan(systemPrompt.length)
   })
+
+  it('defaults only the canonical Router origin, preserving explicit thresholds and opt-out', async () => {
+    received.length = 0
+    // Keep the real request/response pipeline, forwarding the canonical origin
+    // to the loopback Router so no credentials or external calls are needed.
+    const forward: typeof fetch = (input, init) => {
+      const url = new URL(String(input))
+      expect(url.origin).toBe(new URL(DEFAULT_TANGLE_ROUTER_BASE_URL).origin)
+      return fetch(`${baseUrl}${url.pathname.replace(/^\/v1/, '')}`, init)
+    }
+    for (const options of [
+      { systemPrompt },
+      { systemPrompt: 'Short.' },
+      { systemPrompt, gzipRequestAboveBytes: -1 },
+      { systemPrompt, gzipRequestAboveBytes: 1_000_000 },
+      { systemPrompt: 'Short.', gzipRequestAboveBytes: 0 },
+    ]) {
+      const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', userMessage: 'Hi.', repeat: false,
+        fetchImpl: forward, ...options })
+      expect(outcome.failure).toBeUndefined()
+      expect(outcome.text).toBe('Done.')
+    }
+    expect(received.map(request => request.encoding)).toEqual(['gzip', null, null, null, 'gzip'])
+  })
+
 })

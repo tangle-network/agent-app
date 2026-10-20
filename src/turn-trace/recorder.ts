@@ -77,6 +77,8 @@ export interface TurnTraceSummary {
   dropped: number
   /** From the request to the first visible text the member could read (see {@link TurnTrace.markFirstText}); absent when none streamed. */
   firstTextMs?: number
+  /** D1 round trips in the turn scope, when its binding is instrumented. */
+  d1Queries?: number
 }
 
 export interface TurnTraceSnapshot {
@@ -130,6 +132,8 @@ export interface CreateTurnTraceOptions {
   now?: () => number
   /** Most spans one turn keeps (default 1000); the rest are counted as dropped. */
   maxSpans?: number
+  /** Live counter captured by the server turn owner; no Node dependency in the recorder. */
+  d1QueryCounter?: { readonly queries: number }
 }
 
 const TRACE_ID_PATTERN = /^[\w-]{8,200}$/
@@ -320,8 +324,11 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
     record: (name, kind, start, end, attrs) => trace.record(name, kind, start, end, attrs),
   }
 
-  const withFirstText = (summary: TurnTraceSummary): TurnTraceSummary =>
-    firstTextAt === undefined ? summary : { ...summary, firstTextMs: round1(firstTextAt - startedAt) }
+  const withMeasurements = (summary: TurnTraceSummary): TurnTraceSummary => ({
+    ...summary,
+    ...(firstTextAt === undefined ? {} : { firstTextMs: round1(firstTextAt - startedAt) }),
+    ...(options.d1QueryCounter === undefined ? {} : { d1Queries: options.d1QueryCounter.queries }),
+  })
 
   const trace: TurnTrace = {
     get traceId() { return traceId },
@@ -350,8 +357,9 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
       firstTextAt = Math.max(startedAt, at ?? now())
     },
     summary(at) {
-      const end = at ?? finished?.endedAt ?? now()
-      return withFirstText(summarizeTurnSpans(trace.spans(end), rootId, startedAt, end, traceId, dropped))
+      if (finished) return finished.summary
+      const end = at ?? now()
+      return withMeasurements(summarizeTurnSpans(trace.spans(end), rootId, startedAt, end, traceId, dropped))
     },
     spans(at) {
       const end = at ?? finished?.endedAt ?? now()
@@ -374,7 +382,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
         startedAt,
         endedAt,
         spans,
-        summary: withFirstText(summarizeTurnSpans(spans, rootId, startedAt, endedAt, traceId, dropped)),
+        summary: withMeasurements(summarizeTurnSpans(spans, rootId, startedAt, endedAt, traceId, dropped)),
         status: outcome?.error === undefined ? 'ok' : 'error',
         ...(outcome?.error === undefined ? {} : { error: errorText(outcome.error) }),
       }
