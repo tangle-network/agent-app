@@ -3163,7 +3163,7 @@ interface EntryComposerProps
 
 ## `./chat-routes`
 
-Source: `src/chat-routes/index.ts` · depends on `chat-store`, `interactions`, `model-resolution`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-trace`, `web`
+Source: `src/chat-routes/index.ts` · depends on `chat-store`, `interactions`, `launch-invariants`, `model-resolution`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-trace`, `web`
 
 ### `AbortAttachmentWriteFn`
 
@@ -6395,7 +6395,7 @@ type BuildDesignCanvasMcpServerEntryOptions
 
 ### `CANVAS_MCP_TOOLS`
 
-`const` — Provide a collection of MCP tool definitions for manipulating and querying the design canvas environment
+`const`
 
 ```ts
 McpToolDefinition<DesignCanvasMcpToolEnv>[]
@@ -13305,12 +13305,28 @@ class AuthLookupRefused
 (cron: string) => Set<number> | null
 ```
 
+### `currentD1QueryCounter`
+
+`function` — The current scope's counter, shared with the turn trace and product phase logs.
+
+```ts
+() => D1QueryCounter | undefined
+```
+
 ### `D1_MAX_BOUND_PARAMETERS`
 
 `const` — D1 binds at most 100 parameters to one query.
 
 ```ts
 100
+```
+
+### `D1QueryCounter`
+
+`interface` — Round trips: batch = 1; first/all/raw/run = 1 each, including failed calls.
+
+```ts
+interface D1QueryCounter
 ```
 
 ### `DEFAULT_LIMIT_BUDGETS`
@@ -13667,10 +13683,18 @@ type TurnTerminalState
 
 ### `withD1LimitAlarms`
 
-`function` — The D1 binding with each query's rows read and response size observed.
+`function` — The D1 binding with each query's rows read and response size observed, and each round trip counted inside withD1QueryCount (chat routes scope it automatically).
 
 ```ts
 <D extends D1Measurable>(d1: D, alarms: LimitAlarms, options?: { subject?: string | undefined; }) => D
+```
+
+### `withD1QueryCount`
+
+`function` — Run work in a fresh counter scope.
+
+```ts
+<T>(work: () => T) => T
 ```
 
 ### `WranglerCrons`
@@ -19963,6 +19987,14 @@ Source: `src/rollout/d1.ts` · depends on `signoff`
 interface D1LikeForRollout
 ```
 
+### `ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL`
+
+`const` — Apply once through the product migration runner to existing tables; historical rows stay NULL.
+
+```ts
+"ALTER TABLE rollout_turn_timing ADD COLUMN first_visible_ms INTEGER;"
+```
+
 ### `ROLLOUT_TURN_TIMING_SCHEMA_SQL`
 
 `const`
@@ -19976,7 +20008,7 @@ interface D1LikeForRollout
 `function` — Stage metrics from turn rows: first-words and settled percentiles in ms, and the failure rate.
 
 ```ts
-(rows: readonly Pick<TurnTimingRow, "failed" | "firstTextMs" | "settledMs">[]) => { first_words_p50_ms: number | null;…
+(rows: readonly Pick<TurnTimingRow, "failed" | "firstVisibleMs" | "firstTextMs" | "settledMs">[]) => { first_visible_p5…
 ```
 
 ### `TurnTimingRow`
@@ -21788,7 +21820,7 @@ type Outcome
 
 ### `peekWorkspaceSandbox`
 
-`function` — Read-only twin of {@link ensureWorkspaceSandbox}: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything.
+`function` — Read-only twin of {@link ensureWorkspaceSandbox }: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything.
 
 ```ts
 (shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; }) => Promise<PeekWorkspaceS…
@@ -27055,7 +27087,15 @@ interface SkillSupportFile
 `function` — Inline file mounts placing a skill's support files beside its entry on `harness`: `<skillDir>/<skillId>/<path>`.
 
 ```ts
-(harness: Harness, skillId: string, files: readonly SkillSupportFile[]) => AgentProfileFileMount[]
+(harness: Harness, skillId: string, files: readonly SkillSupportFile[], options?: Pick<SkillSupportFileOptions, "resour…
+```
+
+### `SkillSupportFileOptions`
+
+`interface` — Optional naming and reconciliation policies for skill support files.
+
+```ts
+interface SkillSupportFileOptions
 ```
 
 ### `unsupportedSkillHarnesses`
@@ -32211,7 +32251,7 @@ interface ApiKeyFetchOptions
 `function` — KV-backed sliding-window rate limit.
 
 ```ts
-(kv: KvLike, key: string, limit: number, windowSeconds: number) => Promise<RateLimitResult>
+(kv: KvLike, key: string, limit: number, windowSeconds: number, options?: RateLimitOptions) => Promise<RateLimitResult>
 ```
 
 ### `clearCookieHeader`
@@ -32412,6 +32452,14 @@ interface KvLike
 
 ```ts
 interface RateLimitBudget
+```
+
+### `RateLimitOptions`
+
+`interface` — Request-lifetime persistence for a coarse limiter.
+
+```ts
+interface RateLimitOptions
 ```
 
 ### `RateLimitResult`
@@ -33797,7 +33845,7 @@ interface EffortLevel
 
 ### `EffortPicker`
 
-`function` — Thinking-budget selector pill, styled to match {@link ModelPicker}.
+`function` — Thinking-budget selector pill, styled to match {@link ModelPicker }.
 
 ```ts
 ({ value, onChange, levels, label, fullWidth, variant, disabled, id, "aria-describedby": ariaDescribedBy }: EffortPicke…
