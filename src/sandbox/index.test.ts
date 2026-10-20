@@ -46,6 +46,9 @@ import {
   ensureWorkspaceSandbox,
   reuseWorkspaceSandbox,
   dropTrustedBox,
+  createCacheReuseStore,
+  type ReuseStateStore,
+  type SharedReuseState,
   peekWorkspaceSandbox,
   buildAppToolMcpServers,
   adaptSandboxStream,
@@ -5632,6 +5635,59 @@ describe('warm reuse round trips', () => {
     expect(dropTrustedBox(trusted)).toBe(false)
     await ensureWorkspaceSandbox(shell, options)
     expect(calls()).toEqual({ list: 1, get: 5, exec: 3, egress: 3, push: 3, gate: 3, report: 3 })
+  })
+
+  it('hands what one isolate learned about a box to the next through the reuse store', async () => {
+    const saved = new Map<string, SharedReuseState>()
+    const store: ReuseStateStore = {
+      load: async (name) => saved.get(name) ?? null,
+      save: async (name, state) => { saved.set(name, structuredClone(state)) },
+      drop: async (name) => { saved.delete(name) },
+    }
+    const exec = vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
+    const running = fakeBox({ status: 'running', exec } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    getMock.mockResolvedValue(running)
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: {}, reuseState: store })
+
+    await ensureWorkspaceSandbox(shell, scope)
+    expect([...saved.keys()]).toEqual(['box-w1'])
+    expect(exec).toHaveBeenCalledOnce()
+
+    // The next request lands in an isolate that has seen nothing.
+    resetClientCache()
+    const reused = await ensureWorkspaceSandbox(shell, scope)
+    expect(exec).toHaveBeenCalledOnce()
+    expect(listMock).toHaveBeenCalledOnce()
+    expect(getMock).toHaveBeenCalledOnce()
+
+    // A failed first call takes the box out of the store, so no isolate trusts it again.
+    expect(dropTrustedBox(reused)).toBe(true)
+    await vi.waitFor(() => expect(saved.size).toBe(0))
+    resetClientCache()
+    await ensureWorkspaceSandbox(shell, scope)
+    expect(exec).toHaveBeenCalledTimes(2)
+  })
+
+  it('stores reuse state in a Workers-style cache and takes anything it did not write for a miss', async () => {
+    const entries = new Map<string, Response>()
+    const cache = {
+      match: async (request: Request) => entries.get(request.url)?.clone(),
+      put: async (request: Request, response: Response) => { entries.set(request.url, response) },
+      delete: async (request: Request) => entries.delete(request.url),
+    }
+    const store = createCacheReuseStore(async () => cache)
+    const state: SharedReuseState = { boxId: 'sandbox-1', checks: { identity: '|fs-1', alive: 5, egress: { key: 'k', at: 6 } } }
+
+    expect(await store.load('box-w1')).toBeNull()
+    await store.save('box-w1', state)
+    expect(await store.load('box-w1')).toEqual(state)
+    expect([...entries.values()][0]!.headers.get('cache-control')).toMatch(/max-age=\d+/)
+
+    entries.set([...entries.keys()][0]!, new Response(JSON.stringify({ boxId: 7, checks: {} })))
+    expect(await store.load('box-w1')).toBeNull()
+    await store.drop('box-w1')
+    expect(entries.size).toBe(0)
   })
 
   it('lists the running boxes when the box it used by id is gone', async () => {

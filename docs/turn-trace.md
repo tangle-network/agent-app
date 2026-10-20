@@ -42,6 +42,7 @@ A span records metadata only: ids, durations, status codes, model names and toke
 
 A reuse asks the platform for the box this isolate used last under that name (`sandbox.ensure.get_running`), and lists every running box (`list_running`) only when that id is gone, stopped or renamed.
 For ten minutes after a check passed on a box, the same reuse skips it: the exec probe (`liveness`), the egress read, the runtime environment push and the deferred-corpus marker read.
+A request is not promised the isolate that served the last one (eight consecutive Legal turns found no check from the turn before), so the box id and its checks are also kept in the Workers Cache API under the box name (`SandboxRuntimeConfig.reuseState` replaces it; `null` keeps them in the isolate): one read when the isolate has not seen the box, a write only when a check changed.
 The checks belong to the box's identity, its `startedAt` and `filesystemIncarnationId` (the Sandbox API reports no `startedAt` today); a box that is not running when read, a resume, a delete and a failed probe forget them.
 A `strict` or `blocked` egress verdict stands in for the read only when the reuse sends the box no credentials: a changed runtime environment, or a shell `bootstrap`, waits for a fresh read.
 The spend gate (`sandbox.spend.before_provision`) and the box report (`sandbox.spend.observe`) run when the exec probe runs, and before any create, resume or restart.

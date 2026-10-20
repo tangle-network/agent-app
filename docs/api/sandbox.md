@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-260 exports.
+265 exports.
 
 ### `adaptSandboxStream`
 
@@ -164,6 +164,14 @@ interface BuildSandboxToolFileMountsOptions
 
 ```ts
 (events: AsyncIterable<unknown>, message: string | PromptInputPart[], history?: { role: "user" | "assistant"; content:…
+```
+
+### `createCacheReuseStore`
+
+`function` — A store over a Workers-style cache.
+
+```ts
+(open: () => Promise<ReuseCacheLike>) => ReuseStateStore
 ```
 
 ### `createD1PrewarmClaimStore`
@@ -990,6 +998,30 @@ interface ResolveSandboxClientCredentialsOptions
 <T>(attempt: () => Promise<T>, options?: SandboxTransientRetryOptions) => Promise<T>
 ```
 
+### `ReuseCacheLike`
+
+`interface` — The slice of a Workers `Cache` this store uses.
+
+```ts
+interface ReuseCacheLike
+```
+
+### `ReuseChecks`
+
+`interface` — What isolates share about a running box: its id and the checks a reuse may trust (see `ReuseChecks` in `./index`).
+
+```ts
+interface ReuseChecks
+```
+
+### `ReuseStateStore`
+
+`interface` — Where isolates keep {@link SharedReuseState}, by box name.
+
+```ts
+interface ReuseStateStore
+```
+
 ### `reuseWorkspaceSandbox`
 
 `function` — Reuse the workspace's running box if this isolate used it recently, or return undefined.
@@ -1540,6 +1572,14 @@ interface SecretStore
 
 ```ts
 (error: unknown, options?: { maxDepth?: number | undefined; }) => SafeSandboxErrorDiagnostics
+```
+
+### `SharedReuseState`
+
+`interface`
+
+```ts
+interface SharedReuseState
 ```
 
 ### `shellQuote`
