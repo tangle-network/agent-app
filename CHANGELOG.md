@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.219
+
+- fix(sandbox): a reuse's trust is shared across Worker isolates through the Cache API (#1178)
+
 ## 0.60.218
 
 - perf(router-turn): gzip a large model request body when the caller asks (#1176)
