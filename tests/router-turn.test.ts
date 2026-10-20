@@ -54,8 +54,9 @@ describe('runRouterTurn', () => {
     // The model reads its own call and the result back, keyed to the call.
     expect(requests[1]!.body.messages).toEqual(expect.arrayContaining([
       expect.objectContaining({ role: 'tool', tool_call_id: 'call-1', content: '{"taskId":"task-1","title":"Restock towels"}' })]))
-    expect(events.map(event => event.type === 'text' ? `text:${event.delta}` : event.type === 'tool' ? `tool:${event.status}` : 'usage'))
-      .toEqual(['tool:running', 'tool:completed', 'text:Done: ', 'text:Restock towels is on the list.'])
+    // `tool_start` arrives when the model names the tool, before its arguments finish and the call runs.
+    expect(events.map(event => event.type === 'text' ? `text:${event.delta}` : event.type === 'tool' ? `tool:${event.status}` : event.type))
+      .toEqual(['tool_start', 'tool:running', 'tool:completed', 'text:Done: ', 'text:Restock towels is on the list.'])
   })
 
   it('reports a domain refusal to the model and lets it answer', async () => {
@@ -270,7 +271,7 @@ describe('runRouterTurn', () => {
     const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl, systemPrompt: 's', userMessage: 'add a pump',
       tools: [graph], onEvent: event => events.push(event) })
     expect(events.filter(event => event.type !== 'usage').map(event => event.type === 'tool' ? `tool:${event.status}` : event.type === 'tool_event' ? `event:${event.kind}` : event.type))
-      .toEqual(['tool:running', 'event:graph_op', 'event:graph_op', 'tool:completed', 'text'])
+      .toEqual(['tool_start', 'tool:running', 'event:graph_op', 'event:graph_op', 'tool:completed', 'text'])
     expect(outcome.toolEvents).toEqual([
       { callId: 'call-1', toolName: 'graph.edit', kind: 'graph_op', data: { op: 'add_node', id: 'pump' }, at: expect.any(Number) },
       { callId: 'call-1', toolName: 'graph.edit', kind: 'graph_op', data: { op: 'add_edge', from: 'pump', to: 'tank' }, at: expect.any(Number) },
