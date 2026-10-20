@@ -21,7 +21,9 @@ agent_app.turn                       wall time of the turn; coverage and time pe
 ├─ tool.call                         an app tool, sandbox_exec or sandbox_run
 │  ├─ sandbox.claim                  the box a tool call waited for
 │  └─ sandbox.exec                   the command, sent with the turn's trace id
-├─ sandbox.claim                     ensureWorkspaceSandbox: its steps are children (credentials, list_running, finalize, resume, create, wait_running)
+├─ sandbox.claim                     ensureWorkspaceSandbox: its steps are children (credentials, get_running or list_running, egress, liveness, finalize, resume, create, wait_running)
+├─ sandbox.lease.*                   the foreground provisioning lease a product's single-flight takes: inspect, acquire, release
+├─ sandbox.spend.*                   the spend seam around the claim: before_provision, observe
 ├─ sandbox.prompt                    the in-box lane
 │  ├─ sandbox.transit                SDK, API, orchestrator and host hops that no sidecar phase holds
 │  ├─ sidecar.<phase>                agent_run_start, harness_spawn, harness_ready, first_model_request, first_upstream_byte, first_text
@@ -36,9 +38,21 @@ A rollout's `first_words_p50_ms` starts later, at the end of admission (`rollout
 `summary.byKind` credits each instant to the deepest open span's kind (`admission`, `router`, `model`, `network`, `tool`, `sandbox`, `persist`, `other`), so it sums to the covered time, and `largestGapMs` is the longest stretch with no span open.
 A span records metadata only: ids, durations, status codes, model names and token counts; never a prompt, an answer or a tool argument.
 
+## The claim of a reused box
+
+A reuse asks the platform for the box this isolate used last under that name (`sandbox.ensure.get_running`), and lists every running box (`list_running`) only when that id is gone, stopped or renamed.
+For ten minutes after a check passed on one start of a box, the same reuse skips it: the exec probe (`liveness`), the egress read, the runtime environment push and the deferred-corpus marker read.
+A restarted box has a new `startedAt` and matches none of them.
+A `strict` or `blocked` egress verdict stands in for the read only when the reuse sends the box no credentials: a changed runtime environment, or a shell `bootstrap`, waits for a fresh read.
+The spend gate (`sandbox.spend.before_provision`) and the box report (`sandbox.spend.observe`) run when the exec probe runs, and before any create, resume or restart.
+`sandbox.claim` carries `sandbox.probe_trusted` when the probe was skipped.
+A product whose first call on that box fails calls `dropTrustedBox(box)`; `true` means the ensure had skipped the probe, so it ensures once more and the second ensure checks everything.
+`streamSandboxPrompt` does this itself when a prompt fails before its first event.
+`reuseWorkspaceSandbox` is the ensure that never creates, resumes, restarts or deletes; a product's single-flight passes it as `reuse`, so a turn on a running box takes no lease and an ensure that needs a lifecycle step takes it as before.
+
 ## Wiring a product
 
-1. `createChatTurnRoutes({ turnTrace: { sink: createIntelligenceTurnTraceSink({ project }), labels } })`. The sink reads the Sandbox product key from the first of `SANDBOX_PRODUCTION_API_KEY`, `TCLOUD_SANDBOX_API_KEY` and `SANDBOX_API_KEY` that is set (Legal's Worker `TANGLE_API_KEY` was refused with HTTP 401, so a refusal is a console warning, not silence), and every failure (no key, a non-2xx answer, a rejected span) is a console warning unless `onError` takes it. The route runs the sink under `waitUntil` after the lifecycle hooks and after the turn lock is released, so a slow collector never holds the next send; `lifecycle.onTurnComplete` and `onTurnError` also receive `trace` (the summary).
+1. `createChatTurnRoutes({ turnTrace: { sink: createIntelligenceTurnTraceSink({ project }), labels } })`. The sink reads the Sandbox product key from the first of `SANDBOX_PRODUCTION_API_KEY`, `TCLOUD_SANDBOX_API_KEY` and `SANDBOX_API_KEY` that is set (Legal's Worker `TANGLE_API_KEY` was refused with HTTP 401, so a refusal is a console warning, not silence), and every failure (no key, a non-2xx answer, a rejected span) is a console warning unless `onError` takes it. The route runs the sink under `waitUntil` after the lifecycle hooks and after the turn lock is released, so a slow collector never holds the next send; `lifecycle.onTurnComplete` and `onTurnError` also receive `trace` (the summary). Follow-up work that only decorates a finished answer belongs in `lifecycle.afterSettle`, which runs under `waitUntil` once the assistant row is persisted and the lock is released: Legal's model-written checklist moved there from the producer's stream, where it held the lock for 8.8 to 19.6 s after the answer on 2026-10-19. That work records its own trace with `createTurnTrace` and sends it to the same sink, because this turn's trace has ended.
 2. Pass `args.trace` to what the turn runs: `createRouterTurnProducer({ trace })` or `runRouterTurn({ trace })`, `streamSandboxPrompt(..., { trace })` and `ensureWorkspaceSandbox(..., { trace })`. A product that calls `box.streamPrompt` itself sends `traceId: trace.traceId` with the prompt and wraps the stream in `traceSandboxPromptEvents`. A call that gets no trace records nothing, and the turn's coverage says so.
 3. A product that owns its turn without `createChatTurnRoutes` (a Durable Object turn) calls `createTurnTrace({ startedAt, executionId })`, records its own admission spans with `trace.record`, passes `trace` to `runRouterTurn`, and sends `trace.finish()` to the same sink.
 
@@ -46,6 +60,9 @@ Admission's serial reads are the history, the turn lock, the history recheck und
 `admission.lock_warm` runs alongside the history read and ends when the lock's Durable Object answers; on a thread's first turn it holds that object's creation, which `admission.lock` then waits out.
 The running-index read under `admission.history` runs only when its answer can change the turn: no client `turnId`, an assistant row trailing the thread, and the user row behind it repeating this content.
 `produce` and the seams see `userMessageInserted: true` when this turn's insert created `userMessageId`, so a gate that refuses an already-answered retry skips its own read for a fresh row.
+
+`afterAuthorize` starts a turn's box, keys and session as soon as `authorize` and the model policy admit it, so `sandbox.acquire` begins beside `admission.history` and the lock instead of after `admission.produce`.
+The work it starts is never awaited by the route; a turn that ends before `produce` (a held lock, a changed history, a gate's answer) calls the release function the seam returned.
 
 `authorize` receives the turn's `trace` and the `admission.authorize` span, and `beforeTurn` receives the `admission.before_turn` span as its second argument; a product records its own steps with `trace.measure(name, 'admission', work, undefined, span)` so each wait inside the seam is named and nested.
 

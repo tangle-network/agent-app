@@ -4,9 +4,14 @@
  * Background prewarming can lose a race without delaying a request. A real
  * user turn cannot: its losing request must wait for the owner, adopt the box
  * that became ready, or report why the owner did not leave a usable box.
+ *
+ * The lease serializes the steps that create billable boxes or change a box's
+ * lifecycle. A turn on a box that is already running takes none of them, so it
+ * passes `reuse` and takes no lease.
  */
 
 import type { Harness } from '../harness/index'
+import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'
 import type { PeekWorkspaceSandboxOutcome } from './index'
 import {
   sandboxPrewarmClaimKey,
@@ -62,6 +67,13 @@ export interface ForegroundSandboxSingleFlightOptions<T> {
   claim: FencedPrewarmClaimStore
   workspaceId: string
   harness: Harness
+  /**
+   * Take the box that is already running, or resolve undefined. It runs before
+   * the lease and must not create, resume, restart, replace or delete a box
+   * (`reuseWorkspaceSandbox` is that). The box is used only when no other
+   * request holds the lease, because a holder may be changing it.
+   */
+  reuse?(): Promise<T | undefined>
   provision(): Promise<T>
   peek(): Promise<PeekWorkspaceSandboxOutcome>
   adopt(box: ReadyRunningSandboxOutcome): T | Promise<T>
@@ -69,6 +81,9 @@ export interface ForegroundSandboxSingleFlightOptions<T> {
   wait?(ms: number): Promise<void>
   claimTtlSeconds?: number
   pollIntervalMs?: number
+  /** The turn's trace: the lease reads and writes are recorded as `sandbox.lease.*` spans. */
+  trace?: TurnTrace
+  traceParent?: TurnSpan
 }
 
 function failedState(peek: PeekWorkspaceSandboxOutcome): string {
@@ -147,12 +162,17 @@ export async function runForegroundSandboxSingleFlight<T>(
     }
   }
 
+  const timed = <R,>(name: string, work: () => Promise<R>): Promise<R> =>
+    options.trace
+      ? options.trace.measure(name, 'sandbox', () => work(), undefined, options.traceParent)
+      : work()
+
   const provisionAsOwner = async (lease: PrewarmClaimLease): Promise<T> => {
     try {
       return await options.provision()
     } finally {
       try {
-        await options.claim.releaseLease(lease)
+        await timed('sandbox.lease.release', () => options.claim.releaseLease(lease))
       } catch (error) {
         emit({
           type: 'release-failed',
@@ -164,7 +184,19 @@ export async function runForegroundSandboxSingleFlight<T>(
     }
   }
 
-  const initialLease = await options.claim.acquireLease(key, ttlSeconds)
+  if (options.reuse) {
+    // One read of the lease, beside the reuse, replaces the lease's two writes.
+    const [state, reused] = await Promise.allSettled([
+      timed('sandbox.lease.inspect', () => options.claim.inspect(key)),
+      options.reuse(),
+    ])
+    if (reused.status === 'rejected') throw reused.reason
+    if (reused.value !== undefined && state.status === 'fulfilled' && state.value.status !== 'held') {
+      return reused.value
+    }
+  }
+
+  const initialLease = await timed('sandbox.lease.acquire', () => options.claim.acquireLease(key, ttlSeconds))
   if (initialLease) return provisionAsOwner(initialLease)
 
   emit({ type: 'waiting', key, workspaceId: options.workspaceId })

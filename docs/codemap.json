@@ -16549,6 +16549,12 @@
           "doc": "Define options to manage deterministic session resumption and turn idempotency in sandboxed drive turns"
         },
         {
+          "name": "dropTrustedBox",
+          "kind": "function",
+          "signature": "(box: SandboxInstance) => boolean",
+          "doc": "Forget what this isolate trusts about a box after the first real call on it failed."
+        },
+        {
           "name": "EGRESS_PROXY_RECOVERY_PHASE",
           "kind": "const",
           "signature": "\"egress_proxy_recovery\"",
@@ -17003,6 +17009,12 @@
           "kind": "function",
           "signature": "<T>(attempt: () => Promise<T>, options?: SandboxTransientRetryOptions) => Promise<T>",
           "doc": "Run `attempt` until it succeeds, it fails with something this policy does not consider transient, or a transient failure outlasts the deadline."
+        },
+        {
+          "name": "reuseWorkspaceSandbox",
+          "kind": "function",
+          "signature": "(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance | undefined>",
+          "doc": "Reuse the workspace's running box if this isolate used it recently, or return undefined."
         },
         {
           "name": "runForegroundSandboxSingleFlight",
@@ -24197,7 +24209,7 @@
           "name": "threadChannelKey",
           "kind": "function",
           "signature": "(workspaceId: string, threadId: string) => string",
-          "doc": "Channel for a thread-scoped lock."
+          "doc": "Channel for a thread's viewer signals."
         },
         {
           "name": "TURN_LOCK_TTL_MS",
@@ -24214,7 +24226,7 @@
         {
           "name": "TURN_STREAM_STORAGE_KEYS",
           "kind": "const",
-          "signature": "{ readonly lock: \"chatTurnLock\"; readonly activeThreads: \"activeThreads\"; readonly turnStatus: \"turnStatus\"; readonly t…",
+          "signature": "{ readonly lock: \"chatTurnLock\"; readonly threadLockPrefix: \"chatTurnLock:thread:\"; readonly activeThreads: \"activeThre…",
           "doc": "Storage keys inside a DO instance."
         },
         {
@@ -24250,8 +24262,8 @@
         {
           "name": "turnLockChannelKey",
           "kind": "function",
-          "signature": "(workspaceId: string, threadId: string, scope: TurnLockScope) => string",
-          "doc": "The channel a lock lives on: workspace-scope locks serialize every thread in the workspace (one shared sandbox), thread-scope locks serialize one thread (router lane)."
+          "signature": "(workspaceId: string, _threadId: string, _scope: TurnLockScope) => string",
+          "doc": "The channel a lock lives on: the workspace channel, for both scopes."
         },
         {
           "name": "TurnLockInterruptedReleaseInput",
@@ -24288,6 +24300,12 @@
           "kind": "type",
           "signature": "type TurnLockSeamResult",
           "doc": "Verdict shape of the vertical's `turnLock.acquire`."
+        },
+        {
+          "name": "turnLockStorageKey",
+          "kind": "function",
+          "signature": "(scope: TurnLockScope, threadId: string) => string",
+          "doc": "The storage key a lock lives under inside its channel's instance: the workspace-scope lock under `TURN_STREAM_STORAGE_KEYS.lock`, each thread's lock under `TURN_STREAM_STORAGE_KEYS.threadLockPrefix`…"
         },
         {
           "name": "turnStorageChannelKey",

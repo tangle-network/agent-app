@@ -48,7 +48,7 @@ import type {
   SubmitProposalArgs,
   SubmitProposalResult,
 } from '../tools/index'
-import { assertRenderUiSchema } from '../tools/render-ui-schema'
+import { parseRenderUiSchema } from '../tools/render-ui-schema'
 import type { KvLike } from '../web/index'
 
 export {
@@ -417,8 +417,7 @@ export function createPresetToolHandlers(opts: PresetToolHandlerOptions): AppToo
     },
 
     async renderUi(args: RenderUiArgs, ctx: AppToolContext): Promise<RenderUiResult> {
-      assertRenderUiSchema(args.schema)
-      const content = JSON.stringify(args.schema)
+      const content = JSON.stringify(parseRenderUiSchema(args.schema))
       const path = `${uiPrefix}/${ctx.threadId ?? 'global'}/${slug(args.title)}.json`
       await persistArtifact(path, content)
       await insertKnowledge(ctx.workspaceId, path, 'ui', args.title, content)
