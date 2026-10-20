@@ -36,7 +36,7 @@ import {
   DISPATCH_MAX_PARTS,
   type ChatTurnPartInput,
 } from './wire'
-import type { ChatAttachmentPart, ChatMentionPart } from '../chat-store/parts'
+import { historyContentWithAttachments, type ChatAttachmentPart, type ChatMentionPart } from '../chat-store/parts'
 import { bytesToBase64 } from './upload'
 import type { ReadAttachmentFn } from './attachment-store'
 import { pathToFileURL } from 'node:url'
@@ -159,6 +159,23 @@ export function normalizeChatPromptForSandbox(
       url: fileUrl,
     }
   })
+}
+
+/** A persisted message whose attachment pointers accompany its history text. */
+export interface DispatchHistoryMessage {
+  role: string
+  content: string
+  parts?: ReadonlyArray<Record<string, unknown>> | null
+}
+
+/** Project persisted rows using the same role and attachment policy as dispatch. */
+export function projectDispatchHistory(
+  messages: ReadonlyArray<DispatchHistoryMessage>,
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  return messages.map((message) => ({
+    role: message.role === 'assistant' ? 'assistant' : 'user',
+    content: historyContentWithAttachments(message),
+  }))
 }
 
 /** Build input parameters for dispatching chat message parts including text, attachments, mentions, and history */

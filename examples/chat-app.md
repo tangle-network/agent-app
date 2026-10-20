@@ -355,6 +355,24 @@ createSandboxChatProducer({
 })
 ```
 
+When a product carries earlier files into a sandbox turn, use
+`historyAttachmentsFromMessages(currentAttachments, priorMessages)` from
+`/chat-store` to exclude current-turn paths and retain first-seen path order.
+Then await `prepareDispatchAttachments` from `/chat-routes` **before** constructing
+prompt, history or profile-size arguments. Pass the current and carried files,
+mention count, store reader, path resolver, and optional `materialize` adapter.
+The adapter supplies `upload(path, bytes)` and its product-specific
+`missingBytesMessage(path)`; preparation copies sequentially, deduplicates target
+paths and checks uploaded byte counts. Keep the product's existing trace span
+around this preparation call.
+
+Use the returned files as `buildDispatchParts.attachments` and
+`projectDispatchHistory(priorMessages)` as `history`; all other dispatch inputs
+remain product-owned. Projection preserves assistant roles and treats other
+persisted roles as user, including the existing attachment pointers in history
+text. The builder itself remains read-only and retains its existing signature.
+
+
 `/object-store` is a ready-made backend for both seams when a product has no
 vault of its own; fleet apps that already have one (gtm's KV vault) inject
 their own `ReadAttachmentFn`/`AtomicAttachmentWriter` instead of this module — the
