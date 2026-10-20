@@ -245,6 +245,24 @@ export function ChatComposer({
     el.setSelectionRange(text.length, text.length)
   }, [text])
 
+  // A ready file counts as sendable content even without a `part`: store-backed
+  // attachments (`useComposerAttachments`) carry no prompt part — their
+  // references ride the turn body's `attachments` field — but a file-only
+  // message must still be sendable. `canSubmitAttachmentsOnly` widens that to a
+  // file of ANY status, so an in-flight upload leaves the control live and the
+  // host's handler decides what to do about it.
+  const sendableFiles = canSubmitAttachmentsOnly
+    ? pendingFiles
+    : pendingFiles.filter((f) => f.status === 'ready')
+  const hasSendable = text.trim().length > 0 || sendableFiles.length > 0 || Boolean(selectedSkillId)
+  // Streaming blocks a send unless the host queues turns. The button still
+  // shows Stop while streaming, so `canSubmitWhileBusy` opens Enter, not a
+  // second visible control.
+  const sendBlockedByStream = isStreaming && !canSubmitWhileBusy
+  const canSend = hasSendable && !sendBlockedByStream && !disabled && !sendDisabled
+
+  const { failedSend, setFailedSend, send, retryFailedSend } = useComposerSend({ text, textRef, textareaRef, setText, pendingFiles, sendFailureMessage, sendBlockedByStream, disabled, sendDisabled, canSubmitAttachmentsOnly, onSend, onSendParts, onSendFailed, attachmentsNotReadyMessage, selectedSkillId })
+
   // Cmd/Ctrl+L focuses the composer from anywhere — the shortcut the hint
   // advertises. Scoped to when the shortcut is enabled and not disabled.
   // Depends on mention PRESENCE, not identity: hosts build the prop object
@@ -268,24 +286,6 @@ export function ChatComposer({
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [focusShortcut, disabled, mentionEnabled])
-
-  // A ready file counts as sendable content even without a `part`: store-backed
-  // attachments (`useComposerAttachments`) carry no prompt part — their
-  // references ride the turn body's `attachments` field — but a file-only
-  // message must still be sendable. `canSubmitAttachmentsOnly` widens that to a
-  // file of ANY status, so an in-flight upload leaves the control live and the
-  // host's handler decides what to do about it.
-  const sendableFiles = canSubmitAttachmentsOnly
-    ? pendingFiles
-    : pendingFiles.filter((f) => f.status === 'ready')
-  const hasSendable = text.trim().length > 0 || sendableFiles.length > 0 || Boolean(selectedSkillId)
-  // Streaming blocks a send unless the host queues turns. The button still
-  // shows Stop while streaming, so `canSubmitWhileBusy` opens Enter, not a
-  // second visible control.
-  const sendBlockedByStream = isStreaming && !canSubmitWhileBusy
-  const canSend = hasSendable && !sendBlockedByStream && !disabled && !sendDisabled
-
-  const { failedSend, setFailedSend, send, retryFailedSend } = useComposerSend({ text, textRef, textareaRef, setText, pendingFiles, sendFailureMessage, sendBlockedByStream, disabled, sendDisabled, canSubmitAttachmentsOnly, onSend, onSendParts, onSendFailed, attachmentsNotReadyMessage, selectedSkillId })
 
   const { cardRef, slashPanelRef, slashListId, setMentionSuggestionOpen, slashActiveIndex, slashOpen, slashFiltered, skillQuery, hasSkills, setSlashActive, pickSlash, handleSlashKeyDown } = useComposerCommands({ text, textRef, setText, mention, slashCommands, eligibleSkills, onSelectedSkillChange })
 

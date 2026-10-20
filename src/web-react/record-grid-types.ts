@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { AsyncEmptySpec, AsyncResourceState } from './async'
 import type { RecordGridColumn, RecordGridProposal, RecordGridRow, RecordGridValue } from './record-grid-model'
 
+/** One committed cell edit, handed to `onUpdate`. */
 export interface RecordGridCellChange {
   /** The row as it was BEFORE the edit — what rollback restores. */
   row: RecordGridRow
