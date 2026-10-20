@@ -152,7 +152,7 @@ type BuildDesignCanvasMcpServerEntryOptions
 
 ### `CANVAS_MCP_TOOLS`
 
-`const` — Provide a collection of MCP tool definitions for manipulating and querying the design canvas environment
+`const`
 
 ```ts
 McpToolDefinition<DesignCanvasMcpToolEnv>[]

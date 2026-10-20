@@ -736,7 +736,7 @@ type Outcome
 
 ### `peekWorkspaceSandbox`
 
-`function` — Read-only twin of {@link ensureWorkspaceSandbox}: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything.
+`function` — Read-only twin of {@link ensureWorkspaceSandbox }: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything.
 
 ```ts
 (shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; }) => Promise<PeekWorkspaceS…
