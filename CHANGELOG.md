@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.237
+
+- refactor(vault): separate pane chrome from document state (#1202)
+- refactor(canvas): separate workspace input and toolbar responsibilities (#1201)
+
 ## 0.60.236
 
 - refactor(composer): separate send commands and file intake (#1200)
