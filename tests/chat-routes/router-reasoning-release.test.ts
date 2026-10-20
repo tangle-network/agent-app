@@ -73,7 +73,7 @@ describe('Router reasoning release', () => {
     const arrivals = await drain(producer, started)
 
     expect(bodies).toHaveLength(1)
-    expect(bodies[0]!.gateway).toEqual({ streamReasoningImmediately: true, streamIdleTimeout: 45_000 })
+    expect(bodies[0]!.gateway).toEqual({ streamReasoningImmediately: true })
     expect(bodies[0]!.stream).toBe(true)
     const firstReasoning = arrivals.find((event) => event.type === 'reasoning')!
     const firstText = arrivals.find((event) => event.type === 'text')!
