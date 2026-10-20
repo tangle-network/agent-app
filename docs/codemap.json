@@ -2789,6 +2789,18 @@
           "doc": "One event as it crosses the route: the producer's own vocabulary, or an injected keepalive."
         },
         {
+          "name": "ChatTurnAfterAuthorizeArgs",
+          "kind": "interface",
+          "signature": "interface ChatTurnAfterAuthorizeArgs",
+          "doc": "What `afterAuthorize` receives: the admitted turn, before the conversation loads and before any lock, read or write."
+        },
+        {
+          "name": "ChatTurnAfterAuthorizeRelease",
+          "kind": "type",
+          "signature": "type ChatTurnAfterAuthorizeRelease",
+          "doc": "Frees what `afterAuthorize` started, for a turn that ends before `produce` takes it."
+        },
+        {
           "name": "ChatTurnAuthorization",
           "kind": "type",
           "signature": "type ChatTurnAuthorization",

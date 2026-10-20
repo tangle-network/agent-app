@@ -3549,6 +3549,22 @@ type ChatRouteDurableProjectionLogger
 type ChatRouteEvent
 ```
 
+### `ChatTurnAfterAuthorizeArgs`
+
+`interface` — What `afterAuthorize` receives: the admitted turn, before the conversation loads and before any lock, read or write.
+
+```ts
+interface ChatTurnAfterAuthorizeArgs
+```
+
+### `ChatTurnAfterAuthorizeRelease`
+
+`type` — Frees what `afterAuthorize` started, for a turn that ends before `produce` takes it.
+
+```ts
+type ChatTurnAfterAuthorizeRelease
+```
+
 ### `ChatTurnAuthorization`
 
 `type` — Resolve authorization status and context for a chat turn including tenant and user identification

@@ -188,8 +188,9 @@ describe('workspace runtime environment renewal', () => {
   it('renews a changed environment before bootstrap on every reuse, including a cached liveness check', async () => {
     const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
     const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'alive\n' })
-    const box = fakeBox({ setRuntimeEnv, exec, startedAt: new Date('2026-10-11T12:00:00.000Z') })
+    const box = fakeBox({ setRuntimeEnv, exec, status: 'running', startedAt: new Date('2026-10-11T12:00:00.000Z') } as unknown as Partial<SandboxInstance>)
     listMock.mockResolvedValue([box])
+    getMock.mockResolvedValue(box)
     const runtimeEnv = vi.fn()
       .mockResolvedValueOnce({ APP_TOKEN: 'renewed-1' })
       .mockResolvedValueOnce({ APP_TOKEN: 'renewed-2' })
@@ -2447,10 +2448,12 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       const running = fakeBox({
         name: 'box-w1',
         exec,
+        status: 'running',
         startedAt: new Date('2026-10-11T12:00:00.000Z'),
         egress: { get: getEgress, update: vi.fn() },
       } as unknown as Partial<SandboxInstance>)
       listMock.mockResolvedValue([running])
+      getMock.mockResolvedValue(running)
       const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
         livenessProbe: {},
         egressPolicy: { mode: 'open' },
@@ -2518,9 +2521,11 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       delete: del,
       exec,
       streamPrompt,
+      status: 'running',
       startedAt: new Date('2026-10-11T12:00:00.000Z'),
     } as unknown as Partial<SandboxInstance>)
     listMock.mockResolvedValue([running])
+    getMock.mockResolvedValue(running)
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
       livenessProbe: { cacheTtlMs: 60_000 },
     })
@@ -5489,8 +5494,9 @@ describe('warm reuse round trips', () => {
     const startedAt = new Date('2026-10-11T12:00:00.000Z')
     const get = vi.fn().mockResolvedValue({ policy: { mode: 'open' }, source: 'sandbox' })
     const exec = vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
-    const running = fakeBox({ exec, startedAt, egress: { get, update: vi.fn() } } as unknown as Partial<SandboxInstance>)
+    const running = fakeBox({ exec, status: 'running', startedAt, egress: { get, update: vi.fn() } } as unknown as Partial<SandboxInstance>)
     listMock.mockResolvedValue([running])
+    getMock.mockResolvedValue(running)
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy: { mode: 'open' }, livenessProbe: { cacheTtlMs: 0 } })
 
     await ensureWorkspaceSandbox(shell, scope)
@@ -5499,12 +5505,30 @@ describe('warm reuse round trips', () => {
 
     const restarted = fakeBox({
       exec,
+      status: 'running',
       startedAt: new Date('2026-10-11T12:30:00.000Z'),
       egress: { get, update: vi.fn() },
     } as unknown as Partial<SandboxInstance>)
-    listMock.mockResolvedValue([restarted])
+    getMock.mockResolvedValue(restarted)
     await ensureWorkspaceSandbox(shell, scope)
     expect(get).toHaveBeenCalledTimes(2)
+  })
+
+  it('takes a box with another filesystem incarnation for a new box, with or without a start time', async () => {
+    // The Sandbox API reports no startedAt, so the incarnation is what tells a restored filesystem apart.
+    const exec = vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
+    const incarnation = (id: string) => fakeBox({ status: 'running', exec, filesystemIncarnationId: id } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([incarnation('fs-1')])
+    getMock.mockResolvedValue(incarnation('fs-1'))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: {} })
+
+    await ensureWorkspaceSandbox(shell, scope)
+    await ensureWorkspaceSandbox(shell, scope)
+    expect(exec).toHaveBeenCalledOnce()
+
+    getMock.mockResolvedValue(incarnation('fs-2'))
+    await ensureWorkspaceSandbox(shell, scope)
+    expect(exec).toHaveBeenCalledTimes(2)
   })
 
   it('reads a box egress again once the verified entry expires', async () => {

@@ -356,7 +356,7 @@ export interface LivenessProbeConfig {
   execTimeoutMs?: number
   /**
    * Reuse a successful liveness result for this many milliseconds for the
-   * same box id and start time. Defaults to 10 minutes; set to 0 to probe on
+   * same box id and identity (start time and filesystem incarnation). Defaults to 10 minutes; set to 0 to probe on
    * every reuse.
    *
    * Only the exec probe is cached. Runtime readiness, deferred-file
@@ -415,7 +415,7 @@ export interface SandboxRuntimeConfig {
    * A resume receives only the keys the platform names as required to rebuild a runtime.
    * Throw when required credentials cannot be minted; renewal failure preserves
    * the sandbox and prevents dispatch. Requires the matching Sandbox runtime.
-   * Values equal to the last ones delivered to the same start of the box, within
+   * Values equal to the last ones delivered to the same box identity, within
    * 10 minutes, are resolved again but not sent again.
    */
   runtimeEnv?: (scope: SandboxScope) => Promise<Record<string, string>>
@@ -439,7 +439,7 @@ export interface SandboxRuntimeConfig {
    * created. A reused or resumed sandbox is returned only when its explicit
    * policy already matches; existing mismatches are rejected without updating
    * or deleting the sandbox unless migration is explicitly enabled below.
-   * A match read within 10 minutes stands for the same start of the box, except
+   * A match read within 10 minutes stands for the same box identity, except
    * that a `strict` or `blocked` policy is read again whenever a reuse would send
    * the box credentials (a changed {@link runtimeEnv}, or a {@link bootstrap}).
    */
@@ -560,16 +560,17 @@ let _cached: ClientCacheEntry | null = null
 /**
  * How long a reuse trusts what it last checked on a running box instead of
  * repeating the round trip: the exec probe, the egress read, the runtime
- * environment push, and the spend gate. Every check is keyed to the box's start
- * time, so a restarted box matches none of them, and a failed first call on the
- * box drops them all ({@link dropTrustedBox}).
+ * environment push, and the spend gate. Every check belongs to one identity of
+ * the box (its start time and filesystem incarnation, whichever the platform
+ * reports), a box that is not running when read keeps none, and a failed first
+ * call on the box drops them all ({@link dropTrustedBox}).
  */
 const TRUSTED_REUSE_TTL_MS = 10 * 60_000
 const REUSE_CHECKS_MAX = 1_000
 
-/** What this isolate checked on one running box, valid only for the start time it saw. */
+/** What this isolate checked on one running box, valid only for the identity it saw. */
 interface ReuseChecks {
-  startedAt: number
+  identity: string
   /** When the exec probe last passed. */
   alive?: number
   /** The egress policy (normalized) the box was last read at or migrated to. */
@@ -586,26 +587,33 @@ const runningBoxIds = new Map<string, string>()
 /** Boxes an ensure handed out without an exec probe, because a recent probe of this start had passed. */
 const trustedBoxes = new WeakSet<SandboxInstance>()
 
-function boxStartedAt(box: SandboxInstance): number | undefined {
+/**
+ * What tells one run of a box from the next. The Sandbox API reports no
+ * `startedAt` on 2026-10-20 (neither a list row nor a get carries it), so the
+ * filesystem incarnation stands in for a restored or replaced filesystem and the
+ * start time joins it whenever the platform reports one. A box that is stopped
+ * and resumed passes through a status the reuse reads, and resume, delete and a
+ * failed probe forget it.
+ */
+function boxIdentity(box: SandboxInstance): string {
   const startedAt = box.startedAt instanceof Date ? box.startedAt.getTime() : Number.NaN
-  return Number.isFinite(startedAt) ? startedAt : undefined
+  return `${Number.isFinite(startedAt) ? startedAt : ''}|${box.filesystemIncarnationId ?? ''}`
 }
 
-/** The checks recorded for this start of the box. A box that started again keeps none. */
+/** The checks recorded for this identity of the box. A box with another identity keeps none. */
 function checksFor(box: SandboxInstance): ReuseChecks | undefined {
   const checks = reuseChecks.get(box.id)
   if (!checks) return undefined
-  if (checks.startedAt !== boxStartedAt(box)) {
+  if (checks.identity !== boxIdentity(box)) {
     reuseChecks.delete(box.id)
     return undefined
   }
   return checks
 }
 
-function recordCheck(box: SandboxInstance, patch: Omit<Partial<ReuseChecks>, 'startedAt'>): void {
-  const startedAt = boxStartedAt(box)
-  if (startedAt === undefined || !box.id) return
-  const current = checksFor(box) ?? { startedAt }
+function recordCheck(box: SandboxInstance, patch: Omit<Partial<ReuseChecks>, 'identity'>): void {
+  if (!box.id) return
+  const current = checksFor(box) ?? { identity: boxIdentity(box) }
   reuseChecks.delete(box.id)
   reuseChecks.set(box.id, { ...current, ...patch })
   while (reuseChecks.size > REUSE_CHECKS_MAX) {
@@ -1681,7 +1689,7 @@ async function materializeDeferredFilesForExistingBox(
   // written only after a corpus write succeeds and lives on the same disk as
   // the files, so a lost disk loses both and the corpus is written again.
   // What this isolate last found on the box stands in for reading the marker
-  // again for as long as it trusts a probe of the same start.
+  // again for as long as it trusts a probe of the same box identity.
   const found = checksFor(box)?.corpus
   if (isRecent(found?.at, TRUSTED_REUSE_TTL_MS) && found?.hash === corpusHash) return ok(box)
   if ((await (corpusMarker ?? readDeferredCorpusMarker(box))) === corpusHash) {
@@ -2425,7 +2433,7 @@ type EgressRead = Awaited<ReturnType<SandboxInstance['egress']['get']>>
  * sent early only when the egress assertion cannot change where credentials
  * may go (see {@link egressGatesCredentials}); otherwise it waits for it.
  * A read or push this isolate completed within {@link TRUSTED_REUSE_TTL_MS} on
- * the same start of the box is not repeated, subject to the credential rule in
+ * the same box identity is not repeated, subject to the credential rule in
  * {@link prefetchExistingBoxReads}.
  */
 interface ExistingBoxPrefetch {
@@ -2926,8 +2934,12 @@ async function provisionWorkspaceSandbox(
   const knownId = forceNew ? undefined : runningBoxIds.get(name)
   if (knownId) {
     const known = await measure('get_running', () => getRunningBox(client, knownId, name))
-    if (known) existing = ok(known)
-    else runningBoxIds.delete(name)
+    if (known) {
+      existing = ok(known)
+    } else {
+      runningBoxIds.delete(name)
+      forgetBox(knownId)
+    }
   }
   if (reuseOnly && !(existing.succeeded && existing.value)) return undefined
   if (!(existing.succeeded && existing.value)) {
