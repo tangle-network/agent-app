@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.238
+
+- Share attachment history preparation across agent apps (#1203)
+
 ## 0.60.237
 
 - refactor(vault): separate pane chrome from document state (#1202)
