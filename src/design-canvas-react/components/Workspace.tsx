@@ -45,16 +45,13 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react'
 import { Stage, Layer, Rect, Group } from 'react-konva'
-import type Konva from 'konva'
 
 import type { DesignCanvasProps, ExportTriggerOptions } from '../contracts'
-import { exportPageDataUrl } from '../export'
 import { createSceneCommandStack } from '../engine/command-stack'
 import { createSnapEngine, collectGridTargets } from '../engine/snap'
 import { createZoomPanMath } from '../engine/zoom-pan'
@@ -63,14 +60,15 @@ import {
   addElementCommand,
   setAttrsCommand,
   multiSetAttrsCommand,
-  deleteElementCommand,
-  groupElementsCommand,
-  ungroupElementCommand,
 } from '../engine/commands'
 import type { MultiSetAttrsEntry } from '../engine/commands'
 import { DEFAULT_INSERT_TEMPLATES } from '../insert-builders'
 
 import { CanvasEmptyState } from './CanvasEmptyState'
+import { useWorkspaceViewport } from './use-workspace-viewport'
+import { useWorkspaceKeyboard } from './use-workspace-keyboard'
+import { NO_MARQUEE, type MarqueeState, type GestureMode } from './workspace-gesture-state'
+
 import { ElementNode } from './ElementNode'
 import { SelectionLayer } from './SelectionLayer'
 import { GridLayer } from './GridLayer'
@@ -78,7 +76,7 @@ import { SnapGuidesOverlay } from './SnapGuidesOverlay'
 import { InlineTextEditor } from './InlineTextEditor'
 import { BleedTrimOverlay } from './BleedTrimOverlay'
 
-import { normalizeMarquee, nudgeDelta as nudgeDeltaMath } from './transform-math'
+import { normalizeMarquee } from './transform-math'
 import { elementAabb, findElement, boundsIntersect } from '../../design-canvas/model'
 import type { SceneElement, ScenePage, TextElement, Bounds } from '../../design-canvas/model'
 import type { SnapResult, SnapTarget, SceneCommand } from '../contracts'
@@ -89,26 +87,9 @@ import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 // ---------------------------------------------------------------------------
 
 const SNAP_THRESHOLD_SCREEN_PX = 8
-const DUPLICATE_OFFSET = 10
 const ZOOM_FACTOR_WHEEL = 0.998
 const ZOOM_MIN = 0.05
 const ZOOM_MAX = 32
-
-// ---------------------------------------------------------------------------
-// Gesture / marquee types
-// ---------------------------------------------------------------------------
-
-interface MarqueeState {
-  active: boolean
-  startDocX: number
-  startDocY: number
-  endDocX: number
-  endDocY: number
-}
-
-const NO_MARQUEE: MarqueeState = { active: false, startDocX: 0, startDocY: 0, endDocX: 0, endDocY: 0 }
-
-type GestureMode = 'idle' | 'pan' | 'marquee' | 'drag'
 
 // ---------------------------------------------------------------------------
 // WorkspaceViewProps — injectable form (shared stack, guaranteed activePage)
@@ -186,103 +167,7 @@ export function WorkspaceView({
   const zoomPanMath = useMemo(() => createZoomPanMath({ minZoom: ZOOM_MIN, maxZoom: ZOOM_MAX }), [])
   const snapEngine = useMemo(() => createSnapEngine(), [])
 
-  // -------------------------------------------------------------------------
-  // Container sizing
-  // -------------------------------------------------------------------------
-
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
-  // Auto-fit stays live until the user takes control of the view (wheel zoom,
-  // pan, zoom controls, explicit fit). While live, every container re-measure
-  // re-fits: the first measurement can be a transient (composite grids and
-  // mounting chrome settle over several frames), and a one-shot fit would lock
-  // the page at the transient size's zoom — the 5% clamp for small cells.
-  const autoFitRef = useRef(true)
-  const lastAutoFitRef = useRef<{ zoom: number; panX: number; panY: number; width: number; height: number } | null>(null)
-  const readyRef = useRef(false)
-
-  useLayoutEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const ro = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (!entry) return
-      const { width, height } = entry.contentRect
-      setContainerSize({ width, height })
-      if (width <= 0 || height <= 0) return
-
-      // A view that no longer matches our last auto-fit means the user owns
-      // the view now — never yank their zoom on a later resize.
-      const view = stack.getState()
-      const last = lastAutoFitRef.current
-      if (last && (view.zoom !== last.zoom || view.panX !== last.panX || view.panY !== last.panY)) {
-        autoFitRef.current = false
-      }
-      // Re-fit only when the measured size CHANGED. Effect re-subscriptions
-      // (page switch, document edit) re-fire the observer with the same size;
-      // re-fitting there would clobber the zoom+pan the page switch preserved.
-      if (
-        autoFitRef.current &&
-        fitOnMount &&
-        activePage.width > 0 &&
-        activePage.height > 0 &&
-        (!last || last.width !== width || last.height !== height)
-      ) {
-        const fit = zoomPanMath.fitPage(activePage, { width, height })
-        stack.setView(fit)
-        lastAutoFitRef.current = { ...fit, width, height }
-      }
-      // One-shot ready signal on the first real measurement.
-      if (!readyRef.current) {
-        readyRef.current = true
-        onReady?.()
-      }
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [activePage, fitOnMount, onReady, stack, zoomPanMath])
-
-  const stageRef = useRef<Konva.Stage | null>(null)
-
-  // -------------------------------------------------------------------------
-  // Fit-page callback — exposed via onFitRef so the chrome can trigger it
-  // -------------------------------------------------------------------------
-
-  useEffect(() => {
-    if (!onFitRef) return
-    onFitRef.current = () => {
-      const { width, height } = containerSize
-      if (width <= 0 || height <= 0) return
-      const view = zoomPanMath.fitPage(activePage, { width, height })
-      stack.setView(view)
-    }
-    return () => {
-      // Only clear if we still own the slot (multiple WorkspaceView mounts
-      // would each try to own it; the last to mount wins, but on unmount we
-      // must not clear a ref filled by a newer mount).
-      if (onFitRef.current !== null) onFitRef.current = null
-    }
-  })
-
-  // -------------------------------------------------------------------------
-  // Export callback — the chrome's Export control calls this through the ref;
-  // the workspace owns the stage, so it renders here and forwards the result.
-  // -------------------------------------------------------------------------
-
-  useEffect(() => {
-    if (!onExportRef || !onExport) return
-    onExportRef.current = ({ format, pixelRatio }: ExportTriggerOptions) => {
-      const stage = stageRef.current
-      if (!stage) return
-      void (async () => {
-        const dataUrl = await exportPageDataUrl(stage, activePage, { format, pixelRatio })
-        await onExport({ pageId: activePageId, format, dataUrl, pixelRatio })
-      })()
-    }
-    return () => {
-      if (onExportRef.current !== null) onExportRef.current = null
-    }
-  })
+  const { containerRef, containerSize, stageRef } = useWorkspaceViewport({ stack, activePage, activePageId, fitOnMount, onReady, onFitRef, onExport, onExportRef, zoomPanMath })
 
   // -------------------------------------------------------------------------
   // Gesture refs
@@ -299,11 +184,7 @@ export function WorkspaceView({
   const [activeSnap, setActiveSnap] = useState<SnapResult | null>(null)
   const [editingElementId, setEditingElementId] = useState<string | null>(null)
   const editingPreRef = useRef<string>('')
-  const nudgeHeldRef = useRef<{
-    key: string
-    ids: string[]
-    origin: Map<string, { x: number; y: number }>
-  } | null>(null)
+
 
   // -------------------------------------------------------------------------
   // Persist helper — optimistic execute then remote apply, rollback on throw
@@ -416,6 +297,18 @@ export function WorkspaceView({
   // Element drag callbacks
   // -------------------------------------------------------------------------
 
+  /** The preview and final drop use the same document/grid snap targets. */
+  function snapDragBounds(snapBounds: Bounds, draggingIds: string[]): SnapResult {
+    const targets = snapEngine.collectTargets(state, draggingIds)
+    if (gridEnabled) {
+      const thresholdDoc = SNAP_THRESHOLD_SCREEN_PX / zoom
+      const gt = collectGridTargets(snapBounds, gridSize, activePage, thresholdDoc)
+      targets.vertical.push(...gt.vertical)
+      targets.horizontal.push(...gt.horizontal)
+    }
+    return snapEngine.apply(snapBounds, targets, SNAP_THRESHOLD_SCREEN_PX, zoom)
+  }
+
   function handleElementDragStart(elementId: string) {
     if (!canWrite) return
     const ids = selectedElementIds.includes(elementId) ? selectedElementIds : [elementId]
@@ -446,14 +339,7 @@ export function WorkspaceView({
     const snapBounds = { x: proposedX, y: proposedY, width: origin.width, height: origin.height }
 
     if (snapEnabled) {
-      const targets = snapEngine.collectTargets(state, dragging)
-      if (gridEnabled) {
-        const thresholdDoc = SNAP_THRESHOLD_SCREEN_PX / zoom
-        const gt = collectGridTargets(snapBounds, gridSize, activePage, thresholdDoc)
-        targets.vertical.push(...gt.vertical)
-        targets.horizontal.push(...gt.horizontal)
-      }
-      const snapResult = snapEngine.apply(snapBounds, targets, SNAP_THRESHOLD_SCREEN_PX, zoom)
+      const snapResult = snapDragBounds(snapBounds, dragging)
       setActiveSnap(snapResult)
     }
   }
@@ -475,14 +361,7 @@ export function WorkspaceView({
     let snappedY = finalY
     if (snapEnabled) {
       const snapBounds = { x: finalX, y: finalY, width: origin.width, height: origin.height }
-      const targets = snapEngine.collectTargets(state, draggingIds)
-      if (gridEnabled) {
-        const thresholdDoc = SNAP_THRESHOLD_SCREEN_PX / zoom
-        const gt = collectGridTargets(snapBounds, gridSize, activePage, thresholdDoc)
-        targets.vertical.push(...gt.vertical)
-        targets.horizontal.push(...gt.horizontal)
-      }
-      const snapResult = snapEngine.apply(snapBounds, targets, SNAP_THRESHOLD_SCREEN_PX, zoom)
+      const snapResult = snapDragBounds(snapBounds, draggingIds)
       snappedX = snapResult.x
       snappedY = snapResult.y
     }
@@ -618,187 +497,7 @@ export function WorkspaceView({
     stack.setView({ selectedElementIds: [element.id] })
   }
 
-  // -------------------------------------------------------------------------
-  // Keyboard
-  // -------------------------------------------------------------------------
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key === ' ') {
-      e.preventDefault()
-      spaceHeldRef.current = true
-      return
-    }
-
-    const mod = e.metaKey || e.ctrlKey
-
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      if (gestureRef.current !== 'idle') {
-        gestureRef.current = 'idle'
-        setMarquee(NO_MARQUEE)
-        setActiveSnap(null)
-      } else if (editingElementId) {
-        setEditingElementId(null)
-      } else {
-        stack.setView({ selectedElementIds: [] })
-      }
-      return
-    }
-
-    if (editingElementId) return
-
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementIds.length > 0) {
-      e.preventDefault()
-      // Stop the event reaching DesignCanvas's window-level keydown, which also
-      // handles delete/undo/redo — without this the editor handles the key twice
-      // (delete two history steps, undo twice) when Workspace mounts inside it.
-      e.stopPropagation()
-      for (const id of [...selectedElementIds]) {
-        try {
-          persist(deleteElementCommand({ document, pageId: activePageId, elementId: id }))
-        } catch { /* element gone — skip */ }
-      }
-      stack.setView({ selectedElementIds: [] })
-      return
-    }
-
-    if (mod && e.key === 'z' && !e.shiftKey) {
-      e.preventDefault()
-      e.stopPropagation()
-      if (stack.canUndo()) stack.undo()
-      return
-    }
-    if (mod && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
-      e.preventDefault()
-      e.stopPropagation()
-      if (stack.canRedo()) stack.redo()
-      return
-    }
-
-    if (mod && e.key === 'a') {
-      e.preventDefault()
-      const ids = activePage.elements.filter((el) => !el.locked && el.visible).map((el) => el.id)
-      stack.setView({ selectedElementIds: ids })
-      return
-    }
-
-    if (mod && e.key === 'd' && selectedElementIds.length > 0) {
-      e.preventDefault()
-      for (const id of selectedElementIds) {
-        const found = findElement(activePage, id)
-        if (!found) continue
-        const clone: SceneElement = {
-          ...structuredClone(found.element),
-          id: crypto.randomUUID(),
-          x: found.element.x + DUPLICATE_OFFSET,
-          y: found.element.y + DUPLICATE_OFFSET,
-        }
-        persist(addElementCommand({ pageId: activePageId, element: clone }))
-      }
-      return
-    }
-
-    if (mod && !e.shiftKey && e.key === 'g' && selectedElementIds.length >= 2) {
-      e.preventDefault()
-      persist(groupElementsCommand({
-        document,
-        pageId: activePageId,
-        elementIds: selectedElementIds,
-        groupId: crypto.randomUUID(),
-      }))
-      return
-    }
-
-    if (mod && e.shiftKey && e.key === 'g' && selectedElementIds.length === 1) {
-      e.preventDefault()
-      const id = selectedElementIds[0]!
-      persist(ungroupElementCommand({ document, pageId: activePageId, groupId: id }))
-      return
-    }
-
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key) && selectedElementIds.length > 0) {
-      e.preventDefault()
-      const key = e.key as 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown'
-      if (nudgeHeldRef.current && nudgeHeldRef.current.key !== key) {
-        flushNudge()
-      }
-      if (!nudgeHeldRef.current) {
-        const origins = new Map<string, { x: number; y: number }>()
-        for (const id of selectedElementIds) {
-          const found = findElement(activePage, id)
-          if (found) origins.set(id, { x: found.element.x, y: found.element.y })
-        }
-        nudgeHeldRef.current = { key, ids: selectedElementIds.slice(), origin: origins }
-      }
-      // Apply nudge optimistically each keydown via the command stack so the
-      // user sees live movement; the held ref lets us coalesce all steps into
-      // one undo entry on keyup.
-      const { dx, dy } = nudgeDeltaMath(key, e.shiftKey)
-      const entries: MultiSetAttrsEntry[] = []
-      for (const [id, orig] of nudgeHeldRef.current.origin) {
-        const found = findElement(activePage, id)
-        if (!found) continue
-        entries.push({
-          pageId: activePageId,
-          elementId: id,
-          attrs: { x: found.element.x + dx, y: found.element.y + dy },
-          priorAttrs: { x: found.element.x, y: found.element.y },
-        })
-      }
-      if (entries.length > 0) {
-        // Preview: silent local apply without remote persist (flushed on keyup).
-        stack.execute(multiSetAttrsCommand(entries))
-      }
-    }
-  }
-
-  function handleKeyUp(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key === ' ') {
-      spaceHeldRef.current = false
-      return
-    }
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-      flushNudge()
-    }
-  }
-
-  function flushNudge() {
-    const held = nudgeHeldRef.current
-    if (!held) return
-    nudgeHeldRef.current = null
-    if (!canWrite || held.ids.length === 0) return
-
-    // Build a single coalesced set_attrs from original positions to current.
-    const entries: MultiSetAttrsEntry[] = []
-    for (const id of held.ids) {
-      const orig = held.origin.get(id)
-      const found = findElement(activePage, id)
-      if (!orig || !found) continue
-      entries.push({
-        pageId: activePageId,
-        elementId: id,
-        attrs: { x: found.element.x, y: found.element.y },
-        priorAttrs: { x: orig.x, y: orig.y },
-      })
-    }
-    if (entries.length > 0) {
-      // Persist the coalesced nudge; the intermediate stack entries from
-      // keydown previews become part of the committed ops batch.
-      onApplyOperations(multiSetAttrsCommand(entries).operations()).catch(() => {
-        // Roll back if remote rejects.
-        for (const [id, orig] of held.origin) {
-          const found = findElement(activePage, id)
-          if (!found) continue
-          persist(setAttrsCommand({
-            pageId: activePageId,
-            elementId: id,
-            attrs: { x: orig.x, y: orig.y },
-            priorAttrs: { x: found.element.x, y: found.element.y },
-          }))
-        }
-      })
-    }
-  }
+  const { handleKeyDown, handleKeyUp } = useWorkspaceKeyboard({ stack, state, activePage, canWrite, onApplyOperations, persist, gestureRef, spaceHeldRef, setMarquee, setActiveSnap, editingElementId, setEditingElementId })
 
   // -------------------------------------------------------------------------
   // Notify host of selection changes
