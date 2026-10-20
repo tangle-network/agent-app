@@ -129,4 +129,3 @@ export interface WorkProductToolConfig {
   now?: () => number
   generateId?: () => string
 }
-

@@ -409,4 +409,3 @@ export function summarizeArtifactAgreement(
   }
   return { agreeing, checkable, contradicting }
 }
-

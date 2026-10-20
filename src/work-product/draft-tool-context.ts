@@ -71,4 +71,3 @@ export async function resolveDraft(
     provenance: stampProvenance(config.provenance(ctx), config.now),
   })
 }
-
