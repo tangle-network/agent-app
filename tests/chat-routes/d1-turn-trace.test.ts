@@ -49,7 +49,7 @@ it('isolates concurrent route counters through detached drains and exports the e
       return { ok: true as const, tenantId: 'workspace', userId: 'user', context: {} }
     },
     turnTrace: { sink: snapshot => { snapshots.push(snapshot) } },
-    produce: ({ identity: { threadId } }) => ({
+    produce: ({ body: { threadId } }) => ({
       stream: (async function* () {
         await new Promise(resolve => setTimeout(resolve, threadId === 'one' ? 15 : 5))
         await binding.batch([binding.prepare('SELECT 1'), binding.prepare('SELECT 2')])
