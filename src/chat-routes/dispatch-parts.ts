@@ -7,9 +7,9 @@
  * budget first; a mention (read from the LIVE box) takes what is left. A file
  * inlines as a `data:` URI when it fits the remaining budget, otherwise uses
  * the in-box file reference supported by the current sandbox prompt contract.
- * Every media part is deduped by its resolved absolute path. Products may opt
- * into carried-attachment selection and copying before parts are built; the
- * caller decides when a turn dispatches parts instead of a plain string.
+ * Every media part is deduped by its resolved absolute path. This module only
+ * produces the parts array; the caller decides when a turn dispatches parts
+ * instead of a plain string.
  *
  * Storage-parameterized port of gtm-agent's `dispatch-parts.ts`: the vault
  * default reader is dropped (`readAttachment` is REQUIRED — the product supplies
@@ -38,7 +38,7 @@ import {
 } from './wire'
 import { historyContentWithAttachments, type ChatAttachmentPart, type ChatMentionPart } from '../chat-store/parts'
 import { bytesToBase64 } from './upload'
-import { prepareDispatchAttachments, type AttachmentMaterialization, type ReadAttachmentFn } from './attachment-store'
+import type { ReadAttachmentFn } from './attachment-store'
 import { pathToFileURL } from 'node:url'
 
 export type { PromptInputPart }
@@ -184,15 +184,6 @@ export interface BuildDispatchPartsInput {
   attachments: ChatAttachmentPart[]
   mentions?: ChatMentionPart[]
   history: Array<{ role: 'user' | 'assistant'; content: string }>
-  /** Opt into the apps' carry-forward selection: current attachments first,
-   *  then the tail of these candidates after current attachments and mentions
-   *  claim their media slots. The existing `slice(-0)` behavior is preserved. */
-  historyAttachments?: readonly ChatAttachmentPart[]
-  /** Copy selected attachments to the box before dispatch sizing/inline reads.
-   *  Omit to retain the existing read-only dispatch builder. Copy failures
-   *  throw, as the product preparation phase did; dispatch failures remain
-   *  typed outcomes. */
-  materialize?: AttachmentMaterialization
   systemPrompt: string
   /** Serialized size of the backend profile the SDK inlines into the same
    *  prompt request body — a large, non-negotiable rider that must come out of
@@ -237,25 +228,6 @@ function readResultToBase64(read: { base64?: string; bytes?: Uint8Array }): stri
 
 /** Build dispatch parts from input by resolving mentions, paths, and applying size constraints asynchronously */
 export async function buildDispatchParts(input: BuildDispatchPartsInput): Promise<DispatchPartsOutcome> {
-  if (input.historyAttachments === undefined && input.materialize === undefined) {
-    return buildPreparedDispatchParts(input)
-  }
-
-  const attachments = await prepareDispatchAttachments({
-    attachments: input.attachments,
-    historyAttachments: input.historyAttachments,
-    mentionCount: input.mentions?.length ?? 0,
-    scopeId: input.scopeId,
-    readAttachment: input.readAttachment,
-    resolveAttachmentPath: input.resolveAttachmentPath,
-    materialize: input.materialize,
-  })
-
-  return buildPreparedDispatchParts({ ...input, attachments })
-}
-
-/** The established dispatch algorithm; opt-in preparation finishes before it starts. */
-async function buildPreparedDispatchParts(input: BuildDispatchPartsInput): Promise<DispatchPartsOutcome> {
   const readMention = input.readSandboxMention ?? readSandboxMention
   const resolveMentionPath = input.resolveMentionPath ?? input.resolveAttachmentPath
   const forcePath = input.forcePath ?? false
