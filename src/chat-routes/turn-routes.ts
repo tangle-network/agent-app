@@ -499,6 +499,13 @@ export interface ChatTurnLifecycle<TContext> {
   onTurnStart?(info: ChatTurnLifecycleStart<TContext>): void | Promise<void>
   onTurnComplete?(info: ChatTurnLifecycleComplete<TContext>): void | Promise<void>
   onTurnError?(info: ChatTurnLifecycleError<TContext>): void | Promise<void>
+  /** Follow-up work for a turn that ended cleanly: it runs with `onTurnComplete`'s own info once the assistant row is
+   *  persisted, the lifecycle hooks have fired and the thread's lock is released, under `waitUntil` where the host has
+   *  one. The member's next send never waits for it, so work that only decorates the answer (a model-written
+   *  checklist, a title, an index) belongs here and not in the producer's stream, where it holds the lock and the
+   *  stream open. It does not run for a failed, gated or handed-off turn. The turn's trace has ended; a product that
+   *  wants this work traced starts its own. A throw is logged and never reaches the member. */
+  afterSettle?(info: ChatTurnLifecycleComplete<TContext>): void | Promise<void>
 }
 
 /** What a settled turn reports to `onTurnComplete` — the product's
@@ -1356,6 +1363,8 @@ export function createChatTurnRoutes<TContext = void>(
     let firstTextAtMs: number | undefined
     let turnStarted = false
     let lifecycleSettled = false
+    // What `lifecycle.afterSettle` receives: set when the turn ended cleanly with a producer that ran.
+    let settledTurn: ChatTurnLifecycleComplete<TContext> | undefined
     // Set when `contextGate` answered the turn without running the producer.
     let gatedTurn = false
 
@@ -1389,7 +1398,7 @@ export function createChatTurnRoutes<TContext = void>(
         } else {
           const failoverInfo = producer?.modelFailover?.()
           const attribution = producer?.modelAttribution?.()
-          await lifecycle.onTurnComplete?.({
+          const completed: ChatTurnLifecycleComplete<TContext> = {
             identity, executionId, turnStreamId, context, durationMs, ...timing,
             finalText: producer?.finalText() ?? '',
             usage: producer?.usage?.() ?? {},
@@ -1401,7 +1410,9 @@ export function createChatTurnRoutes<TContext = void>(
             ...(attribution?.servedProvider ? { servedProvider: attribution.servedProvider } : {}),
             ...(attribution?.servedSource ? { servedSource: attribution.servedSource } : {}),
             ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
-          })
+          }
+          if (!gatedTurn) settledTurn = completed
+          await lifecycle.onTurnComplete?.(completed)
         }
       } catch (err) {
         log('[chat-routes] lifecycle terminal hook failed', {
@@ -1433,6 +1444,21 @@ export function createChatTurnRoutes<TContext = void>(
         await send()
       } catch (err) {
         log('[chat-routes] turn trace sink failed', {
+          turnId: turnStreamId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    /** The product's follow-up work for a turn that ended cleanly, once its lock is released. Never throws. */
+    const runAfterSettle = async (): Promise<void> => {
+      const info = settledTurn
+      settledTurn = undefined
+      const afterSettle = options.lifecycle?.afterSettle
+      if (!info || !afterSettle) return
+      try {
+        await afterSettle(info)
+      } catch (err) {
+        log('[chat-routes] lifecycle.afterSettle failed', {
           turnId: turnStreamId,
           error: err instanceof Error ? err.message : String(err),
         })
@@ -1788,7 +1814,8 @@ export function createChatTurnRoutes<TContext = void>(
         finalize.end()
         await fireTerminalLifecycle(failed, drainError)
         await releaseLock()
-        await exportTrace()
+        // Both run after the lock is released and inside this waitUntil-tracked drain, so neither holds the next send.
+        await Promise.all([exportTrace(), runAfterSettle()])
       })()
       if (ctx?.waitUntil) ctx.waitUntil(drained)
       else void drained.catch(() => {})
