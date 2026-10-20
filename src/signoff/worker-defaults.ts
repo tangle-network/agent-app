@@ -74,18 +74,20 @@ export interface WorkerDefaultsResult {
   readonly findings: readonly WorkerDefaultsFinding[]
 }
 
+/** Every file the repo tracks, repo-relative. Generated output is gitignored, so this is the complete source list without a hand-kept exclude list. */
+export function trackedFiles(repoRoot: string): string[] {
+  const listed = spawnSync('git', ['ls-files', '-z'], { cwd: repoRoot, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
+  if (listed.status !== 0) throw new Error(`signoff: git ls-files failed in ${repoRoot}: ${listed.stderr}`)
+  return listed.stdout.split('\0').filter((path) => path !== '')
+}
+
 /**
  * Wrangler configs the repo tracks. Generated output (`.wrangler/`, build
  * directories) is gitignored, so `git ls-files` is the complete source list
  * without a hand-kept exclude list.
  */
-function trackedWorkerConfigs(repoRoot: string): string[] {
-  const listed = spawnSync('git', ['ls-files', '-z'], { cwd: repoRoot, encoding: 'utf8' })
-  if (listed.status !== 0) throw new Error(`signoff: git ls-files failed in ${repoRoot}: ${listed.stderr}`)
-  return listed.stdout
-    .split('\0')
-    .filter((path) => path !== '' && WRANGLER_CONFIG_NAME.test(basename(path)))
-    .sort()
+export function trackedWorkerConfigs(repoRoot: string): string[] {
+  return trackedFiles(repoRoot).filter((path) => WRANGLER_CONFIG_NAME.test(basename(path))).sort()
 }
 
 function problemsFor(config: ResolvedWorkerConfig): string[] {

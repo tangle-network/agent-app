@@ -11,7 +11,7 @@
     "dev": "wrangler dev",
     "build": "pnpm run typecheck && pnpm run build:web",
     "build:web": "vite build",
-    "deploy": "pnpm run peer-check && wrangler deploy",
+    "deploy": "pnpm run peer-check && pnpm run signoff && wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply __PACKAGE_NAME__ --remote",
     "db:migrate:local": "wrangler d1 migrations apply __PACKAGE_NAME__ --local",
     "peer-check": "agent-app-peer-check",

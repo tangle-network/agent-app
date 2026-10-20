@@ -19,5 +19,8 @@ TANGLE_API_KEY=
 SANDBOX_API_KEY=
 SANDBOX_GATEWAY_URL=
 
+# Optional ops webhook for platform-limit alarms (80% of a Worker, D1, box or key limit).
+# SLACK_OPS_WEBHOOK_URL=
+
 # Model override without a redeploy (falls back to config.model.default).
 # MODEL_NAME=

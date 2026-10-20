@@ -16,10 +16,12 @@ import { runCommand, type CommandResult } from './exec'
 import { runGraph, validateGraph, type TaskOutcome } from './schedule'
 import { assertShuffleArgsReachTheRunner, newSeedBase, planAttempts } from './seeds'
 import { manifestCacheKey, manifestFiles, resolveStore } from './store'
+import { APP_DEFAULTS_STEP, checkAppDefaults, formatAppDefaults } from './app-defaults'
 import { checkWorkerDefaults, formatWorkerDefaults, WORKER_DEFAULTS_STEP } from './worker-defaults'
 import { materializeCleanTree, removeCleanTree, repoRootOf, type CleanTree } from './workspace'
 import type {
   SignoffAttempt,
+  SignoffConfig,
   SignoffEvent,
   SignoffHostFacts,
   SignoffInstallResult,
@@ -232,7 +234,7 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
         origin,
         host,
         install,
-        steps: [...config.steps.map((step) => step.name), WORKER_DEFAULTS_STEP].map(
+        steps: [...config.steps.map((step) => step.name), WORKER_DEFAULTS_STEP, APP_DEFAULTS_STEP].map(
           (name): SignoffStepResult => ({
             name,
             status: 'skipped',
@@ -284,7 +286,9 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
       },
     })
 
-    const steps = [...outcomes.map(toStepResult), workerDefaults]
+    // After the graph, so the build the app's steps made is there to measure the Worker upload from.
+    const appDefaults = runAppDefaults(tree.path, config, options)
+    const steps = [...outcomes.map(toStepResult), workerDefaults, appDefaults]
     return finish({
       ok: steps.every((step) => step.status === 'passed'),
       startedAt,
@@ -344,6 +348,32 @@ function runWorkerDefaults(
   // It runs before the graph's clock starts, so it has no position on the
   // graph timeline; giving it one would count it as overlapping the roots.
   return { name: WORKER_DEFAULTS_STEP, status: ok ? 'passed' : 'failed', attempts, durationMs, startedAtMs: null, finishedAtMs: null }
+}
+
+/**
+ * Built in beside `worker defaults`: a report of which agent-app defaults the app has (app-defaults.ts). It fails only
+ * on an opt-out that gives no reason, so it can run in every app's gate without blocking one over a gap it can see.
+ */
+function runAppDefaults(treeRoot: string, config: SignoffConfig, options: RunSignoffOptions): SignoffStepResult {
+  const command = `agent-app-signoff ${APP_DEFAULTS_STEP}`
+  options.onEvent?.({ kind: 'step-start', name: APP_DEFAULTS_STEP, command, seed: null })
+  const started = Date.now()
+  let output: string
+  let ok: boolean
+  try {
+    const result = checkAppDefaults(treeRoot, { exemptions: config.agentApp?.exemptions })
+    output = formatAppDefaults(result)
+    ok = result.findings.length === 0
+  } catch (error) {
+    output = `${error instanceof Error ? error.stack ?? error.message : String(error)}\n`
+    ok = false
+  }
+  const durationMs = Date.now() - started
+  const attempts: SignoffAttempt[] = [
+    { command, seed: null, exitCode: ok ? 0 : 1, signal: null, durationMs, timedOut: false, output, outputTruncated: false },
+  ]
+  emitStepEnd(options, APP_DEFAULTS_STEP, ok ? 'passed' : 'failed', attempts)
+  return { name: APP_DEFAULTS_STEP, status: ok ? 'passed' : 'failed', attempts, durationMs, startedAtMs: null, finishedAtMs: null }
 }
 
 /** Emitted from inside the step, so a watching CLI sees a completion when it

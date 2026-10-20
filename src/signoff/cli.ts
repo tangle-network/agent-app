@@ -11,12 +11,14 @@
  *   agent-app-signoff --seed 12345        # reproduce a previous run's orders
  *   agent-app-signoff --keep-going        # run every step, full picture
  *   agent-app-signoff --json proof.json   # machine-readable record
+ *   agent-app-signoff defaults [repoDir]  # which agent-app defaults each app has
  *   agent-app-signoff shell-alignment --base-url <url> --route <path>   # header dividers meet the rail
  *   agent-app-signoff surface-ladder --base-url <url> --route <path>    # cards and fields step off their parent
  *   agent-app-signoff workspace-surface --base-url <url> --route <path> # every page on the shared panel
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { runDefaultsCli } from './defaults-cli'
 import { invokedAsScript } from './invoked-as-script'
 import { formatSignoffLine, formatSignoffReport } from './report'
 import { runSignoff, type RunSignoffOptions } from './run'
@@ -46,6 +48,7 @@ function usage(): string {
     '  --quiet                     verdict only; no per-step progress',
     '',
     'Subcommands:',
+    '  defaults                    report which agent-app defaults each app has (--help for options)',
     '  shell-alignment             measure header dividers against the rail in a browser (--help for options)',
     '  surface-ladder              measure card and field steps, field borders and card copy in a browser (--help for options)',
     '  workspace-surface           every page sits on one shared panel under an inset shell header (--help for options)',
@@ -146,6 +149,7 @@ function progressWriter(): (event: SignoffEvent) => void {
 }
 
 export async function runSignoffCli(argv: readonly string[]): Promise<number> {
+  if (argv[0] === 'defaults') return runDefaultsCli(argv.slice(1))
   if (argv[0] === 'shell-alignment') return runShellAlignmentCli(argv.slice(1))
   if (argv[0] === 'surface-ladder') return runSurfaceLadderCli(argv.slice(1))
   if (argv[0] === 'workspace-surface') return runWorkspaceSurfaceCli(argv.slice(1))

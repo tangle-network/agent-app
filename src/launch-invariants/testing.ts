@@ -605,12 +605,9 @@ export async function checkCoalescedTurn(options: CoalescedTurnOptions): Promise
 
 /** Hard platform limits a declared budget may not exceed. */
 export const PLATFORM_LIMITS = {
-  /** A Worker isolate's memory. */
-  'worker-memory': 128 * MB,
-  /** Platform snapshots per sandbox; the cap GTM hit on 2026-10-10. */
-  'snapshot-count': 25,
-  /** Requests per minute per operator key. */
-  'key-rate': 60,
+  'worker-memory': LAUNCH_BUDGETS.workerMemoryBytes,
+  'snapshot-count': LAUNCH_BUDGETS.snapshotCount,
+  'key-rate': LAUNCH_BUDGETS.keyRatePerMinute,
 } as const
 
 export interface LimitAlarmCheckOptions {

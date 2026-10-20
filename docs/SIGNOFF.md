@@ -45,6 +45,7 @@ Local source checks run in a clean `git worktree` with a `--frozen-lockfile` ins
 
 Every run also includes the built-in `worker defaults` step: after install, each Wrangler config the repo deploys must carry the shared Cloudflare defaults in [worker-defaults.md](./worker-defaults.md).
 This repo deploys no Worker, so its config sets `workerConfigs: []`; `generated projects` checks the template Workers instead.
+After the repo's steps, the built-in `agent-app defaults` step reports which agent-app defaults each app in the checkout has ([app-defaults.md](./app-defaults.md)); it fails only on an opt-out that gives no reason, and this repo is not an app, so it reports nothing here.
 
 Four things it does that CI does not:
 

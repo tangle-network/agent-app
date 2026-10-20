@@ -11,6 +11,8 @@
  * gates.
  */
 
+import type { AppDefaultsExemptions } from './app-defaults'
+
 /** Which bytes get verified. */
 export type SignoffSource =
   /** Exactly the commit that would merge. Uncommitted work is NOT included. */
@@ -104,6 +106,11 @@ export interface SignoffConfig {
    *  every tracked `wrangler.{toml,json,jsonc}`. Each is checked against the
    *  agent-app Worker defaults (`worker-defaults.ts`). */
   readonly workerConfigs?: readonly string[]
+  /** What this app declares about the agent-app defaults (`app-defaults.ts`). */
+  readonly agentApp?: {
+    /** Defaults the app turns off, each with the reason. An empty reason is a configuration error. */
+    readonly exemptions?: AppDefaultsExemptions
+  }
 }
 
 /** Where a config came from. Printed in the proof — a run against a derived

@@ -60,7 +60,7 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./journeys/cli`](api/journeys-cli.md) | 1 | `signoff`, `workspace-export` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
-| [`./launch-invariants`](api/launch-invariants.md) | 59 | `signoff`, `turn-health` |
+| [`./launch-invariants`](api/launch-invariants.md) | 62 | `signoff`, `turn-health` |
 | [`./launch-invariants/cli`](api/launch-invariants-cli.md) | 1 | `signoff`, `turn-health` |
 | [`./launch-invariants/testing`](api/launch-invariants-testing.md) | 38 | `signoff`, `turn-health` |
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
@@ -98,10 +98,10 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./sequences/drizzle`](api/sequences-drizzle.md) | 13 | `tools`, `web` |
 | [`./session-shell`](api/session-shell.md) | 58 | — |
 | [`./settings-react`](api/settings-react.md) | 33 | `teams`, `teams-react`, `web-react`, `workspace-export` |
-| [`./signoff`](api/signoff.md) | 84 | — |
-| [`./signoff/cli`](api/signoff-cli.md) | 2 | — |
-| [`./signoff/proof`](api/signoff-proof.md) | 22 | — |
-| [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | — |
+| [`./signoff`](api/signoff.md) | 84 | `launch-invariants` |
+| [`./signoff/cli`](api/signoff-cli.md) | 2 | `launch-invariants` |
+| [`./signoff/proof`](api/signoff-proof.md) | 22 | `launch-invariants` |
+| [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | `launch-invariants` |
 | [`./skills`](api/skills.md) | 42 | — |
 | [`./skills-placement`](api/skills-placement.md) | 9 | `harness`, `skills` |
 | [`./skills/marketplace-drizzle`](api/skills-marketplace-drizzle.md) | 2 | — |
@@ -125,7 +125,7 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./trace`](api/trace.md) | 20 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting`, `launch-invariants` |
 | [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `crypto`, `stream` |
-| [`./turn-trace`](api/turn-trace.md) | 26 | — |
+| [`./turn-trace`](api/turn-trace.md) | 27 | — |
 | [`./vault`](api/vault.md) | 23 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
@@ -639,11 +639,11 @@ Depends on: `config`
 
 ## `./launch-invariants`
 
-Source: `src/launch-invariants/index.ts` · 59 exports
+Source: `src/launch-invariants/index.ts` · 62 exports
 
 Depends on: `signoff`, `turn-health`
 
-`AUTH_LOOKUP_DEADLINE_MS`, `AUTH_LOOKUP_TTL_MS`, `AuthLookupCache`, `AuthLookupCacheOptions`, `AuthLookupOptions`, `AuthLookupRefused`, `checkIsolatedJobs`, `checkSettlementScenarios`, `checkTurnSettlement`, `createAuthLookupCache`, `createLimitAlarms`, `createScheduledDispatch`, `credentialCacheKey`, `cronDailyFirings`, `D1_MAX_BOUND_PARAMETERS`, `describeVerdict`, `estimatedBytes`, `InvariantVerdict`, `isEdgeBlock`, `IsolatedJobsInput`, `LAUNCH_BUDGETS`, `LAUNCH_INVARIANT_IDS`, `LAUNCH_INVARIANTS`, `LaunchInvariant`, `LaunchInvariantId`, `LIMIT_RESOURCES`, `LimitAlarmOptions`, `LimitAlarms`, `LimitBudgets`, `LimitLevel`, `LimitObservation`, `LimitResource`, `longestGapMinutes`, `ObservedSlot`, `parseWranglerCrons`, `PASTED_CODE_SAMPLES`, `readInSizedBatches`, `ScheduledDispatch`, `ScheduledDispatchOptions`, `ScheduledDispatchResult`, `ScheduledJob`, `ScheduledJobInput`, `ScheduledJobOutcome`, `ScheduleEntry`, `ScheduleSlot`, `SettledTurnRecord`, `SETTLEMENT_SCENARIOS`, `SettlementScenario`, `SIZED_READ_BYTES`, `SIZED_READ_COMPOSITE_ROWS`, `SIZED_READ_ROWS`, `sizedBatches`, `SizedBatchOptions`, `SizedRow`, `slotsOf`, `TurnSettlementCounts`, `TurnTerminalState`, `withD1LimitAlarms`, `WranglerCrons`
+`AUTH_LOOKUP_DEADLINE_MS`, `AUTH_LOOKUP_TTL_MS`, `AuthLookupCache`, `AuthLookupCacheOptions`, `AuthLookupOptions`, `AuthLookupRefused`, `checkIsolatedJobs`, `checkSettlementScenarios`, `checkTurnSettlement`, `createAuthLookupCache`, `createLimitAlarms`, `createProductLimitAlarms`, `createScheduledDispatch`, `credentialCacheKey`, `cronDailyFirings`, `D1_MAX_BOUND_PARAMETERS`, `DEFAULT_LIMIT_BUDGETS`, `describeVerdict`, `estimatedBytes`, `InvariantVerdict`, `isEdgeBlock`, `IsolatedJobsInput`, `LAUNCH_BUDGETS`, `LAUNCH_INVARIANT_IDS`, `LAUNCH_INVARIANTS`, `LaunchInvariant`, `LaunchInvariantId`, `LIMIT_RESOURCES`, `LimitAlarmOptions`, `LimitAlarms`, `LimitBudgets`, `LimitLevel`, `LimitObservation`, `LimitResource`, `longestGapMinutes`, `ObservedSlot`, `parseWranglerCrons`, `PASTED_CODE_SAMPLES`, `ProductLimitAlarmOptions`, `readInSizedBatches`, `ScheduledDispatch`, `ScheduledDispatchOptions`, `ScheduledDispatchResult`, `ScheduledJob`, `ScheduledJobInput`, `ScheduledJobOutcome`, `ScheduleEntry`, `ScheduleSlot`, `SettledTurnRecord`, `SETTLEMENT_SCENARIOS`, `SettlementScenario`, `SIZED_READ_BYTES`, `SIZED_READ_COMPOSITE_ROWS`, `SIZED_READ_ROWS`, `sizedBatches`, `SizedBatchOptions`, `SizedRow`, `slotsOf`, `TurnSettlementCounts`, `TurnTerminalState`, `withD1LimitAlarms`, `WranglerCrons`
 
 [Full API →](api/launch-invariants.md)
 
@@ -1003,6 +1003,8 @@ Depends on: `teams`, `teams-react`, `web-react`, `workspace-export`
 
 Source: `src/signoff/index.ts` · 84 exports
 
+Depends on: `launch-invariants`
+
 `CdpResponseSource`, `checkShellAlignment`, `checkSurfaceLadder`, `checkWorkerDefaults`, `checkWorkspaceSurface`, `collectShellDividers`, `collectSurfaceLadder`, `collectWorkspaceSurface`, `composite`, `contrastRatio`, `CopyBlock`, `createRequestMeter`, `formatNetworkCount`, `formatShellAlignmentReport`, `formatSignoffReport`, `formatSurfaceLadderReport`, `formatWorkerDefaults`, `formatWorkspaceSurfaceReport`, `HEADER_TOP_TOLERANCE_PX`, `isOverBudget`, `judgeShellAlignment`, `judgeSurfaceLadder`, `judgeWorkspaceSurface`, `LoadedSignoffConfig`, `loadSignoffConfig`, `LoadSignoffConfigOptions`, `meterPage`, `NETWORK_OVER_BUDGET_EXIT`, `NetworkCount`, `networkExitCode`, `oklchL`, `parseShellAlignmentArgs`, `parseSurfaceLadderArgs`, `QUIET_CHROMIUM_ARGS`, `reachedNetwork`, `REQUEST_BUDGET_PER_10S`, `RequestMeter`, `Rgb`, `Rgba`, `runShellAlignmentCli`, `runSignoff`, `RunSignoffOptions`, `runSurfaceLadderCli`, `runWorkspaceSurfaceCli`, `SHELL_ALIGNMENT_TOLERANCE_PX`, `ShellAlignmentFinding`, `ShellAlignmentOptions`, `ShellAlignmentReport`, `ShellDivider`, `ShellDividerSample`, `SignoffAttempt`, `SignoffConfig`, `SignoffConfigOrigin`, `SignoffEvent`, `SignoffHostFacts`, `SignoffInstallResult`, `SignoffInstallSpec`, `SignoffRepoFacts`, `SignoffReport`, `SignoffShuffleSpec`, `SignoffSource`, `SignoffStepResult`, `SignoffStepSpec`, `SignoffStepStatus`, `summarizeSurfacePage`, `SURFACE_LADDER_MAX_WORDS`, `SURFACE_LADDER_MIN_BORDER_CONTRAST`, `SURFACE_LADDER_MIN_DELTA_L`, `SurfaceBox`, `surfaceDeltaL`, `SurfaceFinding`, `SurfaceLadderLimits`, `SurfaceLadderOptions`, `SurfaceLadderReport`, `SurfacePageSummary`, `SurfaceRule`, `SurfaceSample`, `WORKER_COMPATIBILITY_DATE_FLOOR`, `WorkerDefaultsFinding`, `WorkerDefaultsResult`, `WorkspaceSurfaceFinding`, `WorkspaceSurfaceOptions`, `WorkspaceSurfaceReport`, `WorkspaceSurfaceSample`
 
 [Full API →](api/signoff.md)
@@ -1010,6 +1012,8 @@ Source: `src/signoff/index.ts` · 84 exports
 ## `./signoff/cli`
 
 Source: `src/signoff/cli.ts` · 2 exports
+
+Depends on: `launch-invariants`
 
 `parseArgs`, `runSignoffCli`
 
@@ -1019,6 +1023,8 @@ Source: `src/signoff/cli.ts` · 2 exports
 
 Source: `src/signoff/proof.ts` · 22 exports
 
+Depends on: `launch-invariants`
+
 `AttachedSignoffProof`, `attachSignoffProof`, `AttachSignoffProofInput`, `CommitFacts`, `formatSignoffSummary`, `IsAncestorFn`, `parseSignoffProof`, `ProofFromReportInput`, `proofFromSignoffReport`, `readSignoffKey`, `SignoffCommitBinding`, `SignoffFailure`, `SignoffFailureCode`, `SignoffProof`, `SignoffProofBody`, `SignoffProofPeer`, `SignoffProofSeal`, `SignoffProofStep`, `SignoffProofSubject`, `SignoffVerification`, `verifySignoffProof`, `VerifySignoffProofOptions`
 
 [Full API →](api/signoff-proof.md)
@@ -1026,6 +1032,8 @@ Source: `src/signoff/proof.ts` · 22 exports
 ## `./signoff/proof-cli`
 
 Source: `src/signoff/proof-cli.ts` · 0 exports
+
+Depends on: `launch-invariants`
 
 _No public exports._
 
@@ -1237,9 +1245,9 @@ Depends on: `chat-routes`, `crypto`, `stream`
 
 ## `./turn-trace`
 
-Source: `src/turn-trace/index.ts` · 26 exports
+Source: `src/turn-trace/index.ts` · 27 exports
 
-`buildTurnTraceOtelSpans`, `createIntelligenceTurnTraceSink`, `createTurnTrace`, `CreateTurnTraceOptions`, `formatServerTiming`, `IntelligenceTurnTraceSinkOptions`, `isTraceId`, `nextCallIndex`, `OtlpSpan`, `otlpTraceId`, `parseServerTiming`, `serverTimingAttrs`, `ServerTimingEntry`, `summarizeTurnSpans`, `tracedModelFetch`, `TracedModelFetchOptions`, `TURN_SPAN_KINDS`, `TurnSpan`, `TurnSpanAttrs`, `TurnSpanKind`, `TurnSpanRecord`, `TurnTrace`, `turnTraceId`, `TurnTraceSink`, `TurnTraceSnapshot`, `TurnTraceSummary`
+`buildTurnTraceOtelSpans`, `createIntelligenceTurnTraceSink`, `createTurnTrace`, `CreateTurnTraceOptions`, `formatServerTiming`, `IntelligenceTurnTraceSinkOptions`, `isTraceId`, `nextCallIndex`, `OtlpSpan`, `otlpTraceId`, `parseServerTiming`, `resolveIngestKey`, `serverTimingAttrs`, `ServerTimingEntry`, `summarizeTurnSpans`, `tracedModelFetch`, `TracedModelFetchOptions`, `TURN_SPAN_KINDS`, `TurnSpan`, `TurnSpanAttrs`, `TurnSpanKind`, `TurnSpanRecord`, `TurnTrace`, `turnTraceId`, `TurnTraceSink`, `TurnTraceSnapshot`, `TurnTraceSummary`
 
 [Full API →](api/turn-trace.md)
 

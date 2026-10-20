@@ -136,7 +136,7 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
       const report = await runSignoff({ repoDir: repo, cacheDir: temp('signoff-cache-'), source: 'head' })
 
       expect(report.ok).toBe(true)
-      expect(report.steps.map((step) => step.status)).toEqual(['passed', 'passed', 'passed'])
+      expect(report.steps.map((step) => step.status)).toEqual(['passed', 'passed', 'passed', 'passed'])
       expect(report.install.exitCode).toBe(0)
       expect(readFileSync(log, 'utf8').trim().split('\n').sort()).toEqual(['build|', 'typecheck|'])
       // The install really ran inside the clean tree, not the developer's.
@@ -158,7 +158,7 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
     const report = await runSignoff({ repoDir: repo, cacheDir: temp('signoff-cache-'), source: 'head' })
 
     expect(report.ok).toBe(true)
-    expect(report.steps.map((step) => step.name)).toEqual(['committed config', 'worker defaults'])
+    expect(report.steps.map((step) => step.name)).toEqual(['committed config', 'worker defaults', 'agent-app defaults'])
     expect(report.configOrigin).toEqual({ kind: 'file', path: join(report.workspace, 'signoff.config.mjs') })
   })
 
@@ -182,7 +182,7 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
     const report = await runSignoff({ repoDir: repo, cacheDir: temp('signoff-cache-'), source: 'head' })
 
     expect(report.ok).toBe(true)
-    expect(report.steps.map((step) => step.name)).toEqual(['committed package config', 'worker defaults'])
+    expect(report.steps.map((step) => step.name)).toEqual(['committed package config', 'worker defaults', 'agent-app defaults'])
     expect(report.configOrigin).toEqual({ kind: 'package-json', path: join(report.workspace, 'package.json') })
   })
 
@@ -222,7 +222,7 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
     const greenLine = formatSignoffLine(green)
     expect(greenLine).toContain('signoff PASS')
     expect(greenLine).toContain(green.repo.head.slice(0, 12))
-    expect(greenLine).toContain('3/3 steps')
+    expect(greenLine).toContain('4/4 steps')
     expect(greenLine).toContain(`seed ${green.seedBase}`)
     expect(greenLine.split('\n')).toHaveLength(1)
 
@@ -234,7 +234,7 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
     const red = await runSignoff({ repoDir: failing, cacheDir: temp('signoff-cache-'), source: 'head' })
     const redLine = formatSignoffLine(red)
     expect(redLine).toContain('signoff FAIL')
-    expect(redLine).toContain('1/2 steps')
+    expect(redLine).toContain('2/3 steps')
   })
 
   it('a gitignored stale artifact in the developer checkout is NOT in the tree the steps see', async () => {
