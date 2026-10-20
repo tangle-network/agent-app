@@ -86,7 +86,8 @@ import {
 import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import { checkModelPolicy, type ModelPolicy } from '../policy-filters/index'
 import { parseJsonObjectBody } from '../web/index'
-import { createTurnTrace, type TurnSpan, type TurnSpanAttrs, type TurnTrace, type TurnTraceSink, type TurnTraceSummary } from '../turn-trace/recorder'
+import { createTurnTrace, type TurnSpan, type TurnSpanAttrs, type TurnTrace, type TurnTraceSink, type TurnTraceSnapshot, type TurnTraceSummary } from '../turn-trace/recorder'
+import { createIntelligenceTurnTraceSink, otlpTraceId } from '../turn-trace/otel'
 import { formatServerTiming } from '../turn-trace/server-timing'
 import {
   buildTurnPhaseEvent,
@@ -563,6 +564,7 @@ export interface ChatTurnCompleteInput<TContext> {
 
 /** Where a finished turn's trace goes, and the host's labels for its root span. Metadata only: never content. */
 export interface ChatTurnTraceOptions<TContext> {
+  /** Default: `createIntelligenceTurnTraceSink({ project: projectId })`, which reads the Sandbox product key from the environment. */
   sink?: TurnTraceSink
   /** Labels for the root span, e.g. the workspace id. Called once per exported turn. */
   labels?(info: { identity: ChatTurnIdentity; executionId: string; context: TContext }): TurnSpanAttrs
@@ -735,12 +737,16 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   /** Trace flush handed to `waitUntil` (OTLP export). */
   traceFlush?(context: TContext): Promise<void>
   /**
-   * Where each finished turn's trace goes (`createIntelligenceTurnTraceSink`). The route always records the
-   * turn's trace (`ChatTurnProduceArgs.trace`) and reports its summary to `lifecycle`; this sends the spans on.
-   * The sink runs under `waitUntil` after the lifecycle hooks and after the turn lock is released, and its failure never fails a turn. A turn handed
-   * to a durable owner (`handoffCompletion`) is exported by that owner, not here.
+   * Where each finished turn's trace goes. On by default: omit it and every turn goes to Tangle Intelligence under
+   * `projectId` (`createIntelligenceTurnTraceSink`); pass `{ sink, labels }` to send it elsewhere or label it.
+   * The route always records the turn's trace (`ChatTurnProduceArgs.trace`), reports its summary to `lifecycle`, and
+   * writes one `agent_app_turn_trace` log line per turn (first text, coverage, time per kind); this sends the spans on.
+   * The sink runs under `waitUntil` after the lifecycle hooks and after the turn lock is released, and its failure never
+   * fails a turn. A turn handed to a durable owner (`handoffCompletion`) is exported when this request's live
+   * projection ends, failed only when the projection saw an error. `false` is the only opt-out, and
+   * `agent-app-signoff defaults` fails it until the app's `signoff.config.mjs` gives the reason.
    */
-  turnTrace?: ChatTurnTraceOptions<TContext>
+  turnTrace?: ChatTurnTraceOptions<TContext> | false
   /** Compose the interaction-answer endpoints (`/interactions`). Omit when the
    *  product has no sidecar ask channel. */
   interactions?: InteractionAnswerRouteOptions
@@ -1004,6 +1010,12 @@ export function createChatTurnRoutes<TContext = void>(
       : (options.incrementalPersistence ?? {})
 
   const progressMessages: Record<TurnRoutePhase, string> = { ...TURN_ROUTE_PHASE_MESSAGES, ...options.progressMessages }
+
+  // Every turn's trace goes to Intelligence unless the product turns it off (`turnTrace: false`).
+  const traceOptions = options.turnTrace === false ? undefined : options.turnTrace
+  const traceSink: TurnTraceSink | undefined = options.turnTrace === false
+    ? undefined
+    : (traceOptions?.sink ?? createIntelligenceTurnTraceSink({ project: options.projectId }))
 
   /** A turn whose body parsed and whose caller `authorize` admitted. */
   type AdmittedTurn = { parsed: ParsedTurnBody; auth: Extract<ChatTurnAuthorization<TContext>, { ok: true }>; trace: TurnTrace }
@@ -1464,8 +1476,52 @@ export function createChatTurnRoutes<TContext = void>(
     let settledTurn: ChatTurnLifecycleComplete<TContext> | undefined
     // Set when `contextGate` answered the turn without running the producer.
     let gatedTurn = false
+    // Set when `contextGate` handed the turn to the product's durable owner (`{ proceed: 'handoff' }`).
+    let legacyHandoff = false
 
     let pendingTraceExport: (() => void | Promise<void>) | undefined
+    let traceEnded = false
+
+    /**
+     * End the turn's trace once: write its summary line, and arm its export for `exportTrace`. A turn handed to a
+     * durable owner ends here when this request's live projection ends; the owner settles everything else.
+     */
+    const endTrace = (failed: boolean, terminalError: unknown): TurnTraceSnapshot => {
+      const failureCode = failed
+        ? (failureCodeOf(lastFailureData) ?? (terminalError instanceof Error ? terminalError.name : 'turn_failed'))
+        : undefined
+      const snapshot = trace.finish(failureCode === undefined ? {} : { error: failureCode })
+      if (traceEnded) return snapshot
+      traceEnded = true
+      const handedOff = completionHandoff || legacyHandoff
+      // One line per turn in the host's logs (Workers Logs), so first text and coverage are readable without Intelligence.
+      console.info(JSON.stringify({
+        event: 'agent_app_turn_trace',
+        project: options.projectId,
+        executionId,
+        otlpTraceId: otlpTraceId(snapshot.traceId),
+        failed,
+        ...(failureCode ? { failureCode } : {}),
+        ...(handedOff ? { handedOff: true } : {}),
+        ...(gatedTurn ? { gated: true } : {}),
+        ...snapshot.summary,
+      }))
+      // Sent by `exportTrace`, after the turn lock is released: a slow collector must not hold the next send.
+      const sink = traceSink
+      if (sink) {
+        pendingTraceExport = () => sink(snapshot, {
+          'tangle.sessionId': identity.sessionId,
+          'tangle.userId': identity.userId,
+          'tangle.tenantId': identity.tenantId,
+          'tangle.turn.failed': failed,
+          ...(gatedTurn ? { 'tangle.turn.gated': true } : {}),
+          ...(handedOff ? { 'tangle.turn.handed_off': true } : {}),
+          ...(failureCode ? { 'tangle.turn.failure_code': failureCode } : {}),
+          ...(traceOptions?.labels?.({ identity, executionId, context }) ?? {}),
+        })
+      }
+      return snapshot
+    }
 
     // Exactly one terminal lifecycle hook, after the turn settles (idempotent).
     // Failure is this route's own verdict (`runFailed` from error/failed
@@ -1474,10 +1530,7 @@ export function createChatTurnRoutes<TContext = void>(
       if (lifecycleSettled) return
       lifecycleSettled = true
       // The trace ends with the turn, before the product's own hooks run, so their work is not in its wall time.
-      const failureCode = failed
-        ? (failureCodeOf(lastFailureData) ?? (terminalError instanceof Error ? terminalError.name : 'turn_failed'))
-        : undefined
-      const snapshot = trace.finish(failureCode === undefined ? {} : { error: failureCode })
+      const snapshot = endTrace(failed, terminalError)
       const lifecycle = options.lifecycle
       const durationMs = Date.now() - turnStartedAtMs
       const timing = {
@@ -1515,20 +1568,6 @@ export function createChatTurnRoutes<TContext = void>(
         log('[chat-routes] lifecycle terminal hook failed', {
           turnId: turnStreamId,
           error: err instanceof Error ? err.message : String(err),
-        })
-      }
-      // Sent by `exportTrace`, after the turn lock is released: a slow collector must not hold the next send.
-      const traceOptions = options.turnTrace
-      if (traceOptions?.sink) {
-        const sink = traceOptions.sink
-        pendingTraceExport = () => sink(snapshot, {
-          'tangle.sessionId': identity.sessionId,
-          'tangle.userId': identity.userId,
-          'tangle.tenantId': identity.tenantId,
-          'tangle.turn.failed': failed,
-          ...(gatedTurn ? { 'tangle.turn.gated': true } : {}),
-          ...(failureCode ? { 'tangle.turn.failure_code': failureCode } : {}),
-          ...(traceOptions.labels?.({ identity, executionId, context }) ?? {}),
         })
       }
     }
@@ -1609,11 +1648,18 @@ export function createChatTurnRoutes<TContext = void>(
         const gate = await trace.measure('admission.gate', 'admission', () => contextGate(produceArgs))
         if (gate.proceed === 'handoff') {
           await releaseLock()
+          legacyHandoff = true
+          endTrace(false, undefined)
+          exportTraceInBackground()
           return gate.response
         }
         if (!gate.proceed) {
           await releaseLock()
-          if (completionHandoff) return gate.response
+          if (completionHandoff) {
+            endTrace(false, undefined)
+            exportTraceInBackground()
+            return gate.response
+          }
           // A gated turn is still a TURN, and until now it was the one answer
           // path that fired no lifecycle hook at all — `turnStarted` is set
           // further down, so an early return here left telemetry with no record
@@ -1893,8 +1939,10 @@ export function createChatTurnRoutes<TContext = void>(
         if (completionHandoff) {
           // The external owner settles transcript, lifecycle, lock and replay
           // status. Flush only the post-handoff live projection; EOF is an
-          // observation stop, never a terminal verdict for that owner.
-          await tap.detach()
+          // observation stop, never a terminal verdict for that owner. The
+          // trace is this request's own record, so it ends here.
+          endTrace(failed, drainError)
+          await Promise.all([tap.detach(), exportTrace()])
           return
         }
         const finalize = trace.start('persist.finalize', 'persist')
@@ -1946,8 +1994,10 @@ export function createChatTurnRoutes<TContext = void>(
       if (!completionHandoff) {
         if (turnStarted) await fireTerminalLifecycle(true, err)
         await releaseLock()
-        exportTraceInBackground()
       }
+      // A turn that failed before it started, or after a durable owner took it, still ends its trace here.
+      endTrace(true, err)
+      exportTraceInBackground()
       throw err
     }
   }

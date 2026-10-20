@@ -507,6 +507,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       if (step.kind === 'event') {
         const event = step.event
         if (event.type === 'text' && event.text) {
+          // A turn that owns its trace outside createChatTurnRoutes (a Durable Object turn) gets first_text_ms here.
+          trace?.markFirstText()
           if (!segmentOpen) { segments.push(''); segmentOpen = true }
           segments[segments.length - 1] += event.text
           emit({ type: 'text', segment: segments.length, delta: event.text })

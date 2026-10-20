@@ -15,12 +15,12 @@ agent-app-signoff defaults --no-bundle --json matrix.json
 
 | Row | Has the default when | Source of the read |
 |---|---|---|
-| agent-app pin | the pinned version is at or above every outcome's floor (`AGENT_APP_OUTCOME_FLOORS`: turn trace 0.60.199, first text 0.60.203) | `package.json` |
-| turn trace | the app wires a sink (`createIntelligenceTurnTraceSink`, or a `turnTrace: { sink }`); with `--probe`, Intelligence also holds a turn from the last 30 days. A sink that exports with an explicit `TANGLE_API_KEY` reads `?` until `--probe` shows an accepted turn: the ingest refused Legal's Worker key (HTTP 401, #468) and accepts Hospitality's | source, Intelligence |
+| agent-app pin | the pinned version is at or above every outcome's floor (`AGENT_APP_OUTCOME_FLOORS`: turn trace 0.60.199, first text 0.60.203, default turn trace 0.60.221) | `package.json` |
+| turn trace | the app uses `createChatTurnRoutes` at agent-app 0.60.221 or later (it exports every turn by default, a turn handed to `handoffCompletion` included), or wires a sink (`createIntelligenceTurnTraceSink`, or a `turnTrace: { sink }`); with `--probe`, Intelligence also holds a turn from the last 30 days. An app that passes `handoffCompletion` below 0.60.221 is a gap: nothing exports its handed-off turns. A sink that exports with an explicit `TANGLE_API_KEY` reads `?` until `--probe` shows an accepted turn: the ingest refused Legal's Worker key (HTTP 401, #468) and accepts Hospitality's | source, Intelligence |
 | first text | the turn owner marks it (`createChatTurnRoutes` from 0.60.203, or `trace.markFirstText()` in a Durable Object turn) and the trace is on | source |
 | prewarm route | the app mounts `createWorkspacePrewarmRoute`; a local route named prewarm is a local copy | source |
 | placement | a Wrangler `[placement]` names a `region` or `host`; smart placement does not pin | Wrangler config |
-| tool_count p50 | reported when Intelligence has it; no ceiling is set until a measured link to first text exists | Intelligence |
+| tool calls p50 | the root span's `tangle.turn.tool_calls` (every `tool.call` span of the turn, the box agent's included); no ceiling is set until a measured link to first text exists | Intelligence |
 | limit alarms | the server wraps its D1 binding with `withD1LimitAlarms` and builds the alarms with `createProductLimitAlarms`, not a copy of `createLimitAlarms` | source |
 | Worker upload | gzip Total Upload from `wrangler deploy --dry-run` is under 80% of `LAUNCH_BUDGETS.workerUploadGzipKiB` (10 MiB) | the app's own Wrangler, after a build |
 

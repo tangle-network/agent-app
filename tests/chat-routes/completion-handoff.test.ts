@@ -7,6 +7,7 @@ import {
   type ChatTurnRouteProducer,
 } from '../../src/chat-routes/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
+import type { TurnSpanAttrs, TurnTraceSnapshot } from '../../src/turn-trace/index'
 
 interface StoredMessage {
   id: string
@@ -92,6 +93,9 @@ describe('createChatTurnRoutes — durable completion handoff', () => {
     const lifecycle = { start: 0, complete: 0, error: 0 }
     const release = vi.fn()
     const onTurnComplete = vi.fn()
+    const exported: Array<{ snapshot: TurnTraceSnapshot; labels: TurnSpanAttrs }> = []
+    const logLines: string[] = []
+    const info = vi.spyOn(console, 'info').mockImplementation((line: unknown) => { logLines.push(String(line)) })
 
     const routes = createChatTurnRoutes({
       projectId: 'handoff-test',
@@ -108,6 +112,7 @@ describe('createChatTurnRoutes — durable completion handoff', () => {
         onTurnError: () => { lifecycle.error += 1 },
       },
       onTurnComplete,
+      turnTrace: { sink: (snapshot, labels) => { exported.push({ snapshot, labels }) } },
       onEvent: (event) => { observed.push(event.type) },
       produce: (args: ChatTurnProduceArgs<void>): ChatTurnRouteProducer => ({
         stream: (async function* () {
@@ -164,5 +169,15 @@ describe('createChatTurnRoutes — durable completion handoff', () => {
     expect(lifecycle).toEqual({ start: 1, complete: 0, error: 0 })
     expect(onTurnComplete).not.toHaveBeenCalled()
     expect(release).not.toHaveBeenCalled()
+
+    // The route exports the handed-off turn's trace once, when its live projection ends: the owner cannot reach it.
+    info.mockRestore()
+    expect(exported).toHaveLength(1)
+    const [{ snapshot, labels }] = exported as [{ snapshot: TurnTraceSnapshot; labels: TurnSpanAttrs }]
+    expect(labels).toMatchObject({ 'tangle.turn.handed_off': true, 'tangle.turn.failed': true, 'tangle.tenantId': 'tenant-1' })
+    expect(snapshot.status).toBe('error')
+    expect(snapshot.summary.firstTextMs).toBeGreaterThanOrEqual(0)
+    const summaryLines = logLines.filter((line) => line.includes('"agent_app_turn_trace"')).map((line) => JSON.parse(line) as Record<string, unknown>)
+    expect(summaryLines).toEqual([expect.objectContaining({ project: 'handoff-test', handedOff: true, failed: true, firstTextMs: snapshot.summary.firstTextMs, coveragePct: snapshot.summary.coveragePct })])
   })
 })
