@@ -70,6 +70,7 @@ function harness(): Harness {
           apiKey: 'k', model: 'm', systemPrompt: 'You are the workspace agent.',
           userMessage: turnPromptText(prompt), history: routerTurnHistory(priorMessages), trace, fetchImpl,
           box: { acquire, runTask, ...(context.box ? { started: context.box } : {}) },
+          onEvent: event => { if (event.type === 'tool_start' || event.type === 'tool') order.push(event.type === 'tool' ? `tool:${event.status}` : 'tool_start') },
         }),
         log: () => {},
       })
@@ -115,7 +116,10 @@ describe('createHybridTurnProducer behind the chat route', () => {
       sse([text('Let me read the lease on the workspace computer.'), toolCall('call-1', 'sandbox_run', '{"task":"read lease.pdf"}')]),
       sse([text('Twelve months.')]),
     ])
-    // The speculator's start and the tool's call share one start.
+    // The box starts when the model names the tool, before its arguments finish and the call runs, and that one
+    // start serves the call.
+    expect(named.order).toContain('tool_start')
+    expect(named.order.indexOf('box.acquire')).toBeLessThan(named.order.indexOf('tool:running'))
     expect(named.acquire).toHaveBeenCalledTimes(1)
     expect(named.runTask).toHaveBeenCalledTimes(1)
   })
