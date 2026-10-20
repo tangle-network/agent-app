@@ -14,7 +14,6 @@ export default {
   agentApp: {
     // An exemption is a default this app does not have yet, with the reason. Delete each line as it is fixed.
     exemptions: {
-      prewarm: 'This scaffold has no workspace-open route yet; agent-app mounts the shared prewarm route by default in a later release.',
       placement: 'The D1 region is unknown until `wrangler d1 create` runs; pin [placement] beside the D1 primary then, and delete this line.',
     },
   },

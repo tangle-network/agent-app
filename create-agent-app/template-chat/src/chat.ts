@@ -8,7 +8,8 @@
  *   turn         `createChatTurnRoutes` — body validation, turn identity,
  *                the default turn-buffer tap (replay after a drop), user and
  *                assistant rows persisted with typed parts + usage receipt
- *   producer     the sandbox lane from `src/sandbox.ts`
+ *   producer     the hybrid lane from `src/sandbox.ts`: the Router answers
+ *                first and escalates to the box through `sandbox_run`
  *   uploads      `createUploadRoute` — small files inline (`data:` URI),
  *                large files into the sandbox workspace by path
  *   asks         `/interactions` list/answer endpoints over the sidecar
@@ -47,7 +48,7 @@ import {
 import { drizzle } from 'drizzle-orm/d1'
 import { accounts, messages, sessions, threads, users, verifications } from './db/schema'
 import type { AppEnv } from './env'
-import { appSlug, createSandboxProduce, resolveSidecarConnection, resolveUploadSink } from './sandbox'
+import { appSlug, createHybridLane, createPrewarmRoute, resolveSidecarConnection, resolveUploadSink } from './sandbox'
 
 export interface ChatAppOverrides {
   /** Test seam: an in-memory drizzle db (the e2e test runs the REAL
@@ -55,7 +56,7 @@ export interface ChatAppOverrides {
   db?: ChatDatabase
   /** Test seam: `createMemoryTurnEventStore()`. Default: D1-backed buffer. */
   turnStore?: TurnEventStore
-  /** Test seam: a fake sandbox producer. Default: the real sandbox lane. */
+  /** Test seam: a fake producer. Default: the real hybrid lane. */
   produce?: (args: ChatTurnProduceArgs<void>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
   /** Test seam: where large uploads land. Default: the workspace box's fs. */
   uploadSink?: (scope: { workspaceId: string; userId: string }) => Promise<SandboxUploadSink | null>
@@ -79,6 +80,8 @@ export interface ChatApp {
     threadMessages(request: Request, params: { threadId: string }): Promise<Response>
   }
   upload(request: Request): Promise<Response>
+  /** POST: warm the open workspace's box (`AgentWorkspaceLayout`'s `prewarm`). */
+  prewarm(request: Request): Promise<Response>
 }
 
 const notFound = () => Response.json({ error: 'Thread not found' }, { status: 404 })
@@ -142,7 +145,8 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
     : null
   interface Admission { handle: unknown; started: boolean; producer?: ChatTurnRouteProducer; userMessageId?: string }
   const admissions = new Map<string, Admission>()
-  const produce = overrides.produce ?? createSandboxProduce(env)
+  const lane = overrides.produce ? null : createHybridLane(env)
+  const produce = overrides.produce ?? lane!.produce
   const routes = createChatTurnRoutes<void>({
     turnLock: {
       acquire: async args => {
@@ -169,6 +173,8 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
     authorize,
     store,
     turnStore,
+    // The box starts the moment the caller is admitted when the ask needs a computer.
+    ...(lane ? { afterAuthorize: lane.afterAuthorize } : {}),
     beforeTurn: async args => {
       const admission = admissions.get(args.executionId)
       if (args.userMessageId) {
@@ -254,11 +260,17 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
     return Response.json({ thread, messages: await store.listMessages(params.threadId) })
   }
 
+  const prewarmRoute = createPrewarmRoute(env, async request => {
+    const session = await requireUser(request)
+    return session.ok ? session.value.user.id : null
+  })
+
   return {
     auth,
     store,
     turnStore,
     routes: { ...routes, createThread, listThreads, threadMessages },
     upload,
+    prewarm: request => prewarmRoute(request),
   }
 }
