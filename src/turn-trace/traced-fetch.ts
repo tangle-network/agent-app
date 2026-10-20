@@ -1,4 +1,5 @@
 import type { TurnSpan, TurnTrace } from './recorder'
+import { otlpTraceId } from './otel'
 import { parseServerTiming, serverTimingAttrs } from './server-timing'
 
 const counters = new WeakMap<TurnTrace, Map<string, number>>()
@@ -83,7 +84,11 @@ export function tracedModelFetch(trace: TurnTrace, inner: typeof fetch, options:
     options.onSpan?.(span)
     let response: Response
     try {
-      response = await inner(input, init)
+      // Fetch replaces Request headers when init.headers is supplied. Preserve
+      // that precedence while parenting Router's spans to this exact send.
+      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
+      headers.set('traceparent', `00-${otlpTraceId(trace.traceId)}-${span.id}-01`)
+      response = await inner(input, { ...init, headers })
     } catch (error) {
       span.end({ 'http.failed': true }, error)
       throw error
