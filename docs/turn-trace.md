@@ -21,7 +21,9 @@ agent_app.turn                       wall time of the turn; coverage and time pe
 ├─ tool.call                         an app tool, sandbox_exec or sandbox_run
 │  ├─ sandbox.claim                  the box a tool call waited for
 │  └─ sandbox.exec                   the command, sent with the turn's trace id
-├─ sandbox.claim                     ensureWorkspaceSandbox: its steps are children (credentials, list_running, finalize, resume, create, wait_running)
+├─ sandbox.claim                     ensureWorkspaceSandbox: its steps are children (credentials, get_running or list_running, egress, liveness, finalize, resume, create, wait_running)
+├─ sandbox.lease.*                   the foreground provisioning lease a product's single-flight takes: inspect, acquire, release
+├─ sandbox.spend.*                   the spend seam around the claim: before_provision, observe
 ├─ sandbox.prompt                    the in-box lane
 │  ├─ sandbox.transit                SDK, API, orchestrator and host hops that no sidecar phase holds
 │  ├─ sidecar.<phase>                agent_run_start, harness_spawn, harness_ready, first_model_request, first_upstream_byte, first_text
@@ -35,6 +37,18 @@ A rollout's `first_words_p50_ms` starts later, at the end of admission (`rollout
 `summary.coveragePct` is the share of the turn's wall time inside at least one child span.
 `summary.byKind` credits each instant to the deepest open span's kind (`admission`, `router`, `model`, `network`, `tool`, `sandbox`, `persist`, `other`), so it sums to the covered time, and `largestGapMs` is the longest stretch with no span open.
 A span records metadata only: ids, durations, status codes, model names and token counts; never a prompt, an answer or a tool argument.
+
+## The claim of a reused box
+
+A reuse asks the platform for the box this isolate used last under that name (`sandbox.ensure.get_running`), and lists every running box (`list_running`) only when that id is gone, stopped or renamed.
+For ten minutes after a check passed on one start of a box, the same reuse skips it: the exec probe (`liveness`), the egress read, the runtime environment push and the deferred-corpus marker read.
+A restarted box has a new `startedAt` and matches none of them.
+A `strict` or `blocked` egress verdict stands in for the read only when the reuse sends the box no credentials: a changed runtime environment, or a shell `bootstrap`, waits for a fresh read.
+The spend gate (`sandbox.spend.before_provision`) and the box report (`sandbox.spend.observe`) run when the exec probe runs, and before any create, resume or restart.
+`sandbox.claim` carries `sandbox.probe_trusted` when the probe was skipped.
+A product whose first call on that box fails calls `dropTrustedBox(box)`; `true` means the ensure had skipped the probe, so it ensures once more and the second ensure checks everything.
+`streamSandboxPrompt` does this itself when a prompt fails before its first event.
+`reuseWorkspaceSandbox` is the ensure that never creates, resumes, restarts or deletes; a product's single-flight passes it as `reuse`, so a turn on a running box takes no lease and an ensure that needs a lifecycle step takes it as before.
 
 ## Wiring a product
 
