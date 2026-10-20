@@ -130,7 +130,9 @@ describe('signoff cache retention', () => {
     writeFileSync(join(outside, 'keep'), 'not cache data')
     symlinkSync(outside, join(cacheDir, 'trees', 'outside-link'))
 
-    const session = await openSignoffCacheSession(cacheDir, tree)
+    const alias = join(root(), 'cache-link')
+    symlinkSync(cacheDir, alias)
+    const session = await openSignoffCacheSession(alias, join(alias, 'trees', 'cached-tree'))
     expect((await pruneSignoffCache(cacheDir, { maxBytes: 0 })).removed).toEqual([])
     await session.close()
     expect((await pruneSignoffCache(cacheDir, { maxBytes: 0 })).removed).toEqual([tree])
