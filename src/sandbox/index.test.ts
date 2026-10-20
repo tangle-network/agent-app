@@ -44,6 +44,8 @@ import {
   getClient,
   resetClientCache,
   ensureWorkspaceSandbox,
+  reuseWorkspaceSandbox,
+  dropTrustedBox,
   peekWorkspaceSandbox,
   buildAppToolMcpServers,
   adaptSandboxStream,
@@ -183,10 +185,10 @@ describe('workspace runtime environment renewal', () => {
     expect(box.setRuntimeEnv).not.toHaveBeenCalled()
   })
 
-  it('renews before bootstrap on every reuse, including a cached liveness check', async () => {
+  it('renews a changed environment before bootstrap on every reuse, including a cached liveness check', async () => {
     const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
     const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'alive\n' })
-    const box = fakeBox({ setRuntimeEnv, exec })
+    const box = fakeBox({ setRuntimeEnv, exec, startedAt: new Date('2026-10-11T12:00:00.000Z') })
     listMock.mockResolvedValue([box])
     const runtimeEnv = vi.fn()
       .mockResolvedValueOnce({ APP_TOKEN: 'renewed-1' })
@@ -2445,6 +2447,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       const running = fakeBox({
         name: 'box-w1',
         exec,
+        startedAt: new Date('2026-10-11T12:00:00.000Z'),
         egress: { get: getEgress, update: vi.fn() },
       } as unknown as Partial<SandboxInstance>)
       listMock.mockResolvedValue([running])
@@ -2455,7 +2458,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       })
 
       await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-      await vi.advanceTimersByTimeAsync(4_999)
+      await vi.advanceTimersByTimeAsync(10 * 60_000 - 1)
       await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
 
       expect(exec).toHaveBeenCalledTimes(1)
@@ -2464,7 +2467,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
 
       expect(exec).toHaveBeenCalledTimes(2)
-      expect(getEgress).toHaveBeenCalledTimes(3)
+      expect(getEgress).toHaveBeenCalledTimes(2)
       expect(bootstrap).toHaveBeenCalledTimes(3)
     } finally {
       vi.useRealTimers()
@@ -2515,6 +2518,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       delete: del,
       exec,
       streamPrompt,
+      startedAt: new Date('2026-10-11T12:00:00.000Z'),
     } as unknown as Partial<SandboxInstance>)
     listMock.mockResolvedValue([running])
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
@@ -5523,19 +5527,136 @@ describe('warm reuse round trips', () => {
     }
   })
 
-  it('never caches a strict policy verdict', async () => {
+  it('trusts a strict policy verdict only for a reuse that sends the box nothing', async () => {
     const desired = { mode: 'strict' as const, allowDomains: ['a.example.com'] }
     const get = vi.fn().mockResolvedValue({ policy: desired, source: 'sandbox' })
+    const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
     const running = fakeBox({
+      status: 'running',
       exec: vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 }),
+      setRuntimeEnv,
       startedAt: new Date('2026-10-11T12:00:00.000Z'),
       egress: { get, update: vi.fn() },
     } as unknown as Partial<SandboxInstance>)
     listMock.mockResolvedValue([running])
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy: desired, livenessProbe: { cacheTtlMs: 0 } })
+    getMock.mockResolvedValue(running)
+    let token = 'one'
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      egressPolicy: desired,
+      runtimeEnv: async () => ({ APP_TOKEN: token }),
+      livenessProbe: {},
+    })
+
     await ensureWorkspaceSandbox(shell, scope)
     await ensureWorkspaceSandbox(shell, scope)
+    // The second reuse had nothing to send, so no read of the policy stood between credentials and the box.
+    expect(get).toHaveBeenCalledOnce()
+    expect(setRuntimeEnv).toHaveBeenCalledOnce()
+
+    token = 'two'
+    await ensureWorkspaceSandbox(shell, scope)
+    // New credentials wait for a fresh read of the policy, whatever was read before.
     expect(get).toHaveBeenCalledTimes(2)
+    expect(setRuntimeEnv).toHaveBeenLastCalledWith({ APP_TOKEN: 'two' })
+  })
+
+  it('reuses a box it probed recently by id, with no gate, report, probe, read or push', async () => {
+    const desired = { mode: 'strict' as const, allowDomains: ['a.example.com'] }
+    const startedAt = new Date('2026-10-11T12:00:00.000Z')
+    const calls = () => ({
+      list: listMock.mock.calls.length,
+      get: getMock.mock.calls.length,
+      exec: exec.mock.calls.length,
+      egress: egressGet.mock.calls.length,
+      push: setRuntimeEnv.mock.calls.length,
+      gate: beforeProvision.mock.calls.length,
+      report: onProvisioned.mock.calls.length,
+    })
+    const exec = vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
+    const egressGet = vi.fn().mockResolvedValue({ policy: desired, source: 'sandbox' })
+    const setRuntimeEnv = vi.fn().mockResolvedValue(undefined)
+    const beforeProvision = vi.fn()
+    const onProvisioned = vi.fn()
+    const running = fakeBox({ status: 'running', exec, setRuntimeEnv, startedAt, egress: { get: egressGet, update: vi.fn() } } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    getMock.mockResolvedValue(running)
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      egressPolicy: desired,
+      runtimeEnv: async () => ({ APP_TOKEN: 'same' }),
+      livenessProbe: {},
+    })
+    const options = { ...scope, spend: { beforeProvision, onProvisioned } }
+
+    await ensureWorkspaceSandbox(shell, options)
+    expect(calls()).toEqual({ list: 1, get: 0, exec: 1, egress: 1, push: 1, gate: 1, report: 1 })
+
+    const reused = await ensureWorkspaceSandbox(shell, options)
+    expect(reused).toBe(running)
+    expect(calls()).toEqual({ list: 1, get: 1, exec: 1, egress: 1, push: 1, gate: 1, report: 1 })
+
+    // The box restarted: every check that named the old start is void, and the full ensure runs.
+    const restarted = fakeBox({ status: 'running', exec, setRuntimeEnv, startedAt: new Date('2026-10-11T12:30:00.000Z'), egress: { get: egressGet, update: vi.fn() } } as unknown as Partial<SandboxInstance>)
+    getMock.mockResolvedValue(restarted)
+    await ensureWorkspaceSandbox(shell, options)
+    expect(calls()).toEqual({ list: 1, get: 2, exec: 2, egress: 2, push: 2, gate: 2, report: 2 })
+
+    // A failed first call on a box handed out on trust hands the next ensure the full verification.
+    await ensureWorkspaceSandbox(shell, options)
+    expect(calls()).toEqual({ list: 1, get: 3, exec: 2, egress: 2, push: 2, gate: 2, report: 2 })
+    const trusted = await ensureWorkspaceSandbox(shell, options)
+    expect(dropTrustedBox(trusted)).toBe(true)
+    expect(dropTrustedBox(trusted)).toBe(false)
+    await ensureWorkspaceSandbox(shell, options)
+    expect(calls()).toEqual({ list: 1, get: 5, exec: 3, egress: 3, push: 3, gate: 3, report: 3 })
+  })
+
+  it('lists the running boxes when the box it used by id is gone', async () => {
+    const startedAt = new Date('2026-10-11T12:00:00.000Z')
+    const exec = vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
+    const first = fakeBox({ status: 'running', exec, startedAt } as unknown as Partial<SandboxInstance>)
+    const replacement = fakeBox({ status: 'running', id: 'sandbox-2', exec, startedAt } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([first])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: {} })
+    await ensureWorkspaceSandbox(shell, scope)
+
+    getMock.mockResolvedValue(null)
+    listMock.mockResolvedValue([replacement])
+    await expect(ensureWorkspaceSandbox(shell, scope)).resolves.toBe(replacement)
+    expect(getMock).toHaveBeenCalledWith('sandbox-1')
+    expect(listMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('reuses a probed box without a lifecycle step, and declines a box that needs one', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      let alive = true
+      const exec = vi.fn().mockImplementation(async () => alive
+        ? { stdout: 'alive', stderr: '', exitCode: 0 }
+        : { stdout: '', stderr: 'dead', exitCode: 1 })
+      const running = fakeBox({ status: 'running', exec, startedAt: new Date('2026-10-11T12:00:00.000Z') } as unknown as Partial<SandboxInstance>)
+      running.stop = vi.fn() as never
+      running.resume = vi.fn() as never
+      listMock.mockResolvedValue([running])
+      getMock.mockResolvedValue(running)
+      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: {} })
+
+      // Nothing probed yet: it declines before it asks the platform anything.
+      await expect(reuseWorkspaceSandbox(shell, scope)).resolves.toBeUndefined()
+      expect(listMock).not.toHaveBeenCalled()
+      expect(getMock).not.toHaveBeenCalled()
+
+      await ensureWorkspaceSandbox(shell, scope)
+      await expect(reuseWorkspaceSandbox(shell, scope)).resolves.toBe(running)
+
+      // Once the probe is due and fails, the box needs a restart: the lease-free path leaves that to the one that may.
+      alive = false
+      vi.setSystemTime(Date.now() + 11 * 60_000)
+      await expect(reuseWorkspaceSandbox(shell, scope)).resolves.toBeUndefined()
+      expect(running.stop).not.toHaveBeenCalled()
+      expect(running.resume).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('renews a recovered box itself when the probe found the reused box dead', async () => {

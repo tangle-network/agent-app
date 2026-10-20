@@ -278,4 +278,50 @@ describe('runForegroundSandboxSingleFlight', () => {
       expect.objectContaining({ type: 'release-failed', error: 'unknown error' }),
     ])
   })
+  it('takes no lease for a reuse, and the lease for a box that needs a lifecycle step', async () => {
+    const db = freshDb()
+    const store = createD1PrewarmClaimStore(d1(db))
+    const acquire = vi.spyOn(store, 'acquireLease')
+    const provision = vi.fn(async () => box('box-new'))
+    const base = {
+      claim: store,
+      workspaceId: 'workspace-1',
+      harness,
+      provision,
+      peek: async () => ({ status: 'absent' }) as const,
+      adopt: (outcome: ReadyRunningSandboxOutcome) => outcome.box,
+    }
+
+    await expect(runForegroundSandboxSingleFlight({ ...base, reuse: async () => box('box-running') }))
+      .resolves.toMatchObject({ id: 'box-running' })
+    expect(acquire).not.toHaveBeenCalled()
+    expect(provision).not.toHaveBeenCalled()
+
+    await expect(runForegroundSandboxSingleFlight({ ...base, reuse: async () => undefined }))
+      .resolves.toMatchObject({ id: 'box-new' })
+    expect(acquire).toHaveBeenCalledOnce()
+    expect(provision).toHaveBeenCalledOnce()
+  })
+
+  it('discards a reused box while another request holds the lease and adopts what that owner leaves', async () => {
+    const db = freshDb()
+    const store = createD1PrewarmClaimStore(d1(db))
+    const owner = await store.acquireLease('workspace-1::opencode', 180)
+    expect(owner).not.toBeNull()
+    const adopt = vi.fn((outcome: ReadyRunningSandboxOutcome) => outcome.box)
+
+    const result = await runForegroundSandboxSingleFlight({
+      claim: store,
+      workspaceId: 'workspace-1',
+      harness,
+      reuse: async () => box('box-stale'),
+      provision: vi.fn(async () => box('never')),
+      peek: async () => ({ status: 'running', box: box('box-left-by-owner') }) as const,
+      adopt,
+      wait: async () => { await store.releaseLease(owner!) },
+    })
+
+    expect(result).toMatchObject({ id: 'box-left-by-owner' })
+    expect(adopt).toHaveBeenCalledOnce()
+  })
 })

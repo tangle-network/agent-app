@@ -16531,6 +16531,12 @@
           "doc": "Define options to manage deterministic session resumption and turn idempotency in sandboxed drive turns"
         },
         {
+          "name": "dropTrustedBox",
+          "kind": "function",
+          "signature": "(box: SandboxInstance) => boolean",
+          "doc": "Forget what this isolate trusts about a box after the first real call on it failed."
+        },
+        {
           "name": "EGRESS_PROXY_RECOVERY_PHASE",
           "kind": "const",
           "signature": "\"egress_proxy_recovery\"",
@@ -16985,6 +16991,12 @@
           "kind": "function",
           "signature": "<T>(attempt: () => Promise<T>, options?: SandboxTransientRetryOptions) => Promise<T>",
           "doc": "Run `attempt` until it succeeds, it fails with something this policy does not consider transient, or a transient failure outlasts the deadline."
+        },
+        {
+          "name": "reuseWorkspaceSandbox",
+          "kind": "function",
+          "signature": "(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance | undefined>",
+          "doc": "Reuse the workspace's running box if this isolate used it recently, or return undefined."
         },
         {
           "name": "runForegroundSandboxSingleFlight",

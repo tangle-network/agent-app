@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-258 exports.
+260 exports.
 
 ### `adaptSandboxStream`
 
@@ -372,6 +372,14 @@ SandboxResourceConfig
 
 ```ts
 interface DriveSandboxTurnOptions
+```
+
+### `dropTrustedBox`
+
+`function` — Forget what this isolate trusts about a box after the first real call on it failed.
+
+```ts
+(box: SandboxInstance) => boolean
 ```
 
 ### `EGRESS_PROXY_RECOVERY_PHASE`
@@ -980,6 +988,14 @@ interface ResolveSandboxClientCredentialsOptions
 
 ```ts
 <T>(attempt: () => Promise<T>, options?: SandboxTransientRetryOptions) => Promise<T>
+```
+
+### `reuseWorkspaceSandbox`
+
+`function` — Reuse the workspace's running box if this isolate used it recently, or return undefined.
+
+```ts
+(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance | undefined>
 ```
 
 ### `runForegroundSandboxSingleFlight`
