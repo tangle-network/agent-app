@@ -227,3 +227,18 @@ export function harnessCapabilities(harness: Harness): HarnessCapabilities {
   if (!caps) throw new Error(`harnessCapabilities: no capability facts for "${harness}"`)
   return caps
 }
+
+// ── Session presets ────────────────────────────────────────────────────────
+//
+// Named (model, harness, effort) pins applied with catalog coherence through
+// the snap helpers above. The contract is semantics; the visual surface stays
+// with the picker canon.
+export {
+  applySessionPreset,
+  createInMemorySessionPresetStore,
+  validateSessionPreset,
+  type AppliedSessionPreset,
+  type SessionPreset,
+  type SessionPresetCatalogContext,
+  type SessionPresetStore,
+} from './presets'
