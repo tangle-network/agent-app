@@ -215,7 +215,7 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
     const red = await runSignoff({ repoDir: failing, cacheDir: temp('signoff-cache-'), source: 'head' })
     const redLine = formatSignoffLine(red)
     expect(redLine).toContain('signoff FAIL')
-    expect(redLine).toContain('1/2 steps')
+    expect(redLine).toContain('2/3 steps')
   })
 
   it('a gitignored stale artifact in the developer checkout is NOT in the tree the steps see', async () => {
