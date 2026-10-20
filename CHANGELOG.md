@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.210
+
+- fix(tools): validate JSON text render UI nodes before dispatch (#1169)
+
 ## 0.60.209
 
 - chore: delete the intakes React surface and HTTP handlers no app imports, and the scaffold's mock sandbox-fence test (#1167)
