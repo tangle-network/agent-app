@@ -84,3 +84,5 @@ export {
   type TurnTerminalState,
 } from './settlement.js'
 export { isEdgeBlock, PASTED_CODE_SAMPLES } from './pasted-code.js'
+
+export { withD1QueryCount, currentD1QueryCounter, type D1QueryCounter } from './d1-query-count.js'

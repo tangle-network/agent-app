@@ -51,6 +51,7 @@
  * normalized to the single-args shape the other seams take.
  */
 
+import { withD1QueryCount, currentD1QueryCounter } from '../launch-invariants/d1-query-count'
 import {
   deriveExecutionId,
   handleChatTurn,
@@ -1065,7 +1066,7 @@ export function createChatTurnRoutes<TContext = void>(
     // shapes: a refusal is always a plain HTTP response that reveals nothing
     // beyond what it says, and nothing runs for a caller who is not admitted.
     // The turn's clock starts at the request, so admission is inside its trace.
-    const admitted = await admitTurn(request, createTurnTrace())
+    const admitted = await admitTurn(request, createTurnTrace({ d1QueryCounter: currentD1QueryCounter() }))
     if (!admitted.ok) return admitted.response
     if (request.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST) return runTurn(request, ctx, admitted)
     return progressFirstTurn(request, ctx, admitted)
@@ -2056,7 +2057,7 @@ export function createChatTurnRoutes<TContext = void>(
   }
 
   return {
-    turn,
+    turn: (request, ctx) => withD1QueryCount(() => turn(request, ctx)),
     replay,
     running,
     interactions: options.interactions ? createInteractionAnswerRoute(options.interactions) : null,

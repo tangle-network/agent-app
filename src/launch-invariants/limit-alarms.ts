@@ -25,6 +25,7 @@ import {
   type AlertSink,
   type TurnHealthAlert,
 } from '../turn-health/sink.js'
+import { tallyD1Query } from './d1-query-count.js'
 import { LAUNCH_BUDGETS } from './catalog.js'
 
 export type LimitResource = 'worker-memory' | 'd1-rows-per-query' | 'sandbox-disk' | 'snapshot-count' | 'key-rate'
@@ -155,7 +156,8 @@ interface D1Measurable {
 }
 
 /**
- * The D1 binding with each query's rows read and response size observed.
+ * The D1 binding with each query's rows read and response size observed,
+ * and each round trip counted inside withD1QueryCount (chat routes scope it automatically).
  * Rows read come from `meta.rows_read` (the rows D1 scanned, not only those
  * returned). The response size is estimated from three sampled rows, so the
  * wrapper never serializes a whole response: that copy would double the memory
@@ -184,6 +186,7 @@ export function withD1LimitAlarms<D extends D1Measurable>(d1: D, alarms: LimitAl
         if (key === 'bind') return (...params: unknown[]) => statement(value.apply(stmt, params) as object, sql)
         if (key === 'all' || key === 'raw' || key === 'run' || key === 'first') {
           return async (...args: unknown[]) => {
+            tallyD1Query()
             const result: unknown = await value.apply(stmt, args)
             if (key !== 'first') await observe(sql, result)
             return result
@@ -203,6 +206,7 @@ export function withD1LimitAlarms<D extends D1Measurable>(d1: D, alarms: LimitAl
       }
       if (key === 'batch' && typeof value === 'function') {
         return async (statements: object[]) => {
+          tallyD1Query()
           const results = await (value as (s: object[]) => Promise<unknown[]>).call(binding, statements.map((stmt) => unwrapped.get(stmt) ?? stmt))
           for (const result of results ?? []) await observe('batch', result)
           return results

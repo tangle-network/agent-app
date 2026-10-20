@@ -39,6 +39,7 @@ const AGENT_APP_OUTCOME_FLOORS = [
   { id: 'first-text', label: 'first text', since: '0.60.203' },
   // createChatTurnRoutes exports every turn without a sink option, and a turn handed to `handoffCompletion` too.
   { id: 'default-trace', label: 'default turn trace', since: '0.60.221' },
+  { id: 'router-turn-defaults', label: 'router-turn defaults (gzip and D1 queries)', since: '0.60.225' },
 ] as const
 
 type DefaultStatus = 'ok' | 'gap' | 'unknown' | 'exempt' | 'opted-out' | 'na'

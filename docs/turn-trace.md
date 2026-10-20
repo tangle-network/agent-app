@@ -34,6 +34,7 @@ agent_app.turn                       wall time of the turn; coverage and time pe
 `summary.firstTextMs` (root attribute `tangle.turn.first_text_ms`) is the member's wait: from the request to the first visible text, admission and the box or the Router included.
 `createChatTurnRoutes` marks it on the first text event of either lane; a product that owns its turn calls `trace.markFirstText()`.
 A rollout's `first_words_p50_ms` starts later, at the end of admission (`rollout_turn_timing.first_text_ms`), so read both.
+`summary.d1Queries` (root attribute `tangle.turn.d1_queries`) counts round trips through `withD1LimitAlarms`: batch is one, each first/all/raw/run is one, including failures. Chat routes isolate the counter per turn through AsyncLocalStorage; custom turn owners pass their scoped counter to `createTurnTrace({ d1QueryCounter })`. Read [the wiring contract](../README.md#shared-turn-defaults) for runtime and observation boundaries.
 `summary.coveragePct` is the share of the turn's wall time inside at least one child span.
 `summary.byKind` credits each instant to the deepest open span's kind (`admission`, `router`, `model`, `network`, `tool`, `sandbox`, `persist`, `other`), so it sums to the covered time, and `largestGapMs` is the longest stretch with no span open.
 A span records metadata only: ids, durations, status codes, model names and token counts; never a prompt, an answer or a tool argument.
