@@ -8,6 +8,7 @@ Where a customer's wait goes: every turn records one trace whose child spans cov
 
 The trace id is the turn's execution id with each character outside `[A-Za-z0-9_-]` replaced by `_` (`turnTraceId`), because the Router drops any other `x-tangle-trace-id`.
 Every Router request and every Sandbox call of the turn sends that id, so a Router dispatch row, a Sandbox API record and the turn's spans join on one value.
+For Router model requests, `tracedModelFetch` also sends W3C `traceparent` with the same `otlpTraceId(trace.traceId)` the turn exporter uses and the current `model.call` span ID as parent. Each HTTP retry gets its own parent span. Existing request headers, including `tracestate`, retain fetch's Request-versus-init precedence. Router spans can therefore join the app's actual span tree; the logical correlation header remains available for dispatch lookup.
 
 ```text
 agent_app.turn                       wall time of the turn; coverage and time per kind as attributes
