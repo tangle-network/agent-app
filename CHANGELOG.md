@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.213
+
+- feat(chat-routes): lifecycle.afterSettle runs a turn's follow-up work once its row is saved and its lock is free (#1173)
+
 ## 0.60.212
 
 - fix(copy-quality): catch measured reveals and permission closers (#1172)
