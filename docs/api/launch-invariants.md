@@ -4,7 +4,7 @@
 
 Source: `src/launch-invariants/index.ts`
 
-62 exports.
+65 exports.
 
 ### `AUTH_LOOKUP_DEADLINE_MS`
 
@@ -126,12 +126,28 @@ class AuthLookupRefused
 (cron: string) => Set<number> | null
 ```
 
+### `currentD1QueryCounter`
+
+`function` — The current scope's counter, shared with the turn trace and product phase logs.
+
+```ts
+() => D1QueryCounter | undefined
+```
+
 ### `D1_MAX_BOUND_PARAMETERS`
 
 `const` — D1 binds at most 100 parameters to one query.
 
 ```ts
 100
+```
+
+### `D1QueryCounter`
+
+`interface` — Round trips: batch = 1; first/all/raw/run = 1 each, including failed calls.
+
+```ts
+interface D1QueryCounter
 ```
 
 ### `DEFAULT_LIMIT_BUDGETS`
@@ -488,10 +504,18 @@ type TurnTerminalState
 
 ### `withD1LimitAlarms`
 
-`function` — The D1 binding with each query's rows read and response size observed.
+`function` — The D1 binding with each query's rows read and response size observed, and each round trip counted inside withD1QueryCount (chat routes scope it automatically).
 
 ```ts
 <D extends D1Measurable>(d1: D, alarms: LimitAlarms, options?: { subject?: string | undefined; }) => D
+```
+
+### `withD1QueryCount`
+
+`function` — Run work in a fresh counter scope.
+
+```ts
+<T>(work: () => T) => T
 ```
 
 ### `WranglerCrons`

@@ -1296,7 +1296,7 @@ interface EffortLevel
 
 ### `EffortPicker`
 
-`function` — Thinking-budget selector pill, styled to match {@link ModelPicker}.
+`function` — Thinking-budget selector pill, styled to match {@link ModelPicker }.
 
 ```ts
 ({ value, onChange, levels, label, fullWidth, variant, disabled, id, "aria-describedby": ariaDescribedBy }: EffortPicke…
