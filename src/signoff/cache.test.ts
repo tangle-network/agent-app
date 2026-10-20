@@ -21,7 +21,17 @@ function store(cacheDir: string, key: string, bytes: number): string {
 }
 
 function git(args: string[], cwd: string): void {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf8' })
+  const result = spawnSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'Signoff fixture',
+      GIT_AUTHOR_EMAIL: 'signoff-fixture@example.invalid',
+      GIT_COMMITTER_NAME: 'Signoff fixture',
+      GIT_COMMITTER_EMAIL: 'signoff-fixture@example.invalid',
+    },
+  })
   if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`)
 }
 
