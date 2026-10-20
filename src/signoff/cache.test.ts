@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { afterEach, describe, expect, it } from 'vitest'
 import { openSignoffCacheSession, pruneSignoffCache } from './cache'
 
@@ -67,6 +68,45 @@ describe('signoff cache retention', () => {
     const after = await pruneSignoffCache(cacheDir, { maxBytes: 0 })
     expect(after.removed).toEqual([path])
     expect(existsSync(path)).toBe(false)
+  })
+
+  it('keeps a detached check and its store after the coordinator exits', async () => {
+    const cacheDir = root()
+    const tree = join(cacheDir, 'trees', 'detached-check')
+    mkdirSync(tree, { recursive: true })
+    writeFileSync(join(tree, '.git'), 'active tree')
+    const key = 'd'.repeat(64)
+    const path = store(cacheDir, key, 32 * 1024)
+    const coordinator = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import { spawn } from 'node:child_process'
+      import { openSignoffCacheSession } from ${JSON.stringify(new URL('./cache.ts', import.meta.url).href)}
+      const session = await openSignoffCacheSession(${JSON.stringify(cacheDir)}, ${JSON.stringify(tree)})
+      await session.protectStore(${JSON.stringify(key)})
+      const check = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+        cwd: ${JSON.stringify(tree)}, env: { ...process.env, SIGNOFF_TREE: ${JSON.stringify(tree)} },
+        detached: true, stdio: 'ignore',
+      })
+      console.log(check.pid)
+      check.unref()
+    `], { encoding: 'utf8' })
+    expect(coordinator.status, coordinator.stderr).toBe(0)
+    const pid = Number(coordinator.stdout.trim())
+    expect(pid).toBeGreaterThan(0)
+    try {
+      expect((await pruneSignoffCache(cacheDir, { maxBytes: 0 })).removed).toEqual([])
+      expect(existsSync(tree)).toBe(true)
+      expect(existsSync(path)).toBe(true)
+    } finally {
+      process.kill(pid, 'SIGTERM')
+    }
+    // A terminated orphan may remain a zombie briefly; it no longer has a cwd or environment.
+    rmSync(join(tree, '.git'))
+    let removed: readonly string[] = []
+    for (let attempt = 0; attempt < 100 && !removed.includes(path); attempt++) {
+      await delay(20)
+      removed = (await pruneSignoffCache(cacheDir, { maxBytes: 0 })).removed
+    }
+    expect(removed).toContain(path)
   })
 
   it('retires an idle cached Git worktree through Git but never follows a symlink', async () => {
