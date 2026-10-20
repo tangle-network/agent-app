@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.220
+
+- docs(lessons): key a cache on what the live payload carries and keep request-spanning state out of isolate memory (#1179)
+
 ## 0.60.219
 
 - fix(sandbox): a reuse's trust is shared across Worker isolates through the Cache API (#1178)
