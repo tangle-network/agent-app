@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.221
+
+- feat(turn-trace): every chat turn exports its trace by default, a handed-off turn included (#1180)
+
 ## 0.60.220
 
 - docs(lessons): key a cache on what the live payload carries and keep request-spanning state out of isolate memory (#1179)
