@@ -13,7 +13,7 @@ import { dirname, resolve } from 'node:path'
 import { checkAppDefaults, collectLastExports, formatAppDefaults } from './app-defaults'
 import { loadSignoffConfig } from './config'
 
-export function defaultsUsage(): string {
+function defaultsUsage(): string {
   return [
     'Usage: agent-app-signoff defaults [repoDir] [options]',
     '',

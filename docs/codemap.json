@@ -10228,6 +10228,12 @@
           "doc": null
         },
         {
+          "name": "createProductLimitAlarms",
+          "kind": "function",
+          "signature": "(options: ProductLimitAlarmOptions) => LimitAlarms",
+          "doc": "A product's limit alarms with every default in place: {@link DEFAULT_LIMIT_BUDGETS}, the console and optional webhook sink, and one page per resource every {@link LAUNCH_BUDGETS.alarmRepeatHours} hou…"
+        },
+        {
           "name": "createScheduledDispatch",
           "kind": "function",
           "signature": "<Ctx>(options: ScheduledDispatchOptions<Ctx>) => ScheduledDispatch<Ctx>",
@@ -10250,6 +10256,12 @@
           "kind": "const",
           "signature": "100",
           "doc": "D1 binds at most 100 parameters to one query."
+        },
+        {
+          "name": "DEFAULT_LIMIT_BUDGETS",
+          "kind": "const",
+          "signature": "Readonly<Record<LimitResource, number>>",
+          "doc": "The budgets every product starts from: {@link LAUNCH_BUDGETS}' platform limits."
         },
         {
           "name": "describeVerdict",
@@ -10376,6 +10388,12 @@
           "kind": "const",
           "signature": "readonly { name: string; text: string; }[]",
           "doc": "Text people paste into a chat with an agent, each of which a WAF rule may match."
+        },
+        {
+          "name": "ProductLimitAlarmOptions",
+          "kind": "interface",
+          "signature": "interface ProductLimitAlarmOptions",
+          "doc": null
         },
         {
           "name": "readInSizedBatches",
@@ -19799,7 +19817,9 @@
     {
       "id": "./signoff",
       "source": "src/signoff/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "launch-invariants"
+      ],
       "error": null,
       "exports": [
         {
@@ -20311,7 +20331,9 @@
     {
       "id": "./signoff/cli",
       "source": "src/signoff/cli.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "launch-invariants"
+      ],
       "error": null,
       "exports": [
         {
@@ -20331,7 +20353,9 @@
     {
       "id": "./signoff/proof",
       "source": "src/signoff/proof.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "launch-invariants"
+      ],
       "error": null,
       "exports": [
         {
@@ -20471,7 +20495,9 @@
     {
       "id": "./signoff/proof-cli",
       "source": "src/signoff/proof-cli.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "launch-invariants"
+      ],
       "error": null,
       "exports": []
     },
