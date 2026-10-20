@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.216
+
+- feat(signoff): report app defaults and share alarm configuration (#1168)
+
 ## 0.60.215
 
 - fix(platform): a 4xx delegation decision is delegated_key.failed with its code, not a 403 refusal (#1150)
