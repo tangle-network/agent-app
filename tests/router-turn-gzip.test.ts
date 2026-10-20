@@ -44,7 +44,8 @@ describe('gzipRequestAboveBytes', () => {
     expect(outcome.failure).toBeUndefined()
     expect(outcome.text).toBe('Done.')
     expect(received).toHaveLength(1)
-    const [request] = received
+    const request = received[0]
+    if (!request) throw new Error('the server received no request')
     expect(request.encoding).toBe('gzip')
     expect(request.body.messages.find(message => message.role === 'system')?.content).toContain(systemPrompt)
     expect(request.body.messages.at(-1)).toEqual({ role: 'user', content: 'Plan a deck.' })
@@ -56,6 +57,6 @@ describe('gzipRequestAboveBytes', () => {
     await runRouterTurn({ apiKey: 'k', model: 'm', baseUrl, systemPrompt: 'Short.', userMessage: 'Hi.', gzipRequestAboveBytes: 32 * 1024, repeat: false })
     await runRouterTurn({ apiKey: 'k', model: 'm', baseUrl, systemPrompt, userMessage: 'Hi.', repeat: false })
     expect(received.map(request => request.encoding)).toEqual([null, null])
-    expect(received[1].wireBytes).toBeGreaterThan(systemPrompt.length)
+    expect(received[1]?.wireBytes).toBeGreaterThan(systemPrompt.length)
   })
 })
