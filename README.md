@@ -255,3 +255,11 @@ Products can read `currentD1QueryCounter()` from `/launch-invariants` for phase
 counts. A custom turn owner uses `withD1QueryCount(() => { ... })` around its
 entire turn and passes `d1QueryCounter: currentD1QueryCounter()` to
 `createTurnTrace`; the recorder captures the total at finish.
+
+## Skill support-file policies
+
+`withSkillSupportFiles` from `/skills-placement` keeps identical mounts by
+default. Its optional fifth argument can name new resources with `resourceName`
+and use `reconcileExisting: 'replace'` to append owned support files in canonical
+order while preserving foreign mounts. The exact-content ownership and
+all-destinations-occupied behavior are documented in the [helper source](src/skills-placement/index.ts).
