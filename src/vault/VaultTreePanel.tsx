@@ -2,6 +2,7 @@
 import type { ReactNode, RefObject } from 'react'
 import { Folder, Plus, RefreshCw } from 'lucide-react'
 
+/** Square header action on the control scale's small step, a touch target on coarse pointers. */
 const TREE_ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:size-10'
 
 interface VaultTreePanelProps {
