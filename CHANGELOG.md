@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.226
+
+- perf(web): allow coarse rate counters to persist through request lifetime (#1185)
+
 ## 0.60.225
 
 - feat: share Router gzip and D1 turn trace defaults (#1184)
