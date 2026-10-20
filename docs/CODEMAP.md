@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_139 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -52,9 +52,6 @@ _139 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./hub-approvals`](api/hub-approvals.md) | 27 | — |
 | [`./hub-approvals-react`](api/hub-approvals-react.md) | 24 | `hub-approvals` |
 | [`./intakes`](api/intakes.md) | 29 | — |
-| [`./intakes-react`](api/intakes-react.md) | 3 | `brand`, `intakes` |
-| [`./intakes-react/lazy`](api/intakes-react-lazy.md) | 2 | `brand`, `intakes` |
-| [`./intakes/api`](api/intakes-api.md) | 3 | — |
 | [`./intakes/drizzle`](api/intakes-drizzle.md) | 18 | — |
 | [`./integrations`](api/integrations.md) | 10 | — |
 | [`./integrations-react`](api/integrations-react.md) | 26 | `platform`, `web-react` |
@@ -565,34 +562,6 @@ Source: `src/intakes/index.ts` · 29 exports
 `AnswerRejectionReason`, `AnswerValidationResult`, `buildContextGatherPrompt`, `computeContextSufficiency`, `ContextFact`, `ContextFactSpec`, `ContextSufficiency`, `emptyPayload`, `getQuestion`, `hasAnswer`, `IntakeAnswers`, `IntakeAnswerType`, `IntakeAnswerValue`, `IntakeGraph`, `IntakeOption`, `IntakePayload`, `intakeProgress`, `IntakeQuestion`, `isComplete`, `KnownFact`, `markComplete`, `MissingFact`, `nextQuestion`, `payloadComplete`, `payloadIsStale`, `reachableQuestions`, `ResolvedContextSignals`, `validateAnswer`, `withAnswer`
 
 [Full API →](api/intakes.md)
-
-## `./intakes-react`
-
-Source: `src/intakes-react/index.ts` · 3 exports
-
-Depends on: `brand`, `intakes`
-
-`IntakeInterview`, `IntakeInterviewProps`, `IntakeView`
-
-[Full API →](api/intakes-react.md)
-
-## `./intakes-react/lazy`
-
-Source: `src/intakes-react/lazy.tsx` · 2 exports
-
-Depends on: `brand`, `intakes`
-
-`IntakeInterviewLazy`, `IntakeInterviewProps`
-
-[Full API →](api/intakes-react-lazy.md)
-
-## `./intakes/api`
-
-Source: `src/intakes/api.ts` · 3 exports
-
-`createIntakeApi`, `CurrentIntakeView`, `IntakeApiOptions`
-
-[Full API →](api/intakes-api.md)
 
 ## `./intakes/drizzle`
 
