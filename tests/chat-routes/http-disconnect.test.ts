@@ -5,6 +5,7 @@
  */
 import { createServer, request as httpRequest, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { expect, it } from 'vitest'
 import { createChatTurnRoutes, createRouterTurnProducer, type ChatTurnMessageStore } from '../../src/chat-routes/index'
 import { createD1TurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/index'
@@ -12,7 +13,16 @@ import { buildTurnTraceOtelSpans, type TurnTraceSnapshot } from '../../src/turn-
 import { sqliteD1 } from '../launch-invariants/sqlite-d1'
 
 const AFTER_DISCONNECT_MS = 31_000
-const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
+async function within<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([work, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`HTTP disconnect fixture exceeded ${timeoutMs}ms`)), timeoutMs)
+    })])
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -49,6 +59,7 @@ it('settles a SQLite-backed turn once when the browser disconnects 31 seconds be
       return { id: String(result.lastInsertRowid) }
     },
   }
+  const fixtureAbort = new AbortController()
   const disconnected = deferred<number>()
   const routerFinished = deferred<number>()
   const pending: Promise<unknown>[] = []
@@ -69,13 +80,14 @@ it('settles a SQLite-backed turn once when the browser disconnects 31 seconds be
         outgoing.writeHead(200, { 'content-type': 'text/event-stream' })
         outgoing.write(frame({ role: 'assistant', reasoning_content: 'The browser can see this thought.' }))
         await disconnected.promise
-        await sleep(AFTER_DISCONNECT_MS)
+        await sleep(AFTER_DISCONNECT_MS, undefined, { signal: fixtureAbort.signal })
         outgoing.write(frame({ content: 'The completed answer survives the closed browser.' }))
         outgoing.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`)
         outgoing.end('data: [DONE]\n\n')
         routerFinished.resolve(Date.now())
       })()
       bridgeTasks.push(task)
+      void task.catch(() => {}) // Observed again below; avoid an early unhandled rejection.
     })
   })
   let app: Server | undefined
@@ -140,7 +152,7 @@ it('settles a SQLite-backed turn once when the browser disconnects 31 seconds be
       void task.catch(error => { outgoing.destroy(error instanceof Error ? error : new Error(String(error))) })
     })
     const appUrl = await listen(app)
-    const browserText = await new Promise<string>((resolve, reject) => {
+    const browserText = await within(new Promise<string>((resolve, reject) => {
       const browser = httpRequest(appUrl, { method: 'POST', headers: { 'content-type': 'application/json' } }, response => {
         let text = ''
         response.on('data', chunk => {
@@ -155,19 +167,19 @@ it('settles a SQLite-backed turn once when the browser disconnects 31 seconds be
       })
       browser.on('error', reject)
       browser.end(JSON.stringify({ threadId: 'thread-disconnected', content: 'Keep working.' }))
-    })
+    }), 5_000)
     expect(browserText).toContain('The browser can see this thought.')
     expect(browserText).not.toContain('The completed answer')
-    const disconnectedAt = await disconnected.promise
-    const finishedAt = await routerFinished.promise
+    const disconnectedAt = await within(disconnected.promise, 5_000)
+    const finishedAt = await within(routerFinished.promise, 40_000)
     expect(finishedAt - disconnectedAt).toBeGreaterThanOrEqual(AFTER_DISCONNECT_MS)
     // Progress-first admission can register another drain while its pump is
     // pending, so include every promise it hands to the host.
     for (let awaited = 0; awaited < pending.length;) {
       awaited = pending.length
-      await Promise.all(pending.slice(0, awaited))
+      await within(Promise.all(pending.slice(0, awaited)), 10_000)
     }
-    await Promise.all(bridgeTasks)
+    await within(Promise.all(bridgeTasks), 10_000)
     expect(requestAborted).toBe(true)
     expect(modelCalls).toBe(1)
     expect(turnId).toBeTruthy()
@@ -194,10 +206,11 @@ it('settles a SQLite-backed turn once when the browser disconnects 31 seconds be
   } finally {
     // Unblock cleanup even if admission or the client assertion fails early.
     disconnected.resolve(Date.now())
+    fixtureAbort.abort()
     if (app) await close(app)
     await close(router)
-    await Promise.allSettled(bridgeTasks)
-    await Promise.allSettled(pending)
+    await within(Promise.allSettled(bridgeTasks), 2_000).catch(() => {})
+    await within(Promise.allSettled(pending), 2_000).catch(() => {})
     sqlite.close()
   }
 }, 60_000)
