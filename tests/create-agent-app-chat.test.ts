@@ -117,7 +117,6 @@ describe('create-agent-app --chat scaffolder', () => {
       'web/public/_headers',
       'tailwind.config.mjs',
       'tests/chat-turn.e2e.test.ts',
-      'tests/sandbox-fence.test.ts',
       'package.json',
       'signoff.config.mjs',
       'tsconfig.json',

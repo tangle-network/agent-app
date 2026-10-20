@@ -17,7 +17,7 @@ navigable and is the seam a future package split would cut along.
 
 ```
   L3  React surfaces      web-react · design-canvas-react · sequences-react · studio-react
-      (react + heavy libs) intakes-react · teams-react · vault · theme/styles/tailwind-preset
+      (react + heavy libs) teams-react · vault · theme/styles/tailwind-preset
                            work-product-react
         │  depends on ▼
   L2  Data / domain       design-canvas · sequences · intakes · teams      (drizzle peer)
@@ -81,7 +81,7 @@ harness/missions/runtime/trace *(chat shell + observability; `react`)* ·
 `design-canvas-react` → design-canvas/theme *(`konva`, `react-konva`)* ·
 `sequences-react` → sequences *(`react`; lazy `@huggingface/transformers` for
 transcription)* · `studio-react` → studio *(`react`, `lucide-react`,
-`react-router`)* · `intakes-react` · `teams-react` ·
+`react-router`)* · `teams-react` ·
 `chatgpt-react` *(ChatGPT setup over public kit metadata and host-owned connection state; enrollment identity is type-only)* ·
 `hosted-agent/react` *(line setup, members, and billing over authenticated host callbacks)* ·
 `openui-react` → openui *(`react` only — the renderer stays the product's own

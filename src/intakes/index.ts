@@ -15,13 +15,9 @@
  *   - `@tangle-network/agent-app/intakes/drizzle` — table factory
  *       (`createIntakeTables`, `workspaceTable` OPTIONAL) + store (imports
  *       `drizzle-orm`).
- *   - `@tangle-network/agent-app/intakes/api`     — framework-neutral
- *       get-current / save-answer / complete handlers (imports `drizzle-orm`).
- *   - `@tangle-network/agent-app/intakes-react`   — one-question-at-a-time
- *       interview UI (optional `react` peer).
  *
- * NEVER re-exported from the package root: `drizzle-orm` and `react` are
- * optional peers, and the whole point is that the tax stays clean.
+ * NEVER re-exported from the package root: `drizzle-orm` is an optional peer,
+ * and the whole point is that the tax stays clean.
  */
 export * from './model'
 export * from './completion'

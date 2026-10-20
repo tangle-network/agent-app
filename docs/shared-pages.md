@@ -15,7 +15,7 @@ A server module or a type does not count; neither does a component in another pa
 | Concept | Rendering owner in agent-app | State | Lower-layer owner or note |
 | --- | --- | --- | --- |
 | Access and recovery | none | No owner | `@tangle-network/sandbox-ui/pages` exports `AuthPage`. agent-app ships only server auth (`/app-auth`, `/platform` SSO handlers). |
-| Onboarding and workspace creation | `/workspace-react`: `WorkspaceList`; `/teams-react`: `InviteAcceptPage`; `/intakes-react`: `IntakeInterview` | Parts | `WorkspaceList` takes `create`; no first-run or creation page. |
+| Onboarding and workspace creation | `/workspace-react`: `WorkspaceList`; `/teams-react`: `InviteAcceptPage` | Parts | `WorkspaceList` takes `create`; no first-run or creation page. |
 | Workspace list and switching | `/workspace-react`: `AgentWorkspaceLayout`, `WorkspaceList`, `WorkspaceSwitcher`, `AgentRailIdentity` | Owned | [app-shell.md](./app-shell.md) |
 | Home | none | Product content | [app-shell.md](./app-shell.md#home): `PageShell`, `PageHeader` and `MetricStrip` from `@tangle-network/ui/primitives`. Not a shared page. |
 | Conversation | `/web-react`: `ChatMessages`, `ChatComposer`, `EntryComposer`, `ChatEmptyState`; `/workspace-react`: `AgentWorkspaceCompanion`; `/assistant`: `AssistantPanel` | Parts | No assembled thread page. Transcripts render through three owners today (below). |

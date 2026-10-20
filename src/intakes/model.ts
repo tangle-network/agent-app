@@ -1,8 +1,7 @@
 /**
  * Pure intake MODEL — the question-graph and the answer/completion algebra a
  * one-question-at-a-time interview runs on. Zero dependencies: no drizzle, no
- * env, no react, no I/O. The DB layer (`./intakes/drizzle`), the handlers
- * (`./intakes/api`) and the React surface (`./intakes-react`) all build on
+ * env, no react, no I/O. The DB layer (`./intakes/drizzle`) builds on
  * these functions; this leaf imports nothing back, so a consumer can pull just
  * the intake math.
  *
