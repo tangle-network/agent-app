@@ -61,8 +61,7 @@ export interface AttachmentMaterialization {
   missingBytesMessage: (path: string) => string
 }
 
-/** Attachment preparation shared by combined dispatch and products whose
- *  prompt is constructed only after their materialization span has finished. */
+/** Prepare carried files before a product constructs its prompt and dispatch input. */
 export interface PrepareDispatchAttachmentsInput {
   attachments: ChatAttachmentPart[]
   historyAttachments?: readonly ChatAttachmentPart[]
