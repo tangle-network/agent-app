@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.225
+
+- feat: share Router gzip and D1 turn trace defaults (#1184)
+
 ## 0.60.224
 
 - fix(deps): accept sandbox-ui 0.135 and 0.136 as the peer (#1183)
