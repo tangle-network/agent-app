@@ -26,7 +26,7 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./catalog`](api/catalog.md) | 10 | `runtime` |
 | [`./channels`](api/channels.md) | 47 | `web-react` |
 | [`./chat-react`](api/chat-react.md) | 5 | `web-react` |
-| [`./chat-routes`](api/chat-routes.md) | 279 | `chat-store`, `interactions`, `model-resolution`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-trace`, `web` |
+| [`./chat-routes`](api/chat-routes.md) | 279 | `chat-store`, `interactions`, `launch-invariants`, `model-resolution`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-trace`, `web` |
 | [`./chat-store`](api/chat-store.md) | 59 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
 | [`./chatgpt-react`](api/chatgpt-react.md) | 5 | `agent-enrollment`, `web-react` |
 | [`./chatgpt-react/styles`](api/chatgpt-react-styles.md) | 0 | `agent-enrollment`, `web-react` |
@@ -60,7 +60,7 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./journeys/cli`](api/journeys-cli.md) | 1 | `signoff`, `workspace-export` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
-| [`./launch-invariants`](api/launch-invariants.md) | 62 | `signoff`, `turn-health` |
+| [`./launch-invariants`](api/launch-invariants.md) | 65 | `signoff`, `turn-health` |
 | [`./launch-invariants/cli`](api/launch-invariants-cli.md) | 1 | `signoff`, `turn-health` |
 | [`./launch-invariants/testing`](api/launch-invariants-testing.md) | 38 | `signoff`, `turn-health` |
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
@@ -89,7 +89,7 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./redact`](api/redact.md) | 15 | — |
 | [`./rollout`](api/rollout.md) | 13 | `signoff` |
 | [`./rollout/cli`](api/rollout-cli.md) | 3 | `signoff` |
-| [`./rollout/d1`](api/rollout-d1.md) | 5 | `signoff` |
+| [`./rollout/d1`](api/rollout-d1.md) | 6 | `signoff` |
 | [`./runtime`](api/runtime.md) | 106 | `tools`, `turn-trace` |
 | [`./runtime/router-turn`](api/runtime-router-turn.md) | 26 | `tools`, `turn-trace` |
 | [`./sandbox`](api/sandbox.md) | 263 | `harness`, `profile`, `runtime`, `tools`, `turn-trace` |
@@ -103,7 +103,7 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./signoff/proof`](api/signoff-proof.md) | 22 | `launch-invariants` |
 | [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | `launch-invariants` |
 | [`./skills`](api/skills.md) | 42 | — |
-| [`./skills-placement`](api/skills-placement.md) | 9 | `harness`, `skills` |
+| [`./skills-placement`](api/skills-placement.md) | 10 | `harness`, `skills` |
 | [`./skills/marketplace-drizzle`](api/skills-marketplace-drizzle.md) | 2 | — |
 | [`./spend`](api/spend.md) | 64 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
@@ -129,7 +129,7 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./vault`](api/vault.md) | 23 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
-| [`./web`](api/web.md) | 43 | — |
+| [`./web`](api/web.md) | 44 | — |
 | [`./web-react`](api/web-react.md) | 521 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/agent-profile-editor`](api/web-react-agent-profile-editor.md) | 8 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/async`](api/web-react-async.md) | 35 | — |
@@ -331,7 +331,7 @@ Depends on: `web-react`
 
 Source: `src/chat-routes/index.ts` · 279 exports
 
-Depends on: `chat-store`, `interactions`, `model-resolution`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-trace`, `web`
+Depends on: `chat-store`, `interactions`, `launch-invariants`, `model-resolution`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-trace`, `web`
 
 `AbortAttachmentWriteFn`, `aggregateNativeCompletionReceipts`, `ALLOWED_ATTACHMENT_SNIFFED_MIMES`, `assertPromptPartsWithinCap`, `AssistantDraftSnapshot`, `AssistantDraftStore`, `AssistantDraftWriter`, `AssistantDraftWriterOptions`, `assistantRowIdForTurn`, `AssistantRowValues`, `AtomicAttachmentUploadAuthorization`, `AtomicAttachmentWriteOptions`, `AtomicAttachmentWriter`, `AtomicAttachmentWriteResult`, `AtomicPromoteAgentFilePartOptions`, `AtomicWriteAttachmentFn`, `ATTACHMENT_ACCEPT`, `ATTACHMENT_MAX_COUNT`, `ATTACHMENT_ROLLBACK_FAILURE_CODE`, `ATTACHMENT_ROLLBACK_FAILURE_MESSAGE`, `ATTACHMENT_STORAGE_FAILURE_MESSAGE`, `AttachmentPathArgs`, `AttachmentPathCheck`, `AttachmentReadResult`, `attachmentSizeErrorMessage`, `AttachmentStreamWriteOptions`, `attachmentTotalSizeErrorMessage`, `AttachmentTypeCheckResult`, `AttachmentUploadAuthorization`, `AttachmentUploadLogger`, `AttachmentWriteOptions`, `AttachmentWriteOwnership`, `AttachmentWriteReceipt`, `AttachmentWriteResult`, `base64WireLen`, `boundNativeCompletionReceipt`, `buildDispatchParts`, `BuildDispatchPartsInput`, `buildMentionPromptBlock`, `buildTurnPhaseEvent`, `bytesToBase64`, `ChatAttachmentInput`, `ChatAttachmentKind`, `ChatMentionKind`, `ChatReasoningEffort`, `ChatRouteDurableProjection`, `ChatRouteDurableProjectionLogger`, `ChatRouteEvent`, `ChatTurnAfterAuthorizeArgs`, `ChatTurnAfterAuthorizeRelease`, `ChatTurnAuthorization`, `ChatTurnAuthorizeArgs`, `ChatTurnCompleteInput`, `ChatTurnExecutionLimits`, `ChatTurnFilePartInput`, `ChatTurnGateResult`, `ChatTurnHeartbeat`, `ChatTurnInputError`, `ChatTurnInputPatch`, `ChatTurnIntelligenceOptions`, `ChatTurnIntentLine`, `ChatTurnIntentLineArgs`, `ChatTurnLifecycle`, `ChatTurnLifecycleComplete`, `ChatTurnLifecycleError`, `ChatTurnLifecycleStart`, `ChatTurnLock`, `ChatTurnLockResult`, `ChatTurnMessageStore`, `ChatTurnModelAttribution`, `ChatTurnModelFailover`, `ChatTurnPartInput`, `ChatTurnPrepareArgs`, `ChatTurnPrepareResult`, `ChatTurnProduceArgs`, `ChatTurnRequestContext`, `chatTurnRequestInit`, `ChatTurnRequestPayload`, `ChatTurnRouteProducer`, `ChatTurnRoutes`, `ChatTurnTextPartInput`, `ChatTurnTraceOptions`, `ChatTurnUsage`, `checkAttachmentType`, `classifyTerminalFailure`, `CompletedSandboxTurnSource`, `createAssistantDraftWriter`, `CreateAtomicAttachmentUploadRouteOptions`, `createAtomicAttachmentWriter`, `createAttachmentUploadRoute`, `CreateAttachmentUploadRouteOptions`, `createChatTurnRoutes`, `CreateChatTurnRoutesOptions`, `createD1PlanFollowUpGate`, `createHybridTurnProducer`, `CreateLegacyAttachmentUploadRouteOptions`, `createProtectedRuntimeChatProducer`, `createRouterTurnProducer`, `createSandboxChatProducer`, `createSandboxFileIndexRoute`, `CreateSandboxFileIndexRouteOptions`, `createStreamingSniffer`, `createUploadRoute`, `CreateUploadRouteOptions`, `D1BoundForPlanFollowUps`, `D1LikeForPlanFollowUps`, `DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS`, `DEFAULT_MODEL_STREAM_OPEN_TIMEOUT_MS`, `DEFAULT_STALE_TURN_LOCK_GRACE_MS`, `DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS`, `defaultValidateAttachmentPath`, `DetachedTurnFinal`, `DetachedTurnOptions`, `DetachedTurnParts`, `DetachedTurnResult`, `DISPATCH_MAX_MEDIA_PARTS`, `DISPATCH_MAX_PARTS`, `DISPATCH_REQUEST_MAX_BYTES`, `DISPATCH_STRUCTURAL_RESERVE_BYTES`, `DispatchPartsOutcome`, `DraftPersistenceTuning`, `DraftStoredMessage`, `EmptyTurnRetryInfo`, `FileIndexAuthorization`, `FileIndexCache`, `FileIndexReadyResponse`, `FileIndexResponse`, `FileIndexWarmingResponse`, `FileMention`, `fileMentionsToParts`, `FileMentionsToPartsOptions`, `FilePartPromotionOutcome`, `formatBytes`, `HYBRID_TURN_GUIDANCE`, `HybridTurnBox`, `HybridTurnProducerOptions`, `immutableAttachmentPath`, `INLINE_PARTS_MAX_BYTES`, `INTENT_LINE_HISTORY_MESSAGES`, `INTENT_LINE_MAX_CHARS`, `INTENT_LINE_TIMEOUT_MS`, `isCommittingSandboxEvent`, `isDraftContentEvent`, `isLiveLifecycleEvent`, `isTurnIntentEvent`, `isTurnPhaseEvent`, `MACRO_ENABLED_OOXML_SNIFFED_MIMES`, `MAX_ATTACHMENT_TOTAL_BYTES`, `MAX_BINARY_ATTACHMENT_BYTES`, `MAX_EMPTY_TURN_RETRIES`, `MAX_TEXT_ATTACHMENT_BYTES`, `mediaTypeForMentionPath`, `MENTION_MAX_COUNT`, `mentionKindForPath`, `ModelAttemptTimeoutCode`, `ModelFailoverStreamHandle`, `ModelFailoverStreamOptions`, `ModelFailoverTimeoutError`, `ModelFallbackInfo`, `NATIVE_COMPLETION_RECEIPT_MAX_BYTES`, `NativeCompletionAdmission`, `NativeCompletionAdmissionStore`, `NativeCompletionObservation`, `NativeCompletionObservationOptions`, `NativeCompletionReceipt`, `NativeCompletionSessionSource`, `NativeCompletionTurnReceipt`, `normalizeChatPromptForSandbox`, `observeChatTurnStream`, `observeNativeCompletion`, `OOXML_PRESENTATION_MACRO_ENABLED_MIME`, `OOXML_PRESENTATION_MIME`, `OOXML_SNIFFED_MIMES`, `OOXML_SPREADSHEET_MACRO_ENABLED_MIME`, `OOXML_SPREADSHEET_MIME`, `OOXML_WORD_MACRO_ENABLED_MIME`, `OOXML_WORD_MIME`, `OpenModelStream`, `parseChatAttachmentInputs`, `ParseChatAttachmentInputsOptions`, `parseChatTurnParts`, `parseFileMentions`, `parsePlanFollowUpAttach`, `PlanFollowUpAdmission`, `PlanFollowUpAttach`, `planFollowUpExecutionId`, `PlanFollowUpGate`, `PlanFollowUpGateOptions`, `PlanFollowUpOutcome`, `PlanFollowUpResolution`, `PlanFollowUpSettlement`, `produceChatTurnWithIntelligence`, `ProducerErrorEvent`, `ProducerNoticeEvent`, `ProducerPassthroughEvent`, `ProducerPassthroughEventType`, `ProducerReasoningEvent`, `ProducerTextEvent`, `ProducerToolCallEvent`, `ProducerToolResultEvent`, `ProducerUsageEvent`, `ProducerWireEvent`, `PROMOTE_MAX_FILE_BYTES`, `promoteAgentFilePart`, `PromoteAgentFilePartOptions`, `PromoteFilePartResult`, `PromptInputPart`, `promptPartsByteSize`, `ProtectedRuntimeChatOptions`, `RawAgentFilePart`, `ReadAttachmentFn`, `readCompletedSandboxTurn`, `ReadCompletedSandboxTurnOptions`, `ReadSandboxMentionFn`, `reconcileStaleTurnLock`, `ReconcileStaleTurnLockOptions`, `ReconcileStaleTurnLockResult`, `recoverSandboxAssistantMessage`, `resolveChatAttachments`, `ResolveChatAttachmentsOptions`, `ResolveChatAttachmentsResult`, `resolveEmptyTurnRetries`, `resolvePlanFollowUpRequest`, `routerTurnHistory`, `RouterTurnProducerOptions`, `rowIdOf`, `runDetachedTurn`, `RUNTIME_RESTARTED_ERROR`, `SandboxChatProducerOptions`, `SandboxFileTreeSource`, `SandboxMentionPathCheck`, `SandboxTreeFile`, `SandboxTreeResult`, `SandboxUploadSink`, `sanitizeAttachmentFileName`, `sanitizeUploadFilename`, `settleTurnResponse`, `sniffBinary`, `sniffedMimeImpliedByName`, `sniffMimeFromName`, `SniffResult`, `StaleTurnLockSandboxProbeResult`, `StaleTurnLockSessionProbeResult`, `startHybridBox`, `storeSupportsDraftPersistence`, `STREAM_SNIFF_HEAD_BYTES`, `STREAM_SNIFF_TAIL_BYTES`, `streamChatRouteAsSandboxEvents`, `StreamChatRouteAsSandboxOptions`, `StreamingSniffer`, `streamPlanFollowUpEvents`, `streamWithModelFailover`, `summarizeFailoverReason`, `TOOL_ABORTED_ERROR`, `TURN_INTENT_EVENT`, `TURN_PHASE_EVENT`, `TURN_PROGRESS_FIRST`, `TURN_PROGRESS_HEADER`, `TURN_RESPONSE_EVENT`, `TURN_ROUTE_PHASE_MESSAGES`, `TURN_STREAM_LOST_CODE`, `turnCarriesFiles`, `TurnIntentData`, `TurnIntentEvent`, `TurnPhaseData`, `TurnPhaseEvent`, `turnPromptText`, `TurnResponseData`, `turnResponseEventFor`, `TurnRoutePhase`, `unwrapSessionEventPayload`, `UPLOAD_INLINE_MAX_BYTES`, `UPLOAD_MAX_FILE_BYTES`, `UploadAuthorization`, `UploadedChatFile`, `validateSandboxMentionPath`, `withDurableChatProjection`, `WriteAttachmentFn`, `WriteAttachmentStreamFn`
 
@@ -639,11 +639,11 @@ Depends on: `config`
 
 ## `./launch-invariants`
 
-Source: `src/launch-invariants/index.ts` · 62 exports
+Source: `src/launch-invariants/index.ts` · 65 exports
 
 Depends on: `signoff`, `turn-health`
 
-`AUTH_LOOKUP_DEADLINE_MS`, `AUTH_LOOKUP_TTL_MS`, `AuthLookupCache`, `AuthLookupCacheOptions`, `AuthLookupOptions`, `AuthLookupRefused`, `checkIsolatedJobs`, `checkSettlementScenarios`, `checkTurnSettlement`, `createAuthLookupCache`, `createLimitAlarms`, `createProductLimitAlarms`, `createScheduledDispatch`, `credentialCacheKey`, `cronDailyFirings`, `D1_MAX_BOUND_PARAMETERS`, `DEFAULT_LIMIT_BUDGETS`, `describeVerdict`, `estimatedBytes`, `InvariantVerdict`, `isEdgeBlock`, `IsolatedJobsInput`, `LAUNCH_BUDGETS`, `LAUNCH_INVARIANT_IDS`, `LAUNCH_INVARIANTS`, `LaunchInvariant`, `LaunchInvariantId`, `LIMIT_RESOURCES`, `LimitAlarmOptions`, `LimitAlarms`, `LimitBudgets`, `LimitLevel`, `LimitObservation`, `LimitResource`, `longestGapMinutes`, `ObservedSlot`, `parseWranglerCrons`, `PASTED_CODE_SAMPLES`, `ProductLimitAlarmOptions`, `readInSizedBatches`, `ScheduledDispatch`, `ScheduledDispatchOptions`, `ScheduledDispatchResult`, `ScheduledJob`, `ScheduledJobInput`, `ScheduledJobOutcome`, `ScheduleEntry`, `ScheduleSlot`, `SettledTurnRecord`, `SETTLEMENT_SCENARIOS`, `SettlementScenario`, `SIZED_READ_BYTES`, `SIZED_READ_COMPOSITE_ROWS`, `SIZED_READ_ROWS`, `sizedBatches`, `SizedBatchOptions`, `SizedRow`, `slotsOf`, `TurnSettlementCounts`, `TurnTerminalState`, `withD1LimitAlarms`, `WranglerCrons`
+`AUTH_LOOKUP_DEADLINE_MS`, `AUTH_LOOKUP_TTL_MS`, `AuthLookupCache`, `AuthLookupCacheOptions`, `AuthLookupOptions`, `AuthLookupRefused`, `checkIsolatedJobs`, `checkSettlementScenarios`, `checkTurnSettlement`, `createAuthLookupCache`, `createLimitAlarms`, `createProductLimitAlarms`, `createScheduledDispatch`, `credentialCacheKey`, `cronDailyFirings`, `currentD1QueryCounter`, `D1_MAX_BOUND_PARAMETERS`, `D1QueryCounter`, `DEFAULT_LIMIT_BUDGETS`, `describeVerdict`, `estimatedBytes`, `InvariantVerdict`, `isEdgeBlock`, `IsolatedJobsInput`, `LAUNCH_BUDGETS`, `LAUNCH_INVARIANT_IDS`, `LAUNCH_INVARIANTS`, `LaunchInvariant`, `LaunchInvariantId`, `LIMIT_RESOURCES`, `LimitAlarmOptions`, `LimitAlarms`, `LimitBudgets`, `LimitLevel`, `LimitObservation`, `LimitResource`, `longestGapMinutes`, `ObservedSlot`, `parseWranglerCrons`, `PASTED_CODE_SAMPLES`, `ProductLimitAlarmOptions`, `readInSizedBatches`, `ScheduledDispatch`, `ScheduledDispatchOptions`, `ScheduledDispatchResult`, `ScheduledJob`, `ScheduledJobInput`, `ScheduledJobOutcome`, `ScheduleEntry`, `ScheduleSlot`, `SettledTurnRecord`, `SETTLEMENT_SCENARIOS`, `SettlementScenario`, `SIZED_READ_BYTES`, `SIZED_READ_COMPOSITE_ROWS`, `SIZED_READ_ROWS`, `sizedBatches`, `SizedBatchOptions`, `SizedRow`, `slotsOf`, `TurnSettlementCounts`, `TurnTerminalState`, `withD1LimitAlarms`, `withD1QueryCount`, `WranglerCrons`
 
 [Full API →](api/launch-invariants.md)
 
@@ -913,11 +913,11 @@ Depends on: `signoff`
 
 ## `./rollout/d1`
 
-Source: `src/rollout/d1.ts` · 5 exports
+Source: `src/rollout/d1.ts` · 6 exports
 
 Depends on: `signoff`
 
-`createD1TurnTimingStore`, `D1LikeForRollout`, `ROLLOUT_TURN_TIMING_SCHEMA_SQL`, `stageMetrics`, `TurnTimingRow`
+`createD1TurnTimingStore`, `D1LikeForRollout`, `ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_SCHEMA_SQL`, `stageMetrics`, `TurnTimingRow`
 
 [Full API →](api/rollout-d1.md)
 
@@ -1047,11 +1047,11 @@ Source: `src/skills/index.ts` · 42 exports
 
 ## `./skills-placement`
 
-Source: `src/skills-placement/index.ts` · 9 exports
+Source: `src/skills-placement/index.ts` · 10 exports
 
 Depends on: `harness`, `skills`
 
-`ComposedSkills`, `composeSkillsForHarness`, `ComposeSkillsForHarnessInput`, `resolveSkillDir`, `SkillEntry`, `SkillSupportFile`, `skillSupportFileMounts`, `unsupportedSkillHarnesses`, `withSkillSupportFiles`
+`ComposedSkills`, `composeSkillsForHarness`, `ComposeSkillsForHarnessInput`, `resolveSkillDir`, `SkillEntry`, `SkillSupportFile`, `skillSupportFileMounts`, `SkillSupportFileOptions`, `unsupportedSkillHarnesses`, `withSkillSupportFiles`
 
 [Full API →](api/skills-placement.md)
 
@@ -1277,9 +1277,9 @@ Source: `src/vault/server.ts` · 8 exports
 
 ## `./web`
 
-Source: `src/web/index.ts` · 43 exports
+Source: `src/web/index.ts` · 44 exports
 
-`acquisitionFromRequest`, `addSecurityHeaders`, `ApiKeyFetch`, `ApiKeyFetchOptions`, `assertMediaUrl`, `checkFreeRouteLimit`, `checkRateLimit`, `clearCookieHeader`, `ConversationGroupItem`, `CookieOptions`, `createApiKeyFetch`, `extractRequestContext`, `FirstTouchAcquisition`, `firstTouchAcquisitionCookie`, `FREE_ROUTE_BUDGETS`, `FreeRouteAllowance`, `FreeRouteClass`, `FreeRouteDenialReason`, `FreeRouteDimension`, `FreeRouteIdentity`, `FreeRouteLimitError`, `FreeRouteLimitInput`, `FreeRouteLimitOutcome`, `freeRouteLimitResponse`, `FreeRouteLimitResponseOptions`, `groupConversationMessages`, `GroupedConversationItem`, `isWorkspaceFileExportable`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitBudget`, `RateLimitResult`, `readCookieValue`, `readFirstTouchAcquisition`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `STANDARD_SECURITY_HEADERS`, `withFreeRouteLimit`, `WithFreeRouteLimitOptions`, `WORKSPACE_BUDGET_MULTIPLIER`
+`acquisitionFromRequest`, `addSecurityHeaders`, `ApiKeyFetch`, `ApiKeyFetchOptions`, `assertMediaUrl`, `checkFreeRouteLimit`, `checkRateLimit`, `clearCookieHeader`, `ConversationGroupItem`, `CookieOptions`, `createApiKeyFetch`, `extractRequestContext`, `FirstTouchAcquisition`, `firstTouchAcquisitionCookie`, `FREE_ROUTE_BUDGETS`, `FreeRouteAllowance`, `FreeRouteClass`, `FreeRouteDenialReason`, `FreeRouteDimension`, `FreeRouteIdentity`, `FreeRouteLimitError`, `FreeRouteLimitInput`, `FreeRouteLimitOutcome`, `freeRouteLimitResponse`, `FreeRouteLimitResponseOptions`, `groupConversationMessages`, `GroupedConversationItem`, `isWorkspaceFileExportable`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitBudget`, `RateLimitOptions`, `RateLimitResult`, `readCookieValue`, `readFirstTouchAcquisition`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `STANDARD_SECURITY_HEADERS`, `withFreeRouteLimit`, `WithFreeRouteLimitOptions`, `WORKSPACE_BUDGET_MULTIPLIER`
 
 [Full API →](api/web.md)
 
