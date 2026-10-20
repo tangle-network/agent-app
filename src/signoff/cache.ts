@@ -60,9 +60,13 @@ function hasRunProcesses(run: ActiveRun): boolean {
     for (const entry of readdirSync('/proc')) {
       if (!/^\d+$/.test(entry)) continue
       const proc = join('/proc', entry)
-      // Other users cannot be children of this signoff process.
-      if (statSync(proc).uid !== process.getuid?.()) continue
       try {
+        // A pre-existing service cannot be a detached child of this run. Its
+        // protected /proc files must not keep every crashed lease forever.
+        const start = processStart(Number(entry))
+        if (run.processStart && start && BigInt(start) < BigInt(run.processStart)) continue
+        // Other users cannot be children of this signoff process.
+        if (statSync(proc).uid !== process.getuid?.()) continue
         const cwd = readlinkSync(join(proc, 'cwd'))
         if (cwd === run.tree || cwd.startsWith(run.tree + sep)) return true
         const env = readFileSync(join(proc, 'environ'), 'utf8').split('\0')
@@ -124,7 +128,7 @@ function protectedPaths(cacheDir: string): { paths: Set<string>; unknown: boolea
       run = JSON.parse(readFileSync(file, 'utf8')) as ActiveRun
       if (!Number.isSafeInteger(run.pid) || run.pid <= 0 || typeof run.host !== 'string' ||
         typeof run.tree !== 'string' || !run.tree.startsWith(resolve(cacheDir) + sep) ||
-        (run.processStart !== null && typeof run.processStart !== 'string') ||
+        (run.processStart !== null && (typeof run.processStart !== 'string' || !/^\d+$/.test(run.processStart))) ||
         (run.storeKey !== null && (typeof run.storeKey !== 'string' || !/^[a-f0-9]{64}$/.test(run.storeKey)))) {
         unknown = true
         continue
