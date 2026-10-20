@@ -36,6 +36,8 @@ import { ok, fail, type Outcome } from './outcome'
 import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'
 import { traceSandboxPromptEvents } from './prompt-trace'
 export { traceSandboxPromptEvents, type TraceSandboxPromptOptions } from './prompt-trace'
+import { workersReuseStore, type ReuseChecks, type ReuseStateStore } from './reuse-state'
+export { createCacheReuseStore, type ReuseCacheLike, type ReuseChecks, type ReuseStateStore, type SharedReuseState } from './reuse-state'
 import {
   SandboxTransientDeadlineError,
   classifySandboxTransientFailure,
@@ -452,6 +454,15 @@ export interface SandboxRuntimeConfig {
    */
   migrateEgressPolicy?: boolean
 
+  /**
+   * Where Worker isolates share what a reuse last checked on a box (its id, the
+   * exec probe, the egress read, the runtime environment delivered). A request is
+   * not promised the isolate that served the last one, so without a shared store
+   * a reuse often finds nothing to trust. Default: the runtime's Cache API when
+   * it has one; `null` keeps the state in the isolate. Holds ids, times and
+   * digests only.
+   */
+  reuseState?: ReuseStateStore | null
   // BYOS3/R2 snapshot storage. Returns undefined => key omitted entirely
   // (fail-closed when creds absent). Product owns bucket/endpoint/credentials/prefix.
   storage?: (ctx: SandboxBuildContext) => StorageConfig | undefined
@@ -568,24 +579,18 @@ let _cached: ClientCacheEntry | null = null
 const TRUSTED_REUSE_TTL_MS = 10 * 60_000
 const REUSE_CHECKS_MAX = 1_000
 
-/** What this isolate checked on one running box, valid only for the identity it saw. */
-interface ReuseChecks {
-  identity: string
-  /** When the exec probe last passed. */
-  alive?: number
-  /** The egress policy (normalized) the box was last read at or migrated to. */
-  egress?: { key: string; at: number }
-  /** The digest of the runtime environment last delivered to the box. */
-  env?: { digest: string; at: number }
-  /** The deferred corpus the box was last found to hold, by its hash. */
-  corpus?: { hash: string; at: number }
-}
-
 const reuseChecks = new Map<string, ReuseChecks>()
 /** The running box last used under a box name, so a reuse reads it by id instead of listing every running box. A wrong id costs one read: the box read must carry the name. */
 const runningBoxIds = new Map<string, string>()
 /** Boxes an ensure handed out without an exec probe, because a recent probe of this start had passed. */
 const trustedBoxes = new WeakSet<SandboxInstance>()
+/** The box name each remembered box id serves, to find its shared state. */
+const reuseNames = new Map<string, string>()
+/** What this isolate last read from or wrote to the shared store, by box name, so an unchanged state is not written again. */
+const savedShared = new Map<string, string>()
+let defaultReuseStore: ReuseStateStore | null | undefined
+/** The store the last ensure used, so a forgotten box is dropped from it too. */
+let activeReuseStore: ReuseStateStore | null = null
 
 /**
  * What tells one run of a box from the next. The Sandbox API reports no
@@ -625,6 +630,11 @@ function recordCheck(box: SandboxInstance, patch: Omit<Partial<ReuseChecks>, 'id
 
 function forgetBox(boxId: string): void {
   reuseChecks.delete(boxId)
+  const name = reuseNames.get(boxId)
+  if (name === undefined || !activeReuseStore) return
+  savedShared.delete(name)
+  // Best effort: a store that cannot drop it costs the other isolates a full check once the entry ages out.
+  void Promise.resolve(activeReuseStore.drop(name)).catch(() => undefined)
 }
 
 function isRecent(at: number | undefined, ttlMs: number, now = Date.now()): at is number {
@@ -669,6 +679,10 @@ export function resetClientCache(): void {
   _cached = null
   reuseChecks.clear()
   runningBoxIds.clear()
+  reuseNames.clear()
+  savedShared.clear()
+  defaultReuseStore = undefined
+  activeReuseStore = null
 }
 
 /** Describe an application tool with its name, unique key, and description */
@@ -1746,10 +1760,16 @@ async function listRunning(
 function rememberRunningBox(name: string, box: SandboxInstance): SandboxInstance {
   runningBoxIds.delete(name)
   runningBoxIds.set(name, box.id)
+  reuseNames.set(box.id, name)
   while (runningBoxIds.size > REUSE_CHECKS_MAX) {
     const oldest = runningBoxIds.keys().next().value
     if (oldest === undefined) break
     runningBoxIds.delete(oldest)
+  }
+  while (reuseNames.size > REUSE_CHECKS_MAX) {
+    const oldest = reuseNames.keys().next().value
+    if (oldest === undefined) break
+    reuseNames.delete(oldest)
   }
   return box
 }
@@ -2714,17 +2734,66 @@ export async function reuseWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
 ): Promise<SandboxInstance | undefined> {
-  if (options.forceNew || !hasRecentProbe(shell, options)) return undefined
+  if (options.forceNew) return undefined
+  await hydrateReuseState(shell, options)
+  if (!hasRecentProbe(shell, options)) return undefined
   return claimWorkspaceSandbox(shell, options, true)
+}
+
+function boxNameFor(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions): string {
+  const scope: SandboxScope = { workspaceId: options.workspaceId, ...(options.userId ? { userId: options.userId } : {}) }
+  return shell.boxKey ? shell.boxKey(scope) : shell.name(options.workspaceId)
 }
 
 /** Whether this isolate probed the workspace's last-used box recently enough that a reuse would skip the probe. */
 function hasRecentProbe(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions): boolean {
   const probe = shell.livenessProbe
   if (!probe || options.forceNew) return false
-  const scope: SandboxScope = { workspaceId: options.workspaceId, ...(options.userId ? { userId: options.userId } : {}) }
-  const id = runningBoxIds.get(shell.boxKey ? shell.boxKey(scope) : shell.name(options.workspaceId))
+  const id = runningBoxIds.get(boxNameFor(shell, options))
   return isRecent(id === undefined ? undefined : reuseChecks.get(id)?.alive, probe.cacheTtlMs ?? TRUSTED_REUSE_TTL_MS)
+}
+
+function reuseStoreOf(shell: SandboxRuntimeConfig): ReuseStateStore | null {
+  if (shell.reuseState !== undefined) return shell.reuseState
+  if (defaultReuseStore === undefined) defaultReuseStore = workersReuseStore()
+  return defaultReuseStore
+}
+
+/** Load what another isolate recorded about this workspace's box, unless this isolate already knows it. */
+async function hydrateReuseState(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions): Promise<void> {
+  if (options.forceNew) return
+  const store = reuseStoreOf(shell)
+  activeReuseStore = store
+  if (!store) return
+  const name = boxNameFor(shell, options)
+  if (runningBoxIds.has(name)) return
+  try {
+    const shared = await store.load(name)
+    if (!shared) return
+    runningBoxIds.set(name, shared.boxId)
+    reuseNames.set(shared.boxId, name)
+    reuseChecks.set(shared.boxId, shared.checks)
+    savedShared.set(name, JSON.stringify(shared))
+  } catch {
+    // A store that cannot answer is a miss: the reuse verifies in full.
+  }
+}
+
+/** Share what this ensure learned about the box, unless the store already holds it. */
+async function persistReuseState(shell: SandboxRuntimeConfig, box: SandboxInstance): Promise<void> {
+  const store = reuseStoreOf(shell)
+  const name = reuseNames.get(box.id)
+  const checks = reuseChecks.get(box.id)
+  if (!store || name === undefined || !checks) return
+  const state = { boxId: box.id, checks }
+  const serialized = JSON.stringify(state)
+  if (savedShared.get(name) === serialized) return
+  try {
+    await store.save(name, state)
+    savedShared.set(name, serialized)
+  } catch {
+    // The next ensure in this isolate still trusts what it learned.
+  }
 }
 
 /** The spend gate, run at most once per ensure and timed under the turn's trace when it has one. */
@@ -2755,6 +2824,7 @@ async function claimWorkspaceSandbox(
   // ensure; it is asked again when that probe expires, and before any lifecycle
   // step, so a reuse pays for it once per probe and not once per turn.
   const gate = spendGate(options)
+  await hydrateReuseState(shell, options)
   if (!hasRecentProbe(shell, options)) await gate()
   const claim = trace?.start('sandbox.claim', 'sandbox', { 'workspace.harness': options.harness }, options.traceParent)
   // Each ensure step is a child of the claim, and the caller's own `measure` still sees it.
@@ -2776,6 +2846,7 @@ async function claimWorkspaceSandbox(
     claim?.end({ 'sandbox.id': box.id, ...(trustedBoxes.has(box) ? { 'sandbox.probe_trusted': true } : {}) })
     // A box handed out on a recent probe was observed by the ensure that probed it.
     if (!trustedBoxes.has(box)) await observeProvisionedBox(shell, options, box)
+    await persistReuseState(shell, box)
     return box
   } catch (error) {
     claim?.end(undefined, error)

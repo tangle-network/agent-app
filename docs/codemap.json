@@ -16405,6 +16405,12 @@
           "doc": "Aggregate a sandbox prompt event stream down to the turn's one final answer."
         },
         {
+          "name": "createCacheReuseStore",
+          "kind": "function",
+          "signature": "(open: () => Promise<ReuseCacheLike>) => ReuseStateStore",
+          "doc": "A store over a Workers-style cache."
+        },
+        {
           "name": "createD1PrewarmClaimStore",
           "kind": "function",
           "signature": "(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => FencedPrewarmClaimStore",
@@ -17023,6 +17029,24 @@
           "doc": "Run `attempt` until it succeeds, it fails with something this policy does not consider transient, or a transient failure outlasts the deadline."
         },
         {
+          "name": "ReuseCacheLike",
+          "kind": "interface",
+          "signature": "interface ReuseCacheLike",
+          "doc": "The slice of a Workers `Cache` this store uses."
+        },
+        {
+          "name": "ReuseChecks",
+          "kind": "interface",
+          "signature": "interface ReuseChecks",
+          "doc": "What isolates share about a running box: its id and the checks a reuse may trust (see `ReuseChecks` in `./index`)."
+        },
+        {
+          "name": "ReuseStateStore",
+          "kind": "interface",
+          "signature": "interface ReuseStateStore",
+          "doc": "Where isolates keep {@link SharedReuseState}, by box name."
+        },
+        {
           "name": "reuseWorkspaceSandbox",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance | undefined>",
@@ -17434,6 +17458,12 @@
           "name": "serializeSandboxProvisioningError",
           "kind": "function",
           "signature": "(error: unknown, options?: { maxDepth?: number | undefined; }) => SafeSandboxErrorDiagnostics",
+          "doc": null
+        },
+        {
+          "name": "SharedReuseState",
+          "kind": "interface",
+          "signature": "interface SharedReuseState",
           "doc": null
         },
         {
