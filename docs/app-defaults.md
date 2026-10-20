@@ -16,7 +16,7 @@ agent-app-signoff defaults --no-bundle --json matrix.json
 | Row | Has the default when | Source of the read |
 |---|---|---|
 | agent-app pin | the pinned version is at or above every outcome's floor (`AGENT_APP_OUTCOME_FLOORS`: turn trace 0.60.199, first text 0.60.203) | `package.json` |
-| turn trace | the app wires a sink (`createIntelligenceTurnTraceSink`, or a `turnTrace: { sink }`) that does not export with `TANGLE_API_KEY`, which the ingest rejects; with `--probe`, Intelligence also holds a turn from the last 30 days | source, Intelligence |
+| turn trace | the app wires a sink (`createIntelligenceTurnTraceSink`, or a `turnTrace: { sink }`) that does not export with `TANGLE_API_KEY` (a Router key the ingest rejects); with `--probe`, Intelligence also holds a turn from the last 30 days | source, Intelligence |
 | first text | the turn owner marks it (`createChatTurnRoutes` from 0.60.203, or `trace.markFirstText()` in a Durable Object turn) and the trace is on | source |
 | prewarm route | the app mounts `createWorkspacePrewarmRoute`; a local route named prewarm is a local copy | source |
 | placement | a Wrangler `[placement]` names a `region` or `host`; smart placement does not pin | Wrangler config |

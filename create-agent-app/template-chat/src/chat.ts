@@ -164,7 +164,7 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
       },
     },
     projectId: appSlug,
-    // One trace per turn, sent to Tangle Intelligence with first_text_ms. The sink reads SANDBOX_API_KEY and
+    // One trace per turn, sent to Tangle Intelligence with first_text_ms. The sink reads the Sandbox product key and
     // warns in the Worker log when an export fails; pass `turnTrace: false` only with an exemption in signoff.config.mjs.
     turnTrace: { sink: createIntelligenceTurnTraceSink({ project: appSlug }) },
     authorize,

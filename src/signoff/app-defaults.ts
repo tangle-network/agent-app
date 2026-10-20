@@ -235,7 +235,7 @@ function turnTraceRow(sources: readonly SourceFile[], calls: readonly SinkCall[]
   }
   const badKey = calls.find((call) => /\bapiKey\s*:[^,}]*\bTANGLE_API_KEY\b/.test(call.args))
   if (badKey) {
-    return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: `exports with TANGLE_API_KEY in ${badKey.file}; the ingest answers 401 (Legal #468): drop apiKey, the sink reads SANDBOX_API_KEY` }, optedOut: null }
+    return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: `exports with TANGLE_API_KEY in ${badKey.file}; the ingest answers 401 (Legal #468): drop apiKey, the sink reads the Sandbox product key` }, optedOut: null }
   }
   const project = calls.find((call) => call.project)?.project ?? null
   const last = project === null ? undefined : exports?.get(project)
@@ -364,14 +364,19 @@ function toolCountRow(): DefaultRow {
 export function checkAppDefaults(repoRoot: string, options: AppDefaultsOptions = {}): AppDefaultsResult {
   const tracked = trackedFiles(repoRoot)
   const packages = findAppPackages(repoRoot, tracked)
-  const wranglerPaths = trackedWorkerConfigs(repoRoot)
+  // A Wrangler config belongs to the deepest package that contains it, so a monorepo's web and server packages
+  // each report their own Worker, and a package that deploys none (a workspace root, a client) is not an app.
+  const owned = new Map<string, string[]>()
+  for (const path of trackedWorkerConfigs(repoRoot)) {
+    const owner = packages.filter((pkg) => underDir(path, pkg.dir)).sort((x, y) => y.dir.length - x.dir.length)[0]
+    if (owner) owned.set(owner.dir, [...(owned.get(owner.dir) ?? []), path])
+  }
+  const deployed = packages.filter((pkg) => owned.has(pkg.dir))
   const apps: AppDefaultsReport[] = []
   const findings: string[] = []
-  for (const pkg of packages) {
+  for (const pkg of deployed.length > 0 ? deployed : packages) {
     const sources = readSources(repoRoot, tracked, pkg.dir, packages.map((other) => other.dir))
-    const configs = wranglerPaths
-      .filter((path) => underDir(path, pkg.dir))
-      .map((path) => ({ path, text: readFileSync(join(repoRoot, path), 'utf8') }))
+    const configs = (owned.get(pkg.dir) ?? []).map((path) => ({ path, text: readFileSync(join(repoRoot, path), 'utf8') }))
     const exemptions = options.exemptions ?? {}
     const pin = versionTuple(pkg.spec) ? (/(\d+\.\d+\.\d+)/.exec(pkg.spec)?.[1] ?? null) : null
     const calls = sinkCalls(sources)
