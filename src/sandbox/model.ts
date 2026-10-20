@@ -16,6 +16,11 @@ export interface ProviderResolutionConfig {
   // provider inference from key presence cannot fire keyless. Default false:
   // a keyless config resolves to undefined exactly as before.
   allowKeylessModel?: boolean
+  // Name of a box environment variable holding the provider key: a stored
+  // secret the box is created with. Caller-owned auth by reference, so the
+  // platform mints no Router key and the key value never passes through the
+  // app. A raw `apiKey` (config or per-turn) takes precedence.
+  apiKeyEnv?: string
 }
 
 /** Represent a fully configured model with optional API key and base URL for sandbox platform integration */
@@ -32,13 +37,14 @@ export interface ProviderResolutionConfig {
  * provider, apiKey, baseUrl, modelId at path backend" (Creative, 2026-10-06).
  */
 export function backendModelFields(model: ResolvedModel): {
-  model: { model: string; provider: string; apiKey?: string; baseUrl?: string };
+  model: { model: string; provider: string; apiKey?: string; apiKeyEnv?: string; baseUrl?: string };
 } {
   return {
     model: {
       model: model.model,
       provider: model.provider,
       ...(model.apiKey !== undefined ? { apiKey: model.apiKey } : {}),
+      ...(model.apiKeyEnv !== undefined ? { apiKeyEnv: model.apiKeyEnv } : {}),
       ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
     },
   };
@@ -50,6 +56,8 @@ export interface ResolvedModel {
   // Omitted only under `allowKeylessModel` — keyless metadata tells the
   // sandbox platform to mint its own per-user router key for the box.
   apiKey?: string
+  /** A stored-secret reference standing in for `apiKey`; see {@link ProviderResolutionConfig.apiKeyEnv}. */
+  apiKeyEnv?: string
   baseUrl?: string
 }
 
@@ -159,7 +167,8 @@ export function resolveModelSelection(
   if (!provider) return { succeeded: false, error: 'no_provider', model: modelName, source }
 
   const apiKey = explicitApiKey ?? (provider === 'openai' ? openaiApiKey : undefined)
-  if (!apiKey && !c.allowKeylessModel) {
+  const apiKeyEnv = apiKey ? null : trimOrNull(c.apiKeyEnv)
+  if (!apiKey && !apiKeyEnv && !c.allowKeylessModel) {
     return { succeeded: false, error: 'no_api_key', model: modelName, provider, source }
   }
 
@@ -168,7 +177,7 @@ export function resolveModelSelection(
     value: {
       model: modelName,
       provider,
-      ...(apiKey ? { apiKey } : {}),
+      ...(apiKey ? { apiKey } : apiKeyEnv ? { apiKeyEnv } : {}),
       ...(explicitBaseUrl ? { baseUrl: explicitBaseUrl } : {}),
     },
   }

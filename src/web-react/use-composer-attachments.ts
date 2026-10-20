@@ -35,6 +35,7 @@ import type { ChatAttachmentInput, ChatAttachmentKind } from './chat-stream'
 import type { ComposerFile } from './chat-composer'
 import { acceptRejectionReason, isAcceptedFileType } from './composer-file-accept'
 import {
+  ALLOWED_ATTACHMENT_SNIFFED_MIMES,
   ATTACHMENT_ACCEPT,
   ATTACHMENT_MAX_COUNT,
   MAX_ATTACHMENT_TOTAL_BYTES,
@@ -47,7 +48,13 @@ import {
 } from '../chat-routes/attachment-validation'
 import { sniffBinary } from '../chat-routes/binary-sniff'
 
-export { ATTACHMENT_ACCEPT } from '../chat-routes/attachment-validation'
+// The gate's defaults, so a host widening its composer gate starts from the
+// route's own values instead of a copy.
+export {
+  ALLOWED_ATTACHMENT_SNIFFED_MIMES,
+  ATTACHMENT_ACCEPT,
+  OOXML_SNIFFED_MIMES,
+} from '../chat-routes/attachment-validation'
 
 /** One staged file and its upload lifecycle. `file` is retained so a failed
  *  upload can be retried without re-selecting; `previewUrl` is an object URL
@@ -85,9 +92,21 @@ export interface UseComposerAttachmentsOptions {
   limits?: {
     maxCount?: number
     maxBinaryBytes?: number
+    /** Binary ceilings keyed by the content-sniffed mime, as the upload
+     *  route's `limits.maxBytesBySniffedMime`. */
+    maxBytesBySniffedMime?: ReadonlyMap<string, number>
     maxTextBytes?: number
     maxTotalBytes?: number
   }
+  /** Sniffed-mime allowlist, as the upload route's `allowedSniffedMimes`.
+   *  Default {@link ALLOWED_ATTACHMENT_SNIFFED_MIMES}. */
+  allowedSniffedMimes?: ReadonlySet<string>
+  /** How each file travels. `'form'` (default) posts multipart form data.
+   *  `'raw'` posts the file itself as the body, named by a `filename`
+   *  query parameter with its size in `X-Upload-Length`, which
+   *  `createAttachmentUploadRoute` streams to the store without holding the
+   *  file whole. */
+  uploadBody?: 'form' | 'raw'
   /** Attachment kinds accepted, checked against the sniffed content's
    *  mime. Default: both (`['image', 'file']` — i.e. no restriction). */
   allowedKinds?: ChatAttachmentKind[]
@@ -185,6 +204,22 @@ async function parseUploadError(res: Response): Promise<string> {
  *  retried once the product fixes its config, instead of silently vanishing. */
 const NO_UPLOAD_TARGET_MESSAGE = 'No upload destination configured (pass uploadUrl or buildUploadRequest)'
 
+/** The upload URL with the raw upload's `filename` query parameter set. */
+function withFilename(url: string, name: string): string {
+  const [base, hash] = url.split('#', 2) as [string, string | undefined]
+  const separator = base.includes('?') ? '&' : '?'
+  return `${base}${separator}filename=${encodeURIComponent(name)}${hash === undefined ? '' : `#${hash}`}`
+}
+
+/** A raw upload's headers: the host's own, plus the declared size the route
+ *  needs before it reads the body. */
+function rawUploadHeaders(init: HeadersInit | undefined, size: number): Headers {
+  const headers = new Headers(init)
+  headers.set('Content-Type', 'application/octet-stream')
+  headers.set('X-Upload-Length', String(size))
+  return headers
+}
+
 /**
  * Owns the composer's attachment lifecycle: validate selected/dropped/pasted
  * files against the shared limits, upload each accepted file to the
@@ -256,13 +291,22 @@ export function useComposerAttachments(
       }
 
       try {
-        const res = await fetch(request.url, {
-          method: 'POST',
-          credentials: 'same-origin',
-          ...request.init,
-          body: form,
-          signal: controller.signal,
-        })
+        const res = opts.uploadBody === 'raw'
+          ? await fetch(withFilename(request.url, name), {
+              method: 'POST',
+              credentials: 'same-origin',
+              ...request.init,
+              headers: rawUploadHeaders(request.init?.headers, file.size),
+              body: file,
+              signal: controller.signal,
+            })
+          : await fetch(request.url, {
+              method: 'POST',
+              credentials: 'same-origin',
+              ...request.init,
+              body: form,
+              signal: controller.signal,
+            })
         if (!res.ok) {
           const message = await parseUploadError(res)
           setStaged((prev) =>
@@ -313,6 +357,8 @@ export function useComposerAttachments(
       const maxBinaryBytes = opts.limits?.maxBinaryBytes ?? MAX_BINARY_ATTACHMENT_BYTES
       const maxTextBytes = opts.limits?.maxTextBytes ?? MAX_TEXT_ATTACHMENT_BYTES
       const maxTotalBytes = opts.limits?.maxTotalBytes ?? MAX_ATTACHMENT_TOTAL_BYTES
+      const maxBytesBySniffedMime = opts.limits?.maxBytesBySniffedMime
+      const allowedSniffedMimes = opts.allowedSniffedMimes ?? ALLOWED_ATTACHMENT_SNIFFED_MIMES
       const allowedKinds = opts.allowedKinds ?? (['image', 'file'] as ChatAttachmentKind[])
 
       const list = Array.isArray(files) ? files : Array.from(files)
@@ -341,12 +387,14 @@ export function useComposerAttachments(
       for (const file of countAccepted) {
         const bytes = new Uint8Array(await file.arrayBuffer())
         const sniff = sniffBinary(bytes)
-        const typeCheck = checkAttachmentType(file.name, sniff)
+        const typeCheck = checkAttachmentType(file.name, sniff, allowedSniffedMimes)
         if (!typeCheck.succeeded) {
           opts.onReject?.(typeCheck.message, file)
           continue
         }
-        const limit = sniff.binary ? maxBinaryBytes : maxTextBytes
+        const limit = !sniff.binary
+          ? maxTextBytes
+          : (sniff.mime ? maxBytesBySniffedMime?.get(sniff.mime) : undefined) ?? maxBinaryBytes
         if (file.size > limit) {
           opts.onReject?.(attachmentSizeErrorMessage(file.name, file.size, limit), file)
           continue

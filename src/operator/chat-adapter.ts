@@ -1,3 +1,4 @@
+import type { ChatAttachmentInput } from '../chat-routes/wire.js'
 import { messageHasTurnId } from '../stream/turn-identity.js'
 import type {
   OperatorApproval,
@@ -65,6 +66,14 @@ export interface ChatOperatorAdmissionStore<Identity> {
 export interface ChatOperatorAdapterOptions<Identity> {
   /** Optional durable claims; without one, transcript retry detection is not an atomic admission lock. */
   admissions?: ChatOperatorAdmissionStore<Identity>
+  /**
+   * Set when `runTurn` forwards `attachments` in the chat request body and the
+   * chat route resolves them from the workspace's store, as with
+   * `resolveChatAttachments`. Without it, turns that carry attachments are refused.
+   */
+  acceptsAttachments?: boolean
+  /** Most attachments one turn may carry; set it to the chat route's own count cap. Default `ATTACHMENT_MAX_COUNT`. */
+  maxAttachments?: number
   /** The app's public origin, the base of every browser link. */
   origin: string
   /** Browser path of a conversation; defaults to `/app/<workspace>/chat/<thread>`. */
@@ -93,8 +102,12 @@ export interface ChatOperatorAdapterOptions<Identity> {
    * Run one turn through the app's own chat route as this caller. The adapter
    * reads the response to its end, so the turn is driven exactly as a browser
    * holding its stream drives it, and the start request returns once it settles.
+   * `attachments` arrives only when `acceptsAttachments` is set.
    */
-  runTurn(ctx: OperatorContext<Identity>, input: { workspaceId: string; threadId: string; turnId: string; content: string; model?: string }): Promise<Response>
+  runTurn(ctx: OperatorContext<Identity>, input: {
+    workspaceId: string; threadId: string; turnId: string; content: string; model?: string
+    attachments?: ChatAttachmentInput[]
+  }): Promise<Response>
   /** Optional authoritative status of this user-turn anchor. When supplied,
    *  missing/running status without a live lease never promotes a partial reply to success. */
   turnStatus?(ctx: OperatorContext<Identity>, workspaceId: string, threadId: string, user: ChatOperatorMessage): Promise<'running' | 'complete' | 'error' | null>
@@ -282,6 +295,8 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
   }
 
   const adapter: OperatorAdapter<Identity> = {
+    ...(options.acceptsAttachments === true ? { acceptsAttachments: true } : {}),
+    ...(options.maxAttachments === undefined ? {} : { maxAttachments: options.maxAttachments }),
     async authorizeWorkspace(ctx, workspaceId, access) {
       const workspace = await options.workspaces.authorize(ctx, workspaceId, access)
       return workspace ? workspaceView(workspace) : null
@@ -314,6 +329,7 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       const response = await options.runTurn(ctx, {
         workspaceId: workspace.id, threadId, turnId: input.turnId, content: input.content,
         ...(input.model === undefined ? {} : { model: input.model }),
+        ...(input.attachments === undefined ? {} : { attachments: input.attachments }),
       })
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { error?: unknown; code?: unknown }

@@ -39,7 +39,7 @@ export type LineLastTurn =
 export interface LineSetupLine extends Pick<Line, 'id' | 'connectionId' | 'transport' | 'address' | 'connect' | 'routerAddress' | 'providerNumberId' | 'status'> {
   /** The attachment shown to the user; hosts can reject a stale disconnect. */
   attachmentId?: string | null
-  /** True only while an active Hub attachment routes messages to an agent or box. */
+  /** True only while the host confirms routing to an agent or box; voice also needs enabled call routing. */
   answering: boolean
   /** The viewer may disconnect this line. A workspace list can include other agents' lines. */
   canDisconnect: boolean

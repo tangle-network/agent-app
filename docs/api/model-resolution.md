@@ -4,7 +4,7 @@
 
 Source: `src/model-resolution/index.ts`
 
-24 exports.
+31 exports.
 
 ### `buildModelChain`
 
@@ -60,6 +60,14 @@ interface ChatModelValidationSuccess
 
 ```ts
 (value: unknown) => string | undefined
+```
+
+### `formatModelNotAllowedRefusal`
+
+`function` — Format the loud, correctable refusal: the blocked model, the allowed set, and the fix.
+
+```ts
+(input: { requested: string; allowedModels: readonly string[]; }) => string
 ```
 
 ### `isUpstreamUnavailable`
@@ -118,6 +126,30 @@ interface ModelFailoverResult
 interface ModelInfo
 ```
 
+### `modelPolicyCatalogFromRouter`
+
+`function` — Map router `/v1/models` rows to a {@link ModelPolicyInfo} catalog: snake_case `zdr` / `hipaa_eligible` become `zeroDataRetention` / `hipaaEligible`, and `provider` comes from the row's `_provider`/`p…
+
+```ts
+(rows: Iterable<RouterModelPolicyRow>) => ModelPolicyInfo[]
+```
+
+### `ModelWithinAllowListResolution`
+
+`type`
+
+```ts
+type ModelWithinAllowListResolution
+```
+
+### `parseModelNotAllowed`
+
+`function` — Parse the allowed-model set out of a router `model_not_allowed` refusal.
+
+```ts
+(message: string) => string[] | null
+```
+
 ### `readHttpStatusHint`
 
 `function` — The HTTP status a message states in prose, or `undefined` when it states none.
@@ -148,6 +180,30 @@ interface ResolveChatModelInput
 
 ```ts
 interface ResolvedChatModel
+```
+
+### `resolveModelWithinAllowList`
+
+`function` — Resolve a model request against the key's allow-list: unscoped → allowed as-is; requested permitted → allowed; a fallback permitted → rerouted (named); nothing permitted → refused with the set.
+
+```ts
+(input: ResolveModelWithinAllowListInput) => ModelWithinAllowListResolution
+```
+
+### `ResolveModelWithinAllowListInput`
+
+`interface`
+
+```ts
+interface ResolveModelWithinAllowListInput
+```
+
+### `RouterModelPolicyRow`
+
+`interface` — A router `/v1/models` row carrying the compliance flags {@link modelPolicyCatalogFromRouter} reads.
+
+```ts
+interface RouterModelPolicyRow
 ```
 
 ### `runWithModelFailover`

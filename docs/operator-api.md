@@ -90,10 +90,11 @@ There is no browser-cookie fallback.
 | GET | `/workspaces` | read | `{ workspaces }` the key can reach |
 | POST | `/workspaces` | write | `{ workspace }`; body `{ name }`; refused for workspace-restricted keys |
 | GET | `/workspaces/:id` | read | `{ workspace }` |
-| POST | `/workspaces/:id/turns` | read, run | 202 `{ turn }`; body `{ turnId, content, threadId?, title?, model? }` |
+| POST | `/workspaces/:id/turns` | read, run | 202 `{ turn }`; body `{ turnId, content, threadId?, title?, model?, attachments? }` |
 | GET | `/workspaces/:id/threads` | read | `{ threads, nextCursor }` |
 | GET | `/workspaces/:id/threads/:thread` | read | `{ thread, latestTurn }` |
 | GET | `/workspaces/:id/threads/:thread/turns/:turn?wait=<s>` | read | `{ turn }`, held up to `wait` seconds (at most 25) |
+| POST | `/workspaces/:id/threads/:thread/turns/:turn/cancel?wait=<s>` | read, run | `{ turn }`: 200 once settled, 202 while the stop is pending; see [Cancel a turn](#cancel-a-turn) |
 | GET | `/workspaces/:id/approvals` | read | `{ approvals }` open in the workspace |
 | GET | `/workspaces/:id/journal?days=<n>` | read | `{ entries }`: dated journal files |
 | GET | `/workspaces/:id/files?prefix=<p>` | read | `{ files }` |
@@ -115,8 +116,60 @@ Errors are `{ error, code, retryable? }`.
 3. `succeeded` and `failed` are settled and carry `reply` or `failure`, plus referenced `assets`, changed `files`, and open `approvals`.
    `input-required`, or a nonempty `approvals` list, waits on someone in `approvals[].decidedBy`.
    `unknown` means the app cannot establish the state; it is never evidence of success.
+4. To stop the turn early, the caller posts its cancel route; see [Cancel a turn](#cancel-a-turn).
 
 An accepted turn or an open connection does not establish completion; read the settled turn.
+
+### Cancel a turn
+
+`POST /workspaces/:id/threads/:thread/turns/:turn/cancel` stops a turn the key may run, through the app's own interrupt path, the one its browser Stop uses.
+It needs `operator:read` and `operator:run` and the workspace role that may start agent work, and it takes no body.
+
+- A settled turn answers 200 with the turn as it settled, without reaching the app, so a repeated or late cancel never fails.
+- An unsettled turn is stopped and answers 202 with the turn as read afterwards. It may still read `working` until the app's turn owner records the stop; read it with `?wait=` until it settles.
+- `?wait=<s>` holds the cancel response, as on a turn read, until the turn settles; a settled response is 200.
+- A stopped turn settles `failed` with `failure.code` `turn.cancelled` (`OPERATOR_TURN_CANCELLED_CODE`). A turn that finished before the stop reached it settles as it finished.
+- A stop the app could not deliver answers a retryable error; retry the same route.
+
+The adapter implements `cancelTurn(ctx, workspace, { threadId, turnId })` by calling the app's existing interrupt for that turn and returning `getTurn`'s view of it. The handler never calls it for a settled turn.
+`GET /api/operator/v1` lists `turns.cancel` among the capabilities of an app that implements it; any other app answers 501 `operator.unsupported`.
+`createOperatorClient` exposes it as `cancelTurn(workspaceId, threadId, turnId, { waitSeconds })`.
+
+### Attach files
+
+A turn carries files the same way a browser-composer message does.
+Upload them to the workspace through the app's attachment upload route, which `createAttachmentUploadRoute` builds and which answers `{ files: ChatAttachmentInput[] }`.
+The route takes either a `multipart/form-data` body or one raw file body: the file's bytes as the request body, its name in the `filename` query parameter and its size in `Content-Length` (or `X-Upload-Length`).
+An app that supplies `writeAttachmentStream` writes a raw body to its store as it arrives, checking the type, kind and size on the way and withholding the last bytes until the file passes, so a large export is never held whole in the Worker.
+Send one raw request per large file; an app may cap form bodies with `limits.maxFormBytes`, because a form is parsed whole.
+
+```sh
+curl -X POST "$APP/api/vault/upload?workspaceId=$WS&filename=delivery-detail.csv" \
+  -H "Authorization: Bearer $KEY" -H 'Content-Type: application/octet-stream' \
+  --data-binary @delivery-detail.csv
+```
+
+Send the returned lists, joined, unchanged as the turn's `attachments`:
+
+```json
+{
+  "turnId": "4b7c1f9e-2d3a-4c5b-8e6f-7a8b9c0d1e2f",
+  "content": "Summarize the brief and draft the launch post.",
+  "attachments": [
+    { "path": "uploads/brief.txt", "name": "brief.txt", "size": 2048, "mediaType": "text/plain", "kind": "file" }
+  ]
+}
+```
+
+The handler checks the shape with the chat route's own rules, `parseChatAttachmentInputs` from `/chat-routes`.
+The value is an array of distinct paths, at most the adapter's `maxAttachments` entries; without one, `ATTACHMENT_MAX_COUNT`. An app whose chat route admits more files per message sets the same number on its adapter.
+Each entry has a store-relative `path` with no traversal, absolute, backslash, control-character or hidden segment, a bounded `name`, a finite `size`, a `mediaType`, and a `kind` of `image` or `file`.
+A malformed value answers 400 `operator.invalid_input` naming `attachments`; an empty list is the same as none.
+Delivery is an explicit adapter capability, so an adapter written before the field existed never drops files silently.
+An adapter that sets `acceptsAttachments: true` receives the list as `input.attachments` and passes it into the app's chat request; `createChatOperatorAdapter` takes the same option and forwards the list to `runTurn`.
+There the app's attachment resolver reads each path from the path workspace's own store and re-derives its size, so a key cannot attach another workspace's files.
+`GET /api/operator/v1` lists `turns.attachments` among the capabilities of an app that accepts them; any other app answers 501 `operator.unsupported` to a turn that carries attachments.
+A retry with the same `turnId` carries the same attachments.
 
 ## Authority model
 
@@ -131,7 +184,7 @@ Work runs on the owner's plan and model budget, under the app's normal product p
 | --- | --- |
 | `operator:read` | Read workspaces, conversations, files, journal, assets, approvals, scorecards, and turn status. |
 | `operator:write` | Create workspaces; an app's older private routes may also use it for conversations and files. |
-| `operator:run` | Start and continue agent turns; requires `operator:read`. The agent can change workspace files and take actions the product allows. An app's older private routes may also use it to answer questions and tool-permission requests, or to interrupt a turn. |
+| `operator:run` | Start, continue, and cancel agent turns; requires `operator:read`. The agent can change workspace files and take actions the product allows. An app's older private routes may also use it to answer questions and tool-permission requests, or to interrupt a turn. |
 | `operator:workspace:<id>` | Restricts the key to the named workspaces. A restricted key cannot create workspaces, and apps refuse it on their older private routes. |
 
 `OPERATOR_ACCESS` carries the labels an app's API access page shows; `OPERATOR_SCOPE_DEPENDENCIES` carries the run-requires-read rule for the key issuer.
@@ -207,7 +260,7 @@ Keep older private routes until their consumers move.
 
 ## Not in v1
 
-Answering questions or approvals, interrupting a turn, and writing files stay on each app's own routes.
+Answering questions or approvals and writing files stay on each app's own routes.
 Apps still issue their own keys for their own users; a Tangle agent key is the one credential every app accepts.
 
 ### Durable chat admission

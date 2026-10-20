@@ -18,6 +18,7 @@ export function HubConnectCallbackPage({ returnHref }: HubConnectCallbackPagePro
     const context = params.get('context')
     if (!provider || !nonce || !context) { setReason('This connection callback is incomplete.'); setPhase('failed'); return }
     const failure = params.get('error_description') || params.get('error')
+      || (params.get('hub_connection') === 'error' ? params.get('hub_error') || 'Please restart the connection flow.' : null)
     try {
       const channel = new BroadcastChannel(HUB_CONNECT_CHANNEL)
       channel.postMessage({ type: failure ? HUB_CONNECT_FAILED_MESSAGE_TYPE : HUB_CONNECTED_MESSAGE_TYPE, provider, nonce, context })

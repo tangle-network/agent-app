@@ -40,6 +40,9 @@ const BROWSER_NONREACT = new Set([
   'crypto',
   'web',
   'harness',
+  // Policy predicates + catalog metadata shapes; a picker filters its offered
+  // catalog client-side with the same filter the server enforces at the seam.
+  'policy-filters',
   'plans',
   // The record leaf is the review-queue vocabulary + the pure fold; a client
   // renders proposed entries from it. Its drizzle sibling is a separate subpath.
@@ -234,7 +237,6 @@ describe('browser-safe subpath manifest', () => {
       'web-react/terminal',
       'design-canvas-react/engine',
       'design-canvas-react/lazy',
-      'intakes-react/lazy',
       'vault/lazy',
     ]) {
       expect(

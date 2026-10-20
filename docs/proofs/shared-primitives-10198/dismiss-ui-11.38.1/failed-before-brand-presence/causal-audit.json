@@ -1,0 +1,123 @@
+{
+  "source": "2a7e1423e50bd72109c1c60d1fc1dc7980b2c41e",
+  "cohort": {
+    "ui": "11.38.1",
+    "brand": "1.25.1",
+    "files": {
+      "@tangle-network/ui/styles/presentation.css": {
+        "sha256": "60dd92d57f8e6debc2d2261e62e1b93d82ea6027aafd87084d79680f8c3c2266"
+      },
+      "@tangle-network/brand/styles/legacy-light.css": {
+        "sha256": "33e13702150c34d3a1350846ce3dae2c6c7ef17e1632fbae5d3479a1b43f55f3"
+      },
+      "surfaceMotion": {
+        "sha256": "f744b19887da230400176cad7328f53389932396bbfdfc5dfa610805af75473b"
+      }
+    },
+    "ownerReleaseSource": "bfd032ec40d578b42bf738b92ffd56df9300968e",
+    "target": "Actual agent-app ActionDialog and CommandPalette consumer fixture; no published agent-app proof"
+  },
+  "gate": "beelink1-044adbe05a6a28cfe879c10a79dd8adf",
+  "result": "FAIL",
+  "failure": "Error: Normal-motion close/reopen replaced the retained surface",
+  "case": {
+    "theme": "agent-dark",
+    "width": 390,
+    "condition": "normal"
+  },
+  "rescuedPartialResultsFromOriginalTrace": {
+    "call@62": {
+      "lostEvents": false,
+      "connected": false,
+      "focusReturned": true,
+      "pointerEvents": "",
+      "events": [],
+      "roles": {
+        "--motion-dismiss": "90ms cubic-bezier(0.4, 0, 1, 1)",
+        "--motion-surface": "240ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "--interaction-feedback-budget": "100ms"
+      },
+      "latency": "UNCHECKED: no calibrated presented frames"
+    },
+    "call@80": {
+      "lostEvents": true,
+      "connected": false,
+      "focusReturned": true,
+      "pointerEvents": "",
+      "events": [],
+      "roles": {
+        "--motion-dismiss": "90ms cubic-bezier(0.4, 0, 1, 1)",
+        "--motion-surface": "240ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "--interaction-feedback-budget": "100ms"
+      },
+      "latency": "UNCHECKED: no calibrated presented frames"
+    }
+  },
+  "allAttempts": 15,
+  "unresolved": 8,
+  "lastInput": {
+    "attempt": 15,
+    "action": "disclosure:Dismiss command palette",
+    "inputStart": 33750.5,
+    "handlerStart": 33751,
+    "batch": null,
+    "roleReadings": {
+      "--interaction-feedback-budget": {
+        "css": "100ms",
+        "ms": 100
+      },
+      "--interaction-pending-delay": {
+        "css": "200ms",
+        "ms": 200
+      },
+      "--interaction-long-work-delay": {
+        "css": "1000ms",
+        "ms": 1000
+      },
+      "--interaction-mutation-budget": {
+        "css": "500ms",
+        "ms": 500
+      }
+    },
+    "feedbackBudgetMs": 100,
+    "status": "UNCHECKED",
+    "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population.",
+    "observationWindowMs": 1000
+  },
+  "classification": "Failed normal-motion sameNode assertion does not establish accepted-before-deadline reversal. CommandPalette persists; actual acceptance timestamp not recorded. Missing Brand presentation keyframes is a separately established stylesheet composition defect. No shared lifecycle defect established.",
+  "traceClockDiagnostic": {
+    "escapeCallStartMs": 63841.094,
+    "escapeCallEndMs": 63869.466,
+    "controlKCallStartMs": 63916.463,
+    "controlKCallEndMs": 64322.394,
+    "closedSnapshotMs": 63930.954,
+    "reopenedSnapshotMs": 64365.154,
+    "calibratedLatency": "UNKNOWN"
+  },
+  "media": [
+    {
+      "path": "dismiss/agent-dark-390-normal-lost-events-open.png",
+      "sha256": "601da5fdb03ecb4160b7e97173e92ec511367452c946649cbd6aed5948d9bf51"
+    },
+    {
+      "path": "dismiss/page@b4ce58fe135b7071fad9a479b028ef7b.webm",
+      "sha256": "c448c4d5310c054d498649843610db554ed9aa9d4e7f18ed9dbdb24882221700"
+    },
+    {
+      "path": "dismiss/agent-dark-390-normal-trace.zip",
+      "sha256": "594ee59de050fe2485045d44edd733d6c66f186752545b3fa12ec8f4fdb8f14a"
+    },
+    {
+      "path": "dismiss/agent-dark-390-normal-busy.png",
+      "sha256": "3591132eb45502f47b47904f1efb41ab692cbe5ef839c3ca7deec6e2943ca339"
+    },
+    {
+      "path": "dismiss/agent-dark-390-normal-normal-open.png",
+      "sha256": "601da5fdb03ecb4160b7e97173e92ec511367452c946649cbd6aed5948d9bf51"
+    },
+    {
+      "path": "dismiss/agent-dark-390-normal-failure.png",
+      "sha256": "601da5fdb03ecb4160b7e97173e92ec511367452c946649cbd6aed5948d9bf51"
+    }
+  ]
+}

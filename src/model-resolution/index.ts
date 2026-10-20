@@ -15,7 +15,18 @@
  * - validateChatModelId: fail-closed. Admit an id that is in the allowlist, or
  *   equals the operator-set env model, or is served by the live router catalog
  *   (exact, or a bare id resolved to its canonical id when the suffix is unique).
+ *   An optional `policy` (see ../policy-filters) layers product admission policy
+ *   over EVERY admission path — allowlist, env, and catalog alike — so a
+ *   policy-filtered deployment (e.g. HIPAA: zero-data-retention, BAA-eligible
+ *   models only) cannot be bypassed through an operator-trusted lane. With a
+ *   policy configured, a model carrying no policy metadata is refused.
  */
+
+import {
+  checkModelPolicy,
+  type ModelPolicy,
+  type ModelPolicyInfo,
+} from '../policy-filters/index'
 
 /** The router /v1/models entry shape this module reads. Minimal on purpose. */
 export interface ModelInfo {
@@ -95,6 +106,10 @@ export interface ValidateChatModelIdInput {
   loadModels?: LoadModels
   /** Catalog endpoint base; required to reach the catalog path. */
   routerBaseUrl?: string
+  /** Product admission policy, evaluated AFTER availability on EVERY admission
+   *  path (allowlist, env, catalog). Fail-closed: a validated model with no
+   *  policy metadata in `catalog` is refused. */
+  policy?: ModelPolicy
 }
 
 /**
@@ -108,15 +123,26 @@ export async function validateChatModelId(
   modelId: unknown,
   input: ValidateChatModelIdInput,
 ): Promise<ChatModelValidationResult> {
+  // Policy composes with availability: an id is admitted only when it is
+  // available AND (no policy configured OR the policy admits it). The policy
+  // runs on every lane, so the operator-trusted allowlist/env paths cannot
+  // bypass a deployment's admission policy.
+  const admit = async (value: string): Promise<ChatModelValidationResult> => {
+    if (!input.policy) return { succeeded: true, value }
+    const decision = await checkModelPolicy(value, input.policy.catalog, input.policy.filter, input.policy.context)
+    if (!decision.allowed) return { succeeded: false, error: decision.reason }
+    return { succeeded: true, value }
+  }
+
   const cleaned = cleanModelId(modelId)
   if (!cleaned) return { succeeded: false, error: 'Model id must be a non-empty string.' }
   if (!isWellFormedModelId(cleaned)) return { succeeded: false, error: `Model id is malformed: ${cleaned}` }
 
   const allowed = new Set(input.allowlist ?? [])
-  if (allowed.has(cleaned)) return { succeeded: true, value: cleaned }
+  if (allowed.has(cleaned)) return admit(cleaned)
 
   // The operator-set env model is trusted without a catalog round-trip.
-  if (cleanModelId(input.envModel) === cleaned) return { succeeded: true, value: cleaned }
+  if (cleanModelId(input.envModel) === cleaned) return admit(cleaned)
 
   if (!input.loadModels || typeof input.routerBaseUrl !== 'string' || input.routerBaseUrl.length === 0) {
     return { succeeded: false, error: `Model is not available: ${cleaned}` }
@@ -131,7 +157,7 @@ export async function validateChatModelId(
   }
 
   const ids = new Set(catalog.flatMap(catalogIdsForModel))
-  if (ids.has(cleaned)) return { succeeded: true, value: cleaned }
+  if (ids.has(cleaned)) return admit(cleaned)
 
   if (!cleaned.includes('/')) {
     const canonicalBySuffix = new Map<string, string[]>()
@@ -145,7 +171,7 @@ export async function validateChatModelId(
       else canonicalBySuffix.set(suffix, [canonical])
     }
     const matches = canonicalBySuffix.get(cleaned)
-    if (matches && matches.length === 1) return { succeeded: true, value: matches[0]! }
+    if (matches && matches.length === 1) return admit(matches[0]!)
   }
 
   return { succeeded: false, error: `Model is not available: ${cleaned}` }
@@ -174,6 +200,65 @@ export function catalogIdsForModel(model: ModelInfo): string[] {
   }
   return [...ids]
 }
+
+/**
+ * A router `/v1/models` row carrying the compliance flags
+ * {@link modelPolicyCatalogFromRouter} reads. The router spells them
+ * snake_case; the policy catalog spells them camelCase (`ModelPolicyInfo`).
+ */
+export interface RouterModelPolicyRow extends ModelInfo {
+  /** The provider retains no prompt/response data for this model. */
+  zdr?: boolean
+  /** The vendor will sign a BAA covering this model. */
+  hipaa_eligible?: boolean
+}
+
+/**
+ * Map router `/v1/models` rows to a {@link ModelPolicyInfo} catalog: snake_case
+ * `zdr` / `hipaa_eligible` become `zeroDataRetention` / `hipaaEligible`, and
+ * `provider` comes from the row's `_provider`/`provider`.
+ *
+ * GRANULARITY: the flags are trusted VERBATIM, per row, at whatever
+ * granularity the router publishes them. A ZDR/BAA attestation is commonly a
+ * provider-wide vendor fact, but this mapper never infers one model's
+ * eligibility from a sibling's — a row that omits a flag yields `undefined`
+ * for it, and a filter reading `=== true` refuses that row (fail closed). If
+ * your attestation is provider-wide, publish it on every row upstream rather
+ * than asking the mapper to guess.
+ *
+ * ID KEYING: one entry is emitted per spelling {@link catalogIdsForModel}
+ * yields (the bare id AND its provider-prefixed canonical form), so a turn
+ * carrying either spelling classifies — lookups in `/policy-filters` are
+ * exact-string and never normalize. Rows with a blank/non-string id are
+ * skipped. Duplicate ids across rows are a product bug (see
+ * `indexPolicyCatalog`).
+ */
+export function modelPolicyCatalogFromRouter(rows: Iterable<RouterModelPolicyRow>): ModelPolicyInfo[] {
+  const catalog: ModelPolicyInfo[] = []
+  for (const row of rows) {
+    if (typeof row.id !== 'string' || !row.id.trim()) continue
+    const provider = row._provider ?? row.provider
+    const flags = {
+      ...(typeof row.zdr === 'boolean' ? { zeroDataRetention: row.zdr } : {}),
+      ...(typeof row.hipaa_eligible === 'boolean' ? { hipaaEligible: row.hipaa_eligible } : {}),
+    }
+    for (const id of catalogIdsForModel(row)) {
+      catalog.push({ id, ...(provider ? { provider } : {}), ...flags })
+    }
+  }
+  return catalog
+}
+
+// Live model routing by allow-list: the positive form of model_not_allowed.
+// Parse the set the router's refusal already names, reroute within the
+// product's fallback order, or refuse loudly naming the set.
+export {
+  parseModelNotAllowed,
+  resolveModelWithinAllowList,
+  formatModelNotAllowedRefusal,
+  type ResolveModelWithinAllowListInput,
+  type ModelWithinAllowListResolution,
+} from './allow-list'
 
 // Reactive failover for the case validation cannot catch: a model that IS in the
 // catalog but whose upstream is down. Catalog membership is not liveness.

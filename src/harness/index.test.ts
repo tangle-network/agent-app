@@ -34,17 +34,11 @@ describe('harness taxonomy + coercion', () => {
     expect(KNOWN_HARNESSES).toContain(DEFAULT_HARNESS)
   })
 
-  it('derives from the canonical harness enum, dropping only what has no backend', () => {
+  it('derives known identities from the canonical enum, not deployment availability', () => {
     const canonical = new Set<string>(harnessTypeSchema.options)
     const known = new Set<string>(KNOWN_HARNESSES)
-
-    // `gemini` is the one deliberate drop: the platform ships no gemini backend, and
-    // KNOWN_HARNESSES is dispatched as `backend.type`.
     expect([...canonical].filter((h) => !known.has(h))).toEqual(['gemini'])
     expect(isHarness('gemini')).toBe(false)
-
-    // Every canonical harness that is not dropped must be offered, so a harness added
-    // upstream reaches this shell without an edit here.
     for (const harness of harnessTypeSchema.options) {
       if (harness === 'gemini') continue
       expect(isHarness(harness), `${harness} should be a known harness`).toBe(true)
@@ -63,15 +57,13 @@ describe('resolveSessionHarness — the session lock', () => {
   it('fresh session: picks requested → workspaceDefault → fallback', () => {
     expect(resolveSessionHarness({ requested: 'codex' })).toEqual({ harness: 'codex', locked: false, swapAttempted: false })
     expect(resolveSessionHarness({ workspaceDefault: 'claude-code' })).toEqual({ harness: 'claude-code', locked: false, swapAttempted: false })
-    expect(resolveSessionHarness({ requested: 'bogus', workspaceDefault: 'amp' })).toEqual({ harness: 'amp', locked: false, swapAttempted: false })
+    expect(() => resolveSessionHarness({ requested: 'bogus', workspaceDefault: 'amp' })).toThrow('harness_unknown')
     expect(resolveSessionHarness({})).toEqual({ harness: 'opencode', locked: false, swapAttempted: false })
     expect(resolveSessionHarness({ fallback: 'codex' })).toEqual({ harness: 'codex', locked: false, swapAttempted: false })
   })
 
   it('locked session: the locked harness wins, model-change is irrelevant', () => {
-    // No swap requested → just returns the lock.
     expect(resolveSessionHarness({ sessionHarness: 'codex' })).toEqual({ harness: 'codex', locked: true, swapAttempted: false })
-    // Same harness re-requested → not a swap.
     expect(resolveSessionHarness({ sessionHarness: 'codex', requested: 'codex' })).toEqual({ harness: 'codex', locked: true, swapAttempted: false })
   })
 
@@ -106,7 +98,6 @@ describe('harness ↔ model compatibility (server-enforced)', () => {
   it('snapModelToHarness picks the best compatible catalog model, opus before sonnet', () => {
     expect(snapModelToHarness('claude-code', 'openai/gpt-5', CATALOG)).toBe('anthropic/claude-opus-4-6')
     expect(snapModelToHarness('codex', 'anthropic/claude-sonnet-4-6', CATALOG)).toBe('openai/gpt-5')
-    // already compatible → unchanged
     expect(snapModelToHarness('claude-code', 'anthropic/claude-sonnet-4-6', CATALOG)).toBe('anthropic/claude-sonnet-4-6')
   })
 
@@ -120,9 +111,7 @@ describe('harness ↔ model compatibility (server-enforced)', () => {
     for (const harness of ['forge', 'cursor'] as const) {
       expect(isModelCompatibleWithHarness(harness, 'openai/gpt-5')).toBe(true)
       expect(isModelCompatibleWithHarness(harness, 'anthropic/claude-sonnet-4-6')).toBe(true)
-      expect(snapModelToHarness(harness, 'anthropic/claude-sonnet-4-6', CATALOG)).toBe(
-        'anthropic/claude-sonnet-4-6',
-      )
+      expect(snapModelToHarness(harness, 'anthropic/claude-sonnet-4-6', CATALOG)).toBe('anthropic/claude-sonnet-4-6')
       expect(snapHarnessToModel(harness, 'openai/gpt-5')).toBe(harness)
       expect(() => assertHarnessModelCompatible(harness, 'openai/gpt-5')).not.toThrow()
     }
@@ -168,10 +157,24 @@ describe('configured harness', () => {
 
   it('refuses a configuration that names an unknown harness or is malformed', () => {
     expect(() => configuredHarness({ default: 'pie' })).toThrow('unknown harness: pie')
-    // One bad entry fails every workspace, not only its own.
-    expect(() => configuredHarness({ workspaces: JSON.stringify({ 'ws-a': 'pi', 'ws-b': 'pie' }) }, 'ws-a'))
-      .toThrow('workspace ws-b')
+    expect(() => configuredHarness({ workspaces: JSON.stringify({ 'ws-a': 'pi', 'ws-b': 'pie' }) }, 'ws-a')).toThrow('workspace ws-b')
     expect(() => configuredHarness({ workspaces: '{' })).toThrow('not JSON')
     expect(() => configuredHarness({ workspaces: '["pi"]' })).toThrow('must map workspace ids')
+  })
+})
+
+describe('harnessCapabilities', () => {
+  it('covers every known harness exhaustively', async () => {
+    const { KNOWN_HARNESSES, harnessCapabilities } = await import('./index')
+    for (const harness of KNOWN_HARNESSES) {
+      expect(() => harnessCapabilities(harness)).not.toThrow()
+    }
+  })
+
+  it('names the platform-verified facts', async () => {
+    const { harnessCapabilities } = await import('./index')
+    expect(harnessCapabilities('pi')).toEqual({ subagents: false, mcp: 'extension', toolControls: 'startup', skillsDir: '.pi/skills' })
+    expect(harnessCapabilities('opencode').skillsDir).toBe('.opencode/skills')
+    expect(harnessCapabilities('hermes').skillsDir).toBeNull()
   })
 })

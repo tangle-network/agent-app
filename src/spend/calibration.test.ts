@@ -3,7 +3,7 @@
  *
  * A gate that cannot be shown to catch its own motivating failure is
  * indistinguishable from one that does nothing. This runs the 2026-08-05
- * parked-time settlements (agent-dev-container#4422) through the reconciler and
+ * parked-time settlements (agent-container#4422) through the reconciler and
  * pins exactly which rules fire, on how many rows, with what numbers.
  *
  * It pins BOTH adoption states, because they are genuinely different products:

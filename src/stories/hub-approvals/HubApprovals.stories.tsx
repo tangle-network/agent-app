@@ -7,8 +7,8 @@ import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 
 import type { HubApprovalItem } from '../../hub-approvals'
-import { HubApprovalDock, HubApprovalReceipts, HubApprovalRow, HubApprovalsList, type HubApprovalDecision } from '../../hub-approvals-react'
-import { ChatComposer } from '../../web-react'
+import { HubActionPreviewView, HubApprovalDock, HubApprovalReceipts, HubApprovalRow, HubApprovalsList, type HubApprovalDecision } from '../../hub-approvals-react'
+import { ChatComposer, ReviewInbox, type ReviewInboxItem } from '../../web-react'
 
 const later = new Date(Date.now() + 22 * 60 * 60 * 1000).toISOString()
 const earlier = new Date(Date.now() - 4 * 60 * 1000).toISOString()
@@ -183,3 +183,72 @@ export const Receipts: Story = {
     </div>
   ),
 }
+
+/** Teaching is independent of approving this exact action live. */
+export const DryRunEmailFeedback: Story = {
+  render: function PreviewFeedbackStory() {
+    const [item, setItem] = useState<HubApprovalItem>({ ...EMAIL, executionMode: 'dry-run', input: {
+      from: 'Taylor <taylor@example.invalid>', fromName: 'Taylor', to: ['Alex <alex@example.invalid>'],
+      subject: 'A sandbox for your next prototype', previewText: 'A working environment without a setup afternoon.',
+      body: '<p>Hi Alex,</p><p>Your prototype should start with code. Here is the <a href="https://example.invalid/sandbox">walkthrough</a>.</p><p>Taylor<br>Example team</p>', html: true,
+    } })
+    return <div className="mx-auto max-w-3xl p-4"><HubApprovalRow item={item} expanded onFeedback={async (_, feedback) => {
+      setItem((current) => ({ ...current, feedback: { ...feedback, savedAt: new Date().toISOString() } }))
+    }} /></div>
+  },
+}
+
+/** Local raster fixtures keep feed layout review independent of provider requests. */
+function mediaFixtures() {
+  return ['#243e82', '#7a421d', '#314d3f'].map((color, index) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 360; canvas.height = 640
+    const drawing = canvas.getContext('2d')!
+    drawing.fillStyle = color; drawing.fillRect(0, 0, 360, 640)
+    drawing.fillStyle = '#ffffff'; drawing.font = 'bold 32px sans-serif'; drawing.fillText('Sandbox', 28, 220)
+    drawing.font = '20px sans-serif'; drawing.fillText(`Local slide ${index + 1}`, 28, 258)
+    return { kind: 'image' as const, src: canvas.toDataURL('image/png'), alt: `Sandbox local slide ${index + 1}`, width: 360, height: 640 }
+  })
+}
+
+function MediaFeedbackStory({ channel, placement, sponsored = false }: {
+  channel: 'x' | 'instagram' | 'facebook' | 'linkedin'; placement: 'feed' | 'vertical' | 'carousel'; sponsored?: boolean
+}) {
+  const [item, setItem] = useState<HubApprovalItem>(() => ({
+    id: 'story-media', actionPath: 'work-product', providerId: channel, phase: 'waiting', executionMode: 'dry-run',
+    input: { text: 'Build the prototype before the setup afternoon.' },
+    preview: { kind: 'post', channel, placement, sponsored, displayName: 'Example studio', handle: '@example-studio',
+      text: 'Build the prototype before the setup afternoon.', media: mediaFixtures(), ...(sponsored ? { callToAction: 'Learn more' } : {}) },
+  }))
+  return <div className="mx-auto max-w-xl p-4"><HubApprovalRow item={item} expanded onFeedback={async (_, feedback) => {
+    setItem(current => ({ ...current, feedback: { ...feedback, savedAt: new Date().toISOString() } }))
+  }} /></div>
+}
+export const XMediaGridFeedback: Story = { render: () => <MediaFeedbackStory channel="x" placement="feed" /> }
+export const InstagramCarouselFeedback: Story = { render: () => <MediaFeedbackStory channel="instagram" placement="carousel" /> }
+export const VerticalSafeZonesFeedback: Story = { render: () => <MediaFeedbackStory channel="instagram" placement="vertical" /> }
+export const MetaFeedAdFeedback: Story = { render: () => <MediaFeedbackStory channel="facebook" placement="feed" sponsored /> }
+export const LinkedInSponsoredFeedback: Story = { render: () => <MediaFeedbackStory channel="linkedin" placement="feed" sponsored /> }
+
+function InboxStory({ state = 'mixed' }: { state?: 'mixed' | 'readonly' | 'error' | 'empty' }) {
+  const [items, setItems] = useState<ReviewInboxItem[]>(() => state === 'empty' ? [] : [
+    { id: 'brief', revision: 1, title: 'Sandbox launch brief', kind: 'work product', createdAt: 1000,
+      canReview: state !== 'readonly', input: { content: 'Explain the setup problem with a concrete example.' } },
+    { id: 'email', revision: 1, title: 'Email for Alex', kind: 'dry-run email', createdAt: 2000,
+      canReview: state !== 'readonly', approveLabel: 'Approve preview',
+      input: { from: 'Taylor <taylor@example.invalid>', to: ['alex@example.invalid'], subject: 'A smaller setup', body: 'Hi Alex, would a smaller sandbox setup help?', html: false },
+      preview: { kind: 'email', from: 'Taylor <taylor@example.invalid>', to: ['alex@example.invalid'], cc: [], bcc: [],
+        subject: 'A smaller setup', body: 'Hi Alex, would a smaller sandbox setup help?', html: false, reply: false } },
+    { id: 'asset', revision: 1, title: 'Campaign carousel', kind: 'asset', createdAt: 3000,
+      canReview: state !== 'readonly', input: { caption: 'Start with the prototype.' },
+      preview: { kind: 'post', channel: 'instagram', placement: 'carousel', text: 'Start with the prototype.', media: mediaFixtures() } },
+  ])
+  return <div className="min-h-screen bg-background p-4"><ReviewInbox items={items} error={state === 'error' ? 'The review service is unavailable. Your drafts are kept.' : undefined}
+    onVerdict={async item => { if (state === 'error') throw new Error('Review could not save. Your edits are kept.'); setItems(current => current.filter(row => row.id !== item.id)) }}
+    onFeedback={async (item, feedback) => { if (state === 'error') throw new Error('Feedback could not save. Your edits are kept.'); setItems(current => current.map(row => row.id === item.id ? { ...row, feedback } : row)) }}
+    renderItem={item => item.preview ? <HubActionPreviewView preview={item.preview} /> : <article className="rounded-lg border border-border bg-card p-5"><p>{(item.input as { content: string }).content}</p></article>} /></div>
+}
+export const MixedReviewInbox: Story = { render: () => <InboxStory /> }
+export const ReadOnlyReviewInbox: Story = { render: () => <InboxStory state="readonly" /> }
+export const ReviewInboxSaveError: Story = { render: () => <InboxStory state="error" /> }
+export const ReviewInboxCaughtUp: Story = { render: () => <InboxStory state="empty" /> }

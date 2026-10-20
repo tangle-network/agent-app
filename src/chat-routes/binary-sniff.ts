@@ -335,14 +335,35 @@ function asciiEntryName(bytes: Uint8Array, offset: number, length: number): stri
   return name
 }
 
+/** The bytes a zip reader may consult: the whole file, or — for a file
+ *  classified while it streams — its first and last bytes. `read` answers a
+ *  range only when every byte of it is held, so a reader that needs a part
+ *  the window dropped gets `null` and leaves the archive unclassified. */
+interface ByteWindow {
+  /** Total byte length of the file. */
+  readonly size: number
+  read(offset: number, length: number): Uint8Array | null
+}
+
+function wholeFileWindow(bytes: Uint8Array): ByteWindow {
+  return {
+    size: bytes.length,
+    read: (offset, length) => (offset >= 0 && length >= 0 && offset + length <= bytes.length
+      ? bytes.subarray(offset, offset + length)
+      : null),
+  }
+}
+
 /** Scan back from the tail for the end-of-central-directory record. The
  *  comment length must account for exactly the bytes that follow, or the
  *  "signature" is compressed data that happens to spell `PK\x05\x06`. */
-function findZipEndOfCentralDirectory(bytes: Uint8Array): number | null {
-  const lowest = Math.max(0, bytes.length - ZIP_END_OF_CENTRAL_DIRECTORY_BYTES - ZIP_MAX_COMMENT_BYTES)
-  for (let offset = bytes.length - ZIP_END_OF_CENTRAL_DIRECTORY_BYTES; offset >= lowest; offset--) {
-    if (readU32Le(bytes, offset) !== ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE) continue
-    if (offset + ZIP_END_OF_CENTRAL_DIRECTORY_BYTES + readU16Le(bytes, offset + 20) === bytes.length) return offset
+function findZipEndOfCentralDirectory(source: ByteWindow): number | null {
+  const lowest = Math.max(0, source.size - ZIP_END_OF_CENTRAL_DIRECTORY_BYTES - ZIP_MAX_COMMENT_BYTES)
+  const region = source.read(lowest, source.size - lowest)
+  if (!region) return null
+  for (let offset = source.size - ZIP_END_OF_CENTRAL_DIRECTORY_BYTES; offset >= lowest; offset--) {
+    if (readU32Le(region, offset - lowest) !== ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE) continue
+    if (offset + ZIP_END_OF_CENTRAL_DIRECTORY_BYTES + readU16Le(region, offset - lowest + 20) === source.size) return offset
   }
   return null
 }
@@ -351,31 +372,37 @@ function findZipEndOfCentralDirectory(bytes: Uint8Array): number | null {
  *  reader uses. Returns `null` for anything that is not a complete, in-bounds,
  *  non-ZIP64 directory: a truncated or crafted archive is left unclassified
  *  rather than guessed at from its first local header. */
-function readZipCentralDirectory(bytes: Uint8Array): ZipEntry[] | null {
-  const end = findZipEndOfCentralDirectory(bytes)
+function readZipCentralDirectory(source: ByteWindow): ZipEntry[] | null {
+  const end = findZipEndOfCentralDirectory(source)
   if (end === null) return null
+  const record = source.read(end, ZIP_END_OF_CENTRAL_DIRECTORY_BYTES)
+  if (!record) return null
 
-  const entryCount = readU16Le(bytes, end + 10)
-  const directoryBytes = readU32Le(bytes, end + 12)
-  const directoryOffset = readU32Le(bytes, end + 16)
+  const entryCount = readU16Le(record, 10)
+  const directoryBytes = readU32Le(record, 12)
+  const directoryOffset = readU32Le(record, 16)
   if (entryCount === ZIP64_SENTINEL_U16) return null
   if (directoryBytes === ZIP64_SENTINEL_U32 || directoryOffset === ZIP64_SENTINEL_U32) return null
-  if (directoryOffset + directoryBytes > bytes.length) return null
+  if (directoryOffset + directoryBytes > source.size) return null
+  // Offsets below are relative to the directory's start; the bounds checks
+  // are the same as against the whole file, which ends where `directory` ends.
+  const directory = source.read(directoryOffset, source.size - directoryOffset)
+  if (!directory) return null
 
   const entries: ZipEntry[] = []
-  let cursor = directoryOffset
+  let cursor = 0
   for (let i = 0; i < entryCount; i++) {
-    if (cursor + ZIP_CENTRAL_FILE_HEADER_BYTES > bytes.length) return null
-    if (readU32Le(bytes, cursor) !== ZIP_CENTRAL_FILE_HEADER_SIGNATURE) return null
-    const nameLength = readU16Le(bytes, cursor + 28)
-    const extraLength = readU16Le(bytes, cursor + 30)
-    const commentLength = readU16Le(bytes, cursor + 32)
-    if (cursor + ZIP_CENTRAL_FILE_HEADER_BYTES + nameLength > bytes.length) return null
+    if (cursor + ZIP_CENTRAL_FILE_HEADER_BYTES > directory.length) return null
+    if (readU32Le(directory, cursor) !== ZIP_CENTRAL_FILE_HEADER_SIGNATURE) return null
+    const nameLength = readU16Le(directory, cursor + 28)
+    const extraLength = readU16Le(directory, cursor + 30)
+    const commentLength = readU16Le(directory, cursor + 32)
+    if (cursor + ZIP_CENTRAL_FILE_HEADER_BYTES + nameLength > directory.length) return null
     entries.push({
-      name: asciiEntryName(bytes, cursor + ZIP_CENTRAL_FILE_HEADER_BYTES, nameLength),
-      compressionMethod: readU16Le(bytes, cursor + 10),
-      compressedBytes: readU32Le(bytes, cursor + 20),
-      localHeaderOffset: readU32Le(bytes, cursor + 42),
+      name: asciiEntryName(directory, cursor + ZIP_CENTRAL_FILE_HEADER_BYTES, nameLength),
+      compressionMethod: readU16Le(directory, cursor + 10),
+      compressedBytes: readU32Le(directory, cursor + 20),
+      localHeaderOffset: readU32Le(directory, cursor + 42),
     })
     cursor += ZIP_CENTRAL_FILE_HEADER_BYTES + nameLength + extraLength + commentLength
   }
@@ -385,15 +412,18 @@ function readZipCentralDirectory(bytes: Uint8Array): ZipEntry[] | null {
 /** Text of an entry stored WITHOUT compression, or `null` for anything else.
  *  The data offset is computed from the local header (its extra field may be
  *  a different length than the central directory's copy). */
-function storedZipEntryText(bytes: Uint8Array, entry: ZipEntry): string | null {
+function storedZipEntryText(source: ByteWindow, entry: ZipEntry): string | null {
   if (entry.compressionMethod !== ZIP_METHOD_STORED) return null
   const header = entry.localHeaderOffset
-  if (header + ZIP_LOCAL_FILE_HEADER_BYTES > bytes.length) return null
-  if (readU32Le(bytes, header) !== ZIP_LOCAL_FILE_HEADER_SIGNATURE) return null
-  const start = header + ZIP_LOCAL_FILE_HEADER_BYTES + readU16Le(bytes, header + 26) + readU16Le(bytes, header + 28)
+  const local = source.read(header, ZIP_LOCAL_FILE_HEADER_BYTES)
+  if (!local) return null
+  if (readU32Le(local, 0) !== ZIP_LOCAL_FILE_HEADER_SIGNATURE) return null
+  const start = header + ZIP_LOCAL_FILE_HEADER_BYTES + readU16Le(local, 26) + readU16Le(local, 28)
   const length = Math.min(entry.compressedBytes, OPC_CONTENT_TYPES_SCAN_BYTES)
-  if (length === 0 || start + length > bytes.length) return null
-  return new TextDecoder('utf-8').decode(bytes.subarray(start, start + length))
+  if (length === 0) return null
+  const text = source.read(start, length)
+  if (!text) return null
+  return new TextDecoder('utf-8').decode(text)
 }
 
 /**
@@ -428,8 +458,8 @@ function storedZipEntryText(bytes: Uint8Array, entry: ZipEntry): string | null {
  * to be a real, parseable document gets that from `/documents`' extractor,
  * which fails loud on a package it cannot read.
  */
-function sniffOoxml(bytes: Uint8Array): string | null {
-  const entries = readZipCentralDirectory(bytes)
+function sniffOoxml(source: ByteWindow): string | null {
+  const entries = readZipCentralDirectory(source)
   if (!entries) return null
 
   const contentTypes = entries.find((entry) => entry.name === OPC_CONTENT_TYPES_PART)
@@ -442,7 +472,7 @@ function sniffOoxml(bytes: Uint8Array): string | null {
   // RETURNS, so this has to be known before it runs.
   const macroEnabled = names.some((name) => name.endsWith(OOXML_VBA_PROJECT_PART_SUFFIX))
 
-  const declared = storedZipEntryText(bytes, contentTypes)
+  const declared = storedZipEntryText(source, contentTypes)
   if (declared !== null) {
     if (!declared.includes(OPC_CONTENT_TYPES_NAMESPACE)) return null
     // Every match, not the first: `includes` over the whole part means a decoy
@@ -459,7 +489,10 @@ function sniffOoxml(bytes: Uint8Array): string | null {
   return macroEnabled ? format.macroEnabledMime : format.mime
 }
 
-function sniffMagicBytes(bytes: Uint8Array): string | null {
+/** `bytes` is the start of the file; `zip` is what the archive reader may
+ *  consult, which is the same bytes unless the file was classified while it
+ *  streamed. Every other family is decided by its first few KB. */
+function sniffMagicBytes(bytes: Uint8Array, zip: ByteWindow = wholeFileWindow(bytes)): string | null {
   if (bytesStartWith(bytes, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png'
   if (bytesStartWith(bytes, 0, [0xff, 0xd8, 0xff])) return 'image/jpeg'
   if (asciiAt(bytes, 0, 'GIF87a') || asciiAt(bytes, 0, 'GIF89a')) return 'image/gif'
@@ -472,7 +505,7 @@ function sniffMagicBytes(bytes: Uint8Array): string | null {
   // inspected before an archive is reported as a generic one — see
   // `sniffOoxml`. An archive that is not an Office package stays
   // `application/zip`, which no default allow-list admits.
-  if (bytesStartWith(bytes, 0, [0x50, 0x4b, 0x03, 0x04])) return sniffOoxml(bytes) ?? 'application/zip'
+  if (bytesStartWith(bytes, 0, [0x50, 0x4b, 0x03, 0x04])) return sniffOoxml(zip) ?? 'application/zip'
   if (bytesStartWith(bytes, 0, [0x1f, 0x8b])) return 'application/gzip'
   if (sniffId3(bytes) || bytesStartWith(bytes, 0, [0xff, 0xfb])) return 'audio/mpeg'
   if (asciiAt(bytes, 0, 'OggS')) return 'audio/ogg'
@@ -525,4 +558,116 @@ export function sniffBinary(bytes: Uint8Array): SniffResult {
   }
   if (sniffSvgText(decoded)) return { binary: true, mime: 'image/svg+xml' }
   return { binary: false, mime: null }
+}
+
+/** Leading bytes a streamed classification keeps. Every magic-byte family
+ *  except PKZIP is decided within them (the EBML header scan reads 4 KiB),
+ *  and a file no longer than this is classified exactly as
+ *  {@link sniffBinary} classifies it. */
+export const STREAM_SNIFF_HEAD_BYTES = 64 * 1024
+
+/** Trailing bytes a streamed classification keeps for the zip reader. The
+ *  end-of-central-directory record sits within 64 KiB + 22 bytes of the end,
+ *  and an Office package's central directory is a few KB. An archive whose
+ *  directory starts earlier than this window is reported as a plain zip. */
+export const STREAM_SNIFF_TAIL_BYTES = 1024 * 1024
+
+/** Classifies a file from its bytes as they stream past, holding at most
+ *  {@link STREAM_SNIFF_HEAD_BYTES} + {@link STREAM_SNIFF_TAIL_BYTES} of it. */
+export interface StreamingSniffer {
+  /** Feed the next bytes in order. The sniffer keeps references to recent
+   *  chunks, so a caller must not reuse a chunk's buffer afterwards. */
+  push(chunk: Uint8Array): void
+  /** Bytes pushed so far. */
+  readonly size: number
+  /** The start of the file, up to {@link STREAM_SNIFF_HEAD_BYTES}. */
+  head(): Uint8Array
+  /** Classify everything pushed. The answer is {@link sniffBinary}'s over the
+   *  whole file, except that a zip whose central directory lies outside the
+   *  tail window reads as `application/zip`, and the SVG check sees only the
+   *  head. Text validity (NUL bytes, UTF-8) is checked over every byte. */
+  finish(): SniffResult
+}
+
+function concatChunks(chunks: readonly Uint8Array[], length: number): Uint8Array {
+  if (chunks.length === 1) return chunks[0]!
+  const joined = new Uint8Array(length)
+  let offset = 0
+  for (const chunk of chunks) {
+    joined.set(chunk, offset)
+    offset += chunk.length
+  }
+  return joined
+}
+
+/** Start a {@link StreamingSniffer} for one file. */
+export function createStreamingSniffer(): StreamingSniffer {
+  const head = new Uint8Array(STREAM_SNIFF_HEAD_BYTES)
+  let headLength = 0
+  const tailChunks: Uint8Array[] = []
+  let tailLength = 0
+  let size = 0
+  let sawNul = false
+  let validUtf8 = true
+  const decoder = new TextDecoder('utf-8', { fatal: true })
+  let finished = false
+
+  return {
+    get size() {
+      return size
+    },
+    head: () => head.subarray(0, headLength),
+    push(chunk) {
+      if (finished) throw new Error('streaming sniffer already finished')
+      if (chunk.length === 0) return
+      size += chunk.length
+      if (headLength < head.length) {
+        const take = Math.min(head.length - headLength, chunk.length)
+        head.set(chunk.subarray(0, take), headLength)
+        headLength += take
+      }
+      tailChunks.push(chunk)
+      tailLength += chunk.length
+      while (tailChunks.length > 1 && tailLength - tailChunks[0]!.length >= STREAM_SNIFF_TAIL_BYTES) {
+        tailLength -= tailChunks.shift()!.length
+      }
+      if (!sawNul && chunk.includes(0x00)) sawNul = true
+      if (validUtf8 && !sawNul) {
+        try {
+          decoder.decode(chunk, { stream: true })
+        } catch {
+          validUtf8 = false
+        }
+      }
+    },
+    finish() {
+      finished = true
+      if (size <= head.length) return sniffBinary(head.subarray(0, size))
+      if (validUtf8 && !sawNul) {
+        try {
+          decoder.decode()
+        } catch {
+          validUtf8 = false
+        }
+      }
+      const start = head.subarray(0, headLength)
+      const joined = concatChunks(tailChunks, tailLength)
+      const tail = joined.subarray(Math.max(0, joined.length - STREAM_SNIFF_TAIL_BYTES))
+      const tailStart = size - tail.length
+      const window: ByteWindow = {
+        size,
+        read(offset, length) {
+          if (offset < 0 || length < 0 || offset + length > size) return null
+          if (offset + length <= start.length) return start.subarray(offset, offset + length)
+          if (offset >= tailStart) return tail.subarray(offset - tailStart, offset - tailStart + length)
+          return null
+        },
+      }
+      const mime = sniffMagicBytes(start, window)
+      if (mime) return { binary: true, mime }
+      if (sawNul || !validUtf8) return { binary: true, mime: null }
+      if (sniffSvgText(new TextDecoder('utf-8').decode(start))) return { binary: true, mime: 'image/svg+xml' }
+      return { binary: false, mime: null }
+    },
+  }
 }

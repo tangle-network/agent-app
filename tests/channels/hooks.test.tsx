@@ -39,6 +39,32 @@ describe('channel hooks through the injected Sandbox lines client', () => {
     expect(fake.state.line.transport).toBe('whatsapp')
   })
 
+  it.each(['voice', 'sms'] as const)('requires an owned %s number before calling the SDK', async transport => {
+    const fake = setup()
+    const create = vi.spyOn(fake.client.lines, 'fromConnection')
+    const { result } = renderHook(() => useConnectChannel(), { wrapper: fake.wrapper })
+    await act(async () => {
+      expect((await result.current.run({ kind: 'connection', input: { transport, connectionId: 'conn_demo', phoneNumberId: '  ' } })).succeeded).toBe(false)
+    })
+    expect(create).not.toHaveBeenCalled()
+    await act(async () => { await result.current.run({ kind: 'connection', input: { transport, connectionId: 'conn_demo', phoneNumberId: 'number_demo' } }) })
+    expect(create).toHaveBeenCalledWith({ transport, connectionId: 'conn_demo', phoneNumberId: 'number_demo' })
+  })
+
+  it.each(['start', 'resume', 'send', 'activate', 'reset'] as const)('refuses text verification action %s for a voice line', async action => {
+    const fake = setup()
+    fake.state.line = channelLine({ transport: 'voice', connect: null, routerAddress: null, address: '+15550100003' })
+    fake.state.test = channelTest('verified')
+    const verification = vi.spyOn(fake.client.setup, 'verification')
+    const mutation = vi.spyOn(fake.client.setup, action)
+    const { result } = renderHook(() => useChannel('ln_demo'), { wrapper: fake.wrapper })
+    await waitFor(() => expect(result.current.resource.status).toBe('ready'))
+    await act(async () => { expect((await result.current.run({ action, confirm: true })).succeeded).toBe(false) })
+    expect(verification).not.toHaveBeenCalled()
+    expect(mutation).not.toHaveBeenCalled()
+    expect(result.current.state).toMatchObject({ status: 'failed', message: expect.stringContaining('Voice calls require host-managed setup') })
+  })
+
   it('normalizes email through the host Hub seam, not a fictional SDK method', async () => {
     const fake = setup()
     const create = vi.spyOn(fake.client.setup, 'fromEmail')

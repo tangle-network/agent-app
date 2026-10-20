@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-256 exports.
+260 exports.
 
 ### `adaptSandboxStream`
 
@@ -75,7 +75,7 @@ interface AppToolDescriptor
 `function` — Spread a {@link ResolvedModel} onto a sandbox backend config as the nested `model` object — the one spelling every admitted SDK accepts.
 
 ```ts
-(model: ResolvedModel) => { model: { model: string; provider: string; apiKey?: string | undefined; baseUrl?: string | u…
+(model: ResolvedModel) => { model: { model: string; provider: string; apiKey?: string | undefined; apiKeyEnv?: string |…
 ```
 
 ### `buildAppToolMcpServers`
@@ -372,6 +372,14 @@ SandboxResourceConfig
 
 ```ts
 interface DriveSandboxTurnOptions
+```
+
+### `dropTrustedBox`
+
+`function` — Forget what this isolate trusts about a box after the first real call on it failed.
+
+```ts
+(box: SandboxInstance) => boolean
 ```
 
 ### `EGRESS_PROXY_RECOVERY_PHASE`
@@ -980,6 +988,14 @@ interface ResolveSandboxClientCredentialsOptions
 
 ```ts
 <T>(attempt: () => Promise<T>, options?: SandboxTransientRetryOptions) => Promise<T>
+```
+
+### `reuseWorkspaceSandbox`
+
+`function` — Reuse the workspace's running box if this isolate used it recently, or return undefined.
+
+```ts
+(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance | undefined>
 ```
 
 ### `runForegroundSandboxSingleFlight`
@@ -1636,6 +1652,22 @@ interface StreamSandboxPromptOptions
 
 ```ts
 interface TerminalConnectionBoxLike
+```
+
+### `traceSandboxPromptEvents`
+
+`function` — Pass a sandbox prompt stream through unchanged while recording it in the turn's trace (see {@link createPromptTrace}).
+
+```ts
+(events: AsyncIterable<unknown>, options: TraceSandboxPromptOptions) => AsyncGenerator<unknown, any, any>
+```
+
+### `TraceSandboxPromptOptions`
+
+`interface`
+
+```ts
+interface TraceSandboxPromptOptions
 ```
 
 ### `utcDay`

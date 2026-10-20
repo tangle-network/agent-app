@@ -4,7 +4,7 @@
 
 Source: `src/hub-approvals-react/index.tsx`
 
-17 exports.
+24 exports.
 
 ### `HubActionPreviewView`
 
@@ -43,7 +43,7 @@ type HubApprovalDecision
 `function` — The calls waiting on the owner, pinned above the composer so a held action never scrolls away.
 
 ```ts
-({ items, onDecide, permissions, onOpen, focusId, className }: HubApprovalDockProps) => Element | null
+({ items, onDecide, permissions, onOpen, focusId, onFeedback, className }: HubApprovalDockProps) => Element | null
 ```
 
 ### `HubApprovalDockProps`
@@ -91,7 +91,7 @@ interface HubApprovalReceiptsProps
 `function` — A held call where the agent made it: one line with the integration, what the call does and where it stands, opening to its preview, result and the exact call.
 
 ```ts
-({ item, expanded: controlled, onExpandedChange, onReview, actions }: HubApprovalRowProps) => Element
+({ item, expanded: controlled, onExpandedChange, onReview, actions, onFeedback }: HubApprovalRowProps) => Element
 ```
 
 ### `HubApprovalRowProps`
@@ -126,9 +126,25 @@ interface HubApprovalsListProps
 ({ wait, className }: { wait: HubApprovalWait; className?: string | undefined; }) => Element
 ```
 
+### `HubPreviewFeedback`
+
+`function` — Existing Hub adapter: teaching never calls the effect transport.
+
+```ts
+({ item, onFeedback, drafts }: HubPreviewFeedbackProps) => Element
+```
+
+### `HubPreviewFeedbackProps`
+
+`interface`
+
+```ts
+interface HubPreviewFeedbackProps
+```
+
 ### `HubProviderMark`
 
-`function` — The integration's own logo on a neutral tile, so dark marks stay legible.
+`function` — A local provider mark: reviewing a held payload must not fetch a remote logo.
 
 ```ts
 ({ providerId, name, size }: { providerId: string; name: string; size?: number | undefined; }) => Element
@@ -140,4 +156,44 @@ interface HubApprovalsListProps
 
 ```ts
 (item: Pick<HubApprovalItem, "phase" | "wait">, blocked?: string) => string | undefined
+```
+
+### `ReviewFeedbackDraft`
+
+`interface`
+
+```ts
+interface ReviewFeedbackDraft
+```
+
+### `ReviewFeedbackForm`
+
+`function` — One form for Hub previews, assets and work products.
+
+```ts
+ForwardRefExoticComponent<ReviewFeedbackFormProps & RefAttributes<ReviewFeedbackFormHandle>>
+```
+
+### `ReviewFeedbackFormHandle`
+
+`interface`
+
+```ts
+interface ReviewFeedbackFormHandle
+```
+
+### `ReviewFeedbackFormProps`
+
+`interface`
+
+```ts
+interface ReviewFeedbackFormProps
+```
+
+### `ReviewVerdict`
+
+`type`
+
+```ts
+type ReviewVerdict
 ```

@@ -1,5 +1,202 @@
 # Changelog
 
+## 0.60.214
+
+- perf(sandbox): a reuse reads its box by id and trusts a recent probe, egress read and env push; the lease and spend gate wait for a lifecycle step (#1175)
+- perf(chat-routes): afterAuthorize starts a turn's box and keys when the caller is admitted (#1174)
+
+## 0.60.213
+
+- feat(chat-routes): lifecycle.afterSettle runs a turn's follow-up work once its row is saved and its lock is free (#1173)
+
+## 0.60.212
+
+- fix(copy-quality): catch measured reveals and permission closers (#1172)
+
+## 0.60.211
+
+- perf(turn-stream): keep thread locks on the workspace channel (#1170)
+
+## 0.60.210
+
+- fix(tools): validate JSON text render UI nodes before dispatch (#1169)
+
+## 0.60.209
+
+- chore: delete the intakes React surface and HTTP handlers no app imports, and the scaffold's mock sandbox-fence test (#1167)
+
+## 0.60.208
+
+- Release Router reasoning as it arrives on turns that render it (#1166)
+
+## 0.60.207
+
+- feat(turn-trace): the Router's own steps and retry waits as spans of each model call (#1164)
+
+## 0.60.206
+
+- perf(chat-routes): one fewer serial admission read per follow-up turn, admission steps in Server-Timing (#1165)
+
+## 0.60.205
+
+- docs(worker-defaults): pin the Worker beside its D1 primary, and the placement hazard measured on Legal (#1163)
+
+## 0.60.204
+
+- feat(turn-trace): authorize and beforeTurn receive their admission span (#1162)
+
+## 0.60.203
+
+- feat(turn-trace): the member's first visible text from the request, and the trace in authorize (#1161)
+- wip (#1160)
+
+## 0.60.202
+
+- fix(turn-trace): keep a trace id in the Router charset as it is and guard the Worker entry across directories (#1159)
+
+## 0.60.201
+
+- fix(turn-trace): send a turn's trace with one OTLP POST and no agent-runtime import (#1158)
+- wip (#1157)
+
+## 0.60.200
+
+- feat(turn-trace): traceSandboxPromptEvents for products that call box.streamPrompt themselves (#1156)
+
+## 0.60.199
+
+- feat(turn-trace): one trace per agent turn with named child spans on the Router and sandbox lanes (#1155)
+
+## 0.60.198
+
+- fix(workspace-apps): revalidate every artifact share access (#1154)
+
+## 0.60.197
+
+- feat(workspace-apps): cloud artifacts that open while the box sleeps (#1153)
+
+## 0.60.196
+
+- feat(operator): turns.cancel stops a running turn (#1152)
+
+## 0.60.195
+
+- feat(chat-routes): stream large raw attachment uploads to the store (#1151)
+
+## 0.60.194
+
+- feat(sandbox): carry a stored-secret key reference in the resolved model (#1149)
+
+## 0.60.193
+
+- feat(policy-filters): product admission policy over the models a deployment will run (#1110)
+
+## 0.60.192
+
+- feat(operator): turns carry file attachments (#1148)
+
+## 0.60.191
+
+- docs(architecture): toolbelt belongs on the L0 foundation map (#1147)
+
+## 0.60.190
+
+- fix(scaffolder): regenerate the template engine cohort for the #1142 bumps (#1146)
+
+## 0.60.189
+
+- refactor: simpler parity probe (readline) + simpler mint (number) (#1143)
+
+## 0.60.188
+
+- test: drop peer-floor ceiling assertions that mirror the current range (#1145)
+
+## 0.60.187
+
+- Accept agent-runtime 0.325.x in the peer range (#1142)
+
+## 0.60.186
+
+- fix(settings-react): `SettingsSaveBar` stays in reach while it has something to report: unsaved changes, a refusal, "Saved", or a `summary` shown after a save. A footer bar on a narrow card no longer drops out of view the moment a save is confirmed (#1138). `placement="group"` is the bar for one save that covers several cards: rendered after the last of them, it is its own card and sticks to the bottom of the screen at every width over every card above it. The bar's `data-sticky` marks when it sticks; `data-dirty` now means only that there are unsaved changes.
+
+## 0.60.185
+
+- feat(settings-react): the shared settings page. `SettingsLayout` and `SettingsNav` give each section its own URL, a sticky section column from 60rem of content and a 56px tab strip below it that keeps the current tab in view; the nav marks a click current at once and never dims the page. `useSettingField` autosaves a row and shows "Saving…" after the pending delay, "Saved" only on a confirmed write, and the server's typed refusal with Retry, keeping the person's value; `confirmSettingResponse` reads `{ error: { code, message } }` refusals, and its `parse` returns the value the server kept (`() => next` for a route that answers `{ success: true }` or 204); without `parse` the value is `unknown`, so it cannot be a field's saved value. `ConfirmAction` (a bottom sheet below 40rem) closes only on a confirmed write and shows a refusal with its `refusalAction`, such as View plans. `SettingsSaveBar` is the one grouped save. `MembersSection`, `InvitationsSection`, `ExportSection`, `DeleteWorkspaceSection` and `TimezonePicker` are the shared sections. Rows and cards are `@tangle-network/ui` 11.40.0 settings atoms; the contract is docs/product-surfaces.md#settings-pages.
+- The teams panels name roles by capability ("Can view", "Can edit", "Can manage settings and people") in the ui `Select`, whose open list says in one line what each role adds, and their buttons are the ui `Button` and titles the ui `Heading`. Below 36rem of panel the role picker takes its own full-width line, so nothing passes a phone's card edge. `MembersPanel` takes `currentUserId` and, like `MembersSection`, offers no role change or removal on the viewer's own row; an inherited owner reads "Organization admin" in both. A revoked invitation's line says "revoked".
+- `MutationStatus` renders at 14px. `useWorkspaceExport` is the export engine both `WorkspaceExportPanel` and `ExportSection` draw from; the panel's notes are 14px.
+- The `@tangle-network/ui` peer floor is 11.40.0 (the settings atoms); the chat template pins ui 11.40.0 and brand 1.26.0.
+
+## 0.60.184
+
+- fix(work-product): keep identity and tabs usable on phones (#1134)
+
+## 0.60.183
+
+- chore(changesets): drop the fleet-lift changeset — consumed by the 0.60.182 release (#1133)
+
+## 0.60.182
+
+- feat: the fleet lift — toolbelt parity gate, budget-derived mint, allow-list routing, skill marketplace (#1132)
+
+## 0.60.181
+
+- fix(teams): accept invitations atomically across workspace transfers
+
+## 0.60.180
+
+- feat(approvals): add media previews and a scored review inbox
+
+## 0.60.179
+
+- refactor(web-react): replace local UI primitives with shared components (#1120)
+
+## 0.60.178
+
+- feat(agent-profiles): shared self-mount storage adapters — every product is 3 lines (#1128)
+- feat(hub-approvals): preview held effects and capture review feedback (#1129)
+
+## 0.60.177
+
+- fix(chat): sync release cohort and generated API docs (#1127)
+
+## 0.60.176
+
+- fix(chat): let readers scroll reasoning while it streams (#1121)
+
+## 0.60.175
+
+- fix(deps): support Hub SDK 0.30.2 in agent apps (#1126)
+- docs(integrations): refresh policy API map [skip release] (#1124)
+
+## 0.60.174
+
+- fix(integrations): show enforced approval policy and OAuth retry (#1123)
+
+## 0.60.173
+
+- refactor(harness): preserve session identity and enforce deployment admission (#1116)
+
+## 0.60.172
+
+- feat(sso): prompt passthrough on start and a quiet signed_out callback (#1122)
+
+## 0.60.171
+
+- fix(harness): drop the gemini capability row — gemini is a non-backend harness type (#1115)
+- feat(harness): harnessCapabilities — what a harness can express, before profile assembly (#1114)
+- feat(harness): harnessCapabilities — what a harness can express, before profile assembly (#1112)
+
+## 0.60.170
+
+- chore: rename agent-dev-container references to agent-container (#1111)
+
+## 0.60.169
+
+- fix: restore optional peers and handle Telegram/voice line contracts (#1107)
+- chore(deps): full interface-5 cohort — every @tangle-network dep to latest (#1109)
+- fix(tests): Node 26 localStorage, workspace-export archive count, and BSD tar
+- chore(deps): @tangle-network/ui 11.35.0 + sandbox 0.60.41 — align with the gtm-agent/hospitality cohort (#1105)
+
 ## 0.60.168
 
 - fix(web): constrain only editable profile resources (#1104)

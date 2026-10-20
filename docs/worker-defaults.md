@@ -54,6 +54,27 @@ Whether it pays depends on each app's D1 region and where its callers are, which
 Measured on 2026-10-10 over 7 days: gtm-agent's D1 primary is in WNAM and 52% of its requests already run at LAX (median wall time 312 ms); its European colos serve a different route mix, so their 138–902 ms medians do not isolate placement.
 Enable `[placement] mode = "smart"` per app only after comparing request duration against the 1% of requests Cloudflare keeps unplaced as a baseline.
 
+## Pin the Worker beside its D1 primary
+
+A chat turn makes tens of sequential D1 reads and writes before its first model byte, and D1 has one primary (read replication is off unless you turn it on).
+A Worker that runs at the caller's colo pays a cross-country round trip for each one: Legal's `admission.history`, a single query, took 74 ms from LAX against a primary in ENAM.
+Read the primary with `GET /accounts/<id>/d1/database/<id>` (`running_in_region`), then pin the Worker next to it with a targeted placement, not Smart Placement:
+
+```toml
+[placement]
+mode = "targeted"
+region = "aws:us-east-1"   # beside an ENAM primary
+```
+
+Measured on Legal (2026-10-19, `agent-ask` turns, one trace each): over 6 turns before and 5 after, `admission.lock` went from 2.1 to 1.6 s, `admission.before_turn` from 1.19 to 0.71 s and the lane's setup from 1.04 to 0.75 s, and the first model byte from 10.3 to 9.3 s, while the Worker-to-Router leg grew from 0.26 to 0.66 s.
+Keep that trade in view: a Worker whose time goes to a far service gains less.
+
+Two hazards of a targeted placement on wrangler 4.127:
+
+- Cloudflare's API cannot serialize the Worker's latest version afterwards (`GET .../workers/workers/<name>/versions/latest` answers `json: error calling MarshalJSON for type *placement.Placement: invalid placement target type`). `wrangler versions secret put` reads that version and fails with code 10013, which blocked Legal's releases until its release script stopped staging a secret that way.
+  Deliver a secret with the deploy (`wrangler deploy --secrets-file`) instead of a step that reads the latest version.
+- Read a served version by its id (`wrangler versions view <id>`, `wrangler deployments status`), not as `latest`.
+
 ## Checking a repo
 
 `agent-app-signoff` runs the check as its `worker defaults` step after install, reading each config through the repo's own `wrangler`, for the top level and every `[env.*]`.

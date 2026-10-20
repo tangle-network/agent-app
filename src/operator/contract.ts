@@ -5,6 +5,8 @@
  * through these routes; the app supplies only storage and execution.
  */
 
+import type { ChatAttachmentInput } from '../chat-routes/wire.js'
+
 export const OPERATOR_API_VERSION = 'v1'
 export const OPERATOR_API_BASE_PATH = '/api/operator/v1'
 
@@ -71,6 +73,8 @@ export interface OperatorAppInfo {
 }
 
 export type OperatorCapability =
+  | 'turns.attachments'
+  | 'turns.cancel'
   | 'workspaces.create'
   | 'threads.read'
   | 'files.read'
@@ -109,6 +113,9 @@ export interface OperatorThread {
 export type OperatorTurnState = 'queued' | 'working' | 'input-required' | 'succeeded' | 'failed' | 'unknown'
 
 export const OPERATOR_SETTLED_STATES: readonly OperatorTurnState[] = ['succeeded', 'failed']
+
+/** `failure.code` of a turn that settled because it was cancelled before it finished. */
+export const OPERATOR_TURN_CANCELLED_CODE = 'turn.cancelled'
 
 export interface OperatorAssetRef {
   id: string
@@ -215,6 +222,16 @@ export interface StartTurnInput {
   /** Title for a new conversation. */
   title?: string
   model?: string
+  /**
+   * Files uploaded to this workspace ahead of the turn, as the app's
+   * attachment upload route returned them in `{ files }`. They reach the
+   * agent exactly as browser-composer attachments do; the app re-checks each
+   * path against the workspace's own store. At most the app's
+   * `maxAttachments` entries, `ATTACHMENT_MAX_COUNT` (`/chat-routes`) unless
+   * the app sets one. Apps without the `turns.attachments` capability refuse
+   * them.
+   */
+  attachments?: ChatAttachmentInput[]
 }
 
 /** Route table: method, path pattern under the base path, and required scopes. */
@@ -227,6 +244,7 @@ export const OPERATOR_ROUTES = [
   { id: 'threads.list', method: 'GET', path: '/workspaces/:workspaceId/threads', scopes: ['operator:read'] },
   { id: 'threads.get', method: 'GET', path: '/workspaces/:workspaceId/threads/:threadId', scopes: ['operator:read'] },
   { id: 'turns.get', method: 'GET', path: '/workspaces/:workspaceId/threads/:threadId/turns/:turnId', scopes: ['operator:read'] },
+  { id: 'turns.cancel', method: 'POST', path: '/workspaces/:workspaceId/threads/:threadId/turns/:turnId/cancel', scopes: ['operator:read', 'operator:run'] },
   { id: 'approvals.list', method: 'GET', path: '/workspaces/:workspaceId/approvals', scopes: ['operator:read'] },
   { id: 'journal.list', method: 'GET', path: '/workspaces/:workspaceId/journal', scopes: ['operator:read'] },
   { id: 'files.list', method: 'GET', path: '/workspaces/:workspaceId/files', scopes: ['operator:read'] },

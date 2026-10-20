@@ -4,7 +4,7 @@
 
 Source: `src/hub-approvals/index.ts`
 
-25 exports.
+27 exports.
 
 ### `formatMinorAmount`
 
@@ -118,6 +118,14 @@ type HubActionPreview
 interface HubActionReceipt
 ```
 
+### `HubApprovalFeedback`
+
+`interface` — The host authenticates the reviewer, binds provenance and computes the edit diff.
+
+```ts
+interface HubApprovalFeedback
+```
+
 ### `HubApprovalItem`
 
 `interface` — One held Hub action and its decision, in the form every surface renders.
@@ -158,6 +166,14 @@ interface HubApprovalResumePart
 interface HubApprovalWait
 ```
 
+### `HubPreviewMedia`
+
+`interface` — Frozen media bytes supplied by the host; renderers never resolve a provider URL.
+
+```ts
+interface HubPreviewMedia
+```
+
 ### `hubProviderName`
 
 `function` — A provider's display name: `github` is GitHub, `outlook-mail` is Outlook.
@@ -179,7 +195,7 @@ interface HubApprovalWait
 `function` — A held call in the owner's words, with the preview its integration renders.
 
 ```ts
-(item: Pick<HubApprovalItem, "input" | "actionPath" | "providerId" | "files" | "bundle">) => HubActionPresentation
+(item: Pick<HubApprovalItem, "input" | "actionPath" | "providerId" | "files" | "bundle" | "preview">) => HubActionPrese…
 ```
 
 ### `splitHubActionPath`

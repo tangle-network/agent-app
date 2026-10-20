@@ -33,6 +33,9 @@ import {
   type TangleExecutionEnvironment,
 } from '../runtime/model'
 import { ok, fail, type Outcome } from './outcome'
+import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'
+import { traceSandboxPromptEvents } from './prompt-trace'
+export { traceSandboxPromptEvents, type TraceSandboxPromptOptions } from './prompt-trace'
 import {
   SandboxTransientDeadlineError,
   classifySandboxTransientFailure,
@@ -353,12 +356,16 @@ export interface LivenessProbeConfig {
   execTimeoutMs?: number
   /**
    * Reuse a successful liveness result for this many milliseconds for the
-   * same box id. Defaults to 5 seconds; set to 0 to probe on every reuse.
+   * same box id and start time. Defaults to 10 minutes; set to 0 to probe on
+   * every reuse.
    *
-   * Only the exec probe is cached. Runtime readiness, egress policy,
-   * deferred-file materialization, and bootstrap still run on every reuse.
-   * A box that dies during this window is surfaced by the next dispatch and
-   * is probed again after the TTL; the cache never triggers box deletion.
+   * Only the exec probe is cached. Runtime readiness, deferred-file
+   * materialization, and bootstrap still run on every reuse, and the egress
+   * policy and runtime environment are checked as {@link SandboxRuntimeConfig.egressPolicy}
+   * and {@link SandboxRuntimeConfig.runtimeEnv} describe. A box that dies during
+   * this window is surfaced by the first call on it: a caller whose first call
+   * fails passes the box to {@link dropTrustedBox} and ensures once more, which
+   * probes it and restarts it in place. The cache never triggers box deletion.
    */
   cacheTtlMs?: number
 }
@@ -408,6 +415,8 @@ export interface SandboxRuntimeConfig {
    * A resume receives only the keys the platform names as required to rebuild a runtime.
    * Throw when required credentials cannot be minted; renewal failure preserves
    * the sandbox and prevents dispatch. Requires the matching Sandbox runtime.
+   * Values equal to the last ones delivered to the same start of the box, within
+   * 10 minutes, are resolved again but not sent again.
    */
   runtimeEnv?: (scope: SandboxScope) => Promise<Record<string, string>>
   files: (ctx: SandboxBuildContext) => Promise<AgentProfileFileMount[]>
@@ -430,6 +439,9 @@ export interface SandboxRuntimeConfig {
    * created. A reused or resumed sandbox is returned only when its explicit
    * policy already matches; existing mismatches are rejected without updating
    * or deleting the sandbox unless migration is explicitly enabled below.
+   * A match read within 10 minutes stands for the same start of the box, except
+   * that a `strict` or `blocked` policy is read again whenever a reuse would send
+   * the box credentials (a changed {@link runtimeEnv}, or a {@link bootstrap}).
    */
   egressPolicy?: EgressPolicy
   /**
@@ -544,9 +556,83 @@ interface ClientCacheEntry {
 }
 
 let _cached: ClientCacheEntry | null = null
-const livenessVerifiedAt = new Map<string, number>()
-/** Reused boxes whose `open` egress this isolate verified, by {@link verifiedEgressKey}. */
-const verifiedEgress = new Map<string, number>()
+
+/**
+ * How long a reuse trusts what it last checked on a running box instead of
+ * repeating the round trip: the exec probe, the egress read, the runtime
+ * environment push, and the spend gate. Every check is keyed to the box's start
+ * time, so a restarted box matches none of them, and a failed first call on the
+ * box drops them all ({@link dropTrustedBox}).
+ */
+const TRUSTED_REUSE_TTL_MS = 10 * 60_000
+const REUSE_CHECKS_MAX = 1_000
+
+/** What this isolate checked on one running box, valid only for the start time it saw. */
+interface ReuseChecks {
+  startedAt: number
+  /** When the exec probe last passed. */
+  alive?: number
+  /** The egress policy (normalized) the box was last read at or migrated to. */
+  egress?: { key: string; at: number }
+  /** The digest of the runtime environment last delivered to the box. */
+  env?: { digest: string; at: number }
+  /** The deferred corpus the box was last found to hold, by its hash. */
+  corpus?: { hash: string; at: number }
+}
+
+const reuseChecks = new Map<string, ReuseChecks>()
+/** The running box last used under a box name, so a reuse reads it by id instead of listing every running box. A wrong id costs one read: the box read must carry the name. */
+const runningBoxIds = new Map<string, string>()
+/** Boxes an ensure handed out without an exec probe, because a recent probe of this start had passed. */
+const trustedBoxes = new WeakSet<SandboxInstance>()
+
+function boxStartedAt(box: SandboxInstance): number | undefined {
+  const startedAt = box.startedAt instanceof Date ? box.startedAt.getTime() : Number.NaN
+  return Number.isFinite(startedAt) ? startedAt : undefined
+}
+
+/** The checks recorded for this start of the box. A box that started again keeps none. */
+function checksFor(box: SandboxInstance): ReuseChecks | undefined {
+  const checks = reuseChecks.get(box.id)
+  if (!checks) return undefined
+  if (checks.startedAt !== boxStartedAt(box)) {
+    reuseChecks.delete(box.id)
+    return undefined
+  }
+  return checks
+}
+
+function recordCheck(box: SandboxInstance, patch: Omit<Partial<ReuseChecks>, 'startedAt'>): void {
+  const startedAt = boxStartedAt(box)
+  if (startedAt === undefined || !box.id) return
+  const current = checksFor(box) ?? { startedAt }
+  reuseChecks.delete(box.id)
+  reuseChecks.set(box.id, { ...current, ...patch })
+  while (reuseChecks.size > REUSE_CHECKS_MAX) {
+    const oldest = reuseChecks.keys().next().value
+    if (oldest === undefined) break
+    reuseChecks.delete(oldest)
+  }
+}
+
+function forgetBox(boxId: string): void {
+  reuseChecks.delete(boxId)
+}
+
+function isRecent(at: number | undefined, ttlMs: number, now = Date.now()): at is number {
+  return at !== undefined && Number.isFinite(ttlMs) && ttlMs > 0 && now - at < ttlMs
+}
+
+/**
+ * Forget what this isolate trusts about a box after the first real call on it
+ * failed. Returns true when the ensure handed the box out without probing it, so
+ * the caller may ensure once more and get the full verification; false when the
+ * ensure had probed it and the failure is the box's own.
+ */
+export function dropTrustedBox(box: SandboxInstance): boolean {
+  forgetBox(box.id)
+  return trustedBoxes.delete(box)
+}
 
 function getClientFromCreds(creds: SandboxClientCredentials): Sandbox {
   const fingerprint = `${creds.apiKey} ${creds.baseUrl}`
@@ -573,8 +659,8 @@ export function getClient(shell: SandboxRuntimeConfig): Sandbox {
 /** Reset the process-local sandbox client and liveness-verification caches. */
 export function resetClientCache(): void {
   _cached = null
-  livenessVerifiedAt.clear()
-  verifiedEgress.clear()
+  reuseChecks.clear()
+  runningBoxIds.clear()
 }
 
 /** Describe an application tool with its name, unique key, and description */
@@ -664,6 +750,18 @@ export interface EnsureWorkspaceSandboxOptions {
    *  product can see which round trip a slow acquisition spent its time in.
    *  Omitted, nothing is measured. */
   measure?: <T>(stage: string, operation: () => Promise<T>) => Promise<T>
+  /**
+   * The turn's trace. The ensure is recorded as one `sandbox.claim` span whose children are the
+   * `sandbox.ensure.*` steps (`credentials`, `get_running` or `list_running`, `finalize` for a reused box,
+   * with `egress` and `liveness` unless a recent check stood in for them; `list_stopped`,
+   * `resume` for a stopped one; `create`, `wait_running`, `bootstrap` for a new one), so a slow claim names
+   * the step it waited on. The spend seam's two calls are recorded beside the claim as
+   * `sandbox.spend.before_provision` and `sandbox.spend.observe`. Omitted, nothing is recorded;
+   * `measure` is unchanged and still called.
+   */
+  trace?: TurnTrace
+  /** The span the claim hangs from. Default: the trace's root. */
+  traceParent?: TurnSpan
 }
 
 /** What `/sandbox` reports once a box is provisioned, reused, or resumed. */
@@ -691,9 +789,18 @@ export interface SandboxProvisionedObservation {
  * bookkeeping must never take down the provisioning it is bookkeeping.
  */
 export interface SandboxSpendHooks {
-  /** Runs before any create, resume, or reuse. Throw to refuse provisioning. */
+  /**
+   * Runs before any create, resume, restart or deletion of a box, and before a
+   * reuse unless this isolate probed that box recently (10 minutes by default,
+   * {@link LivenessProbeConfig.cacheTtlMs}): a reuse of a box it has been using
+   * is gated when its probe expires, not on every turn. Throw to refuse provisioning.
+   */
   beforeProvision?(input: { workspaceId: string; userId?: string }): Promise<void> | void
-  /** Runs after a box is available. Throwing here cannot fail the provision. */
+  /**
+   * Runs after a box is available, except for a reuse that trusted a recent
+   * probe: the ensure that ran that probe reported the box, and `onActivity`
+   * carries its use since. Throwing here cannot fail the provision.
+   */
   onProvisioned?(observation: SandboxProvisionedObservation): Promise<void> | void
   /**
    * The box is doing work. Fired by the turn primitives at the start of a turn
@@ -828,7 +935,7 @@ export function buildSandboxToolFileMounts(
  * segment by failing the whole box. Throwing names the offending directory
  * instead.
  *
- * The consuming half lives in agent-dev-container: `resolveSandboxToolBinDirs`
+ * The consuming half lives in agent-container: `resolveSandboxToolBinDirs`
  * parses this value and every PATH builder appends it at the tail — sidecar
  * exec and PTY through `packages/shared/src/cache-env.ts`, an SSH session
  * through `packages/shared/src/ssh-bootstrap.ts`, and a spawned CLI through
@@ -1573,9 +1680,19 @@ async function materializeDeferredFilesForExistingBox(
   // after it (a ~0.7 s file batch per GTM turn, 2026-10-11). The marker is
   // written only after a corpus write succeeds and lives on the same disk as
   // the files, so a lost disk loses both and the corpus is written again.
-  if (corpusMarker && await corpusMarker === corpusHash) return ok(box)
+  // What this isolate last found on the box stands in for reading the marker
+  // again for as long as it trusts a probe of the same start.
+  const found = checksFor(box)?.corpus
+  if (isRecent(found?.at, TRUSTED_REUSE_TTL_MS) && found?.hash === corpusHash) return ok(box)
+  if ((await (corpusMarker ?? readDeferredCorpusMarker(box))) === corpusHash) {
+    recordCheck(box, { corpus: { hash: corpusHash, at: Date.now() } })
+    return ok(box)
+  }
   const written = await writeDeferredFilesWithRuntimeAuthRefresh(client, box, deferredFiles, stage, name)
-  if (written.succeeded) await writeDeferredCorpusMarker(written.value, corpusHash)
+  if (written.succeeded) {
+    await writeDeferredCorpusMarker(written.value, corpusHash)
+    recordCheck(written.value, { corpus: { hash: corpusHash, at: Date.now() } })
+  }
   return written
 }
 
@@ -1617,6 +1734,38 @@ async function listRunning(
   }
 }
 
+/** Remember the running box serving a box name, so the next reuse reads it by id. */
+function rememberRunningBox(name: string, box: SandboxInstance): SandboxInstance {
+  runningBoxIds.delete(name)
+  runningBoxIds.set(name, box.id)
+  while (runningBoxIds.size > REUSE_CHECKS_MAX) {
+    const oldest = runningBoxIds.keys().next().value
+    if (oldest === undefined) break
+    runningBoxIds.delete(oldest)
+  }
+  return box
+}
+
+/**
+ * The running box this isolate last used under `name`, read by id. Null when it
+ * is gone, stopped, renamed, or answers without the metadata a reuse decides on;
+ * the caller then lists, which is the authority.
+ */
+async function getRunningBox(
+  client: Sandbox,
+  id: string,
+  name: string,
+): Promise<SandboxInstance | null> {
+  try {
+    const box = await client.get(id)
+    if (!box || box.name !== name || box.status !== 'running') return null
+    if (typeof box.metadata?.harness !== 'string') return null
+    return box
+  } catch {
+    return null
+  }
+}
+
 async function listStopped(
   client: Sandbox,
   name: string,
@@ -1632,7 +1781,7 @@ async function listStopped(
 async function deleteBox(box: SandboxInstance): Promise<Outcome<void>> {
   try {
     const acknowledgement = await box.delete({ until: 'removed' })
-    livenessVerifiedAt.delete(box.id)
+    forgetBox(box.id)
     // Creation reuses this box's name as its idempotency key.
     if (acknowledgement.removal === 'pending') {
       return fail(new Error(`sandbox ${box.id} removal is still pending; retry replacement after removal completes`))
@@ -1780,19 +1929,12 @@ async function isBoxAlive(
   }
 }
 
-const DEFAULT_LIVENESS_CACHE_TTL_MS = 5_000
-
 function hasRecentLivenessVerification(
   box: SandboxInstance,
   probe: LivenessProbeConfig,
   now = Date.now(),
 ): boolean {
-  const ttlMs = probe.cacheTtlMs ?? DEFAULT_LIVENESS_CACHE_TTL_MS
-  if (!Number.isFinite(ttlMs) || ttlMs <= 0) return false
-  const verifiedAt = livenessVerifiedAt.get(box.id)
-  if (verifiedAt !== undefined && now - verifiedAt < ttlMs) return true
-  livenessVerifiedAt.delete(box.id)
-  return false
+  return isRecent(checksFor(box)?.alive, probe.cacheTtlMs ?? TRUSTED_REUSE_TTL_MS, now)
 }
 
 const RUNTIME_CONNECTION_WAIT_MS = 30_000
@@ -1996,14 +2138,17 @@ async function isReusableBox(
   probe: LivenessProbeConfig | undefined,
 ): Promise<Outcome<void>> {
   if (sandboxEdgeFailed(box) || !sandboxRuntimeUrl(box)) {
-    livenessVerifiedAt.delete(box.id)
+    forgetBox(box.id)
     return fail(new Error(sandboxEdgeFailed(box) ? 'runtime edge readiness failed' : 'runtime URL is missing'))
   }
   if (!probe) return ok(undefined)
-  if (hasRecentLivenessVerification(box, probe)) return ok(undefined)
+  if (hasRecentLivenessVerification(box, probe)) {
+    trustedBoxes.add(box)
+    return ok(undefined)
+  }
   const alive = await isBoxAlive(box, probe)
-  if (alive.succeeded) livenessVerifiedAt.set(box.id, Date.now())
-  else livenessVerifiedAt.delete(box.id)
+  if (alive.succeeded) recordCheck(box, { alive: Date.now() })
+  else forgetBox(box.id)
   return alive
 }
 
@@ -2046,7 +2191,7 @@ async function resumeStoppedBox(
     }
   }
   try {
-    livenessVerifiedAt.delete(box.id)
+    forgetBox(box.id)
     report('started', 'Resuming the stopped sandbox')
     await resumeWithRequiredRuntimeEnv(box, timeoutMs, runtimeEnv)
     await box.waitFor('running', { timeoutMs, ...(onProgress ? { onProgress } : {}) })
@@ -2270,6 +2415,8 @@ async function resolveWorkspaceRuntimeEnv(
   return env
 }
 
+type EgressRead = Awaited<ReturnType<SandboxInstance['egress']['get']>>
+
 /**
  * Round trips of a reused box that do not depend on its liveness, started with
  * the liveness probe so they overlap it. The egress read and the corpus marker
@@ -2277,47 +2424,94 @@ async function resolveWorkspaceRuntimeEnv(
  * an unknown marker means the corpus is written as before. The runtime env is
  * sent early only when the egress assertion cannot change where credentials
  * may go (see {@link egressGatesCredentials}); otherwise it waits for it.
+ * A read or push this isolate completed within {@link TRUSTED_REUSE_TTL_MS} on
+ * the same start of the box is not repeated, subject to the credential rule in
+ * {@link prefetchExistingBoxReads}.
  */
 interface ExistingBoxPrefetch {
-  egress?: Promise<Outcome<Awaited<ReturnType<SandboxInstance['egress']['get']>>>>
-  /** This isolate verified the box's egress since its last start (see {@link verifiedEgressKey}). */
+  egress?: Promise<Outcome<EgressRead>>
+  /** The box's egress was verified recently enough that this reuse reads and asserts nothing. */
   egressVerified?: boolean
   corpusMarker?: Promise<string | null>
   /** The renewal already sent to the box; finalize waits for it instead of sending another. */
   runtimeEnv?: Promise<Outcome<void>>
+  /** The box already holds this runtime environment, so nothing is sent. */
+  envDelivered?: boolean
+  /** Settles when the minted environment has decided the fields above. */
+  decided: Promise<void>
 }
 
 type ReuseMeasure = <T>(stage: string, operation: () => Promise<T>) => Promise<T>
 
+function runtimeEnvDigest(env: Record<string, string>): string {
+  return createHash('sha256').update(JSON.stringify(canonicalizeJson(env)), 'utf8').digest('hex')
+}
+
+function hasDeliveredEnv(box: SandboxInstance, env: Record<string, string>): boolean {
+  const delivered = checksFor(box)?.env
+  return isRecent(delivered?.at, TRUSTED_REUSE_TTL_MS) && delivered?.digest === runtimeEnvDigest(env)
+}
+
+function hasRecentEgress(box: SandboxInstance, desired: EgressPolicy): boolean {
+  const verified = checksFor(box)?.egress
+  return isRecent(verified?.at, TRUSTED_REUSE_TTL_MS) && verified?.key === normalizedEgressPolicy(desired)
+}
+
+async function pushRuntimeEnv(
+  box: SandboxInstance,
+  env: Record<string, string>,
+  measure?: ReuseMeasure,
+): Promise<Outcome<void>> {
+  try {
+    await (measure ? measure('runtime_env_push', () => box.setRuntimeEnv(env)) : box.setRuntimeEnv(env))
+    recordCheck(box, { env: { digest: runtimeEnvDigest(env), at: Date.now() } })
+    return ok(undefined)
+  } catch (cause) {
+    return fail(cause)
+  }
+}
+
+/**
+ * Start the reads of a reused box. A recent egress read stands in for a new one
+ * when the policy is `open` (a stale verdict can only cost the box its reach) or
+ * when this reuse sends the box no credentials: the environment it would send is
+ * already there and the shell has no bootstrap. A `strict` or `blocked` verdict
+ * never stands in for the read that gates credentials, so a changed environment
+ * or a bootstrap waits for a fresh read.
+ */
 function prefetchExistingBoxReads(
   shell: SandboxRuntimeConfig,
   box: SandboxInstance,
   runtimeEnv: Promise<Record<string, string>>,
   measure: ReuseMeasure,
 ): ExistingBoxPrefetch {
-  const prefetch: ExistingBoxPrefetch = {}
-  if (shell.egressPolicy && hasVerifiedEgress(box, shell.egressPolicy)) {
-    prefetch.egressVerified = true
-  } else if (shell.egressPolicy) {
-    prefetch.egress = measure('egress', async () => {
-      try {
-        return ok(await box.egress.get())
-      } catch (cause) {
-        return fail(cause)
-      }
-    })
+  const desired = shell.egressPolicy
+  const readEgress = () => measure('egress', async () => {
+    try {
+      return ok(await box.egress.get())
+    } catch (cause) {
+      return fail(cause)
+    }
+  })
+  const egressRecent = desired !== undefined && hasRecentEgress(box, desired)
+  const prefetch: ExistingBoxPrefetch = { decided: Promise.resolve() }
+  if (desired && !egressRecent) prefetch.egress = readEgress()
+  if (shell.deferProfileFiles && !isRecent(checksFor(box)?.corpus?.at, TRUSTED_REUSE_TTL_MS)) {
+    prefetch.corpusMarker = readDeferredCorpusMarker(box)
   }
-  if (shell.deferProfileFiles) prefetch.corpusMarker = readDeferredCorpusMarker(box)
-  if (!egressGatesCredentials(shell.egressPolicy)) {
-    // A mint failure rejects `runtimeEnv` and the reuse stops before finalize,
-    // so nothing was sent; the renewal itself is settled here and never rejects.
-    prefetch.runtimeEnv = runtimeEnv.then(
-      (env) => Object.keys(env).length === 0
-        ? ok(undefined)
-        : measure('runtime_env_push', () => box.setRuntimeEnv(env)).then(() => ok(undefined), (cause: unknown) => fail(cause)),
-      () => ok(undefined),
-    )
-  }
+  // A mint failure rejects `runtimeEnv` and the reuse stops before finalize, so
+  // nothing was sent; the renewal itself is settled here and never rejects.
+  prefetch.decided = runtimeEnv.then((env) => {
+    const delivered = Object.keys(env).length === 0 || hasDeliveredEnv(box, env)
+    prefetch.envDelivered = delivered
+    if (desired && egressRecent) {
+      if (desired.mode === 'open' || (delivered && !shell.bootstrap)) prefetch.egressVerified = true
+      else prefetch.egress = readEgress()
+    }
+    if (!delivered && !egressGatesCredentials(desired)) {
+      prefetch.runtimeEnv = pushRuntimeEnv(box, env, measure)
+    }
+  }, () => undefined)
   return prefetch
 }
 
@@ -2332,42 +2526,8 @@ function egressGatesCredentials(desired: EgressPolicy | undefined): boolean {
   return desired !== undefined && desired.mode !== 'open'
 }
 
-/** How long a matching egress read stands for a box that has not restarted. */
-const VERIFIED_EGRESS_TTL_MS = 10 * 60_000
-const VERIFIED_EGRESS_MAX = 1_000
-
-/**
- * The cache key for a box's verified egress, or null when it must be read.
- * Only an `open` policy is cached: a stale `open` verdict can only cost the
- * box its reach until the entry expires, never widen where credentials go.
- * The key carries the box's start time, so a restarted box is read again.
- */
-function verifiedEgressKey(box: SandboxInstance, desired: EgressPolicy): string | null {
-  if (desired.mode !== 'open' || !box.id) return null
-  const startedAt = box.startedAt instanceof Date ? box.startedAt.getTime() : Number.NaN
-  if (!Number.isFinite(startedAt)) return null
-  return `${box.id}|${startedAt}|${normalizedEgressPolicy(desired)}`
-}
-
-function hasVerifiedEgress(box: SandboxInstance, desired: EgressPolicy, now = Date.now()): boolean {
-  const key = verifiedEgressKey(box, desired)
-  if (!key) return false
-  const verifiedAt = verifiedEgress.get(key)
-  if (verifiedAt !== undefined && now - verifiedAt < VERIFIED_EGRESS_TTL_MS) return true
-  verifiedEgress.delete(key)
-  return false
-}
-
 function recordVerifiedEgress(box: SandboxInstance, desired: EgressPolicy): void {
-  const key = verifiedEgressKey(box, desired)
-  if (!key) return
-  verifiedEgress.delete(key)
-  verifiedEgress.set(key, Date.now())
-  while (verifiedEgress.size > VERIFIED_EGRESS_MAX) {
-    const oldest = verifiedEgress.keys().next().value
-    if (oldest === undefined) break
-    verifiedEgress.delete(oldest)
-  }
+  recordCheck(box, { egress: { key: normalizedEgressPolicy(desired), at: Date.now() } })
 }
 
 // All retained-box paths renew credentials before the product bootstrap.
@@ -2382,7 +2542,7 @@ async function finalizeExistingBox(
   harness: Harness,
   scope: SandboxScope,
   runtimeEnv: Record<string, string>,
-  prefetch: ExistingBoxPrefetch = {},
+  prefetch: Omit<ExistingBoxPrefetch, 'decided'> = {},
 ): Promise<SandboxInstance> {
   if (!prefetch.egressVerified) {
     await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name, prefetch.egress)
@@ -2407,8 +2567,9 @@ async function finalizeExistingBox(
     // exactly as a renewal sent here would.
     const renewed = await prefetch.runtimeEnv
     if (!renewed.succeeded) throw renewed.error
-  } else if (Object.keys(runtimeEnv).length > 0) {
-    await finalBox.setRuntimeEnv(runtimeEnv)
+  } else if (!prefetch.envDelivered && Object.keys(runtimeEnv).length > 0) {
+    const renewed = await pushRuntimeEnv(finalBox, runtimeEnv)
+    if (!renewed.succeeded) throw renewed.error
   }
   if (shell.bootstrap) {
     const boot = await shell.bootstrap(finalBox, scope)
@@ -2528,15 +2689,90 @@ export async function ensureWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
 ): Promise<SandboxInstance> {
-  // A budget refusal must land before any box exists, so it runs ahead of both
-  // the first attempt and the unbringable-box replacement below.
-  await options.spend?.beforeProvision?.({
-    workspaceId: options.workspaceId,
-    ...(options.userId ? { userId: options.userId } : {}),
-  })
-  const box = await bringUpWorkspaceSandbox(shell, options)
-  await observeProvisionedBox(shell, options, box)
+  const box = await claimWorkspaceSandbox(shell, options, false)
+  if (!box) throw new Error('ensureWorkspaceSandbox: a claim that may provision returned no box')
   return box
+}
+
+/**
+ * Reuse the workspace's running box if this isolate used it recently, or return
+ * undefined. It never creates, resumes, restarts, replaces or deletes a box, so
+ * a caller can run it without the provisioning lease that serializes those
+ * steps (see `runForegroundSandboxSingleFlight`'s `reuse`); undefined means the
+ * box needs one of them (or this isolate has no recent probe of it), and the
+ * caller takes the lease and calls {@link ensureWorkspaceSandbox}.
+ */
+export async function reuseWorkspaceSandbox(
+  shell: SandboxRuntimeConfig,
+  options: EnsureWorkspaceSandboxOptions,
+): Promise<SandboxInstance | undefined> {
+  if (options.forceNew || !hasRecentProbe(shell, options)) return undefined
+  return claimWorkspaceSandbox(shell, options, true)
+}
+
+/** Whether this isolate probed the workspace's last-used box recently enough that a reuse would skip the probe. */
+function hasRecentProbe(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions): boolean {
+  const probe = shell.livenessProbe
+  if (!probe || options.forceNew) return false
+  const scope: SandboxScope = { workspaceId: options.workspaceId, ...(options.userId ? { userId: options.userId } : {}) }
+  const id = runningBoxIds.get(shell.boxKey ? shell.boxKey(scope) : shell.name(options.workspaceId))
+  return isRecent(id === undefined ? undefined : reuseChecks.get(id)?.alive, probe.cacheTtlMs ?? TRUSTED_REUSE_TTL_MS)
+}
+
+/** The spend gate, run at most once per ensure and timed under the turn's trace when it has one. */
+function spendGate(options: EnsureWorkspaceSandboxOptions): () => Promise<void> {
+  let gated: Promise<void> | undefined
+  return () => {
+    const before = options.spend?.beforeProvision
+    if (!before) return Promise.resolve()
+    const run = () => before({
+      workspaceId: options.workspaceId,
+      ...(options.userId ? { userId: options.userId } : {}),
+    })
+    return gated ??= Promise.resolve(options.trace
+      ? options.trace.measure('sandbox.spend.before_provision', 'sandbox', run, undefined, options.traceParent)
+      : run())
+  }
+}
+
+async function claimWorkspaceSandbox(
+  shell: SandboxRuntimeConfig,
+  options: EnsureWorkspaceSandboxOptions,
+  reuseOnly: boolean,
+): Promise<SandboxInstance | undefined> {
+  const { trace } = options
+  // A budget refusal must land before any box is created, resumed or kept alive,
+  // so it runs ahead of the first attempt and the unbringable-box replacement
+  // below. A box this isolate probed recently has passed the gate in that
+  // ensure; it is asked again when that probe expires, and before any lifecycle
+  // step, so a reuse pays for it once per probe and not once per turn.
+  const gate = spendGate(options)
+  if (!hasRecentProbe(shell, options)) await gate()
+  const claim = trace?.start('sandbox.claim', 'sandbox', { 'workspace.harness': options.harness }, options.traceParent)
+  // Each ensure step is a child of the claim, and the caller's own `measure` still sees it.
+  const traced: EnsureWorkspaceSandboxOptions = trace && claim
+    ? {
+      ...options,
+      measure: <T,>(stage: string, operation: () => Promise<T>): Promise<T> => {
+        const run = () => trace.measure(stage, 'sandbox', () => operation(), undefined, claim)
+        return options.measure ? options.measure(stage, run) : run()
+      },
+    }
+    : options
+  try {
+    const box = await bringUpWorkspaceSandbox(shell, traced, gate, reuseOnly)
+    if (!box) {
+      claim?.end({ 'sandbox.reuse_declined': true })
+      return undefined
+    }
+    claim?.end({ 'sandbox.id': box.id, ...(trustedBoxes.has(box) ? { 'sandbox.probe_trusted': true } : {}) })
+    // A box handed out on a recent probe was observed by the ensure that probed it.
+    if (!trustedBoxes.has(box)) await observeProvisionedBox(shell, options, box)
+    return box
+  } catch (error) {
+    claim?.end(undefined, error)
+    throw error
+  }
 }
 
 /**
@@ -2556,10 +2792,11 @@ async function observeProvisionedBox(
   options: EnsureWorkspaceSandboxOptions,
   box: SandboxInstance,
 ): Promise<void> {
-  if (!options.spend?.onProvisioned) return
+  const onProvisioned = options.spend?.onProvisioned
+  if (!onProvisioned) return
   const resources = shell.resources ?? DEFAULT_SANDBOX_RESOURCES
-  try {
-    await options.spend.onProvisioned({
+  const observe = async (): Promise<void> => {
+    await onProvisioned({
       workspaceId: options.workspaceId,
       ...(options.userId ? { userId: options.userId } : {}),
       sandboxId: box.id,
@@ -2568,6 +2805,11 @@ async function observeProvisionedBox(
       maxLifetimeSeconds: resources.maxLifetimeSeconds,
       at: Date.now(),
     })
+  }
+  try {
+    await (options.trace
+      ? options.trace.measure('sandbox.spend.observe', 'sandbox', observe, undefined, options.traceParent)
+      : observe())
   } catch {
     // An observability seam must never take down the provision it reports on.
   }
@@ -2576,9 +2818,11 @@ async function observeProvisionedBox(
 async function bringUpWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
-): Promise<SandboxInstance> {
+  gate: () => Promise<void>,
+  reuseOnly: boolean,
+): Promise<SandboxInstance | undefined> {
   try {
-    return await provisionWorkspaceSandbox(shell, options)
+    return await provisionWorkspaceSandbox(shell, options, gate, reuseOnly)
   } catch (err) {
     // A box the platform cannot bring up is not a transient failure: the box
     // key is derived from the workspace, so every later call resumes the same
@@ -2589,7 +2833,7 @@ async function bringUpWorkspaceSandbox(
     if (!shell.replaceUnbringableBox) throw err
     if (options.forceNew) throw err
     if (!isUnbringableBoxError(err)) throw err
-    return await provisionWorkspaceSandbox(shell, { ...options, forceNew: true })
+    return await provisionWorkspaceSandbox(shell, { ...options, forceNew: true }, gate, reuseOnly)
   }
 }
 
@@ -2646,10 +2890,18 @@ async function requestMissingSandboxReplacement(
   )
 }
 
+/**
+ * `reuseOnly` stops before any step that creates, resumes, restarts, replaces or
+ * deletes a box and returns undefined there; every other step is a read or the
+ * idempotent renewal a reuse always made. `gate` is the spend gate: it runs
+ * before the first such step, and before a reuse whose probe was not trusted.
+ */
 async function provisionWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
-): Promise<SandboxInstance> {
+  gate: () => Promise<void>,
+  reuseOnly: boolean,
+): Promise<SandboxInstance | undefined> {
   const execTimeoutMs = shell.livenessProbe?.execTimeoutMs
   // Match the supported SDK command-timeout range before any lifecycle mutation.
   if (execTimeoutMs !== undefined && (
@@ -2668,8 +2920,19 @@ async function provisionWorkspaceSandbox(
   const resources = shell.resources ?? DEFAULT_SANDBOX_RESOURCES
   const resumeTimeout = shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS
 
-  // Stage 1 — running-box reuse (skipped on forceNew).
-  let existing = await measure('list_running', () => listRunning(client, name))
+  // Stage 1 — running-box reuse (skipped on forceNew). The box this isolate used
+  // last is read by id; only when that misses is every running box listed.
+  let existing: Outcome<SandboxInstance | null> = ok(null)
+  const knownId = forceNew ? undefined : runningBoxIds.get(name)
+  if (knownId) {
+    const known = await measure('get_running', () => getRunningBox(client, knownId, name))
+    if (known) existing = ok(known)
+    else runningBoxIds.delete(name)
+  }
+  if (reuseOnly && !(existing.succeeded && existing.value)) return undefined
+  if (!(existing.succeeded && existing.value)) {
+    existing = await measure('list_running', () => listRunning(client, name))
+  }
   if (forceNew && existing.succeeded && !existing.value) {
     existing = await listStopped(client, name)
   }
@@ -2692,13 +2955,30 @@ async function provisionWorkspaceSandbox(
         measure('refresh', () => refreshRuntimeConnection(client, found)),
       ])
       if (envResult.status === 'rejected') throw envResult.reason
+      await prefetch.decided
       const runtimeEnv = envResult.value
+      // A refusal from the spend gate is the caller's answer, not a box fault to recover from.
+      const refusal: { error?: unknown; refused: boolean } = { refused: false }
+      const gateBeforeUse = async (): Promise<void> => {
+        try {
+          await gate()
+        } catch (error) {
+          refusal.refused = true
+          refusal.error = error
+          throw error
+        }
+      }
       try {
         if (readyResult.status === 'rejected') throw readyResult.reason
         const ready = readyResult.value
         if ((await measure('liveness', () => isReusableBox(ready, shell.livenessProbe))).succeeded) {
-          return await measure('finalize', () => finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv, prefetch))
+          if (!trustedBoxes.has(ready)) await gateBeforeUse()
+          const finalBox = await measure('finalize', () => finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv, prefetch))
+          if (trustedBoxes.has(ready)) trustedBoxes.add(finalBox)
+          return rememberRunningBox(name, finalBox)
         }
+        if (reuseOnly) return undefined
+        await gateBeforeUse()
         // The prefetched reads never reject; a recovered box is read again in finalize.
         // Unresponsive (or never-connectable) box with the RIGHT harness: recover
         // in place — stop→resume preserves the workspace — and fail loud if the
@@ -2714,8 +2994,10 @@ async function provisionWorkspaceSandbox(
           runtimeEnv,
           onProgress,
         )
-        return await finalizeExistingBox(shell, client, recovered, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv)
+        return rememberRunningBox(name, await finalizeExistingBox(shell, client, recovered, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv))
       } catch (cause) {
+        if (refusal.refused) throw refusal.error
+        if (reuseOnly) return undefined
         const error = cause instanceof Error ? cause : new Error(String(cause))
         const recovery = await requestMissingSandboxReplacement(shell, {
           box: found,
@@ -2729,6 +3011,8 @@ async function provisionWorkspaceSandbox(
         replacementRequested = true
       }
     } else {
+      if (reuseOnly) return undefined
+      await gate()
       const dropped = await deleteBox(found)
       if (!dropped.succeeded) {
         throw new Error(
@@ -2742,12 +3026,15 @@ async function provisionWorkspaceSandbox(
   }
 
   // Stage 2 — stopped-box resume (skipped on forceNew or resumeStopped===false).
+  if (reuseOnly) return undefined
+  await gate()
   if (!replacementRequested && !forceNew && shell.resumeStopped !== false) {
-    const stopped = await listStopped(client, name)
+    const stopped = await measure('list_stopped', () => listStopped(client, name))
     if (!stopped.succeeded) throw stopped.error
     if (stopped.value) {
-      const runtimeEnv = await resolveWorkspaceRuntimeEnv(shell, scope)
-      const resumed = await resumeStoppedBox(stopped.value, resumeTimeout, runtimeEnv, onProgress)
+      const stoppedBox = stopped.value
+      const runtimeEnv = await measure('runtime_env', () => resolveWorkspaceRuntimeEnv(shell, scope))
+      const resumed = await measure('resume', () => resumeStoppedBox(stoppedBox, resumeTimeout, runtimeEnv, onProgress))
       if (!resumed.succeeded) {
         const recovery = await requestSandboxReplacement(
           shell.recoverStoppedSandbox,
@@ -2760,7 +3047,7 @@ async function provisionWorkspaceSandbox(
         try {
           const box = await refreshRuntimeConnection(client, resumed.value)
           if ((await isReusableBox(box, shell.livenessProbe)).succeeded) {
-            return await finalizeExistingBox(shell, client, box, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv)
+            return rememberRunningBox(name, await finalizeExistingBox(shell, client, box, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv))
           }
           // The box resumed but is unresponsive: one full stop→resume cycle is
           // the state-preserving recovery; still-dead fails loud. Never delete —
@@ -2775,7 +3062,7 @@ async function provisionWorkspaceSandbox(
             runtimeEnv,
             onProgress,
           )
-          return await finalizeExistingBox(shell, client, recovered, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv)
+          return rememberRunningBox(name, await finalizeExistingBox(shell, client, recovered, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv))
         } catch (cause) {
           const error = cause instanceof Error ? cause : new Error(String(cause))
           const recovery = await requestMissingSandboxReplacement(shell, {
@@ -2885,13 +3172,13 @@ async function provisionWorkspaceSandbox(
   // is always defined. The structural sections type needs no cast.
   assertProvisionPayloadWithinCap(payload ?? {})
 
-  let box = await client.create(payload)
+  let box = await measure('create', () => client.create(payload))
 
-  await box.waitFor('running', {
+  await measure('wait_running', () => box.waitFor('running', {
     timeoutMs: shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS,
     ...(onProgress ? { onProgress } : {}),
-  })
-  box = await refreshRuntimeConnection(client, box)
+  }))
+  box = await measure('refresh_connection', () => refreshRuntimeConnection(client, box))
 
   if (deferredFiles.length > 0) {
     const written = await writeProfileFilesToBox(box, deferredFiles)
@@ -2901,12 +3188,13 @@ async function provisionWorkspaceSandbox(
   }
 
   if (shell.bootstrap) {
-    const boot = await shell.bootstrap(box, scope)
+    const bootstrap = shell.bootstrap.bind(shell)
+    const boot = await measure('bootstrap', () => bootstrap(box, scope))
     if (!boot.succeeded) {
       throw new Error(`bootstrap failed on new box ${name}`, { cause: boot.error })
     }
   }
-  return box
+  return rememberRunningBox(name, box)
 }
 
 // The SDK's SandboxInstance.streamPrompt/.prompt accept `string | PromptInputPart[]`
@@ -3137,6 +3425,15 @@ export interface StreamSandboxPromptOptions {
   // the SAME object `ensureWorkspaceSandbox` does, so a product builds one and
   // wires it in both places; only `onActivity` is read here.
   spend?: SandboxSpendHooks
+  /**
+   * The turn's trace (`@tangle-network/agent-app/turn-trace`). Its id is sent as `traceId`, the
+   * `x-tangle-trace-id` the Sandbox API, orchestrator, sidecar and the Router's dispatch rows all record, and
+   * the stream is recorded as a `sandbox.prompt` span: the sidecar's first-text phases, the generation and
+   * each tool the box agent ran. Omitted, the SDK mints a trace id the app does not keep.
+   */
+  trace?: TurnTrace
+  /** The span the prompt hangs from. Default: the trace's root. */
+  traceParent?: TurnSpan
 }
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
@@ -3224,6 +3521,7 @@ async function* detachedSandboxPromptEvents(
           : {}),
         ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
         ...(options.ttlMs !== undefined ? { ttlMs: options.ttlMs } : {}),
+        ...(options.trace ? { traceId: options.trace.traceId } : {}),
       } as DispatchPromptOptions)
   const admittedExecutionId = admission?.executionId ?? executionId
   if (!admittedExecutionId) {
@@ -3249,6 +3547,7 @@ async function* detachedSandboxPromptEvents(
     sessionId: admission?.sessionId ?? sessionId,
     executionId: admittedExecutionId,
     lastEventId: lastEventId || '0',
+    ...(options.trace ? { traceId: options.trace.traceId } : {}),
     ...(options.signal ? { signal: options.signal } : {}),
   } as StreamPromptOptions)
 }
@@ -3589,14 +3888,29 @@ export async function* streamSandboxPrompt(
         ...(options?.expectedSecretProfileReceipt
           ? { expectedSecretProfileReceipt: options.expectedSecretProfileReceipt }
           : {}),
+        ...(options?.trace ? { traceId: options.trace.traceId } : {}),
         backend,
       } as StreamPromptOptions)
   const stream = options?.lastEventId ? dispatch() : resendRefusedDispatch(dispatch, options?.signal)
 
   emitSandboxActivity(options?.spend, box)
   let severedFinishReason: string | null = null
+  const observed = options?.trace
+    ? traceSandboxPromptEvents(stream, {
+      trace: options.trace,
+      ...(options.traceParent ? { parent: options.traceParent } : {}),
+      meta: {
+        'sandbox.id': box.id,
+        ...(options.model ? { 'gen_ai.request.model': options.model } : {}),
+        ...(options.harness ? { 'sandbox.harness': options.harness } : {}),
+        ...(options.detach ? { 'sandbox.detached': true } : {}),
+      },
+    })
+    : stream
+  let delivered = false
   try {
-    for await (const event of stream) {
+    for await (const event of observed) {
+      delivered = true
       const step = classifySeveredStream(event)
       if (step) severedFinishReason = step.kind === 'step-finish' && step.severed ? step.reason : null
       if (severedFinishReason && isTerminalPromptEvent(event)) {
@@ -3610,6 +3924,11 @@ export async function* streamSandboxPrompt(
       }
       yield event
     }
+  } catch (error) {
+    // The first call on a box handed out without an exec probe is its probe:
+    // the next ensure checks it in full.
+    if (!delivered && !options?.signal?.aborted) dropTrustedBox(box)
+    throw error
   } finally {
     // The box was working right up to here, however this turn ended — a throw,
     // an abandoned generator and a clean finish all bill the same.

@@ -1,0 +1,106 @@
+[
+  {
+    "theme": "agent-dark",
+    "width": 1280,
+    "height": 1000,
+    "condition": "normal",
+    "browser": "153.0.8010.12",
+    "errors": [],
+    "flow": "busy dialog/return, disclosure draft, grid edit, async action, settled terminal and synthetic API key",
+    "latency": "UNCHECKED: behavioral journeys are not2x40 latency batches or calibrated presented-frame measurements",
+    "terminal": {
+      "text": "Rendered page-1 → out/poster.png (1080x1080)",
+      "selected": "Rendered page-1 → out/poster.png (1080x1080)",
+      "whiteSpace": "pre-wrap"
+    },
+    "environment": {
+      "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        1000
+      ],
+      "dpr": 1,
+      "reduced": false,
+      "horizontalOverflow": false
+    },
+    "status": "PASS"
+  },
+  {
+    "theme": "agent-light",
+    "width": 1280,
+    "height": 1000,
+    "condition": "normal",
+    "browser": "153.0.8010.12",
+    "errors": [],
+    "flow": "busy dialog/return, disclosure draft, grid edit, async action, settled terminal and synthetic API key",
+    "latency": "UNCHECKED: behavioral journeys are not2x40 latency batches or calibrated presented-frame measurements",
+    "terminal": {
+      "text": "Rendered page-1 → out/poster.png (1080x1080)",
+      "selected": "Rendered page-1 → out/poster.png (1080x1080)",
+      "whiteSpace": "pre-wrap"
+    },
+    "environment": {
+      "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        1000
+      ],
+      "dpr": 1,
+      "reduced": false,
+      "horizontalOverflow": false
+    },
+    "status": "PASS"
+  },
+  {
+    "theme": "agent-dark",
+    "width": 390,
+    "height": 844,
+    "condition": "normal",
+    "browser": "153.0.8010.12",
+    "errors": [],
+    "flow": "busy dialog/return, disclosure draft, grid edit, async action, settled terminal and synthetic API key",
+    "latency": "UNCHECKED: behavioral journeys are not2x40 latency batches or calibrated presented-frame measurements",
+    "terminal": {
+      "text": "Rendered page-1 → out/poster.png (1080x1080)",
+      "selected": "Rendered page-1 → out/poster.png (1080x1080)",
+      "whiteSpace": "pre-wrap"
+    },
+    "environment": {
+      "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        390,
+        844
+      ],
+      "dpr": 1,
+      "reduced": false,
+      "horizontalOverflow": false
+    },
+    "status": "PASS"
+  },
+  {
+    "theme": "agent-light",
+    "width": 390,
+    "height": 844,
+    "condition": "normal",
+    "browser": "153.0.8010.12",
+    "errors": [],
+    "flow": "busy dialog/return, disclosure draft, grid edit, async action, settled terminal and synthetic API key",
+    "latency": "UNCHECKED: behavioral journeys are not2x40 latency batches or calibrated presented-frame measurements",
+    "terminal": {
+      "text": "Rendered page-1 → out/poster.png (1080x1080)",
+      "selected": "Rendered page-1 → out/poster.png (1080x1080)",
+      "whiteSpace": "pre-wrap"
+    },
+    "environment": {
+      "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        390,
+        844
+      ],
+      "dpr": 1,
+      "reduced": false,
+      "horizontalOverflow": false
+    },
+    "status": "PASS"
+  }
+]

@@ -15,11 +15,13 @@ Return only targets the viewer may attach; one available identity or target disp
 The identity display names the transport, because one Inkbox account can offer Email and iMessage with the same label.
 The host still enforces the selected connection, transport, and target during `connect()`.
 Set `answering` from an active SDK line attachment, not from `line.status` alone.
+For voice, also require confirmed enabled call routing; an attachment does not prove calls are answered.
 Set `lastTurn` to `latest`, `none`, or `unavailable` so a failed history read never looks like an empty conversation.
 Set `canDisconnect` only for lines this viewer may detach.
 Pass the SDK's `providerNumberId` on every line, including `null` for transports without one.
 For a WhatsApp connection with several numbers, expose each owned number as a separate identity with its provider number ID.
-When Hub requires manual entry, set `requiresPhoneNumberId`; reconnect enables only when the entered ID matches the disconnected line.
+SMS, WhatsApp, and voice always require a provider number ID, even without `requiresPhoneNumberId`.
+For other numbered providers, set `requiresPhoneNumberId`; reconnect enables only when the entered ID matches the disconnected line.
 The UI allows one non-released line per transport in that workspace.
 The server must enforce the same rule because two browser requests can race.
 If a write succeeds but the next read fails, the components keep the stale view visible with Retry and disable its mutation actions.
@@ -36,7 +38,10 @@ The server uses the published clients:
 - `hub.connections.list()` supplies owned connections.
 - `hub.allowances.plan()` and `hub.allowances.status()` supply allowance facts when configured.
 
-The currently published Sandbox SDK supports iMessage, WhatsApp, and email in `fromConnection()`.
+Sandbox 0.60.41 supports iMessage, SMS, WhatsApp, email, Telegram, and voice in `fromConnection()`.
+Voice binds an already-owned ph0ny number; Telegram takes no provider number ID.
+The generic UI delegates to the host's authenticated adapter. `createHostedAgent` and
+`ApplicationLineSetup` retain their narrower supported transport contracts.
 Offer a transport only when the owned connection and deployed Hub can serve it.
 An Inkbox handle line returns `routerAddress` and `connect`.
 Show its handle as the identity and label its action **Connect iMessage**.
@@ -52,6 +57,8 @@ This UI does not order or buy a number.
 Pass a `scopeKey` that changes with the authenticated viewer or workspace.
 For a one-member product, pass `maxMembers={1}` and `allowRemoveLastOwner` only when the server permits freeing the line.
 If owner enrollment differs from a normal invitation, set `canAdd={false}` and keep that enrollment in a verified product action.
+Voice requires a separate consent-aware member enrollment path: generic `LineMembers`
+invitations do not collect the SDK's required prior `voiceConsent` attestation.
 Hub marks a newly invited address as `invited` until its first message; STOP changes the state to `stopped`.
 The member must send START to resume replies.
 The server must enforce member caps and last-owner rules because another client can change membership between reads.

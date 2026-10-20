@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-259 exports.
+269 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -204,6 +204,14 @@ type AttachmentReadResult
 
 ```ts
 (name: string, actualBytes: number, limitBytes: number) => string
+```
+
+### `AttachmentStreamWriteOptions`
+
+`interface` — Options for a streamed write.
+
+```ts
+interface AttachmentStreamWriteOptions
 ```
 
 ### `attachmentTotalSizeErrorMessage`
@@ -630,6 +638,14 @@ interface ChatTurnRoutes
 interface ChatTurnTextPartInput
 ```
 
+### `ChatTurnTraceOptions`
+
+`interface` — Where a finished turn's trace goes, and the host's labels for its root span.
+
+```ts
+interface ChatTurnTraceOptions
+```
+
 ### `ChatTurnUsage`
 
 `interface` — Usage receipt persisted onto the assistant message (the flattened `step-finish` shape `/chat-store`'s columns mirror).
@@ -772,6 +788,14 @@ interface CreateLegacyAttachmentUploadRouteOptions
 
 ```ts
 interface CreateSandboxFileIndexRouteOptions
+```
+
+### `createStreamingSniffer`
+
+`function` — Start a {@link StreamingSniffer} for one file.
+
+```ts
+() => StreamingSniffer
 ```
 
 ### `createUploadRoute`
@@ -1358,6 +1382,22 @@ ReadonlySet<string>
 type OpenModelStream
 ```
 
+### `parseChatAttachmentInputs`
+
+`function` — Validate an `attachments` value's shape without reading the store: an array of at most `maxCount` {@link ChatAttachmentInput}s with valid, distinct paths.
+
+```ts
+(value: unknown, options?: ParseChatAttachmentInputsOptions) => { succeeded: true; value: ChatAttachmentInput[]; } | {…
+```
+
+### `ParseChatAttachmentInputsOptions`
+
+`interface` — Structural limits for {@link parseChatAttachmentInputs}.
+
+```ts
+interface ParseChatAttachmentInputsOptions
+```
+
 ### `parseChatTurnParts`
 
 `function` — Validates the untyped `parts` array off the wire.
@@ -1814,6 +1854,14 @@ interface SandboxUploadSink
 (bytes: Uint8Array<ArrayBufferLike>) => SniffResult
 ```
 
+### `sniffedMimeImpliedByName`
+
+`function` — The sniffed mime a filename's extension implies, when its format has an unambiguous magic-byte family (`.xlsx` → the spreadsheet mime).
+
+```ts
+(fileName: string) => string | undefined
+```
+
 ### `sniffMimeFromName`
 
 `function` — Default MIME hook: extension → mime, or `text/plain` for the unknown.
@@ -1854,6 +1902,22 @@ type StaleTurnLockSessionProbeResult
 (store: AssistantDraftStore) => boolean
 ```
 
+### `STREAM_SNIFF_HEAD_BYTES`
+
+`const` — Leading bytes a streamed classification keeps.
+
+```ts
+number
+```
+
+### `STREAM_SNIFF_TAIL_BYTES`
+
+`const` — Trailing bytes a streamed classification keeps for the zip reader.
+
+```ts
+number
+```
+
 ### `streamChatRouteAsSandboxEvents`
 
 `function` — Drive the normal persisted chat route and expose its events to an agent-gateway sandbox adapter.
@@ -1868,6 +1932,14 @@ type StaleTurnLockSessionProbeResult
 
 ```ts
 interface StreamChatRouteAsSandboxOptions
+```
+
+### `StreamingSniffer`
+
+`interface` — Classifies a file from its bytes as they stream past, holding at most {@link STREAM_SNIFF_HEAD_BYTES} + {@link STREAM_SNIFF_TAIL_BYTES} of it.
+
+```ts
+interface StreamingSniffer
 ```
 
 ### `streamPlanFollowUpEvents`
@@ -2076,4 +2148,12 @@ interface UploadedChatFile
 
 ```ts
 type WriteAttachmentFn
+```
+
+### `WriteAttachmentStreamFn`
+
+`type` — Streamed writer port for an upload too large to hold in memory.
+
+```ts
+type WriteAttachmentStreamFn
 ```

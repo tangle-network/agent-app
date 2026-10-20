@@ -4,7 +4,7 @@
 
 Source: `src/skills/index.ts`
 
-27 exports.
+42 exports.
 
 ### `assertSkillDeliveryDisjoint`
 
@@ -12,6 +12,14 @@ Source: `src/skills/index.ts`
 
 ```ts
 (inlineIds: Iterable<string>, mountedIds: Iterable<string>) => void
+```
+
+### `CatalogSkillEntry`
+
+`interface` — A shared-skill entry as it joins a product's local catalog: the namespaced mount id plus the description (annotated with the owner).
+
+```ts
+interface CatalogSkillEntry
 ```
 
 ### `ComposedSkills`
@@ -78,6 +86,30 @@ interface CorpusLoadResult
 (corpus: CorpusEntry[], anchor: string) => AgentProfileFileMount[]
 ```
 
+### `createInMemoryMarketplaceStore`
+
+`function` — Non-durable default for tests and single-instance products.
+
+```ts
+(entries: readonly MarketplaceSkill[]) => MarketplaceStore
+```
+
+### `createKVMarketplaceStore`
+
+`function` — A KV-backed read-only MarketplaceStore (Cloudflare KV or any lookalike).
+
+```ts
+(kv: { get(key: string): Promise<string | null>; }, prefix?: string) => MarketplaceStore
+```
+
+### `createStaticMarketplaceStore`
+
+`function` — Static-list store over a product-pinned catalog (checked into the product repo).
+
+```ts
+(entries: readonly MarketplaceSkill[]) => MarketplaceStore
+```
+
 ### `GlobModules`
 
 `type` — A Vite eager `?raw` glob result: glob key -> raw file body.
@@ -102,12 +134,76 @@ interface LoadCorpusOptions
 (options: LoadCorpusOptions, importMetaUrl?: string | undefined) => CorpusLoadResult
 ```
 
+### `marketplaceDiscoveryLine`
+
+`function` — The discovery fragment: one line naming every shared skill a foreign agent can mount, for system prompts and tool descriptions.
+
+```ts
+(shared: readonly MarketplaceSkill[]) => string | null
+```
+
+### `MarketplaceRow`
+
+`interface` — Publish helper for the write side (products/platform own the writer): render validated rows for the standard table (see `./skills/marketplace-drizzle` for the table itself).
+
+```ts
+interface MarketplaceRow
+```
+
+### `marketplaceRowsFor`
+
+`function`
+
+```ts
+(entries: readonly MarketplaceSkill[]) => readonly MarketplaceRow[]
+```
+
+### `MarketplaceSkill`
+
+`interface` — A shareable skill as the owning product publishes it.
+
+```ts
+interface MarketplaceSkill
+```
+
+### `MarketplaceStore`
+
+`interface` — Read-only view over a shared catalog.
+
+```ts
+interface MarketplaceStore
+```
+
+### `MAX_MARKETPLACE_ENTRIES`
+
+`const` — Bound on a shared catalog so discovery text stays a prompt-sized line, not a dump.
+
+```ts
+64
+```
+
 ### `mergeComposedSkills`
 
 `function` — Combine multiple {@link ComposedSkills} batches (e.g.
 
 ```ts
 (batches: ComposedSkills[]) => ComposedSkills
+```
+
+### `mergeSkillCatalogs`
+
+`function` — Union a product's local catalog with shared marketplace entries.
+
+```ts
+(local: readonly CatalogSkillEntry[], shared: readonly MarketplaceSkill[]) => readonly CatalogSkillEntry[]
+```
+
+### `namespacedSkillId`
+
+`function` — The mounted id for a shared skill: `product:id` (namespaced so a foreign skill can never shadow a local one).
+
+```ts
+(entry: { product: string; id: string; }) => string
 ```
 
 ### `parseCorpusSkills`
@@ -124,6 +220,14 @@ interface LoadCorpusOptions
 
 ```ts
 interface ParsedSkill
+```
+
+### `parseNamespacedSkillId`
+
+`function` — Split a namespaced id back into `{ product, id }`; a bare id resolves to product `null` (a local skill).
+
+```ts
+(mountedId: string) => { product: string | null; id: string; }
 ```
 
 ### `parseSkillFrontmatter`
@@ -220,4 +324,20 @@ interface SkillFrontmatter
 
 ```ts
 (skills: SkillEntry[], opts?: { tier?: string | undefined; }) => AgentProfileResourceRef[]
+```
+
+### `validateMarketplaceCatalog`
+
+`function` — Validate a whole shared catalog: entries well-formed, ids unique, size capped.
+
+```ts
+(entries: readonly MarketplaceSkill[]) => readonly MarketplaceSkill[]
+```
+
+### `validateMarketplaceSkill`
+
+`function` — Validate one marketplace entry — fail loud on a malformed catalog rather than silently mis-mounting it.
+
+```ts
+(entry: MarketplaceSkill) => MarketplaceSkill
 ```

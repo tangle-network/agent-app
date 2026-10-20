@@ -28,7 +28,7 @@ Reason 1 needs new node types, which belong to the renderer's package.
 The node union has ONE owner and it is not this package.
 `@tangle-network/agent-app/openui` declares only the narrowest structural port it needs — a node is `{ type: string }`, a form field is `{ id, kind, min?, max?, … }` — so a renderer node satisfies it by assignment and neither package imports the other.
 
-The `render_ui` tool advertises the renderer-owned JSON Schema and rejects unsupported nodes before calling a product handler.
+The `render_ui` tool accepts a renderer-owned OpenUI node object or JSON text encoding one node. The shared dispatcher decodes text once, validates the same strict node contract, and passes the validated object to the product handler. Malformed JSON, double-encoded text, arrays, unsupported nodes and unknown node fields fail before persistence.
 The default Cloudflare handler runs the same check before a direct vault write.
 Products with their own direct handler should call `validateOpenUIJsonNode` before persistence.
 The validator reports the path of an unsupported nested node so the agent can correct the call.

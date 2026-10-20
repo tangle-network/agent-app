@@ -1,0 +1,649 @@
+[
+  {
+    "theme": "agent-dark",
+    "width": 390,
+    "height": 844,
+    "condition": "normal",
+    "browser": "153.0.8010.12",
+    "errors": [],
+    "flow": "Affected application Dialog dismissal/focus/reopen, including withheld CSS end/cancel events",
+    "latency": "UNCHECKED: behavioral journeys are not2x40 latency batches or calibrated presented-frame measurements",
+    "instrument": {
+      "protocol": {
+        "batches": 2,
+        "attemptsPerBatch": 40,
+        "conditions": [
+          "normal",
+          "interrupted",
+          "reduced-motion"
+        ],
+        "cacheStates": [
+          "cold",
+          "warm"
+        ],
+        "selection": "Consecutive browser input starts; retain failures and identify capture exclusions before replacement.",
+        "percentile": "Sorted nearest rank ceil(p * n); separate action, condition, batch and cold/warm context.",
+        "cold": "New browser context without application cache.",
+        "warm": "Same loaded workflow after initialization.",
+        "spacing": "Reset the workflow and settle its visible state before the next declared attempt.",
+        "observationWindow": "Maximum computed interaction role time on the input target; missing or invalid roles retain an unresolved sample without observation.",
+        "presentation": "DOM state and frame callbacks are bounds, not a presented-frame measurement. Calibrated trace/recording evidence is required."
+      },
+      "roles": {
+        "--interaction-feedback-budget": {
+          "css": "100ms",
+          "ms": 100
+        },
+        "--interaction-pending-delay": {
+          "css": "200ms",
+          "ms": 200
+        },
+        "--interaction-long-work-delay": {
+          "css": "1000ms",
+          "ms": 1000
+        },
+        "--interaction-mutation-budget": {
+          "css": "500ms",
+          "ms": 500
+        }
+      },
+      "batch": null,
+      "samples": [
+        {
+          "attempt": 1,
+          "action": "control:Open action dialog",
+          "inputStart": 28137.60000014305,
+          "handlerStart": 28148.60000014305,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained.",
+          "observationWindowMs": 1000
+        },
+        {
+          "attempt": 2,
+          "action": "field:Dismiss draft",
+          "inputStart": 28500.200000047684,
+          "handlerStart": 28500.900000095367,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population.",
+          "observationWindowMs": 1000,
+          "domObserved": 28501.200000047684,
+          "frameBefore": 28507.264,
+          "frameAfter": 28507.3,
+          "elapsedBoundsMs": [
+            1,
+            7.099999952315557
+          ]
+        },
+        {
+          "attempt": 3,
+          "action": "control:checked-state",
+          "inputStart": 28609.299999952316,
+          "handlerStart": 28613.10000014305,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population.",
+          "observationWindowMs": 1000,
+          "domObserved": 28613.400000095367,
+          "frameBefore": 28607.266,
+          "frameAfter": 28623.9,
+          "elapsedBoundsMs": [
+            4.1000001430511475,
+            14.600000047685171
+          ]
+        },
+        {
+          "attempt": 4,
+          "action": "field:Dismiss write in flight",
+          "inputStart": 28618,
+          "handlerStart": 28618,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population.",
+          "observationWindowMs": 1000,
+          "domObserved": 28618.799999952316,
+          "frameBefore": 28607.266,
+          "frameAfter": 28623.9,
+          "elapsedBoundsMs": [
+            0.7999999523162842,
+            5.900000000001455
+          ]
+        },
+        {
+          "attempt": 5,
+          "action": "control:checked-state",
+          "inputStart": 29212.60000014305,
+          "handlerStart": 29214.900000095367,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population.",
+          "observationWindowMs": 1000,
+          "domObserved": 29215.200000047684,
+          "frameBefore": 29223.832,
+          "frameAfter": 29223.9,
+          "elapsedBoundsMs": [
+            2.5999999046325684,
+            11.299999856950308
+          ]
+        },
+        {
+          "attempt": 6,
+          "action": "field:Dismiss write in flight",
+          "inputStart": 29227.900000095367,
+          "handlerStart": 29227.900000095367,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population.",
+          "observationWindowMs": 1000,
+          "domObserved": 29228.900000095367,
+          "frameBefore": 29223.832,
+          "frameAfter": 29223.9,
+          "elapsedBoundsMs": [
+            1,
+            0
+          ]
+        },
+        {
+          "attempt": 7,
+          "action": "control:checked-state",
+          "inputStart": 29305.5,
+          "handlerStart": 29305.900000095367,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population.",
+          "observationWindowMs": 1000,
+          "domObserved": 29306.60000014305,
+          "frameBefore": 29307.3,
+          "frameAfter": 29323.9,
+          "elapsedBoundsMs": [
+            1.1000001430511475,
+            18.400000000001455
+          ]
+        },
+        {
+          "attempt": 8,
+          "action": "control:Open action dialog",
+          "inputStart": 29577.299999952316,
+          "handlerStart": 29596,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained.",
+          "observationWindowMs": 1000
+        },
+        {
+          "attempt": 9,
+          "action": "control:Cancel dialog",
+          "inputStart": 30038.60000014305,
+          "handlerStart": 30038.799999952316,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population.",
+          "observationWindowMs": 1000,
+          "domObserved": 30042.60000014305,
+          "frameBefore": 30040.5,
+          "frameAfter": 30057.2,
+          "elapsedBoundsMs": [
+            4,
+            18.59999985694958
+          ]
+        },
+        {
+          "attempt": 10,
+          "action": "control:Open command palette",
+          "inputStart": 30836.200000047684,
+          "handlerStart": 30851.10000014305,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained.",
+          "observationWindowMs": 1000
+        },
+        {
+          "attempt": 11,
+          "action": "disclosure:Dismiss command palette",
+          "inputStart": 31388,
+          "handlerStart": 31388.200000047684,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained.",
+          "observationWindowMs": 1000
+        },
+        {
+          "attempt": 12,
+          "action": "control:Open command palette",
+          "inputStart": 32685.299999952316,
+          "handlerStart": 32688.400000095367,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained.",
+          "observationWindowMs": 1000
+        },
+        {
+          "attempt": 13,
+          "action": "disclosure:Dismiss command palette",
+          "inputStart": 33037.200000047684,
+          "handlerStart": 33038.5,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant state observed within the computed role-backed observation window; unresolved input retained.",
+          "observationWindowMs": 1000
+        },
+        {
+          "attempt": 14,
+          "action": "control:Open command palette",
+          "inputStart": 33338,
+          "handlerStart": 33341.60000014305,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population.",
+          "observationWindowMs": 1000
+        },
+        {
+          "attempt": 15,
+          "action": "disclosure:Dismiss command palette",
+          "inputStart": 33750.5,
+          "handlerStart": 33751,
+          "batch": null,
+          "roleReadings": {
+            "--interaction-feedback-budget": {
+              "css": "100ms",
+              "ms": 100
+            },
+            "--interaction-pending-delay": {
+              "css": "200ms",
+              "ms": 200
+            },
+            "--interaction-long-work-delay": {
+              "css": "1000ms",
+              "ms": 1000
+            },
+            "--interaction-mutation-budget": {
+              "css": "500ms",
+              "ms": 500
+            }
+          },
+          "feedbackBudgetMs": 100,
+          "status": "UNCHECKED",
+          "reason": "No relevant presented frame has been calibrated. Missing changes remain in the sample population.",
+          "observationWindowMs": 1000
+        }
+      ],
+      "summaries": [
+        {
+          "group": [
+            "control:Open action dialog",
+            null
+          ],
+          "attempted": 2,
+          "unresolved": 2,
+          "candidateUpperBoundP50Ms": null,
+          "candidateUpperBoundP95Ms": null,
+          "candidateUpperBoundMaxMs": null,
+          "status": "UNCHECKED",
+          "reason": "Incomplete population: percentile and maximum summaries suppressed; unresolved attempts are retained."
+        },
+        {
+          "group": [
+            "field:Dismiss draft",
+            null
+          ],
+          "attempted": 1,
+          "unresolved": 0,
+          "candidateUpperBoundP50Ms": 7.099999952315557,
+          "candidateUpperBoundP95Ms": 7.099999952315557,
+          "candidateUpperBoundMaxMs": 7.099999952315557,
+          "status": "UNCHECKED",
+          "reason": "Candidate frame bounds require calibrated presented-frame evidence."
+        },
+        {
+          "group": [
+            "control:checked-state",
+            null
+          ],
+          "attempted": 3,
+          "unresolved": 0,
+          "candidateUpperBoundP50Ms": 14.600000047685171,
+          "candidateUpperBoundP95Ms": 18.400000000001455,
+          "candidateUpperBoundMaxMs": 18.400000000001455,
+          "status": "UNCHECKED",
+          "reason": "Candidate frame bounds require calibrated presented-frame evidence."
+        },
+        {
+          "group": [
+            "field:Dismiss write in flight",
+            null
+          ],
+          "attempted": 2,
+          "unresolved": 0,
+          "candidateUpperBoundP50Ms": 0,
+          "candidateUpperBoundP95Ms": 5.900000000001455,
+          "candidateUpperBoundMaxMs": 5.900000000001455,
+          "status": "UNCHECKED",
+          "reason": "Candidate frame bounds require calibrated presented-frame evidence."
+        },
+        {
+          "group": [
+            "control:Cancel dialog",
+            null
+          ],
+          "attempted": 1,
+          "unresolved": 0,
+          "candidateUpperBoundP50Ms": 18.59999985694958,
+          "candidateUpperBoundP95Ms": 18.59999985694958,
+          "candidateUpperBoundMaxMs": 18.59999985694958,
+          "status": "UNCHECKED",
+          "reason": "Candidate frame bounds require calibrated presented-frame evidence."
+        },
+        {
+          "group": [
+            "control:Open command palette",
+            null
+          ],
+          "attempted": 3,
+          "unresolved": 3,
+          "candidateUpperBoundP50Ms": null,
+          "candidateUpperBoundP95Ms": null,
+          "candidateUpperBoundMaxMs": null,
+          "status": "UNCHECKED",
+          "reason": "Incomplete population: percentile and maximum summaries suppressed; unresolved attempts are retained."
+        },
+        {
+          "group": [
+            "disclosure:Dismiss command palette",
+            null
+          ],
+          "attempted": 3,
+          "unresolved": 3,
+          "candidateUpperBoundP50Ms": null,
+          "candidateUpperBoundP95Ms": null,
+          "candidateUpperBoundMaxMs": null,
+          "status": "UNCHECKED",
+          "reason": "Incomplete population: percentile and maximum summaries suppressed; unresolved attempts are retained."
+        }
+      ],
+      "environment": {
+        "browser": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+        "viewport": [
+          390,
+          844
+        ],
+        "devicePixelRatio": 1,
+        "reducedMotion": false
+      },
+      "calibration": {
+        "status": "UNCHECKED",
+        "next": "Run the deliberately delayed fixture and correlate DOM/frame bounds with calibrated traces and recording frames."
+      },
+      "sourceRevision": "UNCHECKED until attached to the catalog manifest or exact gate receipt",
+      "installedBrandRevision": "UNCHECKED until attached from the frozen dependency/release receipt"
+    },
+    "status": "FAIL",
+    "error": "Error: Normal-motion close/reopen replaced the retained surface"
+  }
+]

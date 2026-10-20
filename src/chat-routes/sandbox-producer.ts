@@ -48,6 +48,7 @@ import {
   ModelFailoverExhaustedError,
   type ModelFailoverAttempt,
 } from '../model-resolution/failover'
+import type { ModelPolicy } from '../policy-filters/index'
 import {
   ModelFailoverTimeoutError,
   resolveEmptyTurnRetries,
@@ -124,6 +125,17 @@ export interface SandboxChatProducerOptions {
   /** Opt out of failover while still using {@link openEvents}. `false` collapses
    *  the chain to `model` alone. */
   modelFailover?: false
+  /**
+   * Product admission policy applied to every chain member — the RESOLVED
+   * preferred model AND every fallback — before its stream is opened. This is
+   * the execution-time half of policy enforcement: it covers the model
+   * whatever its source (request body, env, product default), and it is what
+   * stops a compliant model's mid-turn 502 from re-running the turn's data
+   * through a non-compliant fallback. A refused member is skipped with the
+   * refusal recorded in `modelFailover().attempts`; an all-refused chain
+   * exhausts. Omit → availability only (today's behavior).
+   */
+  modelPolicy?: ModelPolicy
   /** Maximum time to open/start one model event source through its first event.
    *  Default 120 seconds. This is separate from provider first-output latency
    *  so cold sandbox startup is not mislabeled as an inference failure. */
@@ -409,6 +421,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       models: chain,
       open: options.openEvents,
       log,
+      ...(options.modelPolicy ? { policy: options.modelPolicy } : {}),
       ...(options.openTimeoutMs !== undefined ? { openTimeoutMs: options.openTimeoutMs } : {}),
       ...(options.firstResponseTimeoutMs !== undefined
         ? { firstResponseTimeoutMs: options.firstResponseTimeoutMs }

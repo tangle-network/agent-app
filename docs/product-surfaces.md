@@ -29,11 +29,121 @@ cannot be expressed through its props. A canvas or other workbench can use the
 available width instead of the bounded `PageShell`.
 
 For a product example, read Platform's
-[DashboardStats](https://github.com/tangle-network/agent-dev-container/blob/main/products/platform/web/src/client/components/dashboard/DashboardStats.tsx)
+[DashboardStats](https://github.com/tangle-network/agent-container/blob/main/products/platform/web/src/client/components/dashboard/DashboardStats.tsx)
 for related metrics and a loading state matching their layout. Follow the
 [empty-state pattern](#pattern-1--empty-state) for first use, filtered results,
 and failed loads. Check the actual page at desktop and phone widths with long
 values and those states; component selection alone does not prove the result.
+
+## Settings pages
+
+A page whose job is changing how a workspace, team or account behaves is a
+settings page, and it composes `@tangle-network/agent-app/settings-react`.
+Rows, cards and fields are `@tangle-network/ui/primitives` (`SettingsSection`,
+`SettingsRow`, `SettingsList`, `SettingsListItem`, `Field`); `settings-react`
+composes them, so a change at the source reaches every product on its next
+version bump. Read the [settings page story](../src/stories/settings/settings-demo.tsx)
+for a whole page.
+
+**Layout.** `SettingsLayout` takes the title, the workspace name as
+`description`, an optional `meta` line, the `sections` (`id`, `label`, `href`,
+`icon`, `hidden`, `badge`), the route's `activeId`, the router's
+`LinkComponent` and an `onIntent` hook that warms a section's route module.
+Each section is its own URL and route, and its loader reads only that section's
+data. A section holds at most four cards. From 60rem of content the sections are
+a sticky column; below it they are a 56px tab strip that keeps the current tab
+in view. The nav marks a clicked section current at once and never dims the
+page; a progress line shows only after the pending delay. Every card has an
+`id`, and `#id` links scroll to it and focus its heading. A page with its own
+frame passes `SettingsNav` to `PageShell measure="settings"` instead.
+
+**Rows.**
+
+- The label is on the left and one `md` control is on the right; switches and
+  single buttons stay on the line (`layout="compact"`), and text areas and
+  lists take the full width (`layout="stacked"`).
+- Most rows have no description. A description is one line that states a
+  consequence the person needs before acting, such as billed compute. Help that
+  explains a setting goes in `info`. Field paths and implementation notes never
+  appear.
+- A setting the viewer cannot change shows `disabledReason`, a sentence naming
+  who can change it, rather than disappearing.
+- In lists, the title is the link to the item, one verb is the at-rest action,
+  and Remove, Revoke and Delete live only in the ⋯ menu, each behind a
+  confirmation.
+- Text is 14px throughout, with 16px card titles and a 20px page title.
+
+**Saving.** A change that adds cost or reach asks first; a change that reduces
+it saves at once.
+
+- Low-risk, reversible settings autosave through `useSettingField`. Picks and
+  switches save on change; text saves on blur or Enter, shows "Unsaved" while
+  edited, and Escape restores it. Writes go one at a time: a change made while
+  one is in flight waits for it, so the server ends on the person's last choice.
+  When the server keeps a normalised value, such as a trimmed name, the control
+  shows that value and the row shows "Saved". A `debounceMs` change still
+  waiting when the section unmounts is sent then, not dropped.
+- "Saving…" appears only after `--interaction-pending-delay`. "Saved" appears
+  only on a confirmed write (`useConfirmedMutation`) and fades after two
+  seconds.
+- A refusal replaces the row's description with the server's sentence and a
+  Retry, and the control keeps the person's value. A failure is never shown
+  only as a toast.
+- Settings routes refuse with
+  `{ error: { code, message, field?, retryAfterSeconds? } }`, and
+  `confirmSettingResponse` turns that into the row's message. A request that
+  never arrives is the `network` code.
+- A field's `save` resolves with the value the server kept, and the control
+  shows it. For a route that answers `{ success: true }` or 204, that is the
+  value sent: `confirmSettingResponse(fetch(...), () => next)`. For a route
+  that answers with the saved record, `parse` reads the kept value from it.
+  Without `parse` the confirmed value is the body, typed `unknown`, so a
+  `save` that returns it does not type-check.
+- An action that sends, starts a job or adds one entry (send now, export,
+  invite) shows its result in its own row.
+- Billed, external, removing or high-reach changes go through `ConfirmAction`.
+  It names the consequence and any from → to `changes`, can require the
+  workspace name, and closes only on a confirmed write. It opens on its first
+  field, or on Cancel, so Enter never confirms by accident. Below 40rem it is a
+  bottom sheet. A refusal stays in the dialog with the server's sentence and
+  the `refusalAction` that answers it, such as View plans for `plan_limit`.
+- Values that only make sense together use the page's one `SettingsSaveBar`.
+  Its "Saved" fades after two seconds too. While it has something to report
+  (unsaved changes, a refusal, "Saved", or a `summary` after a save) it stays
+  in reach: as a card's footer it sticks to the bottom of the screen on a
+  narrow card. When one save covers several cards, such as an agent profile
+  and its knowledge, it goes after the last of them with `placement="group"`
+  and then sticks to the bottom of the screen at every width, over every card
+  above it, so an edit in the first card never leaves Save out of view.
+- The danger card's button is an outline destructive button at rest; the
+  filled destructive button is in the dialog.
+
+**Shared sections.** `MembersSection` and `InvitationsSection` take the teams
+module's `MemberView`, `InvitationView` and role ladder. They name roles by
+capability, and the open role list says in one line what each role adds. On a
+narrow card the role picker takes its own full-width line. The lists offer no
+role change or removal for an owner, an inherited organization admin or the
+viewer's own row. A past invitation says in words that it was joined, expired or
+revoked. A seat-limit refusal on Invite links to `plansHref` as View plans,
+through the app's `LinkComponent`. The `teams-react` `MembersPanel` and
+`InvitationsPanel` follow the same rules (`MembersPanel` takes
+`currentUserId`). They stay for the pages that render them today, and they
+retire once Tax, Legal and GTM adopt the sections
+([#1136](https://github.com/tangle-network/agent-app/issues/1136)).
+`ExportSection` runs the workspace export as rows. `DeleteWorkspaceSection`
+counts what goes and asks for the name. `TimezonePicker` searches zones by city
+or UTC offset. Product rows go in the same cards from the same atoms.
+
+**Enforcement.** `tangle-drift` in `@tangle-network/brand` 1.26.0 and later
+gates `settings_layout`: a settings route or page file that imports nothing from
+`@tangle-network/agent-app/settings-react` (and sits under no settings layout
+that does) counts against its product. Each product's baseline in
+`drift-baseline.json` only falls, so a new local settings page fails that
+product's drift check, and adopting `SettingsLayout` and deleting the local
+layout lowers the count. In this repository, `tests/web-react/shell-type-floor.test.ts`
+holds `settings-react` to the 14px floor, and `scripts/prove-settings-pages.mjs`
+drives the built package through every saving, saved, failed, locked and
+confirm state at 1280 and 390 wide in both themes.
 
 ## The one principle behind every naming call here
 
@@ -235,7 +345,7 @@ The ruler, track lanes, and time grid make timing visible before playback.
   might fail. Nothing else on the surface destroys anything, which is what lets
   every other control stay one click with no dialog.
 
-### Teams (`teams-react`) & Intakes (`intakes-react`)
+### Teams (`teams-react`) & Intakes (`intakes`)
 - **Teams purpose:** invite people, set roles, manage the org. Goal: *"give the
   right people the right access."* First impression: roles named by capability
   ("Can publish", "Can only view"), not abstract tiers.

@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-507 exports.
+519 exports.
 
 ### `acceptRejectionReason`
 
@@ -260,6 +260,14 @@ interface AgentSettingsPopoverProps
 
 ```ts
 interface AgentSetupBlockProps
+```
+
+### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
+
+`const` — Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats `sniffBinary` can identify from content among the accepted types.
+
+```ts
+ReadonlySet<string>
 ```
 
 ### `ApiAccessKey`
@@ -1384,7 +1392,7 @@ type FetchSessionPage
 
 ### `fieldPickerTriggerClass`
 
-`function` — Trigger classes for a `field` picker.
+`function` — Trigger classes for a `field` picker: `@tangle-network/ui`'s own field presentation and `md` field size, the classes its `Input` and `SelectTrigger` draw, so a model, harness or timezone selector sit…
 
 ```ts
 ({ interactive }?: { interactive?: boolean | undefined; }) => string
@@ -2286,6 +2294,14 @@ type NoticeKind
 type NoticePersistedPart
 ```
 
+### `OOXML_SNIFFED_MIMES`
+
+`const` — The Office (OOXML) package mimes the default allow-list admits — the formats professionals actually send: Word contracts, Excel workpapers, PowerPoint decks.
+
+```ts
+ReadonlySet<string>
+```
+
 ### `OVERLAY_SHADOW`
 
 `const` — The one overlay elevation for floating surfaces — picker menus, popovers, drawers, modals.
@@ -3094,6 +3110,70 @@ interface ResourceFileLimits
 interface RestoreChatInteractionsOptions
 ```
 
+### `ReviewFeedbackDraft`
+
+`interface`
+
+```ts
+interface ReviewFeedbackDraft
+```
+
+### `ReviewFeedbackForm`
+
+`function` — One form for Hub previews, assets and work products.
+
+```ts
+ForwardRefExoticComponent<ReviewFeedbackFormProps & RefAttributes<ReviewFeedbackFormHandle>>
+```
+
+### `ReviewFeedbackFormHandle`
+
+`interface`
+
+```ts
+interface ReviewFeedbackFormHandle
+```
+
+### `ReviewFeedbackFormProps`
+
+`interface`
+
+```ts
+interface ReviewFeedbackFormProps
+```
+
+### `ReviewInbox`
+
+`function` — One oldest-first review round.
+
+```ts
+({ items, initialSelectedId, renderItem, onVerdict, onFeedback, loading, error, onRefresh }: ReviewInboxProps) => Eleme…
+```
+
+### `ReviewInboxFeedback`
+
+`interface`
+
+```ts
+interface ReviewInboxFeedback
+```
+
+### `ReviewInboxItem`
+
+`interface`
+
+```ts
+interface ReviewInboxItem
+```
+
+### `ReviewInboxProps`
+
+`interface`
+
+```ts
+interface ReviewInboxProps
+```
+
 ### `ReviewQueueItem`
 
 `interface` — One row of the review queue projection for an engagement scope
@@ -3132,6 +3212,14 @@ interface ReviewQueuePanelProps
 
 ```ts
 type ReviewQueueState
+```
+
+### `ReviewVerdict`
+
+`type`
+
+```ts
+type ReviewVerdict
 ```
 
 ### `rollUpProvenanceStanding`
@@ -3668,6 +3756,14 @@ type UseChatInteractionsOptions
 
 ```ts
 interface UseChatInteractionsResult
+```
+
+### `useChatScroll`
+
+`function` — Follow a growing transcript only while its reader stays at the bottom.
+
+```ts
+() => { viewportRef: Dispatch<SetStateAction<HTMLDivElement | null>>; contentRef: Dispatch<SetStateAction<HTMLDivElemen…
 ```
 
 ### `useComposerAttachments`

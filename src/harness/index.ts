@@ -1,22 +1,13 @@
 /**
- * Coding-agent harness selection — taxonomy, coercion, and the session-lock invariant.
+ * Coding-agent harness selection, model compatibility, and the session lock.
  *
- * A "harness" is the coding-agent CLI a sandbox drives (opencode / codex /
- * claude-code / …). The shell governs WHICH harness a chat session uses and
- * enforces that a session is LOCKED to the harness it started with — the model
- * may change mid-session, the harness may not (swapping it mid-session would
- * orphan the session's running agent state). Every product otherwise hand-rolls
- * this and hard-codes a single harness; this is the one place the rule lives.
+ * Known identities are not a deployment's available runners. Products supply
+ * server-owned availability to resolveSessionHarness. Historical session IDs
+ * remain intact when their runner is unavailable; a harness change requires an
+ * explicit transfer, not a fallback or a rewritten session lock.
  *
- * Substrate-free: the harness list is derived from `@tangle-network/agent-interface`'s canonical
- * harness enum and mirrors the sandbox SDK's `BackendType` (no sandbox dependency). The consumer
- * owns storage — which harness a workspace defaults to, which one a session locked — and maps the
- * resolved value onto the SDK's `backend.type`.
- *
- * Harness↔model COMPATIBILITY (which models a harness can run, snapping) is NOT defined here — it
- * comes from `@tangle-network/agent-interface`, the single source of truth shared with the
- * sandbox-ui pickers and the cli-bridge backends. This module owns the harness TAXONOMY + the
- * session lock, and its server assertion also checks resolved transport-provider evidence.
+ * Model compatibility is owned by @tangle-network/agent-interface. The shell
+ * owns session selection; the consumer owns storage and deployment policy.
  */
 
 import {
@@ -29,23 +20,25 @@ import {
   snapModelToHarness as aiSnapModelToHarness,
   type HarnessType,
 } from '@tangle-network/agent-interface'
+import {
+  selectSessionHarness,
+  type HarnessAvailability as SelectionAvailability,
+  type SessionHarnessSelection,
+  type SessionHarnessSelectionInput,
+} from './session-selection'
 
-/**
- * Canonical harnesses that are NOT sandbox backends. Each value in `KNOWN_HARNESSES` is dispatched
- * as `backend.type`, so a harness the platform ships no provider adapter for must stay out —
- * offering it would resolve a session onto a runner that cannot start.
- */
+export { HarnessSelectionError } from './session-selection'
+
+/** Canonical identities that have no direct Sandbox backend. */
 const NON_BACKEND_HARNESSES = ['gemini'] as const satisfies readonly HarnessType[]
-
 const nonBackendHarnesses = new Set<string>(NON_BACKEND_HARNESSES)
 
-/** A coding-agent backend this shell can dispatch a session onto. */
+/** A recognized coding-agent backend, not a promise that it is installed. */
 export type Harness = Exclude<HarnessType, (typeof NON_BACKEND_HARNESSES)[number]>
 
 /**
- * The known coding-agent backends: the canonical harness set minus what has no provider adapter,
- * Derived from `harnessTypeSchema.options` so a harness added upstream reaches this shell without
- * an edit here, and kept structural so this module still needs no sandbox dependency.
+ * Recognized backend identities, including IDs needed by historical sessions.
+ * Use deployment availability, not membership here, to offer or admit new runs.
  */
 export const KNOWN_HARNESSES: readonly Harness[] = [
   ...harnessTypeSchema.options.filter(
@@ -54,62 +47,38 @@ export const KNOWN_HARNESSES: readonly Harness[] = [
   ),
 ]
 
-/** Define the default harness to use for code execution and testing environments */
+/** Default for an absent choice; never a replacement for an invalid explicit ID. */
 export const DEFAULT_HARNESS: Harness = 'opencode'
-
 const HARNESS_SET: ReadonlySet<string> = new Set(KNOWN_HARNESSES)
 
-/** Determine if a value is a recognized harness string identifier */
+/** Determine whether a value is a recognized identity, independently of availability. */
 export function isHarness(value: unknown): value is Harness {
   return typeof value === 'string' && HARNESS_SET.has(value)
 }
 
-/** Coerce an arbitrary value to a known harness, falling back (default `opencode`). */
+/** Display/config convenience only. Never use coercion to admit an execution or restore a lock. */
 export function coerceHarness(value: unknown, fallback: Harness = DEFAULT_HARNESS): Harness {
   return isHarness(value) ? value : fallback
 }
 
-/** Resolve input options to determine the appropriate session harness to use */
-export interface ResolveSessionHarnessInput {
-  /** The harness already locked to this session (recorded at its first turn). */
-  sessionHarness?: unknown
-  /** The harness requested now — a new session's choice, or a turn's attempt to switch. */
-  requested?: unknown
-  /** The workspace's default harness, used only when starting a fresh session. */
-  workspaceDefault?: unknown
-  /** Final fallback when nothing else resolves (default `opencode`). */
-  fallback?: Harness
-}
+/** Server-owned start and resume sets. Existing-only entries are draining. */
+export type HarnessAvailability = SelectionAvailability<Harness>
 
-/** Represent resolved session state including harness, lock status, and swap attempt flag */
-export interface ResolvedSessionHarness {
-  /** The harness to actually run — the locked one when the session already has it. */
-  harness: Harness
-  /** True when the session already had a locked harness (this turn did not pick it). */
-  locked: boolean
-  /** True when `requested` differs from the locked harness — a forbidden mid-session
-   *  swap the caller should reject or warn on. The lock always wins regardless. */
-  swapAttempted: boolean
-}
+/** A saved lock, explicit choice, workspace default, and optional deployment availability. */
+export type ResolveSessionHarnessInput = SessionHarnessSelectionInput<Harness>
+
+/** The selected identity and the existing session-lock/swap-attempt result. */
+export type ResolvedSessionHarness = SessionHarnessSelection<Harness>
 
 /**
- * Resolve the harness for a turn, enforcing the session lock.
- *
- * - **Session already started** (`sessionHarness` is a known harness): that harness
- *   wins (`locked: true`); a differing `requested` sets `swapAttempted` so the caller
- *   can reject the swap. The model is a separate per-turn concern and is unaffected.
- * - **Fresh session**: pick `requested → workspaceDefault → fallback`. The caller
- *   persists the result as the session's lock for every subsequent turn.
+ * Resolve requested → workspaceDefault → fallback only for a genuinely new session.
+ * A non-null saved identity always takes the lock path. Unknown/retired identities
+ * and invalid explicit requests throw HarnessSelectionError instead of falling back.
+ * A known different request still reports swapAttempted while preserving the lock.
+ * The caller must reject that attempt before execution, as in the existing contract.
  */
 export function resolveSessionHarness(input: ResolveSessionHarnessInput = {}): ResolvedSessionHarness {
-  const fallback = input.fallback ?? DEFAULT_HARNESS
-  if (isHarness(input.sessionHarness)) {
-    const locked = input.sessionHarness
-    const swapAttempted = isHarness(input.requested) && input.requested !== locked
-    return { harness: locked, locked: true, swapAttempted }
-  }
-  const harness = coerceHarness(input.requested, coerceHarness(input.workspaceDefault, fallback))
-  return { harness, locked: false, swapAttempted: false }
+  return selectSessionHarness(input, KNOWN_HARNESSES, DEFAULT_HARNESS)
 }
 
 /**
@@ -155,14 +124,7 @@ export function configuredHarness(config: HarnessConfig, workspaceId?: string): 
   return (workspaceId === undefined ? undefined : parsed.get(workspaceId)) ?? appDefault
 }
 
-/**
- * Harness ↔ model compatibility + snapping — delegated to `@tangle-network/agent-interface`.
- *
- * `Harness` is the dispatchable subset of `HarnessType`: this shell drops only canonical harnesses
- * for which the platform has no backend. Compatibility therefore comes entirely from Interface;
- * this package keeps no second harness taxonomy.
- */
-
+/** Harness-model compatibility is delegated to the Interface owner. */
 export { modelProvider }
 
 /** A resolved model and the transport provider that will execute it. */
@@ -224,4 +186,44 @@ export function assertHarnessModelCompatible(
         `Use ${native ?? 'a router-backed harness (opencode)'} or an allowed model.`,
     )
   }
+}
+
+// Profile-support facts remain here until the materializer supplies its owned descriptor.
+// Do not confuse these facts with deployment availability.
+
+/** What a harness can express, for profile assembly. */
+export interface HarnessCapabilities {
+  /** Lower profile.subagents into native cwd files; false means materialization refuses them. */
+  subagents: boolean
+  /** How profile.mcp reaches the harness. */
+  mcp: 'native' | 'config-file' | 'extension' | 'none'
+  /** Whether tool controls are checked before MCP tools register. */
+  toolControls: 'startup' | 'runtime'
+  /** cwd-relative skill directory, or null when skills must be inlined. */
+  skillsDir: string | null
+}
+
+const HARNESS_CAPABILITIES: Record<Harness, HarnessCapabilities> = {
+  'claude-code': { subagents: true, mcp: 'native', toolControls: 'runtime', skillsDir: '.claude/skills' },
+  nanoclaw: { subagents: true, mcp: 'native', toolControls: 'runtime', skillsDir: '.claude/skills' },
+  opencode: { subagents: true, mcp: 'config-file', toolControls: 'runtime', skillsDir: '.opencode/skills' },
+  codex: { subagents: true, mcp: 'config-file', toolControls: 'runtime', skillsDir: '.codex/skills' },
+  'kimi-code': { subagents: false, mcp: 'config-file', toolControls: 'runtime', skillsDir: '.kimi/skills' },
+  pi: { subagents: false, mcp: 'extension', toolControls: 'startup', skillsDir: '.pi/skills' },
+  prime: { subagents: true, mcp: 'native', toolControls: 'runtime', skillsDir: '.prime/agent/skills' },
+  hermes: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  openclaw: { subagents: false, mcp: 'config-file', toolControls: 'runtime', skillsDir: 'skills' },
+  acp: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  amp: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  'factory-droids': { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  forge: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  cursor: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  'cli-base': { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+}
+
+/** Profile-support facts, independent of whether this deployment enables the harness. */
+export function harnessCapabilities(harness: Harness): HarnessCapabilities {
+  const caps = HARNESS_CAPABILITIES[harness]
+  if (!caps) throw new Error(`harnessCapabilities: no capability facts for "${harness}"`)
+  return caps
 }

@@ -9,7 +9,7 @@ until their paid-service credentials migrate. OIDC failure never falls back
 to `/cross-site/*`. This PR does not change an authorization-server route.
 
 The rejected alternative was to put `accessToken` into `apiKey`. That would
-misrepresent authorization. At agent-dev-container commit
+misrepresent authorization. At agent-container commit
 `7c3bef974c6e005771223b421383d919ffe39679`,
 `products/platform/api/src/lib/control-plane-scopes.ts` excludes `admin` and
 `sandbox:*` from `OAUTH_GRANTABLE_SCOPES`. At runtime merge
