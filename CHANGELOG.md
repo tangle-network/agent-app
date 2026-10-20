@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.236
+
+- refactor(composer): separate send commands and file intake (#1200)
+- refactor(chat): separate message rendering responsibilities (#1199)
+- refactor(records): separate grid editing review and sources (#1198)
+
 ## 0.60.235
 
 - refactor(chat): separate session history responsibilities (#1197)
