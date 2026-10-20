@@ -5,14 +5,19 @@
  * default implementation — agent-app owns the size/budget/idempotency
  * mechanism, the product owns where the bytes actually live.
  *
- * One reader, two callers: `resolveChatAttachments` reads only the
+ * One reader serves validation, materialization, and dispatch:
+ * `resolveChatAttachments` reads only the
  * authoritative `size` (never trusting the client-reported size), while
  * `buildDispatchParts` reads the inline `content` (base64 or raw bytes) to
- * build a `data:` URI. Both fit behind ONE `ReadAttachmentFn` so a product
+ * build a `data:` URI. `prepareDispatchAttachments` copies raw bytes when a
+ * product opts in. All share `ReadAttachmentFn` so a product
  * wires a single vault/object-store adapter, not two. gtm's KV vault (stores
  * base64 bodies) and `/object-store`'s `ObjectStore` (hands back raw bytes)
  * both satisfy this shape.
  */
+
+import type { ChatAttachmentPart } from '../chat-store/parts'
+import { DISPATCH_MAX_MEDIA_PARTS } from './wire'
 
 /**
  * The result of reading one stored attachment. `ok:true` MUST carry the
@@ -47,6 +52,61 @@ export type AttachmentReadResult =
  * turn-level exception.
  */
 export type ReadAttachmentFn = (scopeId: string, path: string) => Promise<AttachmentReadResult>
+
+/** Opt-in copy from the product attachment store to its already-authorized box.
+ *  Uploads are sequential and their returned byte counts must match the store.
+ *  The product retains its missing-content sentence and the surrounding trace span. */
+export interface AttachmentMaterialization {
+  upload: (absolutePath: string, bytes: Uint8Array) => Promise<{ size: number }>
+  missingBytesMessage: (path: string) => string
+}
+
+/** Attachment preparation shared by combined dispatch and products whose
+ *  prompt is constructed only after their materialization span has finished. */
+export interface PrepareDispatchAttachmentsInput {
+  attachments: ChatAttachmentPart[]
+  historyAttachments?: readonly ChatAttachmentPart[]
+  mentionCount?: number
+  scopeId: string
+  readAttachment: ReadAttachmentFn
+  resolveAttachmentPath: (path: string) => string
+  materialize?: AttachmentMaterialization
+}
+
+/** Select carried files and optionally copy them before constructing a prompt.
+ *  Omitted history and materialization preserve the supplied attachment list.
+ *  `slice(-0)` intentionally retains the apps' current zero-slot behavior. */
+export async function prepareDispatchAttachments(input: PrepareDispatchAttachmentsInput): Promise<ChatAttachmentPart[]> {
+  const historyBudget = Math.max(
+    0,
+    DISPATCH_MAX_MEDIA_PARTS - input.attachments.length - (input.mentionCount ?? 0),
+  )
+  const attachments = input.historyAttachments === undefined ? input.attachments : [
+    ...input.attachments,
+    ...input.historyAttachments.slice(-historyBudget),
+  ]
+  const materialize = input.materialize
+  if (!materialize) return attachments
+  const written = new Set<string>()
+  for (const part of attachments) {
+    const target = input.resolveAttachmentPath(part.path)
+    if (written.has(target)) continue
+    written.add(target)
+
+    const read = await input.readAttachment(input.scopeId, part.path)
+    if (!read.ok) throw new Error(read.reason)
+    if (!read.bytes) {
+      throw new Error(materialize.missingBytesMessage(part.path))
+    }
+    const result = await materialize.upload(target, read.bytes)
+    if (result.size !== read.size) {
+      throw new Error(
+        `Sandbox attachment size mismatch for ${part.path}: expected ${read.size}, uploaded ${result.size}`,
+      )
+    }
+  }
+  return attachments
+}
 
 /** The ownership identity for one attempted write. The upload and promotion
  * routes create a unique path for each attempt, and the product adapter stores

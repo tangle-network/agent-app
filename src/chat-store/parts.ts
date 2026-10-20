@@ -494,6 +494,23 @@ export function attachmentPartsFromMessageParts(
   return parts.filter(isChatAttachmentPart)
 }
 
+/** Attachment carry-forward in first-seen path order. Current-turn paths
+ *  are excluded; a later history row replaces a path's value without moving
+ *  the Map entry, matching the existing product dispatches. */
+export function historyAttachmentsFromMessages(
+  currentAttachments: ReadonlyArray<Pick<ChatAttachmentPart, 'path'>>,
+  priorMessages: ReadonlyArray<{ parts?: ReadonlyArray<Record<string, unknown>> | null }>,
+): ChatAttachmentPart[] {
+  const currentPaths = new Set(currentAttachments.map((part) => part.path))
+  const historyByPath = new Map<string, ChatAttachmentPart>()
+  for (const message of priorMessages) {
+    for (const part of attachmentPartsFromMessageParts(message.parts)) {
+      if (!currentPaths.has(part.path)) historyByPath.set(part.path, part)
+    }
+  }
+  return [...historyByPath.values()]
+}
+
 /** gtm's exact default header for {@link buildAttachmentPromptBlock} — kept
  *  byte-identical because it feeds dispatched prompts (gtm-agent#618
  *  reproduces the prompt bytes through this module). Override only with intent. */
