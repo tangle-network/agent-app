@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.233
+
+- fix(trace): parent Router requests to the model call span
+- fix(signoff): isolate fixture identity after PR1108 (#1194)
+
 ## 0.60.232
 
 - refactor(web-react): separate picker and popover responsibilities (#1193)
