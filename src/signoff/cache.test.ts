@@ -73,8 +73,13 @@ describe('signoff cache retention', () => {
   it('keeps a detached check and its store after the coordinator exits', async () => {
     const cacheDir = root()
     const tree = join(cacheDir, 'trees', 'detached-check')
-    mkdirSync(tree, { recursive: true })
-    writeFileSync(join(tree, '.git'), 'active tree')
+    const repo = root()
+    git(['init', '--quiet', '--initial-branch=main'], repo)
+    writeFileSync(join(repo, 'README.md'), 'fixture\n')
+    git(['add', '.'], repo)
+    git(['commit', '--quiet', '-m', 'fixture'], repo)
+    mkdirSync(join(cacheDir, 'trees'))
+    git(['worktree', 'add', '--detach', '--quiet', tree], repo)
     const key = 'd'.repeat(64)
     const path = store(cacheDir, key, 32 * 1024)
     const coordinator = spawnSync(process.execPath, ['--input-type=module', '-e', `
@@ -100,7 +105,6 @@ describe('signoff cache retention', () => {
       process.kill(pid, 'SIGTERM')
     }
     // A terminated orphan may remain a zombie briefly; it no longer has a cwd or environment.
-    rmSync(join(tree, '.git'))
     let removed: readonly string[] = []
     for (let attempt = 0; attempt < 100 && !removed.includes(path); attempt++) {
       await delay(20)
