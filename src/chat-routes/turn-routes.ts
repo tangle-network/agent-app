@@ -1158,7 +1158,7 @@ export function createChatTurnRoutes<TContext = void>(
 
     if (options.turnLock?.warm) {
       // Overlaps the lock's first-use cost with prepareTurn and the history read.
-      // Its span shows that cost: a thread's first turn creates the lock's Durable Object.
+      // Its span shows that cost: waking the workspace channel that holds the lock.
       const warmSpan = trace.start('admission.lock_warm', 'admission')
       const warmFailed = (err: unknown) => {
         warmSpan.end(undefined, err)

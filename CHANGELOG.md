@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.211
+
+- perf(turn-stream): keep thread locks on the workspace channel (#1170)
+
 ## 0.60.210
 
 - fix(tools): validate JSON text render UI nodes before dispatch (#1169)
