@@ -13,7 +13,8 @@ import { trackedFiles, trackedWorkerConfigs } from './worker-defaults'
  * It is a report: it fails only on an explicit opt-out that gives no reason, so a gap stays visible without
  * blocking a merge, and an exemption is a line in the app's `signoff.config.mjs` with the reason beside it.
  *
- * The rows are the outcomes Drew named on 2026-10-19: the turn trace on every turn with `first_text_ms`, the shared
+ * The rows are the outcomes Drew named on 2026-10-19: the turn trace on every turn with `first_text_ms` (a turn handed
+ * to a completion owner included), the shared
  * prewarm route, Worker placement beside the D1 primary, limit alarms wired in the server entry, and the Worker
  * upload size against Cloudflare's limit. A row is read from the source, the Wrangler config and the lockfile; it
  * never runs the app.
@@ -36,6 +37,8 @@ export type AppDefaultsExemptions = Readonly<Partial<Record<ExemptibleDefault, s
 const AGENT_APP_OUTCOME_FLOORS = [
   { id: 'turn-trace', label: 'turn trace', since: '0.60.199' },
   { id: 'first-text', label: 'first text', since: '0.60.203' },
+  // createChatTurnRoutes exports every turn without a sink option, and a turn handed to `handoffCompletion` too.
+  { id: 'default-trace', label: 'default turn trace', since: '0.60.221' },
 ] as const
 
 type DefaultStatus = 'ok' | 'gap' | 'unknown' | 'exempt' | 'opted-out' | 'na'
@@ -184,6 +187,28 @@ interface SinkCall {
   readonly project: string | null
 }
 
+/** A string a property names, given directly or through a `const` in the same file. */
+function namedString(text: string, args: string, property: string): string | null {
+  const direct = new RegExp(`\\b${property}\\s*:\\s*['"\`]([^'"\`]+)['"\`]`).exec(args)
+  if (direct) return direct[1] ?? null
+  const named = new RegExp(`\\b${property}\\s*:\\s*([A-Za-z_$][\\w$]*)\\s*[,}\\n]`).exec(args) ?? new RegExp(`\\b${property}\\b\\s*[,}]`).exec(args)
+  const identifier = named?.[1] ?? (named ? property : undefined)
+  if (!identifier) return null
+  return new RegExp(`(?:const|let)\\s+${identifier}\\s*(?::\\s*string\\s*)?=\\s*['"\`]([^'"\`]+)['"\`]`).exec(text)?.[1] ?? null
+}
+
+/** The Intelligence project of the default sink: the `projectId` a source passes to `createChatTurnRoutes`. */
+function routeProjects(sources: readonly SourceFile[]): SinkCall[] {
+  const calls: SinkCall[] = []
+  for (const file of sources) {
+    for (const match of file.text.matchAll(/\bcreateChatTurnRoutes\s*(?:<[^>(]*>)?\s*\(/g)) {
+      const args = callArguments(file.text, match.index + match[0].length - 1)
+      calls.push({ file: file.path, args, project: namedString(file.text, args, 'projectId') ?? namedString(file.text, file.text, 'projectId') })
+    }
+  }
+  return calls
+}
+
 function sinkCalls(sources: readonly SourceFile[]): SinkCall[] {
   const calls: SinkCall[] = []
   for (const file of sources) {
@@ -231,17 +256,38 @@ function withExemption(
   return { row, finding: null }
 }
 
-function turnTraceRow(sources: readonly SourceFile[], calls: readonly SinkCall[], exports: AppDefaultsOptions['exports']): { row: DefaultRow; optedOut: string | null; wired: boolean } {
+function turnTraceRow(
+  pin: string | null,
+  sources: readonly SourceFile[],
+  calls: readonly SinkCall[],
+  exports: AppDefaultsOptions['exports'],
+): { row: DefaultRow; optedOut: string | null; wired: boolean } {
   const optOut = filesMatching(sources, /\bturnTrace\s*:\s*false\b/)[0]
   if (optOut) return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: '' }, optedOut: `turnTrace: false in ${optOut.path}`, wired: false }
-  const customSink = filesMatching(sources, /\bturnTrace\s*:\s*\{/)
-  if (calls.length === 0 && customSink.length === 0) {
-    return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: 'no turn trace sink; createChatTurnRoutes gets no turnTrace' }, optedOut: null, wired: false }
+  const floor = AGENT_APP_OUTCOME_FLOORS.find((entry) => entry.id === 'default-trace')?.since ?? ''
+  const tuple = pin === null ? null : versionTuple(pin)
+  const byDefault = tuple !== null && atLeast(tuple, floor)
+  const routes = routeProjects(sources)
+  // A turn handed to a durable owner is exported by the route only from the floor; below it nothing exports that turn.
+  const handoff = filesMatching(sources, /\bhandoffCompletion\b/)[0]
+  if (handoff && !byDefault) {
+    return {
+      row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: `${handoff.path} hands turns to a completion owner (handoffCompletion) and agent-app ${pin ?? 'at this pin'} does not export a handed-off turn's trace; ${floor} does` },
+      optedOut: null,
+      wired: false,
+    }
   }
-  const project = calls.find((call) => call.project)?.project ?? null
+  const customSink = filesMatching(sources, /\bturnTrace\s*:\s*\{[^}]*\bsink\b/)
+  const defaulted = byDefault && routes.length > 0
+  if (calls.length === 0 && customSink.length === 0 && !defaulted) {
+    return { row: { id: 'turn-trace', label: 'turn trace', status: 'gap', detail: routes.length > 0 ? `no turn trace sink, and agent-app ${pin ?? 'at this pin'} exports by default only from ${floor}` : 'no turn trace sink; createChatTurnRoutes gets no turnTrace' }, optedOut: null, wired: false }
+  }
+  const project = calls.find((call) => call.project)?.project ?? (customSink.length === 0 ? routes.find((call) => call.project)?.project : undefined) ?? null
   const last = project === null ? undefined : exports?.get(project)
-  const where = calls[0]?.file ?? customSink[0]?.path ?? ''
-  const wired = `sink wired in ${where}${project ? ` (${project})` : ''}`
+  const where = calls[0]?.file ?? customSink[0]?.path
+  const wired = where
+    ? `sink wired in ${where}${project ? ` (${project})` : ''}`
+    : `createChatTurnRoutes exports every turn by default${project ? ` (${project})` : ''}`
   if (last) {
     return { row: { id: 'turn-trace', label: 'turn trace', status: 'ok', detail: `${wired}; last export accepted ${new Date(last.at).toISOString().slice(0, 16)}Z` }, optedOut: null, wired: true }
   }
@@ -264,7 +310,7 @@ function firstTextRow(pin: string | null, sources: readonly SourceFile[], traceW
   if (!traceWired) return { id: 'first-text', label: 'first text', status: 'gap', detail: 'needs the turn trace' }
   if (tuple !== null && !atLeast(tuple, floor)) return { id: 'first-text', label: 'first text', status: 'gap', detail: `agent-app ${pin} does not mark first text; ${floor} does` }
   if (!routes && !marks) return { id: 'first-text', label: 'first text', status: 'gap', detail: 'the turn owner does not call trace.markFirstText() and the app does not use createChatTurnRoutes' }
-  const project = calls.find((call) => call.project)?.project ?? null
+  const project = calls.find((call) => call.project)?.project ?? routeProjects(sources).find((call) => call.project)?.project ?? null
   const last = project === null ? undefined : exports?.get(project)
   const observed = last?.firstTextMs === undefined ? '' : `; last turn first_text_ms ${Math.round(last.firstTextMs)}`
   if (last && last.firstTextMs === undefined) return { id: 'first-text', label: 'first text', status: 'gap', detail: 'the last exported turn has no tangle.turn.first_text_ms' }
@@ -366,7 +412,7 @@ function bundleRow(repoRoot: string, dir: string, configs: readonly SourceFile[]
 }
 
 function toolCountRow(): DefaultRow {
-  return { id: 'tool-count', label: 'tool_count p50', status: 'unknown', detail: 'unmeasured; no ceiling until a measured link to first text exists' }
+  return { id: 'tool-count', label: 'tool calls p50', status: 'unknown', detail: 'tangle.turn.tool_calls on each root span; no ceiling until a measured link to first text exists' }
 }
 
 /** Report each agent app in the checkout against the defaults. Reads only tracked files; measures the Worker upload with the app's own Wrangler. */
@@ -389,7 +435,7 @@ export function checkAppDefaults(repoRoot: string, options: AppDefaultsOptions =
     const exemptions = options.exemptions ?? {}
     const pin = versionTuple(pkg.spec) ? (/(\d+\.\d+\.\d+)/.exec(pkg.spec)?.[1] ?? null) : null
     const calls = sinkCalls(sources)
-    const trace = turnTraceRow(sources, calls, options.exports)
+    const trace = turnTraceRow(pin, sources, calls, options.exports)
     const traceWired = trace.wired
     const reports: { row: DefaultRow; id: ExemptibleDefault | null; optedOut: string | null }[] = [
       { row: pinRow(pin, pkg.spec), id: null, optedOut: null },
@@ -483,7 +529,8 @@ export async function collectLastExports(repoRoot: string, apiKey: string): Prom
   const tracked = trackedFiles(repoRoot)
   const projects = new Set<string>()
   for (const pkg of findAppPackages(repoRoot, tracked)) {
-    for (const call of sinkCalls(readSources(repoRoot, tracked, pkg.dir, []))) if (call.project) projects.add(call.project)
+    const sources = readSources(repoRoot, tracked, pkg.dir, [])
+    for (const call of [...sinkCalls(sources), ...routeProjects(sources)]) if (call.project) projects.add(call.project)
   }
   const exports = new Map<string, LastTurnExport | null>()
   for (const project of projects) {
