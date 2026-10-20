@@ -109,4 +109,3 @@ export function userPartsWithFiles(
     ...mentions.map((mention) => ({ ...mentionInputToPart(mention) })),
   ])
 }
-
