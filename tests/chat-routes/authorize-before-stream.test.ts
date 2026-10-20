@@ -7,7 +7,7 @@
  * opened before `authorize` ran (#944, fixed in #947): an unadmitted caller got
  * an open stream and a stage event before its refusal. Every agent app shares
  * these routes, so the property is checked here for each of them, and for the
- * `prepareTurn` seam that runs product work after admission.
+ * `afterAuthorize` and `prepareTurn` seams that run product work after admission.
  */
 import { describe, expect, it } from 'vitest'
 
@@ -73,6 +73,7 @@ function makeRoutes(
     store: h.store,
     turnStore: h.turnStore,
     incrementalPersistence: false,
+    afterAuthorize: () => { h.touches.push('afterAuthorize') },
     turnLock: {
       warm: () => { h.touches.push('lock.warm') },
       acquire: () => { h.touches.push('lock.acquire'); return { acquired: true as const, handle: 'lock' } },
@@ -135,7 +136,7 @@ describe.each([
     expect(h.touches).toEqual([])
   })
 
-  it('runs prepareTurn only after admission, before any read, lock or producer', async () => {
+  it('runs afterAuthorize and prepareTurn only after admission, before any read, lock or producer', async () => {
     const h = harness()
     const routes = makeRoutes(h, async () => admitted(), async ({ context }) => {
       context.prepared = true
@@ -145,7 +146,7 @@ describe.each([
     await response.text()
     await Promise.all(h.pending)
     const order = h.touches.filter((touch) => touch !== 'waitUntil' && !touch.startsWith('turnStore.'))
-    expect(order.slice(0, 4)).toEqual(['lock.warm', 'prepareTurn', 'store.listMessages', 'lock.acquire'])
+    expect(order.slice(0, 5)).toEqual(['afterAuthorize', 'lock.warm', 'prepareTurn', 'store.listMessages', 'lock.acquire'])
     expect(order).toContain('produce')
   })
 
@@ -160,7 +161,7 @@ describe.each([
     await Promise.all(h.pending)
     expect(settled.status).toBe(400)
     expect(await settled.json()).toEqual({ error: 'Unknown agent profile' })
-    expect(h.touches.filter((touch) => touch !== 'waitUntil')).toEqual(['lock.warm', 'prepareTurn'])
+    expect(h.touches.filter((touch) => touch !== 'waitUntil')).toEqual(['afterAuthorize', 'lock.warm', 'prepareTurn'])
   })
 })
 

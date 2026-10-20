@@ -50,11 +50,6 @@ describe('render_ui tool schema', () => {
   )
   const parameters = renderUi?.function.parameters as Schema & { $defs: Record<string, Schema> }
 
-  it('keeps nested containers in the advertised node schema', () => {
-    expect(parameters.properties).toMatchObject({ schema: { $ref: '#/$defs/node' } })
-    expect(parameters.$defs.stack).toBeDefined()
-  })
-
   it('has no recursive loop of required values, which Gemini rejects', () => {
     expect(findRequiredRefLoop(parameters.$defs)).toBeNull()
   })

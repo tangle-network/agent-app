@@ -177,8 +177,9 @@ export async function acquireDurableTurnLock(
  *
  * The first request to a Durable Object that has never been used creates it,
  * which measured 1.3-2.4 s for a thread's first turn in GTM production
- * (2026-10-10) against 0.05-0.33 s once it exists. A peek sent as soon as a
- * turn is admitted lets that creation overlap the turn's other pre-lock work.
+ * (2026-10-10) against 0.05-0.33 s once it exists; every lock now lives on the
+ * workspace channel, which exists after the workspace's first turn. A peek
+ * sent as soon as a turn is admitted wakes that object if it was evicted.
  */
 export async function peekDurableTurnLock(
   namespace: TurnStreamNamespaceLike,
@@ -186,7 +187,10 @@ export async function peekDurableTurnLock(
   auth: TurnStreamAuth,
 ): Promise<DurableTurnLock | null> {
   const key = turnLockChannelKey(input.workspaceId, input.threadId, input.scope)
-  const result = await postJson<{ active?: DurableTurnLock | null }>(namespace, key, TURN_STREAM_PATHS.lockPeek, {}, auth)
+  const result = await postJson<{ active?: DurableTurnLock | null }>(namespace, key, TURN_STREAM_PATHS.lockPeek, {
+    scope: input.scope,
+    threadId: input.threadId,
+  }, auth)
   if (result.status !== 200) throw new Error(`turn-stream lock peek failed with status ${result.status}`)
   return result.body.active ?? null
 }
@@ -224,6 +228,7 @@ export async function releaseInterruptedDurableTurnLock(
   for (const scope of scopes) {
     const key = turnLockChannelKey(input.workspaceId, input.threadId, scope)
     const result = await postJsonOk<{ released: boolean }>(namespace, key, TURN_STREAM_PATHS.lockReleaseInterrupted, {
+      scope,
       threadId: input.threadId,
       interruptedAt: input.interruptedAt,
       ...(input.turnId ? { turnId: input.turnId } : {}),
@@ -358,8 +363,8 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
   warm(target: { tenantId: string; threadId: string }): Promise<void>
 } {
   return {
-    // The thread channel is the one a thread's first turn creates; the
-    // workspace channel is shared by every thread and its broadcasts keep it up.
+    // Every lock lives on the workspace channel, so this wakes that object
+    // (evicted after idle) before the turn's acquire reaches it.
     async warm(target) {
       await peekDurableTurnLock(options.namespace, { workspaceId: target.tenantId, threadId: target.threadId, scope: 'thread' }, options.auth)
     },

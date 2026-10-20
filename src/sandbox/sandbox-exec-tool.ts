@@ -21,6 +21,9 @@
 import type { SandboxInstance } from '@tangle-network/sandbox'
 import { SandboxRunError, type SandboxToolContext } from './sandbox-run-tool'
 
+/** `ExecOptions` from SDK 0.62.2, which sends `traceId` as `x-tangle-trace-id`; spelled here so the tool builds against the pinned older SDK too. */
+type ExecOptionsWithTrace = NonNullable<Parameters<SandboxInstance['exec']>[1]> & { traceId?: string }
+
 export interface SandboxExecToolOptions {
   /** The box commands run in. The product provisions, binds and bills it. A throw is
    *  `sandbox_unavailable`, unless it is a `SandboxRunError`, which is kept as it is. */
@@ -137,10 +140,14 @@ export function createSandboxExecTool(options: SandboxExecToolOptions): SandboxE
       const signal = AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(options.signal ? [options.signal] : [])])
       if (options.warm) await options.warm.leases.turn(options.warm.key).catch(() => {})
       let box: SandboxInstance
+      // A box this tool already placed answers at once; the span says which kind of claim this was.
+      const reused = ready !== null
+      const claim = context?.span?.child('sandbox.claim', 'sandbox')
       const starting = place(signal)
       try {
         box = await raceAbort(starting, signal)
       } catch (error) {
+        claim?.end(undefined, error instanceof SandboxRunError ? error.code : 'sandbox_unavailable')
         // A start that outlived this call's cap may never settle; the next call starts again.
         if (ready === starting) ready = null
         if (error instanceof SandboxRunError) {
@@ -149,15 +156,22 @@ export function createSandboxExecTool(options: SandboxExecToolOptions): SandboxE
         }
         return fail('sandbox_unavailable', 'The sandbox did not start in time, so the command did not run.', error)
       }
+      claim?.end({ 'claim.reused': reused })
       emit('box_ready', { ms: Date.now() - started })
       let result: { exitCode: number; stdout: string; stderr: string }
+      const execSpan = context?.span?.child('sandbox.exec', 'sandbox')
       try {
         result = await raceAbort(box.exec(command, {
           ...(cwd ? { cwd } : {}),
           ...(options.env ? { env: options.env } : {}),
           timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)),
-        }), signal)
+          // The same id the Router turn sends, so this command's Sandbox API and host records join the turn.
+          // SDK 0.62.2 added `traceId` to ExecOptions; an older SDK ignores the field.
+          ...(context?.trace ? { traceId: context.trace.traceId } : {}),
+        } as ExecOptionsWithTrace), signal)
+        execSpan?.end({ 'exec.exit_code': result.exitCode })
       } catch (error) {
+        execSpan?.end(undefined, 'exec_failed')
         const timedOut = signal.aborted && !options.signal?.aborted
         return fail('sandbox_failed', timedOut
           ? `The command did not finish within ${Math.round(timeoutMs / 1000)} s.`

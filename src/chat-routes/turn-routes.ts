@@ -24,7 +24,9 @@
  * instead of hand-rolling a generator — each omittable to the exact behavior
  * above: `turnLock` (single-flight acquire/release around the turn),
  * `contextGate` (pre-producer domain-readiness short-circuit), `beforeTurn`
- * (observe + augment the producer input), `lifecycle` (deterministic
+ * (observe + augment the producer input), `afterAuthorize` (start the box, keys
+ * and session the turn will need the moment the caller is admitted, so they
+ * overlap the lock and the user-row insert), `lifecycle` (deterministic
  * start/complete/error telemetry), `heartbeat` (keepalive during silent
  * producer waits), and `onRawEvent` (the raw producer events, for telemetry) —
  * plus the `authorize` result's `insertUserMessage` flag (suppress the user row
@@ -84,6 +86,8 @@ import {
 import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import { checkModelPolicy, type ModelPolicy } from '../policy-filters/index'
 import { parseJsonObjectBody } from '../web/index'
+import { createTurnTrace, type TurnSpan, type TurnSpanAttrs, type TurnTrace, type TurnTraceSink, type TurnTraceSummary } from '../turn-trace/recorder'
+import { formatServerTiming } from '../turn-trace/server-timing'
 import {
   buildTurnPhaseEvent,
   TURN_INTENT_EVENT,
@@ -257,6 +261,11 @@ export interface ChatTurnAuthorizeArgs {
   turnId?: string
   /** The thread whose running turns are being discovered (running intent only). */
   threadId?: string
+  /** The turn's trace (turn intent only). A product records its own child spans (a billing read, a workspace check) so the
+   *  admission wait is named by step; the route already records `admission.authorize` around the whole call. */
+  trace?: TurnTrace
+  /** The `admission.authorize` span (turn intent only): the parent for those child spans, so they nest under it. */
+  span?: TurnSpan
 }
 
 /** What `prepareTurn` receives: the admitted turn, before the conversation loads. */
@@ -276,6 +285,23 @@ export interface ChatTurnPrepareArgs<TContext> {
 
 /** `prepareTurn`'s verdict: proceed, or answer with the product's response. */
 export type ChatTurnPrepareResult = { ok: true } | { ok: false; response: Response }
+
+/** What `afterAuthorize` receives: the admitted turn, before the conversation loads and before any lock, read or write. */
+export interface ChatTurnAfterAuthorizeArgs<TContext> {
+  request: Request
+  /** Parsed, validated POST body. */
+  body: ChatTurnRequestPayload
+  tenantId: string
+  userId: string
+  threadId: string
+  /** The context `authorize` returned. Keep what the seam starts on it: `prepareTurn`, every later seam and `produce` receive the same object. */
+  context: TContext
+  /** The turn's trace, for the spans of the work the seam starts. */
+  trace: TurnTrace
+}
+
+/** Frees what `afterAuthorize` started, for a turn that ends before `produce` takes it. */
+export type ChatTurnAfterAuthorizeRelease = () => void | Promise<void>
 
 /** Trusted per-turn limits supplied by a server adapter, never by the body. */
 export interface ChatTurnExecutionLimits {
@@ -316,6 +342,14 @@ export interface ChatTurnProduceArgs<TContext> {
   intentLine?: Promise<string | null>
   /** Server-authenticated limits for this turn. Never copied from the body. */
   executionLimits?: ChatTurnExecutionLimits
+  /**
+   * The turn's trace (`@tangle-network/agent-app/turn-trace`), bound to this turn's execution id. Pass it to the
+   * Router engine (`trace`), `streamSandboxPrompt` and `ensureWorkspaceSandbox` so the turn's model calls, tool
+   * calls and box claim are recorded under it; its `traceId` is what those calls send as `x-tangle-trace-id`.
+   * The route records admission and persistence itself. Optional for source compatibility with synthetic
+   * producers; every `createChatTurnRoutes` invocation supplies it.
+   */
+  trace?: TurnTrace
   /** The durable `role:'user'` row this turn is anchored to — the row the
    *  factory just inserted, or the one retry-dedup REUSED. Products anchor
    *  optimistic-bubble swaps, retry targeting, and stop-polling to it, and it
@@ -330,6 +364,11 @@ export interface ChatTurnProduceArgs<TContext> {
    *    resolved without a usable id.
    *  - a string — the row id, for `contextGate`, `beforeTurn`, and `produce`. */
   userMessageId?: string | null
+  /** True when this turn's own insert created `userMessageId`, so no earlier
+   *  attempt can have answered it; false when retry-dedup reused the row or no
+   *  row was written. A gate that refuses an already-answered retry can skip
+   *  its read when this is true. Undefined until `userMessageId` resolves. */
+  userMessageInserted?: boolean
   /**
    * Transfer completion ownership to a product-owned durable runner. The
    * product MUST first register that runner durably, then await this callback
@@ -424,6 +463,8 @@ interface ChatTurnLifecycleBase<TContext> {
 /** When the turn's first visible word streamed, measured from `onTurnStart`. Absent when no word streamed. */
 interface ChatTurnLifecycleTiming {
   firstTextMs?: number
+  /** Where the turn's wall time went: its share inside named spans and the time per kind of span. */
+  trace?: TurnTraceSummary
 }
 /** Define lifecycle start event with context and timestamp for a chat turn */
 export interface ChatTurnLifecycleStart<TContext> extends ChatTurnLifecycleBase<TContext> {
@@ -477,6 +518,13 @@ export interface ChatTurnLifecycle<TContext> {
   onTurnStart?(info: ChatTurnLifecycleStart<TContext>): void | Promise<void>
   onTurnComplete?(info: ChatTurnLifecycleComplete<TContext>): void | Promise<void>
   onTurnError?(info: ChatTurnLifecycleError<TContext>): void | Promise<void>
+  /** Follow-up work for a turn that ended cleanly: it runs with `onTurnComplete`'s own info once the assistant row is
+   *  persisted, the lifecycle hooks have fired and the thread's lock is released, under `waitUntil` where the host has
+   *  one. The member's next send never waits for it, so work that only decorates the answer (a model-written
+   *  checklist, a title, an index) belongs here and not in the producer's stream, where it holds the lock and the
+   *  stream open. It does not run for a failed, gated or handed-off turn. The turn's trace has ended; a product that
+   *  wants this work traced starts its own. A throw is logged and never reaches the member. */
+  afterSettle?(info: ChatTurnLifecycleComplete<TContext>): void | Promise<void>
 }
 
 /** What a settled turn reports to `onTurnComplete` — the product's
@@ -513,6 +561,13 @@ export interface ChatTurnCompleteInput<TContext> {
   assistantMessageId: string | null
 }
 
+/** Where a finished turn's trace goes, and the host's labels for its root span. Metadata only: never content. */
+export interface ChatTurnTraceOptions<TContext> {
+  sink?: TurnTraceSink
+  /** Labels for the root span, e.g. the workspace id. Called once per exported turn. */
+  labels?(info: { identity: ChatTurnIdentity; executionId: string; context: TContext }): TurnSpanAttrs
+}
+
 /** Define options to configure chat turn routes including authorization, storage, and event buffering */
 export interface CreateChatTurnRoutesOptions<TContext = void> {
   /** Names the product in `deriveExecutionId` so retries land on the same
@@ -532,6 +587,22 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  a plain response without the progress header, a `turn.response` event
    *  with it. Omit → nothing to prepare. */
   prepareTurn?(args: ChatTurnPrepareArgs<TContext>): ChatTurnPrepareResult | Promise<ChatTurnPrepareResult>
+  /** Start the work this turn will need, the moment `authorize` and `modelPolicy` have admitted it, so that work overlaps
+   *  `prepareTurn`, the history read, the lock, the history recheck and the user-row insert instead of following them: the
+   *  workspace box, the keys a producer mints, a session ensure. Keep what it starts on `args.context`; `produce` receives
+   *  that object and awaits it.
+   *
+   *  Admission has not finished, so the seam must start only work that the turn's refusal leaves harmless: a held lock
+   *  (409), a changed history, a gate's answer or a throw all end the turn without `produce`, and the work already
+   *  started runs on. Start nothing a second request for the same thread could not safely repeat, and nothing that
+   *  writes product state.
+   *
+   *  Not awaited, and it must return synchronously: start the work and return, never wait for it. It may return a release
+   *  function; the route calls it once, only if the turn ends without `produce` (the chain above, or a throw before the
+   *  engine took the turn), so a product frees credentials or leases the unused work holds. Once `produce` runs, the
+   *  work belongs to `produce` and the route never calls the release. A throw is logged and the turn goes on without
+   *  the early work. Omit → nothing starts early. */
+  afterAuthorize?(args: ChatTurnAfterAuthorizeArgs<TContext>): void | ChatTurnAfterAuthorizeRelease
   /** Product admission policy over the model a turn NAMES. When the request
    *  body carries a `model`, it is checked here — after `authorize`, before
    *  the conversation loads, the lock is taken, or any row is written — and a
@@ -596,7 +667,11 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  `lifecycle.onTurnStart`, so a throw here fires no terminal lifecycle hook —
    *  the span never opened. Telemetry for a failure in this seam belongs in the
    *  seam, not in `lifecycle`. */
-  beforeTurn?(args: ChatTurnProduceArgs<TContext>): ChatTurnInputPatch | void | Promise<ChatTurnInputPatch | void>
+  beforeTurn?(
+    args: ChatTurnProduceArgs<TContext>,
+    /** `span` is the `admission.before_turn` span: the parent for a product's own child spans. */
+    seam?: { span: TurnSpan },
+  ): ChatTurnInputPatch | void | Promise<ChatTurnInputPatch | void>
   /** Deterministic run telemetry (start / complete / error) with identity and
    *  timing. Omit → no telemetry. */
   lifecycle?: ChatTurnLifecycle<TContext>
@@ -659,6 +734,13 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   onEvent?(event: { type: string; data?: Record<string, unknown> }, context: TContext): void | Promise<void>
   /** Trace flush handed to `waitUntil` (OTLP export). */
   traceFlush?(context: TContext): Promise<void>
+  /**
+   * Where each finished turn's trace goes (`createIntelligenceTurnTraceSink`). The route always records the
+   * turn's trace (`ChatTurnProduceArgs.trace`) and reports its summary to `lifecycle`; this sends the spans on.
+   * The sink runs under `waitUntil` after the lifecycle hooks and after the turn lock is released, and its failure never fails a turn. A turn handed
+   * to a durable owner (`handoffCompletion`) is exported by that owner, not here.
+   */
+  turnTrace?: ChatTurnTraceOptions<TContext>
   /** Compose the interaction-answer endpoints (`/interactions`). Omit when the
    *  product has no sidecar ask channel. */
   interactions?: InteractionAnswerRouteOptions
@@ -745,6 +827,21 @@ interface ParsedTurnBody {
   fileParts: ChatTurnFilePartInput[]
   mentions: FileMention[]
   turnId: string | undefined
+}
+
+/**
+ * The turn's admission as a `Server-Timing` value: `admission` for the
+ * request-to-stream wall time, then each `admission.*` span the trace holds in
+ * start order. A timed request reads where admission went from the response
+ * headers alone; the same spans reach the trace sink.
+ */
+function admissionServerTiming(trace: TurnTrace): string {
+  const now = Date.now()
+  const steps = trace.spans(now)
+    .filter((span) => span.kind === 'admission')
+    .sort((a, b) => a.startMs - b.startMs)
+    .map((span) => ({ name: span.name, durMs: span.endMs - span.startMs }))
+  return formatServerTiming([{ name: 'admission', durMs: now - trace.startedAt }, ...steps])
 }
 
 function validateTurnBody(body: Record<string, unknown>, maxInlinePartBytes: number | undefined): ParsedTurnBody {
@@ -909,7 +1006,7 @@ export function createChatTurnRoutes<TContext = void>(
   const progressMessages: Record<TurnRoutePhase, string> = { ...TURN_ROUTE_PHASE_MESSAGES, ...options.progressMessages }
 
   /** A turn whose body parsed and whose caller `authorize` admitted. */
-  type AdmittedTurn = { parsed: ParsedTurnBody; auth: Extract<ChatTurnAuthorization<TContext>, { ok: true }> }
+  type AdmittedTurn = { parsed: ParsedTurnBody; auth: Extract<ChatTurnAuthorization<TContext>, { ok: true }>; trace: TurnTrace }
 
   /** Start the admitted turn's intent line; resolves to the line, or null. Never rejects. */
   function startIntentLine(admitted: AdmittedTurn): Promise<string | null> | undefined {
@@ -955,14 +1052,16 @@ export function createChatTurnRoutes<TContext = void>(
     // Parsing and authorization finish before any response opens, for both
     // shapes: a refusal is always a plain HTTP response that reveals nothing
     // beyond what it says, and nothing runs for a caller who is not admitted.
-    const admitted = await admitTurn(request)
+    // The turn's clock starts at the request, so admission is inside its trace.
+    const admitted = await admitTurn(request, createTurnTrace())
     if (!admitted.ok) return admitted.response
     if (request.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST) return runTurn(request, ctx, admitted)
     return progressFirstTurn(request, ctx, admitted)
   }
 
   /** Parse and validate the body, then authorize the caller. */
-  async function admitTurn(request: Request): Promise<({ ok: true } & AdmittedTurn) | { ok: false; response: Response }> {
+  async function admitTurn(request: Request, trace: TurnTrace): Promise<({ ok: true } & AdmittedTurn) | { ok: false; response: Response }> {
+    const parse = trace.start('admission.parse', 'admission')
     const [rawBody, badBody] = await parseJsonObjectBody(request)
     if (badBody) return { ok: false, response: badBody }
     let parsed: ParsedTurnBody
@@ -972,24 +1071,26 @@ export function createChatTurnRoutes<TContext = void>(
       if (err instanceof ChatTurnInputError) return { ok: false, response: errorResponse(err) }
       throw err
     }
-    const auth = await options.authorize({ request, intent: 'turn', body: parsed.payload })
+    parse.end()
+    const auth = await trace.measure('admission.authorize', 'admission', (span) => options.authorize({ request, intent: 'turn', body: parsed.payload, trace, span }))
     if (!auth.ok) return { ok: false, response: auth.response }
     // Admission policy on the model the turn NAMES, before any side effect.
     // The unnamed-model half resolves inside `produce`; the producer-side
     // policy covers it at execution.
     const namedModel = typeof parsed.payload.model === 'string' ? parsed.payload.model.trim() : ''
-    if (options.modelPolicy && namedModel) {
-      const decision = await checkModelPolicy(
+    const policy = options.modelPolicy
+    if (policy && namedModel) {
+      const decision = await trace.measure('admission.model_policy', 'admission', () => checkModelPolicy(
         namedModel,
-        options.modelPolicy.catalog,
-        options.modelPolicy.filter,
-        options.modelPolicy.context,
-      )
+        policy.catalog,
+        policy.filter,
+        policy.context,
+      ))
       if (!decision.allowed) {
         return { ok: false, response: Response.json({ code: 'model_policy_denied', error: decision.reason }, { status: 403 }) }
       }
     }
-    return { ok: true, parsed, auth }
+    return { ok: true, parsed, auth, trace }
   }
 
   /**
@@ -1084,6 +1185,48 @@ export function createChatTurnRoutes<TContext = void>(
     })
   }
 
+  /** The work `afterAuthorize` started for one turn: `handOff` gives it to `produce`, `release` frees it if nothing took it. */
+  interface AfterAuthorizeWork {
+    handOff(): void
+    release(): Promise<void>
+  }
+
+  /** Start the product's `afterAuthorize` work for an admitted turn. Never throws. */
+  function startAfterAuthorize(request: Request, admitted: AdmittedTurn): AfterAuthorizeWork {
+    let release: ChatTurnAfterAuthorizeRelease | undefined
+    const { parsed, auth, trace } = admitted
+    if (options.afterAuthorize) {
+      try {
+        const started = options.afterAuthorize({
+          request,
+          body: parsed.payload,
+          tenantId: auth.tenantId,
+          userId: auth.userId,
+          threadId: parsed.payload.threadId,
+          context: auth.context,
+          trace,
+        })
+        if (typeof started === 'function') release = started
+      } catch (err) {
+        log('[chat-routes] afterAuthorize failed; the turn goes on without it', { error: err instanceof Error ? err.message : String(err) })
+      }
+    }
+    return {
+      handOff: () => { release = undefined },
+      release: async () => {
+        const free = release
+        release = undefined
+        if (!free) return
+        try {
+          await free()
+        } catch (err) {
+          log('[chat-routes] afterAuthorize release failed', { error: err instanceof Error ? err.message : String(err) })
+        }
+      },
+    }
+  }
+
+  /** Run an admitted turn with the product's `afterAuthorize` work started first and freed if no producer takes it. */
   async function runTurn(
     request: Request,
     ctx: ChatTurnRequestContext | undefined,
@@ -1091,7 +1234,27 @@ export function createChatTurnRoutes<TContext = void>(
     progress?: TurnProgress,
     startedIntent?: Promise<string | null>,
   ): Promise<Response> {
-    const { parsed, auth } = admitted
+    const early = startAfterAuthorize(request, admitted)
+    try {
+      return await runAdmittedTurn(request, ctx, admitted, early, progress, startedIntent)
+    } finally {
+      // A held lock, a changed history, a gate's answer, a handoff or a throw ends the turn without `produce`. The response
+      // does not wait for the product to free what it started.
+      const freed = early.release()
+      if (ctx?.waitUntil) ctx.waitUntil(freed)
+      else void freed
+    }
+  }
+
+  async function runAdmittedTurn(
+    request: Request,
+    ctx: ChatTurnRequestContext | undefined,
+    admitted: AdmittedTurn,
+    early: AfterAuthorizeWork,
+    progress?: TurnProgress,
+    startedIntent?: Promise<string | null>,
+  ): Promise<Response> {
+    const { parsed, auth, trace } = admitted
     // A progress-first turn started its line at admission; any other starts it here.
     const intentLine = startedIntent ?? startIntentLine(admitted)
     const { payload, content, fileParts, mentions, turnId } = parsed
@@ -1099,17 +1262,22 @@ export function createChatTurnRoutes<TContext = void>(
 
     if (options.turnLock?.warm) {
       // Overlaps the lock's first-use cost with prepareTurn and the history read.
-      try {
-        void Promise.resolve(options.turnLock.warm({ tenantId, userId, threadId: payload.threadId, context })).catch((err) => {
-          log('[chat-routes] turnLock.warm failed', { error: err instanceof Error ? err.message : String(err) })
-        })
-      } catch (err) {
+      // Its span shows that cost: waking the workspace channel that holds the lock.
+      const warmSpan = trace.start('admission.lock_warm', 'admission')
+      const warmFailed = (err: unknown) => {
+        warmSpan.end(undefined, err)
         log('[chat-routes] turnLock.warm failed', { error: err instanceof Error ? err.message : String(err) })
+      }
+      try {
+        void Promise.resolve(options.turnLock.warm({ tenantId, userId, threadId: payload.threadId, context })).then(() => warmSpan.end(), warmFailed)
+      } catch (err) {
+        warmFailed(err)
       }
     }
 
-    if (options.prepareTurn) {
-      const prepared = await options.prepareTurn({
+    const prepareTurn = options.prepareTurn
+    if (prepareTurn) {
+      const prepared = await trace.measure('admission.prepare', 'admission', () => prepareTurn({
         request,
         body: payload,
         tenantId,
@@ -1117,7 +1285,7 @@ export function createChatTurnRoutes<TContext = void>(
         threadId: payload.threadId,
         context,
         progress: (phase, message) => progress?.(phase, message),
-      })
+      }))
       if (!prepared.ok) return prepared.response
     }
 
@@ -1129,6 +1297,7 @@ export function createChatTurnRoutes<TContext = void>(
       content: m.content,
       parts: (m.parts ?? null) as PersistedChatMessageForTurn['parts'],
     }))
+    const historySpan = trace.start('admission.history', 'admission')
     const existingMessages = await readHistory()
     // Lock acquisition is async and follows identity derivation. A previous
     // owner can settle in that gap; the new owner must not dispatch an identity
@@ -1140,18 +1309,29 @@ export function createChatTurnRoutes<TContext = void>(
     // repeat — new turn). The turn buffer's running index is the discriminator;
     // it is only consulted in the one case that can be ambiguous, so the common
     // path costs nothing.
-    let hasRunningTurn = false
+    //
+    // The probe can only change the answer when the running reading would
+    // reuse a row (no client turnId, and the user row behind the trailing
+    // assistant rows repeats this content); the settled reading never reuses
+    // past a trailing assistant row. Every other turn, including each ordinary
+    // follow-up, skips the round trip with an identical result.
+    let chatTurn = resolveChatTurn({ existingMessages, userContent: content, turnId, hasRunningTurn: false })
     if (draftTuning && existingMessages.at(-1)?.role === 'assistant') {
-      try {
-        hasRunningTurn = ((await options.turnStore.listRunning?.(payload.threadId)) ?? []).length > 0
-      } catch (err) {
-        log('[chat-routes] listRunning probe failed; treating the thread as idle', {
-          threadId: payload.threadId,
-          error: err instanceof Error ? err.message : String(err),
-        })
+      const ifRunning = resolveChatTurn({ existingMessages, userContent: content, turnId, hasRunningTurn: true })
+      if (!ifRunning.shouldInsertUserMessage) {
+        let hasRunningTurn = false
+        try {
+          hasRunningTurn = ((await trace.measure('admission.running_probe', 'admission', () => options.turnStore.listRunning?.(payload.threadId), undefined, historySpan)) ?? []).length > 0
+        } catch (err) {
+          log('[chat-routes] listRunning probe failed; treating the thread as idle', {
+            threadId: payload.threadId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+        if (hasRunningTurn) chatTurn = ifRunning
       }
     }
-    const chatTurn = resolveChatTurn({ existingMessages, userContent: content, turnId, hasRunningTurn })
+    historySpan.end({ messages: existingMessages.length })
 
     const identity: ChatTurnIdentity = {
       tenantId,
@@ -1170,6 +1350,8 @@ export function createChatTurnRoutes<TContext = void>(
       ? `${turnExecutionId}:retry:${payload.retryAttemptId}`
       : turnExecutionId
     if (executionId.length > 256) return errorResponse(new ChatTurnInputError('Retry execution id exceeds 256 bytes'))
+    // From here the trace's id is the turn's execution id, the id every Router and Sandbox call sends.
+    trace.bind(executionId)
     const turnStreamId = crypto.randomUUID()
 
     const prompt: string | ChatTurnPartInput[] =
@@ -1223,6 +1405,7 @@ export function createChatTurnRoutes<TContext = void>(
       turnStreamId,
       priorMessages: chatTurn.priorMessages,
       handoffCompletion,
+      trace,
       ...(intentLine ? { intentLine } : {}),
       ...(ctx?.executionLimits ? { executionLimits: ctx.executionLimits } : {}),
     }
@@ -1248,8 +1431,9 @@ export function createChatTurnRoutes<TContext = void>(
         })
       }
     }
-    if (options.turnLock) {
-      const acquired = await options.turnLock.acquire(produceArgs)
+    const turnLock = options.turnLock
+    if (turnLock) {
+      const acquired = await trace.measure('admission.lock', 'admission', () => turnLock.acquire(produceArgs))
       if (!acquired.acquired) return acquired.response
       lockAcquired = true
       lockHandle = acquired.handle
@@ -1276,8 +1460,12 @@ export function createChatTurnRoutes<TContext = void>(
     let firstTextAtMs: number | undefined
     let turnStarted = false
     let lifecycleSettled = false
+    // What `lifecycle.afterSettle` receives: set when the turn ended cleanly with a producer that ran.
+    let settledTurn: ChatTurnLifecycleComplete<TContext> | undefined
     // Set when `contextGate` answered the turn without running the producer.
     let gatedTurn = false
+
+    let pendingTraceExport: (() => void | Promise<void>) | undefined
 
     // Exactly one terminal lifecycle hook, after the turn settles (idempotent).
     // Failure is this route's own verdict (`runFailed` from error/failed
@@ -1285,12 +1473,21 @@ export function createChatTurnRoutes<TContext = void>(
     const fireTerminalLifecycle = async (failed: boolean, terminalError: unknown): Promise<void> => {
       if (lifecycleSettled) return
       lifecycleSettled = true
+      // The trace ends with the turn, before the product's own hooks run, so their work is not in its wall time.
+      const failureCode = failed
+        ? (failureCodeOf(lastFailureData) ?? (terminalError instanceof Error ? terminalError.name : 'turn_failed'))
+        : undefined
+      const snapshot = trace.finish(failureCode === undefined ? {} : { error: failureCode })
       const lifecycle = options.lifecycle
-      if (!lifecycle) return
       const durationMs = Date.now() - turnStartedAtMs
-      const timing = firstTextAtMs === undefined ? {} : { firstTextMs: firstTextAtMs - turnStartedAtMs }
+      const timing = {
+        ...(firstTextAtMs === undefined ? {} : { firstTextMs: firstTextAtMs - turnStartedAtMs }),
+        trace: snapshot.summary,
+      }
       try {
-        if (failed) {
+        if (!lifecycle) {
+          // No hooks to run; the trace still goes to its sink below.
+        } else if (failed) {
           await lifecycle.onTurnError?.({
             identity, executionId, turnStreamId, context, durationMs, ...timing,
             error: terminalError ?? lastFailureData ?? new Error('chat turn failed'),
@@ -1298,7 +1495,7 @@ export function createChatTurnRoutes<TContext = void>(
         } else {
           const failoverInfo = producer?.modelFailover?.()
           const attribution = producer?.modelAttribution?.()
-          await lifecycle.onTurnComplete?.({
+          const completed: ChatTurnLifecycleComplete<TContext> = {
             identity, executionId, turnStreamId, context, durationMs, ...timing,
             finalText: producer?.finalText() ?? '',
             usage: producer?.usage?.() ?? {},
@@ -1310,7 +1507,9 @@ export function createChatTurnRoutes<TContext = void>(
             ...(attribution?.servedProvider ? { servedProvider: attribution.servedProvider } : {}),
             ...(attribution?.servedSource ? { servedSource: attribution.servedSource } : {}),
             ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
-          })
+          }
+          if (!gatedTurn) settledTurn = completed
+          await lifecycle.onTurnComplete?.(completed)
         }
       } catch (err) {
         log('[chat-routes] lifecycle terminal hook failed', {
@@ -1318,10 +1517,59 @@ export function createChatTurnRoutes<TContext = void>(
           error: err instanceof Error ? err.message : String(err),
         })
       }
+      // Sent by `exportTrace`, after the turn lock is released: a slow collector must not hold the next send.
+      const traceOptions = options.turnTrace
+      if (traceOptions?.sink) {
+        const sink = traceOptions.sink
+        pendingTraceExport = () => sink(snapshot, {
+          'tangle.sessionId': identity.sessionId,
+          'tangle.userId': identity.userId,
+          'tangle.tenantId': identity.tenantId,
+          'tangle.turn.failed': failed,
+          ...(gatedTurn ? { 'tangle.turn.gated': true } : {}),
+          ...(failureCode ? { 'tangle.turn.failure_code': failureCode } : {}),
+          ...(traceOptions.labels?.({ identity, executionId, context }) ?? {}),
+        })
+      }
+    }
+    /** Send the finished trace to its sink. Never throws. */
+    const exportTrace = async (): Promise<void> => {
+      const send = pendingTraceExport
+      pendingTraceExport = undefined
+      if (!send) return
+      try {
+        await send()
+      } catch (err) {
+        log('[chat-routes] turn trace sink failed', {
+          turnId: turnStreamId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    /** The product's follow-up work for a turn that ended cleanly, once its lock is released. Never throws. */
+    const runAfterSettle = async (): Promise<void> => {
+      const info = settledTurn
+      settledTurn = undefined
+      const afterSettle = options.lifecycle?.afterSettle
+      if (!info || !afterSettle) return
+      try {
+        await afterSettle(info)
+      } catch (err) {
+        log('[chat-routes] lifecycle.afterSettle failed', {
+          turnId: turnStreamId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    /** Export after the response is on its way: under `waitUntil` where the host has one. */
+    const exportTraceInBackground = (): void => {
+      const sent = exportTrace()
+      if (ctx?.waitUntil) ctx.waitUntil(sent)
+      else void sent.catch(() => {})
     }
 
     try {
-      if (lockAcquired && JSON.stringify(await readHistory()) !== historyBeforeLock) {
+      if (lockAcquired && JSON.stringify(await trace.measure('admission.history_recheck', 'admission', readHistory)) !== historyBeforeLock) {
         await releaseLock()
         return Response.json({
           code: 'chat_history_changed',
@@ -1339,23 +1587,26 @@ export function createChatTurnRoutes<TContext = void>(
       // falling back to the newest row, which mis-resolves under sub-second
       // same-thread turns.
       let userMessageId: string | null = chatTurn.reusedUserMessageId ?? null
+      let userMessageInserted = false
       if (insertUserMessage) {
         userMessageId = rowIdOf(
-          await options.store.appendMessage({
+          await trace.measure('admission.persist_user', 'admission', () => options.store.appendMessage({
             threadId: payload.threadId,
             role: 'user',
             content,
             parts: userPartsWithFiles(chatTurn.userParts, fileParts, mentions),
-          }),
+          })),
         )
+        userMessageInserted = userMessageId !== null
       }
-      produceArgs = { ...produceArgs, userMessageId }
+      produceArgs = { ...produceArgs, userMessageId, userMessageInserted }
 
       // Domain-readiness gate: may short-circuit with the product's own
       // response before the producer runs. The user row above is kept (a real
       // user turn); the gate's response is the assistant side of it.
-      if (options.contextGate) {
-        const gate = await options.contextGate(produceArgs)
+      const contextGate = options.contextGate
+      if (contextGate) {
+        const gate = await trace.measure('admission.gate', 'admission', () => contextGate(produceArgs))
         if (gate.proceed === 'handoff') {
           await releaseLock()
           return gate.response
@@ -1390,15 +1641,18 @@ export function createChatTurnRoutes<TContext = void>(
             }
           }
           await fireTerminalLifecycle(false, undefined)
+          exportTraceInBackground()
           return gate.response
         }
       }
 
       // Observe + optionally augment the assembled producer input.
-      if (options.beforeTurn) {
-        const patch = await options.beforeTurn(produceArgs)
+      const beforeTurn = options.beforeTurn
+      if (beforeTurn) {
+        const patch = await trace.measure('admission.before_turn', 'admission', (span) => beforeTurn(produceArgs, { span }))
         if (patch) produceArgs = { ...produceArgs, ...patch }
       }
+      const streamSetup = trace.start('admission.stream_setup', 'admission')
 
       // Durability tap: every engine event buffers (coalesced) so a dropped
       // client replays the tail. Live delivery rides the Response body, not the
@@ -1459,6 +1713,7 @@ export function createChatTurnRoutes<TContext = void>(
           })
         }
       }
+      streamSetup.end()
 
       const result = handleChatTurn({
         identity,
@@ -1469,7 +1724,8 @@ export function createChatTurnRoutes<TContext = void>(
           // defer it into the generator's first pull.
           produce: () => ({
             stream: (async function* () {
-              producer = await options.produce(produceArgs)
+              // The product's own admission work: its profile pin, prompt and producer construction.
+              producer = await trace.measure('admission.produce', 'admission', () => options.produce(produceArgs))
               let source: AsyncIterable<ChatRouteEvent> = producer.stream
               if (ctx?.cancelOnDisconnect) {
                 source = abortOnSignal(source, request.signal)
@@ -1485,7 +1741,10 @@ export function createChatTurnRoutes<TContext = void>(
             finalText: () => producer?.finalText() ?? '',
           }),
           onEvent: async (event) => {
-            if (firstTextAtMs === undefined && isVisibleText(event)) firstTextAtMs = Date.now()
+            if (firstTextAtMs === undefined && isVisibleText(event)) {
+              firstTextAtMs = Date.now()
+              trace.markFirstText(firstTextAtMs)
+            }
             if (event.type === 'session.run.failed' || event.type === 'error') {
               runFailed = true
               lastFailureData = event.data
@@ -1497,7 +1756,7 @@ export function createChatTurnRoutes<TContext = void>(
             if (options.onEvent) await options.onEvent(event, context)
           },
           ...(options.transformFinalText ? { transformFinalText: options.transformFinalText } : {}),
-          persistAssistantMessage: async ({ finalText }) => {
+          persistAssistantMessage: ({ finalText }) => trace.measure('persist.assistant', 'persist', async () => {
             if (completionHandoff) return
             if (ctx?.cancelOnDisconnect && request.signal.aborted) {
               await draft?.discard()
@@ -1566,7 +1825,7 @@ export function createChatTurnRoutes<TContext = void>(
                 ...values,
               }),
             )
-          },
+          }),
           ...(options.onTurnComplete
             ? {
                 // Wired into the engine's completion hook, which fires only when
@@ -1580,7 +1839,8 @@ export function createChatTurnRoutes<TContext = void>(
                   // the one that actually served — a fallback included.
                   const failoverInfo = producer?.modelFailover?.()
                   const attribution = producer?.modelAttribution?.()
-                  return options.onTurnComplete!({
+                  // The engine awaits this before the stream ends, so the product's completion work is a span, not a gap.
+                  return trace.measure('persist.on_turn_complete', 'persist', () => options.onTurnComplete!({
                     identity: turnIdentity,
                     finalText,
                     context,
@@ -1594,13 +1854,16 @@ export function createChatTurnRoutes<TContext = void>(
                     ...(attribution?.servedProvider ? { servedProvider: attribution.servedProvider } : {}),
                     ...(attribution?.servedSource ? { servedSource: attribution.servedSource } : {}),
                     ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
-                  })
+                  }))
                 },
               }
             : {}),
           ...(options.traceFlush ? { traceFlush: () => options.traceFlush!(context) } : {}),
         },
       })
+
+      // The engine has the turn, and its first pull runs `produce`, which owns whatever `afterAuthorize` started.
+      early.handOff()
 
       // Tee: one branch to the live client, one drained under waitUntil so the
       // turn (and its buffering via onEvent) runs to completion after a client
@@ -1634,6 +1897,7 @@ export function createChatTurnRoutes<TContext = void>(
           await tap.detach()
           return
         }
+        const finalize = trace.start('persist.finalize', 'persist')
         if (ctx?.cancelOnDisconnect && request.signal.aborted) {
           await draft?.discard()
         } else {
@@ -1647,8 +1911,11 @@ export function createChatTurnRoutes<TContext = void>(
             error: err instanceof Error ? err.message : String(err),
           })
         }
+        finalize.end()
         await fireTerminalLifecycle(failed, drainError)
         await releaseLock()
+        // Both run after the lock is released and inside this waitUntil-tracked drain, so neither holds the next send.
+        await Promise.all([exportTrace(), runAfterSettle()])
       })()
       if (ctx?.waitUntil) ctx.waitUntil(drained)
       else void drained.catch(() => {})
@@ -1668,6 +1935,7 @@ export function createChatTurnRoutes<TContext = void>(
           'Content-Type': result.contentType,
           'Cache-Control': 'no-cache',
           'X-Turn-Id': turnStreamId,
+          'Server-Timing': admissionServerTiming(trace),
         },
       })
     } catch (err) {
@@ -1678,6 +1946,7 @@ export function createChatTurnRoutes<TContext = void>(
       if (!completionHandoff) {
         if (turnStarted) await fireTerminalLifecycle(true, err)
         await releaseLock()
+        exportTraceInBackground()
       }
       throw err
     }

@@ -118,6 +118,31 @@ export type WriteAttachmentFn = (
   opts: AttachmentWriteOptions,
 ) => Promise<AttachmentWriteResult>
 
+/** Options for a streamed write. `size` is the exact byte count `content`
+ *  yields. `mediaType` is decided from the file name and its first bytes,
+ *  before the route has read the rest: an archive's central directory sits at
+ *  its end, so the route's response, not this value, carries the final type. */
+export interface AttachmentStreamWriteOptions extends AttachmentWriteOptions {
+  size: number
+  mediaType: string
+}
+
+/**
+ * Streamed writer port for an upload too large to hold in memory. `content`
+ * yields exactly `opts.size` bytes. The route checks the file while it
+ * streams and withholds the final bytes until the whole file has passed, so
+ * on a refusal `content` errors instead of ending. The adapter must make the
+ * bytes readable at `path` only when `content` ends cleanly, and must leave
+ * whatever was stored at `path` before untouched when it errors. A store put
+ * of a fixed-length stream (R2 `put` behind `FixedLengthStream`) does both.
+ */
+export type WriteAttachmentStreamFn = (
+  scopeId: string,
+  path: string,
+  content: ReadableStream<Uint8Array>,
+  opts: AttachmentStreamWriteOptions,
+) => Promise<AttachmentWriteResult>
+
 /** Options for an ownership-safe writer. */
 export interface AtomicAttachmentWriteOptions extends AttachmentWriteOptions {
   ownership: AttachmentWriteOwnership

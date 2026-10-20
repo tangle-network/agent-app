@@ -38,6 +38,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
 
   const run = runRouterTurn({
     ...options,
+    showReasoning: options.showReasoning ?? true,
     onEvent: event => {
       if (event.type === 'text') {
         if (event.segment !== textSegment || !textPart) {
@@ -77,6 +78,10 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
           push({ type: 'tool_result', toolCallId: event.callId, toolName: event.toolName,
             outcome: event.status === 'completed' ? { ok: true, result: event.output } : { ok: false, message: event.error.message, code: event.error.code } })
         }
+      } else if (event.type === 'repeat') {
+        // The repeat's reasoning is a new run: close the failed call's part so the two never merge.
+        reasoningPart = null
+        reasoningClock.settle()
       } else if (event.type === 'usage') {
         push({ type: 'usage', usage: { promptTokens: event.promptTokens, completionTokens: event.completionTokens } })
       } else if (event.type === 'tool_event') {

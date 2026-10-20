@@ -24,6 +24,7 @@ import {
   pruneStaleThreads,
   turnEventStorageKey,
   turnLockMatchesRelease,
+  turnLockStorageKey,
   verifyTurnStreamToken,
   type DurableTurnLock,
   type TurnLockAcquireResult,
@@ -90,6 +91,14 @@ function stringValue(value: unknown): string | null {
 async function jsonBody(request: Request): Promise<Record<string, unknown> | null> {
   const body = await request.json().catch(() => null)
   return body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>) : null
+}
+
+/** The storage key a lock request names: a thread-scope request its thread's
+ *  lock, anything else (including a body without a scope) the workspace-scope
+ *  lock. */
+function lockStorageKeyOf(body: Record<string, unknown> | null): string {
+  const threadId = stringValue(body?.threadId)
+  return body?.scope === 'thread' && threadId ? turnLockStorageKey('thread', threadId) : TURN_STREAM_STORAGE_KEYS.lock
 }
 
 /** Per-scope running-turn index entry (one record per buffered turn). */
@@ -199,7 +208,7 @@ export class TurnStreamDO {
         case TURN_STREAM_PATHS.lockAcquire:
           return this.handleLockAcquire(request)
         case TURN_STREAM_PATHS.lockPeek:
-          return jsonResponse({ active: await this.loadActiveLock() })
+          return jsonResponse({ active: await this.loadActiveLock(Date.now(), lockStorageKeyOf(await jsonBody(request))) })
         case TURN_STREAM_PATHS.lockRelease:
           return this.handleLockRelease(request)
         case TURN_STREAM_PATHS.lockReleaseInterrupted:
@@ -247,10 +256,14 @@ export class TurnStreamDO {
   /** Complete a release parked by {@link shouldDeferLockRelease}. A subclass
    *  calls this when its deferred condition settles. */
   protected async completeDeferredLockRelease(executionId: string): Promise<boolean> {
-    const active = await this.loadActiveLock()
-    if (!active?.releasePending || active.executionId !== executionId) return false
-    await this.state.storage.delete(TURN_STREAM_STORAGE_KEYS.lock)
-    return true
+    const threadLocks = await this.state.storage.list<DurableTurnLock>({ prefix: TURN_STREAM_STORAGE_KEYS.threadLockPrefix })
+    for (const key of [TURN_STREAM_STORAGE_KEYS.lock, ...threadLocks.keys()]) {
+      const active = await this.loadActiveLock(Date.now(), key)
+      if (!active?.releasePending || active.executionId !== executionId) continue
+      await this.state.storage.delete(key)
+      return true
+    }
+    return false
   }
 
   /** Extra product state replayed to a socket during its `sync`, after the
@@ -405,28 +418,39 @@ export class TurnStreamDO {
 
   // ── chat-turn lock ────────────────────────────────────────────────────────
 
-  protected async loadActiveLock(now = Date.now()): Promise<DurableTurnLock | null> {
-    const stored = await this.state.storage.get<DurableTurnLock>(TURN_STREAM_STORAGE_KEYS.lock)
+  /** The live lock under `key` (default: the workspace-scope lock); an
+   *  expired one is deleted and reads as none. */
+  protected async loadActiveLock(now = Date.now(), key: string = TURN_STREAM_STORAGE_KEYS.lock): Promise<DurableTurnLock | null> {
+    const stored = await this.state.storage.get<DurableTurnLock>(key)
     const lock = activeTurnLock(stored, now)
-    if (stored && !lock) await this.state.storage.delete(TURN_STREAM_STORAGE_KEYS.lock)
+    if (stored && !lock) await this.state.storage.delete(key)
     return lock
   }
 
-  private async releaseActiveLock(input: { executionId: string; lockId?: string }): Promise<boolean> {
-    const active = await this.loadActiveLock()
+  private async releaseActiveLock(key: string, input: { executionId: string; lockId?: string }): Promise<boolean> {
+    const active = await this.loadActiveLock(Date.now(), key)
     if (!active || !turnLockMatchesRelease(active, input)) return false
-    await this.state.storage.delete(TURN_STREAM_STORAGE_KEYS.lock)
+    await this.state.storage.delete(key)
     return true
   }
 
   /** Park a release on the lock itself; {@link completeDeferredLockRelease}
    *  finishes it once the product's deferred condition settles. */
-  private async deferLockRelease(input: { executionId: string; lockId?: string }): Promise<boolean> {
-    const active = await this.loadActiveLock()
+  private async deferLockRelease(key: string, input: { executionId: string; lockId?: string }): Promise<boolean> {
+    const active = await this.loadActiveLock(Date.now(), key)
     if (!active || !turnLockMatchesRelease(active, input)) return false
     if (active.releasePending) return true
-    await this.state.storage.put(TURN_STREAM_STORAGE_KEYS.lock, { ...active, releasePending: true })
+    await this.state.storage.put(key, { ...active, releasePending: true })
     return true
+  }
+
+  /** Delete expired thread locks, so a thread whose release never arrived
+   *  leaves no row behind once its lock's TTL passes. */
+  private async pruneExpiredThreadLocks(now: number): Promise<void> {
+    const threadLocks = await this.state.storage.list<DurableTurnLock>({ prefix: TURN_STREAM_STORAGE_KEYS.threadLockPrefix })
+    for (const [key, stored] of threadLocks) {
+      if (!activeTurnLock(stored, now)) await this.state.storage.delete(key)
+    }
   }
 
   private async handleLockAcquire(request: Request): Promise<Response> {
@@ -442,17 +466,20 @@ export class TurnStreamDO {
       return jsonResponse({ error: 'Missing workspaceId, threadId, executionId, lockId, or scope' }, 400)
     }
 
-    const active = await this.loadActiveLock()
+    const key = turnLockStorageKey(scope, threadId)
+    const now = Date.now()
+    const active = await this.loadActiveLock(now, key)
     if (active) {
       return jsonResponse({ acquired: false, active } satisfies TurnLockAcquireResult, 409)
     }
+    if (scope === 'thread') await this.pruneExpiredThreadLocks(now)
 
     const lock = createTurnLock(
       { workspaceId, threadId, scope, executionId, lockId, ...(turnId ? { turnId } : {}) },
-      Date.now(),
+      now,
       this.options.lockTtlMs ?? TURN_LOCK_TTL_MS,
     )
-    await this.state.storage.put(TURN_STREAM_STORAGE_KEYS.lock, lock)
+    await this.state.storage.put(key, lock)
     return jsonResponse({ acquired: true, lock } satisfies TurnLockAcquireResult)
   }
 
@@ -464,11 +491,12 @@ export class TurnStreamDO {
       return jsonResponse({ error: 'Missing executionId or lockId' }, 400)
     }
 
+    const key = lockStorageKeyOf(body)
     if (await this.shouldDeferLockRelease(executionId)) {
-      const deferred = await this.deferLockRelease({ executionId, lockId })
+      const deferred = await this.deferLockRelease(key, { executionId, lockId })
       return jsonResponse({ released: false, deferred })
     }
-    const released = await this.releaseActiveLock({ executionId, lockId })
+    const released = await this.releaseActiveLock(key, { executionId, lockId })
     return jsonResponse({ released })
   }
 
@@ -481,8 +509,9 @@ export class TurnStreamDO {
       return jsonResponse({ error: 'Missing threadId or interruptedAt' }, 400)
     }
     const turnId = stringValue(body?.turnId) ?? undefined
+    const key = lockStorageKeyOf(body)
 
-    const active = await this.loadActiveLock()
+    const active = await this.loadActiveLock(Date.now(), key)
     if (!active) return jsonResponse({ released: false })
     // A deferred product task holds the scope even against an out-of-band
     // release — the box is still being read.
@@ -492,7 +521,7 @@ export class TurnStreamDO {
     if (!interruptedReleaseApplies(active, { threadId, interruptedAt, ...(turnId ? { turnId } : {}) })) {
       return jsonResponse({ released: false })
     }
-    await this.state.storage.delete(TURN_STREAM_STORAGE_KEYS.lock)
+    await this.state.storage.delete(key)
     return jsonResponse({ released: true })
   }
 

@@ -1,16 +1,13 @@
 /**
- * Fixtures for the panels area (teams / intakes / work-product). Local to this
+ * Fixtures for the panels area (teams / work-product). Local to this
  * area: the shared `src/stories/fixtures` barrel covers chat, catalog, canvas,
  * and sequences — none of which these surfaces consume.
  *
  * Shapes mirror the API seams: `MemberView` / `InvitationView` are what
- * `teams/members-api` and `teams/invitations-api` return, `IntakeView` is what
- * `intakes/api` returns, and `WorkProductRecord` is the durable review row.
+ * `teams/members-api` and `teams/invitations-api` return, and `WorkProductRecord`
+ * is the durable review row.
  */
 
-import type { IntakeAnswers, IntakeGraph } from '../../intakes/model'
-import { intakeProgress, nextQuestion } from '../../intakes/model'
-import type { IntakeView } from '../../intakes-react'
 import type { InviteAcceptDetails, InvitationView, MemberView } from '../../teams-react'
 import type { ProfileBacktestSummary, WorkProductRecord } from '../../work-product/types'
 
@@ -168,82 +165,6 @@ export const INVITE_NEEDS_VERIFICATION: InviteAcceptDetails = {
   ...INVITE_READY,
   needsEmailVerification: true,
 }
-
-// ── intakes: onboarding interview ────────────────────────────────────────────
-
-/** A small linear graph with one of the common field types. The optional
- *  multi-select demonstrates that optional questions don't count toward the
- *  progress denominator (3 required of 4 questions). */
-const ONBOARDING_INTAKE: IntakeGraph = {
-  id: 'user-onboarding-v1',
-  title: 'Welcome to Tangle',
-  description: 'A few quick questions so your agent knows how to work with you.',
-  questions: [
-    {
-      id: 'name',
-      prompt: 'What should we call you?',
-      type: 'text',
-      required: true,
-      help: 'Your display name across workspaces.',
-    },
-    {
-      id: 'role',
-      prompt: 'What best describes your role?',
-      type: 'single-select',
-      required: true,
-      options: [
-        { value: 'founder', label: 'Founder / owner' },
-        { value: 'finance', label: 'Finance / accounting' },
-        { value: 'legal', label: 'Legal / counsel' },
-        { value: 'marketing', label: 'Marketing / growth' },
-      ],
-    },
-    {
-      id: 'stack',
-      prompt: 'Which tools does your team already use?',
-      type: 'multi-select',
-      help: 'Optional — pick any that apply.',
-      options: [
-        { value: 'quickbooks', label: 'QuickBooks' },
-        { value: 'netsuite', label: 'NetSuite' },
-        { value: 'salesforce', label: 'Salesforce' },
-        { value: 'hubspot', label: 'HubSpot' },
-        { value: 'notion', label: 'Notion' },
-      ],
-    },
-    {
-      id: 'briefings',
-      prompt: 'Do you want a Monday-morning agent briefing?',
-      type: 'boolean',
-      required: true,
-    },
-  ],
-}
-
-/** Derive a view from the graph the same way `intakes/api` does — the server
- *  re-derives next question + progress after every persisted answer. */
-export function intakeViewFor(answers: IntakeAnswers, completed = false): IntakeView {
-  return {
-    title: ONBOARDING_INTAKE.title,
-    description: ONBOARDING_INTAKE.description,
-    answers,
-    nextQuestion: completed ? null : nextQuestion(ONBOARDING_INTAKE, answers),
-    completed,
-    progress: intakeProgress(ONBOARDING_INTAKE, answers),
-  }
-}
-
-/** Answer snapshots at each step of the flow, for the static step stories. */
-export const INTAKE_STEPS = {
-  /** Nothing answered — the text question, progress 0/3. */
-  start: {},
-  /** Name answered — the single-select question, progress 1/3. */
-  role: { name: 'Dana Whitfield' },
-  /** Role answered — the boolean question (optional multi-select skipped), 2/3. */
-  briefings: { name: 'Dana Whitfield', role: 'finance' },
-  /** All required answered — nextQuestion is null, the Finish action shows. */
-  ready: { name: 'Dana Whitfield', role: 'finance', stack: ['quickbooks', 'notion'], briefings: true },
-} satisfies Record<string, IntakeAnswers>
 
 // ── work product: legal redline (rich record) ────────────────────────────────
 

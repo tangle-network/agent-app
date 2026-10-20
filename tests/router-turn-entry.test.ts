@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
@@ -12,8 +13,10 @@ import { describe, expect, it } from 'vitest'
  */
 const ALLOWED_PACKAGES = new Set(['@tangle-network/agent-runtime/tool-loop', '@tangle-network/agent-runtime/placement'])
 
+const SRC = new URL('../src/', import.meta.url).pathname
+
 function imports(file: string): string[] {
-  const source = readFileSync(new URL(`../src/runtime/${file}`, import.meta.url), 'utf8')
+  const source = readFileSync(resolve(SRC, file), 'utf8')
   // `from 'x'` (static import/export), bare `import 'x'`, and dynamic `import('x')`.
   return [...source.matchAll(/(?:\bfrom\s+|^\s*import\s+|\bimport\s*\(\s*)['"]([^'"]+)['"]/gm)].map(match => match[1]!)
 }
@@ -22,17 +25,19 @@ describe('./router-turn entry', () => {
   it('reaches only relative modules and the agent-runtime tool loop', () => {
     const seen = new Set<string>()
     const packages = new Set<string>()
-    const queue = ['router-turn.ts']
+    const queue = ['runtime/router-turn.ts']
     while (queue.length) {
       const file = queue.shift()!
       if (seen.has(file)) continue
       seen.add(file)
       for (const target of imports(file)) {
-        if (target.startsWith('./')) queue.push(`${target.slice(2)}.ts`)
+        if (target.startsWith('.')) queue.push(relative(SRC, resolve(SRC, file, '..', `${target}.ts`)))
         else packages.add(target)
       }
     }
-    expect([...seen].sort()).toEqual(['loop.ts', 'model-catalog.ts', 'model.ts', 'openai-stream.ts', 'reply-language.ts', 'router-turn.ts', 'turn-continuation.ts', 'turn-knowledge.ts'])
+    // The turn trace's recorder, Server-Timing reader and traced fetch import nothing, so the Worker entry stays light.
+    expect([...seen].sort()).toEqual(['runtime/loop.ts', 'runtime/model-catalog.ts', 'runtime/model.ts', 'runtime/openai-stream.ts', 'runtime/reply-language.ts', 'runtime/router-turn.ts',
+      'runtime/turn-continuation.ts', 'runtime/turn-knowledge.ts', 'turn-trace/recorder.ts', 'turn-trace/server-timing.ts', 'turn-trace/traced-fetch.ts'])
     expect([...packages].filter(name => !ALLOWED_PACKAGES.has(name))).toEqual([])
   })
 })

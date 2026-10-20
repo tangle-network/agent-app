@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.60.194",
+  "version": "0.60.214",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -433,6 +433,11 @@
       "import": "./dist/workspace-apps/index.js",
       "default": "./dist/workspace-apps/index.js"
     },
+    "./workspace-apps/react": {
+      "types": "./dist/workspace-apps/react.d.ts",
+      "import": "./dist/workspace-apps/react.js",
+      "default": "./dist/workspace-apps/react.js"
+    },
     "./workspace-react": {
       "types": "./dist/workspace-react/index.d.ts",
       "import": "./dist/workspace-react/index.js",
@@ -467,6 +472,11 @@
       "types": "./dist/trace/index.d.ts",
       "import": "./dist/trace/index.js",
       "default": "./dist/trace/index.js"
+    },
+    "./turn-trace": {
+      "types": "./dist/turn-trace/index.d.ts",
+      "import": "./dist/turn-trace/index.js",
+      "default": "./dist/turn-trace/index.js"
     },
     "./sequences": {
       "types": "./dist/sequences/index.d.ts",
@@ -581,21 +591,6 @@
       "types": "./dist/intakes/drizzle.d.ts",
       "import": "./dist/intakes/drizzle.js",
       "default": "./dist/intakes/drizzle.js"
-    },
-    "./intakes/api": {
-      "types": "./dist/intakes/api.d.ts",
-      "import": "./dist/intakes/api.js",
-      "default": "./dist/intakes/api.js"
-    },
-    "./intakes-react": {
-      "types": "./dist/intakes-react/index.d.ts",
-      "import": "./dist/intakes-react/index.js",
-      "default": "./dist/intakes-react/index.js"
-    },
-    "./intakes-react/lazy": {
-      "types": "./dist/intakes-react/lazy.d.ts",
-      "import": "./dist/intakes-react/lazy.js",
-      "default": "./dist/intakes-react/lazy.js"
     },
     "./record": {
       "types": "./dist/record/index.d.ts",

@@ -72,6 +72,8 @@ export interface ChatOperatorAdapterOptions<Identity> {
    * `resolveChatAttachments`. Without it, turns that carry attachments are refused.
    */
   acceptsAttachments?: boolean
+  /** Most attachments one turn may carry; set it to the chat route's own count cap. Default `ATTACHMENT_MAX_COUNT`. */
+  maxAttachments?: number
   /** The app's public origin, the base of every browser link. */
   origin: string
   /** Browser path of a conversation; defaults to `/app/<workspace>/chat/<thread>`. */
@@ -294,6 +296,7 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
 
   const adapter: OperatorAdapter<Identity> = {
     ...(options.acceptsAttachments === true ? { acceptsAttachments: true } : {}),
+    ...(options.maxAttachments === undefined ? {} : { maxAttachments: options.maxAttachments }),
     async authorizeWorkspace(ctx, workspaceId, access) {
       const workspace = await options.workspaces.authorize(ctx, workspaceId, access)
       return workspace ? workspaceView(workspace) : null

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   OPERATOR_ROUTES,
+  OPERATOR_TURN_CANCELLED_CODE,
   createOperatorApi,
   createOperatorClient,
   operatorKeyWorkspaces,
@@ -266,6 +267,45 @@ describe('operator client', () => {
     }).listWorkspaces()
     expect(denied).toMatchObject({ succeeded: false, status: 401, code: 'api_key.invalid', retryable: false })
     expect(JSON.stringify(denied)).not.toContain('tak_wrong_secret_value')
+  })
+
+  it('cancels an unsettled turn once and answers every later cancel with its settled state', async () => {
+    let stopped = false
+    const cancelTurn = vi.fn(async (_ctx: unknown, workspace: OperatorWorkspace, target: { threadId: string; turnId: string }) => {
+      stopped = true
+      return turn({ workspaceId: workspace.id, ...target })
+    })
+    const { api, send, adapter } = setup({ adapter: {
+      // The app's turn owner records the stop on a later read, as a durable owner does.
+      getTurn: vi.fn(async (_ctx, workspace, target) => turn({ workspaceId: workspace.id, ...target, ...(stopped
+        ? { state: 'failed' as const, failure: { code: OPERATOR_TURN_CANCELLED_CODE, message: 'Stopped' } } : {}) })),
+      cancelTurn,
+    } })
+    const client = createOperatorClient({ origin: ORIGIN, getApiKey: () => 'tak_valid', fetchImpl: (input, init) => api.handle(new Request(input, init)) })
+    const turnId = '7f4c1d2e-1111-4a2b-8c3d-000000000001'
+
+    expect((await client.describe())).toMatchObject({ succeeded: true, value: { app: { capabilities: expect.arrayContaining(['turns.cancel']) } } })
+    expect((await send(`/workspaces/ws-a/threads/thread-1/turns/${turnId}/cancel?wait=60`, { method: 'POST' })).status).toBe(400)
+    expect(cancelTurn).not.toHaveBeenCalled()
+
+    const cancelled = await client.cancelTurn('ws-a', 'thread-1', turnId, { waitSeconds: 2 })
+    expect(cancelled).toMatchObject({ succeeded: true, value: { state: 'failed', failure: { code: 'turn.cancelled' } } })
+    expect(adapter.authorizeWorkspace).toHaveBeenCalledWith(expect.anything(), 'ws-a', 'run')
+    const again = await send(`/workspaces/ws-a/threads/thread-1/turns/${turnId}/cancel`, { method: 'POST' })
+    expect(again.status).toBe(200)
+    expect(await again.json()).toMatchObject({ turn: { state: 'failed', failure: { code: 'turn.cancelled' } } })
+    expect(cancelTurn).toHaveBeenCalledTimes(1)
+
+    stopped = false
+    cancelTurn.mockClear()
+    const pending = await send(`/workspaces/ws-a/threads/thread-1/turns/${turnId}/cancel`, { method: 'POST' })
+    expect(pending.status).toBe(202)
+    expect(await pending.json()).toMatchObject({ turn: { state: 'working' } })
+
+    const without = setup()
+    const refused = await without.send(`/workspaces/ws-a/threads/thread-1/turns/${turnId}/cancel`, { method: 'POST' })
+    expect(refused.status).toBe(501)
+    expect(await refused.json()).toMatchObject({ code: 'operator.unsupported' })
   })
 
   it('reports a transport failure as retryable without the key', async () => {

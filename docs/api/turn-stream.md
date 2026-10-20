@@ -4,7 +4,7 @@
 
 Source: `src/turn-stream/index.ts`
 
-58 exports.
+59 exports.
 
 ### `acquireDurableTurnLock`
 
@@ -240,7 +240,7 @@ interface ReleaseInterruptedDurableTurnLockInput
 
 ### `threadChannelKey`
 
-`function` — Channel for a thread-scoped lock.
+`function` — Channel for a thread's viewer signals.
 
 ```ts
 (workspaceId: string, threadId: string) => string
@@ -267,7 +267,7 @@ number
 `const` — Storage keys inside a DO instance.
 
 ```ts
-{ readonly lock: "chatTurnLock"; readonly activeThreads: "activeThreads"; readonly turnStatus: "turnStatus"; readonly t…
+{ readonly lock: "chatTurnLock"; readonly threadLockPrefix: "chatTurnLock:thread:"; readonly activeThreads: "activeThre…
 ```
 
 ### `TURN_STREAM_TOKEN_HEADER`
@@ -312,10 +312,10 @@ type TurnLockAcquireResult
 
 ### `turnLockChannelKey`
 
-`function` — The channel a lock lives on: workspace-scope locks serialize every thread in the workspace (one shared sandbox), thread-scope locks serialize one thread (router lane).
+`function` — The channel a lock lives on: the workspace channel, for both scopes.
 
 ```ts
-(workspaceId: string, threadId: string, scope: TurnLockScope) => string
+(workspaceId: string, _threadId: string, _scope: TurnLockScope) => string
 ```
 
 ### `TurnLockInterruptedReleaseInput`
@@ -364,6 +364,14 @@ interface TurnLockSeamArgs
 
 ```ts
 type TurnLockSeamResult
+```
+
+### `turnLockStorageKey`
+
+`function` — The storage key a lock lives under inside its channel's instance: the workspace-scope lock under `TURN_STREAM_STORAGE_KEYS.lock`, each thread's lock under `TURN_STREAM_STORAGE_KEYS.threadLockPrefix`…
+
+```ts
+(scope: TurnLockScope, threadId: string) => string
 ```
 
 ### `turnStorageChannelKey`

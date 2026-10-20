@@ -141,6 +141,13 @@ const EXTENSION_IMPLIES_SNIFFED_MIME: Readonly<Record<string, string>> = {
   mkv: 'video/x-matroska',
 }
 
+/** The sniffed mime a filename's extension implies, when its format has an
+ *  unambiguous magic-byte family (`.xlsx` → the spreadsheet mime). */
+export function sniffedMimeImpliedByName(fileName: string): string | undefined {
+  const extension = fileName.split('.').pop()?.toLowerCase() ?? ''
+  return EXTENSION_IMPLIES_SNIFFED_MIME[extension]
+}
+
 /** Represent the result of checking an attachment's type with success or specific failure details */
 export type AttachmentTypeCheckResult =
   | { succeeded: true }

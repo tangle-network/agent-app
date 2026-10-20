@@ -24,7 +24,7 @@
 
 import { canonicalizeValue, valuesInText } from '../work-product/claim-support'
 
-export type CopySurface = 'short' | 'long'
+export type CopySurface = 'short' | 'long' | 'changelog' | 'show-hn'
 
 export type CopyTellTier = 'ban' | 'cap' | 'weak'
 
@@ -61,6 +61,7 @@ export interface CopyScanOptions {
   /**
    * `short` = headline, subject line, ad, social post, SMS, hero, CTA: no
    * dashes at all. `long` = article, email body, page: two dashes allowed.
+   * `changelog` and `show-hn` use long-copy punctuation and exempt reveal constructions.
    * Default `long`.
    */
   surface?: CopySurface
@@ -151,7 +152,13 @@ const PHRASE_RULES: readonly PhraseRule[] = [
     /\bthe (?:result|catch|best part|secret|kicker|twist|answer|difference|outcome|upshot)\?\s+\S/i,
   ),
   rule('colon-reveal', 'Write it as a normal sentence.')(
-    /\b(?:the best part|here'?s the (?:secret|thing|kicker|catch)|one word|the result|the truth|the secret)\s*:\s/i,
+    /(?:\b(?:the best part|here'?s the (?:secret|thing|kicker|catch)|one word|the result|the truth|the secret)\s*:\s)|(?:(?:^|[.!?]\s+)(?:[\w']+'s\s+)?(?:the\s+|our\s+|my\s+|here's\s+the\s+|the\s+real\s+)?(?:answer|catch|twist|kicker|truth|secret|takeaway|bottom line|short version|good news|upshot|lesson|difference|correction|short intro|intro|question|problem|idea)\s*:\s+\S|(?:^|[.!?]\s+)the [\w-]+ that [^.:\n]{3,50}:\s+\S)/im,
+  ),
+  rule('contrast-reveal', 'State the real point directly with its reason; do not stage a denial first.')(
+    /\bmost [\w\s-]{1,40}\b(?:are|is)\b[^.]{1,60}\.\s+(?:the|but the)\s+(?:unsolved|hard|real|missing|interesting)\s+(?:part|problem)\b|\btakes a middle (?:position|path|ground)\b|\bthe first question is\b/i,
+  ),
+  rule('opener-closer', 'End on the question or the point.')(
+    /\bone-line (?:reply|answer) (?:is )?(?:welcome|fine)\b|\beither answer helps\b|\beither way,? thanks\b|\bthanks for reading\b|\bno worries if not\b|\bquick question\b/i,
   ),
   rule('hype-punctuation', 'Remove the stacked punctuation.')(/[!?]{2,}/),
   rule('decoration', 'Remove decorative unicode letters and emoji bullets.')(
@@ -260,6 +267,7 @@ export function scanCopy(text: string, options: CopyScanOptions = {}): CopyScanR
     }
     let contrast = false
     for (const { pattern, category, fix } of PHRASE_RULES) {
+      if ((surface === 'changelog' || surface === 'show-hn') && (category === 'colon-reveal' || category === 'contrast-reveal')) continue
       const match = paragraph.match(pattern)
       if (!match) continue
       if (category === 'contrast-reveal') {

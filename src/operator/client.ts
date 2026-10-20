@@ -45,6 +45,13 @@ export interface OperatorClient {
   /** Omitting turnId generates one; retry with the returned turn's id. */
   startTurn(workspaceId: string, input: Omit<StartTurnInput, 'turnId'> & { turnId?: string }): Promise<OperatorResult<OperatorTurn>>
   getTurn(workspaceId: string, threadId: string, turnId: string, options?: { waitSeconds?: number; signal?: AbortSignal }): Promise<OperatorResult<OperatorTurn>>
+  /**
+   * Stop a turn. A settled turn comes back as it settled; otherwise the app
+   * has been asked to stop it, and the server holds up to `waitSeconds` for
+   * the turn to settle `failed` with `OPERATOR_TURN_CANCELLED_CODE`. Read it
+   * with `getTurn` or `waitForTurn` until it settles.
+   */
+  cancelTurn(workspaceId: string, threadId: string, turnId: string, options?: { waitSeconds?: number; signal?: AbortSignal }): Promise<OperatorResult<OperatorTurn>>
   /** Follow until the turn settles, waits on a decision, or the timeout passes; the last read is returned. */
   waitForTurn(workspaceId: string, threadId: string, turnId: string, options: WaitForTurnOptions): Promise<OperatorResult<OperatorTurn>>
   listThreads(workspaceId: string, query?: { cursor?: string; limit?: number }): Promise<OperatorResult<{ threads: OperatorThread[]; nextCursor: string | null }>>
@@ -141,6 +148,11 @@ export function createOperatorClient(options: OperatorClientOptions): OperatorCl
       `/workspaces/${segment(workspaceId)}/threads/${segment(threadId)}/turns/${segment(turnId)}${query({ wait: opts.waitSeconds })}`,
       (body) => body.turn as OperatorTurn,
       opts.signal ? { signal: opts.signal } : {},
+    ),
+    cancelTurn: (workspaceId, threadId, turnId, opts = {}) => call(
+      `/workspaces/${segment(workspaceId)}/threads/${segment(threadId)}/turns/${segment(turnId)}/cancel${query({ wait: opts.waitSeconds })}`,
+      (body) => body.turn as OperatorTurn,
+      { method: 'POST', ...(opts.signal ? { signal: opts.signal } : {}) },
     ),
     async waitForTurn(workspaceId, threadId, turnId, opts) {
       const deadline = Date.now() + opts.timeoutMs

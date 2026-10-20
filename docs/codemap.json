@@ -2495,6 +2495,7 @@
         "sandbox",
         "stream",
         "tools",
+        "turn-trace",
         "web"
       ],
       "error": null,
@@ -2648,6 +2649,12 @@
           "kind": "function",
           "signature": "(name: string, actualBytes: number, limitBytes: number) => string",
           "doc": "Human-readable error naming both the actual size and the limit that was exceeded."
+        },
+        {
+          "name": "AttachmentStreamWriteOptions",
+          "kind": "interface",
+          "signature": "interface AttachmentStreamWriteOptions",
+          "doc": "Options for a streamed write."
         },
         {
           "name": "attachmentTotalSizeErrorMessage",
@@ -2968,6 +2975,12 @@
           "doc": "Wire contract between the chat client (composer + `streamChatTurn`) and the assembled server vertical (`createChatTurnRoutes`)."
         },
         {
+          "name": "ChatTurnTraceOptions",
+          "kind": "interface",
+          "signature": "interface ChatTurnTraceOptions",
+          "doc": "Where a finished turn's trace goes, and the host's labels for its root span."
+        },
+        {
           "name": "ChatTurnUsage",
           "kind": "interface",
           "signature": "interface ChatTurnUsage",
@@ -3074,6 +3087,12 @@
           "kind": "interface",
           "signature": "interface CreateSandboxFileIndexRouteOptions",
           "doc": "Define options to authorize and configure sandbox file index route behavior"
+        },
+        {
+          "name": "createStreamingSniffer",
+          "kind": "function",
+          "signature": "() => StreamingSniffer",
+          "doc": "Start a {@link StreamingSniffer} for one file."
         },
         {
           "name": "createUploadRoute",
@@ -3868,6 +3887,12 @@
           "doc": "Decide whether uploaded bytes are binary or text, and identify the mime type when it can be determined from content."
         },
         {
+          "name": "sniffedMimeImpliedByName",
+          "kind": "function",
+          "signature": "(fileName: string) => string | undefined",
+          "doc": "The sniffed mime a filename's extension implies, when its format has an unambiguous magic-byte family (`.xlsx` → the spreadsheet mime)."
+        },
+        {
           "name": "sniffMimeFromName",
           "kind": "function",
           "signature": "(filename: string) => string",
@@ -3898,6 +3923,18 @@
           "doc": "True when a store can support incremental persistence at all."
         },
         {
+          "name": "STREAM_SNIFF_HEAD_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Leading bytes a streamed classification keeps."
+        },
+        {
+          "name": "STREAM_SNIFF_TAIL_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Trailing bytes a streamed classification keeps for the zip reader."
+        },
+        {
           "name": "streamChatRouteAsSandboxEvents",
           "kind": "function",
           "signature": "(options: StreamChatRouteAsSandboxOptions) => AsyncGenerator<SandboxStreamEvent, any, any>",
@@ -3908,6 +3945,12 @@
           "kind": "interface",
           "signature": "interface StreamChatRouteAsSandboxOptions",
           "doc": null
+        },
+        {
+          "name": "StreamingSniffer",
+          "kind": "interface",
+          "signature": "interface StreamingSniffer",
+          "doc": "Classifies a file from its bytes as they stream past, holding at most {@link STREAM_SNIFF_HEAD_BYTES} + {@link STREAM_SNIFF_TAIL_BYTES} of it."
         },
         {
           "name": "streamPlanFollowUpEvents",
@@ -4064,6 +4107,12 @@
           "kind": "type",
           "signature": "type WriteAttachmentFn",
           "doc": "The stable writer port."
+        },
+        {
+          "name": "WriteAttachmentStreamFn",
+          "kind": "type",
+          "signature": "type WriteAttachmentStreamFn",
+          "doc": "Streamed writer port for an upload too large to hold in memory."
         }
       ]
     },
@@ -8779,84 +8828,6 @@
       ]
     },
     {
-      "id": "./intakes-react",
-      "source": "src/intakes-react/index.ts",
-      "dependsOn": [
-        "brand",
-        "intakes"
-      ],
-      "error": null,
-      "exports": [
-        {
-          "name": "IntakeInterview",
-          "kind": "function",
-          "signature": "({ view: initialView, onAnswer, onComplete, onDone, onNotice, }: IntakeInterviewProps) => Element",
-          "doc": null
-        },
-        {
-          "name": "IntakeInterviewProps",
-          "kind": "interface",
-          "signature": "interface IntakeInterviewProps",
-          "doc": "Define properties and callbacks for managing the intake interview flow and user interactions"
-        },
-        {
-          "name": "IntakeView",
-          "kind": "interface",
-          "signature": "interface IntakeView",
-          "doc": "The state the interview renders — the shape `./intakes/api` returns."
-        }
-      ]
-    },
-    {
-      "id": "./intakes-react/lazy",
-      "source": "src/intakes-react/lazy.tsx",
-      "dependsOn": [
-        "brand",
-        "intakes"
-      ],
-      "error": null,
-      "exports": [
-        {
-          "name": "IntakeInterviewLazy",
-          "kind": "function",
-          "signature": "LazyExoticComponent<({ view: initialView, onAnswer, onComplete, onDone, onNotice, }: IntakeInterviewProps) => Element>",
-          "doc": "Load IntakeInterview component lazily to optimize initial application rendering"
-        },
-        {
-          "name": "IntakeInterviewProps",
-          "kind": "interface",
-          "signature": "interface IntakeInterviewProps",
-          "doc": "Define properties and callbacks for managing the intake interview flow and user interactions"
-        }
-      ]
-    },
-    {
-      "id": "./intakes/api",
-      "source": "src/intakes/api.ts",
-      "dependsOn": [],
-      "error": null,
-      "exports": [
-        {
-          "name": "createIntakeApi",
-          "kind": "function",
-          "signature": "(opts: IntakeApiOptions) => { getCurrentIntake: () => Promise<Response>; saveAnswer: (input: { questionId?: string | un…",
-          "doc": "Build the intake API bound to one store + graph."
-        },
-        {
-          "name": "CurrentIntakeView",
-          "kind": "interface",
-          "signature": "interface CurrentIntakeView",
-          "doc": "What the client renders: the saved state, the next prompt, and progress."
-        },
-        {
-          "name": "IntakeApiOptions",
-          "kind": "interface",
-          "signature": "interface IntakeApiOptions",
-          "doc": "Define configuration options for initializing the intake API with store and graph components"
-        }
-      ]
-    },
-    {
       "id": "./intakes/drizzle",
       "source": "src/intakes/drizzle.ts",
       "dependsOn": [],
@@ -12133,6 +12104,12 @@
           "kind": "const",
           "signature": "readonly OperatorTurnState[]",
           "doc": null
+        },
+        {
+          "name": "OPERATOR_TURN_CANCELLED_CODE",
+          "kind": "const",
+          "signature": "\"turn.cancelled\"",
+          "doc": "`failure.code` of a turn that settled because it was cancelled before it finished."
         },
         {
           "name": "OPERATOR_WORKSPACE_SCOPE_PREFIX",
@@ -15455,7 +15432,8 @@
       "id": "./runtime",
       "source": "src/runtime/index.ts",
       "dependsOn": [
-        "tools"
+        "tools",
+        "turn-trace"
       ],
       "error": null,
       "exports": [
@@ -16101,7 +16079,8 @@
       "id": "./runtime/router-turn",
       "source": "src/runtime/router-turn.ts",
       "dependsOn": [
-        "tools"
+        "tools",
+        "turn-trace"
       ],
       "error": null,
       "exports": [
@@ -16270,7 +16249,8 @@
         "harness",
         "profile",
         "runtime",
-        "tools"
+        "tools",
+        "turn-trace"
       ],
       "error": null,
       "exports": [
@@ -16325,7 +16305,7 @@
         {
           "name": "backendModelFields",
           "kind": "function",
-          "signature": "(model: ResolvedModel) => { model: { model: string; provider: string; apiKey?: string | undefined; baseUrl?: string | u…",
+          "signature": "(model: ResolvedModel) => { model: { model: string; provider: string; apiKey?: string | undefined; apiKeyEnv?: string |…",
           "doc": "Spread a {@link ResolvedModel} onto a sandbox backend config as the nested `model` object — the one spelling every admitted SDK accepts."
         },
         {
@@ -16549,6 +16529,12 @@
           "kind": "interface",
           "signature": "interface DriveSandboxTurnOptions",
           "doc": "Define options to manage deterministic session resumption and turn idempotency in sandboxed drive turns"
+        },
+        {
+          "name": "dropTrustedBox",
+          "kind": "function",
+          "signature": "(box: SandboxInstance) => boolean",
+          "doc": "Forget what this isolate trusts about a box after the first real call on it failed."
         },
         {
           "name": "EGRESS_PROXY_RECOVERY_PHASE",
@@ -17005,6 +16991,12 @@
           "kind": "function",
           "signature": "<T>(attempt: () => Promise<T>, options?: SandboxTransientRetryOptions) => Promise<T>",
           "doc": "Run `attempt` until it succeeds, it fails with something this policy does not consider transient, or a transient failure outlasts the deadline."
+        },
+        {
+          "name": "reuseWorkspaceSandbox",
+          "kind": "function",
+          "signature": "(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance | undefined>",
+          "doc": "Reuse the workspace's running box if this isolate used it recently, or return undefined."
         },
         {
           "name": "runForegroundSandboxSingleFlight",
@@ -17497,6 +17489,18 @@
           "kind": "interface",
           "signature": "interface TerminalConnectionBoxLike",
           "doc": "The structural surface this route needs from an SDK sandbox box — no `@tangle-network/sandbox` class import (invariant 3)."
+        },
+        {
+          "name": "traceSandboxPromptEvents",
+          "kind": "function",
+          "signature": "(events: AsyncIterable<unknown>, options: TraceSandboxPromptOptions) => AsyncGenerator<unknown, any, any>",
+          "doc": "Pass a sandbox prompt stream through unchanged while recording it in the turn's trace (see {@link createPromptTrace})."
+        },
+        {
+          "name": "TraceSandboxPromptOptions",
+          "kind": "interface",
+          "signature": "interface TraceSandboxPromptOptions",
+          "doc": null
         },
         {
           "name": "utcDay",
@@ -23673,12 +23677,6 @@
           "doc": "Derive a span trace from timestamped turn events."
         },
         {
-          "name": "buildStageTimingRecord",
-          "kind": "function",
-          "signature": "(context: StageTimingContext, stage: string, startedAt: number, durationMs: number, input?: StageTimingRecordInput) =>…",
-          "doc": "Build one safe record, or return null when its required fields are invalid."
-        },
-        {
           "name": "childSpanContext",
           "kind": "function",
           "signature": "(parent: MissionTraceContext | StepSpanContext, seed?: string | undefined) => StepSpanContext",
@@ -23695,18 +23693,6 @@
           "kind": "function",
           "signature": "(missionId?: string | undefined) => MissionTraceContext",
           "doc": "Mint a mission's trace context."
-        },
-        {
-          "name": "createStageTiming",
-          "kind": "function",
-          "signature": "(options: CreateStageTimingOptions) => StageTiming",
-          "doc": "Create a stage timer with an injected carrier."
-        },
-        {
-          "name": "CreateStageTimingOptions",
-          "kind": "interface",
-          "signature": "interface CreateStageTimingOptions",
-          "doc": null
         },
         {
           "name": "delegationActivityToFlowSpans",
@@ -23767,66 +23753,6 @@
           "kind": "function",
           "signature": "(trace: FlowTrace, opts?: { width?: number | undefined; } | undefined) => string",
           "doc": "ASCII waterfall cascade — the default artifact for explaining a flow."
-        },
-        {
-          "name": "STAGE_TIMING_EVENT",
-          "kind": "const",
-          "signature": "\"stage_timing\"",
-          "doc": "Structured, bounded latency records for one request or agent turn."
-        },
-        {
-          "name": "STAGE_TIMING_VERSION",
-          "kind": "const",
-          "signature": "1",
-          "doc": null
-        },
-        {
-          "name": "StageTiming",
-          "kind": "interface",
-          "signature": "interface StageTiming",
-          "doc": null
-        },
-        {
-          "name": "StageTimingContext",
-          "kind": "interface",
-          "signature": "interface StageTimingContext",
-          "doc": null
-        },
-        {
-          "name": "StageTimingDetailValue",
-          "kind": "type",
-          "signature": "type StageTimingDetailValue",
-          "doc": null
-        },
-        {
-          "name": "StageTimingHandle",
-          "kind": "interface",
-          "signature": "interface StageTimingHandle",
-          "doc": null
-        },
-        {
-          "name": "StageTimingKind",
-          "kind": "type",
-          "signature": "type StageTimingKind",
-          "doc": null
-        },
-        {
-          "name": "StageTimingOutcome",
-          "kind": "type",
-          "signature": "type StageTimingOutcome",
-          "doc": null
-        },
-        {
-          "name": "StageTimingRecord",
-          "kind": "interface",
-          "signature": "interface StageTimingRecord",
-          "doc": null
-        },
-        {
-          "name": "StageTimingRecordInput",
-          "kind": "interface",
-          "signature": "interface StageTimingRecordInput",
-          "doc": null
         },
         {
           "name": "stepActivityFlowTrace",
@@ -24257,7 +24183,7 @@
           "name": "threadChannelKey",
           "kind": "function",
           "signature": "(workspaceId: string, threadId: string) => string",
-          "doc": "Channel for a thread-scoped lock."
+          "doc": "Channel for a thread's viewer signals."
         },
         {
           "name": "TURN_LOCK_TTL_MS",
@@ -24274,7 +24200,7 @@
         {
           "name": "TURN_STREAM_STORAGE_KEYS",
           "kind": "const",
-          "signature": "{ readonly lock: \"chatTurnLock\"; readonly activeThreads: \"activeThreads\"; readonly turnStatus: \"turnStatus\"; readonly t…",
+          "signature": "{ readonly lock: \"chatTurnLock\"; readonly threadLockPrefix: \"chatTurnLock:thread:\"; readonly activeThreads: \"activeThre…",
           "doc": "Storage keys inside a DO instance."
         },
         {
@@ -24310,8 +24236,8 @@
         {
           "name": "turnLockChannelKey",
           "kind": "function",
-          "signature": "(workspaceId: string, threadId: string, scope: TurnLockScope) => string",
-          "doc": "The channel a lock lives on: workspace-scope locks serialize every thread in the workspace (one shared sandbox), thread-scope locks serialize one thread (router lane)."
+          "signature": "(workspaceId: string, _threadId: string, _scope: TurnLockScope) => string",
+          "doc": "The channel a lock lives on: the workspace channel, for both scopes."
         },
         {
           "name": "TurnLockInterruptedReleaseInput",
@@ -24348,6 +24274,12 @@
           "kind": "type",
           "signature": "type TurnLockSeamResult",
           "doc": "Verdict shape of the vertical's `turnLock.acquire`."
+        },
+        {
+          "name": "turnLockStorageKey",
+          "kind": "function",
+          "signature": "(scope: TurnLockScope, threadId: string) => string",
+          "doc": "The storage key a lock lives under inside its channel's instance: the workspace-scope lock under `TURN_STREAM_STORAGE_KEYS.lock`, each thread's lock under `TURN_STREAM_STORAGE_KEYS.threadLockPrefix`…"
         },
         {
           "name": "turnStorageChannelKey",
@@ -24426,6 +24358,170 @@
           "kind": "function",
           "signature": "(workspaceId: string) => string",
           "doc": "Channel for workspace signals and the workspace-scoped lock."
+        }
+      ]
+    },
+    {
+      "id": "./turn-trace",
+      "source": "src/turn-trace/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "buildTurnTraceOtelSpans",
+          "kind": "function",
+          "signature": "(snapshot: TurnTraceSnapshot, labels?: TurnSpanAttrs) => OtlpSpan[]",
+          "doc": "The root span (`agent_app.turn`) carries the host's labels and the turn's numbers: wall time, the share inside child spans, and the time credited to each kind of span."
+        },
+        {
+          "name": "createIntelligenceTurnTraceSink",
+          "kind": "function",
+          "signature": "(options: IntelligenceTurnTraceSinkOptions) => TurnTraceSink",
+          "doc": "The sink a chat route or a Worker turn hands each finished trace to: one OTLP POST per turn, awaited, so a host that runs it under `waitUntil` keeps the isolate alive until delivery."
+        },
+        {
+          "name": "createTurnTrace",
+          "kind": "function",
+          "signature": "(options?: CreateTurnTraceOptions) => TurnTrace",
+          "doc": null
+        },
+        {
+          "name": "CreateTurnTraceOptions",
+          "kind": "interface",
+          "signature": "interface CreateTurnTraceOptions",
+          "doc": null
+        },
+        {
+          "name": "formatServerTiming",
+          "kind": "function",
+          "signature": "(entries: readonly ServerTimingEntry[]) => string",
+          "doc": "Format entries as a `Server-Timing` header value, the inverse of {@link parseServerTiming}."
+        },
+        {
+          "name": "IntelligenceTurnTraceSinkOptions",
+          "kind": "interface",
+          "signature": "interface IntelligenceTurnTraceSinkOptions",
+          "doc": null
+        },
+        {
+          "name": "isTraceId",
+          "kind": "function",
+          "signature": "(value: string) => boolean",
+          "doc": "True when the Router and the Sandbox API keep this id as a `x-tangle-trace-id`."
+        },
+        {
+          "name": "nextCallIndex",
+          "kind": "function",
+          "signature": "(trace: TurnTrace, name: string) => number",
+          "doc": "1-based count of `name` spans started through {@link nextCallIndex} on this trace."
+        },
+        {
+          "name": "OtlpSpan",
+          "kind": "interface",
+          "signature": "interface OtlpSpan",
+          "doc": "One OTLP/JSON span, as Intelligence's ingest reads it."
+        },
+        {
+          "name": "otlpTraceId",
+          "kind": "function",
+          "signature": "(traceId: string) => string",
+          "doc": "A Tangle trace id as the 32-hex OTLP trace id."
+        },
+        {
+          "name": "parseServerTiming",
+          "kind": "function",
+          "signature": "(header: string | null | undefined) => ServerTimingEntry[]",
+          "doc": "Parse a `Server-Timing` header, as the Router and the Sandbox orchestrator send it."
+        },
+        {
+          "name": "serverTimingAttrs",
+          "kind": "function",
+          "signature": "(entries: readonly ServerTimingEntry[]) => Record<string, string | number>",
+          "doc": "Flat span attributes for the entries: `server_timing.<name>_ms` for a duration, `server_timing.<name>` for a `desc`."
+        },
+        {
+          "name": "ServerTimingEntry",
+          "kind": "interface",
+          "signature": "interface ServerTimingEntry",
+          "doc": "One entry of a `Server-Timing` response header."
+        },
+        {
+          "name": "summarizeTurnSpans",
+          "kind": "function",
+          "signature": "(spans: readonly Pick<TurnSpanRecord, \"name\" | \"kind\" | \"spanId\" | \"parentSpanId\" | \"startMs\" | \"endMs\">[], rootSpanId:…",
+          "doc": "Coverage and the per-kind split for a set of spans over `[startMs, endMs]`."
+        },
+        {
+          "name": "tracedModelFetch",
+          "kind": "function",
+          "signature": "(trace: TurnTrace, inner: (input: URL | RequestInfo, init?: RequestInit | undefined) => Promise<Response>, options?: Tr…",
+          "doc": "`fetch` for a model request, recording one `model.call` span per send: the wall time from the request to the end of its body, the time to the first byte, and the Router's own `Server-Timing` so the w…"
+        },
+        {
+          "name": "TracedModelFetchOptions",
+          "kind": "interface",
+          "signature": "interface TracedModelFetchOptions",
+          "doc": null
+        },
+        {
+          "name": "TURN_SPAN_KINDS",
+          "kind": "const",
+          "signature": "readonly TurnSpanKind[]",
+          "doc": null
+        },
+        {
+          "name": "TurnSpan",
+          "kind": "interface",
+          "signature": "interface TurnSpan",
+          "doc": null
+        },
+        {
+          "name": "TurnSpanAttrs",
+          "kind": "type",
+          "signature": "type TurnSpanAttrs",
+          "doc": "Bounded primitive metadata."
+        },
+        {
+          "name": "TurnSpanKind",
+          "kind": "type",
+          "signature": "type TurnSpanKind",
+          "doc": "What a span's time is spent on."
+        },
+        {
+          "name": "TurnSpanRecord",
+          "kind": "interface",
+          "signature": "interface TurnSpanRecord",
+          "doc": null
+        },
+        {
+          "name": "TurnTrace",
+          "kind": "interface",
+          "signature": "interface TurnTrace",
+          "doc": null
+        },
+        {
+          "name": "turnTraceId",
+          "kind": "function",
+          "signature": "(executionId: string) => string",
+          "doc": "The turn's execution id as a trace id."
+        },
+        {
+          "name": "TurnTraceSink",
+          "kind": "type",
+          "signature": "type TurnTraceSink",
+          "doc": "Where a finished turn's trace goes."
+        },
+        {
+          "name": "TurnTraceSnapshot",
+          "kind": "interface",
+          "signature": "interface TurnTraceSnapshot",
+          "doc": null
+        },
+        {
+          "name": "TurnTraceSummary",
+          "kind": "interface",
+          "signature": "interface TurnTraceSummary",
+          "doc": "How much of the turn's wall time is inside named spans, and what the time was spent on."
         }
       ]
     },
@@ -25136,6 +25232,12 @@
           "kind": "interface",
           "signature": "interface AgentSetupBlockProps",
           "doc": null
+        },
+        {
+          "name": "ALLOWED_ATTACHMENT_SNIFFED_MIMES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats `sniffBinary` can identify from content among the accepted types."
         },
         {
           "name": "ApiAccessKey",
@@ -26654,6 +26756,12 @@
           "kind": "type",
           "signature": "type NoticePersistedPart",
           "doc": "Define a persisted notice part with type, id, kind, and text properties"
+        },
+        {
+          "name": "OOXML_SNIFFED_MIMES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "The Office (OOXML) package mimes the default allow-list admits — the formats professionals actually send: Word contracts, Excel workpapers, PowerPoint decks."
         },
         {
           "name": "OVERLAY_SHADOW",
@@ -28982,14 +29090,200 @@
     {
       "id": "./workspace-apps",
       "source": "src/workspace-apps/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "crypto",
+        "object-store",
+        "teams",
+        "tools",
+        "web-react"
+      ],
       "error": null,
       "exports": [
+        {
+          "name": "CLOUD_ARTIFACT_FRAME_SANDBOX",
+          "kind": "const",
+          "signature": "\"allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads\"",
+          "doc": "The iframe sandbox for an artifact frame; never add `allow-same-origin`."
+        },
+        {
+          "name": "CLOUD_ARTIFACT_MAX_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": null
+        },
+        {
+          "name": "CLOUD_ARTIFACT_MAX_FILE_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": null
+        },
+        {
+          "name": "CLOUD_ARTIFACT_MAX_FILES",
+          "kind": "const",
+          "signature": "200",
+          "doc": null
+        },
+        {
+          "name": "CLOUD_ARTIFACT_SCRIPT_HOSTS",
+          "kind": "const",
+          "signature": "readonly [\"https://cdn.jsdelivr.net\", \"https://cdnjs.cloudflare.com\", \"https://unpkg.com\"]",
+          "doc": "Script and style CDNs a generated page may load."
+        },
+        {
+          "name": "CLOUD_ARTIFACT_SHARE_ROLE",
+          "kind": "const",
+          "signature": "\"owner\" | \"viewer\" | \"editor\" | \"admin\"",
+          "doc": "Opening an artifact needs `viewer`; creating or revoking a public link needs this role."
+        },
+        {
+          "name": "CLOUD_ARTIFACT_VIEW_TTL_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Member view links are re-minted on every page load, so they can be short."
+        },
+        {
+          "name": "CLOUD_ARTIFACT_WORKER_MODULE",
+          "kind": "const",
+          "signature": "\"_worker.js\"",
+          "doc": "The module a `worker` bundle runs, at the bundle root (the Cloudflare Pages name)."
+        },
+        {
+          "name": "cloudArtifactContentSecurityPolicy",
+          "kind": "function",
+          "signature": "(input: { origin: string; frameAncestors: readonly string[]; }) => string",
+          "doc": "The Content-Security-Policy every artifact response carries."
+        },
+        {
+          "name": "cloudArtifactContentType",
+          "kind": "function",
+          "signature": "(path: string) => string | null",
+          "doc": "The served type for a path, or null when cloud artifacts do not serve it."
+        },
+        {
+          "name": "CloudArtifactError",
+          "kind": "class",
+          "signature": "class CloudArtifactError",
+          "doc": null
+        },
+        {
+          "name": "CloudArtifactErrorCode",
+          "kind": "type",
+          "signature": "type CloudArtifactErrorCode",
+          "doc": null
+        },
+        {
+          "name": "CloudArtifactFile",
+          "kind": "interface",
+          "signature": "interface CloudArtifactFile",
+          "doc": "One stored file of a version."
+        },
+        {
+          "name": "CloudArtifactGrant",
+          "kind": "type",
+          "signature": "type CloudArtifactGrant",
+          "doc": "Who a view link was minted for: a workspace member, or a public share."
+        },
+        {
+          "name": "CloudArtifactInputFile",
+          "kind": "interface",
+          "signature": "interface CloudArtifactInputFile",
+          "doc": null
+        },
+        {
+          "name": "CloudArtifactKind",
+          "kind": "type",
+          "signature": "type CloudArtifactKind",
+          "doc": null
+        },
+        {
+          "name": "cloudArtifactObjectKey",
+          "kind": "function",
+          "signature": "(workspaceId: string, sha256Hex: string) => string",
+          "doc": "Content-addressed per workspace, so erasing a workspace deletes one prefix."
+        },
+        {
+          "name": "CloudArtifactOriginOptions",
+          "kind": "interface",
+          "signature": "interface CloudArtifactOriginOptions",
+          "doc": null
+        },
+        {
+          "name": "CloudArtifactRecord",
+          "kind": "interface",
+          "signature": "interface CloudArtifactRecord",
+          "doc": "What the origin needs from the product's record."
+        },
+        {
+          "name": "cloudArtifactReferences",
+          "kind": "function",
+          "signature": "(text: string, documentPath: string) => string[]",
+          "doc": "Local files an HTML, CSS or JavaScript document refers to, as bundle paths."
+        },
+        {
+          "name": "CloudArtifactVersion",
+          "kind": "interface",
+          "signature": "interface CloudArtifactVersion",
+          "doc": "An immutable snapshot."
+        },
+        {
+          "name": "CloudArtifactView",
+          "kind": "interface",
+          "signature": "interface CloudArtifactView",
+          "doc": null
+        },
+        {
+          "name": "CloudArtifactWorkerCode",
+          "kind": "interface",
+          "signature": "interface CloudArtifactWorkerCode",
+          "doc": "The code shape Worker Loader's `get` callback returns (Cloudflare `WorkerCode`)."
+        },
+        {
+          "name": "CloudArtifactWorkerLoader",
+          "kind": "interface",
+          "signature": "interface CloudArtifactWorkerLoader",
+          "doc": "Structural `env.LOADER` (a `worker_loaders` binding), so workers-types stays out of the public types."
+        },
+        {
+          "name": "cloudArtifactWorkspacePrefix",
+          "kind": "function",
+          "signature": "(workspaceId: string) => string",
+          "doc": "The prefix holding every stored byte of a workspace's artifacts."
+        },
+        {
+          "name": "collectCloudArtifactBundle",
+          "kind": "function",
+          "signature": "(input: { entry: string; readMany(paths: readonly string[]): Promise<ReadonlyMap<string, Uint8Array<ArrayBufferLike>>>;…",
+          "doc": "Gather an entry and every local file it refers to, transitively, plus `_worker.js` and its imports when the root has one."
+        },
         {
           "name": "confirmWorkspaceAppReady",
           "kind": "function",
           "signature": "(app: WorkspaceAppRecord, proof: WorkspaceAppHttpProof) => WorkspaceAppRecord",
           "doc": "Mark an app ready only after the host fetched its HTML over the trusted preview URL."
+        },
+        {
+          "name": "createCloudArtifactId",
+          "kind": "function",
+          "signature": "() => string",
+          "doc": "A random 32-hex id for an artifact or a share."
+        },
+        {
+          "name": "createCloudArtifactOrigin",
+          "kind": "function",
+          "signature": "(options: CloudArtifactOriginOptions) => (request: Request) => Promise<Response>",
+          "doc": "Serve cloud artifacts on their own origin."
+        },
+        {
+          "name": "createCloudArtifactShareToken",
+          "kind": "function",
+          "signature": "(shareId: string, secret: string) => Promise<string>",
+          "doc": "The secret part of a public link: `<shareId>.<HMAC>`."
+        },
+        {
+          "name": "createCloudArtifactViewUrl",
+          "kind": "function",
+          "signature": "(input: { origin: string; secret: string; artifactId: string; grant: CloudArtifactGrant; path: string; ttlMs?: number |…",
+          "doc": "A short-lived URL on the artifact origin for one artifact and one grant."
         },
         {
           "name": "createWorkspaceAppDataClient",
@@ -29004,10 +29298,52 @@
           "doc": "Bind one registered preview to a product-authorized data adapter."
         },
         {
+          "name": "isCloudArtifactPath",
+          "kind": "function",
+          "signature": "(path: string) => boolean",
+          "doc": "A bundle path: relative, no `.` or `..` segments, no control or URL-special characters."
+        },
+        {
+          "name": "prepareCloudArtifact",
+          "kind": "function",
+          "signature": "(input: { files: readonly CloudArtifactInputFile[]; entry: string; openui?: boolean | undefined; carry?: readonly Cloud…",
+          "doc": "Validate and hash a bundle."
+        },
+        {
+          "name": "PreparedCloudArtifact",
+          "kind": "interface",
+          "signature": "interface PreparedCloudArtifact",
+          "doc": null
+        },
+        {
+          "name": "readCloudArtifactShareToken",
+          "kind": "function",
+          "signature": "(token: string, secret: string) => Promise<string | null>",
+          "doc": "The share id a public link names, or null when its signature does not verify."
+        },
+        {
+          "name": "readCloudArtifactViewUrl",
+          "kind": "function",
+          "signature": "(url: URL, options: { secret: string; now?: (() => number) | undefined; }) => Promise<CloudArtifactView | null>",
+          "doc": "Read and verify a view URL on the artifact origin; null for anything forged, expired or malformed."
+        },
+        {
           "name": "refreshWorkspaceAppPreview",
           "kind": "function",
           "signature": "(app: WorkspaceAppRecord, link: WorkspaceAppPreviewLink, updatedAt?: string) => WorkspaceAppRecord",
           "doc": "Refresh delivery state without changing which sandbox service this app means."
+        },
+        {
+          "name": "resolveCloudArtifactReference",
+          "kind": "function",
+          "signature": "(reference: string, documentPath: string) => string | null",
+          "doc": "Resolve a document-relative reference to a bundle path, or null when it is not a local file."
+        },
+        {
+          "name": "storeCloudArtifact",
+          "kind": "function",
+          "signature": "(store: ObjectStore, workspaceId: string, prepared: PreparedCloudArtifact) => Promise<CloudArtifactVersion>",
+          "doc": "Store a prepared version's new bytes; objects already present are not rewritten."
         },
         {
           "name": "workspaceAppBuilderInstructions",
@@ -29086,6 +29422,50 @@
           "kind": "interface",
           "signature": "interface WorkspaceAppRecord",
           "doc": "A sandbox app registered in one product workspace."
+        }
+      ]
+    },
+    {
+      "id": "./workspace-apps/react",
+      "source": "src/workspace-apps/react.tsx",
+      "dependsOn": [
+        "crypto",
+        "object-store",
+        "teams",
+        "tools",
+        "web-react"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "CLOUD_ARTIFACT_FRAME_SANDBOX",
+          "kind": "const",
+          "signature": "\"allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads\"",
+          "doc": "The iframe sandbox for an artifact frame; never add `allow-same-origin`."
+        },
+        {
+          "name": "CloudArtifactFrame",
+          "kind": "function",
+          "signature": "({ src, title, className }: { src: string; title: string; className?: string | undefined; }) => Element",
+          "doc": "Render a cloud artifact from its view URL on the artifact origin."
+        },
+        {
+          "name": "CloudArtifactPublicLink",
+          "kind": "interface",
+          "signature": "interface CloudArtifactPublicLink",
+          "doc": "A live public link to one artifact."
+        },
+        {
+          "name": "CloudArtifactSharePanel",
+          "kind": "function",
+          "signature": "({ link: initial, canShare, onCreate, onRevoke }: CloudArtifactSharePanelProps) => Element",
+          "doc": "Turn an artifact's public link on, copy it, or turn it off."
+        },
+        {
+          "name": "CloudArtifactSharePanelProps",
+          "kind": "interface",
+          "signature": "interface CloudArtifactSharePanelProps",
+          "doc": null
         }
       ]
     },

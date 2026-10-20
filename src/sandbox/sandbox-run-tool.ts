@@ -18,6 +18,7 @@
  * one the speculator listens for (`DEFAULT_ESCALATION_TOOLS`).
  */
 import type { SandboxInstance } from '@tangle-network/sandbox'
+import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'
 import { runSandboxPrompt, type SandboxRuntimeConfig, type StreamSandboxPromptOptions } from './index'
 
 export type SandboxRunFailureCode = 'sandbox_unavailable' | 'sandbox_failed' | 'sandbox_empty' | 'invalid_arguments'
@@ -33,6 +34,10 @@ export class SandboxRunError extends Error {
 /** The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine. */
 export interface SandboxToolContext {
   emit(kind: string, data?: unknown): void
+  /** The turn's trace and this call's `tool.call` span (`runRouterTurn` supplies both). The box claim, the box run and the
+   *  trace id sent to the Sandbox API follow from them; without them nothing is recorded. */
+  trace?: TurnTrace
+  span?: TurnSpan
 }
 
 export interface SandboxTaskOptions {
@@ -40,6 +45,9 @@ export interface SandboxTaskOptions {
   timeoutMs: number
   /** Streams a typed side event from the box run (a progress step, a file written) as the turn's `tool_event`. */
   emit(kind: string, data?: unknown): void
+  /** The turn's trace and this call's span, for a runner that streams a prompt (`sandboxPromptRunner` does). */
+  trace?: TurnTrace
+  span?: TurnSpan
 }
 
 export interface SandboxRunToolOptions {
@@ -81,7 +89,10 @@ export const SANDBOX_RUN_DESCRIPTION =
 
 /** The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused). */
 export function sandboxPromptRunner(shell: SandboxRuntimeConfig, prompt: Omit<StreamSandboxPromptOptions, 'signal' | 'history'> = {}): SandboxRunToolOptions['runTask'] {
-  return (box, task, { signal, timeoutMs }) => runSandboxPrompt(shell, box, task, { ...prompt, signal, timeoutMs, disallowQuestions: true })
+  return (box, task, { signal, timeoutMs, trace, span }) => runSandboxPrompt(shell, box, task, {
+    ...prompt, signal, timeoutMs, disallowQuestions: true,
+    ...(trace ? { trace } : {}), ...(span ? { traceParent: span } : {}),
+  })
 }
 
 export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRunTool {
@@ -116,9 +127,12 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
         signal.addEventListener('abort', () => reject(signal.reason), { once: true })
       })])
       let box: SandboxInstance
+      const claim = context?.span?.child('sandbox.claim', 'sandbox')
       try {
         box = await capped(options.box(signal))
+        claim?.end()
       } catch (error) {
+        claim?.end(undefined, error instanceof SandboxRunError ? error.code : 'sandbox_unavailable')
         if (error instanceof SandboxRunError) return fail(error.code, error.message, error.cause)
         return fail('sandbox_unavailable', 'The sandbox for this workspace could not start, so this work was not done.', error)
       }
@@ -126,7 +140,10 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
       let answer: string
       try {
         // A product runner may not honour the signal; the call still ends at the cap.
-        answer = await capped(runTask(box, task, { signal, timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)), emit }))
+        answer = await capped(runTask(box, task, {
+          signal, timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)), emit,
+          ...(context?.trace ? { trace: context.trace } : {}), ...(context?.span ? { span: context.span } : {}),
+        }))
       } catch (error) {
         const timedOut = signal.aborted && !options.signal?.aborted
         return fail('sandbox_failed', timedOut

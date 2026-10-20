@@ -1,5 +1,88 @@
 # Changelog
 
+## 0.60.214
+
+- perf(sandbox): a reuse reads its box by id and trusts a recent probe, egress read and env push; the lease and spend gate wait for a lifecycle step (#1175)
+- perf(chat-routes): afterAuthorize starts a turn's box and keys when the caller is admitted (#1174)
+
+## 0.60.213
+
+- feat(chat-routes): lifecycle.afterSettle runs a turn's follow-up work once its row is saved and its lock is free (#1173)
+
+## 0.60.212
+
+- fix(copy-quality): catch measured reveals and permission closers (#1172)
+
+## 0.60.211
+
+- perf(turn-stream): keep thread locks on the workspace channel (#1170)
+
+## 0.60.210
+
+- fix(tools): validate JSON text render UI nodes before dispatch (#1169)
+
+## 0.60.209
+
+- chore: delete the intakes React surface and HTTP handlers no app imports, and the scaffold's mock sandbox-fence test (#1167)
+
+## 0.60.208
+
+- Release Router reasoning as it arrives on turns that render it (#1166)
+
+## 0.60.207
+
+- feat(turn-trace): the Router's own steps and retry waits as spans of each model call (#1164)
+
+## 0.60.206
+
+- perf(chat-routes): one fewer serial admission read per follow-up turn, admission steps in Server-Timing (#1165)
+
+## 0.60.205
+
+- docs(worker-defaults): pin the Worker beside its D1 primary, and the placement hazard measured on Legal (#1163)
+
+## 0.60.204
+
+- feat(turn-trace): authorize and beforeTurn receive their admission span (#1162)
+
+## 0.60.203
+
+- feat(turn-trace): the member's first visible text from the request, and the trace in authorize (#1161)
+- wip (#1160)
+
+## 0.60.202
+
+- fix(turn-trace): keep a trace id in the Router charset as it is and guard the Worker entry across directories (#1159)
+
+## 0.60.201
+
+- fix(turn-trace): send a turn's trace with one OTLP POST and no agent-runtime import (#1158)
+- wip (#1157)
+
+## 0.60.200
+
+- feat(turn-trace): traceSandboxPromptEvents for products that call box.streamPrompt themselves (#1156)
+
+## 0.60.199
+
+- feat(turn-trace): one trace per agent turn with named child spans on the Router and sandbox lanes (#1155)
+
+## 0.60.198
+
+- fix(workspace-apps): revalidate every artifact share access (#1154)
+
+## 0.60.197
+
+- feat(workspace-apps): cloud artifacts that open while the box sleeps (#1153)
+
+## 0.60.196
+
+- feat(operator): turns.cancel stops a running turn (#1152)
+
+## 0.60.195
+
+- feat(chat-routes): stream large raw attachment uploads to the store (#1151)
+
 ## 0.60.194
 
 - feat(sandbox): carry a stored-secret key reference in the resolved model (#1149)
