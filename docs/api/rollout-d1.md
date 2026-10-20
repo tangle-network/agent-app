@@ -4,7 +4,7 @@
 
 Source: `src/rollout/d1.ts`
 
-5 exports.
+6 exports.
 
 ### `createD1TurnTimingStore`
 
@@ -22,6 +22,14 @@ Source: `src/rollout/d1.ts`
 interface D1LikeForRollout
 ```
 
+### `ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL`
+
+`const` — Apply once through the product migration runner to existing tables; historical rows stay NULL.
+
+```ts
+"ALTER TABLE rollout_turn_timing ADD COLUMN first_visible_ms INTEGER;"
+```
+
 ### `ROLLOUT_TURN_TIMING_SCHEMA_SQL`
 
 `const`
@@ -35,7 +43,7 @@ interface D1LikeForRollout
 `function` — Stage metrics from turn rows: first-words and settled percentiles in ms, and the failure rate.
 
 ```ts
-(rows: readonly Pick<TurnTimingRow, "failed" | "firstTextMs" | "settledMs">[]) => { first_words_p50_ms: number | null;…
+(rows: readonly Pick<TurnTimingRow, "failed" | "firstVisibleMs" | "firstTextMs" | "settledMs">[]) => { first_visible_p5…
 ```
 
 ### `TurnTimingRow`

@@ -170,6 +170,13 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     }
     expect(root.attributes.find((attribute) => attribute.key === 'tangle.trace_id')?.value.stringValue).toBe(snapshot!.traceId)
     expect(new Set(exported.map((span) => span.traceId))).toEqual(new Set([otlpTraceId(snapshot!.traceId)]))
+    // Every actual HTTP send names its own exported model.call as parent:
+    // logical x-tangle-trace-id correlation alone cannot join Router spans.
+    const exportedCalls = exported.filter(span => span.name === 'model.call')
+    expect(routerHeaders.map(headers => headers.traceparent)).toEqual(
+      exportedCalls.map(span => `00-${span.traceId}-${span.spanId}-01`),
+    )
+    for (const headers of routerHeaders) expect(headers.authorization).toBe('Bearer k')
     for (const span of exported.filter((candidate) => candidate !== root)) expect(exported.some((candidate) => candidate.spanId === span.parentSpanId)).toBe(true)
   })
 
@@ -202,6 +209,9 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     const { spans, summary } = snapshot!
     const calls = spans.filter((span) => span.name === 'model.call').sort((a, b) => a.startMs - b.startMs)
     expect(calls.map((span) => span.attrs['http.status_code'])).toEqual([503, 200])
+    expect(routerHeaders.slice(sent).map(headers => headers.traceparent)).toEqual(
+      calls.map(span => `00-${otlpTraceId(snapshot!.traceId)}-${span.spanId}-01`),
+    )
     const waits = spans.filter((span) => span.name === 'model.retry_wait')
     expect(waits).toHaveLength(1)
     expect(waits[0]!.attrs).toMatchObject({ 'retry.attempt': 1, 'retry.reason': 'http_503' })
