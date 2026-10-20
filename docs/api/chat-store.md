@@ -4,7 +4,7 @@
 
 Source: `src/chat-store/index.ts`
 
-59 exports.
+60 exports.
 
 ### `AppendMessageInput`
 
@@ -348,6 +348,14 @@ interface CreateThreadInput
 
 ```ts
 "Attached files (already saved to the workspace vault — read them from these paths):"
+```
+
+### `historyAttachmentsFromMessages`
+
+`function` — Attachment carry-forward in first-seen path order.
+
+```ts
+(currentAttachments: readonly Pick<ChatAttachmentPart, "path">[], priorMessages: readonly { parts?: readonly Record<str…
 ```
 
 ### `historyContentWithAttachments`

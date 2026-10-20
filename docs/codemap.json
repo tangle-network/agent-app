@@ -2628,6 +2628,12 @@
           "doc": "Public-safe outcome for a storage outage."
         },
         {
+          "name": "AttachmentMaterialization",
+          "kind": "interface",
+          "signature": "interface AttachmentMaterialization",
+          "doc": "Opt-in copy from the product attachment store to its already-authorized box."
+        },
+        {
           "name": "AttachmentPathArgs",
           "kind": "interface",
           "signature": "interface AttachmentPathArgs",
@@ -3216,6 +3222,12 @@
           "doc": "Bytes reserved off the top of {@link DISPATCH_REQUEST_MAX_BYTES} for the JSON structure around the parts array (keys, delimiters, per-part `type`/`filename`/`mediaType` fields) that {@link base64Wire…"
         },
         {
+          "name": "DispatchHistoryMessage",
+          "kind": "interface",
+          "signature": "interface DispatchHistoryMessage",
+          "doc": "A persisted message whose attachment pointers accompany its history text."
+        },
+        {
           "name": "DispatchPartsOutcome",
           "kind": "type",
           "signature": "type DispatchPartsOutcome",
@@ -3648,6 +3660,18 @@
           "doc": "Result of settling a claim."
         },
         {
+          "name": "prepareDispatchAttachments",
+          "kind": "function",
+          "signature": "(input: PrepareDispatchAttachmentsInput) => Promise<ChatAttachmentPart[]>",
+          "doc": "Select carried files and optionally copy them before constructing a prompt."
+        },
+        {
+          "name": "PrepareDispatchAttachmentsInput",
+          "kind": "interface",
+          "signature": "interface PrepareDispatchAttachmentsInput",
+          "doc": "Prepare carried files before a product constructs its prompt and dispatch input."
+        },
+        {
           "name": "produceChatTurnWithIntelligence",
           "kind": "function",
           "signature": "(options: ChatTurnIntelligenceOptions & { produce: () => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>; }) =>…",
@@ -3712,6 +3736,12 @@
           "kind": "type",
           "signature": "type ProducerWireEvent",
           "doc": "Represent events emitted by a producer during its operation for processing and handling"
+        },
+        {
+          "name": "projectDispatchHistory",
+          "kind": "function",
+          "signature": "(messages: readonly DispatchHistoryMessage[]) => { role: \"user\" | \"assistant\"; content: string; }[]",
+          "doc": "Project persisted rows using the same role and attachment policy as dispatch."
         },
         {
           "name": "PROMOTE_MAX_FILE_BYTES",
@@ -4448,6 +4478,12 @@
           "kind": "const",
           "signature": "\"Attached files (already saved to the workspace vault — read them from these paths):\"",
           "doc": "gtm's exact default header for {@link buildAttachmentPromptBlock} — kept byte-identical because it feeds dispatched prompts (gtm-agent#618 reproduces the prompt bytes through this module)."
+        },
+        {
+          "name": "historyAttachmentsFromMessages",
+          "kind": "function",
+          "signature": "(currentAttachments: readonly Pick<ChatAttachmentPart, \"path\">[], priorMessages: readonly { parts?: readonly Record<str…",
+          "doc": "Attachment carry-forward in first-seen path order."
         },
         {
           "name": "historyContentWithAttachments",

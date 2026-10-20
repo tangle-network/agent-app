@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-279 exports.
+284 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -172,6 +172,14 @@ type AtomicWriteAttachmentFn
 
 ```ts
 "Attachment storage is temporarily unavailable. Please try again."
+```
+
+### `AttachmentMaterialization`
+
+`interface` — Opt-in copy from the product attachment store to its already-authorized box.
+
+```ts
+interface AttachmentMaterialization
 ```
 
 ### `AttachmentPathArgs`
@@ -958,6 +966,14 @@ number
 number
 ```
 
+### `DispatchHistoryMessage`
+
+`interface` — A persisted message whose attachment pointers accompany its history text.
+
+```ts
+interface DispatchHistoryMessage
+```
+
 ### `DispatchPartsOutcome`
 
 `type` — Resolve the outcome of dispatching parts with success status and corresponding value or error message
@@ -1534,6 +1550,22 @@ type PlanFollowUpResolution
 type PlanFollowUpSettlement
 ```
 
+### `prepareDispatchAttachments`
+
+`function` — Select carried files and optionally copy them before constructing a prompt.
+
+```ts
+(input: PrepareDispatchAttachmentsInput) => Promise<ChatAttachmentPart[]>
+```
+
+### `PrepareDispatchAttachmentsInput`
+
+`interface` — Prepare carried files before a product constructs its prompt and dispatch input.
+
+```ts
+interface PrepareDispatchAttachmentsInput
+```
+
 ### `produceChatTurnWithIntelligence`
 
 `function` — Adapter for product producer factories.
@@ -1620,6 +1652,14 @@ interface ProducerUsageEvent
 
 ```ts
 type ProducerWireEvent
+```
+
+### `projectDispatchHistory`
+
+`function` — Project persisted rows using the same role and attachment policy as dispatch.
+
+```ts
+(messages: readonly DispatchHistoryMessage[]) => { role: "user" | "assistant"; content: string; }[]
 ```
 
 ### `PROMOTE_MAX_FILE_BYTES`
