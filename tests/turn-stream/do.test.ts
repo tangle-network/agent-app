@@ -12,7 +12,6 @@ import {
   type TurnStreamAuth,
 } from '../../src/turn-stream/adapters'
 import {
-  threadChannelKey,
   workspaceChannelKey,
   mintTurnStreamToken,
   TURN_STREAM_PATHS,
@@ -197,7 +196,7 @@ describe('TurnStreamDO lock peek (warm-up)', () => {
     expect(contended.acquired).toBe(false)
   })
 
-  it('createDurableTurnLock warms the thread channel its first acquire uses', async () => {
+  it('createDurableTurnLock warms the workspace channel its first acquire uses', async () => {
     const { namespace } = harness()
     const seen: string[] = []
     const watched = {
@@ -206,7 +205,8 @@ describe('TurnStreamDO lock peek (warm-up)', () => {
     } as typeof namespace
     const lock = createDurableTurnLock<undefined>({ namespace: watched, auth: AUTH, scopeOf: () => 'thread' })
     await lock.warm({ tenantId: WS, threadId: THREAD })
-    expect(seen).toEqual([threadChannelKey(WS, THREAD)])
+    await lock.acquire({ identity: { tenantId: WS, sessionId: THREAD }, executionId: 'exec-1', context: undefined, body: {} })
+    expect(seen).toEqual([workspaceChannelKey(WS), workspaceChannelKey(WS)])
   })
 })
 
@@ -236,8 +236,22 @@ describe('TurnStreamDO lock endpoints', () => {
       },
       AUTH,
     )
-    // Different thread, thread scope → different channel → acquires fine.
+    // Different thread, thread scope → its own lock → acquires fine.
     expect(second.acquired).toBe(true)
+
+    // The workspace-scope lock is independent of the thread locks beside it.
+    const workspace = await acquireDurableTurnLock(
+      namespace,
+      { workspaceId: WS, threadId: THREAD, scope: 'workspace', executionId: 'exec-ws' },
+      AUTH,
+    )
+    expect(workspace.acquired).toBe(true)
+    const third = await acquireDurableTurnLock(
+      namespace,
+      { workspaceId: WS, threadId: 'th-third', scope: 'thread', executionId: 'exec-4' },
+      AUTH,
+    )
+    expect(third.acquired).toBe(true)
 
     const contended = await acquireDurableTurnLock(
       namespace,
@@ -383,7 +397,7 @@ describe('TurnStreamDO deferred-release seam', () => {
 
   it('parks the release while the product task runs, completes it on settle', async () => {
     const h = createMemoryTurnStreamHarness((state, secret) => new DeferringDO(state, undefined, { authSecret: secret }))
-    const channel = h.channel(threadChannelKey(WS, THREAD))
+    const channel = h.channel(workspaceChannelKey(WS))
     const doInstance = channel.instance as DeferringDO
     doInstance.deferring.add('exec-1')
 

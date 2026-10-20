@@ -78,9 +78,10 @@ export async function verifyTurnStreamToken(
 // ── channel keys ────────────────────────────────────────────────────────────
 //
 // One DO instance per channel key. Four families:
-//   thread     `${workspaceId}:${threadId}` — thread-scope lock.
+//   thread     `${workspaceId}:${threadId}` — thread viewer signals.
 //   workspace  `${workspaceId}`             — sidebar activity + thread.created
-//              + the workspace-scope lock.
+//              + every turn lock: the workspace-scope lock and each
+//              thread-scope lock, under separate storage keys.
 //   turn       `turn:${turnId}`             — durable turn-event rows + status
 //              (the TurnEventStore contract; replay survives DO eviction).
 //   scope      `scope:${scopeId}`           — running-turn index for a thread,
@@ -89,7 +90,7 @@ export async function verifyTurnStreamToken(
 /** Define the scope level for acquiring a turn lock within thread or workspace contexts */
 export type TurnLockScope = 'thread' | 'workspace'
 
-/** Channel for a thread-scoped lock. */
+/** Channel for a thread's viewer signals. */
 export function threadChannelKey(workspaceId: string, threadId: string): string {
   return `${workspaceId}:${threadId}`
 }
@@ -99,12 +100,22 @@ export function workspaceChannelKey(workspaceId: string): string {
   return workspaceId
 }
 
-/** The channel a lock lives on: workspace-scope locks serialize every thread
- *  in the workspace (one shared sandbox), thread-scope locks serialize one
- *  thread (router lane). Same keying as the reference consumer, so a product
- *  swapping its fork for this package contends on identical instances. */
-export function turnLockChannelKey(workspaceId: string, threadId: string, scope: TurnLockScope): string {
-  return scope === 'workspace' ? workspaceChannelKey(workspaceId) : threadChannelKey(workspaceId, threadId)
+/** The channel a lock lives on: the workspace channel, for both scopes.
+ *  Workspace-scope locks serialize every thread in the workspace (one shared
+ *  sandbox) and thread-scope locks serialize one thread (router lane); they
+ *  stay independent because each has its own storage key
+ *  ({@link turnLockStorageKey}). A thread lock on its own channel created a
+ *  new Durable Object on every thread's first turn, 0.8-1.9 s inside Creative's
+ *  admission on staging (2026-10-20) against an object that already exists. */
+export function turnLockChannelKey(workspaceId: string, _threadId: string, _scope: TurnLockScope): string {
+  return workspaceChannelKey(workspaceId)
+}
+
+/** The storage key a lock lives under inside its channel's instance: the
+ *  workspace-scope lock under `TURN_STREAM_STORAGE_KEYS.lock`, each thread's
+ *  lock under `TURN_STREAM_STORAGE_KEYS.threadLockPrefix` + its thread id. */
+export function turnLockStorageKey(scope: TurnLockScope, threadId: string): string {
+  return scope === 'workspace' ? TURN_STREAM_STORAGE_KEYS.lock : `${TURN_STREAM_STORAGE_KEYS.threadLockPrefix}${threadId}`
 }
 
 /** Channel for the optional Durable Object turn-event backend. */
@@ -277,6 +288,7 @@ export const TURN_STREAM_PATHS = {
  *  a product extending the DO must not collide with these. */
 export const TURN_STREAM_STORAGE_KEYS = {
   lock: 'chatTurnLock',
+  threadLockPrefix: 'chatTurnLock:thread:',
   activeThreads: 'activeThreads',
   turnStatus: 'turnStatus',
   turnScope: 'turnScopeIndex',

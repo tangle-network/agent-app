@@ -7,9 +7,7 @@ import {
   interruptedReleaseApplies,
   pruneStaleThreads,
   scopeIndexChannelKey,
-  threadChannelKey,
   turnEventStorageKey,
-  turnLockChannelKey,
   turnLockMatchesRelease,
   turnStorageChannelKey,
   TURN_LOCK_TTL_MS,
@@ -89,12 +87,6 @@ describe('turn lock record', () => {
 })
 
 describe('channel keys', () => {
-  it('locks contend on the reference-consumer keying: workspace scope shares the workspace channel', () => {
-    expect(turnLockChannelKey('ws', 'th', 'workspace')).toBe('ws')
-    expect(turnLockChannelKey('ws', 'th', 'thread')).toBe('ws:th')
-    expect(threadChannelKey('ws', 'th')).toBe('ws:th')
-  })
-
   it('turn/scope storage channels are namespaced away from thread channels', () => {
     expect(turnStorageChannelKey('t-1')).toBe('turn:t-1')
     expect(scopeIndexChannelKey('th')).toBe('scope:th')
