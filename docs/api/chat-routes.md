@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-271 exports.
+279 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -758,6 +758,14 @@ interface CreateChatTurnRoutesOptions
 (db: D1LikeForPlanFollowUps, options?: PlanFollowUpGateOptions) => PlanFollowUpGate
 ```
 
+### `createHybridTurnProducer`
+
+`function`
+
+```ts
+(options: HybridTurnProducerOptions) => ChatTurnRouteProducer
+```
+
 ### `CreateLegacyAttachmentUploadRouteOptions`
 
 `interface` — Stable route options for products using the original writer contract.
@@ -1060,6 +1068,30 @@ type FilePartPromotionOutcome
 
 ```ts
 (bytes: number) => string
+```
+
+### `HYBRID_TURN_GUIDANCE`
+
+`const` — What the default prompt adds so the Router lane answers first and escalates out loud.
+
+```ts
+string
+```
+
+### `HybridTurnBox`
+
+`interface`
+
+```ts
+interface HybridTurnBox
+```
+
+### `HybridTurnProducerOptions`
+
+`interface`
+
+```ts
+interface HybridTurnProducerOptions
 ```
 
 ### `immutableAttachmentPath`
@@ -1758,6 +1790,14 @@ type ResolveChatAttachmentsResult
 (input: { sessionId: string; planFollowUp: unknown; messages: readonly { role: string; parts?: unknown; }[]; }) => Plan…
 ```
 
+### `routerTurnHistory`
+
+`function` — The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text.
+
+```ts
+(priorMessages: readonly Pick<PersistedChatMessageForTurn, "content" | "role">[], limit?: number) => { role: "user" | "…
+```
+
 ### `RouterTurnProducerOptions`
 
 `type`
@@ -1910,6 +1950,14 @@ type StaleTurnLockSandboxProbeResult
 type StaleTurnLockSessionProbeResult
 ```
 
+### `startHybridBox`
+
+`function` — Start the box at admission when the request asks for execution, so its resume overlaps the turn lock and the profile pin instead of following them.
+
+```ts
+(body: Pick<ChatTurnRequestPayload, "content" | "parts">, acquire: () => Promise<SandboxInstance>) => Promise<SandboxIn…
+```
+
 ### `storeSupportsDraftPersistence`
 
 `function` — True when a store can support incremental persistence at all.
@@ -2046,6 +2094,14 @@ Record<TurnRoutePhase, string>
 "turn_stream_lost"
 ```
 
+### `turnCarriesFiles`
+
+`function` — Whether the turn carries files.
+
+```ts
+(prompt: string | readonly ChatTurnPartInput[]) => boolean
+```
+
 ### `TurnIntentData`
 
 `type` — The data of a {@link TURN_INTENT_EVENT}.
@@ -2076,6 +2132,14 @@ type TurnPhaseData
 
 ```ts
 type TurnPhaseEvent
+```
+
+### `turnPromptText`
+
+`function` — The turn's prompt as the text the model reads: text parts joined; file parts are not text.
+
+```ts
+(prompt: string | readonly ChatTurnPartInput[]) => string
 ```
 
 ### `TurnResponseData`

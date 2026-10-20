@@ -3917,6 +3917,14 @@ interface CreateChatTurnRoutesOptions
 (db: D1LikeForPlanFollowUps, options?: PlanFollowUpGateOptions) => PlanFollowUpGate
 ```
 
+### `createHybridTurnProducer`
+
+`function`
+
+```ts
+(options: HybridTurnProducerOptions) => ChatTurnRouteProducer
+```
+
 ### `CreateLegacyAttachmentUploadRouteOptions`
 
 `interface` — Stable route options for products using the original writer contract.
@@ -4219,6 +4227,30 @@ type FilePartPromotionOutcome
 
 ```ts
 (bytes: number) => string
+```
+
+### `HYBRID_TURN_GUIDANCE`
+
+`const` — What the default prompt adds so the Router lane answers first and escalates out loud.
+
+```ts
+string
+```
+
+### `HybridTurnBox`
+
+`interface`
+
+```ts
+interface HybridTurnBox
+```
+
+### `HybridTurnProducerOptions`
+
+`interface`
+
+```ts
+interface HybridTurnProducerOptions
 ```
 
 ### `immutableAttachmentPath`
@@ -4917,6 +4949,14 @@ type ResolveChatAttachmentsResult
 (input: { sessionId: string; planFollowUp: unknown; messages: readonly { role: string; parts?: unknown; }[]; }) => Plan…
 ```
 
+### `routerTurnHistory`
+
+`function` — The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text.
+
+```ts
+(priorMessages: readonly Pick<PersistedChatMessageForTurn, "content" | "role">[], limit?: number) => { role: "user" | "…
+```
+
 ### `RouterTurnProducerOptions`
 
 `type`
@@ -5069,6 +5109,14 @@ type StaleTurnLockSandboxProbeResult
 type StaleTurnLockSessionProbeResult
 ```
 
+### `startHybridBox`
+
+`function` — Start the box at admission when the request asks for execution, so its resume overlaps the turn lock and the profile pin instead of following them.
+
+```ts
+(body: Pick<ChatTurnRequestPayload, "content" | "parts">, acquire: () => Promise<SandboxInstance>) => Promise<SandboxIn…
+```
+
 ### `storeSupportsDraftPersistence`
 
 `function` — True when a store can support incremental persistence at all.
@@ -5205,6 +5253,14 @@ Record<TurnRoutePhase, string>
 "turn_stream_lost"
 ```
 
+### `turnCarriesFiles`
+
+`function` — Whether the turn carries files.
+
+```ts
+(prompt: string | readonly ChatTurnPartInput[]) => boolean
+```
+
 ### `TurnIntentData`
 
 `type` — The data of a {@link TURN_INTENT_EVENT}.
@@ -5235,6 +5291,14 @@ type TurnPhaseData
 
 ```ts
 type TurnPhaseEvent
+```
+
+### `turnPromptText`
+
+`function` — The turn's prompt as the text the model reads: text parts joined; file parts are not text.
+
+```ts
+(prompt: string | readonly ChatTurnPartInput[]) => string
 ```
 
 ### `TurnResponseData`
@@ -21722,14 +21786,6 @@ type ModelSelectionSource
 type Outcome
 ```
 
-### `parsePrewarmHint`
-
-`function`
-
-```ts
-(value: string | null | undefined) => PrewarmHintMode
-```
-
 ### `peekWorkspaceSandbox`
 
 `function` — Read-only twin of {@link ensureWorkspaceSandbox}: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything.
@@ -21816,14 +21872,6 @@ interface PrewarmDecision
 
 ```ts
 type PrewarmEvent
-```
-
-### `PrewarmHintMode`
-
-`type` — `SANDBOX_PREWARM_HINT`: `off` (default) or `deterministic`.
-
-```ts
-type PrewarmHintMode
 ```
 
 ### `PrewarmOutcome`
@@ -36411,6 +36459,14 @@ interface UseSessionHistoryOptions
 (options: UseWorkspacePrewarmOptions) => WorkspacePrewarmHandle
 ```
 
+### `useWorkspacePrewarmHandle`
+
+`function`
+
+```ts
+() => WorkspacePrewarmHandle | null
+```
+
 ### `UseWorkspacePrewarmOptions`
 
 `interface`
@@ -36569,6 +36625,14 @@ interface WorkProductCardProps
 
 ```ts
 ({ name, size }: { name: string; size?: "sm" | "lg" | undefined; }) => Element
+```
+
+### `WorkspacePrewarmContext`
+
+`function` — The prewarm handle of the workspace shell around this component.
+
+```ts
+Context<WorkspacePrewarmHandle | null>
 ```
 
 ### `WorkspacePrewarmHandle`
@@ -38770,7 +38834,7 @@ interface AgentWorkspaceIdentity
 `function` — The default agent workspace composition.
 
 ```ts
-({ children, navItems, sessions, apps, activeRoute, activeId, product, workspace, ...sidebarProps }: AgentWorkspaceLayo…
+({ children, navItems, sessions, apps, activeRoute, activeId, product, workspace, prewarm, ...sidebarProps }: AgentWork…
 ```
 
 ### `AgentWorkspaceLayoutProps`

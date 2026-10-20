@@ -3065,6 +3065,12 @@
           "doc": "Exclusive claim over a follow-up execution in the shared `turn_status` table."
         },
         {
+          "name": "createHybridTurnProducer",
+          "kind": "function",
+          "signature": "(options: HybridTurnProducerOptions) => ChatTurnRouteProducer",
+          "doc": null
+        },
+        {
           "name": "CreateLegacyAttachmentUploadRouteOptions",
           "kind": "interface",
           "signature": "interface CreateLegacyAttachmentUploadRouteOptions",
@@ -3291,6 +3297,24 @@
           "kind": "function",
           "signature": "(bytes: number) => string",
           "doc": "Render a raw byte count as a human-readable size (`512B`, `3KB`, `12MB 500KB`)."
+        },
+        {
+          "name": "HYBRID_TURN_GUIDANCE",
+          "kind": "const",
+          "signature": "string",
+          "doc": "What the default prompt adds so the Router lane answers first and escalates out loud."
+        },
+        {
+          "name": "HybridTurnBox",
+          "kind": "interface",
+          "signature": "interface HybridTurnBox",
+          "doc": null
+        },
+        {
+          "name": "HybridTurnProducerOptions",
+          "kind": "interface",
+          "signature": "interface HybridTurnProducerOptions",
+          "doc": null
         },
         {
           "name": "immutableAttachmentPath",
@@ -3815,6 +3839,12 @@
           "doc": "Validate a follow-up request against what the session actually persisted: the plan must be in this session at this revision and must already carry the claimed decision."
         },
         {
+          "name": "routerTurnHistory",
+          "kind": "function",
+          "signature": "(priorMessages: readonly Pick<PersistedChatMessageForTurn, \"content\" | \"role\">[], limit?: number) => { role: \"user\" | \"…",
+          "doc": "The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text."
+        },
+        {
           "name": "RouterTurnProducerOptions",
           "kind": "type",
           "signature": "type RouterTurnProducerOptions",
@@ -3929,6 +3959,12 @@
           "doc": "What the thing running the turn says about it."
         },
         {
+          "name": "startHybridBox",
+          "kind": "function",
+          "signature": "(body: Pick<ChatTurnRequestPayload, \"content\" | \"parts\">, acquire: () => Promise<SandboxInstance>) => Promise<SandboxIn…",
+          "doc": "Start the box at admission when the request asks for execution, so its resume overlaps the turn lock and the profile pin instead of following them."
+        },
+        {
           "name": "storeSupportsDraftPersistence",
           "kind": "function",
           "signature": "(store: AssistantDraftStore) => boolean",
@@ -4031,6 +4067,12 @@
           "doc": "Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started."
         },
         {
+          "name": "turnCarriesFiles",
+          "kind": "function",
+          "signature": "(prompt: string | readonly ChatTurnPartInput[]) => boolean",
+          "doc": "Whether the turn carries files."
+        },
+        {
           "name": "TurnIntentData",
           "kind": "type",
           "signature": "type TurnIntentData",
@@ -4053,6 +4095,12 @@
           "kind": "type",
           "signature": "type TurnPhaseEvent",
           "doc": "A {@link TURN_PHASE_EVENT} as it crosses the wire."
+        },
+        {
+          "name": "turnPromptText",
+          "kind": "function",
+          "signature": "(prompt: string | readonly ChatTurnPartInput[]) => string",
+          "doc": "The turn's prompt as the text the model reads: text parts joined; file parts are not text."
         },
         {
           "name": "TurnResponseData",
@@ -16831,12 +16879,6 @@
           "doc": "Represent success or failure of an operation with corresponding value or error information"
         },
         {
-          "name": "parsePrewarmHint",
-          "kind": "function",
-          "signature": "(value: string | null | undefined) => PrewarmHintMode",
-          "doc": null
-        },
-        {
           "name": "peekWorkspaceSandbox",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; }) => Promise<PeekWorkspaceS…",
@@ -16901,12 +16943,6 @@
           "kind": "type",
           "signature": "type PrewarmEvent",
           "doc": null
-        },
-        {
-          "name": "PrewarmHintMode",
-          "kind": "type",
-          "signature": "type PrewarmHintMode",
-          "doc": "`SANDBOX_PREWARM_HINT`: `off` (default) or `deterministic`."
         },
         {
           "name": "PrewarmOutcome",
@@ -28080,6 +28116,12 @@
           "doc": "Prewarm `url` when the page opens or becomes visible; `reassert` on composer focus."
         },
         {
+          "name": "useWorkspacePrewarmHandle",
+          "kind": "function",
+          "signature": "() => WorkspacePrewarmHandle | null",
+          "doc": null
+        },
+        {
           "name": "UseWorkspacePrewarmOptions",
           "kind": "interface",
           "signature": "interface UseWorkspacePrewarmOptions",
@@ -28198,6 +28240,12 @@
           "kind": "function",
           "signature": "({ name, size }: { name: string; size?: \"sm\" | \"lg\" | undefined; }) => Element",
           "doc": "The one workspace avatar: ui's IconTile with the workspace's initials on a categorical tone derived from its name."
+        },
+        {
+          "name": "WorkspacePrewarmContext",
+          "kind": "function",
+          "signature": "Context<WorkspacePrewarmHandle | null>",
+          "doc": "The prewarm handle of the workspace shell around this component."
         },
         {
           "name": "WorkspacePrewarmHandle",
@@ -29948,7 +29996,7 @@
         {
           "name": "AgentWorkspaceLayout",
           "kind": "function",
-          "signature": "({ children, navItems, sessions, apps, activeRoute, activeId, product, workspace, ...sidebarProps }: AgentWorkspaceLayo…",
+          "signature": "({ children, navItems, sessions, apps, activeRoute, activeId, product, workspace, prewarm, ...sidebarProps }: AgentWork…",
           "doc": "The default agent workspace composition."
         },
         {
