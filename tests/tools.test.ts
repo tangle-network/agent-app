@@ -80,7 +80,6 @@ describe('buildAppToolOpenAITools', () => {
     const tools = buildAppToolOpenAITools(taxonomy)
     const render = tools.find((tool) => tool.function.name === 'render_ui')!
     expect(render.function.parameters.$defs).toEqual(OPENUI_NODE_JSON_SCHEMA.$defs)
-    expect((render.function.parameters as { properties: { schema: unknown } }).properties.schema).toEqual({ $ref: '#/$defs/node' })
     const defs = render.function.parameters.$defs as Record<string, unknown>
     for (const [, name] of JSON.stringify(render.function.parameters).matchAll(/"\$ref":"#\/\$defs\/([^"]+)"/g)) {
       if (name === undefined) throw new Error('OpenUI schema reference has no definition name')

@@ -94,7 +94,12 @@ export function buildAppToolOpenAITools(
           $defs: OPENUI_NODE_JSON_SCHEMA.$defs,
           properties: {
             title: { type: 'string' },
-            schema: { $ref: '#/$defs/node' },
+            schema: {
+              anyOf: [
+                { $ref: '#/$defs/node' },
+                { type: 'string', description: 'JSON text encoding exactly one OpenUI node object. Encode once; do not double-encode.' },
+              ],
+            },
           },
           required: ['title', 'schema'],
         },

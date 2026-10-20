@@ -1,7 +1,7 @@
 import { ToolInputError } from './errors'
 import { isAppToolName } from './openai'
 import { findCustomTool, type AppToolDefinition } from './registry'
-import { assertRenderUiSchema } from './render-ui-schema'
+import { parseRenderUiSchema } from './render-ui-schema'
 import type {
   AppToolContext,
   AppToolHandlers,
@@ -97,8 +97,8 @@ export async function dispatchAppTool(
     }
 
     if (toolName === 'render_ui') {
-      assertRenderUiSchema(rawArgs.schema)
-      const r = await opts.handlers.renderUi({ title: String(rawArgs.title ?? ''), schema: rawArgs.schema }, ctx)
+      const schema = parseRenderUiSchema(rawArgs.schema)
+      const r = await opts.handlers.renderUi({ title: String(rawArgs.title ?? ''), schema }, ctx)
       opts.onProduced?.({ type: 'artifact', path: r.path, content: r.content })
       return { ok: true, result: { path: r.path } }
     }
