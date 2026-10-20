@@ -43,5 +43,5 @@ export default {
 }
 ```
 
-An exemption may name `turn-trace`, `first-text`, `prewarm`, `placement` or `limit-alarms`; a reason shorter than eight characters is a configuration error.
+An exemption may name `turn-trace`, `first-visible`, `first-text`, `prewarm`, `placement` or `limit-alarms`; a reason shorter than eight characters is a configuration error.
 Passing `turnTrace: false` to `createChatTurnRoutes` is an opt-out too, and it fails the step until its exemption carries a reason.
