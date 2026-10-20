@@ -24,9 +24,9 @@
  * naming `sandbox_run` starts it while the call's arguments still stream.
  *
  * FIRST WORDS. Unless the product passes its own `guidance`, the prompt tells
- * the model to say in one sentence what it is about to do before it calls
- * `sandbox_run`, so an escalated turn's first text arrives at the model's
- * first token, not after the box run.
+ * the model to say in one sentence what it is about to do before its first
+ * tool call, so a turn that writes a deliverable or escalates to the box shows
+ * text at the model's first token, not after its last tool call.
  *
  * The trace passes through: model calls, tool calls, the box claim and the box
  * run are recorded under the turn's `trace` when the route gives one.
@@ -45,11 +45,13 @@ import { createRouterTurnProducer, type RouterTurnProducerOptions } from './rout
 import type { ChatTurnRouteProducer } from './turn-routes'
 import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
 
+// The lead-in covers every tool, not only sandbox_run: on Legal's Router lane (2026-10-20) the model streamed a
+// submit_proposal payload for 45 s before its first word, so first text came at 54.9 s after a first token at 3.8 s.
 /** What the default prompt adds so the Router lane answers first and escalates out loud. */
 export const HYBRID_TURN_GUIDANCE =
-  'Answer directly. Use sandbox_run only for work that needs code execution or files on the workspace computer; ' +
-  'describe the whole task in it and report what it returns. Before you call sandbox_run, write one short sentence ' +
-  'telling the member what you are about to do; the computer takes a while and they should not wait in silence.'
+  'Start your reply with text: before your first tool call, write one short sentence telling the member what you are ' +
+  'about to do, so they never wait in silence. Use sandbox_run only for work that needs code execution or files on ' +
+  'the workspace computer; describe the whole task in it and report what it returns.'
 
 const DEFAULT_SANDBOX_RUN_TIMEOUT_MS = 4 * 60_000
 
