@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.232
+
+- refactor(web-react): separate picker and popover responsibilities (#1193)
+
 ## 0.60.231
 
 - refactor(work-product): separate draft emission and submission checks (#1192)
