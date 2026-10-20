@@ -134,6 +134,7 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
   const sessions: SignoffCacheSession[] = []
   let session = await openSignoffCacheSession(cacheDir, treePath())
   sessions.push(session)
+  cacheDir = session.cacheDir
   try {
     await pruneSignoffCache(cacheDir)
     tree = materializeCleanTree({ repoDir: repoRoot, dest: treePath(), source })
@@ -144,6 +145,7 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
       if (session.cacheDir !== cacheDir) {
         session = await openSignoffCacheSession(cacheDir, treePath())
         sessions.push(session)
+        cacheDir = session.cacheDir
         await pruneSignoffCache(cacheDir)
       }
       removeCleanTree(tree)

@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import {
   existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync,
-  readlinkSync, statSync, unlinkSync, writeFileSync,
+  readlinkSync, realpathSync, statSync, unlinkSync, writeFileSync,
 } from 'node:fs'
 import type { Stats } from 'node:fs'
 import { hostname } from 'node:os'
-import { basename, join, resolve, sep } from 'node:path'
+import { basename, join, relative, resolve, sep } from 'node:path'
 import lockfile from 'proper-lockfile'
 
 /** Defaults owned by signoff; callers can override only when explicitly testing. */
@@ -86,10 +86,14 @@ function alive(run: ActiveRun): boolean {
   return !run.processStart || !currentStart || currentStart === run.processStart || hasRunProcesses(run)
 }
 
+function cacheRoot(cacheDir: string): string {
+  mkdirSync(cacheDir, { recursive: true })
+  return realpathSync(cacheDir)
+}
+
 /** One short cross-process lock protects lease transitions and deletion decisions. */
 export async function withCacheLock<T>(cacheDir: string, action: () => T | Promise<T>): Promise<T> {
-  mkdirSync(cacheDir, { recursive: true })
-  const release = await lockfile.lock(cacheDir, {
+  const release = await lockfile.lock(cacheRoot(cacheDir), {
     realpath: false,
     stale: 300_000,
     update: 30_000,
@@ -163,10 +167,11 @@ export interface SignoffCacheSession {
 
 /** Register before creating the tree, so a concurrent prune cannot select it. */
 export async function openSignoffCacheSession(cacheDir: string, tree: string): Promise<SignoffCacheSession> {
-  const root = resolve(cacheDir)
+  const root = cacheRoot(cacheDir)
+  const treePath = resolve(root, relative(resolve(cacheDir), resolve(tree)))
   const file = join(markerDir(root), `${process.pid}-${randomUUID()}.json`)
   let run: ActiveRun = { pid: process.pid, host: hostname(), processStart: processStart(process.pid),
-    tree: resolve(tree), storeKey: null }
+    tree: treePath, storeKey: null }
   await withCacheLock(root, () => {
     mkdirSync(markerDir(root), { recursive: true })
     writeMarker(file, run)
@@ -188,6 +193,7 @@ export async function openSignoffCacheSession(cacheDir: string, tree: string): P
 
 /** Active store keys for resolveStore's existing generation cap. Hold the lock. */
 export function activeStoreKeys(cacheDir: string): Set<string> {
+  cacheDir = cacheRoot(cacheDir)
   const active = protectedPaths(cacheDir)
   protectLegacyRuns(cacheDir, active)
   const { paths, unknown } = active
@@ -249,7 +255,7 @@ function removeEntry(entry: CacheEntry): void {
 
 /** Bound idle trees and stores by age first, then allocated physical bytes. */
 export async function pruneSignoffCache(cacheDir: string, options: CachePruneOptions = {}): Promise<CachePruneResult> {
-  const root = resolve(cacheDir)
+  const root = cacheRoot(cacheDir)
   const nowMs = options.nowMs ?? Date.now()
   const maxAgeMs = options.maxAgeMs ?? SIGNOFF_CACHE_MAX_AGE_MS
   const maxBytes = options.maxBytes ?? SIGNOFF_CACHE_MAX_BYTES
