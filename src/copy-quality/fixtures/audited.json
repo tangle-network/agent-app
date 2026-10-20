@@ -1,0 +1,66 @@
+[
+  {
+    "id": "email-1",
+    "text": "Subject: sandbox question about aimux\n\nHi Adel, saw aimux has a CLAUDE.md. I work on Tangle Sandbox, which gives untrusted agent tasks isolated Linux machines; an SDK and CLI expose shell, files, ports, desktop and trace. Question: when agents run on your projects, is keeping their execution off your own machine something you have had to solve? One-line reply welcome."
+  },
+  {
+    "id": "email-2",
+    "text": "Subject: question about agent-toolkit\n\nHi Ulises, noticed agent-toolkit ships an AGENTS.md. I work on Tangle Sandbox: isolated Linux machines for untrusted agent tasks, with shell, files, ports, desktop and trace reachable through an SDK and CLI. Would running those agent tasks in a disposable machine instead of your own environment be useful for the toolkit, or is that already handled? Either answer helps."
+  },
+  {
+    "id": "email-3",
+    "text": "Subject: agent-task-runner and sandboxes\n\nHi rimusz, your agent-task-runner repo has an AGENTS.md. Short intro: I work on Tangle Sandbox, isolated Linux machines for untrusted agent tasks; the SDK and CLI expose shell, files, ports, desktop and trace. When a task runner executes agent work, do you want that isolated from the host, or does local execution work fine today?"
+  },
+  {
+    "id": "email-4",
+    "text": "Subject: sandboxing for sofagent\n\nHi KongFangXun, noticed an AGENTS.md in sofagent. I build Tangle Sandbox: isolated Linux machines for untrusted agent tasks, exposing shell, files, ports, desktop and trace via an SDK and CLI. Do you ever think about what agents can reach beyond the repo when they run, or is that not a concern for you? A one-line answer is fine."
+  },
+  {
+    "id": "email-5",
+    "text": "Subject: quick question from Tangle\n\nHi Abi, saw pi-freeflow has an AGENTS.md. I'm on Tangle Sandbox, which runs untrusted agent tasks in isolated Linux machines; shell, files, ports, desktop and trace come through an SDK and CLI. Is giving agents their own machine something you'd ever want for projects like this, or does your current setup cover it? Either way, thanks for reading."
+  },
+  {
+    "id": "linkedin-sandbox",
+    "text": "If an agent is about to run code you didn't write, the first question is where that code runs.\n\nSandbox's answer: its own isolated Linux machine, for every untrusted agent task. Through the SDK or CLI, the agent works with shell, files, ports and a desktop, and you get a trace of what it did. When a task goes sideways, read the trace, throw the machine away, run the next one.\n\nIsolation is the first product decision in agent infrastructure. Make it on purpose.\n\nhttps://sandbox.tangle.tools/"
+  },
+  {
+    "id": "linkedin-router",
+    "text": "Model routing tends to collapse into one of two extremes: everything automatic, or a routing config you maintain by hand.\n\nRouter takes a middle position. One API for model inference, managed providers by default. When you want a specific call to go somewhere specific, you set an explicit operator route, and the decision stays yours where it matters.\n\nIf your code already speaks the OpenAI SDK, it already speaks Router.\n\nhttps://router.tangle.tools/"
+  },
+  {
+    "id": "linkedin-gtm-agent",
+    "text": "Most agent tools are good at drafts. The unsolved part is everything after the draft.\n\nGTM Agent is a workspace for a founder: give the agent your product and a sales goal, connect your tools, and set its authority. It researches and it drafts. Then the draft waits in review, and nothing sends until you authorize it.\n\nDraft and send are different states, and the agent can't cross that line alone. That boundary is what makes handing over real work survivable.\n\nhttps://gtm.tangle.tools/"
+  },
+  {
+    "id": "linkedin-agent-builder",
+    "text": "An agent you never tested in private will test itself in public.\n\nAgent Builder creates domain agents; you set the personality, the instructions and the tools. The feature that decides whether this goes well: profiles can stay private. Keep one private, run it against real tasks, fix what it gets wrong, publish when it stops embarrassing you.\n\nTesting before publication is how an agent earns its instructions.\n\nhttps://agents.tangle.tools/"
+  },
+  {
+    "id": "ad-sandbox-reddit",
+    "text": "Title: Your agent's code shouldn't run on your machine\nBody: Tangle Sandbox runs each untrusted agent task in its own isolated Linux machine, with shell, files, ports, desktop and trace exposed through an SDK and CLI.\nCTA: See how it works at https://sandbox.tangle.tools"
+  },
+  {
+    "id": "ad-sandbox-meta",
+    "text": "Primary text: Agents run code you didn't write. Sandbox gives each task an isolated Linux machine, driven by SDK or CLI.\nHeadline: Isolated Linux machines for agents\nCTA: See how it works at https://sandbox.tangle.tools"
+  },
+  {
+    "id": "ad-sandbox-x",
+    "text": "Agents run code you didn't write. Sandbox gives each untrusted task its own isolated Linux machine: shell, files, ports, desktop and trace, through the SDK or CLI.\n\nSee it at https://sandbox.tangle.tools"
+  },
+  {
+    "id": "ad-gtm-agent-reddit",
+    "text": "Title: An agent that drafts GTM work, and waits for your OK before anything sends\nBody: Tangle GTM Agent is a workspace where you hand the agent your product and a sales goal, connect your tools, set its authority, and review each draft before anything sends.\nCTA: See how it works at https://gtm.tangle.tools"
+  },
+  {
+    "id": "ad-gtm-agent-meta",
+    "text": "Primary text: Give an agent your product and sales goal. It researches and drafts; you review before anything sends.\nHeadline: Research and drafts, you approve sends\nCTA: See how it works at https://gtm.tangle.tools"
+  },
+  {
+    "id": "ad-gtm-agent-x",
+    "text": "Hand an agent your product and sales goal without handing over the send button. GTM Agent connects your tools, works within the authority you set, and waits in review before anything sends.\n\nSee it at https://gtm.tangle.tools"
+  },
+  {
+    "id": "hero-gtm",
+    "text": "Headline: The GTM lead that drafts the work and brings you every send\nSupporting sentence: GTM Agent is a workspace where you give an agent your product and sales goal, connect your tools, and set its authority; it researches your market, drafts the outreach and pitches, and waits for your review before anything sends.\nCTA: Open GTM Agent at https://gtm.tangle.tools"
+  }
+]
