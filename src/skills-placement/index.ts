@@ -160,6 +160,19 @@ export interface SkillSupportFile {
   content: string
 }
 
+/** Optional naming and reconciliation policies for skill support files. */
+export interface SkillSupportFileOptions {
+  /** Resource name for newly created mounts. Defaults to `<skillId>/<path>`. */
+  resourceName?: (file: SkillSupportFile) => string
+  /**
+   * `retain` (default) keeps identical mounts at their desired paths.
+   * `replace` removes owned mounts and appends canonical mounts in file order.
+   * Foreign mounts always keep their paths. On a supported harness, if they
+   * occupy every desired path, `replace` leaves the original profile unchanged.
+   */
+  reconcileExisting?: 'retain' | 'replace'
+}
+
 /** Inline file mounts placing a skill's support files beside its entry on
  *  `harness`: `<skillDir>/<skillId>/<path>`. Empty when the harness has no
  *  cwd skill dir — the same posture as `resources.skills` itself (the
@@ -175,12 +188,16 @@ export function skillSupportFileMounts(
   harness: Harness,
   skillId: string,
   files: readonly SkillSupportFile[],
+  options: Pick<SkillSupportFileOptions, 'resourceName'> = {},
 ): AgentProfileFileMount[] {
   const skillDir = resolveSkillDir(harness)
   if (!skillDir || files.length === 0) return []
   return files.map((file) => ({
     path: `${skillDir}/${skillId}/${file.path}`,
-    resource: defineInlineResource(`${skillId}/${file.path}`, file.content),
+    resource: defineInlineResource(
+      options.resourceName ? options.resourceName(file) : `${skillId}/${file.path}`,
+      file.content,
+    ),
   }))
 }
 
@@ -192,12 +209,19 @@ export function skillSupportFileMounts(
  *  own mounts wherever they previously pointed, while pack-declared files
  *  with similar paths stay untouched. With no skill dir the skill's own
  *  mounts are dropped (and nothing added) — mirroring how the platform
- *  treats the skill entry itself on that harness. */
+ *  treats the skill entry itself on that harness. `options` can customize
+ *  new resource names and opt into replacing owned mounts in file order. */
 export function withSkillSupportFiles<
   P extends { resources?: AgentProfile['resources'] },
->(profile: P, harness: Harness, skillId: string, files: readonly SkillSupportFile[]): P {
+>(
+  profile: P,
+  harness: Harness,
+  skillId: string,
+  files: readonly SkillSupportFile[],
+  options: SkillSupportFileOptions = {},
+): P {
   const hasSkillDir = resolveSkillDir(harness) !== null
-  const desired = skillSupportFileMounts(harness, skillId, files)
+  const desired = skillSupportFileMounts(harness, skillId, files, options)
   const desiredByPath = new Map(
     desired.map((mount) => [mount.path, mount.resource] as const),
   )
@@ -213,13 +237,13 @@ export function withSkillSupportFiles<
   // entry itself) or when this call would place it at a different path
   // (re-derivation for another harness). Exact-content identity only: a
   // foreign mount at one of our paths keeps the location (pack-declared
-  // files win at their declared paths), and a mount already identical to
-  // what we would add is kept as-is, so re-deriving for the SAME harness
-  // returns the profile unchanged.
-  const isStaleOurs = (mount: AgentProfileFileMount): boolean => {
+  // files win at their declared paths). By default an identical mount is
+  // kept as-is; the replace policy regenerates owned mounts in file order.
+  const shouldDropMount = (mount: AgentProfileFileMount): boolean => {
     if (mount.resource.kind !== 'inline') return false
     const rel = relUnderSkill(mount.path)
     if (rel === null || byRelPath.get(rel) !== mount.resource.content) return false
+    if (options.reconcileExisting === 'replace') return true
     const desiredHere = desiredByPath.get(mount.path)
     return (
       !hasSkillDir ||
@@ -229,10 +253,15 @@ export function withSkillSupportFiles<
     )
   }
   const existing = profile.resources?.files ?? []
-  const retained = existing.filter((mount) => !isStaleOurs(mount))
+  const retained = existing.filter((mount) => !shouldDropMount(mount))
   const taken = new Set(retained.map((mount) => mount.path))
   const additions = desired.filter((mount) => !taken.has(mount.path))
-  if (retained.length === existing.length && additions.length === 0) return profile
+  // Preserve the replace policy's no-op when foreign mounts occupy every
+  // destination; without a skill dir, owned mounts are still removed.
+  if (additions.length === 0 && (
+    retained.length === existing.length ||
+    (hasSkillDir && options.reconcileExisting === 'replace')
+  )) return profile
   return {
     ...profile,
     resources: { ...(profile.resources ?? {}), files: [...retained, ...additions] },
