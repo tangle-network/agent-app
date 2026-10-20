@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.215
+
+- fix(platform): a 4xx delegation decision is delegated_key.failed with its code, not a 403 refusal (#1150)
+
 ## 0.60.214
 
 - perf(sandbox): a reuse reads its box by id and trusts a recent probe, egress read and env push; the lease and spend gate wait for a lifecycle step (#1175)
