@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.60.230
+
+- refactor(chat): separate turn admission execution and streaming (#1190)
+- feat(skills-placement): configure support-file naming and reconciliation (#1191)
+
+## 0.60.229
+
+- refactor(canvas): share MCP readers and compose tool families (#1189)
+
 ## 0.60.228
 
 - refactor(sandbox): separate lifecycle and prompt responsibilities
