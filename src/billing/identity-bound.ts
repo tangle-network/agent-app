@@ -240,6 +240,8 @@ const DEFAULT_LEASE_RENEW_INTERVAL_MS = Math.floor(DEFAULT_LEASE_MS / 3)
 const DEFAULT_REVOCATION_RETRY_BASE_MS = 2_000
 const DEFAULT_REVOCATION_RETRY_MAX_MS = 60_000
 const PENDING_REVOCATION_BATCH_SIZE = 20
+// Covers clock skew between this host and the platform that enforces the child's expiry.
+const ORPHAN_AFTER_EXPIRY_GRACE_MS = 5 * 60_000
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -633,6 +635,10 @@ export function createIdentityBoundWorkspaceKeyManager(
 
     if (candidates.length > 0) {
       await options.store.markRevoked(row.id, now())
+    } else if (now().getTime() >= row.expiresAt.getTime() + ORPHAN_AFTER_EXPIRY_GRACE_MS) {
+      // An empty lookup cannot prove no child exists, but any child this row's create made
+      // carries this expiry and can no longer spend; retrying forever would block issuance.
+      await options.store.markOrphaned(row.id, 'no remote child matched the durable provisioning record before its expiry')
     } else {
       await options.store.markRevocationPending({
         id: row.id,
