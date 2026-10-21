@@ -95,6 +95,10 @@ export interface InvitationsApiOptions {
   memberSyncSeam?: Pick<MemberSyncSeam, 'add'>
   /** Inviter display fallback when the inviter's email is unknown. */
   productDisplayName?: string
+  /** Refuse acceptance until the signed-in account's email is verified. Off by
+   *  default: a valid token for the matching address already proves inbox access
+   *  (#146). A product that wants verification first turns it on. */
+  requireVerifiedEmail?: boolean
 }
 
 /** Represent a workspace invitation with details about inviter, permissions, status, and timestamps */
@@ -137,7 +141,7 @@ export type InvitationOutcome<T> =
  * Returns the six lifecycle handlers an app mounts in its routes.
  */
 export function createInvitationsApi(opts: InvitationsApiOptions) {
-  const { db, tables, access, sendInvitationEmail, enforceSeat, memberSyncSeam } = opts
+  const { db, tables, access, sendInvitationEmail, enforceSeat, memberSyncSeam, requireVerifiedEmail = false } = opts
   const { organizationMembers, workspaceMembers } = tables
   const { workspaceInvitations } = opts.invitationsTable
   const users = opts.userTable
@@ -399,6 +403,10 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
         status: 409,
         error: 'Multiple accounts use this email. Contact support to reconcile before accepting this invitation.',
       }
+    }
+
+    if (requireVerifiedEmail && !currentUser.emailVerified) {
+      return { succeeded: false, status: 403, error: 'Verify your email before accepting this invitation' }
     }
 
     const orgMember = await getOrganizationMember(invitation.organizationId, currentUser.id)
