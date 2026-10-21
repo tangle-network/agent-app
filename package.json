@@ -680,6 +680,21 @@
     "./chatgpt-react/styles": {
       "types": "./dist/chatgpt-react/styles.d.ts",
       "default": "./dist/chatgpt-react/styles.css"
+    },
+    "./spend/drizzle": {
+      "types": "./dist/spend/drizzle.d.ts",
+      "import": "./dist/spend/drizzle.js",
+      "default": "./dist/spend/drizzle.js"
+    },
+    "./platform/billing-config": {
+      "types": "./dist/platform/billing-config.d.ts",
+      "import": "./dist/platform/billing-config.js",
+      "default": "./dist/platform/billing-config.js"
+    },
+    "./skills-placement/box": {
+      "types": "./dist/skills-placement/box.d.ts",
+      "import": "./dist/skills-placement/box.js",
+      "default": "./dist/skills-placement/box.js"
     }
   },
   "scripts": {

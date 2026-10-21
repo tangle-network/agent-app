@@ -2,6 +2,9 @@ import { defineConfig } from 'tsup'
 
 export default defineConfig({
   entry: {
+    'skills-placement/box': 'src/skills-placement/box.ts',
+    'platform/billing-config': 'src/platform/billing-config.ts',
+    'spend/drizzle': 'src/spend/drizzle.ts',
     'tools/index': 'src/tools/index.ts',
     'runtime/index': 'src/runtime/index.ts',
     'runtime/router-turn': 'src/runtime/router-turn.ts',
