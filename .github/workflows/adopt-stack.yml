@@ -1,0 +1,23 @@
+# Adopt each new @tangle-network release: agent-eval's reusable workflow pins it,
+# widens this package's peer upper bounds to include it, runs the gate and opens
+# (and merges) one adoption PR. It replaces the Renovate cohort, which was never
+# installed and adopted nothing.
+name: Adopt stack
+
+on:
+  schedule: [{ cron: '*/30 * * * *' }]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  adopt:
+    uses: tangle-network/agent-eval/.github/workflows/adopt-stack.yml@main
+    with:
+      gate: pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build
+      default-branch: main
+      merge: true
+      runs-on: ubuntu-latest
+    secrets: inherit
