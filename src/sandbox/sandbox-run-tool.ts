@@ -59,6 +59,8 @@ export interface SandboxRunToolOptions {
   /** Runs the task on the box and returns the box agent's final answer: {@link sandboxPromptRunner}
    *  for the shell's own prompt path, or the product's runner (skill placement, app-tool MCP, a spend tap). */
   runTask(box: SandboxInstance, task: string, options: SandboxTaskOptions): Promise<string>
+  /** The member's original message, preserved verbatim before the Router task. */
+  memberRequest?: string
   /** Wall-clock cap for one call, box start included. Default 5 minutes. */
   timeoutMs?: number
   /** Cancels a call in flight, for example the turn's own signal. */
@@ -85,7 +87,8 @@ const TASK_LIMIT = 20_000
 export const SANDBOX_RUN_DESCRIPTION =
   'Run work that needs a computer in this workspace\'s sandbox: executing code or scripts, reading or converting ' +
   'PDFs, spreadsheets and archives, filling forms with the installed toolkits, or editing many files. Describe the ' +
-  'whole task and the result you need; the sandbox agent does it and returns its answer. Takes seconds to minutes, ' +
+  "member's requirements, file paths and exact field names, not model-written code; the sandbox agent writes and " +
+  'runs the code and returns its answer. Takes seconds to minutes, ' +
   'so use it only when the answer needs the computer.'
 
 /** The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused). */
@@ -109,7 +112,7 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
     description: options.description ?? SANDBOX_RUN_DESCRIPTION,
     inputSchema: {
       type: 'object',
-      properties: { task: { type: 'string', description: 'The complete task for the sandbox agent, with the result you need back.' } },
+      properties: { task: { type: 'string', description: 'The member requirements, file paths and exact output field names. The sandbox agent writes and runs the code.' } },
       required: ['task'],
       additionalProperties: false,
     },
@@ -141,7 +144,11 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
       let answer: string
       try {
         // A product runner may not honour the signal; the call still ends at the cap.
-        answer = await capped(runTask(box, task, {
+        const prefix = options.memberRequest === undefined ? ''
+          : `The member's request (verbatim):\n${options.memberRequest}\n\nYour part of it:\n`
+        // The member contract is never truncated, even when it alone exceeds the task budget.
+        const boxTask = prefix + task.slice(0, Math.max(0, TASK_LIMIT - prefix.length))
+        answer = await capped(runTask(box, boxTask, {
           signal, timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)), emit,
           ...(context?.trace ? { trace: context.trace } : {}), ...(context?.span ? { span: context.span } : {}),
         }))
