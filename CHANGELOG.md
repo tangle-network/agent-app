@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.241
+
+- fix: bound rollout observation and retain measured lane (#1206)
+
 ## 0.60.240
 
 - fix: distinguish rollout evidence gaps and record turn origins (#1205)
