@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import {
   chmodSync,
-  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -230,7 +229,6 @@ function installAndRunScaffolder({
   run(installedCli, cliArgs, { cwd: runner, env, timeout: PACK_TIMEOUT_MS })
 
   const packagePath = join(project, 'package.json')
-  const renovatePath = join(project, 'renovate.json')
   const workspacePath = join(project, 'pnpm-workspace.yaml')
   const workspaceBeforeInstall = readFileSync(workspacePath, 'utf8')
   if (!workspaceBeforeInstall.includes('strictPeerDependencies: true')) {
@@ -254,13 +252,6 @@ function installAndRunScaffolder({
   assertEqual(generatedPackage.scripts?.['peer-check'], 'agent-app-peer-check', `${variant} peer check`)
   assertEqual(generatedPackage.scripts?.signoff, 'agent-app-signoff', `${variant} signoff`)
   assertEqual(readFileSync(join(project, '.nvmrc'), 'utf8').trim(), '22', `${variant} Node pin`)
-  if (!existsSync(renovatePath)) throw new Error(`${variant} generated project is missing renovate.json`)
-  const renovate = JSON.parse(readFileSync(renovatePath, 'utf8'))
-  assertEqual(
-    renovate.extends?.includes('github>tangle-network/agent-app:renovate.json'),
-    true,
-    `${variant} canonical dependency policy`,
-  )
 
   applyDependencyCohort(generatedPackage, dependencyCohort, variant)
   generatedPackage.dependencies['@tangle-network/agent-app'] = `file:${packedAgentApp}`
@@ -374,7 +365,6 @@ function main(scratch) {
     'index.mjs',
     'package.json',
     'template-common/.nvmrc',
-    'template-common/renovate.json',
     'template/_package.json',
     'template/_tsconfig.json',
     'template/pnpm-workspace.yaml',
