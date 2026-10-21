@@ -29,14 +29,19 @@
  * The source gate runs FIRST and independently: it needs no installed shell, so
  * a repo whose install is broken still gets the answer that explains why.
  *
- * Usage: agent-app-peer-check [repoDir] [--exclude <path>]...
+ * Usage: agent-app-peer-check [repoDir] [--exclude <path>]... [--sync-floors]
  * `--exclude` takes a repo-relative path prefix the source-tree walk skips —
  * the escape hatch for a repo that genuinely carries a tarball as test data.
  * Exits 1 on any violation, 0 otherwise.
+ *
+ * `--sync-floors` runs none of the gates. It recomputes the repo's OWN Tangle
+ * peer floors after an adoption moved their exact `devDependencies` pins, and is
+ * what `pnpm run adopt:sync` calls after agent-eval's adopt-stack pins a cohort.
  */
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { checkAllPeerFloors, checkPeerFloors, formatPeerFloorReport } from './check'
+import { checkAllPeerFloors, checkPeerFloors, formatPeerFloorReport, satisfiesRange } from './check'
 import { checkDependencySources, formatDependencySourceReport } from './dependency-source'
 import { checkDurabilityOwners, formatDurabilityOwnerReport } from './durability-owners'
 import { invokedAsScript } from '../signoff/invoked-as-script'
@@ -44,6 +49,56 @@ import { invokedAsScript } from '../signoff/invoked-as-script'
 interface CliArgs {
   readonly appDir: string
   readonly exclude: readonly string[]
+  readonly syncFloors: boolean
+}
+
+interface OwnManifest {
+  devDependencies?: Record<string, string>
+  peerDependencies?: Record<string, string>
+}
+
+const RELEASE = /^(\d+)\.(\d+)\.(\d+)$/
+
+/**
+ * Recompute the Tangle peer floors in `appDir/package.json` for every package
+ * whose exact `devDependencies` pin differs from the committed one (the git
+ * index), and return one line per floor changed.
+ *
+ * A floor admits only versions this package was tested on. A committed floor
+ * that already admits the new pin is kept as committed. Otherwise the floor
+ * gains one window for the pin's own line, `>=pin <0.(m+1).0` on 0.x and
+ * `^pin` past 1.0, and nothing between. That undoes agent-eval's `widenRange`,
+ * which stretches the last window's upper bound and so admits every
+ * intermediate minor, e.g. Materialize `>=0.25.2 <0.26.0` became
+ * `>=0.25.2 <0.28.0`, claiming the never-tested 0.26.
+ *
+ * Floors of packages whose pin did not move are left as written, so a
+ * hand-edited floor survives. Rerunning on the result changes nothing.
+ */
+function syncOwnPeerFloors(appDir: string): string[] {
+  const path = join(appDir, 'package.json')
+  const manifest = JSON.parse(readFileSync(path, 'utf8')) as OwnManifest
+  // The index holds the manifest before the adoption: adopt-stack writes the
+  // pins into a clean checkout and commits only after this runs.
+  const index = spawnSync('git', ['show', ':./package.json'], { cwd: appDir, encoding: 'utf8' })
+  if (index.status !== 0) throw new Error(`--sync-floors reads the committed package.json from the git index: ${index.stderr.trim() || index.error?.message}`)
+  const committed = JSON.parse(index.stdout) as OwnManifest
+
+  const changes: string[] = []
+  for (const [name, range] of Object.entries(manifest.peerDependencies ?? {})) {
+    const pin = manifest.devDependencies?.[name]
+    const floor = committed.peerDependencies?.[name]
+    const release = RELEASE.exec(pin ?? '')
+    if (!name.startsWith('@tangle-network/') || !pin || !release || !floor || pin === committed.devDependencies?.[name]) continue
+    const [, major, minor] = release
+    const window = major === '0' ? `>=${pin} <0.${Number(minor) + 1}.0` : `^${pin}`
+    const next = satisfiesRange(pin, floor) ? floor : `${floor} || ${window}`
+    if (next === range) continue
+    manifest.peerDependencies![name] = next
+    changes.push(`package.json peerDependencies ${name}: ${range} -> ${next}`)
+  }
+  if (changes.length) writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`)
+  return changes
 }
 
 /** Exact consumer pins choose an artifact; engine peer ranges choose compatibility. */
@@ -72,9 +127,12 @@ function checkDeclaredPins(appDir: string): boolean {
 export function parsePeerCheckArgs(argv: readonly string[]): CliArgs {
   const exclude: string[] = []
   let appDir: string | undefined
+  let syncFloors = false
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i] as string
-    if (arg === '--exclude') {
+    if (arg === '--sync-floors') {
+      syncFloors = true
+    } else if (arg === '--exclude') {
       const value = argv[i + 1]
       if (value) exclude.push(value)
       i += 1
@@ -84,11 +142,20 @@ export function parsePeerCheckArgs(argv: readonly string[]): CliArgs {
       appDir = arg
     }
   }
-  return { appDir: appDir ?? process.cwd(), exclude }
+  return { appDir: appDir ?? process.cwd(), exclude, syncFloors }
 }
 
 function main(): void {
-  const { appDir, exclude } = parsePeerCheckArgs(process.argv.slice(2))
+  const { appDir, exclude, syncFloors } = parsePeerCheckArgs(process.argv.slice(2))
+  if (syncFloors) {
+    try {
+      for (const change of syncOwnPeerFloors(appDir)) process.stdout.write(`${change}\n`)
+      process.exit(0)
+    } catch (err) {
+      process.stderr.write(`agent-app-peer-check --sync-floors failed: ${err instanceof Error ? err.message : String(err)}\n`)
+      process.exit(1)
+    }
+  }
   let failed = false
 
   try {

@@ -17,6 +17,9 @@ agent-app-peer-check --exclude fixtures # skip a path in the source-tree walk
 
 Exit code 1 on any violation from either half; 0 otherwise.
 
+`agent-app-peer-check --sync-floors` runs no gate: after an adoption moves agent-app's own exact Tangle pins, it gives each moved peer floor one window for the new pin's line, never the minors between, and keeps floors that already admit it.
+`pnpm run adopt:sync` calls it as agent-eval adopt-stack's `post-pin` step.
+
 ## The two defects it was built from
 
 **A vendored tarball, measured.**

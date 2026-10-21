@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 /**
- * `pnpm run adopt:sync` — copy the root `@tangle-network/*` pins into both
- * create-agent-app templates after an adoption bumps them.
+ * `pnpm run adopt:sync` — after an adoption bumps the root `@tangle-network/*`
+ * pins, copy them into both create-agent-app templates, then recompute the
+ * root's own peer floors with `agent-app-peer-check --sync-floors`.
  *
- * agent-eval's adopt-stack workflow runs this as its `post-pin` step, so the
- * template pins join the adoption commit instead of failing
- * `tests/scaffold-cohort.test.ts`. That test owns the rule this applies: every
+ * agent-eval's adopt-stack workflow runs this as its `post-pin` step, after its
+ * install (whose `prepare` builds the CLI) and before the gate, so both edits
+ * join the adoption commit instead of failing `tests/scaffold-cohort.test.ts`
+ * and `src/peer-floors/check.test.ts`. The peer-check CLI owns the floor rule;
+ * `tests/scaffold-cohort.test.ts` owns the template rule this applies: every
  * Tangle package a template installs or declares as a peer, except the shell
  * itself, uses the exact version in the root `devDependencies`.
  *
@@ -13,7 +16,8 @@
  * than keeping a version nothing here exercises, and then writes no file.
  * Files change only when a pin changes, so a second run writes nothing.
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -52,3 +56,11 @@ if (unpinned.length) {
 }
 for (const [path, contents] of writes) writeFileSync(path, contents)
 for (const change of changes) console.log(change)
+
+const cli = join(root, 'dist/peer-floors/cli.js')
+if (!existsSync(cli)) {
+  console.error(`adopt:sync: ${cli} is missing; \`pnpm install\` builds it`)
+  process.exit(1)
+}
+const floors = spawnSync(process.execPath, [cli, root, '--sync-floors'], { stdio: 'inherit' })
+process.exit(floors.status ?? 1)
