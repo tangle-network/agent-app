@@ -105,14 +105,15 @@ through the same validated door.
 
 ### Verified Sandbox profile boundary
 
-The current development cohort uses Interface 5.2.0 and Runtime 0.319.3 with
-Sandbox 0.60.49. The App-to-Sandbox path is verified for ordinary profile file
-mounts, including the `/profile` composer's `knowledge` channel, which produces
-`resources.files`.
+The current development cohort uses Interface 5.7.0 and Runtime 0.337.2 with
+Sandbox 0.63.10. The App-to-Sandbox path was verified on Sandbox 0.60.49 for
+ordinary profile file mounts, including the `/profile` composer's `knowledge`
+channel, which produces `resources.files`; it has not been re-verified live on
+0.63.10.
 
 This does not qualify Interface 5's named `resources.knowledge` generation pins
-for that Sandbox path. Sandbox 0.60.49 still validates profiles with its own
-Interface 4 dependency and rejects those pins before making the HTTP request.
+for that Sandbox path. Sandbox 0.63.10, like 0.60.49, still validates profiles
+with its own Interface 4 dependency and rejects those pins before making the HTTP request.
 App's Interface peer range does not replace the SDK's nested schema. Keep the
 pins intact; do not strip them, override the dependency, or copy its validator
 into App. Named-generation execution requires separately qualified,

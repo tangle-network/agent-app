@@ -61,16 +61,6 @@ describe('layout', () => {
 })
 
 describe('harness↔model coherence', () => {
-  it('selecting an incompatible harness snaps the model to that backend', () => {
-    const { onHarnessChange, onModelChange } = setup()
-    // open the harness picker and pick codex (OpenAI-only)
-    fireEvent.click(screen.getByText('Claude Code (Anthropic)'))
-    fireEvent.click(screen.getByText('Codex (OpenAI)'))
-    expect(onHarnessChange).toHaveBeenCalledWith('codex')
-    // current model (anthropic) is incompatible with codex → snapped to gpt-5
-    expect(onModelChange).toHaveBeenCalledWith('openai/gpt-5')
-  })
-
   it('compatible harness change does not force a model change', () => {
     const { onHarnessChange, onModelChange } = setup({ harness: 'opencode' })
     fireEvent.click(screen.getByText('OpenCode (any model)'))

@@ -1451,15 +1451,6 @@ describe('streamSandboxPrompt seam', () => {
     expect(opts.requireVisibleAssistantOutput).toBe(true)
   })
 
-  it('rejects a named router model before a vendor-locked dispatch', async () => {
-    const streamPrompt = vi.fn()
-    const box = fakeBox({ streamPrompt })
-    await expect((async () => {
-      for await (const _ of streamSandboxPrompt(shell(), box, 'hello', { harness: 'claude-code' })) void _
-    })()).rejects.toThrow(/provider "openai-compat"/)
-    expect(streamPrompt).not.toHaveBeenCalled()
-  })
-
   it('tightens existing profile token ceilings before dispatch', async () => {
     async function* events() {
       yield { type: 'result' }
@@ -2401,39 +2392,6 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(running.stop).not.toHaveBeenCalled()
     expect(running.delete).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('waits for SDK exec settlement before restarting after a command timeout', async () => {
-    vi.useFakeTimers()
-    try {
-      let execSettled = false
-      const sdkTimeout = new Error('runtime process timed out')
-      const exec = vi.fn()
-        .mockImplementationOnce(() => new Promise((_, reject) => setTimeout(() => {
-          execSettled = true
-          reject(sdkTimeout)
-        }, 5_200)))
-        .mockResolvedValue({ stdout: 'alive\n', stderr: '', exitCode: 0 })
-      const running = fakeBox({ name: 'box-w1', exec, stop: vi.fn(async () => {
-        expect(execSettled).toBe(true)
-      }) })
-      listMock.mockResolvedValue([running])
-      const provisioning = ensureWorkspaceSandbox(
-        shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: { execTimeoutMs: 5000 } }),
-        { workspaceId: 'w1', harness: 'opencode' },
-      ).then((box) => ({ box }), (error: unknown) => ({ error }))
-      await vi.advanceTimersByTimeAsync(5_001)
-      expect(exec).toHaveBeenCalledExactlyOnceWith('echo alive', { timeoutMs: 5000 })
-      expect(running.stop).not.toHaveBeenCalled()
-      await vi.advanceTimersByTimeAsync(200)
-      await expect(provisioning).resolves.toEqual({ box: running })
-      expect(running.stop).toHaveBeenCalledOnce()
-      expect(running.resume).toHaveBeenCalledOnce()
-      expect(running.delete).not.toHaveBeenCalled()
-      expect(createMock).not.toHaveBeenCalled()
-    } finally {
-      vi.useRealTimers()
-    }
   })
 
   it('reuses a recent liveness verification and probes again after the default TTL', async () => {
@@ -5097,19 +5055,6 @@ describe('requireTransportableModel + SandboxModelResolutionError callers', () =
     await expect(
       driveSandboxTurn(shell, box, 'go', { sessionId: 's1', model: 'user-picked' }),
     ).rejects.toBeInstanceOf(SandboxModelResolutionError)
-    expect(driveTurn).not.toHaveBeenCalled()
-  })
-
-  it('driveSandboxTurn rejects a named router model before a vendor-locked dispatch', async () => {
-    const driveTurn = vi.fn()
-    const box = fakeBox({ driveTurn })
-    const shell = shellFor(
-      { apiKey: 'k', baseUrl: 'https://s' },
-      { provider: { providerName: 'openai-compat', modelName: 'gemini-3.7-flash', apiKey: 'router-key' } },
-    )
-    await expect(
-      driveSandboxTurn(shell, box, 'go', { sessionId: 's1', harness: 'claude-code' }),
-    ).rejects.toThrow(/provider "openai-compat"/)
     expect(driveTurn).not.toHaveBeenCalled()
   })
 

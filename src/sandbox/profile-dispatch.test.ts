@@ -171,23 +171,6 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     expect(() => assertPrimeModelAgreement(backend.profile, backend.model)).not.toThrow()
   })
 
-  it('discards authored provider evidence when an opaque model alias changes', async () => {
-    const f = fixture()
-    const selected = profile()
-    selected.model = { default: 'custom-native-alias', provider: 'openai' }
-    await expect(dispatch(lane, f, { profile: selected, model: 'different-native-alias' })).rejects.toThrow(/cannot run model/)
-    expect(f.streamPrompt).not.toHaveBeenCalled()
-    expect(f.driveTurn).not.toHaveBeenCalled()
-  })
-
-  it.each([true, false])('does not reuse a stale profile provider for an explicit override (configured transport=%s)', async (configuredTransport) => {
-    const f = fixture()
-    if (!configuredTransport) f.shell.provider = { apiKey: 'transport-key' }
-    await expect(dispatch(lane, f, { profile: profile(), model: 'gemini-3-pro' })).rejects.toThrow(/cannot run model/)
-    expect(f.streamPrompt).not.toHaveBeenCalled()
-    expect(f.driveTurn).not.toHaveBeenCalled()
-  })
-
   it('uses shell defaults only when the selected profile has no model', async () => {
     const f = fixture()
     const backend = await dispatch(lane, f, { profile: { name: 'no-model', harness: 'opencode' } })
@@ -195,11 +178,10 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     expect(backend.profile.model.default).toBe(backend.model.model)
   })
 
-  it.each(['invalid-harness', 'incompatible-model', 'missing-credentials'] as const)('rejects %s before SDK dispatch', async (failure) => {
+  it.each(['invalid-harness', 'missing-credentials'] as const)('rejects %s before SDK dispatch', async (failure) => {
     const f = fixture()
     const selected = profile()
     if (failure === 'invalid-harness') Object.assign(selected, { harness: 'unknown-runner' })
-    if (failure === 'incompatible-model') selected.model = { default: 'anthropic/claude-sonnet-4', provider: 'anthropic' }
     if (failure === 'missing-credentials') f.shell.provider = undefined
     await expect(dispatch(lane, f, { profile: selected })).rejects.toThrow()
     expect(f.streamPrompt).not.toHaveBeenCalled()

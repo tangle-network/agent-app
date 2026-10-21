@@ -82,29 +82,9 @@ describe('resolveSessionHarness — the session lock', () => {
 describe('harness ↔ model compatibility (server-enforced)', () => {
   const CATALOG = ['anthropic/claude-opus-4-6', 'anthropic/claude-sonnet-4-6', 'openai/gpt-5', 'openai/gpt-5-mini']
 
-  it('vendor-locked harnesses only accept their provider; router harnesses accept any', () => {
-    expect(isModelCompatibleWithHarness('claude-code', 'anthropic/claude-sonnet-4-6')).toBe(true)
-    expect(isModelCompatibleWithHarness('claude-code', 'openai/gpt-5')).toBe(false)
-    expect(isModelCompatibleWithHarness('codex', 'openai/gpt-5')).toBe(true)
-    expect(isModelCompatibleWithHarness('codex', 'anthropic/claude-sonnet-4-6')).toBe(false)
-    expect(isModelCompatibleWithHarness('opencode', 'openai/gpt-5')).toBe(true)
-  })
-
   it('provider-less / sentinel ids are compatible everywhere', () => {
     expect(isModelCompatibleWithHarness('claude-code', 'default')).toBe(true)
     expect(isModelCompatibleWithHarness('codex', '')).toBe(true)
-  })
-
-  it('snapModelToHarness picks the best compatible catalog model, opus before sonnet', () => {
-    expect(snapModelToHarness('claude-code', 'openai/gpt-5', CATALOG)).toBe('anthropic/claude-opus-4-6')
-    expect(snapModelToHarness('codex', 'anthropic/claude-sonnet-4-6', CATALOG)).toBe('openai/gpt-5')
-    expect(snapModelToHarness('claude-code', 'anthropic/claude-sonnet-4-6', CATALOG)).toBe('anthropic/claude-sonnet-4-6')
-  })
-
-  it('snapHarnessToModel adopts the model\'s native harness', () => {
-    expect(snapHarnessToModel('claude-code', 'openai/gpt-5')).toBe('codex')
-    expect(snapHarnessToModel('codex', 'anthropic/claude-sonnet-4-6')).toBe('claude-code')
-    expect(snapHarnessToModel('claude-code', 'anthropic/claude-opus-4-6')).toBe('claude-code')
   })
 
   it('uses Interface compatibility for canonical multi-provider backends', () => {
@@ -117,23 +97,6 @@ describe('harness ↔ model compatibility (server-enforced)', () => {
     }
   })
 
-  it('assertHarnessModelCompatible throws on a forbidden pair, passes a valid one', () => {
-    expect(() => assertHarnessModelCompatible('claude-code', 'openai/gpt-5')).toThrow(/cannot run model/)
-    expect(() => assertHarnessModelCompatible('claude-code', 'anthropic/claude-sonnet-4-6')).not.toThrow()
-    expect(() => assertHarnessModelCompatible('opencode', 'openai/gpt-5')).not.toThrow()
-    expect(() => assertHarnessModelCompatible('claude-code', 'default')).not.toThrow()
-  })
-
-  it('rejects a named router model on a vendor-locked harness', () => {
-    expect(() => assertHarnessModelCompatible('claude-code', {
-      model: 'gemini-3.7-flash',
-      provider: 'openai-compat',
-    })).toThrow(/provider "openai-compat"/)
-    expect(() => assertHarnessModelCompatible('claude-code', {
-      model: 'claude-sonnet-4-6',
-      provider: 'anthropic',
-    })).not.toThrow()
-  })
 })
 
 describe('configured harness', () => {

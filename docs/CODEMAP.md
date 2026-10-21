@@ -87,9 +87,9 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./record`](api/record.md) | 33 | — |
 | [`./record/drizzle`](api/record-drizzle.md) | 22 | — |
 | [`./redact`](api/redact.md) | 15 | — |
-| [`./rollout`](api/rollout.md) | 13 | `signoff` |
+| [`./rollout`](api/rollout.md) | 14 | `signoff` |
 | [`./rollout/cli`](api/rollout-cli.md) | 3 | `signoff` |
-| [`./rollout/d1`](api/rollout-d1.md) | 6 | `signoff` |
+| [`./rollout/d1`](api/rollout-d1.md) | 7 | `signoff` |
 | [`./runtime`](api/runtime.md) | 106 | `tools`, `turn-trace` |
 | [`./runtime/router-turn`](api/runtime-router-turn.md) | 26 | `tools`, `turn-trace` |
 | [`./sandbox`](api/sandbox.md) | 263 | `harness`, `profile`, `runtime`, `tools`, `turn-trace` |
@@ -893,11 +893,11 @@ Source: `src/redact/index.ts` · 15 exports
 
 ## `./rollout`
 
-Source: `src/rollout/index.ts` · 13 exports
+Source: `src/rollout/index.ts` · 14 exports
 
 Depends on: `signoff`
 
-`decideRollout`, `killLineBreaches`, `normalizeRolloutValue`, `ParsedRolloutList`, `parseRolloutList`, `rolloutAdmits`, `RolloutDecision`, `RolloutKillLine`, `RolloutPlan`, `RolloutStage`, `rolloutWidens`, `StageMeasurement`, `validateRolloutPlan`
+`assignRolloutArm`, `decideRollout`, `killLineBreaches`, `normalizeRolloutValue`, `ParsedRolloutList`, `parseRolloutList`, `rolloutAdmits`, `RolloutDecision`, `RolloutKillLine`, `RolloutPlan`, `RolloutStage`, `rolloutWidens`, `StageMeasurement`, `validateRolloutPlan`
 
 [Full API →](api/rollout.md)
 
@@ -913,11 +913,11 @@ Depends on: `signoff`
 
 ## `./rollout/d1`
 
-Source: `src/rollout/d1.ts` · 6 exports
+Source: `src/rollout/d1.ts` · 7 exports
 
 Depends on: `signoff`
 
-`createD1TurnTimingStore`, `D1LikeForRollout`, `ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_SCHEMA_SQL`, `stageMetrics`, `TurnTimingRow`
+`createD1TurnTimingStore`, `D1LikeForRollout`, `ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_SCHEMA_SQL`, `stageMetrics`, `TurnTimingRow`
 
 [Full API →](api/rollout-d1.md)
 

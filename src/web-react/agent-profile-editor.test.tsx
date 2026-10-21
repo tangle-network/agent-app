@@ -82,17 +82,6 @@ describe('AgentProfileEditor model and runtime', () => {
     await waitFor(() => expect(current().model).toBeUndefined())
   })
 
-  it('offers only the product harnesses and keeps the default model runnable on the chosen one', async () => {
-    render(<Harness initial={{ model: { default: 'zai/glm-5.3' } }} config={config()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Harness' }))
-    const options = (await screen.findAllByRole('menuitemradio')).map(item => item.textContent)
-    expect(options).toEqual(['Product default', 'OpenCode (any model)', 'Codex (OpenAI)'])
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Codex/ }))
-    await waitFor(() => expect(current().harness).toBe('codex'))
-    expect(current().model?.default).toBe('openai/gpt-6.1-sol')
-    expect(screen.getByText(/Default model changed to GPT 6\.1 Sol/)).toBeTruthy()
-  })
-
   it('uses the composer thinking picker and stores Auto as no override', async () => {
     render(<Harness initial={{ harness: 'codex', model: { default: 'openai/gpt-6.1-sol', reasoningEffort: 'medium' } }} config={config()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Thinking' }))

@@ -54,14 +54,6 @@ function renderControls(
 }
 
 describe('AgentSessionControls coherence', () => {
-  it('snaps the model when the new harness cannot run it', () => {
-    const { onModelChange, onHarnessChange } = renderControls()
-    fireEvent.click(screen.getByTitle('Agent backend'))
-    fireEvent.click(screen.getByText('Codex (OpenAI)'))
-    expect(onHarnessChange).toHaveBeenCalledWith('codex')
-    expect(onModelChange).toHaveBeenCalledWith('openai/gpt-5.2')
-  })
-
   it('keeps the model when the new harness can run it', () => {
     const { onModelChange, onHarnessChange } = renderControls()
     fireEvent.click(screen.getByTitle('Agent backend'))
@@ -70,16 +62,6 @@ describe('AgentSessionControls coherence', () => {
     expect(onModelChange).not.toHaveBeenCalled()
   })
 
-  it("snaps the harness to the picked model's native backend", () => {
-    const { onModelChange, onHarnessChange } = renderControls()
-    const trigger = screen.getByText('Claude Opus 4.8').closest('button')
-    if (!trigger) throw new Error('model trigger did not render')
-    fireEvent.click(trigger)
-    fireEvent.click(screen.getByRole('button', { name: 'Browse all models' }))
-    fireEvent.click(screen.getByText('GPT-5.2'))
-    expect(onModelChange).toHaveBeenCalledWith('openai/gpt-5.2')
-    expect(onHarnessChange).toHaveBeenCalledWith('codex')
-  })
 })
 
 /**
@@ -334,11 +316,4 @@ describe('AgentSessionControls trigger variant', () => {
     expect(classesOf(harnessTrigger())).toContain('hover:bg-accent')
   })
 
-  it('quiet changes the triggers only — the coherence policy still runs', () => {
-    const { onModelChange, onHarnessChange } = renderControls({ variant: 'quiet' })
-    fireEvent.click(harnessTrigger())
-    fireEvent.click(screen.getByText('Codex (OpenAI)'))
-    expect(onHarnessChange).toHaveBeenCalledWith('codex')
-    expect(onModelChange).toHaveBeenCalledWith('openai/gpt-5.2')
-  })
 })

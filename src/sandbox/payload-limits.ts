@@ -51,7 +51,8 @@ export interface ProvisionProfileSection {
  *  the gate is testable without the SDK's (unexported) create-payload type. */
 export interface ProvisionPayloadSections {
   env?: Record<string, string>
-  secrets?: readonly string[] | 'all'
+  /** Secret names, or Sandbox 0.63 host-scoped `SecretBinding` objects; the gate only measures bytes. */
+  secrets?: readonly unknown[] | 'all'
   /** `profile` may also be a named-profile string ref (the SDK's
    *  `BackendConfig` union) — a string ref is tiny and has no files channel. */
   backend?: { profile?: string | ProvisionProfileSection }
