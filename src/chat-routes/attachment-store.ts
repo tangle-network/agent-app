@@ -59,6 +59,11 @@ export type ReadAttachmentFn = (scopeId: string, path: string) => Promise<Attach
 export interface AttachmentMaterialization {
   upload: (absolutePath: string, bytes: Uint8Array) => Promise<{ size: number }>
   missingBytesMessage: (path: string) => string
+  /** The byte sizes of those box files that exist, read in one round trip.
+   *  Attachment paths are immutable, so a box file whose size equals the
+   *  part's stored size is already delivered and is neither read nor uploaded
+   *  again; a missing or different file is copied. Absent: every file is copied. */
+  present?: (absolutePaths: readonly string[]) => Promise<ReadonlyMap<string, number>>
 }
 
 /** Prepare carried files before a product constructs its prompt and dispatch input. */
@@ -86,11 +91,18 @@ export async function prepareDispatchAttachments(input: PrepareDispatchAttachmen
   ]
   const materialize = input.materialize
   if (!materialize) return attachments
+  const targets = attachments.map((part) => input.resolveAttachmentPath(part.path))
+  // Only files carried from earlier turns can already be on the box.
+  const carried = targets.slice(input.attachments.length)
+  const delivered = materialize.present && carried.length > 0
+    ? await materialize.present([...new Set(carried)])
+    : new Map<string, number>()
   const written = new Set<string>()
-  for (const part of attachments) {
-    const target = input.resolveAttachmentPath(part.path)
+  for (const [index, part] of attachments.entries()) {
+    const target = targets[index]
     if (written.has(target)) continue
     written.add(target)
+    if (part.size !== undefined && delivered.get(target) === part.size) continue
 
     const read = await input.readAttachment(input.scopeId, part.path)
     if (!read.ok) throw new Error(read.reason)

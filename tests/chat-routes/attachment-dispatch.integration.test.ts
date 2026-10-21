@@ -126,3 +126,59 @@ it('carries persisted files through real uploads and refuses missing or incomple
     }
   }
 }, 15_000)
+
+it('copies a carried file only when the box lacks it or holds a different size', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'attachment-present-'))
+  try {
+    const stored = join(directory, 'stored', 'workspace')
+    const box = join(directory, 'box')
+    await mkdir(stored, { recursive: true })
+    await mkdir(box)
+    const names = ['first.txt', 'second.txt']
+    for (const name of names) await writeFile(join(stored, name), `bytes:${name}`)
+    const reads: string[] = []
+    const uploads: string[] = []
+    const part = (name: string) => ({ type: 'file' as const, path: name, name, size: `bytes:${name}`.length })
+    const input = {
+      attachments: [] as ReturnType<typeof part>[],
+      historyAttachments: names.map(part),
+      scopeId: 'workspace',
+      resolveAttachmentPath: (path: string) => join(box, path),
+      readAttachment: (async (scope, path) => {
+        reads.push(path)
+        const bytes = await readFile(join(directory, 'stored', scope, path))
+        return { ok: true, size: bytes.length, bytes }
+      }) satisfies ReadAttachmentFn,
+      materialize: {
+        missingBytesMessage: (path: string) => `Bytes unavailable: ${path}`,
+        upload: async (target: string, bytes: Uint8Array) => {
+          uploads.push(basename(target))
+          await writeFile(target, bytes)
+          return { size: (await stat(target)).size }
+        },
+        present: async (targets: readonly string[]) => {
+          const sizes = new Map<string, number>()
+          for (const target of targets) {
+            try { sizes.set(target, (await stat(target)).size) } catch { /* absent */ }
+          }
+          return sizes
+        },
+      },
+    }
+    await prepareDispatchAttachments(input)
+    expect(uploads).toEqual(names)
+    // The next turns carry the same files: nothing is read or copied again.
+    await prepareDispatchAttachments(input)
+    await prepareDispatchAttachments(input)
+    expect(reads).toEqual(names)
+    expect(uploads).toEqual(names)
+    // A removed or truncated box file is restored once.
+    await rm(join(box, 'first.txt'))
+    await writeFile(join(box, 'second.txt'), 'x')
+    await prepareDispatchAttachments(input)
+    expect(uploads).toEqual([...names, ...names])
+    for (const name of names) expect(await readFile(join(box, name), 'utf8')).toBe(`bytes:${name}`)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
