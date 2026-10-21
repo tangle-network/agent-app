@@ -87,3 +87,11 @@ export function createTokenRecallChecker(opts: { minRecall?: number; minContentL
       : { correct: false, reason: `content recalls only ${hits}/${tokens.length} requirement tokens` }
   }
 }
+
+// Reactive persona driver: the simulated user of an app's persona eval.
+export { buildPersonaDriverSystemPrompt, decidePersonaTurn } from './persona-driver'
+export type { DecidePersonaTurnOpts } from './persona-driver'
+
+// Scorecard timeline: append a run and diff it against the previous commit.
+export { recordScorecardAndDiff } from './scorecard'
+export type { ScorecardWiringInput, ScorecardWiringResult } from './scorecard'
