@@ -5,7 +5,7 @@
  * carries an allowed-model set. The router enforces it as a wall:
  *
  *   400 model_not_allowed — `Model "gpt-6-luna" is not in this key's
- *   allow-list. Allowed: glm-5.3, gpt-5.5.`
+ *   allow-list. Allowed: glm-5.3, glm-5-turbo.`
  *
  * The refusal already NAMES the allowed set — so a product can treat the
  * allow-list as routing information instead of a dead end: parse the set,
