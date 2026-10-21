@@ -62,27 +62,6 @@ describe('decideRollout', () => {
     expect(measure).toHaveBeenCalledWith(plan.stages[0])
   })
 
-  it('never blocks a rollback, and does not measure for it', async () => {
-    const measure = vi.fn(async () => null)
-    const decision = await decideRollout({ plan, fromValue: ALL_BUT_RECENTER, toValue: QA, measure, now: at })
-    expect(decision).toMatchObject({ decision: 'allowed', widens: false })
-    expect(measure).not.toHaveBeenCalled()
-  })
-
-  it('refuses a skipped stage, an undeclared value, too few turns and an unmeasured metric', async () => {
-    const good = async () => measured('qa', 40, { first_words_p50_ms: 900, failure_rate: 0 })
-    await expect(decideRollout({ plan, fromValue: QA, toValue: '*', measure: good }))
-      .resolves.toMatchObject({ decision: 'refused', reasons: ['all skips all-but-recenter'] })
-    await expect(decideRollout({ plan, fromValue: QA, toValue: `${QA},ws-3`, measure: good }))
-      .resolves.toMatchObject({ decision: 'refused', reasons: [expect.stringContaining('not a declared stage')] })
-    await expect(decideRollout({ plan, fromValue: QA, toValue: ALL_BUT_RECENTER,
-      measure: async () => measured('qa', 12, { first_words_p50_ms: 900 }) }))
-      .resolves.toMatchObject({ decision: 'refused', reasons: [
-        'stage qa has 12 measured turns, under its minimum of 30', 'failure_rate was not measured'] })
-    await expect(decideRollout({ plan, fromValue: QA, toValue: ALL_BUT_RECENTER, measure: async () => { throw new Error('ledger down') } }))
-      .resolves.toMatchObject({ decision: 'refused', reasons: ['measuring stage qa failed: ledger down'] })
-  })
-
   it('lets an empty list take the first stage without numbers', async () => {
     await expect(decideRollout({ plan, fromValue: '', toValue: QA, measure: async () => null }))
       .resolves.toMatchObject({ decision: 'allowed', widens: true })

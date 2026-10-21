@@ -1,0 +1,46 @@
+{
+  "rollout": "creative-router-engine",
+  "variable": "CREATIVE_ROUTER_TURN_WORKSPACE_IDS",
+  "from": {
+    "value": "5dfb4e77a831e2841c83e526e58ba675",
+    "stage": "qa"
+  },
+  "to": {
+    "value": "*",
+    "stage": "all"
+  },
+  "measured": {
+    "stage": "qa",
+    "samples": 6,
+    "metrics": {
+      "first_visible_p50_ms": 7172,
+      "first_visible_p90_ms": 9541,
+      "first_words_p50_ms": 48578,
+      "first_words_p90_ms": 68655,
+      "settled_p50_ms": 66643,
+      "settled_p90_ms": 83245,
+      "failure_rate": 0,
+      "router_samples": 6,
+      "router_visible_samples": 6,
+      "incumbent_samples": 6,
+      "incumbent_visible_samples": 3,
+      "incumbent_first_visible_p50_ms": 34774,
+      "incumbent_first_words_p50_ms": 72903,
+      "incumbent_failure_rate": 0.3333333333333333,
+      "first_visible_p50_delta_ms": -27602,
+      "failure_rate_delta": -0.333333333333
+    },
+    "source": "rollout_turn_timing lightweight vs sandbox; first_visible_ms; same seven-day snapshot",
+    "window": {
+      "from": "2026-10-13T23:48:49.733Z",
+      "to": "2026-10-20T23:48:49.733Z"
+    },
+    "lane": "router",
+    "sampleRequirements": {
+      "sandbox": {
+        "samples": 3,
+        "minSamples": 5
+      }
+    }
+  }
+}

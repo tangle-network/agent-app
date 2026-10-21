@@ -34,6 +34,8 @@ export class SandboxRunError extends Error {
 
 /** The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine. */
 export interface SandboxToolContext {
+  /** The engine-resolved member request, including checkpoint continuation. */
+  userMessage?: string
   emit(kind: string, data?: unknown): void
   /** The turn's trace and this call's `tool.call` span (`runRouterTurn` supplies both). The box claim, the box run and the
    *  trace id sent to the Sandbox API follow from them; without them nothing is recorded. */
@@ -144,8 +146,9 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
       let answer: string
       try {
         // A product runner may not honour the signal; the call still ends at the cap.
-        const prefix = options.memberRequest === undefined ? ''
-          : `The member's request (verbatim):\n${options.memberRequest}\n\nYour part of it:\n`
+        const memberRequest = context?.userMessage ?? options.memberRequest
+        const prefix = memberRequest === undefined ? ''
+          : `The member's request (verbatim):\n${memberRequest}\n\nYour part of it:\n`
         // The member contract is never truncated, even when it alone exceeds the task budget.
         const boxTask = prefix + task.slice(0, Math.max(0, TASK_LIMIT - prefix.length))
         answer = await capped(runTask(box, boxTask, {

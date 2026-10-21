@@ -341,6 +341,7 @@ export function createAdmittedTurnRunner<TContext>({
       const lifecycle = options.lifecycle
       const durationMs = Date.now() - turnStartedAtMs
       const timing = {
+        admissionMs: turnStartedAtMs - trace.startedAt,
         ...(firstVisibleAtMs === undefined ? {} : { firstVisibleMs: firstVisibleAtMs - turnStartedAtMs }),
         ...(firstTextAtMs === undefined ? {} : { firstTextMs: firstTextAtMs - turnStartedAtMs }),
         trace: snapshot.summary,
@@ -483,6 +484,7 @@ export function createAdmittedTurnRunner<TContext>({
             try {
               await options.lifecycle.onTurnStart({
                 identity, executionId, turnStreamId, context, startedAt: turnStartedAtMs,
+                requestReceivedAt: trace.startedAt, admissionMs: turnStartedAtMs - trace.startedAt,
               })
             } catch (err) {
               log('[chat-routes] lifecycle.onTurnStart failed', {
@@ -556,6 +558,7 @@ export function createAdmittedTurnRunner<TContext>({
         try {
           await options.lifecycle.onTurnStart({
             identity, executionId, turnStreamId, context, startedAt: turnStartedAtMs,
+            requestReceivedAt: trace.startedAt, admissionMs: turnStartedAtMs - trace.startedAt,
           })
         } catch (err) {
           log('[chat-routes] lifecycle.onTurnStart failed', {

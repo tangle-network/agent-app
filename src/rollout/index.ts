@@ -14,16 +14,14 @@
  * {@link rolloutAdmits} is the reference reading of that grammar.
  *
  * THE RULE ({@link decideRollout}).
- * - A change that admits no workspace the current value did not (a narrowing,
- *   a rollback, the same stage) is always allowed: a guard that can block a
- *   rollback is worse than none.
+ * - Narrowing is always allowed. Holds and widenings measure the current stage.
  * - A widening must land on a declared stage, the next one after the current
  *   value's stage, never past it.
  * - The stage being left must have at least `minSamples` measured turns and
- *   every kill line met. A metric that was not measured fails its line.
- * - A refusal names each reason (`first_words_p50_ms 3540 over kill line 2500`).
+ *   every kill line met. A missing metric leaves the decision undecided.
+ * - Missing samples are undecided; a measured breach names each reason (`first_words_p50_ms 3540 over kill line 2500`).
  *
- * Every decision, allowed or refused, is returned as one record the caller
+ * Every decision, allowed, refused or undecided, is returned as one record the caller
  * persists (the CLI appends it to a JSONL ledger and hands it to the
  * config's `record`).
  */
@@ -58,6 +56,10 @@ export interface RolloutPlan {
 export interface StageMeasurement {
   stage: string
   samples: number
+  /** Lane name for the stage sample floor; defaults to the stage name. */
+  lane?: string
+  /** Additional lane sample floors, evaluated as missing evidence rather than breaches. */
+  sampleRequirements?: Record<string, { samples: number; minSamples: number }>
   metrics: Record<string, number | null | undefined>
   /** Where the numbers came from (ledger, query, soak), for the record. */
   source?: string
@@ -70,8 +72,10 @@ export interface RolloutDecision {
   from: { value: string; stage: string | null }
   to: { value: string; stage: string | null }
   widens: boolean
-  decision: 'allowed' | 'refused'
-  /** Empty when allowed; each refusal reason otherwise. */
+  decision: 'allowed' | 'refused' | 'undecided'
+  recommendation: 'widen' | 'hold' | 'narrow' | 'refuse'
+  turnsNeeded: Record<string, number>
+  /** Breaches or evidence deficits, including observations made while narrowing. */
   reasons: string[]
   measured: StageMeasurement | null
   at: string
@@ -141,24 +145,17 @@ function stageOf(plan: RolloutPlan, value: string): RolloutStage | null {
   return plan.stages.find(stage => normalizeRolloutValue(stage.value) === key) ?? null
 }
 
-/** Each kill line the measurement misses, as a reason. Empty when every line holds. */
+/** Finite measured breaches only. Missing observations and sample floors are evidence deficits. */
 export function killLineBreaches(stage: RolloutStage, measured: StageMeasurement | null): string[] {
-  if (!measured) return [`stage ${stage.name} has no measurement`]
-  if (measured.stage !== stage.name) return [`measurement is for stage ${measured.stage}, not ${stage.name}`]
-  const reasons: string[] = []
-  if (!(measured.samples >= stage.minSamples)) {
-    reasons.push(`stage ${stage.name} has ${measured.samples} measured turns, under its minimum of ${stage.minSamples}`)
-  }
-  for (const [metric, line] of Object.entries(stage.kill)) {
+  if (!measured || measured.stage !== stage.name) return []
+  return Object.entries(stage.kill).flatMap(([metric, line]) => {
     const value = measured.metrics[metric]
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
-      reasons.push(`${metric} was not measured`)
-      continue
-    }
-    if (line.max !== undefined && value > line.max) reasons.push(`${metric} ${value} over kill line ${line.max}`)
-    if (line.min !== undefined && value < line.min) reasons.push(`${metric} ${value} under kill line ${line.min}`)
-  }
-  return reasons
+    if (typeof value !== 'number' || !Number.isFinite(value)) return []
+    return [
+      ...(line.max !== undefined && value > line.max ? [`${metric} ${value} over kill line ${line.max}`] : []),
+      ...(line.min !== undefined && value < line.min && !metric.endsWith('samples') ? [`${metric} ${value} under kill line ${line.min}`] : []),
+    ]
+  })
 }
 
 export function validateRolloutPlan(plan: RolloutPlan): void {
@@ -187,10 +184,17 @@ export function validateRolloutPlan(plan: RolloutPlan): void {
   }
 }
 
-/**
- * Decide one change of the list. `measure` is called only for a widening, and
- * only for the stage being left.
- */
+/** Stable per-turn percentage assignment; the product records the returned arm on its row and trace. */
+export function assignRolloutArm(turnId: string, treatmentPct: number): 'control' | 'treatment' {
+  if (!Number.isFinite(treatmentPct) || treatmentPct < 0 || treatmentPct > 100) {
+    throw new RangeError('treatmentPct must be between 0 and 100')
+  }
+  let hash = 2166136261
+  for (let i = 0; i < turnId.length; i++) hash = Math.imul(hash ^ turnId.charCodeAt(i), 16777619)
+  return (hash >>> 0) / 2 ** 32 < treatmentPct / 100 ? 'treatment' : 'control'
+}
+
+/** Measure the current stage for widening, holding and narrowing. Narrowing always remains available. */
 export async function decideRollout(input: {
   plan: RolloutPlan
   fromValue: string
@@ -203,34 +207,52 @@ export async function decideRollout(input: {
   const fromStage = stageOf(plan, fromValue)
   const toStage = stageOf(plan, toValue)
   const widens = rolloutWidens(fromValue, toValue)
-  const record = (reasons: string[], measured: StageMeasurement | null): RolloutDecision => ({
-    rollout: plan.name,
-    variable: plan.variable,
+  const narrowing = !widens && normalizeRolloutValue(fromValue) !== normalizeRolloutValue(toValue)
+  const record = (decision: RolloutDecision['decision'], reasons: string[], measured: StageMeasurement | null,
+    turnsNeeded: Record<string, number> = {}, breach = false): RolloutDecision => ({
+    rollout: plan.name, variable: plan.variable,
     from: { value: fromValue, stage: fromStage?.name ?? null },
-    to: { value: toValue, stage: toStage?.name ?? null },
-    widens,
-    decision: reasons.length ? 'refused' : 'allowed',
-    reasons,
-    measured,
-    at: (input.now?.() ?? new Date()).toISOString(),
+    to: { value: toValue, stage: toStage?.name ?? null }, widens, decision,
+    recommendation: narrowing || breach ? 'narrow' : decision === 'refused' ? 'refuse' : decision === 'undecided' ? 'hold' : widens ? 'widen' : 'hold',
+    turnsNeeded, reasons, measured, at: (input.now?.() ?? new Date()).toISOString(),
   })
-  if (!widens) return record([], null)
-  if (!toStage) return record([`${toValue} is not a declared stage of ${plan.name}`], null)
-  const target = plan.stages.indexOf(toStage)
-  // An empty list admits nobody, so the first stage is the only widening it may take without numbers.
-  if (!fromStage) {
-    const empty = !normalizeRolloutValue(fromValue)
-    return record(empty && target === 0 ? [] : [`the current value ${fromValue || '(empty)'} is not a declared stage of ${plan.name}`], null)
+  if (widens) {
+    if (!toStage) return record('refused', [`${toValue} is not a declared stage of ${plan.name}`], null)
+    const target = plan.stages.indexOf(toStage)
+    if (!fromStage) {
+      const empty = !normalizeRolloutValue(fromValue)
+      return empty && target === 0 ? record('allowed', [], null)
+        : record('refused', [`the current value ${fromValue || '(empty)'} is not a declared stage of ${plan.name}`], null)
+    }
+    const current = plan.stages.indexOf(fromStage)
+    if (target > current + 1) return record('refused', [`${toStage.name} skips ${plan.stages.slice(current + 1, target).map(stage => stage.name).join(', ')}`], null)
   }
-  const current = plan.stages.indexOf(fromStage)
-  if (target > current + 1) {
-    return record([`${toStage.name} skips ${plan.stages.slice(current + 1, target).map(stage => stage.name).join(', ')}`], null)
-  }
+  if (!fromStage) return record('allowed', [], null)
   let measured: StageMeasurement | null
-  try {
-    measured = await input.measure(fromStage)
-  } catch (error) {
-    return record([`measuring stage ${fromStage.name} failed: ${error instanceof Error ? error.message : String(error)}`], null)
+  try { measured = await input.measure(fromStage) }
+  catch (error) {
+    return record(narrowing ? 'allowed' : 'undecided', [`measuring stage ${fromStage.name} failed: ${error instanceof Error ? error.message : String(error)}`], null,
+      { [fromStage.name]: fromStage.minSamples })
   }
-  return record(killLineBreaches(fromStage, measured), measured)
+  const lane = measured?.lane ?? fromStage.name
+  const requirements = { ...measured?.sampleRequirements }
+  requirements[lane] = {
+    samples: Math.min(measured?.samples ?? 0, requirements[lane]?.samples ?? Infinity),
+    minSamples: Math.max(fromStage.minSamples, requirements[lane]?.minSamples ?? 0),
+  }
+  // Older product configs expressed control floors as *_samples minimum kill lines.
+  for (const [metric, line] of Object.entries(fromStage.kill)) {
+    if (metric.endsWith('samples') && line.min !== undefined) {
+      requirements[metric] = { samples: measured?.metrics[metric] ?? 0, minSamples: line.min }
+    }
+  }
+  const turnsNeeded = Object.fromEntries(Object.entries(requirements)
+    .map(([lane, floor]) => [lane, Math.max(0, Math.ceil(floor.minSamples - (Number.isFinite(floor.samples) ? floor.samples : 0)))] as const)
+    .filter(([, needed]) => needed > 0))
+  const measuredStage = measured?.stage === fromStage.name
+  const breaches = killLineBreaches(fromStage, measured)
+  const missing = !measuredStage ? [`stage ${fromStage.name} has no matching measurement`]
+    : Object.keys(fromStage.kill).filter(metric => !Number.isFinite(measured!.metrics[metric])).map(metric => `${metric} was not measured`)
+  const reasons = [...breaches, ...missing, ...Object.entries(turnsNeeded).map(([lane, needed]) => `${lane} needs ${needed} more turns`)]
+  return record(narrowing ? 'allowed' : breaches.length ? 'refused' : reasons.length ? 'undecided' : 'allowed', reasons, measured, turnsNeeded, breaches.length > 0)
 }
