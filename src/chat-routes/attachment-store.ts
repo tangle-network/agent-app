@@ -91,15 +91,14 @@ export async function prepareDispatchAttachments(input: PrepareDispatchAttachmen
   ]
   const materialize = input.materialize
   if (!materialize) return attachments
-  const targets = attachments.map((part) => input.resolveAttachmentPath(part.path))
+  const copies = attachments.map((part) => ({ part, target: input.resolveAttachmentPath(part.path) }))
   // Only files carried from earlier turns can already be on the box.
-  const carried = targets.slice(input.attachments.length)
+  const carried = copies.slice(input.attachments.length).map((copy) => copy.target)
   const delivered = materialize.present && carried.length > 0
     ? await materialize.present([...new Set(carried)])
     : new Map<string, number>()
   const written = new Set<string>()
-  for (const [index, part] of attachments.entries()) {
-    const target = targets[index]
+  for (const { part, target } of copies) {
     if (written.has(target)) continue
     written.add(target)
     if (part.size !== undefined && delivered.get(target) === part.size) continue
