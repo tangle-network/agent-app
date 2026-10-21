@@ -34,6 +34,7 @@ const BROWSER_NONREACT = new Set([
   'catalog',
   'channels',
   'theme',
+  'theme/dom',
   'stream',
   'trace',
   'redact',
