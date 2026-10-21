@@ -40,7 +40,9 @@ import { decideRollout, type RolloutDecision, type RolloutPlan, type RolloutStag
 
 export interface RolloutConfig {
   plans: RolloutPlan[]
-  measure(input: { plan: RolloutPlan; stage: RolloutStage }): Promise<StageMeasurement | null>
+  measure(input: { plan: RolloutPlan; stage: RolloutStage; signal?: AbortSignal }): Promise<StageMeasurement | null>
+  /** Shared observation deadline; see decideRollout. */
+  measurementTimeoutMs?: number
   record?(decision: RolloutDecision): Promise<void> | void
   /** Default `wrangler.toml`. */
   wrangler?: string
@@ -145,7 +147,11 @@ export async function runRolloutCheck(args: CliArgs): Promise<RolloutDecision[]>
   for (const plan of plans) {
     const fromValue = args.from ?? readWranglerVar(base!, plan.variable) ?? ''
     const toValue = args.to ?? readWranglerVar(head, plan.variable) ?? ''
-    const decision = await decideRollout({ plan, fromValue, toValue, measure: stage => config.measure({ plan, stage }) })
+    const decision = await decideRollout({
+      plan, fromValue, toValue,
+      measure: (stage, signal) => config.measure({ plan, stage, signal }),
+      measurementTimeoutMs: config.measurementTimeoutMs,
+    })
     decisions.push(decision)
     const ledger = resolve(args.appDir, args.record)
     mkdirSync(dirname(ledger), { recursive: true })
@@ -182,5 +188,9 @@ async function main(): Promise<number> {
 }
 
 if (invokedAsScript(import.meta.url, process.argv[1])) {
-  main().then(code => { process.exitCode = code })
+  // A timed-out product instrument can leave an uncooperative socket open.
+  // All durable records are awaited by main; flush the receipt before ending the CLI.
+  main().then(code => {
+    process.stdout.write('', () => process.stderr.write('', () => process.exit(code)))
+  })
 }

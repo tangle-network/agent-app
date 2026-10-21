@@ -137,6 +137,7 @@ export function createD1TurnTimingStore(options: { db: D1LikeForRollout; now?: (
         .map(row => ({ firstVisibleMs: row.first_visible_ms ?? undefined, firstTextMs: row.first_text_ms ?? undefined, settledMs: row.settled_ms, failed: row.failed === 1 }))
       return {
         stage: input.stage.name,
+        lane: input.lane,
         samples: rows.length,
         metrics: stageMetrics(rows),
         source: `rollout_turn_timing lane=${input.lane}`,
