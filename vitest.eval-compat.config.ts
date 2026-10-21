@@ -3,7 +3,7 @@ import base from './vitest.config.ts'
 
 // Run the application seams against another admitted Eval line, leaving the
 // current Runtime/Knowledge development cohort intact: the retained 0.204 line
-// by default, or the line AGENT_EVAL_COMPAT names (agent-eval-0211).
+// by default, or the line AGENT_EVAL_COMPAT names (agent-eval-0211, agent-eval-0217).
 const compat = process.env.AGENT_EVAL_COMPAT ?? 'agent-eval-0204'
 
 export default defineConfig({
