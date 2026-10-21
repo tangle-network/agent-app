@@ -714,7 +714,7 @@
     "@tangle-network/agent-profile-materialize": "0.27.0",
     "@tangle-network/agent-runtime": "0.337.2",
     "@tangle-network/brand": "1.26.2",
-    "@tangle-network/hub-sdk": "0.30.8",
+    "@tangle-network/hub-sdk": "0.30.9",
     "@tangle-network/sandbox": "0.63.10",
     "@tangle-network/sandbox-ui": "0.136.1",
     "@tangle-network/ui": "11.40.2",
