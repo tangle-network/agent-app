@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.245
+
+- test: real catalog ids in fixtures — no fabricated model names (#1221)
+
 ## 0.60.244
 
 - chore(deps): adopt @tangle-network/agent-runtime 0.339.0 (#1220)
