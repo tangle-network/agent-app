@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.60.243
+
+- fix(release): pin the adopt-stack reusable workflow to a commit SHA (#1219)
+- perf(attachments): skip carried files the box already holds (#1218)
+- feat(harness): the session-preset contract — coherence, not storage (#1187)
+- chore(deps): adopt @tangle-network/agent-profile-materialize 0.27.1 (#1217)
+- chore(deps): adopt @tangle-network/hub-sdk 0.30.10 (#1216)
+- chore(deps): adopt @tangle-network/agent-runtime 0.338.0 (#1215)
+- chore(deps): adopt @tangle-network/agent-knowledge 22.0.6 (#1214)
+- chore(deps): adopt @tangle-network/hub-sdk 0.30.9 (#1213)
+- chore(deps): adopt 8 @tangle-network/* packages (#1212)
+- agent-app keeps its templates and peer floors in step with each adopted release (#1211)
+- factory: agent-app adopts each new Tangle stack release on its own (#1208)
+
 ## 0.60.242
 
 - Accept `@tangle-network/agent-runtime` 0.319.3 through 0.339 (`>=0.319.3 <0.340.0`), so products can take Runtime 0.337 now and the flow-graph releases 0.338 and 0.339 when they ship. Development and verification use Runtime 0.337.2; 0.338 and 0.339 are admitted but not yet verified here.
