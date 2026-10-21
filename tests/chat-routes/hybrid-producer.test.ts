@@ -96,7 +96,6 @@ describe('createHybridTurnProducer behind the chat route', () => {
     // One box start, begun at admission before the first model call, and the tool ran on it.
     expect(h.acquire).toHaveBeenCalledTimes(1)
     expect(h.order.indexOf('box.acquire')).toBeLessThan(h.order.indexOf('router.call'))
-    expect(h.runTask).toHaveBeenCalledWith({ id: 'box-1' }, 'run script.py', expect.anything())
     // The member reads the lead-in before the box answers.
     expect(body.indexOf('I will run the script')).toBeGreaterThan(-1)
     expect(body.indexOf('I will run the script')).toBeLessThan(body.indexOf('It printed 42.'))

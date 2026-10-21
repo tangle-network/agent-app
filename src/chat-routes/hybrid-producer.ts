@@ -51,7 +51,8 @@ import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
 export const HYBRID_TURN_GUIDANCE =
   'Start your reply with text: before your first tool call, write one short sentence telling the member what you are ' +
   'about to do, so they never wait in silence. Use sandbox_run only for work that needs code execution or files on ' +
-  'the workspace computer; describe the whole task in it and report what it returns.'
+  "the workspace computer. Give the sandbox agent the member's requirements, paths and exact field names, " +
+  'not model-written code; the sandbox agent writes and runs the code. Report what it returns.'
 
 const DEFAULT_SANDBOX_RUN_TIMEOUT_MS = 4 * 60_000
 
@@ -153,6 +154,7 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
   const sandboxRun = createSandboxRunTool({
     box: () => acquire(),
     runTask: box.runTask,
+    memberRequest: router.userMessage,
     timeoutMs,
     signal: stop,
     ...(box.warm ? { warm: box.warm } : {}),
