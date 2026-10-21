@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.246
+
+- docs: last gpt-5.5 fixture example -> glm-5-turbo (#1222)
+
 ## 0.60.245
 
 - test: real catalog ids in fixtures — no fabricated model names (#1221)
