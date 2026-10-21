@@ -39,7 +39,7 @@ describe('app OAuth signed resource token', () => {
   it('verifies a cross-origin issuer and denies a different audience, issuer, signature or consent', async () => {
     const { verify, request } = setup()
     expect(await verify(request(token()))).toEqual({ userId: 'platform-user-1', clientId: 'client-1',
-      scopes: ['operator:read'] })
+      scopes: ['operator:read'], consentId: 'consent-2', sessionId: 'session-1' })
     expect(await verify(request(token({ aud: 'https://id.example.test/mcp' })))).toBeNull()
     expect(await verify(request(token({ iss: 'https://evil.example.test/api/auth' })))).toBeNull()
     expect(await verify(request(`${token().slice(0, -2)}xx`))).toBeNull()
@@ -62,7 +62,7 @@ describe('app OAuth signed resource token', () => {
     const request = (value: string) => new Request(resource, { headers: { authorization: `Bearer ${value}` } })
     const signed = token({ [grantClaim]: 'generation-9' })
     expect(await verify(request(signed))).toEqual({ userId: 'platform-user-1',
-      clientId: 'client-1', scopes: ['operator:read'] })
+      clientId: 'client-1', scopes: ['operator:read'], consentId: 'consent-2', sessionId: 'session-1' })
     expect(snapshot).toHaveBeenCalledOnce()
     expect(snapshot).toHaveBeenCalledWith(expect.objectContaining({ clientId: 'client-1',
       userId: 'platform-user-1', sessionId: 'session-1', consentId: 'consent-2', resource,
