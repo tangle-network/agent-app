@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.244
+
+- chore(deps): adopt @tangle-network/agent-runtime 0.339.0 (#1220)
+
 ## 0.60.243
 
 - fix(release): pin the adopt-stack reusable workflow to a commit SHA (#1219)
