@@ -16,6 +16,7 @@ import type {
   StartTurnInput,
 } from './contract.js'
 import { OperatorError, type OperatorAdapter, type OperatorContext } from './server.js'
+import { sha256Hex } from '../crypto/digest'
 
 /** The message fields the adapter reads; agent-app's chat-store rows satisfy it. */
 export interface ChatOperatorMessage {
@@ -173,11 +174,6 @@ function turnIdOf(message: ChatOperatorMessage): string | null {
     if (typeof part.turnId === 'string' && part.turnId) return part.turnId
   }
   return null
-}
-
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 async function drain(response: Response, signal: AbortSignal): Promise<void> {

@@ -17,6 +17,7 @@ import type { Harness } from '../harness/index'
 import type { Outcome } from '../sandbox/outcome'
 import { writeProfileFilesToBox } from '../sandbox/profile-files'
 import { resolveSkillDir } from './index'
+import { sha256Hex } from '../crypto/digest'
 
 interface DeclaredSkill {
   id: string
@@ -47,11 +48,6 @@ export interface ProfileSkillPlacerConfig {
    * receipt never matches. Return null when the filesystem is not identified.
    */
   filesystemIncarnation?: (box: SandboxInstance) => string | null
-}
-
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 function homeRelative(path: string): string {

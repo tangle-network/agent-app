@@ -9,6 +9,8 @@
  * GCM auth tag is appended by WebCrypto inside the ciphertext.
  */
 
+export { sha256Hex } from './digest'
+
 const IV_LENGTH = 12
 const TAG_LENGTH = 16
 const ALGORITHM = 'AES-GCM'
