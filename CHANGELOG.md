@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.239
+
+- fix: preserve member request across hybrid sandbox escalation (#1204)
+
 ## 0.60.238
 
 - Share attachment history preparation across agent apps (#1203)
