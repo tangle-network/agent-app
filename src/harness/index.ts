@@ -172,8 +172,8 @@ export function assertHarnessModelCompatible(
   const provider = modelProvider(modelId) ?? transportProvider ?? null
   // An omitted/default model is deliberately left to the harness. Once a
   // caller names a model, however, a vendor-locked harness must have provider
-  // evidence. Treating a router provider as compatible with every native CLI
-  // is how a bare Gemini model reached Claude Code and produced "Not logged in".
+  // evidence. Interface owns which harnesses are locked: since 5.7 Claude Code
+  // and Codex run any Router-served model, and kimi-code stays Moonshot-only.
   const isDefaultSentinel = modelId.trim() === '' || modelId.trim() === 'default'
   const compatible = isDefaultSentinel
     || providers === null

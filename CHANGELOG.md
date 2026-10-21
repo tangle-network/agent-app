@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Accept `@tangle-network/agent-runtime` 0.319.3 through 0.339 (`>=0.319.3 <0.340.0`), so products can take Runtime 0.337 now and the flow-graph releases 0.338 and 0.339 when they ship. Development and verification use Runtime 0.337.2; 0.338 and 0.339 are admitted but not yet verified here.
+- Drop the Runtime 0.318 band. Its only consumer, hardware-agent, pins Runtime 0.318.0 with agent-app 0.60.208 and must move to Runtime 0.319.3 or later before it takes this release.
+- Runtime 0.326 and later require Sandbox 0.60.92 or 0.61.1 and later, Eval 0.215 and Interface 5.7. The Sandbox peer now admits `>=0.61.1 <0.64.0` and the Eval peer admits 0.215; development uses Sandbox 0.63.10, Eval 0.215.1 and Interface 5.7.0, and generated apps pin the same versions.
+- The provision payload gate accepts Sandbox 0.63 `SecretBinding` entries in `secrets`, which it measures by size like secret names.
+- Interface 5.7 runs any Router-served model on Claude Code and Codex, so the server harness guard and the session pickers no longer reject or snap away a cross-vendor model on those harnesses. kimi-code stays Moonshot-only.
+
 ## 0.60.241
 
 - fix: bound rollout observation and retain measured lane (#1206)

@@ -35,9 +35,9 @@ describe('./router-turn entry', () => {
         else packages.add(target)
       }
     }
-    // The gzip fetch, the turn trace's recorder, Server-Timing reader and traced fetch import nothing, so the Worker entry stays light.
+    // The gzip fetch and the turn trace's recorder, OTLP ids, Server-Timing reader and traced fetch import no package, so the Worker entry stays light.
     expect([...seen].sort()).toEqual(['runtime/gzip-request.ts', 'runtime/loop.ts', 'runtime/model-catalog.ts', 'runtime/model.ts', 'runtime/openai-stream.ts', 'runtime/reply-language.ts', 'runtime/router-turn.ts',
-      'runtime/turn-continuation.ts', 'runtime/turn-knowledge.ts', 'turn-trace/recorder.ts', 'turn-trace/server-timing.ts', 'turn-trace/traced-fetch.ts'])
+      'runtime/turn-continuation.ts', 'runtime/turn-knowledge.ts', 'turn-trace/otel.ts', 'turn-trace/recorder.ts', 'turn-trace/server-timing.ts', 'turn-trace/traced-fetch.ts'])
     expect([...packages].filter(name => !ALLOWED_PACKAGES.has(name))).toEqual([])
   })
 })

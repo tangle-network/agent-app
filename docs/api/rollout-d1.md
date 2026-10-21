@@ -4,7 +4,7 @@
 
 Source: `src/rollout/d1.ts`
 
-6 exports.
+7 exports.
 
 ### `createD1TurnTimingStore`
 
@@ -28,6 +28,14 @@ interface D1LikeForRollout
 
 ```ts
 "ALTER TABLE rollout_turn_timing ADD COLUMN first_visible_ms INTEGER;"
+```
+
+### `ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL`
+
+`const` — Apply once through the product migration runner; old rows remain unknown.
+
+```ts
+"\nALTER TABLE rollout_turn_timing ADD COLUMN admission_ms INTEGER;\nALTER TABLE rollout_turn_timing ADD COLUMN model T…
 ```
 
 ### `ROLLOUT_TURN_TIMING_SCHEMA_SQL`

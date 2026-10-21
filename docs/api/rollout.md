@@ -4,19 +4,27 @@
 
 Source: `src/rollout/index.ts`
 
-13 exports.
+14 exports.
+
+### `assignRolloutArm`
+
+`function` — Stable per-turn percentage assignment; the product records the returned arm on its row and trace.
+
+```ts
+(turnId: string, treatmentPct: number) => "control" | "treatment"
+```
 
 ### `decideRollout`
 
-`function` — Decide one change of the list.
+`function` — Measure the current stage for widening, holding and narrowing.
 
 ```ts
-(input: { plan: RolloutPlan; fromValue: string; toValue: string; measure(stage: RolloutStage): Promise<StageMeasurement…
+(input: { plan: RolloutPlan; fromValue: string; toValue: string; measure(stage: RolloutStage, signal?: AbortSignal | un…
 ```
 
 ### `killLineBreaches`
 
-`function` — Each kill line the measurement misses, as a reason.
+`function` — Finite measured breaches only.
 
 ```ts
 (stage: RolloutStage, measured: StageMeasurement | null) => string[]
