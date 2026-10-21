@@ -8,8 +8,8 @@ import {
 describe('parseModelNotAllowed', () => {
   it('parses the primary refusal shape (Model "x" is not in … Allowed: a, b)', () => {
     expect(
-      parseModelNotAllowed('Model "gpt-6-luna" is not in this key\'s allow-list. Allowed: glm-5.3, gpt-5.5.'),
-    ).toEqual(['glm-5.3', 'gpt-5.5'])
+      parseModelNotAllowed('Model "gpt-6-luna" is not in this key\'s allow-list. Allowed: glm-5.3, glm-5-turbo.'),
+    ).toEqual(['glm-5.3', 'glm-5-turbo'])
   })
 
   it('parses the fallback refusal shape (Fallback model(s) … Allowed: a, b)', () => {
@@ -30,7 +30,7 @@ describe('parseModelNotAllowed', () => {
 })
 
 describe('resolveModelWithinAllowList', () => {
-  const allowed = ['glm-5.3', 'gpt-5.5'] as const
+  const allowed = ['glm-5.3', 'glm-5-turbo'] as const
 
   it('passes an unscoped key straight through', () => {
     for (const allowedModels of [undefined, null, [] as const] as const) {
@@ -55,15 +55,15 @@ describe('resolveModelWithinAllowList', () => {
       resolveModelWithinAllowList({
         requested: 'gpt-6-luna',
         allowedModels: allowed,
-        fallbacks: ['claude-4.6', 'gpt-5.5', 'glm-5.3'],
+        fallbacks: ['glm-5', 'glm-5-turbo', 'glm-5.3'],
       }),
-    ).toEqual({ status: 'rerouted', model: 'gpt-5.5', rerouted: true, blockedModel: 'gpt-6-luna' })
+    ).toEqual({ status: 'rerouted', model: 'glm-5-turbo', rerouted: true, blockedModel: 'gpt-6-luna' })
   })
 
   it('refuses with the allowed set when no fallback is permitted (fail-closed, never silent)', () => {
     expect(
-      resolveModelWithinAllowList({ requested: 'gpt-6-luna', allowedModels: allowed, fallbacks: ['claude-4.6'] }),
-    ).toEqual({ status: 'refused', model: null, allowedModels: ['glm-5.3', 'gpt-5.5'] })
+      resolveModelWithinAllowList({ requested: 'gpt-6-luna', allowedModels: allowed, fallbacks: ['glm-5'] }),
+    ).toEqual({ status: 'refused', model: null, allowedModels: ['glm-5.3', 'glm-5-turbo'] })
     expect(resolveModelWithinAllowList({ requested: 'gpt-6-luna', allowedModels: allowed }).status).toBe('refused')
   })
 })

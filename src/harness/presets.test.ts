@@ -7,7 +7,7 @@ import {
   type SessionPreset,
 } from './presets'
 
-const CATALOG = ['openai/gpt-6-luna', 'anthropic/claude-4.6', 'zai/glm-5.3', 'default']
+const CATALOG = ['openai/gpt-6-luna', 'zai/glm-5.3', 'glm-5', 'glm-5-turbo', 'default']
 
 describe('validateSessionPreset', () => {
   it('trims the name and enforces the 60-char budget', () => {
@@ -36,11 +36,11 @@ describe('applySessionPreset', () => {
     // change from the pinned ids must be reported. (The snap behavior itself is
     // the agent-interface owner's to evolve; the preset contract rides it.)
     const applied = applySessionPreset(
-      { id: 'p1', name: 'wrong pair', model: 'anthropic/claude-4.6', harness: 'codex' },
+      { id: 'p1', name: 'wrong pair', model: 'zai/glm-5.3', harness: 'codex' },
       { canonicalIds: CATALOG },
     )
     expect(isModelCompatibleWithHarness(applied.harness, applied.model)).toBe(true)
-    const changed = applied.model !== 'anthropic/claude-4.6' || applied.harness !== 'codex'
+    const changed = applied.model !== 'zai/glm-5.3' || applied.harness !== 'codex'
     expect(changed ? applied.snapped.length > 0 : applied.snapped.length === 0).toBe(true)
   })
 
