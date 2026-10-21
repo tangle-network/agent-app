@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.60.242
 
 - Accept `@tangle-network/agent-runtime` 0.319.3 through 0.339 (`>=0.319.3 <0.340.0`), so products can take Runtime 0.337 now and the flow-graph releases 0.338 and 0.339 when they ship. Development and verification use Runtime 0.337.2; 0.338 and 0.339 are admitted but not yet verified here.
 - Drop the Runtime 0.318 band. Its only consumer, hardware-agent, pins Runtime 0.318.0 with agent-app 0.60.208 and must move to Runtime 0.319.3 or later before it takes this release.
