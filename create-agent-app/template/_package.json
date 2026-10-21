@@ -22,15 +22,15 @@
   },
   "peerDependencies": {
     "@tangle-network/agent-eval": "0.215.1",
-    "@tangle-network/agent-integrations": "0.75.0",
+    "@tangle-network/agent-integrations": "0.75.4",
     "@tangle-network/agent-interface": "5.7.0",
     "@tangle-network/agent-runtime": "0.337.2"
   },
   "devDependencies": {
     "@tangle-network/agent-eval": "0.215.1",
-    "@tangle-network/agent-integrations": "0.75.0",
+    "@tangle-network/agent-integrations": "0.75.4",
     "@tangle-network/agent-interface": "5.7.0",
-    "@tangle-network/agent-knowledge": "22.0.3",
+    "@tangle-network/agent-knowledge": "22.0.4",
     "@tangle-network/agent-runtime": "0.337.2",
     "@tangle-network/sandbox": "0.63.10",
     "@types/node": "^22.20.1",
