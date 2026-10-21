@@ -693,6 +693,7 @@
     "signoff": "node dist/signoff/cli.js",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
+    "adopt:sync": "node scripts/adopt-sync.mjs",
     "test:eval-compat": "vitest run --config vitest.eval-compat.config.ts && AGENT_EVAL_COMPAT=agent-eval-0211 vitest run --config vitest.eval-compat.config.ts"
   },
   "devDependencies": {
