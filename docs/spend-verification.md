@@ -398,7 +398,7 @@ Without this, `lastActivityAt` only advances when a box is provisioned, so a thr
 
 ### Scoping the ledger fetch
 
-The product supplies its own settled rows — this package never reaches for them, because the ledger is the counterparty's record and reading it is the product's authenticated business.
+The product decides which wallets to read and with whose key, because the ledger is the counterparty's record and reading it is the product's authenticated business; `fetchPlatformSettlementRows` (`./spend`) performs one key's bounded, paged read and maps it to `SettlementRow`.
 The fetch is `GET /v1/billing/transactions?product=sandbox`, and the most it can narrow to is a **wallet**: `product` there is the platform's own service taxonomy, written by `agent-container` for every sandbox compute charge from every consumer app.
 So on an account running two of our products, each product's fetch returns the other product's boxes.
 
@@ -422,6 +422,6 @@ Exit 0 clean, 1 on findings, 2 on a usage or config error; a failing report goes
 
 - **Nothing records stop or delete in production**, because neither shipped product stops or deletes a box — the 3 600 s platform idle timeout is the only reclamation today. The ceiling therefore rests on `idle-timeout` and `max-lifetime` in practice. Both are sound; `stopped`/`deleted` are simply tighter bounds waiting for a caller.
 - **Detached runs must still be declared by the product.** The turn primitives tap activity automatically (see below), but `recordDetachedRunStarted`/`Ended` are the product's call — only it knows that a dispatch it made is one it will not watch finish. Without them a detached run looks like an ordinary turn that went quiet, and the ceiling will be tighter than the truth.
-- **`silent-ledger` needs a store that can list its boxes.** `listLiveBetween` is optional and no shipped product implements it yet, so today every product's pass reports `expectation.declared: false` until it adds the one query. That is loud rather than silent — but until it lands, a pass that examines nobody is reported as `unverified`, not fixed.
+- **`silent-ledger` needs a store that can list its boxes.** `listLiveBetween` is optional; a store without it reports `expectation.declared: false`, and a pass that examines nobody is reported as `unverified`, not fixed. `createDrizzleSpendStore` (`./spend/drizzle`) implements it over the product's own ledger table.
 - **A settlement the platform never posted at all is indistinguishable from one this product's ownership rule cannot see.** `silent-ledger` reports the shape; which of the two it is comes from re-running the fetch by hand, which is why that is the first line of the remedy.
 - **The budget guard is a pre-check against spend already settled**, not a reservation. Settlement lags provisioning by design, so the cap overshoots by at most the unsettled tail — bounded by the box's own idle timeout. A cap that refuses one box late is worth more than one that cannot be implemented honestly.
