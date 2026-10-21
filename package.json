@@ -617,6 +617,11 @@
       "import": "./dist/vault/server.js",
       "default": "./dist/vault/server.js"
     },
+    "./vault/collaboration": {
+      "types": "./dist/vault/collaboration.d.ts",
+      "import": "./dist/vault/collaboration.js",
+      "default": "./dist/vault/collaboration.js"
+    },
     "./brand": {
       "types": "./dist/brand/index.d.ts",
       "import": "./dist/brand/index.js",

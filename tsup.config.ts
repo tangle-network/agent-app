@@ -124,6 +124,7 @@ export default defineConfig({
     'vault/index': 'src/vault/index.ts',
     'vault/lazy': 'src/vault/lazy.tsx',
     'vault/server': 'src/vault/server.ts',
+    'vault/collaboration': 'src/vault/collaboration.ts',
     'theme/index': 'src/theme/index.ts',
     'theme/tailwind-preset': 'src/theme/tailwind-preset.ts',
     'theme-contract/index': 'src/theme-contract/index.ts',
