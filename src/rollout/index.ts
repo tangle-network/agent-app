@@ -194,12 +194,16 @@ export function assignRolloutArm(turnId: string, treatmentPct: number): 'control
   return (hash >>> 0) / 2 ** 32 < treatmentPct / 100 ? 'treatment' : 'control'
 }
 
+const DEFAULT_MEASUREMENT_TIMEOUT_MS = 5_000
+
 /** Measure the current stage for widening, holding and narrowing. Narrowing always remains available. */
 export async function decideRollout(input: {
   plan: RolloutPlan
   fromValue: string
   toValue: string
-  measure(stage: RolloutStage): Promise<StageMeasurement | null>
+  measure(stage: RolloutStage, signal?: AbortSignal): Promise<StageMeasurement | null>
+  /** Bound observation even when the product instrument ignores cancellation. */
+  measurementTimeoutMs?: number
   now?: () => Date
 }): Promise<RolloutDecision> {
   const { plan, fromValue, toValue } = input
@@ -228,11 +232,26 @@ export async function decideRollout(input: {
     if (target > current + 1) return record('refused', [`${toStage.name} skips ${plan.stages.slice(current + 1, target).map(stage => stage.name).join(', ')}`], null)
   }
   if (!fromStage) return record('allowed', [], null)
+  const timeoutMs = input.measurementTimeoutMs ?? DEFAULT_MEASUREMENT_TIMEOUT_MS
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new RangeError('measurementTimeoutMs must be positive')
+  const abort = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
   let measured: StageMeasurement | null
-  try { measured = await input.measure(fromStage) }
+  try {
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        const error = new Error('measurement timed out')
+        abort.abort(error)
+        reject(error)
+      }, timeoutMs)
+    })
+    measured = await Promise.race([input.measure(fromStage, abort.signal), deadline])
+  }
   catch (error) {
     return record(narrowing ? 'allowed' : 'undecided', [`measuring stage ${fromStage.name} failed: ${error instanceof Error ? error.message : String(error)}`], null,
       { [fromStage.name]: fromStage.minSamples })
+  } finally {
+    clearTimeout(timer)
   }
   const lane = measured?.lane ?? fromStage.name
   const requirements = { ...measured?.sampleRequirements }

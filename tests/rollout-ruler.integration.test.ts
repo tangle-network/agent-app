@@ -1,4 +1,6 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -6,7 +8,7 @@ import Database from 'better-sqlite3'
 import { build } from 'tsup'
 import { expect, it } from 'vitest'
 import { createD1TurnTimingStore, ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL } from '../src/rollout/d1'
-import { assignRolloutArm } from '../src/rollout/index'
+import { assignRolloutArm, decideRollout } from '../src/rollout/index'
 
 // Frozen E8 decision measurement: creative-rollout.result, closed seven-day window
 // 2026-10-13T23:48:49.733Z through 2026-10-20T23:48:49.733Z. No live reads or paid calls.
@@ -76,5 +78,49 @@ it('migrates historical SQLite rows and persists the route timing origin and arm
     expect(sqlite.prepare('SELECT admission_ms + first_visible_ms AS visible, model, revision, arm FROM rollout_turn_timing WHERE turn_id = ?').get('new'))
       .toEqual({ visible: 9172, model: 'served-model', revision: 'release-sha', arm })
     expect(assignRolloutArm('new', 50)).toBe(arm)
+    const stage = { name: 'qa', value: 'w', minSamples: 2, kill: { failure_rate: { max: 0 } } }
+    const measured = await store.measureStage({ rollout: 'r', stage, lane: 'router', since: 0 })
+    const decision = await decideRollout({ plan: { name: 'r', variable: 'IDS', stages: [stage,
+      { ...stage, name: 'all', value: '*' }] }, fromValue: 'w', toValue: '*', measure: async () => measured })
+    expect(decision).toMatchObject({ decision: 'undecided', turnsNeeded: { router: 1 } })
   } finally { sqlite.close() }
+})
+
+
+it('the shipped CLI completes a narrowing when the measurement HTTP request never responds or honors cancellation', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ruler-hung-measure-'))
+  let requests = 0
+  const server = createServer(request => { requests++; request.resume() })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+    await build({ entry: ['src/rollout/cli.ts'], outDir: dir, format: ['esm'], splitting: false,
+      config: false, silent: true, outExtension: () => ({ js: '.mjs' }) })
+    writeFileSync(join(dir, 'wrangler.toml'), '[vars]\nIDS = ""\n')
+    writeFileSync(join(dir, 'rollout.config.mjs'), `export default {
+      measurementTimeoutMs: 500,
+      plans: [{ name: 'hung', variable: 'IDS', stages: [{ name: 'qa', value: 'w', minSamples: 2,
+        kill: { failure_rate: { max: 0 } } }] }],
+      async measure() { return (await fetch(${JSON.stringify(endpoint)})).json() },
+    }`)
+    const started = Date.now()
+    const child = spawn('timeout', ['3', process.execPath, join(dir, 'cli.mjs'), dir, '--from', 'w', '--to', ''])
+    let output = ''
+    child.stdout.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => { output += chunk })
+    const status = await new Promise<number | null>((resolve, reject) => {
+      child.on('error', reject)
+      child.on('exit', resolve)
+    })
+    expect(requests).toBe(1)
+    expect(status, output).toBe(0)
+    expect(Date.now() - started).toBeLessThan(2000)
+    const record = JSON.parse(readFileSync(join(dir, '.rollout/decisions.jsonl'), 'utf8').trim())
+    expect(record).toMatchObject({ decision: 'allowed', recommendation: 'narrow', measured: null })
+    expect(record.reasons.join(' ')).toContain('measurement timed out')
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

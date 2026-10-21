@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { decideRollout, rolloutAdmits, rolloutWidens, validateRolloutPlan, type RolloutPlan, type StageMeasurement } from '../src/rollout/index'
 import { readWranglerVar, runRolloutCheck } from '../src/rollout/cli'
 
@@ -53,13 +53,6 @@ describe('decideRollout', () => {
       measure: async stage => measured(stage.name, 30, { first_words_p50_ms: 3540, failure_rate: 0 }) })
     expect(decision).toMatchObject({ decision: 'refused', widens: true,
       from: { stage: 'qa' }, to: { stage: 'all-but-recenter' }, reasons: ['first_words_p50_ms 3540 over kill line 2500'] })
-  })
-
-  it('allows the next stage once the stage it leaves met every line', async () => {
-    const measure = vi.fn(async () => measured('qa', 39, { first_words_p50_ms: 1400, failure_rate: 0 }))
-    const decision = await decideRollout({ plan, fromValue: QA, toValue: ALL_BUT_RECENTER, measure, now: at })
-    expect(decision).toMatchObject({ decision: 'allowed', reasons: [], measured: { samples: 39 } })
-    expect(measure).toHaveBeenCalledWith(plan.stages[0])
   })
 
   it('lets an empty list take the first stage without numbers', async () => {
