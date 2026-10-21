@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.240
+
+- fix: distinguish rollout evidence gaps and record turn origins (#1205)
+
 ## 0.60.239
 
 - fix: preserve member request across hybrid sandbox escalation (#1204)
