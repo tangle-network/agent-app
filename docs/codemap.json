@@ -7876,6 +7876,18 @@
       "error": null,
       "exports": [
         {
+          "name": "AppliedSessionPreset",
+          "kind": "interface",
+          "signature": "interface AppliedSessionPreset",
+          "doc": "What applying a preset actually set, with every snap named."
+        },
+        {
+          "name": "applySessionPreset",
+          "kind": "function",
+          "signature": "(preset: SessionPreset, context: SessionPresetCatalogContext) => AppliedSessionPreset",
+          "doc": "Apply a preset with catalog coherence."
+        },
+        {
           "name": "assertHarnessModelCompatible",
           "kind": "function",
           "signature": "(harness: Harness, selection: string | HarnessModelSelection) => void",
@@ -7892,6 +7904,12 @@
           "kind": "function",
           "signature": "(config: HarnessConfig, workspaceId?: string | undefined) => Harness",
           "doc": "The harness a workspace's new sessions start on: its own choice, else the app default, else {@link DEFAULT_HARNESS}."
+        },
+        {
+          "name": "createInMemorySessionPresetStore",
+          "kind": "function",
+          "signature": "() => SessionPresetStore",
+          "doc": null
         },
         {
           "name": "DEFAULT_HARNESS",
@@ -7984,6 +8002,24 @@
           "doc": "A saved lock, explicit choice, workspace default, and optional deployment availability."
         },
         {
+          "name": "SessionPreset",
+          "kind": "interface",
+          "signature": "interface SessionPreset",
+          "doc": "A pinned session configuration."
+        },
+        {
+          "name": "SessionPresetCatalogContext",
+          "kind": "interface",
+          "signature": "interface SessionPresetCatalogContext",
+          "doc": null
+        },
+        {
+          "name": "SessionPresetStore",
+          "kind": "interface",
+          "signature": "interface SessionPresetStore",
+          "doc": "Durable preset storage port."
+        },
+        {
           "name": "snapHarnessToModel",
           "kind": "function",
           "signature": "(harness: Harness, modelId: string) => Harness",
@@ -7994,6 +8030,12 @@
           "kind": "function",
           "signature": "(harness: Harness, modelId: string, canonicalIds: readonly string[]) => string",
           "doc": "Keep `modelId` when the harness can run it; else the harness's best compatible catalog id (preferred patterns in order, highest version)."
+        },
+        {
+          "name": "validateSessionPreset",
+          "kind": "function",
+          "signature": "(preset: SessionPreset) => SessionPreset",
+          "doc": "Validate one preset at save time: label budget, canonical model id, no unknown fields smuggled in."
         }
       ]
     },

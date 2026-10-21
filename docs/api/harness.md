@@ -4,7 +4,23 @@
 
 Source: `src/harness/index.ts`
 
-20 exports.
+27 exports.
+
+### `AppliedSessionPreset`
+
+`interface` — What applying a preset actually set, with every snap named.
+
+```ts
+interface AppliedSessionPreset
+```
+
+### `applySessionPreset`
+
+`function` — Apply a preset with catalog coherence.
+
+```ts
+(preset: SessionPreset, context: SessionPresetCatalogContext) => AppliedSessionPreset
+```
 
 ### `assertHarnessModelCompatible`
 
@@ -28,6 +44,14 @@ Source: `src/harness/index.ts`
 
 ```ts
 (config: HarnessConfig, workspaceId?: string | undefined) => Harness
+```
+
+### `createInMemorySessionPresetStore`
+
+`function`
+
+```ts
+() => SessionPresetStore
 ```
 
 ### `DEFAULT_HARNESS`
@@ -150,6 +174,30 @@ type ResolvedSessionHarness
 type ResolveSessionHarnessInput
 ```
 
+### `SessionPreset`
+
+`interface` — A pinned session configuration.
+
+```ts
+interface SessionPreset
+```
+
+### `SessionPresetCatalogContext`
+
+`interface`
+
+```ts
+interface SessionPresetCatalogContext
+```
+
+### `SessionPresetStore`
+
+`interface` — Durable preset storage port.
+
+```ts
+interface SessionPresetStore
+```
+
 ### `snapHarnessToModel`
 
 `function` — Keep the harness when it can run `modelId`; else the model's native harness (anthropic → claude-code, openai → codex, moonshot → kimi-code), falling back to opencode.
@@ -164,4 +212,12 @@ type ResolveSessionHarnessInput
 
 ```ts
 (harness: Harness, modelId: string, canonicalIds: readonly string[]) => string
+```
+
+### `validateSessionPreset`
+
+`function` — Validate one preset at save time: label budget, canonical model id, no unknown fields smuggled in.
+
+```ts
+(preset: SessionPreset) => SessionPreset
 ```
