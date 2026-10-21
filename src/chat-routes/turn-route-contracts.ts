@@ -345,6 +345,8 @@ interface ChatTurnLifecycleBase<TContext> {
 }
 /** When the turn's first visible word streamed, measured from `onTurnStart`. Absent when no word streamed. */
 interface ChatTurnLifecycleTiming {
+  /** Request receipt to onTurnStart; add to firstVisibleMs for request-origin latency. */
+  admissionMs?: number
   /** First reasoning, tool activity or answer output, measured from onTurnStart. */
   firstVisibleMs?: number
   firstTextMs?: number
@@ -354,6 +356,9 @@ interface ChatTurnLifecycleTiming {
 /** Define lifecycle start event with context and timestamp for a chat turn */
 export interface ChatTurnLifecycleStart<TContext> extends ChatTurnLifecycleBase<TContext> {
   startedAt: number
+  /** Request receipt on the server clock. */
+  requestReceivedAt: number
+  admissionMs: number
 }
 /** Define the structure representing the completion state of a chat turn lifecycle with usage data */
 export interface ChatTurnLifecycleComplete<TContext> extends ChatTurnLifecycleBase<TContext>, ChatTurnLifecycleTiming {

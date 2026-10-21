@@ -29,7 +29,7 @@ describe('rollout turn timing', () => {
   it('migrates an existing table without inventing historical visibility and records both timings', async () => {
     const sqlite = new Database(':memory:')
     sqlite.exec(ROLLOUT_TURN_TIMING_SCHEMA_SQL.replace('  first_visible_ms INTEGER,\n', ''))
-    sqlite.exec(`INSERT INTO rollout_turn_timing VALUES ('old', 'routed-chat', 'ws-qa', 'routed', 1200, 2000, 0, NULL, 5000)`)
+    sqlite.exec(`INSERT INTO rollout_turn_timing (turn_id, rollout, workspace_id, lane, first_text_ms, settled_ms, failed, failure_code, at) VALUES ('old', 'routed-chat', 'ws-qa', 'routed', 1200, 2000, 0, NULL, 5000)`)
     sqlite.exec(ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL)
     const db: D1LikeForRollout = { prepare: sql => ({ bind: (...values) => ({
       run: async () => sqlite.prepare(sql).run(...values),

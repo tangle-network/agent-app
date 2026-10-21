@@ -29,7 +29,7 @@
  *
  * Usage: agent-app-rollout-check [appDir] [--config <file>] [--base <git ref>]
  *          [--from <value>] [--to <value>] [--plan <name>] [--record <jsonl>]
- * Exits 0 when every plan's change is allowed, 1 when one is refused, 2 on a usage error.
+ * Exits 0 when allowed, 1 for a measured refusal, 3 for insufficient widening evidence, 2 on a usage error. Undecided holds exit 0.
  */
 import { execFileSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
@@ -160,7 +160,7 @@ function describe(decision: RolloutDecision): string {
   if (decision.decision === 'allowed') {
     return `rollout ${decision.rollout}: allowed ${move}${decision.widens ? '' : ' (not a widening)'}`
   }
-  return `rollout ${decision.rollout}: REFUSED ${move}\n${decision.reasons.map(reason => `  - ${reason}`).join('\n')}`
+  return `rollout ${decision.rollout}: ${decision.decision.toUpperCase()} ${move} (${decision.recommendation})\n${decision.reasons.map(reason => `  - ${reason}`).join('\n')}`
 }
 
 async function main(): Promise<number> {
@@ -174,7 +174,7 @@ async function main(): Promise<number> {
   try {
     const decisions = await runRolloutCheck(args)
     for (const decision of decisions) console.log(describe(decision))
-    return decisions.some(decision => decision.decision === 'refused') ? 1 : 0
+    return decisions.some(decision => decision.decision === 'refused') ? 1 : decisions.some(decision => decision.decision === 'undecided' && decision.widens) ? 3 : 0
   } catch (error) {
     console.error(`agent-app-rollout-check: ${error instanceof Error ? error.message : String(error)}`)
     return 2

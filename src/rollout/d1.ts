@@ -27,6 +27,10 @@ CREATE TABLE IF NOT EXISTS rollout_turn_timing (
   rollout TEXT NOT NULL,
   workspace_id TEXT NOT NULL,
   lane TEXT NOT NULL,
+  admission_ms INTEGER,
+  model TEXT,
+  revision TEXT,
+  arm TEXT,
   first_visible_ms INTEGER,
   first_text_ms INTEGER,
   settled_ms INTEGER NOT NULL,
@@ -41,7 +45,20 @@ CREATE INDEX IF NOT EXISTS rollout_turn_timing_by_lane ON rollout_turn_timing (r
 export const ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL =
   `ALTER TABLE rollout_turn_timing ADD COLUMN first_visible_ms INTEGER;`
 
+/** Apply once through the product migration runner; old rows remain unknown. */
+export const ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL = `
+ALTER TABLE rollout_turn_timing ADD COLUMN admission_ms INTEGER;
+ALTER TABLE rollout_turn_timing ADD COLUMN model TEXT;
+ALTER TABLE rollout_turn_timing ADD COLUMN revision TEXT;
+ALTER TABLE rollout_turn_timing ADD COLUMN arm TEXT;
+`
+
 export interface TurnTimingRow {
+  /** Request receipt to lifecycle start, before the existing relative durations. */
+  admissionMs?: number
+  model?: string
+  revision?: string
+  arm?: string
   turnId: string
   /** The plan this turn counts toward, e.g. `hospitality-routed-chat`. */
   rollout: string
@@ -92,12 +109,14 @@ export function createD1TurnTimingStore(options: { db: D1LikeForRollout; now?: (
       try {
         await options.db.prepare(
           `INSERT OR IGNORE INTO rollout_turn_timing
-             (turn_id, rollout, workspace_id, lane, first_visible_ms, first_text_ms, settled_ms, failed, failure_code, at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (turn_id, rollout, workspace_id, lane, first_visible_ms, first_text_ms, settled_ms, failed, failure_code, at, admission_ms, model, revision, arm)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).bind(row.turnId, row.rollout, row.workspaceId, row.lane,
           row.firstVisibleMs === undefined ? null : Math.round(row.firstVisibleMs),
           row.firstTextMs === undefined ? null : Math.round(row.firstTextMs), Math.round(row.settledMs),
-          row.failed ? 1 : 0, row.failureCode ?? null, row.at ?? now()).run()
+          row.failed ? 1 : 0, row.failureCode ?? null, row.at ?? now(),
+          row.admissionMs === undefined ? null : Math.round(row.admissionMs),
+          row.model ?? null, row.revision ?? null, row.arm ?? null).run()
       } catch (error) {
         console.error(JSON.stringify({ event: 'rollout_turn_timing_record_failed', turnId: row.turnId,
           error: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200) }))

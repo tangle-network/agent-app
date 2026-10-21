@@ -90,11 +90,11 @@ describe('Router reasoning release', () => {
 
   it('records reasoning-first latency separately in the lifecycle and exported root span', async () => {
     let snapshot: TurnTraceSnapshot | undefined
-    let timing: { firstVisibleMs?: number; firstTextMs?: number } | undefined
+    let timing: { admissionMs?: number; firstVisibleMs?: number; firstTextMs?: number } | undefined
     const pending: Promise<unknown>[] = []
     const routes = createChatTurnRoutes<Record<string, never>>({
       projectId: 'reasoning-timing',
-      authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'u-1', context: {} }),
+      authorize: async () => { await sleep(60); return { ok: true, tenantId: 'ws-1', userId: 'u-1', context: {} } },
       store: { async listMessages() { return [] }, async appendMessage() { return { id: 'm-1' } } },
       turnStore: createMemoryTurnEventStore(), incrementalPersistence: false, log: () => {},
       turnTrace: { sink: done => { snapshot = done } },
@@ -113,6 +113,8 @@ describe('Router reasoning release', () => {
     expect(timing?.firstVisibleMs).toBeGreaterThanOrEqual(0)
     expect(timing!.firstTextMs! - timing!.firstVisibleMs!).toBeGreaterThanOrEqual(THINK_MS - 50)
     const summary = snapshot!.summary
+    expect(timing!.admissionMs!).toBeGreaterThanOrEqual(60)
+    expect(timing!.admissionMs! + timing!.firstVisibleMs!).toBeCloseTo(summary.firstVisibleMs!, 0)
     expect(summary.firstTextMs! - summary.firstVisibleMs!).toBeGreaterThanOrEqual(THINK_MS - 50)
     const root = buildTurnTraceOtelSpans(snapshot!)[0]!
     expect(root.attributes.find(attr => attr.key === 'tangle.turn.first_visible_ms')?.value).toEqual({ doubleValue: summary.firstVisibleMs })

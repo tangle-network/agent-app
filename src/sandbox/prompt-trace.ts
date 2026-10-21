@@ -33,7 +33,7 @@ function createPromptTrace(trace: TurnTrace, parent: TurnSpan | undefined, meta:
   let firstEventAt: number | undefined
   let firstTextAt: number | undefined
   let generation: TurnSpan | undefined
-  let phases: { offsets: Rec; warm: boolean | null; model?: string } | undefined
+  let phases: { offsets: Rec; spans: unknown[]; warm: boolean | null; model?: string } | undefined
   let events = 0
   const tools = new Map<string, TurnSpan>()
 
@@ -59,6 +59,7 @@ function createPromptTrace(trace: TurnTrace, parent: TurnSpan | undefined, meta:
         if (offsets) {
           phases = {
             offsets,
+            spans: Array.isArray(report?.spans) ? report.spans.slice(0, 64) : [],
             warm: typeof report?.harnessWarm === 'boolean' ? report.harnessWarm : null,
             ...(typeof report?.model === 'string' ? { model: report.model } : {}),
           }
@@ -105,6 +106,14 @@ function createPromptTrace(trace: TurnTrace, parent: TurnSpan | undefined, meta:
         if (firstText !== undefined && firstTextAt - firstText >= startedAt) {
           const origin = firstTextAt - firstText
           prompt.record('sandbox.transit', 'sandbox', startedAt, origin, { note: 'sdk, api, orchestrator and host hops, both ways' })
+          for (const raw of phases.spans) {
+            const span = asRec(raw)
+            const start = asNum(span?.startMs)
+            const end = asNum(span?.endMs)
+            if (typeof span?.name !== 'string' || !/^[a-zA-Z0-9_.-]{1,100}$/.test(span.name)
+              || start === undefined || end === undefined || end < start || end > firstText) continue
+            prompt.record(`sidecar.${span.name}`, 'sandbox', origin + start, origin + end)
+          }
           let previous = 0
           for (const phase of PHASES) {
             const offset = asNum(phases.offsets[phase])
