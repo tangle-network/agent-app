@@ -104,13 +104,14 @@ export function loopTraceEventsToFlowSpans(events: LoopTraceEventLike[]): FlowSp
   const origin = started?.timestamp ?? ordered[0]!.timestamp
   const rootEnd = ended?.timestamp ?? ordered[ordered.length - 1]!.timestamp
   const t = (epochMs: number) => epochMs - origin
+  const rootId = `loop:${ordered[0]!.runId}`
 
   const spans: FlowSpan[] = []
   const sp = rec(started?.payload)
   const ep = rec(ended?.payload)
   spans.push({
     kind: 'pipeline',
-    id: 'loop',
+    id: rootId,
     status: ended ? 'done' : 'running',
     name: 'loop',
     startMs: 0,
@@ -132,8 +133,8 @@ export function loopTraceEventsToFlowSpans(events: LoopTraceEventLike[]): FlowSp
     if (!round) return
     spans.push({
       kind: 'pipeline',
-      id: `round-${round.index}`,
-      parentId: 'loop',
+      id: `${rootId}:round-${round.index}`,
+      parentId: rootId,
       status: running ? 'running' : 'done',
       name: `loop ▸ round ${round.index} (${round.moveKind})`,
       startMs: round.startMs,
@@ -165,7 +166,7 @@ export function loopTraceEventsToFlowSpans(events: LoopTraceEventLike[]): FlowSp
       }
       case 'loop.iteration.started': {
         const idx = num(p.iterationIndex)
-        if (idx !== undefined) iterStart.set(idx, { timestamp: e.timestamp, parentId: round ? `round-${round.index}` : 'loop' })
+        if (idx !== undefined) iterStart.set(idx, { timestamp: e.timestamp, parentId: round ? `${rootId}:round-${round.index}` : rootId })
         break
       }
       case 'loop.iteration.ended': {
@@ -179,8 +180,8 @@ export function loopTraceEventsToFlowSpans(events: LoopTraceEventLike[]): FlowSp
         const roundLabel = round ? `round ${round.index} ▸ ` : ''
         spans.push({
           kind: 'model',
-          id: `iteration-${idx}`,
-          parentId: open?.parentId ?? 'loop',
+          id: `${rootId}:iteration-${idx}`,
+          parentId: open?.parentId ?? rootId,
           status: error ? 'failed' : 'done',
           name: `loop ▸ ${roundLabel}iter ${idx} (${str(p.agentRunName) ?? 'agent'})`,
           startMs: t(startEpoch),
@@ -210,7 +211,7 @@ export function loopTraceEventsToFlowSpans(events: LoopTraceEventLike[]): FlowSp
   }
   flushRound(rootEnd, !ended)
   for (const [idx, open] of iterStart) {
-    spans.push({ kind: 'model', id: `iteration-${idx}`, parentId: open.parentId,
+    spans.push({ kind: 'model', id: `${rootId}:iteration-${idx}`, parentId: open.parentId,
       name: `loop ▸ iter ${idx}`, startMs: t(open.timestamp), endMs: t(rootEnd),
       status: ended ? 'failed' : 'running', approx: true })
   }

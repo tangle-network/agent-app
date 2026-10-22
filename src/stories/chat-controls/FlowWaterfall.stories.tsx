@@ -13,7 +13,7 @@ const meta: Meta<typeof FlowWaterfall> = {
   component: FlowWaterfall,
   decorators: [
     (Story) => (
-      <div className="w-[800px] max-w-full p-4">
+      <div className="p-4" style={{ width: 'min(800px, calc(100vw - 32px))', minWidth: 0 }}>
         <Story />
       </div>
     ),
