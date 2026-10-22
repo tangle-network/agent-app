@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.280
+
+- Retire redundant mocked RecordGrid create check (#1266)
+
 ## 0.60.279
 
 - feat(chat-routes): prefetch reads a turn's prompt inputs while authorize finishes (#1263)
