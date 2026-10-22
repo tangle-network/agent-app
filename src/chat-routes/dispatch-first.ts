@@ -44,7 +44,7 @@ export interface DispatchedProducer<TContext> {
  * writes nothing durable before it resolves. Its stream is drained into memory
  * from the start, so a producer that only works while pulled still dispatches.
  */
-export function dispatchProducerFirst<TContext>(
+function dispatchProducerFirst<TContext>(
   produce: (args: ChatTurnProduceArgs<TContext>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>,
   args: ChatTurnProduceArgs<TContext>,
   trace: TurnTrace,
