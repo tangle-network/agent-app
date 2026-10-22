@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.255
+
+- fix(chat-routes): keep dispatchProducerFirst private to dispatch-first (#1236)
+
 ## 0.60.254
 
 - chore(deps): run on agent-runtime 0.342.0 and admit it as a peer (#1235)
