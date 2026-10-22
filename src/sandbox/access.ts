@@ -15,47 +15,47 @@ export interface MemberSyncSeam {
   roleToSandboxRole: (workspaceRole: string) => SandboxPermissionLevel
 }
 
-/** Resolve adding a user with a specific role to a sandbox and return the operation outcome */
+/**
+ * Sandbox member permissions are not served. The SDK's `box.permissions` called `/permissions/users*` on the
+ * sidecar, which never served it, so every add, update and remove failed with 404; `@tangle-network/sandbox` 0.64
+ * removed the API (agent-container b9c65980). These keep their signatures so callers compile, and fail with
+ * an error whose `code` is `sandbox_member_permissions_unsupported`, without a network call: the outcome callers already saw,
+ * now named. Access to a workspace box is decided by the product's own authorization, not per-box member rows.
+ */
+class SandboxMemberPermissionsUnsupportedError extends Error {
+  readonly code = 'sandbox_member_permissions_unsupported'
+  constructor() {
+    super('Sandbox member permissions are not served by the platform; @tangle-network/sandbox 0.64 removed box.permissions.')
+    this.name = 'SandboxMemberPermissionsUnsupportedError'
+  }
+}
+
+/** Always fails with {@link SandboxMemberPermissionsUnsupportedError}; see its note. */
 export async function syncSandboxMemberAdd(
-  box: SandboxInstance,
-  seam: MemberSyncSeam,
-  userId: string,
-  role: string,
+  _box: SandboxInstance,
+  _seam: MemberSyncSeam,
+  _userId: string,
+  _role: string,
 ): Promise<Outcome<void>> {
-  try {
-    await box.permissions.add({ userId, role: seam.roleToSandboxRole(role) })
-    return ok(undefined)
-  } catch (err) {
-    return fail(err)
-  }
+  return fail(new SandboxMemberPermissionsUnsupportedError())
 }
 
-/** Remove a member from the sandbox while preserving their home directory and handle the outcome */
+/** Always fails with {@link SandboxMemberPermissionsUnsupportedError}; see its note. */
 export async function syncSandboxMemberRemove(
-  box: SandboxInstance,
-  userId: string,
+  _box: SandboxInstance,
+  _userId: string,
 ): Promise<Outcome<void>> {
-  try {
-    await box.permissions.remove(userId, { preserveHomeDir: true })
-    return ok(undefined)
-  } catch (err) {
-    return fail(err)
-  }
+  return fail(new SandboxMemberPermissionsUnsupportedError())
 }
 
-/** Synchronize a sandbox member's role by updating permissions based on the provided role mapping */
+/** Always fails with {@link SandboxMemberPermissionsUnsupportedError}; see its note. */
 export async function syncSandboxMemberRole(
-  box: SandboxInstance,
-  seam: MemberSyncSeam,
-  userId: string,
-  role: string,
+  _box: SandboxInstance,
+  _seam: MemberSyncSeam,
+  _userId: string,
+  _role: string,
 ): Promise<Outcome<void>> {
-  try {
-    await box.permissions.update(userId, { role: seam.roleToSandboxRole(role) })
-    return ok(undefined)
-  } catch (err) {
-    return fail(err)
-  }
+  return fail(new SandboxMemberPermissionsUnsupportedError())
 }
 
 /**
