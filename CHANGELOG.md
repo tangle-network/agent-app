@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.281
+
+- fix(customer-db-gateway): use patched Node 24 base image (#1265)
+
 ## 0.60.280
 
 - Retire redundant mocked RecordGrid create check (#1266)
