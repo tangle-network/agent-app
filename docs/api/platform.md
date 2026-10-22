@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-130 exports.
+133 exports.
 
 ### `AdminGuardOptions`
 
@@ -12,14 +12,6 @@ Source: `src/platform/index.ts`
 
 ```ts
 interface AdminGuardOptions
-```
-
-### `AdmitBillableTurnOptions`
-
-`interface`
-
-```ts
-interface AdmitBillableTurnOptions
 ```
 
 ### `agentOperatorScopes`
@@ -110,46 +102,6 @@ interface BetterAuthSessionCookieSource
 interface BillableBalanceState
 ```
 
-### `BillableTurnAdmission`
-
-`interface`
-
-```ts
-interface BillableTurnAdmission
-```
-
-### `BillableTurnAdmissionOptions`
-
-`interface`
-
-```ts
-interface BillableTurnAdmissionOptions
-```
-
-### `BillableTurnAdmissionResult`
-
-`type`
-
-```ts
-type BillableTurnAdmissionResult
-```
-
-### `BillableTurnSeatVerdict`
-
-`interface` — A seat verdict; `paidThrough` (ISO) ends a kept verdict early, `null` when access is not a dated seat.
-
-```ts
-interface BillableTurnSeatVerdict
-```
-
-### `BillableTurnVerdict`
-
-`interface` — A Platform read's verdict: only `allowed` decides admission.
-
-```ts
-interface BillableTurnVerdict
-```
-
 ### `BillingConsentOutcome`
 
 `type`
@@ -206,14 +158,6 @@ interface BillingConsentRefusal
 (auth: BetterAuthSessionCookieSource, options?: BetterAuthSessionCookieMinterOptions) => (args: TangleSsoSessionCookieA…
 ```
 
-### `createBillableTurnAdmission`
-
-`function`
-
-```ts
-<Input extends { userId: string; }, Seat extends BillableTurnSeatVerdict, Balance extends BillableTurnVerdict>(options:…
-```
-
 ### `createD1TangleIdentityStore`
 
 `function` — Create the identity-protocol account store for one request.
@@ -228,6 +172,14 @@ interface BillingConsentRefusal
 
 ```ts
 (input: { client: PlatformDelegatedKeyClient; sourceKey: string; product: string; resource?: { type: string; id: string…
+```
+
+### `createDelegatedTurnKeys`
+
+`function`
+
+```ts
+(options: DelegatedTurnKeysOptions) => DelegatedTurnKeys
 ```
 
 ### `createHubSettingsRoutes`
@@ -326,6 +278,14 @@ interface D1TangleIdentityStoreOptions
 Record<TanglePlanTier, TangleTierPolicy>
 ```
 
+### `DELEGATED_KEY_PREMINT_TABLE_DDL`
+
+`const` — Paste into a migration.
+
+```ts
+"CREATE TABLE IF NOT EXISTS delegated_key_premint (\n slot TEXT PRIMARY KEY,\n scope TEXT NOT NULL,\n turn_id TEXT NOT…
+```
+
 ### `DelegatedKey`
 
 `interface`
@@ -350,6 +310,14 @@ type DelegatedKeyBudget
 type DelegatedKeyCode
 ```
 
+### `delegatedKeyFallbackFetch`
+
+`function` — A fetch for one turn that sends a pre-minted key.
+
+```ts
+(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: Request…
+```
+
 ### `DelegatedKeyMissingError`
 
 `class` — A remote key the durable manager must treat as gone (it marks the row revoked and mints again).
@@ -364,6 +332,14 @@ class DelegatedKeyMissingError
 
 ```ts
 type DelegatedKeyOutcome
+```
+
+### `DelegatedKeyPremintD1Like`
+
+`interface` — The D1 surface the slot store uses.
+
+```ts
+interface DelegatedKeyPremintD1Like
 ```
 
 ### `DelegatedKeyProvisioner`
@@ -412,6 +388,54 @@ interface DelegatedKeySlotRef
 
 ```ts
 interface DelegatedKeyVerdict
+```
+
+### `DelegatedTurnKey`
+
+`interface`
+
+```ts
+interface DelegatedTurnKey
+```
+
+### `DelegatedTurnKeyEvent`
+
+`type`
+
+```ts
+type DelegatedTurnKeyEvent
+```
+
+### `DelegatedTurnKeyInput`
+
+`interface`
+
+```ts
+interface DelegatedTurnKeyInput
+```
+
+### `DelegatedTurnKeys`
+
+`interface`
+
+```ts
+interface DelegatedTurnKeys
+```
+
+### `DelegatedTurnKeyScope`
+
+`type` — What a turn's key is minted for.
+
+```ts
+type DelegatedTurnKeyScope
+```
+
+### `DelegatedTurnKeysOptions`
+
+`interface`
+
+```ts
+interface DelegatedTurnKeysOptions
 ```
 
 ### `FREE_TIER_SPEND_CAP_USD`
