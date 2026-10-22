@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.256
+
+- fix(rollout): a hold refuses only a breach measured since the value changed (#1231)
+
 ## 0.60.255
 
 - fix(chat-routes): keep dispatchProducerFirst private to dispatch-first (#1236)
