@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_155 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -150,6 +150,7 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./web-react/agent-profile-editor`](api/web-react-agent-profile-editor.md) | 8 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product` |
 | [`./web-react/async`](api/web-react-async.md) | 35 | — |
 | [`./web-react/document`](api/web-react-document.md) | 7 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product` |
+| [`./web-react/flow-waterfall`](api/web-react-flow-waterfall.md) | 2 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product` |
 | [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product` |
 | [`./web/entry-server`](api/web-entry-server.md) | 1 | — |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
@@ -1496,6 +1497,16 @@ Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `h
 `AppDocument`, `appDocumentLinks`, `AppDocumentProps`, `describeRouteError`, `installFetchResponseObserver`, `svgFaviconHref`, `ThemeClassSync`
 
 [Full API →](api/web-react-document.md)
+
+## `./web-react/flow-waterfall`
+
+Source: `src/web-react/flow-waterfall.tsx` · 2 exports
+
+Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
+
+`FlowWaterfall`, `FlowWaterfallProps`
+
+[Full API →](api/web-react-flow-waterfall.md)
 
 ## `./web-react/terminal`
 

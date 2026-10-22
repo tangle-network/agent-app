@@ -22,7 +22,13 @@ try {
     if (Date.now() > deadline || server?.exitCode != null) throw new Error('Storybook did not become ready; see storybook.log')
     await new Promise(resolve => setTimeout(resolve, 500))
   }
-  browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) })
+  browser = await chromium.launch({ headless: true, slowMo: process.argv.includes('--record') ? 180 : 0, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}) })
+  if (process.argv.includes('--record')) {
+    const warmup = await browser.newPage()
+    await warmup.goto(`${base}/iframe.html?id=chatcontrols-flowwaterfall--healthy&viewMode=story`)
+    await warmup.locator('[data-flow-waterfall]').waitFor({ timeout: 60_000 })
+    await warmup.close()
+  }
   context = await browser.newContext({ viewport: { width: 1100, height: 900 }, recordVideo: { dir: output, size: { width: 1100, height: 900 } } })
   const page = await context.newPage()
   const failures = []
@@ -31,6 +37,11 @@ try {
     await page.goto(`${base}/iframe.html?id=chatcontrols-flowwaterfall--${name}&viewMode=story&globals=agentTheme:${theme}`)
     await page.locator('[data-flow-waterfall]').waitFor({ timeout: 60_000 })
   }
+  await story('healthy')
+  await page.screenshot({ path: `${output}/healthy-desktop-dark.png`, fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.screenshot({ path: `${output}/healthy-phone-dark.png`, fullPage: true })
+  await page.setViewportSize({ width: 1100, height: 900 })
   await story('recorded-discovery')
   const root = page.locator('[data-flow-waterfall]')
   assert.equal(await root.locator('[data-span-id]').count(), 53)
@@ -47,6 +58,7 @@ try {
     await page.getByRole('searchbox', { name: 'Search trace' }).press('Escape')
     await page.getByRole('button', { name: 'Collapse all', exact: true }).click()
     assert.equal(await root.locator('[data-span-id]').count(), 1)
+    await page.screenshot({ path: `${output}/nested-collapsed.png`, fullPage: true })
     // Search reveals a match inside a collapsed nested worker, with its ancestry.
     await page.getByRole('searchbox', { name: 'Search trace' }).fill('Echo worker')
     assert.equal(await root.locator('[data-span-id]').count(), 2)
