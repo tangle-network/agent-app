@@ -33,7 +33,8 @@ it('preserves fragmented UTF-8, tool arguments, usage and per-request reasoning 
   try {
     const options = { baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`, apiKey: 'local-integration-only', model: 'fixture-model' }
     const messages = [{ role: 'user' as const, content: 'Find the lease' }]
-    const chatEvents = await Array.fromAsync(createOpenAICompatStreamTurn(options)(messages))
+    const chatEvents = []
+    for await (const event of createOpenAICompatStreamTurn(options)(messages)) chatEvents.push(event)
     expect(chatEvents).toEqual([
       { type: 'text', text: 'Café ' },
       { type: 'tool_call_start', toolCallId: 'call-1', toolName: 'lookup' },
@@ -43,7 +44,8 @@ it('preserves fragmented UTF-8, tool arguments, usage and per-request reasoning 
     const stream = createOpenAIResponsesTurn(options)
     // Reusing the adapter must not carry the last summary index into another request.
     for (let attempt = 0; attempt < 2; attempt++) {
-      const events = await Array.fromAsync(stream(messages))
+      const events = []
+      for await (const event of stream(messages)) events.push(event)
       expect(events).toEqual([
         { type: 'reasoning', text: 'First' }, { type: 'reasoning', text: '\n\nSecond' },
         { type: 'text', text: 'Café ' }, { type: 'usage', usage: { promptTokens: 7, completionTokens: 3 } },
