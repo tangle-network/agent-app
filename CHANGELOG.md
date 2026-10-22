@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.268
+
+- feat(sandbox): createWarmCache, a value warmed once for every isolate in a data center (#1241)
+- chore(deps): adopt 2 @tangle-network/* packages (#1250)
+
 ## 0.60.267
 
 - feat(platform): pre-minted turn keys take the delegated-key mint off the turn's path (#1245)
