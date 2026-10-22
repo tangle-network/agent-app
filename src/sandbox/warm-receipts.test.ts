@@ -109,5 +109,8 @@ describe('stepped warm with receipts', () => {
     // The receipt carries the step's report for the turn to read at send.
     expect(await receipts.get(warmReceiptId('vault_heads', await warmKey({ head: 'head-2', workspaceId: 'w1' }))))
       .toMatchObject({ report: { name: 'vault_heads' } })
+
+    // A missing value would give every member the same key.
+    await expect(warmKey({ userId: undefined as unknown as string })).rejects.toThrow('userId undefined')
   })
 })

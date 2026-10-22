@@ -64,7 +64,8 @@ export interface WorkspaceWarmStep {
   name: string
   /** What the step depends on (`warmKey({ userId, workspaceId, vaultHead })`). Members who share the result share the key. */
   key: string
-  /** How long a successful run counts. */
+  /** How long a successful run counts. Keep it shorter than the warmed thing's own idle expiry (a box that suspends
+   *  after 5 idle minutes gets a TTL well under that), because a receipt cannot see the thing go cold. */
   ttlMs: number
   /** Do the work. The report, small JSON and never a credential, is stored on the receipt for the turn to read. */
   run: () => Promise<WorkspacePrewarmReport | void>
@@ -184,6 +185,8 @@ export function createWorkspacePrewarmRoute<Context = void>(
   const recent = new Map<string, number>()
   // Step receipt id -> the epoch ms its receipt stops counting, this isolate's copy of the store.
   const warmUntil = new Map<string, number>()
+  // Steps keep their own in-flight marks, so a legacy key can never collide with a step id.
+  const stepsInFlight = new Map<string, { at: number }>()
 
   const emit = (event: WorkspacePrewarmEvent): void => {
     try {
@@ -229,10 +232,10 @@ export function createWorkspacePrewarmRoute<Context = void>(
     }
     const local = warmUntil.get(id)
     if (local !== undefined && now() < local) return result('hit')
-    const running = inFlight.get(id)
+    const running = stepsInFlight.get(id)
     if (running && now() - running.at < staleMs) return result('joined')
     const mark = { at: now() }
-    inFlight.set(id, mark)
+    stepsInFlight.set(id, mark)
     try {
       if (options.receipts) {
         try {
@@ -262,7 +265,7 @@ export function createWorkspacePrewarmRoute<Context = void>(
       }
       return result('miss')
     } finally {
-      if (inFlight.get(id) === mark) inFlight.delete(id)
+      if (stepsInFlight.get(id) === mark) stepsInFlight.delete(id)
     }
   }
 

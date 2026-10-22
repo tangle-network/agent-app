@@ -203,7 +203,8 @@ const prewarm = createWorkspacePrewarmRoute<AppContext>({
       steps: [
         { name: 'vault_heads', key: await warmKey({ workspaceId: member.workspaceId, head }), ttlMs: 10 * 60_000, run: () => readVaultHeads(member) },
         { name: 'tool_catalog', key: await warmKey({ userId: member.id }), ttlMs: 60_000, run: () => buildToolCatalog(member) },
-        { name: 'box', key: await warmKey({ workspaceId: member.workspaceId }), ttlMs: 5 * 60_000, run: () => resumeBox(member) },
+        // Shorter than the box's own idle suspend: a receipt cannot see the box go cold.
+        { name: 'box', key: await warmKey({ workspaceId: member.workspaceId }), ttlMs: 60_000, run: () => resumeBox(member) },
         // Composer focus names the thread; check the member may read it before warming it.
         ...(threadId && await canRead(member, threadId)
           ? [{ name: 'thread', key: await warmKey({ threadId }), ttlMs: 60_000, run: () => readThreadHistory(threadId) }]
@@ -221,5 +222,7 @@ receipt; the turn reads it at send with
 `receipts.get(warmReceiptId(step, key))` to reuse what the warm produced. A
 receipt is a row, so a report never holds a credential. `useWorkspacePrewarm`
 sends `page-open` on open, `composer-focus` with `threadId` on focus, and a
-`heartbeat` every 4 minutes while the tab is visible, so what is warm stays
-warm while the member is active.
+`heartbeat` every 4 minutes while the tab is visible and the member has used it
+since the last beat, so what is warm stays warm while the member is active and
+an idle tab lets the box park. `warmKey` refuses an undefined value, which would
+give every member the same key.

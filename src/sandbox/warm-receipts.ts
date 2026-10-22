@@ -46,8 +46,11 @@ export function warmReceiptId(step: string, key: string): string {
  * are hashed (SHA-256, hex), so a key names no member, path or expiry in the
  * clear. Pass a credential's expiry or revision, never the credential.
  */
-export async function warmKey(parts: Record<string, string | number | boolean | null | undefined>): Promise<string> {
-  const canonical = JSON.stringify(Object.keys(parts).sort().map((name) => [name, parts[name] ?? null]))
+export async function warmKey(parts: Record<string, string | number | boolean | null>): Promise<string> {
+  // A missing value would give every member the same key and serve one member's receipt to another.
+  const missing = Object.keys(parts).filter((name) => parts[name] === undefined)
+  if (missing.length) throw new Error(`warmKey: ${missing.join(', ')} undefined`)
+  const canonical = JSON.stringify(Object.keys(parts).sort().map((name) => [name, parts[name]]))
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
@@ -89,7 +92,11 @@ export const WARM_RECEIPT_TABLE_DDL = `CREATE TABLE IF NOT EXISTS ${DEFAULT_WARM
   at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL,
   report TEXT
-)`
+);
+CREATE INDEX IF NOT EXISTS ${DEFAULT_WARM_RECEIPT_TABLE}_by_expiry ON ${DEFAULT_WARM_RECEIPT_TABLE} (expires_at)`
+
+/** One write in this many also deletes expired rows, so a table keyed by content hashes stays bounded. */
+const PRUNE_EVERY_WRITES = 64
 
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
 
@@ -98,12 +105,15 @@ const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
  * the first read, which the route treats as a miss: the step runs, and the
  * failure reaches `onEvent`.
  */
-export function createD1WarmReceiptStore(db: WarmReceiptD1Like, options: { table?: string } = {}): WarmReceiptStore {
+export function createD1WarmReceiptStore(db: WarmReceiptD1Like, options: { table?: string; now?: () => number } = {}): WarmReceiptStore {
   const table = options.table ?? DEFAULT_WARM_RECEIPT_TABLE
   if (!SAFE_IDENTIFIER.test(table)) throw new Error(`Invalid warm receipt table name: ${JSON.stringify(table)}`)
   const getSql = `SELECT at, expires_at, report FROM ${table} WHERE id = ?1`
   const putSql = `INSERT INTO ${table} (id, at, expires_at, report) VALUES (?1, ?2, ?3, ?4)
 ON CONFLICT(id) DO UPDATE SET at = ?2, expires_at = ?3, report = ?4`
+  const pruneSql = `DELETE FROM ${table} WHERE expires_at < ?1`
+  const now = options.now ?? (() => Date.now())
+  let writes = 0
   return {
     async get(id) {
       const row = await db.prepare(getSql).bind(id).first<{ at: number; expires_at: number; report: string | null }>()
@@ -116,6 +126,7 @@ ON CONFLICT(id) DO UPDATE SET at = ?2, expires_at = ?3, report = ?4`
     },
     async put(id, receipt) {
       await db.prepare(putSql).bind(id, receipt.at, receipt.expiresAt, receipt.report ? JSON.stringify(receipt.report) : null).run()
+      if (++writes % PRUNE_EVERY_WRITES === 0) await db.prepare(pruneSql).bind(now()).run()
     },
   }
 }

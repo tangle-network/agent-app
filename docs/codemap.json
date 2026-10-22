@@ -16588,7 +16588,7 @@
         {
           "name": "createD1WarmReceiptStore",
           "kind": "function",
-          "signature": "(db: WarmReceiptD1Like, options?: { table?: string | undefined; }) => WarmReceiptStore",
+          "signature": "(db: WarmReceiptD1Like, options?: { table?: string | undefined; now?: (() => number) | undefined; }) => WarmReceiptStore",
           "doc": "Receipts in one D1 table, shared by every isolate."
         },
         {
@@ -17782,7 +17782,7 @@
         {
           "name": "warmKey",
           "kind": "function",
-          "signature": "(parts: Record<string, string | number | boolean | null | undefined>) => Promise<string>",
+          "signature": "(parts: Record<string, string | number | boolean | null>) => Promise<string>",
           "doc": "A warm key from exactly the values a step depends on: the same values give the same key whatever their order, and any change gives a new one."
         },
         {

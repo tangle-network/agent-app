@@ -33,7 +33,8 @@ export interface UseWorkspacePrewarmOptions extends WorkspacePrewarmRequestOptio
   url: string | null | undefined
   /** False until the member is known to be signed in and allowed to chat. Default true. */
   enabled?: boolean
-  /** Re-warm this often while the tab is visible. Default 240 000 ms; 0 disables. */
+  /** Re-warm this often while the tab is visible and the member has used the page since the last beat (a key,
+   *  pointer or scroll), so an idle tab lets the box park. Default 240 000 ms; 0 disables. */
   heartbeatMs?: number
 }
 
@@ -92,13 +93,25 @@ export function useWorkspacePrewarm(options: UseWorkspacePrewarmOptions): Worksp
     }
     fire()
     document.addEventListener('visibilitychange', fire)
-    // A hidden tab skips its beats (requestWorkspacePrewarm checks visibility); the member's return fires page-open.
+    // Beat only for a member using the page: a hidden tab skips (requestWorkspacePrewarm checks visibility) and an
+    // untouched one stops, so an open tab left overnight does not keep a box awake. Their return fires page-open.
+    let activeSinceBeat = false
+    const touched = () => { activeSinceBeat = true }
+    const activity = ['keydown', 'pointerdown', 'wheel'] as const
     const beat = heartbeatMs > 0
-      ? setInterval(() => requestWorkspacePrewarm(url, { minIntervalMs: heartbeatMs / 2, reason: 'heartbeat' }), heartbeatMs)
+      ? setInterval(() => {
+        if (!activeSinceBeat) return
+        activeSinceBeat = false
+        requestWorkspacePrewarm(url, { minIntervalMs: heartbeatMs / 2, reason: 'heartbeat' })
+      }, heartbeatMs)
       : undefined
+    if (beat) for (const type of activity) document.addEventListener(type, touched, { passive: true })
     return () => {
       document.removeEventListener('visibilitychange', fire)
-      if (beat) clearInterval(beat)
+      if (beat) {
+        clearInterval(beat)
+        for (const type of activity) document.removeEventListener(type, touched)
+      }
     }
   }, [active, url, minIntervalMs, heartbeatMs])
 

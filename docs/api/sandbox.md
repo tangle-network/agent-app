@@ -195,7 +195,7 @@ interface BuildSandboxToolFileMountsOptions
 `function` — Receipts in one D1 table, shared by every isolate.
 
 ```ts
-(db: WarmReceiptD1Like, options?: { table?: string | undefined; }) => WarmReceiptStore
+(db: WarmReceiptD1Like, options?: { table?: string | undefined; now?: (() => number) | undefined; }) => WarmReceiptStore
 ```
 
 ### `createEscalationSpeculator`
@@ -1787,7 +1787,7 @@ type WarmBoxOutcome
 `function` — A warm key from exactly the values a step depends on: the same values give the same key whatever their order, and any change gives a new one.
 
 ```ts
-(parts: Record<string, string | number | boolean | null | undefined>) => Promise<string>
+(parts: Record<string, string | number | boolean | null>) => Promise<string>
 ```
 
 ### `WarmLeaseD1Like`
