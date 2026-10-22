@@ -8,7 +8,7 @@
  *  - {@link AgentActivityPanel}: the standalone cross-context surface — every
  *    delegation a workspace ran, regardless of which mission (if any) spawned
  *    it — behind a `fetchActivity` data port with cursor + refresh.
- *  - {@link FlowWaterfall}: the web counterpart of `/trace`'s ASCII
+ *  - charts FlowWaterfall: the web counterpart of `/trace`'s ASCII
  *    `renderWaterfall` (which stays CLI) — proportional bars over a FlowTrace.
  *
  * Same styling contract as the rest of `/web-react`: Tailwind classes against
@@ -84,10 +84,7 @@ export function mergeActivityPages(
   return [...byTask.values()].sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))
 }
 
-// Retain the established subpath exports after extracting the trace surface.
-export { waterfallLayout, type WaterfallRow } from './flow-waterfall-model'
-export { FlowWaterfall, type FlowWaterfallProps } from './flow-waterfall'
-import { FlowWaterfall } from './flow-waterfall'
+import { FlowWaterfall } from '@tangle-network/charts/react'
 
 // ── glyphs ────────────────────────────────────────────────────────────────
 

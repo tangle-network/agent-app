@@ -103,6 +103,7 @@ export function buildFlowTrace(
       const id = String(event.toolCallId ?? inner.toolCallId ?? '')
       const open = openCalls.get(id)
       if (open) {
+        const ok = ((event.outcome ?? inner.outcome) as { ok?: boolean } | undefined)?.ok
         spans.push({
           kind: 'tool',
           id: id,
@@ -112,7 +113,8 @@ export function buildFlowTrace(
           startMs: open.lastDeltaT,
           endMs: t,
           approx: true,
-          meta: { ok: ((event.outcome ?? inner.outcome) as { ok?: boolean } | undefined)?.ok },
+          status: ok === false ? 'failed' : 'done',
+          meta: { ok },
         })
         openCalls.delete(id)
       }

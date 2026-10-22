@@ -56,7 +56,7 @@ interface DistributionSummary
 
 ### `FlowSpan`
 
-`interface` — The shared FlowSpan / FlowTrace data shapes — the LEAF both the trace barrel (`./index`, which builds + renders them) and the delegation converters (`./mission-flow`, which emit them) import, so neit…
+`interface` — Producer-owned identities, explicit status and observed totals; no React dependency.
 
 ```ts
 interface FlowSpan

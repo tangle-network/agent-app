@@ -1,4 +1,6 @@
-# FlowWaterfall evidence
+# Historical FlowWaterfall evidence
+
+This records the original agent-app implementation. The current renderer, recorded fixture/provenance and maintained browser proof now live in [charts](https://github.com/tangle-network/charts/tree/main/artifacts/flow-waterfall). Application consumers import charts directly.
 
 Independent implementation of the intake brief's trace-waterfall behavior; no reference code or assets are used.
 
@@ -6,8 +8,8 @@ Independent implementation of the intake brief's trace-waterfall behavior; no re
 
 - Shared source: `73d306c2c8222d93103865da5953ee5e6856525f`.
 - Browser path: real Storybook HTTP iframe, Chromium on Beelink, source imports and real recorded Discovery timing fixture. Desktop 1100×900; phone 390×844; Agent Dark and Agent Light; keyboard and pointer; reduced-motion live/streaming checks.
-- The [recorded fixture provenance](../../src/stories/chat-controls/discovery-waterfall-provenance.md) explains all 53 spans, tool errors, approximations, unknown cost and unknown LLM-call count. Replay is explicitly labeled and compressed 20×; it is not a new research run.
-- `node scripts/prove-flow-waterfall.mjs --record` captures the UI and the nine-capability result. `--package-only` imports the built public subpath, renders 53 spans through React SSR, and checks the standalone and normal stylesheet exports.
+- The [recorded fixture provenance](https://github.com/tangle-network/charts/blob/main/docs/fixtures/discovery-waterfall-provenance.md) explains all 53 spans, tool errors, approximations, unknown cost and unknown LLM-call count. Replay is explicitly labeled and compressed 20×; it is not a new research run.
+- The historical proof captured the UI and nine-capability result, then rendered53spans through the built public package and checked both stylesheet exports. Current executable proof is charts `scripts/charts-browser-proof.mjs`.
 
 ## Media
 
@@ -27,7 +29,7 @@ A frozen install, package build, full typecheck and 75 existing affected checks 
 
 The initial nine browser checks established playback controls but did not measure rate accuracy during live growth. A stronger browser check found all five rates failed the ±15% target. [Forward fix #1273](https://github.com/tangle-network/agent-app/pull/1273) keeps the playback clock stable while the live duration changes. All five now pass, with a worst relative error of 0.19%.
 
-The maintained `--record` proof reads the rendered range position against `performance.now()` over two seconds per selected rate, while the trace limit grows by approximately two seconds. These are browser measurements, not timer simulations: [baseline](live-playback-rates-baseline.json), [fixed](live-playback-rates-fixed.json).
+The historical `--record` proof reads the rendered range position against `performance.now()` over two seconds per selected rate, while the trace limit grows by approximately two seconds. These are browser measurements, not timer simulations: [baseline](live-playback-rates-baseline.json), [fixed](live-playback-rates-fixed.json).
 
 | Selected | Baseline observed | Fixed observed | Relative error after fix |
 | --- | --- | --- | --- |
