@@ -16233,6 +16233,12 @@
           "doc": null
         },
         {
+          "name": "ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL",
+          "kind": "const",
+          "signature": "\"ALTER TABLE rollout_turn_timing ADD COLUMN variant TEXT;\"",
+          "doc": "Apply once through the product migration runner before any row carries `variant`; old rows stay NULL."
+        },
+        {
           "name": "stageMetrics",
           "kind": "function",
           "signature": "(rows: readonly Pick<TurnTimingRow, \"failed\" | \"firstVisibleMs\" | \"firstTextMs\" | \"settledMs\">[]) => { first_visible_p5…",
