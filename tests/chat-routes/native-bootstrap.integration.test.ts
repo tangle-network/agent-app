@@ -4,6 +4,8 @@ import { Sandbox } from '@tangle-network/sandbox'
 import { describe, expect, it } from 'vitest'
 import { createChatTables } from '../../src/chat-store/schema'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
+import { runNativeCompletionWorkflow } from '../../src/preset-cloudflare/native-completion-workflow'
+import { createAssistantDraftWriter } from '../../src/chat-routes/draft-persistence'
 import { createChatTurnRoutes } from '../../src/chat-routes/turn-routes'
 import { observeNativeCompletion, type NativeCompletionAdmissionStore } from '../../src/chat-routes/native-completion'
 import { createBufferedTurnTap, createMemoryTurnEventStore } from '../../src/stream/turn-buffer'
@@ -97,6 +99,8 @@ async function boundary(test: Case) {
     async renew(id) { return this.read(id) },
     async closeExpired(id) { return this.read(id) },
   }
+  db.$client.exec("CREATE TABLE native_turn_lock (turn_id TEXT PRIMARY KEY, state TEXT NOT NULL); CREATE TABLE native_settlement (turn_id TEXT PRIMARY KEY, receipt TEXT NOT NULL)")
+  db.$client.prepare('INSERT INTO native_turn_lock VALUES (?, ?)').run(turnId, 'held')
   const turnStore = createMemoryTurnEventStore()
   await turnStore.setStatus(turnId, 'running', threadId)
   const routes = createChatTurnRoutes({ projectId: 'terminal-boundary', store, turnStore,
@@ -114,39 +118,63 @@ async function boundary(test: Case) {
       executionId: turnId, sessionId, turnId, registeredAt, now: registeredAt + 1_000 })
     if (test.expected === 'throw') {
       await expect(observe()).rejects.toThrow()
+    } else if (test.expected === 'running') {
+      expect(await observe()).toEqual({ state: 'running' })
     } else {
-      const observed = await observe()
-      expect(observed.state).toBe(test.expected)
-      if (observed.state !== 'running') {
-        // Product-owned terminal projection composed with the actual shared
-        // buffer. No synthetic success text and no invented zero usage.
-        expect(observed.receipt.completedTurnIds).toEqual([turnId])
-        expect(observed.receipt.usage).toEqual({})
-        const tap = createBufferedTurnTap({ turnId, scopeId: threadId, store: turnStore })
-        await tap.onEvent({ type: 'error', code: 'native_completion_failed', message: observed.receipt.error })
-        await tap.done('error')
-        await store.appendMessage({ id: `assistant:${turnId}`, threadId, role: 'assistant',
-          content: observed.receipt.text, parts: [{ type: 'notice', kind: 'error', id: 'native-failure', text: observed.receipt.error! }] })
-        const response = await routes.replay(new Request('http://local/chat/replay', {
-          headers: { authorization: 'Bearer member-fixture' },
-        }), { turnId })
-        const publicBody = await response.text()
-        expect(publicBody).toContain(test.publicCause ?? publicDiskCause)
-        expect(publicBody).not.toContain('fixture-private-value')
-        expect(publicBody).not.toContain('stderr:')
-        expect(publicBody).not.toContain('/private/runtime/path')
-        expect(await turnStore.getStatus(turnId)).toBe('error')
-        expect(await turnStore.listRunning!(threadId)).toEqual([])
-        const transcript = await store.listMessages(threadId)
-        expect(transcript).toHaveLength(1)
-        expect(transcript[0]!.content).toBe(test.assistant === 'one' ? 'Exact partial answer.' : '')
-        expect(JSON.stringify(transcript)).not.toContain('fixture-private-value')
-      }
+      const steps: string[] = []
+      const receipt = await runNativeCompletionWorkflow({
+        event: { payload: { sessionId, turnId, registeredAt } },
+        step: {
+          async do(_name, callback) { steps.push(_name); return callback(undefined) },
+          async sleep() { throw new Error('An exact terminal must settle without a poll sleep') },
+        },
+        observe,
+        async persistTranscript(_payload, receipt) {
+          const writer = createAssistantDraftWriter({ store, threadId,
+            messageId: `assistant:${turnId}`, snapshot: () => null })
+          await writer.finalize({ content: receipt.text,
+            parts: [...receipt.parts, { type: 'notice', kind: 'error', id: 'native-failure', text: receipt.error! }] })
+          return `assistant:${turnId}`
+        },
+        async settle(_payload, receipt) {
+          db.$client.prepare('INSERT INTO native_settlement VALUES (?, ?)').run(turnId, JSON.stringify(receipt))
+        },
+        async finalizeBuffer(_payload, receipt) {
+          const tap = createBufferedTurnTap({ turnId, scopeId: threadId, store: turnStore })
+          await tap.onEvent({ type: 'error', code: 'native_completion_failed', message: receipt.error })
+          await tap.done('error')
+        },
+        async releaseLock() {
+          expect(db.$client.prepare("UPDATE native_turn_lock SET state = 'released' WHERE turn_id = ? AND state = 'held'").run(turnId).changes).toBe(1)
+        },
+      })
+      expect(receipt.state).toBe('failed')
+      expect(receipt.completedTurnIds).toEqual([turnId])
+      expect(receipt.usage).toEqual({})
+      expect(steps).toContain('native-completion:finalize-buffer')
+      expect(steps.at(-1)).toBe('native-completion:release-lock')
+      expect(db.$client.prepare('SELECT state FROM native_turn_lock WHERE turn_id = ?').get(turnId)).toEqual({ state: 'released' })
+      expect(db.$client.prepare('SELECT count(*) AS count FROM native_settlement').get()).toEqual({ count: 1 })
+      const response = await routes.replay(new Request('http://local/chat/replay', {
+        headers: { authorization: 'Bearer member-fixture' },
+      }), { turnId })
+      const publicBody = await response.text()
+      expect(publicBody).toContain(test.publicCause ?? publicDiskCause)
+      expect(publicBody).not.toContain('fixture-private-value')
+      expect(publicBody).not.toContain('stderr:')
+      expect(publicBody).not.toContain('/private/runtime/path')
+      expect(await turnStore.getStatus(turnId)).toBe('error')
+      expect(await turnStore.listRunning!(threadId)).toEqual([])
+      const transcript = await store.listMessages(threadId)
+      expect(transcript).toHaveLength(1)
+      expect(transcript[0]!.content).toBe(test.assistant === 'one' ? 'Exact partial answer.' : '')
+      expect(JSON.stringify(transcript)).not.toContain('fixture-private-value')
     }
     if (test.expected !== 'failed') {
       expect(await turnStore.getStatus(turnId)).toBe('running')
       expect(await turnStore.read(turnId, 0)).toEqual([])
       expect(await store.listMessages(threadId)).toEqual([])
+      expect(db.$client.prepare('SELECT state FROM native_turn_lock WHERE turn_id = ?').get(turnId)).toEqual({ state: 'held' })
     }
     expect((await routes.replay(new Request('http://local/chat/replay'), { turnId })).status).toBe(401)
     expect(requests.every(request => request.method === 'GET')).toBe(true)
@@ -163,7 +191,7 @@ describe('native terminal replay reaches the authorized public boundary', () => 
   for (const test of [
     { name: 'bootstrap failure with no assistant settles on its first observation', expected: 'failed' },
     { name: 'ordinary interrupted assistant keeps its exact partial answer', assistant: 'one', expected: 'failed' },
-    { name: 'cancelled native execution remains failed rather than completed', status: 'cancelled', error: 'Native execution was cancelled.', publicCause: 'Native execution was cancelled.', expected: 'failed' },
+    { name: 'cancelled native execution remains failed rather than completed', status: 'cancelled', error: 'Native execution was cancelled.', publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
     { name: 'unknown credentials and paths remain opaque without stderr', error: 'Refused /private/runtime/path; token=fixture-private-value', publicCause: 'Native Sandbox execution failed before producing an answer.', expected: 'failed' },
     { name: 'unknown credentials and paths remain opaque with stderr', error: '/private/runtime/path token=fixture-private-value; stderr: secret diagnostics', publicCause: 'Native Sandbox execution failed before producing an answer.', expected: 'failed' },
     { name: 'recognized bootstrap startup reports a fixed safe cause', error: 'MCP runtime bootstrap failed: /private/runtime/path token=fixture-private-value', publicCause: 'The Sandbox could not start the agent runtime.', expected: 'failed' },
