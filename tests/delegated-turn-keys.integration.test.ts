@@ -24,6 +24,7 @@ const SOURCE = 'sk-tan-payer-linked-key-0001'
 async function platformAndRouter() {
   const minted: Array<{ id: string; key: string; name: string }> = []
   const revoked = new Set<string>()
+  const spent = new Set<string>()
   const routerAuth: string[] = []
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     let raw = ''
@@ -50,7 +51,10 @@ async function platformAndRouter() {
         const auth = req.headers.authorization ?? ''
         routerAuth.push(auth)
         const child = minted.find(k => `Bearer ${k.key}` === auth)
-        if (!child || revoked.has(child.id)) return json(401, { error: { code: 'invalid_api_key' } })
+        // Router's own refusals (tangle-router lib/key-refusal.ts, customer-spend-authorization.ts).
+        if (!child) return json(401, { error: { type: 'authentication_error', code: 'invalid_key' } })
+        if (revoked.has(child.id)) return json(401, { error: { type: 'authentication_error', code: 'invalid_key', reason: 'key_revoked' } })
+        if (spent.has(child.id)) return json(402, { error: { type: 'insufficient_funds', code: 'key_budget_exhausted' } })
         return json(200, { ok: true, body: raw })
       }
       json(404, {})
@@ -58,7 +62,7 @@ async function platformAndRouter() {
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-  return { url, minted, revoked, routerAuth, close: () => new Promise<void>((resolve) => server.close(() => resolve())) }
+  return { url, minted, revoked, spent, routerAuth, close: () => new Promise<void>((resolve) => server.close(() => resolve())) }
 }
 
 /** node:sqlite behind the D1 shape. */
@@ -75,14 +79,14 @@ const scope = (models = ['gemini-3.7-flash']): DelegatedTurnKeyScope =>
 let close: (() => Promise<void>) | undefined
 afterEach(async () => { await close?.(); close = undefined })
 
-async function setup(clock = { at: Date.now() }) {
+async function setup(clock = { at: Date.now() }, crypto = createFieldCrypto('ab'.repeat(32))) {
   const p = await platformAndRouter()
   close = p.close
   const sqlite = new DatabaseSync(':memory:')
   sqlite.exec(DELEGATED_KEY_PREMINT_TABLE_DDL)
   const client = createPlatformDelegatedKeyClient({ platformUrl: p.url, serviceName: 'creative-agent', serviceToken: 'svc' })
   const pending: Promise<unknown>[] = []
-  const keys = createDelegatedTurnKeys({ client, db: d1(sqlite), crypto: createFieldCrypto('ab'.repeat(32)), now: () => clock.at })
+  const keys = createDelegatedTurnKeys({ client, db: d1(sqlite), crypto, now: () => clock.at })
   const turn = (turnId: string, models?: string[]) =>
     keys.forTurn({ slot: 'usr_payer:w1:router', scope: scope(models), ttlMs: 30 * 60_000, turnId, waitUntil: (x) => pending.push(x) })
   const settle = async () => { await Promise.all(pending.splice(0)) }
@@ -128,30 +132,65 @@ describe('pre-minted turn keys', () => {
     expect(await turn('exec-2', ['gpt-6.1-sol'])).toMatchObject({ succeeded: true, value: { preminted: false } })
   })
 
-  it('fails a parked key Platform revoked, then mints inline once and resends', async () => {
-    const { p, keys, turn, settle } = await setup()
-    await keys.park({ slot: 'usr_payer:w1:router', scope: scope(), ttlMs: 30 * 60_000 })
-    const outcome = await turn('exec-1')
-    await settle()
-    if (!outcome.succeeded) throw new Error('no key')
+  /** A turn holding the slot's parked key, and its fallback fetch. */
+  async function parkedTurn() {
+    const env = await setup()
+    await env.keys.park({ slot: 'usr_payer:w1:router', scope: scope(), ttlMs: 30 * 60_000 })
+    const outcome = await env.turn('exec-1')
+    await env.settle()
+    if (!outcome.succeeded || !outcome.value.preminted) throw new Error('no parked key')
     const parked = outcome.value
-    expect(parked.preminted).toBe(true)
-    p.revoked.add(parked.id)
-
-    const send = (f: typeof fetch) => f(`${p.url}/v1/chat/completions`, {
-      method: 'POST', headers: { authorization: `Bearer ${parked.key}` }, body: '{"model":"gemini-3.7-flash"}' })
-    expect((await send(fetch)).status).toBe(401)
-
-    let replacedTurnId: string | undefined
+    let replaced = 0
     const turnFetch = delegatedKeyFallbackFetch({ key: parked,
-      remint: () => keys.mint({ slot: 'usr_payer:w1:router', scope: scope(), ttlMs: 30 * 60_000, turnId: 'exec-1' }),
-      onReplaced: (k) => { replacedTurnId = k.turnId } })
-    const response = await send(turnFetch)
-    expect(response.status).toBe(200)
-    expect(replacedTurnId).toBe('exec-1')
+      remint: () => env.keys.mint({ slot: 'usr_payer:w1:router', scope: scope(), ttlMs: 30 * 60_000, turnId: 'exec-1' }),
+      onReplaced: () => { replaced++ } })
+    const send = (f: typeof fetch, body: BodyInit = '{"model":"gemini-3.7-flash"}') => f(`${env.p.url}/v1/chat/completions`, {
+      method: 'POST', headers: { authorization: `Bearer ${parked.key}` }, body, duplex: 'half' } as RequestInit)
+    return { ...env, parked, turnFetch, send, replaced: () => replaced }
+  }
+
+  it('fails a parked key Platform revoked, then mints inline once for every waiting request and resends each', async () => {
+    const { p, parked, turnFetch, send, replaced } = await parkedTurn()
+    p.revoked.add(parked.id)
+    expect((await send(fetch)).status).toBe(401)
+    const before = p.minted.length
+
+    const stream = new Response('{"model":"gemini-3.7-flash","stream":true}').body!
+    const [a, b] = await Promise.all([send(turnFetch), send(turnFetch, stream)])
+    expect([a.status, b.status]).toEqual([200, 200])
+    // The streamed body was buffered and resent whole with the fresh key.
+    expect(((await b.json()) as { body: string }).body).toBe('{"model":"gemini-3.7-flash","stream":true}')
+    expect(p.minted.length - before).toBe(1)
+    expect(replaced()).toBe(1)
+    const sentParked = p.routerAuth.filter(auth => auth === `Bearer ${parked.key}`).length
     expect((await send(turnFetch)).status).toBe(200)
-    // The revoked key was sent once more (the turn's first request), never after the inline mint.
-    expect(p.routerAuth.filter(a => a === `Bearer ${parked.key}`)).toHaveLength(2)
+    // After the re-mint the revoked key is never sent again.
+    expect(p.routerAuth.filter(auth => auth === `Bearer ${parked.key}`)).toHaveLength(sentParked)
+  })
+
+  it('answers a spent budget with the Router refusal and never mints a second key for the turn', async () => {
+    const { p, parked, turnFetch, send, replaced } = await parkedTurn()
+    p.spent.add(parked.id)
+    const before = p.minted.length
+    const response = await send(turnFetch)
+    expect(response.status).toBe(402)
+    expect(await response.json()).toMatchObject({ error: { code: 'key_budget_exhausted' } })
+    expect(p.minted.length).toBe(before)
+    expect(replaced()).toBe(0)
+    // A bare invalid key (no revoked/expired reason) is not re-minted either.
+    p.spent.delete(parked.id)
+    p.minted.splice(p.minted.findIndex(k => k.id === parked.id), 1)
+    expect((await send(turnFetch)).status).toBe(401)
+    expect(p.minted.length).toBe(before - 1)
+  })
+
+  it('revokes a key it minted but could not park', async () => {
+    const crypto = { ...createFieldCrypto('ab'.repeat(32)), encrypt: async () => { throw new Error('crypto down') } }
+    const { p, keys, stored } = await setup({ at: Date.now() }, crypto)
+    expect(await keys.park({ slot: 'usr_payer:w1:router', scope: scope(), ttlMs: 30 * 60_000 })).toBe(false)
+    expect(p.minted).toHaveLength(1)
+    expect(p.revoked.has(p.minted[0]!.id)).toBe(true)
+    expect(stored()).toHaveLength(0)
   })
 
   it('mints every turn inline when pre-minting is off', async () => {
