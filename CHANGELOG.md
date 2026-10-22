@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.271
+
+- feat(platform): createBillableTurnAdmission keeps a passing seat and balance verdict per user (#1242)
+
 ## 0.60.270
 
 - chore(deps): adopt @tangle-network/sandbox 0.64.8 (#1253)
