@@ -17648,6 +17648,14 @@ interface DelegatedKeyVerdict
 interface DelegatedTurnKey
 ```
 
+### `DelegatedTurnKeyClaimTiming`
+
+`interface`
+
+```ts
+interface DelegatedTurnKeyClaimTiming
+```
+
 ### `DelegatedTurnKeyEvent`
 
 `type`
