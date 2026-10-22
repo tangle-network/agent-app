@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.260
+
+- perf(agent-profiles): a turn pin is one D1 round trip, not three (#1238)
+
 ## 0.60.259
 
 - Legibility tests remove the temporary product trees they create (#1237)
