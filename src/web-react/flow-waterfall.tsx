@@ -90,7 +90,7 @@ export function FlowWaterfall({ trace, live, startedAt, label = 'Trace waterfall
 
   const rows = useMemo(() => waterfallLayout(currentTrace), [currentTrace])
   const visible = visibleWaterfallRows(rows, query, collapsed)
-  const leaves = rows.filter(row => !row.hasChildren)
+  const leaves = rows.filter(row => !row.hasChildren && row.kind !== 'pipeline')
   const slowest = leaves.reduce<typeof rows[number] | undefined>((best, row) =>
     !best || row.span.endMs - row.span.startMs > best.span.endMs - best.span.startMs ? row : best, undefined)
   const summary = [

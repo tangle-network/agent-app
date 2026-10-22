@@ -1,12 +1,29 @@
 /** Real Storybook HTTP/browser integration; no intercepted requests or mocked components. */
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdirSync, createWriteStream, writeFileSync } from 'node:fs'
+import { mkdirSync, createWriteStream, writeFileSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 
 const output = resolve(process.env.WATERFALL_PROOF_DIR ?? '/tmp/flow-waterfall-proof')
 mkdirSync(output, { recursive: true })
+// Verify the exact built public boundary consumed by hosts without Tailwind.
+if (process.argv.includes('--package-only')) {
+  const { FlowWaterfall } = await import('@tangle-network/agent-app/web-react/flow-waterfall')
+  const { createElement } = await import('react')
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  const source = readFileSync('src/stories/chat-controls/discovery-waterfall-fixture.ts', 'utf8')
+  const trace = JSON.parse(source.slice(source.indexOf('{', source.indexOf('export const'))).trim().replace(/;$/, ''))
+  const html = renderToStaticMarkup(createElement(FlowWaterfall, { trace }))
+  assert.equal((html.match(/data-span-id=/g) ?? []).length, 53)
+  assert.ok(html.includes('754,448') && html.includes('Slowest step:'))
+  const stylesheet = readFileSync(fileURLToPath(import.meta.resolve('@tangle-network/agent-app/web-react/flow-waterfall.css')), 'utf8')
+  assert.equal(stylesheet, readFileSync('src/web-react/flow-waterfall.css', 'utf8'))
+  assert.ok(readFileSync(fileURLToPath(import.meta.resolve('@tangle-network/agent-app/styles')), 'utf8').includes('.fw-root'))
+  console.log(JSON.stringify({ publicExport: 'PASS', standaloneStylesheet: 'PASS', standardStylesheet: 'PASS', renderedSpans: 53 }))
+  process.exit(0)
+}
 const base = process.env.WATERFALL_STORYBOOK_URL ?? 'http://127.0.0.1:6019'
 const checks = {}
 let server, browser, context
@@ -38,6 +55,7 @@ try {
     await page.locator('[data-flow-waterfall]').waitFor({ timeout: 60_000 })
   }
   await story('healthy')
+  assert.match(await page.locator('[data-slowest]').innerText(), /sandbox_run_command/)
   await page.screenshot({ path: `${output}/healthy-desktop-dark.png`, fullPage: true })
   await page.setViewportSize({ width: 390, height: 844 })
   await page.screenshot({ path: `${output}/healthy-phone-dark.png`, fullPage: true })
