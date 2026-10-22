@@ -20,9 +20,9 @@
  * - The stage being left must have at least `minSamples` measured turns and
  *   every kill line met. A missing metric leaves the decision undecided.
  * - Missing samples are undecided; a measured breach names each reason (`first_words_p50_ms 3540 over kill line 2500`).
- * - A hold given `changedAt` (when the value last changed) measures since then and refuses a breach only when the
- *   measurement's window starts at or after it. A breach on turns from before the change is undecided: a deploy
- *   that keeps the list is not refused on turns an earlier stage served (Legal, 2026-10-22, run 39714417347).
+ * - A hold given `liveSince` (when the deployed commit went live) judges only turns served since then: it refuses
+ *   a breach only when the measurement's window starts at or after it, and is otherwise undecided. A deploy that
+ *   keeps the list is never refused on turns the previous deploy already served (Legal, 2026-10-22, run 39714417347).
  *
  * Every decision, allowed, refused or undecided, is returned as one record the caller
  * persists (the CLI appends it to a JSONL ledger and hands it to the
@@ -204,12 +204,12 @@ export async function decideRollout(input: {
   plan: RolloutPlan
   fromValue: string
   toValue: string
-  /** `scope.since` (epoch ms) is set for a hold given `changedAt`: measure the turns at or after it. */
+  /** `scope.since` (epoch ms) is set for a hold given `liveSince`: measure the turns at or after it. */
   measure(stage: RolloutStage, signal?: AbortSignal, scope?: { since?: number }): Promise<StageMeasurement | null>
   /** Bound observation even when the product instrument ignores cancellation. */
   measurementTimeoutMs?: number
-  /** Epoch ms the current value took effect. A hold refuses only a breach measured on turns since then. */
-  changedAt?: number
+  /** Epoch ms the deployed commit went live. A hold refuses only a breach measured on turns since then. */
+  liveSince?: number
   now?: () => Date
 }): Promise<RolloutDecision> {
   const { plan, fromValue, toValue } = input
@@ -218,7 +218,7 @@ export async function decideRollout(input: {
   const toStage = stageOf(plan, toValue)
   const widens = rolloutWidens(fromValue, toValue)
   const narrowing = !widens && normalizeRolloutValue(fromValue) !== normalizeRolloutValue(toValue)
-  const holdSince = !widens && !narrowing && Number.isFinite(input.changedAt) ? input.changedAt : undefined
+  const holdSince = !widens && !narrowing && Number.isFinite(input.liveSince) ? input.liveSince : undefined
   const record = (decision: RolloutDecision['decision'], reasons: string[], measured: StageMeasurement | null,
     turnsNeeded: Record<string, number> = {}, breach = false): RolloutDecision => ({
     rollout: plan.name, variable: plan.variable,
@@ -281,7 +281,7 @@ export async function decideRollout(input: {
     : Object.keys(fromStage.kill).filter(metric => !Number.isFinite(measured!.metrics[metric])).map(metric => `${metric} was not measured`)
   const windowFrom = Date.parse(measured?.window?.from ?? '')
   const stale = holdSince !== undefined && breaches.length > 0 && !(windowFrom >= holdSince)
-    ? [`the breach was measured on turns from ${measured?.window?.from ?? 'an unstated time'}, before ${fromStage.name} last changed at ${new Date(holdSince).toISOString()}; turns since the change were not measured on their own`]
+    ? [`the breach was measured on turns from ${measured?.window?.from ?? 'an unstated time'}, before the deployed commit went live at ${new Date(holdSince).toISOString()}; only turns since then can refuse a hold`]
     : []
   const reasons = [...breaches, ...stale, ...missing, ...Object.entries(turnsNeeded).map(([lane, needed]) => `${lane} needs ${needed} more turns`)]
   return record(narrowing ? 'allowed' : breaches.length && !stale.length ? 'refused' : reasons.length ? 'undecided' : 'allowed', reasons, measured, turnsNeeded, breaches.length > 0)

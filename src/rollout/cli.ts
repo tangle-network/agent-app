@@ -27,9 +27,8 @@
  * from the same file at `--base` (default `origin/main`), or given with
  * `--from`. `--to` overrides the new value.
  *
- * A deploy that keeps the value (a hold) is measured since the value last
- * changed: the commit time, in the base's history, of the change that set the
- * current value, or of the oldest commit a shallow checkout holds. `measure`
+ * A deploy that keeps the value (a hold) judges only turns served since the
+ * deployed commit went live, read as the commit time of `--base`. `measure`
  * receives that as `since`; a breach measured on a window that starts before it
  * is undecided, not refused.
  *
@@ -122,49 +121,30 @@ function git(cwd: string, args: string[]): string | null {
   }
 }
 
-/** A file in a git checkout: the repository directory and the file's repo-relative path. */
-interface GitFile { cwd: string; path: string }
-
 /**
  * The file at `ref`. Under agent-app-signoff the app runs in a clean copy with
  * no `.git`; signoff names the source checkout and the copy's root, so the
  * base is read from the source at the same repo-relative path.
  */
-function wranglerAt(appDir: string, file: string, ref: string, env: NodeJS.ProcessEnv = process.env): { source: string; at: GitFile } {
+function wranglerAt(appDir: string, file: string, ref: string, env: NodeJS.ProcessEnv = process.env): { source: string; repo: string } {
   const local = git(appDir, ['show', `${ref}:./${file}`])
-  const [top, prefix] = git(appDir, ['rev-parse', '--show-toplevel', '--show-prefix'])?.split('\n') ?? []
-  if (local !== null && top) return { source: local, at: { cwd: top, path: `${prefix ?? ''}${file.split(sep).join('/')}` } }
+  if (local !== null) return { source: local, repo: appDir }
   const source = env.SIGNOFF_SOURCE_REPO
   const tree = env.SIGNOFF_TREE
   if (source && tree) {
-    const path = relative(resolve(tree), resolve(appDir, file)).split(sep).join('/')
+    const path = relative(resolve(tree), resolve(appDir, file))
     if (!path.startsWith('..') && !isAbsolute(path)) {
-      const fromSource = git(source, ['show', `${ref}:${path}`])
-      if (fromSource !== null) return { source: fromSource, at: { cwd: source, path } }
+      const fromSource = git(source, ['show', `${ref}:${path.split(sep).join('/')}`])
+      if (fromSource !== null) return { source: fromSource, repo: source }
     }
   }
   throw new Error(`cannot read ${file} at ${ref}; fetch it or pass --from`)
 }
 
-/**
- * Epoch ms of the commit, in `ref`'s history, that set `variable` to its value at `ref`. In a shallow
- * checkout that does not reach that commit, the oldest commit it holds: every turn after it is fresh.
- */
-function valueChangedAt(at: GitFile, ref: string, variable: string): number | undefined {
-  const valueAt = (commit: string) => {
-    const source = git(at.cwd, ['show', `${commit}:${at.path}`])
-    return source === null ? null : readWranglerVar(source, variable) ?? ''
-  }
-  const current = valueAt(ref)
-  const log = git(at.cwd, ['log', '--format=%H %ct', '-G', variable, ref, '--', at.path])
-  if (current === null || log === null) return undefined
-  let oldest: number | undefined
-  for (const line of log.trim().split('\n').filter(Boolean)) {
-    const [commit, seconds] = line.split(' ')
-    oldest = Number(seconds) * 1000
-    if (valueAt(`${commit}^`) !== current) return oldest
-  }
-  return oldest
+/** Epoch ms of `ref`'s commit: when the deployed commit went live, for a hold. */
+function commitTime(repo: string, ref: string): number | undefined {
+  const seconds = Number(git(repo, ['log', '-1', '--format=%ct', ref])?.trim())
+  return seconds > 0 ? seconds * 1000 : undefined
 }
 
 export async function runRolloutCheck(args: CliArgs): Promise<RolloutDecision[]> {
@@ -183,7 +163,7 @@ export async function runRolloutCheck(args: CliArgs): Promise<RolloutDecision[]>
       plan, fromValue, toValue,
       measure: (stage, signal, scope) => config.measure({ plan, stage, signal, ...scope }),
       measurementTimeoutMs: config.measurementTimeoutMs,
-      changedAt: base ? valueChangedAt(base.at, args.base, plan.variable) : undefined,
+      liveSince: base ? commitTime(base.repo, args.base) : undefined,
     })
     decisions.push(decision)
     const ledger = resolve(args.appDir, args.record)

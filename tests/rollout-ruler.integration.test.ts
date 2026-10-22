@@ -14,7 +14,7 @@ import { assignRolloutArm, decideRollout } from '../src/rollout/index'
 // 2026-10-13T23:48:49.733Z through 2026-10-20T23:48:49.733Z. No live reads or paid calls.
 const frozen = JSON.parse(readFileSync(new URL('./fixtures/rollout/creative-e8.json', import.meta.url), 'utf8'))
 
-it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only on turns since the value changed, and narrows on an injected failure breach', async () => {
+it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only on turns since the deployed commit went live, and narrows on an injected failure breach', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'ruler-e8-'))
   try {
     writeFileSync(join(dir, 'wrangler.toml'), `[vars]\n${frozen.variable} = "*"\n`)
@@ -26,13 +26,14 @@ it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only o
     ] }
     await build({ entry: ['src/rollout/cli.ts'], outDir: dir, format: ['esm'], splitting: false, config: false, silent: true, outExtension: () => ({ js: '.mjs' }) })
     const cli = join(dir, 'cli.mjs')
-    // `honourSince`: the instrument measures from the CLI's `since`, as a product reading its rows since the change does.
-    const run = (breach: boolean, args: string[], honourSince = false) => {
+    // `from`: 'since' measures from the CLI's `since`, as a product reading only rows at or after it does; an ISO time is a
+    // fixed window the instrument chose; absent keeps the frozen seven-day window.
+    const run = (breach: boolean, args: string[], from?: string) => {
       const measured = structuredClone(frozen.measured)
       if (breach) measured.metrics.failure_rate_delta = 0.02
-      const measure = honourSince
-        ? `async measure({ since }) { const m = ${JSON.stringify(measured)}; return { ...m, window: { ...m.window, from: new Date(since).toISOString() } } }`
-        : `async measure() { return ${JSON.stringify(measured)} }`
+      const window = from === 'since' ? '{ ...m.window, from: new Date(since).toISOString() }'
+        : from ? `{ ...m.window, from: ${JSON.stringify(from)} }` : 'm.window'
+      const measure = `async measure({ since }) { const m = ${JSON.stringify(measured)}; return { ...m, window: ${window} } }`
       writeFileSync(join(dir, 'rollout.config.mjs'), `export default { plans: ${JSON.stringify([plan])}, ${measure} }`)
       const child = spawnSync(process.execPath, [cli, dir, ...args, '--record', 'decisions.jsonl'], { encoding: 'utf8' })
       const records = readFileSync(join(dir, 'decisions.jsonl'), 'utf8').trim().split('\n')
@@ -52,7 +53,7 @@ it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only o
     expect(narrowing.status).toBe(0)
     expect(narrowing.decision).toMatchObject({ decision: 'allowed', recommendation: 'narrow', measured: { samples: 6 } })
 
-    // The value's history: empty, then set to the QA stage after the frozen window closed, then an unrelated commit.
+    // The value's history: empty, set to the QA stage inside the frozen window, then the deployed (base) commit after it closed.
     const commit = (at: string, value: string, message: string) => {
       writeFileSync(join(dir, 'wrangler.toml'), `[vars]\n${frozen.variable} = "${value}"\nOTHER = "${message}"\n`)
       const env = { ...process.env, GIT_AUTHOR_NAME: 'rollout', GIT_AUTHOR_EMAIL: 'rollout@example.com',
@@ -63,16 +64,16 @@ it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only o
       }
     }
     expect(spawnSync('git', ['init', '-q'], { cwd: dir }).status).toBe(0)
-    const changed = '2026-10-21T00:00:00.000Z'
+    const live = '2026-10-21T00:00:00.000Z'
     commit('2026-10-01T00:00:00Z', '', 'empty')
-    commit(changed, frozen.from.value, 'qa')
-    commit('2026-10-22T00:00:00Z', frozen.from.value, 'unrelated')
-    const freshBreach = run(true, ['--base', 'HEAD'], true)
+    commit('2026-10-15T00:00:00Z', frozen.from.value, 'qa')
+    commit(live, frozen.from.value, 'deployed')
+    const freshBreach = run(true, ['--base', 'HEAD'], 'since')
     expect(freshBreach.status, freshBreach.stderr).toBe(1)
     expect(freshBreach.stdout).toContain('(narrow)')
     console.info(freshBreach.stdout.trim())
-    expect(freshBreach.decision).toMatchObject({ decision: 'refused', recommendation: 'narrow', measured: { window: { from: changed } } })
-    // Legal, 2026-10-22: a 7-day window of turns served before the value changed, none since.
+    expect(freshBreach.decision).toMatchObject({ decision: 'refused', recommendation: 'narrow', measured: { window: { from: live } } })
+    // Legal, 2026-10-22: a 7-day window of turns served before the deployed commit went live, none since.
     const staleBreach = run(true, ['--base', 'HEAD'])
     expect(staleBreach.status, staleBreach.stderr).toBe(0)
     expect(staleBreach.stdout).toContain('UNDECIDED')
@@ -80,7 +81,11 @@ it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only o
     console.info(staleBreach.stdout.trim())
     expect(staleBreach.decision).toMatchObject({ decision: 'undecided', recommendation: 'narrow' })
     expect(staleBreach.decision.reasons).toEqual(expect.arrayContaining([
-      'failure_rate_delta 0.02 over kill line 0.01', expect.stringContaining(`last changed at ${changed}`)]))
+      'failure_rate_delta 0.02 over kill line 0.01', expect.stringContaining(`went live at ${live}`)]))
+    // Breach rows only before the base deploy, in a window that opens after the value changed.
+    const sinceChange = run(true, ['--base', 'HEAD'], '2026-10-16T00:00:00.000Z')
+    expect(sinceChange.status, sinceChange.stderr).toBe(0)
+    expect(sinceChange.decision).toMatchObject({ decision: 'undecided', recommendation: 'narrow' })
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
