@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.251
+
+- feat: one shared app platform for the agent apps (vault, auth, OAuth, spend, media, plans, eval, shell) (#1227)
+
 ## 0.60.250
 
 - feat(chat-routes): dispatchFirst — start the model call while the admission chain commits (#1229)
