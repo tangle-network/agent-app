@@ -14,10 +14,10 @@
  * Imports `drizzle-orm` at module top, so it lives behind its own subpath.
  */
 
-import { sql, type BuildColumns, type BuildExtraConfigColumns } from 'drizzle-orm'
+import { sql, type BuildColumns } from 'drizzle-orm'
 import {
   integer, sqliteTable, text, uniqueIndex,
-  type SQLiteColumnBuilderBase, type SQLiteTableExtraConfigValue, type SQLiteTableWithColumns,
+  type AnySQLiteColumn, type SQLiteColumnBuilderBase, type SQLiteTableExtraConfigValue, type SQLiteTableWithColumns,
 } from 'drizzle-orm/sqlite-core'
 
 /** Extra session columns, keyed by their TypeScript field name. */
@@ -25,6 +25,9 @@ export type AppAuthSessionColumns = Record<string, SQLiteColumnBuilderBase>
 
 /** Extra user columns, keyed by their TypeScript field name. */
 export type AppAuthUserColumns = Record<string, SQLiteColumnBuilderBase>
+
+/** A table's built columns by field name, as an index callback receives them. */
+export type AppAuthColumnMap<K extends PropertyKey> = { [P in K]: AnySQLiteColumn }
 
 /** Options for the better-auth core tables. */
 export interface CreateAppAuthTablesOptions<
@@ -36,13 +39,9 @@ export interface CreateAppAuthTablesOptions<
   /** Columns the product adds to the user row. Default none. */
   userColumns?: U
   /** Indexes the product's `user` table carries. Default none. */
-  userIndexes?: (
-    table: BuildExtraConfigColumns<'user', ReturnType<typeof baseUserColumns> & U, 'sqlite'>,
-  ) => SQLiteTableExtraConfigValue[]
+  userIndexes?: (table: AppAuthColumnMap<keyof ReturnType<typeof baseUserColumns> | keyof U>) => SQLiteTableExtraConfigValue[]
   /** Indexes the product's `account` table carries besides the issuer/account one. Default none. */
-  accountIndexes?: (
-    table: BuildExtraConfigColumns<'account', ReturnType<typeof accountColumns>, 'sqlite'>,
-  ) => SQLiteTableExtraConfigValue[]
+  accountIndexes?: (table: AppAuthColumnMap<keyof ReturnType<typeof accountColumns>>) => SQLiteTableExtraConfigValue[]
   /** Name of the unique (issuer, accountId) index. Default `account_issuer_account_id_unique`. */
   accountIssuerIndexName?: string
   /** Default for `account.issuer`; null declares none. Default `local:credential`. */
@@ -74,11 +73,13 @@ function baseUserColumns() {
 }
 
 function accountColumns(issuerDefault: string | null) {
-  const issuer = text('issuer').notNull()
+  const withDefault = text('issuer').notNull().default(issuerDefault ?? 'local:credential')
+  // A null default declares none; the column keeps today's insert type either way.
+  const issuer = issuerDefault === null ? text('issuer').notNull() as unknown as typeof withDefault : withDefault
   return {
     id: text('id').primaryKey(),
     userId: text('userId').notNull(),
-    issuer: issuerDefault === null ? issuer : issuer.default(issuerDefault),
+    issuer,
     accountId: text('accountId').notNull(),
     providerId: text('providerId').notNull(),
     accessToken: text('accessToken'),
@@ -141,7 +142,7 @@ export function createAppAuthTables<
     ...timestampColumns(),
   }, (table) => [
     uniqueIndex(options.accountIssuerIndexName ?? 'account_issuer_account_id_unique').on(table.issuer, table.accountId),
-    ...(options.accountIndexes?.(table) ?? []),
+    ...(options.accountIndexes?.(table as never) ?? []),
   ])
 
   const verifications = sqliteTable('verification', {
