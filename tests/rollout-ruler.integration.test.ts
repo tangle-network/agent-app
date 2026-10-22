@@ -184,7 +184,7 @@ it('records an experiment variant apart from the cohort arm, and keeps recording
 })
 
 it('a product writer that omits timing still records first visible, admission and the served model, on a full table and on a pre-ruler one', async () => {
-  // Full schema; Tax's 0022 table (no first_visible_ms, ruler or variant columns); and an opted-out store on the full schema.
+  // Full schema; the Tax 0022 table (no first_visible_ms, ruler or variant columns); and an opted-out store on the full schema.
   const full = new Database(':memory:'), legacy = new Database(':memory:'), optedOut = new Database(':memory:')
   full.exec(ROLLOUT_TURN_TIMING_SCHEMA_SQL)
   optedOut.exec(ROLLOUT_TURN_TIMING_SCHEMA_SQL)
@@ -211,7 +211,7 @@ it('a product writer that omits timing still records first visible, admission an
       })(),
       finalText: () => 'Four rooms.',
     }),
-    // Legal's writer (legal-agent chat-vertical.ts): lane, words and settle time, nothing else.
+    // The Legal writer (legal-agent chat-vertical.ts): lane, words and settle time, nothing else.
     lifecycle: { onTurnComplete: async info => { await Promise.all(stores.map(timing => timing.record({ turnId: info.turnStreamId,
       rollout: 'r', workspaceId: 'ws-1', lane: 'sandbox', firstTextMs: info.firstTextMs, settledMs: info.durationMs, failed: false }))) } },
   })
