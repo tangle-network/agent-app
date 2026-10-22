@@ -85,6 +85,32 @@ import { ChatTurnInputError } from './wire'
 
 export * from './turn-route-contracts'
 
+/** What a turn started before `produce`: the product's `afterAuthorize` release and the route's own (a dispatch-first producer). */
+function earlyTurnWork(
+  release: ChatTurnAfterAuthorizeRelease | undefined,
+  log: (message: string, meta?: Record<string, unknown>) => void,
+): AfterAuthorizeWork {
+  let free = release
+  let also: Array<() => void> = []
+  return {
+    handOff: () => { free = undefined; also = [] },
+    add: (more) => { also.push(more) },
+    release: async () => {
+      const product = free
+      const route = also
+      free = undefined
+      also = []
+      for (const stop of route) stop()
+      if (!product) return
+      try {
+        await product()
+      } catch (err) {
+        log('[chat-routes] afterAuthorize release failed', { error: err instanceof Error ? err.message : String(err) })
+      }
+    },
+  }
+}
+
 /** Build chat turn routes to handle and validate incoming chat requests with optional logging */
 export function createChatTurnRoutes<TContext = void>(
   options: CreateChatTurnRoutesOptions<TContext>,
@@ -311,19 +337,7 @@ export function createChatTurnRoutes<TContext = void>(
         log('[chat-routes] afterAuthorize failed; the turn goes on without it', { error: err instanceof Error ? err.message : String(err) })
       }
     }
-    return {
-      handOff: () => { release = undefined },
-      release: async () => {
-        const free = release
-        release = undefined
-        if (!free) return
-        try {
-          await free()
-        } catch (err) {
-          log('[chat-routes] afterAuthorize release failed', { error: err instanceof Error ? err.message : String(err) })
-        }
-      },
-    }
+    return earlyTurnWork(release, log)
   }
 
   /** Run an admitted turn with the product's `afterAuthorize` work started first and freed if no producer takes it. */

@@ -279,6 +279,13 @@ export interface ChatTurnProduceArgs<TContext> {
    * `createChatTurnRoutes` invocation supplies it before `produce` runs.
    */
   handoffCompletion?: () => Promise<void>
+  /** Set only under `dispatchFirst`, where `produce` starts before the lock. Resolves to the final args (with
+   *  `userMessageId`, after `contextGate` and `beforeTurn`) once the admission chain commits, or rejects with
+   *  `TurnAdmissionRefusedError` when the turn is refused. Start the model call at once; write nothing durable,
+   *  and read nothing `beforeTurn` adds to `context`, until it resolves. */
+  admitted?: Promise<ChatTurnProduceArgs<TContext>>
+  /** Set only under `dispatchFirst`: aborts when the turn is refused after `produce` started. Pass it to the model call. */
+  admissionSignal?: AbortSignal
 }
 
 /** One event as it crosses the route: the producer's own vocabulary, or an
@@ -518,6 +525,17 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  wrapped in `createSandboxChatProducer`. Router/openai-compat lane: the
    *  product's own producer. May be async (box resolution). */
   produce(args: ChatTurnProduceArgs<TContext>): ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
+  /**
+   * Start `produce`, and so the model call, right after the history read, while the lock, the history recheck, the
+   * user-row insert, `contextGate` and `beforeTurn` run (see `./dispatch-first`). Nothing it emits reaches the member,
+   * the turn buffer or the transcript before that chain commits; a refusal aborts it through `args.admissionSignal`
+   * and drops its output. `produce` receives `args.admitted` for the final args.
+   *
+   * Opt in only when every billing gate runs in `authorize` (or at the model service before it calls a provider):
+   * the declaration is the literal `gatesInAuthorize: true`. `beforeTurn` may still mutate `context` but must not
+   * return a patch, since the prompt has already been sent; a patch throws. Omit → `produce` runs after admission.
+   */
+  dispatchFirst?: { gatesInAuthorize: true }
   /** Single-flight lock acquired before any side effect and released once when
    *  the turn settles (including short-circuit/throw). `/turn-stream`'s
    *  `createDurableTurnLock` is the shared DO-backed implementation. Omit →
