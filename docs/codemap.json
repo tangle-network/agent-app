@@ -16502,6 +16502,12 @@
           "doc": "Minimal OpenAI Chat Completions streaming chunk (structural — no `openai` dep)."
         },
         {
+          "name": "perTurnPrefixBytes",
+          "kind": "function",
+          "signature": "(prefix: string, perTurn?: readonly string[]) => string[]",
+          "doc": "The per-turn bytes in a prompt prefix: a clock to the minute, and any of this turn's `context` sections (or the caller's own per-turn values: ids, the member's message) that also appear there."
+        },
+        {
           "name": "placeRouterTurn",
           "kind": "function",
           "signature": "(input: RouterTurnPlacementInput) => PlacementRecord",
@@ -16961,6 +16967,12 @@
           "kind": "const",
           "signature": "number",
           "doc": "Wall time a durable hop may plan for: a Durable Object alarm or Queue consumer gets 15 minutes."
+        },
+        {
+          "name": "perTurnPrefixBytes",
+          "kind": "function",
+          "signature": "(prefix: string, perTurn?: readonly string[]) => string[]",
+          "doc": "The per-turn bytes in a prompt prefix: a clock to the minute, and any of this turn's `context` sections (or the caller's own per-turn values: ids, the member's message) that also appear there."
         },
         {
           "name": "placeRouterTurn",
