@@ -95,7 +95,7 @@ try {
     await page.waitForFunction(previous => document.querySelector('dd').textContent !== previous, duration)
     await page.screenshot({ path: `${output}/live-growing.png`, fullPage: true })
     const rowDuration = await page.locator('[data-span-id="tool"] .fw-duration').innerText()
-    assert.notEqual(rowDuration, '0.5s')
+    await page.waitForFunction(previous => document.querySelector('[data-span-id="tool"] .fw-duration').textContent !== previous, rowDuration)
     await story('discovery-streaming-replay')
     await page.waitForFunction(() => document.querySelectorAll('[data-span-id]').length > 5)
     const count = await page.locator('[data-span-id]').count()
