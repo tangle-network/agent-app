@@ -916,6 +916,12 @@
       "error": null,
       "exports": [
         {
+          "name": "AppAuthColumnMap",
+          "kind": "type",
+          "signature": "type AppAuthColumnMap",
+          "doc": "A table's built columns by field name, as an index callback receives them."
+        },
+        {
           "name": "AppAuthSessionColumns",
           "kind": "type",
           "signature": "type AppAuthSessionColumns",
@@ -934,9 +940,21 @@
           "doc": "The tables `createAppAuthTables` returns."
         },
         {
+          "name": "AppAuthUserColumns",
+          "kind": "type",
+          "signature": "type AppAuthUserColumns",
+          "doc": "Extra user columns, keyed by their TypeScript field name."
+        },
+        {
+          "name": "AppAuthUsersTable",
+          "kind": "type",
+          "signature": "type AppAuthUsersTable",
+          "doc": "The `user` table with the product's extra columns."
+        },
+        {
           "name": "createAppAuthTables",
           "kind": "function",
-          "signature": "<S extends AppAuthSessionColumns = Record<never, never>>(options?: CreateAppAuthTablesOptions<S>) => { users: SQLiteTab…",
+          "signature": "<S extends AppAuthSessionColumns = Record<never, never>, U extends AppAuthUserColumns = Record<never, never>>(options?:…",
           "doc": "Build the better-auth `user`, `session`, `account` and `verification` tables."
         },
         {
@@ -16213,6 +16231,12 @@
           "kind": "const",
           "signature": "\"\\nCREATE TABLE IF NOT EXISTS rollout_turn_timing (\\n turn_id TEXT PRIMARY KEY,\\n rollout TEXT NOT NULL,\\n workspace_id…",
           "doc": null
+        },
+        {
+          "name": "ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL",
+          "kind": "const",
+          "signature": "\"ALTER TABLE rollout_turn_timing ADD COLUMN variant TEXT;\"",
+          "doc": "Apply once through the product migration runner before any row carries `variant`; old rows stay NULL."
         },
         {
           "name": "stageMetrics",
