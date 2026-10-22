@@ -695,6 +695,76 @@
       "types": "./dist/skills-placement/box.d.ts",
       "import": "./dist/skills-placement/box.js",
       "default": "./dist/skills-placement/box.js"
+    },
+    "./app-auth/drizzle": {
+      "types": "./dist/app-auth/drizzle.d.ts",
+      "import": "./dist/app-auth/drizzle.js",
+      "default": "./dist/app-auth/drizzle.js"
+    },
+    "./app-oauth/drizzle": {
+      "types": "./dist/app-oauth/drizzle.d.ts",
+      "import": "./dist/app-oauth/drizzle.js",
+      "default": "./dist/app-oauth/drizzle.js"
+    },
+    "./app-oauth/issuer": {
+      "types": "./dist/app-oauth/issuer.d.ts",
+      "import": "./dist/app-oauth/issuer.js",
+      "default": "./dist/app-oauth/issuer.js"
+    },
+    "./knowledge/prelaunch-audit": {
+      "types": "./dist/knowledge/prelaunch-audit.d.ts",
+      "import": "./dist/knowledge/prelaunch-audit.js",
+      "default": "./dist/knowledge/prelaunch-audit.js"
+    },
+    "./vault/store": {
+      "types": "./dist/vault/store/index.d.ts",
+      "import": "./dist/vault/store/index.js",
+      "default": "./dist/vault/store/index.js"
+    },
+    "./runtime/telemetry-cap": {
+      "types": "./dist/runtime/telemetry-cap.d.ts",
+      "import": "./dist/runtime/telemetry-cap.js",
+      "default": "./dist/runtime/telemetry-cap.js"
+    },
+    "./eval/research-plan": {
+      "types": "./dist/eval/research-plan.d.ts",
+      "import": "./dist/eval/research-plan.js",
+      "default": "./dist/eval/research-plan.js"
+    },
+    "./theme/dom": {
+      "types": "./dist/theme/dom.d.ts",
+      "import": "./dist/theme/dom.js",
+      "default": "./dist/theme/dom.js"
+    },
+    "./web-react/document": {
+      "types": "./dist/web-react/document.d.ts",
+      "import": "./dist/web-react/document.js",
+      "default": "./dist/web-react/document.js"
+    },
+    "./media": {
+      "types": "./dist/media/index.d.ts",
+      "import": "./dist/media/index.js",
+      "default": "./dist/media/index.js"
+    },
+    "./media/drizzle": {
+      "types": "./dist/media/drizzle.d.ts",
+      "import": "./dist/media/drizzle.js",
+      "default": "./dist/media/drizzle.js"
+    },
+    "./web/entry-server": {
+      "types": "./dist/web/entry-server.d.ts",
+      "import": "./dist/web/entry-server.js",
+      "default": "./dist/web/entry-server.js"
+    },
+    "./plans/drizzle": {
+      "types": "./dist/plans/drizzle.d.ts",
+      "import": "./dist/plans/drizzle.js",
+      "default": "./dist/plans/drizzle.js"
+    },
+    "./studio/generated-media": {
+      "types": "./dist/studio/generated-media/index.d.ts",
+      "import": "./dist/studio/generated-media/index.js",
+      "default": "./dist/studio/generated-media/index.js"
     }
   },
   "scripts": {

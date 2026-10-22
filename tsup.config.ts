@@ -2,6 +2,20 @@ import { defineConfig } from 'tsup'
 
 export default defineConfig({
   entry: {
+    'studio/generated-media/index': 'src/studio/generated-media/index.ts',
+    'plans/drizzle': 'src/plans/drizzle.ts',
+    'web/entry-server': 'src/web/entry-server.tsx',
+    'media/drizzle': 'src/media/drizzle.ts',
+    'media/index': 'src/media/index.ts',
+    'web-react/document': 'src/web-react/document.tsx',
+    'theme/dom': 'src/theme/dom.ts',
+    'eval/research-plan': 'src/eval/research-plan.ts',
+    'runtime/telemetry-cap': 'src/runtime/telemetry-cap.ts',
+    'vault/store/index': 'src/vault/store/index.ts',
+    'knowledge/prelaunch-audit': 'src/knowledge/prelaunch-audit.ts',
+    'app-oauth/issuer': 'src/app-oauth/issuer.ts',
+    'app-oauth/drizzle': 'src/app-oauth/drizzle.ts',
+    'app-auth/drizzle': 'src/app-auth/drizzle.ts',
     'skills-placement/box': 'src/skills-placement/box.ts',
     'platform/billing-config': 'src/platform/billing-config.ts',
     'spend/drizzle': 'src/spend/drizzle.ts',

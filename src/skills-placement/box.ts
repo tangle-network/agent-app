@@ -16,6 +16,7 @@ import { NotFoundError, type SandboxInstance } from '@tangle-network/sandbox'
 import type { Harness } from '../harness/index'
 import type { Outcome } from '../sandbox/outcome'
 import { writeProfileFilesToBox } from '../sandbox/profile-files'
+import { shellQuote } from '../sandbox/binary-read'
 import { resolveSkillDir } from './index'
 import { sha256Hex } from '../crypto/digest'
 
@@ -48,11 +49,53 @@ export interface ProfileSkillPlacerConfig {
    * receipt never matches. Return null when the filesystem is not identified.
    */
   filesystemIncarnation?: (box: SandboxInstance) => string | null
+  /**
+   * Serialize placement on the box with a `mkdir` lock beside the manifest
+   * (30 s wait, a lock older than 2 minutes is reclaimed). Without it, two
+   * isolates placing different corpora at once (a rolling deploy) can leave a
+   * manifest that names a skill the other one pruned.
+   */
+  boxLock?: boolean
 }
 
 function homeRelative(path: string): string {
   if (!path.startsWith('~/')) throw new Error(`Expected a home-relative path, got ${path}`)
   return path.slice(2)
+}
+
+function shellHomePath(path: string): string {
+  return `~/${shellQuote(homeRelative(path))}`
+}
+
+async function acquireBoxLock(box: SandboxInstance, manifestDir: string, lockPath: string): Promise<Outcome<void>> {
+  const command = [
+    `mkdir -p ${shellHomePath(manifestDir)}`,
+    `lock=${shellHomePath(lockPath)}`,
+    'deadline=$(( $(date +%s) + 30 ))',
+    'while ! mkdir "$lock" 2>/dev/null; do',
+    '  now=$(date +%s)',
+    '  if [ -n "$(find "$lock" -maxdepth 0 -mmin +2 -print 2>/dev/null)" ]; then rm -rf "$lock"; continue; fi',
+    '  if [ "$now" -ge "$deadline" ]; then echo "timed out waiting for skill placement lock" >&2; exit 42; fi',
+    '  sleep 0.1',
+    'done',
+  ].join('\n')
+  try {
+    const acquired = await box.exec(command)
+    if (acquired.exitCode === 0) return { succeeded: true, value: undefined }
+    return { succeeded: false, error: new Error(`placeProfileSkillsOnBox: ${acquired.stderr || 'failed to acquire skill placement lock'}`) }
+  } catch (error) {
+    return { succeeded: false, error: new Error('placeProfileSkillsOnBox: failed to acquire the skill placement lock', { cause: error }) }
+  }
+}
+
+async function releaseBoxLock(box: SandboxInstance, lockPath: string): Promise<Outcome<void>> {
+  try {
+    const released = await box.exec(`rm -rf ${shellHomePath(lockPath)}`)
+    if (released.exitCode === 0) return { succeeded: true, value: undefined }
+    return { succeeded: false, error: new Error(`placeProfileSkillsOnBox: failed to release skill placement lock: ${released.stderr}`) }
+  } catch (error) {
+    return { succeeded: false, error: new Error('placeProfileSkillsOnBox: failed to release the skill placement lock', { cause: error }) }
+  }
 }
 
 /** `null` when any ref is not an inline body: a github ref needs async
@@ -80,7 +123,7 @@ function skillFileMounts(root: string, skills: readonly DeclaredSkill[]): AgentP
  * removed. Empty `refs`, or a harness with no skill directory, is a no-op.
  */
 export function createProfileSkillPlacer(config: ProfileSkillPlacerConfig) {
-  const { manifestSchema, manifestDir, manifestName, filesystemIncarnation } = config
+  const { manifestSchema, manifestDir, manifestName, filesystemIncarnation, boxLock = false } = config
 
   // Corpora this isolate placed or verified, by box, filesystem and harness. Digests only.
   const placedCorpora = new Map<string, string>()
@@ -213,9 +256,18 @@ export function createProfileSkillPlacer(config: ProfileSkillPlacerConfig) {
 
     const key = receiptKey(box, harness)
     if (key && placedCorpora.get(key) === expected.hash) return { succeeded: true, value: undefined }
+    if (!boxLock) {
+      const placed = await placeSkills(box, harness, root, skills, expected)
+      if (placed.succeeded) recordPlacement(key, expected.hash)
+      return placed
+    }
+    const lockPath = `${manifestDir}/${harness}.json.lock`
+    const acquired = await acquireBoxLock(box, manifestDir, lockPath)
+    if (!acquired.succeeded) return acquired
     const placed = await placeSkills(box, harness, root, skills, expected)
-    if (placed.succeeded) recordPlacement(key, expected.hash)
-    return placed
+    const released = await releaseBoxLock(box, lockPath)
+    if (placed.succeeded && released.succeeded) recordPlacement(key, expected.hash)
+    return released.succeeded ? placed : released
   }
 
   /** Whether two skill declarations carry the same inline corpus. */

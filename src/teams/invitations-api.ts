@@ -137,6 +137,64 @@ export type InvitationOutcome<T> =
   | { succeeded: false; status: number; error: string }
 
 /**
+ * The live fence all three acceptance writes share, evaluated inside one
+ * atomic D1 batch. A workspace transfer or revoke between the reads and the
+ * batch wins cleanly: there is no membership to repair or runtime access to
+ * retract.
+ */
+function invitationAcceptFence(
+  tables: {
+    workspaceInvitations: WorkspaceInvitationTables['workspaceInvitations']
+    workspaces: InvitationWorkspaceTable
+    users: InvitationUserTable
+    organizationMembers: TeamTables['organizationMembers']
+    workspaceMembers: TeamTables['workspaceMembers']
+  },
+  fence: {
+    token: string
+    invitation: WorkspaceInvitationRow
+    currentUser: { id: string; emailVerified: boolean | null }
+    now: Date
+  },
+) {
+  const { workspaceInvitations, workspaces, users, organizationMembers, workspaceMembers } = tables
+  const { invitation, currentUser, now } = fence
+  const input = { token: fence.token }
+  return and(
+    eq(workspaceInvitations.id, invitation.id),
+    eq(workspaceInvitations.token, input.token),
+    eq(workspaceInvitations.status, 'pending'),
+    eq(workspaceInvitations.organizationId, invitation.organizationId),
+    eq(workspaceInvitations.workspaceId, invitation.workspaceId),
+    eq(workspaceInvitations.email, invitation.email),
+    eq(workspaceInvitations.permissions, invitation.permissions),
+    sql`${workspaceInvitations.expiresAt} > ${Math.floor(now.getTime() / 1000)}`,
+    sql`exists (select 1 from ${workspaces} where ${workspaces.id} = ${workspaceInvitations.workspaceId}
+      and ${workspaces.organizationId} = ${invitation.organizationId})`,
+    sql`exists (select 1 from ${users} where ${users.id} = ${currentUser.id}
+      and lower(trim(${users.email})) = ${invitation.email}
+      and ${users.emailVerified} = ${currentUser.emailVerified ? 1 : 0})`,
+    sql`(select count(*) from ${users} where lower(trim(${users.email})) = ${invitation.email}) = 1`,
+    sql`not exists (select 1 from ${workspaceMembers} inner join ${organizationMembers}
+      on ${organizationMembers.id} = ${workspaceMembers.organizationMemberId}
+      where ${workspaceMembers.workspaceId} = ${invitation.workspaceId}
+        and ${organizationMembers.organizationId} = ${invitation.organizationId}
+        and ${organizationMembers.userId} = ${currentUser.id}
+        and ${workspaceMembers.acceptedAt} is null)`,
+    sql`not exists (select 1 from ${workspaceMembers} where ${workspaceMembers.inviteToken} = ${invitation.token}
+      and (${workspaceMembers.workspaceId} != ${invitation.workspaceId}
+        or ${workspaceMembers.organizationMemberId} is null
+        or ${workspaceMembers.organizationMemberId} not in (select ${organizationMembers.id} from ${organizationMembers}
+          where ${organizationMembers.organizationId} = ${invitation.organizationId}
+            and ${organizationMembers.userId} = ${currentUser.id})))`,
+    sql`not exists (select 1 from ${organizationMembers}
+      where ${organizationMembers.organizationId} = ${invitation.organizationId}
+        and ${organizationMembers.userId} = ${currentUser.id}
+        and ${organizationMembers.role} in ('owner', 'admin'))`,
+  )
+}
+
+/**
  * Build the invitations API bound to one product's db/tables/access/seams.
  * Returns the six lifecycle handlers an app mounts in its routes.
  */
@@ -425,40 +483,9 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
     if (invitation.expiresAt <= now) return { succeeded: false, status: 409, error: 'Invitation has expired' }
     if (!db.batch) return { succeeded: false, status: 500, error: 'Atomic invitation acceptance is unavailable' }
 
-    // All three writes share this live fence, evaluated inside one atomic D1
-    // batch. A workspace transfer or revoke between the reads and batch wins
-    // cleanly: there is no membership to repair or runtime access to retract.
-    const eligible = and(
-      eq(workspaceInvitations.id, invitation.id),
-      eq(workspaceInvitations.token, input.token),
-      eq(workspaceInvitations.status, 'pending'),
-      eq(workspaceInvitations.organizationId, invitation.organizationId),
-      eq(workspaceInvitations.workspaceId, invitation.workspaceId),
-      eq(workspaceInvitations.email, invitation.email),
-      eq(workspaceInvitations.permissions, invitation.permissions),
-      sql`${workspaceInvitations.expiresAt} > ${Math.floor(now.getTime() / 1000)}`,
-      sql`exists (select 1 from ${workspaces} where ${workspaces.id} = ${workspaceInvitations.workspaceId}
-        and ${workspaces.organizationId} = ${invitation.organizationId})`,
-      sql`exists (select 1 from ${users} where ${users.id} = ${currentUser.id}
-        and lower(trim(${users.email})) = ${invitation.email}
-        and ${users.emailVerified} = ${currentUser.emailVerified ? 1 : 0})`,
-      sql`(select count(*) from ${users} where lower(trim(${users.email})) = ${invitation.email}) = 1`,
-      sql`not exists (select 1 from ${workspaceMembers} inner join ${organizationMembers}
-        on ${organizationMembers.id} = ${workspaceMembers.organizationMemberId}
-        where ${workspaceMembers.workspaceId} = ${invitation.workspaceId}
-          and ${organizationMembers.organizationId} = ${invitation.organizationId}
-          and ${organizationMembers.userId} = ${currentUser.id}
-          and ${workspaceMembers.acceptedAt} is null)`,
-      sql`not exists (select 1 from ${workspaceMembers} where ${workspaceMembers.inviteToken} = ${invitation.token}
-        and (${workspaceMembers.workspaceId} != ${invitation.workspaceId}
-          or ${workspaceMembers.organizationMemberId} is null
-          or ${workspaceMembers.organizationMemberId} not in (select ${organizationMembers.id} from ${organizationMembers}
-            where ${organizationMembers.organizationId} = ${invitation.organizationId}
-              and ${organizationMembers.userId} = ${currentUser.id})))`,
-      sql`not exists (select 1 from ${organizationMembers}
-        where ${organizationMembers.organizationId} = ${invitation.organizationId}
-          and ${organizationMembers.userId} = ${currentUser.id}
-          and ${organizationMembers.role} in ('owner', 'admin'))`,
+    const eligible = invitationAcceptFence(
+      { workspaceInvitations, workspaces, users, organizationMembers, workspaceMembers },
+      { token: input.token, invitation, currentUser, now },
     )
     const eligibleInvitation = sql`exists (select 1 from ${workspaceInvitations} where ${eligible})`
     const timestamp = sql`${Math.floor(now.getTime() / 1000)}`
