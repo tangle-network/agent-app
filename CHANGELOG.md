@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.270
+
+- chore(deps): adopt @tangle-network/sandbox 0.64.8 (#1253)
+
 ## 0.60.269
 
 - feat(platform): pre-mint claim event splits the claim's time (digest, D1 round trip, decrypt) (#1252)
