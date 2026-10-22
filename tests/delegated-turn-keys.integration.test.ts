@@ -9,14 +9,14 @@ import type { AddressInfo } from 'node:net'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createFieldCrypto } from '../src/crypto'
+import { createPlatformDelegatedKeyClient } from '../src/platform/delegated-keys'
 import {
   createDelegatedTurnKeys,
-  createPlatformDelegatedKeyClient,
   DELEGATED_KEY_PREMINT_TABLE_DDL,
   delegatedKeyFallbackFetch,
   type DelegatedKeyPremintD1Like,
   type DelegatedTurnKeyScope,
-} from '../src/platform/delegated-keys'
+} from '../src/platform/delegated-turn-keys'
 
 const SOURCE = 'sk-tan-payer-linked-key-0001'
 
