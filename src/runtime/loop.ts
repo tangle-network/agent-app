@@ -65,5 +65,5 @@ export type LoopEvent =
       type: 'tool_call'
       call: import('@tangle-network/agent-runtime/tool-loop').ToolLoopCall
     }
-  | { type: 'usage'; usage: { promptTokens: number; completionTokens: number } }
+  | { type: 'usage'; usage: { promptTokens: number; completionTokens: number; cachedPromptTokens?: number } }
   | { type: 'other'; event: unknown }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { composeRouterTurnPrompt, placeRouterTurn, replyLanguageInstruction, routerFunctionName, runRouterTurn, workspaceTurnCheckpoints, type RouterTurnEvent, type RouterTurnTool } from '../src/runtime/router-turn'
+import { composeRouterTurnPrompt, composeRouterTurnPromptSections, placeRouterTurn, replyLanguageInstruction, routerFunctionName, runRouterTurn, workspaceTurnCheckpoints, type RouterTurnEvent, type RouterTurnTool } from '../src/runtime/router-turn'
 import { createInMemoryWorkspaceStore } from '@tangle-network/agent-runtime/workspace-store'
+import { createTurnTrace } from '../src/turn-trace/recorder'
 
 /** One Router chat completion streamed as OpenAI server-sent events. */
 function sse(chunks: unknown[], headers: Record<string, string> = {}) {
@@ -480,5 +481,51 @@ describe('composeRouterTurnPrompt', () => {
       { prompt: { systemPrompt: 'You are Pablo.', appendSystemPrompt: 'Keep staff.tasks private.', instructions: ['Use staff.task.create for tasks.', 'Use staff.tasks to read them.'] } },
       { context: ['Current time: Sunday.'], toolNames: ['staff.tasks', 'staff.task.create'] },
     )).toBe(`You are Pablo.\n\nKeep staff_tasks private.\n\nUse staff_task_create for tasks.\n\nUse staff_tasks to read them.\n\n${replyLanguageInstruction()}\n\nCurrent time: Sunday.`)
+  })
+})
+
+describe('composeRouterTurnPromptSections', () => {
+  // One workspace, two turns: the same profile, skills and knowledge; a different clock, board and turn id.
+  const workspaceTurn = (context: string[]) => composeRouterTurnPromptSections(
+    { prompt: { systemPrompt: 'You are the creative director.', instructions: ['Use media.generate for images.'] } },
+    { stable: ['Skill brand-voice: write short.', 'Integrations: Figma, Drive.'], context, toolNames: ['media.generate'],
+      knowledge: { files: [{ path: '/files/brief.md', size: 12, text: 'Launch in May.' }] } },
+  )
+
+  it('keeps every per-turn section out of a byte-identical prefix', () => {
+    const first = workspaceTurn(['Current time: 2026-10-22T00:41:07.123Z', 'Turn id: creative:abc:0', 'Board: 3 open tasks.'])
+    const second = workspaceTurn(['Current time: 2026-10-22T00:43:55.918Z', 'Turn id: creative:abc:1', 'Board: 4 open tasks.'])
+    expect(second.prefix).toBe(first.prefix)
+    expect(second.tail).not.toBe(first.tail)
+    for (const perTurn of ['2026-10-22T00:4', 'creative:abc:', 'open tasks']) expect(first.prefix).not.toContain(perTurn)
+    // Longest-lived first: the profile, the reply rule, the caller's stable sections, then the knowledge files.
+    expect(first.prefix.startsWith(['You are the creative director.', 'Use media_generate for images.', replyLanguageInstruction(),
+      'Skill brand-voice: write short.', 'Integrations: Figma, Drive.'].join('\n\n'))).toBe(true)
+    expect(first.prefix).toContain('Knowledge file /files/brief.md:\nLaunch in May.')
+    expect(first.text).toBe(`${first.prefix}\n\n${first.tail}`)
+    expect(composeRouterTurnPrompt({ prompt: { systemPrompt: 'x' } }, { context: ['Now.'] })).toBe(`x\n\n${replyLanguageInstruction()}\n\nNow.`)
+  })
+})
+
+describe('prompt-cache usage', () => {
+  it('reads the cached prompt tokens the Router reports into the outcome, the span and the trace summary', async () => {
+    // The final two chunks of a recorded gemini-3.7-flash call through the Router (2026-10-22): usage repeats on
+    // each chunk, and only the last carries prompt_tokens_details.
+    const { fetchImpl } = router(sse([
+      { ...text('ok.'), usage: { completion_tokens: 2, prompt_tokens: 40698, total_tokens: 40700 } },
+      { choices: [{ delta: { role: 'assistant' }, finish_reason: 'stop', index: 0 }], model: 'gemini-3.7-flash',
+        usage: { completion_tokens: 2, prompt_tokens: 40698, prompt_tokens_details: { cached_tokens: 38649 }, total_tokens: 40700 } },
+    ]))
+    let clock = 1_000
+    const trace = createTurnTrace({ now: () => clock, startedAt: 1_000 })
+    trace.record('admission.lock', 'admission', 1_000, 1_040)
+    clock = 1_250
+    const events: RouterTurnEvent[] = []
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'gemini-3.7-flash', fetchImpl, trace,
+      systemPrompt: 'stable', userMessage: 'Say ok.', onEvent: event => events.push(event) })
+    expect(outcome.usage).toEqual({ promptTokens: 40698, completionTokens: 2, modelCalls: 1, cachedPromptTokens: 38649 })
+    expect(events.filter(event => event.type === 'usage')).toEqual([{ type: 'usage', promptTokens: 40698, completionTokens: 2, cachedPromptTokens: 38649 }])
+    const summary = trace.finish().summary
+    expect(summary).toMatchObject({ dispatchMs: 250, admission: { lock: 40 }, inputTokens: 40698, cachedInputTokens: 38649 })
   })
 })

@@ -85,7 +85,8 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
         reasoningPart = null
         reasoningClock.settle()
       } else if (event.type === 'usage') {
-        push({ type: 'usage', usage: { promptTokens: event.promptTokens, completionTokens: event.completionTokens } })
+        push({ type: 'usage', usage: { promptTokens: event.promptTokens, completionTokens: event.completionTokens,
+          ...(event.cachedPromptTokens !== undefined ? { cachedPromptTokens: event.cachedPromptTokens } : {}) } })
       } else if (event.type === 'tool_event') {
         // Recorded on the tool's part, so a reload shows what the tool did, and streamed as it happens.
         const part = toolParts.get(event.callId)
@@ -129,6 +130,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
   const usage = (): ChatTurnUsage => ({
     inputTokens: outcome?.usage.promptTokens ?? 0,
     outputTokens: outcome?.usage.completionTokens ?? 0,
+    ...(outcome?.usage.cachedPromptTokens !== undefined ? { cacheReadTokens: outcome.usage.cachedPromptTokens } : {}),
   })
 
   return {
