@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.273
+
+- fix(sso): log which step failed when the local session write throws (#1256)
+- chore(deps): adopt @tangle-network/sandbox 0.64.10 (#1255)
+- chore(deps): adopt @tangle-network/sandbox 0.64.9 (#1254)
+
 ## 0.60.272
 
 - feat(chat-routes): a first turn creates its thread from a minted id (createThread + mintThreadId) (#1243)
