@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.60.286
+
+- chore(deps-dev): bump @modelcontextprotocol/sdk from 1.30.1 to 1.32.0 (#1271)
+- docs(waterfall): retain calibrated playback and delivery proof [skip release] (#1277)
+- fix(chat): settle native bootstrap failures before assistant creation (#1274)
+
+## 0.60.285
+
+- chore(deps): adopt @tangle-network/sandbox 0.64.14 (#1275)
+
+## 0.60.284
+
+- fix: honor playback speed while the trace grows (#1273)
+
+## 0.60.283
+
+- Admit Eval 0.220 with a compatible development cohort (#1269)
+- feat: searchable nested live trace waterfall (#1267)
+
 ## 0.60.282
 
 - fix(chat): discard prefetch when admission throws

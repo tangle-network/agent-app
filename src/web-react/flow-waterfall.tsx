@@ -58,6 +58,8 @@ export function FlowWaterfall({ trace, live, startedAt, label = 'Trace waterfall
   }, [trace, elapsed, isLive])
   const totalMs = currentTrace.totalMs
   const playhead = Math.min(position ?? totalMs, totalMs)
+  const playbackLimit = useRef(totalMs)
+  useEffect(() => { playbackLimit.current = totalMs }, [totalMs])
 
   useEffect(() => {
     if (!playing) return
@@ -66,10 +68,10 @@ export function FlowWaterfall({ trace, live, startedAt, label = 'Trace waterfall
       const now = performance.now()
       const delta = (now - last) * speed
       last = now
-      setPosition(previous => Math.min(totalMs, (previous ?? 0) + delta))
+      setPosition(previous => Math.min(playbackLimit.current, (previous ?? 0) + delta))
     }, 50)
     return () => clearInterval(timer)
-  }, [playing, speed, totalMs])
+  }, [playing, speed])
   useEffect(() => { if (playing && position !== null && position >= totalMs) setPlaying(false) }, [position, playing, totalMs])
 
   useEffect(() => {
