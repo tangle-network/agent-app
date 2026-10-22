@@ -303,6 +303,38 @@ export interface RouterTurnPromptOptions {
   /** Knowledge files every turn carries; see {@link turnKnowledgeInstructions}. They change only when the workspace
    *  edits them, so they close the prefix. */
   knowledge?: { files: readonly TurnKnowledgeFile[]; readTool?: string }
+  /** Under a test runner (Vitest, Jest, `NODE_ENV=test`) the composition throws when the prefix carries a per-turn
+   *  byte ({@link perTurnPrefixBytes}), so an app's own tests fail before a timestamp costs every turn its prompt
+   *  cache. It never runs outside a test runner. `false` turns the check off for a prefix that is meant to vary. */
+  checkStablePrefix?: boolean
+}
+
+// A clock to the minute is per-turn by construction: ISO (`2026-10-22T08:15`, `2026-10-22 08:15`), `Date#toString`
+// (`Wed Oct 22 2026 08:15:00`) and `Date#toUTCString` (`Wed, 22 Oct 2026 08:15:00`).
+const PER_TURN_CLOCKS = [
+  /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/,
+  /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{2} \d{4} \d{2}:\d{2}/,
+  /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}/,
+]
+/** A turn section shorter than this may repeat a stable phrase; only longer ones are looked for in the prefix. */
+const MIN_REPEATED_CONTEXT = 24
+
+/**
+ * The per-turn bytes in a prompt prefix: a clock to the minute, and any of this turn's `context` sections (or the
+ * caller's own per-turn values: ids, the member's message) that also appear there. Empty for a cacheable prefix.
+ */
+export function perTurnPrefixBytes(prefix: string, perTurn: readonly string[] = []): string[] {
+  const found = PER_TURN_CLOCKS.flatMap(pattern => prefix.match(pattern)?.[0] ?? [])
+  for (const value of perTurn) {
+    const trimmed = value.trim()
+    if (trimmed.length >= MIN_REPEATED_CONTEXT && prefix.includes(trimmed)) found.push(trimmed.slice(0, 80))
+  }
+  return found
+}
+
+function underTestRunner(): boolean {
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+  return Boolean(env && (env.VITEST || env.JEST_WORKER_ID || env.NODE_ENV === 'test'))
 }
 
 /**
@@ -314,7 +346,8 @@ export interface RouterTurnPromptOptions {
  * A provider serves a repeated prompt prefix from its cache: through the Router, Gemini served 38,685 of
  * 40,734 prompt tokens from cache on each repeat of a stable 150 kB prefix, and none when a timestamp came first
  * (2026-10-22). One per-turn byte early in the prompt therefore costs the whole prompt on every turn, so nothing
- * per-turn belongs in `stable` or the profile's prompt.
+ * per-turn belongs in `stable` or the profile's prompt; under a test runner a clock or a repeated `context` section in
+ * the prefix throws (`checkStablePrefix`).
  */
 export function composeRouterTurnPromptSections(
   profile: { prompt?: { systemPrompt?: string; appendSystemPrompt?: string; instructions?: readonly string[] } },
@@ -324,9 +357,18 @@ export function composeRouterTurnPromptSections(
   const names = [...(options.toolNames ?? [])].sort((a, b) => b.length - a.length)
   const render = (parts: readonly string[]) => names.reduce((out, name) => out.split(name).join(routerFunctionName(name)),
     parts.filter(part => part.trim()).join('\n\n'))
-  const prefix = render([profile.prompt?.systemPrompt ?? '', profile.prompt?.appendSystemPrompt ?? '', ...(profile.prompt?.instructions ?? []),
-    replyLanguageInstruction(), ...(options.stable ?? []), ...knowledge])
+  const authored = [profile.prompt?.systemPrompt ?? '', profile.prompt?.appendSystemPrompt ?? '', ...(profile.prompt?.instructions ?? []),
+    replyLanguageInstruction(), ...(options.stable ?? [])]
+  const prefix = render([...authored, ...knowledge])
   const tail = render(options.context ?? [])
+  // The workspace's knowledge files are its own text and may quote a time; the check reads what the app authored.
+  if (options.checkStablePrefix !== false && underTestRunner()) {
+    const perTurn = perTurnPrefixBytes(render(authored), (options.context ?? []).map(section => render([section])))
+    if (perTurn.length) {
+      throw new Error(`composeRouterTurnPromptSections: the stable prefix carries per-turn bytes (${perTurn.map(value => JSON.stringify(value)).join(', ')}); `
+        + 'move them to `context` so the prompt cache serves the prefix, or pass `checkStablePrefix: false`.')
+    }
+  }
   return { prefix, tail, text: [prefix, tail].filter(Boolean).join('\n\n') }
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { composeRouterTurnPrompt, composeRouterTurnPromptSections, placeRouterTurn, replyLanguageInstruction, routerFunctionName, runRouterTurn, workspaceTurnCheckpoints, type RouterTurnEvent, type RouterTurnTool } from '../src/runtime/router-turn'
+import { composeRouterTurnPrompt, composeRouterTurnPromptSections, perTurnPrefixBytes, placeRouterTurn, replyLanguageInstruction, routerFunctionName, runRouterTurn, workspaceTurnCheckpoints, type RouterTurnEvent, type RouterTurnTool } from '../src/runtime/router-turn'
 import { createInMemoryWorkspaceStore } from '@tangle-network/agent-runtime/workspace-store'
 import { createTurnTrace } from '../src/turn-trace/recorder'
 
@@ -504,6 +504,25 @@ describe('composeRouterTurnPromptSections', () => {
     expect(first.prefix).toContain('Knowledge file /files/brief.md:\nLaunch in May.')
     expect(first.text).toBe(`${first.prefix}\n\n${first.tail}`)
     expect(composeRouterTurnPrompt({ prompt: { systemPrompt: 'x' } }, { context: ['Now.'] })).toBe(`x\n\n${replyLanguageInstruction()}\n\nNow.`)
+  })
+
+  it('fails a test that puts a clock or a turn section in the stable prefix, and lets knowledge quote a time', () => {
+    const clock = new Date(Date.UTC(2026, 9, 22, 8, 15))
+    for (const leak of [`Current time: ${clock.toISOString()}`, `Now: ${clock.toUTCString()}`, `Now: ${clock.toString()}`]) {
+      expect(() => composeRouterTurnPromptSections({ prompt: { systemPrompt: `You are Pablo. ${leak}` } }, {}))
+        .toThrow(/stable prefix carries per-turn bytes/)
+      expect(() => composeRouterTurnPromptSections({ prompt: { systemPrompt: 'You are Pablo.' } }, { stable: [leak] }))
+        .toThrow(/move them to `context`/)
+    }
+    const board = 'Board: 3 open tasks, oldest from Tuesday.'
+    expect(() => composeRouterTurnPromptSections({ prompt: { systemPrompt: 'You are Pablo.' } }, { stable: [board], context: [board] }))
+      .toThrow(/Board: 3 open tasks/)
+    // Opt-out, a clock in the tail, and a time quoted by a knowledge file all compose.
+    expect(composeRouterTurnPromptSections({ prompt: { systemPrompt: `Now: ${clock.toISOString()}` } }, { checkStablePrefix: false }).prefix)
+      .toContain('2026-10-22T08:15')
+    expect(composeRouterTurnPromptSections({ prompt: { systemPrompt: 'x' } }, { context: [`Now: ${clock.toISOString()}`, board],
+      knowledge: { files: [{ path: 'log.md', size: 30, text: 'Checked in 2026-10-21 14:02.' }] } }).tail).toContain(board)
+    expect(perTurnPrefixBytes('Open since 2026-10-22. Closes at 12 pm.')).toEqual([])
   })
 })
 
