@@ -15694,7 +15694,13 @@
           "name": "composeRouterTurnPrompt",
           "kind": "function",
           "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; appendSystemPrompt?: string | undefined; instructions?: reado…",
-          "doc": "The lean system prompt for a Router turn: the profile's system prompt, appended prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function nam…"
+          "doc": "The system prompt {@link composeRouterTurnPromptSections} composes, as one string."
+        },
+        {
+          "name": "composeRouterTurnPromptSections",
+          "kind": "function",
+          "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; appendSystemPrompt?: string | undefined; instructions?: reado…",
+          "doc": "The lean system prompt for a Router turn, split where its bytes stop repeating."
         },
         {
           "name": "createCertifiedDelivery",
@@ -16033,6 +16039,18 @@
           "doc": "What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose."
         },
         {
+          "name": "RouterTurnPromptOptions",
+          "kind": "interface",
+          "signature": "interface RouterTurnPromptOptions",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnPromptSections",
+          "kind": "interface",
+          "signature": "interface RouterTurnPromptSections",
+          "doc": null
+        },
+        {
           "name": "RouterTurnSettlement",
           "kind": "interface",
           "signature": "interface RouterTurnSettlement",
@@ -16299,7 +16317,13 @@
           "name": "composeRouterTurnPrompt",
           "kind": "function",
           "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; appendSystemPrompt?: string | undefined; instructions?: reado…",
-          "doc": "The lean system prompt for a Router turn: the profile's system prompt, appended prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function nam…"
+          "doc": "The system prompt {@link composeRouterTurnPromptSections} composes, as one string."
+        },
+        {
+          "name": "composeRouterTurnPromptSections",
+          "kind": "function",
+          "signature": "(profile: { prompt?: { systemPrompt?: string | undefined; appendSystemPrompt?: string | undefined; instructions?: reado…",
+          "doc": "The lean system prompt for a Router turn, split where its bytes stop repeating."
         },
         {
           "name": "DURABLE_HOP_BUDGET_MS",
@@ -16360,6 +16384,18 @@
           "kind": "interface",
           "signature": "interface RouterTurnPlacementInput",
           "doc": "What placement reads for a Router turn: the resolved profile, the tools the turn would hold, and a model the sender chose."
+        },
+        {
+          "name": "RouterTurnPromptOptions",
+          "kind": "interface",
+          "signature": "interface RouterTurnPromptOptions",
+          "doc": null
+        },
+        {
+          "name": "RouterTurnPromptSections",
+          "kind": "interface",
+          "signature": "interface RouterTurnPromptSections",
+          "doc": null
         },
         {
           "name": "RouterTurnTool",
