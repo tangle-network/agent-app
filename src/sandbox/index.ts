@@ -8,6 +8,9 @@ export {
   type SharedReuseState,
 } from './reuse-state'
 
+// A value warmed once and read by every isolate in the data center (isolate + colo layers).
+export * from './warm-cache'
+
 export type { Outcome } from './outcome'
 
 export * from './binary-read'
