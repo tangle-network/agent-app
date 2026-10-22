@@ -805,7 +805,7 @@
     "@tangle-network/agent-runtime": "0.343.3",
     "@tangle-network/brand": "1.26.2",
     "@tangle-network/hub-sdk": "0.30.14",
-    "@tangle-network/sandbox": "0.64.9",
+    "@tangle-network/sandbox": "0.64.10",
     "@tangle-network/sandbox-ui": "0.136.1",
     "@tangle-network/ui": "11.41.0",
     "@testing-library/dom": "^10.4.1",
