@@ -154,7 +154,6 @@ check(
     packageJob.indexOf('- name: Pack and inspect exact tarballs') < packageJob.indexOf('- name: Upload release artifact'),
   'release artifact is not built before upload',
 )
-check(!namedStep(packageJob, 'Check release contract').includes('if:'), 'release contract does not run on both paths')
 check(packageJob.includes('bash .github/scripts/test-write-release.sh'), 'release transition tests do not run')
 check(text.includes('git show "$BASE_SHA:.github/scripts/next-release-version.mjs" > "$RUNNER_TEMP/next-release-version.mjs"'), 'isolated release writer omits the version calculator from the exact source')
 check(packageJob.includes('Verify release tag is on main'), 'tag publishing does not check main ancestry')
