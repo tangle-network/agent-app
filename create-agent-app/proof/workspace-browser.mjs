@@ -26,6 +26,7 @@ const origin = `http://127.0.0.1:${port}`
 const email = 'workspace-proof@example.test'
 const password = randomBytes(24).toString('hex')
 const failures = []
+const recordings = []
 let turnRequests = 0
 let child
 let browser
@@ -69,8 +70,12 @@ async function startWorker() {
   throw new Error(`Worker did not start\n${workerOutput}`)
 }
 async function pageInNewContext() {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 960 } })
+  const viewport = { width: 1440, height: 960 }
+  const context = await browser.newContext({ viewport, recordVideo: { dir: join(evidence, 'videos'), size: viewport } })
   const page = await context.newPage()
+  const video = page.video()
+  assert.ok(video, 'The generated workspace journey must retain its recording')
+  recordings.push({ path: await video.path(), size: viewport })
   page.on('pageerror', (error) => failures.push(error.message))
   page.on('request', (request) => {
     if (new URL(request.url()).pathname === '/api/chat' && request.method() === 'POST') turnRequests++
@@ -218,7 +223,7 @@ try {
     browserDriver: "repository-pinned Playwright Chromium, one browser",
     package: pkg.name,
     checks: ['public agent discovery', 'owner read-only key issuance', 'fresh bearer client discovery', 'key revocation', 'real signup', 'real cookie session', 'HTTP thread create', 'History navigation', 'thread URL reload', 'shared mobile drawer navigation', 'shared profile menu signout', 'fresh Worker process and browser login reopen the same D1 thread'],
-    entryDesktop, entryMobile, desktop, mobile, modelTurnRequests: turnRequests,
+    entryDesktop, entryMobile, desktop, mobile, modelTurnRequests: turnRequests, recordings,
     unrun: ['hosted deployment', 'live model/sandbox turn', 'live mid-turn disconnect'],
     messagePersistence: 'Covered separately by the generated app e2e suite with its explicitly fake sandbox producer, not by this no-model browser proof.',
   }
@@ -228,4 +233,5 @@ try {
   await browser?.close()
   await stopWorker()
   for (const path of [config, vars, state]) rmSync(path, { recursive: true, force: true })
+  if (recordings.length) writeFileSync(join(evidence, 'workspace-videos.json'), JSON.stringify({ recordings }, null, 2) + '\n')
 }
