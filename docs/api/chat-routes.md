@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-284 exports.
+288 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -438,6 +438,22 @@ interface ChatTurnAuthorizeArgs
 interface ChatTurnCompleteInput
 ```
 
+### `ChatTurnCreateThreadOptions`
+
+`interface` — The `createThread` route option: who may create a thread from a minted id, and how the row is written.
+
+```ts
+interface ChatTurnCreateThreadOptions
+```
+
+### `ChatTurnCreateThreadResult`
+
+`type` — What `args.createThread` answers: the created row, or the response refusing the turn (404 or 409).
+
+```ts
+type ChatTurnCreateThreadResult
+```
+
 ### `ChatTurnExecutionLimits`
 
 `interface` — Trusted per-turn limits supplied by a server adapter, never by the body.
@@ -582,6 +598,14 @@ interface ChatTurnModelAttribution
 interface ChatTurnModelFailover
 ```
 
+### `ChatTurnNewThread`
+
+`interface` — The body field a minted first turn carries.
+
+```ts
+interface ChatTurnNewThread
+```
+
 ### `ChatTurnPartInput`
 
 `type` — Resolve input as either a text part or a file part of a chat turn
@@ -660,6 +684,14 @@ interface ChatTurnRoutes
 
 ```ts
 interface ChatTurnTextPartInput
+```
+
+### `ChatTurnThreadOwner`
+
+`interface` — Who a created thread belongs to: the tenant (workspace) and member `authorize` resolved.
+
+```ts
+interface ChatTurnThreadOwner
 ```
 
 ### `ChatTurnTraceOptions`
@@ -747,7 +779,7 @@ interface CreateAttachmentUploadRouteOptions
 `function` — Build chat turn routes to handle and validate incoming chat requests with optional logging
 
 ```ts
-<TContext = void>(options: CreateChatTurnRoutesOptions<TContext>) => ChatTurnRoutes
+<TContext = void, TThread = unknown>(options: CreateChatTurnRoutesOptions<TContext, TThread>) => ChatTurnRoutes
 ```
 
 ### `CreateChatTurnRoutesOptions`

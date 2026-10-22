@@ -2973,6 +2973,18 @@
           "doc": "What a settled turn reports to `onTurnComplete` — the product's post-processing seam (billing, titles, audit)."
         },
         {
+          "name": "ChatTurnCreateThreadOptions",
+          "kind": "interface",
+          "signature": "interface ChatTurnCreateThreadOptions",
+          "doc": "The `createThread` route option: who may create a thread from a minted id, and how the row is written."
+        },
+        {
+          "name": "ChatTurnCreateThreadResult",
+          "kind": "type",
+          "signature": "type ChatTurnCreateThreadResult",
+          "doc": "What `args.createThread` answers: the created row, or the response refusing the turn (404 or 409)."
+        },
+        {
           "name": "ChatTurnExecutionLimits",
           "kind": "interface",
           "signature": "interface ChatTurnExecutionLimits",
@@ -3081,6 +3093,12 @@
           "doc": "Which model served, and what it took to get there."
         },
         {
+          "name": "ChatTurnNewThread",
+          "kind": "interface",
+          "signature": "interface ChatTurnNewThread",
+          "doc": "The body field a minted first turn carries."
+        },
+        {
           "name": "ChatTurnPartInput",
           "kind": "type",
           "signature": "type ChatTurnPartInput",
@@ -3139,6 +3157,12 @@
           "kind": "interface",
           "signature": "interface ChatTurnTextPartInput",
           "doc": "Wire contract between the chat client (composer + `streamChatTurn`) and the assembled server vertical (`createChatTurnRoutes`)."
+        },
+        {
+          "name": "ChatTurnThreadOwner",
+          "kind": "interface",
+          "signature": "interface ChatTurnThreadOwner",
+          "doc": "Who a created thread belongs to: the tenant (workspace) and member `authorize` resolved."
         },
         {
           "name": "ChatTurnTraceOptions",
@@ -3203,7 +3227,7 @@
         {
           "name": "createChatTurnRoutes",
           "kind": "function",
-          "signature": "<TContext = void>(options: CreateChatTurnRoutesOptions<TContext>) => ChatTurnRoutes",
+          "signature": "<TContext = void, TThread = unknown>(options: CreateChatTurnRoutesOptions<TContext, TThread>) => ChatTurnRoutes",
           "doc": "Build chat turn routes to handle and validate incoming chat requests with optional logging"
         },
         {
@@ -28886,6 +28910,12 @@
           "kind": "interface",
           "signature": "interface MessageAttachmentsProps",
           "doc": null
+        },
+        {
+          "name": "mintThreadId",
+          "kind": "function",
+          "signature": "() => string",
+          "doc": "A thread id in the server's own format (32 lowercase hex), minted in the browser for a new chat's first turn: send it as both `threadId` and `newThread.id`, and the turn route's `createThread` option…"
         },
         {
           "name": "missingAnswerHint",
