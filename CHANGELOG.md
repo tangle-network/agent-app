@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.274
+
+- docs: an afterAuthorize release must await what the hook started under dispatchFirst (#1257)
+
 ## 0.60.273
 
 - fix(sso): log which step failed when the local session write throws (#1256)
