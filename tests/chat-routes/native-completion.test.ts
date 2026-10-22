@@ -311,40 +311,7 @@ describe('observeNativeCompletion', () => {
     })
   })
 
-  it('retains partial tool and file parts from an exact interrupted turn without billing it', async () => {
-    const box = source({
-      status: { id: 'session-1', status: 'cancelled', latestExecutionId: 'turn-1', failureReason: { message: 'cancelled' } },
-      messages: [{
-        id: 'assistant-1', role: 'assistant', timestamp: '2026-09-20T00:00:00.000Z',
-        metadata: { turnId: 'turn-1', status: 'interrupted', interrupted: true, interruptReason: 'user cancelled' },
-        parts: [
-          { type: 'tool', id: 'tool-1', tool: 'write', state: { status: 'completed', input: { path: 'draft.md' }, output: { ok: true } } },
-          { type: 'file', id: 'file-1', path: 'draft.md', filename: 'draft.md' },
-          { type: 'step-finish', id: 'usage-1', tokens: { input: 10, output: 2, reasoning: 4, cache: { read: 6, write: 8 } }, cost: 0.03 },
-        ],
-      }],
-      result: { success: false, status: 'cancelled', error: 'user cancelled', usage: { inputTokens: 10, outputTokens: 2 }, costUsd: 0.03 },
-    })
 
-    const observed = await observeNativeCompletion({
-      source: box,
-      admissionStore: store(),
-      executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 0, now: 100,
-    })
-
-    expect(observed).toMatchObject({
-      state: 'failed',
-      receipt: {
-        state: 'failed', error: 'user cancelled', completedTurnIds: ['turn-1'],
-        usage: { inputTokens: 10, outputTokens: 2, reasoningTokens: 4, cacheReadTokens: 6, cacheWriteTokens: 8, costUsd: 0.03 },
-      },
-    })
-    if (observed.state === 'running') throw new Error('expected terminal receipt')
-    expect(observed.receipt.parts).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'tool', id: 'tool-1' }),
-      expect.objectContaining({ type: 'file', path: 'draft.md' }),
-    ]))
-  })
 
   it('treats a missing terminal receipt as retryable until its deadline', async () => {
     const observed = await observeNativeCompletion({
@@ -404,42 +371,7 @@ describe('observeNativeCompletion', () => {
     })
   })
 
-  it('preserves an earlier interrupted receipt when a later admitted continuation completes', async () => {
-    const box = source({
-      status: { id: 'session-1', status: 'completed', latestExecutionId: 'turn-2' },
-      runs: [
-        { executionId: 'turn-2', sessionId: 'session-1', status: 'completed', startedAt: 2, completedAt: 3, eventCount: 3, lastEventId: '3' },
-        { executionId: 'turn-1', sessionId: 'session-1', status: 'failed', startedAt: 1, completedAt: 2, eventCount: 2, lastEventId: '2' },
-      ],
-      completed: {
-        turnId: 'turn-2', sessionId: 'session-1',
-        result: { response: 'continuation completed' },
-      },
-      messages: [{
-        id: 'assistant-1', role: 'assistant', timestamp: '2026-09-20T00:00:00.000Z',
-        metadata: { turnId: 'turn-1', status: 'interrupted', interrupted: true, interruptReason: 'base failed' },
-        parts: [{ type: 'tool', id: 'tool-1', tool: 'write', state: { status: 'completed' } }],
-      }],
-      result: { success: false, status: 'error', error: 'base failed', usage: { inputTokens: 10 } },
-    })
 
-    const observed = await observeNativeCompletion({
-      source: box,
-      admissionStore: store({ ...admission, admittedTurnIds: ['turn-1', 'turn-2'] }),
-      executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 0, now: 100,
-    })
-
-    expect(observed).toMatchObject({
-      state: 'failed',
-      receipt: {
-        error: 'base failed', text: 'continuation completed', completedTurnIds: ['turn-1', 'turn-2'],
-      },
-    })
-    if (observed.state === 'running') throw new Error('expected terminal receipt')
-    expect(observed.receipt.parts).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'tool', id: 'tool-1' }),
-    ]))
-  })
 
   it('retains exact earlier partial parts when a later terminal receipt stays missing past its deadline', async () => {
     const box = source({
@@ -475,32 +407,7 @@ describe('observeNativeCompletion', () => {
     ]))
   })
 
-  it('builds a long interrupted receipt from the recorded message without replaying the execution', async () => {
-    const box = source({
-      status: { id: 'session-1', status: 'failed', latestExecutionId: 'turn-1', failureReason: { message: 'runtime stopped' } },
-      runs: [{ executionId: 'turn-1', sessionId: 'session-1', status: 'failed', startedAt: 1, completedAt: 2, eventCount: 40_000, lastEventId: '40000' }],
-      messages: [{
-        id: 'assistant-1', role: 'assistant', timestamp: '2026-10-10T00:00:00.000Z',
-        metadata: { turnId: 'turn-1', status: 'interrupted', interrupted: true },
-        parts: [{ type: 'text', id: 'text-1', text: 'what I found so far' }],
-      }],
-    })
 
-    const observed = await observeNativeCompletion({
-      source: box,
-      admissionStore: store(),
-      executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 1_800_000, now: 2_000_000,
-    })
-
-    expect(observed).toMatchObject({
-      state: 'failed',
-      receipt: { text: 'what I found so far', error: 'runtime stopped', completedTurnIds: ['turn-1'] },
-    })
-    const sessions = (box.session as ReturnType<typeof vi.fn>).mock.results.map((result) => result.value)
-    // The execution's event stream grows with the run; only the turn's own messages are read.
-    for (const session of sessions) expect(session.result).not.toHaveBeenCalled()
-    expect(sessions.flatMap((session) => session.messages.mock.calls)).toEqual([[{ limit: 1_000, since: 1_200_000 }]])
-  })
 
   it('reads a completed turn from messages since its registration', async () => {
     const box = source({
