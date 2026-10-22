@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url'
 
 const root = process.cwd()
 const output = process.env.FLOW_CONSUMER_PROOF_DIR
+const runtimeOnly = process.argv.includes('--runtime-only')
 const scratch = mkdtempSync(join(tmpdir(),'app-flow-consumer-'))
 try {
   const packed = JSON.parse(execFileSync('npm',['pack','--ignore-scripts','--json','--pack-destination',scratch],{encoding:'utf8'}))
@@ -25,21 +26,23 @@ try {
   const { buildFlowTrace, composeMissionFlowTrace, stepActivityFlowTrace } = await load(fromPack,'@tangle-network/agent-app/trace')
   const surfaces = await load(fromPack,'@tangle-network/agent-app/web-react')
   for (const removed of ['FlowWaterfall','waterfallLayout']) assert.equal(removed in surfaces,false,removed)
-  // Type-only APIs require a real downstream compiler; runtime namespace checks cannot prove them.
-  const compilerManifest = fromOwner.resolve('typescript/package.json')
-  const compiler = join(dirname(compilerManifest),JSON.parse(readFileSync(compilerManifest,'utf8')).bin.tsc)
-  const compile = source => {
-    writeFileSync(join(scratch,'types.ts'),source)
-    writeFileSync(join(scratch,'tsconfig.json'),JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',strict:true,skipLibCheck:true,noEmit:true,types:[],lib:['ES2022','DOM']},files:['types.ts']}))
-    return spawnSync(process.execPath,[compiler,'-p',join(scratch,'tsconfig.json')],{encoding:'utf8'})
+  if (!runtimeOnly) {
+    // Type-only APIs require a real downstream compiler; runtime namespace checks cannot prove them.
+    const compilerManifest = fromOwner.resolve('typescript/package.json')
+    const compiler = join(dirname(compilerManifest),JSON.parse(readFileSync(compilerManifest,'utf8')).bin.tsc)
+    const compile = source => {
+      writeFileSync(join(scratch,'types.ts'),source)
+      writeFileSync(join(scratch,'tsconfig.json'),JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',strict:true,skipLibCheck:true,noEmit:true,types:[],lib:['ES2022','DOM']},files:['types.ts']}))
+      return spawnSync(process.execPath,[compiler,'-p',join(scratch,'tsconfig.json')],{encoding:'utf8'})
+    }
+    const retained = compile("import type {MissionActivityLaneProps} from '@tangle-network/agent-app/web-react'; import type {FlowTrace,FlowSpan} from '@tangle-network/agent-app/trace'; export type Retained=MissionActivityLaneProps; const span:FlowSpan={kind:'tool',name:'retained',startMs:0,endMs:1}; const trace:FlowTrace={spans:[span],totalMs:1,promptTokens:0,completionTokens:0,toolCalls:1}; void trace;")
+    assert.equal(retained.status,0,retained.stdout+retained.stderr)
+    const retired = compile("import type {FlowWaterfallProps,WaterfallRow} from '@tangle-network/agent-app/web-react'; export type Removed=[FlowWaterfallProps,WaterfallRow];")
+    assert.notEqual(retired.status,0,'Removed type exports must fail downstream compilation')
+    assert.match(retired.stdout,/FlowWaterfallProps/)
+    assert.match(retired.stdout,/WaterfallRow/)
+    assert.match(retired.stdout,/TS(2305|2724)/,'The compiler must reject removed named exports')
   }
-  const retained = compile("import type {MissionActivityLaneProps} from '@tangle-network/agent-app/web-react'; import type {FlowTrace,FlowSpan} from '@tangle-network/agent-app/trace'; export type Retained=MissionActivityLaneProps; const span:FlowSpan={kind:'tool',name:'retained',startMs:0,endMs:1}; const trace:FlowTrace={spans:[span],totalMs:1,promptTokens:0,completionTokens:0,toolCalls:1}; void trace;")
-  assert.equal(retained.status,0,retained.stdout+retained.stderr)
-  const retired = compile("import type {FlowWaterfallProps,WaterfallRow} from '@tangle-network/agent-app/web-react'; export type Removed=[FlowWaterfallProps,WaterfallRow];")
-  assert.notEqual(retired.status,0,'Removed type exports must fail downstream compilation')
-  assert.match(retired.stdout,/FlowWaterfallProps/)
-  assert.match(retired.stdout,/WaterfallRow/)
-  assert.match(retired.stdout,/TS(2305|2724)/,'The compiler must reject removed named exports')
   const { FlowWaterfall } = await load(fromOwner,'@tangle-network/charts/react')
   const { createElement } = await load(fromOwner,'react')
   const { renderToStaticMarkup } = await load(fromOwner,'react-dom/server')
@@ -71,7 +74,7 @@ try {
   const running = buildFlowTrace([{t:0,event:{type:'tool_call',call:{toolCallId:'open',toolName:'Open tool'}}}],{running:true})
   assert.equal(running.spans[0].status,'running')
   assert.match(html(running),/data-span-id="open"/)
-  const result = {result:'PASS',packedPublicExports:true,dependencyTree:'frozen owner checkout',removedExports:true,retainedTraceTypes:true,retiredTypeImportsRejected:true,stylesheetBridge:true,bufferedFailure:true,running:true,domainStatuses:observed}
+  const result = {result:'PASS',packedPublicExports:true,dependencyTree:'frozen owner checkout',removedExports:true,retainedTraceTypes:runtimeOnly?null:true,retiredTypeImportsRejected:runtimeOnly?null:true,stylesheetBridge:true,bufferedFailure:true,running:true,domainStatuses:observed}
   if(output){mkdirSync(resolve(output),{recursive:true});writeFileSync(join(output,'producer-consumer.json'),JSON.stringify(result,null,2))}
   console.log(JSON.stringify(result))
 } finally {rmSync(scratch,{recursive:true,force:true})}
