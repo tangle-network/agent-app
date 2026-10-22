@@ -42,8 +42,10 @@ export interface ApiAccessPanelProps {
   /** The product's words for one workspace and several. Defaults to workspace / workspaces. */
   workspaceNoun?: { singular: string; plural: string }
   /** `workspaceIds` is empty for a key that reaches every workspace. */
-  onCreate: (input: { name: string; scopes: string[]; expiresAt: string; workspaceIds: string[] }) => Promise<{ id: string; key: string }>
-  onRevoke: (id: string) => Promise<void>
+  /** Defaults to `POST /api/keys`, the route the shared key handlers serve. */
+  onCreate?: (input: { name: string; scopes: string[]; expiresAt: string; workspaceIds: string[] }) => Promise<{ id: string; key: string }>
+  /** Defaults to `DELETE /api/keys/:id`. */
+  onRevoke?: (id: string) => Promise<void>
   onChanged: () => void
 }
 
@@ -84,10 +86,25 @@ function expandScopes(scopes: readonly string[], access: readonly ApiAccessScope
   return [...selected]
 }
 
+async function createKeyViaApi(input: { name: string; scopes: string[]; expiresAt: string; workspaceIds: string[] }) {
+  const response = await fetch('/api/keys', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  })
+  const result = await response.json() as { id?: string; key?: string; error?: string }
+  if (!response.ok || !result.id || !result.key) throw new Error(result.error ?? 'Could not create key')
+  return { id: result.id, key: result.key }
+}
+
+async function revokeKeyViaApi(id: string) {
+  const response = await fetch(`/api/keys/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  const result = await response.json() as { deleted?: boolean; error?: string }
+  if (!response.ok || result.deleted !== true) throw new Error(result.error ?? 'Could not revoke key')
+}
+
 export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHref, description,
   limitsDescription, expiryDays = defaultExpiryChoices, defaultExpiryDays = 7,
   workspaces, workspaceNoun = { singular: 'workspace', plural: 'workspaces' },
-  onCreate, onRevoke, onChanged }: ApiAccessPanelProps) {
+  onCreate = createKeyViaApi, onRevoke = revokeKeyViaApi, onChanged }: ApiAccessPanelProps) {
   const [name, setName] = useState('')
   const [reach, setReach] = useState('')
   // A workspace that is no longer offered falls back to "all" rather than minting a key for it.

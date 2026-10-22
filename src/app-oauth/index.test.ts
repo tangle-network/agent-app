@@ -45,7 +45,8 @@ describe('app OAuth host boundary', () => {
   it('accepts only a live resource-bound consent, client, session and user', async () => {
     const { authority, config, request } = setup()
     const verify = createAppOAuthResourceVerifier({ ...config, jwksFetch: async () => ({ keys: [] }) })
-    expect(await verify(request())).toEqual({ userId: 'user-1', clientId: 'client-1', scopes: ['operator:read'] })
+    expect(await verify(request())).toEqual({ userId: 'user-1', clientId: 'client-1', scopes: ['operator:read'],
+      consentId: 'consent-2', sessionId: 'session-1' })
     expect(vi.mocked(verifyJwsAccessToken).mock.calls[0]?.[1]?.verifyOptions).toMatchObject({
       issuer, audience: resource,
       algorithms: expect.arrayContaining(['EdDSA', 'ES256', 'RS256']),

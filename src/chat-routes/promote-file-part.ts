@@ -40,6 +40,9 @@ import {
 } from './attachment-write-safety'
 import { sanitizeAttachmentFileName } from './attachment-validation'
 import { formatBytes } from './wire'
+import { sniffMimeFromName } from '../web/mime'
+
+export { sniffMimeFromName }
 
 /** Default ceiling on a promoted file's raw (pre-encoding) byte size. */
 export const PROMOTE_MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -78,50 +81,6 @@ export interface AttachmentPathArgs {
   mediaType: string
   /** `image`/`file` split of the media type. */
   kind: ChatAttachmentKind
-}
-
-/** Minimal extension→mime map — the last-resort media type when the part
- *  carries none. Generic file typing, NOT a product accept-list (which is a
- *  domain value the product supplies): an unknown extension falls to
- *  `text/plain`, it never rejects. */
-const EXT_TO_MIME: Record<string, string> = {
-  md: 'text/markdown',
-  markdown: 'text/markdown',
-  txt: 'text/plain',
-  log: 'text/plain',
-  csv: 'text/csv',
-  tsv: 'text/tab-separated-values',
-  json: 'application/json',
-  yaml: 'text/yaml',
-  yml: 'text/yaml',
-  xml: 'application/xml',
-  html: 'text/html',
-  htm: 'text/html',
-  pdf: 'application/pdf',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  avif: 'image/avif',
-  heic: 'image/heic',
-  heif: 'image/heif',
-  svg: 'image/svg+xml',
-  mp4: 'video/mp4',
-  webm: 'video/webm',
-  mov: 'video/quicktime',
-  mp3: 'audio/mpeg',
-  wav: 'audio/wav',
-  ogg: 'audio/ogg',
-  m4a: 'audio/mp4',
-  aac: 'audio/aac',
-}
-
-/** Default MIME hook: extension → mime, or `text/plain` for the unknown. */
-export function sniffMimeFromName(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase()
-  if (!ext) return 'text/plain'
-  return EXT_TO_MIME[ext] ?? 'text/plain'
 }
 
 /** Decode base64 with `atob` (not `Buffer.from`, which SKIPS out-of-alphabet

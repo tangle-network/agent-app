@@ -4,7 +4,7 @@
 
 Source: `src/eval/index.ts`
 
-29 exports.
+34 exports.
 
 ### `AskVerdict`
 
@@ -92,6 +92,22 @@ interface CorrectnessChecker
 
 ```ts
 (opts?: { minRecall?: number | undefined; minContentLength?: number | undefined; }) => (requirement: CompletionRequirem…
+```
+
+### `decidePersonaTurn`
+
+`function` — Decide the simulated user's next turn.
+
+```ts
+(chat: ChatClient, opts: DecidePersonaTurnOpts) => Promise<string>
+```
+
+### `DecidePersonaTurnOpts`
+
+`interface`
+
+```ts
+interface DecidePersonaTurnOpts
 ```
 
 ### `extractProducedState`
@@ -190,6 +206,14 @@ interface ProbeReport
 interface ProducedState
 ```
 
+### `recordScorecardAndDiff`
+
+`function` — Append the run to the scorecard, fold the log, diff, and surface a regression flag.
+
+```ts
+(input: ScorecardWiringInput) => ScorecardWiringResult
+```
+
 ### `runParityEval`
 
 `function` — Ask every lane every question, one ask at a time per lane (lanes run in parallel), and grade each answer the same way.
@@ -212,6 +236,22 @@ type RuntimeEventLike
 
 ```ts
 type SatisfiedBy
+```
+
+### `ScorecardWiringInput`
+
+`interface`
+
+```ts
+interface ScorecardWiringInput
+```
+
+### `ScorecardWiringResult`
+
+`interface`
+
+```ts
+interface ScorecardWiringResult
 ```
 
 ### `TaskGold`

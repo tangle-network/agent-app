@@ -4,7 +4,7 @@
 
 Source: `src/studio-react/index.tsx`
 
-48 exports.
+53 exports.
 
 ### `AudioTogglePill`
 
@@ -44,6 +44,14 @@ type ComposerType
 
 ```ts
 interface DeferredDelete
+```
+
+### `downloadGenerationFiles`
+
+`function` — Download generations through the workspace asset-version file route, falling back to the stored result URL when a generation has no asset version.
+
+```ts
+(workspaceId: string, items: readonly Generation[]) => void
 ```
 
 ### `downloadGenerationsViaAnchor`
@@ -238,6 +246,14 @@ interface StudioConfirmDialogProps
 interface StudioGenerationScreenProps
 ```
 
+### `studioHistoryFetcher`
+
+`function` — The cursor-paged history fetch against `{endpoint}?workspaceId&q&type&cursor` (default `/api/generations`).
+
+```ts
+(workspaceId: string, options?: { endpoint?: string | undefined; isRemoved?: ((generationId: string) => boolean) | unde…
+```
+
 ### `StudioHistoryScreen`
 
 `function`
@@ -284,6 +300,22 @@ interface StudioPlayback
 
 ```ts
 (props: { children: ReactNode; createAudioElement?: (() => StudioAudioElementLike) | undefined; }) => Element
+```
+
+### `StudioScreen`
+
+`type` — In-route navigation between the three studio screens: one URL, local state.
+
+```ts
+type StudioScreen
+```
+
+### `studioShouldRevalidate`
+
+`function` — `?type=`-only URL changes never need the loader: the history screen pages its own data through `fetchPage`, and the param only picks the entry screen.
+
+```ts
+({ currentUrl, nextUrl, defaultShouldRevalidate, }: ShouldRevalidateFunctionArgs) => boolean
 ```
 
 ### `StudioToastInput`
@@ -364,6 +396,14 @@ interface UseGenerationHistoryOptions
 
 ```ts
 () => StudioPlayback
+```
+
+### `useStudioScreens`
+
+`function` — Screen state for the studio route.
+
+```ts
+({ canGenerate, viewerBackHref }: { canGenerate: boolean; viewerBackHref: string; }) => { screen: StudioScreen; backToS…
 ```
 
 ### `useStudioToast`

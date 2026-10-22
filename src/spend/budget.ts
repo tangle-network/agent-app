@@ -1,5 +1,19 @@
 import type { SpendLedger } from './store'
 
+/**
+ * Default compute-spend ceiling for a workspace that enables the guard without
+ * naming its own limit: ten times the cost of running one 2 vCPU / 4 GB box for
+ * a 24-hour max lifetime, at the incident's calibrated price
+ * ($0.114055255/hour — reverse-derived in `fixtures/incident-parked-time.ts`
+ * so its 23 incident rows sum to the refunded $514.161090533 exactly).
+ *
+ *   10 x 24h x $0.114055255/h = $27.3732612  ->  27_373_261_200 nanodollars
+ *
+ * Deliberately generous: there is no spend history to ground a tighter number,
+ * and a guard that refuses ordinary usage is itself an incident.
+ */
+export const DEFAULT_WORKSPACE_SPEND_BUDGET_NANO_USD = 27_373_261_200
+
 /** Why provisioning was refused, with every number the decision used. */
 export interface ComputeBudgetRefusal {
   readonly workspaceId: string

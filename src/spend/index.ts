@@ -99,6 +99,7 @@ export {
 
 export {
   ComputeBudgetExceededError,
+  DEFAULT_WORKSPACE_SPEND_BUDGET_NANO_USD,
   assertComputeBudget,
   createSandboxSpendHooks,
   type ComputeBudget,
@@ -119,3 +120,13 @@ export {
 } from './delegate-budget'
 
 export { formatSpendReport, spendReportToJson } from './report'
+
+// The platform's settled-row read, the input to both the reconciler and the
+// budget guard. Drizzle persistence lives in `./spend/drizzle`.
+export {
+  SPEND_BUDGET_LOOKBACK_MS,
+  SPEND_RECONCILE_LOOKBACK_MS,
+  fetchPlatformSettlementRows,
+  sandboxChargeNanoUsd,
+  type FetchPlatformSettlementRowsInput,
+} from './platform-settlements'

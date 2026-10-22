@@ -4,7 +4,7 @@
 
 Source: `src/web/index.ts`
 
-44 exports.
+52 exports.
 
 ### `acquisitionFromRequest`
 
@@ -92,6 +92,14 @@ interface CookieOptions
 
 ```ts
 (options: ApiKeyFetchOptions) => ApiKeyFetch
+```
+
+### `createRateLimiterBinding`
+
+`function` — A product's limiter bound once to its KV namespace at worker start: `setKV(env.RATE_LIMIT_KV)`, then `check(key, limit, windowSeconds)` anywhere.
+
+```ts
+(options?: RateLimiterBindingOptions) => { setKV: (kv: KvLike) => void; check: (key: string, limit: number, windowSecon…
 ```
 
 ### `extractRequestContext`
@@ -222,6 +230,22 @@ interface FreeRouteLimitResponseOptions
 type GroupedConversationItem
 ```
 
+### `isBlockedFetchHostname`
+
+`function` — Server-side fetch target guard: refuse hosts that resolve to this machine or a private network, so a user- or model-supplied URL cannot reach internal services.
+
+```ts
+(hostname: string) => boolean
+```
+
+### `isEditableMime`
+
+`function` — The vault editor surface is Markdown-only.
+
+```ts
+(mime: string) => boolean
+```
+
 ### `isWorkspaceFileExportable`
 
 `function` — Workspace exports exclude runtime configuration and hidden credential stores.
@@ -262,6 +286,14 @@ interface KvLike
 interface RateLimitBudget
 ```
 
+### `RateLimiterBindingOptions`
+
+`interface`
+
+```ts
+interface RateLimiterBindingOptions
+```
+
 ### `RateLimitOptions`
 
 `interface` — Request-lifetime persistence for a coarse limiter.
@@ -276,6 +308,14 @@ interface RateLimitOptions
 
 ```ts
 interface RateLimitResult
+```
+
+### `RateLimitTiming`
+
+`interface` — Timing of one limiter decision, for a product that logs it.
+
+```ts
+interface RateLimitTiming
 ```
 
 ### `readCookieValue`
@@ -326,6 +366,22 @@ interface SecurityHeaderOptions
 (value: string, opts: CookieOptions) => string
 ```
 
+### `sniffMime`
+
+`function` — Extension → mime for choosing a file preview renderer.
+
+```ts
+(filename: string, extraExtensions?: Readonly<Record<string, string>> | undefined) => string
+```
+
+### `sniffMimeFromName`
+
+`function` — Generic extension → mime for uploads and promoted files.
+
+```ts
+(filename: string) => string
+```
+
 ### `STANDARD_SECURITY_HEADERS`
 
 `const` — Canonical generic response headers used by {@link addSecurityHeaders}.
@@ -348,6 +404,14 @@ Readonly<{ readonly 'Strict-Transport-Security': "max-age=31536000; includeSubDo
 
 ```ts
 interface WithFreeRouteLimitOptions
+```
+
+### `withTimeout`
+
+`function` — Race an async operation against a timeout.
+
+```ts
+<T>(operation: (signal: AbortSignal) => Promise<T>, timeoutMs: number, message: string) => Promise<T>
 ```
 
 ### `WORKSPACE_BUDGET_MULTIPLIER`

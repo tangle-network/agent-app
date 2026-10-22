@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -17,7 +17,10 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./agent-surfaces/cli`](api/agent-surfaces-cli.md) | 0 | — |
 | [`./alerting`](api/alerting.md) | 8 | — |
 | [`./app-auth`](api/app-auth.md) | 13 | `email`, `platform` |
+| [`./app-auth/drizzle`](api/app-auth-drizzle.md) | 5 | `email`, `platform` |
 | [`./app-oauth`](api/app-oauth.md) | 19 | — |
+| [`./app-oauth/drizzle`](api/app-oauth-drizzle.md) | 2 | — |
+| [`./app-oauth/issuer`](api/app-oauth-issuer.md) | 10 | — |
 | [`./assets`](api/assets.md) | 41 | — |
 | [`./assistant`](api/assistant.md) | 69 | `runtime`, `web-react` |
 | [`./billing`](api/billing.md) | 34 | — |
@@ -32,7 +35,7 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./chatgpt-react/styles`](api/chatgpt-react-styles.md) | 0 | `agent-enrollment`, `web-react` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
 | [`./copy-quality`](api/copy-quality.md) | 15 | `work-product` |
-| [`./crypto`](api/crypto.md) | 10 | `billing` |
+| [`./crypto`](api/crypto.md) | 11 | `billing` |
 | [`./design-canvas`](api/design-canvas.md) | 99 | `tools`, `web` |
 | [`./design-canvas-react`](api/design-canvas-react.md) | 130 | `brand`, `design-canvas`, `theme` |
 | [`./design-canvas-react/engine`](api/design-canvas-react-engine.md) | 77 | `brand`, `design-canvas`, `theme` |
@@ -41,9 +44,10 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./documents`](api/documents.md) | 37 | — |
 | [`./documents/pdf-inspector`](api/documents-pdf-inspector.md) | 4 | — |
 | [`./email`](api/email.md) | 22 | — |
-| [`./eval`](api/eval.md) | 29 | `tools` |
+| [`./eval`](api/eval.md) | 34 | `tools` |
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
-| [`./forms`](api/forms.md) | 29 | — |
+| [`./eval/research-plan`](api/eval-research-plan.md) | 4 | `tools` |
+| [`./forms`](api/forms.md) | 29 | `crypto` |
 | [`./harness`](api/harness.md) | 27 | — |
 | [`./hosted-agent`](api/hosted-agent.md) | 26 | `profile`, `web` |
 | [`./hosted-agent/application`](api/hosted-agent-application.md) | 9 | `profile`, `web` |
@@ -60,26 +64,31 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./journeys/cli`](api/journeys-cli.md) | 1 | `signoff`, `workspace-export` |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
+| [`./knowledge/prelaunch-audit`](api/knowledge-prelaunch-audit.md) | 2 | — |
 | [`./launch-invariants`](api/launch-invariants.md) | 65 | `signoff`, `turn-health` |
 | [`./launch-invariants/cli`](api/launch-invariants-cli.md) | 1 | `signoff`, `turn-health` |
 | [`./launch-invariants/testing`](api/launch-invariants-testing.md) | 38 | `signoff`, `turn-health` |
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
 | [`./legibility/cli`](api/legibility-cli.md) | 0 | `signoff` |
+| [`./media`](api/media.md) | 42 | `studio`, `web` |
+| [`./media/drizzle`](api/media-drizzle.md) | 3 | `studio`, `web` |
 | [`./missions`](api/missions.md) | 65 | — |
 | [`./model-resolution`](api/model-resolution.md) | 31 | `policy-filters` |
 | [`./object-store`](api/object-store.md) | 20 | `crypto` |
 | [`./openui`](api/openui.md) | 35 | `web` |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
-| [`./operator`](api/operator.md) | 56 | `chat-routes`, `platform`, `stream`, `web` |
+| [`./operator`](api/operator.md) | 56 | `chat-routes`, `crypto`, `platform`, `stream`, `web` |
 | [`./peer-floors/check`](api/peer-floors-check.md) | 23 | `signoff` |
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 1 | `signoff` |
-| [`./plans`](api/plans.md) | 12 | — |
+| [`./plans`](api/plans.md) | 19 | — |
+| [`./plans/drizzle`](api/plans-drizzle.md) | 3 | — |
 | [`./platform`](api/platform.md) | 123 | `billing`, `runtime`, `web` |
+| [`./platform/billing-config`](api/platform-billing-config.md) | 2 | `billing`, `runtime`, `web` |
 | [`./policy-filters`](api/policy-filters.md) | 17 | — |
 | [`./preflight`](api/preflight.md) | 14 | `signoff` |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | `signoff` |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 36 | `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`, `web` |
-| [`./profile`](api/profile.md) | 88 | `copy-quality`, `skills` |
+| [`./profile`](api/profile.md) | 88 | `copy-quality`, `crypto`, `skills` |
 | [`./profile-editor`](api/profile-editor.md) | 23 | `skills` |
 | [`./profile-editor/server`](api/profile-editor-server.md) | 39 | `skills` |
 | [`./prompt`](api/prompt.md) | 3 | — |
@@ -92,6 +101,7 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./rollout/d1`](api/rollout-d1.md) | 7 | `signoff` |
 | [`./runtime`](api/runtime.md) | 109 | `tools`, `turn-trace` |
 | [`./runtime/router-turn`](api/runtime-router-turn.md) | 29 | `tools`, `turn-trace` |
+| [`./runtime/telemetry-cap`](api/runtime-telemetry-cap.md) | 4 | `tools`, `turn-trace` |
 | [`./sandbox`](api/sandbox.md) | 276 | `harness`, `profile`, `runtime`, `tools`, `turn-trace` |
 | [`./sequences`](api/sequences.md) | 111 | `tools`, `web` |
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
@@ -103,14 +113,17 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./signoff/proof`](api/signoff-proof.md) | 22 | `launch-invariants` |
 | [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | `launch-invariants` |
 | [`./skills`](api/skills.md) | 42 | — |
-| [`./skills-placement`](api/skills-placement.md) | 10 | `harness`, `skills` |
+| [`./skills-placement`](api/skills-placement.md) | 10 | `crypto`, `harness`, `sandbox`, `skills` |
+| [`./skills-placement/box`](api/skills-placement-box.md) | 2 | `crypto`, `harness`, `sandbox`, `skills` |
 | [`./skills/marketplace-drizzle`](api/skills-marketplace-drizzle.md) | 2 | — |
-| [`./spend`](api/spend.md) | 64 | `sandbox` |
+| [`./spend`](api/spend.md) | 70 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
+| [`./spend/drizzle`](api/spend-drizzle.md) | 9 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
 | [`./stream`](api/stream.md) | 67 | `interactions`, `plans` |
-| [`./studio`](api/studio.md) | 68 | `runtime` |
-| [`./studio-react`](api/studio-react.md) | 48 | `runtime`, `studio`, `web-react` |
+| [`./studio`](api/studio.md) | 68 | `runtime`, `vault`, `web` |
+| [`./studio-react`](api/studio-react.md) | 53 | `runtime`, `studio`, `web-react` |
+| [`./studio/generated-media`](api/studio-generated-media.md) | 26 | `vault`, `web` |
 | [`./teams`](api/teams.md) | 35 | — |
 | [`./teams-react`](api/teams-react.md) | 10 | `brand`, `teams` |
 | [`./teams/drizzle`](api/teams-drizzle.md) | 27 | — |
@@ -119,6 +132,7 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./theme`](api/theme.md) | 6 | — |
 | [`./theme-contract`](api/theme-contract.md) | 4 | `legibility`, `signoff` |
 | [`./theme-contract/cli`](api/theme-contract-cli.md) | 0 | `legibility`, `signoff` |
+| [`./theme/dom`](api/theme-dom.md) | 7 | — |
 | [`./theme/tailwind-preset`](api/theme-tailwind-preset.md) | 1 | — |
 | [`./toolbelt`](api/toolbelt.md) | 11 | — |
 | [`./tools`](api/tools.md) | 66 | `crypto`, `eval`, `openui` |
@@ -126,14 +140,18 @@ _136 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./turn-health`](api/turn-health.md) | 32 | `alerting`, `launch-invariants` |
 | [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `crypto`, `stream` |
 | [`./turn-trace`](api/turn-trace.md) | 27 | — |
-| [`./vault`](api/vault.md) | 23 | — |
-| [`./vault/lazy`](api/vault-lazy.md) | 3 | — |
-| [`./vault/server`](api/vault-server.md) | 8 | — |
-| [`./web`](api/web.md) | 44 | — |
-| [`./web-react`](api/web-react.md) | 521 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product` |
-| [`./web-react/agent-profile-editor`](api/web-react-agent-profile-editor.md) | 8 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product` |
+| [`./vault`](api/vault.md) | 23 | `crypto`, `store`, `teams`, `web` |
+| [`./vault/collaboration`](api/vault-collaboration.md) | 13 | `crypto`, `store`, `teams`, `web` |
+| [`./vault/lazy`](api/vault-lazy.md) | 3 | `crypto`, `store`, `teams`, `web` |
+| [`./vault/server`](api/vault-server.md) | 8 | `crypto`, `store`, `teams`, `web` |
+| [`./vault/store`](api/vault-store.md) | 105 | `crypto`, `store`, `web` |
+| [`./web`](api/web.md) | 52 | — |
+| [`./web-react`](api/web-react.md) | 521 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product` |
+| [`./web-react/agent-profile-editor`](api/web-react-agent-profile-editor.md) | 8 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product` |
 | [`./web-react/async`](api/web-react-async.md) | 35 | — |
-| [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product` |
+| [`./web-react/document`](api/web-react-document.md) | 7 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product` |
+| [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product` |
+| [`./web/entry-server`](api/web-entry-server.md) | 1 | — |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
 | [`./workspace-apps`](api/workspace-apps.md) | 54 | `crypto`, `object-store`, `teams`, `tools`, `web-react` |
@@ -247,6 +265,16 @@ Depends on: `email`, `platform`
 
 [Full API →](api/app-auth.md)
 
+## `./app-auth/drizzle`
+
+Source: `src/app-auth/drizzle.ts` · 5 exports
+
+Depends on: `email`, `platform`
+
+`AppAuthSessionColumns`, `AppAuthSessionsTable`, `AppAuthTables`, `createAppAuthTables`, `CreateAppAuthTablesOptions`
+
+[Full API →](api/app-auth-drizzle.md)
+
 ## `./app-oauth`
 
 Source: `src/app-oauth/index.ts` · 19 exports
@@ -254,6 +282,22 @@ Source: `src/app-oauth/index.ts` · 19 exports
 `activeAppOAuthConsent`, `AppOAuthAuthority`, `AppOAuthAuthoritySnapshot`, `AppOAuthAuthoritySnapshotInput`, `AppOAuthConfig`, `AppOAuthConsent`, `AppOAuthConsentAuthority`, `AppOAuthIssuerConfig`, `AppOAuthJwksFetch`, `appOAuthMetadataResponse`, `AppOAuthPrincipal`, `appOAuthProtectedResourceMetadata`, `AppOAuthRefreshStore`, `AppOAuthRefreshToken`, `AppOAuthResourceConfig`, `AppOAuthSnapshotAuthority`, `appOAuthTokenResponse`, `createAppOAuthProvider`, `createAppOAuthResourceVerifier`
 
 [Full API →](api/app-oauth.md)
+
+## `./app-oauth/drizzle`
+
+Source: `src/app-oauth/drizzle.ts` · 2 exports
+
+`AppOAuthTables`, `createAppOAuthTables`
+
+[Full API →](api/app-oauth-drizzle.md)
+
+## `./app-oauth/issuer`
+
+Source: `src/app-oauth/issuer.ts` · 10 exports
+
+`AppOAuthConsentView`, `AppOAuthGrant`, `AppOAuthIssuer`, `AppOAuthIssuerAuth`, `AppOAuthIssuerDatabase`, `AppOAuthIssuerTables`, `createAppOAuthConsent`, `CreateAppOAuthConsentOptions`, `createAppOAuthIssuer`, `CreateAppOAuthIssuerOptions`
+
+[Full API →](api/app-oauth-issuer.md)
 
 ## `./assets`
 
@@ -387,11 +431,11 @@ Depends on: `work-product`
 
 ## `./crypto`
 
-Source: `src/crypto/index.ts` · 10 exports
+Source: `src/crypto/index.ts` · 11 exports
 
 Depends on: `billing`
 
-`createFieldCrypto`, `decodeHexKey`, `decryptAesGcm`, `decryptBytes`, `decryptWithKey`, `deriveKey`, `DeriveKeyOptions`, `encryptAesGcm`, `encryptBytes`, `encryptWithKey`
+`createFieldCrypto`, `decodeHexKey`, `decryptAesGcm`, `decryptBytes`, `decryptWithKey`, `deriveKey`, `DeriveKeyOptions`, `encryptAesGcm`, `encryptBytes`, `encryptWithKey`, `sha256Hex`
 
 [Full API →](api/crypto.md)
 
@@ -471,11 +515,11 @@ Source: `src/email/index.ts` · 22 exports
 
 ## `./eval`
 
-Source: `src/eval/index.ts` · 29 exports
+Source: `src/eval/index.ts` · 34 exports
 
 Depends on: `tools`
 
-`AskVerdict`, `assertGateDiscriminates`, `calibrateGate`, `CalibrationCase`, `CalibrationOutcome`, `CalibrationReport`, `CompletionRequirement`, `CompletionVerdict`, `CorrectnessChecker`, `createLlmCorrectnessChecker`, `createTokenRecallChecker`, `extractProducedState`, `GateFn`, `gradeAnswer`, `LaneAnswer`, `measureWithControl`, `ParityAsk`, `parityGate`, `ParityLane`, `ParityReport`, `ProbeReport`, `producedFromToolEvents`, `ProducedState`, `runParityEval`, `RuntimeEventLike`, `SatisfiedBy`, `TaskGold`, `verifyCompletion`, `weightedComposite`
+`AskVerdict`, `assertGateDiscriminates`, `calibrateGate`, `CalibrationCase`, `CalibrationOutcome`, `CalibrationReport`, `CompletionRequirement`, `CompletionVerdict`, `CorrectnessChecker`, `createLlmCorrectnessChecker`, `createTokenRecallChecker`, `decidePersonaTurn`, `DecidePersonaTurnOpts`, `extractProducedState`, `GateFn`, `gradeAnswer`, `LaneAnswer`, `measureWithControl`, `ParityAsk`, `parityGate`, `ParityLane`, `ParityReport`, `ProbeReport`, `producedFromToolEvents`, `ProducedState`, `recordScorecardAndDiff`, `runParityEval`, `RuntimeEventLike`, `SatisfiedBy`, `ScorecardWiringInput`, `ScorecardWiringResult`, `TaskGold`, `verifyCompletion`, `weightedComposite`
 
 [Full API →](api/eval.md)
 
@@ -487,9 +531,21 @@ Source: `src/eval-campaign/index.ts` · 37 exports
 
 [Full API →](api/eval-campaign.md)
 
+## `./eval/research-plan`
+
+Source: `src/eval/research-plan.ts` · 4 exports
+
+Depends on: `tools`
+
+`latestRunDir`, `researchCliArg`, `ResearchPlanConfig`, `writeResearchPlan`
+
+[Full API →](api/eval-research-plan.md)
+
 ## `./forms`
 
 Source: `src/forms/index.ts` · 29 exports
+
+Depends on: `crypto`
 
 `assertFormBlankIntegrity`, `checkRegistryAgainstBlank`, `decodeFormBlank`, `describeFormFill`, `FilledWidget`, `FillFormOptions`, `FillFormResult`, `fillPdfForm`, `formatFormCurrency`, `FormBlank`, `FormLabelBasis`, `FormRegistry`, `FormSlot`, `FormSlotFormat`, `FormSlotKind`, `LabelVerdict`, `parseFormAmount`, `parseFormBoolean`, `RegistryCheckResult`, `RegistryProblem`, `RegistryProblemCode`, `sha256Hex`, `SlotVerdict`, `SlotVerification`, `UnfilledCode`, `UnfilledSlot`, `verifyFilledForm`, `VerifyFormResult`, `widgetLabel`
 
@@ -637,6 +693,14 @@ Depends on: `config`
 
 [Full API →](api/knowledge-loop.md)
 
+## `./knowledge/prelaunch-audit`
+
+Source: `src/knowledge/prelaunch-audit.ts` · 2 exports
+
+`PrelaunchKnowledgeAuditConfig`, `runPrelaunchKnowledgeAudit`
+
+[Full API →](api/knowledge-prelaunch-audit.md)
+
 ## `./launch-invariants`
 
 Source: `src/launch-invariants/index.ts` · 65 exports
@@ -684,6 +748,26 @@ Source: `src/legibility/cli.ts` · 0 exports
 Depends on: `signoff`
 
 _No public exports._
+
+## `./media`
+
+Source: `src/media/index.ts` · 42 exports
+
+Depends on: `studio`, `web`
+
+`browserUsableSourceUrl`, `Checked`, `checkMediaModelSelection`, `createMediaModelCatalog`, `createRouterGeneration`, `createRouterMediaClient`, `createSpeechScriptResolver`, `fetchBoundedAudio`, `GenerateInputs`, `GenerateRequestBody`, `generationMetadata`, `GenerationMetadataFields`, `imageCountForRequest`, `MediaCatalog`, `MediaCatalogModel`, `MediaModelAdmission`, `MediaModelCatalogConfig`, `MediaRouteabilityEndpoint`, `metadataResultUrl`, `modelForRequest`, `normalizeProviderJobStatus`, `optionalHttpsUrl`, `providerImageBytes`, `ProviderImageOutput`, `ProviderJobStatus`, `requiredText`, `RouterAvatarRequest`, `RouterHttpError`, `RouterMediaClient`, `RouterMediaClientConfig`, `RouterMediaModelRow`, `RouterMediaSource`, `routerResponseErrorMessage`, `RouterTranscriptionRequest`, `routerV1Url`, `RouterVideoModelRow`, `RouterVideoRequest`, `SpeechInput`, `SpeechScriptConfig`, `validateGenerateRequest`, `validatePublicHttpUrl`, `validProviderImages`
+
+[Full API →](api/media.md)
+
+## `./media/drizzle`
+
+Source: `src/media/drizzle.ts` · 3 exports
+
+Depends on: `studio`, `web`
+
+`createGenerationsTable`, `CreateGenerationsTableOptions`, `GenerationParentTable`
+
+[Full API →](api/media-drizzle.md)
 
 ## `./missions`
 
@@ -737,7 +821,7 @@ Depends on: `openui`
 
 Source: `src/operator/index.ts` · 56 exports
 
-Depends on: `chat-routes`, `platform`, `stream`, `web`
+Depends on: `chat-routes`, `crypto`, `platform`, `stream`, `web`
 
 `ChatOperatorAdapterOptions`, `ChatOperatorAdmission`, `ChatOperatorAdmissionStore`, `ChatOperatorMessage`, `ChatOperatorThread`, `ChatOperatorWorkspace`, `createChatOperatorAdapter`, `createOperatorApi`, `createOperatorClient`, `matchOperatorRoute`, `OPERATOR_ACCESS`, `OPERATOR_API_BASE_PATH`, `OPERATOR_API_SCOPES`, `OPERATOR_API_VERSION`, `OPERATOR_ROUTES`, `OPERATOR_SCOPE_DEPENDENCIES`, `OPERATOR_SETTLED_STATES`, `OPERATOR_TURN_CANCELLED_CODE`, `OPERATOR_WORKSPACE_SCOPE_PREFIX`, `OperatorAdapter`, `OperatorApi`, `OperatorApiOptions`, `OperatorAppInfo`, `OperatorApproval`, `OperatorApprovalKind`, `OperatorAssetRef`, `OperatorCapability`, `OperatorClient`, `OperatorClientOptions`, `OperatorContext`, `OperatorError`, `OperatorErrorBody`, `OperatorFile`, `OperatorFileChange`, `OperatorFileEntry`, `OperatorJournalEntry`, `OperatorKeyStore`, `operatorKeyWorkspaces`, `OperatorMetric`, `OperatorPrincipalInfo`, `OperatorResult`, `OperatorRole`, `OperatorRouteId`, `OperatorScope`, `OperatorScorecard`, `OperatorThread`, `OperatorTurn`, `OperatorTurnState`, `OperatorWorkspace`, `operatorWorkspaceScope`, `PlatformAgentKeyAccess`, `PlatformAgentKeyContext`, `PlatformAgentOperatorKey`, `StartTurnInput`, `WaitForTurnOptions`, `withPlatformAgentKeys`
 
@@ -765,11 +849,19 @@ Depends on: `signoff`
 
 ## `./plans`
 
-Source: `src/plans/index.ts` · 12 exports
+Source: `src/plans/index.ts` · 19 exports
 
-`canTransitionPlanStatus`, `ChatPlan`, `ChatPlanPersistedPart`, `ChatPlanStatus`, `parsePlanSubmittedEvent`, `ParsePlanSubmittedResult`, `persistedPartToPlan`, `PLAN_SUBMITTED_EVENT`, `planFollowUpTurnId`, `planPartKey`, `planRevisionKey`, `planToPersistedPart`
+`canTransitionPlanStatus`, `ChatPlan`, `ChatPlanPersistedPart`, `ChatPlanStatus`, `durablePlanConflictCode`, `DurablePlanLike`, `isTerminalPlanStatus`, `parsePlanDecisionBody`, `parsePlanSubmittedEvent`, `ParsePlanSubmittedResult`, `persistedPartToPlan`, `PLAN_SUBMITTED_EVENT`, `PlanDecisionBody`, `PlanDecisionOutcome`, `planFollowUpTurnId`, `planPartKey`, `planRevisionKey`, `planToPersistedPart`, `toChatPlan`
 
 [Full API →](api/plans.md)
+
+## `./plans/drizzle`
+
+Source: `src/plans/drizzle.ts` · 3 exports
+
+`createPlanPartStore`, `PlanMessageTable`, `PlanPartStoreOptions`
+
+[Full API →](api/plans-drizzle.md)
 
 ## `./platform`
 
@@ -780,6 +872,16 @@ Depends on: `billing`, `runtime`, `web`
 `AdminGuardOptions`, `agentOperatorScopes`, `AgentSpendOutcome`, `AgentSpendRefusal`, `ApiKeyRequestAuthOptions`, `assertBillableBalance`, `AssertBillableBalanceOptions`, `AuthGuard`, `AuthGuardOptions`, `BetterAuthSessionCookieMinterOptions`, `BetterAuthSessionCookieSource`, `BillableBalanceState`, `BillingConsentOutcome`, `BillingConsentRefusal`, `canonicalDelegatedKeyName`, `createAdminGuard`, `createApiKeyRequestAuth`, `createAuthGuard`, `createBetterAuthSessionCookieMinter`, `createD1TangleIdentityStore`, `createDelegatedKeyProvisioner`, `createHubSettingsRoutes`, `createPlatformAgentKeyVerifier`, `createPlatformAgentSpend`, `createPlatformBillingConsent`, `createPlatformBillingHttp`, `createPlatformDelegatedKeyClient`, `createSignedSsoState`, `createTanglePlatformBillingClient`, `createTangleSsoHandlers`, `D1TangleIdentityStoreOptions`, `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`, `DEFAULT_TANGLE_TIER_POLICY`, `DelegatedKey`, `DelegatedKeyBudget`, `DelegatedKeyCode`, `DelegatedKeyMissingError`, `DelegatedKeyOutcome`, `DelegatedKeyProvisioner`, `DelegatedKeyRefusal`, `DelegatedKeyRefusalError`, `DelegatedKeyRequest`, `DelegatedKeySlotRef`, `DelegatedKeyVerdict`, `FREE_TIER_SPEND_CAP_USD`, `getProductEntitlement`, `guardResolution`, `GuardResolution`, `HubSettingsApiKeyMetadata`, `HubSettingsClient`, `HubSettingsClientBinding`, `HubSettingsContext`, `HubSettingsGrant`, `HubSettingsOAuthInput`, `HubSettingsOperation`, `HubSettingsPrincipal`, `HubSettingsRoutes`, `isPlatformBillingHttpError`, `isProductEntitled`, `isSeatBillingEnabled`, `normalizeTanglePlanTier`, `normalizeTangleSsoEmail`, `parseAdminEmails`, `PLATFORM_AGENT_KEY_PROVISIONER`, `PLATFORM_KEY_PREFIX`, `PlatformAgentKeyVerification`, `PlatformAgentKeyVerifier`, `PlatformAgentKeyVerifierOptions`, `PlatformAgentSpend`, `PlatformAgentSpendOptions`, `PlatformBalanceSnapshot`, `PlatformBillingConsent`, `PlatformBillingConsentOptions`, `PlatformBillingHttp`, `PlatformBillingHttpError`, `PlatformBillingHttpOptions`, `PlatformDelegatedKeyClient`, `PlatformDelegatedKeyClientOptions`, `PlatformIdentityStore`, `platformKeyRefusal`, `PlatformSubscriptionInfo`, `PlatformUsageProductRow`, `ProductEntitlement`, `ProductSeatOffer`, `ProductSeatOfferPeriod`, `readTangleTierState`, `RequestApiKey`, `resolveTangleSsoAccount`, `SeatBillingFlagOptions`, `seatCheckoutUrl`, `SeatStatus`, `signSessionCookieValue`, `SsoStateConfig`, `TANGLE_IDENTITY_ACCOUNT_INDEXES_SQL`, `TANGLE_IDENTITY_PROVIDER_ID`, `TangleIdentityD1Like`, `TangleIdentityD1Statement`, `TangleIdentityLegacyLinkTable`, `TangleIdentitySsoAccountStore`, `TangleIdentitySsoAuthClient`, `TangleIdentitySsoExchangeResult`, `TangleIdentitySsoHandlerOptions`, `TangleOidcSsoAccountStore`, `TangleOidcSsoAuthClient`, `TangleOidcSsoHandlerOptions`, `TangleOidcSsoTokens`, `TangleOidcSsoUser`, `TanglePlanTier`, `TangleSsoAccountConflictError`, `TangleSsoAccountConflictReason`, `TangleSsoAccountResolution`, `TangleSsoAccountResolutionInput`, `TangleSsoAccountStore`, `TangleSsoAuthClient`, `TangleSsoExchangeResult`, `TangleSsoHandlerOptions`, `TangleSsoHandlers`, `TangleSsoLocalAccount`, `TangleSsoSessionCookieArgs`, `TangleSsoUserCreateError`, `TangleTierPolicy`, `TangleTierState`, `verifySignedSsoState`
 
 [Full API →](api/platform.md)
+
+## `./platform/billing-config`
+
+Source: `src/platform/billing-config.ts` · 2 exports
+
+Depends on: `billing`, `runtime`, `web`
+
+`checkPlatformBillingConfig`, `PlatformBillingConfigInput`
+
+[Full API →](api/platform-billing-config.md)
 
 ## `./policy-filters`
 
@@ -823,7 +925,7 @@ Depends on: `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`,
 
 Source: `src/profile/index.ts` · 88 exports
 
-Depends on: `copy-quality`, `skills`
+Depends on: `copy-quality`, `crypto`, `skills`
 
 `AgentPromptInput`, `AgentPromptSection`, `assertProfilePromptWithinBudget`, `assertSkillDeliveryDisjoint`, `assertSystemPromptWithinBudget`, `captureModelInput`, `CaptureModelInputInput`, `composeAgentProfile`, `ComposedSkills`, `ComposeProfileBudget`, `composeShellResources`, `ComposeShellResourcesInput`, `composeSkills`, `CorpusEntry`, `CorpusLoadResult`, `corpusSkills`, `createMemoryModelInputStore`, `DEFAULT_HOME_LIMITS`, `DEFAULT_MAX_SYSTEM_PROMPT_BYTES`, `defaultHomeFiles`, `defaultQualitySkills`, `defaultSystemPromptPlacement`, `diffProfileFingerprints`, `fingerprintAgentProfile`, `formatProfileDrift`, `GlobModules`, `HARNESS_PROMPT_RECAST`, `HARNESSES_WITH_OWN_PROMPT`, `HUMAN_PROSE_SKILL_ID`, `HUMANIZER_LICENSE`, `HUMANIZER_SKILL_ID`, `HUMANIZER_SOURCE`, `humanizerSkill`, `humanProseSkill`, `HumanProseSkillOptions`, `largestPromptSections`, `LEARNED_GUIDANCE_SECTION_ID`, `LoadCorpusOptions`, `loadMarkdownCorpus`, `mergeComposedSkills`, `MODEL_INPUT_RECORD_SCHEMA`, `modelInputBlob`, `ModelInputBlob`, `ModelInputKind`, `ModelInputMediaType`, `ModelInputOutcome`, `ModelInputRecord`, `ModelInputRef`, `ModelInputSectionRef`, `ModelInputStore`, `OPERATING_CONTRACT_CLAUSES`, `OPERATING_CONTRACT_VERSION`, `OperatingContractClause`, `OperatingContractClauseId`, `OperatingContractOptions`, `parseCorpusSkills`, `ParsedSkill`, `parseSkillFrontmatter`, `placedSystemPrompt`, `profile`, `ProfileChannels`, `ProfileDrift`, `ProfileDriftEntry`, `ProfileFingerprint`, `ProfileFingerprintContext`, `ProfileOverlay`, `QualitySkillOptions`, `readModelInput`, `registrySkills`, `renderAgentPrompt`, `RenderedAgentPrompt`, `RenderedAgentPromptSection`, `RenderedOperatingContract`, `renderInlineSkills`, `renderOperatingContract`, `renderSkillIndex`, `SkillDeliveryMode`, `SkillEntry`, `skillEntryFromMarkdown`, `SkillFrontmatter`, `skillMountPath`, `skillRefs`, `stripComments`, `SystemPromptPlacement`, `UserSkill`, `userSkillMounts`, `withDefaultAgentHome`, `withDefaultQualitySkills`
 
@@ -941,6 +1043,16 @@ Depends on: `tools`, `turn-trace`
 
 [Full API →](api/runtime-router-turn.md)
 
+## `./runtime/telemetry-cap`
+
+Source: `src/runtime/telemetry-cap.ts` · 4 exports
+
+Depends on: `tools`, `turn-trace`
+
+`CappedRuntimeTelemetry`, `createCappedRuntimeTelemetry`, `RuntimeTelemetryCaps`, `RuntimeTelemetryTruncation`
+
+[Full API →](api/runtime-telemetry-cap.md)
+
 ## `./sandbox`
 
 Source: `src/sandbox/index.ts` · 276 exports
@@ -1049,11 +1161,21 @@ Source: `src/skills/index.ts` · 42 exports
 
 Source: `src/skills-placement/index.ts` · 10 exports
 
-Depends on: `harness`, `skills`
+Depends on: `crypto`, `harness`, `sandbox`, `skills`
 
 `ComposedSkills`, `composeSkillsForHarness`, `ComposeSkillsForHarnessInput`, `resolveSkillDir`, `SkillEntry`, `SkillSupportFile`, `skillSupportFileMounts`, `SkillSupportFileOptions`, `unsupportedSkillHarnesses`, `withSkillSupportFiles`
 
 [Full API →](api/skills-placement.md)
+
+## `./skills-placement/box`
+
+Source: `src/skills-placement/box.ts` · 2 exports
+
+Depends on: `crypto`, `harness`, `sandbox`, `skills`
+
+`createProfileSkillPlacer`, `ProfileSkillPlacerConfig`
+
+[Full API →](api/skills-placement-box.md)
 
 ## `./skills/marketplace-drizzle`
 
@@ -1065,11 +1187,11 @@ Source: `src/skills/marketplace-drizzle.ts` · 2 exports
 
 ## `./spend`
 
-Source: `src/spend/index.ts` · 64 exports
+Source: `src/spend/index.ts` · 70 exports
 
 Depends on: `sandbox`
 
-`AllExcludedAssessment`, `AllExcludedBasis`, `assertComputeBudget`, `assertSpendWindow`, `assessAllExcluded`, `BilledDurationBasis`, `boxLivenessInWindow`, `BoxLivenessOptions`, `BoxRateResolver`, `CeilingBasis`, `chargeNanoUsd`, `ComputeBudget`, `ComputeBudgetExceededError`, `ComputeBudgetRefusal`, `computeExpectedCeiling`, `ComputeExpectedCeilingOptions`, `createInMemorySpendLedgerStore`, `createSandboxSpendHooks`, `createSpendLedger`, `decideBoxOwnership`, `DEFAULT_CEILING_TOLERANCE_MS`, `DEFAULT_EXPECTATION_GRACE_MS`, `DeriveChildKeyBudgetInput`, `deriveChildKeyBudgetUsd`, `ExpectedCeiling`, `foldSpendBoxRecord`, `formatSpendReport`, `InMemorySpendLedgerStore`, `isCharge`, `MIN_CHILD_KEY_BUDGET_USD`, `ObservedBalance`, `ObserveSandboxInput`, `ownedByBillingKeys`, `ParentBudgetExhaustedError`, `parseSandboxGroupKey`, `parseSettlementReference`, `reconcileSpend`, `ReconcileSpendOptions`, `SandboxSpendHooksOptions`, `SandboxSpendSeam`, `SettlementReference`, `SettlementRow`, `settlementSandboxId`, `SPEND_CHECKS`, `SpendBoxLiveness`, `SpendBoxPatch`, `SpendBoxRecord`, `SpendCheckId`, `SpendCoverage`, `SpendExpectationSummary`, `SpendFinding`, `SpendLedger`, `SpendLedgerOptions`, `SpendLedgerStorePort`, `SpendOwnershipCandidate`, `SpendOwnershipRule`, `SpendOwnershipSummary`, `SpendOwnershipVerdict`, `SpendProvisionObservation`, `SpendReport`, `spendReportToJson`, `SpendWindow`, `undeclaredExpectation`, `VelocityOptions`
+`AllExcludedAssessment`, `AllExcludedBasis`, `assertComputeBudget`, `assertSpendWindow`, `assessAllExcluded`, `BilledDurationBasis`, `boxLivenessInWindow`, `BoxLivenessOptions`, `BoxRateResolver`, `CeilingBasis`, `chargeNanoUsd`, `ComputeBudget`, `ComputeBudgetExceededError`, `ComputeBudgetRefusal`, `computeExpectedCeiling`, `ComputeExpectedCeilingOptions`, `createInMemorySpendLedgerStore`, `createSandboxSpendHooks`, `createSpendLedger`, `decideBoxOwnership`, `DEFAULT_CEILING_TOLERANCE_MS`, `DEFAULT_EXPECTATION_GRACE_MS`, `DEFAULT_WORKSPACE_SPEND_BUDGET_NANO_USD`, `DeriveChildKeyBudgetInput`, `deriveChildKeyBudgetUsd`, `ExpectedCeiling`, `fetchPlatformSettlementRows`, `FetchPlatformSettlementRowsInput`, `foldSpendBoxRecord`, `formatSpendReport`, `InMemorySpendLedgerStore`, `isCharge`, `MIN_CHILD_KEY_BUDGET_USD`, `ObservedBalance`, `ObserveSandboxInput`, `ownedByBillingKeys`, `ParentBudgetExhaustedError`, `parseSandboxGroupKey`, `parseSettlementReference`, `reconcileSpend`, `ReconcileSpendOptions`, `sandboxChargeNanoUsd`, `SandboxSpendHooksOptions`, `SandboxSpendSeam`, `SettlementReference`, `SettlementRow`, `settlementSandboxId`, `SPEND_BUDGET_LOOKBACK_MS`, `SPEND_CHECKS`, `SPEND_RECONCILE_LOOKBACK_MS`, `SpendBoxLiveness`, `SpendBoxPatch`, `SpendBoxRecord`, `SpendCheckId`, `SpendCoverage`, `SpendExpectationSummary`, `SpendFinding`, `SpendLedger`, `SpendLedgerOptions`, `SpendLedgerStorePort`, `SpendOwnershipCandidate`, `SpendOwnershipRule`, `SpendOwnershipSummary`, `SpendOwnershipVerdict`, `SpendProvisionObservation`, `SpendReport`, `spendReportToJson`, `SpendWindow`, `undeclaredExpectation`, `VelocityOptions`
 
 [Full API →](api/spend.md)
 
@@ -1080,6 +1202,16 @@ Source: `src/spend/cli.ts` · 0 exports
 Depends on: `sandbox`
 
 _No public exports._
+
+## `./spend/drizzle`
+
+Source: `src/spend/drizzle.ts` · 9 exports
+
+Depends on: `sandbox`
+
+`createDrizzleSpendStore`, `listLedgerBillingOwnerIds`, `listWorkspaceSandboxIds`, `loadWorkspaceSpendBudgetConfig`, `SpendBoxLedgerTable`, `SpendBudgetWorkspaceTable`, `SpendDatabase`, `SpendLedgerTableOptions`, `WorkspaceSpendBudgetConfig`
+
+[Full API →](api/spend-drizzle.md)
 
 ## `./store`
 
@@ -1103,7 +1235,7 @@ Depends on: `interactions`, `plans`
 
 Source: `src/studio/index.ts` · 68 exports
 
-Depends on: `runtime`
+Depends on: `runtime`, `vault`, `web`
 
 `aspectRatioFromOptions`, `buildGenerationRequestBody`, `curateComposerModels`, `defaultVaultPathFor`, `DeleteGenerations`, `DownloadGenerations`, `failedOptimisticGeneration`, `FALLBACK_VIDEO_MODEL_OPTIONS`, `FetchGenerationsPage`, `Generation`, `GENERATION_TYPES`, `generationAspectRatio`, `generationAssetId`, `generationBatchKey`, `generationError`, `generationMergeKey`, `GenerationPage`, `GenerationPageQuery`, `GenerationRequestFields`, `generationSavedToVault`, `generationsInBatch`, `generationSpecSegments`, `generationStatus`, `GenerationStatus`, `GenerationType`, `generationVaultPath`, `GPT_IMAGE_2_CUSTOM_SIZE`, `GRID_WAVEFORM_BARS`, `hashSeed`, `IMAGE_TO_VIDEO_SIBLINGS`, `imageToVideoSibling`, `isGenerationType`, `isLocalGeneration`, `laneUnavailable`, `latestBatchOf`, `MAX_IMAGE_COUNT`, `MEDIA_TYPE_FILTERS`, `MediaModelCatalogResponse`, `MediaModelOption`, `MediaModelStatus`, `MediaTypeFilter`, `mergeGenerationPages`, `mergeLiveGeneration`, `mergeLoaderAndLive`, `MIN_IMAGE_COUNT`, `ModelOptionMetadata`, `ModelOptionsMetadata`, `ModelOptionValue`, `normalizeImageCount`, `normalizeVaultPath`, `optimisticGeneration`, `optionChoices`, `optionDefault`, `outputPathFor`, `preferredModelId`, `previewWaveformBars`, `reconcileOptionValues`, `relativeTime`, `resolveComposerOptions`, `SaveGenerationsToVault`, `StudioMediaActions`, `supportsCustomImageSize`, `textToVideoSibling`, `userSafeGenerationMessage`, `validateCustomImageSize`, `VaultSaveResult`, `WaveformBar`, `WIDE_WAVEFORM_BARS`
 
@@ -1111,13 +1243,23 @@ Depends on: `runtime`
 
 ## `./studio-react`
 
-Source: `src/studio-react/index.tsx` · 48 exports
+Source: `src/studio-react/index.tsx` · 53 exports
 
 Depends on: `runtime`, `studio`, `web-react`
 
-`AudioTogglePill`, `ComposerBand`, `ComposerType`, `CustomSizeForm`, `DeferredDelete`, `downloadGenerationsViaAnchor`, `formatClock`, `GenerationHistoryState`, `GenerationNoticeChip`, `GenerationSetting`, `GenerationSettings`, `MediaTile`, `MediaTileProps`, `MediaTypeSegment`, `MediaTypeSegments`, `MediaViewerModal`, `MediaViewerModalProps`, `MenuPill`, `OptionChoice`, `OptionPill`, `optionValueLabel`, `ReferencePill`, `StudioAudioElementLike`, `StudioComposer`, `StudioComposerProps`, `StudioConfirmDialog`, `StudioConfirmDialogProps`, `StudioGenerationScreen`, `StudioGenerationScreenProps`, `StudioHistoryScreen`, `StudioHistoryScreenProps`, `StudioHomeScreen`, `StudioHomeScreenProps`, `StudioPlayback`, `StudioPlaybackProvider`, `StudioToastInput`, `StudioToastProvider`, `useBatchNavigation`, `UseBatchNavigationOptions`, `useDeferredDelete`, `UseDeferredDeleteOptions`, `useGenerationHistory`, `UseGenerationHistoryOptions`, `useStudioGenerations`, `useStudioPlayback`, `useStudioToast`, `VaultPathPopover`, `VaultPathPopoverProps`
+`AudioTogglePill`, `ComposerBand`, `ComposerType`, `CustomSizeForm`, `DeferredDelete`, `downloadGenerationFiles`, `downloadGenerationsViaAnchor`, `formatClock`, `GenerationHistoryState`, `GenerationNoticeChip`, `GenerationSetting`, `GenerationSettings`, `MediaTile`, `MediaTileProps`, `MediaTypeSegment`, `MediaTypeSegments`, `MediaViewerModal`, `MediaViewerModalProps`, `MenuPill`, `OptionChoice`, `OptionPill`, `optionValueLabel`, `ReferencePill`, `StudioAudioElementLike`, `StudioComposer`, `StudioComposerProps`, `StudioConfirmDialog`, `StudioConfirmDialogProps`, `StudioGenerationScreen`, `StudioGenerationScreenProps`, `studioHistoryFetcher`, `StudioHistoryScreen`, `StudioHistoryScreenProps`, `StudioHomeScreen`, `StudioHomeScreenProps`, `StudioPlayback`, `StudioPlaybackProvider`, `StudioScreen`, `studioShouldRevalidate`, `StudioToastInput`, `StudioToastProvider`, `useBatchNavigation`, `UseBatchNavigationOptions`, `useDeferredDelete`, `UseDeferredDeleteOptions`, `useGenerationHistory`, `UseGenerationHistoryOptions`, `useStudioGenerations`, `useStudioPlayback`, `useStudioScreens`, `useStudioToast`, `VaultPathPopover`, `VaultPathPopoverProps`
 
 [Full API →](api/studio-react.md)
+
+## `./studio/generated-media`
+
+Source: `src/studio/generated-media/index.ts` · 26 exports
+
+Depends on: `vault`, `web`
+
+`createGeneratedMediaStore`, `DEFAULT_GENERATED_OUTPUT_PATHS`, `DeleteGeneratedMediaResult`, `extensionForGeneratedMimeType`, `GENERATED_MEDIA_MISSING_FILE_METADATA`, `GENERATED_OUTPUT_CONFIG`, `generatedExtensionFromUrl`, `GeneratedMediaAssetTable`, `GeneratedMediaAssetVersionTable`, `GeneratedMediaBucket`, `GeneratedMediaDatabase`, `GeneratedMediaGenerationTable`, `generatedMediaLabel`, `GeneratedMediaStore`, `GeneratedMediaStoreConfig`, `GeneratedMediaTables`, `GeneratedMediaType`, `GeneratedMediaVaultFile`, `generatedMimeTypeFromUrl`, `GeneratedOutputConfig`, `GeneratedOutputType`, `isGeneratedMediaType`, `normalizeGeneratedOutputPath`, `PersistedGeneratedMedia`, `resolveGeneratedVaultPath`, `validateGeneratedMediaSourceUrl`
+
+[Full API →](api/studio-generated-media.md)
 
 ## `./teams`
 
@@ -1187,6 +1329,14 @@ Depends on: `legibility`, `signoff`
 
 _No public exports._
 
+## `./theme/dom`
+
+Source: `src/theme/dom.ts` · 7 exports
+
+`applyThemeDom`, `DARK_THEME_COLOR`, `LIGHT_THEME_COLOR`, `shouldFollowSystemTheme`, `syncThemePreference`, `THEME_BOOTSTRAP_SCRIPT`, `ThemePreference`
+
+[Full API →](api/theme-dom.md)
+
 ## `./theme/tailwind-preset`
 
 Source: `src/theme/tailwind-preset.ts` · 1 exports
@@ -1255,13 +1405,27 @@ Source: `src/turn-trace/index.ts` · 27 exports
 
 Source: `src/vault/index.ts` · 23 exports
 
+Depends on: `crypto`, `store`, `teams`, `web`
+
 `ConfirmDialog`, `ConfirmDialogProps`, `VAULT_TREE_CHILD_PAGE`, `VaultArtifactRenderProps`, `VaultContentMatch`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneHandle`, `VaultPaneProps`, `VaultRevision`, `VaultRichParts`, `VaultTree`, `VaultTreeNode`, `VaultTreeProps`, `VaultTreeRenderProps`
 
 [Full API →](api/vault.md)
 
+## `./vault/collaboration`
+
+Source: `src/vault/collaboration.ts` · 13 exports
+
+Depends on: `crypto`, `store`, `teams`, `web`
+
+`buildVaultCollaborationBootstrap`, `CollaborationAccess`, `CollaborationEnv`, `CollaborationSessionUser`, `CollaborationVaultFile`, `CollaborationViewer`, `CollaborationWorkspaceAccess`, `createVaultCollaborationRoutes`, `isCollaborationConfigured`, `ReadCollaborationVaultFile`, `refreshVaultCollaborationToken`, `saveVaultCollaborationSnapshot`, `VaultCollaborationRoutesConfig`
+
+[Full API →](api/vault-collaboration.md)
+
 ## `./vault/lazy`
 
 Source: `src/vault/lazy.tsx` · 3 exports
+
+Depends on: `crypto`, `store`, `teams`, `web`
 
 `VaultPaneHandle`, `VaultPaneLazy`, `VaultPaneProps`
 
@@ -1271,15 +1435,27 @@ Source: `src/vault/lazy.tsx` · 3 exports
 
 Source: `src/vault/server.ts` · 8 exports
 
+Depends on: `crypto`, `store`, `teams`, `web`
+
 `assessVaultDeletionBatch`, `compareIncarnationBaseline`, `FilesystemIncarnationLike`, `IncarnationComparison`, `VAULT_DELETION_REFUSAL_MIN_LIVE_FILES`, `VAULT_DELETION_REFUSAL_RATIO`, `VaultDeletionAssessment`, `VaultDeletionPolicy`
 
 [Full API →](api/vault-server.md)
 
+## `./vault/store`
+
+Source: `src/vault/store/index.ts` · 105 exports
+
+Depends on: `crypto`, `store`, `web`
+
+`applyVaultMutationBatch`, `buildSandboxVaultRenameUnits`, `buildTreeFromPaths`, `createVaultCoordinator`, `createVaultStore`, `flattenVaultTreePaths`, `groupSandboxVaultChanges`, `isHiddenVaultFilePath`, `mapWithConcurrency`, `NormalizedVaultSandboxBaseline`, `normalizeVaultSandboxBaseline`, `normalizeVaultWriterProvenance`, `parseVaultHeadMetadata`, `parseVaultPathErrorResponse`, `readReadySandboxFilesystemIncarnation`, `readVaultHeadState`, `readVaultHeadStateConverged`, `readVaultHeadStateForErasure`, `ReadySandboxFilesystemIncarnation`, `SandboxVaultPathRejection`, `sandboxVaultRejection`, `SandboxVaultRenameItem`, `SandboxVaultSyncChange`, `SandboxVaultSyncProgress`, `validateVaultFilePath`, `validateVaultMutationKeys`, `validateWorkspaceId`, `VAULT_HEAD_SCHEMA`, `VAULT_HISTORY_MAX_REVISIONS`, `VAULT_KV_KEY_MAX_BYTES`, `VAULT_LINEAGE_MAX_REVISIONS`, `VAULT_OPERATION_SCHEMA`, `VAULT_READ_CONVERGENCE_INITIAL_DELAY_MS`, `VAULT_READ_CONVERGENCE_MAX_DELAY_MS`, `VAULT_READ_CONVERGENCE_TIMEOUT_MS`, `VAULT_REVISION_SCHEMA`, `VAULT_SANDBOX_BASELINE_SCHEMA`, `VaultConflictError`, `VaultConvergenceOptions`, `vaultConvergenceResponse`, `VaultCoordinator`, `VaultCoordinatorErrorDetail`, `vaultCoordinatorJson`, `VaultCoordinatorNamespace`, `VaultCoordinatorOptions`, `VaultCoordinatorStorage`, `VaultCreation`, `vaultErasureJobKey`, `vaultErasureKey`, `vaultErasurePrefix`, `VaultFileNotFoundError`, `VaultFileRevision`, `VaultFilesystemIncarnationError`, `VaultFrontmatterCodec`, `VaultFrontmatterParse`, `vaultHeadCreation`, `vaultHeadKey`, `VaultHeadListEntry`, `VaultHeadListOptions`, `VaultHeadListPage`, `VaultHeadListStats`, `vaultHeadMatchesFence`, `VaultHeadMetadata`, `vaultHeadPathPrefix`, `vaultHeadPrefix`, `VaultHeadReader`, `vaultHeadSequence`, `VaultHeadState`, `VaultHydrationError`, `VaultHydrationIncompleteError`, `VaultLearningActor`, `vaultMetaKey`, `VaultMutationChange`, `VaultMutationConflict`, `VaultMutationFileResult`, `VaultMutationOptions`, `VaultMutationPolicy`, `VaultMutationRequest`, `VaultMutationResult`, `VaultNode`, `vaultOperationCommitted`, `vaultOperationKey`, `VaultPathError`, `vaultPathErrorResponse`, `vaultPathErrorResponseBody`, `VaultPathErrorResponseBody`, `VaultPrivateRuntimeFileError`, `VaultReadConvergenceError`, `vaultRevisionKey`, `VaultRevisionMetadata`, `vaultRevisionPrefix`, `VaultRevisionsPage`, `VaultSandboxBaseline`, `VaultSandboxBaselineFile`, `VaultSandboxProgress`, `VaultStorageKeyError`, `VaultStorageKeyKind`, `VaultStore`, `VaultStoreConfig`, `VaultStoredFile`, `VaultVisibilityFence`, `VaultWriteProvenance`, `VaultWriter`, `vaultWriterActor`, `VaultWriterKind`
+
+[Full API →](api/vault-store.md)
+
 ## `./web`
 
-Source: `src/web/index.ts` · 44 exports
+Source: `src/web/index.ts` · 52 exports
 
-`acquisitionFromRequest`, `addSecurityHeaders`, `ApiKeyFetch`, `ApiKeyFetchOptions`, `assertMediaUrl`, `checkFreeRouteLimit`, `checkRateLimit`, `clearCookieHeader`, `ConversationGroupItem`, `CookieOptions`, `createApiKeyFetch`, `extractRequestContext`, `FirstTouchAcquisition`, `firstTouchAcquisitionCookie`, `FREE_ROUTE_BUDGETS`, `FreeRouteAllowance`, `FreeRouteClass`, `FreeRouteDenialReason`, `FreeRouteDimension`, `FreeRouteIdentity`, `FreeRouteLimitError`, `FreeRouteLimitInput`, `FreeRouteLimitOutcome`, `freeRouteLimitResponse`, `FreeRouteLimitResponseOptions`, `groupConversationMessages`, `GroupedConversationItem`, `isWorkspaceFileExportable`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitBudget`, `RateLimitOptions`, `RateLimitResult`, `readCookieValue`, `readFirstTouchAcquisition`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `STANDARD_SECURITY_HEADERS`, `withFreeRouteLimit`, `WithFreeRouteLimitOptions`, `WORKSPACE_BUDGET_MULTIPLIER`
+`acquisitionFromRequest`, `addSecurityHeaders`, `ApiKeyFetch`, `ApiKeyFetchOptions`, `assertMediaUrl`, `checkFreeRouteLimit`, `checkRateLimit`, `clearCookieHeader`, `ConversationGroupItem`, `CookieOptions`, `createApiKeyFetch`, `createRateLimiterBinding`, `extractRequestContext`, `FirstTouchAcquisition`, `firstTouchAcquisitionCookie`, `FREE_ROUTE_BUDGETS`, `FreeRouteAllowance`, `FreeRouteClass`, `FreeRouteDenialReason`, `FreeRouteDimension`, `FreeRouteIdentity`, `FreeRouteLimitError`, `FreeRouteLimitInput`, `FreeRouteLimitOutcome`, `freeRouteLimitResponse`, `FreeRouteLimitResponseOptions`, `groupConversationMessages`, `GroupedConversationItem`, `isBlockedFetchHostname`, `isEditableMime`, `isWorkspaceFileExportable`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitBudget`, `RateLimiterBindingOptions`, `RateLimitOptions`, `RateLimitResult`, `RateLimitTiming`, `readCookieValue`, `readFirstTouchAcquisition`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `sniffMime`, `sniffMimeFromName`, `STANDARD_SECURITY_HEADERS`, `withFreeRouteLimit`, `WithFreeRouteLimitOptions`, `withTimeout`, `WORKSPACE_BUDGET_MULTIPLIER`
 
 [Full API →](api/web.md)
 
@@ -1287,7 +1463,7 @@ Source: `src/web/index.ts` · 44 exports
 
 Source: `src/web-react/index.tsx` · 521 exports
 
-Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product`
+Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
 
 `acceptRejectionReason`, `activityTone`, `ActivityTone`, `AGENT_PROFILE_EDITOR_SECTIONS`, `AgentActivityPage`, `AgentActivityPanel`, `AgentActivityPanelProps`, `AgentActivityRecord`, `AgentProfileChoices`, `AgentProfileChoicesProps`, `AgentProfileEditor`, `AgentProfileEditorConfig`, `AgentProfileEditorModelCatalog`, `AgentProfileEditorProps`, `AgentProfileEditorSaveState`, `AgentProfileEditorSection`, `AgentProfileRegistryError`, `AgentProfileRegistryFailure`, `AgentProfileRegistryMcpResult`, `AgentProfileRegistryMcpServer`, `AgentProfileRegistryPort`, `AgentProfileRegistrySkill`, `AgentProfileRegistrySkillsResult`, `AgentProfileResourceKind`, `AgentProfileViewer`, `AgentProfileViewerProps`, `AgentSessionControls`, `AgentSessionControlsProps`, `AgentSettingsPopover`, `AgentSettingsPopoverProps`, `AgentSetupBlock`, `AgentSetupBlockProps`, `ALLOWED_ATTACHMENT_SNIFFED_MIMES`, `ApiAccessKey`, `ApiAccessPanel`, `ApiAccessPanelProps`, `ApiAccessScope`, `ApiAccessWorkspace`, `ATTACHMENT_ACCEPT`, `AttachmentFileResult`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `base64WireLen`, `buildAnswerData`, `buildMentionPromptBlock`, `buildTurnPhaseEvent`, `cancelChatInteraction`, `cancelStatusFor`, `canTransitionInteractionStatus`, `CatalogModel`, `ChatAttachmentInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatComposer`, `ChatComposerProps`, `ChatEmptyDoor`, `ChatEmptyState`, `ChatEmptyStateProps`, `ChatFreeTextField`, `ChatFundingFailure`, `ChatFundingRecovery`, `ChatInteraction`, `ChatInteractionField`, `ChatInteractionRestoreMode`, `ChatInteractionStatus`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessageMetrics`, `ChatMessages`, `ChatMessageSegment`, `ChatMessagesProps`, `ChatNoticeTone`, `chatReasoningFromParts`, `ChatReasoningState`, `ChatSelectField`, `ChatStreamCallbacks`, `ChatStreamToolCall`, `ChatStreamToolResult`, `ChatToolCallInfo`, `chatToolCallPart`, `ChatTurnFilePartInput`, `ChatTurnPartInput`, `chatTurnRequestInit`, `ChatTurnRequestPayload`, `ChatUiMessage`, `CommandPalette`, `CommandPaletteItem`, `CommandPaletteProps`, `composerAnswerData`, `composerAnswerDeliveries`, `ComposerAnswerDelivery`, `ComposerContextItem`, `ComposerFile`, `ComposerFilePart`, `ComposerFileRejection`, `ComposerMentionProp`, `ComposerModeControls`, `ComposerModeControlsProps`, `ComposerPlanModeSelection`, `ComposerProfilePill`, `ComposerProfilePillProps`, `ComposerProfileSelection`, `ComposerSendFailure`, `ComposerSendHandler`, `ComposerSendOutcome`, `ComposerSendPartsHandler`, `ComposerSendRejected`, `ComposerSendResult`, `ComposerSkillOption`, `consumeChatStream`, `ConsumeChatStreamResult`, `createDurableInteractionAnswerSubmitter`, `createDurablePlanDecisionClient`, `createInteractionAnswerSubmitter`, `createMemoryInteractionAttemptStore`, `createSessionInteractionAttemptStore`, `dedupeQuestionInteractionsByContent`, `DEFAULT_EFFORT_LEVELS`, `DEFAULT_INSIGHT_PAGE_SIZE`, `DEFAULT_MENTION_EMPTY_TEXT`, `DEFAULT_MENTION_LIMIT`, `DEFAULT_PROVENANCE_CONFIDENCE_POLICY`, `DEFAULT_SPARKLINE_EMPTY_LABEL`, `DEFAULT_SPARKLINE_HEIGHT`, `DEFAULT_SPARKLINE_LABEL`, `DEFAULT_SPARKLINE_UNAVAILABLE_LABEL`, `DEFAULT_SPARKLINE_WIDTH`, `describeProvenance`, `describeProvenanceSourceStatus`, `DictationAudio`, `DictationControls`, `dictationErrorMessage`, `diffRecordGridProposal`, `DISPATCH_MAX_MEDIA_PARTS`, `DISPATCH_MAX_PARTS`, `DISPATCH_REQUEST_MAX_BYTES`, `DISPATCH_STRUCTURAL_RESERVE_BYTES`, `dispatchChatStreamLine`, `DurableChatCard`, `DurableChatCards`, `durableChatCardsFromParts`, `DurableChatCardsProps`, `DurableInteractionAnswerSubmitterOptions`, `DurablePlanCard`, `DurablePlanCardProps`, `DurablePlanClientError`, `DurablePlanCurrentInput`, `DurablePlanDecision`, `DurablePlanDecisionClient`, `DurablePlanDecisionClientOptions`, `DurablePlanDecisionInput`, `DurablePlanDecisionResult`, `DurablePlanFollowUpReceipt`, `EFFORT_METER_SEGMENTS`, `EffortLevel`, `effortLevelLabel`, `effortLevelsFromIds`, `EffortMeter`, `effortMeterFill`, `EffortPicker`, `EffortPickerProps`, `EMPTY_RECORD_GRID_OVERLAY`, `EntryComposer`, `EntryComposerProps`, `EvidenceLineageTable`, `EvidenceLineageTableProps`, `ExceptionList`, `ExceptionListProps`, `FetchSessionPage`, `fieldAcceptsFreeText`, `fieldAnswer`, `fieldPickerTriggerClass`, `FieldValues`, `fieldValuesFromAnswers`, `FileIndexReadyResponse`, `FileIndexResponse`, `FileIndexWarmingResponse`, `FileMention`, `fileMentionsToParts`, `filterAcceptedFiles`, `firstUnansweredRequiredField`, `FlowWaterfall`, `FlowWaterfallProps`, `formatActivityCost`, `formatActivityDuration`, `formatDictationElapsed`, `formatInsightDelta`, `formatModelCost`, `formatModelPrice`, `formatRecordGridValue`, `formatSessionTimestamp`, `formatSparklineValue`, `formatTokensPerSecond`, `getChatFundingRecovery`, `HarnessGlyph`, `HarnessGlyphProps`, `HarnessPicker`, `HarnessPickerProps`, `hasSecretField`, `hydrateChatInteractions`, `INDEX_REFRESH_AFTER_MS`, `Insight`, `InsightAction`, `InsightCard`, `InsightCardProps`, `InsightDeck`, `InsightDeckProps`, `insightDelta`, `InsightDelta`, `insightDeltaTone`, `InsightDirection`, `insightPageCount`, `insightPageSize`, `insightPageSlice`, `InsightPolarity`, `InsightTone`, `INTERACTION_CANCEL_EVENT`, `INTERACTION_EVENT`, `INTERACTION_RESOLVED_EVENT`, `INTERACTION_SUBMIT_TIMEOUT_MESSAGE`, `INTERACTION_SUBMIT_TIMEOUT_MS`, `InteractionActionButton`, `InteractionAnswers`, `InteractionAnswerSubmission`, `InteractionAnswerSubmitterOptions`, `InteractionAnswerValue`, `InteractionAttemptStore`, `InteractionBadge`, `InteractionBadgeVariant`, `InteractionCancelData`, `InteractionData`, `interactionFromWireRequest`, `InteractionOutcome`, `interactionPartKey`, `InteractionPersistedPart`, `InteractionPlanCard`, `InteractionPlanCardProps`, `InteractionQuestionCard`, `InteractionQuestionCardProps`, `InteractionRequest`, `InteractionRequestWire`, `interactionStatusLabels`, `interactionSubmissionSignature`, `InteractionSubmitResult`, `interactionTerminalNotes`, `interactionToPersistedPart`, `isAcceptedFileType`, `isChatAttachmentPart`, `isLateAnswerableStatus`, `isRecordGridCellApplicable`, `isRenderableInteractionKind`, `isSafeInteractionFieldKey`, `isTerminalInteractionStatus`, `isTurnIntentEvent`, `isTurnPhaseEvent`, `lateAnswerMessage`, `LateAnswerResult`, `lazyRoute`, `LazyRoute`, `LinkLikeComponent`, `LinkLikeProps`, `loadAttachmentFile`, `loadingProvenanceSources`, `mediaTypeForMentionPath`, `MENTION_PILL_CLASS`, `mentionInputToPart`, `MentionItem`, `mentionKindForPath`, `mentionPartsFromMessageParts`, `MentionTextSegment`, `mergeActivityPages`, `mergeReviewQueuePages`, `MessageAttachments`, `MessageAttachmentsProps`, `missingAnswerHint`, `MissionActivityLane`, `MissionActivityLaneProps`, `ModelPicker`, `ModelPickerProps`, `nextRevealCount`, `NoticeKind`, `noticePart`, `noticePartKey`, `NoticePersistedPart`, `OOXML_SNIFFED_MIMES`, `OVERLAY_SHADOW`, `parseInteractionAnswers`, `ParseInteractionAnswersResult`, `parseInteractionCancel`, `parseInteractionRequest`, `ParseInteractionResult`, `parseRecordGridInput`, `parseReviewQueueItem`, `pendingApprovalOf`, `persistedPartToInteraction`, `pickDictationMimeType`, `PickerVariant`, `POPOVER_SURFACE_ATTR`, `PopoverSurface`, `PopoverSurfaceProps`, `preloadWhenIdle`, `ProducerErrorEvent`, `ProducerNoticeEvent`, `ProducerPassthroughEvent`, `ProducerPassthroughEventType`, `ProducerReasoningEvent`, `ProducerTextEvent`, `ProducerToolCallEvent`, `ProducerToolResultEvent`, `ProducerUsageEvent`, `ProducerWireEvent`, `projectRecordGridRows`, `ProposalApprovalHandlers`, `PROVENANCE_BASES`, `ProvenanceBasis`, `provenanceBasisMeta`, `ProvenanceBasisMeta`, `ProvenanceConfidencePolicy`, `ProvenanceGap`, `ProvenanceGapKind`, `provenanceGaps`, `ProvenanceLegend`, `ProvenanceLegendProps`, `provenanceNextMove`, `ProvenanceRecord`, `ProvenanceSource`, `ProvenanceSourceStatus`, `ProvenanceStamp`, `ProvenanceStampProps`, `ProvenanceStanding`, `provenanceStandingMeta`, `ProvenanceStandingMeta`, `provenanceTriggerLabel`, `ProvenanceValue`, `ProvenanceValueProps`, `ProviderLogo`, `ProviderLogoProps`, `pruneRecordGridOverlay`, `QualityCheckList`, `QualityCheckListProps`, `questionInteractionContentSignature`, `QuestionOptionList`, `QuestionOptionListProps`, `rankFileMentions`, `readRecordGridCell`, `ReasoningRow`, `ReasoningRowProps`, `reconcileEffortLevels`, `RecordGrid`, `RecordGridBooleanColumn`, `RecordGridCellChange`, `RecordGridCellDiff`, `RecordGridCellOutcome`, `RecordGridCellSource`, `RecordGridColumn`, `RecordGridColumnBase`, `RecordGridCreateOutcome`, `RecordGridCurrencyColumn`, `RecordGridDateColumn`, `RecordGridDependency`, `recordGridEditorText`, `recordGridFail`, `RecordGridNumberColumn`, `recordGridOk`, `RecordGridOverlay`, `RecordGridProposal`, `RecordGridProps`, `RecordGridRow`, `RecordGridRowDiff`, `RecordGridRowDiffKind`, `recordGridRowLabel`, `RecordGridRowOutcome`, `RecordGridSelectColumn`, `RecordGridSelectOption`, `RecordGridSourceBasis`, `RecordGridTextColumn`, `RecordGridValue`, `RecordGridWriteOutcome`, `renamePastedImages`, `requestWorkspacePrewarm`, `resolveChatInteraction`, `resolveProvenanceStanding`, `ResourceFileLimits`, `responseErrorMessage`, `restoreChatInteractions`, `RestoreChatInteractionsOptions`, `ReviewFeedbackDraft`, `ReviewFeedbackForm`, `ReviewFeedbackFormHandle`, `ReviewFeedbackFormProps`, `ReviewInbox`, `ReviewInboxFeedback`, `ReviewInboxItem`, `ReviewInboxProps`, `ReviewQueueItem`, `ReviewQueuePage`, `ReviewQueuePanel`, `ReviewQueuePanelProps`, `ReviewQueueState`, `ReviewVerdict`, `rollUpProvenanceStanding`, `RouteChunkBoundary`, `RouteChunkBoundaryProps`, `RunDrillIn`, `RunDrillInProps`, `sameRecordGridValue`, `SandboxTerminalConnection`, `SandboxTerminalConnectionResponse`, `SeatPaywall`, `SeatPaywallProps`, `segmentMentionContent`, `SessionActionLabels`, `SessionActions`, `SessionActionsOptions`, `SessionBulkAction`, `SessionHistoryPanel`, `SessionHistoryPanelProps`, `SessionHistoryState`, `SessionPageQuery`, `settleInteractionSubmit`, `settleTurnResponse`, `SlashCommand`, `SmoothRevealOptions`, `Sparkline`, `SparklineDirection`, `sparklineGeometry`, `SparklineGeometry`, `SparklineGeometryOptions`, `sparklineLabel`, `SparklineLabelOptions`, `SparklinePoint`, `sparklinePointsAttribute`, `SparklineProps`, `sparklineReadings`, `stampInteractionAnswers`, `standingFromConfidence`, `StreamChatOptions`, `streamChatTurn`, `SubmitInteractionAnswer`, `sumRecordGridColumn`, `tabTerminalConnectionId`, `terminalizePendingChatInteractions`, `ToolDetailRenderers`, `ToolRunRecord`, `ToolRunStep`, `trackChatReasoning`, `TrackedChatStreamCallbacks`, `triggerAttachmentDownload`, `TURN_INTENT_EVENT`, `TURN_PHASE_EVENT`, `TURN_PROGRESS_FIRST`, `TURN_PROGRESS_HEADER`, `TURN_RESPONSE_EVENT`, `TURN_ROUTE_PHASE_MESSAGES`, `TURN_STREAM_LOST_CODE`, `TurnIntentData`, `TurnIntentEvent`, `TurnPhaseData`, `TurnPhaseEvent`, `TurnProgress`, `TurnProgressProps`, `TurnResponseData`, `TurnRoutePhase`, `upsertChatInteraction`, `useChatInteractions`, `UseChatInteractionsOptions`, `UseChatInteractionsResult`, `useChatScroll`, `useComposerAttachments`, `UseComposerAttachmentsOptions`, `UseComposerAttachmentsResult`, `useDictation`, `UseDictationOptions`, `useDurablePlanFlow`, `UseDurablePlanFlowOptions`, `UseDurablePlanFlowResult`, `useFileMentions`, `UseFileMentionsOptions`, `UseFileMentionsResult`, `useInfiniteScroll`, `UseInfiniteScrollOptions`, `usePending`, `usePopover`, `useSandboxTerminalConnection`, `UseSandboxTerminalConnectionOptions`, `UseSandboxTerminalConnectionResult`, `useSessionActions`, `useSessionHistory`, `UseSessionHistoryOptions`, `useSmoothText`, `useThinkingSeconds`, `useWorkspacePrewarm`, `useWorkspacePrewarmHandle`, `UseWorkspacePrewarmOptions`, `validateRecordGridCell`, `validateRecordGridRow`, `waterfallLayout`, `WaterfallRow`, `weakerProvenanceStanding`, `withoutRecordGridCreated`, `withoutRecordGridRemoved`, `withoutRecordGridUpdate`, `withRecordGridCreated`, `withRecordGridRemoved`, `withRecordGridServerRow`, `withRecordGridUpdate`, `WorkProductCard`, `WorkProductCardProps`, `workProductPartsFromMessageParts`, `workProductStatusLabel`, `WorkProductStatusPill`, `workProductStatusTone`, `WorkspaceInitial`, `WorkspacePrewarmContext`, `WorkspacePrewarmHandle`, `WorkspacePrewarmRequestOptions`, `WorkspaceSwitcher`, `WorkspaceSwitcherItem`, `WorkspaceSwitcherProps`
 
@@ -1297,7 +1473,7 @@ Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `h
 
 Source: `src/web-react/agent-profile-editor.tsx` · 8 exports
 
-Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product`
+Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
 
 `AGENT_PROFILE_EDITOR_SECTIONS`, `AgentProfileEditor`, `AgentProfileEditorConfig`, `AgentProfileEditorModelCatalog`, `AgentProfileEditorProps`, `AgentProfileEditorSaveState`, `AgentProfileEditorSection`, `AgentProfileResourceKind`
 
@@ -1311,15 +1487,33 @@ Source: `src/web-react/async/index.ts` · 35 exports
 
 [Full API →](api/web-react-async.md)
 
+## `./web-react/document`
+
+Source: `src/web-react/document.tsx` · 7 exports
+
+Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
+
+`AppDocument`, `appDocumentLinks`, `AppDocumentProps`, `describeRouteError`, `installFetchResponseObserver`, `svgFaviconHref`, `ThemeClassSync`
+
+[Full API →](api/web-react-document.md)
+
 ## `./web-react/terminal`
 
 Source: `src/web-react/terminal.ts` · 6 exports
 
-Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `trace`, `work-product`
+Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
 
 `SandboxTerminalConnection`, `SandboxTerminalConnectionResponse`, `tabTerminalConnectionId`, `useSandboxTerminalConnection`, `UseSandboxTerminalConnectionOptions`, `UseSandboxTerminalConnectionResult`
 
 [Full API →](api/web-react-terminal.md)
+
+## `./web/entry-server`
+
+Source: `src/web/entry-server.tsx` · 1 exports
+
+`handleRouterRequest`
+
+[Full API →](api/web-entry-server.md)
 
 ## `./work-product`
 

@@ -234,6 +234,10 @@ export interface AppOAuthPrincipal {
   userId: string
   clientId: string
   scopes: readonly string[]
+  /** The consent row the token was minted under. */
+  consentId: string
+  /** The issuer session (`sid`) the token was minted in. */
+  sessionId: string
 }
 
 /** Verify bearer tokens and current host grants before any private tool is listed. */
@@ -293,7 +297,8 @@ export function createAppOAuthResourceVerifier(config: AppOAuthResourceConfig & 
       if (!await authority.sessionActive(claims.sid, userId)
         || !await authority.userActive(userId)) return null
     }
-    return { userId, clientId, scopes: tokenScopes.filter(scope => config.scopes.includes(scope)) }
+    return { userId, clientId, scopes: tokenScopes.filter(scope => config.scopes.includes(scope)),
+      consentId, sessionId: claims.sid }
   }
 }
 

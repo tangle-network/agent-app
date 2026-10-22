@@ -176,3 +176,4 @@ export function parsePlanSubmittedEvent(event: unknown): ParsePlanSubmittedResul
     ? { succeeded: true, value: parsed }
     : { succeeded: false, error: 'plan.submitted event carried a malformed plan' }
 }
+export * from './decision'

@@ -16,6 +16,7 @@
  */
 
 import type { RenderedAgentPrompt } from './agent-prompt'
+import { sha256Hex } from '../crypto/digest'
 
 export const MODEL_INPUT_RECORD_SCHEMA = 'agent-app.model-input.v1'
 
@@ -73,13 +74,6 @@ export interface ModelInputStore {
 }
 
 const encoder = new TextEncoder()
-
-async function sha256Hex(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(text))
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-}
 
 const DEFAULT_MEDIA_TYPE: Record<ModelInputKind, ModelInputMediaType> = {
   'system-prompt': 'text/markdown',

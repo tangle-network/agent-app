@@ -54,14 +54,9 @@ export function decodeFormBlank(blank: FormBlank): Uint8Array {
   return bytes
 }
 
-/** Lowercase-hex SHA-256 of a byte range. */
-export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const view = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-  const digest = await crypto.subtle.digest('SHA-256', view as ArrayBuffer)
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-}
+import { sha256Hex } from '../crypto/digest'
+
+export { sha256Hex }
 
 /**
  * Prove the embedded bytes are the file the registry was derived from.

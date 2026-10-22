@@ -76,3 +76,67 @@ function parseRateLimitState(raw: string | null): number[] | typeof POISONED_STA
   if (!Array.isArray(parsed)) return POISONED_STATE
   return parsed.filter((t): t is number => typeof t === 'number' && Number.isFinite(t))
 }
+
+/** Timing of one limiter decision, for a product that logs it. */
+export interface RateLimitTiming {
+  readMs: number
+  /** Present once the counter write settled. */
+  writeMs?: number
+  /** Present on the decision event. */
+  decisionMs?: number
+  allowed?: boolean
+  deferred: boolean
+}
+
+export interface RateLimiterBindingOptions {
+  /** Called when the counter write settles and when the decision is made. */
+  onTiming?: (event: 'counter' | 'decision', timing: RateLimitTiming) => void
+  /** Called when a deferred counter write fails; the decision already stood. */
+  onPersistError?: (error: unknown) => void
+}
+
+/**
+ * A product's limiter bound once to its KV namespace at worker start:
+ * `setKV(env.RATE_LIMIT_KV)`, then `check(key, limit, windowSeconds)` anywhere.
+ * Pass `waitUntil` to defer the counter write past the response.
+ */
+export function createRateLimiterBinding(options: RateLimiterBindingOptions = {}) {
+  let bound: KvLike | null = null
+
+  function setKV(kv: KvLike): void { bound = kv }
+
+  async function check(
+    key: string,
+    limit: number,
+    windowSeconds: number,
+    waitUntil?: (persist: Promise<void>) => void,
+  ): Promise<RateLimitResult> {
+    if (!bound) throw new Error('RATE_LIMIT_KV not initialized')
+    const { onTiming, onPersistError } = options
+    const kv = bound
+    const deferred = Boolean(waitUntil)
+    const startedAt = Date.now()
+    let readMs = 0
+    const measured: KvLike = onTiming
+      ? {
+          async get(counterKey) {
+            const began = Date.now()
+            try { return await kv.get(counterKey) } finally { readMs = Date.now() - began }
+          },
+          async put(counterKey, value, putOptions) {
+            const began = Date.now()
+            try { await kv.put(counterKey, value, putOptions) } finally {
+              onTiming('counter', { readMs, writeMs: Date.now() - began, deferred })
+            }
+          },
+        }
+      : kv
+    const result = await checkRateLimit(measured, key, limit, windowSeconds, waitUntil
+      ? { waitUntil: (persist) => waitUntil(persist.catch((error: unknown) => onPersistError?.(error))) }
+      : {})
+    onTiming?.('decision', { readMs, decisionMs: Date.now() - startedAt, allowed: result.allowed, deferred })
+    return result
+  }
+
+  return { setKV, check }
+}

@@ -1,12 +1,18 @@
 import { CostLedger, resolveModelPricing } from '@tangle-network/agent-eval'
 import { CostLedger as retainedCostLedger } from 'agent-eval-0204'
 import { CostLedger as currentLineCostLedger } from 'agent-eval-0211'
+import { CostLedger as nextLineCostLedger } from 'agent-eval-0217'
 import { expect, it } from 'vitest'
 
 const compat = process.env.AGENT_EVAL_COMPAT ?? 'agent-eval-0204'
+const compatCostLedger: Record<string, unknown> = {
+  'agent-eval-0204': retainedCostLedger,
+  'agent-eval-0211': currentLineCostLedger,
+  'agent-eval-0217': nextLineCostLedger,
+}
 
 it('executes the compat Eval package instead of the current development peer', () => {
-  expect(CostLedger).toBe(compat === 'agent-eval-0211' ? currentLineCostLedger : retainedCostLedger)
+  expect(CostLedger).toBe(compatCostLedger[compat])
 })
 
 it.runIf(compat === 'agent-eval-0211')('prices the default Router model on the 0.211 line', () => {
