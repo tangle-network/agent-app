@@ -126,6 +126,31 @@ try {
     await page.screenshot({ path: `${output}/live-growing.png`, fullPage: true })
     const rowDuration = await page.locator('[data-span-id="tool"] .fw-duration').innerText()
     await page.waitForFunction(previous => document.querySelector('[data-span-id="tool"] .fw-duration').textContent !== previous, rowDuration)
+    // Sample the real browser clock and the rendered range input while live ticks continue.
+    const livePlaybackRates = []
+    for (const selected of [0.5, 1, 1.5, 2, 4]) {
+      await page.getByRole('button', { name: 'Restart', exact: true }).click()
+      await page.getByLabel('Playback speed').selectOption(String(selected))
+      await page.getByRole('button', { name: 'Play', exact: true }).click()
+      const sample = await page.evaluate(async () => {
+        const position = () => document.querySelector('input[aria-label="Playback position"]')
+        const read = () => ({ at: performance.now(), position: Number(position().value), limit: Number(position().max) })
+        const start = read()
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        return { start, end: read() }
+      })
+      await page.getByRole('button', { name: 'Pause', exact: true }).click()
+      const wallMs = sample.end.at - sample.start.at
+      const advanceMs = sample.end.position - sample.start.position
+      livePlaybackRates.push({ selected, observed: advanceMs / wallMs, wallMs, advanceMs, limitGrowthMs: sample.end.limit - sample.start.limit })
+    }
+    writeFileSync(`${output}/live-playback-rates.json`, JSON.stringify(livePlaybackRates, null, 2))
+    console.log(JSON.stringify({ livePlaybackRates }))
+    for (const sample of livePlaybackRates) {
+      assert.ok(sample.limitGrowthMs > 1500, 'The sampled trace must keep growing during playback')
+      assert.ok(Math.abs(sample.observed - sample.selected) <= sample.selected * 0.15,
+        `${sample.selected}x live playback measured ${sample.observed.toFixed(3)}x; allowed ±15%`)
+    }
     await story('discovery-streaming-replay')
     await page.waitForFunction(() => document.querySelectorAll('[data-span-id]').length > 5)
     const count = await page.locator('[data-span-id]').count()
