@@ -27,6 +27,11 @@
  * from the same file at `--base` (default `origin/main`), or given with
  * `--from`. `--to` overrides the new value.
  *
+ * A deploy that keeps the value (a hold) judges only turns served since the
+ * deployed commit went live, read as the commit time of `--base`. `measure`
+ * receives that as `since`; a breach measured on a window that starts before it
+ * is undecided, not refused.
+ *
  * Usage: agent-app-rollout-check [appDir] [--config <file>] [--base <git ref>]
  *          [--from <value>] [--to <value>] [--plan <name>] [--record <jsonl>]
  * Exits 0 when allowed, 1 for a measured refusal, 3 for insufficient widening evidence, 2 on a usage error. Undecided holds exit 0.
@@ -40,7 +45,8 @@ import { decideRollout, type RolloutDecision, type RolloutPlan, type RolloutStag
 
 export interface RolloutConfig {
   plans: RolloutPlan[]
-  measure(input: { plan: RolloutPlan; stage: RolloutStage; signal?: AbortSignal }): Promise<StageMeasurement | null>
+  /** `since` (epoch ms) is set for a hold: measure the turns at or after it and return it as `window.from`. */
+  measure(input: { plan: RolloutPlan; stage: RolloutStage; signal?: AbortSignal; since?: number }): Promise<StageMeasurement | null>
   /** Shared observation deadline; see decideRollout. */
   measurementTimeoutMs?: number
   record?(decision: RolloutDecision): Promise<void> | void
@@ -107,9 +113,9 @@ async function loadConfig(appDir: string, explicit?: string): Promise<RolloutCon
   return config
 }
 
-function gitShow(cwd: string, spec: string): string | null {
+function git(cwd: string, args: string[]): string | null {
   try {
-    return execFileSync('git', ['show', spec], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   } catch {
     return null
   }
@@ -120,19 +126,25 @@ function gitShow(cwd: string, spec: string): string | null {
  * no `.git`; signoff names the source checkout and the copy's root, so the
  * base is read from the source at the same repo-relative path.
  */
-function wranglerAt(appDir: string, file: string, ref: string, env: NodeJS.ProcessEnv = process.env): string {
-  const local = gitShow(appDir, `${ref}:./${file}`)
-  if (local !== null) return local
+function wranglerAt(appDir: string, file: string, ref: string, env: NodeJS.ProcessEnv = process.env): { source: string; repo: string } {
+  const local = git(appDir, ['show', `${ref}:./${file}`])
+  if (local !== null) return { source: local, repo: appDir }
   const source = env.SIGNOFF_SOURCE_REPO
   const tree = env.SIGNOFF_TREE
   if (source && tree) {
     const path = relative(resolve(tree), resolve(appDir, file))
     if (!path.startsWith('..') && !isAbsolute(path)) {
-      const fromSource = gitShow(source, `${ref}:${path.split(sep).join('/')}`)
-      if (fromSource !== null) return fromSource
+      const fromSource = git(source, ['show', `${ref}:${path.split(sep).join('/')}`])
+      if (fromSource !== null) return { source: fromSource, repo: source }
     }
   }
   throw new Error(`cannot read ${file} at ${ref}; fetch it or pass --from`)
+}
+
+/** Epoch ms of `ref`'s commit: when the deployed commit went live, for a hold. */
+function commitTime(repo: string, ref: string): number | undefined {
+  const seconds = Number(git(repo, ['log', '-1', '--format=%ct', ref])?.trim())
+  return seconds > 0 ? seconds * 1000 : undefined
 }
 
 export async function runRolloutCheck(args: CliArgs): Promise<RolloutDecision[]> {
@@ -145,12 +157,13 @@ export async function runRolloutCheck(args: CliArgs): Promise<RolloutDecision[]>
   const base = args.from === undefined ? wranglerAt(args.appDir, file, args.base) : null
   const decisions: RolloutDecision[] = []
   for (const plan of plans) {
-    const fromValue = args.from ?? readWranglerVar(base!, plan.variable) ?? ''
+    const fromValue = args.from ?? readWranglerVar(base!.source, plan.variable) ?? ''
     const toValue = args.to ?? readWranglerVar(head, plan.variable) ?? ''
     const decision = await decideRollout({
       plan, fromValue, toValue,
-      measure: (stage, signal) => config.measure({ plan, stage, signal }),
+      measure: (stage, signal, scope) => config.measure({ plan, stage, signal, ...scope }),
       measurementTimeoutMs: config.measurementTimeoutMs,
+      liveSince: base ? commitTime(base.repo, args.base) : undefined,
     })
     decisions.push(decision)
     const ledger = resolve(args.appDir, args.record)
