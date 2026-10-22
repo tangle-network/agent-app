@@ -214,6 +214,8 @@ try {
   const reopened = await page.request.get(`${origin}/api/threads/${encodeURIComponent(thread.id)}/messages`)
   assert.equal(reopened.status(), 200)
   assert.equal((await reopened.json()).thread.id, thread.id)
+  await page.getByText('Send a message to continue this thread.', { exact: true }).waitFor()
+  await page.screenshot({ path: join(evidence, 'workspace-reopened.png'), fullPage: true })
   await context.close()
   assert.deepEqual(failures, [], 'Browser runtime errors')
   assert.equal(turnRequests, 0, 'Local persistence proof must make no model turn requests')
