@@ -78,7 +78,7 @@ export type RouterTurnEvent =
   | { type: 'tool'; callId: string; toolName: string; status: 'running'; input: Record<string, unknown>; startedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'completed'; output: unknown; startedAt: number; endedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'error'; error: { code: string; message: string }; startedAt: number; endedAt: number }
-  | { type: 'usage'; promptTokens: number; completionTokens: number }
+  | { type: 'usage'; promptTokens: number; completionTokens: number; cachedPromptTokens?: number }
   | ({ type: 'tool_event' } & RouterTurnToolEvent)
 
 export interface RouterTurnFailure {
@@ -100,8 +100,9 @@ export interface RouterTurnOutcome {
   /** The model the router reports having served, when it said. */
   servedModel: string | null
   toolCalls: Array<{ callId: string; toolName: string; ok: boolean }>
-  /** Token use summed over every model call in the turn, as the router reported it. */
-  usage: { promptTokens: number; completionTokens: number; modelCalls: number }
+  /** Token use summed over every model call in the turn, as the router reported it. `cachedPromptTokens` are the
+   *  prompt tokens the provider served from its prompt cache; absent when no call reported them. */
+  usage: { promptTokens: number; completionTokens: number; modelCalls: number; cachedPromptTokens?: number }
   /** Reasoning the turn streamed (deltas and characters). Zero when the model sent none; absent when no model was called. */
   reasoning?: { deltas: number; chars: number }
   /** Every side event the turn's tools reported, in order (at most 500). */
@@ -283,26 +284,58 @@ export function routerFunctionName(name: string): string {
   return name.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64)
 }
 
+export interface RouterTurnPromptSections {
+  /** Every section that is the same on each turn of a workspace, first, so the bytes repeat turn after turn. */
+  prefix: string
+  /** What this turn adds: its `context`. Empty when there is none. */
+  tail: string
+  /** `prefix` then `tail`: the system prompt the model reads. */
+  text: string
+}
+
+export interface RouterTurnPromptOptions {
+  /** Sections the same on every turn of a workspace (skills, tool guidance, catalogs, references). They go in the
+   *  prefix, after the profile's prompt, so a provider's prompt cache serves them. */
+  stable?: readonly string[]
+  /** This turn's own sections (the clock, the board, what changed, ids). They go last, after every stable byte. */
+  context?: readonly string[]
+  toolNames?: readonly string[]
+  /** Knowledge files every turn carries; see {@link turnKnowledgeInstructions}. They change only when the workspace
+   *  edits them, so they close the prefix. */
+  knowledge?: { files: readonly TurnKnowledgeFile[]; readTool?: string }
+}
+
 /**
- * The lean system prompt for a Router turn: the profile's system prompt, appended prompt and
- * instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function
- * names the model actually calls.
+ * The lean system prompt for a Router turn, split where its bytes stop repeating. The prefix holds the profile's
+ * system prompt, appended prompt and instructions, the reply-language rule, the caller's `stable` sections and the
+ * knowledge files; the tail holds the turn's `context`. Tool names are rewritten to the function names the model
+ * actually calls.
+ *
+ * A provider serves a repeated prompt prefix from its cache: through the Router, Gemini served 38,685 of
+ * 40,734 prompt tokens from cache on each repeat of a stable 150 kB prefix, and none when a timestamp came first
+ * (2026-10-22). One per-turn byte early in the prompt therefore costs the whole prompt on every turn, so nothing
+ * per-turn belongs in `stable` or the profile's prompt.
  */
+export function composeRouterTurnPromptSections(
+  profile: { prompt?: { systemPrompt?: string; appendSystemPrompt?: string; instructions?: readonly string[] } },
+  options: RouterTurnPromptOptions = {},
+): RouterTurnPromptSections {
+  const knowledge = options.knowledge ? turnKnowledgeInstructions(options.knowledge.files, { readTool: options.knowledge.readTool }) : []
+  const names = [...(options.toolNames ?? [])].sort((a, b) => b.length - a.length)
+  const render = (parts: readonly string[]) => names.reduce((out, name) => out.split(name).join(routerFunctionName(name)),
+    parts.filter(part => part.trim()).join('\n\n'))
+  const prefix = render([profile.prompt?.systemPrompt ?? '', profile.prompt?.appendSystemPrompt ?? '', ...(profile.prompt?.instructions ?? []),
+    replyLanguageInstruction(), ...(options.stable ?? []), ...knowledge])
+  const tail = render(options.context ?? [])
+  return { prefix, tail, text: [prefix, tail].filter(Boolean).join('\n\n') }
+}
+
+/** The system prompt {@link composeRouterTurnPromptSections} composes, as one string. */
 export function composeRouterTurnPrompt(
   profile: { prompt?: { systemPrompt?: string; appendSystemPrompt?: string; instructions?: readonly string[] } },
-  options: {
-    context?: readonly string[]
-    toolNames?: readonly string[]
-    /** Knowledge files every turn carries; see {@link turnKnowledgeInstructions}. */
-    knowledge?: { files: readonly TurnKnowledgeFile[]; readTool?: string }
-  } = {},
+  options: RouterTurnPromptOptions = {},
 ): string {
-  const knowledge = options.knowledge ? turnKnowledgeInstructions(options.knowledge.files, { readTool: options.knowledge.readTool }) : []
-  const text = [profile.prompt?.systemPrompt ?? '', profile.prompt?.appendSystemPrompt ?? '', ...(profile.prompt?.instructions ?? []), ...knowledge,
-    replyLanguageInstruction(), ...(options.context ?? [])]
-    .filter(part => part.trim()).join('\n\n')
-  return [...(options.toolNames ?? [])].sort((a, b) => b.length - a.length)
-    .reduce((out, name) => out.split(name).join(routerFunctionName(name)), text)
+  return composeRouterTurnPromptSections(profile, options).text
 }
 
 const joinText = (parts: string[]) => parts.map(part => part.trim()).filter(Boolean).join('\n\n')
@@ -324,6 +357,24 @@ function renderResult(outcome: RouterTurnToolOutcome, limit = TOOL_RESULT_LIMIT)
   try { text = typeof outcome.result === 'string' ? outcome.result : JSON.stringify(outcome.result ?? null) }
   catch { text = String(outcome.result) }
   return text.length > limit ? `${text.slice(0, limit)}…` : text
+}
+
+/** Add one model call's usage to the turn's totals and to that call's span. */
+function addCallUsage(
+  usage: RouterTurnOutcome['usage'],
+  call: { promptTokens: number; completionTokens: number; cachedPromptTokens?: number },
+  span: TurnSpan | undefined,
+): void {
+  usage.promptTokens += call.promptTokens
+  usage.completionTokens += call.completionTokens
+  usage.modelCalls++
+  const cached = call.cachedPromptTokens
+  if (cached !== undefined) usage.cachedPromptTokens = (usage.cachedPromptTokens ?? 0) + cached
+  span?.set({
+    'gen_ai.usage.input_tokens': call.promptTokens,
+    'gen_ai.usage.output_tokens': call.completionTokens,
+    ...(cached !== undefined ? { 'gen_ai.usage.cache_read.input_tokens': cached } : {}),
+  })
 }
 
 export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterTurnOutcome> {
@@ -454,7 +505,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     },
   })
   const segments: string[] = []
-  const usage = { promptTokens: 0, completionTokens: 0, modelCalls: 0 }
+  const usage: RouterTurnOutcome['usage'] = { promptTokens: 0, completionTokens: 0, modelCalls: 0 }
   // How much reasoning the turn streamed: the number an app logs to measure reasoning coverage.
   const reasoning = { deltas: 0, chars: 0 }
   const toolCalls: RouterTurnOutcome['toolCalls'] = []
@@ -540,13 +591,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           reasoning.chars += event.text.length
           emit({ type: 'reasoning', delta: event.text })
         } else if (event.type === 'usage') {
-          usage.promptTokens += event.usage.promptTokens
-          usage.completionTokens += event.usage.completionTokens
-          usage.modelCalls++
-          lastModelSpan?.set({
-            'gen_ai.usage.input_tokens': event.usage.promptTokens,
-            'gen_ai.usage.output_tokens': event.usage.completionTokens,
-          })
+          addCallUsage(usage, event.usage, lastModelSpan)
           emit({ type: 'usage', ...event.usage })
         } else if (event.type === 'tool_call_start') {
           emit({ type: 'tool_start', toolName: byFunction.get(event.toolName)?.name ?? event.toolName })

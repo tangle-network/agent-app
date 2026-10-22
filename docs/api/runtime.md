@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-106 exports.
+109 exports.
 
 ### `AnySurfaceKind`
 
@@ -88,7 +88,15 @@ interface CheckpointWorkspaceStore
 
 ### `composeRouterTurnPrompt`
 
-`function` — The lean system prompt for a Router turn: the profile's system prompt, appended prompt and instructions, the turn's knowledge files, then caller context, with tool names rewritten to the function nam…
+`function` — The system prompt {@link composeRouterTurnPromptSections} composes, as one string.
+
+```ts
+(profile: { prompt?: { systemPrompt?: string | undefined; appendSystemPrompt?: string | undefined; instructions?: reado…
+```
+
+### `composeRouterTurnPromptSections`
+
+`function` — The lean system prompt for a Router turn, split where its bytes stop repeating.
 
 ```ts
 (profile: { prompt?: { systemPrompt?: string | undefined; appendSystemPrompt?: string | undefined; instructions?: reado…
@@ -540,6 +548,22 @@ interface RouterTurnOutcome
 
 ```ts
 interface RouterTurnPlacementInput
+```
+
+### `RouterTurnPromptOptions`
+
+`interface`
+
+```ts
+interface RouterTurnPromptOptions
+```
+
+### `RouterTurnPromptSections`
+
+`interface`
+
+```ts
+interface RouterTurnPromptSections
 ```
 
 ### `RouterTurnSettlement`

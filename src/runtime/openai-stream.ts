@@ -50,6 +50,8 @@ export interface OpenAIStreamChunk {
   usage?: {
     prompt_tokens?: number
     completion_tokens?: number
+    /** Prompt tokens the provider served from its prompt cache (Gemini implicit caching, OpenAI, Anthropic through the Router). */
+    prompt_tokens_details?: { cached_tokens?: number | null } | null
   } | null
 }
 
@@ -79,14 +81,18 @@ interface PartialToolCall {
  */
 export async function* toLoopEvents(chunks: AsyncIterable<OpenAIStreamChunk>): AsyncIterable<LoopEvent> {
   const calls = new Map<number, PartialToolCall>()
-  let usage: { promptTokens: number; completionTokens: number } | undefined
+  let usage: { promptTokens: number; completionTokens: number; cachedPromptTokens?: number } | undefined
   for await (const chunk of chunks) {
     // Usage can ride a chunk with an empty choices array — read it before the
     // choice guard. Each report is cumulative, so the last one is the call's.
     if (chunk.usage?.prompt_tokens != null || chunk.usage?.completion_tokens != null) {
+      // Cumulative like the rest, but a provider may send the details on an earlier chunk only: keep the largest.
+      const reported = chunk.usage.prompt_tokens_details?.cached_tokens
+      const cached = typeof reported === 'number' ? Math.max(reported, usage?.cachedPromptTokens ?? 0) : usage?.cachedPromptTokens
       usage = {
         promptTokens: chunk.usage.prompt_tokens ?? 0,
         completionTokens: chunk.usage.completion_tokens ?? 0,
+        ...(typeof cached === 'number' ? { cachedPromptTokens: cached } : {}),
       }
     }
     const choice = chunk.choices?.[0]
@@ -280,7 +286,7 @@ interface OpenAICompletion {
     }
     finish_reason?: string | null
   }>
-  usage?: { prompt_tokens?: number; completion_tokens?: number } | null
+  usage?: OpenAIStreamChunk['usage']
 }
 
 async function* completionAsChunk(
@@ -519,7 +525,7 @@ interface ResponsesEvent {
   output_index?: number
   summary_index?: number
   item?: { type?: string; call_id?: string; name?: string; arguments?: string }
-  response?: { model?: string; usage?: { input_tokens?: number; output_tokens?: number }; error?: { code?: string; message?: string } }
+  response?: { model?: string; usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number | null } | null }; error?: { code?: string; message?: string } }
   error?: { code?: string; message?: string }
   message?: string
 }
@@ -599,7 +605,8 @@ async function* streamResponses(
           if (attribution && !reported && model) report(servedFromBody(model, attribution.requestedModel))
           const usage = event.response?.usage
           yield { ...(model ? { model } : {}), choices: [],
-            ...(usage ? { usage: { prompt_tokens: usage.input_tokens ?? 0, completion_tokens: usage.output_tokens ?? 0 } } : {}) }
+            ...(usage ? { usage: { prompt_tokens: usage.input_tokens ?? 0, completion_tokens: usage.output_tokens ?? 0,
+              ...(usage.input_tokens_details ? { prompt_tokens_details: usage.input_tokens_details } : {}) } } : {}) }
           return
         }
         case 'response.failed':
