@@ -7,8 +7,10 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { build } from 'tsup'
 import { expect, it } from 'vitest'
-import { createD1TurnTimingStore, ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL, ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL } from '../src/rollout/d1'
+import { createChatTurnRoutes, type ChatTurnMessageStore } from '../src/chat-routes/index'
+import { createD1TurnTimingStore, ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL, ROLLOUT_TURN_TIMING_SCHEMA_SQL, ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL, type D1LikeForRollout } from '../src/rollout/d1'
 import { assignRolloutArm, decideRollout } from '../src/rollout/index'
+import { createMemoryTurnEventStore } from '../src/stream/index'
 
 // Frozen E8 decision measurement: creative-rollout.result, closed seven-day window
 // 2026-10-13T23:48:49.733Z through 2026-10-20T23:48:49.733Z. No live reads or paid calls.
@@ -179,4 +181,57 @@ it('records an experiment variant apart from the cohort arm, and keeps recording
     expect(sqlite.prepare('SELECT turn_id, arm, variant FROM rollout_turn_timing ORDER BY turn_id').all())
       .toEqual([{ turn_id: 'after', arm: 'synthetic-router', variant: 'billing_in_gate=1' }, { turn_id: 'before', arm: 'synthetic-router', variant: null }])
   } finally { sqlite.close() }
+})
+
+it('a product writer that omits timing still records first visible, admission and the served model, on a full table and on a pre-ruler one', async () => {
+  // Full schema; the Tax 0022 table (no first_visible_ms, ruler or variant columns); and an opted-out store on the full schema.
+  const full = new Database(':memory:'), legacy = new Database(':memory:'), optedOut = new Database(':memory:')
+  full.exec(ROLLOUT_TURN_TIMING_SCHEMA_SQL)
+  optedOut.exec(ROLLOUT_TURN_TIMING_SCHEMA_SQL)
+  legacy.exec(`CREATE TABLE rollout_turn_timing (turn_id TEXT PRIMARY KEY, rollout TEXT NOT NULL, workspace_id TEXT NOT NULL,
+    lane TEXT NOT NULL, first_text_ms INTEGER, settled_ms INTEGER NOT NULL, failed INTEGER NOT NULL, failure_code TEXT, at INTEGER NOT NULL);`)
+  const d1 = (sqlite: Database.Database): D1LikeForRollout => ({ prepare: sql => ({ bind: (...values) => ({
+    run: async () => sqlite.prepare(sql).run(...values),
+    all: async <T>() => ({ results: sqlite.prepare(sql).all(...values) as T[] }),
+  }) }) })
+  const stores = [createD1TurnTimingStore({ db: d1(full) }), createD1TurnTimingStore({ db: d1(legacy) }),
+    createD1TurnTimingStore({ db: d1(optedOut), measuredFacts: false })]
+  const store: ChatTurnMessageStore = { async listMessages() { return [] }, async appendMessage() { return { id: 'm' } } }
+  const pending: Promise<unknown>[] = []
+  const routes = createChatTurnRoutes<Record<string, never>>({
+    projectId: 'timing-default', store, turnStore: createMemoryTurnEventStore(), incrementalPersistence: false, log: () => {},
+    authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'u-1', context: {} }),
+    produce: () => ({
+      model: 'served-model',
+      stream: (async function* () {
+        for (const text of ['Four', ' rooms.']) {
+          await new Promise(resolve => setTimeout(resolve, 30))
+          yield { type: 'text', text } as never
+        }
+      })(),
+      finalText: () => 'Four rooms.',
+    }),
+    // The Legal writer (legal-agent chat-vertical.ts): lane, words and settle time, nothing else.
+    lifecycle: { onTurnComplete: async info => { await Promise.all(stores.map(timing => timing.record({ turnId: info.turnStreamId,
+      rollout: 'r', workspaceId: 'ws-1', lane: 'sandbox', firstTextMs: info.firstTextMs, settledMs: info.durationMs, failed: false }))) } },
+  })
+  try {
+    const response = await routes.turn(new Request('http://app.test/api/chat', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId: 't-1', content: 'hi' }) }),
+    { waitUntil: (p: Promise<unknown>) => { pending.push(p) } })
+    await response.text()
+    await Promise.all(pending)
+    const row = full.prepare('SELECT lane, admission_ms, first_visible_ms, first_text_ms, model FROM rollout_turn_timing').get() as Record<string, unknown>
+    expect(row).toMatchObject({ lane: 'sandbox', model: 'served-model' })
+    expect(row.admission_ms).toBeGreaterThanOrEqual(0)
+    expect(row.first_visible_ms).toBeGreaterThanOrEqual(25)
+    expect(row.first_visible_ms).toBeLessThanOrEqual(row.first_text_ms as number)
+    const measured = await stores[0]!.measureStage({ rollout: 'r', stage: { name: 'qa', value: 'ws-1', minSamples: 1, kill: {} }, lane: 'sandbox', since: 0 })
+    expect(measured.metrics.first_visible_p50_ms).toBe(row.first_visible_ms)
+    // The pre-ruler table keeps recording the columns it has instead of losing the row.
+    expect(legacy.prepare('SELECT lane, first_text_ms FROM rollout_turn_timing').get()).toEqual({ lane: 'sandbox', first_text_ms: row.first_text_ms })
+    // measuredFacts: false writes only what the product passed.
+    expect(optedOut.prepare('SELECT admission_ms, first_visible_ms, model FROM rollout_turn_timing').get())
+      .toEqual({ admission_ms: null, first_visible_ms: null, model: null })
+  } finally { full.close(); legacy.close(); optedOut.close() }
 })

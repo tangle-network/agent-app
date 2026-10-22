@@ -11,7 +11,7 @@ Source: `src/rollout/d1.ts`
 `function`
 
 ```ts
-(options: { db: D1LikeForRollout; now?: (() => number) | undefined; }) => { record(row: TurnTimingRow): Promise<void>;…
+(options: { db: D1LikeForRollout; now?: (() => number) | undefined; measuredFacts?: boolean | undefined; }) => { record…
 ```
 
 ### `D1LikeForRollout`

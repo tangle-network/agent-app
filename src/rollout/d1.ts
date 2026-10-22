@@ -8,7 +8,15 @@
  * operator endpoint that the deploy's `rollout.config.mjs` calls. A stage is
  * measured on the turns of the workspaces it admits, in the lane being rolled
  * out, since the time it went live.
+ *
+ * By default `record` fills what the product's row leaves out from what the chat route measured for the same
+ * `turnId` (its `turnStreamId`): `admissionMs`, `firstVisibleMs`, `firstTextMs` and the served `model`, on every
+ * lane. It writes only the columns the table has (read once per isolate with `PRAGMA table_info`), so a table that
+ * predates a migration keeps recording the columns it has instead of losing the row. `revision`, `arm` and
+ * `variant` are the product's and are written when the row carries them. Pass `measuredFacts: false` to write
+ * only the row's own values.
  */
+import { measuredTurnFacts } from '../turn-trace/turn-facts'
 import { rolloutAdmits, type RolloutStage, type StageMeasurement } from './index'
 
 /** Minimal D1 surface (Cloudflare's `D1Database` satisfies it). */
@@ -110,23 +118,61 @@ export function stageMetrics(rows: ReadonlyArray<Pick<TurnTimingRow, 'firstVisib
   }
 }
 
-export function createD1TurnTimingStore(options: { db: D1LikeForRollout; now?: () => number }) {
+/** Columns `record` writes, in order; `variant` and the ruler columns arrived by migration. */
+const RECORD_COLUMNS = ['turn_id', 'rollout', 'workspace_id', 'lane', 'first_visible_ms', 'first_text_ms', 'settled_ms', 'failed',
+  'failure_code', 'at', 'admission_ms', 'model', 'revision', 'arm', 'variant'] as const
+type RecordColumn = typeof RECORD_COLUMNS[number]
+
+/** The table's columns per database binding, read once per isolate; `null` when they could not be read. */
+const tableColumns = new WeakMap<object, Promise<ReadonlySet<string> | null>>()
+
+function readColumns(db: D1LikeForRollout, refresh: boolean): Promise<ReadonlySet<string> | null> {
+  const cached = tableColumns.get(db)
+  if (cached && !refresh) return cached
+  const read = Promise.resolve().then(() => db.prepare('PRAGMA table_info(rollout_turn_timing)').bind().all<{ name: string }>())
+    .then(({ results = [] }) => results.length ? new Set(results.map(column => column.name)) : null, () => null)
+  tableColumns.set(db, read)
+  return read
+}
+
+function roundOrNull(value: number | undefined): number | null {
+  return value === undefined ? null : Math.round(value)
+}
+
+export function createD1TurnTimingStore(options: {
+  db: D1LikeForRollout
+  now?: () => number
+  /** Fill omitted timing and model from the chat route's measurement of the same turn. Default true. */
+  measuredFacts?: boolean
+}) {
   const now = options.now ?? Date.now
   return {
     /** Record one settled turn. Idempotent on `turnId`. Never throws: telemetry must not fail a turn. */
     async record(row: TurnTimingRow): Promise<void> {
       try {
-        const variant = row.variant === undefined ? '' : ', variant'
+        // Read before any await: the facts belong to the request that is settling this turn.
+        const measured = options.measuredFacts === false ? undefined : measuredTurnFacts(row.turnId)
+        const values: Record<RecordColumn, unknown> = {
+          turn_id: row.turnId, rollout: row.rollout, workspace_id: row.workspaceId, lane: row.lane,
+          first_visible_ms: roundOrNull(row.firstVisibleMs ?? measured?.firstVisibleMs),
+          first_text_ms: roundOrNull(row.firstTextMs ?? measured?.firstTextMs),
+          settled_ms: Math.round(row.settledMs), failed: row.failed ? 1 : 0, failure_code: row.failureCode ?? null,
+          at: row.at ?? now(), admission_ms: roundOrNull(row.admissionMs ?? measured?.admissionMs),
+          model: row.model ?? measured?.model ?? null, revision: row.revision ?? null, arm: row.arm ?? null,
+          variant: row.variant ?? null,
+        }
+        let columns = await readColumns(options.db, false)
+        // A value the product passed whose column is unknown: the table may have migrated since the read.
+        const explicit: Partial<Record<RecordColumn, unknown>> = { first_visible_ms: row.firstVisibleMs,
+          admission_ms: row.admissionMs, model: row.model, revision: row.revision, arm: row.arm, variant: row.variant }
+        if (columns && Object.entries(explicit).some(([column, value]) => value !== undefined && !columns!.has(column))) {
+          columns = await readColumns(options.db, true)
+        }
+        // Columns unknown (no table yet, or a binding without PRAGMA): every column, `variant` only when set.
+        const written = RECORD_COLUMNS.filter(column => columns ? columns.has(column) : column !== 'variant' || row.variant !== undefined)
         await options.db.prepare(
-          `INSERT OR IGNORE INTO rollout_turn_timing
-             (turn_id, rollout, workspace_id, lane, first_visible_ms, first_text_ms, settled_ms, failed, failure_code, at, admission_ms, model, revision, arm${variant})
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${variant ? ', ?' : ''})`,
-        ).bind(row.turnId, row.rollout, row.workspaceId, row.lane,
-          row.firstVisibleMs === undefined ? null : Math.round(row.firstVisibleMs),
-          row.firstTextMs === undefined ? null : Math.round(row.firstTextMs), Math.round(row.settledMs),
-          row.failed ? 1 : 0, row.failureCode ?? null, row.at ?? now(),
-          row.admissionMs === undefined ? null : Math.round(row.admissionMs),
-          row.model ?? null, row.revision ?? null, row.arm ?? null, ...(row.variant === undefined ? [] : [row.variant])).run()
+          `INSERT OR IGNORE INTO rollout_turn_timing (${written.join(', ')}) VALUES (${written.map(() => '?').join(', ')})`,
+        ).bind(...written.map(column => values[column])).run()
       } catch (error) {
         console.error(JSON.stringify({ event: 'rollout_turn_timing_record_failed', turnId: row.turnId,
           error: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200) }))
