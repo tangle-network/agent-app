@@ -230,8 +230,13 @@ export const VerticalSafeZonesFeedback: Story = { render: () => <MediaFeedbackSt
 export const MetaFeedAdFeedback: Story = { render: () => <MediaFeedbackStory channel="facebook" placement="feed" sponsored /> }
 export const LinkedInSponsoredFeedback: Story = { render: () => <MediaFeedbackStory channel="linkedin" placement="feed" sponsored /> }
 
-function InboxStory({ state = 'mixed' }: { state?: 'mixed' | 'readonly' | 'error' | 'empty' }) {
-  const [items, setItems] = useState<ReviewInboxItem[]>(() => state === 'empty' ? [] : [
+function InboxStory({ state = 'mixed' }: { state?: 'mixed' | 'readonly' | 'error' | 'empty' | 'compare' }) {
+  const [items, setItems] = useState<ReviewInboxItem[]>(() => state === 'empty' ? [] : state === 'compare' ? Array.from({ length: 5 }, (_, index) => ({
+    id: `cell-${index}`, revision: 1, title: 'Hidden column title', kind: 'Hidden source', createdAt: index,
+    canReview: true, compare: { rowId: 'launch-brief', seed: 'retained-review-order' },
+    input: { content: ['Start with the prototype.', 'Less setup. More building.', 'A smaller first step.', 'Make room for the work.', 'One clear next step.'][index] },
+    allowedVerdicts: ['approve', 'reject'] as const,
+  })) : [
     { id: 'brief', revision: 1, title: 'Sandbox launch brief', kind: 'work product', createdAt: 1000,
       canReview: state !== 'readonly', input: { content: 'Explain the setup problem with a concrete example.' } },
     { id: 'email', revision: 1, title: 'Email for Alex', kind: 'dry-run email', createdAt: 2000,
@@ -244,6 +249,7 @@ function InboxStory({ state = 'mixed' }: { state?: 'mixed' | 'readonly' | 'error
       preview: { kind: 'post', channel: 'instagram', placement: 'carousel', text: 'Start with the prototype.', media: mediaFixtures() } },
   ])
   return <div className="min-h-screen bg-background p-4"><ReviewInbox items={items} error={state === 'error' ? 'The review service is unavailable. Your drafts are kept.' : undefined}
+    renderCompareBrief={() => <p>Launch brief: make the setup problem concrete. Judge each draft independently.</p>}
     onVerdict={async item => { if (state === 'error') throw new Error('Review could not save. Your edits are kept.'); setItems(current => current.filter(row => row.id !== item.id)) }}
     onFeedback={async (item, feedback) => { if (state === 'error') throw new Error('Feedback could not save. Your edits are kept.'); setItems(current => current.map(row => row.id === item.id ? { ...row, feedback } : row)) }}
     renderItem={item => item.preview ? <HubActionPreviewView preview={item.preview} /> : <article className="rounded-lg border border-border bg-card p-5"><p>{(item.input as { content: string }).content}</p></article>} /></div>
@@ -252,3 +258,7 @@ export const MixedReviewInbox: Story = { render: () => <InboxStory /> }
 export const ReadOnlyReviewInbox: Story = { render: () => <InboxStory state="readonly" /> }
 export const ReviewInboxSaveError: Story = { render: () => <InboxStory state="error" /> }
 export const ReviewInboxCaughtUp: Story = { render: () => <InboxStory state="empty" /> }
+
+
+/** The same inbox and feedback forms; host content never names the source column. */
+export const BlindCompareReviewInbox: Story = { render: () => <InboxStory state="compare" /> }

@@ -35,6 +35,31 @@ for related metrics and a loading state matching their layout. Follow the
 and failed loads. Check the actual page at desktop and phone widths with long
 values and those states; component selection alone does not prove the result.
 
+`ReviewInbox` also hosts blind comparisons without a second review surface. Give every
+cell in a row `compare: { rowId, seed }`, the same nonempty seed, and an opaque item ID.
+The inbox sorts IDs before a seeded shuffle, freezes the round membership and comparison descriptors, labels
+cells Draft 1…N, and hides each item's title and kind. Cards share a desktop grid and
+stack at phone widths. `renderCompareBrief(rowId)` renders the brief once;
+`renderItem(item)` remains the host's artifact renderer. These callbacks, `input`
+(including the editable teaching payload), image URLs and alt text must not expose
+source/profile/model identities. Redacting the header alone cannot make host content blind.
+
+The existing score, comment, authority and verdict controls apply to every cell.
+`onVerdict` and `onFeedback` receive `comparison: { rowId, seed, position, itemIds }`;
+position is zero-based in the frozen display order. Store that metadata atomically
+with the feedback and verdict, and validate membership against the server's retained
+row; browser-supplied ordering never grants authority. Resolve the callback only after
+storage succeeds. A failed save retains the cell and its draft. Answered cells remain
+visible during the round as pending items leave the host's list. To reconstruct a row
+after a page reload, load its full retained membership and saved feedback, not just
+its remaining pending items. Render the cached `renderItem` argument so removing
+an answered cell from the pending response does not remove its preview. After a
+reload, saved feedback pre-fills the form; a score alone does not imply a verdict.
+The host must keep previously decided cells read-only through `canReview`.
+A row with inconsistent or changed comparison descriptors cannot be reviewed until an explicit refresh.
+The shared proof supports `--compare-images <directory>` to exercise actual retained
+PNGs through the built inbox, HTTP and SQLite on desktop and phone.
+
 ## Settings pages
 
 A page whose job is changing how a workspace, team or account behaves is a

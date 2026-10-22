@@ -1,5 +1,6 @@
 /** Real built review inbox, keyboard-only triage, HTTP/SSE and atomic SQLite outcome records. */
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { once } from 'node:events'
 import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
@@ -15,6 +16,27 @@ import tailwind from '@tailwindcss/postcss'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argument = process.argv.indexOf('--output')
+const compareArgument = process.argv.indexOf('--compare-images')
+const compareDirectory = compareArgument < 0 ? null : process.argv[compareArgument + 1]
+const faultCompare = process.argv.includes('--fault-compare')
+assert.ok(!faultCompare || compareDirectory, '--fault-compare requires --compare-images')
+assert.ok(compareArgument < 0 || (compareDirectory && !compareDirectory.startsWith('--')), '--compare-images requires a directory')
+const comparison = { rowId: 'retained-png-row', seed: 'review-proof-stable-seed-v1' }
+const compareImages = []
+if (compareDirectory) {
+  const directory = path.resolve(compareDirectory)
+  const entries = await readdir(directory)
+  const files = entries.filter(file => file.toLowerCase().endsWith('.png')).sort()
+  const paths = files.length === 5 ? files.map(file => path.join(directory, file))
+    : Array.from({ length: 5 }, (_, index) => path.join(directory, `ad${index + 1}`, 'original.png'))
+  for (const source of paths) {
+    const bytes = await readFile(source)
+    assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', 'Comparison input must be an actual PNG')
+    assert.ok(bytes.readUInt32BE(16) > 1 && bytes.readUInt32BE(20) > 1, 'Comparison PNG must contain a real image')
+    compareImages.push({ source, bytes, sha256: createHash('sha256').update(bytes).digest('hex'), width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) })
+  }
+  assert.equal(new Set(compareImages.map(image => image.sha256)).size, 5, 'Use five distinct retained PNGs')
+}
 const faultNoVerdictTransport = process.argv.includes('--fault-no-verdict-transport')
 const faultArgument = process.argv.indexOf('--fault-work-product-layout')
 const faultWorkProductLayout = faultArgument < 0 ? null : process.argv[faultArgument + 1]
@@ -26,7 +48,7 @@ const db = new DatabaseSync(path.join(output, 'review-round.sqlite'))
 db.exec('CREATE TABLE items (id TEXT PRIMARY KEY, body TEXT NOT NULL); CREATE TABLE verdicts (id TEXT NOT NULL, revision TEXT NOT NULL, body TEXT NOT NULL, UNIQUE(id, revision)); CREATE TABLE signals (id TEXT NOT NULL, revision TEXT NOT NULL, body TEXT NOT NULL, UNIQUE(id, revision)); CREATE TABLE held (body TEXT NOT NULL); CREATE TABLE held_feedback (body TEXT NOT NULL)')
 const image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII='
 const kinds = ['work-product', 'asset', 'hub', 'dry-run', 'asset', 'work-product', 'hub', 'dry-run', 'asset', 'work-product']
-const fixtures = kinds.map((kind, index) => {
+const normalFixtures = kinds.map((kind, index) => {
   const title = `${index + 1}. ${kind === 'work-product' ? 'Sandbox launch brief' : kind === 'asset' ? 'Sandbox campaign asset' : kind === 'hub' ? 'Email for Alex' : 'Sandbox social preview'}`
   const input = kind === 'work-product' ? { content: `Brief ${index + 1}: make the setup smaller.` }
     : kind === 'hub' ? { from: 'Taylor <taylor@example.invalid>', to: ['alex@example.invalid'], subject: 'A smaller prototype setup', body: 'Hi Alex, would a smaller sandbox setup help?', html: false }
@@ -47,15 +69,20 @@ const fixtures = kinds.map((kind, index) => {
   return { id: `${kind}:${String(index + 1).padStart(2, '0')}`, revision: 'v1', title, kind, createdAt: (index === 3 ? 3 : index + 1) * 1000,
     canReview: true, input, preview, ...(workProduct ? { workProduct } : {}), ...(kind === 'hub' ? { approveLabel: 'Approve preview' } : {}) }
 })
+const fixtures = compareDirectory ? compareImages.map((_, index) => ({
+  id: `comparison-cell-${index}`, revision: 'v1', title: `Private column ${index}`, kind: `private-generator-${index}`,
+  createdAt: index + 1, canReview: true, input: { brief: 'A retained creative brief with one clear call to action.' },
+  compare: comparison, imageUrl: `/compare-images/${index}.png`,
+})) : normalFixtures
 for (const item of fixtures) db.prepare('INSERT INTO items VALUES (?, ?)').run(item.id, JSON.stringify(item))
-const held = { id: 'held-email', actionPath: 'gmail.send', providerId: 'gmail', phase: 'waiting', executionMode: 'dry-run', input: fixtures.find(item => item.kind === 'hub').input }
+const held = { id: 'held-email', actionPath: 'gmail.send', providerId: 'gmail', phase: 'waiting', executionMode: 'dry-run', input: normalFixtures.find(item => item.kind === 'hub').input }
 db.prepare('INSERT INTO held VALUES (?)').run(JSON.stringify(held))
 const originalOrder = [...fixtures].sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1))
 const clients = new Set()
 const checks = [], externalRequests = [], browserErrors = []
 let activeCheck = 'initial render', failNext = false, holdNext = false, releaseVerdict, verdictRequests = 0, failedWrites = 0
 let browser, context, page, server, phoneContext, phonePage
-let workProductPhone
+let workProductPhone, compareProof
 const headerGeometry = element => {
   const rect = node => { const r = node.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height } }
   const header = element.firstElementChild.firstElementChild
@@ -69,6 +96,7 @@ const count = table => db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n
 function pendingItems() {
   return db.prepare('SELECT body FROM items ORDER BY id DESC').all().map(row => JSON.parse(row.body))
     .filter(item => !db.prepare('SELECT 1 FROM verdicts WHERE id=? AND revision=?').get(item.id, String(item.revision)))
+    .map(item => faultCompare ? (({ compare, ...rest }) => rest)(item) : item)
 }
 function replace(item) {
   db.prepare('UPDATE items SET body=? WHERE id=?').run(JSON.stringify(item), item.id)
@@ -92,6 +120,136 @@ async function score(value) {
   await page.keyboard.press('Escape')
 }
 
+/** Compare mode reuses the built package, HTTP/SSE transport and atomic local records. */
+async function proveComparison(origin) {
+  const cards = target => target.locator('[data-review-compare-row] > article')
+  const ids = target => cards(target).locator('[data-compare-artifact]').evaluateAll(images => images.map(image => image.dataset.compareArtifact))
+  const draft = (target, index) => target.getByRole('article', { name: `Draft ${index + 1}`, exact: true })
+  const savedRows = () => db.prepare('SELECT body FROM verdicts ORDER BY rowid').all().map(row => JSON.parse(row.body))
+  let order
+  await check('five real PNGs render as opaque drafts in a stable seeded row', async () => {
+    await expect(page.locator('[data-review-title]')).toHaveText('Compare drafts')
+    await expect(cards(page)).toHaveCount(5)
+    await expect(page.locator('[data-review-compare-brief]')).toHaveCount(1)
+    order = await ids(page)
+    assert.deepEqual([...order].sort(), fixtures.map(item => item.id).sort())
+    assert.notDeepEqual(order, fixtures.map(item => item.id), 'The seeded row must shuffle chronological input order')
+    for (let index = 0; index < 5; index++) {
+      await expect(draft(page, index).getByRole('heading', { exact: true, name: `Draft ${index + 1}` })).toBeVisible()
+      await expect.poll(() => draft(page, index).locator('img').evaluate(image => image.complete && image.naturalWidth > 1)).toBe(true)
+    }
+    assert.doesNotMatch(await page.locator('[data-review-inbox]').innerText(), /Private column|private-generator|comparison-cell-/)
+    await page.reload()
+    await expect(cards(page)).toHaveCount(5)
+    assert.deepEqual(await ids(page), order)
+    await page.screenshot({ path: path.join(output, 'compare-desktop.png'), fullPage: true })
+    const geometry = await cards(page).evaluateAll(elements => elements.map(element => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height } }))
+    assert.ok(geometry[0].x !== geometry[1].x && Math.abs(geometry[0].y - geometry[1].y) < 2, 'Desktop drafts must render beside each other')
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Desktop must not overflow')
+    compareProof = { row: comparison, order, desktop: geometry }
+  })
+  await check('live seed row and metadata changes refuse review without changing the frozen blind row', async () => {
+    async function receive(items) {
+      publish({ items, loading: false, error: null })
+      const identity = JSON.stringify(items.map(item => [item.id, item.compare?.rowId ?? null, item.compare?.seed ?? null]))
+      await expect(page.locator('[data-fixture-source-compare]')).toHaveAttribute('data-fixture-source-compare', identity)
+    }
+    const original = pendingItems()
+    const mutations = [
+      ['all seeds changed', original.map(item => ({ ...item, compare: { ...item.compare, seed: 'changed-live-seed' } }))],
+      ['one row ID changed', original.map(item => item.id === order[0] ? { ...item, compare: { ...item.compare, rowId: 'changed-live-row' } } : item)],
+      ['comparison metadata removed', original.map(({ compare, ...item }) => item)],
+    ]
+    compareProof.liveChanges = []
+    for (const [name, changed] of mutations) {
+      await receive(changed)
+      await expect(page.locator('[data-review-title]')).toHaveText('Compare drafts')
+      await expect(cards(page)).toHaveCount(5)
+      assert.deepEqual(await ids(page), order, `${name} must not change frozen item positions`)
+      await expect(page.getByRole('alert')).toContainText('This comparison changed')
+      for (let index = 0; index < 5; index++) await expect(draft(page, index).getByRole('button', { name: 'Approve', exact: true })).toBeDisabled()
+      assert.doesNotMatch(await page.locator('[data-review-inbox]').innerText(), /Private column|private-generator|comparison-cell-/)
+      assert.equal(verdictRequests, 0)
+      compareProof.liveChanges.push({ name, order: await ids(page), verdictRequests })
+      await receive(original)
+      await expect(page.getByRole('alert')).toHaveCount(0)
+      for (let index = 0; index < 5; index++) await expect(draft(page, index).getByRole('button', { name: 'Approve', exact: true })).toBeEnabled()
+    }
+  })
+  await check('390px comparison stacks every PNG with a 16px gutter and no horizontal overflow', async () => {
+    phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
+      recordVideo: { dir: output, size: { width: 390, height: 844 } } })
+    phoneContext.on('request', request => { if (/^https?:/.test(request.url()) && !request.url().startsWith(origin + '/')) externalRequests.push(request.url()) })
+    phonePage = await phoneContext.newPage(); phonePage.on('pageerror', error => browserErrors.push(error.message))
+    await phonePage.goto(origin)
+    await expect(cards(phonePage)).toHaveCount(5)
+    assert.deepEqual(await ids(phonePage), order)
+    const geometry = await cards(phonePage).evaluateAll(elements => elements.map(element => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width } }))
+    for (let index = 0; index < geometry.length; index++) {
+      assert.ok(geometry[index].x >= 16 && geometry[index].right <= 374, 'Phone card must retain its 16px outer gutter')
+      if (index) assert.ok(geometry[index].y >= geometry[index - 1].bottom + 15, 'Phone cards must stack with a 16px gap')
+      await draft(phonePage, index).scrollIntoViewIfNeeded()
+      await expect(draft(phonePage, index).locator('img')).toBeInViewport()
+    }
+    assert.ok(await phonePage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Phone must not overflow')
+    compareProof.phone = geometry
+    await phonePage.screenshot({ path: path.join(output, 'compare-phone.png'), fullPage: true })
+    await phoneContext.close(); phoneContext = undefined
+  })
+  await check('typing and live updates preserve cell focus and separate unsaved drafts', async () => {
+    const first = draft(page, 0), second = draft(page, 1)
+    const firstScore = first.getByLabel('Score (0–100)', { exact: true })
+    await firstScore.focus(); await page.keyboard.type('81')
+    await expect(firstScore).toBeFocused()
+    await first.getByLabel('Comment', { exact: true }).fill('Keep this first draft.')
+    await second.getByLabel('Score (0–100)', { exact: true }).fill('62')
+    const secondComment = second.getByLabel('Comment', { exact: true })
+    await secondComment.focus(); await page.keyboard.type('ajkr: preserve this second draft.')
+    await expect(secondComment).toBeFocused()
+    const reversed = pendingItems().reverse()
+    publish({ items: reversed, loading: false, error: null })
+    await expect(page.locator('[data-fixture-source-order]')).toHaveAttribute('data-fixture-source-order', reversed.map(item => item.id).join(','))
+    await expect(secondComment).toBeFocused()
+    await expect(firstScore).toHaveValue('81')
+    await expect(first.getByLabel('Comment', { exact: true })).toHaveValue('Keep this first draft.')
+    await expect(second.getByLabel('Score (0–100)', { exact: true })).toHaveValue('62')
+    await expect(secondComment).toHaveValue('ajkr: preserve this second draft.')
+    assert.deepEqual(await ids(page), order)
+    assert.equal(verdictRequests, 0)
+  })
+  await check('each verdict durably retains its original row seed position and five item IDs after pending removal', async () => {
+    const verdicts = ['approve', 'reject', 'request_changes', 'approve', 'approve']
+    for (let index = 0; index < 5; index++) {
+      const card = draft(page, index)
+      const value = 50 + index
+      await card.getByLabel('Score (0–100)', { exact: true }).fill(String(value))
+      await card.getByLabel('Comment', { exact: true }).fill(`Retained comparison judgment ${index + 1}.`)
+      await card.getByRole('button', { name: verdicts[index] === 'approve' ? 'Approve' : verdicts[index] === 'reject' ? 'Reject' : 'Request changes', exact: true }).click()
+      await expect.poll(() => count('verdicts')).toBe(index + 1)
+      assert.equal(pendingItems().length, 4 - index)
+      const saved = savedRows()[index]
+      assert.equal(saved.id, order[index]); assert.equal(saved.score, value); assert.equal(saved.verdict, verdicts[index])
+      assert.deepEqual(saved.comparison, { ...comparison, position: index, itemIds: order })
+      assert.deepEqual(JSON.parse(db.prepare('SELECT body FROM signals WHERE id=?').get(saved.id).body), saved)
+      if (index < 4) {
+        await expect(cards(page)).toHaveCount(5)
+        assert.deepEqual(await ids(page), order)
+        await expect(card.getByText('Review saved', { exact: true })).toBeVisible()
+        if (index === 0) {
+          await expect(draft(page, 1).getByLabel('Score (0–100)', { exact: true })).toHaveValue('62')
+          await expect(draft(page, 1).getByLabel('Comment', { exact: true })).toHaveValue('ajkr: preserve this second draft.')
+          await page.screenshot({ path: path.join(output, 'compare-pending-removal.png'), fullPage: true })
+        }
+      }
+    }
+    await expect(page.getByRole('heading', { name: 'All caught up', exact: true })).toBeVisible()
+    assert.equal(count('verdicts'), 5); assert.equal(count('signals'), 5)
+    assert.deepEqual(externalRequests, []); assert.deepEqual(browserErrors, [])
+    compareProof.verdicts = savedRows()
+    await page.screenshot({ path: path.join(output, 'compare-completed.png'), fullPage: true })
+  })
+}
+
 const app = `import React,{useEffect,useState} from 'react';import {createRoot} from 'react-dom/client';
 import {ReviewInbox} from './dist/web-react/index.js';import {HubActionPreviewView,HubApprovalRow} from './dist/hub-approvals-react/index.js';
 import {WorkProductPane} from './dist/work-product-react/index.js';
@@ -100,7 +258,7 @@ function App(){const[items,setItems]=useState([]);const[loading,setLoading]=useS
 async function load(){try{const response=await fetch('/api/items');if(!response.ok)throw new Error('Inbox unavailable');setItems(await response.json());setError(null)}catch(error){setError(error.message)}finally{setLoading(false)}}
 useEffect(()=>{load();const updates=new EventSource('/api/updates');updates.onmessage=event=>{const state=JSON.parse(event.data);if(state.items){setItems(state.items);setLoading(state.loading);setError(state.error)}};return()=>updates.close()},[]);
 async function verdict(item,feedback){if(${JSON.stringify(faultNoVerdictTransport)})return;const response=await fetch('/api/verdict',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:item.id,revision:item.revision,...feedback})});const result=await response.json();if(!response.ok)throw new Error(result.error);setItems(result.items)}
-return <main className="px-4 py-6" data-fixture-source-count={items.length}><ReviewInbox items={items} initialSelectedId={new URLSearchParams(location.search).get('item')??undefined} loading={loading} error={error} onRefresh={load} onVerdict={verdict} renderItem={item=>item.preview?<HubActionPreviewView preview={item.preview} account="Example studio"/>:<div data-work-product-proof><WorkProductPane workProduct={item.workProduct} defaultTab="artifact" resolveSourceUrl={entry=>'/vault?file='+encodeURIComponent(entry.sourceRef)}/></div>}/></main>}
+return <main className="px-4 py-6" data-fixture-source-count={items.length} data-fixture-source-order={items.map(item=>item.id).join(',')} data-fixture-source-compare={JSON.stringify(items.map(item=>[item.id,item.compare?.rowId??null,item.compare?.seed??null]))}><ReviewInbox items={items} initialSelectedId={new URLSearchParams(location.search).get('item')??undefined} loading={loading} error={error} onRefresh={load} onVerdict={verdict} renderCompareBrief={()=> <p>A retained creative brief with one clear call to action.</p>} renderItem={item=>item.imageUrl?<img data-compare-artifact={item.id} src={item.imageUrl} alt="Blind creative draft" className="block h-auto w-full max-w-full"/>:item.preview?<HubActionPreviewView preview={item.preview} account="Example studio"/>:<div data-work-product-proof><WorkProductPane workProduct={item.workProduct} defaultTab="artifact" resolveSourceUrl={entry=>'/vault?file='+encodeURIComponent(entry.sourceRef)}/></div>}/></main>}
 createRoot(document.getElementById('root')).render(new URLSearchParams(location.search).has('hub')?<HubFixture/>:<App/>);`
 
 try {
@@ -114,6 +272,8 @@ try {
   await writeFile(path.join(temp, 'app.css'), css.css)
   server = createServer(async (request, response) => {
     try {
+      const png = /^\/compare-images\/(\d)\.png$/.exec(request.url)
+      if (png && compareImages[Number(png[1])]) { response.writeHead(200, { 'content-type': 'image/png' }); return response.end(compareImages[Number(png[1])].bytes) }
       if (request.url === '/api/items') return json(response, pendingItems())
       if (request.url === '/api/held') return json(response, JSON.parse(db.prepare('SELECT body FROM held').get().body))
       if (request.url === '/api/held-feedback') { db.prepare('INSERT INTO held_feedback VALUES (?)').run(JSON.stringify(await body(request))); return json(response, { saved: true }) }
@@ -154,6 +314,9 @@ try {
   context.on('request', request => { if (/^https?:/.test(request.url()) && !request.url().startsWith(origin + '/')) externalRequests.push(request.url()) })
   page = await context.newPage(); page.on('pageerror', error => browserErrors.push(error.message))
   await page.goto(origin)
+  if (compareDirectory) {
+    await proveComparison(origin)
+  } else {
   await expect(page.locator('[data-review-title]')).toHaveText(originalOrder[0].title)
   await page.screenshot({ path: path.join(output, 'starting-desktop.png'), fullPage: true })
   await check('phone work-product identity and all tabs remain reachable by touch and keyboard', async () => {
@@ -391,6 +554,7 @@ try {
     await page.screenshot({ path: path.join(output, 'all-caught-up-desktop.png'), fullPage: true })
     await page.setViewportSize({ width: 390, height: 844 }); await page.screenshot({ path: path.join(output, 'all-caught-up-phone.png'), fullPage: true })
   })
+  }
 } catch (error) {
   await phonePage?.screenshot({ path: path.join(output, 'failure-phone.png'), fullPage: true }).catch(() => {})
   await page?.screenshot({ path: path.join(output, 'failure.png'), fullPage: true }).catch(() => {})
@@ -401,7 +565,7 @@ try {
   if (server) await new Promise(resolve => server.close(resolve))
   const report = { target: 'Built shared ReviewInbox with real local HTTP/SSE and SQLite; keyboard-only fixture triage',
     revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), capturedAt: new Date().toISOString(),
-    checks, workProductPhone, fault: faultWorkProductLayout ? 'remove only work-product ' + faultWorkProductLayout + ' protection' : faultNoVerdictTransport ? 'verdict callback returns without transport or persistence' : null,
+    checks, workProductPhone, compareProof, compareImages: compareImages.map(({ bytes, ...image }) => image), fault: faultCompare ? 'strip comparison metadata from the HTTP items response' : faultWorkProductLayout ? 'remove only work-product ' + faultWorkProductLayout + ' protection' : faultNoVerdictTransport ? 'verdict callback returns without transport or persistence' : null,
     previewCount: fixtures.length, verdictCount: count('verdicts'), learningRowCount: count('signals'), verdictRequests, failedWrites, externalRequests, browserErrors,
     missingCoverage: ['Actual Drew ratings', 'Real phone hardware', 'Served GTM consumer', 'Live send, publish or ad buy'] }
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
