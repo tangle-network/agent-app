@@ -7541,7 +7541,7 @@
         {
           "name": "compareOptimizationMethods",
           "kind": "function",
-          "signature": "<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…",
+          "signature": "<TScenario extends Scenario, TArtifact>(rawOpts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Op…",
           "doc": "Compare complete optimization methods on disjoint train, selection, and final test data."
         },
         {
@@ -7596,7 +7596,7 @@
           "name": "gepaOptimizationMethod",
           "kind": "function",
           "signature": "<TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…",
-          "doc": null
+          "doc": "Environment for a bridge child that spawns `claude` CLI subprocesses."
         },
         {
           "name": "GepaOptimizationMethodConfig",
@@ -24986,15 +24986,15 @@
         },
         {
           "name": "FlowSpan",
-          "kind": "value",
-          "signature": "FlowSpan",
-          "doc": null
+          "kind": "interface",
+          "signature": "interface FlowSpan",
+          "doc": "Producer-owned identities, explicit status and observed totals; no React dependency."
         },
         {
           "name": "FlowTrace",
-          "kind": "value",
-          "signature": "FlowTrace",
-          "doc": null
+          "kind": "interface",
+          "signature": "interface FlowTrace",
+          "doc": "Describe the structure of a flow trace including spans, timing, tokens, cost, and tool calls"
         },
         {
           "name": "MissionTraceContext",

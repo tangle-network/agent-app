@@ -9725,7 +9725,7 @@ interface CampaignResult
 `function` — Compare complete optimization methods on disjoint train, selection, and final test data.
 
 ```ts
-<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…
+<TScenario extends Scenario, TArtifact>(rawOpts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Op…
 ```
 
 ### `CompareOptimizationMethodsOptions`
@@ -9794,7 +9794,7 @@ interface Gate
 
 ### `gepaOptimizationMethod`
 
-`function`
+`function` — Environment for a bridge child that spawns `claude` CLI subprocesses.
 
 ```ts
 <TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…
@@ -32233,18 +32233,18 @@ Source: `src/trace/index.ts` · depends on `missions`
 
 ### `FlowSpan`
 
-`value`
+`interface` — Producer-owned identities, explicit status and observed totals; no React dependency.
 
 ```ts
-FlowSpan
+interface FlowSpan
 ```
 
 ### `FlowTrace`
 
-`value`
+`interface` — Describe the structure of a flow trace including spans, timing, tokens, cost, and tool calls
 
 ```ts
-FlowTrace
+interface FlowTrace
 ```
 
 ### `MissionTraceContext`

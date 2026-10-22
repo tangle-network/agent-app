@@ -40,18 +40,18 @@ Source: `src/trace/index.ts`
 
 ### `FlowSpan`
 
-`value`
+`interface` — Producer-owned identities, explicit status and observed totals; no React dependency.
 
 ```ts
-FlowSpan
+interface FlowSpan
 ```
 
 ### `FlowTrace`
 
-`value`
+`interface` — Describe the structure of a flow trace including spans, timing, tokens, cost, and tool calls
 
 ```ts
-FlowTrace
+interface FlowTrace
 ```
 
 ### `MissionTraceContext`
