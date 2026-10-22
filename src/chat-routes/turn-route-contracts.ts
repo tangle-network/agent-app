@@ -284,7 +284,9 @@ export interface ChatTurnProduceArgs<TContext> {
    *  `TurnAdmissionRefusedError` when the turn is refused. Start the model call at once; write nothing durable,
    *  and read nothing `beforeTurn` adds to `context`, until it resolves. */
   admitted?: Promise<ChatTurnProduceArgs<TContext>>
-  /** Set only under `dispatchFirst`: aborts when the turn is refused after `produce` started. Pass it to the model call. */
+  /** Set only under `dispatchFirst`: aborts when the turn is refused after `produce` started, or when the route stops
+   *  reading the producer (a disconnect under `cancelOnDisconnect`). Pass it to the model call. Under `dispatchFirst`,
+   *  `handoffCompletion` resolves only after `admitted` does. */
   admissionSignal?: AbortSignal
 }
 
@@ -537,8 +539,13 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    * a plan feature) belong in `contextGate`, which then runs while the model starts and holds its output until it
    * passes. `beforeTurn` may still mutate `context` but must not return a patch, since the prompt has already been
    * sent; a patch throws. Omit → `produce` runs after admission.
+   *
+   * `when` picks the turns that dispatch first (default all). Return false for a producer whose dispatch is keyed by
+   * the turn's `executionId` (a box session): two sends on one thread resolve the same id, and the refused duplicate
+   * would reach the winner's execution before the lock refused it. A Router call per request is safe; the refused
+   * duplicate costs only the call its `admissionSignal` cancels.
    */
-  dispatchFirst?: { billing: 'authorize' | 'model-service' }
+  dispatchFirst?: { billing: 'authorize' | 'model-service'; when?: (args: ChatTurnProduceArgs<TContext>) => boolean }
   /** Single-flight lock acquired before any side effect and released once when
    *  the turn settles (including short-circuit/throw). `/turn-stream`'s
    *  `createDurableTurnLock` is the shared DO-backed implementation. Omit →

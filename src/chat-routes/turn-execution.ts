@@ -18,7 +18,7 @@ import {
   type AssistantDraftWriter,
   type DraftPersistenceTuning,
 } from './draft-persistence'
-import { dispatchProducerFirst } from './dispatch-first'
+import { dispatchFirstFor } from './dispatch-first'
 import { admissionServerTiming, errorResponse, userPartsWithFiles, type AdmittedTurn, type TurnProgress } from './turn-admission'
 import { abortOnSignal, concatStreams, failureCodeOf, failureReasonOf, isVisibleOutput, isVisibleText, tapRawEvents, withStreamHeartbeat } from './turn-event-stream'
 import type {
@@ -233,7 +233,7 @@ export function createAdmittedTurnRunner<TContext>({
       ...(ctx?.executionLimits ? { executionLimits: ctx.executionLimits } : {}),
     }
     // Dispatch-first: the model call starts now; its output waits for the chain below to commit (./dispatch-first).
-    const dispatched = options.dispatchFirst ? dispatchProducerFirst(options.produce, produceArgs, trace) : undefined
+    const dispatched = dispatchFirstFor(options, produceArgs, trace)
     if (dispatched) early.add(dispatched.refuse)
 
     // Single-flight lock: acquire before any side effect. `release` runs
@@ -511,7 +511,7 @@ export function createAdmittedTurnRunner<TContext>({
       const beforeTurn = options.beforeTurn
       if (beforeTurn) {
         const patch = await trace.measure('admission.before_turn', 'admission', (span) => beforeTurn(produceArgs, { span }))
-        if (patch && dispatched) throw new Error('beforeTurn cannot patch a dispatchFirst turn: its prompt is already sent')
+        if (patch && Object.keys(patch).length && dispatched) throw new Error('beforeTurn cannot patch a dispatchFirst turn: its prompt is already sent')
         if (patch) produceArgs = { ...produceArgs, ...patch }
       }
       const streamSetup = trace.start('admission.stream_setup', 'admission')

@@ -21,7 +21,7 @@ import { createMemoryTurnEventStore } from '../../src/stream/index'
 type Row = { id: string; role: 'user' | 'assistant'; content: string }
 const tick = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-function harness(options: { gate?: ChatTurnGateResult; lockMs?: number } = {}) {
+function harness(options: { gate?: ChatTurnGateResult; lockMs?: number; words?: number; handoff?: boolean } = {}) {
   const log: string[] = []
   const rows: Row[] = []
   const store: ChatTurnMessageStore = {
@@ -47,11 +47,13 @@ function harness(options: { gate?: ChatTurnGateResult; lockMs?: number } = {}) {
       log.push('lock.acquired')
       return { acquired: true, handle: thread }
     },
-    release: (handle) => { held.delete(handle as string) },
+    release: (handle) => { held.delete(handle as string); log.push('lock.released') },
   }
   const signals: AbortSignal[] = []
   const admittedRows: Array<string | null | undefined> = []
   const refusals: unknown[] = []
+  const handoffs: string[] = []
+  let produced = 0
   const routes = createChatTurnRoutes<Record<string, never>>({
     projectId: 'dispatch-first',
     authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'user-1', context: {} }),
@@ -65,12 +67,16 @@ function harness(options: { gate?: ChatTurnGateResult; lockMs?: number } = {}) {
       log.push(`model.start:${args.userMessageId === undefined ? 'before-row' : 'after-row'}`)
       if (args.admissionSignal) signals.push(args.admissionSignal)
       args.admitted?.then((final) => admittedRows.push(final.userMessageId), (error: unknown) => refusals.push(error))
+      // A product that hands completion to a durable owner calls this before it dispatches.
+      if (options.handoff) args.handoffCompletion?.().then(() => handoffs.push('handed-off'), () => handoffs.push('handoff-refused'))
       let text = ''
+      const words = options.words ? Array.from({ length: options.words }, (_, i) => ` w${i}`) : ['Hello', ' there']
       return {
         stream: (async function* () {
-          for (const word of ['Hello', ' there']) {
+          for (const word of words) {
             await tick(15)
             if (args.admissionSignal?.aborted) return
+            produced += 1
             text += word
             yield { type: 'message.part.updated', data: { part: { type: 'text', text: word }, delta: word } }
           }
@@ -81,13 +87,14 @@ function harness(options: { gate?: ChatTurnGateResult; lockMs?: number } = {}) {
     log: () => {},
   })
   const pending: Promise<unknown>[] = []
-  const ctx = { waitUntil: (p: Promise<unknown>) => { pending.push(p) } }
-  const send = (content = 'hi') => routes.turn(new Request('http://app.test/api/chat', {
+  const ctx = { waitUntil: (p: Promise<unknown>) => { pending.push(p) }, cancelOnDisconnect: true }
+  const send = (content = 'hi', signal?: AbortSignal) => routes.turn(new Request('http://app.test/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ threadId: 't-1', content }),
+    ...(signal ? { signal } : {}),
   }), ctx)
-  return { send, log, rows, signals, admittedRows, refusals, pending }
+  return { send, log, rows, signals, admittedRows, refusals, handoffs, pending, produced: () => produced }
 }
 
 describe('dispatchFirst', () => {
@@ -131,5 +138,30 @@ describe('dispatchFirst', () => {
     expect(h.signals[0]!.aborted).toBe(true)
     expect(h.refusals[0]).toBeInstanceOf(TurnAdmissionRefusedError)
     expect(h.rows.filter((row) => row.role === 'assistant')).toEqual([])
+  })
+
+  it('stops the producer when the member disconnects after the turn opened', async () => {
+    const h = harness({ words: 40 })
+    const client = new AbortController()
+    const response = await h.send('hi', client.signal)
+    const reader = response.body!.getReader()
+    await reader.read()
+    await tick(60)
+    client.abort()
+    await reader.cancel().catch(() => {})
+    await Promise.all(h.pending)
+    await tick(100)
+    expect(h.signals[0]!.aborted).toBe(true)
+    expect(h.produced()).toBeLessThan(40)
+  })
+
+  it('hands completion to a durable owner only after admission commits', async () => {
+    const refused = harness({ handoff: true, gate: { proceed: false, response: Response.json({ answer: 'no' }) } })
+    await (await refused.send()).text()
+    await Promise.all(refused.pending)
+    await tick(20)
+    expect(refused.handoffs).toEqual(['handoff-refused'])
+    // The route kept the lock it took and released it on the refusal.
+    expect(refused.log).toContain('lock.released')
   })
 })
