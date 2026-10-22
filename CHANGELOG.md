@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.259
+
+- Legibility tests remove the temporary product trees they create (#1237)
+
 ## 0.60.258
 
 - fix(platform): delegate keeps asking through a Platform outage, inside the caller's window (#1233)
