@@ -20692,7 +20692,7 @@ interface RevealSpanOptions
 
 ## `./rollout`
 
-Source: `src/rollout/index.ts` · depends on `signoff`
+Source: `src/rollout/index.ts` · depends on `signoff`, `turn-trace`
 
 ### `assignRolloutArm`
 
@@ -20809,7 +20809,7 @@ interface StageMeasurement
 
 ## `./rollout/cli`
 
-Source: `src/rollout/cli.ts` · depends on `signoff`
+Source: `src/rollout/cli.ts` · depends on `signoff`, `turn-trace`
 
 ### `readWranglerVar`
 
@@ -20838,14 +20838,14 @@ interface RolloutConfig
 
 ## `./rollout/d1`
 
-Source: `src/rollout/d1.ts` · depends on `signoff`
+Source: `src/rollout/d1.ts` · depends on `signoff`, `turn-trace`
 
 ### `createD1TurnTimingStore`
 
 `function`
 
 ```ts
-(options: { db: D1LikeForRollout; now?: (() => number) | undefined; }) => { record(row: TurnTimingRow): Promise<void>;…
+(options: { db: D1LikeForRollout; now?: (() => number) | undefined; measuredFacts?: boolean | undefined; }) => { record…
 ```
 
 ### `D1LikeForRollout`
