@@ -736,6 +736,12 @@
       "import": "./dist/theme/dom.js",
       "default": "./dist/theme/dom.js"
     },
+    "./web-react/flow-waterfall": {
+      "types": "./dist/web-react/flow-waterfall.d.ts",
+      "import": "./dist/web-react/flow-waterfall.js",
+      "default": "./dist/web-react/flow-waterfall.js"
+    },
+    "./web-react/flow-waterfall.css": "./dist/web-react/flow-waterfall.css",
     "./web-react/document": {
       "types": "./dist/web-react/document.d.ts",
       "import": "./dist/web-react/document.js",

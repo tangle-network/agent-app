@@ -1472,10 +1472,10 @@ interface FileMention
 
 ### `FlowWaterfall`
 
-`function` — Compact proportional waterfall over a FlowTrace — span name, bar, duration per row; total + cost in the footer.
+`function` — Shared trace inspector.
 
 ```ts
-({ trace }: FlowWaterfallProps) => Element | null
+({ trace, live, startedAt, label, defaultCollapsed }: FlowWaterfallProps) => Element
 ```
 
 ### `FlowWaterfallProps`
@@ -4000,7 +4000,7 @@ interface UseWorkspacePrewarmOptions
 
 ### `waterfallLayout`
 
-`function` — Project a FlowTrace into proportional bar geometry for {@link FlowWaterfall}.
+`function` — One geometry owner for the web surface and its established public helper.
 
 ```ts
 (trace: FlowTrace) => WaterfallRow[]

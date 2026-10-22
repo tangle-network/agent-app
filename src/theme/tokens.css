@@ -9,6 +9,7 @@
 @import '@tangle-network/brand/styles/presentation.css';
 @import '@tangle-network/ui/styles/presentation.css';
 @import './compat.generated.css' layer(theme);
+@import '../web-react/flow-waterfall.css';
 
 @layer theme {
   :where(:root) {
