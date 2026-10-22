@@ -1,4 +1,5 @@
 /** Public contracts for admission, execution, persistence and chat-route hooks. */
+import type { ChatTurnPrefetch, ChatTurnPrefetchIdentity } from './turn-prefetch'
 import type { ChatTurnIdentity, ChatTurnProducer } from '@tangle-network/agent-runtime/durable'
 import type { ChatMessagePart } from '../chat-store/parts'
 import type { InteractionAnswerRoute, InteractionAnswerRouteOptions } from '../interactions/route'
@@ -170,6 +171,9 @@ export interface ChatTurnAuthorizeArgs<TThread = unknown> {
    *  Call it only where the product's own thread read missed; it answers 404 when the body names no valid minted
    *  thread or the member is outside the arm, and 409 when the id already exists anywhere (see `./minted-thread`). */
   createThread?(owner: ChatTurnThreadOwner): Promise<ChatTurnCreateThreadResult<TThread>>
+  /** Turn intent with the route's `prefetch` option set: call it as soon as the caller's identity is verified, before
+   *  the rest of the checks, so the prefetch reads beside them (see `./turn-prefetch`). */
+  identified?(identity: ChatTurnPrefetchIdentity): void
 }
 
 /** What `prepareTurn` receives: the admitted turn, before the conversation loads. */
@@ -284,6 +288,8 @@ export interface ChatTurnProduceArgs<TContext> {
    * `createChatTurnRoutes` invocation supplies it before `produce` runs.
    */
   handoffCompletion?: () => Promise<void>
+  /** What the route's `prefetch` read for this turn's admitted identity; set only when `prefetch` is configured. */
+  prefetched?: Promise<unknown>
   /** Set only under `dispatchFirst`, where `produce` starts before the lock. Resolves to the final args (with
    *  `userMessageId`, after `contextGate` and `beforeTurn`) once the admission chain commits, or rejects with
    *  `TurnAdmissionRefusedError` when the turn is refused. Start the model call at once; write nothing durable,
@@ -486,6 +492,11 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TThread = unknown>
    *  client skips the thread POST: `authorize` receives `args.createThread` and calls it where its thread read missed.
    *  Omit → an unknown thread stays the product's 404. */
   createThread?: ChatTurnCreateThreadOptions<TThread>
+  /** Read the turn's prompt inputs (profile, knowledge, catalogs) while `authorize` finishes: started when `authorize`
+   *  calls `args.identified`, or once it allows the turn. Read only: no writes, nothing paid or external beyond what
+   *  the verified identity allows. `produce` receives the result as `args.prefetched` only for an allowed turn of that
+   *  identity; a refusal aborts `args.signal` and drops it. Omit → nothing is prefetched. */
+  prefetch?: ChatTurnPrefetch
   /** Finish the turn's context after `authorize` has admitted the caller and
    *  before the conversation loads or the lock is taken: resolve the profile,
    *  the model, anything that reads or writes product state. Keep `authorize`

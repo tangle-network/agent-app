@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-288 exports.
+291 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -612,6 +612,30 @@ interface ChatTurnNewThread
 
 ```ts
 type ChatTurnPartInput
+```
+
+### `ChatTurnPrefetch`
+
+`type`
+
+```ts
+type ChatTurnPrefetch
+```
+
+### `ChatTurnPrefetchArgs`
+
+`interface`
+
+```ts
+interface ChatTurnPrefetchArgs
+```
+
+### `ChatTurnPrefetchIdentity`
+
+`interface` — Who `authorize` verified the caller to be: the workspace (tenant) and the member.
+
+```ts
+interface ChatTurnPrefetchIdentity
 ```
 
 ### `ChatTurnPrepareArgs`
