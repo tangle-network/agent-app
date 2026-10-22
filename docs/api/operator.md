@@ -4,7 +4,7 @@
 
 Source: `src/operator/index.ts`
 
-56 exports.
+57 exports.
 
 ### `ChatOperatorAdapterOptions`
 
@@ -388,6 +388,14 @@ interface OperatorTurn
 
 ```ts
 type OperatorTurnState
+```
+
+### `operatorTurnUsage`
+
+`function` — The operator turn usage of a stored assistant row, for `OperatorTurn.usage`.
+
+```ts
+(row: Pick<ChatOperatorMessage, "inputTokens" | "outputTokens" | "cacheReadTokens">, options?: { inputIncludesCache?: b…
 ```
 
 ### `OperatorWorkspace`
