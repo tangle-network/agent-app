@@ -163,7 +163,7 @@ app.post('/api/workspaces/:id/prewarm', (c) => prewarm(c.req.raw, c))
 // workspace, and again when focus enters the composer.
 import { ChatComposer, useWorkspacePrewarm } from '@tangle-network/agent-app/web-react'
 
-const prewarm = useWorkspacePrewarm({ url: `/api/workspaces/${id}/prewarm`, enabled: signedIn })
+const prewarm = useWorkspacePrewarm({ url: `/api/workspaces/${id}/prewarm`, enabled: signedIn, threadId })
 <ChatComposer onFocusWithin={prewarm.reassert} … />
 ```
 
@@ -180,3 +180,46 @@ and prepare only what that turn would prepare under the same authority checks.
 The in-box OpenCode server prewarm is a separate Sandbox platform switch
 (`SANDBOX_OPENCODE_PREWARM_ENABLED` with the warm-server cohort); a product
 route does not duplicate it.
+
+## Warm once: steps keyed by what they depend on
+
+Warm as early as intent shows, and never warm the same thing twice. Return
+`steps` instead of one `warm`, give each step the key of exactly what it depends
+on, and pass a shared `receipts` store. A step whose key holds an unexpired
+receipt answers `hit` after one read and does not run; a changed key or an
+expired receipt runs it again.
+
+```ts
+import { createD1WarmReceiptStore, createWorkspacePrewarmRoute, warmKey } from '@tangle-network/agent-app/sandbox'
+
+const prewarm = createWorkspacePrewarmRoute<AppContext>({
+  receipts: createD1WarmReceiptStore(env.DB), // WARM_RECEIPT_TABLE_DDL goes in a migration
+  authorize: async ({ request, context: c, threadId }) => {
+    const member = await requireMember(c.env, request)
+    if (!member) return { status: 'denied', response: Response.json({ error: 'Authentication required' }, { status: 401 }) }
+    const head = await vaultHead(member.workspaceId) // one cheap read
+    return {
+      status: 'allowed',
+      steps: [
+        { name: 'vault_heads', key: await warmKey({ workspaceId: member.workspaceId, head }), ttlMs: 10 * 60_000, run: () => readVaultHeads(member) },
+        { name: 'tool_catalog', key: await warmKey({ userId: member.id }), ttlMs: 60_000, run: () => buildToolCatalog(member) },
+        { name: 'box', key: await warmKey({ workspaceId: member.workspaceId }), ttlMs: 5 * 60_000, run: () => resumeBox(member) },
+        // Composer focus names the thread; check the member may read it before warming it.
+        ...(threadId && await canRead(member, threadId)
+          ? [{ name: 'thread', key: await warmKey({ threadId }), ttlMs: 60_000, run: () => readThreadHistory(threadId) }]
+          : []),
+      ],
+    }
+  },
+})
+```
+
+The response lists every step's `hit`, `miss`, `joined` or `failed` with its
+time, and its `Server-Timing` header carries one `warm.<step>` entry per step,
+so a second warm that misses is visible. A step's report is stored on its
+receipt; the turn reads it at send with
+`receipts.get(warmReceiptId(step, key))` to reuse what the warm produced. A
+receipt is a row, so a report never holds a credential. `useWorkspacePrewarm`
+sends `page-open` on open, `composer-focus` with `threadId` on focus, and a
+`heartbeat` every 4 minutes while the tab is visible, so what is warm stays
+warm while the member is active.

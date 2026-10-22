@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-263 exports.
+276 exports.
 
 ### `adaptSandboxStream`
 
@@ -190,12 +190,28 @@ interface BuildSandboxToolFileMountsOptions
 (db: WarmLeaseD1Like, options?: { table?: string | undefined; }) => WarmLeaseStore
 ```
 
+### `createD1WarmReceiptStore`
+
+`function` — Receipts in one D1 table, shared by every isolate.
+
+```ts
+(db: WarmReceiptD1Like, options?: { table?: string | undefined; }) => WarmReceiptStore
+```
+
 ### `createEscalationSpeculator`
 
 `function` — One speculator per turn.
 
 ```ts
 (options: EscalationSpeculatorOptions) => EscalationSpeculator
+```
+
+### `createMemoryWarmReceiptStore`
+
+`function` — Receipts in one isolate's memory: for tests and single-process hosts.
+
+```ts
+(options?: { limit?: number | undefined; }) => WarmReceiptStore
 ```
 
 ### `createSandboxExecTool`
@@ -340,6 +356,14 @@ SandboxResourceConfig
 
 ```ts
 "sandbox_warm_lease"
+```
+
+### `DEFAULT_WARM_RECEIPT_TABLE`
+
+`const`
+
+```ts
+"warm_receipts"
 ```
 
 ### `deferredCorpusHash`
@@ -1726,6 +1750,14 @@ readonly ["ALTER TABLE sandbox_warm_lease ADD COLUMN pending_warm_at INTEGER NOT
 "CREATE TABLE IF NOT EXISTS sandbox_warm_lease (\n key TEXT PRIMARY KEY,\n lease_id TEXT,\n reason TEXT,\n started_at I…
 ```
 
+### `WARM_RECEIPT_TABLE_DDL`
+
+`const` — Paste into a product migration; the store never runs DDL.
+
+```ts
+"CREATE TABLE IF NOT EXISTS warm_receipts (\n id TEXT PRIMARY KEY,\n at INTEGER NOT NULL,\n expires_at INTEGER NOT NULL…
+```
+
 ### `WARM_SLOTS`
 
 `const` — 144 ten-minute bins of the UTC day, then 7 weekday counts (Monday first).
@@ -1748,6 +1780,14 @@ readonly ["ALTER TABLE sandbox_warm_lease ADD COLUMN pending_warm_at INTEGER NOT
 
 ```ts
 type WarmBoxOutcome
+```
+
+### `warmKey`
+
+`function` — A warm key from exactly the values a step depends on: the same values give the same key whatever their order, and any change gives a new one.
+
+```ts
+(parts: Record<string, string | number | boolean | null | undefined>) => Promise<string>
 ```
 
 ### `WarmLeaseD1Like`
@@ -1804,6 +1844,46 @@ interface WarmLeaseStore
 
 ```ts
 type WarmReason
+```
+
+### `WarmReceipt`
+
+`interface`
+
+```ts
+interface WarmReceipt
+```
+
+### `WarmReceiptD1Like`
+
+`interface` — The D1 surface the store uses.
+
+```ts
+interface WarmReceiptD1Like
+```
+
+### `warmReceiptId`
+
+`function` — The receipt id for one step and its key.
+
+```ts
+(step: string, key: string) => string
+```
+
+### `WarmReceiptReport`
+
+`type` — Warm receipts: the record that a warm step already ran for exactly the inputs it depends on, so a second warm with the same inputs does no work.
+
+```ts
+type WarmReceiptReport
+```
+
+### `WarmReceiptStore`
+
+`interface`
+
+```ts
+interface WarmReceiptStore
 ```
 
 ### `WarmSignalOutcome`
@@ -1920,7 +2000,7 @@ type WorkspacePrewarmOutcome
 
 ### `WorkspacePrewarmReason`
 
-`type` — Why the browser asked: `useWorkspacePrewarm` sends `page-open` or `composer-focus`.
+`type` — Why the browser asked: `useWorkspacePrewarm` sends `page-open`, `composer-focus`, or `heartbeat` while the tab stays open.
 
 ```ts
 type WorkspacePrewarmReason
@@ -2092,6 +2172,30 @@ type WorkspaceSandboxSnapshotAvailability
 
 ```ts
 type WorkspaceSandboxSnapshotFreshness
+```
+
+### `WorkspaceWarmStep`
+
+`interface` — One warm step, keyed by exactly what it depends on.
+
+```ts
+interface WorkspaceWarmStep
+```
+
+### `WorkspaceWarmStepOutcome`
+
+`type`
+
+```ts
+type WorkspaceWarmStepOutcome
+```
+
+### `WorkspaceWarmStepResult`
+
+`interface`
+
+```ts
+interface WorkspaceWarmStepResult
 ```
 
 ### `WriteProfileFilesOptions`
