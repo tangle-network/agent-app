@@ -4,7 +4,7 @@
 
 Source: `src/plans/index.ts`
 
-12 exports.
+19 exports.
 
 ### `canTransitionPlanStatus`
 
@@ -36,6 +36,38 @@ type ChatPlanPersistedPart
 
 ```ts
 type ChatPlanStatus
+```
+
+### `durablePlanConflictCode`
+
+`function` — A 409 from the sandbox is a decision that already happened; classify which one so the caller can reconcile instead of reporting a failure.
+
+```ts
+(error: { status?: number | undefined; code?: string | undefined; message: string; }) => "plan_already_decided" | "plan…
+```
+
+### `DurablePlanLike`
+
+`interface` — The SDK's plan snapshot, as the fields the projection reads.
+
+```ts
+interface DurablePlanLike
+```
+
+### `isTerminalPlanStatus`
+
+`function`
+
+```ts
+(status: ChatPlanStatus) => boolean
+```
+
+### `parsePlanDecisionBody`
+
+`function` — Validate a plan-decision request body.
+
+```ts
+(body: Record<string, unknown>) => PlanDecisionBody
 ```
 
 ### `parsePlanSubmittedEvent`
@@ -70,6 +102,22 @@ type ParsePlanSubmittedResult
 "plan.submitted"
 ```
 
+### `PlanDecisionBody`
+
+`type`
+
+```ts
+type PlanDecisionBody
+```
+
+### `PlanDecisionOutcome`
+
+`type`
+
+```ts
+type PlanDecisionOutcome
+```
+
 ### `planFollowUpTurnId`
 
 `function` — The follow-up turn the Sandbox platform enqueues when one plan revision is decided.
@@ -100,4 +148,12 @@ type ParsePlanSubmittedResult
 
 ```ts
 (plan: ChatPlan) => ChatPlanPersistedPart
+```
+
+### `toChatPlan`
+
+`function` — Project the SDK's plan onto the chat projection.
+
+```ts
+(plan: DurablePlanLike) => ChatPlan
 ```

@@ -176,10 +176,10 @@ type RegistryProblemCode
 
 ### `sha256Hex`
 
-`function` — Lowercase-hex SHA-256 of a byte range.
+`function` — Lowercase-hex SHA-256 of a UTF-8 string or a byte range.
 
 ```ts
-(bytes: Uint8Array<ArrayBufferLike>) => Promise<string>
+(value: string | Uint8Array<ArrayBufferLike>) => Promise<string>
 ```
 
 ### `SlotVerdict`

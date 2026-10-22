@@ -1960,7 +1960,7 @@ interface SandboxUploadSink
 
 ### `sniffMimeFromName`
 
-`function` — Default MIME hook: extension → mime, or `text/plain` for the unknown.
+`function` — Generic extension → mime for uploads and promoted files.
 
 ```ts
 (filename: string) => string

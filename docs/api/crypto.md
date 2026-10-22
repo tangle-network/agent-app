@@ -4,7 +4,7 @@
 
 Source: `src/crypto/index.ts`
 
-10 exports.
+11 exports.
 
 ### `createFieldCrypto`
 
@@ -84,4 +84,12 @@ interface DeriveKeyOptions
 
 ```ts
 (plaintext: string, key: CryptoKey) => Promise<string>
+```
+
+### `sha256Hex`
+
+`function` — Lowercase-hex SHA-256 of a UTF-8 string or a byte range.
+
+```ts
+(value: string | Uint8Array<ArrayBufferLike>) => Promise<string>
 ```

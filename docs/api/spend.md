@@ -4,7 +4,7 @@
 
 Source: `src/spend/index.ts`
 
-64 exports.
+70 exports.
 
 ### `AllExcludedAssessment`
 
@@ -182,6 +182,14 @@ interface ComputeExpectedCeilingOptions
 900000
 ```
 
+### `DEFAULT_WORKSPACE_SPEND_BUDGET_NANO_USD`
+
+`const` — Default compute-spend ceiling for a workspace that enables the guard without naming its own limit: ten times the cost of running one 2 vCPU / 4 GB box for a 24-hour max lifetime, at the incident's ca…
+
+```ts
+27373261200
+```
+
 ### `DeriveChildKeyBudgetInput`
 
 `interface`
@@ -204,6 +212,22 @@ interface DeriveChildKeyBudgetInput
 
 ```ts
 interface ExpectedCeiling
+```
+
+### `fetchPlatformSettlementRows`
+
+`function` — Every settled row of one product the key's wallet holds since `dateFromMs`.
+
+```ts
+(input: FetchPlatformSettlementRowsInput) => Promise<SettlementRow[]>
+```
+
+### `FetchPlatformSettlementRowsInput`
+
+`interface` — Read the settled rows one platform API key can see.
+
+```ts
+interface FetchPlatformSettlementRowsInput
 ```
 
 ### `foldSpendBoxRecord`
@@ -310,6 +334,14 @@ class ParentBudgetExhaustedError
 interface ReconcileSpendOptions
 ```
 
+### `sandboxChargeNanoUsd`
+
+`function` — Unsigned charge of the rows whose sandbox is in `sandboxIds`.
+
+```ts
+(rows: readonly SettlementRow[], sandboxIds: ReadonlySet<string>) => number
+```
+
 ### `SandboxSpendHooksOptions`
 
 `interface`
@@ -350,12 +382,28 @@ interface SettlementRow
 (row: SettlementRow) => string | null
 ```
 
+### `SPEND_BUDGET_LOOKBACK_MS`
+
+`const` — The budget guard enforces a ROLLING cap, not a lifetime one.
+
+```ts
+number
+```
+
 ### `SPEND_CHECKS`
 
 `const`
 
 ```ts
 readonly SpendCheckId[]
+```
+
+### `SPEND_RECONCILE_LOOKBACK_MS`
+
+`const` — The reconciliation pass runs daily; three days of lookback is ample margin over that cadence plus the platform's own settlement lag, without re-reading months of already-reconciled history on every r…
+
+```ts
+number
 ```
 
 ### `SpendBoxLiveness`
