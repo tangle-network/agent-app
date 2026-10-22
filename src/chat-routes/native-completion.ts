@@ -217,7 +217,10 @@ function isSandboxNotFoundError(value: unknown): boolean {
 }
 
 /** A terminal receipt is public; runtime stderr stays in the native record. */
-function terminalFailureMessage(error: string): string {
+function terminalFailureMessage(error: string, cancelled: boolean): string {
+  if (cancelled && (error === 'Execution cancelled by user' || error === 'Execution cancelled by the user')) {
+    return 'Execution cancelled by the user'
+  }
   if (/\bENOSPC\b|no space left on device/i.test(error)) {
     return 'The Sandbox ran out of disk space before the execution finished.'
   }
@@ -455,7 +458,7 @@ export async function observeNativeCompletion(
       if (result) {
         recovered.push({
           turnId, state: 'failed', text: '', parts: [], usage: usageFromResult(result),
-          ...attributionFromResult(result), error: terminalFailureMessage(result.error as string),
+          ...attributionFromResult(result), error: terminalFailureMessage(result.error as string, run.status === 'cancelled'),
         })
         continue
       }
@@ -476,7 +479,7 @@ export async function observeNativeCompletion(
           ?? interrupted[0]!.metadata?.interruptReason
           ?? (restarted ? RUNTIME_RESTARTED_ERROR : undefined)
           ?? status.failureReason?.message
-          ?? 'Native Sandbox execution failed.'),
+          ?? 'Native Sandbox execution failed.', run.status === 'cancelled'),
       })
       continue
     }

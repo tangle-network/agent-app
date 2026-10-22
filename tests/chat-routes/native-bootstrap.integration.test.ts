@@ -24,6 +24,9 @@ type Case = {
   status?: 'failed' | 'cancelled'
   assistant?: 'one' | 'ambiguous' | 'unmarked'
   error?: string
+  interruptReason?: string
+  omitReplayError?: boolean
+  userStop?: boolean
   resultId?: string
   ledgerSessionId?: string
   malformedLedger?: boolean
@@ -63,7 +66,7 @@ async function boundary(test: Case) {
       const count = test.assistant === 'ambiguous' ? 2 : test.assistant ? 1 : 0
       return json(Array.from({ length: count }, (_, index) => ({
         info: { id: `assistant-${index}`, role: 'assistant', timestamp: new Date().toISOString(),
-          metadata: { turnId, ...(test.assistant === 'unmarked' ? {} : { interrupted: true }), interruptReason: 'Interrupted' } },
+          metadata: { turnId, ...(test.assistant === 'unmarked' ? {} : { interrupted: true }), interruptReason: test.interruptReason ?? 'Interrupted' } },
         parts: [
           { type: 'text', text: 'Exact partial answer.' },
           { type: 'tool', id: 'tool-1', tool: 'write', state: { status: 'completed', input: { path: 'draft.md' }, output: { ok: true } } },
@@ -84,6 +87,8 @@ async function boundary(test: Case) {
       const events = test.resultId ? [
         // Adversarial done-only identity control, deliberately not incident wire.
         frame('done', { executionId: test.resultId, success: false, status: 'error', error: test.error ?? diskCause }, 5),
+      ] : test.omitReplayError ? [
+        frame('done', { requestId: 'fixture-request', effectiveBackend }, 5),
       ] : [
         frame('start', { id: 'fixture-request', created_at: 1 }, 0),
         frame('execution.started', { executionId: turnId, sessionId, timestamp: 1, effectiveBackend }, 1),
@@ -183,6 +188,8 @@ async function boundary(test: Case) {
       }), { turnId })
       const publicBody = await response.text()
       expect(publicBody).toContain(test.publicCause ?? publicDiskCause)
+      if (test.userStop) expect(receipt.error).toBe('Execution cancelled by the user')
+      else expect(publicBody).not.toContain('cancelled by the user')
       expect(publicBody).not.toContain('fixture-private-value')
       expect(publicBody).not.toContain('stderr:')
       expect(publicBody).not.toContain('/private/runtime/path')
@@ -216,6 +223,14 @@ describe('native terminal replay reaches the authorized public boundary', () => 
     { name: 'bootstrap failure with no assistant settles on its first observation', expected: 'failed' },
     { name: 'ordinary interrupted assistant keeps its exact partial answer', assistant: 'one', expected: 'failed' },
     { name: 'cancelled native execution remains failed rather than completed', status: 'cancelled', error: 'Native execution was cancelled.', publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
+    { name: 'canonical user-stop result keeps user attribution at the public boundary', status: 'cancelled', error: 'Execution cancelled by user', publicCause: 'Execution cancelled by the user', userStop: true, expected: 'failed' },
+    { name: 'canonical user-stop metadata keeps attribution when replay has no error', status: 'cancelled', assistant: 'one', interruptReason: 'Execution cancelled by the user', omitReplayError: true, publicCause: 'Execution cancelled by the user', userStop: true, expected: 'failed' },
+    { name: 'canonical user-stop metadata keeps attribution without a long replay', status: 'cancelled', assistant: 'one', interruptReason: 'Execution cancelled by the user', eventCount: 40_000, publicCause: 'Execution cancelled by the user', userStop: true, expected: 'failed' },
+    { name: 'canonical user-stop text with failed ledger status cannot claim a user stop', error: 'Execution cancelled by the user', publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
+    { name: 'canonical user-stop suffix with private diagnostics stays generic', status: 'cancelled', error: 'Execution cancelled by user; stderr: /private/runtime/path token=fixture-private-value', publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
+    { name: 'canonical user-stop prefix and newline stay generic', status: 'cancelled', error: 'fixture-private-value\nExecution cancelled by the user', publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
+    { name: 'canonical user-stop result with mismatched execution stays unfinalized', status: 'cancelled', resultId: 'foreign-turn', error: 'Execution cancelled by the user', expected: 'running' },
+    { name: 'canonical user-stop metadata suffix without replay stays generic', status: 'cancelled', assistant: 'one', interruptReason: 'Execution cancelled by the user\n/private/runtime/path token=fixture-private-value', eventCount: 40_000, publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
     { name: 'unknown credentials and paths remain opaque without stderr', error: 'Refused /private/runtime/path; token=fixture-private-value', publicCause: 'Native Sandbox execution failed before producing an answer.', expected: 'failed' },
     { name: 'unknown credentials and paths remain opaque with stderr', error: '/private/runtime/path token=fixture-private-value; stderr: secret diagnostics', publicCause: 'Native Sandbox execution failed before producing an answer.', expected: 'failed' },
     { name: 'recognized bootstrap startup reports a fixed safe cause', error: 'MCP runtime bootstrap failed: /private/runtime/path token=fixture-private-value', publicCause: 'The Sandbox could not start the agent runtime.', expected: 'failed' },
