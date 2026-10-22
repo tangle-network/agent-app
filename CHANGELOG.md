@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.248
+
+- perf(router-turn): byte-stable prompt prefix and prompt-cache usage in the turn trace (#1226)
+
 ## 0.60.247
 
 - fix(billing): orphan an empty provisioning row once its key expiry passes (#1224)
