@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.266
+
+- agent-app tests the current cohort: agent-eval 0.218.1, agent-knowledge 22.0.12 (#1249)
+
 ## 0.60.265
 
 - agent-app accepts agent-runtime 0.343 (#1248)
