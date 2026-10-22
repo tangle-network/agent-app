@@ -116,7 +116,7 @@ describe('chat operator adapter', () => {
     const metered = await client.startTurn('ws-a', { content: 'Metered' })
     if (!metered.succeeded) throw new Error(metered.error)
     // A recorded zero is reported; columns the operator turn does not carry are not.
-    expect(metered.value.usage).toEqual({ inputTokens: 1200, cacheReadTokens: 800, outputTokens: 0 })
+    expect(metered.value.usage).toEqual({ inputTokens: 1200, cachedInputTokens: 800, outputTokens: 0 })
 
     const partly = await client.startTurn('ws-a', { content: 'Partly metered' })
     if (!partly.succeeded) throw new Error(partly.error)

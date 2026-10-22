@@ -183,16 +183,17 @@ function turnIdOf(message: ChatOperatorMessage): string | null {
 /**
  * The operator turn usage of a stored assistant row, for `OperatorTurn.usage`.
  * Reads chat-store's columns, where `inputTokens` is the prompt not read from
- * cache and `cacheReadTokens` the cache reads; a lane that reports no cache
- * split stores no `cacheReadTokens`, so its cache share stays unknown. A count
+ * cache and `cacheReadTokens` the cache reads (reported as `cachedInputTokens`);
+ * a lane that reports no cache split stores no `cacheReadTokens`, so its cache
+ * share stays unknown. A count
  * that is not a finite number is omitted, never zeroed; a row with none gives
  * `undefined`. An app that builds its own operator turns from such rows calls
  * this rather than mapping them itself.
  */
 export function operatorTurnUsage(row: Pick<ChatOperatorMessage, 'inputTokens' | 'cacheReadTokens' | 'outputTokens'>): OperatorTurn['usage'] {
   const usage: NonNullable<OperatorTurn['usage']> = {}
-  for (const key of ['inputTokens', 'cacheReadTokens', 'outputTokens'] as const) {
-    const count = row[key]
+  const counts = [['inputTokens', row.inputTokens], ['cachedInputTokens', row.cacheReadTokens], ['outputTokens', row.outputTokens]] as const
+  for (const [key, count] of counts) {
     if (typeof count === 'number' && Number.isFinite(count)) usage[key] = count
   }
   return Object.keys(usage).length > 0 ? usage : undefined

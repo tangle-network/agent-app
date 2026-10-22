@@ -5,7 +5,6 @@
  * through these routes; the app supplies only storage and execution.
  */
 
-import type { ChatTurnUsage } from '../chat-routes/turn-route-contracts.js'
 import type { ChatAttachmentInput } from '../chat-routes/wire.js'
 
 export const OPERATOR_API_VERSION = 'v1'
@@ -157,17 +156,20 @@ export interface OperatorTurn {
   model?: string
   costUsd?: number
   /**
-   * Token usage the app stored on the turn's reply, with chat-store's column
-   * names and meanings (`operatorTurnUsage` maps a row):
-   * - `inputTokens`: prompt tokens NOT read from the provider's cache. It
-   *   excludes `cacheReadTokens`; the Router lane subtracts them before storing.
-   * - `cacheReadTokens`: prompt tokens read from the provider's cache. The
-   *   whole prompt is `inputTokens + cacheReadTokens`. When it is absent the
-   *   cache share is unknown, not zero.
+   * Token usage the app stored on the turn's reply; `operatorTurnUsage` maps
+   * a chat-store row to it.
+   * - `inputTokens`: prompt tokens NOT read from the provider's cache (the
+   *   row's `inputTokens`, which excludes cache reads; the Router lane
+   *   subtracts them before storing).
+   * - `cachedInputTokens`: prompt tokens read from the provider's cache (the
+   *   row's `cacheReadTokens`). The whole prompt is
+   *   `inputTokens + cachedInputTokens`. Unlike the turn trace's summary,
+   *   `inputTokens` here never includes them. When absent, the cache share
+   *   is unknown, not zero.
    * - `outputTokens`: completion tokens.
    * Each field is present only when the app recorded it; never a guessed zero.
    */
-  usage?: Pick<ChatTurnUsage, 'inputTokens' | 'cacheReadTokens' | 'outputTokens'>
+  usage?: { inputTokens?: number; cachedInputTokens?: number; outputTokens?: number }
   completedAt?: string
   /** The settled answer; null until the turn settles. */
   reply: { content: string; mediaType: string } | null
