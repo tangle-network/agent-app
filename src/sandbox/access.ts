@@ -19,10 +19,10 @@ export interface MemberSyncSeam {
  * Sandbox member permissions are not served. The SDK's `box.permissions` called `/permissions/users*` on the
  * sidecar, which never served it, so every add, update and remove failed with 404; `@tangle-network/sandbox` 0.64
  * removed the API (agent-container b9c65980). These keep their signatures so callers compile, and fail with
- * {@link SandboxMemberPermissionsUnsupportedError} without a network call: the same outcome callers already saw,
+ * an error whose `code` is `sandbox_member_permissions_unsupported`, without a network call: the outcome callers already saw,
  * now named. Access to a workspace box is decided by the product's own authorization, not per-box member rows.
  */
-export class SandboxMemberPermissionsUnsupportedError extends Error {
+class SandboxMemberPermissionsUnsupportedError extends Error {
   readonly code = 'sandbox_member_permissions_unsupported'
   constructor() {
     super('Sandbox member permissions are not served by the platform; @tangle-network/sandbox 0.64 removed box.permissions.')
