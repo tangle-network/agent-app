@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.272
+
+- feat(chat-routes): a first turn creates its thread from a minted id (createThread + mintThreadId) (#1243)
+
 ## 0.60.271
 
 - feat(platform): createBillableTurnAdmission keeps a passing seat and balance verdict per user (#1242)
