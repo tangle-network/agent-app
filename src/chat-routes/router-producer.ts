@@ -25,6 +25,8 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
   let wake: (() => void) | null = null
   let done = false
   let outcome: RouterTurnOutcome | null = null
+  // The runtime starts usage at zero, so only a reported usage event makes the counts real.
+  let usageReported = false
   const parts: Array<Record<string, unknown>> = []
   const toolParts = new Map<string, Record<string, unknown>>()
   let textPart: { type: 'text'; text: string } | null = null
@@ -85,6 +87,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
         reasoningPart = null
         reasoningClock.settle()
       } else if (event.type === 'usage') {
+        usageReported = true
         push({ type: 'usage', usage: { promptTokens: event.promptTokens, completionTokens: event.completionTokens,
           ...(event.cachedPromptTokens !== undefined ? { cachedPromptTokens: event.cachedPromptTokens } : {}) } })
       } else if (event.type === 'tool_event') {
@@ -127,12 +130,13 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
     ? { ...part, time: reasoningClock.time(part) }
     : { ...part })
 
-  const usage = (): ChatTurnUsage => ({
+  // A turn whose Router reported no usage stores no counts (null), never a made-up 0.
+  const usage = (): ChatTurnUsage => !outcome || !usageReported ? {} : ({
     // The Router's prompt tokens include the cached ones; the sandbox lanes report input and cache reads apart, so
     // the stored row counts them apart here too and `inputTokens + cacheReadTokens` is the prompt on either lane.
-    inputTokens: (outcome?.usage.promptTokens ?? 0) - (outcome?.usage.cachedPromptTokens ?? 0),
-    outputTokens: outcome?.usage.completionTokens ?? 0,
-    ...(outcome?.usage.cachedPromptTokens !== undefined ? { cacheReadTokens: outcome.usage.cachedPromptTokens } : {}),
+    inputTokens: outcome.usage.promptTokens - (outcome.usage.cachedPromptTokens ?? 0),
+    outputTokens: outcome.usage.completionTokens,
+    ...(outcome.usage.cachedPromptTokens !== undefined ? { cacheReadTokens: outcome.usage.cachedPromptTokens } : {}),
   })
 
   return {
