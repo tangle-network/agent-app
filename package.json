@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.60.287",
+  "version": "0.61.0",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -726,12 +726,6 @@
       "import": "./dist/theme/dom.js",
       "default": "./dist/theme/dom.js"
     },
-    "./web-react/flow-waterfall": {
-      "types": "./dist/web-react/flow-waterfall.d.ts",
-      "import": "./dist/web-react/flow-waterfall.js",
-      "default": "./dist/web-react/flow-waterfall.js"
-    },
-    "./web-react/flow-waterfall.css": "./dist/web-react/flow-waterfall.css",
     "./web-react/document": {
       "types": "./dist/web-react/document.d.ts",
       "import": "./dist/web-react/document.js",
@@ -1005,6 +999,7 @@
     }
   },
   "dependencies": {
+    "@tangle-network/charts": "0.15.0",
     "proper-lockfile": "4.1.2"
   }
 }

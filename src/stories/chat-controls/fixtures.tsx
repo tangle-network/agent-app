@@ -26,7 +26,6 @@ import type {
   WorkProductCardProps,
 } from '../../web-react'
 import type { StepAgentActivity } from '../../missions/agent-activity'
-import type { FlowTrace } from '../../trace'
 import type { ChatPlan } from '../../plans'
 import type { WorkProductPersistedPart } from '../../work-product/types'
 import type { ProductSeatOffer } from '../../platform/billing'
@@ -583,32 +582,6 @@ export const fetchActivityError = async (): Promise<AgentActivityPage> => {
 /** Never settles — the refresh spinner holds. */
 export const fetchActivityHangs = (): Promise<AgentActivityPage> =>
   new Promise<AgentActivityPage>(() => {})
-
-// ── flow waterfall ──────────────────────────────────────────────────────────
-
-export const posterFlowTrace: FlowTrace = {
-  spans: [
-    { kind: 'pipeline', name: 'mission.launch-poster', startMs: 0, endMs: 48_000 },
-    { kind: 'model', name: 'claude-opus-4 · plan', startMs: 400, endMs: 8_200 },
-    { kind: 'tool', name: 'sandbox_run_command', startMs: 8_400, endMs: 30_200 },
-    { kind: 'tool', name: 'canvas_export', startMs: 30_600, endMs: 44_100, approx: true },
-    { kind: 'model', name: 'claude-opus-4 · summarize', startMs: 44_300, endMs: 47_800 },
-  ],
-  totalMs: 48_000,
-  promptTokens: 7_120,
-  completionTokens: 942,
-  costUsd: 0.1774,
-  toolCalls: 2,
-}
-
-export const failedFlowTrace: FlowTrace = {
-  ...posterFlowTrace,
-  spans: [
-    ...(posterFlowTrace.spans.slice(0, 3)),
-    { kind: 'tool', name: 'schedule_followup', startMs: 30_600, endMs: 39_900, meta: { status: 'failed' } },
-    { kind: 'model', name: 'claude-opus-4 · summarize', startMs: 44_300, endMs: 47_800 },
-  ],
-}
 
 // ── story helpers ───────────────────────────────────────────────────────────
 

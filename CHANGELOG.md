@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.0
+
+- refactor(web-react)!: move trace rendering to charts (#1282)
+
 ## 0.60.287
 
 - fix(chat): preserve canonical native user stops (#1281)

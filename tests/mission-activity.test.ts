@@ -5,13 +5,12 @@ import {
   formatActivityCost,
   formatActivityDuration,
   mergeActivityPages,
-  waterfallLayout,
   type AgentActivityRecord,
 } from '../src/web-react/mission-activity'
 import { stepActivityFlowTrace } from '../src/trace/index'
 
 // The pure logic under the two observability surfaces. The components are thin
-// shells over these helpers — tone mapping, page merging, bar geometry — so
+// shells over these helpers — tone mapping, page merging — so
 // the contract is provable without a DOM.
 
 const T0 = Date.parse('2026-06-12T10:00:00.000Z')
@@ -77,44 +76,6 @@ describe('mergeActivityPages (cursor + refresh convergence)', () => {
     const page = [record({ taskId: 't1' }), record({ taskId: 't2', startedAt: iso(5_000) })]
     const once = mergeActivityPages([], page)
     expect(mergeActivityPages(once, page)).toEqual(once)
-  })
-})
-
-describe('waterfallLayout (bar geometry)', () => {
-  it('projects spans to offset/width percentages of the total', () => {
-    const trace = stepActivityFlowTrace([
-      record({ taskId: 't1', startedAt: iso(0), durationMs: 30_000 }),
-      record({ taskId: 't2', startedAt: iso(30_000), durationMs: 10_000, status: 'failed' }),
-    ])
-    const rows = waterfallLayout(trace)
-    expect(rows).toHaveLength(2)
-    expect(rows[0]).toMatchObject({ offsetPct: 0, widthPct: 75, ok: true, durationLabel: '30.0s' })
-    expect(rows[1]).toMatchObject({ offsetPct: 75, widthPct: 25, ok: false })
-  })
-
-  it('clamps a zero-length span to a visible sliver and flags approx', () => {
-    const trace = stepActivityFlowTrace([
-      record({ taskId: 't1', startedAt: iso(0), durationMs: 60_000 }),
-      record({ taskId: 't2', status: 'running', startedAt: iso(59_000), durationMs: undefined }),
-    ])
-    const sliver = waterfallLayout(trace)[1]!
-    expect(sliver.widthPct).toBe(0.5)
-    expect(sliver.approx).toBe(true)
-    expect(sliver.durationLabel).toBe('0.0s~')
-  })
-
-  it('orders rows by start time regardless of span order in the trace', () => {
-    const rows = waterfallLayout({
-      spans: [
-        { kind: 'tool', name: 'late', startMs: 5_000, endMs: 6_000 },
-        { kind: 'pipeline', name: 'early', startMs: 0, endMs: 6_000 },
-      ],
-      totalMs: 6_000,
-      promptTokens: 0,
-      completionTokens: 0,
-      toolCalls: 1,
-    })
-    expect(rows.map((r) => r.name)).toEqual(['early', 'late'])
   })
 })
 

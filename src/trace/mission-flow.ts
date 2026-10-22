@@ -1,7 +1,7 @@
 /** Convert journaled step delegations into the flow trace shown by the mission activity lane. */
 
 import type { StepAgentActivity } from '../missions/agent-activity'
-import type { FlowSpan, FlowTrace } from './flow-types'
+import type { FlowSpan, FlowTrace } from '@tangle-network/charts'
 
 const num = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) ? v : undefined
@@ -11,6 +11,13 @@ const rec = (v: unknown): Record<string, unknown> =>
 /** Statuses that mean the delegation is still producing wall time. */
 const LIVE_DELEGATION_STATUSES = new Set(['pending', 'running'])
 const ERROR_STATUSES = new Set(['failed', 'error', 'cancelled', 'aborted', 'down'])
+
+/** Interpret domain wire status at the producer boundary, never in the chart. */
+function flowStatus(status?: string): NonNullable<FlowSpan['status']> {
+  const normalized = String(status ?? '').toLowerCase()
+  return ERROR_STATUSES.has(normalized) ? 'failed'
+    : LIVE_DELEGATION_STATUSES.has(normalized) ? 'running' : 'done'
+}
 
 /**
  * One 'tool' FlowSpan per delegation, positioned relative to `turnStartMs`
@@ -30,7 +37,8 @@ export function delegationActivityToFlowSpans(
     const startedAt = Date.parse(run.startedAt)
     if (!Number.isFinite(startedAt)) continue
     const startMs = startedAt - turnStartMs
-    const live = LIVE_DELEGATION_STATUSES.has(run.status)
+    const status = flowStatus(run.status)
+    const live = status === 'running'
     const endMs =
       run.durationMs !== undefined
         ? startMs + run.durationMs
@@ -39,7 +47,7 @@ export function delegationActivityToFlowSpans(
           : startMs
     spans.push({
       id: run.taskId,
-      status: live ? 'running' : ERROR_STATUSES.has(run.status) ? 'failed' : 'done',
+      status,
       kind: 'tool',
       name: `${run.tool} — ${run.detail}`,
       startMs,

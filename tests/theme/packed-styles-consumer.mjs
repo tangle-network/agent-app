@@ -62,6 +62,7 @@ try {
   assert.equal(exported.css, readFileSync(join(root, 'dist/theme/tokens.css'), 'utf8'))
   assert.equal(exported.preset.theme.extend.colors['surface-container-high'], 'var(--md3-surface-container-high)')
   assert.equal(exported.preset.theme.extend.backgroundColor.input.includes('--bg-input'), true)
+  assert.match(exported.css, /\.fw-root/,'The public app stylesheet must retain charts waterfall styles')
   assert.doesNotMatch(exported.css, /@import\s|url\(\s*['"]?https?:/)
 
   browser = await chromium.launch()

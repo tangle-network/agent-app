@@ -40,18 +40,18 @@ Source: `src/trace/index.ts`
 
 ### `FlowSpan`
 
-`interface` — The shared FlowSpan / FlowTrace data shapes — the LEAF both the trace barrel (`./index`, which builds + renders them) and the delegation converters (`./mission-flow`, which emit them) import, so neit…
+`value`
 
 ```ts
-interface FlowSpan
+FlowSpan
 ```
 
 ### `FlowTrace`
 
-`interface` — Describe the structure of a flow trace including spans, timing, tokens, cost, and tool calls
+`value`
 
 ```ts
-interface FlowTrace
+FlowTrace
 ```
 
 ### `MissionTraceContext`

@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-522 exports.
+518 exports.
 
 ### `acceptRejectionReason`
 
@@ -1468,22 +1468,6 @@ interface FileMention
 
 ```ts
 (fields: ({ name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined;…
-```
-
-### `FlowWaterfall`
-
-`function` — Shared trace inspector.
-
-```ts
-({ trace, live, startedAt, label, defaultCollapsed }: FlowWaterfallProps) => Element
-```
-
-### `FlowWaterfallProps`
-
-`interface`
-
-```ts
-interface FlowWaterfallProps
 ```
 
 ### `formatActivityCost`
@@ -3996,22 +3980,6 @@ interface UseWorkspacePrewarmOptions
 
 ```ts
 (columns: readonly RecordGridColumn[], values: Readonly<Record<string, RecordGridValue>>) => RecordGridRowOutcome
-```
-
-### `waterfallLayout`
-
-`function` — One geometry owner for the web surface and its established public helper.
-
-```ts
-(trace: FlowTrace) => WaterfallRow[]
-```
-
-### `WaterfallRow`
-
-`interface`
-
-```ts
-interface WaterfallRow
 ```
 
 ### `weakerProvenanceStanding`

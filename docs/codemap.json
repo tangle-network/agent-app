@@ -7541,7 +7541,7 @@
         {
           "name": "compareOptimizationMethods",
           "kind": "function",
-          "signature": "<TScenario extends Scenario, TArtifact>(rawOpts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Op…",
+          "signature": "<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…",
           "doc": "Compare complete optimization methods on disjoint train, selection, and final test data."
         },
         {
@@ -7596,7 +7596,7 @@
           "name": "gepaOptimizationMethod",
           "kind": "function",
           "signature": "<TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…",
-          "doc": "Environment for a bridge child that spawns `claude` CLI subprocesses."
+          "doc": null
         },
         {
           "name": "GepaOptimizationMethodConfig",
@@ -24986,15 +24986,15 @@
         },
         {
           "name": "FlowSpan",
-          "kind": "interface",
-          "signature": "interface FlowSpan",
-          "doc": "The shared FlowSpan / FlowTrace data shapes — the LEAF both the trace barrel (`./index`, which builds + renders them) and the delegation converters (`./mission-flow`, which emit them) import, so neit…"
+          "kind": "value",
+          "signature": "FlowSpan",
+          "doc": null
         },
         {
           "name": "FlowTrace",
-          "kind": "interface",
-          "signature": "interface FlowTrace",
-          "doc": "Describe the structure of a flow trace including spans, timing, tokens, cost, and tool calls"
+          "kind": "value",
+          "signature": "FlowTrace",
+          "doc": null
         },
         {
           "name": "MissionTraceContext",
@@ -28189,18 +28189,6 @@
           "doc": "The first required field still without an answer, or null when every required field has one: the reason `buildAnswerData` returned null."
         },
         {
-          "name": "FlowWaterfall",
-          "kind": "function",
-          "signature": "({ trace, live, startedAt, label, defaultCollapsed }: FlowWaterfallProps) => Element",
-          "doc": "Shared trace inspector."
-        },
-        {
-          "name": "FlowWaterfallProps",
-          "kind": "interface",
-          "signature": "interface FlowWaterfallProps",
-          "doc": null
-        },
-        {
           "name": "formatActivityCost",
           "kind": "function",
           "signature": "(costUsd?: number | undefined) => string | null",
@@ -30085,18 +30073,6 @@
           "doc": "Validate a whole value bag against the columns."
         },
         {
-          "name": "waterfallLayout",
-          "kind": "function",
-          "signature": "(trace: FlowTrace) => WaterfallRow[]",
-          "doc": "One geometry owner for the web surface and its established public helper."
-        },
-        {
-          "name": "WaterfallRow",
-          "kind": "interface",
-          "signature": "interface WaterfallRow",
-          "doc": null
-        },
-        {
           "name": "weakerProvenanceStanding",
           "kind": "function",
           "signature": "(a: ProvenanceStanding, b: ProvenanceStanding) => ProvenanceStanding",
@@ -30579,43 +30555,6 @@
           "kind": "function",
           "signature": "() => null",
           "doc": "The shared `useTheme` hook toggles only `.dark` on <html>."
-        }
-      ]
-    },
-    {
-      "id": "./web-react/flow-waterfall",
-      "source": "src/web-react/flow-waterfall.tsx",
-      "dependsOn": [
-        "brand",
-        "chat-routes",
-        "chat-store",
-        "harness",
-        "hub-approvals",
-        "hub-approvals-react",
-        "interactions",
-        "missions",
-        "plans",
-        "platform",
-        "profile-editor",
-        "runtime",
-        "session-shell",
-        "theme",
-        "trace",
-        "work-product"
-      ],
-      "error": null,
-      "exports": [
-        {
-          "name": "FlowWaterfall",
-          "kind": "function",
-          "signature": "({ trace, live, startedAt, label, defaultCollapsed }: FlowWaterfallProps) => Element",
-          "doc": "Shared trace inspector."
-        },
-        {
-          "name": "FlowWaterfallProps",
-          "kind": "interface",
-          "signature": "interface FlowWaterfallProps",
-          "doc": null
         }
       ]
     },
