@@ -238,6 +238,8 @@ measure request to the first reasoning, tool activity or answer output. First an
 Chat routes mark both automatically; lifecycle timings start at `onTurnStart` after
 admission. See [turn timing and rollout migration](docs/turn-trace.md#the-trace).
 
+Work an `afterAuthorize` hook starts (a box, a key) runs before the lock and the profile pin, and its release frees it when the turn ends before `produce` takes it. Under `dispatchFirst` the producer can own that work before admission resolves, so a release or a refusal path must await whatever the hook started before freeing it (legal-agent #518 leaked early-box keys by disposing first).
+
 `/router-turn` compresses bodies of at least 32 KiB when the base URL has the
 origin of `DEFAULT_TANGLE_ROUTER_BASE_URL`. Other origins stay uncompressed.
 `gzipRequestAboveBytes` overrides the threshold; a negative value disables it.
