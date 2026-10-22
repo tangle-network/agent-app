@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.277
+
+- feat(review): compare blind rows in the existing inbox (#1259)
+
 ## 0.60.276
 
 - fix(router-producer): store no usage when the Router reports none (#1260)
