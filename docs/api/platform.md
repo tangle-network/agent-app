@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-133 exports.
+134 exports.
 
 ### `AdminGuardOptions`
 
@@ -396,6 +396,14 @@ interface DelegatedKeyVerdict
 
 ```ts
 interface DelegatedTurnKey
+```
+
+### `DelegatedTurnKeyClaimTiming`
+
+`interface`
+
+```ts
+interface DelegatedTurnKeyClaimTiming
 ```
 
 ### `DelegatedTurnKeyEvent`

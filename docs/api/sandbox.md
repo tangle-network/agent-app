@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-276 exports.
+280 exports.
 
 ### `adaptSandboxStream`
 
@@ -244,6 +244,14 @@ interface BuildSandboxToolFileMountsOptions
 
 ```ts
 <TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…
+```
+
+### `createWarmCache`
+
+`function` — `namespace` is the cache URL's host; it names no origin and is never routed.
+
+```ts
+<T>(namespace: string, options?: WarmCacheOptions) => WarmCache<T>
 ```
 
 ### `createWarmLeases`
@@ -1780,6 +1788,30 @@ readonly ["ALTER TABLE sandbox_warm_lease ADD COLUMN pending_warm_at INTEGER NOT
 
 ```ts
 type WarmBoxOutcome
+```
+
+### `WarmCache`
+
+`interface`
+
+```ts
+interface WarmCache
+```
+
+### `WarmCacheOptions`
+
+`interface`
+
+```ts
+interface WarmCacheOptions
+```
+
+### `WarmCacheSource`
+
+`type` — Which layer answered a read: this isolate's memory or the data center's Workers cache.
+
+```ts
+type WarmCacheSource
 ```
 
 ### `warmKey`
