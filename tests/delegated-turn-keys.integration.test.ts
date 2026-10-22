@@ -21,7 +21,7 @@ import {
 const SOURCE = 'sk-tan-payer-linked-key-0001'
 
 /** Platform (`/v1/keys/delegate`, `DELETE /v1/keys/:id`) and Router (`/v1/chat/completions`) in one local server. */
-async function platformAndRouter() {
+async function platformAndRouter(options: { ssoSource?: boolean } = {}) {
   const minted: Array<{ id: string; key: string; name: string }> = []
   const revoked = new Set<string>()
   const spent = new Set<string>()
@@ -43,8 +43,20 @@ async function platformAndRouter() {
             payerId: 'usr_payer', resourceType: null, resourceId: null, expiresAt: body.expiresAt },
         } })
       }
+      // Platform refuses key mutations from an app-provisioned (SSO) source; the slot is retired with the service token.
       if (req.method === 'DELETE' && req.url?.startsWith('/v1/keys/')) {
+        if (options.ssoSource) return json(403, { success: false, error: { code: 'FORBIDDEN' } })
         revoked.add(decodeURIComponent(req.url.slice('/v1/keys/'.length)))
+        return json(200, { success: true })
+      }
+      if (req.method === 'GET' && req.url?.startsWith('/v1/keys/')) {
+        const child = minted.find(k => k.id === decodeURIComponent(req.url!.slice('/v1/keys/'.length)))
+        return child ? json(200, { success: true, data: { id: child.id, name: child.name, product: 'router' } }) : json(404, {})
+      }
+      if (req.method === 'POST' && req.url === '/v1/keys/auto-provisioned/revoke-slot') {
+        const body = JSON.parse(raw) as { userId?: string; childKeyId?: string }
+        if (body.userId !== 'usr_payer' || !body.childKeyId) return json(400, { success: false })
+        revoked.add(body.childKeyId)
         return json(200, { success: true })
       }
       if (req.method === 'POST' && req.url === '/v1/chat/completions') {
@@ -79,8 +91,8 @@ const scope = (models = ['gemini-3.7-flash']): DelegatedTurnKeyScope =>
 let close: (() => Promise<void>) | undefined
 afterEach(async () => { await close?.(); close = undefined })
 
-async function setup(clock = { at: Date.now() }, crypto = createFieldCrypto('ab'.repeat(32))) {
-  const p = await platformAndRouter()
+async function setup(clock = { at: Date.now() }, crypto = createFieldCrypto('ab'.repeat(32)), ssoSource = false) {
+  const p = await platformAndRouter({ ssoSource })
   close = p.close
   const sqlite = new DatabaseSync(':memory:')
   sqlite.exec(DELEGATED_KEY_PREMINT_TABLE_DDL)
@@ -184,10 +196,10 @@ describe('pre-minted turn keys', () => {
     expect(p.minted.length).toBe(before - 1)
   })
 
-  it('revokes a key it minted but could not park', async () => {
+  it('revokes a key it minted but could not park, through the slot when the source is an SSO key', async () => {
     const crypto = { ...createFieldCrypto('ab'.repeat(32)), encrypt: async () => { throw new Error('crypto down') } }
-    const { p, keys, stored } = await setup({ at: Date.now() }, crypto)
-    expect(await keys.park({ slot: 'usr_payer:w1:router', scope: scope(), ttlMs: 30 * 60_000 })).toBe(false)
+    const { p, keys, stored } = await setup({ at: Date.now() }, crypto, true)
+    expect(await keys.park({ slot: 'usr_payer:w1:router', scope: scope(), ttlMs: 30 * 60_000, payerId: 'usr_payer' })).toBe(false)
     expect(p.minted).toHaveLength(1)
     expect(p.revoked.has(p.minted[0]!.id)).toBe(true)
     expect(stored()).toHaveLength(0)

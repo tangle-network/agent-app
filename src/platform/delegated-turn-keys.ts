@@ -43,6 +43,9 @@ export interface DelegatedTurnKeyInput {
   ttlMs: number
   notAfter?: Date
   retryUnavailable?: DelegatedKeyRequest['retryUnavailable']
+  /** The payer's Platform user id. Platform refuses `DELETE` from an app-provisioned (SSO) source key, so an unused
+   *  child is retired through `revoke-slot` with it; without it (or `scope.expect.payerId`) such a child just expires. */
+  payerId?: string
 }
 
 export interface DelegatedTurnKey {
@@ -123,15 +126,18 @@ export function createDelegatedTurnKeys(options: DelegatedTurnKeysOptions): Dele
   }
 
   // Best effort: a key nobody will use is retired now, or expires on its own.
-  async function retire(scope: DelegatedTurnKeyScope, keyId: string): Promise<void> {
-    const payerId = scope.expect?.payerId
+  async function retire(input: Pick<DelegatedTurnKeyInput, 'scope' | 'payerId'>, keyId: string): Promise<void> {
+    const { scope } = input
+    const payerId = scope.expect?.payerId ?? input.payerId
     await options.client.revoke({ sourceKey: scope.sourceKey, keyId,
-      ...(payerId ? { slot: { userId: payerId, ...(scope.expect?.sourceKeyId ? { sourceKeyId: scope.expect.sourceKeyId } : {}) } } : {}),
+      ...(payerId ? { slot: { userId: payerId, product: scope.product,
+        ...(scope.expect?.sourceKeyId ? { sourceKeyId: scope.expect.sourceKeyId } : {}) } } : {}),
     }).catch(() => null)
   }
 
-  async function claim(slot: string, scope: DelegatedTurnKeyScope): Promise<DelegatedTurnKey | null> {
+  async function claim(input: DelegatedTurnKeyInput): Promise<DelegatedTurnKey | null> {
     if (!db) return null
+    const { slot, scope } = input
     const row = await db.prepare(`DELETE FROM ${table} WHERE slot = ?1 AND scope = ?2 AND expires_at > ?3
 RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, await scopeDigest(scope), now() + minRemainingMs)
       .first<{ turn_id: string; key_id: string; key_encrypted: string; expires_at: number }>()
@@ -140,7 +146,7 @@ RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, await scopeDig
       const key = await options.crypto.decrypt(row.key_encrypted)
       return { key, id: row.key_id, turnId: row.turn_id, expiresAt: new Date(row.expires_at), preminted: true }
     } catch {
-      await retire(scope, row.key_id)
+      await retire(input, row.key_id)
       return null
     }
   }
@@ -170,13 +176,13 @@ RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, await scopeDig
       // An unclaimed key this one replaces (another request's, or near expiry) is never handed out again.
       const displaced = await db.prepare(`DELETE FROM ${table} WHERE slot = ?1 RETURNING key_id`).bind(input.slot)
         .first<{ key_id: string }>()
-      if (displaced) await retire(input.scope, displaced.key_id)
+      if (displaced) await retire(input, displaced.key_id)
       const stored = await db.prepare(`INSERT INTO ${table} (slot, scope, turn_id, key_id, key_encrypted, expires_at)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(slot) DO NOTHING RETURNING slot`)
         .bind(input.slot, scope, minted.value.turnId, minted.value.id, encrypted, minted.value.expiresAt.getTime()).first()
       if (!stored) {
         // A racing park filled the slot first; this key would be a second unused one.
-        await retire(input.scope, minted.value.id)
+        await retire(input, minted.value.id)
         emit({ type: 'park_kept', slot: input.slot })
         return true
       }
@@ -184,7 +190,7 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(slot) DO NOTHING RETURNING slot`)
       return true
     } catch {
       // The minted child never reached the slot, so nothing will hand it out: retire it now (best effort).
-      await retire(input.scope, minted.value.id)
+      await retire(input, minted.value.id)
       emit({ type: 'park_failed', slot: input.slot, code: 'premint_store_failed' })
       return false
     }
@@ -193,10 +199,10 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(slot) DO NOTHING RETURNING slot`)
   return {
     async forTurn(input) {
       // A slot store that fails (no table, D1 down) is a miss: the turn mints inline as before.
-      const claimed = await claim(input.slot, input.scope).catch(() => null)
+      const claimed = await claim(input).catch(() => null)
       if (db) {
         const next = park({ slot: input.slot, scope: input.scope, ttlMs: input.ttlMs,
-          ...(input.notAfter ? { notAfter: input.notAfter } : {}) })
+          ...(input.notAfter ? { notAfter: input.notAfter } : {}), ...(input.payerId ? { payerId: input.payerId } : {}) })
         input.waitUntil?.(next)
       }
       emit({ type: claimed ? 'claimed' : 'missed', slot: input.slot })
