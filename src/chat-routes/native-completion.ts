@@ -216,8 +216,13 @@ function isSandboxNotFoundError(value: unknown): boolean {
   return error?.name === 'NotFoundError' || error?.code === 'NOT_FOUND' || error?.status === 404
 }
 
+function isCanonicalUserStop(error: unknown): boolean {
+  return error === 'Execution cancelled by user' || error === 'Execution cancelled by the user'
+}
+
 /** A terminal receipt is public; runtime stderr stays in the native record. */
-function terminalFailureMessage(error: string): string {
+function terminalFailureMessage(error: string, provenUserStop: boolean): string {
+  if (provenUserStop) return 'Execution cancelled by the user'
   if (/\bENOSPC\b|no space left on device/i.test(error)) {
     return 'The Sandbox ran out of disk space before the execution finished.'
   }
@@ -455,7 +460,7 @@ export async function observeNativeCompletion(
       if (result) {
         recovered.push({
           turnId, state: 'failed', text: '', parts: [], usage: usageFromResult(result),
-          ...attributionFromResult(result), error: terminalFailureMessage(result.error as string),
+          ...attributionFromResult(result), error: terminalFailureMessage(result.error as string, run.status === 'cancelled' && isCanonicalUserStop(result.error)),
         })
         continue
       }
@@ -465,6 +470,9 @@ export async function observeNativeCompletion(
       const result = replayableExecution(run)
         ? await exactSession.result({ executionId: turnId }) as unknown as Record<string, unknown>
         : undefined
+      const provenUserStop = run.status === 'cancelled'
+        && (isCanonicalUserStop(interrupted[0]!.metadata?.interruptReason)
+          || isCanonicalUserStop(exactFailedResult(result, turnId, options.sessionId)?.error))
       recovered.push({
         turnId,
         state: 'failed',
@@ -476,7 +484,7 @@ export async function observeNativeCompletion(
           ?? interrupted[0]!.metadata?.interruptReason
           ?? (restarted ? RUNTIME_RESTARTED_ERROR : undefined)
           ?? status.failureReason?.message
-          ?? 'Native Sandbox execution failed.'),
+          ?? 'Native Sandbox execution failed.', provenUserStop),
       })
       continue
     }
