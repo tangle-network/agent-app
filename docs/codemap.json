@@ -13666,6 +13666,12 @@
           "doc": null
         },
         {
+          "name": "DelegatedTurnKeyClaimTiming",
+          "kind": "interface",
+          "signature": "interface DelegatedTurnKeyClaimTiming",
+          "doc": null
+        },
+        {
           "name": "DelegatedTurnKeyEvent",
           "kind": "type",
           "signature": "type DelegatedTurnKeyEvent",

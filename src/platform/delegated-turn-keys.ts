@@ -60,8 +60,13 @@ export interface DelegatedTurnKey {
   preminted: boolean
 }
 
+export interface DelegatedTurnKeyClaimTiming { digestMs: number; storeMs: number; decryptMs?: number }
+
 export type DelegatedTurnKeyEvent =
-  | { type: 'claimed' | 'missed' | 'parked' | 'park_kept'; slot: string }
+  /** `timing` splits the claim on the turn's path: the scope digest, the slot's `DELETE … RETURNING` round trip, and
+   *  (claimed only) the decrypt. */
+  | { type: 'claimed' | 'missed'; slot: string; timing?: DelegatedTurnKeyClaimTiming }
+  | { type: 'parked' | 'park_kept'; slot: string }
   /** `keyId` names a child minted but not parked (retired best effort); never its key. */
   | { type: 'park_failed'; slot: string; code: string; keyId?: string }
 
@@ -137,15 +142,22 @@ export function createDelegatedTurnKeys(options: DelegatedTurnKeysOptions): Dele
     }).catch(() => null)
   }
 
-  async function claim(input: DelegatedTurnKeyInput): Promise<DelegatedTurnKey | null> {
+  async function claim(input: DelegatedTurnKeyInput, timing: Partial<DelegatedTurnKeyClaimTiming>): Promise<DelegatedTurnKey | null> {
     if (!db) return null
     const { slot, scope } = input
+    let at = Date.now()
+    const digest = await scopeDigest(scope)
+    timing.digestMs = Date.now() - at
+    at = Date.now()
     const row = await db.prepare(`DELETE FROM ${table} WHERE slot = ?1 AND scope = ?2 AND expires_at > ?3
-RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, await scopeDigest(scope), now() + minRemainingMs)
+RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, digest, now() + minRemainingMs)
       .first<{ turn_id: string; key_id: string; key_encrypted: string; expires_at: number }>()
+    timing.storeMs = Date.now() - at
     if (!row) return null
     try {
+      at = Date.now()
       const key = await options.crypto.decrypt(row.key_encrypted)
+      timing.decryptMs = Date.now() - at
       return { key, id: row.key_id, turnId: row.turn_id, expiresAt: new Date(row.expires_at), preminted: true }
     } catch {
       await retire(input, row.key_id)
@@ -208,13 +220,15 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(slot) DO NOTHING RETURNING slot`)
   return {
     async forTurn(input) {
       // A slot store that fails (no table, D1 down) is a miss: the turn mints inline as before.
-      const claimed = await claim(input).catch(() => null)
+      const timing: Partial<DelegatedTurnKeyClaimTiming> = {}
+      const claimed = await claim(input, timing).catch(() => null)
       if (db) {
         const next = park({ slot: input.slot, scope: input.scope, ttlMs: input.ttlMs,
           ...(input.notAfter ? { notAfter: input.notAfter } : {}), ...(input.payerId ? { payerId: input.payerId } : {}) })
         input.waitUntil?.(next)
       }
-      emit({ type: claimed ? 'claimed' : 'missed', slot: input.slot })
+      emit({ type: claimed ? 'claimed' : 'missed', slot: input.slot,
+        ...(timing.digestMs !== undefined && timing.storeMs !== undefined ? { timing: timing as DelegatedTurnKeyClaimTiming } : {}) })
       return claimed ? { succeeded: true, value: claimed } : mint(input, false)
     },
     park,
