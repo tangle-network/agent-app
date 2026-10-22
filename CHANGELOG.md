@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.249
+
+- feat(prewarm): warm once — steps keyed by what they depend on, with shared receipts (#1228)
+
 ## 0.60.248
 
 - perf(router-turn): byte-stable prompt prefix and prompt-cache usage in the turn trace (#1226)
