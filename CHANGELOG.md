@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.275
+
+- feat(operator): token usage on OperatorTurn via operatorTurnUsage (#1258)
+
 ## 0.60.274
 
 - docs: an afterAuthorize release must await what the hook started under dispatchFirst (#1257)
