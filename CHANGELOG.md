@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.279
+
+- feat(chat-routes): prefetch reads a turn's prompt inputs while authorize finishes (#1263)
+
 ## 0.60.278
 
 - Expose producer-supplied turn cost provenance (#1262)
