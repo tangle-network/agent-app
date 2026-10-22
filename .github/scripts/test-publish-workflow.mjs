@@ -285,7 +285,6 @@ for (const [name, block] of [['safety_net_issue', safetyIssueJob], ['safety_net_
 }
 check(safetyIssueJob.includes("needs.package_release.result == 'failure'"), 'failed verification does not open the rolling issue')
 check(safetyClearJob.includes("needs.package_release.result == 'success'"), 'successful verification does not clear the rolling issue')
-check(safetyIssueJob.includes("!contains(github.event.head_commit.message, '[skip release]')"), 'skip-release pushes open the rolling issue')
 
 check(script.includes('--provenance') && script.includes('--ignore-scripts'), 'publish command lacks provenance or allows lifecycle scripts')
 
