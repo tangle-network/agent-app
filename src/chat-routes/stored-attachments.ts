@@ -36,19 +36,24 @@ export function createStoredChatAttachments(options: StoredChatAttachmentsOption
     store().get(attachmentObjectKey(scopeId, path))
 
   const writeAttachment: WriteAttachmentFn = async (scopeId, path, content, opts) => {
+    let bytes: Uint8Array
+    let key: string
     try {
-      const bytes = typeof content === 'string' ? decodeAttachmentBase64(content) : content
+      bytes = typeof content === 'string' ? decodeAttachmentBase64(content) : content
       if (opts.size !== undefined && opts.size !== bytes.byteLength) {
         return { ok: false, reason: `Attachment size mismatch for ${path}: expected ${opts.size}, received ${bytes.byteLength}` }
       }
-      await store().put(attachmentObjectKey(scopeId, path), bytes, {
-        ...(opts.mediaType ? { contentType: opts.mediaType } : {}),
-        contentLength: bytes.byteLength,
-      })
-      return { ok: true }
+      key = attachmentObjectKey(scopeId, path)
     } catch (error) {
       return { ok: false, reason: `Attachment write failed for ${path}: ${error instanceof Error ? error.message : String(error)}` }
     }
+    // Validation refusals use the legacy result; storage outages must reach
+    // the route's opaque, retryable 503 response rather than its 413 refusal.
+    await store().put(key, bytes, {
+      ...(opts.mediaType ? { contentType: opts.mediaType } : {}),
+      contentLength: bytes.byteLength,
+    })
+    return { ok: true }
   }
 
   const readAttachment: ReadAttachmentFn = async (scopeId, path) => {

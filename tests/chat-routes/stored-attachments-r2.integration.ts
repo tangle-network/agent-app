@@ -11,6 +11,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { createR2ObjectStore, type ObjectStore, type R2LikeBucket } from '../../src/object-store'
 import { createStoredChatAttachments } from '../../src/chat-routes/stored-attachments'
+import { createAttachmentUploadRoute } from '../../src/chat-routes/attachment-upload'
 
 const consumerRoot = process.env.AGENT_APP_R2_CONSUMER_ROOT
 if (!consumerRoot) throw new Error('Set AGENT_APP_R2_CONSUMER_ROOT to an installed consuming app with a declared Wrangler dependency')
@@ -40,6 +41,7 @@ const { Miniflare, convertV4MiniflareOptions } = wrangler('miniflare') as { conv
 } }
 const runtime = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: 'attachments', modules: true, compatibilityDate,
   script: 'export default { fetch() { return new Response("ready") } }', r2Buckets: ['ATTACHMENTS'] }] }))
+let disposed = false
 try {
   let binding: ObjectStore | undefined
   const attachments = createStoredChatAttachments({ store: () => {
@@ -84,8 +86,24 @@ try {
   assert.deepEqual((await bucket.list()).objects.map(object => object.key).sort(), [
     'workspace-a/uploads/base64.bin', 'workspace-a/uploads/fixture.bin',
   ])
-  console.log(JSON.stringify({ consumerRoot, consumerRevision, consumerLockSha256, compatibilityDate, miniflareEntry, miniflareVersion, r2Objects: 2, byteExact: true, lazyBinding: true,
-    crossWorkspaceMiss: true, unsafeKeysRefused: 4, sizeMismatchRefused: true, corruptBase64Refused: true }))
-} finally {
+  // A stopped real storage process must reach the upload route's transient
+  // response, while validation refusals above remain on the legacy result port.
   await runtime.dispose()
+  disposed = true
+  const upload = createAttachmentUploadRoute({
+    authorize: async () => ({ ok: true, scopeId: 'workspace-a' }),
+    writeAttachment: attachments.writeAttachment,
+  })
+  const data = new FormData()
+  data.append('file', new File(['isolated storage outage fixture'], 'outage.txt', { type: 'text/plain' }))
+  const response = await upload(new Request('http://localhost/attachments/upload', { method: 'POST', body: data }))
+  const failure = await response.json() as { error: { code: string; message: string } }
+  assert.equal(response.status, 503, 'A real R2 outage must remain retryable, not a 413 file refusal')
+  assert.equal(failure.error.code, 'attachment_store_unavailable')
+  assert.equal(failure.error.message, 'Attachment storage is temporarily unavailable. Please try again.')
+  assert(!JSON.stringify(failure).includes('Miniflare'))
+  console.log(JSON.stringify({ consumerRoot, consumerRevision, consumerLockSha256, compatibilityDate, miniflareEntry, miniflareVersion, r2Objects: 2, byteExact: true, lazyBinding: true,
+    transientOutageStatus: response.status, crossWorkspaceMiss: true, unsafeKeysRefused: 4, sizeMismatchRefused: true, corruptBase64Refused: true }))
+} finally {
+  if (!disposed) await runtime.dispose()
 }
