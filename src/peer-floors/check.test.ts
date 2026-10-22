@@ -173,11 +173,11 @@ describe('this package audits itself', () => {
     for (const old of ['0.282.2', '0.313.1', '0.317.99', '0.318.0', '0.318.9', '0.319.0', '0.319.1', '0.319.2']) {
       expect(satisfiesRange(old, range!)).toBe(false)
     }
-    // 0.338 to 0.342 carry flow graphs; this package's suites run on 0.342.0. 0.343 is not yet verified.
-    for (const current of ['0.319.3', '0.319.999', '0.325.0', '0.337.2', '0.338.0', '0.339.999', '0.340.0', '0.342.0', '0.342.999']) {
+    // 0.338 to 0.343 carry flow graphs; this package's suites run on 0.343.2. 0.344 is not yet verified.
+    for (const current of ['0.319.3', '0.319.999', '0.325.0', '0.337.2', '0.338.0', '0.339.999', '0.340.0', '0.342.0', '0.342.999', '0.343.0', '0.343.2', '0.343.999']) {
       expect(satisfiesRange(current, range!)).toBe(true)
     }
-    expect(satisfiesRange('0.343.0', range!)).toBe(false)
+    expect(satisfiesRange('0.344.0', range!)).toBe(false)
   })
 
   it('admits the tcloud line used by the Sandbox 0.59 consumer', async () => {
