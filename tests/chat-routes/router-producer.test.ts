@@ -45,6 +45,14 @@ describe('createRouterTurnProducer', () => {
     expect(producer.modelAttribution!()).toEqual({ requestedModel: 'requested/model', servedModel: 'served/model', echoReceived: true })
   })
 
+  it('stores no usage counts when the Router reports none, never a made-up 0', async () => {
+    const producer = createRouterTurnProducer({ apiKey: 'k', model: 'requested/model', systemPrompt: 's', userMessage: 'Hi',
+      fetchImpl: router(sse([text('Hello.')])) })
+    for await (const _event of producer.stream) { /* drain */ }
+    expect(producer.finalText()).toBe('Hello.')
+    expect(producer.usage!()).toEqual({})
+  })
+
   it('streams a tool event as tool.event and keeps it on the tool part', async () => {
     const mapper = { ...lookup, name: 'graph.edit', run: async (_args: Record<string, unknown>, context: { emit(kind: string, data?: unknown): void }) => {
       context.emit('graph_op', { op: 'add_node' })
