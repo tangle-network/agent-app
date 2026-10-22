@@ -18400,20 +18400,20 @@
         {
           "name": "syncSandboxMemberAdd",
           "kind": "function",
-          "signature": "(box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>",
-          "doc": "Resolve adding a user with a specific role to a sandbox and return the operation outcome"
+          "signature": "(_box: SandboxInstance, _seam: MemberSyncSeam, _userId: string, _role: string) => Promise<Outcome<void>>",
+          "doc": "Always fails with {@link SandboxMemberPermissionsUnsupportedError}; see its note."
         },
         {
           "name": "syncSandboxMemberRemove",
           "kind": "function",
-          "signature": "(box: SandboxInstance, userId: string) => Promise<Outcome<void>>",
-          "doc": "Remove a member from the sandbox while preserving their home directory and handle the outcome"
+          "signature": "(_box: SandboxInstance, _userId: string) => Promise<Outcome<void>>",
+          "doc": "Always fails with {@link SandboxMemberPermissionsUnsupportedError}; see its note."
         },
         {
           "name": "syncSandboxMemberRole",
           "kind": "function",
-          "signature": "(box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>",
-          "doc": "Synchronize a sandbox member's role by updating permissions based on the provided role mapping"
+          "signature": "(_box: SandboxInstance, _seam: MemberSyncSeam, _userId: string, _role: string) => Promise<Outcome<void>>",
+          "doc": "Always fails with {@link SandboxMemberPermissionsUnsupportedError}; see its note."
         },
         {
           "name": "TerminalConnectionBoxLike",

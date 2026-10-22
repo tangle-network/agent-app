@@ -64,7 +64,6 @@ import {
   mergeExtraMcp,
   attachReasoningEffort,
   applyPromptTokenLimits,
-  syncSandboxMemberAdd,
   storeSecret,
   secretStoreFromClient,
   deleteSecret,
@@ -152,11 +151,6 @@ function fakeBox(over: Partial<SandboxInstance> = {}): SandboxInstance {
     stop: vi.fn().mockResolvedValue(undefined),
     resume: vi.fn().mockResolvedValue(undefined),
     streamPrompt: vi.fn(),
-    permissions: {
-      add: vi.fn().mockResolvedValue(undefined),
-      update: vi.fn().mockResolvedValue(undefined),
-      remove: vi.fn().mockResolvedValue(undefined),
-    },
     ...over,
   } as unknown as SandboxInstance
 }
@@ -2060,30 +2054,6 @@ describe('pure seam helpers', () => {
 
   it('resolveModel allowKeylessModel without explicit providerName stays undefined', () => {
     expect(resolveModel({ modelName: 'm', allowKeylessModel: true })).toBeUndefined()
-  })
-})
-
-describe('member sync typed outcomes', () => {
-  it('returns succeeded:true on add', async () => {
-    const box = fakeBox()
-    const seam = { roleToSandboxRole: () => 'developer' as const }
-    const r = await syncSandboxMemberAdd(box, seam, 'u1', 'editor')
-    expect(r.succeeded).toBe(true)
-    expect(box.permissions.add).toHaveBeenCalledWith({ userId: 'u1', role: 'developer' })
-  })
-
-  it('returns succeeded:false with the error when the SDK throws (no swallow)', async () => {
-    const box = fakeBox({
-      permissions: {
-        add: vi.fn().mockRejectedValue(new Error('perm down')),
-        update: vi.fn(),
-        remove: vi.fn(),
-      } as unknown as SandboxInstance['permissions'],
-    })
-    const seam = { roleToSandboxRole: () => 'developer' as const }
-    const r = await syncSandboxMemberAdd(box, seam, 'u1', 'editor')
-    expect(r.succeeded).toBe(false)
-    if (!r.succeeded) expect(r.error.message).toBe('perm down')
   })
 })
 

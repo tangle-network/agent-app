@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.60.257
+
+- chore(deps): accept sandbox 0.64 and agent-runtime 0.342; member sync fails by name (#1234)
+
+## 0.60.256
+
+- fix(rollout): a hold refuses only a breach measured since the value changed (#1231)
+
 ## 0.60.255
 
 - fix(chat-routes): keep dispatchProducerFirst private to dispatch-first (#1236)
