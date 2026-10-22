@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 
-import { FlowWaterfall } from '../../web-react'
+import { FlowWaterfall } from '../../web-react/flow-waterfall'
 import { failedFlowTrace, posterFlowTrace } from './fixtures'
 import { discoveryWaterfallTrace } from './discovery-waterfall-fixture'
 import type { FlowTrace } from '../../trace'
@@ -84,9 +84,9 @@ export const DiscoveryStreamingReplay: Story = { render: () => <StreamingReplay 
 
 /** A stalled producer still has a growing running span between snapshots. */
 export const GrowingLiveTrace: Story = {
-  args: { trace: { spans: [{ id: 'root', kind: 'pipeline', name: 'Orchestrator', startMs: 0, endMs: 1000, status: 'running' },
-    { id: 'tool', parentId: 'root', kind: 'tool', name: 'Waiting for tool result', startMs: 500, endMs: 1000, status: 'running' }],
-    totalMs: 1000, promptTokens: 0, completionTokens: 0, toolCalls: 1 }, live: true },
+  args: { trace: { spans: [{ id: 'root', kind: 'pipeline', name: 'Orchestrator', startMs: 0, endMs: 60000, status: 'running' },
+    { id: 'tool', parentId: 'root', kind: 'tool', name: 'Waiting for tool result', startMs: 500, endMs: 60000, status: 'running' }],
+    totalMs: 60000, promptTokens: 0, completionTokens: 0, toolCalls: 1 }, live: true },
 }
 
 export const EmptyFlowTrace: Story = { args: { trace: { spans: [], totalMs: 0, promptTokens: 0, completionTokens: 0, toolCalls: 0 } } }
