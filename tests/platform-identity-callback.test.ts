@@ -20,8 +20,11 @@ function harness(overrides: {
   setSessionCookie?: () => Promise<readonly string[]>
   saveTangleLink?: TangleIdentitySsoAccountStore['saveTangleLink']
   deleteSession?: TangleIdentitySsoAccountStore['deleteSession']
+  upsertUserByEmail?: () => Promise<never>
+  createSession?: () => Promise<never>
 } = {}) {
   const calls: string[] = []
+  const logs: Array<{ message: string; detail: unknown }> = []
   const sessions = new Set<string>()
   const links = new Set<string>()
   const auth: TangleIdentitySsoAuthClient = {
@@ -43,10 +46,12 @@ function harness(overrides: {
     },
     upsertUserByEmail: async () => {
       calls.push('upsert-user')
+      if (overrides.upsertUserByEmail) await overrides.upsertUserByEmail()
       return { userId: 'local-user' }
     },
     createSession: async () => {
       calls.push('create-session')
+      if (overrides.createSession) await overrides.createSession()
       sessions.add('local-session')
       return { token: 'local-session' }
     },
@@ -69,9 +74,9 @@ function harness(overrides: {
       calls.push('mint-cookie')
       return ['local_session=local-session; Path=/; HttpOnly']
     }),
-    log: () => {},
+    log: (message, detail) => { logs.push({ message, detail }) },
   })
-  return { handlers, calls, sessions, links }
+  return { handlers, calls, sessions, links, logs }
 }
 
 async function callback(handlers: ReturnType<typeof createTangleSsoHandlers>) {
@@ -118,6 +123,23 @@ describe('identity-only SSO callback boundary', () => {
     expect(response.headers.get('Location')).toBe('/login?error=tangle_exchange_failed')
     expect(h.calls).toEqual(['exchange:controlled-code'])
     expect(h.sessions.size).toBe(0)
+  })
+
+  it.each([
+    ['upsert', { upsertUserByEmail: async () => { throw new Error('D1_ERROR: UNIQUE constraint failed: user.email for member@example.test') } }],
+    ['createSession', { createSession: async () => { throw new Error('D1_ERROR: database is locked') } }],
+    ['cookies', { setSessionCookie: async () => { throw new TypeError('cookie mint failed for local-session-token-abcdefghijklmnopqrstuvwxyz') } }],
+    ['saveTangleLink', { saveTangleLink: async () => { throw new Error('D1_ERROR: Network connection lost.') } }],
+  ] as const)('logs which step failed (%s) without tokens or emails', async (step, failure) => {
+    const h = harness(failure)
+    const response = await callback(h.handlers)
+    expect(response.headers.get('Location')).toBe('/login?error=tangle_session_failed')
+    const failed = h.logs.find(entry => entry.message === '[tangle-sso] local session persistence failed')
+    expect(failed?.detail).toMatchObject({ step, errorClass: step === 'cookies' ? 'TypeError' : 'Error' })
+    const logged = JSON.stringify(h.logs)
+    expect(logged).not.toContain('member@example.test')
+    expect(logged).not.toContain('local-session-token-abcdefghijklmnopqrstuvwxyz')
+    if (step !== 'cookies') expect((failed?.detail as { message: string }).message).toMatch(/^D1_ERROR: /)
   })
 
   it('removes an unpublished session if cookie minting fails', async () => {
