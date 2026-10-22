@@ -33,12 +33,15 @@ Keep data that must never leave your systems out of the operations' result colum
 5. Start it behind HTTPS:
 
 ```sh
-docker build -t customer-db-gateway .
+docker build --pull -t customer-db-gateway .
 docker run -d -p 8787:8787 \
   -e DATABASE_URL='postgres://tangle_agent:...@db:5432/app' \
   -e GATEWAY_OPERATIONS=/cfg/operations.json -e GATEWAY_TOKENS=/cfg/tokens.txt \
   -v "$PWD/cfg:/cfg:ro" customer-db-gateway
 ```
+
+For updates, rebuild from the current Dockerfile and roll out that image through your deployment process.
+Record the deployed image digest and `docker exec <gateway-container> node --version` from the running gateway.
 
 Set `TRUST_PROXY=1` only behind a proxy that sets `X-Forwarded-For`, so the audit records the caller's address.
 Optional limits: `GATEWAY_MAX_ROWS` (default 200) and `GATEWAY_STATEMENT_TIMEOUT_MS` (default 5000).
