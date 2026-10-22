@@ -1,4 +1,5 @@
 import type { KeyCrypto } from '../billing'
+import { assertWorkspaceKeyCryptoUsable } from '../billing/crypto-probe'
 import { sha256Hex } from '../crypto/digest'
 import type { DelegatedKeyOutcome, DelegatedKeyRequest, PlatformDelegatedKeyClient } from './delegated-keys'
 
@@ -61,7 +62,8 @@ export interface DelegatedTurnKey {
 
 export type DelegatedTurnKeyEvent =
   | { type: 'claimed' | 'missed' | 'parked' | 'park_kept'; slot: string }
-  | { type: 'park_failed'; slot: string; code: string }
+  /** `keyId` names a child minted but not parked (retired best effort); never its key. */
+  | { type: 'park_failed'; slot: string; code: string; keyId?: string }
 
 export interface DelegatedTurnKeysOptions {
   client: PlatformDelegatedKeyClient
@@ -166,6 +168,13 @@ RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, await scopeDig
       emit({ type: 'park_failed', slot: input.slot, code: 'premint_store_failed' })
       return false
     }
+    // The at-rest key is proven before Platform mints, so a crypto fault never orphans a billable child.
+    try {
+      await assertWorkspaceKeyCryptoUsable(options.crypto)
+    } catch {
+      emit({ type: 'park_failed', slot: input.slot, code: 'premint_crypto_unusable' })
+      return false
+    }
     const minted = await mint({ ...input, turnId: crypto.randomUUID() }, true)
     if (!minted.succeeded) {
       emit({ type: 'park_failed', slot: input.slot, code: minted.error.code })
@@ -181,7 +190,7 @@ RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, await scopeDig
 VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(slot) DO NOTHING RETURNING slot`)
         .bind(input.slot, scope, minted.value.turnId, minted.value.id, encrypted, minted.value.expiresAt.getTime()).first()
       if (!stored) {
-        // A racing park filled the slot first; this key would be a second unused one.
+        // No row came back (a racing park filled the slot first): nothing will hand this key out.
         await retire(input, minted.value.id)
         emit({ type: 'park_kept', slot: input.slot })
         return true
@@ -191,7 +200,7 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(slot) DO NOTHING RETURNING slot`)
     } catch {
       // The minted child never reached the slot, so nothing will hand it out: retire it now (best effort).
       await retire(input, minted.value.id)
-      emit({ type: 'park_failed', slot: input.slot, code: 'premint_store_failed' })
+      emit({ type: 'park_failed', slot: input.slot, code: 'premint_store_failed', keyId: minted.value.id })
       return false
     }
   }
@@ -213,21 +222,28 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(slot) DO NOTHING RETURNING slot`)
   }
 }
 
-/** Router's refusal of a key Platform revoked or let expire: 401 `invalid_key` naming the reason (lib/key-refusal.ts).
- *  Anything else, a bare `invalid_key` (a spent key verifies as invalid without a reason), a 402
- *  `key_budget_exhausted` or a 403, is the turn's answer: a second mint would give the turn a second cap. */
-async function revokedOrExpired(response: Response): Promise<boolean> {
+/** 401 codes that mean Platform no longer honours the key itself (tangle-router lib/key-refusal.ts and
+ *  app/api/chat/auth-admission.ts): `invalid_key` naming `key_revoked`/`key_expired`, and the codes reviewers named. */
+const REFUSED_KEY_CODES = new Set(['key_revoked', 'key_expired', 'invalid_api_key', 'invalid_key_contract'])
+
+/** Whether the Router refused the key as revoked, expired or invalid. Only a 401 counts: Router's 403s
+ *  (email verification, product scope, routing rules) are not revocation, a 402 `key_budget_exhausted` is the
+ *  turn's own cap, and a bare `invalid_key` can be a spent key; re-minting for any of those would give the turn
+ *  a second cap. */
+async function refusedKey(response: Response): Promise<boolean> {
   if (response.status !== 401) return false
   const body = await response.clone().json().catch(() => null) as { error?: { code?: unknown; reason?: unknown } } | null
-  return body?.error?.code === 'invalid_key' && (body.error.reason === 'key_revoked' || body.error.reason === 'key_expired')
+  const code = body?.error?.code
+  return typeof code === 'string' && (REFUSED_KEY_CODES.has(code) ||
+    (code === 'invalid_key' && (body?.error?.reason === 'key_revoked' || body?.error?.reason === 'key_expired')))
 }
 
 /**
- * A fetch for one turn that sends a pre-minted key and, when the Router refuses it as revoked or expired (Platform
- * retired the parked child), mints inline once and resends that request with the fresh key. Every later request,
- * and every request that was waiting on the same refusal, carries the fresh key; the parked key is not sent again.
- * A stream body is buffered first so the refused request can be resent. Requests whose `init.headers` carry another
- * credential, and keys minted inline, pass through. Make one per turn: the re-mint it shares belongs to that turn.
+ * A fetch for one turn that sends a pre-minted key. When the Router refuses the turn's FIRST request with it as
+ * revoked, expired or invalid (Platform retired the parked child), it mints inline once and resends that request
+ * with the fresh key; later requests carry the fresh key. Any other refusal, and any refusal later in the turn, is
+ * the turn's answer. A stream body on the first request is buffered so it can be resent. Requests whose
+ * `init.headers` carry another credential, and keys minted inline, pass through. Make one per turn.
  */
 export function delegatedKeyFallbackFetch(input: {
   key: DelegatedTurnKey
@@ -238,28 +254,27 @@ export function delegatedKeyFallbackFetch(input: {
   const base = input.fetch ?? fetch
   if (!input.key.preminted) return base
   const parked = `Bearer ${input.key.key}`
-  // This turn's one re-mint, shared by this turn's own requests only (the closure is per turn).
-  let replacement: Promise<string | null> | undefined
-  const remint = () => replacement ??= input.remint().then((fresh) => {
-    if (!fresh.succeeded) return null
-    input.onReplaced?.(fresh.value)
-    return `Bearer ${fresh.value.key}`
-  }, () => null)
+  let first = true
+  let fresh: string | undefined
   return async (resource, init) => {
     const headers = new Headers(init?.headers)
     if (headers.get('authorization') !== parked) return base(resource, init)
-    const body = init?.body instanceof ReadableStream ? await new Response(init.body).arrayBuffer() : init?.body
-    const send = (bearer: string) => {
-      headers.set('authorization', bearer)
-      return base(resource, { ...init, headers, ...(body !== undefined ? { body } : {}) })
+    if (fresh) {
+      headers.set('authorization', fresh)
+      return base(resource, { ...init, headers })
     }
-    const fresh = replacement ? await replacement : null
-    if (fresh) return send(fresh)
-    const response = await send(parked)
-    if (!(await revokedOrExpired(response))) return response
-    const next = await remint()
-    if (!next) return response
+    if (!first) return base(resource, init)
+    first = false
+    const body = init?.body instanceof ReadableStream ? await new Response(init.body).arrayBuffer() : init?.body
+    const send = () => base(resource, { ...init, headers, ...(body !== undefined ? { body } : {}) })
+    const response = await send()
+    if (!(await refusedKey(response))) return response
+    const reminted = await input.remint()
+    if (!reminted.succeeded) return response
     await response.body?.cancel().catch(() => {})
-    return send(next)
+    fresh = `Bearer ${reminted.value.key}`
+    headers.set('authorization', fresh)
+    input.onReplaced?.(reminted.value)
+    return send()
   }
 }
