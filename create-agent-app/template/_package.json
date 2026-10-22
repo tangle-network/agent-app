@@ -24,15 +24,15 @@
     "@tangle-network/agent-eval": "0.218.1",
     "@tangle-network/agent-integrations": "0.75.4",
     "@tangle-network/agent-interface": "5.7.0",
-    "@tangle-network/agent-runtime": "0.343.2"
+    "@tangle-network/agent-runtime": "0.343.3"
   },
   "devDependencies": {
     "@tangle-network/agent-eval": "0.218.1",
     "@tangle-network/agent-integrations": "0.75.4",
     "@tangle-network/agent-interface": "5.7.0",
     "@tangle-network/agent-knowledge": "22.0.12",
-    "@tangle-network/agent-runtime": "0.343.2",
-    "@tangle-network/sandbox": "0.64.3",
+    "@tangle-network/agent-runtime": "0.343.3",
+    "@tangle-network/sandbox": "0.64.6",
     "@types/node": "^22.20.1",
     "typescript": "^7.0.2",
     "viem": "^2.0.0",
