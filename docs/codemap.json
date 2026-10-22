@@ -13603,7 +13603,7 @@
           "name": "delegatedKeyFallbackFetch",
           "kind": "function",
           "signature": "(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: Request…",
-          "doc": "A fetch for one turn that sends a pre-minted key and, when the Router answers 401 or 403 to it (Platform revoked the parked child), mints inline once and resends that request with the fresh key; late…"
+          "doc": "A fetch for one turn that sends a pre-minted key and, when the Router refuses it as revoked or expired (Platform retired the parked child), mints inline once and resends that request with the fresh k…"
         },
         {
           "name": "DelegatedKeyMissingError",
