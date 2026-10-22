@@ -1672,26 +1672,26 @@ interface StreamSandboxPromptOptions
 
 ### `syncSandboxMemberAdd`
 
-`function` — Resolve adding a user with a specific role to a sandbox and return the operation outcome
+`function` — Always fails with {@link SandboxMemberPermissionsUnsupportedError}; see its note.
 
 ```ts
-(box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>
+(_box: SandboxInstance, _seam: MemberSyncSeam, _userId: string, _role: string) => Promise<Outcome<void>>
 ```
 
 ### `syncSandboxMemberRemove`
 
-`function` — Remove a member from the sandbox while preserving their home directory and handle the outcome
+`function` — Always fails with {@link SandboxMemberPermissionsUnsupportedError}; see its note.
 
 ```ts
-(box: SandboxInstance, userId: string) => Promise<Outcome<void>>
+(_box: SandboxInstance, _userId: string) => Promise<Outcome<void>>
 ```
 
 ### `syncSandboxMemberRole`
 
-`function` — Synchronize a sandbox member's role by updating permissions based on the provided role mapping
+`function` — Always fails with {@link SandboxMemberPermissionsUnsupportedError}; see its note.
 
 ```ts
-(box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>
+(_box: SandboxInstance, _seam: MemberSyncSeam, _userId: string, _role: string) => Promise<Outcome<void>>
 ```
 
 ### `TerminalConnectionBoxLike`
