@@ -74,7 +74,7 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
   const compareForms = useRef(new Map<string, ReviewFeedbackFormHandle>())
   for (const item of items) {
     cache.current.set(item.id, item)
-    if (!comparisons.current.has(item.id)) comparisons.current.set(item.id, item.compare)
+    if (!comparisons.current.has(item.id)) comparisons.current.set(item.id, item.compare ? { ...item.compare } : undefined)
   }
   const currentItems = new Map(items.map(item => [item.id, item]))
   // Confirmed source changes affect this render's navigation, before effects retain the snapshot.
@@ -105,7 +105,7 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
   useEffect(() => {
     if (loading || (!restart && (round.length > 0 || items.length === 0))) return
     const next = ordered(items).map(item => item.id)
-    comparisons.current = new Map(items.map(item => [item.id, item.compare]))
+    comparisons.current = new Map(items.map(item => [item.id, item.compare ? { ...item.compare } : undefined]))
     setRound(next); setActiveId(initialSelectedId && next.includes(initialSelectedId) ? initialSelectedId : next[0] ?? null)
     setAnswered(new Set()); setResolvedElsewhere(new Set()); setRestart(false)
   }, [items, loading, restart, round.length, initialSelectedId])
@@ -131,10 +131,10 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
   }
 
   async function verdict(item: ReviewInboxItem, value: ReviewInboxFeedback) {
-    if (pending.current || !item.canReview || !currentItems.has(item.id) || (item.compare && !compareValid)) return
+    if (pending.current || !item.canReview || !currentItems.has(item.id) || (comparisons.current.get(item.id) && !compareValid)) return
     pending.current = true; setBusy(true)
     try {
-      await onVerdict(item, { ...value, ...(item.compare ? { comparison: positionOf(item) } : {}) })
+      await onVerdict(item, { ...value, ...(comparisons.current.get(item.id) ? { comparison: positionOf(item) } : {}) })
       const nextAnswered = new Set(answered).add(revisionKey(item))
       setAnswered(nextAnswered)
       const remaining = round.filter(id => {
@@ -147,9 +147,9 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
   }
 
   async function feedback(item: ReviewInboxItem, value: Omit<ReviewInboxFeedback, 'verdict'>) {
-    if (!onFeedback || pending.current || !item.canReview || !currentItems.has(item.id) || (item.compare && !compareValid)) return
+    if (!onFeedback || pending.current || !item.canReview || !currentItems.has(item.id) || (comparisons.current.get(item.id) && !compareValid)) return
     pending.current = true; setBusy(true)
-    try { await onFeedback(item, { ...value, ...(item.compare ? { comparison: positionOf(item) } : {}) }) }
+    try { await onFeedback(item, { ...value, ...(comparisons.current.get(item.id) ? { comparison: positionOf(item) } : {}) }) }
     finally { pending.current = false; setBusy(false) }
   }
 
