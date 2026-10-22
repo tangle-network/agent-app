@@ -8,8 +8,9 @@ import {
   type BufferedTurnTap,
   type PersistedChatMessageForTurn,
 } from '../stream/index'
-import type { TurnTraceSink, TurnTraceSnapshot } from '../turn-trace/recorder'
+import type { TurnTraceSink, TurnTraceSnapshot, TurnTraceSummary } from '../turn-trace/recorder'
 import { otlpTraceId } from '../turn-trace/otel'
+import { noteMeasuredTurnFacts } from '../turn-trace/turn-facts'
 import {
   assistantRowIdForTurn,
   createAssistantDraftWriter,
@@ -71,6 +72,19 @@ function modelAttributionFields(attribution: ChatTurnModelAttribution | undefine
 }
 
 /** Bind the route's construction-time dependencies; each invocation retains its own turn state. */
+/** The lifecycle's timing for a settled turn, noted for the rollout timing store so it can fill a product row that
+ *  omits it (rollout/d1 `record`). */
+function settledTurnTiming(turnStreamId: string, at: { requestAt: number; startedAt: number; firstVisibleAt?: number;
+  firstTextAt?: number; model?: string }, trace: TurnTraceSummary) {
+  const measured = {
+    admissionMs: at.startedAt - at.requestAt,
+    ...(at.firstVisibleAt === undefined ? {} : { firstVisibleMs: at.firstVisibleAt - at.startedAt }),
+    ...(at.firstTextAt === undefined ? {} : { firstTextMs: at.firstTextAt - at.startedAt }),
+  }
+  noteMeasuredTurnFacts(turnStreamId, { ...measured, ...(at.model ? { model: at.model } : {}) })
+  return { ...measured, trace }
+}
+
 export function createAdmittedTurnRunner<TContext>({
   options, draftStore, draftTuning, progressMessages, traceOptions, traceSink, startIntentLine, log,
 }: TurnExecutionOptions<TContext>) {
@@ -348,12 +362,8 @@ export function createAdmittedTurnRunner<TContext>({
       const snapshot = endTrace(failed, terminalError)
       const lifecycle = options.lifecycle
       const durationMs = Date.now() - turnStartedAtMs
-      const timing = {
-        admissionMs: turnStartedAtMs - trace.startedAt,
-        ...(firstVisibleAtMs === undefined ? {} : { firstVisibleMs: firstVisibleAtMs - turnStartedAtMs }),
-        ...(firstTextAtMs === undefined ? {} : { firstTextMs: firstTextAtMs - turnStartedAtMs }),
-        trace: snapshot.summary,
-      }
+      const timing = settledTurnTiming(turnStreamId, { requestAt: trace.startedAt, startedAt: turnStartedAtMs,
+        firstVisibleAt: firstVisibleAtMs, firstTextAt: firstTextAtMs, model: producer?.model }, snapshot.summary)
       try {
         if (!lifecycle) {
           // No hooks to run; the trace still goes to its sink below.
