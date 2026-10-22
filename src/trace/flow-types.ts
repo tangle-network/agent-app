@@ -6,7 +6,12 @@
  */
 
 export interface FlowSpan {
-  kind: 'pipeline' | 'model' | 'tool'
+  kind: 'pipeline' | 'model' | 'tool' | 'waiting' | 'handoff'
+  /** Stable identity and parent identity for nested, incrementally updated traces. */
+  id?: string
+  parentId?: string
+  /** Running spans extend from endMs to the viewer's observation time. */
+  status?: 'running' | 'done' | 'failed'
   name: string
   startMs: number
   endMs: number
@@ -23,4 +28,7 @@ export interface FlowTrace {
   /** Computed when per-token pricing is supplied. */
   costUsd?: number
   toolCalls: number
+  /** Authoritative LLM request count when supplied; absent means unknown. */
+  modelCalls?: number
+  errors?: number
 }

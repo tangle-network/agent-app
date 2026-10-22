@@ -7,6 +7,7 @@ export default defineConfig({
     'web/entry-server': 'src/web/entry-server.tsx',
     'media/drizzle': 'src/media/drizzle.ts',
     'media/index': 'src/media/index.ts',
+    'web-react/flow-waterfall': 'src/web-react/flow-waterfall.tsx',
     'web-react/document': 'src/web-react/document.tsx',
     'theme/dom': 'src/theme/dom.ts',
     'eval/research-plan': 'src/eval/research-plan.ts',
@@ -181,5 +182,5 @@ export default defineConfig({
   external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tiptap/core', '@tiptap/extension-mention', '@tiptap/react', '@tiptap/starter-kit', '@tiptap/suggestion', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-profile-materialize', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers', '@tangle-network/sandbox-ui', '@tangle-network/sandbox-ui/*', '@tangle-network/ui', '@tangle-network/ui/*', 'lucide-react', 'react-router', '@radix-ui/react-dialog', 'resend', 'better-auth', 'better-auth/*', 'pdf-lib', '@firecrawl/pdf-inspector-wasm'],
   // tokens.css is shipped raw (the ./styles subpath); copy it next to the
   // built theme entries so `import '@tangle-network/agent-app/styles'` resolves.
-  onSuccess: 'node src/theme/build.mjs --dist && cp src/studio-react/studio.css dist/studio-react/studio.css && cp src/hosted-agent/react/lines.css dist/hosted-agent/react/lines.css && cp src/chatgpt-react/styles.css dist/chatgpt-react/styles.css',
+  onSuccess: 'node src/theme/build.mjs --dist && cp src/studio-react/studio.css dist/studio-react/studio.css && cp src/hosted-agent/react/lines.css dist/hosted-agent/react/lines.css && cp src/chatgpt-react/styles.css dist/chatgpt-react/styles.css && cp src/web-react/flow-waterfall.css dist/web-react/flow-waterfall.css',
 })
