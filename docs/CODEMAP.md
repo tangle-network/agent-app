@@ -17,7 +17,7 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./agent-surfaces/cli`](api/agent-surfaces-cli.md) | 0 | — |
 | [`./alerting`](api/alerting.md) | 8 | — |
 | [`./app-auth`](api/app-auth.md) | 13 | `email`, `platform` |
-| [`./app-auth/drizzle`](api/app-auth-drizzle.md) | 5 | `email`, `platform` |
+| [`./app-auth/drizzle`](api/app-auth-drizzle.md) | 8 | `email`, `platform` |
 | [`./app-oauth`](api/app-oauth.md) | 19 | — |
 | [`./app-oauth/drizzle`](api/app-oauth-drizzle.md) | 2 | — |
 | [`./app-oauth/issuer`](api/app-oauth-issuer.md) | 10 | — |
@@ -267,11 +267,11 @@ Depends on: `email`, `platform`
 
 ## `./app-auth/drizzle`
 
-Source: `src/app-auth/drizzle.ts` · 5 exports
+Source: `src/app-auth/drizzle.ts` · 8 exports
 
 Depends on: `email`, `platform`
 
-`AppAuthSessionColumns`, `AppAuthSessionsTable`, `AppAuthTables`, `createAppAuthTables`, `CreateAppAuthTablesOptions`
+`AppAuthColumnMap`, `AppAuthSessionColumns`, `AppAuthSessionsTable`, `AppAuthTables`, `AppAuthUserColumns`, `AppAuthUsersTable`, `createAppAuthTables`, `CreateAppAuthTablesOptions`
 
 [Full API →](api/app-auth-drizzle.md)
 
