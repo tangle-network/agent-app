@@ -33,6 +33,9 @@
  */
 
 const REQUEST_TIMEOUT_MS = 10_000
+// Backoff while Platform cannot answer a delegation: 250 ms doubling to 5 s, with jitter.
+const UNAVAILABLE_BASE_DELAY_MS = 250
+const UNAVAILABLE_MAX_DELAY_MS = 5_000
 const KEY_PREFIX = 'sk-tan-'
 const AUTO_PREFIX = 'auto:'
 /** Products whose key names Platform qualifies as `auto:<service>:<product>:...` (key-provenance.ts). */
@@ -82,6 +85,14 @@ export interface DelegatedKeyRequest {
   /** Checked against the child's attribution when given: the payer's Platform user id, the source key's id, and
    *  the origin app Platform carries over from the source (an app's SSO key; a personal key has none). */
   expect?: { payerId?: string; sourceKeyId?: string; originAppId?: string | null }
+  /**
+   * Keep asking while Platform answers `delegated_key.unavailable` (no answer, 5xx, 429, busy), with jittered
+   * backoff, for at most `forMs` from the first attempt; then return that refusal. Platform's origin was unreachable
+   * for 84.8 s and 54.5 s across restarts on 2026-10-22, and each such failure ended a member's Router turn, so a
+   * turn-scoped mint passes about 90 000 here, inside its turn's budget. `signal` stops the wait early. A retried
+   * request may have reached Platform, so an extra child can exist; it carries its own budget and expiry.
+   */
+  retryUnavailable?: { forMs: number; signal?: AbortSignal }
 }
 
 export interface DelegatedKey {
@@ -262,52 +273,73 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
     }
   }
 
+  async function delegateOnce(request: DelegatedKeyRequest): Promise<DelegatedKeyOutcome<DelegatedKey>> {
+    if (!request.sourceKey.startsWith(KEY_PREFIX)) return failure(400, 'delegated_key.invalid_request', 'The source must be a linked sk-tan- key.')
+    if (request.expiresAt.getTime() <= now()) return failure(400, 'delegated_key.invalid_request', 'The expiry must be in the future.')
+    const name = canonicalDelegatedKeyName({ serviceName: options.serviceName, product: request.product, name: request.name })
+    const budget = request.budget
+    const result = await call('/v1/keys/delegate', {
+      method: 'POST', bearer: serviceToken(), service: true, body: {
+        sourceKey: request.sourceKey,
+        name,
+        product: request.product,
+        ...(request.resource ? { resourceType: request.resource.type, resourceId: request.resource.id } : {}),
+        ...(budget && 'usd' in budget ? { budgetUsd: budget.usd } : {}),
+        ...(budget && 'spendThrough' in budget ? { spendThrough: true } : {}),
+        ...(budget?.monthlyUsd !== undefined ? { monthlyBudgetUsd: budget.monthlyUsd } : {}),
+        ...(request.allowedModels ? { allowedModels: [...new Set(request.allowedModels)] } : {}),
+        ...(request.rpmLimit !== undefined ? { rpmLimit: request.rpmLimit } : {}),
+        // Omitted, Platform copies the source's scopes onto the child; a product key carries none.
+        scopes: [],
+        expiresAt: request.expiresAt.toISOString(),
+      },
+    })
+    if (!result) return { succeeded: false, error: refusal(503, null) }
+    const data = record(result.body?.data)
+    if (result.status !== 201 || result.body?.success !== true || !data) {
+      return { succeeded: false, error: refusal(result.status, record(result.body?.error)?.code) }
+    }
+    const problem = childProblem(data, request, name, options.serviceName, now())
+    if (problem) {
+      // A child Platform minted but this app cannot trust is retired, never returned.
+      const id = typeof data.id === 'string' && data.id ? data.id : null
+      const owner = request.expect?.payerId
+        ? { userId: request.expect.payerId, name, product: request.product,
+            ...(request.expect.sourceKeyId ? { sourceKeyId: request.expect.sourceKeyId } : {}) }
+        : undefined
+      const revoked = id ? await client.revoke({ sourceKey: request.sourceKey, keyId: id, ...(owner ? { slot: owner } : {}) }) : null
+      return failure(502, 'delegated_key.response_invalid', `Platform returned ${problem}.`,
+        id && !revoked?.succeeded ? { unrevokedKeyId: id } : {})
+    }
+    const attribution = record(data.attribution)!
+    return { succeeded: true, value: {
+      key: data.key as string, id: data.id as string, name, product: request.product,
+      expiresAt: new Date(attribution.expiresAt as string),
+      allowedModels: request.allowedModels ? [...new Set(request.allowedModels)] : null,
+      budgetUsd: typeof data.budgetUsd === 'number' ? data.budgetUsd : null,
+    } }
+  }
+
+  /** Wait before the next attempt, or answer false when the window or the signal says stop. */
+  async function backoff(attempt: number, deadline: number, signal: AbortSignal | undefined): Promise<boolean> {
+    const delay = Math.min(UNAVAILABLE_MAX_DELAY_MS, UNAVAILABLE_BASE_DELAY_MS * 2 ** attempt) * (0.5 + Math.random() / 2)
+    if (signal?.aborted || Date.now() + delay > deadline) return false
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, delay)
+      signal?.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
+    })
+    return !signal?.aborted
+  }
+
   const client: PlatformDelegatedKeyClient = {
     async delegate(request) {
-      if (!request.sourceKey.startsWith(KEY_PREFIX)) return failure(400, 'delegated_key.invalid_request', 'The source must be a linked sk-tan- key.')
-      if (request.expiresAt.getTime() <= now()) return failure(400, 'delegated_key.invalid_request', 'The expiry must be in the future.')
-      const name = canonicalDelegatedKeyName({ serviceName: options.serviceName, product: request.product, name: request.name })
-      const budget = request.budget
-      const result = await call('/v1/keys/delegate', {
-        method: 'POST', bearer: serviceToken(), service: true, body: {
-          sourceKey: request.sourceKey,
-          name,
-          product: request.product,
-          ...(request.resource ? { resourceType: request.resource.type, resourceId: request.resource.id } : {}),
-          ...(budget && 'usd' in budget ? { budgetUsd: budget.usd } : {}),
-          ...(budget && 'spendThrough' in budget ? { spendThrough: true } : {}),
-          ...(budget?.monthlyUsd !== undefined ? { monthlyBudgetUsd: budget.monthlyUsd } : {}),
-          ...(request.allowedModels ? { allowedModels: [...new Set(request.allowedModels)] } : {}),
-          ...(request.rpmLimit !== undefined ? { rpmLimit: request.rpmLimit } : {}),
-          // Omitted, Platform copies the source's scopes onto the child; a product key carries none.
-          scopes: [],
-          expiresAt: request.expiresAt.toISOString(),
-        },
-      })
-      if (!result) return { succeeded: false, error: refusal(503, null) }
-      const data = record(result.body?.data)
-      if (result.status !== 201 || result.body?.success !== true || !data) {
-        return { succeeded: false, error: refusal(result.status, record(result.body?.error)?.code) }
+      const retry = request.retryUnavailable
+      const deadline = Date.now() + Math.max(0, retry?.forMs ?? 0)
+      for (let attempt = 0; ; attempt++) {
+        const outcome = await delegateOnce(request)
+        if (outcome.succeeded || outcome.error.code !== 'delegated_key.unavailable' || !retry) return outcome
+        if (!(await backoff(attempt, deadline, retry.signal))) return outcome
       }
-      const problem = childProblem(data, request, name, options.serviceName, now())
-      if (problem) {
-        // A child Platform minted but this app cannot trust is retired, never returned.
-        const id = typeof data.id === 'string' && data.id ? data.id : null
-        const owner = request.expect?.payerId
-          ? { userId: request.expect.payerId, name, product: request.product,
-              ...(request.expect.sourceKeyId ? { sourceKeyId: request.expect.sourceKeyId } : {}) }
-          : undefined
-        const revoked = id ? await client.revoke({ sourceKey: request.sourceKey, keyId: id, ...(owner ? { slot: owner } : {}) }) : null
-        return failure(502, 'delegated_key.response_invalid', `Platform returned ${problem}.`,
-          id && !revoked?.succeeded ? { unrevokedKeyId: id } : {})
-      }
-      const attribution = record(data.attribution)!
-      return { succeeded: true, value: {
-        key: data.key as string, id: data.id as string, name, product: request.product,
-        expiresAt: new Date(attribution.expiresAt as string),
-        allowedModels: request.allowedModels ? [...new Set(request.allowedModels)] : null,
-        budgetUsd: typeof data.budgetUsd === 'number' ? data.budgetUsd : null,
-      } }
     },
 
     async verify({ keyId, product }) {
