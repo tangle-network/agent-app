@@ -71,7 +71,6 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
   const pending = useRef(false)
   const section = useRef<HTMLElement>(null)
   const form = useRef<ReviewFeedbackFormHandle>(null)
-  const compareForms = useRef(new Map<string, ReviewFeedbackFormHandle>())
   for (const item of items) {
     cache.current.set(item.id, item)
     if (!comparisons.current.has(item.id)) comparisons.current.set(item.id, item.compare ? { ...item.compare } : undefined)
@@ -171,9 +170,9 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
       const key = event.key.toLowerCase()
       if (key === 'j') { event.preventDefault(); navigate(1) }
       else if (key === 'k') { event.preventDefault(); navigate(-1) }
-      else if (active && canReview && key === 's') { event.preventDefault(); (compare ? compareForms.current.get(active.id) : form.current)?.focusScore() }
-      else if (active && canReview && (key === 'a' || key === 'r')) {
-        event.preventDefault(); void (compare ? compareForms.current.get(active.id) : form.current)?.submitVerdict(key === 'a' ? 'approve' : 'request_changes')
+      else if (!compare && active && canReview && key === 's') { event.preventDefault(); form.current?.focusScore() }
+      else if (!compare && active && canReview && (key === 'a' || key === 'r')) {
+        event.preventDefault(); void form.current?.submitVerdict(key === 'a' ? 'approve' : 'request_changes')
       }
     }
     window.addEventListener('keydown', shortcut)
@@ -204,8 +203,9 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
               data-review-compare-position={index} onFocusCapture={() => { if (!done && present) setActiveId(item.id) }}>
               <h3 className="text-lg font-semibold">Draft {index + 1}</h3>
               <div className="min-w-0" data-review-content>{renderItem(item)}</div>
+              {present && !done && !item.canReview && <p className="text-sm text-muted-foreground">You do not have permission to review this item.</p>}
               {done ? <p role="status">Review saved</p> : !present ? <p role="status">This draft is no longer waiting.</p> : <ReviewFeedbackForm
-                key={key} ref={handle => { if (handle) compareForms.current.set(item.id, handle); else compareForms.current.delete(item.id) }}
+                key={key}
                 draftKey={key} drafts={drafts.current} input={item.input} feedback={item.feedback}
                 disabled={!compareValid || !item.canReview || busy || loading} approveLabel={item.approveLabel} allowedVerdicts={item.allowedVerdicts}
                 onVerdict={(decision, value) => verdict(item, { verdict: decision, ...value })}
@@ -221,7 +221,7 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
         onVerdict={(decision, value) => verdict(active, { verdict: decision, ...value })}
         onFeedback={onFeedback ? (value) => feedback(active, value) : undefined} />
       </>}
-      <p className="text-xs leading-5 text-muted-foreground">A approve · R request changes · S score · J/K next/previous · Esc leave a field. Shortcuts pause while typing.</p>
+      {!compare && <p className="text-xs leading-5 text-muted-foreground">A approve · R request changes · S score · J/K next/previous · Esc leave a field. Shortcuts pause while typing.</p>}
     </>}
   </section>
 }

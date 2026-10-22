@@ -176,6 +176,24 @@ async function proveComparison(origin) {
       for (let index = 0; index < 5; index++) await expect(draft(page, index).getByRole('button', { name: 'Approve', exact: true })).toBeEnabled()
     }
   })
+  await check('compare shortcuts cannot submit an unseen draft and missing permission is explained', async () => {
+    const first = draft(page, 0)
+    const scoreField = first.getByLabel('Score (0–100)', { exact: true })
+    await scoreField.fill('80')
+    await first.getByLabel('Comment', { exact: true }).fill('This draft has not been approved.')
+    await page.locator('[data-review-inbox]').focus()
+    await page.keyboard.press('a'); await page.keyboard.press('r'); await page.keyboard.press('s')
+    await expect(page.locator('[data-review-inbox]')).toBeFocused()
+    assert.equal(verdictRequests, 0); assert.equal(count('signals'), 0)
+    await scoreField.fill(''); await first.getByLabel('Comment', { exact: true }).fill('')
+    const item = fixtures.find(item => item.id === order[0])
+    replace({ ...item, canReview: false })
+    await expect(first.getByText('You do not have permission to review this item.', { exact: true })).toBeVisible()
+    await expect(first.getByRole('button', { name: 'Approve', exact: true })).toBeDisabled()
+    replace(item)
+    await expect(first.getByRole('button', { name: 'Approve', exact: true })).toBeEnabled()
+    await expect(first.getByText('You do not have permission to review this item.', { exact: true })).toHaveCount(0)
+  })
   await check('390px comparison stacks every PNG with a 16px gutter and no horizontal overflow', async () => {
     phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
       recordVideo: { dir: output, size: { width: 390, height: 844 } } })

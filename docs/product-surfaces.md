@@ -45,6 +45,8 @@ stack at phone widths. `renderCompareBrief(rowId)` renders the brief once;
 source/profile/model identities. Redacting the header alone cannot make host content blind.
 
 The existing score, comment, authority and verdict controls apply to every cell.
+In compare mode A/R/S shortcuts are disabled; use the controls inside the chosen
+card so a hidden active selection cannot submit a different draft.
 `onVerdict` and `onFeedback` receive `comparison: { rowId, seed, position, itemIds }`;
 position is zero-based in the frozen display order. Store that metadata atomically
 with the feedback and verdict, and validate membership against the server's retained
