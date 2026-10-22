@@ -79,7 +79,7 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
   // Confirmed source changes affect this render's navigation, before effects retain the snapshot.
   const missing = loading || error || busy || refreshing ? resolvedElsewhere : new Set(round.filter(id => !currentItems.has(id)))
   const savedComparisonVerdict = (item: ReviewInboxItem) => !!comparisons.current.get(item.id)
-    && ['approve', 'reject', 'request_changes'].includes(item.feedback?.verdict ?? '')
+    && item.feedback?.verdict !== undefined
   const isAnswered = (item: ReviewInboxItem) => answered.has(revisionKey(item)) || savedComparisonVerdict(item)
   const unanswered = round.filter(id => {
     const item = cache.current.get(id)
