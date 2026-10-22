@@ -26,6 +26,8 @@ type Case = {
   error?: string
   interruptReason?: string
   omitReplayError?: boolean
+  omitInterruptReason?: boolean
+  sessionFailureReason?: string
   userStop?: boolean
   resultId?: string
   ledgerSessionId?: string
@@ -55,7 +57,8 @@ async function boundary(test: Case) {
       filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
     })
     const path = url.pathname.replace('/v1/sandboxes/fixture-box/runtime', '')
-    if (path === `/agents/sessions/${sessionId}`) return json({ id: sessionId, status, latestExecutionId: 'unrelated-later-turn' })
+    if (path === `/agents/sessions/${sessionId}`) return json({ id: sessionId, status, latestExecutionId: 'unrelated-later-turn',
+      ...(test.sessionFailureReason ? { failureReason: { message: test.sessionFailureReason } } : {}) })
     if (path === `/agents/sessions/${sessionId}/runs`) return json({ success: true, executions: [{
       executionId: turnId, sessionId: test.ledgerSessionId ?? sessionId, status,
       startedAt: 1, completedAt: 2, eventCount: test.eventCount ?? 6,
@@ -66,7 +69,7 @@ async function boundary(test: Case) {
       const count = test.assistant === 'ambiguous' ? 2 : test.assistant ? 1 : 0
       return json(Array.from({ length: count }, (_, index) => ({
         info: { id: `assistant-${index}`, role: 'assistant', timestamp: new Date().toISOString(),
-          metadata: { turnId, ...(test.assistant === 'unmarked' ? {} : { interrupted: true }), interruptReason: test.interruptReason ?? 'Interrupted' } },
+          metadata: { turnId, ...(test.assistant === 'unmarked' ? {} : { interrupted: true }), ...(test.omitInterruptReason ? {} : { interruptReason: test.interruptReason ?? 'Interrupted' }) } },
         parts: [
           { type: 'text', text: 'Exact partial answer.' },
           { type: 'tool', id: 'tool-1', tool: 'write', state: { status: 'completed', input: { path: 'draft.md' }, output: { ok: true } } },
@@ -231,6 +234,9 @@ describe('native terminal replay reaches the authorized public boundary', () => 
     { name: 'canonical user-stop prefix and newline stay generic', status: 'cancelled', error: 'fixture-private-value\nExecution cancelled by the user', publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
     { name: 'canonical user-stop result with mismatched execution stays unfinalized', status: 'cancelled', resultId: 'foreign-turn', error: 'Execution cancelled by the user', expected: 'running' },
     { name: 'canonical user-stop metadata suffix without replay stays generic', status: 'cancelled', assistant: 'one', interruptReason: 'Execution cancelled by the user\n/private/runtime/path token=fixture-private-value', eventCount: 40_000, publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
+    { name: 'canonical user-stop in unbound global session failure stays generic', status: 'cancelled', assistant: 'one', omitInterruptReason: true, sessionFailureReason: 'Execution cancelled by the user', eventCount: 40_000, publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
+    { name: 'canonical user-stop in foreign partial replay stays generic', status: 'cancelled', assistant: 'one', resultId: 'foreign-turn', error: 'Execution cancelled by the user', publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
+    { name: 'canonical user-stop metadata remains authoritative over foreign replay', status: 'cancelled', assistant: 'one', interruptReason: 'Execution cancelled by the user', resultId: 'foreign-turn', error: 'Execution cancelled by the user', publicCause: 'Execution cancelled by the user', userStop: true, expected: 'failed' },
     { name: 'unknown credentials and paths remain opaque without stderr', error: 'Refused /private/runtime/path; token=fixture-private-value', publicCause: 'Native Sandbox execution failed before producing an answer.', expected: 'failed' },
     { name: 'unknown credentials and paths remain opaque with stderr', error: '/private/runtime/path token=fixture-private-value; stderr: secret diagnostics', publicCause: 'Native Sandbox execution failed before producing an answer.', expected: 'failed' },
     { name: 'recognized bootstrap startup reports a fixed safe cause', error: 'MCP runtime bootstrap failed: /private/runtime/path token=fixture-private-value', publicCause: 'The Sandbox could not start the agent runtime.', expected: 'failed' },
