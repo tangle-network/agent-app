@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.264
+
+- feat(router-turn): a test fails when the stable prompt prefix carries per-turn bytes (#1240)
+
 ## 0.60.263
 
 - feat(rollout): turn timing rows carry first visible, admission and the served model by default (#1239)

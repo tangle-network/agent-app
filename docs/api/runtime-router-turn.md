@@ -4,7 +4,7 @@
 
 Source: `src/runtime/router-turn.ts`
 
-29 exports.
+30 exports.
 
 ### `asksForLanguage`
 
@@ -52,6 +52,14 @@ interface CheckpointWorkspaceStore
 
 ```ts
 number
+```
+
+### `perTurnPrefixBytes`
+
+`function` — The per-turn bytes in a prompt prefix: a clock to the minute, and any of this turn's `context` sections (or the caller's own per-turn values: ids, the member's message) that also appear there.
+
+```ts
+(prefix: string, perTurn?: readonly string[]) => string[]
 ```
 
 ### `placeRouterTurn`
