@@ -221,8 +221,8 @@ function isCanonicalUserStop(error: unknown): boolean {
 }
 
 /** A terminal receipt is public; runtime stderr stays in the native record. */
-function terminalFailureMessage(error: string, userCancelled: boolean): string {
-  if (userCancelled) return 'Execution cancelled by the user'
+function terminalFailureMessage(error: string, provenUserStop: boolean): string {
+  if (provenUserStop) return 'Execution cancelled by the user'
   if (/\bENOSPC\b|no space left on device/i.test(error)) {
     return 'The Sandbox ran out of disk space before the execution finished.'
   }
@@ -470,7 +470,7 @@ export async function observeNativeCompletion(
       const result = replayableExecution(run)
         ? await exactSession.result({ executionId: turnId }) as unknown as Record<string, unknown>
         : undefined
-      const userCancelled = run.status === 'cancelled'
+      const provenUserStop = run.status === 'cancelled'
         && (isCanonicalUserStop(interrupted[0]!.metadata?.interruptReason)
           || isCanonicalUserStop(exactFailedResult(result, turnId, options.sessionId)?.error))
       recovered.push({
@@ -484,7 +484,7 @@ export async function observeNativeCompletion(
           ?? interrupted[0]!.metadata?.interruptReason
           ?? (restarted ? RUNTIME_RESTARTED_ERROR : undefined)
           ?? status.failureReason?.message
-          ?? 'Native Sandbox execution failed.', userCancelled),
+          ?? 'Native Sandbox execution failed.', provenUserStop),
       })
       continue
     }
