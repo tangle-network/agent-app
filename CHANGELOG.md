@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.252
+
+- feat(app-auth): user columns and index options for createAppAuthTables (#1230)
+
 ## 0.60.251
 
 - feat: one shared app platform for the agent apps (vault, auth, OAuth, spend, media, plans, eval, shell) (#1227)
