@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.250
+
+- feat(chat-routes): dispatchFirst — start the model call while the admission chain commits (#1229)
+
 ## 0.60.249
 
 - feat(prewarm): warm once — steps keyed by what they depend on, with shared receipts (#1228)
