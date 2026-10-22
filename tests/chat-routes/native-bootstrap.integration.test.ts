@@ -2,6 +2,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { Sandbox } from '@tangle-network/sandbox'
 import { describe, expect, it } from 'vitest'
+import { toChatMessageParts } from '../../src/chat-store/parts'
 import { createChatTables } from '../../src/chat-store/schema'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
 import { noticePart } from '../../src/interactions/contract'
@@ -70,13 +71,24 @@ async function boundary(test: Case) {
       if (url.searchParams.get('sessionId') !== sessionId) return json({ error: 'wrong session' }, 400)
       if (test.transportFailure) return json({ error: 'retained event transport unavailable' }, 503)
       response.writeHead(200, { 'content-type': 'text/event-stream' })
-      // A terminal done frame can carry a contradictory id. The SDK returns
-      // that id; the observer must not accept it as the admitted execution.
-      const event = { type: 'done', sessionId, executionId: turnId, data: {
-        executionId: test.resultId ?? turnId, success: false, status: status === 'cancelled' ? 'cancelled' : 'error',
-        error: test.error ?? diskCause,
-      } }
-      return response.end(`id: 1066\nevent: done\ndata: ${JSON.stringify(event)}\n\n`)
+      const effectiveBackend = { provider: 'openai-compat', model: 'fixture-model', source: 'request' }
+      const frame = (type: string, data: Record<string, unknown>, offset: number) => ({
+        type, data, sessionId, executionId: turnId, eventId: String(1061 + offset), timestamp: 1 + offset,
+      })
+      // The incident's six-frame shape: error.data owns the message; done.data
+      // contains only requestId/effectiveBackend. Let the SDK assemble failure.
+      const events = test.resultId ? [
+        // Adversarial done-only identity control, deliberately not incident wire.
+        frame('done', { executionId: test.resultId, success: false, status: 'error', error: test.error ?? diskCause }, 5),
+      ] : [
+        frame('start', { id: 'fixture-request', created_at: 1 }, 0),
+        frame('execution.started', { executionId: turnId, sessionId, timestamp: 1, effectiveBackend }, 1),
+        frame('status', { type: 'status', status: 'generating_response' }, 2),
+        frame('status', { type: 'status', status: 'started' }, 3),
+        frame('error', { message: test.error ?? diskCause, requestId: 'fixture-request', effectiveBackend }, 4),
+        frame('done', { requestId: 'fixture-request', effectiveBackend }, 5),
+      ]
+      return response.end(events.map(event => `id: ${event.eventId}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(''))
     }
     return json({ error: `Unexpected read: ${path}` }, 404)
   })
@@ -134,7 +146,7 @@ async function boundary(test: Case) {
           const writer = createAssistantDraftWriter({ store, threadId,
             messageId: `assistant:${turnId}`, snapshot: () => null })
           await writer.finalize({ content: receipt.text,
-            parts: [...receipt.parts, noticePart('error', 'native-failure', receipt.error!, 'native_completion_failed')] })
+            parts: [...toChatMessageParts(receipt.parts), noticePart('error', 'native-failure', receipt.error!, 'native_completion_failed')] })
           return `assistant:${turnId}`
         },
         async settle(_payload, receipt) {
