@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.60.248
+
+- perf(router-turn): byte-stable prompt prefix and prompt-cache usage in the turn trace (#1226)
+
+## 0.60.247
+
+- fix(billing): orphan an empty provisioning row once its key expiry passes (#1224)
+- chore(deps): adopt @tangle-network/ui 11.41.0 (#1223)
+
 ## 0.60.246
 
 - docs: last gpt-5.5 fixture example -> glm-5-turbo (#1222)

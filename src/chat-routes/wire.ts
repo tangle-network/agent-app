@@ -80,6 +80,8 @@ export interface ProducerUsageEvent {
   usage: {
     promptTokens: number
     completionTokens: number
+    /** Prompt tokens the provider served from its prompt cache. */
+    cachedPromptTokens?: number
     reasoningTokens?: number
     toolTokens?: number
     toolCallCount?: number
