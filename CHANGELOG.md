@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.258
+
+- fix(platform): delegate keeps asking through a Platform outage, inside the caller's window (#1233)
+
 ## 0.60.257
 
 - chore(deps): accept sandbox 0.64 and agent-runtime 0.342; member sync fails by name (#1234)
