@@ -18,6 +18,7 @@ import {
   type AssistantDraftWriter,
   type DraftPersistenceTuning,
 } from './draft-persistence'
+import { dispatchFirstFor } from './dispatch-first'
 import { admissionServerTiming, errorResponse, userPartsWithFiles, type AdmittedTurn, type TurnProgress } from './turn-admission'
 import { abortOnSignal, concatStreams, failureCodeOf, failureReasonOf, isVisibleOutput, isVisibleText, tapRawEvents, withStreamHeartbeat } from './turn-event-stream'
 import type {
@@ -33,10 +34,19 @@ import type {
 import type { TurnRoutePhase } from './turn-progress'
 import { ChatTurnInputError, type ChatTurnPartInput } from './wire'
 
-/** Work `afterAuthorize` started: `handOff` gives it to `produce`; `release` frees it if nothing took it. */
+/** Work started before `produce` took the turn: `handOff` gives it to `produce`; `release` frees it if nothing took it. */
 export interface AfterAuthorizeWork {
   handOff(): void
   release(): Promise<void>
+  /** Free this too if the turn ends before `handOff`. */
+  add(release: () => void): void
+}
+
+/** The thread's messages as the turn-identity resolver reads them. */
+async function readTurnHistory(store: CreateChatTurnRoutesOptions<unknown>['store'], threadId: string): Promise<PersistedChatMessageForTurn[]> {
+  return (await store.listMessages(threadId)).map((m) => ({
+    id: m.id, role: m.role, content: m.content, parts: (m.parts ?? null) as PersistedChatMessageForTurn['parts'],
+  }))
 }
 
 interface TurnExecutionOptions<TContext> {
@@ -109,12 +119,7 @@ export function createAdmittedTurnRunner<TContext>({
 
     // Turn identity: reuse the just-persisted user row on a retry (same
     // turnId or identical trailing content) instead of double-inserting.
-    const readHistory = async () => (await options.store.listMessages(payload.threadId)).map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: m.content,
-      parts: (m.parts ?? null) as PersistedChatMessageForTurn['parts'],
-    }))
+    const readHistory = () => readTurnHistory(options.store, payload.threadId)
     const historySpan = trace.start('admission.history', 'admission')
     const existingMessages = await readHistory()
     // Lock acquisition is async and follows identity derivation. A previous
@@ -227,6 +232,9 @@ export function createAdmittedTurnRunner<TContext>({
       ...(intentLine ? { intentLine } : {}),
       ...(ctx?.executionLimits ? { executionLimits: ctx.executionLimits } : {}),
     }
+    // Dispatch-first: the model call starts now; its output waits for the chain below to commit (./dispatch-first).
+    const dispatched = dispatchFirstFor(options, produceArgs, trace)
+    if (dispatched) early.add(dispatched.refuse)
 
     // Single-flight lock: acquire before any side effect. `release` runs
     // exactly once — in the drain's `finally` on a normal turn, or right here
@@ -503,6 +511,7 @@ export function createAdmittedTurnRunner<TContext>({
       const beforeTurn = options.beforeTurn
       if (beforeTurn) {
         const patch = await trace.measure('admission.before_turn', 'admission', (span) => beforeTurn(produceArgs, { span }))
+        if (patch && Object.keys(patch).length && dispatched) throw new Error('beforeTurn cannot patch a dispatchFirst turn: its prompt is already sent')
         if (patch) produceArgs = { ...produceArgs, ...patch }
       }
       const streamSetup = trace.start('admission.stream_setup', 'admission')
@@ -579,7 +588,7 @@ export function createAdmittedTurnRunner<TContext>({
           produce: () => ({
             stream: (async function* () {
               // The product's own admission work: its profile pin, prompt and producer construction.
-              producer = await trace.measure('admission.produce', 'admission', () => options.produce(produceArgs))
+              producer = await (dispatched ? dispatched.take(produceArgs) : trace.measure('admission.produce', 'admission', () => options.produce(produceArgs)))
               let source: AsyncIterable<ChatRouteEvent> = producer.stream
               if (ctx?.cancelOnDisconnect) {
                 source = abortOnSignal(source, request.signal)

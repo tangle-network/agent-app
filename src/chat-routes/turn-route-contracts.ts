@@ -279,6 +279,15 @@ export interface ChatTurnProduceArgs<TContext> {
    * `createChatTurnRoutes` invocation supplies it before `produce` runs.
    */
   handoffCompletion?: () => Promise<void>
+  /** Set only under `dispatchFirst`, where `produce` starts before the lock. Resolves to the final args (with
+   *  `userMessageId`, after `contextGate` and `beforeTurn`) once the admission chain commits, or rejects with
+   *  `TurnAdmissionRefusedError` when the turn is refused. Start the model call at once; write nothing durable,
+   *  and read nothing `beforeTurn` adds to `context`, until it resolves. */
+  admitted?: Promise<ChatTurnProduceArgs<TContext>>
+  /** Set only under `dispatchFirst`: aborts when the turn is refused after `produce` started, or when the route stops
+   *  reading the producer (a disconnect under `cancelOnDisconnect`). Pass it to the model call. Under `dispatchFirst`,
+   *  `handoffCompletion` resolves only after `admitted` does. */
+  admissionSignal?: AbortSignal
 }
 
 /** One event as it crosses the route: the producer's own vocabulary, or an
@@ -518,6 +527,25 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  wrapped in `createSandboxChatProducer`. Router/openai-compat lane: the
    *  product's own producer. May be async (box resolution). */
   produce(args: ChatTurnProduceArgs<TContext>): ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
+  /**
+   * Start `produce`, and so the model call, right after the history read, while the lock, the history recheck, the
+   * user-row insert, `contextGate` and `beforeTurn` run (see `./dispatch-first`). Nothing it emits reaches the member,
+   * the turn buffer or the transcript before that chain commits; a refusal aborts it through `args.admissionSignal`
+   * and drops its output. `produce` receives `args.admitted` for the final args.
+   *
+   * Opt in only by naming where billing is enforced before any provider is paid: `'authorize'` (the product's
+   * balance and spend checks run there) or `'model-service'` (the Tangle Router holds the spend and refuses an
+   * unfunded key before it calls a provider, fail-closed). Entitlement gates the model service cannot know (a seat,
+   * a plan feature) belong in `contextGate`, which then runs while the model starts and holds its output until it
+   * passes. `beforeTurn` may still mutate `context` but must not return a patch, since the prompt has already been
+   * sent; a patch throws. Omit → `produce` runs after admission.
+   *
+   * `when` picks the turns that dispatch first (default all). Return false for a producer whose dispatch is keyed by
+   * the turn's `executionId` (a box session): two sends on one thread resolve the same id, and the refused duplicate
+   * would reach the winner's execution before the lock refused it. A Router call per request is safe; the refused
+   * duplicate costs only the call its `admissionSignal` cancels.
+   */
+  dispatchFirst?: { billing: 'authorize' | 'model-service'; when?: (args: ChatTurnProduceArgs<TContext>) => boolean }
   /** Single-flight lock acquired before any side effect and released once when
    *  the turn settles (including short-circuit/throw). `/turn-stream`'s
    *  `createDurableTurnLock` is the shared DO-backed implementation. Omit →
