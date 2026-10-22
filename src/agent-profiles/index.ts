@@ -121,7 +121,7 @@ export interface ProfileRevisionStore {
   /** Receipt and binding event append atomically; a refusal leaves the binding untouched. */
   recordSwitch(receipt: ProfileSwitchReceipt, expectedVersion: number): Promise<ProfileSwitchReceipt>
   /** Persist one immutable pin under a message id; retries must return the same pin. */
-  pinTurn(pin: ProfileTurnPin, expectedBindingVersion: number): Promise<ProfileTurnPin>
+  pinTurn(pin: ProfileTurnPin, expectedBindingVersion: number, options?: { priorChecked?: boolean }): Promise<ProfileTurnPin>
   getTurnPin(key: ProfileBindingKey, messageId: string, inputHash: string): Promise<ProfileTurnPin | null>
   listKnowledgeEvents(workspaceId: string, profileId: string): Promise<ProfileKnowledgeEvent[]>
   appendKnowledgeEvent(event: ProfileKnowledgeEvent): Promise<void>
@@ -641,7 +641,9 @@ export async function admitProfileTurn(input: {
   }
   return input.store.pinTurn({ ...input.key, messageId: input.messageId, inputHash,
     profileId: revision.profileId, revisionId: revision.id,
-    authorityDigest: revision.authorityDigest, planDigest: input.observedManagedPlanDigest }, binding.version)
+    authorityDigest: revision.authorityDigest, planDigest: input.observedManagedPlanDigest }, binding.version,
+  // The prior pin was read above (or with the admission read), so the store need not read it again.
+  { priorChecked: true })
 }
 
 const KNOWLEDGE_TEXT_MAX = 32000

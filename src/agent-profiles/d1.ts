@@ -23,7 +23,7 @@ export interface ProfileD1Statement {
 
 export interface ProfileD1Database {
   prepare(sql: string): ProfileD1Statement
-  batch(statements: ProfileD1Statement[]): Promise<{ meta: { changes: number } }[]>
+  batch(statements: ProfileD1Statement[]): Promise<{ meta: { changes: number }; results?: unknown[] }[]>
 }
 
 /** Trusted product SQL checked in the same D1 transaction as an agent-authored save. */
@@ -446,11 +446,14 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database,
       if (!saved) throw new ProfileConflictError('Profile binding changed during switch')
       return saved
     },
-    async pinTurn(pin, expectedBindingVersion) {
+    async pinTurn(pin, expectedBindingVersion, options) {
       const key = pin
-      const prior = await getTurnPin(key, pin.messageId, pin.inputHash)
-      if (prior) return prior
-      const inserted = await db.prepare(`INSERT INTO agent_profile_turn_pin
+      // admitProfileTurn has already read this message's pin; a second read here was one more serial round trip.
+      if (!options?.priorChecked) {
+        const prior = await getTurnPin(key, pin.messageId, pin.inputHash)
+        if (prior) return prior
+      }
+      const insert = db.prepare(`INSERT INTO agent_profile_turn_pin
         (workspace_id, member_id, channel, message_id, input_hash, profile_id, revision_id,
          authority_digest, plan_digest)
         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (
@@ -471,9 +474,15 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database,
           pin.authorityDigest, pin.planDigest, ...keyValues(key), expectedBindingVersion,
           pin.profileId, pin.authorityDigest,
           pin.revisionId, pin.revisionId, key.workspaceId,
-          pin.profileId, pin.revisionId, pin.authorityDigest).run()
-      const saved = await getTurnPin(key, pin.messageId, pin.inputHash)
-      if (!saved || (inserted.meta.changes === 0 && saved.revisionId !== pin.revisionId)) {
+          pin.profileId, pin.revisionId, pin.authorityDigest)
+      const readBack = db.prepare(`SELECT * FROM agent_profile_turn_pin WHERE workspace_id = ?
+        AND member_id = ? AND channel = ? AND message_id = ?`).bind(...keyValues(key), pin.messageId)
+      // The compare-and-set insert and its read-back travel as one batch: one round trip instead of two.
+      const [inserted, read] = await db.batch([insert, readBack])
+      const row = (read?.results?.[0] ?? null) as TurnRow | null
+      if (row && row.input_hash !== pin.inputHash) throw new ProfileConflictError('Message id was reused with different input')
+      const saved = row ? turnFromRow(row) : null
+      if (!saved || (inserted!.meta.changes === 0 && saved.revisionId !== pin.revisionId)) {
         throw new ProfileConflictError('Profile binding changed during turn admission')
       }
       return saved
