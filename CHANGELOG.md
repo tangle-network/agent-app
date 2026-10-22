@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.287
+
+- fix(chat): preserve canonical native user stops (#1281)
+- fix(release): carry pending work through skipped descendants (#1279)
+
 ## 0.60.286
 
 - chore(deps-dev): bump @modelcontextprotocol/sdk from 1.30.1 to 1.32.0 (#1271)
