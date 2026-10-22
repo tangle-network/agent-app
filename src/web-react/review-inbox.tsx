@@ -11,7 +11,7 @@ export interface ReviewInboxItem {
   createdAt: number
   canReview: boolean
   input: unknown
-  feedback?: HubApprovalFeedback
+  feedback?: HubApprovalFeedback & { verdict?: ReviewVerdict }
   preview?: HubActionPreview
   approveLabel?: string
   allowedVerdicts?: readonly ReviewVerdict[]
@@ -78,9 +78,12 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
   const currentItems = new Map(items.map(item => [item.id, item]))
   // Confirmed source changes affect this render's navigation, before effects retain the snapshot.
   const missing = loading || error || busy || refreshing ? resolvedElsewhere : new Set(round.filter(id => !currentItems.has(id)))
+  const savedComparisonVerdict = (item: ReviewInboxItem) => !!comparisons.current.get(item.id)
+    && ['approve', 'reject', 'request_changes'].includes(item.feedback?.verdict ?? '')
+  const isAnswered = (item: ReviewInboxItem) => answered.has(revisionKey(item)) || savedComparisonVerdict(item)
   const unanswered = round.filter(id => {
     const item = cache.current.get(id)
-    return item && !answered.has(revisionKey(item)) && !missing.has(id)
+    return item && !isAnswered(item) && !missing.has(id)
   })
   const currentId = activeId && unanswered.includes(activeId) ? activeId
     : unanswered.find(id => round.indexOf(id) > round.indexOf(activeId ?? '')) ?? unanswered[0]
@@ -138,7 +141,7 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
       setAnswered(nextAnswered)
       const remaining = round.filter(id => {
         const candidate = cache.current.get(id)
-        return candidate && !nextAnswered.has(revisionKey(candidate))
+        return candidate && !nextAnswered.has(revisionKey(candidate)) && !savedComparisonVerdict(candidate)
       })
       const position = round.indexOf(item.id)
       setActiveId(remaining.find(id => round.indexOf(id) > position) ?? remaining[0] ?? null)
@@ -197,7 +200,7 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
         <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3" data-review-compare-row>
           {compareItems.map((item, index) => {
             const key = revisionKey(item)
-            const done = answered.has(key)
+            const done = isAnswered(item)
             const present = currentItems.has(item.id)
             return <article key={key} aria-label={`Draft ${index + 1}`} className="min-w-0 space-y-3 rounded-lg border p-4"
               data-review-compare-position={index} onFocusCapture={() => { if (!done && present) setActiveId(item.id) }}>

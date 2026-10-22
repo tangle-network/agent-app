@@ -98,6 +98,14 @@ function pendingItems() {
     .filter(item => !db.prepare('SELECT 1 FROM verdicts WHERE id=? AND revision=?').get(item.id, String(item.revision)))
     .map(item => faultCompare ? (({ compare, ...rest }) => rest)(item) : item)
 }
+function retainedInboxItems() {
+  if (!compareDirectory) return pendingItems()
+  return db.prepare('SELECT body FROM items ORDER BY id DESC').all().map(row => {
+    const item = JSON.parse(row.body)
+    const saved = db.prepare('SELECT body FROM verdicts WHERE id=? AND revision=?').get(item.id, String(item.revision))
+    return { ...item, ...(saved ? { feedback: JSON.parse(saved.body), canReview: false } : {}) }
+  }).map(item => faultCompare ? (({ compare, ...rest }) => rest)(item) : item)
+}
 function replace(item) {
   db.prepare('UPDATE items SET body=? WHERE id=?').run(JSON.stringify(item), item.id)
   publish({ items: pendingItems(), loading: false, error: null })
@@ -257,6 +265,12 @@ async function proveComparison(origin) {
           await expect(draft(page, 1).getByLabel('Score (0–100)', { exact: true })).toHaveValue('62')
           await expect(draft(page, 1).getByLabel('Comment', { exact: true })).toHaveValue('ajkr: preserve this second draft.')
           await page.screenshot({ path: path.join(output, 'compare-pending-removal.png'), fullPage: true })
+          await page.reload()
+          await expect(cards(page)).toHaveCount(5)
+          assert.deepEqual(await ids(page), order)
+          await expect(draft(page, 0).getByText('Review saved', { exact: true })).toBeVisible()
+          await expect(page.locator('[data-review-progress]')).toHaveText('1 of 5 resolved')
+          await page.screenshot({ path: path.join(output, 'compare-reloaded-verdict.png'), fullPage: true })
         }
       }
     }
@@ -292,7 +306,7 @@ try {
     try {
       const png = /^\/compare-images\/(\d)\.png$/.exec(request.url)
       if (png && compareImages[Number(png[1])]) { response.writeHead(200, { 'content-type': 'image/png' }); return response.end(compareImages[Number(png[1])].bytes) }
-      if (request.url === '/api/items') return json(response, pendingItems())
+      if (request.url === '/api/items') return json(response, retainedInboxItems())
       if (request.url === '/api/held') return json(response, JSON.parse(db.prepare('SELECT body FROM held').get().body))
       if (request.url === '/api/held-feedback') { db.prepare('INSERT INTO held_feedback VALUES (?)').run(JSON.stringify(await body(request))); return json(response, { saved: true }) }
       if (request.url === '/api/updates') {

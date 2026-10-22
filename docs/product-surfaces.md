@@ -56,8 +56,10 @@ visible during the round as pending items leave the host's list. To reconstruct 
 after a page reload, load its full retained membership and saved feedback, not just
 its remaining pending items. Render the cached `renderItem` argument so removing
 an answered cell from the pending response does not remove its preview. After a
-reload, saved feedback pre-fills the form; a score alone does not imply a verdict.
-The host must keep previously decided cells read-only through `canReview`.
+reload, include `feedback.verdict` with saved comparison decisions so the inbox
+counts those cells as resolved and completes the remaining row. A saved score
+alone pre-fills the form and does not imply a verdict. Keep decided cells
+read-only through `canReview` as well.
 A row with inconsistent or changed comparison descriptors cannot be reviewed until an explicit refresh.
 The shared proof supports `--compare-images <directory>` to exercise actual retained
 PNGs through the built inbox, HTTP and SQLite on desktop and phone.
