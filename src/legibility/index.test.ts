@@ -6,10 +6,10 @@
  * response, and a screen no navigation entry reaches — plus the code that must
  * stay silent.
  */
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { checkLegibility } from './index'
 import { formatLegibilityReport, legibilityReportToJson } from './report'
 import type { LegibilityCheckId } from './types'
@@ -73,8 +73,15 @@ export async function readAttachment(id: string) {
 }
 `
 
+const roots: string[] = []
+
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
 function fixture(extra: Record<string, string> = {}): { src: string; routes: string; nav: string } {
   const root = mkdtempSync(join(tmpdir(), 'legibility-e2e-'))
+  roots.push(root)
   const files: Record<string, string> = {
     'src/routes.ts': ROUTES,
     'src/components/nav.tsx': NAV,

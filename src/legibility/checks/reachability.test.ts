@@ -4,10 +4,10 @@
  * react-router config where every path is composed from ancestors and every
  * link is built from a runtime `base`.
  */
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { buildScannedFile, scanSources } from '../scan'
 import { checkReachability, parseRouteConfig, staticSegments } from './reachability'
 
@@ -29,9 +29,16 @@ export default [
 ] satisfies RouteConfig
 `
 
+const roots: string[] = []
+
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
 /** A product tree on disk: the check reads real files, never a stub. */
 function product(files: Record<string, string>): { dir: string; routes: string } {
   const dir = mkdtempSync(join(tmpdir(), 'legibility-routes-'))
+  roots.push(dir)
   for (const [name, contents] of Object.entries(files)) {
     const path = join(dir, name)
     mkdirSync(join(path, '..'), { recursive: true })

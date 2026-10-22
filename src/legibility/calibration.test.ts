@@ -13,10 +13,10 @@
  *
  * Measured totals are in `docs/legibility-calibration.md`.
  */
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { checkEmptyStates } from './checks/empty-state'
 import { checkReachability } from './checks/reachability'
 import { checkSilentFailure } from './checks/silent-failure'
@@ -344,9 +344,16 @@ describe('empty states — a screen that strands the reader vs a section that do
   })
 })
 
+const roots: string[] = []
+
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
 /** A product tree on disk: the reachability check reads real files. */
 function product(files: Record<string, string>): { dir: string; routes: string } {
   const root = mkdtempSync(join(tmpdir(), 'legibility-calibration-'))
+  roots.push(root)
   for (const [name, contents] of Object.entries(files)) {
     const path = join(root, name)
     mkdirSync(join(path, '..'), { recursive: true })
