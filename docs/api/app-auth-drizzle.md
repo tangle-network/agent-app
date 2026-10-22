@@ -4,7 +4,15 @@
 
 Source: `src/app-auth/drizzle.ts`
 
-5 exports.
+8 exports.
+
+### `AppAuthColumnMap`
+
+`type` — A table's built columns by field name, as an index callback receives them.
+
+```ts
+type AppAuthColumnMap
+```
 
 ### `AppAuthSessionColumns`
 
@@ -30,12 +38,28 @@ type AppAuthSessionsTable
 type AppAuthTables
 ```
 
+### `AppAuthUserColumns`
+
+`type` — Extra user columns, keyed by their TypeScript field name.
+
+```ts
+type AppAuthUserColumns
+```
+
+### `AppAuthUsersTable`
+
+`type` — The `user` table with the product's extra columns.
+
+```ts
+type AppAuthUsersTable
+```
+
 ### `createAppAuthTables`
 
 `function` — Build the better-auth `user`, `session`, `account` and `verification` tables.
 
 ```ts
-<S extends AppAuthSessionColumns = Record<never, never>>(options?: CreateAppAuthTablesOptions<S>) => { users: SQLiteTab…
+<S extends AppAuthSessionColumns = Record<never, never>, U extends AppAuthUserColumns = Record<never, never>>(options?:…
 ```
 
 ### `CreateAppAuthTablesOptions`
