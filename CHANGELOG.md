@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.60.263
+
+- feat(rollout): turn timing rows carry first visible, admission and the served model by default (#1239)
+
+## 0.60.262
+
+- test(peer-floors): delete the hard-coded verified-window case (main red since #1234) (#1246)
+
+## 0.60.261
+
+- docs(platform): a delegated key's name is a slot; a new delegation there revokes its holder (#1244)
+- chore(deps): adopt 5 @tangle-network/* packages (#1225)
+
 ## 0.60.260
 
 - perf(agent-profiles): a turn pin is one D1 round trip, not three (#1238)
