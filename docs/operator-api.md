@@ -116,6 +116,8 @@ Errors are `{ error, code, retryable? }`.
 3. `succeeded` and `failed` are settled and carry `reply` or `failure`, plus referenced `assets`, changed `files`, and open `approvals`.
    `input-required`, or a nonempty `approvals` list, waits on someone in `approvals[].decidedBy`.
    `unknown` means the app cannot establish the state; it is never evidence of success.
+   A turn with a reply may carry `model`, `costUsd`, and `usage` with the token counts the app stored on it: `inputTokens` (prompt not served from cache), `cacheReadTokens` (prompt served from the provider's cache), and `outputTokens`.
+   A count the app did not record is absent, never zero.
 4. To stop the turn early, the caller posts its cancel route; see [Cancel a turn](#cancel-a-turn).
 
 An accepted turn or an open connection does not establish completion; read the settled turn.

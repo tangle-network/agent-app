@@ -41,7 +41,8 @@ function setup(options: {
     list.push({ id: `u-${input.turnId}`, role: 'user', content: input.content, parts: [{ type: 'text', text: input.content, turnId: input.turnId }], createdAt: ++clock })
     const reply = options.reply?.(input.content) ?? { content: `Done: ${input.content}`, parts: [{ type: 'session-artifact', path: 'notes/plan.md', action: 'created' }] }
     list.push({ id: `a-${input.turnId}`, role: 'assistant', content: String(reply.content ?? ''), parts: (reply.parts as Array<Record<string, unknown>>) ?? [], createdAt: ++clock, servedModel: 'gpt-6-luna', costUsd: 0.12,
-      ...(reply.metadata ? { metadata: reply.metadata as Record<string, unknown> } : {}) })
+      ...(reply.metadata ? { metadata: reply.metadata as Record<string, unknown> } : {}),
+      ...(reply.usage ? reply.usage as Pick<ChatOperatorMessage, 'inputTokens' | 'cacheReadTokens' | 'outputTokens'> : {}) })
     messages.set(input.threadId, list)
     return new Response('{"type":"text"}\n{"type":"done"}\n', { headers: { 'content-type': 'application/x-ndjson' } })
   })
@@ -104,6 +105,26 @@ describe('chat operator adapter', () => {
 
     const thread = await client.getThread('ws-a', started.value.threadId)
     expect(thread).toMatchObject({ succeeded: true, value: { latestTurn: { turnId: '1f0c5a3e-9b7d-4c21-8e6f-0a1b2c3d4e5f', state: 'succeeded' } } })
+  })
+
+  it('reports the token usage stored on the reply row, and none when the row has none', async () => {
+    const { client } = setup({ reply: (content) => ({ content: `Done: ${content}`, parts: [],
+      ...(content === 'Metered' ? { usage: { inputTokens: 1200, cacheReadTokens: 800, outputTokens: 0, reasoningTokens: 40 } } : {}),
+      ...(content === 'Partly metered' ? { usage: { outputTokens: 55, inputTokens: null } } : {}) }) })
+
+    const metered = await client.startTurn('ws-a', { content: 'Metered' })
+    if (!metered.succeeded) throw new Error(metered.error)
+    // A recorded zero is reported; columns the operator turn does not carry are not.
+    expect(metered.value.usage).toEqual({ inputTokens: 1200, cacheReadTokens: 800, outputTokens: 0 })
+
+    const partly = await client.startTurn('ws-a', { content: 'Partly metered' })
+    if (!partly.succeeded) throw new Error(partly.error)
+    expect(partly.value.usage).toEqual({ outputTokens: 55 })
+
+    const unmetered = await client.startTurn('ws-a', { content: 'Unmetered' })
+    if (!unmetered.succeeded) throw new Error(unmetered.error)
+    expect(unmetered.value.state).toBe('succeeded')
+    expect('usage' in unmetered.value).toBe(false)
   })
 
   it('reports a failure notice as a failed turn', async () => {

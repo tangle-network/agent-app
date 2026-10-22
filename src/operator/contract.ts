@@ -5,6 +5,7 @@
  * through these routes; the app supplies only storage and execution.
  */
 
+import type { ChatTurnUsage } from '../chat-routes/turn-route-contracts.js'
 import type { ChatAttachmentInput } from '../chat-routes/wire.js'
 
 export const OPERATOR_API_VERSION = 'v1'
@@ -155,6 +156,14 @@ export interface OperatorTurn {
   executionId?: string
   model?: string
   costUsd?: number
+  /**
+   * Token usage the app stored on the turn's reply, with chat-store's names.
+   * `inputTokens` is the uncached prompt; `cacheReadTokens` is the prompt the
+   * provider served from its cache, so the whole prompt is their sum.
+   * `outputTokens` is the completion. Each field is present only when the app
+   * recorded it; an absent field is unknown, never zero.
+   */
+  usage?: Pick<ChatTurnUsage, 'inputTokens' | 'cacheReadTokens' | 'outputTokens'>
   completedAt?: string
   /** The settled answer; null until the turn settles. */
   reply: { content: string; mediaType: string } | null

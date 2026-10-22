@@ -29,6 +29,10 @@ export interface ChatOperatorMessage {
   model?: string | null
   servedModel?: string | null
   costUsd?: number | null
+  /** Usage columns as chat-store stores them; `inputTokens` excludes `cacheReadTokens`. */
+  inputTokens?: number | null
+  cacheReadTokens?: number | null
+  outputTokens?: number | null
   /** The row's product metadata, for a `failureOf` that reads a stamped turn status. */
   metadata?: Record<string, unknown> | null
 }
@@ -239,6 +243,12 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       const model = assistant.servedModel ?? assistant.model
       if (model) turn.model = model
       if (typeof assistant.costUsd === 'number') turn.costUsd = assistant.costUsd
+      const usage: NonNullable<OperatorTurn['usage']> = {}
+      for (const key of ['inputTokens', 'cacheReadTokens', 'outputTokens'] as const) {
+        const count = assistant[key]
+        if (typeof count === 'number') usage[key] = count
+      }
+      if (Object.keys(usage).length > 0) turn.usage = usage
       if (state !== 'working' && terminal) {
         const failure = (options.failureOf ?? defaultFailure)(assistant) ?? (status === 'error' ? { code: 'turn.error', message: 'The turn failed; retained text may be partial' } : null)
         if (failure) {
