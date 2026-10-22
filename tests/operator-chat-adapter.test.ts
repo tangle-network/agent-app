@@ -113,7 +113,8 @@ describe('chat operator adapter', () => {
   it('reports the token usage stored on the reply row, and none when the row has none', async () => {
     const { client } = setup({ reply: (content) => ({ content: `Done: ${content}`, parts: [],
       ...(content === 'Metered' ? { usage: { inputTokens: 1200, cacheReadTokens: 800, outputTokens: 0, reasoningTokens: 40 } } : {}),
-      ...(content === 'Partly metered' ? { usage: { outputTokens: 55, inputTokens: 300, cacheReadTokens: null } } : {}) }) })
+      ...(content === 'Partly metered' ? { usage: { outputTokens: 55, inputTokens: 300, cacheReadTokens: 0 } } : {}),
+      ...(content === 'Cache unrecorded' ? { usage: { inputTokens: 100, outputTokens: 20, cacheReadTokens: null } } : {}) }) })
 
     const metered = await client.startTurn('ws-a', { content: 'Metered' })
     if (!metered.succeeded) throw new Error(metered.error)
@@ -123,8 +124,13 @@ describe('chat operator adapter', () => {
 
     const partly = await client.startTurn('ws-a', { content: 'Partly metered' })
     if (!partly.succeeded) throw new Error(partly.error)
-    // With no cache reads the input count is unambiguous.
-    expect(partly.value.usage).toEqual({ inputTokens: 300, outputTokens: 55 })
+    // A recorded zero cache read makes the input count unambiguous.
+    expect(partly.value.usage).toEqual({ inputTokens: 300, cachedInputTokens: 0, outputTokens: 55 })
+
+    // A missing cache count is unknown, not zero, so the input count is omitted.
+    const unrecorded = await client.startTurn('ws-a', { content: 'Cache unrecorded' })
+    if (!unrecorded.succeeded) throw new Error(unrecorded.error)
+    expect(unrecorded.value.usage).toEqual({ outputTokens: 20 })
 
     const unmetered = await client.startTurn('ws-a', { content: 'Unmetered' })
     if (!unmetered.succeeded) throw new Error(unmetered.error)
@@ -142,6 +148,10 @@ describe('chat operator adapter', () => {
     expect(operatorTurnUsage({ inputTokens: 500, cacheReadTokens: 800 }, { inputIncludesCache: true })).toEqual({ cachedInputTokens: 800 })
     expect(operatorTurnUsage(row)).toEqual({ cachedInputTokens: 800, outputTokens: 9 })
     expect(operatorTurnUsage({ inputTokens: 7, cacheReadTokens: 0 })).toEqual({ inputTokens: 7, cachedInputTokens: 0 })
+    const unrecordedRow = { inputTokens: 100, outputTokens: 20, cacheReadTokens: null }
+    expect(operatorTurnUsage(unrecordedRow)).toEqual({ outputTokens: 20 })
+    expect(operatorTurnUsage(unrecordedRow, { inputIncludesCache: false })).toEqual({ inputTokens: 100, outputTokens: 20 })
+    expect(operatorTurnUsage(unrecordedRow, { inputIncludesCache: true })).toEqual({ outputTokens: 20 })
   })
 
   it('reports a failure notice as a failed turn', async () => {

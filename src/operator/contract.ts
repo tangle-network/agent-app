@@ -160,7 +160,8 @@ export interface OperatorTurn {
    * a chat-store row to it.
    * - `inputTokens`: prompt tokens NOT read from the provider's cache. Unlike
    *   the turn trace's summary, it never includes cache reads; it is omitted
-   *   when the row's split is ambiguous (see `operatorTurnUsage`).
+   *   when the row's split is ambiguous, including when the row records no
+   *   cache count (see `operatorTurnUsage`).
    * - `cachedInputTokens`: prompt tokens read from the provider's cache (the
    *   row's `cacheReadTokens`); with both present the whole prompt is
    *   `inputTokens + cachedInputTokens`. When absent the cache share is unknown.
