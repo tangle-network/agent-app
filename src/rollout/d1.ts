@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS rollout_turn_timing (
   model TEXT,
   revision TEXT,
   arm TEXT,
+  variant TEXT,
   first_visible_ms INTEGER,
   first_text_ms INTEGER,
   settled_ms INTEGER NOT NULL,
@@ -53,12 +54,20 @@ ALTER TABLE rollout_turn_timing ADD COLUMN revision TEXT;
 ALTER TABLE rollout_turn_timing ADD COLUMN arm TEXT;
 `
 
+/** Apply once through the product migration runner before any row carries `variant`; old rows stay NULL. */
+export const ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL =
+  `ALTER TABLE rollout_turn_timing ADD COLUMN variant TEXT;`
+
 export interface TurnTimingRow {
   /** Request receipt to lifecycle start, before the existing relative durations. */
   admissionMs?: number
   model?: string
   revision?: string
+  /** The rollout cohort arm (`assignRolloutArm`, or a synthetic cohort's label). Guards filter on it. */
   arm?: string
+  /** The turn's experiment assignments, apart from `arm` so an experiment never changes the cohort a guard reads,
+   *  e.g. `billing_in_gate=1;prompt_prefix=0`. Written only when set, so a table without the column keeps recording. */
+  variant?: string
   turnId: string
   /** The plan this turn counts toward, e.g. `hospitality-routed-chat`. */
   rollout: string
@@ -107,16 +116,17 @@ export function createD1TurnTimingStore(options: { db: D1LikeForRollout; now?: (
     /** Record one settled turn. Idempotent on `turnId`. Never throws: telemetry must not fail a turn. */
     async record(row: TurnTimingRow): Promise<void> {
       try {
+        const variant = row.variant === undefined ? '' : ', variant'
         await options.db.prepare(
           `INSERT OR IGNORE INTO rollout_turn_timing
-             (turn_id, rollout, workspace_id, lane, first_visible_ms, first_text_ms, settled_ms, failed, failure_code, at, admission_ms, model, revision, arm)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (turn_id, rollout, workspace_id, lane, first_visible_ms, first_text_ms, settled_ms, failed, failure_code, at, admission_ms, model, revision, arm${variant})
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${variant ? ', ?' : ''})`,
         ).bind(row.turnId, row.rollout, row.workspaceId, row.lane,
           row.firstVisibleMs === undefined ? null : Math.round(row.firstVisibleMs),
           row.firstTextMs === undefined ? null : Math.round(row.firstTextMs), Math.round(row.settledMs),
           row.failed ? 1 : 0, row.failureCode ?? null, row.at ?? now(),
           row.admissionMs === undefined ? null : Math.round(row.admissionMs),
-          row.model ?? null, row.revision ?? null, row.arm ?? null).run()
+          row.model ?? null, row.revision ?? null, row.arm ?? null, ...(row.variant === undefined ? [] : [row.variant])).run()
       } catch (error) {
         console.error(JSON.stringify({ event: 'rollout_turn_timing_record_failed', turnId: row.turnId,
           error: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200) }))

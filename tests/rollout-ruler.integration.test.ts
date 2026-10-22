@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { build } from 'tsup'
 import { expect, it } from 'vitest'
-import { createD1TurnTimingStore, ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL } from '../src/rollout/d1'
+import { createD1TurnTimingStore, ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL, ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL } from '../src/rollout/d1'
 import { assignRolloutArm, decideRollout } from '../src/rollout/index'
 
 // Frozen E8 decision measurement: creative-rollout.result, closed seven-day window
@@ -123,4 +123,27 @@ it('the shipped CLI completes a narrowing when the measurement HTTP request neve
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+it('records an experiment variant apart from the cohort arm, and keeps recording on a table without the column', async () => {
+  const sqlite = new Database(':memory:')
+  try {
+    sqlite.exec(`CREATE TABLE rollout_turn_timing (
+      turn_id TEXT PRIMARY KEY, rollout TEXT, workspace_id TEXT, lane TEXT,
+      first_visible_ms INTEGER, first_text_ms INTEGER, settled_ms INTEGER,
+      failed INTEGER, failure_code TEXT, at INTEGER
+    );`)
+    sqlite.exec(ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL)
+    const store = createD1TurnTimingStore({ db: { prepare: sql => ({ bind: (...values) => ({
+      run: async () => sqlite.prepare(sql).run(...values),
+      all: async <T>() => ({ results: sqlite.prepare(sql).all(...values) as T[] }),
+    }) }) } })
+    const row = { rollout: 'r', workspaceId: 'w', lane: 'router', settledMs: 10, failed: false, arm: 'synthetic-router', at: 1 }
+    // Before the variant migration: a row without a variant still lands.
+    await store.record({ ...row, turnId: 'before' })
+    sqlite.exec(ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL)
+    await store.record({ ...row, turnId: 'after', variant: 'billing_in_gate=1' })
+    expect(sqlite.prepare('SELECT turn_id, arm, variant FROM rollout_turn_timing ORDER BY turn_id').all())
+      .toEqual([{ turn_id: 'after', arm: 'synthetic-router', variant: 'billing_in_gate=1' }, { turn_id: 'before', arm: 'synthetic-router', variant: null }])
+  } finally { sqlite.close() }
 })
