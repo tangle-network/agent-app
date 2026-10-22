@@ -639,6 +639,27 @@ function stateBinding(payload: StateCookiePayload, callbackUrl: string): string 
 }
 
 /** Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies */
+/** The callback step that threw while creating the local session. */
+type TangleSsoPersistenceStep = 'upsert' | 'createSession' | 'cookies' | 'saveTangleLink'
+
+/**
+ * What a failed local-session write logs: the step, the error class and its
+ * message with emails and long token-like strings removed, so the next failure
+ * names its cause (a D1 error says which statement failed) without leaking a
+ * session token, cookie value or address.
+ */
+function persistenceFailure(step: TangleSsoPersistenceStep, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return {
+    step,
+    errorClass: error instanceof Error ? error.name : typeof error,
+    message: message
+      .replace(/[^\s@"'<>]+@[^\s@"'<>]+\.[A-Za-z]{2,}/g, '<email>')
+      .replace(/[A-Za-z0-9_\-.~+/=]{24,}/g, '<redacted>')
+      .slice(0, 300),
+  }
+}
+
 export function createTangleSsoHandlers(
   opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions | TangleIdentitySsoHandlerOptions,
 ): TangleSsoHandlers {
@@ -769,6 +790,7 @@ export function createTangleSsoHandlers(
       let legacyExchange: TangleSsoExchangeResult | undefined
       let createdSession: string | undefined
       let committed = false
+      let step: TangleSsoPersistenceStep = 'upsert'
       try {
         let exchanged: { user: TangleSsoExchangeResult['user']; emailVerified: boolean }
         try {
@@ -819,6 +841,7 @@ export function createTangleSsoHandlers(
           throw err
         }
         const expiresAt = new Date(now() + sessionTtlSeconds * 1000)
+        step = 'createSession'
         const { token } = await opts.store.createSession({
           userId,
           expiresAt,
@@ -836,9 +859,11 @@ export function createTangleSsoHandlers(
         if (opts.protocol === 'oidc') {
           const headers = new Headers()
           headers.append('Set-Cookie', clearCookieHeader(stateCookieOpts))
+          step = 'cookies'
           const sessionCookies = await mintSessionCookies({ token, expiresAt, ttlSeconds: sessionTtlSeconds, secure: opts.secureCookies })
           for (const cookie of sessionCookies) headers.append('Set-Cookie', cookie)
           const response = redirectResponse(sanitizeRedirectPath(payload.r, defaultRedirectPath), headers)
+          step = 'saveTangleLink'
           await opts.store.saveTangleLink({
             ...link,
             tokens: oidcTokens!,
@@ -850,9 +875,11 @@ export function createTangleSsoHandlers(
         if (opts.protocol === 'identity') {
           const headers = new Headers()
           headers.append('Set-Cookie', clearCookieHeader(stateCookieOpts))
+          step = 'cookies'
           const sessionCookies = await mintSessionCookies({ token, expiresAt, ttlSeconds: sessionTtlSeconds, secure: opts.secureCookies })
           for (const cookie of sessionCookies) headers.append('Set-Cookie', cookie)
           const response = redirectResponse(sanitizeRedirectPath(payload.r, defaultRedirectPath), headers)
+          step = 'saveTangleLink'
           await opts.store.saveTangleLink(link)
           committed = true
           return response
@@ -865,7 +892,7 @@ export function createTangleSsoHandlers(
         return redirectResponse(sanitizeRedirectPath(payload.r, defaultRedirectPath), headers)
       } catch (error) {
         if (opts.protocol !== 'oidc' && opts.protocol !== 'identity') throw error
-        log('[tangle-sso] local session persistence failed')
+        log('[tangle-sso] local session persistence failed', persistenceFailure(step, error))
         return loginErrorRedirect('tangle_session_failed')
       } finally {
         if ((opts.protocol === 'oidc' || opts.protocol === 'identity') && !committed) {
