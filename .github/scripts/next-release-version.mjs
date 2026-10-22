@@ -1,9 +1,10 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
-const [manifestPath, sourceSha] = process.argv.slice(2)
-if (!manifestPath || !/^[0-9a-f]{40}$/.test(sourceSha ?? '')) {
-  throw new Error('Usage: next-release-version.mjs <package.json> <source-sha>')
+const [manifestPath, sourceSha, output] = process.argv.slice(2)
+if (!manifestPath || !/^[0-9a-f]{40}$/.test(sourceSha ?? '') ||
+    (output !== undefined && output !== '--json') || process.argv.length > 5) {
+  throw new Error('Usage: next-release-version.mjs <package.json> <source-sha> [--json]')
 }
 
 const { version } = JSON.parse(readFileSync(manifestPath, 'utf8'))
@@ -16,8 +17,9 @@ const lastRelease = execFileSync('git', [
   '--grep=^chore\\(release\\): [0-9]+\\.[0-9]+\\.[0-9]+ \\[skip release\\]$', sourceSha,
 ], { encoding: 'utf8' }).trim()
 const range = lastRelease ? `${lastRelease}..${sourceSha}` : sourceSha
-const subjects = execFileSync('git', ['log', '--first-parent', '--format=%s', range], { encoding: 'utf8' })
-  .trim().split('\n')
+const messages = execFileSync('git', ['log', '--first-parent', '--format=%B%x00', range], { encoding: 'utf8' })
+  .split('\0').map((message) => message.trim()).filter(Boolean)
+const subjects = messages.map((message) => message.split('\n')[0])
 const breaking = subjects.some((subject) => /^[a-z]+(?:\([^)]+\))?!:/.test(subject))
 let next
 if (breaking) {
@@ -27,4 +29,7 @@ if (breaking) {
 } else {
   next = `${match[1]}.${match[2]}.${BigInt(match[3]) + 1n}`
 }
-process.stdout.write(next)
+// A skip marker suppresses its own commit, never executable work still waiting
+// below it. Version-only callers (including the atomic writer) keep their API.
+const pending = messages.some((message) => !message.includes('[skip release]'))
+process.stdout.write(output === '--json' ? JSON.stringify({ version: next, pending }) : next)
