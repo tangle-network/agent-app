@@ -8,9 +8,14 @@
  * expiry and revocation rules, and four never noticed a key Platform had
  * revoked, superseded or expired.
  *
- * TWO WAYS TO HOLD ONE.
+ * THREE WAYS TO HOLD ONE.
  * - Per turn: `client.delegate` before the turn, `client.revoke` after it.
  *   Nothing is cached, so nothing stale can be handed out.
+ * - Pre-minted per turn: `createDelegatedTurnKeys` (`./delegated-turn-keys`) gives each turn its own
+ *   child, same cap and expiry, but mints the next turn's child in the
+ *   background and parks it in D1, so the ~320 ms mint leaves the turn's
+ *   critical path. A parked key is taken exactly once; anything else mints
+ *   inline as before.
  * - Per workspace: `createDelegatedKeyProvisioner` plugs this client into
  *   `createIdentityBoundWorkspaceKeyManager` (`./billing`), which owns the
  *   durable, lease-fenced slot. Its `getKey` asks Platform's

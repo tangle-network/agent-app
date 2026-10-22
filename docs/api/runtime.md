@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-109 exports.
+110 exports.
 
 ### `AnySurfaceKind`
 
@@ -324,6 +324,14 @@ interface OpenAICompatStreamTurnOptions
 
 ```ts
 interface OpenAIStreamChunk
+```
+
+### `perTurnPrefixBytes`
+
+`function` — The per-turn bytes in a prompt prefix: a clock to the minute, and any of this turn's `context` sections (or the caller's own per-turn values: ids, the member's message) that also appear there.
+
+```ts
+(prefix: string, perTurn?: readonly string[]) => string[]
 ```
 
 ### `placeRouterTurn`

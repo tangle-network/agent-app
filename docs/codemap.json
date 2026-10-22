@@ -7667,7 +7667,7 @@
         {
           "name": "compareOptimizationMethods",
           "kind": "function",
-          "signature": "<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…",
+          "signature": "<TScenario extends Scenario, TArtifact>(rawOpts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Op…",
           "doc": "Compare complete optimization methods on disjoint train, selection, and final test data."
         },
         {
@@ -7722,7 +7722,7 @@
           "name": "gepaOptimizationMethod",
           "kind": "function",
           "signature": "<TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…",
-          "doc": null
+          "doc": "Environment for a bridge child that spawns `claude` CLI subprocesses."
         },
         {
           "name": "GepaOptimizationMethodConfig",
@@ -13365,6 +13365,7 @@
       "source": "src/platform/index.ts",
       "dependsOn": [
         "billing",
+        "crypto",
         "runtime",
         "web"
       ],
@@ -13497,6 +13498,12 @@
           "doc": "Plug the client into `createIdentityBoundWorkspaceKeyManager` for a workspace-held key."
         },
         {
+          "name": "createDelegatedTurnKeys",
+          "kind": "function",
+          "signature": "(options: DelegatedTurnKeysOptions) => DelegatedTurnKeys",
+          "doc": null
+        },
+        {
           "name": "createHubSettingsRoutes",
           "kind": "function",
           "signature": "(ctx: HubSettingsContext) => HubSettingsRoutes",
@@ -13569,6 +13576,12 @@
           "doc": "Define default concurrency and overage policies for each TanglePlanTier level"
         },
         {
+          "name": "DELEGATED_KEY_PREMINT_TABLE_DDL",
+          "kind": "const",
+          "signature": "\"CREATE TABLE IF NOT EXISTS delegated_key_premint (\\n slot TEXT PRIMARY KEY,\\n scope TEXT NOT NULL,\\n turn_id TEXT NOT…",
+          "doc": "Paste into a migration."
+        },
+        {
           "name": "DelegatedKey",
           "kind": "interface",
           "signature": "interface DelegatedKey",
@@ -13587,6 +13600,12 @@
           "doc": null
         },
         {
+          "name": "delegatedKeyFallbackFetch",
+          "kind": "function",
+          "signature": "(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: Request…",
+          "doc": "A fetch for one turn that sends a pre-minted key."
+        },
+        {
           "name": "DelegatedKeyMissingError",
           "kind": "class",
           "signature": "class DelegatedKeyMissingError",
@@ -13597,6 +13616,12 @@
           "kind": "type",
           "signature": "type DelegatedKeyOutcome",
           "doc": null
+        },
+        {
+          "name": "DelegatedKeyPremintD1Like",
+          "kind": "interface",
+          "signature": "interface DelegatedKeyPremintD1Like",
+          "doc": "The D1 surface the slot store uses."
         },
         {
           "name": "DelegatedKeyProvisioner",
@@ -13633,6 +13658,42 @@
           "kind": "interface",
           "signature": "interface DelegatedKeyVerdict",
           "doc": "Platform's `verify-by-id` verdict on one key, secret-free."
+        },
+        {
+          "name": "DelegatedTurnKey",
+          "kind": "interface",
+          "signature": "interface DelegatedTurnKey",
+          "doc": null
+        },
+        {
+          "name": "DelegatedTurnKeyEvent",
+          "kind": "type",
+          "signature": "type DelegatedTurnKeyEvent",
+          "doc": null
+        },
+        {
+          "name": "DelegatedTurnKeyInput",
+          "kind": "interface",
+          "signature": "interface DelegatedTurnKeyInput",
+          "doc": null
+        },
+        {
+          "name": "DelegatedTurnKeys",
+          "kind": "interface",
+          "signature": "interface DelegatedTurnKeys",
+          "doc": null
+        },
+        {
+          "name": "DelegatedTurnKeyScope",
+          "kind": "type",
+          "signature": "type DelegatedTurnKeyScope",
+          "doc": "What a turn's key is minted for."
+        },
+        {
+          "name": "DelegatedTurnKeysOptions",
+          "kind": "interface",
+          "signature": "interface DelegatedTurnKeysOptions",
+          "doc": null
         },
         {
           "name": "FREE_TIER_SPEND_CAP_USD",
@@ -14115,6 +14176,7 @@
       "source": "src/platform/billing-config.ts",
       "dependsOn": [
         "billing",
+        "crypto",
         "runtime",
         "web"
       ],
@@ -16505,6 +16567,12 @@
           "doc": "Minimal OpenAI Chat Completions streaming chunk (structural — no `openai` dep)."
         },
         {
+          "name": "perTurnPrefixBytes",
+          "kind": "function",
+          "signature": "(prefix: string, perTurn?: readonly string[]) => string[]",
+          "doc": "The per-turn bytes in a prompt prefix: a clock to the minute, and any of this turn's `context` sections (or the caller's own per-turn values: ids, the member's message) that also appear there."
+        },
+        {
           "name": "placeRouterTurn",
           "kind": "function",
           "signature": "(input: RouterTurnPlacementInput) => PlacementRecord",
@@ -16964,6 +17032,12 @@
           "kind": "const",
           "signature": "number",
           "doc": "Wall time a durable hop may plan for: a Durable Object alarm or Queue consumer gets 15 minutes."
+        },
+        {
+          "name": "perTurnPrefixBytes",
+          "kind": "function",
+          "signature": "(prefix: string, perTurn?: readonly string[]) => string[]",
+          "doc": "The per-turn bytes in a prompt prefix: a clock to the minute, and any of this turn's `context` sections (or the caller's own per-turn values: ids, the member's message) that also appear there."
         },
         {
           "name": "placeRouterTurn",
@@ -25868,7 +25942,7 @@
         {
           "name": "tracedModelFetch",
           "kind": "function",
-          "signature": "(trace: TurnTrace, inner: (input: URL | RequestInfo, init?: RequestInit | undefined) => Promise<Response>, options?: Tr…",
+          "signature": "(trace: TurnTrace, inner: (input: RequestInfo | URL, init?: RequestInit | undefined) => Promise<Response>, options?: Tr…",
           "doc": "`fetch` for a model request, recording one `model.call` span per send: the wall time from the request to the end of its body, the time to the first byte, and the Router's own `Server-Timing` so the w…"
         },
         {
@@ -30727,7 +30801,7 @@
         {
           "name": "installFetchResponseObserver",
           "kind": "function",
-          "signature": "(onResponse: (response: Response, args: [input: URL | RequestInfo, init?: RequestInit | undefined]) => void | Promise<v…",
+          "signature": "(onResponse: (response: Response, args: [input: RequestInfo | URL, init?: RequestInit | undefined]) => void | Promise<v…",
           "doc": "Wrap `window.fetch` for the page's lifetime so `onResponse` sees every response."
         },
         {

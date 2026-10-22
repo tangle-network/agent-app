@@ -9890,7 +9890,7 @@ interface CampaignResult
 `function` — Compare complete optimization methods on disjoint train, selection, and final test data.
 
 ```ts
-<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…
+<TScenario extends Scenario, TArtifact>(rawOpts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Op…
 ```
 
 ### `CompareOptimizationMethodsOptions`
@@ -9959,7 +9959,7 @@ interface Gate
 
 ### `gepaOptimizationMethod`
 
-`function`
+`function` — Environment for a bridge child that spawns `claude` CLI subprocesses.
 
 ```ts
 <TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…
@@ -17198,7 +17198,7 @@ interface PlanPartStoreOptions
 
 ## `./platform`
 
-Source: `src/platform/index.ts` · depends on `billing`, `runtime`, `web`
+Source: `src/platform/index.ts` · depends on `billing`, `crypto`, `runtime`, `web`
 
 ### `AdminGuardOptions`
 
@@ -17368,6 +17368,14 @@ interface BillingConsentRefusal
 (input: { client: PlatformDelegatedKeyClient; sourceKey: string; product: string; resource?: { type: string; id: string…
 ```
 
+### `createDelegatedTurnKeys`
+
+`function`
+
+```ts
+(options: DelegatedTurnKeysOptions) => DelegatedTurnKeys
+```
+
 ### `createHubSettingsRoutes`
 
 `function` — Build the finite, application-authorized Hub settings server boundary.
@@ -17464,6 +17472,14 @@ interface D1TangleIdentityStoreOptions
 Record<TanglePlanTier, TangleTierPolicy>
 ```
 
+### `DELEGATED_KEY_PREMINT_TABLE_DDL`
+
+`const` — Paste into a migration.
+
+```ts
+"CREATE TABLE IF NOT EXISTS delegated_key_premint (\n slot TEXT PRIMARY KEY,\n scope TEXT NOT NULL,\n turn_id TEXT NOT…
+```
+
 ### `DelegatedKey`
 
 `interface`
@@ -17488,6 +17504,14 @@ type DelegatedKeyBudget
 type DelegatedKeyCode
 ```
 
+### `delegatedKeyFallbackFetch`
+
+`function` — A fetch for one turn that sends a pre-minted key.
+
+```ts
+(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: Request…
+```
+
 ### `DelegatedKeyMissingError`
 
 `class` — A remote key the durable manager must treat as gone (it marks the row revoked and mints again).
@@ -17502,6 +17526,14 @@ class DelegatedKeyMissingError
 
 ```ts
 type DelegatedKeyOutcome
+```
+
+### `DelegatedKeyPremintD1Like`
+
+`interface` — The D1 surface the slot store uses.
+
+```ts
+interface DelegatedKeyPremintD1Like
 ```
 
 ### `DelegatedKeyProvisioner`
@@ -17550,6 +17582,54 @@ interface DelegatedKeySlotRef
 
 ```ts
 interface DelegatedKeyVerdict
+```
+
+### `DelegatedTurnKey`
+
+`interface`
+
+```ts
+interface DelegatedTurnKey
+```
+
+### `DelegatedTurnKeyEvent`
+
+`type`
+
+```ts
+type DelegatedTurnKeyEvent
+```
+
+### `DelegatedTurnKeyInput`
+
+`interface`
+
+```ts
+interface DelegatedTurnKeyInput
+```
+
+### `DelegatedTurnKeys`
+
+`interface`
+
+```ts
+interface DelegatedTurnKeys
+```
+
+### `DelegatedTurnKeyScope`
+
+`type` — What a turn's key is minted for.
+
+```ts
+type DelegatedTurnKeyScope
+```
+
+### `DelegatedTurnKeysOptions`
+
+`interface`
+
+```ts
+interface DelegatedTurnKeysOptions
 ```
 
 ### `FREE_TIER_SPEND_CAP_USD`
@@ -18187,7 +18267,7 @@ interface TangleTierState
 
 ## `./platform/billing-config`
 
-Source: `src/platform/billing-config.ts` · depends on `billing`, `runtime`, `web`
+Source: `src/platform/billing-config.ts` · depends on `billing`, `crypto`, `runtime`, `web`
 
 ### `checkPlatformBillingConfig`
 
@@ -21229,6 +21309,14 @@ interface OpenAICompatStreamTurnOptions
 interface OpenAIStreamChunk
 ```
 
+### `perTurnPrefixBytes`
+
+`function` — The per-turn bytes in a prompt prefix: a clock to the minute, and any of this turn's `context` sections (or the caller's own per-turn values: ids, the member's message) that also appear there.
+
+```ts
+(prefix: string, perTurn?: readonly string[]) => string[]
+```
+
 ### `placeRouterTurn`
 
 `function` — Where one conversational turn runs: `inference` or `loop` run here in `runRouterTurn`; `sandbox` means the profile or request needs a computer (a harness, files, MCP servers, skills that are not inli…
@@ -21832,6 +21920,14 @@ interface CheckpointWorkspaceStore
 
 ```ts
 number
+```
+
+### `perTurnPrefixBytes`
+
+`function` — The per-turn bytes in a prompt prefix: a clock to the minute, and any of this turn's `context` sections (or the caller's own per-turn values: ids, the member's message) that also appear there.
+
+```ts
+(prefix: string, perTurn?: readonly string[]) => string[]
 ```
 
 ### `placeRouterTurn`
@@ -33381,7 +33477,7 @@ interface ServerTimingEntry
 `function` — `fetch` for a model request, recording one `model.call` span per send: the wall time from the request to the end of its body, the time to the first byte, and the Router's own `Server-Timing` so the w…
 
 ```ts
-(trace: TurnTrace, inner: (input: URL | RequestInfo, init?: RequestInit | undefined) => Promise<Response>, options?: Tr…
+(trace: TurnTrace, inner: (input: RequestInfo | URL, init?: RequestInit | undefined) => Promise<Response>, options?: Tr…
 ```
 
 ### `TracedModelFetchOptions`
@@ -39703,7 +39799,7 @@ interface AppDocumentProps
 `function` — Wrap `window.fetch` for the page's lifetime so `onResponse` sees every response.
 
 ```ts
-(onResponse: (response: Response, args: [input: URL | RequestInfo, init?: RequestInit | undefined]) => void | Promise<v…
+(onResponse: (response: Response, args: [input: RequestInfo | URL, init?: RequestInit | undefined]) => void | Promise<v…
 ```
 
 ### `svgFaviconHref`
