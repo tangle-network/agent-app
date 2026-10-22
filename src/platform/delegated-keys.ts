@@ -80,7 +80,10 @@ export type DelegatedKeyBudget =
 export interface DelegatedKeyRequest {
   /** The payer's linked `sk-tan-` key. Never a shared app key. */
   sourceKey: string
-  /** The logical slot, e.g. `turn:<id>`. Sent as Platform's canonical name; see {@link canonicalDelegatedKeyName}. */
+  /** The logical slot, e.g. `turn:<id>`. Sent as Platform's canonical name; see {@link canonicalDelegatedKeyName}.
+   *  A slot holds one key: a new delegation under the same name revokes (or supersedes) the key holding it
+   *  (Platform key-provisioning `revokeKeySubtrees`). Two attempts that may run at once, such as a transport retry
+   *  beside the attempt it replaces, need distinct names, or the second revokes the first mid-turn. */
   name: string
   product: 'router' | 'sandbox' | (string & {})
   resource?: { type: string; id: string }
@@ -97,7 +100,8 @@ export interface DelegatedKeyRequest {
    * backoff, for at most `forMs` from the first attempt; then return that refusal. Platform's origin was unreachable
    * for 84.8 s and 54.5 s across restarts on 2026-10-22, and each such failure ended a member's Router turn, so a
    * turn-scoped mint passes about 90 000 here, inside its turn's budget. `signal` stops the wait early. A retried
-   * request may have reached Platform, so an extra child can exist; it carries its own budget and expiry.
+   * request may have reached Platform; the next attempt uses the same name, so it replaces that child in its slot
+   * rather than leaving a second one.
    */
   retryUnavailable?: { forMs: number; signal?: AbortSignal }
 }
