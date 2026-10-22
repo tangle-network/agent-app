@@ -6,9 +6,10 @@
  * The rules are the route's, not the product's:
  * - the body's `newThread.id` equals the route's `threadId` and is 32 lowercase
  *   hex (the server's own id format), else the turn is the 404 it always was;
- * - an id that already exists anywhere is refused with 409 and never adopted,
- *   so a guessed id cannot reach another member's thread, and nothing is written
- *   (the product's insert does nothing on conflict);
+ * - an id that exists anywhere, or that any turn ever used, is refused with
+ *   409 and never adopted, so a guessed or remembered id cannot reach another
+ *   tenant's thread or a deleted thread's turns, and nothing is written (the
+ *   product's insert does nothing on conflict and checks its turn records);
  * - the title is trimmed and cut to 200 characters; blank is `null`;
  * - `arm` admits members one by one, so a product can roll it out by percent.
  *
@@ -32,10 +33,16 @@ export interface ChatTurnCreateThreadOptions<TThread = unknown> {
   /** Per-member arm. Omit → every member. */
   arm?(owner: ChatTurnThreadOwner): boolean
   /**
-   * Insert the thread, doing nothing when the id already exists (for example
-   * drizzle's `.onConflictDoNothing().returning()`), and return the written
-   * row, or `null`/`undefined` when nothing was written. `title` is `null` when
-   * the client sent none; the product names the fallback.
+   * Insert the thread and return the written row, or `null`/`undefined` (409)
+   * when the id exists or was ever used:
+   * - the thread id column must be unique on its own, not per tenant, and the
+   *   insert must do nothing on conflict (drizzle's
+   *   `.onConflictDoNothing().returning()`);
+   * - refuse an id any turn ever used (for example a `turn_status` row whose
+   *   `scopeId` is the id): turn records keyed by thread id outlive a deleted
+   *   thread, and a re-created id would hand them to its new owner through
+   *   replay and running-turn discovery.
+   * `title` is `null` when the client sent none; the product names the fallback.
    */
   insert(thread: { id: string; title: string | null } & ChatTurnThreadOwner): Promise<TThread | null | undefined>
 }
