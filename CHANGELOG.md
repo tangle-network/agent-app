@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.276
+
+- fix(router-producer): store no usage when the Router reports none (#1260)
+
 ## 0.60.275
 
 - feat(operator): token usage on OperatorTurn via operatorTurnUsage (#1258)
