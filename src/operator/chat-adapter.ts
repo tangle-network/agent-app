@@ -138,10 +138,10 @@ export interface ChatOperatorAdapterOptions<Identity> {
   failureOf?(message: ChatOperatorMessage): { code?: string; message: string } | null
   /**
    * Whether stored rows' `inputTokens` include cache reads, for
-   * `operatorTurnUsage`. A row does not say which agent-app wrote it: since
-   * 0.60.248 the writers exclude them (`false`), so an app whose rows all
-   * date from then may pass `false`. Default `'unknown'` omits `inputTokens`
-   * on rows with cache reads.
+   * `operatorTurnUsage`. A row does not say which writer or version stored
+   * it, so pass a boolean only when every writer of the app's rows is known
+   * to follow it. Default `'unknown'` omits `inputTokens` on rows with cache
+   * reads.
    */
   inputIncludesCache?: boolean | 'unknown'
 }
@@ -193,8 +193,9 @@ function turnIdOf(message: ChatOperatorMessage): string | null {
  * `cachedInputTokens` is the row's `cacheReadTokens` and `outputTokens` its
  * `outputTokens`, each when the row has it. `inputTokens` is reported only as
  * the prompt NOT read from cache, and a row does not record whether its
- * `inputTokens` already excludes cache reads (agent-app's writers exclude them
- * since 0.60.248; earlier Router-lane rows include them). So:
+ * `inputTokens` already excludes cache reads: the Router lane subtracts them
+ * before storing since 0.60.248 and included them before, and the sandbox
+ * lanes store the split their upstream reports. So:
  * - with no cache reads (absent or 0), the row's `inputTokens` is unambiguous;
  * - `inputIncludesCache: false` reports the row's `inputTokens`;
  * - `inputIncludesCache: true` reports `inputTokens - cacheReadTokens`, omitted
