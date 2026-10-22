@@ -1,0 +1,30 @@
+/**
+ * What `createChatTurnRoutes` measured for a settled turn, kept in this isolate
+ * under the turn's stream id so the rollout timing store can fill the row the
+ * product writes from its lifecycle hook. A product's writer that forgot
+ * `firstVisibleMs` or `admissionMs` (Legal never wrote first_visible_ms) still
+ * records them after a version bump, on every lane.
+ *
+ * Internal: not exported from a subpath. Values the product passes always win.
+ */
+export interface MeasuredTurnFacts {
+  admissionMs?: number
+  firstVisibleMs?: number
+  firstTextMs?: number
+  /** The model that served the turn. */
+  model?: string
+}
+
+/** Turns kept; a lifecycle hook reads its turn's facts within the same request, so a small window is enough. */
+const KEEP = 512
+const facts = new Map<string, MeasuredTurnFacts>()
+
+export function noteMeasuredTurnFacts(turnStreamId: string, measured: MeasuredTurnFacts): void {
+  facts.delete(turnStreamId)
+  facts.set(turnStreamId, measured)
+  if (facts.size > KEEP) facts.delete(facts.keys().next().value!)
+}
+
+export function measuredTurnFacts(turnStreamId: string): MeasuredTurnFacts | undefined {
+  return facts.get(turnStreamId)
+}

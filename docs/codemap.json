@@ -16100,7 +16100,8 @@
       "id": "./rollout",
       "source": "src/rollout/index.ts",
       "dependsOn": [
-        "signoff"
+        "signoff",
+        "turn-trace"
       ],
       "error": null,
       "exports": [
@@ -16194,7 +16195,8 @@
       "id": "./rollout/cli",
       "source": "src/rollout/cli.ts",
       "dependsOn": [
-        "signoff"
+        "signoff",
+        "turn-trace"
       ],
       "error": null,
       "exports": [
@@ -16222,14 +16224,15 @@
       "id": "./rollout/d1",
       "source": "src/rollout/d1.ts",
       "dependsOn": [
-        "signoff"
+        "signoff",
+        "turn-trace"
       ],
       "error": null,
       "exports": [
         {
           "name": "createD1TurnTimingStore",
           "kind": "function",
-          "signature": "(options: { db: D1LikeForRollout; now?: (() => number) | undefined; }) => { record(row: TurnTimingRow): Promise<void>;…",
+          "signature": "(options: { db: D1LikeForRollout; now?: (() => number) | undefined; measuredFacts?: boolean | undefined; }) => { record…",
           "doc": null
         },
         {
