@@ -74,7 +74,7 @@ importers:
         version: 0.27.1(@tangle-network/agent-interface@5.7.0)
       '@tangle-network/agent-runtime':
         specifier: 0.342.0
-        version: 0.342.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.215.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@5.7.0)(@tangle-network/sandbox@0.63.10(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
+        version: 0.342.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.215.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@5.7.0)(@tangle-network/sandbox@0.64.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
       '@tangle-network/brand':
         specifier: 1.26.2
         version: 1.26.2(react@19.2.8)
@@ -85,14 +85,14 @@ importers:
         specifier: 0.30.10
         version: 0.30.10(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
       '@tangle-network/sandbox':
-        specifier: 0.63.10
-        version: 0.63.10(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
+        specifier: 0.64.0
+        version: 0.64.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       '@tangle-network/sandbox-ui':
         specifier: 0.136.1
         version: 0.136.1(9cf1bd26b542966855069cf1b5ef4f20)
       '@tangle-network/tcloud':
-        specifier: 0.8.3
-        version: 0.8.3(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(typescript@7.0.2)(zod@4.4.3)
+        specifier: 0.8.4
+        version: 0.8.4(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(typescript@7.0.2)(zod@4.4.3)
       '@tangle-network/ui':
         specifier: 11.41.0
         version: 11.41.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@nanostores/react@1.1.0(nanostores@1.5.4)(react@19.2.8))(@shikijs/themes@4.4.3)(@tangle-network/brand@1.26.2(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.4)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
@@ -3040,8 +3040,8 @@ packages:
       yjs:
         optional: true
 
-  '@tangle-network/sandbox@0.60.49':
-    resolution: {integrity: sha512-boHCuUIexnkNwv1X/ra2bLGrwpwosyYEpq12c4FbofmKZI3xUpvVB1BMqgPqgaABpbts3JT7AmTcF3XvLg7Gmg==}
+  '@tangle-network/sandbox@0.63.10':
+    resolution: {integrity: sha512-5zYWOEQKEXSy4F4iCw6AcBeXQqGOUdy9IJ9t5GxJxQwssB/+9hAvkpMlcSU9KzAOn4QMxtkr8/tKcVuH8kUgAg==}
     peerDependencies:
       '@mastra/core': ^1.36.0
       '@modelcontextprotocol/sdk': ^1.30.0
@@ -3060,8 +3060,8 @@ packages:
       viem:
         optional: true
 
-  '@tangle-network/sandbox@0.63.10':
-    resolution: {integrity: sha512-5zYWOEQKEXSy4F4iCw6AcBeXQqGOUdy9IJ9t5GxJxQwssB/+9hAvkpMlcSU9KzAOn4QMxtkr8/tKcVuH8kUgAg==}
+  '@tangle-network/sandbox@0.64.0':
+    resolution: {integrity: sha512-5TH83yQdbdKKxsraUKv326yPNafwXMsiHtJ6ZQfSw2/7Yc/nTYWCsP0flHKKWdC7mXIdY3jL9yMtgCYdnE1uYw==}
     peerDependencies:
       '@mastra/core': ^1.36.0
       '@modelcontextprotocol/sdk': ^1.30.0
@@ -3084,8 +3084,8 @@ packages:
     resolution: {integrity: sha512-+TAF9s5t1jOWGyGHvKhIWe2FYmG7puVaxmmg0Et67ylAjGa7GqUAvISXGjG/6dzld7A170V0kQHK0WVdh2Wh0Q==}
     engines: {node: '>=18'}
 
-  '@tangle-network/tcloud@0.8.3':
-    resolution: {integrity: sha512-OWCddpcwbZ6YhfLTN3nS2L1pw/kpKhqMd5BC9Hn4cxU5E4Bbe2jk6yFFgyrwLA693P4lKYpLD66kp0nPL+7+Ng==}
+  '@tangle-network/tcloud@0.8.4':
+    resolution: {integrity: sha512-3EWmbX671P92Q1uK5nv62B+YHcPSRnEv3C+q5N9VmuQjrF35WnppM5rukm3u61hQhhFqpzRUwKe4gh3hJfAxfA==}
     engines: {node: '>=22.12.0'}
     hasBin: true
 
@@ -8987,7 +8987,7 @@ snapshots:
     dependencies:
       '@tangle-network/agent-interface': 5.7.0
 
-  '@tangle-network/agent-runtime@0.342.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.215.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@5.7.0)(@tangle-network/sandbox@0.63.10(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
+  '@tangle-network/agent-runtime@0.342.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(@tangle-network/agent-eval@0.215.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@5.7.0)(@tangle-network/sandbox@0.64.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
     dependencies:
       '@earendil-works/pi-codemode': 1.0.4
       '@tangle-network/agent-core': 0.12.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
@@ -8996,7 +8996,7 @@ snapshots:
       '@tangle-network/agent-knowledge': 22.0.7(@tangle-network/agent-eval@0.215.1(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3)))(@tangle-network/agent-interface@5.7.0)
       '@tangle-network/agent-profile-materialize': 0.25.2(@tangle-network/agent-interface@5.7.0)
       '@tangle-network/agent-trace-contract': 2.1.0
-      '@tangle-network/sandbox': 0.63.10(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
+      '@tangle-network/sandbox': 0.64.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       tar-stream: 3.2.1
       zod: 4.6.5
     transitivePeerDependencies:
@@ -9084,7 +9084,7 @@ snapshots:
       - '@types/react-dom'
       - tailwindcss
 
-  '@tangle-network/sandbox@0.60.49(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.57.1(typescript@7.0.2)(zod@4.4.3))':
+  '@tangle-network/sandbox@0.63.10(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.57.1(typescript@7.0.2)(zod@4.4.3))':
     dependencies:
       '@tangle-network/agent-core': 0.11.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
       '@tangle-network/agent-interface': 4.0.0
@@ -9100,7 +9100,7 @@ snapshots:
       - bare-buffer
       - react-native-b4a
 
-  '@tangle-network/sandbox@0.63.10(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))':
+  '@tangle-network/sandbox@0.64.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))':
     dependencies:
       '@tangle-network/agent-core': 0.11.0(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))
       '@tangle-network/agent-interface': 4.0.0
@@ -9118,9 +9118,9 @@ snapshots:
 
   '@tangle-network/tcloud-attestation@0.1.1': {}
 
-  '@tangle-network/tcloud@0.8.3(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(typescript@7.0.2)(zod@4.4.3)':
+  '@tangle-network/tcloud@0.8.4(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(typescript@7.0.2)(zod@4.4.3)':
     dependencies:
-      '@tangle-network/sandbox': 0.60.49(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.57.1(typescript@7.0.2)(zod@4.4.3))
+      '@tangle-network/sandbox': 0.63.10(@modelcontextprotocol/sdk@1.30.1(zod@4.4.3))(ai@6.0.292(zod@4.4.3))(openai@6.49.0(ws@8.21.3)(zod@4.4.3))(viem@2.57.1(typescript@7.0.2)(zod@4.4.3))
       '@tangle-network/tcloud-attestation': 0.1.1
       commander: 15.0.0
       viem: 2.57.1(typescript@7.0.2)(zod@4.4.3)
