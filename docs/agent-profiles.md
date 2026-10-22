@@ -26,7 +26,6 @@ Trusted product attachments may change the effective digest without changing the
 An owner or manager may activate a text edit for the next message using an expected active revision; a conflict says the text changed since it was opened and requires review.
 Authority edits require a verified consent decision before activation.
 Optimizer proposals remain candidates until promoted.
-One-step rollback rebinds to the previous revision; it does not mutate a historical snapshot.
 Revision rows, activation events, binding events, receipts and turn pins are append-only.
 The current revision and member/channel binding are derived from the latest event version.
 
@@ -37,9 +36,9 @@ The current revision and member/channel binding are derived from the latest even
 | Different-authority switch | Prepare managed plan, health-check, then guarded binding event | Same | None of the user's workspace files inline |
 | Authority edit | Editor and verified consent | Same | None inline |
 | Optimizer revision | Candidate until evaluated and promoted | Same | None inline |
-| Destructive action | Reaper only | No chat action | Dry run, reference check, grace |
+| Destructive action | Product retention owner | No chat action | Reference and retention checks |
 
-`PROFILE_CHANGE_POLICY` is the enforced code counterpart of this table.
+The internal `PROFILE_CHANGE_POLICY` is the enforced code counterpart of this table.
 
 The command `Switch to <name>` is parsed before model dispatch and accepts a whole message only.
 Names match exactly after whitespace normalization and case folding.
@@ -62,14 +61,13 @@ If preparation fails, the old binding remains and a failure receipt is appended.
 
 Workspace materialization is digest addressed and writes profile-managed skills, hooks, prompt files and MCP/model configuration only under reserved managed paths.
 The same digest is a no-op; another digest stages the entire replacement set and records it in a per-box manifest.
-User and agent workspace files are never overwritten or deleted by a switch, edit or rollback.
+User and agent workspace files are never overwritten or deleted by a switch or edit.
 A profile resource that collides with a workspace path is written beside it with a profile-specific name, and the receipt names the conflict.
 The executor resolves secrets for the binding owner at apply time; old authority secrets are not readable in the newly selected managed paths.
 The current ADC apply primitive does not yet provide that staged managed-set contract, so consumers cannot safely use authority switching until its owner exports it.
 
-Knowledge documents are an add-wins event set.
-Add events commute; a remove event tombstones the add events it observed, so a concurrent add survives.
-Tombstones and unused managed resources are eligible only for a separate reaper: dry run first, no live binding or in-flight pin references, at least 24 hours old, and at least one successful turn after the replacement binding.
+Historical knowledge events and tombstones remain append-only persistence records with a shared storage contract.
+Cleanup of those records or unused managed resources belongs to the product retention owner, which checks live bindings and in-flight pins before deletion.
 Credentials from an old authority expire by TTL instead of being revoked during a switch.
 
 ## Live self-mounting (the safe self-improve subset)

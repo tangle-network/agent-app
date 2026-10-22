@@ -14,7 +14,7 @@ pnpm test:generated
 
 `test:generated` is the existing generator gate, not a second packaging path.
 It packs Agent App and create-agent-app, installs the packed CLI into a clean
-runner, and generates both the unchanged headless variant and the chat variant.
+runner, and generates both the headless variant and the chat variant.
 The fresh chat install replaces only Agent App's requested version with the
 candidate tarball. It keeps strict peers and the generated dependency policy.
 The gate prints both tarball integrity values and runs consumer typechecks,
@@ -32,9 +32,9 @@ A fresh Worker process and browser context must reopen the same thread after a r
 
 The driver rejects external browser requests, records page errors, and requires
 zero `POST /api/chat` requests.
-It writes `workspace-proof.json` and desktop, mobile, drawer, and account screenshots under `VERIFICATION_DIR`.
-The existing Verify PR workflow also captures the exact commit, source archive,
-and generated-gate log. Temporary passwords/auth secrets never enter committed
+It writes `workspace-proof.json`, desktop/mobile screenshots, and uncut WebM recordings under `VERIFICATION_DIR`.
+The `workspace-videos.json` manifest also retains recording paths after a failed journey.
+Keep the Beelink gate receipt and generated-project log alongside these artifacts. Temporary passwords/auth secrets never enter committed
 evidence, and proof-owned processes and local state are removed on exit.
 
 The browser proof checks real thread persistence, not model-message production.
