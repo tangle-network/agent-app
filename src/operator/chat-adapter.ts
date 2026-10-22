@@ -29,6 +29,11 @@ export interface ChatOperatorMessage {
   model?: string | null
   servedModel?: string | null
   costUsd?: number | null
+  /** Explicit producer facts, supplied by the app's stored-row projection; metadata is not interpreted. */
+  costSource?: OperatorTurn['costSource'] | null
+  billingOwner?: OperatorTurn['billingOwner'] | null
+  credentialSource?: OperatorTurn['credentialSource'] | null
+  settlementRecord?: string | null
   /** Usage columns as chat-store stores them; see `operatorTurnUsage` for what `inputTokens` holds. */
   inputTokens?: number | null
   cacheReadTokens?: number | null
@@ -295,6 +300,10 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       const model = assistant.servedModel ?? assistant.model
       if (model) turn.model = model
       if (typeof assistant.costUsd === 'number') turn.costUsd = assistant.costUsd
+      if (assistant.costSource != null) turn.costSource = assistant.costSource
+      if (assistant.billingOwner != null) turn.billingOwner = assistant.billingOwner
+      if (assistant.credentialSource != null) turn.credentialSource = assistant.credentialSource
+      if (assistant.settlementRecord != null) turn.settlementRecord = assistant.settlementRecord
       const usage = operatorTurnUsage(assistant, { inputIncludesCache: options.inputIncludesCache ?? 'unknown' })
       if (usage) turn.usage = usage
       if (state !== 'working' && terminal) {

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.278
+
+- Expose producer-supplied turn cost provenance (#1262)
+- chore(deps): adopt @tangle-network/sandbox 0.64.12 (#1261)
+
 ## 0.60.277
 
 - feat(review): compare blind rows in the existing inbox (#1259)
