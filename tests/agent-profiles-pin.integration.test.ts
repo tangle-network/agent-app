@@ -72,7 +72,8 @@ describe('profile turn pin', () => {
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM agent_profile_turn_pin').get()).toEqual({ n: 1 })
 
     // The same message id with different content is refused at the store.
-    await expect(store.pinTurn({ ...pin, inputHash: `sha256:${'b'.repeat(64)}` }, switched.bindingVersion ?? 1, { priorChecked: true }))
+    const binding = await store.getBinding(key)
+    await expect(store.pinTurn({ ...pin, inputHash: `sha256:${'b'.repeat(64)}` }, binding!.version, { priorChecked: true }))
       .rejects.toBeInstanceOf(ProfileConflictError)
   })
 })
