@@ -30,10 +30,10 @@ try {
   const compiler = join(dirname(compilerManifest),JSON.parse(readFileSync(compilerManifest,'utf8')).bin.tsc)
   const compile = source => {
     writeFileSync(join(scratch,'types.ts'),source)
-    writeFileSync(join(scratch,'tsconfig.json'),JSON.stringify({compilerOptions:{target:'ES2022',module:'NodeNext',moduleResolution:'NodeNext',strict:true,skipLibCheck:true,noEmit:true,types:[],lib:['ES2022','DOM']},files:['types.ts']}))
+    writeFileSync(join(scratch,'tsconfig.json'),JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',strict:true,skipLibCheck:true,noEmit:true,types:[],lib:['ES2022','DOM']},files:['types.ts']}))
     return spawnSync(process.execPath,[compiler,'-p',join(scratch,'tsconfig.json')],{encoding:'utf8'})
   }
-  const retained = compile("import type {FlowTrace,FlowSpan} from '@tangle-network/agent-app/trace'; const span:FlowSpan={kind:'tool',name:'retained',startMs:0,endMs:1}; const trace:FlowTrace={spans:[span],totalMs:1,promptTokens:0,completionTokens:0,toolCalls:1}; void trace;")
+  const retained = compile("import type {MissionActivityLaneProps} from '@tangle-network/agent-app/web-react'; import type {FlowTrace,FlowSpan} from '@tangle-network/agent-app/trace'; export type Retained=MissionActivityLaneProps; const span:FlowSpan={kind:'tool',name:'retained',startMs:0,endMs:1}; const trace:FlowTrace={spans:[span],totalMs:1,promptTokens:0,completionTokens:0,toolCalls:1}; void trace;")
   assert.equal(retained.status,0,retained.stdout+retained.stderr)
   const retired = compile("import type {FlowWaterfallProps,WaterfallRow} from '@tangle-network/agent-app/web-react'; export type Removed=[FlowWaterfallProps,WaterfallRow];")
   assert.notEqual(retired.status,0,'Removed type exports must fail downstream compilation')

@@ -15,10 +15,10 @@
  */
 
 export * from './mission-trace'
-export * from './flow-types'
+export type { FlowSpan, FlowTrace } from '@tangle-network/charts'
 export * from './mission-flow'
 
-import type { FlowSpan, FlowTrace } from './flow-types'
+import type { FlowSpan, FlowTrace } from '@tangle-network/charts'
 
 /** Represent a timed event with a timestamp and associated event data */
 export interface TimedEvent {

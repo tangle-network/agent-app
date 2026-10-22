@@ -19,7 +19,7 @@
  */
 
 import type { StepAgentActivity } from '../missions/agent-activity'
-import type { FlowSpan, FlowTrace } from './flow-types'
+import type { FlowSpan, FlowTrace } from '@tangle-network/charts'
 
 /** Structural mirror of agent-runtime's `LoopTraceEvent` — same fields, no
  *  import, so journals parsed from JSON feed straight in. */
@@ -44,7 +44,7 @@ const ERROR_STATUSES = new Set(['failed', 'error', 'cancelled', 'aborted', 'down
 
 /** Interpret domain wire status at the producer boundary, never in the chart. */
 function flowStatus(status?: string): NonNullable<FlowSpan['status']> {
-  const normalized = status?.toLowerCase() ?? ''
+  const normalized = String(status ?? '').toLowerCase()
   return ERROR_STATUSES.has(normalized) ? 'failed'
     : LIVE_DELEGATION_STATUSES.has(normalized) ? 'running' : 'done'
 }
