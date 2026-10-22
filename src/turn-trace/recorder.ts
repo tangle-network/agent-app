@@ -81,6 +81,13 @@ export interface TurnTraceSummary {
   firstVisibleMs?: number
   /** D1 round trips in the turn scope, when its binding is instrumented. */
   d1Queries?: number
+  /** From the request to the first model request: the wait the app owns before the model can start. */
+  dispatchMs?: number
+  /** Each `admission.*` span's duration by its name after `admission.`, the split of the wait before the turn opens. */
+  admission?: Record<string, number>
+  /** Prompt tokens over every model call, and how many of them the provider served from its prompt cache. */
+  inputTokens?: number
+  cachedInputTokens?: number
 }
 
 export interface TurnTraceSnapshot {
@@ -253,6 +260,32 @@ export function summarizeTurnSpans(
   }
 }
 
+/** The summary fields read from span names and attributes: dispatch time, the admission split and prompt-cache use. */
+function spanMeasurements(spans: readonly TurnSpanRecord[], startedAt: number): Partial<TurnTraceSummary> {
+  const admission: Record<string, number> = {}
+  let firstModelCall: number | undefined
+  let inputTokens: number | undefined
+  let cachedInputTokens: number | undefined
+  for (const span of spans) {
+    if (span.kind === 'admission' && span.name.startsWith('admission.')) {
+      const step = span.name.slice('admission.'.length)
+      admission[step] = round1((admission[step] ?? 0) + span.endMs - span.startMs)
+    }
+    if (span.name !== 'model.call') continue
+    firstModelCall = Math.min(firstModelCall ?? span.startMs, span.startMs)
+    const input = span.attrs['gen_ai.usage.input_tokens']
+    if (typeof input === 'number') inputTokens = (inputTokens ?? 0) + input
+    const cached = span.attrs['gen_ai.usage.cache_read.input_tokens']
+    if (typeof cached === 'number') cachedInputTokens = (cachedInputTokens ?? 0) + cached
+  }
+  return {
+    ...(firstModelCall === undefined ? {} : { dispatchMs: round1(Math.max(0, firstModelCall - startedAt)) }),
+    ...(Object.keys(admission).length ? { admission } : {}),
+    ...(inputTokens === undefined ? {} : { inputTokens }),
+    ...(cachedInputTokens === undefined ? {} : { cachedInputTokens }),
+  }
+}
+
 export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace {
   const now = options.now ?? Date.now
   const startedAt = options.startedAt ?? now()
@@ -329,8 +362,9 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
     record: (name, kind, start, end, attrs) => trace.record(name, kind, start, end, attrs),
   }
 
-  const withMeasurements = (summary: TurnTraceSummary): TurnTraceSummary => ({
+  const withMeasurements = (summary: TurnTraceSummary, spans: readonly TurnSpanRecord[]): TurnTraceSummary => ({
     ...summary,
+    ...spanMeasurements(spans, startedAt),
     ...(firstVisibleAt === undefined ? {} : { firstVisibleMs: round1(firstVisibleAt - startedAt) }),
     ...(firstTextAt === undefined ? {} : { firstTextMs: round1(firstTextAt - startedAt) }),
     ...(options.d1QueryCounter === undefined ? {} : { d1Queries: options.d1QueryCounter.queries }),
@@ -370,7 +404,8 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
     summary(at) {
       if (finished) return finished.summary
       const end = at ?? now()
-      return withMeasurements(summarizeTurnSpans(trace.spans(end), rootId, startedAt, end, traceId, dropped))
+      const spans = trace.spans(end)
+      return withMeasurements(summarizeTurnSpans(spans, rootId, startedAt, end, traceId, dropped), spans)
     },
     spans(at) {
       const end = at ?? finished?.endedAt ?? now()
@@ -393,7 +428,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
         startedAt,
         endedAt,
         spans,
-        summary: withMeasurements(summarizeTurnSpans(spans, rootId, startedAt, endedAt, traceId, dropped)),
+        summary: withMeasurements(summarizeTurnSpans(spans, rootId, startedAt, endedAt, traceId, dropped), spans),
         status: outcome?.error === undefined ? 'ok' : 'error',
         ...(outcome?.error === undefined ? {} : { error: errorText(outcome.error) }),
       }
