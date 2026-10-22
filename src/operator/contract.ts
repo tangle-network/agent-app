@@ -157,11 +157,15 @@ export interface OperatorTurn {
   model?: string
   costUsd?: number
   /**
-   * Token usage the app stored on the turn's reply, with chat-store's names.
-   * `inputTokens` is the uncached prompt; `cacheReadTokens` is the prompt the
-   * provider served from its cache, so the whole prompt is their sum.
-   * `outputTokens` is the completion. Each field is present only when the app
-   * recorded it; an absent field is unknown, never zero.
+   * Token usage the app stored on the turn's reply, with chat-store's column
+   * names and meanings (`operatorTurnUsage` maps a row):
+   * - `inputTokens`: prompt tokens NOT read from the provider's cache. It
+   *   excludes `cacheReadTokens`; the Router lane subtracts them before storing.
+   * - `cacheReadTokens`: prompt tokens read from the provider's cache. The
+   *   whole prompt is `inputTokens + cacheReadTokens`. When it is absent the
+   *   cache share is unknown, not zero.
+   * - `outputTokens`: completion tokens.
+   * Each field is present only when the app recorded it; never a guessed zero.
    */
   usage?: Pick<ChatTurnUsage, 'inputTokens' | 'cacheReadTokens' | 'outputTokens'>
   completedAt?: string

@@ -3,6 +3,7 @@ import {
   createChatOperatorAdapter,
   createOperatorApi,
   createOperatorClient,
+  operatorTurnUsage,
   type ChatOperatorAdapterOptions,
   type ChatOperatorAdmission,
   type ChatOperatorAdmissionStore,
@@ -125,6 +126,8 @@ describe('chat operator adapter', () => {
     if (!unmetered.succeeded) throw new Error(unmetered.error)
     expect(unmetered.value.state).toBe('succeeded')
     expect('usage' in unmetered.value).toBe(false)
+    // An app with its own operator turns maps its rows through the same function.
+    expect(operatorTurnUsage({ inputTokens: 7, cacheReadTokens: null })).toEqual({ inputTokens: 7 })
   })
 
   it('reports a failure notice as a failed turn', async () => {
