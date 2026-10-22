@@ -3,6 +3,7 @@
  *
  *  - a refused turn runs the prefetch (started at `identified`) but answers today's refusal, aborts the prefetch,
  *    writes no row and hands nothing on;
+ *  - a thrown admission error aborts pending prefetch and propagates unchanged, without writes or output;
  *  - an allowed turn's prefetch starts before `authorize` ends, and `produce` starts only after `authorize` ends,
  *    with the prefetched value for that identity;
  *  - an `authorize` that never calls `identified` still gets the prefetch, after it allows the turn.
@@ -14,7 +15,7 @@ import { createMemoryTurnEventStore } from '../../src/stream/index'
 
 const tick = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-function harness(options: { refuse?: boolean; signal?: boolean } = {}) {
+function harness(options: { refuse?: boolean; signal?: boolean; authorizeError?: Error; modelDenied?: boolean } = {}) {
   const log: Array<{ at: number; what: string }> = []
   const mark = (what: string) => log.push({ at: performance.now(), what })
   const rows: string[] = []
@@ -33,17 +34,24 @@ function harness(options: { refuse?: boolean; signal?: boolean } = {}) {
       if (options.signal !== false) identified?.({ tenantId: 'ws-1', userId: 'user-1' })
       await tick(80)
       mark('authorize.end')
+      if (options.authorizeError) throw options.authorizeError
       if (options.refuse) return { ok: false, response: Response.json({ error: 'No seat' }, { status: 402 }) }
       return { ok: true, tenantId: 'ws-1', userId: 'user-1', context: {} }
     },
     prefetch: async ({ tenantId, userId, signal }) => {
       mark('prefetch.start')
       signals.push(signal)
+      if (options.authorizeError) {
+        await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }))
+        mark('prefetch.aborted')
+        return undefined
+      }
       await tick(40)
       mark('prefetch.end')
       return { prompt: `profile for ${userId} in ${tenantId}` }
     },
     store,
+    ...(options.modelDenied ? { modelPolicy: { catalog: [], filter: () => true } } : {}),
     turnStore: createMemoryTurnEventStore(),
     incrementalPersistence: false,
     produce: async (args) => {
@@ -58,13 +66,34 @@ function harness(options: { refuse?: boolean; signal?: boolean } = {}) {
   })
   const pending: Promise<unknown>[] = []
   const send = () => routes.turn(new Request('http://app.test/api/chat', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId: 't-1', content: 'hi' }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId: 't-1', content: 'hi', ...(options.modelDenied ? { model: 'acme/model' } : {}) }),
   }), { waitUntil: (p: Promise<unknown>) => { pending.push(p) } })
   const at = (what: string) => log.find((entry) => entry.what === what)?.at
   return { send, log, rows, signals, prefetchedSeen, pending, at }
 }
 
 describe('turn prefetch', () => {
+  it('aborts pending prefetch when authorize throws and preserves the original error without writes or output', async () => {
+    const error = new Error('admission store unavailable')
+    const h = harness({ authorizeError: error })
+    await expect(h.send()).rejects.toBe(error)
+    expect(h.signals[0]!.aborted).toBe(true)
+    expect(h.at('prefetch.aborted')).toBeDefined()
+    expect(h.at('produce.start')).toBeUndefined()
+    expect(h.prefetchedSeen).toEqual([])
+    expect(h.rows).toEqual([])
+  })
+
+  it('discards prefetch when named-model policy refuses after authorization', async () => {
+    const h = harness({ modelDenied: true })
+    const response = await h.send()
+    expect(response.status).toBe(403)
+    expect(h.signals[0]!.aborted).toBe(true)
+    expect(h.at('produce.start')).toBeUndefined()
+    expect(h.prefetchedSeen).toEqual([])
+    expect(h.rows).toEqual([])
+  })
+
   it('answers a refused turn with its refusal, aborts the prefetch and hands nothing on', async () => {
     const h = harness({ refuse: true })
     const response = await h.send()
