@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.253
+
+- feat(rollout): a variant column for experiment assignments, apart from the cohort arm (#1232)
+
 ## 0.60.252
 
 - feat(app-auth): user columns and index options for createAppAuthTables (#1230)
