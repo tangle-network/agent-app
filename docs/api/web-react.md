@@ -3152,10 +3152,10 @@ interface ReviewFeedbackFormProps
 
 ### `ReviewInbox`
 
-`function` — One oldest-first review round.
+`function` — One oldest-first review round, with optional blind comparison rows.
 
 ```ts
-({ items, initialSelectedId, renderItem, onVerdict, onFeedback, loading, error, onRefresh }: ReviewInboxProps) => Eleme…
+({ items, initialSelectedId, renderItem, renderCompareBrief, onVerdict, onFeedback, loading, error, onRefresh }: Review…
 ```
 
 ### `ReviewInboxFeedback`
