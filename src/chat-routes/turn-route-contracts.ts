@@ -7,6 +7,7 @@ import type { ModelPolicy } from '../policy-filters/index'
 import type { PersistedChatMessageForTurn, TurnEventStore } from '../stream/index'
 import type { TurnSpan, TurnSpanAttrs, TurnTrace, TurnTraceSink, TurnTraceSummary } from '../turn-trace/recorder'
 import type { DraftPersistenceTuning } from './draft-persistence'
+import type { ChatTurnCreateThreadOptions, ChatTurnCreateThreadResult, ChatTurnThreadOwner } from './minted-thread'
 import type { TurnRoutePhase } from './turn-progress'
 import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
 
@@ -151,7 +152,7 @@ export type ChatTurnAuthorization<TContext> =
   | { ok: false; response: Response }
 
 /** Define arguments required to authorize a chat turn based on intent and request details */
-export interface ChatTurnAuthorizeArgs {
+export interface ChatTurnAuthorizeArgs<TThread = unknown> {
   request: Request
   intent: 'turn' | 'replay' | 'running'
   /** Parsed, validated POST body (turn intent only). */
@@ -165,6 +166,10 @@ export interface ChatTurnAuthorizeArgs {
   trace?: TurnTrace
   /** The `admission.authorize` span (turn intent only): the parent for those child spans, so they nest under it. */
   span?: TurnSpan
+  /** Turn intent with the route's `createThread` option set: create the turn's thread from the id the client minted.
+   *  Call it only where the product's own thread read missed; it answers 404 when the body names no valid minted
+   *  thread or the member is outside the arm, and 409 when the id already exists anywhere (see `./minted-thread`). */
+  createThread?(owner: ChatTurnThreadOwner): Promise<ChatTurnCreateThreadResult<TThread>>
 }
 
 /** What `prepareTurn` receives: the admitted turn, before the conversation loads. */
@@ -469,14 +474,18 @@ export interface ChatTurnTraceOptions<TContext> {
 }
 
 /** Define options to configure chat turn routes including authorization, storage, and event buffering */
-export interface CreateChatTurnRoutesOptions<TContext = void> {
+export interface CreateChatTurnRoutesOptions<TContext = void, TThread = unknown> {
   /** Names the product in `deriveExecutionId` so retries land on the same
    *  substrate execution. */
   projectId: string
   /** Authenticate + authorize the caller for a turn or a replay. The only
    *  product-supplied access step: session auth, thread/workspace access,
    *  seat/balance gates, rate limits all live here. */
-  authorize(args: ChatTurnAuthorizeArgs): Promise<ChatTurnAuthorization<TContext>>
+  authorize(args: ChatTurnAuthorizeArgs<TThread>): Promise<ChatTurnAuthorization<TContext>>
+  /** A new chat's first turn creates its thread from an id the client minted (`mintThreadId` in `/web-react`), so the
+   *  client skips the thread POST: `authorize` receives `args.createThread` and calls it where its thread read missed.
+   *  Omit → an unknown thread stays the product's 404. */
+  createThread?: ChatTurnCreateThreadOptions<TThread>
   /** Finish the turn's context after `authorize` has admitted the caller and
    *  before the conversation loads or the lock is taken: resolve the profile,
    *  the model, anything that reads or writes product state. Keep `authorize`

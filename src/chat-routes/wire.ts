@@ -199,6 +199,10 @@ export interface ChatTurnRequestPayload {
   turnId?: string
   /** New token for a deliberate retry; reuse it for transport retries of that attempt. */
   retryAttemptId?: string
+  /** A new chat's first turn: the thread to create, `id` equal to `threadId` (`mintThreadId` in `/web-react`).
+   *  Send it on every turn of a minted thread until one is admitted, so a refused first turn retries as a creating one;
+   *  once the thread exists the server finds it first and creates nothing. */
+  newThread?: { id: string; title?: string }
   [key: string]: unknown
 }
 
