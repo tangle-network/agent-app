@@ -64,7 +64,11 @@ async function boundary(test: Case) {
       return json(Array.from({ length: count }, (_, index) => ({
         info: { id: `assistant-${index}`, role: 'assistant', timestamp: new Date().toISOString(),
           metadata: { turnId, ...(test.assistant === 'unmarked' ? {} : { interrupted: true }), interruptReason: 'Interrupted' } },
-        parts: [{ type: 'text', text: 'Exact partial answer.' }],
+        parts: [
+          { type: 'text', text: 'Exact partial answer.' },
+          { type: 'tool', id: 'tool-1', tool: 'write', state: { status: 'completed', input: { path: 'draft.md' }, output: { ok: true } } },
+          { type: 'file', id: 'file-1', path: 'draft.md', filename: 'draft.md' },
+        ],
       })))
     }
     if (path === `/agents/run/${turnId}/events`) {
@@ -88,7 +92,7 @@ async function boundary(test: Case) {
         frame('error', { message: test.error ?? diskCause, requestId: 'fixture-request', effectiveBackend }, 4),
         frame('done', { requestId: 'fixture-request', effectiveBackend }, 5),
       ]
-      return response.end(events.map(event => `id: ${event.eventId}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(''))
+      return response.end(events.map(event => `id: ${event.eventId}\nevent: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`).join(''))
     }
     return json({ error: `Unexpected read: ${path}` }, 404)
   })
@@ -164,6 +168,12 @@ async function boundary(test: Case) {
       expect(receipt.state).toBe('failed')
       expect(receipt.completedTurnIds).toEqual([turnId])
       expect(receipt.usage).toEqual({})
+      if (test.assistant === 'one') {
+        expect(receipt.parts).toEqual(expect.arrayContaining([
+          expect.objectContaining({ type: 'tool', id: 'tool-1' }),
+          expect.objectContaining({ type: 'file', path: 'draft.md' }),
+        ]))
+      }
       expect(steps).toContain('native-completion:finalize-buffer')
       expect(steps.at(-1)).toBe('native-completion:release-lock')
       expect(db.$client.prepare('SELECT state FROM native_turn_lock WHERE turn_id = ?').get(turnId)).toEqual({ state: 'released' })
@@ -193,7 +203,7 @@ async function boundary(test: Case) {
     expect((await routes.replay(new Request('http://local/chat/replay'), { turnId })).status).toBe(401)
     expect(requests.every(request => request.method === 'GET')).toBe(true)
     expect(requests.some(request => request.path.includes('/unrelated-later-turn/'))).toBe(false)
-    if (test.expected === 'failed') expect(requests.some(request => request.path.includes(`/run/${turnId}/events`))).toBe(true)
+    if (test.expected === 'failed') expect(requests.some(request => request.path.includes(`/run/${turnId}/events`))).toBe((test.eventCount ?? 6) <= 2_000)
   } finally {
     db.$client.close()
     server.closeAllConnections()
@@ -216,5 +226,6 @@ describe('native terminal replay reaches the authorized public boundary', () => 
     { name: 'an unmarked assistant is not misclassified as pre-assistant bootstrap', assistant: 'unmarked', expected: 'running' },
     { name: 'event transport errors remain retryable and cannot publish a terminal', transportFailure: true, expected: 'throw' },
     { name: 'a large native replay stays bounded', eventCount: 2_001, expected: 'running' },
+    { name: 'long interrupted assistant keeps partial parts without replaying its event stream', assistant: 'one', eventCount: 40_000, publicCause: 'Native Sandbox execution failed before producing an answer.', expected: 'failed' },
   ] satisfies Case[]) it(test.name, () => boundary(test), 30_000)
 })
