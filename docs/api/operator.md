@@ -395,7 +395,7 @@ type OperatorTurnState
 `function` — The operator turn usage of a stored assistant row, for `OperatorTurn.usage`.
 
 ```ts
-(row: Pick<ChatOperatorMessage, "inputTokens" | "outputTokens" | "cacheReadTokens">) => Pick<ChatTurnUsage, "inputToken…
+(row: Pick<ChatOperatorMessage, "inputTokens" | "outputTokens" | "cacheReadTokens">) => { inputTokens?: number | undefi…
 ```
 
 ### `OperatorWorkspace`
