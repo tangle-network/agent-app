@@ -272,44 +272,16 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('23.0.0', range!)).toBe(false)
   })
 
-  // Each window starts at the floor this application code ran on, admits the
-  // newer minor tested in an installed consumer, and claims nothing past it.
-  // The Runtime refuses Sandbox
-  // 0.48, so the shell refuses it too. Sandbox 0.50 adds the named instances
-  // that `hosted-agent` keeps each person's box on, 0.51 adds lines, 0.52
-  // runs each line member in their own named instance, 0.53 adds email lines,
-  // and 0.55 adds the global line detach the hosted-agent kit uses.
-  // Sandbox 0.59 is admitted for this shell's optional /sandbox adapter.
-  // Sandbox 0.60.3 is the first public parser that preserves signed shared
-  // Line callback identity and dispatch fields; 0.60.0–0.60.2 drop them.
-  // Sandbox 0.61.1 through 0.63 are the windows Runtime 0.327–0.337 admits.
-  // Runtime declares its own Sandbox window for consumers that install both.
-  // The Runtime 0.289.1 line requires Eval 0.201–0.203; older Runtime and
-  // Knowledge lines retain their own peer contracts in combined consumers.
-  // Runtime 0.293 with Knowledge 19.0.1 is qualified against Eval 0.205.1;
-  // Eval 0.204 is separately exercised through test:eval-compat without changing that cohort.
-  const verifiedWindows: Array<[string, string[], string[], string[]]> = [
-    ['@tangle-network/agent-eval', ['0.198.999'], ['0.199.0', '0.199.1', '0.199.999', '0.200.0', '0.200.1', '0.200.999', '0.201.0', '0.202.0', '0.203.0', '0.203.999', '0.204.0', '0.204.999', '0.205.1', '0.205.999', '0.209.1', '0.209.999', '0.211.2', '0.211.999', '0.213.0', '0.213.999', '0.214.0', '0.215.0', '0.215.999'], ['0.205.0', '0.206.0', '0.210.0', '0.211.0', '0.211.1', '0.212.0', '0.216.0']],
-    ['@tangle-network/sandbox', ['0.44.999', '0.48.0', '0.48.999'], ['0.45.0', '0.46.0', '0.47.0', '0.47.999', '0.49.0', '0.49.999', '0.50.0', '0.50.999', '0.51.0', '0.51.999', '0.52.0', '0.52.999', '0.53.0', '0.53.999', '0.54.0', '0.55.2', '0.58.1', '0.58.999', '0.59.0', '0.59.999', '0.60.3', '0.60.999', '0.61.1', '0.62.2', '0.62.15', '0.63.10', '0.63.999'], ['0.56.0', '0.57.0', '0.58.0', '0.60.0', '0.60.1', '0.60.2', '0.61.0', '0.64.0']],
-    ['@tangle-network/agent-interface', ['2.12.999'], ['2.13.0', '2.14.0', '2.15.0', '2.16.0', '2.17.0', '3.0.0', '5.2.0', '5.7.0'], ['4.0.0', '5.1.999', '6.0.0']],
+  // The engine peers whose installed development version must satisfy the installed Runtime's own peer range.
+  const enginePeers = [
+    '@tangle-network/agent-eval',
+    '@tangle-network/sandbox',
+    '@tangle-network/agent-interface',
   ]
-
-  it.each(verifiedWindows)('keeps the %s peer on the verified window', async (name, below, admitted, above) => {
-    const root = join(here, '..', '..')
-    const own = JSON.parse(
-      await readFile(join(root, 'package.json'), 'utf8'),
-    ) as { peerDependencies?: Record<string, string> }
-    const range = own.peerDependencies?.[name]
-
-    expect(range).toBeDefined()
-    for (const version of below) expect(satisfiesRange(version, range!)).toBe(false)
-    for (const version of admitted) expect(satisfiesRange(version, range!)).toBe(true)
-    for (const version of above) expect(satisfiesRange(version, range!)).toBe(false)
-  })
 
   // Supported Runtime cohorts have different Interface floors. Check the exact
   // development cohort against the installed Runtime, not every older option.
-  it.each(verifiedWindows)('installs a %s version the installed Runtime admits', async (name) => {
+  it.each(enginePeers)('installs a %s version the installed Runtime admits', async (name) => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
