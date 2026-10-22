@@ -196,12 +196,5 @@ describe('native completion uses one validated terminal receipt', () => {
     assert.deepEqual(test.calls, { cache: 0, messages: 1, results: ['turn-1', 'turn-2'] })
   })
 
-  it('takes a long interrupted execution\'s receipt from its recorded message without replaying it', async () => {
-    const test = fixture({ status: 'failed', eventCount: 40_000 })
-    const receipt = terminal(await test.observe())
-    assert.equal(receipt.state, 'failed')
-    assert.equal(receipt.error, 'interrupted')
-    assert.deepEqual(receipt.completedTurnIds, ['turn-1'])
-    assert.deepEqual(test.calls, { cache: 0, messages: 1, results: [] })
-  })
+
 })

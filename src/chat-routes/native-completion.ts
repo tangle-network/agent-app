@@ -216,6 +216,27 @@ function isSandboxNotFoundError(value: unknown): boolean {
   return error?.name === 'NotFoundError' || error?.code === 'NOT_FOUND' || error?.status === 404
 }
 
+/** A terminal receipt is public; runtime stderr stays in the native record. */
+function terminalFailureMessage(error: string): string {
+  if (/\bENOSPC\b|no space left on device/i.test(error)) {
+    return 'The Sandbox ran out of disk space before the execution finished.'
+  }
+  if (error === RUNTIME_RESTARTED_ERROR) return RUNTIME_RESTARTED_ERROR
+  if (/\bcancelled\b|\bcanceled\b/i.test(error)) return 'Native Sandbox execution was cancelled.'
+  if (/MCP.*(?:did not become ready|bootstrap)|(?:MCP|runtime) bootstrap failed/i.test(error)) {
+    return 'The Sandbox could not start the agent runtime.'
+  }
+  return 'Native Sandbox execution failed before producing an answer.'
+}
+
+/** The SDK reads this execution's replay; reject contradictory terminal identity. */
+function exactFailedResult(value: unknown, turnId: string, sessionId: string): Record<string, unknown> | undefined {
+  const result = record(value)
+  if (result?.executionId !== turnId || (result.sessionId !== undefined && result.sessionId !== sessionId)) return undefined
+  if (result.success !== false || !['error', 'failed', 'cancelled'].includes(String(result.status))) return undefined
+  return typeof result.error === 'string' && result.error.trim() ? result : undefined
+}
+
 function interruptedMessages(messages: SessionMessage[], turnId: string): SessionMessage[] {
   return messages.filter((message) =>
     message.role === 'assistant'
@@ -425,6 +446,20 @@ export async function observeNativeCompletion(
       recovered.push({ turnId, state: 'failed', text: '', parts: [], usage: {}, error: RUNTIME_RESTARTED_ERROR })
       continue
     }
+    // Bootstrap can fail before the runtime creates an assistant message. The
+    // terminal execution replay is independent of that transcript projection.
+    if ((run.status === 'failed' || run.status === 'cancelled') && interrupted.length === 0
+      && turnAssistantMessages(messages ?? [], turnId).length === 0
+      && run.sessionId === options.sessionId && replayableExecution(run)) {
+      const result = exactFailedResult(await exactSession.result({ executionId: turnId }), turnId, options.sessionId)
+      if (result) {
+        recovered.push({
+          turnId, state: 'failed', text: '', parts: [], usage: usageFromResult(result),
+          ...attributionFromResult(result), error: terminalFailureMessage(result.error as string),
+        })
+        continue
+      }
+    }
     if ((run.status === 'failed' || run.status === 'cancelled') && interrupted.length === 1) {
       const message = recoverSandboxAssistantMessage(interrupted[0]!)
       const result = replayableExecution(run)
@@ -437,10 +472,11 @@ export async function observeNativeCompletion(
         parts: message.parts ?? [],
         usage: { ...message.usage, ...usageFromResult(result) },
         ...attributionFromResult(result),
-        error: (typeof result?.error === 'string' ? result.error : undefined)
+        error: terminalFailureMessage((typeof result?.error === 'string' ? result.error : undefined)
           ?? interrupted[0]!.metadata?.interruptReason
           ?? (restarted ? RUNTIME_RESTARTED_ERROR : undefined)
-          ?? status.failureReason?.message,
+          ?? status.failureReason?.message
+          ?? 'Native Sandbox execution failed.'),
       })
       continue
     }
