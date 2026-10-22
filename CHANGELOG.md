@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.284
+
+- fix: honor playback speed while the trace grows (#1273)
+
 ## 0.60.283
 
 - Admit Eval 0.220 with a compatible development cohort (#1269)
