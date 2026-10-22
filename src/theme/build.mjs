@@ -142,7 +142,7 @@ function stylesheet() {
   const imports = new Map([
     ['@tangle-network/brand/styles/legacy-light.css', { text: source, layer: 'theme' }],
     ['./compat.generated.css', { text: compat, layer: 'theme' }],
-    ['../web-react/flow-waterfall.css', { text: readFileSync(join(here, '../web-react/flow-waterfall.css'), 'utf8'), layer: null }],
+    ['@tangle-network/charts/react/flow-waterfall.css', { text: readFileSync(require.resolve('@tangle-network/charts/react/flow-waterfall.css'), 'utf8'), layer: null }],
     ...['@tangle-network/brand/styles/presentation.css', '@tangle-network/ui/styles/presentation.css']
       .map(id => [id, { text: readFileSync(require.resolve(id), 'utf8'), layer: null }]),
   ])

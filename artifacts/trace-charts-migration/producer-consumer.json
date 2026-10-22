@@ -1,0 +1,53 @@
+{
+  "result": "PASS",
+  "packedPublicExports": true,
+  "dependencyTree": "frozen owner checkout",
+  "removedExports": true,
+  "retainedTraceTypes": true,
+  "retiredTypeImportsRejected": true,
+  "stylesheetBridge": true,
+  "bufferedFailure": true,
+  "running": true,
+  "domainStatuses": [
+    {
+      "status": "failed",
+      "expected": "failed",
+      "renderedFailure": true
+    },
+    {
+      "status": "Error",
+      "expected": "failed",
+      "renderedFailure": true
+    },
+    {
+      "status": "CANCELLED",
+      "expected": "failed",
+      "renderedFailure": true
+    },
+    {
+      "status": "Aborted",
+      "expected": "failed",
+      "renderedFailure": true
+    },
+    {
+      "status": "down",
+      "expected": "failed",
+      "renderedFailure": true
+    },
+    {
+      "status": "running",
+      "expected": "running",
+      "renderedFailure": false
+    },
+    {
+      "status": "Pending",
+      "expected": "running",
+      "renderedFailure": false
+    },
+    {
+      "status": "completed",
+      "expected": "done",
+      "renderedFailure": false
+    }
+  ]
+}
