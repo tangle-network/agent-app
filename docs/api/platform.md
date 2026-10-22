@@ -312,7 +312,7 @@ type DelegatedKeyCode
 
 ### `delegatedKeyFallbackFetch`
 
-`function` — A fetch for one turn that sends a pre-minted key and, when the Router refuses it as revoked or expired (Platform retired the parked child), mints inline once and resends that request with the fresh k…
+`function` — A fetch for one turn that sends a pre-minted key.
 
 ```ts
 (input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: Request…
