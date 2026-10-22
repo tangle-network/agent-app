@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.285
+
+- chore(deps): adopt @tangle-network/sandbox 0.64.14 (#1275)
+
 ## 0.60.284
 
 - fix: honor playback speed while the trace grows (#1273)
