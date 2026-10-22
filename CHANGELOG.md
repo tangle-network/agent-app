@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.267
+
+- feat(platform): pre-minted turn keys take the delegated-key mint off the turn's path (#1245)
+- chore(deps): adopt 3 @tangle-network/* packages (#1247)
+
 ## 0.60.266
 
 - agent-app tests the current cohort: agent-eval 0.218.1, agent-knowledge 22.0.12 (#1249)
