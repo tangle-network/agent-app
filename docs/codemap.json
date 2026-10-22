@@ -17407,6 +17407,12 @@
           "doc": "Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token pinned to `scope: 'session-runtime'` (the ONLY scope the platform gran…"
         },
         {
+          "name": "createWarmCache",
+          "kind": "function",
+          "signature": "<T>(namespace: string, options?: WarmCacheOptions) => WarmCache<T>",
+          "doc": "`namespace` is the cache URL's host; it names no origin and is never routed."
+        },
+        {
           "name": "createWarmLeases",
           "kind": "function",
           "signature": "(options: WarmLeasesOptions) => WarmLeases",
@@ -18557,6 +18563,24 @@
           "kind": "type",
           "signature": "type WarmBoxOutcome",
           "doc": "What the product's `warm` did to the box."
+        },
+        {
+          "name": "WarmCache",
+          "kind": "interface",
+          "signature": "interface WarmCache",
+          "doc": null
+        },
+        {
+          "name": "WarmCacheOptions",
+          "kind": "interface",
+          "signature": "interface WarmCacheOptions",
+          "doc": null
+        },
+        {
+          "name": "WarmCacheSource",
+          "kind": "type",
+          "signature": "type WarmCacheSource",
+          "doc": "Which layer answered a read: this isolate's memory or the data center's Workers cache."
         },
         {
           "name": "warmKey",
