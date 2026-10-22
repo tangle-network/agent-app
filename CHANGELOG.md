@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.262
+
+- test(peer-floors): delete the hard-coded verified-window case (main red since #1234) (#1246)
+
 ## 0.60.261
 
 - docs(platform): a delegated key's name is a slot; a new delegation there revokes its holder (#1244)
