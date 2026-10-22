@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.282
+
+- fix(chat): discard prefetch when admission throws
+
 ## 0.60.281
 
 - fix(customer-db-gateway): use patched Node 24 base image (#1265)
